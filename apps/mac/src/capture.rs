@@ -1,4 +1,4 @@
-//! Silent, host-side `WKWebView` cover capture for macOS visual artifacts.
+//! Silent, host-side `WKWebView` cover capture for macOS visual notes.
 //!
 //! Captures the active visible `WKWebView` directly through WebKit's native
 //! `takeSnapshotWithConfiguration:completionHandler:` API, completely outside
@@ -42,7 +42,7 @@ unsafe extern "C" {
 extern "C" fn on_webview_snapshot(ctx: *mut c_void, rgba: *const u8, width: u32, height: u32, error: *const c_char) {
     // SAFETY: `ctx` was allocated with `Box::into_raw` in `start_webview_capture` and
     // WebKit / `vv_capture_webview_snapshot` invokes this callback exactly once.
-    let tx = unsafe { Box::from_raw(ctx.cast::<flume::Sender<Result<RawRgba, String>>>()) };
+    let tx = unsafe { Box::from_raw(ctx.cast::<tokio::sync::oneshot::Sender<Result<RawRgba, String>>>()) };
     let result = if !error.is_null() {
         // SAFETY: `vv_capture_webview_snapshot` passes a valid NUL-terminated UTF-8 string.
         let msg = unsafe { CStr::from_ptr(error) }.to_string_lossy().into_owned();
@@ -155,7 +155,7 @@ pub fn encode_cover(mut raw: RawRgba, dst_w: u32, dst_h: u32) -> Result<HostCapt
 }
 
 struct PendingCapture {
-    rx: flume::Receiver<Result<RawRgba, String>>,
+    rx: tokio::sync::oneshot::Receiver<Result<RawRgba, String>>,
     dst_w: u32,
     dst_h: u32,
 }
@@ -168,7 +168,7 @@ fn start_webview_capture(window: &gpui::Window, width: Option<u32>, height: Opti
         _ => return Err("webview capture is only supported on AppKit windows".into()),
     };
 
-    let (tx, rx) = flume::bounded::<Result<RawRgba, String>>(1);
+    let (tx, rx) = tokio::sync::oneshot::channel::<Result<RawRgba, String>>();
     let ctx = Box::into_raw(Box::new(tx)).cast::<c_void>();
     // SAFETY: `ns_view` is a live `NSView *` owned by GPUI's window on the main thread,
     // and `on_webview_snapshot` reclaims `ctx` exactly once.
@@ -197,7 +197,7 @@ pub fn capture_webview_cover(
 
     cx.spawn(async move |cx| {
         let timer = cx.background_executor().timer(SNAPSHOT_TIMEOUT);
-        let raw = match select(Box::pin(snap_rx.recv_async()), Box::pin(timer)).await {
+        let raw = match select(Box::pin(snap_rx), Box::pin(timer)).await {
             Either::Left((Ok(Ok(raw)), _)) => raw,
             Either::Left((Ok(Err(reason)), _)) => {
                 let _ = tx.send(Err(reason));
@@ -223,12 +223,12 @@ pub fn capture_webview_cover(
 
 /// Asynchronously captures the active visible `WKWebView` in `window` and sends
 /// `Envelope::ok(HostCapturedImage)` (or `Envelope::ok(null)` on graceful no-op).
-pub fn capture_webview_for_reply(
+pub fn capture_webview_for_reply<T: 'static>(
     window: &gpui::Window,
     width: Option<u32>,
     height: Option<u32>,
-    reply: crate::hosted::Replier,
-    cx: &mut gpui::Context<crate::shell::Shell>,
+    reply: crate::host_types::Replier,
+    cx: &mut gpui::Context<T>,
 ) {
     use serde_json::Value;
     use vibevalley_server::gateway::bridge::Envelope;
@@ -244,7 +244,7 @@ pub fn capture_webview_for_reply(
 
     cx.spawn(async move |_, cx| {
         let timer = cx.background_executor().timer(SNAPSHOT_TIMEOUT);
-        let raw = match select(Box::pin(rx.recv_async()), Box::pin(timer)).await {
+        let raw = match select(Box::pin(rx), Box::pin(timer)).await {
             Either::Left((Ok(Ok(raw)), _)) => raw,
             Either::Left((Ok(Err(reason)), _)) => {
                 tracing::debug!(target: "vibevalley::capture", %reason, "webview capture skipped");

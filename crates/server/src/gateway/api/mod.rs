@@ -10,6 +10,5 @@ pub mod media;
 
 pub use dispatch::{BridgeRpc, ClientRpc, Server};
 pub(crate) use dispatch::{
-    GatewayMeta, decode, dispatch_boundary_async, flush_and_snapshot_json, flush_and_subscribe_slice, invoke_server_op, ok_json, open_subscription_channel,
-    slice_snapshot_value, watch_slice_value,
+    GatewayMeta, decode, dispatch_boundary_async, flush_and_snapshot_json, flush_and_subscribe_slice, ok_json, open_subscription_channel,
 };

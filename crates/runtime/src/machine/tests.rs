@@ -466,3 +466,195 @@ fn concurrent_lock_free_reads_stay_consistent_under_hot_plug_writes() {
 
     assert!(registry.get(LOCAL_MACHINE_ID).is_some());
 }
+
+fn remote_hello(machine_id: &str) -> vibevalley_protocol::MachineHello {
+    vibevalley_protocol::MachineHello {
+        machine_id: machine_id.into(),
+        name: format!("Remote {machine_id}"),
+        platform: vibevalley_protocol::MachinePlatform::Linux,
+        ephemeral: false,
+        worktree_supported: true,
+        runtimes: vec![vibevalley_protocol::MachineRuntimeSummary {
+            id: "claude".into(),
+            label: "Claude".into(),
+            models: Vec::new(),
+            capabilities: Vec::new(),
+            available: true,
+        }],
+    }
+}
+
+#[tokio::test]
+async fn remote_runtime_open_forwards_typed_dispatch_meta_without_env_smuggling() {
+    use std::collections::BTreeMap;
+    use tokio::sync::mpsc;
+    use vibevalley_protocol::{MachineSessionOpened, MachineWireFrame};
+
+    use super::{RemoteDispatchMeta, RemoteMachine};
+
+    let (tx, mut rx) = mpsc::channel(16);
+    let machine = RemoteMachine::new(&remote_hello("gpu-typed"), 1, tx, 1_000);
+    let runtime = machine.runtime("claude").expect("remote claude runtime");
+
+    let meta = RemoteDispatchMeta {
+        session_id: Some("s42".into()),
+        repo_ref: Some("https://github.com/acme/farm.git".into()),
+        branch: Some("vv/issue-42".into()),
+        base_ref: Some("main".into()),
+        mcp_session_token: Some("mcp_secret_token_999".into()),
+    };
+    let debug = format!("{meta:?}");
+    assert!(!debug.contains("mcp_secret_token_999"), "RemoteDispatchMeta Debug leaked secret: {debug}");
+
+    let open_machine = Arc::clone(&machine);
+    let responder = tokio::spawn(async move {
+        let frame = rx.recv().await.expect("session.open frame");
+        let MachineWireFrame::MachineSessionOpen(open) = frame else {
+            panic!("expected MachineSessionOpen, got {frame:?}");
+        };
+        open_machine.handle_session_opened(MachineSessionOpened {
+            request_id: open.request_id.clone(),
+            session_id: open.session_id.clone(),
+            ok: true,
+            workdir: Some("/remote/work/s42".into()),
+            error: None,
+        });
+        open
+    });
+
+    let _session = runtime
+        .open(SessionOptions {
+            cwd: PathBuf::from("/local/unused"),
+            env: vec![("CUSTOM_FLAG".into(), "1".into())],
+            remote_dispatch: Some(meta),
+            ..Default::default()
+        })
+        .await
+        .expect("remote session opened");
+
+    let open = responder.await.expect("responder joined");
+    assert_eq!(open.session_id, "s42");
+    assert_eq!(open.repo_ref.as_deref(), Some("https://github.com/acme/farm.git"));
+    assert_eq!(open.branch.as_deref(), Some("vv/issue-42"));
+    assert_eq!(open.base_ref.as_deref(), Some("main"));
+    assert_eq!(open.mcp_session_token.as_deref(), Some("mcp_secret_token_999"));
+    assert_eq!(open.env, BTreeMap::from([("CUSTOM_FLAG".to_string(), "1".to_string())]));
+    assert!(
+        open.env.keys().all(|k| !k.starts_with("__VIBEVALLEY_REMOTE_")),
+        "child env must never carry __VIBEVALLEY_REMOTE_* keys: {:?}",
+        open.env
+    );
+}
+
+#[tokio::test]
+async fn remote_runtime_open_falls_back_to_mcp_bearer_token_when_meta_token_absent() {
+    use tokio::sync::mpsc;
+    use vibevalley_protocol::{MachineSessionOpened, MachineWireFrame};
+
+    use super::{RemoteDispatchMeta, RemoteMachine};
+    use crate::oar::McpServer;
+
+    let (tx, mut rx) = mpsc::channel(16);
+    let machine = RemoteMachine::new(&remote_hello("gpu-mcp"), 1, tx, 1_000);
+    let runtime = machine.runtime("claude").expect("remote claude runtime");
+
+    let open_machine = Arc::clone(&machine);
+    let responder = tokio::spawn(async move {
+        let frame = rx.recv().await.expect("session.open frame");
+        let MachineWireFrame::MachineSessionOpen(open) = frame else {
+            panic!("expected MachineSessionOpen, got {frame:?}");
+        };
+        open_machine.handle_session_opened(MachineSessionOpened {
+            request_id: open.request_id.clone(),
+            session_id: open.session_id.clone(),
+            ok: true,
+            workdir: None,
+            error: None,
+        });
+        open
+    });
+
+    let _session = runtime
+        .open(SessionOptions {
+            remote_dispatch: Some(RemoteDispatchMeta {
+                session_id: Some("s99".into()),
+                ..Default::default()
+            }),
+            mcp_servers: vec![McpServer::Http {
+                name: "vibevalley".into(),
+                url: "http://127.0.0.1:8790/mcp".into(),
+                headers: vec![("Authorization".into(), "Bearer tok_from_mcp_header".into())],
+            }],
+            ..Default::default()
+        })
+        .await
+        .expect("remote session opened");
+
+    let open = responder.await.expect("responder joined");
+    assert_eq!(open.session_id, "s99");
+    assert_eq!(open.mcp_session_token.as_deref(), Some("tok_from_mcp_header"));
+}
+
+#[tokio::test]
+async fn remote_session_evicts_slow_event_subscriber_when_bounded_channel_fills() {
+    use tokio::sync::mpsc;
+    use vibevalley_protocol::{MachineSessionEvent, MachineSessionOpened, MachineWireFrame};
+
+    use super::{RemoteDispatchMeta, RemoteMachine};
+    use crate::oar::core::EVENT_SUBSCRIBER_CAPACITY;
+
+    let (tx, mut rx) = mpsc::channel(16);
+    let machine = RemoteMachine::new(&remote_hello("gpu-bp"), 1, tx, 1_000);
+    let runtime = machine.runtime("claude").expect("remote claude runtime");
+
+    let open_machine = Arc::clone(&machine);
+    tokio::spawn(async move {
+        if let Some(MachineWireFrame::MachineSessionOpen(open)) = rx.recv().await {
+            open_machine.handle_session_opened(MachineSessionOpened {
+                request_id: open.request_id,
+                session_id: open.session_id,
+                ok: true,
+                workdir: None,
+                error: None,
+            });
+        }
+    });
+
+    let session = runtime
+        .open(SessionOptions {
+            remote_dispatch: Some(RemoteDispatchMeta {
+                session_id: Some("s-bp".into()),
+                ..Default::default()
+            }),
+            ..Default::default()
+        })
+        .await
+        .expect("open session");
+
+    let mut slow_rx = session.events();
+    let mut fast_rx = session.events();
+
+    for seq in 1..=(EVENT_SUBSCRIBER_CAPACITY as u64 + 5) {
+        let ev = crate::oar::Event {
+            seq,
+            agent_path: Vec::new(),
+            at_ms: 1_000,
+            kind: EventKind::TextDelta { text: "x".into() },
+        };
+        machine.handle_session_event(MachineSessionEvent {
+            session_id: "s-bp".into(),
+            seq,
+            event_json: serde_json::to_string(&ev).expect("serialize event"),
+            terminal: false,
+            at: 1_000,
+        });
+        assert!(fast_rx.try_recv().is_ok(), "fast subscriber keeps receiving at seq {seq}");
+    }
+
+    let mut slow_count = 0usize;
+    while slow_rx.try_recv().is_ok() {
+        slow_count += 1;
+    }
+    assert_eq!(slow_count, EVENT_SUBSCRIBER_CAPACITY);
+    assert!(slow_rx.recv().await.is_none(), "slow subscriber must be evicted and closed");
+}

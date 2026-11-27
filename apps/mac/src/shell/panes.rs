@@ -299,28 +299,55 @@ impl Shell {
             if self.workspace.chat_watches.contains_key(&sid) {
                 continue;
             }
-            let Ok((sub_id, mut rx)) = server.subscribe("session.watch", json!({ "id": sid, "afterSeq": i64::MAX })) else {
-                continue;
-            };
             let watch_sid = sid.clone();
+            let server_for_watch = server.clone();
             let task = cx.spawn(async move |this, cx| {
+                let Ok((sub_id, mut rx)) = server_for_watch
+                    .clone()
+                    .subscribe_with_async(
+                        vibevalley_server::gateway::bridge::CallerContext::local(),
+                        "session.watch".into(),
+                        json!({ "id": watch_sid, "afterSeq": i64::MAX }),
+                    )
+                    .await
+                else {
+                    let _ = this.update(cx, |shell, _| {
+                        shell.workspace.chat_watches.remove(&watch_sid);
+                    });
+                    return;
+                };
+                if this
+                    .update(cx, |shell, _| {
+                        if let Some(entry) = shell.workspace.chat_watches.get_mut(&watch_sid) {
+                            entry.0 = sub_id;
+                        } else {
+                            server_for_watch.unsubscribe(sub_id);
+                        }
+                    })
+                    .is_err()
+                {
+                    server_for_watch.unsubscribe(sub_id);
+                    return;
+                }
                 while let Some(value) = rx.recv().await {
                     let Ok(ev) = serde_json::from_value::<vibevalley_protocol::SessionWatchEvent>(value) else {
                         continue;
                     };
                     if this.update(cx, |shell, cx| shell.apply_chat_watch_event(&watch_sid, ev, cx)).is_err() {
+                        server_for_watch.unsubscribe(sub_id);
                         return;
                     }
                 }
                 let _ = this.update(cx, |shell, cx| {
                     if let Some((sub_id, _)) = shell.workspace.chat_watches.remove(&watch_sid)
+                        && sub_id != 0
                         && let Some(bridge) = cx.try_global::<crate::hosted::BridgeHub>()
                     {
                         bridge.0.server().unsubscribe(sub_id);
                     }
                 });
             });
-            self.workspace.chat_watches.insert(sid, (sub_id, task));
+            self.workspace.chat_watches.insert(sid, (0, task));
         }
     }
 
@@ -674,7 +701,7 @@ impl Shell {
         match tab_close_action(busy, force) {
             TabCloseAction::CloseNow => self.force_close_tab(pid, tab, window, cx),
             TabCloseAction::ConfirmBusy { label } => {
-                let title_text = crate::panes::tab_title(self, tab_ref, cx);
+                let title_text = super::tab_title(self, tab_ref, cx);
                 let title = vibevalley_i18n::t("desktop.tab.closeBusy.title", &[("title", title_text.into())]);
                 let detail = vibevalley_i18n::t("desktop.tab.closeBusy.detail", &[("process", label.into())]);
                 let cancel = vibevalley_i18n::t("desktop.tab.closeBusy.cancel", &[]);
@@ -1218,9 +1245,9 @@ impl Shell {
     fn save_terminal_hooks_async(&self, cx: &mut Context<Self>) {
         let Some(store) = self.workspace.store.clone() else { return };
         let config = self.workspace.terminal_hooks.clone();
-        Self::bg(
+        Self::bg_tokio(
             cx,
-            move || vibevalley_workspace::save_terminal_hooks(&*store, &config),
+            async move { vibevalley_workspace::save_terminal_hooks(&*store, &config).await },
             |_, r, _| {
                 if let Err(e) = r {
                     eprintln!("save terminal hooks: {e}");
@@ -1388,7 +1415,7 @@ pub(crate) fn non_terminal_tab_busy_label(kind: &PaneKind, chat_status: Option<&
                 .as_deref()
                 .map(str::trim)
                 .filter(|s| !s.is_empty())
-                .unwrap_or_else(|| crate::panes::chat_runtime_label(runtime));
+                .unwrap_or_else(|| crate::host_types::chat_runtime_label(runtime));
             Some(label.to_string())
         }
         PaneKind::Terminal { .. } | PaneKind::File { .. } | PaneKind::Diff { .. } | PaneKind::Hosted { .. } | PaneKind::Diorama { .. } => None,

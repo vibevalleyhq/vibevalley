@@ -3,7 +3,6 @@ import { computed, Scroll, signal, Text, View } from "nsh";
 import { t } from "@vibevalley/i18n";
 import { TemplateCategoryValues } from "@vibevalley/protocol";
 
-import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
 import { TextInput } from "../../design/Field";
 import { Icon } from "../../design/Icon";
@@ -11,6 +10,7 @@ import { PageBody } from "../../design/layout";
 import { Segmented } from "../../design/Segmented";
 import { Hint } from "../../design/Tip";
 import { toast } from "../../design/toasts";
+import { createAct } from "../../infra/act";
 import { api } from "../../infra/api";
 import { ready, useAgentTemplates, useQueryClient, useRuntimes } from "../../infra/query";
 import { Link as A } from "../../infra/router";

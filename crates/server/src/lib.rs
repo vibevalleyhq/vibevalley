@@ -5,7 +5,6 @@
 
 pub mod agent;
 pub mod app;
-pub mod artifact;
 mod boot;
 pub mod channel;
 pub mod config;
@@ -15,12 +14,14 @@ pub mod cron;
 pub mod db;
 pub mod debug;
 mod debug_sources;
+#[cfg(any(test, feature = "fake"))]
 pub mod fake;
 pub mod game;
 pub mod gateway;
 pub mod issue;
 pub mod log;
 pub mod machine;
+pub mod note;
 mod projection;
 pub mod provider;
 pub mod repo;

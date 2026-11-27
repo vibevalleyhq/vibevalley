@@ -3,6 +3,7 @@
 //! bounded per-lane ring buffers, fault-injection overrides, and multi-kind
 //! trajectory inspection.
 
+use crate::support::{RouterTestExt as _, ServerTestExt as _};
 use std::fs::File;
 use std::io::BufWriter;
 use std::path::Path;
@@ -20,7 +21,6 @@ use vibevalley_runtime::agent::durable::Store;
 use vibevalley_runtime::agent::eval::{ReplaySpec, analyze_store};
 use vibevalley_runtime::oar::voyage::{Header as VoyageHeader, Kind as VoyageKind, Record as VoyageRecord, Writer as VoyageWriter};
 use vibevalley_runtime::oar::{Event as OarEvent, EventKind as OarEventKind, OarObserver, Registry, StopReason, Usage as OarUsage};
-use vibevalley_server::Server as _;
 use vibevalley_server::gateway::api::{CallerContext, CallerPrincipal, ClientIdentity, ClientKind, FaultGate, HostDebugBridge, InvokeObserver};
 use vibevalley_server::runtime::Step;
 use vibevalley_server::{App, Config, create_app_blocking};
@@ -66,39 +66,18 @@ impl HostDebugBridge for FakeHostDebug {
     }
 }
 
-/// Minimal standard ZIP parser validating EOCD, central directory, local
-/// headers, STORE method 0, and IEEE CRC32 checksums.
+/// Parses a ZIP archive via `zip::ZipArchive`, verifying DEFLATE compression and entry integrity.
 fn parse_zip_archive(bytes: &[u8]) -> Vec<(String, Vec<u8>)> {
-    let eocd_pos = bytes
-        .windows(4)
-        .rposition(|w| w == 0x0605_4b50u32.to_le_bytes())
-        .expect("EOCD signature present");
-    let count = u16::from_le_bytes([bytes[eocd_pos + 10], bytes[eocd_pos + 11]]) as usize;
-    let cd_offset = u32::from_le_bytes(bytes[eocd_pos + 16..eocd_pos + 20].try_into().unwrap()) as usize;
+    use std::io::Read as _;
 
-    let mut pos = cd_offset;
-    let mut entries = Vec::with_capacity(count);
-    for _ in 0..count {
-        assert_eq!(&bytes[pos..pos + 4], &0x0201_4b50u32.to_le_bytes());
-        let method = u16::from_le_bytes([bytes[pos + 10], bytes[pos + 11]]);
-        assert_eq!(method, 0, "expected STORE method 0");
-        let crc = u32::from_le_bytes(bytes[pos + 16..pos + 20].try_into().unwrap());
-        let comp_size = u32::from_le_bytes(bytes[pos + 20..pos + 24].try_into().unwrap()) as usize;
-        let uncomp_size = u32::from_le_bytes(bytes[pos + 24..pos + 28].try_into().unwrap()) as usize;
-        assert_eq!(comp_size, uncomp_size);
-        let name_len = u16::from_le_bytes([bytes[pos + 28], bytes[pos + 29]]) as usize;
-        let extra_len = u16::from_le_bytes([bytes[pos + 30], bytes[pos + 31]]) as usize;
-        let comment_len = u16::from_le_bytes([bytes[pos + 32], bytes[pos + 33]]) as usize;
-        let local_off = u32::from_le_bytes(bytes[pos + 42..pos + 46].try_into().unwrap()) as usize;
-        let name = std::str::from_utf8(&bytes[pos + 46..pos + 46 + name_len]).unwrap().to_string();
-        pos += 46 + name_len + extra_len + comment_len;
-
-        assert_eq!(&bytes[local_off..local_off + 4], &0x0403_4b50u32.to_le_bytes());
-        let l_name_len = u16::from_le_bytes([bytes[local_off + 26], bytes[local_off + 27]]) as usize;
-        let l_extra_len = u16::from_le_bytes([bytes[local_off + 28], bytes[local_off + 29]]) as usize;
-        let data_start = local_off + 30 + l_name_len + l_extra_len;
-        let data = bytes[data_start..data_start + uncomp_size].to_vec();
-        assert_eq!(crc32fast::hash(&data), crc, "CRC32 mismatch for {name}");
+    let mut archive = zip::ZipArchive::new(std::io::Cursor::new(bytes)).expect("valid ZIP archive");
+    let mut entries = Vec::with_capacity(archive.len());
+    for i in 0..archive.len() {
+        let mut file = archive.by_index(i).expect("zip entry");
+        assert_eq!(file.compression(), zip::CompressionMethod::Deflated, "expected DEFLATE compression");
+        let name = file.name().expect("zip entry name").to_string();
+        let mut data = Vec::with_capacity(file.size() as usize);
+        file.read_to_end(&mut data).expect("read zip entry");
         entries.push((name, data));
     }
     entries
@@ -779,23 +758,23 @@ fn state_cache_inspects_live_loro_frontiers_and_ephemeral_presence() {
 
     let created = started.router().call_as(
         Caller::User,
-        "artifact.create",
-        json!({ "title": "Collab Inspector Doc", "artifactType": "docs", "announce": false }),
+        "note.create",
+        json!({ "title": "Collab Inspector Doc", "noteType": "doc", "announce": false }),
     );
     assert_eq!(created.biz_code, 0, "{}", created.message);
-    let art_id = created.data.unwrap()["id"].as_str().unwrap().to_string();
+    let note_id = created.data.unwrap()["id"].as_str().unwrap().to_string();
 
     let presence = started.router().call_as(
         Caller::User,
-        "artifact.presence.update",
+        "note.presence.update",
         json!({
-            "id": art_id,
+            "id": note_id,
             "presence": {
                 "id": "peer-alice",
                 "name": "Alice",
                 "color": "#3b82f6",
                 "kind": "cursor",
-                "path": "structure/doc.md",
+                "path": "structure/doc.json",
                 "nodeId": "sec-1",
                 "status": "editing sk-collab-secret-token",
                 "updatedAt": 0
@@ -811,10 +790,10 @@ fn state_cache_inspects_live_loro_frontiers_and_ephemeral_presence() {
         .state_cache
         .collab
         .iter()
-        .find(|c| c.artifact_id == art_id)
-        .unwrap_or_else(|| panic!("missing collab state for {art_id} in {:?}", snap.state_cache.collab));
+        .find(|c| c.note_id == note_id)
+        .unwrap_or_else(|| panic!("missing collab state for {note_id} in {:?}", snap.state_cache.collab));
     assert_eq!(entry.title, "Collab Inspector Doc");
-    assert_eq!(entry.artifact_type, "docs");
+    assert_eq!(entry.note_type, "doc");
     assert!(entry.snapshot_bytes > 0);
     assert!(entry.ephemeral_ttl_ms > 0);
     assert_eq!(entry.presence_count, 1);
@@ -822,7 +801,7 @@ fn state_cache_inspects_live_loro_frontiers_and_ephemeral_presence() {
     assert_eq!(entry.presence[0].id, "peer-alice");
     assert_eq!(entry.presence[0].name, "Alice");
     assert_eq!(entry.presence[0].node_id.as_deref(), Some("sec-1"));
-    assert_eq!(entry.presence[0].path.as_deref(), Some("structure/doc.md"));
+    assert_eq!(entry.presence[0].path.as_deref(), Some("structure/doc.json"));
     let serialized = serde_json::to_string(&snap.state_cache.collab).unwrap();
     assert!(!serialized.contains("sk-collab-secret-token"), "leaked secret in collab snapshot: {serialized}");
 

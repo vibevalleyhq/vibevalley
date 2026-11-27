@@ -488,6 +488,39 @@ impl Index {
             self.parse_endpoint_table(&clean, &lines, endpoints_path, "ENDPOINTS", false);
             self.parse_endpoint_ids_macro(&clean, &lines, endpoints_path);
             self.parse_subscriptions_table(&clean, &lines, endpoints_path);
+        } else {
+            let endpoints_dir = root.join("crates/protocol/src/contract/endpoints");
+            if endpoints_dir.is_dir() {
+                let mut entries: Vec<String> = fs::read_dir(&endpoints_dir)
+                    .map_err(|err| format!("failed to read {}: {err}", endpoints_dir.display()))?
+                    .filter_map(|e| e.ok())
+                    .filter_map(|e| {
+                        let name = e.file_name().to_str()?.to_owned();
+                        name.ends_with(".rs").then_some(name)
+                    })
+                    .collect();
+                entries.sort();
+                let mut id_files: Vec<(String, String)> = Vec::new();
+                for name in entries {
+                    let rel = format!("crates/protocol/src/contract/endpoints/{name}");
+                    let Some(raw) = read_optional_file(root, &rel)? else {
+                        continue;
+                    };
+                    if name == "mod.rs" || name == "id.rs" {
+                        id_files.push((rel, raw));
+                        continue;
+                    }
+                    let clean = strip_rust_comments_keep_strings_non_test(&raw, &rel);
+                    let lines = LineIndex::new(&raw);
+                    self.parse_endpoint_table(&clean, &lines, &rel, "ENDPOINTS", false);
+                    self.parse_subscriptions_table(&clean, &lines, &rel);
+                }
+                for (rel, raw) in id_files {
+                    let clean = strip_rust_comments_keep_strings_non_test(&raw, &rel);
+                    let lines = LineIndex::new(&raw);
+                    self.parse_endpoint_ids_macro(&clean, &lines, &rel);
+                }
+            }
         }
 
         let native_path = "crates/protocol/src/native.rs";
@@ -1368,9 +1401,9 @@ impl Index {
             for (sub_name, variant) in [
                 ("channel.follow", "ChannelFollow"),
                 ("channel.reports", "ChannelReports"),
-                ("artifact.follow", "ArtifactFollow"),
-                ("artifact.suggestion.follow", "ArtifactSuggestionFollow"),
-                ("artifact.presence.follow", "ArtifactPresenceFollow"),
+                ("note.follow", "NoteFollow"),
+                ("note.suggestion.follow", "NoteSuggestionFollow"),
+                ("note.presence.follow", "NotePresenceFollow"),
                 ("session.watch", "SessionWatch"),
                 ("issue.watch", "IssueWatch"),
             ] {
@@ -2040,9 +2073,9 @@ impl Index {
         let mapped = match expanded {
             s if s.contains("agent.profile") || s.contains("agent.orchestrator") || s == "pr" || s == "orch" => "agent",
             s if s.contains("agent.memory") || s == "mem" => "agent/memory",
-            s if s.contains("artifact.media") || s == "med" => "artifact/media",
-            s if s.contains("artifact.library") || s == "lib" => "artifact/library",
-            s if s.contains("artifact") || s == "art" => "artifact",
+            s if s.contains("note.media") || s == "med" => "note/media",
+            s if s.contains("note.library") || s == "lib" => "note/library",
+            s if s.contains("note") => "note",
             s if s.contains("channel") || s == "ch" => "channel",
             s if s.contains("runtime") || s == "rt" => "runtime",
             s if s.contains("board") || s == "brd" => "issue",
@@ -3233,9 +3266,9 @@ fn server_module_key(file: &str) -> String {
         _ if trimmed.starts_with("issue/pull") => "issue/pull".to_owned(),
         _ if trimmed.starts_with("agent/memory") => "agent/memory".to_owned(),
         _ if trimmed.starts_with("agent/") => "agent".to_owned(),
-        _ if trimmed.starts_with("artifact/media") => "artifact/media".to_owned(),
-        _ if trimmed.starts_with("artifact/library") => "artifact/library".to_owned(),
-        _ if trimmed.starts_with("artifact/") => "artifact".to_owned(),
+        _ if trimmed.starts_with("note/media") => "note/media".to_owned(),
+        _ if trimmed.starts_with("note/library") => "note/library".to_owned(),
+        _ if trimmed.starts_with("note/") => "note".to_owned(),
         _ if trimmed.starts_with("channel/") => "channel".to_owned(),
         _ if trimmed.starts_with("runtime/") => "runtime".to_owned(),
         _ if trimmed.starts_with("gateway/remote") => "gateway/remote".to_owned(),

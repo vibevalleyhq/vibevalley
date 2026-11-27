@@ -9,4 +9,4 @@
 mod service;
 
 pub use service::{MACHINE_HEARTBEAT_MS, Machine, MachineBusAdapter};
-pub use vibevalley_runtime::machine::{RemoteDispatchMeta, RemoteMachine, RemoteRuntime, RemoteSession, attach_dispatch_meta};
+pub use vibevalley_runtime::machine::{RemoteDispatchMeta, RemoteMachine, RemoteRuntime, RemoteSession};

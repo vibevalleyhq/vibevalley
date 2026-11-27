@@ -1,10 +1,9 @@
 import { computed, signal, Text, untracked, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
-import type { ProviderConnectionUpdate, ProviderStatus, ProviderUpdate, SettingsStatus, SettingsUpdate, VoiceSettings } from "@vibevalley/protocol";
+import type { ProviderConnectionUpdate, ProviderStatus, SettingsStatus, SettingsUpdate, VoiceSettings } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 
-import { createAct } from "../../../design/act";
 import { Button } from "../../../design/Button";
 import { KeyRow, SettingRow, SettingsGroup } from "../../../design/domain/settings";
 import { Select, TextArea, TextInput } from "../../../design/Field";
@@ -13,30 +12,19 @@ import { SaveBar } from "../../../design/KeyField";
 import { Quiet } from "../../../design/layout";
 import { TextLink } from "../../../design/TextLink";
 import { toast } from "../../../design/toasts";
+import { createAct } from "../../../infra/act";
 import { api, reasonOf } from "../../../infra/api";
 import { createSettled, Keyed } from "../../../infra/base/dom";
 import { defineQuery, providerQuery, providerVoicesQuery, ready, settingsQuery, useQuery, useQueryClient, useSettings } from "../../../infra/query";
 import { Link as A } from "../../../infra/router";
 import { useSaveSettings } from "../../../infra/settings";
+import { discoveredModelsForConnection, editableProviderUpdate } from "../../provider";
 import { NativeCall } from "./NativeCall";
 
 type VoicePart = "line" | "agent";
 type VoiceUse = "live" | "speech" | "transcription";
 
 const sameVoice = (a: VoiceSettings, b: VoiceSettings) => same(a, b);
-
-const editableProviders = (status: ProviderStatus): ProviderUpdate => ({
-  revision: status.revision,
-  connections: status.connections.map(({ key: _key, ...connection }) => connection),
-  image: status.image,
-  understanding: status.understanding,
-  speech: status.speech,
-  live: status.live,
-  speakers: status.speakers,
-  voiceDesign: status.voiceDesign,
-  transcription: status.transcription,
-  vision: status.vision,
-});
 
 export function VoiceForm(props: { part: VoicePart }) {
   if (props.part === "line") {
@@ -70,12 +58,12 @@ function VoiceConfigSection() {
 function VoiceConfigForm(props: { initial: ProviderStatus }) {
   const client = useQueryClient();
   const base = signal(props.initial);
-  const draft = signal(editableProviders(props.initial));
+  const draft = signal(editableProviderUpdate(props.initial));
   const selectedId = signal<string | undefined>(undefined);
   const error = signal<string | undefined>(undefined);
   const act = createAct((why) => error.set(why));
 
-  const dirty = computed(() => !same(draft(), editableProviders(base())));
+  const dirty = computed(() => !same(draft(), editableProviderUpdate(base())));
   const activeConnectionId = computed(() => {
     const list = draft().connections;
     if (list.length === 0) return undefined;
@@ -105,7 +93,7 @@ function VoiceConfigForm(props: { initial: ProviderStatus }) {
 
   const accept = (status: ProviderStatus) => {
     base.set(status);
-    draft.set(editableProviders(status));
+    draft.set(editableProviderUpdate(status));
     error.set(undefined);
     client.setData(providerQuery(), () => ({ value: status }));
   };
@@ -134,10 +122,10 @@ function VoiceConfigForm(props: { initial: ProviderStatus }) {
   };
 
   const addConnection = () => {
-    const id = crypto.randomUUID();
-    const firstModel = base().liveModels[0] ?? "moss-live-1.0";
-    const speechModel = base().speechModels[0] ?? "moss-tts-1.5-flash";
-    const txModel = base().transcriptionModels[0] ?? "moss-transcribe-1.0";
+    const id = "moss";
+    const firstModel = discoveredModelsForConnection(base(), id, "realtime")[0] ?? "moss-live-1.0";
+    const speechModel = discoveredModelsForConnection(base(), id, "tts")[0] ?? "moss-tts-1.5-flash";
+    const txModel = discoveredModelsForConnection(base(), id, "asr")[0] ?? "moss-transcribe-1.0";
     const next = draft();
     draft.set({
       ...next,
@@ -183,7 +171,7 @@ function VoiceConfigForm(props: { initial: ProviderStatus }) {
       <SettingsGroup
         title={t("web.voice.moss.configTitle")}
         note={t("web.voice.moss.configNote")}
-        action={<TextLink href="/settings/models">{t("web.voice.moss.manageAll")}</TextLink>}
+        action={<TextLink href="/settings/providers">{t("web.voice.moss.manageAll")}</TextLink>}
         testid="voice-config-group"
       >
         <SettingRow icon="plug" label={t("web.voice.moss.accountLabel")} hint={t("web.voice.moss.accountHint")} testid="voice-connection-row">
@@ -230,7 +218,7 @@ function VoiceConfigForm(props: { initial: ProviderStatus }) {
               label={t("web.voice.moss.liveModel")}
               disabled={draft().connections.length === 0}
               value={draft().live?.model ?? ""}
-              options={modelOptions(base().liveModels, draft().live?.model)}
+              options={modelOptions(discoveredModelsForConnection(base(), activeConnectionId() ?? "", "realtime"), draft().live?.model)}
               onChange={(m) => setUseModel("live", m)}
             />
           </View>
@@ -243,7 +231,7 @@ function VoiceConfigForm(props: { initial: ProviderStatus }) {
               label={t("web.voice.moss.speechModel")}
               disabled={draft().connections.length === 0}
               value={draft().speech?.model ?? ""}
-              options={modelOptions(base().speechModels, draft().speech?.model)}
+              options={modelOptions(discoveredModelsForConnection(base(), activeConnectionId() ?? "", "tts"), draft().speech?.model)}
               onChange={(m) => setUseModel("speech", m)}
             />
           </View>
@@ -262,7 +250,7 @@ function VoiceConfigForm(props: { initial: ProviderStatus }) {
               label={t("web.voice.moss.transcriptionModel")}
               disabled={draft().connections.length === 0}
               value={draft().transcription?.model ?? ""}
-              options={modelOptions(base().transcriptionModels, draft().transcription?.model)}
+              options={modelOptions(discoveredModelsForConnection(base(), activeConnectionId() ?? "", "asr"), draft().transcription?.model)}
               onChange={(m) => setUseModel("transcription", m)}
             />
           </View>
@@ -293,7 +281,7 @@ function VoiceConfigForm(props: { initial: ProviderStatus }) {
         busy={act.busy()}
         onSave={() => void save()}
         onUndo={() => {
-          draft.set(editableProviders(base()));
+          draft.set(editableProviderUpdate(base()));
           error.set(undefined);
         }}
         left={

@@ -2,7 +2,7 @@
 // vibevalley-chart + ImageSrc::svg_markup), with a clean fallback for stock `nsh test`.
 import { Text, View } from "nsh";
 
-import { richNative } from "../../infra/rich";
+import { useDesignHost } from "../host";
 
 export interface ChartProps {
   spec: string;
@@ -11,7 +11,7 @@ export interface ChartProps {
 }
 
 export function Chart(props: ChartProps) {
-  const native = richNative();
+  const native = useDesignHost().rich();
   if (native) {
     const VvChart = native.VvChart;
     return <VvChart spec={props.spec} title={props.title ?? null} class={props.class} />;

@@ -16,15 +16,8 @@ import { Banner, Empty } from "../../design/layout";
 import { CountPill, Tag } from "../../design/Tag";
 import { api, reasonOf } from "../../infra/api";
 import { wallClockText } from "../../infra/base/format";
-import {
-  formatBytes,
-  formatDurationMs,
-  formatTokenBreakdown,
-  formatTokenCompact,
-  trajectoryKindLabel,
-  trajectoryKindTone,
-  type TrajectoryJumpFocus,
-} from "./format";
+import { formatTokens } from "../../infra/sessionRuns";
+import { formatBytes, formatDurationMs, formatTokenBreakdown, totalTokens, trajectoryKindLabel, trajectoryKindTone, type TrajectoryJumpFocus } from "./format";
 import { CopyButton, JsonPreview, SectionHeader } from "./shared";
 
 function subagentTone(status?: string): "ok" | "info" | "bad" | "neutral" {
@@ -378,7 +371,7 @@ export function TrajectoryTab(props: {
                     </Text>
                     <If when={item().tokens !== undefined}>
                       <Text class="font-mono text-2xs tabular-nums text-muted">
-                        {t("web.devtools.trajectory.tokens")}: {item().tokens ? formatTokenCompact(item().tokens!) : ""}
+                        {t("web.devtools.trajectory.tokens")}: {item().tokens ? formatTokens(totalTokens(item().tokens!)) : ""}
                       </Text>
                     </If>
                   </View>

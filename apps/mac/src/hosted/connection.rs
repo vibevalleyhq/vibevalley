@@ -1,7 +1,6 @@
 //! Desktop Control Plane connection mode persistence (`$VIBEVALLEY_HOME/desktop-connection.json`),
 //! redacted token handling, environment variable overrides, and pair-code exchange.
 
-use std::fmt;
 use std::fs;
 use std::io::{ErrorKind, Write};
 use std::path::{Path, PathBuf};
@@ -9,7 +8,7 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use url::Url;
-pub use vibevalley_protocol::{ConnectionSaveRequest, DesktopConnectionMode, DesktopConnectionSnapshot, DesktopConnectionSource};
+pub use vibevalley_protocol::{ConnectionSaveRequest, DesktopConnectionMode, DesktopConnectionSnapshot, DesktopConnectionSource, Secret};
 use vibevalley_protocol::{Envelope, RemotePairExchangeRequest, RemotePairExchangeResult, RemotePlatform, SCOPE_REMOTE_CLIENT};
 
 pub const CONNECTION_FILE: &str = "desktop-connection.json";
@@ -18,59 +17,6 @@ pub const ENV_CONTROL_PLANE_TOKEN: &str = "VIBEVALLEY_CONTROL_PLANE_TOKEN";
 pub const ENV_CONTROL_PLANE_LABEL: &str = "VIBEVALLEY_CONTROL_PLANE_LABEL";
 
 const REMOTE_CLIENT_HEADER: &str = "remote";
-
-/// Redacted bearer token: serializes as a plain JSON string, never exposes the full secret in `Debug` or `Display`.
-#[derive(Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(transparent)]
-pub struct Secret(String);
-
-impl Secret {
-    pub fn new(raw: impl Into<String>) -> Self {
-        Self(raw.into())
-    }
-
-    pub fn expose(&self) -> &str {
-        &self.0
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.0.trim().is_empty()
-    }
-
-    pub fn trimmed(&self) -> Option<Self> {
-        let trimmed = self.0.trim();
-        (!trimmed.is_empty()).then(|| Self(trimmed.to_string()))
-    }
-
-    /// Safe redacted suffix hint (last 4 chars for long tokens; never reveals short secrets).
-    pub fn hint(&self) -> String {
-        let trimmed = self.0.trim();
-        if trimmed.is_empty() {
-            return "none".into();
-        }
-        if trimmed.chars().count() <= 8 {
-            return "[redacted]".into();
-        }
-        let tail: String = trimmed.chars().rev().take(4).collect::<Vec<_>>().into_iter().rev().collect();
-        format!("…{tail}")
-    }
-}
-
-impl fmt::Debug for Secret {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.is_empty() {
-            f.write_str("Secret(none)")
-        } else {
-            write!(f, "Secret({})", self.hint())
-        }
-    }
-}
-
-impl fmt::Display for Secret {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.hint())
-    }
-}
 
 /// Persisted or active Control Plane transport mode for the macOS desktop app.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -380,7 +326,7 @@ pub fn exchange_pair_code(base_url: &str, code: &str, device_name: &str) -> Resu
     }
     let client = builder.build().map_err(|e| format!("failed to build HTTP client: {e}"))?;
 
-    vibevalley_runtime::rt::block_on(async move {
+    vibevalley_rt::block_on(async move {
         let response = client
             .post(&endpoint)
             .header("x-vibevalley-client", REMOTE_CLIENT_HEADER)

@@ -55,7 +55,7 @@
 ## 为什么这样
 
 - **PR 独立成模块，工单表不存 GitHub 细节**：分支发布既服务工单，也服务本机独立分支（`issue_id = null`），并支持 GitLab.com 发布；把 `pull` 与 `pull_event` 独立成 `work/pull` 并通过回调挂载到 `Board`，使 `work/issue` 完全不依赖平台 CLI 与轮询实现。
-- **`issue` 更新用 `ON CONFLICT DO UPDATE` 保护外键**：`pull.issue_id`（以及 `cron.issue_id`、`artifact.issue`）均带 `references issue(id) on delete set null`，工单表的 `PutIssue` 不使用 `INSERT OR REPLACE`（在 SQLite 中等价于删除后重建），避免每次更新工单时静默清空外键。
+- **`issue` 更新用 `ON CONFLICT DO UPDATE` 保护外键**：`pull.issue_id`（以及 `cron.issue_id`、`note.issue`）均带 `references issue(id) on delete set null`，工单表的 `PutIssue` 不使用 `INSERT OR REPLACE`（在 SQLite 中等价于删除后重建），避免每次更新工单时静默清空外键。
 
 ## 怎么验证
 

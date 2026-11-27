@@ -1,7 +1,8 @@
 //! Thin compile-time exhaustive [`Router`] implementing [`Server`] over all
-//! `EndpointId` (203), `NativeEndpointId` (3), and `SUBSCRIPTIONS` (8).
+//! `EndpointId`, `NativeEndpointId`, and `SUBSCRIPTIONS`.
 
 mod glue;
+pub(crate) mod note;
 
 use std::collections::BTreeMap;
 use std::sync::{Arc, Weak};
@@ -14,7 +15,7 @@ pub(crate) use self::glue::AppCore;
 use crate::context::{SliceSubscription, bridge_live_receiver};
 use crate::gateway::api::{
     BoxFuture, CallerContext, GatewayMeta, GatewayPorts, Server, SharedFaultGate, SharedHostDebug, decode, dispatch_boundary_async, flush_and_snapshot_json,
-    flush_and_subscribe_slice, invoke_server_op, ok_json, open_subscription_channel, slice_snapshot_value, watch_slice_value,
+    flush_and_subscribe_slice, ok_json, open_subscription_channel,
 };
 use crate::gateway::remote::Remote;
 
@@ -52,15 +53,8 @@ pub struct Router {
 }
 
 impl Router {
-    pub(crate) fn new(core: Arc<AppCore>, remote: Arc<Remote>, gw: GatewayMeta) -> Arc<Self> {
-        Arc::new_cyclic(|me| Self {
-            me: me.clone(),
-            core,
-            remote,
-            gw,
-        })
-    }
     router_methods! {
+        pub(crate) fn new(core: Arc<AppCore>, remote: Arc<Remote>, gw: GatewayMeta) -> Arc<Self> { Arc::new_cyclic(|me| Self { me: me.clone(), core, remote, gw }) }
         pub fn has_observer(&self) -> bool { self.gw.observer.is_some() }
         pub fn has_fault_gate(&self) -> bool { self.gw.fault_gate.is_some() }
         pub fn active_subscription_count(&self) -> u32 { self.gw.subs.len() }
@@ -68,48 +62,44 @@ impl Router {
         pub fn answers_subscription(&self, name: &str) -> bool { SUBSCRIPTIONS.iter().any(|s| s.name == name) }
         pub fn slice_seqs(&self) -> BTreeMap<String, i64> { self.core.ctx.feed.slice_seqs() }
         pub fn slice_watcher_counts(&self) -> BTreeMap<String, u32> { self.core.ctx.feed.watcher_counts() }
-        pub fn call_as(&self, caller: Caller, op: &str, payload: Value) -> Envelope { self.call_with(&CallerContext::from_caller(caller), op, payload) }
+        pub async fn call_as_async(&self, caller: Caller, op: &str, payload: Value) -> Envelope { self.dispatch_op_async(CallerContext::from_caller(caller), op, payload).await }
         pub(crate) fn close_subscriptions(&self) { self.gw.subs.close_all(); }
         fn server_arc(&self) -> Result<Arc<dyn Server>, ApiError> { self.me.upgrade().map(|r| r as Arc<dyn Server>).ok_or_else(|| ApiError::new(BizCode::ServiceUnavailable, "router dropped")) }
     }
-    pub fn invoke<O: Op>(&self, ctx: &CallerContext, input: O::Input) -> Result<O::Result, ApiError>
+    pub async fn invoke_async<O: Op>(&self, ctx: &CallerContext, input: O::Input) -> Result<O::Result, ApiError>
     where
         O::Result: DeserializeOwned,
     {
-        invoke_server_op::<O>(self, ctx, input)
+        let p = serde_json::to_value(input).map_err(|e| ApiError::new(BizCode::InvalidInput, e.to_string()))?;
+        let env = self.dispatch_op_async(ctx.clone(), O::NAME, p).await;
+        if let Some(err) = env.error() {
+            return Err(err);
+        }
+        serde_json::from_value(env.data.unwrap_or(Value::Null)).map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))
     }
-    pub fn invoke_as<O: Op>(&self, caller: Caller, input: O::Input) -> Result<O::Result, ApiError>
+    pub async fn invoke_as_async<O: Op>(&self, caller: Caller, input: O::Input) -> Result<O::Result, ApiError>
     where
         O::Result: DeserializeOwned,
     {
-        self.invoke::<O>(&CallerContext::from_caller(caller), input)
+        self.invoke_async::<O>(&CallerContext::from_caller(caller), input).await
     }
     #[allow(clippy::result_large_err)]
-    async fn open_sub_async(&self, ctx: &CallerContext, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
+    async fn open_sub_async(&self, ctx: &CallerContext, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::Receiver<Value>), Envelope> {
         open_subscription_channel(&self.gw, ctx, name, payload, |sub, sink| glue::open_sub_domain_async(&self.core, sub, sink)).await
     }
-    async fn dispatch_op_async(&self, ctx: CallerContext, op: &str, payload: Value) -> Envelope {
-        dispatch_boundary_async(
-            self,
-            &self.gw,
-            ctx,
-            op,
-            payload,
-            |r, c, id, p| r.dispatch_endpoint_async(c, id, p),
-            |r, n| Box::pin(glue::dispatch_native_domain_async(&r.core.storage, n)),
-        )
-        .await
+    router_methods! {
+        async fn dispatch_op_async(&self, ctx: CallerContext, op: &str, payload: Value) -> Envelope { dispatch_boundary_async(self, &self.gw, ctx, op, payload, |r, c, id, p| r.dispatch_endpoint_async(c, id, p), |r, n| Box::pin(glue::dispatch_native_domain_async(&r.core.storage, n))).await }
     }
 
     fn dispatch_endpoint_async<'a>(&'a self, ctx: &'a CallerContext, id: EndpointId, p: Value) -> BoxFuture<'a, Result<Value, ApiError>> {
         let c = &self.core;
-        let (pr, mem, orch, med, lib, art) = (
+        let (pr, mem, orch, med, lib, note) = (
             &c.agent.profile,
             &c.agent.memory,
             &c.agent.orchestrator,
-            &c.artifact.media,
-            &c.artifact.library,
-            &c.artifact,
+            &c.note.media,
+            &c.note.library,
+            &c.note,
         );
         let (ch, rt, brd, st, dbg) = (&c.channel, &c.runtime, &c.board, &c.storage, &c.debug);
         match id {
@@ -117,6 +107,7 @@ impl Router {
             E::AgentValidate => on!(p, AgentValidate, |r| pr.validate_async(&r.agents).await),
             E::AgentCreate => on!(p, AgentCreate, |r| pr.agent_create_async(r).await?),
             E::AgentUpdate => on!(p, AgentUpdate, |r| pr.agent_update_async(r).await?),
+            E::AgentRegister => on!(p, AgentRegister, |r| pr.agent_register_async(r).await?),
             E::AgentDelete => void!(p, AgentDelete, |r| pr.agent_delete_async(&r.id).await?),
             E::AgentPreviewDelete => on!(p, AgentPreviewDelete, |r| pr.agent_preview_delete(&r.id)?),
             E::AgentTemplateList => ret!(ok_json(pr.templates_async().await)),
@@ -185,7 +176,8 @@ impl Router {
             E::IssueRunList => on!(p, IssueRunList, |r| brd.issue_run_list_endpoint_async(&r.id).await?),
             E::IssueTimelineGet => on!(p, IssueTimelineGet, |r| brd.issue_timeline_endpoint_async(&r.id).await?),
             E::IssueCreate => on!(p, IssueCreate, |r| brd.issue_create_endpoint_async(&r).await?),
-            E::IssueUpdate => on!(p, IssueUpdate, |r| brd.issue_update_endpoint_async(r).await?),
+            E::IssueUpdate => on!(p, IssueUpdate, |r| note::issue_update(c, ctx, r).await?),
+            E::IssueBodyEnsure => on!(p, IssueBodyEnsure, |r| note::issue_body_ensure(c, ctx, &r).await?),
             E::IssueDelete => void!(p, IssueDelete, |r| brd.issue_delete_endpoint_async(&r.id).await?),
             E::IssuePreviewDelete => on!(p, IssuePreviewDelete, |r| brd.issue_preview_delete_endpoint_async(&r.id).await?),
             E::IssueStatusUpdate => on!(p, IssueStatusUpdate, |r| glue::issue_status_update(c, &r).await?),
@@ -258,52 +250,50 @@ impl Router {
             E::LibraryItemAdd => on!(p, LibraryItemAdd, |r| glue::library_add_async(c, ctx, &r).await?),
             E::LibraryItemDelete => void!(p, LibraryItemDelete, |r| lib.remove_async(&r.id).await?),
             E::LibraryItemPreviewDelete => on!(p, LibraryItemPreviewDelete, |r| lib.preview_remove_async(&r.id).await?),
-            E::ArtifactList => on!(p, ArtifactList, |r| art.list_async(&r).await?),
-            E::ArtifactGet => on!(p, ArtifactGet, |r| art.get_async(&r.id).await?),
-            E::ArtifactContentGet => on!(p, ArtifactContentGet, |r| art.content_async(&r.id, r.version).await?),
-            E::ArtifactCreate => on!(p, ArtifactCreate, |r| art.create_async(&art.caller_meta(ctx).0, &r).await?),
-            E::ArtifactVersionCreate => on!(p, ArtifactVersionCreate, |r| glue::artifact_version(art, ctx, &r).await?),
-            E::ArtifactUpdate => on!(p, ArtifactUpdate, |r| art.update_async(&r).await?),
-            E::ArtifactDelete => void!(p, ArtifactDelete, |r| art.remove_async(&r.id).await?),
-            E::ArtifactPreviewDelete => on!(p, ArtifactPreviewDelete, |r| art.preview_remove_async(&r.id).await?),
-            E::ArtifactFileList => on!(p, ArtifactFileList, |r| art.list_files_async(&r).await?),
-            E::ArtifactFileGet => on!(p, ArtifactFileGet, |r| art.get_file_async(&r).await?),
-            E::ArtifactFileWrite => on!(p, ArtifactFileWrite, |r| glue::artifact_write(art, ctx, &r).await?),
-            E::ArtifactFileDelete => on!(p, ArtifactFileDelete, |r| glue::artifact_delete_file(art, ctx, &r).await?),
-            E::ArtifactSuggestionList => on!(p, ArtifactSuggestionList, |r| art.suggestions_async(&r.id).await?),
-            E::ArtifactSuggestionCreate => on!(p, ArtifactSuggestionCreate, |r| glue::art_suggest(art, ctx, &r).await?),
-            E::ArtifactSuggestionAccept => on!(p, ArtifactSuggestionAccept, |r| glue::art_accept(art, ctx, &r).await?),
-            E::ArtifactSuggestionReject => on!(p, ArtifactSuggestionReject, |r| glue::artifact_reject(art, ctx, &r).await?),
-            E::ArtifactTypeList => ret!(ok_json(art.list_types_async().await?)),
-            E::ArtifactTypeRead => on!(p, ArtifactTypeRead, |r| art.read_type_async(&r).await?),
-            E::ArtifactPresenceUpdate => on!(p, ArtifactPresenceUpdate, |r| art.update_presence_async(&r).await?),
-            E::ArtifactHistoryList => on!(p, ArtifactHistoryList, |r| art.history_list_async(&r).await?),
-            E::ArtifactHistoryPreview => on!(p, ArtifactHistoryPreview, |r| art.history_preview_async(&r).await?),
-            E::ArtifactHistoryRestore => on!(p, ArtifactHistoryRestore, |r| art.history_restore_async(&art.caller_meta(ctx).0, &r).await?),
-            E::ArtifactHistoryFork => on!(p, ArtifactHistoryFork, |r| art.history_fork_async(&art.caller_meta(ctx).0, &r).await?),
-            E::ArtifactHistoryUndoOrigin => on!(p, ArtifactHistoryUndoOrigin, |r| glue::artifact_undo_origin(art, ctx, &r).await?),
-            E::ArtifactHistoryCompact => on!(p, ArtifactHistoryCompact, |r| art.history_compact_async(&r).await?),
-            E::ArtifactCollabExport => on!(p, ArtifactCollabExport, |r| art.collab_export_async(&r).await?),
-            E::ArtifactCollabImport => on!(p, ArtifactCollabImport, |r| glue::artifact_collab_import(art, ctx, &r).await?),
-            E::ArtifactCoverSet => on!(p, ArtifactCoverSet, |r| art.set_cover_async(&r).await?),
+            E::NoteList => on!(p, NoteList, |r| note.list_async(&r).await?),
+            E::NoteGet => on!(p, NoteGet, |r| note.get_async(&r.id).await?),
+            E::NoteContentGet => on!(p, NoteContentGet, |r| note.content_async(&r.id, r.version).await?),
+            E::NoteCreate => on!(p, NoteCreate, |r| note.create_for_caller_async(ctx, &r).await?),
+            E::NoteVersionCreate => on!(p, NoteVersionCreate, |r| note.version_for_caller_async(ctx, &r).await?),
+            E::NoteUpdate => on!(p, NoteUpdate, |r| note.update_async(&r).await?),
+            E::NoteDelete => void!(p, NoteDelete, |r| note.remove_async(&r.id).await?),
+            E::NotePreviewDelete => on!(p, NotePreviewDelete, |r| note.preview_remove_async(&r.id).await?),
+            E::NoteTreeMove => on!(p, NoteTreeMove, |r| note.move_tree_async(&r).await?),
+            E::NoteLinkList => on!(p, NoteLinkList, |r| note.list_links_async(&r).await?),
+            E::NoteDocView => on!(p, NoteDocView, |r| note.doc_view_async(&r.id).await?),
+            E::NoteDocAppendBlock => on!(p, NoteDocAppendBlock, |r| note.doc_append_block_for_caller_async(ctx, &r).await?),
+            E::NoteBaseView => on!(p, NoteBaseView, |r| note.base_view_async(&r).await?),
+            E::NoteBaseUpsertRow => on!(p, NoteBaseUpsertRow, |r| note.base_upsert_row_for_caller_async(ctx, &r).await?),
+            E::NoteBaseRunAgentColumn => on!(p, NoteBaseRunAgentColumn, |r| note::base_run_agent_column(c, ctx, &r).await?),
+            E::NoteFileList => on!(p, NoteFileList, |r| note.list_files_async(&r).await?),
+            E::NoteFileGet => on!(p, NoteFileGet, |r| note.get_file_async(&r).await?),
+            E::NoteFileWrite => on!(p, NoteFileWrite, |r| note.write_for_caller_async(ctx, &r).await?),
+            E::NoteFileDelete => on!(p, NoteFileDelete, |r| note.delete_file_for_caller_async(ctx, &r).await?),
+            E::NoteSuggestionList => on!(p, NoteSuggestionList, |r| note.suggestions_async(&r.id).await?),
+            E::NoteSuggestionCreate => on!(p, NoteSuggestionCreate, |r| note.create_suggestion_for_caller_async(ctx, &r).await?),
+            E::NoteSuggestionAccept => on!(p, NoteSuggestionAccept, |r| note.accept_suggestion_for_caller_async(ctx, &r).await?),
+            E::NoteSuggestionReject => on!(p, NoteSuggestionReject, |r| note.reject_suggestion_for_caller_async(ctx, &r).await?),
+            E::NoteTypeList => ret!(ok_json(note.list_types_async().await?)),
+            E::NoteTypeRead => on!(p, NoteTypeRead, |r| note.read_type_async(&r).await?),
+            E::NotePresenceUpdate => on!(p, NotePresenceUpdate, |r| note.update_presence_async(&r).await?),
+            E::NoteHistoryList => on!(p, NoteHistoryList, |r| note.history_list_async(&r).await?),
+            E::NoteHistoryPreview => on!(p, NoteHistoryPreview, |r| note.history_preview_async(&r).await?),
+            E::NoteHistoryRestore => on!(p, NoteHistoryRestore, |r| note.history_restore_for_caller_async(ctx, &r).await?),
+            E::NoteHistoryFork => on!(p, NoteHistoryFork, |r| note.history_fork_for_caller_async(ctx, &r).await?),
+            E::NoteHistoryUndoOrigin => on!(p, NoteHistoryUndoOrigin, |r| note.history_undo_origin_for_caller_async(ctx, &r).await?),
+            E::NoteHistoryCompact => on!(p, NoteHistoryCompact, |r| note.history_compact_async(&r).await?),
+            E::NoteCollabExport => on!(p, NoteCollabExport, |r| note.collab_export_async(&r).await?),
+            E::NoteCollabImport => on!(p, NoteCollabImport, |r| note.collab_import_for_caller_async(ctx, &r).await?),
+            E::NoteCoverSet => on!(p, NoteCoverSet, |r| note.set_cover_async(&r).await?),
             E::ConnectorLogin => on!(p, ConnectorLogin, |r| c.connector.handle_login(r).await?),
             E::ConnectorVerify => on!(p, ConnectorVerify, |r| c.connector.handle_verify(r).await?),
             E::ConnectorLogout => on!(p, ConnectorLogout, |r| c.connector.handle_logout(r).await?),
             E::ConnectorChannelSet => on!(p, ConnectorChannelSet, |r| c.connector.handle_channel_set(r).await?),
-            E::VoiceHear => void!(p, VoiceHear, |r| c.voice.handle_hear(r).await?),
             E::VoiceMossVerify => ret!(ok_json(c.voice.handle_moss_verify().await)),
-            E::VoiceGrantCreate => ret!(ok_json(c.voice.handle_grant_create()?)),
-            E::VoiceCallStart => on!(p, VoiceCallStart, |r| c.voice.handle_call_start(r)?),
-            E::VoiceCallStop => void!(p, VoiceCallStop, |r| c.voice.handle_call_stop(r)?),
-            E::VoiceCallHear => void!(p, VoiceCallHear, |r| c.voice.handle_call_hear(r).await?),
-            E::VoiceCallSay => void!(p, VoiceCallSay, |r| c.voice.handle_call_say(r).await?),
-            E::VoiceAsrStart => ret!(ok_json(c.voice.handle_asr_start()?)),
-            E::VoiceAsrStop => void!(p, VoiceAsrStop, |r| c.voice.handle_asr_stop(r)?),
-            E::VoiceAsrTranscribe => on!(p, VoiceAsrTranscribe, |r| c.voice.handle_asr_transcribe(r).await?),
             E::ProviderGet => ret!(ok_json(c.provider.status())),
             E::ProviderUpdate => on!(p, ProviderUpdate, |r| c.provider.update_async(&r).await?),
+            E::ProviderVerify => on!(p, ProviderVerify, |r| c.provider.verify_async(&r).await?),
             E::ProviderVoiceList => on!(p, ProviderVoiceList, |r| c.provider.voices_async(&r).await?),
-            E::ProviderModelList => on!(p, ProviderModelList, |r| c.provider.models_async(&r.connection, r.revision).await?),
             E::SettingGet => ret!(ok_json(c.setting.status())),
             E::SettingValidate => on!(p, SettingValidate, |r| c.setting.validate(&r)),
             E::SettingUpdate => on!(p, SettingUpdate, |r| glue::setting_update(c, r).await?),
@@ -326,32 +316,23 @@ impl Router {
             E::MachineList => ret!(ok_json(c.machine.list())),
             E::GameShopList => ret!(ok_json(c.game.shop_list_async().await?)),
             E::GameShopBuy => on!(p, GameShopBuy, |r| c.game.shop_buy_async(&r).await?),
-            E::GameDailyList => ret!(ok_json(c.game.daily_list_async().await?)),
         }
     }
 }
 
 impl Server for Router {
     router_methods! {
-        fn call(&self, op: &str, payload: Value) -> Envelope { self.call_with(&CallerContext::local(), op, payload) }
-        fn call_with(&self, ctx: &CallerContext, op: &str, payload: Value) -> Envelope { vibevalley_runtime::rt::block_on(self.dispatch_op_async(ctx.clone(), op, payload)) }
         fn call_with_async(self: Arc<Self>, ctx: CallerContext, op: String, payload: Value) -> BoxFuture<'static, Envelope> { Box::pin(async move { self.dispatch_op_async(ctx, &op, payload).await }) }
-        fn slice_snapshot(&self, slice: SliceKind) -> Value { slice_snapshot_value(&self.core.ctx, slice) }
         fn slice_snapshot_json(&self, slice: SliceKind) -> Arc<str> { self.core.ctx.feed.snapshot_json(slice) }
         fn slice_snapshot_json_async(self: Arc<Self>, slice: SliceKind) -> BoxFuture<'static, Arc<str>> { Box::pin(flush_and_snapshot_json(self.core.ctx.clone(), slice)) }
         fn subscribe_slice(&self, slice: SliceKind) -> Option<SliceSubscription> { Some(self.core.ctx.feed.subscribe(slice)) }
         fn subscribe_slice_async(self: Arc<Self>, slice: SliceKind) -> BoxFuture<'static, Option<SliceSubscription>> { Box::pin(flush_and_subscribe_slice(self.core.ctx.clone(), slice)) }
         fn fault_gate(&self) -> Option<SharedFaultGate> { self.gw.fault_gate.clone() }
-        fn live(&self) -> tokio::sync::mpsc::UnboundedReceiver<LiveEvent> { bridge_live_receiver(self.core.ctx.live.subscribe_live(), self.core.ctx.token()) }
+        fn live(&self) -> tokio::sync::mpsc::Receiver<LiveEvent> { bridge_live_receiver(self.core.ctx.live.subscribe_live(), self.core.ctx.token()) }
         fn subscribe_live(&self) -> Option<tokio::sync::broadcast::Receiver<LiveEvent>> { Some(self.core.ctx.live.subscribe_live()) }
-        fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> { self.subscribe_with(&CallerContext::local(), name, payload) }
-        fn subscribe_with(&self, ctx: &CallerContext, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> { vibevalley_runtime::rt::block_on(self.open_sub_async(ctx, name, payload)) }
-        fn subscribe_with_async(self: Arc<Self>, ctx: CallerContext, name: String, payload: Value) -> BoxFuture<'static, Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope>> { Box::pin(async move { self.open_sub_async(&ctx, &name, payload).await }) }
+        fn subscribe_with_async(self: Arc<Self>, ctx: CallerContext, name: String, payload: Value) -> BoxFuture<'static, Result<(u64, tokio::sync::mpsc::Receiver<Value>), Envelope>> { Box::pin(async move { self.open_sub_async(&ctx, &name, payload).await }) }
         fn ports(&self) -> GatewayPorts { self.gw.ports.clone() }
         fn host_debug(&self) -> Option<SharedHostDebug> { self.gw.host_debug.clone() }
-    }
-    fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &tokio_util::sync::CancellationToken, receive: &mut dyn FnMut(i64, &Value)) {
-        watch_slice_value(&self.core.ctx, self.gw.fault_gate.as_ref(), slice, after_seq, stop, receive);
     }
     fn unsubscribe(&self, id: u64) {
         self.gw.subs.remove(id);

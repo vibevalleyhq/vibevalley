@@ -8,7 +8,8 @@ description = "VibeValley's wire protocol, home path conventions, and generated 
 
 [features]
 default = []
-ts-gen = ["dep:ts-rs"]
+host = []
+ts-gen = ["host", "dep:ts-rs"]
 
 [dependencies]
 serde = { workspace = true }

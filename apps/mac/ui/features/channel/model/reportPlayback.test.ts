@@ -6,7 +6,9 @@ import { messageId } from "@vibevalley/protocol/schema";
 import { isWorkerReportMessage, resolveReportVoiceTarget, sanitizeReportForSpeech, SerializedReportQueue } from "./reportPlayback";
 
 const baseAgent = (overrides: Partial<Agent> & Pick<Agent, "id" | "name">): Agent => ({
+  code: "W-01",
   role: "worker",
+  mode: "managed",
   duty: "",
   enabled: true,
   runtime: "claude",
@@ -38,7 +40,18 @@ const baseAgent = (overrides: Partial<Agent> & Pick<Agent, "id" | "name">): Agen
 
 const baseProvider = (overrides: Partial<ProviderStatus> = {}): ProviderStatus => ({
   revision: 3,
-  connections: [{ id: "moss", name: "MOSS", adapter: "moss", enabled: true, key: { source: "settings", hint: "…a41c" } }],
+  connections: [
+    {
+      id: "moss",
+      name: "MOSS",
+      adapter: "moss",
+      enabled: true,
+      key: { source: "settings", hint: "…a41c" },
+      models: [{ id: "moss-tts-1.5-flash", owner: "moss", capabilities: ["tts"] }],
+    },
+  ],
+  orchestrator: null,
+  polish: null,
   image: null,
   understanding: null,
   speech: { connection: "moss", model: "moss-tts-1.5-flash" },
@@ -47,14 +60,7 @@ const baseProvider = (overrides: Partial<ProviderStatus> = {}): ProviderStatus =
   voiceDesign: null,
   transcription: null,
   vision: null,
-  imageModels: [],
-  understandingModels: [],
-  speechModels: ["moss-tts-1.5-flash"],
-  liveModels: [],
-  speakersModels: [],
-  voiceDesignModels: [],
-  transcriptionModels: [],
-  visionModels: [],
+  scenePolicies: [],
   ...overrides,
 });
 
@@ -93,7 +99,7 @@ test("sanitizeReportForSpeech strips markdown noise and resolveReportVoiceTarget
     resolveReportVoiceTarget(
       baseReport(3, "laozhou", "Done"),
       agents,
-      baseProvider({ connections: [{ id: "moss", name: "MOSS", adapter: "moss", enabled: true, key: { source: null } }] }),
+      baseProvider({ connections: [{ id: "moss", name: "MOSS", adapter: "moss", enabled: true, key: { source: null }, models: [] }] }),
     ),
   ).toBeUndefined();
   // Missing Speech binding silently skips.

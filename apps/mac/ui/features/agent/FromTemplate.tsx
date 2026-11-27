@@ -3,9 +3,9 @@ import { Text, View } from "nsh";
 import { t } from "@vibevalley/i18n";
 import type { Agent } from "@vibevalley/protocol";
 
-import { createAct } from "../../design/act";
 import { ConfirmButton } from "../../design/ConfirmButton";
 import { toast } from "../../design/toasts";
+import { createAct } from "../../infra/act";
 import { api } from "../../infra/api";
 import { ready, useAgentTemplates, useQueryClient } from "../../infra/query";
 

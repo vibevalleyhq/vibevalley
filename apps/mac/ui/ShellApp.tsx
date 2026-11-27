@@ -4,7 +4,7 @@ import { host, mount, Text, View, type Component } from "nsh";
 
 import { setLocale } from "@vibevalley/i18n";
 
-import { createAppDesignHost, installMotionReporter } from "./design/appHost";
+import { createAppDesignHost, installMotionReporter } from "./app/DesignHost";
 import { DesignHostProvider } from "./design/host";
 import { applyMotion } from "./design/motion";
 import { DevToolsApp } from "./features/devtools/DevToolsApp";

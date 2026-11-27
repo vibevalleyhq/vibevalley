@@ -36,12 +36,12 @@
 
 ## remote
 
-远程访问：开关、Tailscale 监听、设备配对与撤销
+远程访问：开关、局域网直连与可选 Tailscale 监听、设备配对与撤销
 
 | 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 主助手 | 执行会话 |
 |---|---|---|---|---|---|---|
-| `remote.status` | 查看远程访问状态、Tailscale 信息与已配对设备 | `/api/v1/remote/status` | ✓ |   |   |   |
-| `remote.enable` | 开启远程访问监听（默认绑定 Tailscale IPv4 或指定回环地址） | `/api/v1/remote/enable` | ✓ |   |   |   |
+| `remote.status` | 查看远程访问状态、局域网 IPv4 / Tailscale 信息与已配对设备 | `/api/v1/remote/status` | ✓ |   |   |   |
+| `remote.enable` | 开启远程访问监听（默认绑定在线 Tailscale IPv4、检测到的局域网 IPv4 或回环地址） | `/api/v1/remote/enable` | ✓ |   |   |   |
 | `remote.disable` | 关闭远程访问监听 | `/api/v1/remote/disable` | ✓ |   |   |   |
 | `remote.pair.create` | 生成 5 分钟有效的一次性配对码与配对深链 | `/api/v1/remote/pair/create` | ✓ |   |   |   |
 | `remote.pair.exchange` | 用一次性配对码交换持久设备令牌 | `/api/v1/remote/pair/exchange` | ✓ | ✓ |   |   |
@@ -86,8 +86,8 @@
 |---|---|---|---|---|---|---|
 | `provider.get` | 读取供应商连接和默认用途，密钥只显示提示 | `/api/v1/provider/get` | ✓ |   |   |   |
 | `provider.update` | 按版本保存供应商连接和默认用途 | `/api/v1/provider/update` | ✓ |   |   |   |
+| `provider.verify` | cap.op.provider.verify | `/api/v1/provider/verify` | ✓ |   |   |   |
 | `provider.voice.list` | 查询指定 MOSS 账号的一页音色，不生成音频 | `/api/v1/provider/voice/list` | ✓ |   |   |   |
-| `provider.model.list` | 查询已配置 MOSS 账号的可用模型，不发推理请求 | `/api/v1/provider/model/list` | ✓ |   |   |   |
 
 ## media
 
@@ -178,16 +178,7 @@ MOSS Live 语音通话
 
 | 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 主助手 | 执行会话 |
 |---|---|---|---|---|---|---|
-| `voice.hear` | 交上正在通的那通电话里听到的一句 | `/api/v1/voice/hear` | ✓ | ✓ |   |   |
 | `voice.moss.verify` | 试 MOSS 的钥匙能不能用，什么都不说 | `/api/v1/voice/moss/verify` | ✓ |   |   |   |
-| `voice.grant.create` | 为 MOSS Live 通话签发频道与会话标识 | `/api/v1/voice/grant/create` | ✓ | ✓ |   |   |
-| `voice.call.start` | 开始和主助手通话 | `/api/v1/voice/call/start` | ✓ | ✓ |   |   |
-| `voice.call.stop` | 挂断通话 | `/api/v1/voice/call/stop` | ✓ | ✓ |   |   |
-| `voice.call.hear` | 交上通话里你说的一句 | `/api/v1/voice/call/hear` | ✓ | ✓ |   |   |
-| `voice.call.say` | 交上通话里主助手说出的话 | `/api/v1/voice/call/say` | ✓ | ✓ |   |   |
-| `voice.asr.start` | cap.op.voice.asr.start | `/api/v1/voice/asr/start` | ✓ | ✓ |   |   |
-| `voice.asr.stop` | cap.op.voice.asr.stop | `/api/v1/voice/asr/stop` | ✓ | ✓ |   |   |
-| `voice.asr.transcribe` | cap.op.voice.asr.transcribe | `/api/v1/voice/asr/transcribe` | ✓ | ✓ |   |   |
 
 ## issue
 
@@ -207,6 +198,7 @@ MOSS Live 语音通话
 | `issue.timeline.get` | 任务的时间线和每一轮加起来的花费 | `/api/v1/issue/timeline/get` | ✓ | ✓ |   |   |
 | `issue.create` | 写一张新任务 | `/api/v1/issue/create` | ✓ | ✓ | ✓ |   |
 | `issue.update` | 改一个任务 | `/api/v1/issue/update` | ✓ | ✓ | ✓ |   |
+| `issue.body.ensure` | 为任务按需懒物化或获取 Block Doc 协作正文笔记 | `/api/v1/issue/body/ensure` | ✓ | ✓ | ✓ |   |
 | `issue.delete` | 删掉一个任务 | `/api/v1/issue/delete` | ✓ | ✓ |   |   |
 | `issue.previewDelete` | 试删一个任务：说会删掉什么，不真删 | `/api/v1/issue/previewDelete` | ✓ | ✓ |   |   |
 | `issue.status.update` | 挪任务的状态：派活、再来一轮、完成或取消 | `/api/v1/issue/status/update` | ✓ | ✓ | ✓ |   |
@@ -239,40 +231,47 @@ MOSS Live 语音通话
 | `session.compact` | cap.op.session.compact | `/api/v1/session/compact` | ✓ | ✓ |   |   |
 | `session.runCode` | cap.op.session.runCode | `/api/v1/session/runCode` | ✓ | ✓ |   |   |
 
-## artifact
+## note
 
-作品：按目录组织、支持多人多代理实时协作的 12 类作品
+笔记：按目录组织、支持 3+1 基元（块文档、多维库、自由画布、媒体记录）、页面树、双向链接与多人多代理实时协作
 
 | 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 主助手 | 执行会话 |
 |---|---|---|---|---|---|---|
-| `artifact.list` | 列出某个频道或任务的作品，不指定就是全部 | `/api/v1/artifact/list` | ✓ | ✓ | ✓ | ✓ |
-| `artifact.get` | 看一篇作品 | `/api/v1/artifact/get` | ✓ | ✓ | ✓ | ✓ |
-| `artifact.content.get` | 读作品主入口文件内容（可指定历史版本快照） | `/api/v1/artifact/content/get` | ✓ | ✓ | ✓ | ✓ |
-| `artifact.create` | 新建目录化作品并初始化对应类型的起始文件 | `/api/v1/artifact/create` | ✓ | ✓ | ✓ | ✓ |
-| `artifact.version.create` | 为作品切出一个新的不可变目录版本快照，旧的留着 | `/api/v1/artifact/version/create` | ✓ | ✓ | ✓ | ✓ |
-| `artifact.update` | 给作品改标题或默认设置 | `/api/v1/artifact/update` | ✓ | ✓ |   |   |
-| `artifact.delete` | 删掉一篇作品 | `/api/v1/artifact/delete` | ✓ | ✓ |   |   |
-| `artifact.previewDelete` | 试删一篇作品：说会删掉什么，不真删 | `/api/v1/artifact/previewDelete` | ✓ | ✓ |   |   |
-| `artifact.type.list` | 列出全部 12 种作品类型与当前默认设计体系 | `/api/v1/artifact/type/list` | ✓ | ✓ | ✓ | ✓ |
-| `artifact.type.read` | 读取一种作品类型的规范或参考分册 | `/api/v1/artifact/type/read` | ✓ | ✓ | ✓ | ✓ |
-| `artifact.file.list` | 列出作品目录中的文件（manifest.json、structure/* 与 asset/*） | `/api/v1/artifact/file/list` | ✓ | ✓ | ✓ | ✓ |
-| `artifact.file.get` | 按相对路径读取作品目录中的一个文件（可指定历史版本快照） | `/api/v1/artifact/file/get` | ✓ | ✓ | ✓ | ✓ |
-| `artifact.file.write` | 原子写入一个或多个文件到作品目录的 structure/ 或 asset/，记录来源并同步协作状态 | `/api/v1/artifact/file/write` | ✓ | ✓ | ✓ | ✓ |
-| `artifact.file.delete` | 删除作品目录中 structure/ 或 asset/ 下的指定文件，记录来源并同步协作状态 | `/api/v1/artifact/file/delete` | ✓ | ✓ | ✓ | ✓ |
-| `artifact.suggestion.list` | 列出作品上的改写建议，没答的和答过的 | `/api/v1/artifact/suggestion/list` | ✓ | ✓ | ✓ | ✓ |
-| `artifact.suggestion.create` | 对作品目录中的文件或目标提出改写建议 | `/api/v1/artifact/suggestion/create` | ✓ | ✓ | ✓ | ✓ |
-| `artifact.suggestion.accept` | 接受一条改写建议 | `/api/v1/artifact/suggestion/accept` | ✓ | ✓ |   |   |
-| `artifact.suggestion.reject` | 拒绝一条改写建议 | `/api/v1/artifact/suggestion/reject` | ✓ | ✓ |   |   |
-| `artifact.presence.update` | 更新实时在场状态（光标、选区、高亮区域或视口），仅驻留内存不落库 | `/api/v1/artifact/presence/update` | ✓ | ✓ | ✓ | ✓ |
-| `artifact.history.list` | 列出作品的协作提交时间线，最新的在前 | `/api/v1/artifact/history/list` | ✓ | ✓ |   |   |
-| `artifact.history.preview` | 只读预览指定历史前沿上的作品快照 | `/api/v1/artifact/history/preview` | ✓ | ✓ |   |   |
-| `artifact.history.restore` | 把作品恢复到指定历史前沿并记为一次新提交 | `/api/v1/artifact/history/restore` | ✓ | ✓ |   |   |
-| `artifact.history.fork` | 从指定的历史前沿分叉出一篇新作品 | `/api/v1/artifact/history/fork` | ✓ | ✓ |   |   |
-| `artifact.history.undoOrigin` | 按提交来源选择性撤销某一轮的改动，保留其他人的并发编辑 | `/api/v1/artifact/history/undoOrigin` | ✓ | ✓ |   |   |
-| `artifact.history.compact` | 把较早的操作历史压缩成浅快照，当前内容保持不变 | `/api/v1/artifact/history/compact` | ✓ | ✓ |   |   |
-| `artifact.collab.export` | 按版本向量导出作品的 Loro 增量同步更新或快照 | `/api/v1/artifact/collab/export` | ✓ | ✓ | ✓ | ✓ |
-| `artifact.collab.import` | 导入端上的 Loro 增量更新并合入作品目录，可选返回服务端缺失增量 | `/api/v1/artifact/collab/import` | ✓ | ✓ |   |   |
-| `artifact.cover.set` | cap.op.artifact.cover.set | `/api/v1/artifact/cover/set` | ✓ | ✓ |   |   |
+| `note.list` | 列出某个频道、工单或父页面下的笔记，不指定就是全部 | `/api/v1/note/list` | ✓ | ✓ | ✓ | ✓ |
+| `note.get` | 看一篇笔记 | `/api/v1/note/get` | ✓ | ✓ | ✓ | ✓ |
+| `note.content.get` | 读笔记主入口文件内容（可指定历史版本快照） | `/api/v1/note/content/get` | ✓ | ✓ | ✓ | ✓ |
+| `note.create` | 新建目录化笔记并初始化对应基元类型的起始文件 | `/api/v1/note/create` | ✓ | ✓ | ✓ | ✓ |
+| `note.version.create` | 为笔记切出一个新的不可变目录版本快照，旧的留着 | `/api/v1/note/version/create` | ✓ | ✓ | ✓ | ✓ |
+| `note.update` | 给笔记改标题、页面树位置或关联工单 | `/api/v1/note/update` | ✓ | ✓ |   |   |
+| `note.delete` | 删掉一篇笔记 | `/api/v1/note/delete` | ✓ | ✓ |   |   |
+| `note.previewDelete` | 试删一篇笔记：说会删掉什么，不真删 | `/api/v1/note/previewDelete` | ✓ | ✓ |   |   |
+| `note.tree.move` | 在页面树中移动或重排笔记节点（自动校验环路） | `/api/v1/note/tree/move` | ✓ | ✓ | ✓ | ✓ |
+| `note.link.list` | 列出笔记或工单的出站双向链接（[[note:...]] / [[issue:...]]）与反向链接 | `/api/v1/note/link/list` | ✓ | ✓ | ✓ | ✓ |
+| `note.doc.view` | 读取块文档（Doc）的结构化内容块、字数、分页与外链投影 | `/api/v1/note/doc/view` | ✓ | ✓ | ✓ | ✓ |
+| `note.doc.appendBlock` | 向块文档（Doc）追加一个结构化内容块并刷新双向链接索引 | `/api/v1/note/doc/appendBlock` | ✓ | ✓ | ✓ | ✓ |
+| `note.base.view` | 读取多维库（Base）指定工作表与视图经过筛选、排序、分组和汇总后的投影 | `/api/v1/note/base/view` | ✓ | ✓ | ✓ | ✓ |
+| `note.base.upsertRow` | 在多维库（Base）工作表中新增或更新一行数据 | `/api/v1/note/base/upsertRow` | ✓ | ✓ | ✓ | ✓ |
+| `note.base.runAgentColumn` | 在多维库（Base）指定行上触发 Agent 动作列执行并回写结果或生成工单 | `/api/v1/note/base/runAgentColumn` | ✓ | ✓ | ✓ |   |
+| `note.type.list` | 列出全部 4 类笔记基元（块文档、多维库、自由画布、媒体记录） | `/api/v1/note/type/list` | ✓ | ✓ | ✓ | ✓ |
+| `note.type.read` | 读取一种笔记基元的规范或参考分册 | `/api/v1/note/type/read` | ✓ | ✓ | ✓ | ✓ |
+| `note.file.list` | 列出笔记目录中的文件（manifest.json、structure/* 与 asset/*） | `/api/v1/note/file/list` | ✓ | ✓ | ✓ | ✓ |
+| `note.file.get` | 按相对路径读取笔记目录中的一个文件（可指定历史版本快照） | `/api/v1/note/file/get` | ✓ | ✓ | ✓ | ✓ |
+| `note.file.write` | 原子写入一个或多个文件到笔记目录的 structure/ 或 asset/，记录来源并同步协作状态 | `/api/v1/note/file/write` | ✓ | ✓ | ✓ | ✓ |
+| `note.file.delete` | 删除笔记目录中 structure/ 或 asset/ 下的指定文件，记录来源并同步协作状态 | `/api/v1/note/file/delete` | ✓ | ✓ | ✓ | ✓ |
+| `note.suggestion.list` | 列出笔记上的改写建议，没答的和答过的 | `/api/v1/note/suggestion/list` | ✓ | ✓ | ✓ | ✓ |
+| `note.suggestion.create` | 对笔记目录中的文件或目标提出改写建议 | `/api/v1/note/suggestion/create` | ✓ | ✓ | ✓ | ✓ |
+| `note.suggestion.accept` | 接受一条改写建议 | `/api/v1/note/suggestion/accept` | ✓ | ✓ |   |   |
+| `note.suggestion.reject` | 拒绝一条改写建议 | `/api/v1/note/suggestion/reject` | ✓ | ✓ |   |   |
+| `note.presence.update` | 更新实时在场状态（光标、选区、高亮区域或视口），仅驻留内存不落库 | `/api/v1/note/presence/update` | ✓ | ✓ | ✓ | ✓ |
+| `note.history.list` | 列出笔记的协作提交时间线，最新的在前 | `/api/v1/note/history/list` | ✓ | ✓ |   |   |
+| `note.history.preview` | 只读预览指定历史前沿上的笔记快照 | `/api/v1/note/history/preview` | ✓ | ✓ |   |   |
+| `note.history.restore` | 把笔记恢复到指定历史前沿并记为一次新提交 | `/api/v1/note/history/restore` | ✓ | ✓ |   |   |
+| `note.history.fork` | 从指定的历史前沿分叉出一篇新笔记 | `/api/v1/note/history/fork` | ✓ | ✓ |   |   |
+| `note.history.undoOrigin` | 按提交来源选择性撤销某一轮的改动，保留其他人的并发编辑 | `/api/v1/note/history/undoOrigin` | ✓ | ✓ |   |   |
+| `note.history.compact` | 把较早的操作历史压缩成浅快照，当前内容保持不变 | `/api/v1/note/history/compact` | ✓ | ✓ |   |   |
+| `note.collab.export` | 按版本向量导出笔记的 Loro 增量同步更新或快照 | `/api/v1/note/collab/export` | ✓ | ✓ | ✓ | ✓ |
+| `note.collab.import` | 导入端上的 Loro 增量更新并合入笔记目录，可选返回服务端缺失增量 | `/api/v1/note/collab/import` | ✓ | ✓ |   |   |
+| `note.cover.set` | cap.op.note.cover.set | `/api/v1/note/cover/set` | ✓ | ✓ |   |   |
 
 ## game
 
@@ -282,7 +281,6 @@ MOSS Live 语音通话
 |---|---|---|---|---|---|---|
 | `game.shop.list` | 列出田头小摊里的庭院摆件和工单模板 | `/api/v1/game/shop/list` | ✓ | ✓ |   |   |
 | `game.shop.buy` | 用金币买一件庭院摆件或工单模板 | `/api/v1/game/shop/buy` | ✓ | ✓ |   |   |
-| `game.daily.list` | 列出今天的每日任务和自动结算金币 | `/api/v1/game/daily/list` | ✓ | ✓ |   |   |
 
 ## runtime
 
@@ -336,6 +334,7 @@ GitHub 的检测：gh 装没装、登没登录
 | `agent.validate` | 看每份角色现在派活哪里不对，没存的草稿也看 | `/api/v1/agent/validate` | ✓ | ✓ |   |   |
 | `agent.create` | 新建一份角色 | `/api/v1/agent/create` | ✓ |   |   |   |
 | `agent.update` | 改一份角色（整份写入） | `/api/v1/agent/update` | ✓ |   |   |   |
+| `agent.register` | 幂等登记或更新一个外部编程队友并分配稳定 W-XX 编号 | `/api/v1/agent/register` | ✓ | ✓ |   |   |
 | `agent.delete` | 删掉一份角色 | `/api/v1/agent/delete` | ✓ |   |   |   |
 | `agent.previewDelete` | 试删一份角色：说会删掉什么，不真删 | `/api/v1/agent/previewDelete` | ✓ |   |   |   |
 | `agent.template.list` | 列出能装的角色模板：内置的，再是加进来的 | `/api/v1/agent/template/list` | ✓ | ✓ |   |   |

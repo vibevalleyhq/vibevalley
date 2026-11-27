@@ -1,6 +1,6 @@
 # 附件
 
-农场留下的一份文件与统一后端抽象（`Storage` / `StorageBackend`，`crates/server/src/storage/`）：附件按内容 SHA-256 存一次，有名字、媒体类型和大小。消息带着附件的 id（界面叫「附件」），媒体任务的结果和输入、素材库条目及作品目录均通过 `storage/` 统一读写底层存储后端。
+农场留下的一份文件与统一后端抽象（`Storage` / `StorageBackend`，`crates/server/src/storage/`）：附件按内容 SHA-256 存一次，有名字、媒体类型和大小。消息带着附件的 id（界面叫「附件」），媒体任务的结果和输入、素材库条目及笔记目录均通过 `storage/` 统一读写底层存储后端。
 
 ## 管什么，不管什么
 
@@ -8,7 +8,7 @@
 |---|---|
 | `server.db` 的表 `attachment` 记名字、类型、大小；`StorageBackend` 读写对象字节与本地读穿缓存 | 消息怎么带它、怎么画（[频道](docs/subsystems/channel.md)） |
 | 上传（`attachment.create`）：空的、超过上限的拒绝 | 生成和下载结果的任务（[媒体](docs/subsystems/media.md)） |
-| 按 id 读回字节和类型，经 `GET /api/v1/attachment/<id>` 走统一 `serve_file_range` 带沙箱返回 | 素材的来路和列表（[素材库](docs/subsystems/media.md#素材库)，`crates/server/src/artifact/library.rs`） |
+| 按 id 读回字节和类型，经 `GET /api/v1/attachment/<id>` 走统一 `serve_file_range` 带沙箱返回 | 素材的来路和列表（[素材库](docs/subsystems/media.md#素材库)，`crates/server/src/note/library.rs`） |
 
 ## 在哪
 
@@ -32,23 +32,23 @@
 - **上限**：经 `attachment.create` 上传的单个 25MB（`attachmentMax`），以 Base64 走请求体；媒体的输入写进 `attachments/.staging/media/`、记在媒体的配额里，最大 512MB，写完经 `keep_staged` 放进来。
 - **放进来时核对**：`keep_staged` 遇到同名的文件先算它的哈希，对不上（磁盘上被改过）就用新写的替换，不信任坏掉的那份。
 - **鉴权、统一 `serve_file_range` 与读回沙箱**：`GET /api/v1/attachment/<id>` 经 `Router` 校验 `CallerContext`（允许本机 `Caller::User` 与已认证 `Caller::Remote`，支持 `Authorization: Bearer` 头或 `?token=` 查询参数），与 `media::content` 共用 `serve_file_range` 流式响应：`Accept-Ranges: bytes`、`206 Partial Content`、`Content-Range`、0 字节文件在带 `Range` 时返回 `416`（`bytes */0`）否则返回 `200`（`content-length: 0`）、`X-Content-Type-Options: nosniff`、`Content-Security-Policy: sandbox`、RFC 5987 `Content-Disposition: inline; filename*=UTF-8''...` 与不可变长期缓存。
-- **只增不改**：附件不随消息、任务、Artifact 或素材删除而删。现在没有回收：没人引用的附件留在存储上，要回收得先数清所有引用它的地方。
+- **只增不改**：附件不随消息、任务、笔记或素材删除而删。现在没有回收：没人引用的附件留在存储上，要回收得先数清所有引用它的地方。
 
 ## 和谁打交道
 
 - **频道**：发消息时用 `of` 核对带的附件都在；给帮工的信封里附上本地或读穿缓存路径。
 - **媒体**：生图、语音、对白的结果用 `attach` 存成附件；为理解、克隆、转写上传的输入和生成的音频结果流式写进 `staging/media/`，经 `keep_staged` 成为附件，媒体只记它的使用（`media_input`：阶段、到期、哪些任务在用）。
-- **Artifact**：作品目录 `<storage>/artifact/<id>/` 与版本快照通过同一 `Storage` / `StorageBackend` 持久化（[Artifact](docs/subsystems/artifact.md)）。
+- **Note**：笔记目录 `<storage>/note/<id>/` 与版本快照通过同一 `Storage` / `StorageBackend` 持久化（[Note](docs/subsystems/note.md)）。
 - **素材库**：用户上传的、帮工拿回来的文件经 `attach` 存，按 id 认素材。
 
 ## 为什么这样
 
 - **附件与后端实现收在 `storage/` 内部，不引入 `object_store` / `aws-sdk-s3`**：服务端只需 6 个窄对象原语与标准 SigV4，复用既有 `reqwest` + `sha2` + `jiff` 可在零新增 Cargo 依赖下完整掌控 `Secret` 脱敏与错误边界；通过读穿缓存隔离 `local_path()` 差异，避免上层 `channel` / `issue` / `media` / `gateway` 按存储后端类型分支。
-- **只有一处存字节、统一响应安全头**：Artifact、媒体与素材库共用 `Storage`；`attachment` 与 `media::content` 共用 `serve_file_range`，避免重复拼接 HTTP `Range` 时遗漏 `nosniff` 与 `sandbox` 防护。
+- **只有一处存字节、统一响应安全头**：Note、媒体与素材库共用 `Storage`；`attachment` 与 `media::content` 共用 `serve_file_range`，避免重复拼接 HTTP `Range` 时遗漏 `nosniff` 与 `sandbox` 防护。
 
 ## 怎么验证
 
 - `crates/server/tests/media_inputs.rs`：媒体输入经暂存放进附件、删输入不删还被引用的字节、伪装的文件和不对的大小被拒。
 - `crates/server/src/storage/` 单测与 Mock S3 集成测试：`LocalFsBackend`、`MemoryBackend`、`S3Backend`（SigV4 测试向量、分页 `ListObjectsV2`、读穿缓存与远端恢复）。
 - `crates/server/src/gateway/http/tests.rs`：`serve_file_range` 的 `nosniff`/`sandbox`/RFC 5987 安全头、Byte-Range `206` 与 0 字节回归测试。
-- `crates/server/tests/channel.rs`、`crates/server/tests/artifact.rs`、`crates/server/tests/library.rs`：带附件的消息、作品目录与素材经存储存取。
+- `crates/server/tests/channel.rs`、`crates/server/tests/note.rs`、`crates/server/tests/library.rs`：带附件的消息、笔记目录与素材经存储存取。

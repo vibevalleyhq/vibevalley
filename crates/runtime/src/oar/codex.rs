@@ -648,19 +648,37 @@ impl Shared {
             Ok(result) => json!({ "id": id, "result": result }),
             Err((code, message)) => json!({ "id": id, "error": { "code": code, "message": message } }),
         };
-        if let Ok(child) = self.child() {
-            let _ = child.write_json(&message).await;
+        match self.child() {
+            Ok(child) => {
+                if let Err(err) = child.write_json(&message).await {
+                    tracing::error!(request_id = %id, error = %err, "codex JSON-RPC reply write failed");
+                }
+            }
+            Err(err) => {
+                tracing::warn!(request_id = %id, error = %err, "codex JSON-RPC reply dropped: child process unavailable");
+            }
         }
     }
 
     async fn interrupt(&self, session: &SessionState, turn_id: &str) {
-        let _ = self
+        if let Err(err) = self
             .call_async("turn/interrupt", json!({ "threadId": session.thread_id, "turnId": turn_id }), Box::new(|_| {}))
-            .await;
+            .await
+        {
+            tracing::warn!(thread_id = %session.thread_id, turn_id, error = %err, "codex turn/interrupt call failed");
+        }
     }
 
     async fn on_line(&self, line: &str) {
-        let Ok(message) = serde_json::from_str::<Value>(line) else { return };
+        let message = match serde_json::from_str::<Value>(line) {
+            Ok(v) => v,
+            Err(err) => {
+                if !line.trim().is_empty() {
+                    tracing::warn!(error = %err, line_len = line.len(), "codex dropped malformed JSON stdout line");
+                }
+                return;
+            }
+        };
         let method = str_of(&message, "method");
         let id = message.get("id").filter(|id| !id.is_null());
         match (method, id) {

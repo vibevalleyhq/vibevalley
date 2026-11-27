@@ -278,7 +278,31 @@ impl Pull {
             PublishPlatform::Github => &self.gh,
             PublishPlatform::Gitlab => &self.glab,
         };
-        publish::remote_pull_state(&hosted, number, runner).await
+        publish::remote_pull_state(&hosted, number, runner, self.publisher.github_rest()).await
+    }
+
+    /// Merges a pull/merge request remotely (`PUT /pulls/{n}/merge` or CLI) and settles any tracked record.
+    pub async fn merge_pull_async(
+        &self,
+        repo: &str,
+        number: i64,
+        platform: Option<PublishPlatform>,
+        method: Option<&str>,
+    ) -> Result<PullRequestState, ApiError> {
+        let hosted = self.hosted_repo_of_async(repo, platform).await?;
+        self.publisher.merge_pull_async(&hosted, number, method).await?;
+        let existing = self.find(repo, number).or_else(|| self.find(&hosted.name, number));
+        if let Some(row) = existing {
+            if let Err(err) = self.set_state_async(&row.id, PullRequestState::Merged, now()).await {
+                tracing::warn!(pull_id = %row.id, error = %err, "pull.merge failed to persist merged PR state");
+            }
+            if let (Some(board), Some(issue_id)) = (self.board.as_ref(), row.issue_id.as_deref())
+                && let Err(err) = board.settle_pull_async(issue_id, PullRequestState::Merged).await
+            {
+                tracing::warn!(pull_id = %row.id, issue_id, error = %err, "pull.merge failed to settle linked issue");
+            }
+        }
+        Ok(PullRequestState::Merged)
     }
 
     /// Publishes a branch via `Publisher::submit_async` and durably tracks non-dry-run
@@ -312,7 +336,7 @@ impl Pull {
     /// Fetches a GitHub pull request snapshot (`checks`, `reviews`, `comments`).
     pub async fn snapshot_async(&self, repo: &str, number: i64) -> Result<GitHubPullSnapshot, ApiError> {
         let remote = self.github_remote_async(repo).await?;
-        snapshot::fetch_snapshot(&self.gh, &remote, number).await
+        snapshot::fetch_snapshot(&self.gh, self.publisher.github_rest(), &remote, number).await
     }
 
     /// `repo.pr.submit`: domain router handler for submitting a branch as a PR/MR.

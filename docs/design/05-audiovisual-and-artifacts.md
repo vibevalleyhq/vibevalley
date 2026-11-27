@@ -1,6 +1,6 @@
-# 第五篇：视听多媒体、Artifact 与终端交互物理学
+# 第五篇：视听多媒体、Note 笔记与终端交互物理学
 
-工作台的音频通话、素材库查看、弹性分栏、Artifact 演示与原生 Diff/文件/终端之间，统一遵守「原生重资产 + 工作台轻量协调」边界：重解码、实时 PCM、语法高亮和终端网格光栅全部放在 Rust 进程侧执行，工作台仅持有结构化视图和调度指令。
+工作台的音频通话、素材库查看、弹性分栏、Note 笔记与原生 Diff/文件/终端之间，统一遵守「原生重资产 + 工作台轻量协调」边界：重解码、实时 PCM、语法高亮和终端网格光栅全部放在 Rust 进程侧执行，工作台仅持有结构化视图和调度指令。
 
 ## 5.1 原生音频管线与程序化音效合成
 
@@ -13,7 +13,7 @@
 - **语音朗读状态机（`apps/mac/src/speech_audio.rs`）**：围绕四态枚举 `Phase` 运转：`Idle` → `Playing` → `Draining` → `Stopping`，并通过 `Claim` 句柄绑定服务端 `SharedSpeechStreams` 的生命周期回收通知。
 - **实时双工通话（`apps/mac/src/live_voice.rs`）**：独立 `moss-live` 线程建立 WebSocket 语音流，维护四态 `Phase`（`Idle` / `Connecting` / `Live` / `Stopping`）、静音开关 `muted` 以及实时识别双轨字幕 `heard` / `said`。
 
-### 程序化音效合成器（`apps/mac/src/audio.rs` 与 `apps/mac/ui/design/sound.ts`）
+### 程序化音效合成器（`apps/mac/src/audio.rs` 与 `apps/mac/ui/infra/sound.ts`）
 
 纸雕农场的界面动作与帮工提示音由原生合成器实时计算 PCM 波形并缓存标准 WAV 字节序列：
 
@@ -27,8 +27,8 @@
 - **灯箱（`Lightbox.tsx`）**：点击图片或媒体附件后全屏浮动于页面上方（`bg-scrim z-30`），一次展示一张，支持键盘左右方向键（`left`/`right`）翻页、ESC 关闭以及「用系统应用打开原文件」。
 - **附件去重与展示（`AttachmentTile.tsx`）**：上传媒体经服务端按 SHA-256 哈希去重归档，工作台统一以统一磁贴渲染图标/缩略图、文件名与体积。
 - **素材库三栏布局与筛选状态机（`LibraryPage.tsx`、`Rail.tsx`、`Tiles.tsx`、`Inspector.tsx`、`libraryView.ts`）**：
-  - 左侧 `Rail` 按 `LibraryScope` 过滤媒体类别（全部、图片、音频、语音、理解任务、Artifact 等）。
-  - 中部 `Tiles` 网格展示媒体卡片与生成任务进度，由 `libraryView.ts` 显式管理文件多选/范围选择、Artifact 选中、`Lightbox` 当前索引与删除确认态（`PickMode` 与 `reconcileSelection` 在列表刷新后自动清理失效选中项）。
+  - 左侧 `Rail` 按 `ContentBucket` 过滤内容类别（全部最近、置顶收藏、已安装应用、笔记 3+1 原语、图片、音频、视频等）。
+  - 中部 `Tiles` 网格展示笔记卡片、媒体卡片与生成任务进度，由 `libraryView.ts` 显式管理文件多选/范围选择、`Lightbox` 当前索引与删除确认态（`reconcileSelection` 在列表刷新后自动清理失效选中项）。
   - 右侧 `Inspector` 按选定条目分派专用子面板（`ImagePanel.tsx` / `AudioPanel.tsx` / `SpeechPanel.tsx` / `UnderstandingPanel.tsx` / `JobFacts.tsx`）。
 
 ## 5.3 双轨弹性分栏物理学
@@ -42,18 +42,17 @@
    - 原生工作区 `/workspace` 的左侧项目栏与右侧检查器默认宽度均为 `280.0`，拖拽允许范围为 `SIDEBAR_MIN = 180.0` 到 `SIDEBAR_MAX = 560.0`。右侧检查器在窗口宽度低于 `1040.0px` 时自动隐藏（不破坏已有偏好设置）。
    - 主工作区内部通过 `vibevalley_workspace::Layout` 树支持水平/垂直任意递归切分；`SplitBounds` 缓存上一帧每个拆分节点在屏幕上的几何矩形，拖拽分割线时直接计算被共享相邻子窗格之间的精确分配比例（截断在 `[0.0, 1.0]`）。
 
-## 5.4 Artifact 三态运行时与沙箱预览
+## 5.4 Note 笔记（3+1 原语）与沙箱预览
 
-Artifact 页面实现于 `apps/mac/ui/features/artifact/`（`ArtifactsPage.tsx`、`PresenterPage.tsx`、`store.ts`、`HtmlFrame.tsx`）：
+Note 工作台页面实现于 `apps/mac/ui/features/note/`（`NotePage.tsx`、`BlockDocView.tsx`、`views/BaseView.tsx`、`views/CanvasView.tsx`、`views/MediaView.tsx`、`PresenterPage.tsx`、`store.ts`、`html.ts`）：
 
-- **三种产物形态**：
-  1. **结构化文档块（`blocks`）**：按块序列渲染的交互式富文档与图文组件。
-  2. **持久状态（`store`）**：附带状态读取与本地表单交互的持久化 Artifact。
-  3. **沙箱 HTML（`HTML`）**：由独立渲染容器（`HtmlFrame.tsx` / WKWebView 沙箱）托管运行，隔离脚本与样式污染。
+- **3+1 原语视图与沙箱**：
+  1. **24 块结构化文档（`doc`）**：由 `BlockDocView` 渲染，支持斜杠指令、`[[` 双链、GFM 表格、`chart`/`diagram`/`preview`（无 `allow-same-origin` 严格沙箱）及全屏演讲者模式。
+  2. **多维结构化数据库（`base`）**：由 `BaseView` 投影 `table`/`board`/`gallery`/`timeline` 四视图、Row=Page 侧边抽屉与批量 `agentAction` 列。
+  3. **空间画布与多媒体（`canvas` / `media`）**：由 `CanvasView`（原生 `VvWhiteboard`）与 `MediaView`（音频/转写/分镜/动效）承接；均支持 `NoteDirectoryView` 文件级预览与 Loro CRDT 实时协同。
 - **演讲者模式（`/present`，`PresenterPage.tsx`）**：
-  - 全屏独立于常规导航外框，提供当前幻灯片主视图、下一张预览窗口、演讲者备忘录与深/浅双主题切换支持。
-  - 在原生环境中多视图内容就绪依赖各自 WebView 首次绘制回执，确保讲稿同步与切换无空白帧。
-- **入口衔接**：`/artifacts` 路由与 `/library` 同归属于工作区导航的 `library` 空间，并在侧栏协同呈现频道上下文面板（`ChannelSidePane`）。
+  - 全屏独立于常规导航外框，以 `pageBreak` 块切分页面，提供当前页主视图、下一张预览、演讲者备忘录与深/浅双主题切换支持。
+- **入口衔接**：`/notes` 路由与 `/library` 同归属于工作区导航的 `content` 空间，并在侧栏协同呈现 `PageTree` 页面树与频道上下文面板（`ChannelSidePane`）。
 
 ## 5.5 原生 Diff、文件查看与可点击终端
 

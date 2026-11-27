@@ -873,6 +873,9 @@ pub struct Issue {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[cfg_attr(feature = "ts-gen", ts(as = "Option<Vec<IssueRelation>>", optional))]
     pub relations: Vec<IssueRelation>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "Option<crate::typescript::NoteId>", optional))]
+    pub body_note_id: Option<NoteId>,
 }
 
 /// Includes the Core fold `seq` that applied the mutation so clients can await state convergence.
@@ -936,6 +939,9 @@ pub struct AppliedIssue {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[cfg_attr(feature = "ts-gen", ts(as = "Option<Vec<IssueRelation>>", optional))]
     pub relations: Vec<IssueRelation>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "Option<crate::typescript::NoteId>", optional))]
+    pub body_note_id: Option<NoteId>,
     pub seq: i64,
 }
 
@@ -982,6 +988,7 @@ impl AppliedIssue {
             due_at: issue.due_at,
             owner: issue.owner,
             relations: issue.relations,
+            body_note_id: issue.body_note_id,
             seq,
         }
     }
@@ -1751,6 +1758,26 @@ pub struct BacklogTriageDismissInput {
     pub id: String,
 }
 
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct IssueBodyEnsureInput {
+    pub id: String,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct IssueBodyEnsureResult {
+    pub issue: Issue,
+    pub note: Note,
+    pub doc_view: DocView,
+}
+
 #[cfg(feature = "ts-gen")]
 crate::typescript::module! {
     "issue";
@@ -1840,6 +1867,8 @@ crate::typescript::module! {
     IssueDigestGetInput,
     BacklogTriageSuggestInput,
     BacklogTriageConfirmInput,
-    BacklogTriageDismissInput];
+    BacklogTriageDismissInput,
+    IssueBodyEnsureInput,
+    IssueBodyEnsureResult];
     aliases: [];
 }

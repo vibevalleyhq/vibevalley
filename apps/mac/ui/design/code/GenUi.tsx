@@ -4,12 +4,23 @@
 import { signal, Text, untracked, View } from "nsh";
 import { z } from "zod";
 
-import { richNative, type VvGenUiActionEvent } from "../../infra/rich";
+import { jsonString } from "@vibevalley/protocol/schema";
+
+import { useDesignHost, type DesignGenUiActionEvent } from "../host";
+
+/** Formats a GenUI action event into a concise human-readable line for toasts or channel feedback. */
+export function formatGenUiAction(event: DesignGenUiActionEvent): string {
+  const action = event.action.trim();
+  const payload = event.payload.trim();
+  if (action === "state_change") return payload;
+  if (!action) return payload;
+  return payload ? `${action}: ${payload}` : action;
+}
 
 export interface GenUiProps {
   spec: string;
   streaming?: boolean;
-  onAction?: (event: VvGenUiActionEvent) => void;
+  onAction?: (event: DesignGenUiActionEvent) => void;
   class?: string | undefined;
 }
 
@@ -42,6 +53,7 @@ const FallbackPatchSchema = z.discriminatedUnion("op", [
   z.object({ op: z.literal("state_init"), state: z.record(z.string(), z.unknown()) }),
   z.object({ op: z.literal("set_node"), node: z.unknown() }),
 ]);
+const FallbackPatchJsonSchema = jsonString(FallbackPatchSchema);
 
 function parseFallbackSpec(spec: string): { title?: string; state: Record<string, unknown>; controls: FallbackControl[] } {
   let title: string | undefined;
@@ -50,13 +62,7 @@ function parseFallbackSpec(spec: string): { title?: string; state: Record<string
   for (const rawLine of spec.split(/\r?\n/u)) {
     const line = rawLine.trim();
     if (!line.startsWith("{")) continue;
-    let parsedJson: unknown;
-    try {
-      parsedJson = JSON.parse(line);
-    } catch {
-      continue;
-    }
-    const patch = FallbackPatchSchema.safeParse(parsedJson);
+    const patch = FallbackPatchJsonSchema.safeParse(line);
     if (!patch.success) continue;
     switch (patch.data.op) {
       case "title":
@@ -76,7 +82,7 @@ function parseFallbackSpec(spec: string): { title?: string; state: Record<string
 }
 
 export function GenUi(props: GenUiProps) {
-  const native = richNative();
+  const native = useDesignHost().rich();
   if (native) {
     const VvGenUi = native.VvGenUi;
     return <VvGenUi spec={props.spec} streaming={props.streaming} onAction={props.onAction} class={props.class} />;
@@ -102,7 +108,7 @@ function asTabs(c: FallbackControl) {
   return c.kind === "tabs" ? c : undefined;
 }
 
-function GenUiFallback(props: { spec: string; onAction?: ((event: VvGenUiActionEvent) => void) | undefined; class?: string | undefined }) {
+function GenUiFallback(props: { spec: string; onAction?: ((event: DesignGenUiActionEvent) => void) | undefined; class?: string | undefined }) {
   const parsed = () => parseFallbackSpec(props.spec);
   const overrides = signal<Record<string, unknown>>({});
   const stateOf = (bind: string): unknown => {

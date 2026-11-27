@@ -1,6 +1,7 @@
 //! `cron.*` and the ticker over the whole server (VibeValley
 //! `cron.test.ts`, the parts that are not `vibevalley-cron`'s rules).
 
+use crate::support::RouterTestExt as _;
 use std::sync::Arc;
 use std::time::Duration;
 

@@ -6,27 +6,27 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，和 [Multica](https://gi
 
 ## Host 和 Space
 
-本机有一套 **Host**（`$VIBEVALLEY_HOME`，默认 `~/.vibevalley`）：只放跨空间共用的东西，模型密钥、引擎探测、全局角色模板和日志。业务都在 **Space**（`$VIBEVALLEY_WORK_ROOT`，默认 `~/vibevalley-dev`）里：一个 Space 是一套独立的工作，换一个目录就是换一个 Space。
+本机有一套 **Host**（`$VIBEVALLEY_HOME`，默认 `~/.vibevalley`）：只放跨空间共用的东西，模型密钥、环境探测、全局角色模板和日志。业务都在 **Space**（`$VIBEVALLEY_WORK_ROOT`，默认 `~/vibevalley-dev`）里：一个 Space 是一套独立的工作，换一个目录就是换一个 Space。
 
 ```
-Host（~/.vibevalley：密钥、引擎、全局角色模板）
+Host（~/.vibevalley：密钥、环境、全局角色模板）
 └── Space（<space>/：repos、worktrees、AGENTS.md）
     ├── Repo（<space>/repos/<name>，一个 git 仓库，地图上的一座岛）
     │   └── Worktree（<space>/worktrees/<repo>.<issue>，任务的检出）
     ├── Issue（任务，可以指一个 Repo）
     │   ├── Assignment → Agent 角色
     │   └── IssueThread → Channel
-    └── Artifact（作品，含 outline 大纲笔记）
+    └── Note（笔记，3+1 原语：doc、base、canvas、media）
 ```
 
-一个 Space 有若干个 **Repo**、若干个 **Issue** 和若干份 **Artifact**。Repo 是仓库本身；Issue 归 Space，用 `repo` 指向它要改的仓库，也可以不指（只调研、只写大纲或文档）；指了仓库且角色开了 worktree 时，才为它切出 **Worktree**。Agent、Session、Run 是在这个 Space 里运行与协同的实体。
+一个 Space 有若干个 **Repo**、若干个 **Issue** 和若干份 **Note**。Repo 是仓库本身；Issue 归 Space，用 `repo` 指向它要改的仓库，也可以不指（只调研、只写文档或方案）；指了仓库且角色开了 worktree 时，才为它切出 **Worktree**。Agent、Session、Run 是在这个 Space 里运行与协同的实体。
 
 现在任务、频道这些状态仍在 Host 的库里（`$VIBEVALLEY_HOME/server.db`），切换 Space 目前只切 `repos/` 和 `worktrees/`；原拟由每个 Space 单独持有本地 `server.db` 的方案已退役，后续按 `#36`（Hub/Machine 解耦与按空间隔离）推进。
 
 ## 一件活怎么走
 
 1. 用户或主助手写下一个**任务**，选一个 **Agent 角色**和一个**仓库**，派出去。
-2. 服务端开一个 **Session（执行会话）**：角色在一个引擎（runtime）上接下这份活。角色开了 worktree 时，它在这个任务的 worktree 里、任务的分支上工作（`vibevalley/issue-<任务号>`）；没开时在仓库目录里工作。
+2. 服务端开一个 **Session（执行会话）**：角色在一个环境（runtime）上接下这份活。角色开了 worktree 时，它在这个任务的 worktree 里、任务的分支上工作（`vibevalley/issue-<任务号>`）；没开时在仓库目录里工作。
 3. 每次 **run** 从一次触发开始（派出去、一条 comment、前置子任务完成、定时任务），到一次汇报结束；中间每一步都记下来。
 4. 用户看**改动**，决定**完成**还是**取消**。完成是任务的结论，交付另记：本地合进主分支、PR 合入、提交了 PR、保留分支或没有改动要合；取消是不再做，分支上有提交就留着（[完成和交付](docs/subsystems/issue.md#完成和交付)）。
 
@@ -34,7 +34,7 @@ Host（~/.vibevalley：密钥、引擎、全局角色模板）
 
 ## Session 和 oar 会话
 
-单写的 Session 指一个角色持续运行的执行上下文（工作台叫**执行会话**），可以处理任务，也可以承接频道里的对话。引擎那一层（oar 的会话，重启后会换一个）在代码里只经 oar 的 import 出现，文档里写「oar 会话」；中文里我们这一层写 Session 或执行会话（[Session 概念](docs/subsystems/session.md)）。
+单写的 Session 指一个角色持续运行的执行上下文（工作台叫**执行会话**），可以处理任务，也可以承接频道里的对话。环境那一层（oar 的会话，重启后会换一个）在代码里只经 oar 的 import 出现，文档里写「oar 会话」；中文里我们这一层写 Session 或执行会话（[Session 概念](docs/subsystems/session.md)）。
 
 ## 东西
 
@@ -42,16 +42,16 @@ Host（~/.vibevalley：密钥、引擎、全局角色模板）
 
 | 概念 | 代码里 | 是什么 |
 |---|---|---|
-| Host | `ServerConfig` 的 `home` | 本机的 VibeValley：跨空间共用的密钥、引擎、全局角色模板和日志都在 `$VIBEVALLEY_HOME` |
+| Host | `ServerConfig` 的 `home` | 本机的 VibeValley：跨空间共用的密钥、环境、全局角色模板和日志都在 `$VIBEVALLEY_HOME` |
 | Space | `SpaceState`（核心状态）；目录是服务端 `ServerConfig` 的 `workRoot` | 一套独立的工作：`repos/`、`worktrees/`；同时运行的上限（6）是它的 |
 | 主助手 | `Orchestrator` | 用户的统筹 agent：听用户说，拆成任务，派出去，转告结果 |
-| Agent 角色 | `Agent` | 能派活的「同事」：引擎、模型、人设、技能、MCP、环境变量、长相 |
-| 引擎 | `RuntimeInfo` | 本机上的一种编码 agent 程序，由 oar 驱动 |
+| Agent 角色（工作台称「队友」） | `Agent` | 能派活的「同事」：环境、模型、人设、技能、MCP、环境变量、长相 |
+| 环境 | `RuntimeInfo` | 本机上的一种编码 agent 程序，由 oar 驱动 |
 | 仓库 | `Repo` | 一个 git 仓库，和能同时在里面做的任务数上限（`repo.max_sessions`，`RepoSummary.maxSessions`） |
 | 工作树 | `Workplace` | 一个任务在某个仓库上的检出：`<space>/worktrees/<仓库>.<任务号>`，分支 `vibevalley/issue-<任务号>`；角色不开 worktree 时不切 |
 | 任务 | `Issue` | 一件活，从写下到关上一个 id；状态由服务端给，用户挪状态就是派活；代码相关的开不开 worktree 由角色设置决定；每个都有验收，完成就是通过；关上的能重开 |
 | 派工关联 | `Assignment` | 任务由哪个角色负责；可以尚未开工，同人继续负责时跨执行上下文保留，换人或清空指派才结束 |
-| 执行器 | `Drivers`（`crates/server/src/runtime/session/driver.rs`） | 将指派的角色装配为 oar 引擎参数并开启会话；不替任务保存责任归属 |
+| 执行器 | `Drivers`（`crates/server/src/runtime/session/driver.rs`） | 将指派的角色装配为 oar 运行时参数并开启会话；不替任务保存责任归属 |
 | Session | `Session`（服务是 `Session`，派活是 `Issue` 的 `hire`） | 角色的执行上下文（界面叫执行会话）；任务使用仓库目录或任务 worktree，对话使用独立目录并关联频道；跨多轮、休眠和重启保留身份 |
 | Run | `Run`（`session_run` 表）；核心状态里由带着 `brief` 的 `sessionPhaseChanged` 事实开始、`sessionReported` 事实结束 | 一轮：一次触发到一次汇报；执行会话的一次 run 包着一个 oar turn，进程内 agent 的 loop 也记 Run |
 | 事件 | `SessionEvent`，一个 Session 的全部是它的日志 | 日志里的一条：收到的话、想、说、工具调用、重试、用量、出错，和 Run 的边界（`run/start`、`run/end`）；类型照 DeepSeek Harness 写成 `<主体>/<做了什么>` |
@@ -60,7 +60,7 @@ Host（~/.vibevalley：密钥、引擎、全局角色模板）
 | 父子任务 | `Issue.parent`、`blockedBy`（拆单输入 `IssueChildDraft`） | 一件大活拆成有先后的子任务：每个子任务是普通任务，前置做完后派发，过了检查先合进父任务分支，最后由父任务统一验收、合进主分支 |
 | 频道 | `Channel`（`type: channel`、`direct`、`thread`） | 说话的地方，照 Discord：频道、私聊和话题都是 channel；有一个默认频道（`default`，农场画成田头），用户和主助手有一个私聊（`peer`），话题挂在一个频道（`parent`）的一条消息（`root`）下面；外面的聊天软件经连接器接到一个频道上 |
 | 任务话题 | `type: thread`、`subjectKind: issue` | 一个任务下的对话，相当于 Linear 的评论 |
-| 作品 | `Artifact`（正文 `blocks`、`store` 或 `html`） | 留下来要人看的作品：协作块文档（含 `outline` 树状大纲与 `.md` 导入）、结构化多条目作品（幻灯片、看板、短片、白板、界面画板、设计体系）或按稿保存的单页网页 |
+| 笔记 | `Note`（原语 `doc`、`base`、`canvas`、`media`） | 留下来给人看和协作的结构化知识载体：24 块协作文档（`doc`）、多维结构化数据库（`base`）、空间画布白板（`canvas`）与多媒体转写工程（`media`） |
 | 定时任务 | `Cron` | 一个任务的一种触发：一个定时任务对应一个任务，派给一个角色或主助手，每次到点是它的一次 run |
 | 收件箱 | `InboxItem` | 要你处理的事，从核心状态现算（[核心状态的收件箱](docs/subsystems/core.md#收件箱)） |
 | 记忆 | `Memory` | 一个角色记得的事 |

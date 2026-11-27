@@ -7,7 +7,7 @@ use std::os::fd::OwnedFd;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, mpsc};
 use std::time::{Duration, Instant};
 
 use libghostty_vt::{
@@ -57,10 +57,10 @@ pub(crate) enum Msg {
     SelectionStart(Point, SelectionMode),
     SelectionExtend(Point),
     SelectionClear,
-    SelectionText(flume::Sender<Option<String>>),
+    SelectionText(mpsc::SyncSender<Option<String>>),
     SetTheme(Theme),
-    ScrollbackText(usize, flume::Sender<String>),
-    CommandOutput(u64, flume::Sender<Option<String>>),
+    ScrollbackText(usize, mpsc::SyncSender<String>),
+    CommandOutput(u64, mpsc::SyncSender<Option<String>>),
     OptionAsAlt(bool),
     Kill,
     Shutdown,
@@ -207,25 +207,6 @@ fn apply_theme(term: &mut Terminal<'static, 'static>, theme: &Theme) -> Result<(
     Ok(())
 }
 
-fn percent_decode(input: &[u8]) -> Vec<u8> {
-    let hex = |b: u8| (b as char).to_digit(16).map(|d| d as u8);
-    let mut out = Vec::with_capacity(input.len());
-    let mut i = 0;
-    while i < input.len() {
-        if input[i] == b'%'
-            && i + 2 < input.len()
-            && let (Some(hi), Some(lo)) = (hex(input[i + 1]), hex(input[i + 2]))
-        {
-            out.push(hi << 4 | lo);
-            i += 3;
-        } else {
-            out.push(input[i]);
-            i += 1;
-        }
-    }
-    out
-}
-
 /// Accepts what shells put in OSC 7: a `file://host/path` URL (percent
 /// encoded), kitty's unencoded `kitty-shell-cwd://host/path`, or a bare path.
 pub(crate) fn parse_pwd(raw: &[u8]) -> Option<PathBuf> {
@@ -240,7 +221,11 @@ pub(crate) fn parse_pwd(raw: &[u8]) -> Option<PathBuf> {
     };
     let start = rest.iter().position(|b| *b == b'/')?;
     let path = &rest[start..];
-    let bytes = if encoded { percent_decode(path) } else { path.to_vec() };
+    let bytes: Vec<u8> = if encoded {
+        percent_encoding::percent_decode(path).collect()
+    } else {
+        path.to_vec()
+    };
     Some(PathBuf::from(std::ffi::OsString::from_vec(bytes)))
 }
 
@@ -961,7 +946,7 @@ impl Session {
         true
     }
 
-    fn run(&mut self, rx: &flume::Receiver<Msg>) {
+    fn run(&mut self, rx: &mpsc::Receiver<Msg>) {
         loop {
             let now = Instant::now();
             self.on_timers(now);
@@ -970,16 +955,16 @@ impl Session {
             }
             let msg = match rx.try_recv() {
                 Ok(msg) => msg,
-                Err(flume::TryRecvError::Disconnected) => return,
-                Err(flume::TryRecvError::Empty) => {
+                Err(mpsc::TryRecvError::Disconnected) => return,
+                Err(mpsc::TryRecvError::Empty) => {
                     let received = match self.next_deadline(now) {
-                        Some(deadline) => rx.recv_deadline(deadline),
-                        None => rx.recv().map_err(|_| flume::RecvTimeoutError::Disconnected),
+                        Some(deadline) => rx.recv_timeout(deadline.saturating_duration_since(Instant::now())),
+                        None => rx.recv().map_err(|_| mpsc::RecvTimeoutError::Disconnected),
                     };
                     match received {
                         Ok(msg) => msg,
-                        Err(flume::RecvTimeoutError::Timeout) => continue,
-                        Err(flume::RecvTimeoutError::Disconnected) => return,
+                        Err(mpsc::RecvTimeoutError::Timeout) => continue,
+                        Err(mpsc::RecvTimeoutError::Disconnected) => return,
                     }
                 }
             };
@@ -992,7 +977,7 @@ impl Session {
     /// Last handle dropped: run two-stage graceful shutdown (`SIGINT` to
     /// foreground job -> `SIGHUP` to shell -> `SIGKILL` fallback) so jobs and
     /// shells can flush state/history before teardown.
-    fn shutdown(&mut self, rx: &flume::Receiver<Msg>) {
+    fn shutdown(&mut self, rx: &mpsc::Receiver<Msg>) {
         if self.child_exit.is_none() {
             self.start_graceful_kill(Instant::now());
             while self.child_exit.is_none() && self.shutdown_stage != ShutdownStage::None {
@@ -1001,22 +986,22 @@ impl Session {
                 let Some(deadline) = self.shutdown_step_deadline(now) else {
                     break;
                 };
-                match rx.recv_deadline(deadline) {
+                match rx.recv_timeout(deadline.saturating_duration_since(Instant::now())) {
                     Ok(Msg::ChildExited(code)) => {
                         self.child_exit = Some(code);
                         break;
                     }
                     Ok(Msg::Pty(data)) => self.pty.budget.release(data.len()),
                     Ok(_) => {}
-                    Err(flume::RecvTimeoutError::Timeout) => {}
-                    Err(flume::RecvTimeoutError::Disconnected) => break,
+                    Err(mpsc::RecvTimeoutError::Timeout) => {}
+                    Err(mpsc::RecvTimeoutError::Disconnected) => break,
                 }
             }
             if self.child_exit.is_none() {
                 self.force_kill();
                 let reap_deadline = Instant::now() + REAP_GRACE;
                 loop {
-                    match rx.recv_deadline(reap_deadline) {
+                    match rx.recv_timeout(reap_deadline.saturating_duration_since(Instant::now())) {
                         Ok(Msg::ChildExited(code)) => {
                             self.child_exit = Some(code);
                             break;
@@ -1039,9 +1024,9 @@ pub(crate) fn run_with_history(
     history: &str,
     pty: Pty,
     shared: Arc<Shared>,
-    rx: flume::Receiver<Msg>,
+    rx: mpsc::Receiver<Msg>,
     on_event: Box<dyn Fn(TermEvent)>,
-    ready: flume::Sender<Result<(), TermError>>,
+    ready: mpsc::SyncSender<Result<(), TermError>>,
 ) {
     let mut session = match Session::new(&opts, pty, shared, on_event) {
         Ok(session) => session,
@@ -1064,6 +1049,7 @@ pub(crate) fn run_with_history(
 
 #[cfg(test)]
 mod tests {
+    use std::sync::mpsc;
     use std::time::{Duration, Instant};
 
     use crate::{Rgb, SpawnOptions, TermEvent, TermSession, TermSize, Theme};
@@ -1116,7 +1102,7 @@ mod tests {
             .join("\n")
     }
 
-    fn wait_for_screen(session: &TermSession, events: &flume::Receiver<TermEvent>, needle: &str) {
+    fn wait_for_screen(session: &TermSession, events: &mpsc::Receiver<TermEvent>, needle: &str) {
         let deadline = Instant::now() + Duration::from_secs(10);
         loop {
             let text = screen_text(session);
@@ -1135,7 +1121,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let fg_marker = dir.path().join("fg_sigint");
         let shell_marker = dir.path().join("shell_sighup");
-        let (tx, rx) = flume::unbounded();
+        let (tx, rx) = mpsc::channel();
         let session = TermSession::spawn(spawn_opts("/bin/zsh", &["-f", "-i"]), move |ev| {
             let _ = tx.send(ev);
         })
@@ -1165,7 +1151,7 @@ mod tests {
 
     #[test]
     fn graceful_shutdown_falls_back_to_sigkill_when_foreground_ignores_sigint_and_sighup() {
-        let (tx, rx) = flume::unbounded();
+        let (tx, rx) = mpsc::channel();
         let session = TermSession::spawn(spawn_opts("/bin/sh", &["-c", "trap '' INT HUP; echo STUCK_READY; sleep 30"]), move |ev| {
             let _ = tx.send(ev);
         })
@@ -1188,7 +1174,7 @@ mod tests {
     fn graceful_shutdown_waits_sigint_grace_then_sighups_stubborn_foreground_job() {
         let dir = tempfile::tempdir().unwrap();
         let shell_marker = dir.path().join("shell_sighup");
-        let (tx, rx) = flume::unbounded();
+        let (tx, rx) = mpsc::channel();
         let session = TermSession::spawn(spawn_opts("/bin/zsh", &["-f", "-i"]), move |ev| {
             let _ = tx.send(ev);
         })

@@ -1,9 +1,8 @@
 import { Clipboard, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
-import type { ArtifactId, MediaAudioJob, MediaCloneRequest, Preview } from "@vibevalley/protocol";
+import type { MediaAudioJob, MediaCloneRequest, NoteId, Preview } from "@vibevalley/protocol";
 
-import { createAct } from "../../../design/act";
 import { Button } from "../../../design/Button";
 import { ConfirmButton } from "../../../design/ConfirmButton";
 import { Field, TextInput } from "../../../design/Field";
@@ -13,11 +12,14 @@ import { Card, Quiet } from "../../../design/layout";
 import { CountPill, Dot } from "../../../design/Tag";
 import { TextLink } from "../../../design/TextLink";
 import { Bubble } from "../../../design/Tip";
+import { createAct } from "../../../infra/act";
 import { api, sha256Hex } from "../../../infra/api";
 import { playInput } from "../../../infra/attachmentFile";
 import { useTimeout } from "../../../infra/base/timer";
 import { useOpsSlice } from "../../../infra/frame";
+import { noteHref } from "../../note";
 import { audioTimestamp, transcriptContent } from "../audio";
+import { textToDocJson } from "../items";
 import { AudioMetadataLine, AudioUsageLine, FactGrid, JobActions, NoticeBanner, PhasePill, Refusal, ResultAudio, SourceLine } from "../JobFacts";
 import { ReleaseAssets } from "../ReleaseAssets";
 import { audioModeTitle } from "./AudioForms";
@@ -37,7 +39,7 @@ export function AudioJobCard(props: { job: MediaAudioJob }) {
     );
     return job?.kind === "clone" ? job.request : saveRequest();
   };
-  const saved = signal<ArtifactId | undefined>(undefined);
+  const saved = signal<NoteId | undefined>(undefined);
   const copied = signal(false);
   const later = useTimeout();
   const cleanupPreview = signal<Preview | undefined>(undefined);
@@ -161,13 +163,13 @@ export function AudioJobCard(props: { job: MediaAudioJob }) {
                     />
                     <Button
                       testID="audio-save-transcript"
-                      icon="artifacts"
+                      icon="notes"
                       disabled={act.busy() || Boolean(saved()) || !content()}
                       onPress={() => {
                         const text = content();
                         const input = props.job.input?.name ?? props.job.id;
                         const title = partial() ? `${input} — ${t("web.audio.partialTitle")}` : input;
-                        void act.run(async () => saved.set((await api.artifact.create({ title, artifactType: "docs", content: text })).id));
+                        void act.run(async () => saved.set((await api.note.create({ title, noteType: "doc", content: textToDocJson(text) })).id));
                       }}
                     >
                       {partial() ? t("web.audio.savePartialTranscript") : t("web.audio.saveTranscript")}
@@ -184,7 +186,7 @@ export function AudioJobCard(props: { job: MediaAudioJob }) {
                 </Text>
                 <If when={saved()}>
                   {(id) => (
-                    <TextLink href={`/artifacts/${id()}`} testid="audio-artifact">
+                    <TextLink href={noteHref(id())} testid="audio-note">
                       {t("web.audio.openTranscript")}
                     </TextLink>
                   )}

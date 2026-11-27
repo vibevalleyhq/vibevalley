@@ -284,6 +284,7 @@ pub trait LiveVoicePort: Send + Sync {
     fn asr_line(&self) -> Result<Box<dyn LiveVoiceLine>, ApiError>;
     fn can_transcribe(&self) -> bool;
     fn transcribe_wav_async(&self, wav: Vec<u8>) -> BoxFuture<'static, Result<String, ApiError>>;
+    fn polish_transcript_async(&self, raw: String) -> BoxFuture<'static, Result<String, ApiError>>;
     fn start(&self, channel: &str, uid: &str) -> Result<vibevalley_protocol::VoiceCall, ApiError>;
     fn heard(&self, agent_id: &str, text: &str, turn: Option<&str>) -> Result<(), ApiError>;
     fn said(&self, agent_id: &str, text: &str) -> Result<(), ApiError>;
@@ -314,9 +315,9 @@ pub fn refusal(code: BizCode, message: impl Into<String>) -> Envelope {
 pub(crate) enum DomainSubscription {
     ChannelFollow(<vibevalley_protocol::subscriptions::ChannelFollow as vibevalley_protocol::Subscription>::Payload),
     ChannelReports(<vibevalley_protocol::subscriptions::ChannelReports as vibevalley_protocol::Subscription>::Payload),
-    ArtifactFollow(<vibevalley_protocol::subscriptions::ArtifactFollow as vibevalley_protocol::Subscription>::Payload),
-    ArtifactSuggestionFollow(<vibevalley_protocol::subscriptions::ArtifactSuggestionFollow as vibevalley_protocol::Subscription>::Payload),
-    ArtifactPresenceFollow(<vibevalley_protocol::subscriptions::ArtifactPresenceFollow as vibevalley_protocol::Subscription>::Payload),
+    NoteFollow(<vibevalley_protocol::subscriptions::NoteFollow as vibevalley_protocol::Subscription>::Payload),
+    NoteSuggestionFollow(<vibevalley_protocol::subscriptions::NoteSuggestionFollow as vibevalley_protocol::Subscription>::Payload),
+    NotePresenceFollow(<vibevalley_protocol::subscriptions::NotePresenceFollow as vibevalley_protocol::Subscription>::Payload),
     SessionWatch(<vibevalley_protocol::subscriptions::SessionWatch as vibevalley_protocol::Subscription>::Payload),
     IssueWatch(<vibevalley_protocol::subscriptions::IssueWatch as vibevalley_protocol::Subscription>::Payload),
 }

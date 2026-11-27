@@ -86,92 +86,6 @@ pub struct SettingsUpdateVoice {
     pub greeting: Option<String>,
 }
 
-#[skip_serializing_none]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts-gen", derive(TS))]
-#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
-#[serde(rename_all = "camelCase")]
-pub struct VoiceSaid {
-    pub agent_id: String,
-    pub text: String,
-}
-
-#[skip_serializing_none]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts-gen", derive(TS))]
-#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
-#[serde(rename_all = "camelCase")]
-pub struct VoiceHeard {
-    pub agent_id: String,
-    pub text: String,
-    /// The profile the user picked; absent for none.
-    pub agent: Option<String>,
-    pub send_key: Option<String>,
-}
-
-#[skip_serializing_none]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts-gen", derive(TS))]
-#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
-#[serde(rename_all = "camelCase")]
-pub struct VoiceCallStart {
-    pub channel: String,
-    pub uid: String,
-    /// The call answers a ring: what rang, which the orchestrator says first instead of the greeting.
-    pub about: Option<String>,
-}
-
-#[skip_serializing_none]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts-gen", derive(TS))]
-#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
-#[serde(rename_all = "camelCase")]
-pub struct VoiceHearInput {
-    pub text: String,
-    pub agent: Option<String>,
-    pub send_key: Option<String>,
-}
-
-/// Credentials identifying an active server-tracked ASR dictation session.
-#[skip_serializing_none]
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts-gen", derive(TS))]
-#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
-#[serde(rename_all = "camelCase")]
-pub struct VoiceAsrGrant {
-    pub session_id: String,
-    pub model: String,
-}
-
-#[skip_serializing_none]
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts-gen", derive(TS))]
-#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
-#[serde(rename_all = "camelCase")]
-pub struct VoiceAsrStopInput {
-    pub session_id: String,
-}
-
-/// WAV audio payload submitted for one-shot MOSS transcription (`voice.asr.transcribe`).
-#[skip_serializing_none]
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts-gen", derive(TS))]
-#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
-#[serde(rename_all = "camelCase")]
-pub struct VoiceAsrTranscribeInput {
-    pub wav_base64: String,
-    pub session_id: Option<String>,
-}
-
-#[skip_serializing_none]
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts-gen", derive(TS))]
-#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
-#[serde(rename_all = "camelCase")]
-pub struct VoiceAsrResult {
-    pub text: String,
-}
-
 #[cfg(feature = "ts-gen")]
 crate::typescript::module! {
     "voice";
@@ -180,14 +94,6 @@ crate::typescript::module! {
     VoiceCall,
     VoiceGrant,
     VoiceSettings,
-    SettingsUpdateVoice,
-    VoiceSaid,
-    VoiceHeard,
-    VoiceCallStart,
-    VoiceHearInput,
-    VoiceAsrGrant,
-    VoiceAsrStopInput,
-    VoiceAsrTranscribeInput,
-    VoiceAsrResult];
+    SettingsUpdateVoice];
     aliases: [];
 }

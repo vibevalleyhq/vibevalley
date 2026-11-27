@@ -19,10 +19,10 @@ use vibevalley_core::game::{
 use vibevalley_core::rules::farm_of;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    AchievementList, Actor, AgentRole, ApiError, BizCode, CheckResult, ChooseTitleRequest, DailyTaskBoard, Doing, FarmShopView, Issue, IssueTemplate,
-    LedgerEntry, LedgerEntryCalled, LedgerEntryCheckPassed, LedgerEntryConflicted, LedgerEntryDailySettled, LedgerEntryDelivered, LedgerEntryFailed,
-    LedgerEntryHandoff, LedgerEntryHarvested, LedgerEntryHired, LedgerEntryMoment, LedgerEntryPurchased, LedgerEntryReviewCompleted, LedgerEntryReviewed,
-    LedgerEntryTitled, LedgerEntryTold, Millis, Outcome, ProjectCheckStatus, RepoStack, Session, SessionClose, SessionId, SessionPlay, ShopPurchaseRequest,
+    AchievementList, Actor, AgentRole, ApiError, BizCode, CheckResult, ChooseTitleRequest, Doing, FarmShopView, Issue, IssueTemplate, LedgerEntry,
+    LedgerEntryCalled, LedgerEntryCheckPassed, LedgerEntryConflicted, LedgerEntryDailySettled, LedgerEntryDelivered, LedgerEntryFailed, LedgerEntryHandoff,
+    LedgerEntryHarvested, LedgerEntryHired, LedgerEntryMoment, LedgerEntryPurchased, LedgerEntryReviewCompleted, LedgerEntryReviewed, LedgerEntryTitled,
+    LedgerEntryTold, Millis, Outcome, ProjectCheckStatus, RepoStack, Session, SessionClose, SessionId, SessionPlay, ShopPurchaseRequest,
 };
 
 use crate::context::Context;
@@ -661,13 +661,6 @@ impl Game {
         } else if !issue.checks.is_empty() && issue.checks.iter().all(|c| c.result == CheckResult::Met) {
             self.on_issue_check_passed(&format!("{}:checks", issue.id));
         }
-    }
-
-    pub async fn daily_list_async(&self) -> Result<DailyTaskBoard, ApiError> {
-        self.refresh_daily();
-        let day = local_day(self.ctx.now());
-        let folded = self.folded.lock();
-        Ok(daily_board_for(&folded.seen.daily, &day))
     }
 
     pub async fn shop_list_async(&self) -> Result<FarmShopView, ApiError> {

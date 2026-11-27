@@ -10,8 +10,9 @@ use vibevalley_protocol::{
     AgentRole, ApiError, BizCode, NoticeLevel, OrchestratorApproval, OrchestratorApprovalListInput, OrchestratorApprovalResolveInput, OrchestratorEval,
     OrchestratorEvalRequest, OrchestratorStopInput, Outcome, Phase, SessionCompactResult, SessionController, SessionRunCodeInput, SessionRunCodeResult,
 };
-use vibevalley_runtime::agent::Brain;
+use vibevalley_runtime::agent::ai::CancelToken;
 use vibevalley_runtime::agent::durable::Error as DurableError;
+use vibevalley_runtime::agent::{Brain, ChatRequest, Delta, Message};
 
 use super::chat::ChatIntake;
 use super::execution::{Execution, OrchestratorHost, TurnInput};
@@ -21,11 +22,11 @@ use super::types::{Input, Instance};
 use super::words::Source;
 use crate::BoxFuture;
 use crate::agent::tool::{Route, RouteSource};
-use crate::artifact::Manager as ArtifactManager;
 use crate::channel::{Chat, Posting, Saying};
 use crate::context::error::{LookIn, missing};
 use crate::context::port::{CronOrchestratorPort, VoiceOrchestratorPort};
 use crate::issue::Board;
+use crate::note::Manager as NoteManager;
 use crate::runtime::{Runtime, Step};
 
 impl OrchestratorHost for Orchestrator {
@@ -41,8 +42,8 @@ impl OrchestratorHost for Orchestrator {
         &self.issue
     }
 
-    fn artifact(&self) -> &ArtifactManager {
-        &self.artifact
+    fn note(&self) -> &NoteManager {
+        &self.note
     }
 
     fn brain_at_async<'a>(&'a self, id: &'a str, route: &'a Arc<Mutex<Route>>, model: &'a str) -> BoxFuture<'a, Brain> {
@@ -108,7 +109,7 @@ impl Orchestrator {
                 runtime: p.runtime,
                 repo: p.repo,
                 memory: p.memory,
-                artifact: p.artifact,
+                note: p.note,
                 home: p.home,
                 key: p.key,
                 client: p.client,
@@ -617,6 +618,37 @@ impl VoiceOrchestratorPort for Orchestrator {
             } else {
                 Some(reply.whole_async(wait).await)
             }
+        })
+    }
+
+    fn polish_text_async<'a>(&'a self, system: &'a str, text: &'a str) -> BoxFuture<'a, Result<String, String>> {
+        Box::pin(async move {
+            let trimmed = text.trim();
+            if trimmed.is_empty() {
+                return Ok(String::new());
+            }
+            if self.client.is_none() && (self.key)().is_none() {
+                return Ok(trimmed.to_string());
+            }
+            let req = ChatRequest {
+                model: "deepseek-flash".into(),
+                messages: vec![Message::system(system), Message::user(trimmed)],
+                temperature: Some(0.1),
+                max_tokens: Some(2048),
+                ..Default::default()
+            };
+            let cancel_token = CancellationToken::new();
+            let cancel = CancelToken::from_tokio(cancel_token.clone());
+            let mut sink = |_delta: Delta| {};
+            let completion = tokio::time::timeout(std::time::Duration::from_secs(10), self.client().complete_cancellable(&req, &cancel, &mut sink))
+                .await
+                .map_err(|_| {
+                    cancel_token.cancel();
+                    "ASR polish timed out".to_string()
+                })?
+                .map_err(|e| e.to_string())?;
+            let polished = completion.message.content.unwrap_or_default().trim().to_string();
+            Ok(if polished.is_empty() { trimmed.to_string() } else { polished })
         })
     }
 }

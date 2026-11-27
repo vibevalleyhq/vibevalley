@@ -45,13 +45,13 @@ describe("the endpoint table", () => {
     expect(missing).toEqual([]);
   });
 
-  test("is the table the server serves (crates/protocol/src/contract/endpoints.rs)", () => {
+  test("is the table the server serves (crates/protocol/src/contract/endpoints/)", () => {
     const row = (e: { op: string; can: readonly string[]; about: readonly string[]; dryRun?: string }) =>
       `${e.op} can [${e.can.join(" ")}] about [${e.about.join(" ")}]${e.dryRun ? ` dry run ${e.dryRun}` : ""}`;
     expect(endpoints.map(row).toSorted()).toEqual(servedEndpoints.map(row).toSorted());
   });
 
-  test("matches served subscription RBAC table (crates/protocol/src/contract/endpoints.rs)", () => {
+  test("matches served subscription RBAC table (crates/protocol/src/contract/endpoints/subscription.rs)", () => {
     const served = new Map<string, readonly string[]>(servedSubscriptions.map((s) => [s.name, s.can]));
     for (const [name, spec] of Object.entries(subscriptions)) {
       expect(served.get(name), `missing subscription ${name}`).toEqual(spec.can);

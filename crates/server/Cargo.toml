@@ -17,8 +17,19 @@ path = "tests/publish.rs"
 [[test]]
 name = "dual_db"
 path = "tests/dual_db.rs"
+required-features = ["postgres"]
 
 [features]
+default = ["sqlite"]
+sqlite = []
+# Test & offline verification fakes (`crate::fake::*`); never enabled in release binaries.
+fake = []
+postgres = [
+  "sea-orm/sqlx-postgres",
+  "sea-orm-migration/sqlx-postgres",
+  "sea-query/backend-postgres",
+  "vibevalley-runtime/postgres",
+]
 # Test-only model checking (`cargo xtask loom`); never enable in release binaries.
 loom = ["dep:loom"]
 
@@ -30,12 +41,18 @@ base64 = { workspace = true }
 crc32fast = "1.5.5"
 flate2 = "1.1.11"
 futures-util = { workspace = true }
+hex = { workspace = true }
+hmac = { workspace = true }
+imagesize = { workspace = true }
 include_dir = "0.7.4"
 jiff = { workspace = true }
 loom = { workspace = true, optional = true }
 parking_lot = { workspace = true }
+percent-encoding = { workspace = true }
+png = { workspace = true }
 regex = { workspace = true }
 reqwest = { workspace = true }
+roxmltree = { workspace = true }
 rustls = { workspace = true }
 sea-orm = { workspace = true }
 sea-orm-migration = { workspace = true }
@@ -44,6 +61,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 serde_path_to_error = "0.1.20"
 sha2 = { workspace = true }
+subtle = { workspace = true }
 symphonia = { version = "0.6.1", default-features = false, features = ["wav", "mp3", "isomp4", "flac", "ogg", "mkv"] }
 thiserror = { workspace = true }
 tokio = { workspace = true }
@@ -55,14 +73,17 @@ tracing-subscriber = { workspace = true }
 url = { workspace = true }
 uuid = { workspace = true }
 vibevalley-core = { version = "0.1.0", path = "../core", features = ["collab"] }
+vibevalley-files = { version = "0.1.0", path = "../files" }
 vibevalley-git = { version = "0.1.0", path = "../git" }
 vibevalley-i18n = { version = "0.1.0", path = "../i18n" }
 vibevalley-mcp = { workspace = true }
 vibevalley-protocol = { version = "0.1.0", path = "../protocol" }
 vibevalley-runtime = { version = "0.1.0", path = "../runtime" }
+zip = { workspace = true }
 
 [dev-dependencies]
 reqwest = { workspace = true, features = ["blocking"] }
 sqlx = { workspace = true, features = ["runtime-tokio"] }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["test-util"] }
+vibevalley-server = { path = ".", features = ["fake"] }

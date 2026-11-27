@@ -117,15 +117,19 @@ impl Shell {
             if let Some(earlier) = running {
                 earlier.await;
             }
-            let loaded = cx
-                .background_spawn(async move {
-                    if !path.is_dir() {
+            let loaded = vibevalley_rt::current_or_global_handle()
+                .spawn(async move {
+                    if !tokio::fs::metadata(&path).await.is_ok_and(|m| m.is_dir()) {
                         return Err(format!("{}: {}", vibevalley_i18n::t("desktop.terminal.missingFolder", &[]), path.display()));
                     }
-                    let loaded = store.and_then(|db| load_project(&*db, &path).map_err(|e| eprintln!("open project: {e}")).ok());
+                    let loaded = match store {
+                        Some(db) => load_project(&*db, &path).await.map_err(|e| eprintln!("open project: {e}")).ok(),
+                        None => None,
+                    };
                     Ok((path, loaded))
                 })
-                .await;
+                .await
+                .unwrap_or_else(|e| Err(format!("open project task failed: {e}")));
             let _ = cx.update_window(window, |_, window, cx| {
                 let _ = this.update(cx, |shell, cx| {
                     let id = loaded.map(|(path, loaded)| {
@@ -164,11 +168,11 @@ impl Shell {
     pub(super) fn after_activate(&mut self, id: ProjectId, window: &mut Window, cx: &mut Context<Self>) {
         self.ensure_project_view(id, cx);
         if let Some(store) = self.workspace.store.clone() {
-            Self::bg(
+            Self::bg_tokio(
                 cx,
-                move || {
-                    let _ = store.touch_project(id);
-                    let _ = store.set_setting(ACTIVE_KEY, &json!(id));
+                async move {
+                    let _ = store.touch_project(id).await;
+                    let _ = store.set_setting(ACTIVE_KEY, &json!(id)).await;
                 },
                 |_, _, _| {},
             );
@@ -192,7 +196,10 @@ impl Shell {
             let (Some(path), Some(store)) = (paths.into_iter().next(), store) else {
                 return;
             };
-            let loaded = cx.background_spawn(async move { load_project(&*store, &path) }).await;
+            let loaded = vibevalley_rt::current_or_global_handle()
+                .spawn(async move { load_project(&*store, &path).await })
+                .await
+                .unwrap_or_else(|e| Err(vibevalley_workspace::StoreError::Io(e.to_string())));
             let _ = cx.update_window(window_handle, |_, window, cx| {
                 let _ = this.update(cx, |s, cx| match loaded {
                     Ok(p) => {
@@ -220,11 +227,11 @@ impl Shell {
         let live: std::collections::BTreeSet<String> = self.workspace.ws.projects().iter().flat_map(|p| p.layout.terminal_ids()).collect();
         self.workspace.terminals.retain(|tid, _| live.contains(tid));
         if let Some(store) = self.workspace.store.clone() {
-            Self::bg(
+            Self::bg_tokio(
                 cx,
-                move || {
-                    let _ = job.run(&*store);
-                    let _ = store.remove_project(id);
+                async move {
+                    let _ = job.run(&*store).await;
+                    let _ = store.remove_project(id).await;
                 },
                 |_, _, _| {},
             );
@@ -378,8 +385,8 @@ impl Shell {
             if repo_roots.is_empty() {
                 return;
             }
-            let (tx, rx) = flume::bounded(1);
-            let rt = vibevalley_runtime::rt::current_or_global_handle();
+            let (tx, rx) = tokio::sync::oneshot::channel();
+            let rt = vibevalley_rt::current_or_global_handle();
             rt.spawn(async move {
                 let mut any_mounted = false;
                 for root in repo_roots {
@@ -396,7 +403,7 @@ impl Shell {
                 }
                 let _ = tx.send(any_mounted);
             });
-            if rx.recv_async().await.unwrap_or(false) {
+            if rx.await.unwrap_or(false) {
                 let _ = this.update(cx, |shell, cx| {
                     shell.chrome.workbench.update(cx, |view, cx| view.notify_repos_changed(cx));
                     shell.chrome.sidebar.update(cx, |view, cx| view.notify_repos_changed(cx));
@@ -644,12 +651,12 @@ impl Shell {
                         })
                         .unwrap_or_default();
                     let active_tab = p.layout.active_tab().map(|t| t.id);
-                    let names = crate::panes::numbered_titles(self, p.layout.tabs(), cx);
+                    let names = super::numbered_titles(self, p.layout.tabs(), cx);
                     let tabs: Vec<vibevalley_protocol::HostRailTab> = p
                         .layout
                         .tabs()
                         .map(|t| {
-                            let title = names.get(&t.id).cloned().unwrap_or_else(|| crate::panes::tab_title(self, t, cx));
+                            let title = names.get(&t.id).cloned().unwrap_or_else(|| super::tab_title(self, t, cx));
                             let (kind, running, running_state, running_agent, running_label, attention) = match &t.kind {
                                 PaneKind::Terminal { terminal_id, .. } => {
                                     let status = self

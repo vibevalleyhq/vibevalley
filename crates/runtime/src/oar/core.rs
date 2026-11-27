@@ -76,6 +76,10 @@ pub(crate) fn rejected(code: &str, detail: impl AsRef<str>) -> AgentError {
 pub const HISTORY_LIMIT: usize = 10_000;
 /// Cap on in-memory voyage records when no disk `record_to` file is attached.
 pub const RECORD_HISTORY_LIMIT: usize = 1_024;
+/// Bounded per-subscriber queue capacity for live `Session::events` receivers.
+pub const EVENT_SUBSCRIBER_CAPACITY: usize = 4_096;
+/// Bounded per-subscriber queue capacity for live `Session::subscribe_records` receivers.
+pub const RECORD_SUBSCRIBER_CAPACITY: usize = 1_024;
 
 #[derive(Debug, Clone, Default)]
 pub struct StatusFold {
@@ -182,7 +186,7 @@ pub fn derive_status<'a>(events: impl IntoIterator<Item = &'a Event>) -> Session
 
 struct CoreState {
     next_seq: u64,
-    subscribers: Vec<mpsc::UnboundedSender<Event>>,
+    subscribers: Vec<mpsc::Sender<Event>>,
     /// The newest `HISTORY_LIMIT` events, for late subscribers. The record
     /// file, when one is set, keeps everything.
     history: std::collections::VecDeque<Event>,
@@ -196,7 +200,7 @@ struct CoreState {
     records: VecDeque<crate::oar::voyage::Record>,
     last_usage: Option<crate::oar::TokenTotals>,
     frames: std::collections::HashMap<std::thread::ThreadId, crate::oar::voyage::Record>,
-    record_subscribers: Vec<mpsc::UnboundedSender<crate::oar::voyage::Record>>,
+    record_subscribers: Vec<mpsc::Sender<crate::oar::voyage::Record>>,
     ended: bool,
     disposed: bool,
     unresumable: bool,
@@ -435,7 +439,18 @@ impl SessionCore {
             state.span_id.clear();
             state.trace_id = None;
         }
-        state.subscribers.retain(|subscriber| subscriber.send(event.clone()).is_ok());
+        state.subscribers.retain(|subscriber| match subscriber.try_send(event.clone()) {
+            Ok(()) => true,
+            Err(mpsc::error::TrySendError::Full(_)) => {
+                tracing::warn!(
+                    session_id = %self.session_id(),
+                    seq = event.seq,
+                    "oar event subscriber buffer full; evicting slow subscriber"
+                );
+                false
+            }
+            Err(mpsc::error::TrySendError::Closed(_)) => false,
+        });
         if matches!(event.kind, EventKind::SessionEnded) {
             state.ended = true;
             state.recorder.take();
@@ -465,12 +480,29 @@ impl SessionCore {
             }
         }
         if let Some(recorder) = state.recorder.as_mut()
-            && recorder.write(&record).is_err()
+            && let Err(err) = recorder.write(&record)
         {
+            tracing::error!(
+                session_id = %self.session_id(),
+                seq = record.seq,
+                error = %err,
+                "oar voyage recorder write failed; disabling disk recorder"
+            );
             state.recorder = None;
         }
         if !state.record_subscribers.is_empty() {
-            state.record_subscribers.retain(|s| s.send(record.clone()).is_ok());
+            state.record_subscribers.retain(|s| match s.try_send(record.clone()) {
+                Ok(()) => true,
+                Err(mpsc::error::TrySendError::Full(_)) => {
+                    tracing::warn!(
+                        session_id = %self.session_id(),
+                        seq = record.seq,
+                        "oar record subscriber buffer full; evicting slow subscriber"
+                    );
+                    false
+                }
+                Err(mpsc::error::TrySendError::Closed(_)) => false,
+            });
         }
         if state.record_path.is_none() {
             if state.records.len() == RECORD_HISTORY_LIMIT {
@@ -622,14 +654,29 @@ impl SessionCore {
         self.lock().fold.turn_active()
     }
 
-    pub(crate) fn subscribe(&self, with_history: bool) -> mpsc::UnboundedReceiver<Event> {
-        let (tx, rx) = mpsc::unbounded_channel();
+    pub(crate) fn subscribe(&self, with_history: bool) -> mpsc::Receiver<Event> {
         let mut state = self.lock();
+        let cap = if with_history {
+            EVENT_SUBSCRIBER_CAPACITY.max(state.history.len().saturating_add(256))
+        } else {
+            EVENT_SUBSCRIBER_CAPACITY
+        };
+        let (tx, rx) = mpsc::channel(cap);
         if with_history {
             for event in &state.history {
-                let _ = tx.send(event.clone());
+                let _ = tx.try_send(event.clone());
             }
         }
+        if !state.ended {
+            state.subscribers.push(tx);
+        }
+        rx
+    }
+
+    #[cfg(test)]
+    pub(crate) fn subscribe_with_capacity(&self, capacity: usize) -> mpsc::Receiver<Event> {
+        let (tx, rx) = mpsc::channel(capacity.max(1));
+        let mut state = self.lock();
         if !state.ended {
             state.subscribers.push(tx);
         }
@@ -1120,22 +1167,25 @@ impl<D: Driver> Session for CoreSession<D> {
         state.records.iter().cloned().collect()
     }
 
-    fn subscribe_records(&self, after: Option<u64>) -> mpsc::UnboundedReceiver<crate::oar::voyage::Record> {
-        let (tx, rx) = mpsc::unbounded_channel();
+    fn subscribe_records(&self, after: Option<u64>) -> mpsc::Receiver<crate::oar::voyage::Record> {
         let mut state = self.core.lock();
         let needs_history = after.is_none_or(|seq| seq + 1 < state.next_record_seq);
-        if needs_history {
+        let history: Vec<crate::oar::voyage::Record> = if needs_history {
             if let Some(path) = state.record_path.as_deref() {
-                for rec in crate::oar::record::read_session_records(path, state.record_base, state.next_record_seq) {
-                    if after.is_none_or(|seq| rec.seq > seq) {
-                        let _ = tx.send(rec);
-                    }
-                }
+                crate::oar::record::read_session_records(path, state.record_base, state.next_record_seq)
+                    .into_iter()
+                    .filter(|rec| after.is_none_or(|seq| rec.seq > seq))
+                    .collect()
             } else {
-                for rec in state.records.iter().filter(|r| after.is_none_or(|seq| r.seq > seq)) {
-                    let _ = tx.send(rec.clone());
-                }
+                state.records.iter().filter(|r| after.is_none_or(|seq| r.seq > seq)).cloned().collect()
             }
+        } else {
+            Vec::new()
+        };
+        let cap = RECORD_SUBSCRIBER_CAPACITY.max(history.len().saturating_add(RECORD_SUBSCRIBER_CAPACITY));
+        let (tx, rx) = mpsc::channel(cap);
+        for rec in history {
+            let _ = tx.try_send(rec);
         }
         if !state.ended {
             state.record_subscribers.push(tx);
@@ -1173,11 +1223,11 @@ impl<D: Driver> Session for CoreSession<D> {
         self.core.status()
     }
 
-    fn events(&self) -> mpsc::UnboundedReceiver<Event> {
+    fn events(&self) -> mpsc::Receiver<Event> {
         self.core.subscribe(false)
     }
 
-    fn events_with_history(&self) -> mpsc::UnboundedReceiver<Event> {
+    fn events_with_history(&self) -> mpsc::Receiver<Event> {
         self.core.subscribe(true)
     }
 

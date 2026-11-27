@@ -317,7 +317,7 @@ pub(crate) fn with_issue_statuses(state: &mut SpaceState) -> bool {
     apply_issue_statuses(&mut state.issues, &state.sessions)
 }
 
-const KEEP_CLOSED_ISSUES: usize = 50;
+pub const KEEP_CLOSED_ISSUES: usize = 50;
 
 /// `issueOrder`: the never-sent by rank, then the sent newest first.
 pub fn issue_order(a: &Issue, b: &Issue) -> Ordering {

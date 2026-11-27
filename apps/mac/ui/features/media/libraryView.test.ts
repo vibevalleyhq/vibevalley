@@ -2,35 +2,35 @@ import "../../infra/polyfill";
 import { expect, test } from "nsh/test";
 
 import {
-  type Artifact,
-  ArtifactTypeValues,
   type Channel,
   type Issue,
   type IssueId,
   type LibraryItem,
   type MediaJob,
+  type Note,
+  NoteTypeValues,
   type Session,
   type SessionId,
   userId,
 } from "@vibevalley/protocol";
-import { artifactId } from "@vibevalley/protocol/schema";
+import { noteId } from "@vibevalley/protocol/schema";
 
 import { type ContentBucket, countContentHub, countForBucket } from "../../infra/state/contentNav";
 import {
-  artifactMatchesType,
   buildCategoryFilterOptions,
   type ContentContextLookup,
   countCategoryFilters,
-  resolveArtifactContext,
+  noteMatchesType,
   resolveMediaContext,
-  shownArtifacts,
+  resolveNoteContext,
   shownMedia,
+  shownNotes,
 } from "./items";
 import {
   activeFileId,
   askRemove,
-  bucketArtifactType,
   bucketFileKind,
+  bucketNoteType,
   cancelRemove,
   clearSelection,
   closeLightbox,
@@ -45,13 +45,13 @@ import {
   reconcileSelection,
   selectBucketSelection,
   selectedFileIds,
-  showsArtifactsInBucket,
   showsMediaInBucket,
+  showsNotesInBucket,
 } from "./libraryView";
 
-const makeArtifact = (over: Omit<Partial<Artifact>, "id"> & { readonly id: string; readonly title: string }): Artifact => ({
-  artifactType: "docs",
-  isDefault: false,
+const makeNote = (over: Omit<Partial<Note>, "id"> & { readonly id: string; readonly title: string }): Note => ({
+  noteType: "doc",
+  sortOrder: 0,
   by: userId,
   byName: "Me",
   version: 0,
@@ -60,7 +60,7 @@ const makeArtifact = (over: Omit<Partial<Artifact>, "id"> & { readonly id: strin
   at: 100,
   updated: 100,
   ...over,
-  id: artifactId(over.id),
+  id: noteId(over.id),
 });
 
 const makeMedia = (over: { readonly id: string; readonly name: string; readonly type: string; readonly origin: LibraryItem["origin"] }): LibraryItem => ({
@@ -72,74 +72,74 @@ const makeMedia = (over: { readonly id: string; readonly name: string; readonly 
 
 test("bucket helpers report visible content categories and clear incompatible media selections", () => {
   const recent: ContentBucket = { kind: "recent" };
-  expect(showsArtifactsInBucket(recent)).toBe(true);
+  expect(showsNotesInBucket(recent)).toBe(true);
   expect(showsMediaInBucket(recent)).toBe(true);
   expect(isPinnedBucket(recent)).toBe(false);
-  expect(bucketArtifactType(recent)).toBeUndefined();
+  expect(bucketNoteType(recent)).toBeUndefined();
   expect(bucketFileKind(recent)).toBeUndefined();
 
   const pinned: ContentBucket = { kind: "pinned" };
-  expect(showsArtifactsInBucket(pinned)).toBe(true);
+  expect(showsNotesInBucket(pinned)).toBe(true);
   expect(showsMediaInBucket(pinned)).toBe(true);
   expect(isPinnedBucket(pinned)).toBe(true);
 
   const apps: ContentBucket = { kind: "apps" };
-  expect(showsArtifactsInBucket(apps)).toBe(true);
+  expect(showsNotesInBucket(apps)).toBe(true);
   expect(showsMediaInBucket(apps)).toBe(false);
   expect(isPinnedBucket(apps)).toBe(false);
 
-  const outline: ContentBucket = { kind: "artifacts", artifactType: "outline" };
-  expect(showsArtifactsInBucket(outline)).toBe(true);
-  expect(showsMediaInBucket(outline)).toBe(false);
-  expect(bucketArtifactType(outline)).toBe("outline");
+  const docBucket: ContentBucket = { kind: "notes", noteType: "doc" };
+  expect(showsNotesInBucket(docBucket)).toBe(true);
+  expect(showsMediaInBucket(docBucket)).toBe(false);
+  expect(bucketNoteType(docBucket)).toBe("doc");
 
-  const whiteboard: ContentBucket = { kind: "artifacts", artifactType: "whiteboard" };
-  expect(showsArtifactsInBucket(whiteboard)).toBe(true);
-  expect(showsMediaInBucket(whiteboard)).toBe(false);
-  expect(bucketArtifactType(whiteboard)).toBe("whiteboard");
-  expect(bucketFileKind(whiteboard)).toBeUndefined();
+  const canvasBucket: ContentBucket = { kind: "notes", noteType: "canvas" };
+  expect(showsNotesInBucket(canvasBucket)).toBe(true);
+  expect(showsMediaInBucket(canvasBucket)).toBe(false);
+  expect(bucketNoteType(canvasBucket)).toBe("canvas");
+  expect(bucketFileKind(canvasBucket)).toBeUndefined();
 
   const audio: ContentBucket = { kind: "media", fileKind: "audio" };
-  expect(showsArtifactsInBucket(audio)).toBe(false);
+  expect(showsNotesInBucket(audio)).toBe(false);
   expect(showsMediaInBucket(audio)).toBe(true);
   expect(bucketFileKind(audio)).toBe("audio");
-  expect(bucketArtifactType(audio)).toBeUndefined();
+  expect(bucketNoteType(audio)).toBeUndefined();
 
   const withAsking = askRemove(focusFile("f1"));
-  expect(selectBucketSelection(withAsking, outline)).toEqual({ kind: "none" });
-  expect(selectBucketSelection(withAsking, whiteboard)).toEqual({ kind: "none" });
+  expect(selectBucketSelection(withAsking, docBucket)).toEqual({ kind: "none" });
+  expect(selectBucketSelection(withAsking, canvasBucket)).toEqual({ kind: "none" });
   expect(selectBucketSelection(withAsking, audio)).toEqual({ kind: "files", ids: ["f1"], anchor: "f1", asking: false });
-  expect(selectBucketSelection(openLightbox(withAsking, 0, 2), whiteboard)).toEqual({ kind: "none" });
+  expect(selectBucketSelection(openLightbox(withAsking, 0, 2), canvasBucket)).toEqual({ kind: "none" });
 });
 
-test("artifactMatchesType matches all 12 exact artifact types", () => {
-  const byType = new Map(ArtifactTypeValues.map((t) => [t, makeArtifact({ id: `a-${t}`, title: t, artifactType: t })]));
-  for (const type of ArtifactTypeValues) {
+test("noteMatchesType matches all 3+1 canonical note types", () => {
+  const byType = new Map(NoteTypeValues.map((t) => [t, makeNote({ id: `n-${t}`, title: t, noteType: t })]));
+  for (const type of NoteTypeValues) {
     const target = byType.get(type)!;
-    expect(artifactMatchesType(target, type)).toBe(true);
-    expect(artifactMatchesType(target, undefined)).toBe(true);
-    for (const other of ArtifactTypeValues) {
-      if (other !== type) expect(artifactMatchesType(target, other)).toBe(false);
+    expect(noteMatchesType(target, type)).toBe(true);
+    expect(noteMatchesType(target, undefined)).toBe(true);
+    for (const other of NoteTypeValues) {
+      if (other !== type) expect(noteMatchesType(target, other)).toBe(false);
     }
   }
 });
 
-test("artifactType, fileKind, sort, and pinned filtering work across artifacts and media", () => {
-  const artifacts = [
-    makeArtifact({ id: "art-user", title: "My Board", artifactType: "whiteboard", by: userId, updated: 150 }),
-    makeArtifact({ id: "art-agent", title: "Agent Deck", artifactType: "slides", by: "a1", byName: "Agent", updated: 250 }),
+test("noteType, fileKind, sort, and pinned filtering work across notes and media", () => {
+  const notes = [
+    makeNote({ id: "note-user", title: "My Board", noteType: "canvas", by: userId, updated: 150 }),
+    makeNote({ id: "note-agent", title: "Agent Base", noteType: "base", by: "a1", byName: "Agent", updated: 250 }),
   ];
   const media = [
     makeMedia({ id: "m-up", name: "photo.png", type: "image/png", origin: { kind: "uploaded" } }),
     makeMedia({ id: "m-gen", name: "voice.mp3", type: "audio/mpeg", origin: { kind: "generated", job: "j1", jobKind: "speech" } }),
     makeMedia({ id: "m-fetch", name: "clip.mp4", type: "video/mp4", origin: { kind: "fetched", agent: "w1", from: { url: "https://example.com/v.mp4" } } }),
   ];
-  const pinned = new Set(["artifact:art-agent", "media:m-up"]);
+  const pinned = new Set(["note:note-agent", "media:m-up"]);
 
-  expect(shownArtifacts(artifacts, { sort: "recent" }).map((a) => a.id)).toEqual(["art-agent", "art-user"]);
-  expect(shownArtifacts(artifacts, { sort: "name" }).map((a) => a.id)).toEqual(["art-agent", "art-user"]);
-  expect(shownArtifacts(artifacts, { artifactType: "whiteboard", sort: "recent" }).map((a) => a.id)).toEqual(["art-user"]);
-  expect(shownArtifacts(artifacts, { sort: "recent", pinnedOnly: true, pinned }).map((a) => a.id)).toEqual(["art-agent"]);
+  expect(shownNotes(notes, { sort: "recent" }).map((n) => n.id)).toEqual(["note-agent", "note-user"]);
+  expect(shownNotes(notes, { sort: "name" }).map((n) => n.id)).toEqual(["note-agent", "note-user"]);
+  expect(shownNotes(notes, { noteType: "canvas", sort: "recent" }).map((n) => n.id)).toEqual(["note-user"]);
+  expect(shownNotes(notes, { sort: "recent", pinnedOnly: true, pinned }).map((n) => n.id)).toEqual(["note-agent"]);
 
   expect(shownMedia(media, {}).map((m) => m.attachment.id)).toEqual(["m-up", "m-gen", "m-fetch"]);
   expect(shownMedia(media, { fileKind: "audio" }).map((m) => m.attachment.id)).toEqual(["m-gen"]);
@@ -250,15 +250,11 @@ test("reconcileSelection prunes vanished files, anchors, and out-of-range lightb
 });
 
 test("regression: countContentHub sidebar badges match LibraryPage visible counts across every bucket", () => {
-  const artifacts = [
-    makeArtifact({ id: "a-out", title: "Outline", artifactType: "outline" }),
-    makeArtifact({ id: "a-wb", title: "Board", artifactType: "whiteboard" }),
-    makeArtifact({ id: "a-doc", title: "Doc", artifactType: "docs" }),
-    makeArtifact({ id: "a-slides", title: "Slides", artifactType: "slides" }),
-    makeArtifact({ id: "a-proto", title: "Prototype", artifactType: "prototype" }),
-    makeArtifact({ id: "a-sheet", title: "Sheet", artifactType: "sheet" }),
-    makeArtifact({ id: "a-diag", title: "Diagram", artifactType: "diagram" }),
-    makeArtifact({ id: "a-sb", title: "Storyboard", artifactType: "storyboard" }),
+  const notes = [
+    makeNote({ id: "n-doc", title: "Doc", noteType: "doc" }),
+    makeNote({ id: "n-base", title: "Base", noteType: "base" }),
+    makeNote({ id: "n-canvas", title: "Canvas", noteType: "canvas" }),
+    makeNote({ id: "n-media", title: "Media", noteType: "media" }),
   ];
   const media = [
     makeMedia({ id: "m-img", name: "photo.png", type: "image/png", origin: { kind: "uploaded" } }),
@@ -266,16 +262,16 @@ test("regression: countContentHub sidebar badges match LibraryPage visible count
     makeMedia({ id: "m-vid", name: "clip.mp4", type: "video/mp4", origin: { kind: "uploaded" } }),
     makeMedia({ id: "m-bin", name: "data.bin", type: "application/octet-stream", origin: { kind: "uploaded" } }),
   ];
-  const pinned = new Set(["artifact:a-wb", "media:m-img", "artifact:gone"]);
-  const installedArtifactIds = new Set(["a-wb", "a-proto"]);
+  const pinned = new Set(["note:n-canvas", "media:m-img", "note:gone"]);
+  const installedNoteIds = new Set(["n-canvas", "n-doc"]);
 
-  const counts = countContentHub({ artifacts, media, pinned, installedArtifactIds });
+  const counts = countContentHub({ notes, media, pinned, installedNoteIds });
   const buckets: readonly ContentBucket[] = [
     { kind: "recent" },
     { kind: "pinned" },
     { kind: "apps" },
-    { kind: "artifacts" },
-    ...ArtifactTypeValues.map((artifactType): ContentBucket => ({ kind: "artifacts", artifactType })),
+    { kind: "notes" },
+    ...NoteTypeValues.map((noteType): ContentBucket => ({ kind: "notes", noteType })),
     { kind: "media" },
     { kind: "media", fileKind: "image" },
     { kind: "media", fileKind: "audio" },
@@ -286,19 +282,19 @@ test("regression: countContentHub sidebar badges match LibraryPage visible count
   for (const bucket of buckets) {
     const pinnedOnly = isPinnedBucket(bucket);
     const pageTotal =
-      (showsArtifactsInBucket(bucket)
-        ? shownArtifacts(artifacts, { artifactType: bucketArtifactType(bucket), sort: "recent", pinnedOnly, pinned }).filter(
-            (a) => bucket.kind !== "apps" || installedArtifactIds.has(a.id),
+      (showsNotesInBucket(bucket)
+        ? shownNotes(notes, { noteType: bucketNoteType(bucket), sort: "recent", pinnedOnly, pinned }).filter(
+            (n) => bucket.kind !== "apps" || installedNoteIds.has(n.id),
           ).length
         : 0) + (showsMediaInBucket(bucket) ? shownMedia(media, { fileKind: bucketFileKind(bucket), pinnedOnly, pinned }).length : 0);
     expect(countForBucket(counts, bucket)).toBe(pageTotal);
   }
-  expect(counts.total).toBe(artifacts.length + media.length);
+  expect(counts.total).toBe(notes.length + media.length);
   expect(counts.pinned).toBe(2);
   expect(counts.installedApps).toBe(2);
 });
 
-test("category filtering resolves repo, parent/issue, channel, and media origin across artifacts and media", () => {
+test("category filtering resolves repo, parent/issue, channel, and media origin across notes and media", () => {
   const issues: Pick<Issue, "id" | "number" | "title" | "repo" | "parent">[] = [
     { id: "i-parent" as IssueId, number: 40, title: "Q4 Platform Work", repo: "vibevalley" },
     { id: "i-child" as IssueId, number: 42, title: "Board Drag FSM", repo: "vibevalley", parent: "i-parent" as IssueId },
@@ -326,9 +322,9 @@ test("category filtering resolves repo, parent/issue, channel, and media origin 
     jobsById: new Map(jobs.map((j) => [j.id, j])),
   };
 
-  const artifacts = [
-    makeArtifact({ id: "art-child", title: "FSM Spec", artifactType: "docs", issue: "i-child" as IssueId, channel: "general" }),
-    makeArtifact({ id: "art-site", title: "Launch Deck", artifactType: "slides", issue: "i-docs" as IssueId, channel: "marketing" }),
+  const notes = [
+    makeNote({ id: "note-child", title: "FSM Spec", noteType: "doc", issue: "i-child" as IssueId, channel: "general" }),
+    makeNote({ id: "note-site", title: "Launch Base", noteType: "base", issue: "i-docs" as IssueId, channel: "marketing" }),
   ];
   const media = [
     makeMedia({ id: "m-gen", name: "hero.png", type: "image/png", origin: { kind: "generated", job: "job-img", jobKind: "image" } }),
@@ -341,18 +337,18 @@ test("category filtering resolves repo, parent/issue, channel, and media origin 
     }),
   ];
 
-  expect(resolveArtifactContext(artifacts[0], lookup)).toEqual({ repo: "vibevalley", issueId: "i-parent", channelId: "general" });
+  expect(resolveNoteContext(notes[0], lookup)).toEqual({ repo: "vibevalley", issueId: "i-parent", channelId: "general" });
   expect(resolveMediaContext(media[0], lookup)).toEqual({ repo: "docs-site", channelId: "marketing" });
   expect(resolveMediaContext(media[2], lookup)).toEqual({ repo: "vibevalley", issueId: "i-parent", channelId: "general" });
 
-  const options = buildCategoryFilterOptions({ artifacts, media, lookup, extraRepos: ["extra-repo"] });
+  const options = buildCategoryFilterOptions({ notes, media, lookup, extraRepos: ["extra-repo"] });
   expect(options.repos.map((r) => r.value)).toEqual(["docs-site", "extra-repo", "vibevalley"]);
   expect(options.issues.map((p) => p.value)).toEqual(["i-docs", "i-parent"]);
   expect(options.channels.map((c) => c.value)).toEqual(["general", "marketing"]);
 
-  expect(shownArtifacts(artifacts, { sort: "recent", category: { repo: "vibevalley" }, lookup }).map((a) => a.id)).toEqual(["art-child"]);
-  expect(shownArtifacts(artifacts, { sort: "recent", category: { issueId: "i-parent" }, lookup }).map((a) => a.id)).toEqual(["art-child"]);
-  expect(shownArtifacts(artifacts, { sort: "recent", category: { channelId: "marketing" }, lookup }).map((a) => a.id)).toEqual(["art-site"]);
+  expect(shownNotes(notes, { sort: "recent", category: { repo: "vibevalley" }, lookup }).map((n) => n.id)).toEqual(["note-child"]);
+  expect(shownNotes(notes, { sort: "recent", category: { issueId: "i-parent" }, lookup }).map((n) => n.id)).toEqual(["note-child"]);
+  expect(shownNotes(notes, { sort: "recent", category: { channelId: "marketing" }, lookup }).map((n) => n.id)).toEqual(["note-site"]);
 
   expect(shownMedia(media, { category: { repo: "vibevalley" }, lookup }).map((m) => m.attachment.id)).toEqual(["m-up", "m-fetch"]);
   expect(shownMedia(media, { category: { issueId: "i-parent" }, lookup }).map((m) => m.attachment.id)).toEqual(["m-fetch"]);

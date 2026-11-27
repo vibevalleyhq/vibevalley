@@ -3,7 +3,21 @@ import { expect, open, test } from "nsh/test";
 
 import { setLocale, t } from "@vibevalley/i18n";
 import "@vibevalley/i18n/catalogs";
-import type { Channel, ChatMessage, Issue, IssueId, MessageId, Milestone, Run, Session, SessionEvent, SessionId, SliceBundle } from "@vibevalley/protocol";
+import type {
+  Channel,
+  ChatMessage,
+  Issue,
+  IssueId,
+  MessageId,
+  Milestone,
+  Note,
+  NoteId,
+  Run,
+  Session,
+  SessionEvent,
+  SessionId,
+  SliceBundle,
+} from "@vibevalley/protocol";
 
 import { fakeHost } from "../../../fixtures/fakeHost";
 import { SCENARIO_NOW, scenarios } from "../../../fixtures/scenarios";
@@ -315,4 +329,72 @@ test("TodoDetail renders unified issue-activity stream with milestones, comments
   await app.press("id:run-steps");
   await fake.pumpUntil(app, () => app.count("id:work-log") === 1);
   expect(app.texts().join("\n")).toContain("Search TodoDetail");
+});
+
+test("IssueActivity renders fallback comment composer before a thread channel exists and resolves [[note:...]] links in comments", async () => {
+  setLocale("en");
+  const todo = makeIssue({
+    id: "i-fallback-comment",
+    number: 93,
+    title: "Pre-dispatch comment and note links",
+    status: "backlog",
+    stage: { state: "draft", acts: [] },
+  });
+  const linkedNote: Note = {
+    id: "note-arch-93" as NoteId,
+    title: "Architecture Spec",
+    noteType: "doc",
+    seq: 1,
+    version: 1,
+    versions: [],
+    by: "user",
+    byName: "User",
+    at: SCENARIO_NOW - 10_000,
+    updated: SCENARIO_NOW - 1_000,
+    sortOrder: 0,
+  };
+  const state: SliceBundle = {
+    ...scenarios.empty.state,
+    board: { seq: 1, issues: [todo] },
+  };
+  const fake = fakeHost({ state, responses: scenarios.typical.responses }, { route: `/issues/${todo.id}`, locale: "en" });
+  fake.respond("note.list", () => [linkedNote]);
+  fake.respond("issue.conversation.get", () => null);
+  fake.respond("issue.comment.create", () => ({ seq: 1 }));
+  fake.respond("issue.timeline.get", { milestones: [] });
+  fake.respond("issue.run.list", []);
+
+  const app = await open("../../../app/main.tsx", {
+    width: 1200,
+    height: 950,
+    colorScheme: "light",
+    platform: "macos",
+    clock: { time: SCENARIO_NOW },
+    host: fake.options,
+  });
+  await fake.pumpUntil(app, () => app.count("id:issue-comment-fallback-composer") === 1);
+  expect(app.count("id:issue-comment-composer")).toBe(0);
+
+  await app.type("id:issue-comment-fallback-input", "See [[note:note-arch-93]] before implementing");
+  await app.press("id:issue-comment-fallback-send");
+  await fake.pumpUntil(app, () => fake.calls.some((c) => c.op === "issue.comment.create"));
+  const sent = fake.calls.find((c) => c.op === "issue.comment.create");
+  expect(sent?.payload).toMatchObject({ id: todo.id, text: "See [[note:note-arch-93]] before implementing" });
+
+  // Switch to active thread channel with a comment containing [[note:...]] and verify NoteLinkPills render.
+  const channel = makeChannel(todo.id, "ch-93");
+  const msgWithNote = makeMessage({
+    id: "m-note-ref",
+    channel: channel.id,
+    number: 1,
+    at: SCENARIO_NOW - 5_000,
+    text: "Updated [[note:note-arch-93]] notes.",
+  });
+  fake.respond("issue.conversation.get", () => channel.id);
+  fake.respond("channel.message.list", () => [msgWithNote]);
+  await fake.setSlice(app, "collab", {
+    ...scenarios.empty.state.collab,
+    chat: { channels: [channel], userMentions: [] },
+  });
+  await fake.pumpUntil(app, () => app.count("id:issue-note-link-note-arch-93") === 1);
 });

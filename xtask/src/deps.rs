@@ -30,7 +30,7 @@ const SERVER_HIGHER_MODULES: &[&str] = &[
     "channel",
     "connector",
     "voice",
-    "artifact",
+    "note",
     "runtime",
     "repo",
     "setting",
@@ -985,9 +985,27 @@ pub fn check_ui_layering(files: &[SourceFile]) -> (usize, Vec<UiLayerViolation>)
                 continue;
             };
 
+            if ui_rel.starts_with("infra/") {
+                if !target_rel.starts_with("infra/") && target_rel != "infra" {
+                    let to_layer = target_rel.split('/').next().unwrap_or(target_rel);
+                    violations.push(UiLayerViolation {
+                        rule: "ui-infra-layer".to_owned(),
+                        file: norm.clone(),
+                        line,
+                        from_layer: "infra/".to_owned(),
+                        to_target: format!("apps/mac/ui/{target_rel}"),
+                        specifier: specifier.clone(),
+                        why: format!("infra module `{ui_rel}` imports upper-layer `{to_layer}/` ({specifier})"),
+                        fix_hint: "Keep `apps/mac/ui/infra/` as a leaf foundation layer with zero imports from `design/`, `features/`, `workspace/`, `farm/`, or `app/`."
+                            .to_owned(),
+                    });
+                }
+                continue;
+            }
+
             if ui_rel.starts_with("design/") {
-                if target_rel.starts_with("features/") || target_rel == "features" || target_rel.starts_with("workspace/") || target_rel == "workspace" {
-                    let to_layer = if target_rel.starts_with("features") { "features/" } else { "workspace/" };
+                if !target_rel.starts_with("design/") && target_rel != "design" {
+                    let to_layer = target_rel.split('/').next().unwrap_or(target_rel);
                     violations.push(UiLayerViolation {
                         rule: "ui-design-layer".to_owned(),
                         file: norm.clone(),
@@ -995,10 +1013,67 @@ pub fn check_ui_layering(files: &[SourceFile]) -> (usize, Vec<UiLayerViolation>)
                         from_layer: "design/".to_owned(),
                         to_target: format!("apps/mac/ui/{target_rel}"),
                         specifier: specifier.clone(),
-                        why: format!("design primitive `{ui_rel}` imports from `{to_layer}` ({specifier})"),
-                        fix_hint: "Keep `apps/mac/ui/design/` free of `features/` and `workspace/` imports; inject domain callbacks/slots via props."
+                        why: format!("design primitive `{ui_rel}` imports outside `design/` from `{to_layer}/` ({specifier})"),
+                        fix_hint: "Keep `apps/mac/ui/design/` self-contained with zero imports from `infra/`, `features/`, `workspace/`, `farm/`, or `app/`; inject host capabilities via `design/host.tsx` or props."
                             .to_owned(),
                     });
+                }
+                continue;
+            }
+
+            if ui_rel.starts_with("farm/") {
+                if target_rel.starts_with("features/") || target_rel == "features" {
+                    violations.push(UiLayerViolation {
+                        rule: "ui-farm-layer".to_owned(),
+                        file: norm.clone(),
+                        line,
+                        from_layer: "farm/".to_owned(),
+                        to_target: format!("apps/mac/ui/{target_rel}"),
+                        specifier: specifier.clone(),
+                        why: format!("farm skin `{ui_rel}` imports from `features/` ({specifier})"),
+                        fix_hint: "Keep `apps/mac/ui/farm/` decoupled from `features/`; sink shared reads/actions into `apps/mac/ui/infra/` or `@vibevalley/protocol/rules`."
+                            .to_owned(),
+                    });
+                }
+                continue;
+            }
+
+            if ui_rel.starts_with("workspace/") {
+                if target_rel.starts_with("features/") || target_rel == "features" {
+                    violations.push(UiLayerViolation {
+                        rule: "ui-workspace-layer".to_owned(),
+                        file: norm.clone(),
+                        line,
+                        from_layer: "workspace/".to_owned(),
+                        to_target: format!("apps/mac/ui/{target_rel}"),
+                        specifier: specifier.clone(),
+                        why: format!("workspace shell `{ui_rel}` imports from `features/` ({specifier})"),
+                        fix_hint: "Keep `apps/mac/ui/workspace/` decoupled from `features/`; sink shared helpers into `apps/mac/ui/infra/` or inject slots from `app/`."
+                            .to_owned(),
+                    });
+                }
+                continue;
+            }
+
+            if ui_rel.starts_with("app/") {
+                if let Some(target_after_feat) = target_rel.strip_prefix("features/")
+                    && let Some((dst_feature, dst_rest)) = target_after_feat.split_once('/')
+                {
+                    let dst_rest_clean = strip_ts_ext(dst_rest);
+                    if !dst_rest_clean.is_empty() && dst_rest_clean != "index" {
+                        violations.push(UiLayerViolation {
+                            rule: "ui-app-feature-deep-import".to_owned(),
+                            file: norm.clone(),
+                            line,
+                            from_layer: "app/".to_owned(),
+                            to_target: format!("apps/mac/ui/{target_rel}"),
+                            specifier: specifier.clone(),
+                            why: format!("app composition file `{ui_rel}` deep-imports internal file `{dst_rest}` from feature `{dst_feature}`"),
+                            fix_hint: format!(
+                                "Import from `features/{dst_feature}` public barrel (`../features/{dst_feature}`) or move shared helpers to `infra/`."
+                            ),
+                        });
+                    }
                 }
                 continue;
             }
@@ -1369,12 +1444,33 @@ mod tests {
     #[test]
     fn checks_ui_ts_import_layering_rules() {
         let files = vec![
-            // Violation 1: design/ importing features/
+            // Violation 1: app/ deep-importing feature internal file
+            sf(
+                "apps/mac/ui/app/BadRoute.tsx",
+                "import { IssuesPage } from \"../features/issue/views/IssuesPage\";\n",
+            ),
+            // Violation 2: design/ importing features/
             sf("apps/mac/ui/design/BadCard.tsx", "import { IssueBadge } from \"../features/issue\";\n"),
-            // Violation 2: design/ importing workspace/
+            // Violation 3: design/ importing infra/
+            sf("apps/mac/ui/design/BadHook.tsx", "import { api } from \"../infra/api\";\n"),
+            // Violation 4: design/ importing workspace/
             sf("apps/mac/ui/design/BadPanel.tsx", "import { Sidebar } from \"../workspace/Sidebar\";\n"),
-            // Violation 3: cross-feature deep import into internal non-barrel file
+            // Violation 5: farm/ importing features/
+            sf(
+                "apps/mac/ui/farm/BadPhone.tsx",
+                "import { useFollowed } from \"../features/channel/model/follow\";\n",
+            ),
+            // Violation 6: cross-feature deep import into internal non-barrel file
             sf("apps/mac/ui/features/content/Sidebar.tsx", "import { listing } from \"../media/listing\";\n"),
+            // Violation 7: infra/ importing upper layer
+            sf("apps/mac/ui/infra/badStore.ts", "import { Button } from \"../design/Button\";\n"),
+            // Violation 8: workspace/ importing features/
+            sf("apps/mac/ui/workspace/BadDetail.tsx", "import { sortRepos } from \"../features/repo/repos\";\n"),
+            // Allowed: app/ importing feature barrel
+            sf("apps/mac/ui/app/GoodRoute.tsx", "import { IssuesPage } from \"../features/issue\";\n"),
+            // Allowed: farm/ and workspace/ importing infra/
+            sf("apps/mac/ui/farm/GoodPhone.tsx", "import { useFollowed } from \"../infra/channelFollow\";\n"),
+            sf("apps/mac/ui/workspace/GoodDetail.tsx", "import { sortRepos } from \"../infra/repos\";\n"),
             // Allowed: cross-feature barrel import
             sf(
                 "apps/mac/ui/features/content/GoodSidebar.tsx",
@@ -1397,19 +1493,34 @@ mod tests {
         ];
 
         let (scanned, violations) = check_ui_layering(&files);
-        assert_eq!(scanned, 7);
-        assert_eq!(violations.len(), 3);
+        assert_eq!(scanned, 15);
+        assert_eq!(violations.len(), 8);
 
-        assert_eq!(violations[0].rule, "ui-design-layer");
-        assert_eq!(violations[0].file, "apps/mac/ui/design/BadCard.tsx");
-        assert_eq!(violations[0].line, 1);
+        assert_eq!(violations[0].rule, "ui-app-feature-deep-import");
+        assert_eq!(violations[0].file, "apps/mac/ui/app/BadRoute.tsx");
 
         assert_eq!(violations[1].rule, "ui-design-layer");
-        assert_eq!(violations[1].file, "apps/mac/ui/design/BadPanel.tsx");
+        assert_eq!(violations[1].file, "apps/mac/ui/design/BadCard.tsx");
+        assert_eq!(violations[1].line, 1);
 
-        assert_eq!(violations[2].rule, "ui-cross-feature-deep-import");
-        assert_eq!(violations[2].file, "apps/mac/ui/features/content/Sidebar.tsx");
-        assert_eq!(violations[2].specifier, "../media/listing");
+        assert_eq!(violations[2].rule, "ui-design-layer");
+        assert_eq!(violations[2].file, "apps/mac/ui/design/BadHook.tsx");
+
+        assert_eq!(violations[3].rule, "ui-design-layer");
+        assert_eq!(violations[3].file, "apps/mac/ui/design/BadPanel.tsx");
+
+        assert_eq!(violations[4].rule, "ui-farm-layer");
+        assert_eq!(violations[4].file, "apps/mac/ui/farm/BadPhone.tsx");
+
+        assert_eq!(violations[5].rule, "ui-cross-feature-deep-import");
+        assert_eq!(violations[5].file, "apps/mac/ui/features/content/Sidebar.tsx");
+        assert_eq!(violations[5].specifier, "../media/listing");
+
+        assert_eq!(violations[6].rule, "ui-infra-layer");
+        assert_eq!(violations[6].file, "apps/mac/ui/infra/badStore.ts");
+
+        assert_eq!(violations[7].rule, "ui-workspace-layer");
+        assert_eq!(violations[7].file, "apps/mac/ui/workspace/BadDetail.tsx");
     }
 
     #[test]

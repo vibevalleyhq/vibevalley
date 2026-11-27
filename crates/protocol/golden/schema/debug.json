@@ -356,7 +356,7 @@
    "channels": 3,
    "agents": 4,
    "repos": 2,
-   "artifacts": 5,
+   "notes": 5,
    "inbox": 1,
    "mediaJobs": 0
   }
@@ -377,11 +377,11 @@
    "updatedAt": 1700000000000
   }
  ],
- "DebugCollabArtifactState": [
+ "DebugCollabNoteState": [
   {
-   "artifactId": "art-1",
+   "noteId": "art-1",
    "title": "Architecture Spec",
-   "artifactType": "doc",
+   "noteType": "doc",
    "seq": 12,
    "snapshotBytes": 512,
    "frontiers": "1@1234",
@@ -428,7 +428,7 @@
     "channels": 3,
     "agents": 4,
     "repos": 2,
-    "artifacts": 5,
+    "notes": 5,
     "inbox": 1,
     "mediaJobs": 0
    },
@@ -504,7 +504,7 @@
      "channels": 1,
      "agents": 1,
      "repos": 1,
-     "artifacts": 0,
+     "notes": 0,
      "inbox": 0,
      "mediaJobs": 0
     },

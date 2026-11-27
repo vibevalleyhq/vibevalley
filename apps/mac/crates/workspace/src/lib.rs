@@ -3,8 +3,7 @@
 //! save/restore through `vibevalley-store`.
 //!
 //! Nothing here depends on GPUI. Plain state types (`Workspace`, `Layout`)
-//! never block; anything that touches the disk is a separate function
-//! documented as blocking.
+//! never block; persistence and terminal shutdown helpers are async on Tokio.
 
 pub mod layout;
 pub mod persist;

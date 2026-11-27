@@ -9,8 +9,8 @@ import { Icon } from "../design/Icon";
 import { motionClass } from "../design/motion";
 import { Bubble } from "../design/Tip";
 import { mix } from "../design/tone";
-import { languageShares, number as formatNumber, percent as formatPercent } from "../features/repo/repos";
 import { act, callDecoded, hostApi } from "../infra/bridge";
+import { languageShares, number as formatNumber, percent as formatPercent } from "../infra/repos";
 import { ShellIconButton, startEllipsis } from "./chrome";
 
 export interface RepoDetailWorktree {

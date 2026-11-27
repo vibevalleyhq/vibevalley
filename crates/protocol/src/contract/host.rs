@@ -900,34 +900,6 @@ pub struct HostPlaySoundPayload {
 #[cfg_attr(feature = "ts-gen", derive(TS))]
 #[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
-pub struct HostSeekAudioPayload {
-    pub position: f64,
-}
-
-#[skip_serializing_none]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts-gen", derive(TS))]
-#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct HostPcmStartPayload {
-    pub sample_rate: u32,
-    pub channels: u32,
-}
-
-#[skip_serializing_none]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts-gen", derive(TS))]
-#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
-#[serde(rename_all = "camelCase")]
-pub struct HostPcmAppendPayload {
-    pub data: String,
-}
-
-#[skip_serializing_none]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts-gen", derive(TS))]
-#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
-#[serde(rename_all = "camelCase")]
 pub struct HostReadFilePayload {
     pub path: String,
 }
@@ -960,15 +932,15 @@ pub struct HostQrPayload {
     pub border: Option<u32>,
 }
 
-/// Installed or queried metadata for a local macOS artifact applet `.app` bundle.
+/// Installed or queried metadata for a local macOS note applet `.app` bundle.
 #[skip_serializing_none]
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts-gen", derive(TS))]
 #[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
-pub struct ArtifactAppletInfo {
-    pub artifact_id: String,
-    pub artifact_type: String,
+pub struct NoteAppletInfo {
+    pub note_id: String,
+    pub note_type: String,
     pub app_name: String,
     pub bundle_id: String,
     pub bundle_path: String,
@@ -983,8 +955,8 @@ pub struct ArtifactAppletInfo {
 #[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct HostAppletInstallPayload {
-    pub artifact_id: String,
-    pub artifact_type: String,
+    pub note_id: String,
+    pub note_type: String,
     pub app_name: String,
     #[serde(default)]
     pub always_on_top: bool,
@@ -997,7 +969,7 @@ pub struct HostAppletInstallPayload {
 #[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct HostAppletIdPayload {
-    pub artifact_id: String,
+    pub note_id: String,
 }
 
 /// Result payload returned by `host.appletUninstall`.
@@ -1156,6 +1128,7 @@ pub enum HostAsrPhase {
     Connecting,
     Listening,
     Finishing,
+    Polishing,
 }
 
 /// Snapshot returned by `host.asr*` bridge operations.
@@ -1168,6 +1141,9 @@ pub struct HostAsrState {
     pub mic_level: f64,
     pub text: String,
     pub partial: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts-gen", ts(optional))]
+    pub raw_text: Option<String>,
     pub problem: Option<String>,
 }
 
@@ -1272,14 +1248,6 @@ pub enum HostOp {
     PlayAudio(HostPlayAudioPayload),
     #[serde(rename = "host.playSound")]
     PlaySound(HostPlaySoundPayload),
-    #[serde(rename = "host.seekAudio")]
-    SeekAudio(HostSeekAudioPayload),
-    #[serde(rename = "host.audioState")]
-    AudioState,
-    #[serde(rename = "host.pcmStart")]
-    PcmStart(HostPcmStartPayload),
-    #[serde(rename = "host.pcmAppend")]
-    PcmAppend(HostPcmAppendPayload),
     #[serde(rename = "host.stopAudio")]
     StopAudio,
     #[serde(rename = "host.readFile")]
@@ -1343,10 +1311,6 @@ impl HostOp {
         "host.voiceMute",
         "host.playAudio",
         "host.playSound",
-        "host.seekAudio",
-        "host.audioState",
-        "host.pcmStart",
-        "host.pcmAppend",
         "host.stopAudio",
         "host.readFile",
         "host.assetsDir",
@@ -1401,10 +1365,6 @@ impl HostOp {
             HostOp::VoiceMute(_) => "host.voiceMute",
             HostOp::PlayAudio(_) => "host.playAudio",
             HostOp::PlaySound(_) => "host.playSound",
-            HostOp::SeekAudio(_) => "host.seekAudio",
-            HostOp::AudioState => "host.audioState",
-            HostOp::PcmStart(_) => "host.pcmStart",
-            HostOp::PcmAppend(_) => "host.pcmAppend",
             HostOp::StopAudio => "host.stopAudio",
             HostOp::ReadFile(_) => "host.readFile",
             HostOp::AssetsDir => "host.assetsDir",
@@ -1500,10 +1460,6 @@ impl HostOp {
                 .map(HostOp::PlayAudio)
                 .map_err(|_| "playAudio requires a file path".to_string()),
             "host.playSound" => serde_json::from_value(payload).map(HostOp::PlaySound).map_err(|e| format!("playSound: {e}")),
-            "host.seekAudio" => serde_json::from_value(payload).map(HostOp::SeekAudio).map_err(|e| format!("seekAudio: {e}")),
-            "host.audioState" => expect_empty(&payload).map(|()| HostOp::AudioState),
-            "host.pcmStart" => serde_json::from_value(payload).map(HostOp::PcmStart).map_err(|e| e.to_string()),
-            "host.pcmAppend" => serde_json::from_value(payload).map(HostOp::PcmAppend).map_err(|e| format!("pcmAppend: {e}")),
             "host.stopAudio" => expect_empty(&payload).map(|()| HostOp::StopAudio),
             "host.readFile" => serde_json::from_value(payload).map(HostOp::ReadFile).map_err(|e| format!("readFile: {e}")),
             "host.assetsDir" => expect_empty(&payload).map(|()| HostOp::AssetsDir),
@@ -1575,14 +1531,11 @@ crate::typescript::module! {
     HostVoiceMutePayload,
     HostPlayAudioPayload,
     HostPlaySoundPayload,
-    HostSeekAudioPayload,
-    HostPcmStartPayload,
-    HostPcmAppendPayload,
     HostReadFilePayload,
     HostSha256Payload,
     HostRandomBytesPayload,
     HostQrPayload,
-    ArtifactAppletInfo,
+    NoteAppletInfo,
     HostAppletInstallPayload,
     HostAppletIdPayload,
     AppletRemoveResult,
@@ -1758,25 +1711,6 @@ mod tests {
                 json!({ "name": "levelUp" }),
                 HostOp::PlaySound(HostPlaySoundPayload { name: HostSoundName::LevelUp }),
             ),
-            (
-                "host.seekAudio",
-                json!({ "position": 4.25 }),
-                HostOp::SeekAudio(HostSeekAudioPayload { position: 4.25 }),
-            ),
-            ("host.audioState", json!(null), HostOp::AudioState),
-            (
-                "host.pcmStart",
-                json!({ "sampleRate": 24000, "channels": 1 }),
-                HostOp::PcmStart(HostPcmStartPayload {
-                    sample_rate: 24000,
-                    channels: 1,
-                }),
-            ),
-            (
-                "host.pcmAppend",
-                json!({ "data": "AAAA" }),
-                HostOp::PcmAppend(HostPcmAppendPayload { data: "AAAA".into() }),
-            ),
             ("host.stopAudio", json!({}), HostOp::StopAudio),
             (
                 "host.readFile",
@@ -1806,27 +1740,27 @@ mod tests {
             (
                 "host.appletInstall",
                 json!({
-                    "artifactId": "art-1",
-                    "artifactType": "dashboard",
+                    "noteId": "n1",
+                    "noteType": "base",
                     "appName": "Metrics",
                     "alwaysOnTop": true
                 }),
                 HostOp::AppletInstall(HostAppletInstallPayload {
-                    artifact_id: "art-1".into(),
-                    artifact_type: "dashboard".into(),
+                    note_id: "n1".into(),
+                    note_type: "base".into(),
                     app_name: "Metrics".into(),
                     always_on_top: true,
                 }),
             ),
             (
                 "host.appletUninstall",
-                json!({ "artifactId": "art-1" }),
-                HostOp::AppletUninstall(HostAppletIdPayload { artifact_id: "art-1".into() }),
+                json!({ "noteId": "n1" }),
+                HostOp::AppletUninstall(HostAppletIdPayload { note_id: "n1".into() }),
             ),
             (
                 "host.appletOpen",
-                json!({ "artifactId": "art-1" }),
-                HostOp::AppletOpen(HostAppletIdPayload { artifact_id: "art-1".into() }),
+                json!({ "noteId": "n1" }),
+                HostOp::AppletOpen(HostAppletIdPayload { note_id: "n1".into() }),
             ),
             ("host.captureWebView", json!(null), HostOp::CaptureWebView(HostCaptureWebViewPayload::default())),
             (
@@ -1893,21 +1827,24 @@ mod tests {
         assert!(HostOp::from_wire("host.reveal", json!(42)).is_err());
         assert!(HostOp::from_wire("host.voiceMute", json!({ "id": "v1" })).is_err());
         assert!(HostOp::from_wire("host.playSound", json!({ "name": "tap", "extra": true })).is_err());
-        assert!(HostOp::from_wire("host.pcmStart", json!({ "sampleRate": 24000, "channels": 1, "extra": 1 })).is_err());
+        assert!(!HostOp::is_known_op("host.seekAudio"));
+        assert!(!HostOp::is_known_op("host.audioState"));
+        assert!(!HostOp::is_known_op("host.pcmStart"));
+        assert!(!HostOp::is_known_op("host.pcmAppend"));
         assert!(HostOp::from_wire("host.sha256", json!({ "text": "a", "extra": 1 })).is_err());
         assert!(HostOp::from_wire("host.randomBytes", json!({ "length": -1 })).is_err());
         assert!(HostOp::from_wire("host.qr", json!({ "text": "hi", "extra": 1 })).is_err());
         assert!(HostOp::from_wire("host.appletList", json!({ "extra": 1 })).is_err());
-        assert!(HostOp::from_wire("host.appletInstall", json!({ "artifactId": "art-1" })).is_err());
+        assert!(HostOp::from_wire("host.appletInstall", json!({ "noteId": "n1" })).is_err());
         assert!(
             HostOp::from_wire(
                 "host.appletInstall",
-                json!({ "artifactId": "art-1", "artifactType": "docs", "appName": "Docs", "alwaysOnTop": false, "extra": 1 })
+                json!({ "noteId": "n1", "noteType": "doc", "appName": "Docs", "alwaysOnTop": false, "extra": 1 })
             )
             .is_err()
         );
         assert!(HostOp::from_wire("host.appletUninstall", json!({})).is_err());
-        assert!(HostOp::from_wire("host.appletOpen", json!({ "artifactId": "art-1", "extra": 1 })).is_err());
+        assert!(HostOp::from_wire("host.appletOpen", json!({ "noteId": "n1", "extra": 1 })).is_err());
         assert!(HostOp::from_wire("host.captureWebView", json!({ "width": 640, "extra": true })).is_err());
         assert!(HostOp::from_wire("host.vdpDiscover", json!({ "extra": true })).is_err());
         assert!(HostOp::from_wire("host.vdpCall", json!({})).is_err());
@@ -1915,12 +1852,12 @@ mod tests {
     }
 
     #[test]
-    fn artifact_applet_info_round_trips_wire_json() {
-        let info = ArtifactAppletInfo {
-            artifact_id: "art-1".into(),
-            artifact_type: "dashboard".into(),
+    fn note_applet_info_round_trips_wire_json() {
+        let info = NoteAppletInfo {
+            note_id: "n1".into(),
+            note_type: "base".into(),
             app_name: "Metrics".into(),
-            bundle_id: "dev.vibevalley.applet.art-1".into(),
+            bundle_id: "dev.vibevalley.applet.n1".into(),
             bundle_path: "/Users/demo/Applications/VibeValley Apps/Metrics.app".into(),
             always_on_top: true,
             installed: true,
@@ -1929,16 +1866,16 @@ mod tests {
         assert_eq!(
             encoded,
             json!({
-                "artifactId": "art-1",
-                "artifactType": "dashboard",
+                "noteId": "n1",
+                "noteType": "base",
                 "appName": "Metrics",
-                "bundleId": "dev.vibevalley.applet.art-1",
+                "bundleId": "dev.vibevalley.applet.n1",
                 "bundlePath": "/Users/demo/Applications/VibeValley Apps/Metrics.app",
                 "alwaysOnTop": true,
                 "installed": true,
             })
         );
-        assert_eq!(serde_json::from_value::<ArtifactAppletInfo>(encoded).unwrap(), info);
+        assert_eq!(serde_json::from_value::<NoteAppletInfo>(encoded).unwrap(), info);
     }
 
     #[test]

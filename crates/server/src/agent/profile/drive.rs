@@ -4,7 +4,7 @@
 use std::sync::Arc;
 
 use vibevalley_i18n::t;
-use vibevalley_protocol::{Agent, AgentRole, ApiError, BizCode, Deliverable, Issue, MCPServer, Next, PersonaMode, RuntimeRef, Skill};
+use vibevalley_protocol::{Agent, AgentExecutionMode, AgentRole, ApiError, BizCode, Deliverable, Issue, MCPServer, Next, PersonaMode, RuntimeRef, Skill};
 use vibevalley_runtime::oar::McpServer;
 
 use super::Profile;
@@ -159,19 +159,23 @@ impl SessionDriver for AgentDriver {
     fn profile_info(&self, id: &str) -> Option<AgentProfileInfo> {
         self.profile.agent(id).map(|a| AgentProfileInfo {
             id: a.id,
+            code: a.code,
             name: a.name,
             enabled: a.enabled,
             is_orchestrator: a.role == AgentRole::Orchestrator,
+            is_external: a.mode == AgentExecutionMode::External,
         })
     }
 
     fn reviewer_profile(&self) -> Option<AgentProfileInfo> {
-        let agents = self.profile.agents();
+        let agents = self.profile.managed_workers();
         let to_info = |a: Agent| AgentProfileInfo {
             id: a.id,
+            code: a.code,
             name: a.name,
             enabled: a.enabled,
             is_orchestrator: false,
+            is_external: false,
         };
         agents
             .iter()
@@ -190,10 +194,16 @@ impl SessionDriver for AgentDriver {
         if needle.is_empty() {
             return None;
         }
-        let workers: Vec<Agent> = self.profile.agents().into_iter().filter(|a| a.enabled && a.role == AgentRole::Worker).collect();
+        let workers: Vec<Agent> = self
+            .profile
+            .managed_workers()
+            .into_iter()
+            .filter(|a| a.enabled && a.role == AgentRole::Worker)
+            .collect();
         let found = workers
             .iter()
             .find(|a| a.id == needle)
+            .or_else(|| workers.iter().find(|a| a.code.eq_ignore_ascii_case(needle)))
             .or_else(|| workers.iter().find(|a| a.name == needle))
             .or_else(|| {
                 workers
@@ -202,9 +212,11 @@ impl SessionDriver for AgentDriver {
             })?;
         Some(AgentProfileInfo {
             id: found.id.clone(),
+            code: found.code.clone(),
             name: found.name.clone(),
             enabled: found.enabled,
             is_orchestrator: false,
+            is_external: false,
         })
     }
 
@@ -232,7 +244,19 @@ impl SessionDriver for AgentDriver {
         if language != "中文" { rules.replace("中文", &language) } else { rules }
     }
 
-    fn check(&self, _agent: &str) -> Result<(), RuntimeError> {
+    fn check(&self, agent: &str) -> Result<(), RuntimeError> {
+        let key = agent.trim();
+        if let Some(profile) = self.profile.agent(key).or_else(|| self.profile.named(key))
+            && profile.mode == AgentExecutionMode::External
+        {
+            return Err(refusal(
+                t(
+                    "server.issue.externalNotDispatchable",
+                    &[("name", profile.name.into()), ("code", profile.code.into())],
+                ),
+                vec![LookIn::Agent.next()],
+            ));
+        }
         Ok(())
     }
 
@@ -254,6 +278,15 @@ impl SessionDriver for AgentDriver {
                 }
                 return Err(refusal(t("server.issue.profileGone", &[("id", id.into())]), pick));
             };
+            if profile.mode == AgentExecutionMode::External {
+                return Err(refusal(
+                    t(
+                        "server.issue.externalNotDispatchable",
+                        &[("name", profile.name.into()), ("code", profile.code.into())],
+                    ),
+                    pick,
+                ));
+            }
             self.drive_on_async(&profile, issue.machine_id.as_deref()).await
         })
     }

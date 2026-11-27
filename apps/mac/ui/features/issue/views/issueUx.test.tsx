@@ -3,7 +3,7 @@ import { expect, open, test } from "nsh/test";
 
 import { setLocale, t } from "@vibevalley/i18n";
 import "@vibevalley/i18n/catalogs";
-import type { Issue, IssueId, Session, SessionId, SliceBundle } from "@vibevalley/protocol";
+import type { Agent, Issue, IssueId, Session, SessionId, SliceBundle } from "@vibevalley/protocol";
 import { issueId } from "@vibevalley/protocol/schema";
 
 import { fakeHost } from "../../../fixtures/fakeHost";
@@ -122,7 +122,7 @@ test("IssueDetail shows full unclamped title, omits empty repo crumb, localizes 
   expect(app.count("id:issue-comment-composer")).toBe(0);
 
   await app.press("id:issue-error-settings");
-  await fake.pumpUntil(app, () => app.count("id:settings-models") === 1);
+  await fake.pumpUntil(app, () => app.count("id:settings-providers") === 1);
 });
 
 test("IssueDetail renders inline comment composer when an issue thread channel exists", async () => {
@@ -713,9 +713,9 @@ test("Searchable OwnerPicker sets owner on NewIssue, TodoDetail, and IssueDetail
   await app.press("id:issue-new-owner-trigger");
   await fake.pumpUntil(app, () => app.count("id:issue-new-owner-search") === 1);
   await app.type("id:issue-new-owner-search", "老周");
-  await fake.pumpUntil(app, () => app.count("text:老周") >= 1);
+  await fake.pumpUntil(app, () => app.count("id:issue-new-owner-option-agent:laozhou") === 1);
   expect(app.texts()).not.toContain("alice");
-  await app.press("text:老周");
+  await app.press("id:issue-new-owner-option-agent:laozhou");
   await fake.pumpUntil(app, () => app.count("id:issue-new-owner-search") === 0);
 
   await app.type("id:issue-new-text", "Owner test task");
@@ -1070,7 +1070,7 @@ test("BlockedByPicker edits blockedBy with cycle-safe options and clickable Bloc
   });
 });
 
-test("Keyboard j/k/Enter/e navigation, x/Shift+click multi-select, and BatchTriageBar compose with Group By and Hierarchy", async () => {
+test("Keyboard j/k/Enter/e navigation composes with Hierarchy while cards and rows omit multi-select checkboxes and Shift+click opens normally", async () => {
   setLocale("en");
   const t1 = makeIssueFixture({
     id: "i-kbd-1",
@@ -1120,16 +1120,6 @@ test("Keyboard j/k/Enter/e navigation, x/Shift+click multi-select, and BatchTria
     "issue.history.list",
     all.map((issue) => ({ issue, sessions: [], missingSessions: [] })),
   );
-  fake.respond("issue.update", (payload: unknown) => {
-    const p = payload as { id: string };
-    const found = all.find((i) => i.id === p.id)!;
-    return { ...found, seq: 41 };
-  });
-  fake.respond("issue.status.update", (payload: unknown) => {
-    const p = payload as { id: string; status: Issue["status"] };
-    const found = all.find((i) => i.id === p.id)!;
-    return { ...found, status: p.status, seq: 42 };
-  });
 
   const app = await open("../../../app/main.tsx", {
     width: 1280,
@@ -1141,6 +1131,10 @@ test("Keyboard j/k/Enter/e navigation, x/Shift+click multi-select, and BatchTria
     host: fake.options,
   });
   await fake.pumpUntil(app, () => app.count("id:issue-card") === 4);
+
+  // Kanban cards render zero multi-select checkboxes (#138).
+  expect(app.count("id:issue-select-i-kbd-1")).toBe(0);
+  expect(app.count("id:batch-triage-bar")).toBe(0);
 
   // Compose with Hierarchy -> top_level via DisplayMenu (hides i-kbd-child, leaving 3 top-level cards: 501, 502, 503).
   await app.press("id:display");
@@ -1167,44 +1161,23 @@ test("Keyboard j/k/Enter/e navigation, x/Shift+click multi-select, and BatchTria
   await app.keyboard.press("escape");
   await fake.pumpUntil(app, () => app.count("id:issue-board") === 1);
 
-  // x toggles selection on #501 and opens floating BatchTriageBar ("1 selected").
+  // Pressing x does not open BatchTriageBar; Shift+click opens the card normally without multi-select.
   await app.keyboard.press("x");
-  await fake.pumpUntil(app, () => app.count("id:batch-triage-bar") === 1);
-  expect(app.shows("id:batch-triage-count >> text:1 selected")).toBe(true);
+  await fake.pump(app);
+  expect(app.count("id:batch-triage-bar")).toBe(0);
 
-  // Shift+click on #503 selects range (#501, #502, #503 -> 3 selected, excluding hidden child).
   await app.keyboard.down("shift");
   await app.press("text:Third review item");
   await app.keyboard.up("shift");
-  await fake.pumpUntil(app, () => app.shows("id:batch-triage-count >> text:3 selected"));
+  await fake.pumpUntil(app, () => app.count("id:issue-peek-modal") === 1);
+  expect(app.count("id:batch-triage-bar")).toBe(0);
+  await app.press("id:issue-peek-close");
+  await fake.pumpUntil(app, () => app.count("id:issue-peek-modal") === 0);
 
-  // Batch update priority -> urgent (fires issue.update for all 3 selected issues).
-  await app.press("id:batch-triage-priority-trigger");
-  await fake.pumpUntil(app, () => app.count(`text:${t("shared.priority.urgent")}`) >= 1);
-  await app.press(`text:${t("shared.priority.urgent")}`);
-  await fake.pumpUntil(app, () => fake.calls.filter((c) => c.op === "issue.update").length === 3);
-  expect(fake.calls.filter((c) => c.op === "issue.update").map((c) => c.payload)).toEqual([
-    { id: t1.id, priority: "urgent" },
-    { id: t2.id, priority: "urgent" },
-    { id: t3.id, priority: "urgent" },
-  ]);
-
-  // Batch update status -> done (skips nothing since none are done, fires 3 issue.status.update calls).
-  await app.press("id:batch-triage-status-trigger");
-  await fake.pumpUntil(app, () => app.count(`text:${t("shared.status.done")}`) >= 1);
-  await app.press(`text:${t("shared.status.done")}`);
-  await fake.pumpUntil(app, () => fake.calls.filter((c) => c.op === "issue.status.update").length === 3);
-
-  // Batch add tag ("UX") via tags popover.
-  await app.press("id:batch-triage-tags-trigger");
-  await fake.pumpUntil(app, () => app.count("id:batch-triage-tags-popover") === 1);
-  await app.press("id:tag-preset-UX");
-  await app.press("id:batch-triage-tags-add");
-  await fake.pumpUntil(app, () => fake.calls.filter((c) => c.op === "issue.update").length === 6);
-
-  // Clear selection closes the floating BatchTriageBar.
-  await app.press("id:batch-triage-clear");
-  await fake.pumpUntil(app, () => app.count("id:batch-triage-bar") === 0);
+  // List rows also omit multi-select checkboxes.
+  await app.press("id:issue-view-list");
+  await fake.pumpUntil(app, () => app.count("id:issue-list") === 1);
+  expect(app.count("id:issue-select-i-kbd-1")).toBe(0);
 });
 
 test("Issue detail displays and updates non-blocking relations without blocking status", async () => {
@@ -1495,4 +1468,94 @@ test("Unified DisplayMenu toggles density, field visibility, persistence, and re
   await fake.pumpUntil(app, () => app.count("id:issue-timeline") === 1);
   expect(app.layout("id:timeline-row >> nth=0")!.height).toBe(38);
   expect(app.count("id:timeline-row >> text:#701")).toBe(1);
+});
+
+test("External teammates are searchable and selectable in OwnerPicker, shown with code/name on cards and rows, and excluded from OAR AgentSelect", async () => {
+  setLocale("zh");
+  const baseAgents = scenarios.typical.responses["agent.list"] as Agent[];
+  const externalTeammate: Agent = {
+    ...baseAgents[1],
+    id: "antigravity-ide",
+    code: "W-04",
+    name: "Antigravity",
+    role: "worker",
+    mode: "external",
+    runtime: "antigravity",
+    enabled: true,
+    look: { ...baseAgents[1].look, avatar: "avatar-architect" },
+  };
+  const externalOwned = makeIssueFixture({
+    id: "i-ext-owner",
+    number: 801,
+    title: "External teammate issue",
+    status: "todo",
+    owner: { kind: "agent", id: "antigravity-ide" },
+    stage: { state: "draft", acts: [] },
+  });
+  const base = scenarios.typical;
+  const state: SliceBundle = {
+    ...base.state,
+    board: { seq: 15, issues: [externalOwned] },
+  };
+  const fake = fakeHost({ state, responses: base.responses }, { route: "/issues", locale: "zh" });
+  fake.respond("agent.list", () => [...baseAgents, externalTeammate]);
+  fake.respond("issue.create", (payload: unknown) => {
+    const p = payload as { title?: string; owner?: Issue["owner"] };
+    return makeIssueFixture({
+      id: "i-ext-created",
+      number: 802,
+      title: p.title ?? "Created",
+      status: "backlog",
+      ...(p.owner ? { owner: p.owner } : {}),
+      stage: { state: "draft", acts: [] },
+    });
+  });
+
+  const app = await open("../../../app/main.tsx", {
+    width: 1280,
+    height: 820,
+    colorScheme: "light",
+    platform: "macos",
+    clock: { time: SCENARIO_NOW },
+    host: fake.options,
+  });
+  await fake.pumpUntil(app, () => app.count("id:issue-card") === 1);
+
+  // Kanban card owner displays teammate code + name.
+  expect(app.shows("id:card-owner >> text:W-04")).toBe(true);
+  expect(app.shows("id:card-owner >> text:Antigravity")).toBe(true);
+
+  // List row owner displays teammate code + name + External mode badge.
+  await app.press("id:issue-view-list");
+  await fake.pumpUntil(app, () => app.count("id:issue-list") === 1);
+  expect(app.shows("id:row-owner >> text:W-04")).toBe(true);
+  expect(app.shows("id:row-owner >> text:Antigravity")).toBe(true);
+  expect(app.shows("id:row-owner >> text:外部接入")).toBe(true);
+
+  // NewIssue OAR helper selector excludes External teammates, while OwnerPicker searches by code/runtime.
+  await app.press("id:issue-toolbar-new");
+  await fake.pumpUntil(app, () => app.count("id:issue-new-helper-trigger") === 1);
+  await app.press("id:issue-new-helper-trigger");
+  await fake.pumpUntil(app, () => app.count("id:issue-new-helper-search") === 1);
+  await app.type("id:issue-new-helper-search", "Antigravity");
+  await fake.pumpUntil(app, () => app.texts().includes("没有符合条件的角色。"));
+  await app.keyboard.press("escape");
+  await fake.pumpUntil(app, () => app.count("id:issue-new-helper-search") === 0);
+
+  await app.press("id:issue-new-owner-trigger");
+  await fake.pumpUntil(app, () => app.count("id:issue-new-owner-search") === 1);
+  await app.type("id:issue-new-owner-search", "W-04");
+  await fake.pumpUntil(app, () => app.count("id:issue-new-owner-option-agent:antigravity-ide") === 1);
+  expect(app.texts()).toContain("外部接入");
+  await app.press("id:issue-new-owner-option-agent:antigravity-ide");
+  await fake.pumpUntil(app, () => app.count("id:issue-new-owner-search") === 0);
+
+  await app.type("id:issue-new-text", "Assign external owner by code");
+  await app.press("id:issue-new-keep");
+  await fake.pumpUntil(app, () => app.count("id:issue-new-dialog") === 0);
+  const created = fake.calls.findLast((c) => c.op === "issue.create");
+  expect(created?.payload).toMatchObject({
+    title: "Assign external owner by code",
+    owner: { kind: "agent", id: "antigravity-ide" },
+  });
 });

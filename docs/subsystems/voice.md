@@ -1,13 +1,13 @@
 # 语音
 
-实时通话与语音听写（ASR）的凭据、MOSS Live 线路与主助手语音旁白（`Voice::speak`）在 Rust 服务端的 `crates/server/src/voice/`，接口是 `voice.*`（`voice.hear`、`voice.moss.verify`、`voice.grant.create`、`voice.call.{start,stop,hear,say}`、`voice.asr.{start,stop,transcribe}`）。服务端不碰音频设备：连 MOSS Live 的 WebSocket、采集麦克风和播放回答，都是宿主（原生应用 `apps/mac`，和服务端同一个进程）的事。
+实时通话与语音听写（ASR）的凭据、MOSS Live 线路与主助手语音旁白（`Voice::speak`）在 Rust 服务端的 `crates/server/src/voice/`。桌面原生通话与听写经进程内窄端口 `Server::voice()`（`LiveVoicePort`）直接驱动；对外仅保留 `voice.moss.verify` 一个校验密钥的 RPC 接口。服务端不碰音频设备：连 MOSS Live 的 WebSocket、采集麦克风和播放回答，都是宿主（原生应用 `apps/mac`，和服务端同一个进程）的事。
 
 ## 在哪
 
 | 位置 | 是什么 |
 |---|---|
-| `crates/server/src/context/api.rs` | `LiveVoicePort`、`LiveVoiceLine` 与 `SharedLiveVoice` 窄端口 trait：隔离开服务端具体 `Voice` 实现与桌面宿主（含 `asr_line`、`can_transcribe`、`transcribe_wav_async`） |
-| `crates/server/src/voice/` | `Voice`（实现 `LiveVoicePort`）：通话凭据与会话（`grant`、`start`、`stop`、`heard`、`said`、`speak`）、ASR 听写会话与转写（`asr_start`、`asr_stop`、`asr_transcribe_async`、`asr_line`）、验 MOSS 的 Key（`verify_moss_async`） |
+| `crates/server/src/context/api.rs` | `LiveVoicePort`、`LiveVoiceLine` 与 `SharedLiveVoice` 窄端口 trait：隔离开服务端具体 `Voice` 实现与桌面宿主（含 `grant`、`start`、`stop`、`heard`、`said`、`moss_line`、`asr_line`、`can_transcribe`、`transcribe_wav_async`、`polish_transcript_async`） |
+| `crates/server/src/voice/` | `Voice`（实现 `LiveVoicePort`）：通话凭据与会话（`grant`、`start`、`stop`、`heard_async`、`said_async`、`speak`）、ASR 听写与转写（`asr_line`、`transcribe_wav_async`、`polish_transcript_async`）、验 MOSS 的 Key（`verify_moss_async`） |
 | `crates/server/src/voice/moss.rs` | MOSS Live 文字帧（`ask_orchestrator` 工具、通话与听写 `session_update`、旁白、验 Key）与批量 WAV 转写（`HttpTranscriber`） |
 | `crates/server/src/voice/prompt.rs` | 通话与听写里对模型说的话 |
 | `crates/server/src/agent/orchestrator/mod.rs` 的 `answer`、`brief` | 助手这一轮的话除了写进群聊，也通过窄端口交给等着它的那通电话（`Reply`） |
@@ -33,11 +33,11 @@
 
 ## 一通电话
 
-1. `voice.grant.create`：签发一份通话凭据 `VoiceGrant { channel, uid }`（未用时一小时过期，一份凭据只开一通电话）。
-2. 宿主向 `Voice::moss_line()` 取 `MossLine`（含 MOSS Live 地址、Authorization Key 与会话配置），先发 `session_update()`（人设、开场白与 `ask_orchestrator` 工具）。
-3. `voice.call.start { channel, uid, about? }`：登记活跃通话并回 `VoiceCall { agentId }`；`about` 是响铃缘由，用于替代默认问候语。
-4. 通话里：宿主把 `outgoing` 里的帧原样发给 MOSS，把 MOSS 说的文字帧交给 `heard()`，并经 `voice.call.hear`（用户说的）和 `voice.call.say`（模型说的）记进默认频道（问候语不记）。`voice.hear` 是不带 `agentId` 的简化入口，只在恰好有一通电话时管用。模型调 `ask_orchestrator` 时服务端去问主助手并把回答放进 `outgoing`；服务端也可经 `Voice::speak` 注入旁白。
-5. `voice.call.stop { agentId }`（或 `MossLine` 连接断开）：结束这通电话并释放活跃状态。
+1. `LiveVoicePort::grant()`：签发一份通话凭据 `VoiceGrant { channel, uid }`（未用时一小时过期，一份凭据只开一通电话）。
+2. 宿主向 `LiveVoicePort::moss_line()` 取 `LiveVoiceLine`（含 MOSS Live 地址、Authorization Key 与会话配置），先发 `session_update()`（人设、开场白与 `ask_orchestrator` 工具）。
+3. `LiveVoicePort::start(channel, uid)`：登记活跃通话并回 `VoiceCall { agentId }`（`Voice::start` 另支持传入响铃缘由 `about`，替代默认问候语）。
+4. 通话里：宿主把 `outgoing` 里的帧原样发给 MOSS，把 MOSS 说的文字帧交给 `heard()`，并经 `LiveVoicePort::heard`（用户说的）和 `LiveVoicePort::said`（模型说的）记进默认频道（问候语不记）。模型调 `ask_orchestrator` 时服务端去问主助手并把回答放进 `outgoing`；服务端也可经 `Voice::speak` 注入旁白。
+5. `LiveVoicePort::stop(agent_id)`（或 `MossLine` 连接断开）：结束这通电话并释放活跃状态。
 
 ## 守住的
 

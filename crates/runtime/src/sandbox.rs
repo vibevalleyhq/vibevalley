@@ -19,66 +19,7 @@ use uuid::Uuid;
 
 use crate::BoxFuture;
 use crate::teardown_gate::AsyncTeardownGate;
-
-/// Redacted credential wrapper: serializes transparently, never exposes raw bytes in `Debug` or `Display`.
-#[derive(Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(transparent)]
-pub struct Secret(String);
-
-impl Secret {
-    pub fn new(raw: impl Into<String>) -> Self {
-        Self(raw.into())
-    }
-
-    pub fn expose(&self) -> &str {
-        &self.0
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.0.trim().is_empty()
-    }
-
-    /// Safe redacted suffix hint (only last 4 chars for long tokens; never reveals short secrets).
-    pub fn hint(&self) -> String {
-        let trimmed = self.0.trim();
-        if trimmed.is_empty() {
-            return "none".into();
-        }
-        if trimmed.chars().count() <= 8 {
-            return "[redacted]".into();
-        }
-        let tail: String = trimmed.chars().rev().take(4).collect::<Vec<_>>().into_iter().rev().collect();
-        format!("…{tail}")
-    }
-}
-
-impl From<String> for Secret {
-    fn from(value: String) -> Self {
-        Self(value)
-    }
-}
-
-impl From<&str> for Secret {
-    fn from(value: &str) -> Self {
-        Self(value.to_string())
-    }
-}
-
-impl fmt::Debug for Secret {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.is_empty() {
-            f.write_str("Secret(none)")
-        } else {
-            write!(f, "Secret({})", self.hint())
-        }
-    }
-}
-
-impl fmt::Display for Secret {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.hint())
-    }
-}
+pub use vibevalley_protocol::Secret;
 
 #[derive(Debug, thiserror::Error)]
 pub enum SandboxError {

@@ -71,11 +71,10 @@
 | `PageBody` / `Card` / `ListCard` / `ListRow` / `Split` / `SidebarSection` / `ActiveBar` | `apps/mac/ui/design/layout.tsx` | `PageBody` 统一管理内容阅读宽度（`prose` `max-w-3xl` / `manage` `max-w-5xl` / `wide` `w-full`）与 `gap-5` 节奏；`Split` / `ListCard` / `ListRow` 组织列表布局；`SidebarSection` 统一侧栏折叠组（`h-7`、`10px` 旋转箭头、`CountPill`、`collapsedBadge` 与右侧动作）；`ActiveBar` 绘制 `2px` 绝对定位选中竖条 |
 | `Bubble` / `Tip` / `Hint` | `apps/mac/ui/design/Tip.tsx` | `Bubble` 供 `tooltip` 挂载微气泡；`Hint` 为问号图标悬浮解释 |
 
-## 2.4 对话框、菜单、表格与分栏
+## 2.4 对话框、菜单与分栏
 
 - **`Dialog`（`apps/mac/ui/design/Dialog.tsx`）**：模态层覆盖 `bg-scrim`（`z-30`），居中容器 `rounded-lg border border-line bg-elevated shadow-float`，内置标题栏、ESC 监听与背景防穿透锁；提供四档固定宽度（`sm` `480` / `md` `640` / `lg` `820` / `xl` `1000`，均按视口留边距取小）与两种高度模式（`auto` 受像素上限与视口比例 `maxHeight` 双重封顶，用于确认框与轻表单；`fixed` 锁定固定高度并在内部滚动，用于带 Tab、搜索、列表浏览、预览或差异审查的弹窗），并统一锚定在稳定的顶部 `marginTop` Y 坐标上避免切换高度时上下跳动；支持固定不随正文滚动的 `toolbar` / `footer` 槽位及 `scroll={false}` 自定义布局。非打断性的单字段创建与微确认优先使用就地锚定的 `Popover` 或 `ConfirmButton`，避免全屏遮罩打断操作。
 - **`MoreMenu`（`apps/mac/ui/design/MoreMenu.tsx`）**：点击「更多」按钮在 `z-20` 弹出的动作清单（`min-w-44 max-w-72 max-h-80`），支持分隔线、危险条目红字及图标前置。
-- **`DataTable`（`apps/mac/ui/design/DataTable.tsx`）**：通用等高行数据表，固定列宽与 `min-w-0` 弹性列配比，支持列头排序、空态回落、行点击整行响应。
 - **`Splitter` 与 `usePaneWidth`（`apps/mac/ui/design/Splitter.tsx`）**：`1px` 隐形加宽可拖拽热区线条；按 `side` 枚举（靠左/靠右面板）计算向外扩展像素差，并自动写入持久化偏好。
 - **`ShortcutSheet`（`apps/mac/ui/design/ShortcutSheet.tsx`）**：按下 `?` 呼出的快捷键速查弹窗，按 `shortcutPlaces` 作用域分组呈现所有可用按键组合与键帽徽标。
 

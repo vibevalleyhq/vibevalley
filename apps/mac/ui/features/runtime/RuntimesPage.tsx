@@ -13,7 +13,6 @@ import {
   type SessionView,
 } from "@vibevalley/protocol";
 
-import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
 import { AgentFace } from "../../design/domain/Face";
 import { RuntimeIcon } from "../../design/domain/RuntimeIcon";
@@ -25,6 +24,7 @@ import { ActiveBar, Empty, Quiet, Toggle } from "../../design/layout";
 import { Splitter, usePaneWidth } from "../../design/Splitter";
 import { CountPill, Dot, Tag, type DotTone, type TagTone } from "../../design/Tag";
 import { Bubble } from "../../design/Tip";
+import { createAct } from "../../infra/act";
 import { useWorkAgents } from "../../infra/agents";
 import { api, reasonOf } from "../../infra/api";
 import { Keyed, variant } from "../../infra/base/dom";
@@ -32,6 +32,7 @@ import { momentText, wallClockText } from "../../infra/base/format";
 import { useSessionsSlice } from "../../infra/frame";
 import { ready, runtimesQuery, useQueryClient, useRuntimes } from "../../infra/query";
 import { Link as A } from "../../infra/router";
+import { useVdpNode } from "../../infra/vdpProbe";
 import {
   buildMachineRuntimeGroups,
   type DisplayMachine,
@@ -171,8 +172,9 @@ function matchesAgentForEntry(agent: Agent, machine: DisplayMachine, entry: Mach
   return machine.here && agent.runtime === entry.runtimeId;
 }
 
-/** `rest` is the path after /runtimes/ (`<machine>/<runtime>` or legacy `<runtime>`). */
+/** `rest` is the path after /runtimes/ (`<machine>/<runtime>`). */
 export function RuntimesPage(props: { rest: string }) {
+  useVdpNode({ testId: "runtimes-page", role: "region" });
   const client = useQueryClient();
   const runtimes = useRuntimes();
   const agents = useWorkAgents();

@@ -14,6 +14,8 @@ path = "tests/suite.rs"
 base64 = { workspace = true }
 nsh-base = { version = "0.7.1", default-features = false, features = ["editor"] }
 nsh-core = { version = "0.7.1", default-features = false, features = ["svg"] }
+percent-encoding = { workspace = true }
+quick-xml = { workspace = true }
 ratex-font = "0.1.15"
 ratex-layout = "0.1.15"
 ratex-parser = "0.1.15"
@@ -24,7 +26,7 @@ thiserror = { workspace = true }
 tokio = { workspace = true }
 ttf-parser = "0.25"
 vibevalley-core = { path = "../core", features = ["collab"] }
-vibevalley-i18n = { path = "../i18n", features = ["web"] }
+vibevalley-i18n = { path = "../i18n" }
 vibevalley-pele = { path = "../engines/pele" }
 vibevalley-protocol = { path = "../protocol" }
 vibevalley-shiki = { path = "../engines/shiki" }
@@ -34,5 +36,5 @@ zstd = { version = "0.14", default-features = false }
 nsh-core = { version = "0.7.1", features = ["declarations"] }
 nsh-js = { version = "0.7.1", default-features = false }
 resvg = { version = "0.46.0", default-features = false, features = ["text"] }
-roxmltree = "0.21.2"
+roxmltree = { workspace = true }
 usvg = "0.46.0"

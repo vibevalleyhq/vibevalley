@@ -138,7 +138,7 @@ fn route_to_bridge_watches_slices_forwards_applied_slice_and_unwatches() {
         }
 
         fn wait_for(&self, what: &str, mut f: impl FnMut(&Self) -> bool) {
-            vibevalley_runtime::rt::block_on(async {
+            vibevalley_rt::block_on(async {
                 tokio::time::timeout(Duration::from_secs(3), async {
                     loop {
                         let notified = self.notify.notified();
@@ -188,7 +188,7 @@ fn route_to_bridge_watches_slices_forwards_applied_slice_and_unwatches() {
     assert_eq!(rec.named("frame:slice:board").last().unwrap()["data"]["issues"][0]["id"], "i-1");
 
     assert!(route_to_bridge(&client, &json!({ "type": "unwatch", "topic": "slice:board" })));
-    vibevalley_runtime::rt::block_on(async {
+    vibevalley_rt::block_on(async {
         tokio::time::timeout(Duration::from_secs(3), async {
             let mut yields = 0usize;
             while fake.slice_watchers(SliceKind::Board) != 0 {
@@ -217,28 +217,27 @@ fn shell_debug_handle_bridges_snapshots_into_server_with_bounded_frames_and_clie
     }
 
     struct DebugBridgeServer {
-        inner: FakeServer,
+        inner: Arc<FakeServer>,
         host_debug: SharedHostDebug,
     }
 
     impl Server for DebugBridgeServer {
-        fn call(&self, op: &str, payload: Value) -> Envelope {
-            self.inner.call(op, payload)
+        fn call_with_async(self: Arc<Self>, ctx: CallerContext, op: String, payload: Value) -> vibevalley_server::gateway::api::BoxFuture<'static, Envelope> {
+            Arc::clone(&self.inner).call_with_async(ctx, op, payload)
         }
-        fn call_with(&self, ctx: &CallerContext, op: &str, payload: Value) -> Envelope {
-            self.inner.call_with(ctx, op, payload)
+        fn slice_snapshot_json(&self, slice: SliceKind) -> Arc<str> {
+            self.inner.slice_snapshot_json(slice)
         }
-        fn slice_snapshot(&self, slice: SliceKind) -> Value {
-            self.inner.slice_snapshot(slice)
-        }
-        fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &tokio_util::sync::CancellationToken, receive: &mut dyn FnMut(i64, &Value)) {
-            self.inner.watch_slice(slice, after_seq, stop, receive);
-        }
-        fn live(&self) -> tokio::sync::mpsc::UnboundedReceiver<LiveEvent> {
+        fn live(&self) -> tokio::sync::mpsc::Receiver<LiveEvent> {
             self.inner.live()
         }
-        fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
-            self.inner.subscribe(name, payload)
+        fn subscribe_with_async(
+            self: Arc<Self>,
+            ctx: CallerContext,
+            name: String,
+            payload: Value,
+        ) -> vibevalley_server::gateway::api::BoxFuture<'static, Result<(u64, tokio::sync::mpsc::Receiver<Value>), Envelope>> {
+            Arc::clone(&self.inner).subscribe_with_async(ctx, name, payload)
         }
         fn unsubscribe(&self, id: u64) {
             self.inner.unsubscribe(id);
@@ -250,7 +249,7 @@ fn shell_debug_handle_bridges_snapshots_into_server_with_bounded_frames_and_clie
 
     let handle = ShellDebugHandle::new();
     let server: Arc<dyn Server> = Arc::new(DebugBridgeServer {
-        inner: FakeServer::new(),
+        inner: Arc::new(FakeServer::new()),
         host_debug: Arc::new(handle.clone()),
     });
     handle.set_bundle_mode("nshc");
@@ -368,32 +367,20 @@ fn failed_server_reports_service_unavailable_with_root_cause_and_empty_slices() 
     let root_cause = "vibevalley server: no such column: source_job_id";
     let server = Arc::new(FailedServer::new(root_cause));
 
-    for env in [
-        server.call("session.openWorkspace", json!({})),
-        server.call_with(&CallerContext::local(), "session.openWorkspace", json!({})),
-        vibevalley_runtime::rt::block_on(Arc::clone(&server).call_with_async(CallerContext::local(), "session.openWorkspace".into(), json!({}))),
-    ] {
-        assert_eq!(env.biz_code, BizCode::ServiceUnavailable.code());
-        assert!(env.message.contains(root_cause), "unexpected message: {}", env.message);
-        assert!(
-            !env.message.to_ascii_lowercase().contains("fake server"),
-            "must never mention fake server: {}",
-            env.message
-        );
-    }
+    let env = vibevalley_rt::block_on(Arc::clone(&server).call_with_async(CallerContext::local(), "session.openWorkspace".into(), json!({})));
+    assert_eq!(env.biz_code, BizCode::ServiceUnavailable.code());
+    assert!(env.message.contains(root_cause), "unexpected message: {}", env.message);
+    assert!(
+        !env.message.to_ascii_lowercase().contains("fake server"),
+        "must never mention fake server: {}",
+        env.message
+    );
 
-    let sub_err = server
-        .subscribe("channel.follow", json!({}))
+    let sub_err = vibevalley_rt::block_on(Arc::clone(&server).subscribe_with_async(CallerContext::local(), "channel.follow".into(), json!({})))
         .expect_err("FailedServer must refuse subscriptions");
     assert_eq!(sub_err.biz_code, BizCode::ServiceUnavailable.code());
     assert!(sub_err.message.contains(root_cause));
     assert!(!sub_err.message.to_ascii_lowercase().contains("fake server"));
-
-    let sub_with_err = server
-        .subscribe_with(&CallerContext::local(), "channel.follow", json!({}))
-        .expect_err("FailedServer must refuse subscribe_with");
-    assert_eq!(sub_with_err.biz_code, BizCode::ServiceUnavailable.code());
-    assert!(sub_with_err.message.contains(root_cause));
 
     // Empty slices render cleanly without panicking and expose cached JSON + async subscriptions.
     for kind in [
@@ -404,10 +391,10 @@ fn failed_server_reports_service_unavailable_with_root_cause_and_empty_slices() 
         SliceKind::Ops,
         SliceKind::Farm,
     ] {
-        let snap = server.slice_snapshot(kind);
-        assert_eq!(snap["seq"], 0);
         let json = server.slice_snapshot_json(kind);
         assert!(json.contains("\"seq\":0"), "slice {kind:?} json: {json}");
+        let snap: Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(snap["seq"], 0);
         assert!(server.subscribe_slice(kind).is_some());
     }
 
@@ -428,7 +415,7 @@ fn bridge_concurrency_does_not_starve_fast_rpcs_behind_four_slow_session_opens()
     use vibevalley_server::gateway::bridge::{Bridge, CallerContext, Envelope, Outlet, Server, SliceKind};
 
     struct SlowOpenServer {
-        inner: FakeServer,
+        inner: Arc<FakeServer>,
         open_in_flight: AtomicUsize,
         open_entered: Notify,
         release_opens: Notify,
@@ -437,7 +424,7 @@ fn bridge_concurrency_does_not_starve_fast_rpcs_behind_four_slow_session_opens()
     impl SlowOpenServer {
         fn new() -> Arc<Self> {
             Arc::new(Self {
-                inner: FakeServer::new(),
+                inner: Arc::new(FakeServer::new()),
                 open_in_flight: AtomicUsize::new(0),
                 open_entered: Notify::new(),
                 release_opens: Notify::new(),
@@ -446,12 +433,6 @@ fn bridge_concurrency_does_not_starve_fast_rpcs_behind_four_slow_session_opens()
     }
 
     impl Server for SlowOpenServer {
-        fn call(&self, op: &str, payload: Value) -> Envelope {
-            self.inner.call(op, payload)
-        }
-        fn call_with(&self, ctx: &CallerContext, op: &str, payload: Value) -> Envelope {
-            self.inner.call_with(ctx, op, payload)
-        }
         fn call_with_async(self: Arc<Self>, _ctx: CallerContext, op: String, _payload: Value) -> BoxFuture<'static, Envelope> {
             Box::pin(async move {
                 if op == "session.openWorkspace" {
@@ -466,20 +447,19 @@ fn bridge_concurrency_does_not_starve_fast_rpcs_behind_four_slow_session_opens()
                 Envelope::ok(json!({ "op": op }))
             })
         }
-        fn slice_snapshot(&self, slice: SliceKind) -> Value {
-            self.inner.slice_snapshot(slice)
+        fn slice_snapshot_json(&self, slice: SliceKind) -> Arc<str> {
+            self.inner.slice_snapshot_json(slice)
         }
-        fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &tokio_util::sync::CancellationToken, receive: &mut dyn FnMut(i64, &Value)) {
-            self.inner.watch_slice(slice, after_seq, stop, receive);
-        }
-        fn live(&self) -> tokio::sync::mpsc::UnboundedReceiver<vibevalley_server::gateway::bridge::LiveEvent> {
+        fn live(&self) -> tokio::sync::mpsc::Receiver<vibevalley_server::gateway::bridge::LiveEvent> {
             self.inner.live()
         }
-        fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
-            self.inner.subscribe(name, payload)
-        }
-        fn subscribe_with(&self, ctx: &CallerContext, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
-            self.inner.subscribe_with(ctx, name, payload)
+        fn subscribe_with_async(
+            self: Arc<Self>,
+            ctx: CallerContext,
+            name: String,
+            payload: Value,
+        ) -> BoxFuture<'static, Result<(u64, tokio::sync::mpsc::Receiver<Value>), Envelope>> {
+            Arc::clone(&self.inner).subscribe_with_async(ctx, name, payload)
         }
         fn unsubscribe(&self, id: u64) {
             self.inner.unsubscribe(id);
@@ -518,7 +498,7 @@ fn bridge_concurrency_does_not_starve_fast_rpcs_behind_four_slow_session_opens()
         );
     }
 
-    vibevalley_runtime::rt::block_on(async {
+    vibevalley_rt::block_on(async {
         tokio::time::timeout(Duration::from_secs(3), async {
             loop {
                 let entered = server.open_entered.notified();

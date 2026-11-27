@@ -1,5 +1,5 @@
 import { computed, signal, Text, View } from "nsh";
-import { Input, Popover } from "nsh/base";
+import { Popover } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
 import {
@@ -17,28 +17,30 @@ import {
 import { assignedAgentOf, omitUndefined } from "@vibevalley/protocol/rules";
 import { IssueLane as IssueLaneSchema } from "@vibevalley/protocol/schema";
 
-import { createAct } from "../../../design/act";
 import { Button } from "../../../design/Button";
 import { ConfirmButton } from "../../../design/ConfirmButton";
 import { AgentReadinessNote, AgentSelect } from "../../../design/domain/AgentSelect";
 import { TextArea } from "../../../design/Field";
 import { Icon } from "../../../design/Icon";
-import { Markdown } from "../../../design/Markdown";
+import { motionClass } from "../../../design/motion";
 import { Bubble } from "../../../design/Tip";
 import { toast } from "../../../design/toasts";
 import { mix } from "../../../design/tone";
-import { useWorkAgentReadiness, useWorkAgents } from "../../../infra/agents";
+import { createAct } from "../../../infra/act";
+import { useManagedWorkAgents, useWorkAgentReadiness } from "../../../infra/agents";
 import { api, reasonOf } from "../../../infra/api";
 import { ago, shortMomentText } from "../../../infra/base/format";
+import { useTimeout } from "../../../infra/base/timer";
 import { hostApi } from "../../../infra/bridge";
+import { newIssueTitle } from "../../../infra/issueActions";
 import { ready, useQueryClient, useRepos } from "../../../infra/query";
 import { createEffect, createSignal, untrack } from "../../../infra/solid";
 import { useIntents } from "../../../infra/state/intent";
 import { rememberPick } from "../../../infra/state/prefs";
-import { IssueArtifacts } from "../../artifact";
+import { IssueBodyEditor, IssueNotes, useNotes } from "../../note";
 import { todoStatusLabel } from "../model/cards";
 import { useIssues } from "../model/history";
-import { isRefined, newIssueTitle } from "../model/issue";
+import { isRefined } from "../model/issue";
 import { blockerIssuesOf, relationIssuesOf } from "../model/meta";
 import { issueMove, issueMoveOf, movedIssue, sendMove } from "../model/moves";
 import { ActLines } from "./ActLines";
@@ -116,11 +118,18 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
   const newRepo = signal(false);
   const repoActions = signal(false);
   const repoActionCreate = signal(false);
-  const editingDesc = signal(false);
   const refineOpen = signal(false);
-  const agents = useWorkAgents(true);
+  const saveState = signal<"idle" | "saving" | "saved">("idle");
+  const clearSaved = useTimeout();
+  const markSaved = () => {
+    saveState.set("saved");
+    clearSaved(() => saveState.set("idle"), 2000);
+  };
+  const agents = useManagedWorkAgents(true);
   const agentReadiness = useWorkAgentReadiness(true);
   const allIssues = useIssues();
+  const notesQuery = useNotes(() => ({}));
+  const allNotes = computed(() => ready(notesQuery, []));
   const queries = useQueryClient();
   const repoList = useRepos();
   const repos = computed(() => ready(repoList, []).map((p) => p.name));
@@ -267,9 +276,13 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
     const prevRaw = form().draft.criteria;
     const nextRaw = nextLines.join("\n");
     setForm((cur) => ({ ...cur, draft: { ...cur.draft, criteria: nextRaw } }));
+    saveState.set("saving");
     const ok = await act.run(() => api.issue.update({ id: props.item.id, criteria: nextLines }));
     if (ok === undefined) {
+      saveState.set("idle");
       setForm((cur) => (cur.draft.criteria === nextRaw ? { ...cur, draft: { ...cur.draft, criteria: prevRaw } } : cur));
+    } else {
+      markSaved();
     }
   };
   const remove = () => {
@@ -332,7 +345,9 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
           {(status) => (
             <View class="mb-2">
               <View class="flex-row items-center gap-2">
-                <Icon name={drafting() ? "bolt" : "idea"} size={14} tone={talkHighlight() ?? "muted"} />
+                <View class={drafting() ? motionClass("animate-pulse") : ""}>
+                  <Icon name={drafting() ? "bolt" : "idea"} size={14} tone={talkHighlight() ?? "muted"} />
+                </View>
                 <Text class="min-w-0 flex-1 text-sm font-semibold text-ink">{status()[0]}</Text>
               </View>
               <Text class="mt-0.5 text-xs leading-relaxed text-muted">{status()[1]}</Text>
@@ -382,55 +397,20 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
     </If>
   );
 
-  const hasDescription = computed(() => d().description.trim() !== "");
+  const hasDescription = computed(() => d().description.trim() !== "" || Boolean(props.item.bodyNoteId));
   const main = (
     <>
-      <View>
-        <If
-          when={editingDesc()}
-          else={
-            <If
-              when={hasDescription()}
-              else={
-                <If when={!closed()}>
-                  <View role="button" testID="issue-edit-description" onPress={() => editingDesc.set(true)} class="-mx-2 rounded-md px-2 py-2 hover:bg-hover">
-                    <Text class="text-sm text-faint">{t("web.issue.todo.addDescription")}</Text>
-                  </View>
-                </If>
-              }
-            >
-              <View class="mb-2 flex-row items-center justify-between gap-2">
-                <Text class="text-xs font-semibold text-muted">{t("web.issue.todo.description")}</Text>
-                <If when={!closed()}>
-                  <Button size="compact" tone="quiet" icon="edit" testID="issue-edit-description" onPress={() => editingDesc.set(true)}>
-                    {t("web.issue.todo.edit")}
-                  </Button>
-                </If>
-              </View>
-              <View testID="issue-description-preview">
-                <Markdown size="sm" text={d().description} />
-              </View>
-            </If>
-          }
-        >
-          <View class="mb-2 flex-row items-center justify-between gap-2">
-            <Text class="text-xs font-semibold text-muted">{t("web.issue.todo.description")}</Text>
-            <Button size="compact" tone="quiet" icon="check" testID="issue-edit-description-done" onPress={() => editingDesc.set(false)}>
-              {t("web.issue.todo.doneEditing")}
-            </Button>
-          </View>
-          <Input
-            multiline
-            autoFocus
-            testID="issue-description"
-            value={d().description}
-            onChange={(e) => edit({ description: e.value })}
-            placeholder={t("web.issue.todo.descriptionHint")}
-            accessibilityLabel={t("web.issue.todo.description")}
-            class="min-h-22 w-full rounded-md border border-line bg-page px-2.5 py-2 text-sm text-ink placeholder:text-faint focus:border-focus"
-          />
-        </If>
-      </View>
+      <IssueBodyEditor
+        issue={props.item}
+        editable={!closed()}
+        description={d().description}
+        notes={allNotes()}
+        onDraftDescription={(description) => edit({ description })}
+        onOpenIssue={(id) => props.onDone(id)}
+        sectionTitle={t("web.issue.todo.description")}
+        emptyLabel={t("web.issue.todo.addDescription")}
+        placeholder={t("web.issue.todo.descriptionHint")}
+      />
 
       <TodoCriteriaSection
         value={d().criteria}
@@ -443,11 +423,11 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
       {talk()}
       <IssueAttachments files={d().attachments} editable={!closed()} busy={busy()} onAdd={addAttachment} onRemove={removeAttachment} />
       <SubIssuesSection issueId={props.item.id} allIssues={allIssues()} onOpen={(id) => props.onDone(id)} />
-      <IssueArtifacts
+      <IssueNotes
         issue={props.item.id}
         heading={
           <View class="mt-7 border-t border-line pt-5">
-            <SheetLabel first>{t("web.artifact.issue.title")}</SheetLabel>
+            <Text class="text-xs font-semibold text-muted">{t("web.note.issue.title")}</Text>
           </View>
         }
       />
@@ -716,21 +696,44 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
         <ActLines issue={props.item.id} />
       </View>
       <View class="mt-2 gap-2 border-t border-line pt-4">
-        <If when={edited()}>
-          <View class="flex-row items-center gap-2">
-            <View class="h-1.5 w-1.5 shrink-0 rounded-full bg-wheat" />
-            <Button
-              tone="primary"
-              testID="issue-save"
-              disabled={!canSave()}
-              onPress={() => {
-                const id = props.item.id;
-                const edit = unsaved();
-                if (edit) void act.run(async () => saved(await api.issue.update({ id, ...edit })));
-              }}
-            >
-              {t("web.issue.todo.save")}
-            </Button>
+        <If when={edited() || saveState() !== "idle"}>
+          <View class="min-h-7 flex-row items-center gap-2">
+            <If when={edited()}>
+              <View class="h-1.5 w-1.5 shrink-0 rounded-full bg-wheat" />
+              <Button
+                tone="primary"
+                testID="issue-save"
+                disabled={!canSave()}
+                onPress={() => {
+                  const id = props.item.id;
+                  const editPayload = unsaved();
+                  if (!editPayload) return;
+                  saveState.set("saving");
+                  void act
+                    .run(async () => saved(await api.issue.update({ id, ...editPayload })))
+                    .then((res) => {
+                      if (res !== undefined) markSaved();
+                      else saveState.set("idle");
+                    });
+                }}
+              >
+                {t("web.issue.todo.save")}
+              </Button>
+            </If>
+            <If when={saveState() === "saving"}>
+              <View testID="issue-save-status" class="flex-row items-center gap-1">
+                <View class={motionClass("animate-spin")}>
+                  <Icon name="wait" size={12} tone="muted" />
+                </View>
+                <Text class="text-xs text-muted">{t("web.agent.saving")}</Text>
+              </View>
+            </If>
+            <If when={saveState() === "saved" && !edited()}>
+              <View testID="issue-save-status" class="flex-row items-center gap-1">
+                <Icon name="check" size={12} tone="leaf" />
+                <Text class="text-xs text-leaf">{t("web.agent.saved")}</Text>
+              </View>
+            </If>
           </View>
         </If>
         <If
@@ -747,7 +750,6 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
           <View testID="todo-triage-actions" class="flex-row flex-wrap items-center gap-2">
             <If when={backlog()}>
               <Button
-                size="compact"
                 tone="plain"
                 testID="todo-mark-ready"
                 disabled={!startable()}
@@ -757,7 +759,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
                 {t("web.issue.todo.markReady")}
               </Button>
               <If when={!showTalkBox()}>
-                <Button size="compact" tone="quiet" testID="issue-draft-toggle" disabled={busy() || Boolean(drafting())} onPress={() => refineOpen.set(true)}>
+                <Button tone="quiet" testID="issue-draft-toggle" disabled={busy() || Boolean(drafting())} onPress={() => refineOpen.set(true)}>
                   {refined() || hasDescription() || criteria().length > 0 ? t("web.issue.todo.polish") : t("web.issue.todo.draft")}
                 </Button>
               </If>

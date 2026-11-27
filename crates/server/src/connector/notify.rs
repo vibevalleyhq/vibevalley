@@ -235,7 +235,8 @@ impl NotifyRouter {
         }
     }
 
-    /// Computes newly entered actionable events and issue ids that left actionable stages.
+    /// Computes newly entered actionable events and exact superseded push `message_id`s
+    /// (`"push:<dedupe_key>"`) whose issue stage settled or changed.
     pub fn diff_board_issues(
         &self,
         issues: &[Issue],
@@ -245,7 +246,7 @@ impl NotifyRouter {
     ) -> (Vec<PersonalEvent>, Vec<String>) {
         let mut seen = self.seen_issue_keys.lock();
         let mut new_events = Vec::new();
-        let mut settled_issues = Vec::new();
+        let mut settled_messages = Vec::new();
         let mut live_ids = HashMap::with_capacity(issues.len());
 
         for issue in issues {
@@ -257,21 +258,31 @@ impl NotifyRouter {
                 .map(|r| r.summary.as_str());
             if let Some(ev) = personal_event_for_issue(issue, summary, now_ms, channel_id) {
                 live_ids.insert(issue.id.clone(), ev.dedupe_key.clone());
-                if seen.get(&issue.id) != Some(&ev.dedupe_key) {
-                    new_events.push(ev);
+                match seen.get(&issue.id) {
+                    Some(prev_key) if prev_key == &ev.dedupe_key => {}
+                    Some(prev_key) => {
+                        settled_messages.push(format!("push:{prev_key}"));
+                        new_events.push(ev);
+                    }
+                    None => {
+                        new_events.push(ev);
+                    }
                 }
-            } else if seen.contains_key(&issue.id) {
-                settled_issues.push(issue.id.clone());
+            } else if let Some(prev_key) = seen.get(&issue.id) {
+                settled_messages.push(format!("push:{prev_key}"));
             }
         }
 
-        for id in seen.keys() {
-            if !live_ids.contains_key(id) && !settled_issues.contains(id) {
-                settled_issues.push(id.clone());
+        for (id, prev_key) in seen.iter() {
+            if !live_ids.contains_key(id) {
+                let msg_id = format!("push:{prev_key}");
+                if !settled_messages.contains(&msg_id) {
+                    settled_messages.push(msg_id);
+                }
             }
         }
         *seen = live_ids;
-        (new_events, settled_issues)
+        (new_events, settled_messages)
     }
 
     /// Evaluates quiet/dedupe/rate-limit rules and durably enqueues [`OutboxEvent::ConnectorNotify`].

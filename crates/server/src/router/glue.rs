@@ -5,15 +5,10 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use vibevalley_core::SliceMask;
-use vibevalley_protocol::{
-    ApiError, Artifact, ArtifactCollabImportRequest, ArtifactCollabImportResult, ArtifactFileDeleteRequest, ArtifactFileDeleteResult, ArtifactFileWriteRequest,
-    ArtifactFileWriteResult, ArtifactHistoryUndoOriginRequest, ArtifactSuggestionAcceptInput, ArtifactSuggestionCreateInput, ArtifactVersionRequest, BizCode,
-    Caller, Health, Op, RepoTemplates, SayRequest, SessionSendInput, Suggestion, ops,
-};
+use vibevalley_protocol::{ApiError, BizCode, Caller, Health, Op, RepoTemplates, SayRequest, SessionSendInput, ops};
 use vibevalley_runtime::oar::{Registry, set_observer};
 
 use crate::agent::{Agent, Profile};
-use crate::artifact::Manager as ArtifactManager;
 use crate::channel::Chat;
 use crate::connector::Connector;
 use crate::context::api::{CallerContext, DomainSubscription, NativeEndpointInput, NativeEndpointOutput};
@@ -23,6 +18,7 @@ use crate::debug::DebugKit;
 use crate::game::Game;
 use crate::issue::{Board, IssueChat, Pull, SessionChat};
 use crate::machine::Machine;
+use crate::note::Manager as NoteManager;
 use crate::provider::Provider;
 use crate::repo::Repo;
 use crate::runtime::Runtime;
@@ -47,7 +43,7 @@ pub(crate) struct AppCore {
     pub issue_chat: Arc<IssueChat>,
     pub session_chat: Arc<SessionChat>,
     pub agent: Arc<Agent>,
-    pub artifact: Arc<ArtifactManager>,
+    pub note: Arc<NoteManager>,
     pub channel: Arc<Chat>,
     pub connector: Arc<Connector>,
     pub cron: Arc<CronScheduler>,
@@ -67,8 +63,8 @@ impl AppCore {
             set.spawn_blocking(move || machine.close());
             let game = self.game.clone();
             set.spawn(async move { game.close_async().await });
-            let artifact = self.artifact.clone();
-            set.spawn_blocking(move || artifact.close());
+            let note = self.note.clone();
+            set.spawn_blocking(move || note.close());
             let storage = self.storage.clone();
             set.spawn(async move { storage.close_async().await });
             let repo = self.repo.clone();
@@ -170,8 +166,8 @@ pub(crate) async fn library_add_async(
     ctx: &CallerContext,
     req: &vibevalley_protocol::LibraryAddRequest,
 ) -> Result<vibevalley_protocol::LibraryItem, ApiError> {
-    let by = c.artifact.added_by_for_caller_async(ctx).await;
-    c.artifact.library.add_async(req, &by).await
+    let by = c.note.added_by_for_caller_async(ctx).await;
+    c.note.library.add_async(req, &by).await
 }
 
 pub(crate) async fn agent_tmpl_install(pr: &Profile, r: vibevalley_protocol::AgentTemplateInstallInput) -> Result<vibevalley_protocol::Agent, ApiError> {
@@ -195,54 +191,15 @@ pub(crate) async fn session_send(c: &AppCore, ctx: &CallerContext, r: SessionSen
         .await
 }
 
-pub(crate) async fn artifact_version(art: &ArtifactManager, ctx: &CallerContext, r: &ArtifactVersionRequest) -> Result<Artifact, ApiError> {
-    let (m, _, t) = art.caller_meta(ctx);
-    art.version_with_meta_async(&m, r, &t).await
-}
-
-pub(crate) async fn artifact_write(art: &ArtifactManager, ctx: &CallerContext, r: &ArtifactFileWriteRequest) -> Result<ArtifactFileWriteResult, ApiError> {
-    let (m, _, t) = art.caller_meta(ctx);
-    art.write_files_with_meta_async(&m, r, &t).await
-}
-
-pub(crate) async fn artifact_delete_file(
-    art: &ArtifactManager,
-    ctx: &CallerContext,
-    r: &ArtifactFileDeleteRequest,
-) -> Result<ArtifactFileDeleteResult, ApiError> {
-    let (m, _, t) = art.caller_meta(ctx);
-    art.delete_file_with_meta_async(&m, r, &t).await
-}
-
-pub(crate) async fn art_suggest(art: &ArtifactManager, ctx: &CallerContext, r: &ArtifactSuggestionCreateInput) -> Result<Suggestion, ApiError> {
-    art.create_suggestion_async(&art.caller_meta(ctx).1, r).await
-}
-
-pub(crate) async fn art_accept(art: &ArtifactManager, ctx: &CallerContext, r: &ArtifactSuggestionAcceptInput) -> Result<Suggestion, ApiError> {
-    art.accept_suggestion_async(&art.caller_meta(ctx).1, r).await
-}
-
-pub(crate) async fn artifact_reject(art: &ArtifactManager, ctx: &CallerContext, r: &ArtifactSuggestionAcceptInput) -> Result<Suggestion, ApiError> {
-    art.reject_suggestion_async(&art.caller_meta(ctx).1, &r.id, &r.suggestion).await
-}
-
-pub(crate) async fn artifact_undo_origin(art: &ArtifactManager, ctx: &CallerContext, r: &ArtifactHistoryUndoOriginRequest) -> Result<Artifact, ApiError> {
-    art.history_undo_origin_async(&art.caller_meta(ctx).0, r).await
-}
-
-pub(crate) async fn artifact_collab_import(
-    art: &ArtifactManager,
-    ctx: &CallerContext,
-    r: &ArtifactCollabImportRequest,
-) -> Result<ArtifactCollabImportResult, ApiError> {
-    art.collab_import_async(&art.caller_meta(ctx).0, r).await
-}
-
 pub(crate) async fn setting_update(c: &AppCore, r: <ops::SettingUpdate as Op>::Input) -> Result<<ops::SettingUpdate as Op>::Result, ApiError> {
     let locale_changed = r.locale.is_some();
+    let github_token_changed = r.github_token.is_some();
     let status = c.setting.save_async(r).await?;
     if locale_changed {
         c.ctx.mark_dirty(SliceMask::ALL);
+    }
+    if github_token_changed {
+        c.repo.invalidate_github_cache();
     }
     Ok(status)
 }
@@ -290,9 +247,9 @@ pub(crate) async fn open_sub_domain_async(core: &AppCore, input: DomainSubscript
     match input {
         DomainSubscription::ChannelFollow(q) => core.channel.follow(&q.id, q.after, sink),
         DomainSubscription::ChannelReports(q) => core.channel.reports(q.after, sink),
-        DomainSubscription::ArtifactFollow(q) => core.artifact.follow_files_async(&q.id, q.after, sink).await,
-        DomainSubscription::ArtifactSuggestionFollow(q) => core.artifact.follow_suggestions_async(&q.id, sink).await,
-        DomainSubscription::ArtifactPresenceFollow(q) => core.artifact.follow_presence_async(&q.id, sink).await,
+        DomainSubscription::NoteFollow(q) => core.note.follow_files_async(&q.id, q.after, sink).await,
+        DomainSubscription::NoteSuggestionFollow(q) => core.note.follow_suggestions_async(&q.id, sink).await,
+        DomainSubscription::NotePresenceFollow(q) => core.note.follow_presence_async(&q.id, sink).await,
         DomainSubscription::SessionWatch(q) => core.runtime.watch_session_async(q, sink).await,
         DomainSubscription::IssueWatch(q) => core.runtime.watch_issue_async(q, sink).await,
     }

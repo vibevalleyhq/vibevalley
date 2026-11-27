@@ -6,6 +6,12 @@ export const defaultOf = (chat: Chat | undefined): Channel | undefined => chat?.
 /** A channel by its id; none when no id is given. */
 export const channelOf = (chat: Chat | undefined, id: string | undefined): Channel | undefined => (id ? chat?.channels.find((c) => c.id === id) : undefined);
 
+/** Display name of a channel (title for direct messages, name or title otherwise). */
+export const channelName = (c: Channel | undefined): string => (c?.type === "direct" ? c.title : (c?.name ?? c?.title ?? ""));
+
+/** Prefixed channel label (`#name` for channels/threads, title for direct messages). */
+export const channelLabel = (c: Channel | undefined): string => (c?.type === "direct" ? channelName(c) : `#${channelName(c)}`);
+
 /** The agent's role when an actor is an agent; undefined for the user or the system. */
 export const actorRoleOf = (actor: Actor): AgentRole | undefined => (actor.kind === "agent" ? actor.role : undefined);
 

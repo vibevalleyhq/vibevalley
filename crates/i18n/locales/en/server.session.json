@@ -15,8 +15,8 @@
   },
   "workspace": {
     "badCwd": "Working directory does not exist: {cwd}",
-    "runtimeRequired": "A runtime id is required",
-    "notWorkspace": "Session is not a workspace chat",
+    "runtimeRequired": "An environment id is required",
+    "notWorkspace": "Session is not a project chat",
     "emptyMessage": "Message cannot be empty",
     "notLive": "Session is not currently live",
     "interactionDecisionRequired": "Choose an option, enter custom text, or cancel"
@@ -29,6 +29,6 @@
   },
   "codemode": {
     "emptyScript": "Script must not be empty",
-    "unsupportedRuntime": "Runtime `{runtime}` does not support durable CodeMode scripts"
+    "unsupportedRuntime": "Environment `{runtime}` does not support durable CodeMode scripts"
   }
 }

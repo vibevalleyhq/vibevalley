@@ -14,7 +14,7 @@ use vibevalley_rich::engine::whiteboard::{
 
 fn make_entry(path: &str, rev: i64, value: &str) -> WhiteboardEntry {
     WhiteboardEntry {
-        artifact_id: "art-test".to_owned(),
+        note_id: "art-test".to_owned(),
         path: path.to_owned(),
         kind: WhiteboardEntryKind::Json,
         mime: "application/json".to_owned(),
@@ -1107,4 +1107,57 @@ fn regression_creating_text_card_sticky_or_callout_emits_open_inline_editor() {
         !rect_effs.iter().any(|e| matches!(e, ControllerEffect::OpenInlineEditor(_))),
         "plain Rect creation should not auto-open inline editor"
     );
+}
+
+#[test]
+fn regression_whiteboard_entry_deserializes_note_id_and_artifact_id_wire_shapes() {
+    let json_with_note_id = serde_json::json!([
+        {
+            "noteId": "note_01",
+            "path": "board/meta",
+            "kind": "json",
+            "mime": "application/json",
+            "size": 0,
+            "rev": 1,
+            "updatedBy": "user",
+            "updated": 0,
+            "value": "{\"title\":\"Canvas\",\"grid\":\"architectural\"}"
+        },
+        {
+            "noteId": "note_01",
+            "path": "elements/t1",
+            "kind": "json",
+            "mime": "application/json",
+            "size": 42,
+            "rev": 1,
+            "updatedBy": "user",
+            "updated": 0,
+            "value": "{\"id\":\"t1\",\"type\":\"text\",\"label\":\"Gateway Node\",\"x\":60,\"y\":40}"
+        }
+    ])
+    .to_string();
+
+    let entries: Vec<WhiteboardEntry> = serde_json::from_str(&json_with_note_id).expect("noteId entries should deserialize");
+    assert_eq!(entries.len(), 2);
+    assert_eq!(entries[0].note_id, "note_01");
+    let doc = decode_board_entries(&entries, 1);
+    assert_eq!(doc.elements.len(), 1);
+    assert_eq!(doc.elements[0].id.0, "t1");
+
+    let legacy_json = serde_json::json!([
+        {
+            "artifactId": "art_01",
+            "path": "elements/t2",
+            "kind": "json",
+            "mime": "application/json",
+            "size": 42,
+            "rev": 1,
+            "updatedBy": "user",
+            "updated": 0,
+            "value": "{\"id\":\"t2\",\"type\":\"text\",\"label\":\"Legacy\",\"x\":10,\"y\":20}"
+        }
+    ])
+    .to_string();
+    let legacy_entries: Vec<WhiteboardEntry> = serde_json::from_str(&legacy_json).expect("artifactId alias should deserialize");
+    assert_eq!(legacy_entries[0].note_id, "art_01");
 }

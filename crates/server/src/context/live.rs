@@ -4,11 +4,13 @@
 //! writes SQL.
 
 use std::collections::{BTreeMap, VecDeque};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use parking_lot::{Mutex, RwLock};
 use serde::Serialize;
 use serde_json::Value;
-use tokio::sync::broadcast;
+use tokio::sync::{broadcast, mpsc};
 use tokio_util::sync::CancellationToken;
 use vibevalley_core::LiveSessionOverlay;
 use vibevalley_protocol::{
@@ -16,28 +18,79 @@ use vibevalley_protocol::{
     NoticeLevel, Phase, Progress, RuntimeInfo, SessionEvent, SessionId, SessionSubagents, SessionTelemetry, Spent, ToolConnection,
 };
 
-const DEFAULT_LIVE_CAPACITY: usize = 512;
+pub const DEFAULT_LIVE_CAPACITY: usize = 512;
+pub const DEFAULT_SUBSCRIPTION_CAPACITY: usize = 256;
 const DEFAULT_FARM_EFFECT_CAPACITY: usize = 256;
 
 /// Ephemeral farm animation effect alias matching the protocol effect union.
 pub type FarmEffect = GameEffect;
 
-/// Where a subscription's events go; ends when the subscriber stops (`stopped`)
-/// or the opener drops it.
+/// Bounded receiver carrying serialized JSON events for one subscription.
+pub type SubscriptionRx = mpsc::Receiver<Value>;
+
+/// Where a subscription's events go; ends when the subscriber stops (`stopped`),
+/// the consumer falls behind the bounded buffer, or the opener drops it.
 pub struct Sink {
-    pub events: tokio::sync::mpsc::UnboundedSender<Value>,
-    /// Cancelled once the subscriber has stopped.
+    pub events: mpsc::Sender<Value>,
+    /// Cancelled once the subscriber has stopped or was disconnected for backpressure.
     pub stop: CancellationToken,
+    capacity: usize,
+    slow_disconnects: Arc<AtomicU64>,
 }
 
 impl Sink {
+    /// Creates a bounded subscription sink and its matching receiver.
+    pub fn new(capacity: usize, stop: CancellationToken) -> (Self, SubscriptionRx) {
+        let cap = capacity.max(1);
+        let (events, rx) = mpsc::channel(cap);
+        (
+            Self {
+                events,
+                stop,
+                capacity: cap,
+                slow_disconnects: Arc::new(AtomicU64::new(0)),
+            },
+            rx,
+        )
+    }
+
+    /// Creates a subscription sink with [`DEFAULT_SUBSCRIPTION_CAPACITY`].
+    pub fn with_default_capacity(stop: CancellationToken) -> (Self, SubscriptionRx) {
+        Self::new(DEFAULT_SUBSCRIPTION_CAPACITY, stop)
+    }
+
     pub fn stopped(&self) -> bool {
         self.stop.is_cancelled()
     }
 
-    /// Sends one serialized event; returns `false` once nobody listens.
+    /// Count of slow-consumer overflow disconnects observed on this sink.
+    pub fn slow_disconnects(&self) -> u64 {
+        self.slow_disconnects.load(Ordering::Acquire)
+    }
+
+    /// Sends one serialized event without blocking; returns `false` once nobody
+    /// listens or when the bounded buffer fills (cancelling `stop` so the slow
+    /// consumer disconnects and reconnects cleanly).
     pub fn send<T: Serialize>(&self, event: &T) -> bool {
-        !self.stopped() && serde_json::to_value(event).is_ok_and(|v| self.events.send(v).is_ok())
+        if self.stopped() {
+            return false;
+        }
+        let Ok(value) = serde_json::to_value(event) else {
+            return false;
+        };
+        match self.events.try_send(value) {
+            Ok(()) => true,
+            Err(mpsc::error::TrySendError::Full(_)) => {
+                self.slow_disconnects.fetch_add(1, Ordering::AcqRel);
+                tracing::warn!(capacity = self.capacity, "subscription sink full; disconnecting slow consumer");
+                self.stop.cancel();
+                false
+            }
+            Err(mpsc::error::TrySendError::Closed(_)) => {
+                self.stop.cancel();
+                false
+            }
+        }
     }
 }
 
@@ -375,10 +428,20 @@ fn replace_if_changed<T: PartialEq>(lock: &RwLock<T>, next: T) -> bool {
     true
 }
 
-/// Adapts a Tokio `broadcast::Receiver<LiveEvent>` onto an unbounded mpsc receiver
-/// for synchronous trait callers (`Server::live`).
-pub fn bridge_live_receiver(mut rx: broadcast::Receiver<LiveEvent>, cancel: CancellationToken) -> tokio::sync::mpsc::UnboundedReceiver<LiveEvent> {
-    let (tx, out) = tokio::sync::mpsc::unbounded_channel();
+/// Adapts a Tokio `broadcast::Receiver<LiveEvent>` onto a bounded mpsc receiver
+/// for synchronous trait callers (`Server::live`). Logs broadcast lag and
+/// disconnects a slow consumer when the bounded buffer fills.
+pub fn bridge_live_receiver(rx: broadcast::Receiver<LiveEvent>, cancel: CancellationToken) -> mpsc::Receiver<LiveEvent> {
+    bridge_live_receiver_with_capacity(rx, cancel, DEFAULT_LIVE_CAPACITY)
+}
+
+pub(crate) fn bridge_live_receiver_with_capacity(
+    mut rx: broadcast::Receiver<LiveEvent>,
+    cancel: CancellationToken,
+    capacity: usize,
+) -> mpsc::Receiver<LiveEvent> {
+    let cap = capacity.max(1);
+    let (tx, out) = mpsc::channel(cap);
     crate::log::spawn_traced(async move {
         loop {
             let item = tokio::select! {
@@ -387,12 +450,20 @@ pub fn bridge_live_receiver(mut rx: broadcast::Receiver<LiveEvent>, cancel: Canc
                 _ = tx.closed() => break,
                 res = rx.recv() => match res {
                     Ok(ev) => ev,
-                    Err(broadcast::error::RecvError::Lagged(_)) => continue,
+                    Err(broadcast::error::RecvError::Lagged(skipped)) => {
+                        tracing::warn!(skipped, "live.bridge broadcast lagged; skipped live events");
+                        continue;
+                    }
                     Err(broadcast::error::RecvError::Closed) => break,
                 },
             };
-            if tx.send(item).is_err() {
-                break;
+            match tx.try_send(item) {
+                Ok(()) => {}
+                Err(mpsc::error::TrySendError::Full(_)) => {
+                    tracing::warn!(capacity = cap, "live.bridge receiver full; disconnecting slow consumer");
+                    break;
+                }
+                Err(mpsc::error::TrySendError::Closed(_)) => break,
             }
         }
     });
@@ -497,5 +568,63 @@ mod tests {
 
         let tail_seq = live.push_farm_effects([e2]);
         assert_eq!(tail_seq, 5);
+    }
+
+    #[tokio::test]
+    async fn sink_overflow_disconnects_slow_consumer_and_bounds_memory() {
+        let stop = CancellationToken::new();
+        let (sink, mut rx) = Sink::new(4, stop.clone());
+
+        for i in 0..4u64 {
+            assert!(sink.send(&serde_json::json!({ "seq": i })), "event {i} should fit");
+        }
+        assert!(!sink.stopped());
+        assert_eq!(sink.slow_disconnects(), 0);
+
+        // 5th event overflows the bounded queue -> cancels stop and disconnects slow consumer.
+        assert!(!sink.send(&serde_json::json!({ "seq": 4 })));
+        assert!(sink.stopped());
+        assert!(stop.is_cancelled());
+        assert_eq!(sink.slow_disconnects(), 1);
+        assert!(!sink.send(&serde_json::json!({ "seq": 5 })));
+
+        drop(sink);
+        let mut received = Vec::new();
+        while let Some(v) = rx.recv().await {
+            received.push(v["seq"].as_u64().unwrap());
+        }
+        assert_eq!(received, vec![0, 1, 2, 3]);
+    }
+
+    #[tokio::test]
+    async fn bridge_live_receiver_recovers_from_lag_and_disconnects_when_full() {
+        // 1. Broadcast lag recovery: receiver survives Lagged(n) and delivers trailing events.
+        let live = LiveState::with_capacities(2, 8);
+        let raw_rx = live.subscribe_live();
+        live.publish_notice(1, NoticeLevel::Info, "dropped-by-lag");
+        live.publish_notice(2, NoticeLevel::Info, "kept-a");
+        live.publish_notice(3, NoticeLevel::Info, "kept-b");
+
+        let cancel = CancellationToken::new();
+        let mut bridged = bridge_live_receiver_with_capacity(raw_rx, cancel.clone(), 8);
+        let first = tokio::time::timeout(std::time::Duration::from_secs(2), bridged.recv()).await.unwrap().unwrap();
+        let second = tokio::time::timeout(std::time::Duration::from_secs(2), bridged.recv()).await.unwrap().unwrap();
+        assert!(matches!(first, LiveEvent::Notice(n) if n.text == "kept-a"));
+        assert!(matches!(second, LiveEvent::Notice(n) if n.text == "kept-b"));
+        cancel.cancel();
+
+        // 2. Slow-consumer overflow: filling bounded mpsc disconnects bridge task cleanly.
+        let live_full = LiveState::with_capacities(32, 8);
+        let slow_cancel = CancellationToken::new();
+        let mut slow_rx = bridge_live_receiver_with_capacity(live_full.subscribe_live(), slow_cancel.clone(), 2);
+        for i in 0..10u64 {
+            live_full.publish_notice(i as i64, NoticeLevel::Info, format!("burst-{i}"));
+        }
+        let mut drained = Vec::new();
+        while let Ok(Some(ev)) = tokio::time::timeout(std::time::Duration::from_secs(2), slow_rx.recv()).await {
+            drained.push(ev);
+        }
+        assert_eq!(drained.len(), 2, "slow bridge consumer must close after bounded capacity");
+        slow_cancel.cancel();
     }
 }

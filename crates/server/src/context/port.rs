@@ -8,7 +8,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
-use vibevalley_protocol::{ApiError, ArtifactCard, ChatMessage, ConnectorID, Issue, Millis, MorningDigest, Run, Session};
+use vibevalley_protocol::{ApiError, ChatMessage, ConnectorID, Issue, Millis, MorningDigest, NoteCard, Run, Session};
 
 use crate::BoxFuture;
 
@@ -22,7 +22,7 @@ pub trait CronAgentPort: Send + Sync {
     fn resolve_agent_id(&self, named: &str) -> Option<String>;
 }
 
-/// Breaks the `channel <- artifact` layering edge so `Chat` implements card/attachment announcements directly.
+/// Breaks the `channel <- note` layering edge so `Chat` implements card/attachment announcements directly.
 pub trait ChannelAnnounce: Send + Sync {
     fn place_exists(&self, id: &str) -> bool;
     fn orchestrator_in(&self, channel: &str) -> String;
@@ -32,7 +32,7 @@ pub trait ChannelAnnounce: Send + Sync {
         from: &'a str,
         channel: &'a str,
         text: &'a str,
-        card: ArtifactCard,
+        card: NoteCard,
         run: Option<String>,
         send_key: String,
     ) -> BoxFuture<'a, Result<ChatMessage, ApiError>>;
@@ -51,9 +51,13 @@ pub trait MemoryRecallPort: Send + Sync {
     fn recall_text<'a>(&'a self, agent: &'a str, session: Option<&'a str>, repo: &'a str, query: &'a str) -> BoxFuture<'a, String>;
 }
 
-/// Decouples `voice` live-call briefing from concrete `orchestrator` construction and offline voice tests.
+/// Decouples `voice` live-call briefing and dictation polish from concrete `orchestrator` construction and offline voice tests.
 pub trait VoiceOrchestratorPort: Send + Sync {
     fn brief<'a>(&'a self, line: String, wait: Duration) -> BoxFuture<'a, Option<String>>;
+    fn polish_text_async<'a>(&'a self, _system: &'a str, text: &'a str) -> BoxFuture<'a, Result<String, String>> {
+        let fallback = text.trim().to_string();
+        Box::pin(async move { Ok(fallback) })
+    }
 }
 
 /// Where a scheduled digest cron delivers its summary.

@@ -5,12 +5,15 @@
 use std::sync::Arc;
 
 use sea_orm::sea_query::{Expr, OnConflict};
-use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Update};
+use sea_orm::{ActiveValue::Set, ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Update};
 use vibevalley_protocol::ConnectorID;
 
-use super::with_write_tx;
+use super::{batch_chunk_rows, with_write_tx};
 use crate::db::entity::{connector_account, connector_inbound, connector_outbox};
 use crate::db::{Database, DbResult};
+
+const CONNECTOR_INBOUND_BATCH_ROWS: usize = batch_chunk_rows(9);
+const CONNECTOR_OUTBOX_BATCH_ROWS: usize = batch_chunk_rows(8);
 
 #[derive(Clone, PartialEq, Eq)]
 pub(crate) struct ConnectorAccountRow {
@@ -216,27 +219,28 @@ impl ConnectorService {
             if count == 0 {
                 return Ok(false);
             }
-            for m in messages {
-                let model = connector_inbound::ActiveModel {
-                    connector: Set(id.as_str().to_owned()),
-                    ext_id: Set(m.id.clone()),
-                    from_id: Set(m.from.clone()),
-                    body: Set(m.text.clone()),
-                    reply: Set(m.reply.clone()),
-                    quoted: Set(m.quoted.clone()),
-                    message_id: Set(None),
-                    created_at: Set(at),
-                    delivered: Set(false),
-                    ..Default::default()
-                };
-                connector_inbound::Entity::insert(model)
-                    .on_conflict(
-                        OnConflict::columns([connector_inbound::Column::Connector, connector_inbound::Column::ExtId])
-                            .do_nothing()
-                            .to_owned(),
-                    )
-                    .exec_without_returning(tx)
-                    .await?;
+            if !messages.is_empty() {
+                let on_conflict = OnConflict::columns([connector_inbound::Column::Connector, connector_inbound::Column::ExtId])
+                    .do_nothing()
+                    .to_owned();
+                for chunk in messages.chunks(CONNECTOR_INBOUND_BATCH_ROWS) {
+                    let models = chunk.iter().map(|m| connector_inbound::ActiveModel {
+                        connector: Set(id.as_str().to_owned()),
+                        ext_id: Set(m.id.clone()),
+                        from_id: Set(m.from.clone()),
+                        body: Set(m.text.clone()),
+                        reply: Set(m.reply.clone()),
+                        quoted: Set(m.quoted.clone()),
+                        message_id: Set(None),
+                        created_at: Set(at),
+                        delivered: Set(false),
+                        ..Default::default()
+                    });
+                    connector_inbound::Entity::insert_many(models)
+                        .on_conflict(on_conflict.clone())
+                        .exec_without_returning(tx)
+                        .await?;
+                }
             }
             if !cursor.is_empty() {
                 Update::many(connector_account::Entity)
@@ -297,8 +301,8 @@ impl ConnectorService {
                     return Ok(false);
                 }
             }
-            for piece in pieces {
-                connector_outbox::ActiveModel {
+            for chunk in pieces.chunks(CONNECTOR_OUTBOX_BATCH_ROWS) {
+                let models = chunk.iter().map(|piece| connector_outbox::ActiveModel {
                     connector: Set(id.as_str().to_owned()),
                     message_id: Set(message.to_owned()),
                     body: Set(piece.clone()),
@@ -308,9 +312,8 @@ impl ConnectorService {
                     created_at: Set(at),
                     sent_at: Set(None),
                     ..Default::default()
-                }
-                .insert(tx)
-                .await?;
+                });
+                connector_outbox::Entity::insert_many(models).exec_without_returning(tx).await?;
             }
             Ok(true)
         })

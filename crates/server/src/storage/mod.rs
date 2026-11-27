@@ -1,11 +1,12 @@
 //! Core file and staged media input storage (`Storage`), combining a pluggable
 //! [`StorageBackend`] with content-addressed attachments ([`AttachmentStorage`]),
-//! temporary staged uploads ([`MediaInputStorage`]), and artifact directories ([`ArtifactStorage`]).
+//! temporary staged uploads ([`MediaInputStorage`]), and note directories ([`NoteStorage`]).
 
-pub mod artifact;
 pub mod attachment;
 pub mod backend;
 pub mod media_input;
+pub mod note;
+pub mod retention;
 pub mod validate;
 
 use std::io::Read;
@@ -14,28 +15,30 @@ use std::sync::Arc;
 
 use vibevalley_protocol::{ApiError, Attachment, AttachmentFile, AttachmentImportPathInput, AttachmentUpload, MediaInput, MediaInputRequest, Preview};
 
-pub use artifact::ArtifactStorage;
 pub use attachment::{ATTACHMENT_MAX, AttachmentStorage};
 pub use backend::{LocalFsBackend, MemoryBackend, ObjectMeta, S3Backend, S3Config, StorageBackend, StorageConfig, StorageError, StorageKind, build_backend};
 pub use media_input::MediaInputStorage;
+pub use note::NoteStorage;
+pub use retention::{Housekeeper, OrphanAttachmentCandidate, OrphanAttachmentReport, RetentionPolicy, RetentionReport};
 pub use validate::{AudioFacts, audio_facts};
 
 use crate::context::{Context, internal};
 use crate::service::Tx;
 
 /// Unified server file storage: pluggable object backend, content-addressed attachments,
-/// staged media inputs, and artifact directories.
+/// staged media inputs, note directories, and periodic retention housekeeping.
 pub struct Storage {
     pub backend: Arc<dyn StorageBackend>,
     pub attachment: Arc<AttachmentStorage>,
     pub media_input: Arc<MediaInputStorage>,
-    pub artifact: Arc<ArtifactStorage>,
+    pub note: Arc<NoteStorage>,
+    pub housekeeper: Arc<Housekeeper>,
 }
 
 impl Storage {
-    /// Opens attachment CAS, staged media input storage, and artifact directory storage under `home`
+    /// Opens attachment CAS, staged media input storage, and note directory storage under `home`
     /// using the default [`LocalFsBackend`], awaiting the initial staged-input recovery sweep and
-    /// starting the periodic sweeper on `ctx.task`.
+    /// starting the periodic sweepers on `ctx.task`.
     pub async fn open_async(home: &Path, ctx: Arc<Context>) -> Result<Arc<Self>, ApiError> {
         let backend: Arc<dyn StorageBackend> = Arc::new(LocalFsBackend::new(home));
         Self::open_with_backend_async(home, backend, ctx).await
@@ -49,14 +52,26 @@ impl Storage {
 
     /// Opens [`Storage`] with an explicit pluggable [`StorageBackend`] instance.
     pub async fn open_with_backend_async(home: &Path, backend: Arc<dyn StorageBackend>, ctx: Arc<Context>) -> Result<Arc<Self>, ApiError> {
+        Self::open_with_backend_and_policy_async(home, backend, ctx, RetentionPolicy::from_env()).await
+    }
+
+    /// Opens [`Storage`] with an explicit pluggable [`StorageBackend`] and [`RetentionPolicy`].
+    pub async fn open_with_backend_and_policy_async(
+        home: &Path,
+        backend: Arc<dyn StorageBackend>,
+        ctx: Arc<Context>,
+        policy: RetentionPolicy,
+    ) -> Result<Arc<Self>, ApiError> {
         let attachment = AttachmentStorage::open_with_backend(home, backend.clone(), ctx.clone());
         let media_input = MediaInputStorage::open_async(home, ctx.clone(), attachment.clone()).await?;
-        let artifact = ArtifactStorage::open_with_backend(home, backend.clone(), ctx);
+        let note = NoteStorage::open_with_backend(home, backend.clone(), ctx.clone());
+        let housekeeper = Housekeeper::open_and_start(home, backend.clone(), attachment.clone(), ctx, policy);
         Ok(Arc::new(Self {
             backend,
             attachment,
             media_input,
-            artifact,
+            note,
+            housekeeper,
         }))
     }
 
@@ -69,9 +84,20 @@ impl Storage {
         self.attachment.signed_url(id, expires_secs)
     }
 
-    /// Stops the staged media input sweeper cleanly.
+    /// Stops the staged media input and retention sweepers cleanly.
     pub async fn close_async(&self) {
+        self.housekeeper.close_async().await;
         self.media_input.close_async().await;
+    }
+
+    /// Executes one bounded retention cleanup pass across append-only tables and disk artifacts.
+    pub async fn run_housekeeping_async(&self) -> Result<RetentionReport, ApiError> {
+        self.housekeeper.run_once_async().await
+    }
+
+    /// Scans (or reclaims when `dry_run == false`) unreferenced attachments older than the grace window.
+    pub async fn gc_orphan_attachments_async(&self, dry_run: bool) -> Result<OrphanAttachmentReport, ApiError> {
+        self.housekeeper.gc_orphan_attachments_async(dry_run).await
     }
 
     pub fn path_of(&self, id: &str) -> PathBuf {

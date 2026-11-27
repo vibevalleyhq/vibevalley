@@ -1,33 +1,17 @@
 import { computed } from "nsh";
 
 import { t } from "@vibevalley/i18n";
-import { type Changes, type Issue, type IssueAct, type IssueAction, type IssueStatus } from "@vibevalley/protocol";
+import { type Issue, type IssueAct, type IssueStatus } from "@vibevalley/protocol";
 import { latestSessionIdOf, omitUndefined } from "@vibevalley/protocol/rules";
 
-import type { Act } from "../../../design/act";
-import { api } from "../../../infra/api";
+import type { Act } from "../../../infra/act";
+import { actionOf, perform } from "../../../infra/issueActions";
 import { createSignal } from "../../../infra/solid";
 import { useIntents } from "../../../infra/state/intent";
 import { issueMove, issueMoveOf, sendMove } from "./moves";
 import { issueSay, pendingWords } from "./write";
 
 // The user's buttons on an issue, as both issue pages carry them out: the workbench's (features/issue/IssueDetail.tsx) and the farm's (farm/issue/IssueView.tsx).
-
-/** An action sent once, without an overlay (the farm's bed tools, which play their effect after it). */
-export function perform(issue: Issue, a: IssueAction, words = "", sendKey = "", revision?: Changes["revision"]): Promise<unknown> {
-  switch (a.does) {
-    case "move":
-      return api.issue.status.update({ id: issue.id, status: a.status, ...(words ? { text: words } : {}), ...(revision ? { revision } : {}) });
-    case "say":
-      return api.issue.comment.create({ id: issue.id, text: words, ...(sendKey ? { sendKey } : {}) });
-    case "stop": {
-      const session = latestSessionIdOf(issue);
-      return session === undefined ? Promise.resolve() : api.session.stop({ id: session });
-    }
-  }
-}
-
-export const actionOf = (issue: Issue, act: IssueAct) => issue.stage.acts.find((a) => a.act === act);
 
 /** The box under an issue's ask: the findings of reject, or a word to the helper. */
 type ActBox = "reject" | "tell";

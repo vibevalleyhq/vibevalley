@@ -1112,30 +1112,12 @@
   }
  },
  {
-  "op": "artifact.list",
-  "name": "artifact_list",
-  "description": "列出作品：在一个频道里说过的，或为一个任务做的；都不填列出最近的。每行包含 id、标题、artifactType、最新版本号、协同 seq 与作者。",
+  "op": "note.list",
+  "name": "note_list",
+  "description": "列出笔记：在一个频道里说过的，或为一个任务做的；都不填列出最近的。每行包含 id、标题、noteType、parentId、最新版本号、协同 seq 与作者。",
   "parameters": {
    "additionalProperties": true,
    "properties": {
-    "artifactType": {
-     "description": "只列某一种 ArtifactType；不填列全部",
-     "enum": [
-      "docs",
-      "outline",
-      "slides",
-      "dashboard",
-      "motion",
-      "whiteboard",
-      "design",
-      "design-system",
-      "sheet",
-      "prototype",
-      "diagram",
-      "storyboard"
-     ],
-     "type": "string"
-    },
     "channel": {
      "description": "在哪说：#<频道>，或 #<频道>:<消息号>（一个话题）；不填就是你正在回话的地方",
      "type": "string"
@@ -1143,20 +1125,34 @@
     "issue": {
      "description": "它是为哪个任务做的：编号（#12）；不填就不挂在任务上",
      "type": "string"
+    },
+    "noteType": {
+     "description": "只列某一种 NoteType（doc、base、canvas、media）；不填列全部",
+     "enum": [
+      "doc",
+      "base",
+      "canvas",
+      "media"
+     ],
+     "type": "string"
+    },
+    "parentId": {
+     "description": "只列某篇父笔记下的直接子笔记；不填列全部",
+     "type": "string"
     }
    },
    "type": "object"
   }
  },
  {
-  "op": "artifact.get",
-  "name": "artifact_get",
-  "description": "看一份作品：每一稿是谁做的、改了什么、在对话里哪条消息（用户的评论就是对它的回复）。",
+  "op": "note.get",
+  "name": "note_get",
+  "description": "看一篇笔记：每一稿是谁做的、改了什么、层级父子信息，以及在对话里哪条消息。",
   "parameters": {
    "additionalProperties": true,
    "properties": {
     "id": {
-     "description": "作品的 id：卡片上、artifact_list 的回答里有",
+     "description": "笔记的 id：卡片上、note_list 的回答里有",
      "type": "string"
     }
    },
@@ -1167,14 +1163,14 @@
   }
  },
  {
-  "op": "artifact.content.get",
-  "name": "artifact_content_get",
-  "description": "读取一份作品主入口文件（如 structure/index.md、structure/board.json、structure/index.html 等）的当前或指定版本全文；查看目录里全部文件或读写具体文件请用 artifact_file_list / artifact_file_get / artifact_file_write。",
+  "op": "note.content.get",
+  "name": "note_content_get",
+  "description": "读取一篇笔记主入口文件（structure/doc.json、structure/base.json、structure/board.json 或 structure/media.json）的当前或指定版本全文；读写具体文件请用 note_file_list / note_file_get / note_file_write。",
   "parameters": {
    "additionalProperties": true,
    "properties": {
     "id": {
-     "description": "作品的 id：卡片上、artifact_list 的回答里有",
+     "description": "笔记的 id：卡片上、note_list 的回答里有",
      "type": "string"
     },
     "version": {
@@ -1189,33 +1185,15 @@
   }
  },
  {
-  "op": "artifact.create",
-  "name": "artifact_create",
-  "description": "创建一份目录式实时协作作品（支持 docs、outline、slides、dashboard、motion、whiteboard、design、design-system、sheet、prototype、diagram、storyboard 共 12 类）。动笔前先调 artifact_type_read 读规范。它挂在你说话的地方，你会以自己的名义说一句带卡片的话，用户在工作台里点开看、回复卡片评论。只是几句话的事直接说，不用它。",
+  "op": "note.create",
+  "name": "note_create",
+  "description": "创建一篇目录式实时协作笔记（支持 doc、base、canvas、media 四类）。动笔前先调 note_type_read 读规范。可挂在页面树 parentId 下或频道与任务下。",
   "parameters": {
    "additionalProperties": true,
    "properties": {
     "announce": {
      "description": "创建后是否在频道里发一张卡片通知用户",
      "type": "boolean"
-    },
-    "artifactType": {
-     "description": "作品类型（12 类之一）：docs、outline、slides、dashboard、motion、whiteboard、design、design-system、sheet、prototype、diagram、storyboard。动笔前先调 artifact_type_read 读规范",
-     "enum": [
-      "docs",
-      "outline",
-      "slides",
-      "dashboard",
-      "motion",
-      "whiteboard",
-      "design",
-      "design-system",
-      "sheet",
-      "prototype",
-      "diagram",
-      "storyboard"
-     ],
-     "type": "string"
     },
     "channel": {
      "description": "在哪说：#<频道>，或 #<频道>:<消息号>（一个话题）；不填就是你正在回话的地方",
@@ -1245,7 +1223,7 @@
         "type": "string"
        },
        "path": {
-        "description": "目录内相对路径，如 structure/index.md、structure/deck.json、asset/hero.png",
+        "description": "目录内相对路径，如 structure/doc.json、structure/base.json、asset/hero.png",
         "type": "string"
        }
       },
@@ -1257,10 +1235,6 @@
      },
      "type": "array"
     },
-    "isDefault": {
-     "description": "仅用于 design-system：设为全局常驻默认令牌，视觉类作品会自动引用它",
-     "type": "boolean"
-    },
     "issue": {
      "description": "它是为哪个任务做的：编号（#12）；不填就不挂在任务上",
      "type": "string"
@@ -1269,22 +1243,40 @@
      "description": "这一稿改了什么，一句话；第一稿可以写这是什么",
      "type": "string"
     },
+    "noteType": {
+     "description": "笔记原语类型（doc、base、canvas、media 四选一）",
+     "enum": [
+      "doc",
+      "base",
+      "canvas",
+      "media"
+     ],
+     "type": "string"
+    },
+    "parentId": {
+     "description": "可选：父笔记 id（放进页面树）",
+     "type": "string"
+    },
+    "sortOrder": {
+     "description": "可选：同级排序值",
+     "type": "integer"
+    },
     "title": {
-     "description": "标题：用户在卡片上看到的那一行，最多 200 个字",
+     "description": "标题：用户在页面树与卡片上看到的那一行，最多 200 个字",
      "type": "string"
     }
    },
    "required": [
     "title",
-    "artifactType"
+    "noteType"
    ],
    "type": "object"
   }
  },
  {
-  "op": "artifact.version.create",
-  "name": "artifact_version_create",
-  "description": "为作品切一个不可变版本快照（用于阶段评审、里程碑定稿或按用户评论改完交新稿）：可附带更新主入口 content，也可直接对当前目录切版，并在频道发更新卡片。",
+  "op": "note.version.create",
+  "name": "note_version_create",
+  "description": "为笔记切一个不可变版本快照：可附带更新主入口 content，也可直接对当前目录切版，并在频道发更新卡片。",
   "parameters": {
    "additionalProperties": true,
    "properties": {
@@ -1293,7 +1285,7 @@
      "type": "string"
     },
     "id": {
-     "description": "作品的 id：卡片上、artifact_list 的回答里有",
+     "description": "笔记的 id",
      "type": "string"
     },
     "note": {
@@ -1308,9 +1300,199 @@
   }
  },
  {
-  "op": "artifact.type.list",
-  "name": "artifact_type_list",
-  "description": "列出工作台支持的 12 种 ArtifactType（docs、outline、slides、dashboard、motion、whiteboard、design、design-system、sheet、prototype、diagram、storyboard）、各自简介、主入口路径、可用参考分册以及当前默认的 Design System。",
+  "op": "note.tree.move",
+  "name": "note_tree_move",
+  "description": "移动笔记在页面树中的父节点（parentId 为 null 或空移回顶层）与排序值 sortOrder（自动拦截环形依赖）。",
+  "parameters": {
+   "additionalProperties": true,
+   "properties": {
+    "id": {
+     "description": "被移动笔记的 id",
+     "type": "string"
+    },
+    "parentId": {
+     "description": "目标父笔记 id（不填或 null 表示顶层）",
+     "type": "string"
+    },
+    "sortOrder": {
+     "description": "排序权重（整数）",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "id",
+    "sortOrder"
+   ],
+   "type": "object"
+  }
+ },
+ {
+  "op": "note.link.list",
+  "name": "note_link_list",
+  "description": "查询一篇笔记或一个工单的出链（outgoing）与反向引用（backlinks）。",
+  "parameters": {
+   "additionalProperties": true,
+   "properties": {
+    "entityId": {
+     "description": "笔记 id 或工单 id",
+     "type": "string"
+    },
+    "entityKind": {
+     "description": "实体类型（note 或 issue）",
+     "enum": [
+      "note",
+      "issue"
+     ],
+     "type": "string"
+    }
+   },
+   "required": [
+    "entityKind",
+    "entityId"
+   ],
+   "type": "object"
+  }
+ },
+ {
+  "op": "note.doc.view",
+  "name": "note_doc_view",
+  "description": "读取 doc 笔记投影后的结构化块树（DocView），含块列表、字数、分页数与提取出的双链。",
+  "parameters": {
+   "additionalProperties": true,
+   "properties": {
+    "id": {
+     "description": "doc 笔记的 id",
+     "type": "string"
+    }
+   },
+   "required": [
+    "id"
+   ],
+   "type": "object"
+  }
+ },
+ {
+  "op": "note.doc.appendBlock",
+  "name": "note_doc_append_block",
+  "description": "向 doc 笔记的 structure/doc.json 追加或按 afterBlockId 插入一个 DocBlock。",
+  "parameters": {
+   "additionalProperties": true,
+   "properties": {
+    "afterBlockId": {
+     "description": "可选：插入到该 blockId 之后；不填则追加到末尾",
+     "type": "string"
+    },
+    "block": {
+     "description": "要插入的 DocBlock 对象（含 id、type 及对应字段）",
+     "type": "object"
+    },
+    "id": {
+     "description": "doc 笔记的 id",
+     "type": "string"
+    }
+   },
+   "required": [
+    "id",
+    "block"
+   ],
+   "type": "object"
+  }
+ },
+ {
+  "op": "note.base.view",
+  "name": "note_base_view",
+  "description": "按指定 sheetId 与 viewId 读取经 Rust 计算投影的 BaseViewSnapshot（筛选/排序/分组/统计汇总与当前行数据）。",
+  "parameters": {
+   "additionalProperties": true,
+   "properties": {
+    "id": {
+     "description": "base 笔记的 id",
+     "type": "string"
+    },
+    "sheetId": {
+     "description": "可选：Sheet id，默认取首个",
+     "type": "string"
+    },
+    "viewId": {
+     "description": "可选：View id，默认取首个",
+     "type": "string"
+    }
+   },
+   "required": [
+    "id"
+   ],
+   "type": "object"
+  }
+ },
+ {
+  "op": "note.base.upsertRow",
+  "name": "note_base_upsert_row",
+  "description": "在 base 笔记指定 sheet 中新增或更新一行（cells 映射 columnId -> BaseCellValue）。",
+  "parameters": {
+   "additionalProperties": true,
+   "properties": {
+    "cells": {
+     "description": "列 id 到单元格值对象的映射",
+     "type": "object"
+    },
+    "id": {
+     "description": "base 笔记的 id",
+     "type": "string"
+    },
+    "rowId": {
+     "description": "可选：行 id；不填则新增一行",
+     "type": "string"
+    },
+    "sheetId": {
+     "description": "可选：Sheet id，默认取首个",
+     "type": "string"
+    }
+   },
+   "required": [
+    "id",
+    "cells"
+   ],
+   "type": "object"
+  }
+ },
+ {
+  "op": "note.base.runAgentColumn",
+  "name": "note_base_run_agent_column",
+  "description": "批量触发 base 笔记的 agentAction 列：按 promptTemplate 渲染每行任务，配置 spawnIssueRepo 时自动建工单并把执行摘要写回单元。",
+  "parameters": {
+   "additionalProperties": true,
+   "properties": {
+    "columnId": {
+     "description": "agentAction 列 id",
+     "type": "string"
+    },
+    "id": {
+     "description": "base 笔记的 id",
+     "type": "string"
+    },
+    "rowIds": {
+     "description": "可选：只执行这些行 id；不填执行全部行",
+     "items": {
+      "type": "string"
+     },
+     "type": "array"
+    },
+    "sheetId": {
+     "description": "可选：Sheet id，默认取首个",
+     "type": "string"
+    }
+   },
+   "required": [
+    "id",
+    "columnId"
+   ],
+   "type": "object"
+  }
+ },
+ {
+  "op": "note.type.list",
+  "name": "note_type_list",
+  "description": "列出工作台支持的 4 种 NoteType 原语（doc、base、canvas、media）、各自简介、主入口路径及可用参考分册。",
   "parameters": {
    "additionalProperties": true,
    "properties": {},
@@ -1318,31 +1500,23 @@
   }
  },
  {
-  "op": "artifact.type.read",
-  "name": "artifact_type_read",
-  "description": "按需读取某一种 ArtifactType 的目录结构规范与创作技能（SKILL）或指定参考分册（reference），并告知当前默认的 Design System。做作品前先调它。",
+  "op": "note.type.read",
+  "name": "note_type_read",
+  "description": "按需读取某一种 NoteType 的目录结构规范与创作技能（SKILL）或参考分册（reference）。动笔前先调它。",
   "parameters": {
    "additionalProperties": true,
    "properties": {
     "reference": {
-     "description": "可选的参考分册名（从 artifact_type_read 或 artifact_type_list 返回的 references 里挑）；不填读该类型的主 SKILL",
+     "description": "可选参考分册名（如 format）",
      "type": "string"
     },
     "type": {
-     "description": "要读规范的类型：docs、outline、slides、dashboard、motion、whiteboard、design、design-system、sheet、prototype、diagram、storyboard",
+     "description": "要读规范的类型：doc、base、canvas、media",
      "enum": [
-      "docs",
-      "outline",
-      "slides",
-      "dashboard",
-      "motion",
-      "whiteboard",
-      "design",
-      "design-system",
-      "sheet",
-      "prototype",
-      "diagram",
-      "storyboard"
+      "doc",
+      "base",
+      "canvas",
+      "media"
      ],
      "type": "string"
     }
@@ -1354,14 +1528,14 @@
   }
  },
  {
-  "op": "artifact.file.list",
-  "name": "artifact_file_list",
-  "description": "列出作品目录（manifest.json、structure/*、asset/*）里的文件清单（路径、MIME、大小、SHA-256 hash 与协同 seq）。",
+  "op": "note.file.list",
+  "name": "note_file_list",
+  "description": "列出笔记目录（manifest.json、structure/*、asset/*）里的文件清单（路径、MIME、大小、SHA-256 hash 与协同 seq）。",
   "parameters": {
    "additionalProperties": true,
    "properties": {
     "id": {
-     "description": "作品的 id",
+     "description": "笔记的 id",
      "type": "string"
     },
     "prefix": {
@@ -1376,18 +1550,18 @@
   }
  },
  {
-  "op": "artifact.file.get",
-  "name": "artifact_file_get",
-  "description": "读取作品目录里某一个文件的当前内容或指定历史版本文件内容，返回文本（utf8）或二进制（base64）及 SHA-256 hash。",
+  "op": "note.file.get",
+  "name": "note_file_get",
+  "description": "读取笔记目录里某一个文件的当前内容或指定历史版本文件内容，返回文本（utf8）或二进制（base64）及 SHA-256 hash。",
   "parameters": {
    "additionalProperties": true,
    "properties": {
     "id": {
-     "description": "作品的 id",
+     "description": "笔记的 id",
      "type": "string"
     },
     "path": {
-     "description": "相对路径，如 manifest.json、structure/index.md、structure/slides/s01.json",
+     "description": "相对路径，如 manifest.json、structure/doc.json、structure/base.json",
      "type": "string"
     },
     "version": {
@@ -1403,9 +1577,9 @@
   }
  },
  {
-  "op": "artifact.file.write",
-  "name": "artifact_file_write",
-  "description": "向作品目录写入或更新一个或多个文件（支持 expectedHash 乐观并发校验；若目标文件由人类亲手改过，会自动转为审阅建议等待用户接受）。",
+  "op": "note.file.write",
+  "name": "note_file_write",
+  "description": "向笔记目录写入或更新一个或多个文件（支持 expectedHash 乐观并发校验；若目标文件由人类亲手改过，会自动转为审阅建议等待用户接受）。",
   "parameters": {
    "additionalProperties": true,
    "properties": {
@@ -1450,7 +1624,7 @@
      "type": "array"
     },
     "id": {
-     "description": "作品的 id",
+     "description": "笔记的 id",
      "type": "string"
     },
     "summary": {
@@ -1466,14 +1640,14 @@
   }
  },
  {
-  "op": "artifact.file.delete",
-  "name": "artifact_file_delete",
-  "description": "删除作品目录里不再需要的 structure/* 或 asset/* 文件（不能删除 manifest.json 或主入口文件）。",
+  "op": "note.file.delete",
+  "name": "note_file_delete",
+  "description": "删除笔记目录里不再需要的 structure/* 或 asset/* 文件（不能删除 manifest.json 或主入口文件）。",
   "parameters": {
    "additionalProperties": true,
    "properties": {
     "id": {
-     "description": "作品的 id",
+     "description": "笔记的 id",
      "type": "string"
     },
     "path": {
@@ -1493,14 +1667,14 @@
   }
  },
  {
-  "op": "artifact.suggestion.list",
-  "name": "artifact_suggestion_list",
-  "description": "列出作品上全部审阅建议（待用户确认 / 已接受 / 已拒绝）。",
+  "op": "note.suggestion.list",
+  "name": "note_suggestion_list",
+  "description": "列出笔记上全部审阅建议（待用户确认 / 已接受 / 已拒绝）。",
   "parameters": {
    "additionalProperties": true,
    "properties": {
     "id": {
-     "description": "作品的 id",
+     "description": "笔记的 id",
      "type": "string"
     }
    },
@@ -1511,9 +1685,9 @@
   }
  },
  {
-  "op": "artifact.suggestion.create",
-  "name": "artifact_suggestion_create",
-  "description": "对作品里的某文件（或指定字符区间 startOffset..endOffset）提出审阅建议，等用户在界面点击接受或拒绝。",
+  "op": "note.suggestion.create",
+  "name": "note_suggestion_create",
+  "description": "对笔记里的某文件（或指定字符区间 startOffset..endOffset）提出审阅建议，等用户在界面点击接受或拒绝。",
   "parameters": {
    "additionalProperties": true,
    "properties": {
@@ -1522,7 +1696,7 @@
      "type": "string"
     },
     "baseRev": {
-     "description": "你读取该文件时作品的 seq 版本号",
+     "description": "你读取该文件时笔记的 seq 版本号",
      "type": "integer"
     },
     "change": {
@@ -1552,11 +1726,11 @@
      "type": "integer"
     },
     "id": {
-     "description": "作品的 id",
+     "description": "笔记的 id",
      "type": "string"
     },
     "path": {
-     "description": "目标文件相对路径，如 structure/index.md",
+     "description": "目标文件相对路径，如 structure/doc.json",
      "type": "string"
     },
     "startOffset": {

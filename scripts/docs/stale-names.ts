@@ -3,8 +3,6 @@ import { resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "../..");
 const TS_DIRS = ["apps/mac/ui/app", "apps/mac/ui/features", "apps/mac/ui/design", "apps/mac/ui/infra", "apps/mac/ui/farm", "packages/protocol/src"];
-// Legacy path prefixes kept only so synthetic path assertions in stale-names.test.ts match scope without scanning removed dirs.
-const LEGACY_TEST_DIRS = ["apps/server/src", "apps/web/src", "apps/web/test"];
 // The native port keeps oar's and its own Rust/workspace words where rules do not name `dirs`.
 const NATIVE_DIRS = ["crates", "apps/mac/src", "apps/mac/ui"];
 const DIRS = [...TS_DIRS, ...NATIVE_DIRS];
@@ -33,16 +31,15 @@ const RULES: readonly Rule[] = [
     pattern:
       /\bowner_?[iI]d\b|(?:\b(?:for|wants|by|on|from|needs|stopped|hands|source|conflict)|For|Wants|By|On|From|Needs|Stopped|Hands|Source|Conflict)Owner|\bowner(?:Mentions?|Required|Read|Last|Line|Late|Spoke|Said|Seen|Event|Only|AgentWord|sLanguage)|Owner(?:Mention|Face|Unread|Read|Did|Required|Only|Ask)|["']owner["']/u,
     says: "the one person a farm has is the user in code, tables and values: userId, actsForUser, stageWantsUser, the actor kind \"user\" (docs/subsystems/user.md); a thread's, a block's or a trigger's owner (ownerOf, threadOwnerOf) is another word and stays",
-    // oar's acquired-session key, EverOS sender id, and Issue #84's explicit Issue.owner / GroupBy "owner" dimension.
+    // Issue #84's explicit Issue.owner / GroupBy "owner" dimension.
     except:
-      /^(?:apps\/server\/src\/modules\/(session\/executor\.test|memory\/everos|memory\/outside\.test)\.ts|apps\/mac\/ui\/features\/issue\/(model\/(display|write|schedule\.test)|views\/(FamilyDetail|IssueDetail|IssueList|IssueMetaControls|issueUx\.test))\.tsx?)$/u,
+      /^apps\/mac\/ui\/features\/issue\/(model\/(display|write|schedule\.test)|views\/(FamilyDetail|IssueDetail|IssueList|IssueMetaControls|issueUx\.test))\.tsx?$/u,
   },
   {
     name: "a delivery name the one-door plan retired",
     pattern:
       /\b(openDeliveries|returnOne|returnInput|registerTalk|registerInitialInputs|deliverDirect|breakerNotices|dropEnvelope|retireDispatches|queuedInputs|issueInputs|DeliveryChange|recordChannelTrigger|forOrchestrator|OrchestratorNews|ChannelMail|ChannelRouteInput|InboxMessage|asInbox|inboxLines|orchestratorInboxLines|inboxMore|InputConsumed|InputReturned|startedIssues|finishedRuns|inputsConsumed|inputsReturned|launchesHub)\b|\bsessions\.(register|launches|present|presentSessions|workers)\b|\b(presentSessions|registerOrchestrator|orchestratorOfRow|orchestratorForChannel|OrchestratorForChannel|setOrchestrator|SetOrchestrator|channel_follow|Follows|isForOrchestrator|beginOrchestrator|recordOrchestratorStart|recordWorkerStart|publishOrchestrator|orchestratorSays|tellSession|runSays)\b/u,
-    says: "the session module's door: receive (a Trigger with the watch's braked Hearers, a Record, an Event, or a Hire), withdraw, read (IssueTriggers, Queued, Digest…), handBack, decline, deliveries (Handed, Consumed, EmptyWake); an envelope as its helper reads it is Envelope; an orchestrator's session is registered by Session itself whenever its profile is kept (Agent.whenKept); everything a session does is one Session.news (Hired, Reported, Left, IssueStarted, RunFinished, Consumed, Returned and its launch's Spoke, Ended, HandedOff, Settling, Closed, Compacting) (docs/subsystems/session.md); the deliveries' own steps inside apps/server/src/modules/session are their business",
-    except: /^apps\/server\/src\/modules\/session\/(mailbox|work|pump|deliveries|routing|triggers|envelope|payload)(\.test)?\.ts$/u,
+    says: "the session module's door: receive (a Trigger with the watch's braked Hearers, a Record, an Event, or a Hire), withdraw, read (IssueTriggers, Queued, Digest…), handBack, decline, deliveries (Handed, Consumed, EmptyWake); an envelope as its helper reads it is Envelope; an orchestrator's session is registered by Session itself whenever its profile is kept (Agent.whenKept); everything a session does is one Session.news (Hired, Reported, Left, IssueStarted, RunFinished, Consumed, Returned and its launch's Spoke, Ended, HandedOff, Settling, Closed, Compacting) (docs/subsystems/session.md)",
   },
   {
     name: "send for hiring a helper",
@@ -63,9 +60,9 @@ const RULES: readonly Rule[] = [
     dirs: DIRS,
   },
   {
-    name: "产出 or 稿子 for a work artifact",
+    name: "产出 or 稿子 for a note",
     pattern: /产出|稿子/u,
-    says: "the page and the prompts call an artifact 作品, and an html one's versions 第 N 稿 (a block's revisions are 第 N 版) (docs/README.md 用语)",
+    says: "the page and the prompts call a note 笔记, and its versions 第 N 稿 (docs/README.md 用语)",
     dirs: DIRS,
   },
   {
@@ -91,10 +88,10 @@ const RULES: readonly Rule[] = [
     says: "a retried toggle undoes itself; send the value the user asked for: channel.reaction.set, channel.pin.set, channel.archive.set ({ on })",
   },
   {
-    name: "a document, now an artifact",
+    name: "a document under its retired doc endpoint/page names",
     pattern:
       /\bdoc_(get|block_\w+)\b|\bdoc\.(list|create|import|get|submit|block|markdown|demo)\b|\bDoc(Op|Submit|Ack|Span|Marks|Snapshot|Shape|Editor|sPage|BlockCreate|BlockUpdate|Request|Import)\w*\b|\bdocOwner\b|\/doc\/doc\b|features\/doc\b|["'`]\/docs\b/u,
-    says: "documents are artifacts with a blocks body (Artifact, artifact.block.list, artifact_block_create, BlockOp, BlockSubmit, /artifacts)",
+    says: "documents are Note doc primitives (Note, note.doc.view, note_doc_append_block, DocBlock, /notes)",
   },
   {
     name: "a cron under its old name",
@@ -105,8 +102,6 @@ const RULES: readonly Rule[] = [
     name: "playbook or plan for a task",
     pattern: /[Pp]laybook|\b[a-z_]*[Pp]lan(s|ner|ners|ning|ned)?\b|\b[A-Z][A-Za-z]*Plan(?![te])[A-Za-z]*\b/u,
     says: "a task (Task, task.*, task_split …), split for breaking one into steps, step for one of its steps",
-    // A compaction's plan of what to fold, and oar's own usage.Plan: other meanings of the word.
-    except: /^apps\/server\/src\/modules\/(agent\/brain\/(compaction|agent|.*\.test)\.ts|agent\/runtime\.ts)$/u,
   },
   {
     name: "a task graph under its old name",
@@ -117,8 +112,6 @@ const RULES: readonly Rule[] = [
     name: "an API path without its version",
     pattern: /["'`]\/api\/(?!v1\/)/u,
     says: "every route is under /api/v1",
-    // EverOS's own API, which the memory source speaks: its versions are its own.
-    except: /^apps\/server\/src\/modules\/memory\/(everos|outside|source-lifetime)(\.test)?\.ts$/u,
   },
   {
     name: "the word ticket",
@@ -151,8 +144,6 @@ const RULES: readonly Rule[] = [
     pattern:
       /\b(channel_say|channel_read|read_chat|channel_inbox|channel_settings|open_channel|list_crons|cancel_cron|issue_status|graph_action|task_action|task_edit|task_add|task_update|task_graph|memory_add|doc_read|doc_append|doc_update|wants_owner|all_repos|base_rev)\b/u,
     says: "a tool is named by its endpoint (tool/schemas.ts toolName): channel_message_send, channel_message_list, channel_unread_list, channel_update, channel_create, cron_list, cron_delete, issue_status_update, graph_act, graph_task_act, graph_task_update, memory_create, doc_get, doc_block_create, doc_block_update; an agent's own todo is todo_add, todo_update, todo_list; fields as the endpoint's (wantsUser, repo, baseRev)",
-    // Nowledge Mem's own tools, which the memory source calls.
-    except: /^apps\/server\/src\/modules\/memory\/(nowledge|outside)(\.test)?\.ts$/u,
   },
   {
     name: "an old protocol name",
@@ -165,12 +156,6 @@ const RULES: readonly Rule[] = [
     name: "the old helper agent role",
     pattern: /\brole\s*(?::|===?|!==?)\s*["'`]helper["'`]|\bagent\.role\.helper\b/u,
     says: 'an agent role is "orchestrator" or "worker" (AgentRoleValues); its words are web.agent.role.worker',
-  },
-  {
-    name: "channel-owned delivery storage",
-    pattern: /\bchannel_delivery\b/u,
-    says: "session_delivery: delivery belongs to the session module",
-    dirs: ["apps/server/src"],
   },
   {
     name: "an old home file or its mover",
@@ -218,8 +203,6 @@ const RULES: readonly Rule[] = [
     name: "a helper's question under the ask name",
     pattern: /\b(Ask|Asks|openAsks|asksOf|setIssueAsks|SetIssueAsks|OwnerAsk|badgeAsks)\b|\.asks\b/u,
     says: "Question, questions, openQuestions, questionsOf; the inbox kind ask and the verb ask stay",
-    // The marker a helper writing English may put before a question (question).
-    except: /^apps\/server\/src\/modules\/session\/report\.ts$/u,
   },
   {
     name: "the read model under the core name",
@@ -231,7 +214,7 @@ const RULES: readonly Rule[] = [
     pattern: /\b(Standing|StandingValues|IssueStanding|standingLabel|standingOf|standingIn|standingTone|standingWantsOwner)\b|\.standing\b/u,
     says: "IssueStageKind, IssueStage, issueStageOf, issueStageIn; an achievement's standing (AchievementStanding) stays",
     // The achievements panel's standings are an achievement's tier.
-    except: /^apps\/(?:web\/src|mac\/ui)\/farm\/panels\/Achievements\.tsx$/u,
+    except: /^apps\/mac\/ui\/farm\/panels\/Achievements\.tsx$/u,
   },
   {
     name: "an issue's stage under the attention type name",
@@ -279,7 +262,7 @@ const RULES: readonly Rule[] = [
     pattern: /收获|收成|缺肥|种植计划|活熟了|\bPhaseRipe\b|_tag (?:===|!==|:) "ripe"|"graph-ripe"|act: "harvest"|\bHarvest(?:Deps|Review)\b|\bharvesting\(/u,
     says: "the issue's own words (docs/subsystems/issue.md 状态和用语): 完成 (complete) and what it delivered (合进了主分支…), 改动, 问题 (等你回答), 计划; phase done, graph ready; farm words are for the farm's skin",
     // The farm's skin and the game say it their way.
-    except: /^(apps\/(?:web\/src\/farm|mac\/ui\/farm)\/|apps\/web\/test\/farm-|apps\/server\/src\/modules\/game\/|crates\/server\/src\/skin\/game(?:\.rs|\/))/u,
+    except: /^(apps\/mac\/ui\/farm\/|crates\/server\/src\/game(?:\.rs|\/))/u,
   },
   {
     name: "a word list for an issue's or a session's state outside the protocol's rules",
@@ -293,22 +276,7 @@ const RULES: readonly Rule[] = [
     name: "presence or the system in farm words, where agents and the workbench read them",
     pattern: /地里|【农场|农场现状|not_on_farm/u,
     says: "在场 (present sessions: presentSessions, session_list), 现状 (the orchestrator's situation), VibeValley for the system; 地里 and 农场 are the farm's own words",
-    dirs: [
-      "apps/server/src/issue",
-      "apps/server/src/session",
-      "apps/server/src/task",
-      "apps/server/src/tool",
-      "apps/server/src/orchestrator",
-      "apps/server/src/channel",
-      "apps/server/src/mcp",
-      "apps/server/src/inbox",
-      "apps/web/src/features",
-      "apps/web/src/base",
-      "apps/web/src/ui",
-      "apps/mac/ui/features",
-      "apps/mac/ui/infra",
-      "apps/mac/ui/design",
-    ],
+    dirs: ["apps/mac/ui/features", "apps/mac/ui/infra", "apps/mac/ui/design"],
     // What the user types in a test is the user's words.
     except: /\.test\.ts$/u,
   },
@@ -316,7 +284,7 @@ const RULES: readonly Rule[] = [
     name: "the repo map's farm words in the workbench",
     pattern: /\b(growthOf|Growth|TillingCalendar|Deed|Planted|logoInBed|SowHere|plotsIn|sessionInPlot|onSow)\b|web\.repo\.(map|repo|growth)\b/u,
     says: "the repos page says recency (recencyOf, Recency), Overview, Languages, CommitCalendar, logoInBar; the map, its plots and its sowing are the farm's (apps/mac/ui/farm/map, web.farm.map.*), handed in as ReposSkin",
-    dirs: ["apps/web/src/features", "apps/web/src/base", "apps/web/src/ui", "apps/mac/ui/features", "apps/mac/ui/infra", "apps/mac/ui/design"],
+    dirs: ["apps/mac/ui/features", "apps/mac/ui/infra", "apps/mac/ui/design"],
   },
   {
     name: "the one orchestrator under its old names",
@@ -327,9 +295,24 @@ const RULES: readonly Rule[] = [
     name: "a profile called a helper's where the user reads it",
     pattern: /帮工档案/u,
     says: "角色 (a profile): its role is 主助手 or 执行角色; tools for a model name roles or agents explicitly (docs/README.md 用语)",
-    dirs: ["apps/web/src", "apps/mac/ui/app", "apps/mac/ui/design", "apps/mac/ui/features", "apps/mac/ui/infra", "apps/mac/ui/workspace", "apps/server/src"],
-    // On the server only user catalogs (locales/server.*.json) are the user's; orchestrator/words.rs and prompts.ts are a model's.
-    except: /^apps\/server\/src\/(?!.*\/words\.ts$)/u,
+    dirs: ["apps/mac/ui/app", "apps/mac/ui/design", "apps/mac/ui/features", "apps/mac/ui/infra", "apps/mac/ui/workspace", "crates/server/src"],
+    // On the server only user catalogs (locales/server.*.json) are the user's; internal prompts are a model's.
+    except: /^crates\/server\/src\/(?!.*\/words\.rs$)/u,
+  },
+  {
+    name: "retired user-facing terms 作品 / 专家 / 引擎",
+    pattern: /作品|专家|引擎/u,
+    says: "user-facing copy and docs/README.md 用语 use 笔记 (Notes), 队友 (Teammates), and 环境 (Environments) instead of 作品, 专家, or 引擎",
+    dirs: [
+      "apps/mac/ui/app",
+      "apps/mac/ui/design",
+      "apps/mac/ui/features",
+      "apps/mac/ui/infra",
+      "apps/mac/ui/workspace",
+      "apps/mobile/src",
+      "crates/server/src",
+    ],
+    except: /^crates\/server\/src\/(?!.*\/words\.rs$)/u,
   },
   {
     name: "a profile seeded in code",
@@ -340,28 +323,18 @@ const RULES: readonly Rule[] = [
     name: "a place to talk under another name",
     pattern: /\b(Conversation\w*|conversation_id|channel_conversation|Rooms|RoomEvent|roomsPath|useRoom|followRoom)\b/u,
     says: "Channel (channel_id, the Channel service): a channel, a direct channel and a thread are all channels, by type (as Discord's); a model's conversation is the brain's word",
-    // pi-durable's Conversation is a model's: the server uses its API in these four files only.
-    except: /^apps\/server\/src\/modules\/(agent\/durable|agent\/vibevalley|agent\/helperExtension|session\/host)\.ts$/u,
   },
   {
     name: "a business name in farm words",
     pattern: /\b(onFarm|OnFarm|notOnFarm|NotOnFarm|farmURL|FarmURL|farmRules|farmNow|putFarm|MemoryAuthorFarm)\b|MemoryAuthor\.farm\b/u,
     says: "presentSessions, MCPURL, workplaceRules, situationNow, putSystem, MemoryAuthorSystem; farm words are for the skin",
     // The client's onFarm is the skin it is on.
-    dirs: [
-      "apps/server/src",
-      "apps/web/src/features",
-      "apps/web/src/base",
-      "apps/web/src/ui",
-      "apps/mac/ui/features",
-      "apps/mac/ui/infra",
-      "apps/mac/ui/design",
-    ],
+    dirs: ["apps/mac/ui/features", "apps/mac/ui/infra", "apps/mac/ui/design"],
   },
   {
     name: "a voice call under session or agent",
     pattern: /voice[./](session|agent)[./]|\bVoiceAgent(Failed)?\b|\b(StartRequest|RenewRequest)\b/u,
-    says: "a call's token is a grant (voice.grant.create, VoiceGrant); the call is a call (voice.call.*, VoiceCall, VoiceCallStart, VoiceCallFailed)",
+    says: "a call's token is a grant (VoiceGrant); the call is a call (VoiceCall, VoiceCallFailed)",
   },
   {
     name: "validating under the word check",
@@ -395,7 +368,7 @@ const RULES: readonly Rule[] = [
     pattern:
       /\b(Round|RoundView|roundsOf|roundLabel|roundMs|liveRound|failedRound|finishedRound|TurnSteps|turnLabel)\b|features\/session\/rounds\b|web\.session\.rounds\.|web\.session\.trajectory\.rounds?\b|web\.issue\.card\.turns?\b/u,
     says: "the log shows the server's runs, one view each (runs.ts: RunView, runsOf, runTitle, runMs, RunSteps, runLabel; web.session.runs.*, web.issue.card.run(s)); 一轮 is the user's word for a Run",
-    dirs: ["apps/web/src", "apps/web/test", "apps/mac/ui/features", "apps/mac/ui/app"],
+    dirs: ["apps/mac/ui/features", "apps/mac/ui/app"],
   },
   {
     name: "an agent's own todo under the task name",
@@ -425,19 +398,6 @@ const RULES: readonly Rule[] = [
     says: "orchestrator (or the profile's id): manager is only the English farm's word for 主助手",
   },
   {
-    name: "a service under a plural name",
-    pattern:
-      /\b(Agents|Artifacts|Channels|Connectors|Crons|Issues|Memories|Repos|Runtimes|Sessions|Tasks|Tools)(?=\.[A-Za-z]|\[|\s*[,;})]|$)|"(Agents|Artifacts|Channels|Connectors|Crons|Issues|Memories|Repos|Runtimes|Sessions|Tasks|Tools)\.\w+"|\b(makeMemories|makeBlocks|BlocksOptions)\b|memory\/memories\b/u,
-    says: "a service takes its concept's singular word (Agent, Artifact, Channel, Connector, Cron, Issue, Memory, Repo, Runtime, Session, Task, Tool; its deps key is the same word in lower case, deps.issue); the protocol shape of the same name is T.Issue; the stores are MemoryStore (memory/memory.ts, makeMemoryStore) and BlockStore (makeBlockStore) (docs/style/naming.md)",
-    dirs: ["apps/server/src"],
-  },
-  {
-    name: "a retired single-caller or pass-through server service",
-    pattern: /["'`](?:\.\.?\/|#\/)(?:storage|executor|resource|ingress)\/|\b(Storage|Executor|Resource|Ingress|worldBelowIngress|ingress_github)\b/u,
-    says: "Attachment owns attachment/storage.ts, Session owns session/executor.ts, Tool owns tool/resource.ts (Tool.readResource), and Ingress split into Channel.{user,say}, Session.{record,accept}, Repo.githubSnapshot and Issue.pollGitHub (issue_github); module tests use moduleWorld",
-    dirs: ["apps/server/src"],
-  },
-  {
     name: "an issue's landing under the delivery type name",
     pattern: /\b(DeliveryValues|T\.Delivery)\b|\bexport\s+(?:const|type)\s+Delivery\b/u,
     says: "an issue's completion landing is Landing (LandingValues, T.Landing; Issue.delivered keeps its wire field name); delivery is the session module's session_delivery",
@@ -452,12 +412,12 @@ const RULES: readonly Rule[] = [
     pattern:
       /["'`](?:\.\.?\/|@\/)(?:channel\/(?:chat|folded|model|records)|issue\/records|mailbox\/chat|session\/(?:takeIn|shapes|records)|farm\/support|base\/util|ui\/richRules|repo\/shapes|testing\/(?:helper|until|issues|said|agents)|farm\/world\/places|features\/voice\/(?:agora|moss)|features\/channel\/(?:emoji|feed|switcher|draft)|features\/issue\/(?:lanes|rows|queries)|features\/artifact\/queries|memory\/store|artifact\/spans|tool\/(?:cron|memory|channel|definition)|infra\/live|state\/latest)(?:\.tsx?)?["'`]|\b(issueRecords|IssueRecords|sessionRecords|SessionRecords|channelRecords|ChannelRecords)\b/u,
     says: "channel/{channel,messages,rooms,hub}.ts, issue/lifecycle.ts, mailbox/envelope.ts, session/{briefing,registry,signals}.ts, farm/{store,tools,cues}.ts, base/dom.tsx, ui/richText.ts, repo/workplace.ts, features/issue/{history,cards}.ts, features/artifact/ArtifactCard.tsx, testing/{worker,layers,world}.ts, farm/world/world.ts, features/voice/{call,mossLine}.ts, features/channel/{EmojiPicker.tsx,places.ts,composing.ts}, memory/memory.ts, artifact/ops.ts, tool/{tool,schemas}.ts, infra/frame.ts, state/atom.ts",
-    dirs: ["apps/server/src", "apps/web/src", "apps/mac/ui"],
+    dirs: ["apps/mac/ui"],
   },
 ];
 
 // A catalog says what the user reads, in the glossary's words (docs/README.md).
-const userWords = (source: string) => source.startsWith("crates/i18n/locales/") || source === "apps/web/test/english.spec.ts";
+const userWords = (source: string) => source.startsWith("crates/i18n/locales/");
 const han = /\p{Script=Han}/u;
 
 function placeOf(ns: string): string {
@@ -466,8 +426,7 @@ function placeOf(ns: string): string {
   if (ns === "mac") return "apps/mac/src/words.rs";
   const [host, ...parts] = ns.split(".");
   if (host === "server") {
-    if (parts[0] === "game") return "crates/server/src/skin/game/words.rs";
-    return `apps/server/src/${[...parts, "words.ts"].join("/")}`;
+    return `crates/server/src/${[...parts, "words.rs"].join("/")}`;
   }
   if (host === "web" && parts.length > 0) {
     if (parts[0] === "shell") return "apps/mac/ui/workspace/words.ts";
@@ -487,9 +446,7 @@ export function staleNamesIn(source: string, text: string): string[] {
   const file = source.startsWith("crates/i18n/locales/") ? placeOf(source.split("/").pop()!.slice(0, -".json".length)) : source;
   for (const [i, line] of lines.entries()) {
     for (const rule of RULES) {
-      const inScope = rule.dirs
-        ? rule.dirs.some((dir) => file.startsWith(dir + "/"))
-        : isCatalog || TS_DIRS.some((dir) => file.startsWith(dir + "/")) || LEGACY_TEST_DIRS.some((dir) => file.startsWith(dir + "/"));
+      const inScope = rule.dirs ? rule.dirs.some((dir) => file.startsWith(dir + "/")) : isCatalog || TS_DIRS.some((dir) => file.startsWith(dir + "/"));
       if (!inScope) continue;
       if (rule.except?.test(file) === true) continue;
       if (isCatalog && !han.test(rule.pattern.source)) continue;

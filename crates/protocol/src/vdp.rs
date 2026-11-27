@@ -418,7 +418,10 @@ impl VdpShellSendTerminalInputParams {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct VdpShellDispatchActionParams {
+    #[cfg(feature = "host")]
     pub action: crate::HostAction,
+    #[cfg(not(feature = "host"))]
+    pub action: serde_json::Value,
 }
 
 #[skip_serializing_none]
@@ -1234,7 +1237,10 @@ mod tests {
             ),
             (
                 VdpCommand::ShellDispatchAction(VdpShellDispatchActionParams {
+                    #[cfg(feature = "host")]
                     action: crate::HostAction::ActivatePath { path: "/tmp/repo".into() },
+                    #[cfg(not(feature = "host"))]
+                    action: json!({ "type": "activate_path", "path": "/tmp/repo" }),
                 }),
                 json!({ "action": { "type": "activate_path", "path": "/tmp/repo" } }),
             ),

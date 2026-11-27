@@ -134,8 +134,10 @@
  "Agent": [
   {
    "id": "s70",
+   "code": "O-01",
    "name": "s71",
    "role": "orchestrator",
+   "mode": "managed",
    "duty": "s72",
    "enabled": false,
    "runtime": "s74",
@@ -191,8 +193,10 @@
   },
   {
    "id": "s96",
+   "code": "W-01",
    "name": "s97",
    "role": "orchestrator",
+   "mode": "external",
    "duty": "s98",
    "enabled": false,
    "runtime": "s100",
@@ -320,8 +324,10 @@
    "agents": [
     {
      "id": "s152",
+     "code": "O-01",
      "name": "s153",
      "role": "orchestrator",
+     "mode": "managed",
      "duty": "s154",
      "enabled": false,
      "runtime": "s156",
@@ -377,8 +383,10 @@
    "agents": [
     {
      "id": "s175",
+     "code": "W-01",
      "name": "s176",
      "role": "orchestrator",
+     "mode": "managed",
      "duty": "s177",
      "enabled": true,
      "runtime": "s179",
@@ -470,6 +478,26 @@
    "id": "s6921"
   }
  ],
+ "AgentExecutionMode": [
+  "managed",
+  "external"
+ ],
+ "AgentRegisterInput": [
+  {
+   "id": "antigravity",
+   "name": "Antigravity",
+   "runtime": "antigravity",
+   "duty": "External IDE teammate",
+   "avatar": "avatar-cat",
+   "code": "W-09",
+   "tags": [
+    "external"
+   ]
+  },
+  {
+   "name": "Cursor Agent"
+  }
+ ],
  "AgentTemplateInstallInput": [
   {
    "id": "s6922"
@@ -512,6 +540,6 @@
   "memory",
   "media",
   "library",
-  "artifact"
+  "note"
  ]
 }

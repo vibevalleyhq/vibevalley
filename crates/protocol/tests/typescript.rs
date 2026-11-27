@@ -44,11 +44,14 @@ fn typescript_matches_the_contract() {
 /// A field holding an id is branded in TypeScript only when it says so (`#[ts(as = …)]`).
 #[test]
 fn every_id_field_is_branded_in_typescript() {
-    const IDS: &[&str] = &["IssueId", "SessionId", "ArtifactId", "SuggestionId", "MessageId"];
+    const IDS: &[&str] = &["IssueId", "SessionId", "NoteId", "SuggestionId", "MessageId"];
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/contract");
     let mut bare = Vec::new();
     for entry in std::fs::read_dir(&dir).unwrap() {
         let path = entry.unwrap().path();
+        if !path.is_file() {
+            continue;
+        }
         let text = std::fs::read_to_string(&path).unwrap();
         let lines: Vec<&str> = text.lines().collect();
         for (i, line) in lines.iter().enumerate() {

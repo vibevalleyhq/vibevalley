@@ -7,7 +7,6 @@
     "label": "Page language"
   },
   "keys": {
-    "deepseekHint": "sk-… (leave empty to keep)",
     "saved": "Saved, in use at once."
   },
   "source": {
@@ -31,13 +30,24 @@
     "everythingHint": "Not only what VibeValley remembered for helpers: every helper reads your own memories there too"
   },
   "github": {
-    "noGh": "gh is not installed",
-    "note": "Which repos can open PRs is on the Repos page; opening a PR on completion is turned on in the configuration (github.pr_repos).",
+    "noGh": "Not installed (optional)",
+    "note": "Configure a GitHub Token for direct REST API access or sign in with the local gh CLI to push branches and open or merge PRs for your projects.",
     "recheck": "Check again",
-    "cli": "gh command line",
-    "cliHint": "Used to open PRs and read repositories when merging",
-    "login": "Login",
-    "loginHint": "The account gh auth login signed in",
+    "status": "Connection status",
+    "statusHint": "Uses GitHub Token when configured; falls back to local gh login",
+    "mode": {
+      "token": "Connected via Token",
+      "gh": "Signed in via gh",
+      "none": "Not configured"
+    },
+    "token": "GitHub Token",
+    "tokenHint": "Used to call the GitHub REST API directly for PRs and checks; can also be set via GITHUB_TOKEN",
+    "tokenPlaceholder": "ghp_… or github_pat_… (leave empty to keep)",
+    "tokenConfigured": "Token configured",
+    "cli": "gh CLI (optional)",
+    "cliHint": "Used when no Token is configured to open PRs and inspect projects",
+    "login": "Account",
+    "loginHint": "GitHub account for the active Token or gh session",
     "notLoggedIn": "Not signed in"
   },
   "nav": {
@@ -46,7 +56,8 @@
     "profile": "Profile",
     "general": "General",
     "appearance": "Appearance",
-    "models": "Models & Engines",
+    "providers": "Model Providers",
+    "models": "Models & Model Policy",
     "skills": "Skills",
     "mcp": "MCP Integrations",
     "voice": "Voice & Calls",
@@ -56,7 +67,7 @@
     "memory": "Memory",
     "chat": "Chat Channels",
     "width": "Navigation width (drag; double-click for the default)",
-    "groupWorkspace": "Profile & Workspace",
+    "groupWorkspace": "Profile & Projects",
     "groupConnect": "Connections & Integrations",
     "groupAbout": "Data & About"
   },
@@ -64,14 +75,15 @@
     "profile": "profile avatar display name tagline bio",
     "general": "language start workbench farm startup",
     "appearance": "theme dark light size zoom scale font animation motion reduce",
-    "models": "keys accounts DeepSeek MOSS API key models binding engines",
+    "providers": "providers credentials API key verify fetch DeepSeek MiniMax MOSS OpenAI Anthropic",
+    "models": "models policy scene fallback orchestrator chat polish ASR dictation TTS speech realtime vision image",
     "skills": "skills skill built-in installed library prompt",
     "memory": "memory source sources Nowledge EverOS external read write",
     "mcp": "MCP Antigravity Claude Code Codex Cursor stdio streamableHttp integration",
     "voice": "call phone recognition speech MOSS live realtime vision transcription",
     "chat": "WeChat Feishu Lark QQ connectors chat pairing",
-    "github": "GitHub gh PR login",
-    "remote": "remote mobile phone Tailscale pair pairing QR device iOS Android CLI machine sandbox listener token control plane embedded",
+    "github": "GitHub Token gh PR login",
+    "remote": "remote mobile phone lan wifi local direct Tailscale pair pairing QR device iOS Android CLI machine sandbox listener token control plane embedded",
     "data": "home folder settings repos worktrees data storage backend",
     "about": "version update cli command line"
   },
@@ -171,14 +183,16 @@
     "intro": "Inspect local data paths, repository and worktree folders, and the active storage backend.",
     "storageTitle": "Storage Backend",
     "backend": "Active backend",
-    "backendHint": "Storage engine backing attachments, media inputs, and artifacts",
+    "backendHint": "Storage backend for attachments, media inputs, and notes",
     "backendLocalFs": "Local Filesystem (LocalFs)",
     "backendS3": "Object Storage (S3)",
     "backendMemory": "In-Memory (Memory)"
   },
+  "providers": {
+    "intro": "Manage credentials for DeepSeek, MiniMax, MOSS, and other providers (1 provider = 1 API key), verify connectivity, and auto-fetch capability-tagged models."
+  },
   "models": {
-    "intro": "Configure model accounts, API keys, and feature bindings.",
-    "deepseekHint": "The assistant and VibeValley's own helpers use it"
+    "intro": "Configure per-scene primary models and fallback policies from discovered provider models only."
   },
   "memory": {
     "intro": "Helpers can also look things up in, and write to, memory outside VibeValley."
@@ -227,8 +241,9 @@
     },
     "check": "Check for updates",
     "retry": "Retry",
+    "details": "Details",
+    "dialogTitle": "App update",
     "restart": "Restart to update",
-    "restartQuestion": "Restart into the new version?",
     "workingQuestion": "{n} active sessions are running; restarting will interrupt them. Restart now?",
     "newFarmQuestion": "The new version starts from fresh data; the old stays in the home folder. Restart now?",
     "download": "Download",
@@ -268,6 +283,6 @@
   },
   "remote": {
     "toggleLabel": "Mobile & client listener",
-    "toggleHint": "Allow paired devices to connect to this Mac over Tailscale."
+    "toggleHint": "Allow paired devices to connect to this Mac over local Wi-Fi LAN or Tailscale."
   }
 }

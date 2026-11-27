@@ -159,10 +159,13 @@ test("TodoDetail defaults to preview-first Markdown, Compare, visual criteria ch
   const titleBox = app.layout("id:issue-title");
   expect(titleBox).toBeDefined();
   expect(titleBox!.height).toBeGreaterThan(44);
+  const triggerBoxBefore = app.layout("id:issue-title-trigger")!;
 
-  // Clicking title toggles inline multiline edit; typing and pressing Enter commits into preview title.
+  // Clicking title toggles inline multiline edit with isomorphic box model (zero vertical jump); Enter commits into preview title.
   await app.press("id:issue-title-trigger");
   await fake.pumpUntil(app, () => app.count("id:issue-title-input") === 1);
+  const inputBox = app.layout("id:issue-title-input")!;
+  expect(Math.abs(inputBox.y - triggerBoxBefore.y)).toBeLessThanOrEqual(1);
   await app.type("id:issue-title-input", " updated");
   await app.keyboard.press("enter");
   await fake.pumpUntil(app, () => app.count("id:issue-title-input") === 0);
@@ -182,11 +185,23 @@ test("TodoDetail defaults to preview-first Markdown, Compare, visual criteria ch
   await app.press("id:issue-edit-description-done");
   await fake.pumpUntil(app, () => app.count("id:issue-description-preview") === 1 && app.count("id:compare-card") === 1);
 
-  // Clicking Edit on criteria switches to textarea and Done returns to visual checklist.
+  // Clicking Edit on criteria switches to isomorphic textarea and Done returns to visual checklist.
   await app.press("id:issue-edit-criteria");
   await fake.pumpUntil(app, () => app.count("id:issue-criteria-input") === 1);
   await app.press("id:issue-edit-criteria-done");
   await fake.pumpUntil(app, () => app.count("id:issue-criteria-preview") === 1 && app.count("id:todo-criterion") === 2);
+
+  // Inspector TagEditor collapses 8 preset tags behind click-to-edit toggle in resting state (#143).
+  expect(app.count("id:issue-tag-toggle")).toBe(1);
+  expect(app.count("id:tag-preset-UX")).toBe(0);
+  await app.press("id:issue-tag-toggle");
+  await fake.pumpUntil(app, () => app.count("id:tag-preset-UX") === 1);
+  await app.press("id:issue-tag-toggle");
+  await fake.pumpUntil(app, () => app.count("id:tag-preset-UX") === 0);
+
+  // Clicking Save triggers lightweight saved status feedback (#136).
+  await app.press("id:issue-save");
+  await fake.pumpUntil(app, () => app.count("id:issue-save-status") === 1);
 
   // Clicking the quiet refine toggle reveals the compact refine textarea.
   await app.press("id:issue-draft-toggle");

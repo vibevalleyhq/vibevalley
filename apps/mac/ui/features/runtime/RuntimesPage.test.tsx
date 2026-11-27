@@ -245,7 +245,7 @@ test("RuntimesPage: renders calm empty state when no coding agents are installed
   expect(app.texts()).toContain(t("web.runtime.noneInstalled"));
 });
 
-test("Navigation: Runtimes sits directly above Experts, Experts has no sub-tabs, and /skills + /memory redirect to Settings", async () => {
+test("Navigation: Runtimes sits directly above Experts, Experts has no sub-tabs, and skills/memory live under Settings", async () => {
   setLocale("en");
   const { places } = await import("../../app/places");
   const runtimesIndex = places.findIndex((p) => p.id === "runtimes");
@@ -261,18 +261,11 @@ test("Navigation: Runtimes sits directly above Experts, Experts has no sub-tabs,
   expect(app.count("id:tab-team-skills")).toBe(0);
   expect(app.count("id:tab-team-memory")).toBe(0);
 
-  await app.host.send("route", "/skills");
+  await app.host.send("route", "/settings/skills");
   await fake.pumpUntil(app, () => app.count("id:skills-book") === 1);
   expect(app.count("id:settings-skills")).toBe(1);
 
-  await app.host.send("route", "/team/skills");
-  await fake.pumpUntil(app, () => app.count("id:skills-book") === 1);
-  expect(app.count("id:settings-skills")).toBe(1);
-
-  await app.host.send("route", "/memory");
-  await fake.pumpUntil(app, () => app.count("id:settings-memory") === 1);
-
-  await app.host.send("route", "/team/memory");
+  await app.host.send("route", "/settings/memory");
   await fake.pumpUntil(app, () => app.count("id:settings-memory") === 1);
 });
 
@@ -485,10 +478,10 @@ test("regression: repeated /runtimes mount/unmount cycles keep subscription and 
 
 test("i18n: runtime inventory unreported copy avoids literal fragment in zh and en", () => {
   setLocale("zh");
-  expect(t("web.runtime.unreported")).toBe("当前引擎未上报这一项。");
+  expect(t("web.runtime.unreported")).toBe("当前环境未上报这一项。");
   expect(t("web.runtime.none")).toBe("暂无。");
   setLocale("en");
-  expect(t("web.runtime.unreported")).toBe("Not reported by this engine.");
+  expect(t("web.runtime.unreported")).toBe("Not reported by this environment.");
   expect(t("web.runtime.none")).toBe("None.");
 });
 

@@ -151,6 +151,7 @@ test("alpha builds default to zip + local file:// update feed while beta and rel
     skipVerify: false,
     skipBuild: false,
   });
+  expect(alpha.profile).toBe("debug");
   expect(alpha.makeZip).toBe(true);
   expect(alpha.localFeed).toBe(localUpdateFeedUrl(outDir));
   expect(alpha.localFeed).toBe("file:///Users/dev/My%20Apps/dist/release.json");

@@ -1,10 +1,9 @@
-import { Text, View, type JSX } from "nsh";
+import { context, Text, View, type JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import type { KeyStatus } from "@vibevalley/protocol";
 
-import { matches } from "../../infra/base/search";
-import { type Accessor, createContext, useContext } from "../../infra/solid";
+import { useDesignHost } from "../host";
 import { Icon } from "../Icon";
 import { IconButton, OutLink } from "../IconButton";
 import type { IconName } from "../icons";
@@ -14,7 +13,7 @@ import { Hint } from "../Tip";
 import { mix } from "../tone";
 
 /** What is being searched for in Settings, lower-cased; "" when nothing. */
-export const SettingsSearch = createContext<Accessor<string>>(() => "");
+export const SettingsSearch = context<() => string>(() => "");
 
 /** A section's page: crisp title + 1-line description, optional right action, and grouped cards in a 720px reading column. */
 export function SettingsPage(props: {
@@ -94,8 +93,9 @@ export function SettingRow(props: {
   last?: boolean;
   children?: JSX.Element;
 }) {
-  const query = useContext(SettingsSearch);
-  const found = () => query() !== "" && matches(query(), [props.label, props.hint, props.tip]);
+  const designHost = useDesignHost();
+  const query = SettingsSearch();
+  const found = () => query() !== "" && designHost.matchesSearch(query(), [props.label, props.hint, props.tip]);
   return (
     <View
       testID={props.testid}

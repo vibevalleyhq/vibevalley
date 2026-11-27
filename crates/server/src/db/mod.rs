@@ -10,14 +10,19 @@ pub(crate) mod column;
 mod database;
 pub(crate) mod entity;
 pub mod error;
+pub mod metrics;
 pub mod migration;
 pub mod verify;
 
-pub(crate) use database::begin_write_tx;
-#[cfg(test)]
+#[cfg(all(test, feature = "postgres"))]
 pub(crate) use database::test_pg;
-pub use database::{BoxFuture, Database, DatabaseConfig, Tx, commit_tx, rollback_tx};
+pub use database::{
+    BoxFuture, DEFAULT_POSTGRES_ACQUIRE_TIMEOUT, DEFAULT_POSTGRES_IDLE_TIMEOUT, DEFAULT_POSTGRES_MAX_CONNECTIONS, DEFAULT_POSTGRES_MAX_LIFETIME,
+    DEFAULT_POSTGRES_MIN_CONNECTIONS, Database, DatabaseConfig, Tx, commit_tx, rollback_tx,
+};
+pub(crate) use database::{begin_read_tx, begin_write_tx};
 pub use error::{DbError, DbResult, internal_db};
+pub use metrics::{DEFAULT_SLOW_QUERY_THRESHOLD, QueryMetrics, QueryStatsSnapshot, redact_sql_literals};
 pub use verify::{SchemaMismatchReport, TableDrift};
 
 /// Database engine backing a [`Database`] instance.

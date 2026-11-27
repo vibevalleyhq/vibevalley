@@ -1,25 +1,25 @@
 import { signal } from "nsh";
 import { z } from "zod";
 
-import type { Artifact, ArtifactType, LibraryFileKind, LibraryItem } from "@vibevalley/protocol";
+import type { LibraryFileKind, LibraryItem, Note, NoteType } from "@vibevalley/protocol";
 
 import { defineAtom } from "./atom";
 import { defineStored } from "./stored";
 
-export type ArtifactFacet = ArtifactType;
+export type NoteFacet = NoteType;
 
 export type ContentBucket =
   | { readonly kind: "recent" }
   | { readonly kind: "pinned" }
   | { readonly kind: "apps" }
-  | { readonly kind: "artifacts"; readonly artifactType?: ArtifactFacet | undefined }
+  | { readonly kind: "notes"; readonly noteType?: NoteFacet | undefined }
   | { readonly kind: "media"; readonly fileKind?: LibraryFileKind | undefined };
 
-export type TemplateCategory = "recommended" | "apps" | "engineering" | "note" | "whiteboard" | "deliverable" | "ai";
+export type TemplateCategory = "recommended" | "apps" | "engineering" | "doc" | "base" | "canvas" | "media" | "ai";
 
 export const contentSidebarOpen = defineStored("content.sidebar", z.boolean(), true);
 export const contentBrowseBucket = signal<ContentBucket>({ kind: "recent" });
-export const activeArtifactType = signal<ArtifactType | undefined>(undefined);
+export const activeNoteType = signal<NoteType | undefined>(undefined);
 export const contentPresenting = signal(false);
 export const contentFocusMediaId = signal<string | undefined>(undefined);
 
@@ -28,27 +28,23 @@ const lastContentPathStorage = defineStored("content.lastPath", z.string(), "/li
 
 export interface TemplatePickerInitial {
   readonly category: TemplateCategory;
-  readonly artifactType?: ArtifactType | undefined;
+  readonly noteType?: NoteType | undefined;
 }
 
 export const templatePickerState = defineAtom<TemplatePickerInitial | undefined>(undefined);
 export const contentSearchOpen = defineAtom<boolean>(false);
 
-function categoryForArtifactType(type: ArtifactType): TemplateCategory {
-  if (type === "outline") return "note";
-  if (type === "whiteboard") return "whiteboard";
-  return "deliverable";
+function categoryForNoteType(type: NoteType): TemplateCategory {
+  return type;
 }
 
-export function templatePickerContextFor(bucket: ContentBucket, openType?: ArtifactType): TemplatePickerInitial {
+export function templatePickerContextFor(bucket: ContentBucket, openType?: NoteType): TemplatePickerInitial {
   if (openType !== undefined) {
-    return { category: categoryForArtifactType(openType), artifactType: openType };
+    return { category: categoryForNoteType(openType), noteType: openType };
   }
   switch (bucket.kind) {
-    case "artifacts":
-      return bucket.artifactType !== undefined
-        ? { category: categoryForArtifactType(bucket.artifactType), artifactType: bucket.artifactType }
-        : { category: "recommended" };
+    case "notes":
+      return bucket.noteType !== undefined ? { category: categoryForNoteType(bucket.noteType), noteType: bucket.noteType } : { category: "recommended" };
     case "apps":
       return { category: "apps" };
     case "media":
@@ -78,7 +74,7 @@ export function togglePinned(key: string): boolean {
 }
 
 export function openTemplatePicker(
-  input?: TemplateCategory | { readonly category?: TemplateCategory | undefined; readonly artifactType?: ArtifactType | undefined },
+  input?: TemplateCategory | { readonly category?: TemplateCategory | undefined; readonly noteType?: NoteType | undefined },
 ): void {
   if (typeof input === "string") {
     templatePickerState.set({ category: input });
@@ -88,10 +84,10 @@ export function openTemplatePicker(
     templatePickerState.set({ category: "recommended" });
     return;
   }
-  const category = input.category ?? (input.artifactType !== undefined ? categoryForArtifactType(input.artifactType) : "recommended");
+  const category = input.category ?? (input.noteType !== undefined ? categoryForNoteType(input.noteType) : "recommended");
   templatePickerState.set({
     category,
-    ...(input.artifactType !== undefined ? { artifactType: input.artifactType } : {}),
+    ...(input.noteType !== undefined ? { noteType: input.noteType } : {}),
   });
 }
 
@@ -107,7 +103,7 @@ export function closeContentSearch(): void {
   contentSearchOpen.set(false);
 }
 
-const contentPrefixes = ["/library", "/artifacts"] as const;
+const contentPrefixes = ["/library", "/notes"] as const;
 
 function isContentPath(path: string): boolean {
   return contentPrefixes.some((prefix) => path === prefix || path.startsWith(`${prefix}/`) || path.startsWith(`${prefix}?`));
@@ -139,8 +135,8 @@ export function safeLastContentPath(): string {
   return normalizeContentPath(pathname, query ? `?${query}` : "") ?? "/library";
 }
 
-export function artifactFacetOf(a: { readonly artifactType: ArtifactType }): ArtifactFacet {
-  return a.artifactType;
+export function noteFacetOf(n: { readonly noteType: NoteType }): NoteFacet {
+  return n.noteType;
 }
 
 export function mediaKindOf(mime: string): LibraryFileKind {
@@ -154,27 +150,27 @@ export interface ContentHubCounts {
   readonly total: number;
   readonly pinned: number;
   readonly installedApps: number;
-  readonly artifacts: number;
-  readonly artifactByFacet: ReadonlyMap<ArtifactFacet, number>;
+  readonly notes: number;
+  readonly noteByFacet: ReadonlyMap<NoteFacet, number>;
   readonly media: number;
   readonly mediaByKind: ReadonlyMap<LibraryFileKind, number>;
 }
 
 /** Single count formula shared by `ContentSidebar` badges and `LibraryPage` bucket views. */
 export function countContentHub(input: {
-  readonly artifacts: readonly Pick<Artifact, "id" | "artifactType">[];
+  readonly notes: readonly Pick<Note, "id" | "noteType">[];
   readonly media: readonly { readonly attachment: Pick<LibraryItem["attachment"], "id" | "type"> }[];
   readonly pinned: ReadonlySet<string>;
-  readonly installedArtifactIds?: ReadonlySet<string> | undefined;
+  readonly installedNoteIds?: ReadonlySet<string> | undefined;
 }): ContentHubCounts {
   let pinned = 0;
   let installedApps = 0;
-  const artifactByFacet = new Map<ArtifactFacet, number>();
-  for (const a of input.artifacts) {
-    if (input.pinned.has(`artifact:${a.id}`)) pinned += 1;
-    if (input.installedArtifactIds?.has(a.id) === true) installedApps += 1;
-    const facet = artifactFacetOf(a);
-    artifactByFacet.set(facet, (artifactByFacet.get(facet) ?? 0) + 1);
+  const noteByFacet = new Map<NoteFacet, number>();
+  for (const n of input.notes) {
+    if (input.pinned.has(`note:${n.id}`)) pinned += 1;
+    if (input.installedNoteIds?.has(n.id) === true) installedApps += 1;
+    const facet = noteFacetOf(n);
+    noteByFacet.set(facet, (noteByFacet.get(facet) ?? 0) + 1);
   }
   const mediaByKind = new Map<LibraryFileKind, number>();
   for (const m of input.media) {
@@ -183,11 +179,11 @@ export function countContentHub(input: {
     mediaByKind.set(kind, (mediaByKind.get(kind) ?? 0) + 1);
   }
   return {
-    total: input.artifacts.length + input.media.length,
+    total: input.notes.length + input.media.length,
     pinned,
     installedApps,
-    artifacts: input.artifacts.length,
-    artifactByFacet,
+    notes: input.notes.length,
+    noteByFacet,
     media: input.media.length,
     mediaByKind,
   };
@@ -201,8 +197,8 @@ export function countForBucket(counts: ContentHubCounts, bucket: ContentBucket):
       return counts.pinned;
     case "apps":
       return counts.installedApps;
-    case "artifacts":
-      return bucket.artifactType === undefined ? counts.artifacts : (counts.artifactByFacet.get(bucket.artifactType) ?? 0);
+    case "notes":
+      return bucket.noteType === undefined ? counts.notes : (counts.noteByFacet.get(bucket.noteType) ?? 0);
     case "media":
       return bucket.fileKind === undefined ? counts.media : (counts.mediaByKind.get(bucket.fileKind) ?? 0);
   }

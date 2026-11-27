@@ -3105,9 +3105,6 @@ name = "fastrand"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "da7c62ceae207dd37ea5b845da6a0696c799f85e97da1ab5b7910be3c1c80223"
-dependencies = [
- "getrandom 0.4.3",
-]
 
 [[package]]
 name = "fax"
@@ -3239,7 +3236,6 @@ version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5e139bc46ca777eb5efaf62df0ab8cc5fd400866427e56c68b22e414e53bd3be"
 dependencies = [
- "fastrand",
  "futures-core",
  "futures-sink",
  "spin 0.9.9",
@@ -12461,6 +12457,7 @@ dependencies = [
  "vibevalley-protocol",
  "vibevalley-runtime",
  "vibevalley-server",
+ "which",
 ]
 
 [[package]]
@@ -12486,6 +12483,7 @@ dependencies = [
  "image",
  "serde",
  "serde_json",
+ "vibevalley-core",
  "wgpu 29.0.4",
 ]
 
@@ -12528,10 +12526,10 @@ dependencies = [
  "backon",
  "base64 0.23.1",
  "block2 0.6.2",
- "flume 0.12.0",
  "futures-util",
  "gpui-fast",
  "gpui-fast-platform",
+ "hex",
  "image",
  "indexmap 2.14.2",
  "jiff 1.0.1",
@@ -12544,14 +12542,17 @@ dependencies = [
  "objc2-user-notifications",
  "parking_lot",
  "percent-encoding",
+ "quick-xml",
  "raw-window-handle",
  "reqwest",
  "rustls",
  "rustybuzz",
+ "semver",
  "serde",
  "serde_json",
  "sha2 0.11.1",
  "smallvec",
+ "subtle",
  "tempfile",
  "tokio",
  "tokio-tungstenite 0.29.0",
@@ -12562,13 +12563,14 @@ dependencies = [
  "unicode-width",
  "url",
  "uuid",
+ "vibevalley-core",
  "vibevalley-diorama",
  "vibevalley-files",
  "vibevalley-git",
  "vibevalley-i18n",
  "vibevalley-protocol",
  "vibevalley-rich",
- "vibevalley-runtime",
+ "vibevalley-rt",
  "vibevalley-server",
  "vibevalley-terminal",
  "vibevalley-workspace",
@@ -12620,6 +12622,8 @@ dependencies = [
  "nsh-base",
  "nsh-core",
  "nsh-js",
+ "percent-encoding",
+ "quick-xml",
  "ratex-font",
  "ratex-layout",
  "ratex-parser",
@@ -12638,6 +12642,14 @@ dependencies = [
  "vibevalley-protocol",
  "vibevalley-shiki",
  "zstd",
+]
+
+[[package]]
+name = "vibevalley-rt"
+version = "0.1.0"
+dependencies = [
+ "rustls",
+ "tokio",
 ]
 
 [[package]]
@@ -12661,7 +12673,9 @@ dependencies = [
  "oxc_parser",
  "oxc_span",
  "parking_lot",
+ "percent-encoding",
  "proptest",
+ "quick-xml",
  "quickjs-jit",
  "regex",
  "reqwest",
@@ -12671,6 +12685,7 @@ dependencies = [
  "sea-orm",
  "sea-orm-migration",
  "sea-query",
+ "semver",
  "serde",
  "serde_json",
  "sqlx",
@@ -12679,10 +12694,13 @@ dependencies = [
  "tokio",
  "tokio-util",
  "toml_edit 0.25.19+spec-1.1.0",
+ "tracing",
  "uuid",
  "vibevalley-git",
  "vibevalley-mcp",
  "vibevalley-protocol",
+ "vibevalley-rt",
+ "which",
 ]
 
 [[package]]
@@ -12696,12 +12714,18 @@ dependencies = [
  "crc32fast",
  "flate2",
  "futures-util",
+ "hex",
+ "hmac 0.13.0",
+ "imagesize 0.15.0",
  "include_dir",
  "jiff 1.0.1",
  "loom",
  "parking_lot",
+ "percent-encoding",
+ "png 0.18.1",
  "regex",
  "reqwest",
+ "roxmltree 0.21.2",
  "rustls",
  "sea-orm",
  "sea-orm-migration",
@@ -12711,6 +12735,7 @@ dependencies = [
  "serde_path_to_error",
  "sha2 0.11.1",
  "sqlx",
+ "subtle",
  "symphonia",
  "tempfile",
  "thiserror 2.0.21",
@@ -12723,11 +12748,14 @@ dependencies = [
  "url",
  "uuid",
  "vibevalley-core",
+ "vibevalley-files",
  "vibevalley-git",
  "vibevalley-i18n",
  "vibevalley-mcp",
  "vibevalley-protocol",
  "vibevalley-runtime",
+ "vibevalley-server",
+ "zip",
 ]
 
 [[package]]
@@ -12745,9 +12773,9 @@ dependencies = [
 name = "vibevalley-terminal"
 version = "0.1.0"
 dependencies = [
- "flume 0.12.0",
  "libc",
  "libghostty-vt",
+ "percent-encoding",
  "portable-pty",
  "serde",
  "serde_json",
@@ -12766,8 +12794,8 @@ dependencies = [
  "serde_json",
  "tempfile",
  "thiserror 2.0.21",
+ "tokio",
  "vibevalley-git",
- "vibevalley-runtime",
  "vibevalley-terminal",
 ]
 

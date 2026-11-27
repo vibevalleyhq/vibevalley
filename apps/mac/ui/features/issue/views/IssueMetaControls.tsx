@@ -7,8 +7,8 @@ import { issueId } from "@vibevalley/protocol/schema";
 
 import { Combobox } from "../../../design/Combobox";
 import { EpochDatePicker } from "../../../design/DatePicker";
-import { UserAvatar } from "../../../design/domain/Face";
-import { initialOf } from "../../../design/domain/RuntimeBadge";
+import { AgentCodeBadge, AgentModeBadge, UserAvatar } from "../../../design/domain/Face";
+import { initialOf, runtimeName } from "../../../design/domain/RuntimeBadge";
 import { Select } from "../../../design/Field";
 import { Icon } from "../../../design/Icon";
 import { IconButton } from "../../../design/IconButton";
@@ -16,7 +16,7 @@ import { motionDuration, motionOff } from "../../../design/motion";
 import { CountPill } from "../../../design/Tag";
 import { Bubble } from "../../../design/Tip";
 import { mix } from "../../../design/tone";
-import { ready, useAgents, useSettings } from "../../../infra/query";
+import { ready, useAgents, useRuntimes, useSettings } from "../../../infra/query";
 import { decodeActorRef, encodeActorRef, type GroupBy } from "../model/display";
 import { childIssuesOf, eligibleBlockerOptions, eligibleParentOptions, eligibleRelationOptions, issueTagPresets, normalizeTagList } from "../model/meta";
 import { AgentFaceOf, NoFaceMark, PriorityMark, StatusMark } from "./Marks";
@@ -59,14 +59,14 @@ export function ParentBadge(props: { parent: Issue; showTitle?: boolean | undefi
       onPress={() => {
         props.onOpen(props.parent.id);
       }}
-      class="max-w-44 shrink-0 flex-row items-center rounded-sm border border-line bg-side px-1.5 py-px hover:border-line-strong hover:bg-hover"
+      class="min-w-0 max-w-44 shrink flex-row items-center overflow-hidden rounded-sm border border-line bg-side px-1.5 py-px hover:border-line-strong hover:bg-hover"
     >
-      <Text class="truncate font-mono text-2xs leading-3.5 text-water">{text()}</Text>
+      <Text class="min-w-0 flex-1 truncate font-mono text-2xs leading-3.5 text-water">{text()}</Text>
     </View>
   );
 }
 
-/** Crisp tag editor with preset chips and custom tag input. */
+/** Crisp tag editor with progressive-disclosure presets in inspector mode and compact inline presets in dialogs. */
 export function TagEditor(props: {
   tags: readonly string[];
   disabled?: boolean | undefined;
@@ -75,8 +75,10 @@ export function TagEditor(props: {
   testid?: string | undefined;
 }) {
   const draft = signal("");
+  const expanded = signal(false);
   const current = () => props.tags;
   const presets = () => issueTagPresets();
+  const showPalette = computed(() => props.compact === true || expanded());
   const toggle = (tag: string) => {
     if (props.disabled === true) return;
     if (current().includes(tag)) props.onChange(current().filter((x) => x !== tag));
@@ -93,65 +95,103 @@ export function TagEditor(props: {
     return current().filter((tag) => !known.includes(tag));
   });
   return (
-    <View testID={props.testid ?? "issue-tag-editor"} class="gap-1.5">
+    <View testID={props.testid ?? "issue-tag-editor"} class={props.compact === true ? "gap-1.5" : "gap-1.5 px-2 py-1"}>
       <If when={props.disabled === true}>
         <If when={current().length > 0} else={<Text class="text-xs text-faint">{t("web.issue.tags.empty")}</Text>}>
           <TagPills tags={current()} max={12} />
         </If>
       </If>
       <If when={props.disabled !== true}>
-        <If when={customTags().length > 0}>
+        <If
+          when={props.compact === true}
+          else={
+            <View class="flex-row flex-wrap items-center gap-1">
+              <Each of={current()} key={(tag) => tag}>
+                {(tag) => (
+                  <View class="flex-row items-center gap-1 rounded-sm border border-line bg-page px-1.5 py-px">
+                    <Text class="text-2xs leading-3.5 font-medium text-ink">{tag()}</Text>
+                    <View
+                      role="button"
+                      testID={`tag-remove-${tag()}`}
+                      accessibilityLabel={t("web.issue.tags.remove", { tag: tag() })}
+                      onPress={() => toggle(tag())}
+                      class="size-3.5 items-center justify-center rounded-xs hover:bg-hover"
+                    >
+                      <Icon name="close" size={9} tone="muted" />
+                    </View>
+                  </View>
+                )}
+              </Each>
+              <View
+                role="button"
+                testID={props.testid ? `${props.testid}-toggle` : "issue-tag-toggle"}
+                accessibilityLabel={expanded() ? t("web.issue.todo.doneEditing") : t("web.issue.tags.add")}
+                onPress={() => expanded.set(!expanded())}
+                class="flex-row items-center gap-1 rounded-sm border border-transparent px-1.5 py-px hover:border-line hover:bg-hover"
+              >
+                <Icon name={expanded() ? "check" : "add"} size={10} tone="muted" />
+                <Text class="text-2xs leading-3.5 font-medium text-muted">
+                  {expanded() ? t("web.issue.todo.doneEditing") : current().length === 0 ? t("web.issue.tags.add") : t("web.issue.todo.edit")}
+                </Text>
+              </View>
+            </View>
+          }
+        >
+          <If when={customTags().length > 0}>
+            <View class="flex-row flex-wrap items-center gap-1">
+              <Each of={customTags()} key={(tag) => tag}>
+                {(tag) => (
+                  <View class="flex-row items-center gap-1 rounded-sm border border-accent bg-selected px-1.5 py-0.5">
+                    <Text class="text-2xs font-medium text-ink">{tag()}</Text>
+                    <View
+                      role="button"
+                      testID={`tag-remove-${tag()}`}
+                      accessibilityLabel={t("web.issue.tags.remove", { tag: tag() })}
+                      onPress={() => toggle(tag())}
+                      class="size-3.5 items-center justify-center rounded-xs hover:bg-hover"
+                    >
+                      <Icon name="close" size={9} tone="muted" />
+                    </View>
+                  </View>
+                )}
+              </Each>
+            </View>
+          </If>
+        </If>
+        <If when={showPalette()}>
           <View class="flex-row flex-wrap items-center gap-1">
-            <Each of={customTags()} key={(tag) => tag}>
-              {(tag) => (
-                <View class="flex-row items-center gap-1 rounded-sm border border-accent bg-selected px-1.5 py-0.5">
-                  <Text class="text-2xs font-medium text-ink">{tag()}</Text>
+            <Each of={presets()} key={(preset) => preset}>
+              {(preset) => {
+                const active = () => current().includes(preset());
+                return (
                   <View
                     role="button"
-                    testID={`tag-remove-${tag()}`}
-                    accessibilityLabel={t("web.issue.tags.remove", { tag: tag() })}
-                    onPress={() => toggle(tag())}
-                    class="size-3.5 items-center justify-center rounded-xs hover:bg-hover"
+                    testID={`tag-preset-${preset()}`}
+                    accessibilityState={{ selected: active() }}
+                    onPress={() => toggle(preset())}
+                    class={`rounded-sm border px-1.5 py-0.5 ${
+                      active() ? "border-accent bg-selected" : "border-line bg-page hover:border-line-strong hover:bg-hover"
+                    }`}
                   >
-                    <Icon name="close" size={9} tone="muted" />
+                    <Text class={`text-2xs font-medium ${active() ? "text-ink" : "text-muted"}`}>{preset()}</Text>
                   </View>
-                </View>
-              )}
+                );
+              }}
             </Each>
           </View>
-        </If>
-        <View class="flex-row flex-wrap items-center gap-1">
-          <Each of={presets()} key={(preset) => preset}>
-            {(preset) => {
-              const active = () => current().includes(preset());
-              return (
-                <View
-                  role="button"
-                  testID={`tag-preset-${preset()}`}
-                  accessibilityState={{ selected: active() }}
-                  onPress={() => toggle(preset())}
-                  class={`rounded-sm border px-1.5 py-0.5 ${
-                    active() ? "border-accent bg-selected" : "border-line bg-page hover:border-line-strong hover:bg-hover"
-                  }`}
-                >
-                  <Text class={`text-2xs font-medium ${active() ? "text-ink" : "text-muted"}`}>{preset()}</Text>
-                </View>
-              );
+          <Input
+            testID={props.testid ? `${props.testid}-input` : "issue-tag-input"}
+            accessibilityLabel={t("web.issue.tags.add")}
+            value={draft()}
+            placeholder={t("web.issue.tags.placeholder")}
+            onChange={(e) => {
+              if (e.value.endsWith(",") || e.value.endsWith("\uFF0C")) addCustom(e.value.slice(0, -1));
+              else draft.set(e.value);
             }}
-          </Each>
-        </View>
-        <Input
-          testID={props.testid ? `${props.testid}-input` : "issue-tag-input"}
-          accessibilityLabel={t("web.issue.tags.add")}
-          value={draft()}
-          placeholder={t("web.issue.tags.placeholder")}
-          onChange={(e) => {
-            if (e.value.endsWith(",") || e.value.endsWith("\uFF0C")) addCustom(e.value.slice(0, -1));
-            else draft.set(e.value);
-          }}
-          onSubmit={() => addCustom()}
-          class={`${props.compact === true ? "h-6.5" : "h-7"} w-full rounded-md border border-line bg-page px-2 text-xs text-ink placeholder:text-faint hover:border-faint focus:border-focus`}
-        />
+            onSubmit={() => addCustom()}
+            class={`${props.compact === true ? "h-6.5" : "h-7"} w-full rounded-md border border-line bg-page px-2 text-xs text-ink placeholder:text-faint hover:border-faint focus:border-focus`}
+          />
+        </If>
       </If>
     </View>
   );
@@ -465,7 +505,7 @@ export function SubIssuesSection(props: { issueId: string; allIssues: readonly I
   return (
     <If when={children().length > 0}>
       <View testID="issue-sub-issues" class={props.bordered === false ? "" : "mt-7 border-t border-line pt-5"}>
-        <View class="mb-2.5 flex-row items-center justify-between gap-2">
+        <View class="mb-2.5 min-h-6 flex-row items-center justify-between gap-2">
           <Text class="text-xs font-semibold text-muted">{t("web.issue.family.children")}</Text>
           <View class="flex-row items-center gap-2">
             <Text testID="issue-sub-progress-text" class="text-xs text-muted tabular-nums">
@@ -500,8 +540,15 @@ export function SubIssuesSection(props: { issueId: string; allIssues: readonly I
   );
 }
 
+const isSelfUser = (owner: ActorRef | undefined): boolean => owner?.kind === "user" && (owner.id === "self" || owner.id === "user");
+
 /** Compact avatar/icon for an `ActorRef` owner (`user:self`, collaborator `user`, or `agent`). */
-export function OwnerMark(props: { owner: ActorRef | undefined; size?: number | undefined }) {
+export function OwnerMark(props: {
+  owner: ActorRef | undefined;
+  size?: number | undefined;
+  showIdentity?: boolean | undefined;
+  showMode?: boolean | undefined;
+}) {
   const size = () => props.size ?? 16;
   const owner = () => props.owner;
   return (
@@ -511,7 +558,7 @@ export function OwnerMark(props: { owner: ActorRef | undefined; size?: number | 
           when={ref().kind === "agent"}
           else={
             <If
-              when={ref().id === "self"}
+              when={isSelfUser(ref())}
               else={
                 <View class="shrink-0 items-center justify-center rounded-full bg-selected" style={{ width: size(), height: size() }}>
                   <Text class="font-semibold text-ink" style={{ fontSize: Math.max(8, Math.round(size() * 0.48)), lineHeight: size() }}>
@@ -524,7 +571,7 @@ export function OwnerMark(props: { owner: ActorRef | undefined; size?: number | 
             </If>
           }
         >
-          <AgentFaceOf agent={ref().id} size={size()} />
+          <AgentFaceOf agent={ref().id} size={size()} showIdentity={props.showIdentity} showMode={props.showMode} />
         </If>
       )}
     </If>
@@ -541,7 +588,7 @@ function useOwnerLabel(): () => (owner: ActorRef | undefined) => string {
     return (owner: ActorRef | undefined) => {
       if (!owner) return t("web.issue.owner.unassigned");
       if (owner.kind === "user") {
-        if (owner.id === "self") {
+        if (isSelfUser(owner)) {
           return profileName ? t("web.issue.owner.selfNamed", { name: profileName }) : t("web.issue.owner.self");
         }
         return owner.id;
@@ -551,8 +598,8 @@ function useOwnerLabel(): () => (owner: ActorRef | undefined) => string {
   });
 }
 
-/** Shared searchable option list for `OwnerPicker` and `BatchTriageBar`. */
-export function useOwnerOptions(
+/** Shared searchable option list for `OwnerPicker`. */
+function useOwnerOptions(
   allIssues: () => readonly Issue[],
   currentOwner?: () => ActorRef | undefined,
 ): () => { value: string; label: string; group: string }[] {
@@ -567,12 +614,12 @@ export function useOwnerOptions(
 
     const collaboratorIds = new Set<string>();
     for (const issue of allIssues()) {
-      if (issue.owner?.kind === "user" && issue.owner.id !== "self" && issue.owner.id.trim() !== "") {
+      if (issue.owner?.kind === "user" && !isSelfUser(issue.owner) && issue.owner.id.trim() !== "") {
         collaboratorIds.add(issue.owner.id);
       }
     }
     const cur = currentOwner?.();
-    if (cur?.kind === "user" && cur.id !== "self" && cur.id.trim() !== "") {
+    if (cur?.kind === "user" && !isSelfUser(cur) && cur.id.trim() !== "") {
       collaboratorIds.add(cur.id);
     }
     for (const userId of [...collaboratorIds].toSorted()) {
@@ -583,12 +630,17 @@ export function useOwnerOptions(
       .filter((a) => a.enabled)
       .toSorted((a, b) => {
         const roleDiff = Number(a.role === "orchestrator") - Number(b.role === "orchestrator");
-        return roleDiff !== 0 ? roleDiff : a.name.localeCompare(b.name);
+        if (roleDiff !== 0) return roleDiff;
+        const modeDiff = Number(a.mode === "external") - Number(b.mode === "external");
+        if (modeDiff !== 0) return modeDiff;
+        const codeDiff = (a.code ?? "").localeCompare(b.code ?? "");
+        return codeDiff !== 0 ? codeDiff : a.name.localeCompare(b.name);
       });
     const seenAgents = new Set<string>();
     for (const a of agentList) {
       seenAgents.add(a.id);
-      items.push({ value: `agent:${a.id}`, label: a.name, group: expertsGroup });
+      const searchLabel = [a.code, a.name, a.runtime].filter(Boolean).join(" · ");
+      items.push({ value: `agent:${a.id}`, label: searchLabel, group: expertsGroup });
     }
     if (cur?.kind === "agent" && cur.id.trim() !== "" && !seenAgents.has(cur.id)) {
       items.push({ value: `agent:${cur.id}`, label: cur.id, group: expertsGroup });
@@ -597,12 +649,13 @@ export function useOwnerOptions(
   });
 }
 
-/** Searchable owner selector (`Select` with `cover={false}`) for assigning self, collaborators, or an Expert agent. */
+/** Searchable owner selector (`Select` with `cover={false}`) for assigning self, collaborators, or a teammate. */
 export function OwnerPicker(props: {
   owner: ActorRef | undefined;
   allIssues: readonly Issue[];
   disabled?: boolean | undefined;
   quiet?: boolean | undefined;
+  showLeadingMark?: boolean | undefined;
   size?: "control" | "field" | undefined;
   state?: "pending" | "failed" | undefined;
   clearable?: boolean | undefined;
@@ -611,9 +664,15 @@ export function OwnerPicker(props: {
   onChange: (owner: ActorRef | undefined) => void;
 }) {
   const ownerLabel = useOwnerLabel();
+  const agents = useAgents();
+  const runtimes = useRuntimes();
   const testid = () => props.testid ?? "issue-owner-picker";
   const clearTestid = () => `${testid()}-clear`;
-  const encodedValue = computed(() => encodeActorRef(props.owner));
+  const showLeadingMark = () => props.showLeadingMark ?? props.quiet === false;
+  const encodedValue = computed(() => (isSelfUser(props.owner) ? "user:self" : encodeActorRef(props.owner)));
+  const agentById = computed(() => new Map(ready(agents, []).map((a) => [a.id, a])));
+  const selectedAgent = computed(() => (props.owner?.kind === "agent" ? agentById().get(props.owner.id) : undefined));
+  const runtimeOf = (id: string) => runtimeName(ready(runtimes, []), id);
 
   const options = useOwnerOptions(
     () => props.allIssues,
@@ -640,18 +699,33 @@ export function OwnerPicker(props: {
               searchable
               searchPlaceholder={t("web.issue.owner.search")}
               emptyText={t("web.base.table.empty")}
-              renderOption={(entry) => (
-                <View class="flex-row items-center gap-2">
-                  <OwnerMark owner={decodeActorRef(entry.value)} size={16} />
-                  <Text class="min-w-0 flex-1 truncate text-sm text-ink group-selected:font-medium">{entry.title}</Text>
-                </View>
-              )}
+              renderOption={(entry) => {
+                const ref = decodeActorRef(entry.value);
+                const found = ref?.kind === "agent" ? agentById().get(ref.id) : undefined;
+                return (
+                  <View testID={`${testid()}-option-${entry.value}`} class="min-w-0 flex-1 flex-row items-center gap-1.5">
+                    <OwnerMark owner={ref} size={16} />
+                    <If when={found}>{(a) => <AgentCodeBadge code={a().code} external={a().mode === "external"} compact />}</If>
+                    <Text class="min-w-0 flex-1 truncate text-sm text-ink group-selected:font-medium">{found?.name ?? entry.title}</Text>
+                    <If when={found}>
+                      {(a) => (
+                        <>
+                          <AgentModeBadge mode={a().mode} compact />
+                          <Text class="shrink-0 text-2xs text-muted">{runtimeOf(a().runtime)}</Text>
+                        </>
+                      )}
+                    </If>
+                  </View>
+                );
+              }}
               renderValue={() => (
                 <View class="min-w-0 flex-row items-center gap-1.5">
-                  <If when={props.owner}>{(o) => <OwnerMark owner={o()} size={14} />}</If>
+                  <If when={showLeadingMark() ? props.owner : undefined}>{(o) => <OwnerMark owner={o()} size={14} />}</If>
+                  <If when={selectedAgent()}>{(a) => <AgentCodeBadge code={a().code} external={a().mode === "external"} compact />}</If>
                   <Text class={`min-w-0 shrink truncate text-sm ${props.owner ? "text-ink" : "text-faint"}`}>
                     {props.owner ? shownLabel() : t("web.issue.owner.pick")}
                   </Text>
+                  <If when={selectedAgent()}>{(a) => <AgentModeBadge mode={a().mode} compact />}</If>
                 </View>
               )}
               onChange={(raw) => props.onChange(decodeActorRef(raw))}
@@ -659,8 +733,10 @@ export function OwnerPicker(props: {
           }
         >
           <View testID={testid()} accessibilityLabel={t("web.issue.owner.label")} class="min-h-7 flex-row items-center gap-1.5 px-2">
-            <If when={props.owner}>{(o) => <OwnerMark owner={o()} size={14} />}</If>
+            <If when={showLeadingMark() ? props.owner : undefined}>{(o) => <OwnerMark owner={o()} size={14} />}</If>
+            <If when={selectedAgent()}>{(a) => <AgentCodeBadge code={a().code} external={a().mode === "external"} compact />}</If>
             <Text class={`min-w-0 truncate text-sm ${props.owner ? "text-ink" : "text-faint"}`}>{shownLabel()}</Text>
+            <If when={selectedAgent()}>{(a) => <AgentModeBadge mode={a().mode} compact />}</If>
           </View>
         </If>
       </View>

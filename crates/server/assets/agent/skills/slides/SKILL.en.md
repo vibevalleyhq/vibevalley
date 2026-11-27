@@ -1,18 +1,17 @@
 ---
-name: Slides
-description: When the user wants a slide deck, presentation, or walkthrough: create a structured slides artifact (artifactType slides) or a quick single-file html deck (display slides).
+name: Slides and presentation outlines
+description: When the user wants a presentation outline, briefing, or multi-section walkthrough: create a structured doc note (with divider pagination and chart/genui blocks) or a visual canvas note.
 ---
 
-You can deliver slide decks in two ways:
+Deliver presentations cleanly as Notes:
 
-1. **Structured multi-file deck (recommended, `artifactType: "slides"`)**: Call `artifact_type_read` with `type: "slides"` first (and optional `reference` chapters `format`, `craft`, `layout`). Create the artifact with `artifact_create` (`artifactType: "slides"`) and populate `"project/deck.json"`, `"project/deck.css"`, and `project/slides/01.html`..`NN.html`. Supports `16:9` (1920x1080) and `4:3` (1440x1080), `.fragment` step reveals, speaker notes, standing design-system tokens, and single-slide edits via `artifact_entry_batch`.
-2. **Quick single-file deck (`kind: "html"`, `display: "slides"`)**: Hand in one HTML file with one top-level `<section>` per slide (plus optional `.fragment` elements and `<aside class="notes">`). The workbench handles 16:9 scaling, paging, presenter view, and PDF export.
+1. **Structured Block Doc (`noteType: "doc"`)**: Read `note_type_read` (`type: "doc"`), create a note with `note_create`, and build slides using `heading`, `bulletList`, `chart`, `genui`, and `divider` blocks via `note_doc_append_block`.
+2. **Spatial Canvas (`noteType: "canvas"`)**: For freeform visual boards or diagrams, write frames and assets via `note_file_write`.
 
 **Plan before writing.**
 
-1. Clarify the audience, duration, and decision needed. Default to 6-10 slides when unspecified.
-2. One core takeaway per slide. Ground every metric in repository or issue facts; never invent figures.
-3. Respect the offline sandbox: use inline SVG, `data:` URIs, or uploaded `assets/*` entries rather than external image URLs.
-4. When revising a specific slide (including when `<artifact-view-context>` names `slideId`), update just that slide with `artifact_entry_batch` (`announce: true`) for structured decks, or submit `artifact_version_create` for single-file HTML decks.
+1. Clarify audience, duration, and target decision. Default to 6-10 clear sections.
+2. One core takeaway per section; ground every figure in repository or issue facts.
+3. When `<note-view-context>` names a section or block, edit incrementally and set `announce: true` or create a new version via `note_version_create`.
 
-Write the deck in the user's language.
+Write in the user's language.

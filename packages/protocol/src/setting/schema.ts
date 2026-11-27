@@ -52,6 +52,7 @@ export const SettingsStatus = z.object({
   version: z.string(),
   locale: Locale,
   deepseekApiKey: KeyStatus,
+  githubToken: KeyStatus,
   voice: VoiceSettings,
   voiceDefaults: VoiceSettings,
   readiness: z.record(z.enum(T.FeatureValues), Readiness),
@@ -74,6 +75,7 @@ const MemorySourceUpdate = z.object({
 export const SettingsUpdate = z.object({
   locale: z.exactOptional(Locale),
   deepseekApiKey: z.exactOptional(z.string()),
+  githubToken: z.exactOptional(z.string()),
   voice: z.exactOptional(SettingsUpdateVoice),
   memorySources: z.exactOptional(z.array(MemorySourceUpdate)),
   profile: z.exactOptional(UserProfile),

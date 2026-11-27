@@ -1,21 +1,18 @@
 //! Bootstrap wiring helpers invoked by [`crate::app::create_app`]: runtime
 //! registry assembly, lazy cron orchestrator binding, outbox registration, and
-//! cross-domain event bridges (chat→artifact and runtime/chat→farm skin).
+//! cross-domain event bridges (chat→note and runtime/chat→farm skin).
 
 use std::collections::{HashMap, HashSet};
-use std::path::PathBuf;
 use std::sync::{Arc, OnceLock};
 
 use tokio::sync::broadcast;
 use vibevalley_protocol::{ChatMessage, Phase};
-use vibevalley_runtime::agent::ModelClient;
-use vibevalley_runtime::agent::harness::SharedExecution;
-use vibevalley_runtime::agent::runtime::VibeValleyRuntime;
+use vibevalley_runtime::agent::{ModelClient, harness::SharedExecution, runtime::VibeValleyRuntime};
 use vibevalley_runtime::oar::Registry;
 
 use crate::agent::{Agent, Profile};
 use crate::channel::{ChannelMessageEvent, Chat};
-use crate::config::{Config, StartError, StartErrorKind, failed};
+use crate::config::{Config, StartError, failed};
 use crate::connector::{Connector, Options as ConnectorOptions};
 use crate::context::api::BoxFuture;
 use crate::context::port::CronOrchestratorPort;
@@ -24,58 +21,43 @@ use crate::cron::Scheduler as CronScheduler;
 use crate::game::Game;
 use crate::issue::{Board, IssueChat, Publisher, SessionChat};
 use crate::runtime::{OUTBOX_SESSION_REPORTED, OutboxSessionReported, Runtime, SessionLifecycleEvent};
-use crate::service::{DbError, Service};
+use crate::service::Service;
 use crate::setting::Setting;
 use crate::voice::moss::{Realtime, Transcriber};
 
 /// Domain-level test and embedding overrides supplied at server composition time.
 #[derive(Clone, Default)]
 pub struct Overrides {
-    /// Optional hosted-branch publisher override (offline tests).
     pub publisher: Option<Arc<Publisher>>,
-    /// External chat app connector configuration override.
     pub connector: Option<ConnectorOptions>,
-    /// Optional MOSS realtime probe override for offline voice tests.
     pub voice_realtime: Option<Arc<dyn Realtime>>,
-    /// Optional MOSS transcription override for offline voice tests.
     pub voice_transcriber: Option<Arc<dyn Transcriber>>,
 }
 
 pub(crate) fn apply_env_overrides(config: &mut Config) {
-    if config.registry.is_none() && config.model_client.is_none() && std::env::var("VIBEVALLEY_TEST_RUNTIMES").ok().as_deref() == Some("1") {
-        let port = std::env::var("VIBEVALLEY_TEST_MODEL_PORT").ok().filter(|v| !v.is_empty());
-        crate::fake::runtime::configure(config, port.as_deref());
+    if config.registry.is_some() || config.model_client.is_some() || std::env::var("VIBEVALLEY_TEST_RUNTIMES").ok().as_deref() != Some("1") {
+        return;
     }
-}
-
-fn start_error_from_db(err: DbError, fallback_path: Option<PathBuf>) -> StartError {
-    let (kind, message, detail, db_path) = match err.schema_mismatch() {
-        Some(r) => (
-            StartErrorKind::DatabaseSchema,
-            format!("the database: {r}"),
-            Some(r.format_detail()),
-            r.db_path.clone().or(fallback_path),
-        ),
-        None => (StartErrorKind::Database, format!("the database: {err}"), None, fallback_path),
-    };
-    StartError {
-        kind,
-        message,
-        detail,
-        db_path,
-    }
+    #[cfg(any(test, feature = "fake"))]
+    crate::fake::runtime::configure(config, std::env::var("VIBEVALLEY_TEST_MODEL_PORT").ok().filter(|v| !v.is_empty()).as_deref());
+    #[cfg(not(any(test, feature = "fake")))]
+    eprintln!("vibevalley-server: VIBEVALLEY_TEST_RUNTIMES=1 ignored (built without `fake` feature)");
 }
 
 pub(crate) async fn open_service(config: &Config) -> Result<Arc<Service>, StartError> {
-    tokio::fs::create_dir_all(&config.home).await.map_err(|e| failed("the home")(&e))?;
-    for dir in [config.work_root.clone(), config.work_root.join("repos"), config.work_root.join("worktrees")] {
-        tokio::fs::create_dir_all(&dir).await.map_err(|e| failed("the work root")(&e))?;
+    for (dir, label) in [
+        (&config.home, "the home"),
+        (&config.work_root, "the work root"),
+        (&config.work_root.join("repos"), "the work root"),
+        (&config.work_root.join("worktrees"), "the work root"),
+    ] {
+        tokio::fs::create_dir_all(dir).await.map_err(|e| failed(label)(&e))?;
     }
     match config.database_url.as_deref() {
-        Some(url) => Box::pin(Service::open_url(url)).await.map_err(|e| start_error_from_db(e, None)),
+        Some(url) => Box::pin(Service::open_url(url)).await.map_err(|e| StartError::from_db(e, None)),
         None => Box::pin(Service::open(&config.home))
             .await
-            .map_err(|e| start_error_from_db(e, Some(config.home.join("server.db")))),
+            .map_err(|e| StartError::from_db(e, Some(config.home.join("server.db")))),
     }
 }
 
@@ -84,7 +66,15 @@ pub(crate) async fn open_context(config: &Config) -> Result<Arc<Context>, StartE
     let service = open_service(config).await?;
     let (http, download): (Arc<dyn Fetch>, Arc<dyn Fetch>) = match &config.media_network {
         Some(network) => network.clone(),
+        #[cfg(any(test, feature = "fake"))]
         None if config.offline_media => crate::fake::moss::network(),
+        #[cfg(not(any(test, feature = "fake")))]
+        None if config.offline_media => {
+            return Err(StartError::new(
+                crate::config::StartErrorKind::Boot,
+                "offline_media requires the `fake` feature",
+            ));
+        }
         None => (Arc::new(Http), Arc::new(PublicDownload)),
     };
     let outbox = Arc::new(Outbox::new(service.clone()).with_clock(config.clock.clone()));
@@ -101,13 +91,11 @@ pub(crate) async fn open_context(config: &Config) -> Result<Arc<Context>, StartE
 }
 
 /// Seeds the 3 starter guide issues once on a fresh real-server database.
-/// Skipped for test and scripted boots (`probe_runtimes == false` or injected fakes).
 pub(crate) async fn seed_starter_issues_on_boot(config: &Config, setting: &Setting, board: &Board) {
     if !config.probe_runtimes || config.registry.is_some() || config.model_client.is_some() || config.media_network.is_some() || config.offline_media {
         return;
     }
-    let locale = setting.status().locale;
-    if let Err(e) = board.seed_starter_issues_if_fresh_async(locale).await {
+    if let Err(e) = board.seed_starter_issues_if_fresh_async(setting.status().locale).await {
         eprintln!("vibevalley-server: issue: seeding starter issues: {e}");
     }
 }
@@ -164,20 +152,22 @@ pub(crate) async fn seat_orchestrators_and_watch(ctx: &Context, profile: &Arc<Pr
     }));
 }
 
-pub(crate) fn spawn_chat_artifact_bridge(ctx: &Context, channel: &Chat) -> broadcast::Receiver<ChatMessage> {
+fn warn_lagged(bridge: &'static str, stream: &'static str, skipped: u64) {
+    tracing::warn!(skipped, bridge, stream, "broadcast receiver lagged");
+}
+
+pub(crate) fn spawn_chat_note_bridge(ctx: &Context, channel: &Chat) -> broadcast::Receiver<ChatMessage> {
     let (chat_msg_tx, chat_msg_rx) = broadcast::channel(256);
     let mut msg_events = channel.subscribe_message_events();
     let cancel = ctx.task.child_token();
-    ctx.spawn("artifact.chat_messages", async move {
+    ctx.spawn("note.chat_messages", async move {
         loop {
             tokio::select! {
                 biased;
                 _ = cancel.cancelled() => return,
                 res = msg_events.recv() => match res {
-                    Ok(ChannelMessageEvent::Posted { message, .. } | ChannelMessageEvent::Edited(message)) => {
-                        let _ = chat_msg_tx.send(message);
-                    }
-                    Err(broadcast::error::RecvError::Lagged(_)) => continue,
+                    Ok(ChannelMessageEvent::Posted { message, .. } | ChannelMessageEvent::Edited(message)) => { let _ = chat_msg_tx.send(message); }
+                    Err(broadcast::error::RecvError::Lagged(skipped)) => warn_lagged("note.chat_messages", "message", skipped),
                     Err(broadcast::error::RecvError::Closed) => return,
                 }
             }
@@ -198,7 +188,7 @@ pub(crate) fn register_session_reported_outbox(
     cron: &Arc<CronScheduler>,
 ) {
     cron.set_digest_delivery(connector.clone());
-    let (ic, sc, ag, g, rt, conn) = (
+    let targets = (
         Arc::downgrade(issue_chat),
         Arc::downgrade(session_chat),
         Arc::downgrade(agent),
@@ -207,7 +197,7 @@ pub(crate) fn register_session_reported_outbox(
         Arc::downgrade(connector),
     );
     ctx.outbox.register(OUTBOX_SESSION_REPORTED, move |delivery| {
-        let (ic, sc, ag, g, rt, conn) = (ic.clone(), sc.clone(), ag.clone(), g.clone(), rt.clone(), conn.clone());
+        let (ic, sc, ag, g, rt, conn) = targets.clone();
         async move {
             let report: OutboxSessionReported = delivery.decode().map_err(|e| format!("invalid {OUTBOX_SESSION_REPORTED} payload: {e}"))?;
             if let Some(ic) = ic.upgrade() {
@@ -281,16 +271,19 @@ pub(crate) async fn spawn_skin_event_bridge(ctx: &Context, game: &Arc<Game>, run
                             if let Some(removed) = known_sessions.remove(&id) { g.on_session_left(&removed, closed, merged_commits); } else { g.remove_play(&id); }
                         }
                     }
-                    Err(broadcast::error::RecvError::Lagged(_)) => if let Some(rt) = runtime_ref.upgrade() {
-                        let current = rt.list_async().await;
-                        if let Some(g) = game.upgrade() { g.seed_sessions(&current); }
-                        index_sessions(current, &mut known_sessions, &mut was_working);
+                    Err(broadcast::error::RecvError::Lagged(skipped)) => {
+                        warn_lagged("game.event_bridge", "session", skipped);
+                        if let Some(rt) = runtime_ref.upgrade() {
+                            let current = rt.list_async().await;
+                            if let Some(g) = game.upgrade() { g.seed_sessions(&current); }
+                            index_sessions(current, &mut known_sessions, &mut was_working);
+                        }
                     },
                     Err(broadcast::error::RecvError::Closed) => return,
                 },
                 ev = doing_rx.recv() => match ev {
                     Ok((id, at, doing)) => if let (Some(g), Some(s)) = (game.upgrade(), known_sessions.get(&id)) { g.on_session_doing(s, at, &doing); },
-                    Err(broadcast::error::RecvError::Lagged(_)) => {}
+                    Err(broadcast::error::RecvError::Lagged(skipped)) => warn_lagged("game.event_bridge", "doing", skipped),
                     Err(broadcast::error::RecvError::Closed) => return,
                 },
                 ev = message_rx.recv() => match ev {
@@ -300,7 +293,8 @@ pub(crate) async fn spawn_skin_event_bridge(ctx: &Context, game: &Arc<Game>, run
                         let mentioned: Vec<String> = message.mentions.iter().filter(|m| known_sessions.contains_key(m.as_str())).cloned().collect();
                         g.on_message_posted(&message.actor, thread_worker, &mentioned, answers.is_some());
                     }
-                    Ok(ChannelMessageEvent::Edited(_)) | Err(broadcast::error::RecvError::Lagged(_)) => {}
+                    Ok(ChannelMessageEvent::Edited(_)) => {}
+                    Err(broadcast::error::RecvError::Lagged(skipped)) => warn_lagged("game.event_bridge", "message", skipped),
                     Err(broadcast::error::RecvError::Closed) => return,
                 }
             }

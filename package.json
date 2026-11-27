@@ -15,15 +15,14 @@
     "tokens:gen": "vpx scripts/gen/tokens.ts",
     "icons:gen": "vpx scripts/gen/icons.ts",
     "ui:gallery": "vpx scripts/audit/ui-gallery.ts",
-    "ui:review": "vpx scripts/release/vdp-review.ts",
-    "ui:flow": "vpx scripts/release/vdp-flow.ts",
+    "vdp": "vpx scripts/vdp/run.ts",
     "api:client": "vpx scripts/gen/api-client.ts",
     "i18n:gen": "vpx scripts/gen/i18n.ts gen",
     "nsh:install": "sh scripts/release/install-nsh.sh 0.7.1",
     "branding:dmg": "vpx scripts/gen/mac-branding.ts --dmg-only",
     "package:mac": "vpx scripts/release/package.ts",
-    "package:mac:alpha": "vpx scripts/release/package.ts --profile alpha --fast --no-dmg --no-zip",
-    "package:mac:alpha:dmg": "vpx scripts/release/package.ts --profile alpha --fast --no-zip",
+    "package:mac:alpha": "vpx scripts/release/package.ts --profile debug --fast --no-dmg --no-zip",
+    "package:mac:alpha:dmg": "vpx scripts/release/package.ts --profile debug --fast --no-zip",
     "update-check": "vpx scripts/release/update-check.ts"
   },
   "devDependencies": {

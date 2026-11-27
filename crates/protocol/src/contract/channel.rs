@@ -121,8 +121,8 @@ pub struct ChatMessage {
     pub reactions: Vec<Reaction>,
     pub attachments: Vec<Attachment>,
     pub embeds: Vec<Embed>,
-    pub artifact: Option<ArtifactCard>,
-    pub view_context: Option<ArtifactViewContext>,
+    pub note: Option<NoteCard>,
+    pub view_context: Option<NoteViewContext>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
@@ -275,7 +275,7 @@ pub struct ChannelCommand {
 pub struct SayRequest {
     pub id: String,
     pub text: String,
-    pub view_context: Option<ArtifactViewContext>,
+    pub view_context: Option<NoteViewContext>,
     pub reply_to: Option<i64>,
     pub attachments: Option<Vec<String>>,
     pub station: Option<i64>,

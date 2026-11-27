@@ -16,7 +16,7 @@ use super::board::Board;
 use super::chat::{IssueChat, KeyedLaneQueue, REPORT_MAX, view_context_of};
 use crate::channel::{ChannelDispatched, Chat, Committed, DeliveryTargetKind, Meta, Note, Noticing, QueuedDelivery, Seat, profile_id};
 use crate::context::Context;
-use crate::context::text::{format_artifact_view_context, head};
+use crate::context::text::{format_note_view_context, head};
 use crate::runtime::{MailboxSource, MailboxStatus, OUTBOX_SESSION_REPORTED, OutboxSessionReported, SessionLifecycleEvent};
 
 #[derive(Clone)]
@@ -119,12 +119,18 @@ impl SessionChat {
                     },
                     res = removals.recv() => match res {
                         Ok(message_id) => CoordinatorEvent::Removed(message_id),
-                        Err(broadcast::error::RecvError::Lagged(_)) => CoordinatorEvent::Ignore,
+                        Err(broadcast::error::RecvError::Lagged(skipped)) => {
+                            tracing::warn!(skipped, "session_chat removals broadcast lagged; skipped message removals");
+                            CoordinatorEvent::Ignore
+                        }
                         Err(broadcast::error::RecvError::Closed) => CoordinatorEvent::Stop,
                     },
                     res = session_events.recv() => match res {
                         Ok(ev) => CoordinatorEvent::Lifecycle(ev),
-                        Err(broadcast::error::RecvError::Lagged(_)) => CoordinatorEvent::LaggedLifecycle,
+                        Err(broadcast::error::RecvError::Lagged(skipped)) => {
+                            tracing::warn!(skipped, "session_chat lifecycle broadcast lagged; resyncing seats");
+                            CoordinatorEvent::LaggedLifecycle
+                        }
                         Err(broadcast::error::RecvError::Closed) => CoordinatorEvent::Stop,
                     },
                 };
@@ -177,15 +183,22 @@ impl SessionChat {
 
     async fn boot_async(self: &Arc<Self>) {
         self.sync_seats_async().await;
-        if let Ok(pending) = self.channel.pending_deliveries_async(DeliveryTargetKind::Direct).await {
-            for d in pending {
-                self.enqueue_lane(d.recipient_id.clone(), DirectWake { delivery: d, committed: None });
+        match self.channel.pending_deliveries_async(DeliveryTargetKind::Direct).await {
+            Ok(pending) => {
+                for d in pending {
+                    self.enqueue_lane(d.recipient_id.clone(), DirectWake { delivery: d, committed: None });
+                }
+            }
+            Err(err) => {
+                tracing::warn!(error = %err, "session_chat failed to load pending direct deliveries on boot");
             }
         }
     }
 
     async fn withdraw_message_mailbox_async(&self, message_id: &str) {
-        let _ = self.board.session_engine().withdraw_mailbox_by_message_async(message_id).await;
+        if let Err(err) = self.board.session_engine().withdraw_mailbox_by_message_async(message_id).await {
+            tracing::warn!(message_id, error = %err, "session_chat failed to withdraw removed message mailbox");
+        }
     }
 
     pub(crate) async fn handle_report_async(&self, report: &OutboxSessionReported) {
@@ -211,7 +224,7 @@ impl SessionChat {
                     .map(|s| s.id)
                     .unwrap_or_else(|| format!("profile:{}", d.recipient_id));
                 let key = direct_mail_key(&d.recipient_id, &d.message_id);
-                let _ = sessions
+                if let Err(err) = sessions
                     .enqueue_mailbox_async(
                         &mailbox_owner,
                         &key,
@@ -219,7 +232,10 @@ impl SessionChat {
                         Some(&d.message_id),
                         &dispatched.committed.row.body,
                     )
-                    .await;
+                    .await
+                {
+                    tracing::warn!(recipient_id = %d.recipient_id, message_id = %d.message_id, error = %err, "session_chat failed to enqueue direct mailbox");
+                }
                 self.enqueue_lane(
                     d.recipient_id.clone(),
                     DirectWake {
@@ -248,21 +264,37 @@ impl SessionChat {
         let mail_key = direct_mail_key(&d.recipient_id, &d.message_id);
         let sessions = self.board.session_engine();
         if !self.channel.delivery_is_pending_async(d.id).await.unwrap_or(false) {
-            let _ = sessions.withdraw_mailbox_async(&mail_key).await;
+            if let Err(err) = sessions.withdraw_mailbox_async(&mail_key).await {
+                tracing::warn!(delivery_id = d.id, mail_key = %mail_key, error = %err, "session_chat failed to withdraw non-pending direct mailbox");
+            }
             return;
         }
         let c = match wake.committed {
             Some(c) => Some(c),
-            None => self.channel.committed_of_async(&d.message_id).await.ok().flatten().map(Arc::new),
+            None => match self.channel.committed_of_async(&d.message_id).await {
+                Ok(found) => found.map(Arc::new),
+                Err(err) => {
+                    tracing::warn!(delivery_id = d.id, message_id = %d.message_id, error = %err, "session_chat failed to load committed direct message");
+                    None
+                }
+            },
         };
         let Some(c) = c else {
-            let _ = sessions.withdraw_mailbox_async(&mail_key).await;
-            let _ = self.channel.withdraw_delivery_async(d.id).await;
+            if let Err(err) = sessions.withdraw_mailbox_async(&mail_key).await {
+                tracing::warn!(delivery_id = d.id, mail_key = %mail_key, error = %err, "session_chat failed to withdraw missing-message direct mailbox");
+            }
+            if let Err(err) = self.channel.withdraw_delivery_async(d.id).await {
+                tracing::warn!(delivery_id = d.id, message_id = %d.message_id, error = %err, "session_chat failed to withdraw missing-message direct delivery");
+            }
             return;
         };
         if c.row.deleted_at.is_some() {
-            let _ = sessions.withdraw_mailbox_async(&mail_key).await;
-            let _ = self.channel.withdraw_delivery_async(d.id).await;
+            if let Err(err) = sessions.withdraw_mailbox_async(&mail_key).await {
+                tracing::warn!(delivery_id = d.id, mail_key = %mail_key, error = %err, "session_chat failed to withdraw deleted-message direct mailbox");
+            }
+            if let Err(err) = self.channel.withdraw_delivery_async(d.id).await {
+                tracing::warn!(delivery_id = d.id, message_id = %d.message_id, error = %err, "session_chat failed to withdraw deleted-message direct delivery");
+            }
             return;
         }
         let mailbox_owner = sessions
@@ -270,10 +302,16 @@ impl SessionChat {
             .await
             .map(|s| s.id)
             .unwrap_or_else(|| format!("profile:{}", d.recipient_id));
-        let mail_entry = sessions
+        let mail_entry = match sessions
             .enqueue_mailbox_async(&mailbox_owner, &mail_key, MailboxSource::ChannelDirect, Some(&d.message_id), &c.row.body)
             .await
-            .ok();
+        {
+            Ok(entry) => Some(entry),
+            Err(err) => {
+                tracing::warn!(delivery_id = d.id, mail_key = %mail_key, error = %err, "session_chat failed to upsert direct mailbox entry");
+                None
+            }
+        };
         let claimed = sessions.claim_mailbox_by_key_async(&mail_key).await.unwrap_or(false);
         if !claimed
             && mail_entry
@@ -284,7 +322,7 @@ impl SessionChat {
         }
         let settle_id = mail_entry.as_ref().map(|e| e.id);
         let words = match view_context_of(&c) {
-            Some(vc) => format!("{}\n{}", format_artifact_view_context(&vc), c.row.body),
+            Some(vc) => format!("{}\n{}", format_note_view_context(&vc), c.row.body),
             None => c.row.body.clone(),
         };
         enum TalkOutcome {
@@ -300,18 +338,26 @@ impl SessionChat {
         };
         let why = match outcome {
             TalkOutcome::Ok(sid) => {
-                if let Some(id) = settle_id {
-                    let _ = sessions.settle_mailbox_async(id, true, Some(&sid)).await;
+                if let Some(id) = settle_id
+                    && let Err(err) = sessions.settle_mailbox_async(id, true, Some(&sid)).await
+                {
+                    tracing::warn!(delivery_id = d.id, mailbox_id = id, error = %err, "session_chat failed to settle direct mailbox");
                 }
-                let _ = self.channel.settle_delivery_async(d.id, true).await;
+                if let Err(err) = self.channel.settle_delivery_async(d.id, true).await {
+                    tracing::warn!(delivery_id = d.id, message_id = %d.message_id, error = %err, "session_chat failed to settle direct delivery");
+                }
                 return;
             }
             TalkOutcome::Err(why) => why,
         };
-        if let Some(id) = settle_id {
-            let _ = sessions.settle_mailbox_async(id, false, Some(&why)).await;
+        if let Some(id) = settle_id
+            && let Err(err) = sessions.settle_mailbox_async(id, false, Some(&why)).await
+        {
+            tracing::warn!(delivery_id = d.id, mailbox_id = id, error = %err, "session_chat failed to mark failed direct mailbox");
         }
-        let _ = self.channel.settle_delivery_async(d.id, false).await;
+        if let Err(err) = self.channel.settle_delivery_async(d.id, false).await {
+            tracing::warn!(delivery_id = d.id, message_id = %d.message_id, error = %err, "session_chat failed to mark failed direct delivery");
+        }
         self.channel
             .notice_async(Noticing {
                 channel: d.channel_id,

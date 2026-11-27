@@ -86,7 +86,7 @@ async fn write_frames(mut stdin: impl AsyncWrite + Unpin, mut rx: watch::Receive
     }
 }
 
-async fn read_clicks(stdout: impl AsyncRead + Unpin, clicks: flume::Sender<String>, cancel: CancellationToken) {
+async fn read_clicks(stdout: impl AsyncRead + Unpin, clicks: tokio::sync::mpsc::Sender<String>, cancel: CancellationToken) {
     let mut lines = BufReader::new(stdout).lines();
     loop {
         let line = tokio::select! {
@@ -110,7 +110,7 @@ pub struct Island {
 }
 
 impl Island {
-    pub fn start() -> Result<Option<(Self, flume::Receiver<String>)>, String> {
+    pub fn start() -> Result<Option<(Self, tokio::sync::mpsc::Receiver<String>)>, String> {
         if std::env::var_os("VIBEVALLEY_NO_ISLAND").is_some() {
             return Ok(None);
         }
@@ -123,7 +123,7 @@ impl Island {
         let Some(binary) = candidates.into_iter().flatten().find(|p| p.is_file()) else {
             return Ok(None);
         };
-        let handle = vibevalley_runtime::rt::current_or_global_handle();
+        let handle = vibevalley_rt::current_or_global_handle();
         let mut child = {
             let _guard = handle.enter();
             Command::new(binary)
@@ -138,7 +138,7 @@ impl Island {
         let (frames, incoming) = watch::channel(None::<String>);
         let cancel = CancellationToken::new();
         handle.spawn(write_frames(stdin, incoming, cancel.clone()));
-        let (clicks, opened) = flume::bounded(8);
+        let (clicks, opened) = tokio::sync::mpsc::channel(8);
         handle.spawn(read_clicks(stdout, clicks, cancel.clone()));
         Ok(Some((
             Self {
@@ -161,7 +161,7 @@ impl Drop for Island {
         self.cancel.cancel();
         if let Some(mut child) = self.child.take() {
             let _ = child.start_kill();
-            vibevalley_runtime::rt::current_or_global_handle().spawn(async move {
+            vibevalley_rt::current_or_global_handle().spawn(async move {
                 let _ = child.wait().await;
             });
         }
@@ -193,7 +193,7 @@ mod tests {
 
     #[test]
     fn async_pipes_write_latest_frame_and_read_clicks() {
-        vibevalley_runtime::rt::block_on(async {
+        vibevalley_rt::block_on(async {
             let (stdin_tx, mut stdin_rx) = tokio::io::duplex(256);
             let (frames_tx, frames_rx) = watch::channel(None::<String>);
             let cancel = CancellationToken::new();
@@ -208,12 +208,12 @@ mod tests {
             writer.await.unwrap();
 
             let (mut stdout_tx, stdout_rx) = tokio::io::duplex(256);
-            let (clicks_tx, clicks_rx) = flume::bounded(8);
+            let (clicks_tx, mut clicks_rx) = tokio::sync::mpsc::channel(8);
             let cancel = CancellationToken::new();
             let reader_task = tokio::spawn(read_clicks(stdout_rx, clicks_tx, cancel.clone()));
             stdout_tx.write_all(b"{\"open\":\"issue-42\"}\n").await.unwrap();
             stdout_tx.flush().await.unwrap();
-            assert_eq!(clicks_rx.recv_async().await.unwrap(), "issue-42");
+            assert_eq!(clicks_rx.recv().await.unwrap(), "issue-42");
             cancel.cancel();
             reader_task.await.unwrap();
         });

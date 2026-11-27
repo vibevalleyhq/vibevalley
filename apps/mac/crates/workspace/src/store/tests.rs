@@ -3,8 +3,8 @@ use serde_json::json;
 
 use super::*;
 
-fn store() -> Store {
-    Store::open_in_memory().unwrap()
+async fn store() -> Store {
+    Store::open_in_memory().await.unwrap()
 }
 
 fn terminal(id: &str, project_id: ProjectId) -> SavedTerminal {
@@ -32,36 +32,36 @@ fn default_path_is_under_application_support() {
     assert!(Store::default_path_for("VibeValley-dev").ends_with("Library/Application Support/VibeValley-dev/state.db"));
 }
 
-#[test]
-fn add_project_is_idempotent_and_ordered() {
-    let s = store();
-    let a = s.add_project(Path::new("/work/alpha")).unwrap();
-    let b = s.add_project(Path::new("/work/beta 项目/")).unwrap();
+#[tokio::test]
+async fn add_project_is_idempotent_and_ordered() {
+    let s = store().await;
+    let a = s.add_project(Path::new("/work/alpha")).await.unwrap();
+    let b = s.add_project(Path::new("/work/beta 项目/")).await.unwrap();
     assert_eq!(a.name, "alpha");
     assert_eq!(b.name, "beta 项目");
     assert_eq!(b.path, PathBuf::from("/work/beta 项目"));
     assert_eq!((a.position, b.position), (0, 1));
     assert!(a.last_opened_ms > 0);
 
-    let again = s.add_project(Path::new("/work/alpha/")).unwrap();
+    let again = s.add_project(Path::new("/work/alpha/")).await.unwrap();
     assert_eq!(again, a);
-    assert_eq!(s.projects().unwrap(), vec![a.clone(), b]);
-    assert_eq!(s.project(a.id).unwrap(), a);
+    assert_eq!(s.projects().await.unwrap(), vec![a.clone(), b]);
+    assert_eq!(s.project(a.id).await.unwrap(), a);
 }
 
-#[test]
-fn rename_relocate_touch() {
-    let s = store();
-    let a = s.add_project(Path::new("/work/alpha")).unwrap();
-    let b = s.add_project(Path::new("/work/beta")).unwrap();
+#[tokio::test]
+async fn rename_relocate_touch() {
+    let s = store().await;
+    let a = s.add_project(Path::new("/work/alpha")).await.unwrap();
+    let b = s.add_project(Path::new("/work/beta")).await.unwrap();
 
-    s.rename_project(a.id, "Alpha!").unwrap();
-    s.relocate_project(a.id, Path::new("/moved/alpha")).unwrap();
-    let got = s.project(a.id).unwrap();
+    s.rename_project(a.id, "Alpha!").await.unwrap();
+    s.relocate_project(a.id, Path::new("/moved/alpha")).await.unwrap();
+    let got = s.project(a.id).await.unwrap();
     assert_eq!(got.name, "Alpha!");
     assert_eq!(got.path, PathBuf::from("/moved/alpha"));
 
-    assert!(matches!(s.relocate_project(a.id, &b.path), Err(StoreError::Db(_))));
+    assert!(matches!(s.relocate_project(a.id, &b.path).await, Err(StoreError::Db(_))));
 
     s.run(async |conn| {
         projects::Entity::update_many()
@@ -70,160 +70,164 @@ fn rename_relocate_touch() {
             .await?;
         Ok(())
     })
+    .await
     .unwrap();
-    s.touch_project(a.id).unwrap();
-    assert!(s.project(a.id).unwrap().last_opened_ms > 1);
-    assert_eq!(s.project(b.id).unwrap().last_opened_ms, 1);
+    s.touch_project(a.id).await.unwrap();
+    assert!(s.project(a.id).await.unwrap().last_opened_ms > 1);
+    assert_eq!(s.project(b.id).await.unwrap().last_opened_ms, 1);
 }
 
-#[test]
-fn missing_project_is_not_found() {
-    let s = store();
-    assert!(matches!(s.rename_project(99, "x"), Err(StoreError::NotFound)));
-    assert!(matches!(s.relocate_project(99, Path::new("/x")), Err(StoreError::NotFound)));
-    assert!(matches!(s.touch_project(99), Err(StoreError::NotFound)));
-    assert!(matches!(s.remove_project(99), Err(StoreError::NotFound)));
-    assert!(matches!(s.project(99), Err(StoreError::NotFound)));
-    assert!(matches!(s.set_layout(99, &json!({})), Err(StoreError::NotFound)));
-    assert!(matches!(s.set_terminals(99, &[]), Err(StoreError::NotFound)));
-    assert_eq!(s.layout(99).unwrap(), None);
-    assert!(s.terminals(99).unwrap().is_empty());
+#[tokio::test]
+async fn missing_project_is_not_found() {
+    let s = store().await;
+    assert!(matches!(s.rename_project(99, "x").await, Err(StoreError::NotFound)));
+    assert!(matches!(s.relocate_project(99, Path::new("/x")).await, Err(StoreError::NotFound)));
+    assert!(matches!(s.touch_project(99).await, Err(StoreError::NotFound)));
+    assert!(matches!(s.remove_project(99).await, Err(StoreError::NotFound)));
+    assert!(matches!(s.project(99).await, Err(StoreError::NotFound)));
+    assert!(matches!(s.set_layout(99, &json!({})).await, Err(StoreError::NotFound)));
+    assert!(matches!(s.set_terminals(99, &[]).await, Err(StoreError::NotFound)));
+    assert_eq!(s.layout(99).await.unwrap(), None);
+    assert!(s.terminals(99).await.unwrap().is_empty());
 }
 
-#[test]
-fn reorder_projects() {
-    let s = store();
-    let ids: Vec<ProjectId> = ["a", "b", "c", "d"]
-        .iter()
-        .map(|n| s.add_project(&Path::new("/w").join(n)).unwrap().id)
-        .collect();
-    let order = |s: &Store| s.projects().unwrap().iter().map(|p| p.id).collect::<Vec<_>>();
+#[tokio::test]
+async fn reorder_projects() {
+    let s = store().await;
+    let mut ids: Vec<ProjectId> = Vec::new();
+    for n in ["a", "b", "c", "d"] {
+        ids.push(s.add_project(&Path::new("/w").join(n)).await.unwrap().id);
+    }
 
-    s.reorder_projects(&[ids[3], ids[1], ids[0], ids[2]]).unwrap();
-    assert_eq!(order(&s), vec![ids[3], ids[1], ids[0], ids[2]]);
+    s.reorder_projects(&[ids[3], ids[1], ids[0], ids[2]]).await.unwrap();
+    let order: Vec<_> = s.projects().await.unwrap().iter().map(|p| p.id).collect();
+    assert_eq!(order, vec![ids[3], ids[1], ids[0], ids[2]]);
 
     // Partial list, a duplicate and an unknown id.
-    s.reorder_projects(&[ids[2], 12345, ids[2]]).unwrap();
-    assert_eq!(order(&s), vec![ids[2], ids[3], ids[1], ids[0]]);
-    let positions: Vec<i64> = s.projects().unwrap().iter().map(|p| p.position).collect();
+    s.reorder_projects(&[ids[2], 12345, ids[2]]).await.unwrap();
+    let projects = s.projects().await.unwrap();
+    let order: Vec<_> = projects.iter().map(|p| p.id).collect();
+    assert_eq!(order, vec![ids[2], ids[3], ids[1], ids[0]]);
+    let positions: Vec<i64> = projects.iter().map(|p| p.position).collect();
     assert_eq!(positions, vec![0, 1, 2, 3]);
 
     // A project added after a reorder goes last.
-    let e = s.add_project(Path::new("/w/e")).unwrap();
-    assert_eq!(order(&s).last(), Some(&e.id));
+    let e = s.add_project(Path::new("/w/e")).await.unwrap();
+    let order: Vec<_> = s.projects().await.unwrap().iter().map(|p| p.id).collect();
+    assert_eq!(order.last(), Some(&e.id));
 }
 
-#[test]
-fn layout_round_trip() {
-    let s = store();
-    let p = s.add_project(Path::new("/w/a")).unwrap();
-    assert_eq!(s.layout(p.id).unwrap(), None);
+#[tokio::test]
+async fn layout_round_trip() {
+    let s = store().await;
+    let p = s.add_project(Path::new("/w/a")).await.unwrap();
+    assert_eq!(s.layout(p.id).await.unwrap(), None);
     let layout = json!({"split": "h", "ratio": 0.5, "children": [{"term": "t1"}, {"file": "读我.md"}]});
-    s.set_layout(p.id, &layout).unwrap();
-    assert_eq!(s.layout(p.id).unwrap(), Some(layout));
-    s.set_layout(p.id, &json!(null)).unwrap();
-    assert_eq!(s.layout(p.id).unwrap(), Some(json!(null)));
+    s.set_layout(p.id, &layout).await.unwrap();
+    assert_eq!(s.layout(p.id).await.unwrap(), Some(layout));
+    s.set_layout(p.id, &json!(null)).await.unwrap();
+    assert_eq!(s.layout(p.id).await.unwrap(), Some(json!(null)));
 }
 
-#[test]
-fn terminals_are_replaced_and_keep_order() {
-    let s = store();
-    let p = s.add_project(Path::new("/w/a")).unwrap();
-    let q = s.add_project(Path::new("/w/b")).unwrap();
+#[tokio::test]
+async fn terminals_are_replaced_and_keep_order() {
+    let s = store().await;
+    let p = s.add_project(Path::new("/w/a")).await.unwrap();
+    let q = s.add_project(Path::new("/w/b")).await.unwrap();
 
     let first = vec![terminal("z", p.id), terminal("a", p.id), terminal("m", p.id)];
-    s.set_terminals(p.id, &first).unwrap();
-    s.set_terminals(q.id, &[terminal("z", q.id)]).unwrap();
-    assert_eq!(s.terminals(p.id).unwrap(), first);
+    s.set_terminals(p.id, &first).await.unwrap();
+    s.set_terminals(q.id, &[terminal("z", q.id)]).await.unwrap();
+    assert_eq!(s.terminals(p.id).await.unwrap(), first);
 
     // The argument wins over a stale project_id on the row.
     let second = vec![terminal("only", q.id)];
-    s.set_terminals(p.id, &second).unwrap();
-    let got = s.terminals(p.id).unwrap();
+    s.set_terminals(p.id, &second).await.unwrap();
+    let got = s.terminals(p.id).await.unwrap();
     assert_eq!(got.len(), 1);
     assert_eq!(got[0].project_id, p.id);
     assert_eq!(got[0].id, "only");
-    assert_eq!(s.terminals(q.id).unwrap().len(), 1);
+    assert_eq!(s.terminals(q.id).await.unwrap().len(), 1);
 
-    s.set_terminals(p.id, &[]).unwrap();
-    assert!(s.terminals(p.id).unwrap().is_empty());
+    s.set_terminals(p.id, &[]).await.unwrap();
+    assert!(s.terminals(p.id).await.unwrap().is_empty());
 }
 
-#[test]
-fn removing_a_project_removes_everything_it_owns() {
-    let s = store();
-    let p = s.add_project(Path::new("/w/a")).unwrap();
-    let keep = s.add_project(Path::new("/w/keep")).unwrap();
+#[tokio::test]
+async fn removing_a_project_removes_everything_it_owns() {
+    let s = store().await;
+    let p = s.add_project(Path::new("/w/a")).await.unwrap();
+    let keep = s.add_project(Path::new("/w/keep")).await.unwrap();
     for id in [p.id, keep.id] {
-        s.set_layout(id, &json!({"id": id})).unwrap();
-        s.set_terminals(id, &[terminal("t", id)]).unwrap();
+        s.set_layout(id, &json!({"id": id})).await.unwrap();
+        s.set_terminals(id, &[terminal("t", id)]).await.unwrap();
     }
 
-    s.remove_project(p.id).unwrap();
+    s.remove_project(p.id).await.unwrap();
 
-    assert_eq!(s.projects().unwrap(), vec![keep.clone()]);
-    assert_eq!(s.layout(p.id).unwrap(), None);
-    assert!(s.terminals(p.id).unwrap().is_empty());
+    assert_eq!(s.projects().await.unwrap(), vec![keep.clone()]);
+    assert_eq!(s.layout(p.id).await.unwrap(), None);
+    assert!(s.terminals(p.id).await.unwrap().is_empty());
     s.run(async |conn| {
         assert_eq!(layouts::Entity::find().count(conn).await?, 1);
         assert_eq!(terminals::Entity::find().count(conn).await?, 1);
         Ok(())
     })
+    .await
     .unwrap();
-    assert_eq!(s.layout(keep.id).unwrap(), Some(json!({"id": keep.id})));
+    assert_eq!(s.layout(keep.id).await.unwrap(), Some(json!({"id": keep.id})));
 
     // Ids are never reused, so stale references cannot alias a new project.
-    let again = s.add_project(Path::new("/w/a")).unwrap();
+    let again = s.add_project(Path::new("/w/a")).await.unwrap();
     assert!(again.id > keep.id);
 }
 
-#[test]
-fn settings_round_trip() {
-    let s = store();
-    assert_eq!(s.setting("theme").unwrap(), None);
-    s.set_setting("theme", &json!("dark")).unwrap();
-    s.set_setting("font", &json!({"family": "Berkeley Mono", "size": 13.5})).unwrap();
-    s.set_setting("theme", &json!("light")).unwrap();
-    assert_eq!(s.setting("theme").unwrap(), Some(json!("light")));
-    assert_eq!(s.setting("font").unwrap().unwrap()["size"], json!(13.5));
-    s.set_setting("theme", &json!(null)).unwrap();
-    assert_eq!(s.setting("theme").unwrap(), None);
+#[tokio::test]
+async fn settings_round_trip() {
+    let s = store().await;
+    assert_eq!(s.setting("theme").await.unwrap(), None);
+    s.set_setting("theme", &json!("dark")).await.unwrap();
+    s.set_setting("font", &json!({"family": "Berkeley Mono", "size": 13.5})).await.unwrap();
+    s.set_setting("theme", &json!("light")).await.unwrap();
+    assert_eq!(s.setting("theme").await.unwrap(), Some(json!("light")));
+    assert_eq!(s.setting("font").await.unwrap().unwrap()["size"], json!(13.5));
+    s.set_setting("theme", &json!(null)).await.unwrap();
+    assert_eq!(s.setting("theme").await.unwrap(), None);
 }
 
-#[test]
-fn concurrent_use_from_many_threads() {
-    let s = std::sync::Arc::new(store());
-    let p = s.add_project(Path::new("/w/a")).unwrap();
-    let handles: Vec<_> = (0..8)
-        .map(|t| {
-            let s = s.clone();
-            std::thread::spawn(move || {
-                for i in 0..50 {
-                    s.set_layout(p.id, &json!({"t": t, "i": i})).unwrap();
-                    s.set_setting(&format!("k{t}-{i}"), &json!(i)).unwrap();
-                    s.projects().unwrap();
-                }
-            })
-        })
-        .collect();
-    for h in handles {
-        h.join().unwrap();
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn concurrent_use_from_many_tasks() {
+    let s = std::sync::Arc::new(store().await);
+    let p = s.add_project(Path::new("/w/a")).await.unwrap();
+    let mut join_set = tokio::task::JoinSet::new();
+    for t in 0..8 {
+        let s = s.clone();
+        join_set.spawn(async move {
+            for i in 0..50 {
+                s.set_layout(p.id, &json!({"t": t, "i": i})).await.unwrap();
+                s.set_setting(&format!("k{t}-{i}"), &json!(i)).await.unwrap();
+                s.projects().await.unwrap();
+            }
+        });
     }
-    assert_eq!(s.setting("k7-49").unwrap(), Some(json!(49)));
+    while let Some(res) = join_set.join_next().await {
+        res.unwrap();
+    }
+    assert_eq!(s.setting("k7-49").await.unwrap(), Some(json!(49)));
 }
 
-#[test]
-fn on_disk_reopen_keeps_data_and_migrations_are_idempotent() {
+#[tokio::test]
+async fn on_disk_reopen_keeps_data_and_migrations_are_idempotent() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("nested/dirs/state.db");
 
     let (project, layout) = {
-        let s = Store::open(&path).unwrap();
-        let p = s.add_project(Path::new("/w/持久")).unwrap();
+        let s = Store::open(&path).await.unwrap();
+        let p = s.add_project(Path::new("/w/持久")).await.unwrap();
         let layout = json!({"tabs": [1, 2, 3]});
-        s.set_layout(p.id, &layout).unwrap();
-        s.set_terminals(p.id, &[terminal("t1", p.id), terminal("t2", p.id)]).unwrap();
-        s.set_setting("k", &json!([true, null])).unwrap();
+        s.set_layout(p.id, &layout).await.unwrap();
+        s.set_terminals(p.id, &[terminal("t1", p.id), terminal("t2", p.id)]).await.unwrap();
+        s.set_setting("k", &json!([true, null])).await.unwrap();
         let mode: String = s
             .run(async |conn| {
                 let row = conn
@@ -232,13 +236,15 @@ fn on_disk_reopen_keeps_data_and_migrations_are_idempotent() {
                     .unwrap();
                 Ok(row.try_get_by_index(0)?)
             })
+            .await
             .unwrap();
         assert_eq!(mode, "wal");
+        s.close().await.unwrap();
         (p, layout)
     };
 
     for _ in 0..2 {
-        let s = Store::open(&path).unwrap();
+        let s = Store::open(&path).await.unwrap();
         s.run(async |conn| {
             for (sql, expected) in [
                 ("PRAGMA user_version", Store::schema_version()),
@@ -252,67 +258,70 @@ fn on_disk_reopen_keeps_data_and_migrations_are_idempotent() {
             }
             Ok(())
         })
+        .await
         .unwrap();
-        assert_eq!(s.projects().unwrap(), vec![project.clone()]);
-        assert_eq!(s.layout(project.id).unwrap(), Some(layout.clone()));
-        assert_eq!(s.terminals(project.id).unwrap(), vec![terminal("t1", project.id), terminal("t2", project.id)]);
-        assert_eq!(s.setting("k").unwrap(), Some(json!([true, null])));
+        assert_eq!(s.projects().await.unwrap(), vec![project.clone()]);
+        assert_eq!(s.layout(project.id).await.unwrap(), Some(layout.clone()));
+        assert_eq!(
+            s.terminals(project.id).await.unwrap(),
+            vec![terminal("t1", project.id), terminal("t2", project.id)]
+        );
+        assert_eq!(s.setting("k").await.unwrap(), Some(json!([true, null])));
+        s.close().await.unwrap();
     }
 }
 
-#[test]
-fn opens_existing_legacy_user_version_1_database() {
+#[tokio::test]
+async fn opens_existing_legacy_user_version_1_database() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("legacy state#1?.db");
     let url = sqlite_file_url(&path);
-    vibevalley_runtime::rt::block_on(async {
-        let conn = Database::connect(&url).await.unwrap();
-        conn.execute_unprepared(
-            r#"
-            CREATE TABLE projects (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                path TEXT NOT NULL UNIQUE,
-                name TEXT NOT NULL,
-                position INTEGER NOT NULL,
-                last_opened_ms INTEGER NOT NULL
-            );
-            CREATE TABLE layouts (
-                project_id INTEGER PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
-                json TEXT NOT NULL
-            );
-            CREATE TABLE terminals (
-                project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-                id TEXT NOT NULL,
-                ord INTEGER NOT NULL,
-                cwd TEXT NOT NULL,
-                title TEXT,
-                scrollback TEXT NOT NULL,
-                PRIMARY KEY (project_id, id)
-            );
-            CREATE TABLE settings (
-                key TEXT PRIMARY KEY,
-                value TEXT NOT NULL
-            );
-            INSERT INTO projects (id, path, name, position, last_opened_ms) VALUES (7, '/legacy/app', 'app', 0, 12345);
-            INSERT INTO layouts (project_id, json) VALUES (7, '{"tabs":["main"]}');
-            INSERT INTO terminals (project_id, id, ord, cwd, title, scrollback) VALUES (7, 't1', 0, '/legacy/app', NULL, 'hi');
-            INSERT INTO settings (key, value) VALUES ('theme', '"warm"');
-            PRAGMA user_version = 1;
-            "#,
-        )
-        .await
-        .unwrap();
-        conn.close().await.unwrap();
-    });
+    let conn = Database::connect(&url).await.unwrap();
+    conn.execute_unprepared(
+        r#"
+        CREATE TABLE projects (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            path TEXT NOT NULL UNIQUE,
+            name TEXT NOT NULL,
+            position INTEGER NOT NULL,
+            last_opened_ms INTEGER NOT NULL
+        );
+        CREATE TABLE layouts (
+            project_id INTEGER PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
+            json TEXT NOT NULL
+        );
+        CREATE TABLE terminals (
+            project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+            id TEXT NOT NULL,
+            ord INTEGER NOT NULL,
+            cwd TEXT NOT NULL,
+            title TEXT,
+            scrollback TEXT NOT NULL,
+            PRIMARY KEY (project_id, id)
+        );
+        CREATE TABLE settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );
+        INSERT INTO projects (id, path, name, position, last_opened_ms) VALUES (7, '/legacy/app', 'app', 0, 12345);
+        INSERT INTO layouts (project_id, json) VALUES (7, '{"tabs":["main"]}');
+        INSERT INTO terminals (project_id, id, ord, cwd, title, scrollback) VALUES (7, 't1', 0, '/legacy/app', NULL, 'hi');
+        INSERT INTO settings (key, value) VALUES ('theme', '"warm"');
+        PRAGMA user_version = 1;
+        "#,
+    )
+    .await
+    .unwrap();
+    conn.close().await.unwrap();
 
-    let s = Store::open(&path).unwrap();
-    let projects = s.projects().unwrap();
+    let s = Store::open(&path).await.unwrap();
+    let projects = s.projects().await.unwrap();
     assert_eq!(projects.len(), 1);
     assert_eq!(projects[0].id, 7);
     assert_eq!(projects[0].path, PathBuf::from("/legacy/app"));
-    assert_eq!(s.layout(7).unwrap(), Some(json!({"tabs": ["main"]})));
+    assert_eq!(s.layout(7).await.unwrap(), Some(json!({"tabs": ["main"]})));
     assert_eq!(
-        s.terminals(7).unwrap(),
+        s.terminals(7).await.unwrap(),
         vec![SavedTerminal {
             id: "t1".into(),
             project_id: 7,
@@ -321,34 +330,35 @@ fn opens_existing_legacy_user_version_1_database() {
             scrollback: "hi".into(),
         }]
     );
-    assert_eq!(s.setting("theme").unwrap(), Some(json!("warm")));
+    assert_eq!(s.setting("theme").await.unwrap(), Some(json!("warm")));
 }
 
-#[test]
-fn refuses_a_database_from_a_newer_build() {
+#[tokio::test]
+async fn refuses_a_database_from_a_newer_build() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("state.db");
-    let store = Store::open(&path).unwrap();
+    let store = Store::open(&path).await.unwrap();
     store
         .run(async |conn| {
             conn.execute_unprepared("PRAGMA user_version = 2147483647").await?;
             Ok(())
         })
+        .await
         .unwrap();
-    drop(store);
-    assert!(matches!(Store::open(&path), Err(StoreError::Db(_))));
+    store.close().await.unwrap();
+    assert!(matches!(Store::open(&path).await, Err(StoreError::Db(_))));
 }
 
-#[test]
-fn regression_failed_terminal_batch_preserves_previous_set_after_restart() {
+#[tokio::test]
+async fn regression_failed_terminal_batch_preserves_previous_set_after_restart() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("state.db");
-    let s = Store::open(&path).unwrap();
-    let id = s.add_project(Path::new("/project")).unwrap().id;
+    let s = Store::open(&path).await.unwrap();
+    let id = s.add_project(Path::new("/project")).await.unwrap().id;
     let original = terminal("saved", id);
-    s.set_terminals(id, std::slice::from_ref(&original)).unwrap();
+    s.set_terminals(id, std::slice::from_ref(&original)).await.unwrap();
     let duplicate = terminal("duplicate", id);
-    assert!(matches!(s.set_terminals(id, &[duplicate.clone(), duplicate]), Err(StoreError::Db(_))));
-    drop(s);
-    assert_eq!(Store::open(&path).unwrap().terminals(id).unwrap(), vec![original]);
+    assert!(matches!(s.set_terminals(id, &[duplicate.clone(), duplicate]).await, Err(StoreError::Db(_))));
+    s.close().await.unwrap();
+    assert_eq!(Store::open(&path).await.unwrap().terminals(id).await.unwrap(), vec![original]);
 }

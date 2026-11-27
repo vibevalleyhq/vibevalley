@@ -6,7 +6,7 @@ import { isFreeUserSession, isOrchestratorSession, sessionIssueId, sessionProfil
 import { AgentFace, OrchestratorFace, UserAvatar } from "../../design/domain/Face";
 import { Icon } from "../../design/Icon";
 import type { IconName } from "../../design/icons";
-import { Quiet } from "../../design/layout";
+import { Empty, Quiet } from "../../design/layout";
 import { Segmented } from "../../design/Segmented";
 import { CountPill, Dot, type DotTone } from "../../design/Tag";
 import { useOrchestrators } from "../../infra/agents";
@@ -15,6 +15,7 @@ import { ago } from "../../infra/base/format";
 import { useBoardSlice, useInboxSlice, useSessionsSlice } from "../../infra/frame";
 import { ready, useAgents, useQuery } from "../../infra/query";
 import { Link as A, useRouter } from "../../infra/router";
+import { useVdpNode } from "../../infra/vdpProbe";
 import { waitingOnUser } from "../inbox";
 import { allSessionsQuery, buildRunEntries, runActivityAt, type RunApprovals, type RunEntry, RunsPage, type RunStatusBadge, runStatusOf } from "../session";
 import { MorningDigestPanel } from "./MorningDigestPanel";
@@ -226,8 +227,15 @@ function DashboardOverview() {
           <If
             when={hasPending()}
             else={
-              <View testID="dashboard-pending-empty" class="px-4 py-5">
-                <Quiet>{t("web.base.dashboard.pending.empty")}</Quiet>
+              <View class="p-3">
+                <Empty
+                  variant="zero"
+                  compact
+                  testid="dashboard-pending-empty"
+                  icon="check"
+                  title={t("web.base.dashboard.pending.zeroTitle")}
+                  description={t("web.base.dashboard.pending.empty")}
+                />
               </View>
             }
           >
@@ -326,6 +334,7 @@ function DashboardOverview() {
 }
 
 export function DashboardPage(props: { tab?: DashboardTab | undefined; approvals?: RunApprovals }) {
+  useVdpNode({ testId: "dashboard-page", role: "region" });
   const router = useRouter();
   const sessionsSlice = useSessionsSlice();
   const tab = () => props.tab ?? "overview";

@@ -3,7 +3,7 @@
     "issue": "列出工单，找它的编号",
     "session": "列出执行会话，找它的 id",
     "repo": "列出仓库，找它的名字",
-    "runtime": "列出引擎，找它的 id",
+    "runtime": "列出环境，找它的 id",
     "agent": "列出角色，找它的 id",
     "skill": "列出技能，找它的 id",
     "template": "列出模板，找它的 id",
@@ -11,7 +11,7 @@
     "channel": "列出频道，找它的 id",
     "graph": "列出计划，找它的 id",
     "memories": "列出它的记忆，找那一条的 id",
-    "artifact": "列出作品，找它的 id",
+    "note": "列出笔记，找它的 id",
     "library": "列出媒体库，找它的 id"
   },
   "repoRef": "仓库 {id}",

@@ -16,8 +16,8 @@
 | 位置 | 职责 |
 |---|---|
 | `crates/protocol/src/contract/machine.rs` | 协议契约：`LOCAL_MACHINE_ID`（`"local"`）、`MachinePlatform`、`MachineStatus`、`MachineInfo`、`MachineRuntimeSummary`、`MachineWireFrame`（握手、心跳、清单、会话开关/输入/续接/事件/权限、`/mcp` 隧道、附件拉取、worktree 准备/清理）与 `machine.list` 端点 |
-| `crates/runtime/src/machine/mod.rs`、`crates/runtime/src/machine/remote.rs` | 运行时核心抽象：`Machine` trait、`LocalMachine`、`RemoteMachine`、`RemoteRuntime`、`RemoteSession`、`RemoteDispatchMeta`、`RuntimeRef`、`WorkdirSpec`/`WorkdirHandle`、基于 `ArcSwap` 的无锁 `MachineRegistry` 与变更广播 `MachineRegistryEvent` |
-| `crates/runtime/src/sandbox.rs` | 容器沙箱层：`Secret` 脱敏令牌包装、`SandboxSpec`、`SandboxHandle`、`SandboxProvider` trait、`DockerSandboxProvider`、`AppleContainerSandboxProvider`、`MockSandboxProvider` 与析构自回收的 `SandboxMachine` |
+| `crates/runtime/src/machine/mod.rs`、`crates/runtime/src/machine/remote.rs` | 运行时核心抽象：`Machine` trait、`LocalMachine`、`RemoteMachine`、`RemoteRuntime`、`RemoteSession`、`RuntimeRef`、`WorkdirSpec`/`WorkdirHandle`、基于 `ArcSwap` 的无锁 `MachineRegistry` 与变更广播 `MachineRegistryEvent`；派单元数据经 `oar::SessionOptions::remote_dispatch`（`RemoteDispatchMeta`）强类型透传，不再经环境变量拼接 |
+| `crates/runtime/src/sandbox.rs` | 容器沙箱层（由 `vibevalley-runtime` 的显式 `sandbox` Cargo feature 门控，默认发行构建不编译，待三期总控编排接线后启用）：`SandboxSpec`、`SandboxHandle`、`SandboxProvider` trait、`DockerSandboxProvider`、`AppleContainerSandboxProvider`、`MockSandboxProvider` 与析构自回收的 `SandboxMachine`（令牌脱敏复用 `vibevalley_protocol::Secret`） |
 | `crates/runtime/src/teardown_gate.rs` | 三态幂等析构门 `TeardownGate`（`ARMED -> TERMINATING -> TERMINATED`），串行化并发清理并在失败或 unwind 时安全回滚，受 `loom` 交错验证 |
 | `crates/server/src/machine/mod.rs` | 控制面 L1 `MachineManager`：维护 `Arc<MachineRegistry>`、将本地与远端机器投影为 `Fact::MachineChanged`/`Fact::MachineRemoved`、响应 `Hub::on_system_wake()` 立即探活、经 `AttachmentReadPort` 响应附件拉取，并委托 `vibevalley_runtime::machine` 处理远端 OAR 代理 |
 | `crates/server/src/gateway/http/machine_ws.rs` | `GET /api/v1/machine/ws` 升级处理器：强制 Bearer 令牌校验与 `SCOPE_REMOTE_MACHINE`（`"remote:runtime"`）作用域隔离，不回落到本机默认身份；将 `MachineMcpRequest` 经 `Server::mcp()` 隧道转回控制面 |
@@ -31,7 +31,7 @@
 - **凭据最小暴露与落盘权限**：`vibevalley machine up --code <配对码>` 通过 `POST /api/v1/remote/pair/exchange` 换取 `remote:runtime` 作用域令牌，非临时模式以 `0o600` 原子写入 `$VIBEVALLEY_HOME/machine-auth.json`；`--ephemeral` 模式不写凭据文件，退出时自动清理临时 worktree。所有内存中的令牌经 `Secret` 包装，在 `Debug`/`Display` 中脱敏。
 - **断线无损续传（`session.attach`）与唤醒探活**：`machine_agent` 在本地为每个运行中的执行会话维护按单调 `seq` 索引的事件环与幂等输入记录；WebSocket 闪断重连后，控制面发送带 `afterSeq` 的 `MachineSessionAttach`，远端按序号补发错过的事件而不中止正在运行的引擎进程。macOS 休眠唤醒触发 `Hub::on_system_wake()`，控制面立即向已连远端发出 `MachinePing` 检测死连接。
 - **本地 `/mcp` 隧道与附件按需拉取**：远程宿主机不向公网暴露端口；`machine_agent` 仅为运行中的会话在 `127.0.0.1:0` 临时起 Axum 回环代理 `LocalMcpProxy`（统一走 `axum::Router` 与 `CancellationToken::drop_guard()`，无裸 `TcpStream` 解析器），将引擎发出的 `/mcp` JSON-RPC 封装为 `MachineMcpRequest` 经同一条 WebSocket 隧道送回控制面的 `Server::mcp()`；附件内容经 `MachineAttachmentFetch` / `MachineAttachmentData` 按需拉取。
-- **一次性容器沙箱 RAII 回收**：`SandboxMachine::launch(provider, &spec)` 按 `DockerSandboxProvider`（`docker`）或 `AppleContainerSandboxProvider`（macOS `container` CLI）拉起一次性容器并在其中运行 `vibevalley machine up --ephemeral`；一次性令牌一律通过子进程环境变量传入而非命令行参数，避免出现在 `ps` 参数表中；容器析构通过 `TeardownGate` 保证并发调用不重入且在 `teardown()` 或 `Drop` 时自动停止销毁。
+- **一次性容器沙箱 RAII 回收（`sandbox` feature 门控）**：`SandboxMachine::launch(provider, &spec)` 当前位于 `vibevalley-runtime` 的可选 `sandbox` Cargo feature 下（`#[cfg(any(test, feature = "sandbox"))]`，测试与 `--features sandbox` 全量编译校验，默认服务端发行构建不携带未接线死代码）；启用后按 `DockerSandboxProvider`（`docker`）或 `AppleContainerSandboxProvider`（macOS `container` CLI）拉起一次性容器并在其中运行 `vibevalley machine up --ephemeral`；一次性令牌一律通过子进程环境变量传入而非命令行参数，避免出现在 `ps` 参数表中；容器析构通过 `TeardownGate` 保证并发调用不重入且在 `teardown()` 或 `Drop` 时自动停止销毁。
 
 ## 怎么走
 

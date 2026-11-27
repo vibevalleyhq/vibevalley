@@ -151,7 +151,7 @@ pub fn router_with_ports(server: Shared, ports: GatewayPorts) -> Router {
 
 fn authenticated_api_routes() -> Router<HttpState> {
     // Each GET path also matches ops of the same shape (POST
-    // attachment/create, artifact/block/list): those go to `command`.
+    // attachment/create, note/doc/view): those go to `command`.
     Router::new()
         .route("/api/v1/slice/{name}", get(slice).post(command))
         .route("/api/v1/live", get(live).post(command))
@@ -159,16 +159,7 @@ fn authenticated_api_routes() -> Router<HttpState> {
         .route("/api/v1/subscribe/{name}", get(subscribe).post(command))
         .route("/api/v1/issue/watch/{id}", get(issue_watch).post(command))
         .route("/api/v1/attachment/{id}", get(attachment).post(command))
-        .route("/api/v1/artifact/{id}/cover", get(artifact_cover).post(command))
-        .route("/api/v1/{*path}", post(command).get(not_allowed))
-}
-
-fn machine_routes() -> Router<HttpState> {
-    Router::new().route("/api/v1/machine/ws", get(machine_ws::upgrade).post(command))
-}
-
-fn local_only_routes() -> Router<HttpState> {
-    Router::new()
+        .route("/api/v1/note/{id}/cover", get(note_cover).post(command))
         .route(
             "/api/v1/media/input/{id}/content",
             get(media::content)
@@ -177,7 +168,15 @@ fn local_only_routes() -> Router<HttpState> {
                 .post(command),
         )
         .route("/api/v1/media/speech/{id}/stream", get(media::speech).post(command))
-        .route("/mcp", post(mcp).get(not_allowed))
+        .route("/api/v1/{*path}", post(command).get(not_allowed))
+}
+
+fn machine_routes() -> Router<HttpState> {
+    Router::new().route("/api/v1/machine/ws", get(machine_ws::upgrade).post(command))
+}
+
+fn local_only_routes() -> Router<HttpState> {
+    Router::new().route("/mcp", post(mcp).get(not_allowed))
 }
 
 async fn trace_request(req: Request, next: Next) -> Response {
@@ -391,13 +390,16 @@ async fn live(State(state): State<HttpState>, _auth: Authenticated) -> Response 
                     let data = serde_json::to_string(&ev).unwrap_or_else(|_| "null".into());
                     Some(Event::default().data(data))
                 }
-                Err(BroadcastStreamRecvError::Lagged(_)) => None,
+                Err(BroadcastStreamRecvError::Lagged(skipped)) => {
+                    tracing::warn!(skipped, "http.sse.live broadcast lagged; skipped live events");
+                    Some(Event::default().event("lagged").data(serde_json::json!({ "skipped": skipped }).to_string()))
+                }
             };
             std::future::ready(event)
         });
         return sse_with_shutdown(stream, state.shutdown);
     }
-    let stream = tokio_stream::wrappers::UnboundedReceiverStream::new(state.server.live()).map(|item| {
+    let stream = tokio_stream::wrappers::ReceiverStream::new(state.server.live()).map(|item| {
         let data = serde_json::to_string(&item).unwrap_or_else(|_| "null".into());
         Event::default().data(data)
     });
@@ -470,18 +472,18 @@ async fn attachment(State(state): State<HttpState>, AuthenticatedQuery(ctx): Aut
 }
 
 #[derive(serde::Deserialize)]
-struct ArtifactCoverReply {
-    cover: Option<vibevalley_protocol::ArtifactCover>,
+struct NoteCoverReply {
+    cover: Option<vibevalley_protocol::NoteCover>,
 }
 
-async fn artifact_cover(State(state): State<HttpState>, AuthenticatedQuery(ctx): AuthenticatedQuery, Path(id): Path<String>, headers: HeaderMap) -> Response {
-    let envelope = state.server.call_with_async(ctx, "artifact.get".into(), serde_json::json!({ "id": id })).await;
+async fn note_cover(State(state): State<HttpState>, AuthenticatedQuery(ctx): AuthenticatedQuery, Path(id): Path<String>, headers: HeaderMap) -> Response {
+    let envelope = state.server.call_with_async(ctx, "note.get".into(), serde_json::json!({ "id": id })).await;
     if envelope.biz_code != 0 {
         return reply(envelope);
     }
     let Some(cover) = envelope
         .data
-        .and_then(|d| serde_json::from_value::<ArtifactCoverReply>(d).ok())
+        .and_then(|d| serde_json::from_value::<NoteCoverReply>(d).ok())
         .and_then(|r| r.cover)
     else {
         return StatusCode::NOT_FOUND.into_response();
@@ -491,7 +493,7 @@ async fn artifact_cover(State(state): State<HttpState>, AuthenticatedQuery(ctx):
         content_type: &cover.mime,
         filename: "cover",
         cache_control: "private, no-cache",
-        truncated_msg: "artifact cover truncated",
+        truncated_msg: "note cover truncated",
     };
     match serve_file_range(&headers, spec).await {
         Ok(response) => response,
@@ -514,7 +516,7 @@ async fn issue_watch(State(state): State<HttpState>, Authenticated(ctx): Authent
 async fn open(server: Shared, shutdown: CancellationToken, ctx: CallerContext, name: String, payload: Value) -> Result<Response, Envelope> {
     let (id, rx) = server.clone().subscribe_with_async(ctx, name, payload).await?;
     let guard = Subscription { server, id };
-    let stream = tokio_stream::wrappers::UnboundedReceiverStream::new(rx).map(move |item| {
+    let stream = tokio_stream::wrappers::ReceiverStream::new(rx).map(move |item| {
         let _keep = &guard;
         let data = serde_json::to_string(&item).unwrap_or_else(|_| "null".into());
         Event::default().data(data)

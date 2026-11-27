@@ -1,6 +1,6 @@
 {
   "tab": {
-    "chat": "对话",
+    "chat": "频道",
     "issues": "工单",
     "crons": "定时任务"
   },
@@ -20,15 +20,15 @@
   "channelsTitle": "频道",
   "directsTitle": "私聊",
   "newChannel": "创建频道",
-  "newChat": "发起对话",
+  "newChat": "新建频道或私聊",
   "filter": {
-    "label": "筛选会话",
+    "label": "筛选频道",
     "all": "全部",
     "group": "频道",
     "direct": "私聊"
   },
   "emptyPreview": "暂无消息",
-  "emptyList": "这里还没有对话",
+  "emptyList": "这里还没有频道",
   "runsEntry": "查看执行会话",
   "mood": {
     "idle": "在歇着",
@@ -59,10 +59,13 @@
     "save": "保存"
   },
   "issues": {
-    "empty": "这个频道里还没有工单。在聊天里跟主助手说一件要做的事，它会派执行会话，工单就列在这里。",
+    "emptyTitle": "还没有工单",
+    "empty": "这个频道里还没有工单。在频道里跟主助手说一件要做的事，它会派执行会话，工单就列在这里。",
+    "openBoard": "打开工单看板",
     "thread": "工单话题"
   },
   "crons": {
+    "emptyTitle": "还没有定时任务",
     "empty": "还没有定时任务：跟主助手说「每天九点跑一遍测试」。",
     "next": "下次 {next}",
     "direct": "直接派 {agent}",
@@ -150,16 +153,18 @@
     "attach": "附上文件",
     "uploadFailed": "没传上去：{why}",
     "command": "命令",
-    "artifactContext": "当前上下文：{title}",
-    "artifactSlide": "第 {n} 页",
-    "artifactSelected": "已选 {n} 个元素",
+    "noteContext": "当前上下文：{title}",
+    "noteSlide": "第 {n} 页",
+    "noteSelected": "已选 {n} 个元素",
     "clearContext": "移除本次附带的上下文",
     "runningHint": "正在处理中，可直接补充说明或点击停止",
-    "dictateStart": "语音输入（MOSS ASR）",
+    "dictateStart": "语音听写（ASR）",
     "dictateStop": "停止语音输入",
     "dictateConnecting": "正在连接语音…",
     "dictateListening": "正在听写…",
-    "dictateFinishing": "正在整理文字…"
+    "dictateFinishing": "识别中…",
+    "dictatePolishing": "润色中…",
+    "dictateRevertRaw": "还原原文"
   },
   "manage": {
     "name": "名称",
@@ -198,17 +203,17 @@
     "markUnread": "从这里标成未读",
     "jump": "跳到这条",
     "promoteIssue": "转为工单",
-    "saveArtifact": "存为作品"
+    "saveNote": "存为笔记"
   },
   "promote": {
     "source": "来自 {where}",
-    "saveTitle": "将消息存为作品",
-    "artifactTitle": "标题",
-    "artifactType": "类型",
-    "artifactContent": "内容",
-    "artifactSave": "保存作品",
-    "artifactSaved": "已存为「{title}」",
-    "artifactNote": "存自 {where}",
+    "saveTitle": "将消息存为笔记",
+    "noteTitle": "标题",
+    "noteType": "类型",
+    "noteContent": "内容",
+    "noteSave": "保存笔记",
+    "noteSaved": "已存为「{title}」",
+    "noteNote": "存自 {where}",
     "fallbackTitle": "第 {number} 条消息"
   },
   "switcher": {

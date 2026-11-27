@@ -4,12 +4,12 @@ import { t } from "@vibevalley/i18n";
 import type { HostLiveVoicePhase, HostLiveVoiceState as LiveVoiceSnapshot } from "@vibevalley/protocol";
 import { HostLiveVoiceState } from "@vibevalley/protocol/schema";
 
-import { createAct } from "../../../design/act";
 import { Button } from "../../../design/Button";
 import { Icon } from "../../../design/Icon";
 import { Banner } from "../../../design/layout";
 import { Dot } from "../../../design/Tag";
 import { Bubble } from "../../../design/Tip";
+import { createAct } from "../../../infra/act";
 import { useInterval } from "../../../infra/base/timer";
 import { transport } from "../../../infra/transport";
 import { MossVerify } from "./MossVerify";

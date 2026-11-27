@@ -6,6 +6,7 @@ pub mod envelope;
 mod ext;
 pub mod home;
 mod native;
+pub mod secret;
 #[cfg(feature = "ts-gen")]
 pub mod typescript;
 pub mod vdp;
@@ -15,5 +16,6 @@ pub use contract::*;
 pub use envelope::*;
 pub use ext::*;
 pub use native::*;
+pub use secret::Secret;
 pub use vdp::*;
 pub use wire::*;

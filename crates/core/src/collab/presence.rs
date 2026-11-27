@@ -1,6 +1,6 @@
 //! Phase A: Pure in-memory real-time presence backed by `loro::awareness::EphemeralStore`.
 //!
-//! Never writes to SQLite and never bumps `artifact.seq`. Supports configurable
+//! Never writes to SQLite and never bumps `note.seq`. Supports configurable
 //! TTL eviction (default 30 s) and binary incremental `encode` / `apply` sync.
 
 use std::collections::HashMap;

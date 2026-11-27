@@ -15,8 +15,8 @@
   },
   "workspace": {
     "badCwd": "工作区不存在：{cwd}",
-    "runtimeRequired": "需要指定引擎",
-    "notWorkspace": "该执行会话不是工作区对话",
+    "runtimeRequired": "需要指定环境",
+    "notWorkspace": "该执行会话不是项目对话",
     "emptyMessage": "消息内容不能为空",
     "notLive": "执行会话当前未运行",
     "interactionDecisionRequired": "需要选择选项、填写回复或取消"
@@ -29,6 +29,6 @@
   },
   "codemode": {
     "emptyScript": "脚本内容不能为空",
-    "unsupportedRuntime": "引擎 `{runtime}` 不支持持久化 CodeMode 脚本执行"
+    "unsupportedRuntime": "环境 `{runtime}` 不支持持久化 CodeMode 脚本执行"
   }
 }

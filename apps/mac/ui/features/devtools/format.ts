@@ -152,14 +152,8 @@ export function slowBadgeTone(event: DebugTimelineEvent): TagTone {
   return "wait";
 }
 
-function totalTokens(tokens: EventTokens): number {
+export function totalTokens(tokens: EventTokens): number {
   return tokens.input + tokens.cacheRead + tokens.output + (tokens.cacheWrite ?? 0) + (tokens.reasoning ?? 0);
-}
-
-export function formatTokenCompact(tokens: EventTokens): string {
-  const total = totalTokens(tokens);
-  if (total >= 1000) return `${(total / 1000).toFixed(1)}k`;
-  return String(total);
 }
 
 export function formatTokenBreakdown(tokens: EventTokens): readonly string[] {

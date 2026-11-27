@@ -1,6 +1,7 @@
 //! Sessions' work logs (VibeValley `journal.test.ts`), `session.*` and the
 //! `issue.watch` stream over a scripted session.
 
+use crate::support::{RouterTestExt as _, ServerTestExt as _};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 

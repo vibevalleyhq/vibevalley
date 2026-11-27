@@ -11,6 +11,7 @@ import { IconButton } from "../../../design/IconButton";
 import { Lightbox } from "../../../design/Lightbox";
 import { motionClass } from "../../../design/motion";
 import { readFiles } from "../../../design/picked";
+import { CountPill } from "../../../design/Tag";
 import { Bubble } from "../../../design/Tip";
 import { toast } from "../../../design/toasts";
 import { mix } from "../../../design/tone";
@@ -138,13 +139,13 @@ export function IssueAttachments(props: {
             </View>
           }
         >
-          <View class={`${props.first === true ? "mt-0" : "mt-6"} mb-2 flex-row items-center justify-between gap-2`}>
-            <View class="flex-row items-baseline gap-2">
+          <View class={`${props.first === true ? "mt-0" : "mt-6 border-t border-line pt-5"} mb-2.5 min-h-6 flex-row items-center justify-between gap-2`}>
+            <View class="flex-row items-center gap-1.5">
               <Text class="text-xs font-semibold text-muted">{t("web.issue.attachments.title")}</Text>
               <If when={props.files.length > 0}>
-                <Text testID="issue-attachments-count" class="text-xs text-muted tabular-nums">
-                  {String(props.files.length)}
-                </Text>
+                <View testID="issue-attachments-count">
+                  <CountPill count={props.files.length} />
+                </View>
               </If>
             </View>
             <If when={props.editable === true}>

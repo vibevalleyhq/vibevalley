@@ -4,7 +4,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use sea_orm::sea_query::{Alias, Condition, Expr, Func, JoinType, OnConflict, Order, Query, SelectStatement, SubQueryStatement};
+use sea_orm::sea_query::{Alias, Condition, Expr, Func, JoinType, OnConflict, Order, Query, SelectStatement};
 use sea_orm::{
     ActiveValue::Set, ColumnTrait, ConnectionTrait, EntityTrait, ExprTrait, FromQueryResult, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Update,
 };
@@ -13,7 +13,7 @@ use vibevalley_core::{apply_session_telemetry, fold_session_telemetry};
 use vibevalley_protocol::{Run, Session, SessionEvent, SessionPermissionMode, SessionSubagents, SessionTelemetry};
 use vibevalley_runtime::agent::durable::entities::durable_document;
 
-use super::with_write_tx;
+use super::{batch_chunk_rows, with_write_tx};
 use crate::db::column::{db_json, db_word, read_db_json, read_db_word};
 use crate::db::entity::{session, session_event, session_mailbox, session_run};
 use crate::db::{Database, DbError, DbResult, Tx};
@@ -86,7 +86,6 @@ struct SessionQueryRow {
     tool_connections: Option<String>,
     machine: Option<String>,
     phase: String,
-    subagents: Option<String>,
 }
 
 #[derive(FromQueryResult)]
@@ -105,7 +104,7 @@ struct RunQueryRow {
     reconciliation: Option<String>,
 }
 
-fn read_session(r: SessionQueryRow) -> DbResult<Session> {
+fn read_session(r: SessionQueryRow, subagents: Option<String>) -> DbResult<Session> {
     Ok(Session {
         id: r.id,
         controller: read_db_word(r.controller)?,
@@ -121,7 +120,7 @@ fn read_session(r: SessionQueryRow) -> DbResult<Session> {
         runs: r.runs,
         last_run: r.last_run.map(read_db_json).transpose()?,
         spent: r.spent.map(read_db_json).transpose()?,
-        subagents: r.subagents.map(read_db_json).transpose()?,
+        subagents: subagents.map(read_db_json).transpose()?,
         tool_connections: r.tool_connections.map(read_db_json).transpose()?,
         telemetry: None,
         machine: r.machine,
@@ -162,20 +161,6 @@ fn read_mailbox_row(r: session_mailbox::Model) -> DbResult<MailboxEntry> {
 }
 
 fn session_select(departed: bool, id: Option<&str>) -> SelectStatement {
-    let r_alias = Alias::new("r");
-    let latest_subagents = Query::select()
-        .column((r_alias.clone(), session_run::Column::SubagentSummary))
-        .from_as(session_run::Entity, r_alias.clone())
-        .and_where(Expr::col((r_alias.clone(), session_run::Column::Session)).equals((session::Entity, session::Column::Id)))
-        .order_by((r_alias.clone(), session_run::Column::StartedAt), Order::Desc)
-        .order_by_expr(
-            Expr::expr(Func::char_length(Expr::col((r_alias.clone(), session_run::Column::Id)))),
-            Order::Desc,
-        )
-        .order_by((r_alias, session_run::Column::Id), Order::Desc)
-        .limit(1)
-        .to_owned();
-
     let mut q = Query::select();
     q.columns([
         (session::Entity, session::Column::Id),
@@ -196,7 +181,6 @@ fn session_select(departed: bool, id: Option<&str>) -> SelectStatement {
         (session::Entity, session::Column::Machine),
         (session::Entity, session::Column::Phase),
     ])
-    .expr_as(Expr::from(SubQueryStatement::SelectStatement(latest_subagents)), Alias::new("subagents"))
     .from(session::Entity)
     .and_where(Expr::col((session::Entity, session::Column::Departed)).eq(departed));
 
@@ -207,6 +191,58 @@ fn session_select(departed: bool, id: Option<&str>) -> SelectStatement {
             .order_by((session::Entity, session::Column::Id), Order::Asc);
     }
     q
+}
+
+async fn latest_subagents_for_sessions_impl<C: ConnectionTrait>(db: &C, ids: &[String]) -> DbResult<HashMap<String, String>> {
+    if ids.is_empty() {
+        return Ok(HashMap::new());
+    }
+    if ids.len() == 1 {
+        let stmt = Query::select()
+            .column(session_run::Column::SubagentSummary)
+            .from(session_run::Entity)
+            .and_where(session_run::Column::Session.eq(ids[0].as_str()))
+            .order_by(session_run::Column::StartedAt, Order::Desc)
+            .order_by_expr(Expr::expr(Func::char_length(Expr::col(session_run::Column::Id))), Order::Desc)
+            .order_by(session_run::Column::Id, Order::Desc)
+            .limit(1)
+            .to_owned();
+        let mut out = HashMap::new();
+        if let Some(row) = db.query_one(&stmt).await?
+            && let Some(summary) = row.try_get::<Option<String>>("", "subagent_summary")?
+        {
+            out.insert(ids[0].clone(), summary);
+        }
+        return Ok(out);
+    }
+
+    let mut out = HashMap::new();
+    for chunk in ids.chunks(super::MAX_SQL_BIND_PARAMS) {
+        let ranked = Alias::new("ranked");
+        let inner = Query::select()
+            .column(session_run::Column::Session)
+            .column(session_run::Column::SubagentSummary)
+            .expr_as(
+                Expr::cust("ROW_NUMBER() OVER (PARTITION BY session ORDER BY started_at DESC, LENGTH(id) DESC, id DESC)"),
+                "rn",
+            )
+            .from(session_run::Entity)
+            .and_where(session_run::Column::Session.is_in(chunk.iter().cloned()))
+            .to_owned();
+        let stmt = Query::select()
+            .column((ranked.clone(), Alias::new("session")))
+            .column((ranked.clone(), Alias::new("subagent_summary")))
+            .from_subquery(inner, ranked.clone())
+            .and_where(Expr::col((ranked.clone(), Alias::new("rn"))).eq(1i64))
+            .and_where(Expr::col((ranked, Alias::new("subagent_summary"))).is_not_null())
+            .to_owned();
+        for row in db.query_all(&stmt).await? {
+            let session_id: String = row.try_get("", "session")?;
+            let summary: String = row.try_get("", "subagent_summary")?;
+            out.insert(session_id, summary);
+        }
+    }
+    Ok(out)
 }
 
 fn run_select() -> SelectStatement {
@@ -254,17 +290,30 @@ fn event_payload_query(session_id: &str, run_id: &str) -> sea_orm::Select<sessio
 async fn all_impl<C: ConnectionTrait>(db: &C) -> DbResult<Vec<Session>> {
     let stmt = session_select(false, None);
     let rows = db.query_all(&stmt).await?;
-    rows.into_iter()
-        .map(|row| SessionQueryRow::from_query_result(&row, "").map_err(DbError::from).and_then(read_session))
+    let parsed: Vec<SessionQueryRow> = rows
+        .into_iter()
+        .map(|row| SessionQueryRow::from_query_result(&row, "").map_err(DbError::from))
+        .collect::<DbResult<_>>()?;
+    let ids: Vec<String> = parsed.iter().map(|row| row.id.clone()).collect();
+    let mut subagents = latest_subagents_for_sessions_impl(db, &ids).await?;
+    parsed
+        .into_iter()
+        .map(|row| {
+            let sub = subagents.remove(&row.id);
+            read_session(row, sub)
+        })
         .collect()
 }
 
 async fn find_by_departed_impl<C: ConnectionTrait>(db: &C, id: &str, departed: bool) -> DbResult<Option<Session>> {
     let stmt = session_select(departed, Some(id));
-    db.query_one(&stmt)
-        .await?
-        .map(|row| SessionQueryRow::from_query_result(&row, "").map_err(DbError::from).and_then(read_session))
-        .transpose()
+    let Some(row) = db.query_one(&stmt).await? else {
+        return Ok(None);
+    };
+    let parsed = SessionQueryRow::from_query_result(&row, "").map_err(DbError::from)?;
+    let mut subagents = latest_subagents_for_sessions_impl(db, std::slice::from_ref(&parsed.id)).await?;
+    let sub = subagents.remove(&parsed.id);
+    read_session(parsed, sub).map(Some)
 }
 
 async fn put_impl<C: ConnectionTrait>(db: &C, s: &Session, departed: bool) -> DbResult<()> {
@@ -505,10 +554,38 @@ async fn put_run_impl<C: ConnectionTrait>(db: &C, r: &Run) -> DbResult<()> {
     Ok(())
 }
 
-async fn upsert_events_impl<C: ConnectionTrait>(db: &C, session_id: &str, events: &[SessionEvent]) -> DbResult<()> {
-    if events.is_empty() {
+const SESSION_EVENT_BATCH_ROWS: usize = batch_chunk_rows(5);
+const TELEMETRY_EVENT_TYPES: [&str; 3] = ["llm/usage", "llm/retry", "run/error"];
+
+async fn upsert_events_batch_impl<C: ConnectionTrait>(db: &C, writes: &[(String, Vec<SessionEvent>)]) -> DbResult<()> {
+    let total_events: usize = writes.iter().map(|(_, events)| events.len()).sum();
+    if total_events == 0 {
         return Ok(());
     }
+
+    // Deduplicate `(session_id, seq)` within a batch while preserving `COALESCE(excluded.run_id, existing.run_id)`
+    // semantics so PostgreSQL never hits "ON CONFLICT DO UPDATE command cannot affect row a second time".
+    let mut index_by_key: HashMap<(&str, i64), usize> = HashMap::with_capacity(total_events);
+    let mut rows: Vec<(&str, i64, Option<String>, String, String)> = Vec::with_capacity(total_events);
+    for (session_id, events) in writes {
+        for e in events {
+            let event_type = db_word(&e.r#type)?;
+            let payload = db_json(e)?;
+            let key = (session_id.as_str(), e.seq);
+            if let Some(&idx) = index_by_key.get(&key) {
+                let existing = &mut rows[idx];
+                if e.run.is_some() {
+                    existing.2 = e.run.clone();
+                }
+                existing.3 = event_type;
+                existing.4 = payload;
+            } else {
+                index_by_key.insert(key, rows.len());
+                rows.push((session_id.as_str(), e.seq, e.run.clone(), event_type, payload));
+            }
+        }
+    }
+
     let on_conflict = OnConflict::columns([session_event::Column::SessionId, session_event::Column::Seq])
         .value(
             session_event::Column::RunId,
@@ -517,16 +594,27 @@ async fn upsert_events_impl<C: ConnectionTrait>(db: &C, session_id: &str, events
                 Expr::col((session_event::Entity, session_event::Column::RunId)),
             ])),
         )
-        .update_column(session_event::Column::Payload)
+        .update_columns([session_event::Column::EventType, session_event::Column::Payload])
         .to_owned();
-    for e in events {
-        let model = session_event::ActiveModel {
+
+    let mut iter = rows
+        .into_iter()
+        .map(|(session_id, seq, run_id, event_type, payload)| session_event::ActiveModel {
             session_id: Set(session_id.to_owned()),
-            seq: Set(e.seq),
-            run_id: Set(e.run.clone()),
-            payload: Set(db_json(e)?),
-        };
-        session_event::Entity::insert(model).on_conflict(on_conflict.clone()).exec(db).await?;
+            seq: Set(seq),
+            run_id: Set(run_id),
+            event_type: Set(Some(event_type)),
+            payload: Set(payload),
+        });
+    loop {
+        let chunk: Vec<session_event::ActiveModel> = iter.by_ref().take(SESSION_EVENT_BATCH_ROWS).collect();
+        if chunk.is_empty() {
+            break;
+        }
+        session_event::Entity::insert_many(chunk)
+            .on_conflict(on_conflict.clone())
+            .exec_without_returning(db)
+            .await?;
     }
     Ok(())
 }
@@ -650,6 +738,10 @@ impl SessionService {
         all_impl(self.db.read_conn()).await
     }
 
+    pub(crate) async fn all_in_tx(&self, tx: &Tx) -> DbResult<Vec<Session>> {
+        all_impl(tx).await
+    }
+
     pub(crate) async fn get(&self, id: &str) -> DbResult<Option<Session>> {
         find_by_departed_impl(self.db.read_conn(), id, false).await
     }
@@ -737,16 +829,10 @@ impl SessionService {
 
     /// Atomically persists batched dirty events across multiple sessions in one write transaction.
     pub(crate) async fn upsert_events_batch(&self, writes: &[(String, Vec<SessionEvent>)]) -> DbResult<()> {
-        if writes.is_empty() {
+        if writes.iter().all(|(_, events)| events.is_empty()) {
             return Ok(());
         }
-        with_write_tx(&self.db, async |tx| {
-            for (session_id, events) in writes {
-                upsert_events_impl(tx, session_id, events).await?;
-            }
-            Ok(())
-        })
-        .await
+        with_write_tx(&self.db, async |tx| upsert_events_batch_impl(tx, writes).await).await
     }
 
     pub(crate) async fn delete_events(&self, session_id: &str) -> DbResult<()> {
@@ -804,19 +890,21 @@ impl SessionService {
     }
 
     pub(crate) async fn telemetry_for_session(&self, session_id: &str) -> DbResult<Option<SessionTelemetry>> {
-        let rows = session_event::Entity::find()
-            .select_only()
-            .column(session_event::Column::Payload)
-            .filter(session_event::Column::SessionId.eq(session_id))
-            .filter(
-                Condition::any()
-                    .add(session_event::Column::Payload.contains("llm/usage"))
-                    .add(session_event::Column::Payload.contains("llm/retry"))
-                    .add(session_event::Column::Payload.contains("run/error")),
+        let rows = self
+            .db
+            .query_metrics()
+            .observe(
+                "session.telemetry_for_session",
+                "SELECT payload FROM session_event WHERE session_id = ? AND event_type IN (...)",
+                session_event::Entity::find()
+                    .select_only()
+                    .column(session_event::Column::Payload)
+                    .filter(session_event::Column::SessionId.eq(session_id))
+                    .filter(session_event::Column::EventType.is_in(TELEMETRY_EVENT_TYPES))
+                    .order_by_asc(session_event::Column::Seq)
+                    .into_tuple::<String>()
+                    .all(self.db.read_conn()),
             )
-            .order_by_asc(session_event::Column::Seq)
-            .into_tuple::<String>()
-            .all(self.db.read_conn())
             .await?;
         let events = rows.into_iter().map(read_db_json).collect::<DbResult<Vec<SessionEvent>>>()?;
         Ok(fold_session_telemetry(&events))
@@ -828,20 +916,22 @@ impl SessionService {
             .from(session::Entity)
             .and_where(Expr::col(session::Column::Departed).eq(false))
             .to_owned();
-        let rows = session_event::Entity::find()
-            .select_only()
-            .columns([session_event::Column::SessionId, session_event::Column::Payload])
-            .filter(session_event::Column::SessionId.in_subquery(active_ids))
-            .filter(
-                Condition::any()
-                    .add(session_event::Column::Payload.contains("llm/usage"))
-                    .add(session_event::Column::Payload.contains("llm/retry"))
-                    .add(session_event::Column::Payload.contains("run/error")),
+        let rows = self
+            .db
+            .query_metrics()
+            .observe(
+                "session.telemetry_by_session",
+                "SELECT session_id, payload FROM session_event WHERE event_type IN (...)",
+                session_event::Entity::find()
+                    .select_only()
+                    .columns([session_event::Column::SessionId, session_event::Column::Payload])
+                    .filter(session_event::Column::SessionId.in_subquery(active_ids))
+                    .filter(session_event::Column::EventType.is_in(TELEMETRY_EVENT_TYPES))
+                    .order_by_asc(session_event::Column::SessionId)
+                    .order_by_asc(session_event::Column::Seq)
+                    .into_tuple::<(String, String)>()
+                    .all(self.db.read_conn()),
             )
-            .order_by_asc(session_event::Column::SessionId)
-            .order_by_asc(session_event::Column::Seq)
-            .into_tuple::<(String, String)>()
-            .all(self.db.read_conn())
             .await?;
 
         let mut out: HashMap<String, SessionTelemetry> = HashMap::new();
@@ -890,5 +980,37 @@ impl SessionService {
 
     pub(crate) async fn list_mailbox(&self, session_id: &str) -> DbResult<Vec<MailboxEntry>> {
         list_mailbox_impl(self.db.read_conn(), session_id).await
+    }
+
+    /// Deletes up to `limit` settled mailbox rows (`status NOT IN ('pending', 'claimed')` and `updated_at < before_ms`).
+    pub(crate) async fn prune_settled_mailbox_batch(&self, before_ms: i64, limit: u64) -> DbResult<u64> {
+        if limit == 0 {
+            return Ok(0);
+        }
+        with_write_tx(&self.db, async |tx| {
+            let ids: Vec<i64> = session_mailbox::Entity::find()
+                .select_only()
+                .column(session_mailbox::Column::Id)
+                .filter(session_mailbox::Column::Status.is_not_in(["pending", "claimed"]))
+                .filter(session_mailbox::Column::UpdatedAt.lt(before_ms))
+                .order_by_asc(session_mailbox::Column::Id)
+                .limit(limit)
+                .into_tuple()
+                .all(tx)
+                .await?;
+            if ids.is_empty() {
+                return Ok(0);
+            }
+            let mut deleted = 0u64;
+            for chunk in ids.chunks(super::MAX_SQL_BIND_PARAMS) {
+                let res = session_mailbox::Entity::delete_many()
+                    .filter(session_mailbox::Column::Id.is_in(chunk.iter().copied()))
+                    .exec(tx)
+                    .await?;
+                deleted += res.rows_affected;
+            }
+            Ok(deleted)
+        })
+        .await
     }
 }

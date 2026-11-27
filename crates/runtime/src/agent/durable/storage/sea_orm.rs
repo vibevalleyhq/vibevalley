@@ -55,6 +55,24 @@ impl Drop for SeaOrmInner {
     }
 }
 
+const SQLITE_ACQUIRE_TIMEOUT: Duration = Duration::from_secs(10);
+const POSTGRES_MAX_CONNECTIONS: u32 = 16;
+const POSTGRES_MIN_CONNECTIONS: u32 = 2;
+const POSTGRES_ACQUIRE_TIMEOUT: Duration = Duration::from_secs(10);
+const POSTGRES_IDLE_TIMEOUT: Duration = Duration::from_secs(300);
+const POSTGRES_MAX_LIFETIME: Duration = Duration::from_secs(1800);
+
+fn postgres_connect_options(url: &str) -> ConnectOptions {
+    let mut opts = ConnectOptions::new(url);
+    opts.max_connections(POSTGRES_MAX_CONNECTIONS)
+        .min_connections(POSTGRES_MIN_CONNECTIONS)
+        .acquire_timeout(POSTGRES_ACQUIRE_TIMEOUT)
+        .idle_timeout(POSTGRES_IDLE_TIMEOUT)
+        .max_lifetime(POSTGRES_MAX_LIFETIME)
+        .sqlx_logging(false);
+    opts
+}
+
 /// SeaORM-backed `StorageBackend` supporting both SQLite and PostgreSQL.
 #[derive(Clone)]
 pub struct SeaOrmStorage(Arc<SeaOrmInner>);
@@ -73,7 +91,10 @@ impl SeaOrmStorage {
             if !url.contains("mode=ro") {
                 sqlx_opts = sqlx_opts.journal_mode(SqliteJournalMode::Wal).synchronous(SqliteSynchronous::Normal);
             }
-            let mut pool_opts = SqlitePoolOptions::new().max_connections(1).min_connections(1);
+            let mut pool_opts = SqlitePoolOptions::new()
+                .max_connections(1)
+                .min_connections(1)
+                .acquire_timeout(SQLITE_ACQUIRE_TIMEOUT);
             if url.contains(":memory:") {
                 pool_opts = pool_opts.idle_timeout(None).max_lifetime(None);
             }
@@ -81,9 +102,7 @@ impl SeaOrmStorage {
             let conn = SqlxSqliteConnector::from_sqlx_sqlite_pool(pool);
             return Self::init(conn, None, true, false, clock).await;
         }
-        let mut opts = ConnectOptions::new(url);
-        opts.sqlx_logging(false);
-        let conn = Database::connect(opts).await?;
+        let conn = Database::connect(postgres_connect_options(url)).await?;
         Self::init(conn, None, true, false, clock).await
     }
 
@@ -108,12 +127,22 @@ impl SeaOrmStorage {
                     .create_if_missing(true)
                     .journal_mode(SqliteJournalMode::Wal)
                     .synchronous(SqliteSynchronous::Normal);
-                let write_pool = SqlitePoolOptions::new().max_connections(1).min_connections(1).connect_with(write_opts).await?;
+                let write_pool = SqlitePoolOptions::new()
+                    .max_connections(1)
+                    .min_connections(1)
+                    .acquire_timeout(SQLITE_ACQUIRE_TIMEOUT)
+                    .connect_with(write_opts)
+                    .await?;
                 let write_conn = SqlxSqliteConnector::from_sqlx_sqlite_pool(write_pool);
                 Migrator::up(&write_conn, None).await?;
 
                 let read_opts = base.filename(file).read_only(true);
-                let read_pool = SqlitePoolOptions::new().max_connections(4).min_connections(1).connect_with(read_opts).await?;
+                let read_pool = SqlitePoolOptions::new()
+                    .max_connections(4)
+                    .min_connections(1)
+                    .acquire_timeout(SQLITE_ACQUIRE_TIMEOUT)
+                    .connect_with(read_opts)
+                    .await?;
                 let read_conn = SqlxSqliteConnector::from_sqlx_sqlite_pool(read_pool);
                 (write_conn, Some(read_conn))
             }
@@ -122,6 +151,7 @@ impl SeaOrmStorage {
                 let write_pool = SqlitePoolOptions::new()
                     .max_connections(1)
                     .min_connections(1)
+                    .acquire_timeout(SQLITE_ACQUIRE_TIMEOUT)
                     .idle_timeout(None)
                     .max_lifetime(None)
                     .connect_with(write_opts)
@@ -149,7 +179,12 @@ impl SeaOrmStorage {
             return Err(Error::Invalid(format!("sqlite database does not exist: {}", path.display())));
         }
         let read_opts = SqliteConnectOptions::new().filename(path).read_only(true).busy_timeout(Duration::from_secs(5));
-        let read_pool = SqlitePoolOptions::new().max_connections(4).min_connections(1).connect_with(read_opts).await?;
+        let read_pool = SqlitePoolOptions::new()
+            .max_connections(4)
+            .min_connections(1)
+            .acquire_timeout(SQLITE_ACQUIRE_TIMEOUT)
+            .connect_with(read_opts)
+            .await?;
         let read_conn = SqlxSqliteConnector::from_sqlx_sqlite_pool(read_pool);
         let backend = read_conn.get_database_backend();
         Ok(Self(Arc::new(SeaOrmInner {
@@ -521,5 +556,21 @@ impl StorageWrite for SeaOrmTx<'_> {
 
     fn consume_first_signal_async<'a>(&'a self, task_id: &'a str, name: &'a str, now_ms: i64) -> BoxFuture<'a, Result<Option<Signal>>> {
         Box::pin(self.write_op_async(async move |tx| ops::consume_first_signal(tx, task_id, name, now_ms).await))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn durable_postgres_connect_options_set_pool_limits_and_timeouts() {
+        let opts = postgres_connect_options("postgres://postgres@127.0.0.1:5432/durable");
+        assert_eq!(opts.get_max_connections(), Some(POSTGRES_MAX_CONNECTIONS));
+        assert_eq!(opts.get_min_connections(), Some(POSTGRES_MIN_CONNECTIONS));
+        assert_eq!(opts.get_acquire_timeout(), Some(POSTGRES_ACQUIRE_TIMEOUT));
+        assert_eq!(opts.get_idle_timeout(), Some(Some(POSTGRES_IDLE_TIMEOUT)));
+        assert_eq!(opts.get_max_lifetime(), Some(Some(POSTGRES_MAX_LIFETIME)));
+        assert!(!opts.get_sqlx_logging());
     }
 }

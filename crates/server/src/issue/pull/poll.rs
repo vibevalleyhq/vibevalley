@@ -15,6 +15,7 @@ use super::publish::{HostRunner, HostedRepo, remote_pull_state};
 use super::service::{DEFAULT_POLL_SECONDS, Pull};
 use super::snapshot::{GitHubCheck, GitHubComment, GitHubPullSnapshot, GitHubReview, checks_fingerprint, checks_verdict, failed_job_log, fetch_snapshot};
 use crate::context::now;
+use crate::repo::GitHubRest;
 use crate::service::issue::{KnownPullEvent, PullRecord};
 
 const POLL_CONCURRENCY: usize = 4;
@@ -40,13 +41,15 @@ pub async fn refresh(pulls: &Pull) {
 
     let sem = Arc::new(Semaphore::new(POLL_CONCURRENCY));
     let mut set = JoinSet::new();
+    let github_rest = pulls.publisher.github_rest().cloned();
     for (idx, row, hosted, runner) in targets {
         let sem = sem.clone();
+        let rest = github_rest.clone();
         set.spawn(
             async move {
                 let Ok(_permit) = sem.acquire_owned().await else { return None };
                 let number = row.number;
-                let state = remote_pull_state(&hosted, number, &runner).await.ok()?;
+                let state = remote_pull_state(&hosted, number, &runner, rest.as_ref()).await.ok()?;
                 Some((idx, row, state))
             }
             .in_current_span()
@@ -65,11 +68,14 @@ pub async fn refresh(pulls: &Pull) {
         if state == PullRequestState::Open {
             continue;
         }
-        if pulls.set_state_async(&row.id, state, now()).await.is_err() {
+        if let Err(err) = pulls.set_state_async(&row.id, state, now()).await {
+            tracing::warn!(pull_id = %row.id, state = ?state, error = %err, "pull.poll failed to persist settled PR state");
             continue;
         }
-        if let (Some(board), Some(issue_id)) = (pulls.board.as_ref(), row.issue_id.as_deref()) {
-            let _ = board.settle_pull_async(issue_id, state).await;
+        if let (Some(board), Some(issue_id)) = (pulls.board.as_ref(), row.issue_id.as_deref())
+            && let Err(err) = board.settle_pull_async(issue_id, state).await
+        {
+            tracing::warn!(pull_id = %row.id, issue_id, state = ?state, error = %err, "pull.poll failed to settle linked issue for PR");
         }
     }
 }
@@ -100,14 +106,16 @@ pub async fn poll(pulls: &Pull) {
 
     let sem = Arc::new(Semaphore::new(POLL_CONCURRENCY));
     let mut set = JoinSet::new();
+    let github_rest = pulls.publisher.github_rest().cloned();
     for (idx, row, remote) in targets {
         let sem = sem.clone();
         let gh = pulls.gh.clone();
+        let rest = github_rest.clone();
         set.spawn(
             async move {
                 let Ok(_permit) = sem.acquire_owned().await else { return None };
                 let number = row.number;
-                let snapshot = fetch_snapshot(&gh, &remote, number).await.ok()?;
+                let snapshot = fetch_snapshot(&gh, rest.as_ref(), &remote, number).await.ok()?;
                 Some((idx, row, remote, snapshot))
             }
             .in_current_span()
@@ -127,27 +135,29 @@ pub async fn poll(pulls: &Pull) {
     }
 }
 
-async fn fetch_failed_job_logs(gh: &HostRunner, remote: &str, failed: &[&GitHubCheck]) -> Vec<String> {
+async fn fetch_failed_job_logs(gh: &HostRunner, github_rest: Option<&GitHubRest>, remote: &str, failed: &[&GitHubCheck]) -> Vec<String> {
     if failed.len() <= 1 {
         let mut out = Vec::with_capacity(failed.len());
         for check in failed {
-            out.push(failed_job_log(gh, remote, &check.url).await);
+            out.push(failed_job_log(gh, github_rest, remote, &check.url).await);
         }
         return out;
     }
     let items: Vec<(usize, String)> = failed.iter().enumerate().map(|(idx, check)| (idx, check.url.clone())).collect();
     let sem = Arc::new(Semaphore::new(POLL_CONCURRENCY));
     let mut set = JoinSet::new();
+    let github_rest = github_rest.cloned();
     for (idx, url) in items {
         let sem = sem.clone();
         let gh = gh.clone();
+        let rest = github_rest.clone();
         let remote = remote.to_string();
         set.spawn(
             async move {
                 let Ok(_permit) = sem.acquire_owned().await else {
                     return (idx, String::new());
                 };
-                let log = failed_job_log(&gh, &remote, &url).await;
+                let log = failed_job_log(&gh, rest.as_ref(), &remote, &url).await;
                 (idx, log)
             }
             .in_current_span()
@@ -172,7 +182,7 @@ fn check_status_label(check: &GitHubCheck) -> &str {
     }
 }
 
-async fn format_ci_report_async(gh: &HostRunner, remote: &str, checks: &[GitHubCheck], failed: &[&GitHubCheck]) -> String {
+async fn format_ci_report_async(gh: &HostRunner, github_rest: Option<&GitHubRest>, remote: &str, checks: &[GitHubCheck], failed: &[&GitHubCheck]) -> String {
     if failed.is_empty() {
         return checks
             .iter()
@@ -180,7 +190,7 @@ async fn format_ci_report_async(gh: &HostRunner, remote: &str, checks: &[GitHubC
             .collect::<Vec<_>>()
             .join("\n");
     }
-    let logs = fetch_failed_job_logs(gh, remote, failed).await;
+    let logs = fetch_failed_job_logs(gh, github_rest, remote, failed).await;
     failed
         .iter()
         .zip(logs)
@@ -203,7 +213,9 @@ async fn observe_checks_async(pulls: &Pull, row: &PullRecord, remote: &str, curr
     }
     let revision = row.check_revision + 1;
     let (failed, finished) = checks_verdict(&current.checks);
-    let _ = pulls.observe_checks_async(&row.id, &fingerprint, revision, at).await;
+    if let Err(err) = pulls.observe_checks_async(&row.id, &fingerprint, revision, at).await {
+        tracing::warn!(pull_id = %row.id, revision, error = %err, "pull.poll failed to persist observed CI checks");
+    }
 
     let (Some(board), Some(issue_id)) = (&pulls.board, linked_issue_id) else {
         return;
@@ -211,9 +223,11 @@ async fn observe_checks_async(pulls: &Pull, row: &PullRecord, remote: &str, curr
     if failed.is_empty() && !finished {
         return;
     }
-    let text = format_ci_report_async(&pulls.gh, remote, &current.checks, &failed).await;
+    let text = format_ci_report_async(&pulls.gh, pulls.publisher.github_rest(), remote, &current.checks, &failed).await;
     let key = format!("{}#{}:ci:{revision}", row.repo, row.number);
-    let _ = board.tell_message_async(issue_id, &text, &key).await;
+    if let Err(err) = board.tell_message_async(issue_id, &text, &key).await {
+        tracing::warn!(pull_id = %row.id, issue_id, key = %key, error = %err, "pull.poll failed to notify issue of CI verdict");
+    }
 }
 
 fn format_comment_text(comment: &GitHubComment) -> String {
@@ -295,7 +309,8 @@ impl KnownPollState {
         }
         let round = event.bot.then(|| self.rounds.get(&event.round_key).copied().unwrap_or(self.bot_round + 1));
         let round_key = round.map(|_| event.round_key.as_str());
-        if pulls.keep_event_async(&row.id, &event.key, round_key, round).await.is_err() {
+        if let Err(err) = pulls.keep_event_async(&row.id, &event.key, round_key, round).await {
+            tracing::warn!(pull_id = %row.id, event_key = %event.key, error = %err, "pull.poll failed to record PR event");
             return;
         }
         self.seen_keys.insert(event.key.clone());
@@ -305,8 +320,9 @@ impl KnownPollState {
         }
         if let (Some(board), Some(issue_id)) = (&pulls.board, linked_issue_id)
             && !event.text.is_empty()
+            && let Err(err) = board.tell_message_async(issue_id, &event.text, &event.key).await
         {
-            let _ = board.tell_message_async(issue_id, &event.text, &event.key).await;
+            tracing::warn!(pull_id = %row.id, issue_id, event_key = %event.key, error = %err, "pull.poll failed to deliver PR review/comment to issue");
         }
     }
 }

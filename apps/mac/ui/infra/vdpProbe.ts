@@ -116,6 +116,27 @@ export function useVdpNode(registration: VdpNodeRegistration): void {
   cleanup(registerVdpNode(registration));
 }
 
+/** Non-visual reactive anchor that registers a VDP node while mounted inside JSX branches. */
+export function VdpAnchor(props: {
+  readonly testId: string;
+  readonly role?: string | undefined;
+  readonly text?: (() => string | undefined) | undefined;
+  readonly getRef?: (() => ViewRef | undefined) | undefined;
+  readonly onPress?: (() => void | Promise<void>) | undefined;
+}) {
+  if (!isVdpEnabled()) return null;
+  const role = props.role;
+  const getRef = props.getRef;
+  useVdpNode({
+    testId: untracked(() => props.testId),
+    ...(role !== undefined ? { role } : {}),
+    ...(props.text !== undefined ? { text: props.text } : {}),
+    ...(getRef !== undefined ? { getRef } : {}),
+    ...(props.onPress !== undefined ? { onPress: () => props.onPress?.() } : {}),
+  });
+  return null;
+}
+
 function listenDetached(event: string, listener: (payload: unknown) => void): () => void {
   let active = true;
   let off: (() => void) | undefined;

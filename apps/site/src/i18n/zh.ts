@@ -103,7 +103,7 @@ export const zh = {
       {
         icon: "home" as IconName,
         title: "全在你的电脑上",
-        text: "服务端只听 127.0.0.1，数据在你的家目录（~/.vibevalley）；帮工的记性、档案、笔记和 Artifact 都在本机。",
+        text: "服务端只听 127.0.0.1，数据在你的家目录（~/.vibevalley）；帮工的记性、档案和笔记都在本机。",
       },
     ],
   },

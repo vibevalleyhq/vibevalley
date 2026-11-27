@@ -2,10 +2,10 @@ import { expect, it } from "vite-plus/test";
 
 import { staleNamesIn } from "./stale-names.ts";
 
-const source = "apps/server/src/machine/executor.ts";
+const source = "apps/mac/ui/infra/session.ts";
 
 it("regression: browser worker feature detection is not a stale domain name", () => {
-  const browser = "apps/web/src/features/voice/moss-worker.ts";
+  const browser = "apps/mac/ui/features/voice/moss-worker.ts";
   expect(staleNamesIn(browser, 'if (typeof Worker !== "undefined") {}')).toEqual([]);
   expect(staleNamesIn(browser, "const worker: Worker = new Worker(url);")).toEqual([]);
   expect(staleNamesIn(browser, 'Object.defineProperty(window, "Worker", { value: undefined });')).toEqual([]);
@@ -42,18 +42,19 @@ it("regression: stale service names are rejected while the config and the Settin
   expect(staleNamesIn(source, "const home = deps.config.home;")).toEqual([]);
   expect(staleNamesIn(source, "const key = await deps.setting.get();")).toEqual([]);
   expect(staleNamesIn(source, "agents.saveAgent(input)")).toHaveLength(1);
-  for (const line of ['import { Storage } from "#/storage/storage.ts";', "const ingress: Ingress = deps.ingress;", "worldBelowIngress()"])
-    expect(staleNamesIn(source, line)).toHaveLength(1);
 });
 
 it("regression: native mac workbench UI, Rust crates, and i18n catalogs enforce glossary terms", () => {
   expect(staleNamesIn("apps/mac/ui/features/issue/IssueCard.tsx", 'const kind = "owner";')).toHaveLength(1);
   expect(staleNamesIn("apps/mac/ui/features/issue/IssueCard.tsx", "const t = '地里';")).toHaveLength(1);
   expect(staleNamesIn("apps/mac/ui/farm/hud/Hud.tsx", "const t = '收获';")).toEqual([]);
-  expect(staleNamesIn("crates/server/src/work/issue/board.rs", 'let msg = "问主人";')).toHaveLength(1);
+  expect(staleNamesIn("crates/server/src/issue/board.rs", 'let msg = "问主人";')).toHaveLength(1);
   expect(staleNamesIn("crates/i18n/locales/zh/cli.json", '{ "help": "问管家" }')).toHaveLength(1);
   expect(staleNamesIn("crates/i18n/locales/zh/server.issue.json", '{ "done": "收获了" }')).toHaveLength(1);
   expect(staleNamesIn("crates/i18n/locales/zh/server.game.json", '{ "done": "收获了" }')).toEqual([]);
   expect(staleNamesIn("crates/i18n/locales/zh/web.farm.hud.json", '{ "done": "收获了" }')).toEqual([]);
   expect(staleNamesIn("crates/i18n/locales/zh/web.issue.json", '{ "done": "收获了" }')).toHaveLength(1);
+  expect(staleNamesIn("crates/i18n/locales/zh/web.base.json", '{ "nav": "专家" }')).toHaveLength(1);
+  expect(staleNamesIn("crates/i18n/locales/zh/web.runtime.json", '{ "empty": "没有引擎" }')).toHaveLength(1);
+  expect(staleNamesIn("apps/mac/ui/features/agent/AgentsPage.tsx", "const title = '作品';")).toHaveLength(1);
 });

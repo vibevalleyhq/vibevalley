@@ -6,6 +6,7 @@
 //! - `MachineMcpRequest` -> `MachineMcpResponse` reverse tunnel & `MachineAttachmentFetch` -> `MachineAttachmentData`
 //! - `Hub::on_system_wake()` waking subscribers and pinging connected machines
 
+use crate::support::RouterTestExt as _;
 use std::sync::Arc;
 use std::time::Duration;
 

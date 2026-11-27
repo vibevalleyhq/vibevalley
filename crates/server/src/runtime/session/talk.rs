@@ -92,17 +92,14 @@ impl SessionEngine {
         let mut mcp_servers: Vec<_> = self.door_for(&session.id).into_iter().collect();
         mcp_servers.extend(drive.mcp_servers.iter().cloned());
         let (append_system_prompt, prompt) = drive.work_instructions(rules, prompt);
-        let mut env = drive.env.clone();
-        if !drive.is_local {
-            let meta = crate::machine::RemoteDispatchMeta {
-                session_id: Some(session.id.clone()),
-                repo_ref: None,
-                branch: None,
-                base_ref: None,
-                mcp_session_token: Some(self.mcp_token_for(&session.id)),
-            };
-            crate::machine::attach_dispatch_meta(&mut env, &meta);
-        }
+        let env = drive.env.clone();
+        let remote_dispatch = (!drive.is_local).then(|| vibevalley_runtime::oar::RemoteDispatchMeta {
+            session_id: Some(session.id.clone()),
+            repo_ref: None,
+            branch: None,
+            base_ref: None,
+            mcp_session_token: Some(self.mcp_token_for(&session.id)),
+        });
         let opts = SessionOptions {
             cwd,
             model: drive.model.clone(),
@@ -115,6 +112,7 @@ impl SessionEngine {
             mcp_servers,
             disallowed_tools: drive.disallowed_tools.clone(),
             system_prompt,
+            remote_dispatch,
             ..Default::default()
         };
         let agent = self.open_runtime_for_session_async(drive.runtime.as_ref(), &session, opts).await?;

@@ -89,6 +89,10 @@
     "source": "settings",
     "hint": "s4647"
    },
+   "githubToken": {
+    "source": "settings",
+    "hint": "s4648"
+   },
    "voice": {
     "persona": "s4651",
     "greeting": "s4652"
@@ -155,6 +159,9 @@
    "version": "s4682",
    "locale": "zh",
    "deepseekApiKey": {
+    "source": null
+   },
+   "githubToken": {
     "source": null
    },
    "voice": {

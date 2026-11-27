@@ -1,11 +1,12 @@
 //! VibeValley `modules/media/library.test.ts`, through `start()`.
 
+use crate::support::RouterTestExt as _;
 use std::sync::Arc;
 use std::time::Duration;
 
 use serde_json::{Value, json};
 use vibevalley_protocol::{BizCode, Caller, Envelope, LibraryAddRequest, MediaJob};
-use vibevalley_server::artifact::library::AddedBy;
+use vibevalley_server::note::library::AddedBy;
 use vibevalley_server::{App, Config, context::Context, create_app_blocking};
 
 fn start(dir: &std::path::Path) -> App {
@@ -66,7 +67,7 @@ fn keeps_what_the_user_says_with_a_file_and_what_a_ready_job_made_once_each() {
     assert!(uploaded[0]["origin"]["message"].is_string());
 
     let made = ok(call("attachment.create", file("cat.png", "not really a png", "image/png")));
-    crate::support::block_on(app.test_internals().artifact.library.record_made_async(&[
+    crate::support::block_on(app.test_internals().note.library.record_made_async(&[
         image("job-1", &made, "generating"),
         image("job-1", &made, "ready"),
         image("job-1", &made, "ready"),
@@ -144,7 +145,7 @@ fn takes_an_item_out_but_keeps_the_file() {
 fn refuses_what_does_not_name_one_public_source_or_is_not_the_callers_to_give() {
     let dir = tempfile::tempdir().unwrap();
     let app = start(dir.path());
-    let library = &app.test_internals().artifact.library;
+    let library = &app.test_internals().note.library;
     let helper = AddedBy::Agent {
         agent: "lab".into(),
         session: Some("w1".into()),

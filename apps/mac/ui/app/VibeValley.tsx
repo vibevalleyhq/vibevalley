@@ -7,10 +7,10 @@ import { cleanup, host } from "nsh";
 import { setLocale } from "@vibevalley/i18n";
 
 import { applyMotion } from "../design/motion";
-import { SOUNDS, playSound, type SoundName } from "../design/sound";
 import { useBridge } from "../infra/bridged";
 import { readHostParams } from "../infra/hostParams";
 import { appHistory } from "../infra/router";
+import { SOUNDS, playSound, type SoundName } from "../infra/sound";
 import { App } from "./Workbench";
 
 const isSoundName = (name: string): name is SoundName => Object.hasOwn(SOUNDS, name);

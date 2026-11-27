@@ -252,7 +252,10 @@ async fn watch_session(
             }
             ev = live.recv() => match ev {
                 Ok(e) => Msg::Live(Box::new(e)),
-                Err(broadcast::error::RecvError::Lagged(_)) => Msg::State,
+                Err(broadcast::error::RecvError::Lagged(skipped)) => {
+                    tracing::warn!(skipped, session_id = %id, "session.watch live stream lagged; resyncing state");
+                    Msg::State
+                }
                 Err(broadcast::error::RecvError::Closed) => Msg::Stop,
             },
             // Poll mtime-cached swarm snapshots on the 500 ms tick; identical states are skipped.
@@ -346,7 +349,10 @@ async fn next_issue_watch_step_async(
         changed = sessions_sub.changed() => if changed { WatchStep::State } else { WatchStep::Stop },
         ev = live.recv() => match ev {
             Ok(e) => WatchStep::Live(Box::new(e)),
-            Err(broadcast::error::RecvError::Lagged(_)) => WatchStep::State,
+            Err(broadcast::error::RecvError::Lagged(skipped)) => {
+                tracing::warn!(skipped, "issue.watch live stream lagged; resyncing state");
+                WatchStep::State
+            }
             Err(broadcast::error::RecvError::Closed) => WatchStep::Stop,
         },
     }

@@ -3,8 +3,8 @@ import { Command, type CommandItem } from "nsh/base";
 import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
-import type { Artifact as ArtifactData, Session as SessionData } from "@vibevalley/protocol";
-import { Artifact as ArtifactSchema, HostPaletteMode as HostPaletteModeSchema, Session as SessionSchema } from "@vibevalley/protocol/schema";
+import type { Note as NoteData, Session as SessionData } from "@vibevalley/protocol";
+import { HostPaletteMode as HostPaletteModeSchema, Note as NoteSchema, Session as SessionSchema } from "@vibevalley/protocol/schema";
 
 import { Icon } from "../design/Icon";
 import type { IconName } from "../design/icons";
@@ -47,7 +47,7 @@ const modeKeys: readonly { mode: PaletteMode; keys: string }[] = [
   { mode: "search", keys: "⇧⌘F" },
 ];
 
-const artifactListSchema = z.array(ArtifactSchema);
+const noteListSchema = z.array(NoteSchema);
 const sessionListSchema = z.array(SessionSchema);
 
 function KeyCap(props: { label: string; surface?: "tile" | "surface"; active?: boolean }) {
@@ -69,7 +69,7 @@ export function Palette() {
   const mode = (): PaletteMode => f()?.mode ?? "commands";
 
   const localQuery = signal("");
-  const artifacts = signal<readonly ArtifactData[]>([]);
+  const notes = signal<readonly NoteData[]>([]);
   const sessions = signal<readonly SessionData[]>([]);
 
   let fetchSeq = 0;
@@ -82,8 +82,8 @@ export function Palette() {
     if (mode() !== "commands" || loadedEntities || !host.available()) return;
     loadedEntities = true;
     const seq = ++fetchSeq;
-    void callDecoded("artifact.list", {}, artifactListSchema).then((env) => {
-      if (fetchSeq === seq && env.bizCode === 0 && env.data) artifacts.set(env.data);
+    void callDecoded("note.list", {}, noteListSchema).then((env) => {
+      if (fetchSeq === seq && env.bizCode === 0 && env.data) notes.set(env.data);
     });
     void callDecoded("session.list", {}, sessionListSchema).then((env) => {
       if (fetchSeq === seq && env.bizCode === 0 && env.data) sessions.set(env.data);
@@ -97,7 +97,7 @@ export function Palette() {
       baseItems,
       query: localQuery(),
       issues: board()?.issues ?? [],
-      artifacts: artifacts(),
+      notes: notes(),
       sessions: sessions(),
       liveSessions: sessionsSlice()?.sessions ?? [],
     });

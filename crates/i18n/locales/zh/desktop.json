@@ -34,7 +34,7 @@
     "newChat": "新对话",
     "newTerminal": "新终端",
     "newChatWith": "新建 {runtime} 对话",
-    "chooseRuntime": "选择对话引擎"
+    "chooseRuntime": "选择对话环境"
   },
   "tab": {
     "closeBusy": {
@@ -56,9 +56,9 @@
       "tooltipActive": "已启用 Hook：{hooks}",
       "tooltipPending": "Hook 已变更（{hooks}），重启终端后生效",
       "tabSection": "当前标签页",
-      "workspaceSection": "工作区默认",
+      "workspaceSection": "项目默认",
       "workspaceToggle": "在 {repo} 新建终端时默认启用 {hook}",
-      "sourceWorkspace": "工作区",
+      "sourceWorkspace": "项目",
       "sourceTab": "标签页",
       "sourceOff": "关闭",
       "pendingRestart": "Hook 配置已变更，需要重启当前终端以生效",

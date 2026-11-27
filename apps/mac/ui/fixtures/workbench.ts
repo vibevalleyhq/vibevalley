@@ -4,12 +4,12 @@ import { issueId } from "@vibevalley/protocol/schema";
 
 import { min, now, sampleIssue as issue, sampleSession as session, working } from "../features/issue/model/issue.samples";
 import { responses as agentsResponses } from "./agents";
-import { responses as artifactsResponses } from "./artifacts";
 import { responses as assetResponses } from "./assets";
 import { chatState, crons, responses as chatResponses } from "./chat";
 import { responses as issuesResponses } from "./issues";
 import { mediaJobs, responses as libraryResponses } from "./library";
 import { responses as memoryResponses } from "./memory";
+import { responses as notesResponses } from "./notes";
 import { connectors, responses as settingsResponses } from "./settings";
 
 const w = session("w1", "laozhou", working(now - 3 * min), {
@@ -88,8 +88,8 @@ export const state: SliceBundle = {
   },
 };
 
-const agent = (id: string, name: string): Agent =>
-  ({ id, name, role: "worker", enabled: true, runtime: "claude", look: {}, description: "" }) as unknown as Agent;
+const agent = (id: string, name: string, code = "W-01"): Agent =>
+  ({ id, code, name, role: "worker", mode: "managed", enabled: true, runtime: "claude", look: {}, description: "" }) as unknown as Agent;
 
 /** `{ op: data }` as vibevalley_bridge::fake reads responses.json. */
 export const responses: Record<string, unknown> = {
@@ -99,7 +99,7 @@ export const responses: Record<string, unknown> = {
     missingSessions: [],
   })),
   "game.achievement.list": { items: [], standings: [] } satisfies AchievementList,
-  "agent.list": [agent("laozhou", "老周"), agent("xiaolin", "小林")],
+  "agent.list": [agent("laozhou", "老周", "W-01"), agent("xiaolin", "小林", "W-02")],
   "agent.template.list": [],
   "repo.list": [],
   "runtime.list": [],
@@ -109,6 +109,6 @@ export const responses: Record<string, unknown> = {
   ...settingsResponses,
   ...memoryResponses,
   ...assetResponses,
-  ...artifactsResponses,
+  ...notesResponses,
   ...libraryResponses,
 };

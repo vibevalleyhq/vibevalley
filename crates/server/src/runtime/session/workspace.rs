@@ -512,7 +512,8 @@ impl SessionEngine {
         };
         let mut mcp_servers: Vec<_> = self.door_for(&id).into_iter().collect();
         mcp_servers.extend(drive.mcp_servers.iter().cloned());
-        let env = self.build_workspace_env(&id, &drive, repo_name.as_deref());
+        let env = drive.env.clone();
+        let remote_dispatch = self.build_workspace_dispatch_meta(&id, &drive, repo_name.as_deref());
         let opts = SessionOptions {
             cwd: PathBuf::from(&cwd),
             model: drive.model.clone(),
@@ -522,6 +523,7 @@ impl SessionEngine {
             record_to: Some(self.record_path(&id)),
             effort: effective_effort,
             mcp_servers,
+            remote_dispatch,
             ..Default::default()
         };
         let agent = self.open_runtime_for_session_async(drive.runtime.as_ref(), &session, opts).await?;
@@ -531,21 +533,23 @@ impl SessionEngine {
         Ok(self.workspace_reply_async(self.session_async(&id).await.unwrap_or(session)).await)
     }
 
-    fn build_workspace_env(&self, id: &str, drive: &super::driver::Drive, repo_name: Option<&str>) -> Vec<(String, String)> {
-        let mut env = drive.env.clone();
+    fn build_workspace_dispatch_meta(
+        &self,
+        id: &str,
+        drive: &super::driver::Drive,
+        repo_name: Option<&str>,
+    ) -> Option<vibevalley_runtime::oar::RemoteDispatchMeta> {
         if drive.is_local {
-            return env;
+            return None;
         }
         let repo_ref = repo_name.map(|r| self.0.worktree.repo_remote_url(r).unwrap_or_else(|| r.to_string()));
-        let dispatch = crate::machine::RemoteDispatchMeta {
+        Some(vibevalley_runtime::oar::RemoteDispatchMeta {
             session_id: Some(id.to_string()),
             repo_ref,
             branch: None,
             base_ref: None,
             mcp_session_token: Some(self.mcp_token_for(id)),
-        };
-        crate::machine::attach_dispatch_meta(&mut env, &dispatch);
-        env
+        })
     }
 
     async fn set_workspace_meta_async(&self, session_id: &str, meta: WorkspaceMeta) {
@@ -581,18 +585,8 @@ impl SessionEngine {
         };
         let mut mcp_servers: Vec<_> = self.door_for(&session.id).into_iter().collect();
         mcp_servers.extend(drive.mcp_servers.iter().cloned());
-        let mut env = drive.env.clone();
-        if !drive.is_local {
-            let repo_ref = session.repo_name().map(|r| self.0.worktree.repo_remote_url(r).unwrap_or_else(|| r.to_string()));
-            let dispatch = crate::machine::RemoteDispatchMeta {
-                session_id: Some(session.id.clone()),
-                repo_ref,
-                branch: None,
-                base_ref: None,
-                mcp_session_token: Some(self.mcp_token_for(&session.id)),
-            };
-            crate::machine::attach_dispatch_meta(&mut env, &dispatch);
-        }
+        let env = drive.env.clone();
+        let remote_dispatch = self.build_workspace_dispatch_meta(&session.id, &drive, session.repo_name());
         let opts = SessionOptions {
             cwd: PathBuf::from(&cwd),
             model: meta.model.clone(),
@@ -602,6 +596,7 @@ impl SessionEngine {
             record_to: Some(self.record_path(&session.id)),
             effort: meta.effort.clone(),
             mcp_servers,
+            remote_dispatch,
             ..Default::default()
         };
         let agent = self.open_runtime_for_session_async(drive.runtime.as_ref(), &session, opts).await?;
@@ -1033,8 +1028,8 @@ mod tests {
 
     struct StubSession {
         id: String,
-        tx: mpsc::UnboundedSender<Event>,
-        rx: parking_lot::Mutex<Option<mpsc::UnboundedReceiver<Event>>>,
+        tx: mpsc::Sender<Event>,
+        rx: parking_lot::Mutex<Option<mpsc::Receiver<Event>>>,
         aborts: Arc<AtomicUsize>,
         disposes: Arc<AtomicUsize>,
     }
@@ -1067,8 +1062,8 @@ mod tests {
             vec![]
         }
 
-        fn subscribe_records(&self, _: Option<u64>) -> mpsc::UnboundedReceiver<voyage::Record> {
-            let (_tx, rx) = mpsc::unbounded_channel();
+        fn subscribe_records(&self, _: Option<u64>) -> mpsc::Receiver<voyage::Record> {
+            let (_tx, rx) = mpsc::channel(1);
             rx
         }
 
@@ -1080,8 +1075,8 @@ mod tests {
             SessionStatus::Idle
         }
 
-        fn events(&self) -> mpsc::UnboundedReceiver<Event> {
-            self.rx.lock().take().unwrap_or_else(|| mpsc::unbounded_channel().1)
+        fn events(&self) -> mpsc::Receiver<Event> {
+            self.rx.lock().take().unwrap_or_else(|| mpsc::channel(1).1)
         }
 
         fn prompt(&self, _: Vec<ContentBlock>) -> vibevalley_runtime::BoxFuture<'_, vibevalley_runtime::oar::Result<()>> {
@@ -1112,7 +1107,7 @@ mod tests {
 
         fn signal_dispose(&self) {
             self.disposes.fetch_add(1, Ordering::SeqCst);
-            let _ = self.tx.send(Event {
+            let _ = self.tx.try_send(Event {
                 seq: 0,
                 at_ms: 0,
                 agent_path: vec![],
@@ -1156,7 +1151,7 @@ mod tests {
             let aborts = self.aborts.clone();
             let disposes = self.disposes.clone();
             Box::pin(async move {
-                let (tx, rx) = mpsc::unbounded_channel();
+                let (tx, rx) = mpsc::channel(64);
                 Ok(Arc::new(StubSession {
                     id: "stub-1".into(),
                     tx,

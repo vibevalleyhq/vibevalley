@@ -1026,6 +1026,7 @@ fn run_command_with_timeout(work_root: &Path, spec: &TestCommandSpec, timeout: O
                     kill_process_tree(&mut child);
                     break None;
                 }
+                #[allow(clippy::disallowed_methods, reason = "synchronous CLI xtask child timeout poll")]
                 std::thread::sleep(Duration::from_millis(10));
             }
             Err(err) => {

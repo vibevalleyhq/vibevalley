@@ -2,7 +2,8 @@ import { z } from "zod";
 
 import { Attachment } from "../attachment/schema";
 import type { Codec } from "../codec";
-import { ActorKind, IssueId, Outcome, SessionId, Spent } from "../common/schema";
+import { ActorKind, IssueId, NoteId, Outcome, SessionId, Spent } from "../common/schema";
+import { DocView, Note } from "../note/schema";
 import { Conflict, RepoHealth, ReviewRevision } from "../repo/schema";
 import { IssueAnswer, Session } from "../session/schema";
 import * as T from "./shapes.gen";
@@ -268,6 +269,7 @@ const issueFields = {
   dueAt: z.exactOptional(z.number()),
   owner: z.exactOptional(ActorRef),
   relations: z.exactOptional(z.array(IssueRelation)),
+  bodyNoteId: z.exactOptional(NoteId),
 };
 
 export const Issue = z.object(issueFields) satisfies Codec<T.Issue>;
@@ -443,3 +445,13 @@ export const BacklogTriageConfirmInput = z.object({
 export const BacklogTriageDismissInput = z.object({
   id: z.string(),
 }) satisfies Codec<T.BacklogTriageDismissInput>;
+
+export const IssueBodyEnsureInput = z.object({
+  id: z.string(),
+}) satisfies Codec<T.IssueBodyEnsureInput>;
+
+export const IssueBodyEnsureResult = z.object({
+  issue: Issue,
+  note: Note,
+  docView: DocView,
+}) satisfies Codec<T.IssueBodyEnsureResult>;

@@ -1,14 +1,7 @@
 {
   "badName": "A repo name starts with a letter or a digit and has only letters, digits, -, _ and ., up to 64 characters",
   "badGithub": "Give a GitHub repository address, such as https://github.com/botiverse/raft-source",
-  "noTokei": "Counting code needs tokei, which is not on this machine: install it (brew install tokei, or cargo install tokei) and count again",
   "noName": "unnamed",
-  "gh": {
-    "missing": "gh is not installed",
-    "failed": "gh could not be checked",
-    "signedOut": "not signed in to GitHub",
-    "noAccount": "the GitHub account could not be confirmed"
-  },
   "notRepoName": "\"{name}\" cannot be a repo name: use a simple English folder name, such as clock-in",
   "outside": "A repo must be inside the work folder, not linked to somewhere outside it",
   "commit": {
@@ -24,17 +17,19 @@
   "exists": "\"{name}\" already exists: pick another repo name",
   "cloneFailedGh": "The download failed: check the GitHub sign-in, the repository's permissions and the network, then retry",
   "cloneFailed": "The download failed: check that the repository is public, the address is right and the network works; it stops after 3 minutes, and can be retried",
-  "tokeiFailed": "tokei did not finish counting: {why}",
-  "tokeiUnread": "tokei's output cannot be read: try a newer tokei",
   "github": {
     "unchecked": "GitHub has not been checked",
     "notGithub": "Not a GitHub repository",
     "noPermission": "The repository's permissions could not be checked",
-    "readOnly": "No write permission"
+    "readOnly": "No write permission",
+    "noneConfigured": "Not configured: set a GitHub Token in Settings (or GITHUB_TOKEN), or install and sign in with gh",
+    "tokenInvalid": "GitHub Token is invalid or lacks permission",
+    "tokenNetwork": "Could not reach GitHub API: {why}"
   },
   "conflict": "merging into {base} conflicts",
   "publish.refused": "Branch publication refused: {detail}",
-  "publish.platformFailed": "Hosting platform failed: {stage}. Check installation and login.",
+  "publish.missingCredentials": "No GitHub credentials configured: set a GitHub Token in Settings (or GITHUB_TOKEN), or sign in with gh CLI",
+  "publish.platformFailed": "Hosting platform failed: {stage}. Check your GitHub Token or CLI login.",
   "publish.pushedWithoutLink": "SHA {sha} was pushed, but no PR/MR link was confirmed: {why}. Retry to recover an open request.",
   "publish.userOnly": "Only the user on this computer can publish an existing branch",
   "publish.pushUnconfirmed": "Push of SHA {sha} was not confirmed. No PR/MR creation was attempted; inspect the remote before retrying.",
@@ -43,6 +38,6 @@
     "notFound": "Folder does not exist: {path}",
     "notDir": "Path is not a folder: {path}",
     "notGit": "\"{path}\" is not a Git repository yet (enable Git initialization to mount it)",
-    "unmountManaged": "\"{name}\" is a managed workspace repository and cannot be unmounted"
+    "unmountManaged": "\"{name}\" is a managed project repository and cannot be unmounted"
   }
 }

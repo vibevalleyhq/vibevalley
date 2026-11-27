@@ -147,7 +147,7 @@ export function buildStepPlan(scenario: GalleryScenario, shotsDir: string): Gall
       wait(700),
       draw,
       shotStep(shotsDir, "typical-agents-light", expected),
-      routeStep("/artifacts/art-launch-board"),
+      routeStep("/notes/art-launch-board"),
       wait(1100),
       draw,
       shotStep(shotsDir, "typical-whiteboard-light", expected),
@@ -267,11 +267,11 @@ function writeScenarioResponses(root: string, scenario: GalleryScenario, outPath
     return;
   }
   const parsed = z.record(z.string(), z.unknown()).parse(JSON.parse(raw));
-  const list = parsed["artifact.list"];
+  const list = parsed["note.list"];
   if (Array.isArray(list)) {
     const board: unknown = list.find((a) => typeof a === "object" && a !== null && "id" in a && a.id === "art-launch-board");
     if (board !== undefined) {
-      parsed["artifact.get"] = board;
+      parsed["note.get"] = board;
     }
   }
   writeFileSync(outPath, `${JSON.stringify(parsed, null, 2)}\n`, "utf8");

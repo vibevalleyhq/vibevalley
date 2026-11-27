@@ -4,6 +4,7 @@ import { t } from "@vibevalley/i18n";
 
 import { Icon } from "../../../design/Icon";
 import { IconButton } from "../../../design/IconButton";
+import { motionClass } from "../../../design/motion";
 import { TextLink } from "../../../design/TextLink";
 import { mix } from "../../../design/tone";
 import { useIntents } from "../../../infra/state/intent";
@@ -35,7 +36,9 @@ export function ActLines(props: {
                 class={`flex-row items-center gap-2 rounded-lg border px-3 py-2 ${failed() ? "bg-bad-soft" : "border-line bg-side"}`}
                 style={failed() ? { borderColor: mix("berry", 0.25) } : undefined}
               >
-                <Icon name={failed() ? "cross" : "wait"} size={14} tone={failed() ? "berry" : "muted"} />
+                <View class={`shrink-0 ${failed() ? "" : motionClass("animate-spin")}`}>
+                  <Icon name={failed() ? "cross" : "wait"} size={14} tone={failed() ? "berry" : "muted"} />
+                </View>
                 <Text class={`min-w-0 flex-1 truncate text-sm ${failed() ? "font-medium text-berry" : "text-muted"}`}>
                   {m().state === "moving" ? t("web.issue.acts.moving") : (moveErr()?.text ?? t("web.issue.board.moveFailed"))}
                 </Text>
@@ -66,7 +69,7 @@ export function ActLines(props: {
                 class={`flex-row items-start gap-2 rounded-lg border px-3 py-2 ${failed() ? "bg-bad-soft" : "border-line bg-side"}`}
                 style={failed() ? { borderColor: mix("berry", 0.25) } : undefined}
               >
-                <View class="mt-0.5 shrink-0">
+                <View class={`mt-0.5 shrink-0 ${failed() ? "" : motionClass("animate-spin")}`}>
                   <Icon name={failed() ? "cross" : "wait"} size={14} tone={failed() ? "berry" : "muted"} />
                 </View>
                 <View class="min-w-0 flex-1 gap-0.5">

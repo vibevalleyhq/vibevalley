@@ -42,7 +42,7 @@ fn graded_issue(
     server.set_mcp_url(format!("{}/mcp", listener.url()));
     let user = |op: &str, req| via_http(&listener, op, req);
     user("repo.create", json!({"name":"r"}));
-    user("artifact.create", json!({"title":"unrelated artifact private marker","artifactType":"docs"}));
+    user("note.create", json!({"title":"unrelated note private marker","noteType":"doc"}));
     let mut helper = vibevalley_runtime::rt::block_on(server.test_internals().agent.profile.store.install_template_async("reviewer")).unwrap();
     helper.name = "Checked".into();
     helper.runtime = "vibevalley".into();
@@ -95,7 +95,7 @@ fn regression_issue_criteria_grade_the_builtin_worker_with_only_its_own_delivery
         assert!(input["taskPrompt"].as_str().unwrap().contains("Deliver the requested file"));
         let evidence = input["deliverables"].as_str().unwrap();
         assert!(evidence.contains("graded.txt") && evidence.contains(expected), "{evidence}");
-        assert!(!input.to_string().contains("unrelated artifact private marker"));
+        assert!(!input.to_string().contains("unrelated note private marker"));
         assert!(!input.to_string().contains("private worker reasoning marker"));
     }
     assert!(json!(requests[3].messages).to_string().contains("use the required content"));

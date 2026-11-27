@@ -1,3 +1,4 @@
+use crate::support::ServerTestExt as _;
 use serde_json::{Value, json};
 use std::{
     io::{Cursor, Write},
@@ -8,8 +9,8 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio_util::sync::CancellationToken;
+use vibevalley_server::BoxFuture;
 use vibevalley_server::context::{Fetch, FetchError, Request, Response};
-use vibevalley_server::{BoxFuture, Server as _};
 
 struct Backend {
     generations: AtomicUsize,

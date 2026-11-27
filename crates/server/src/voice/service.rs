@@ -3,13 +3,9 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Weak};
 use std::time::Duration;
 
-use base64::Engine as _;
 use parking_lot::Mutex;
 use vibevalley_i18n::t;
-use vibevalley_protocol::{
-    ApiError, ApiErrorDetail, BizCode, DEFAULT_ORCHESTRATOR, Millis, NoticeLevel, Op, Validation, VoiceAsrGrant, VoiceAsrResult, VoiceCall, VoiceFix,
-    VoiceGrant, ops,
-};
+use vibevalley_protocol::{ApiError, ApiErrorDetail, BizCode, DEFAULT_ORCHESTRATOR, Millis, NoticeLevel, Validation, VoiceCall, VoiceFix, VoiceGrant};
 
 use super::moss::{self, HttpTranscriber, Realtime, Transcriber, Verdict};
 use super::prompt;
@@ -104,7 +100,6 @@ type GrantKey = (String, String);
 struct State {
     grants: HashMap<GrantKey, Grant>,
     calls: HashMap<String, Arc<Call>>,
-    asr_sessions: HashSet<String>,
     moss: Option<Arc<MossShared>>,
     live_line: bool,
     stopped: bool,
@@ -176,7 +171,7 @@ impl Voice {
         state.grants.retain(|_, g| g.phase != GrantPhase::Issued || g.expires > at);
     }
 
-    /// `voice.grant.create`: issues a channel and uid naming a new MOSS Live call.
+    /// Issues a channel and uid naming a new MOSS Live call.
     pub fn grant(&self) -> Result<VoiceGrant, ApiError> {
         self.live_account()?;
         let channel = new_channel(now());
@@ -196,7 +191,7 @@ impl Voice {
         Ok(VoiceGrant { channel, uid })
     }
 
-    /// `voice.call.start`: begins the granted MOSS Live call. `about` is what rang:
+    /// Begins the granted MOSS Live call. `about` is what rang:
     /// the orchestrator says it first instead of the greeting.
     pub fn start(self: &Arc<Self>, channel: &str, uid: &str, about: Option<&str>) -> Result<VoiceCall, ApiError> {
         let key = (channel.to_string(), uid.to_string());
@@ -265,7 +260,7 @@ impl Voice {
         }
     }
 
-    /// `voice.call.stop`: ends the call. Stopping an unknown or already-ended call is a no-op.
+    /// Ends the call. Stopping an unknown or already-ended call is a no-op.
     pub fn stop(&self, agent: &str) -> Result<(), ApiError> {
         let call = {
             let mut state = self.state.lock();
@@ -332,16 +327,6 @@ impl Voice {
         Ok(())
     }
 
-    /// `voice.hear`: records spoken user words on the sole active call.
-    pub async fn heard_current_async(&self, text: &str, picked: Option<&str>, send_key: Option<&str>) -> Result<(), ApiError> {
-        let live = self.live_calls();
-        match live.as_slice() {
-            [] => Err(failed(t("server.voice.noCall", &[]))),
-            [only] => self.heard_async(only, text, picked, send_key).await,
-            _ => Err(failed(t("server.voice.manyCalls", &[]))),
-        }
-    }
-
     /// Non-blocking host transcript handoff used by [`LiveVoicePort::said`].
     fn said_background(self: &Arc<Self>, agent: &str, text: &str) -> Result<(), ApiError> {
         self.call(agent)?;
@@ -354,7 +339,7 @@ impl Voice {
         Ok(())
     }
 
-    /// `voice.call.say`: records what the MOSS Live session said in chat; its greeting is skipped.
+    /// Records what the MOSS Live session said in chat; its greeting is skipped.
     pub async fn said_async(&self, agent: &str, text: &str) -> Result<(), ApiError> {
         let call = self.call(agent)?;
         if text.trim() != call.greeting
@@ -510,69 +495,8 @@ impl Voice {
         }
     }
 
-    pub(crate) async fn handle_hear(&self, req: <ops::VoiceHear as Op>::Input) -> Result<(), ApiError> {
-        self.heard_current_async(&req.text, req.agent.as_deref(), req.send_key.as_deref()).await
-    }
-
     pub(crate) async fn handle_moss_verify(&self) -> Validation {
         self.verify_moss_async().await
-    }
-
-    pub(crate) fn handle_grant_create(&self) -> Result<VoiceGrant, ApiError> {
-        self.grant()
-    }
-
-    pub(crate) fn handle_call_start(self: &Arc<Self>, req: <ops::VoiceCallStart as Op>::Input) -> Result<VoiceCall, ApiError> {
-        self.start(&req.channel, &req.uid, req.about.as_deref())
-    }
-
-    pub(crate) fn handle_call_stop(&self, req: <ops::VoiceCallStop as Op>::Input) -> Result<(), ApiError> {
-        self.stop(&req.agent_id)
-    }
-
-    pub(crate) async fn handle_call_hear(&self, req: <ops::VoiceCallHear as Op>::Input) -> Result<(), ApiError> {
-        self.heard_async(&req.agent_id, &req.text, req.agent.as_deref(), req.send_key.as_deref()).await
-    }
-
-    pub(crate) async fn handle_call_say(&self, req: <ops::VoiceCallSay as Op>::Input) -> Result<(), ApiError> {
-        self.said_async(&req.agent_id, &req.text).await
-    }
-
-    /// `voice.asr.start`: allocates an active ASR dictation session using the bound MOSS Live or Transcription key.
-    pub fn asr_start(&self) -> Result<VoiceAsrGrant, ApiError> {
-        let providers = self.setting.providers();
-        let account = providers
-            .account(Use::Live)
-            .or_else(|| providers.account(Use::Transcription))
-            .ok_or_else(|| unavailable(t("server.voice.moss.noAsrKey", &[]), Some(VoiceFix::Moss)))?;
-        let mut state = self.state.lock();
-        if state.stopped {
-            return Err(Self::stopped());
-        }
-        if state.asr_sessions.len() >= 64 {
-            state.asr_sessions.clear();
-        }
-        let session_id = format!("asr-{}", uuid::Uuid::new_v4().simple());
-        state.asr_sessions.insert(session_id.clone());
-        Ok(VoiceAsrGrant {
-            session_id,
-            model: account.model,
-        })
-    }
-
-    /// `voice.asr.stop`: ends an ASR dictation session cleanly.
-    pub fn asr_stop(&self, session_id: &str) -> Result<(), ApiError> {
-        self.state.lock().asr_sessions.remove(session_id);
-        Ok(())
-    }
-
-    /// `voice.asr.transcribe`: transcribes a base64-encoded WAV clip via MOSS Transcription.
-    pub async fn asr_transcribe_async(&self, req: <ops::VoiceAsrTranscribe as Op>::Input) -> Result<VoiceAsrResult, ApiError> {
-        let wav = base64::engine::general_purpose::STANDARD
-            .decode(req.wav_base64.trim())
-            .map_err(|_| ApiError::new(BizCode::InvalidInput, t("server.voice.asr.badAudio", &[])))?;
-        let text = self.transcribe_wav_async(wav).await?;
-        Ok(VoiceAsrResult { text })
     }
 
     /// Transcribes raw WAV bytes via MOSS Transcription (`Use::Transcription`).
@@ -591,6 +515,18 @@ impl Voice {
         self.transcriber.transcribe_wav_async(&account.key, &account.model, wav).await.map_err(failed)
     }
 
+    /// Lightweight post-dictation text polish pass (punctuation restoration + filler/repetition cleanup).
+    pub async fn polish_transcript_async(&self, raw: &str) -> Result<String, ApiError> {
+        let trimmed = raw.trim();
+        if trimmed.is_empty() {
+            return Ok(String::new());
+        }
+        if self.state.lock().stopped {
+            return Err(Self::stopped());
+        }
+        self.orchestrator.polish_text_async(prompt::ASR_POLISH_SYSTEM, trimmed).await.map_err(failed)
+    }
+
     /// Lightweight dictation-only MOSS Live WebSocket credentials (no tools or commentary).
     pub fn asr_line(&self) -> Result<MossAsrLine, ApiError> {
         let account = self.live_account()?;
@@ -601,18 +537,6 @@ impl Voice {
             url: format!("wss://api.mosi.cn/v1/realtime?model={}", account.model),
             key: account.key,
         })
-    }
-
-    pub(crate) fn handle_asr_start(&self) -> Result<VoiceAsrGrant, ApiError> {
-        self.asr_start()
-    }
-
-    pub(crate) fn handle_asr_stop(&self, req: <ops::VoiceAsrStop as Op>::Input) -> Result<(), ApiError> {
-        self.asr_stop(&req.session_id)
-    }
-
-    pub(crate) async fn handle_asr_transcribe(&self, req: <ops::VoiceAsrTranscribe as Op>::Input) -> Result<VoiceAsrResult, ApiError> {
-        self.asr_transcribe_async(req).await
     }
 }
 
@@ -803,6 +727,14 @@ impl LiveVoicePort for Voice {
         Box::pin(async move {
             let voice = voice.ok_or_else(Voice::stopped)?;
             voice.transcribe_wav_async(wav).await
+        })
+    }
+
+    fn polish_transcript_async(&self, raw: String) -> BoxFuture<'static, Result<String, ApiError>> {
+        let voice = self.me.upgrade();
+        Box::pin(async move {
+            let voice = voice.ok_or_else(Voice::stopped)?;
+            voice.polish_transcript_async(&raw).await
         })
     }
 

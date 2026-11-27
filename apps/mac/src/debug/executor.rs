@@ -14,16 +14,17 @@ use vibevalley_protocol::{
     HostCapturedImage, VdpAckResult, VdpCaptureScreenshotParams, VdpDispatchKeyParams, VdpDispatchMouseParams, VdpError, VdpInputResult, VdpMouseButton,
     VdpMouseEventKind, VdpPageMetrics, VdpScreenshotTarget, VdpShellClosePaneParams, VdpShellDispatchActionParams, VdpShellGetTerminalGridParams,
     VdpShellNavigateParams, VdpShellOpenPaneParams, VdpShellResizeParams, VdpShellRunCommandParams, VdpShellSendTerminalInputParams,
-    VdpShellSetDioramaClockParams, VdpShellSetThemeParams, VdpTarget, VdpTargetKind, VdpTypeTextParams, VdpUiBounds, VdpUiHighlightParams,
-    VdpUiInspectAtResult, VdpUiInspectorModeParams, VdpUiNode,
+    VdpShellSetDioramaClockParams, VdpShellSetThemeParams, VdpTarget, VdpTargetKind, VdpTypeTextParams, VdpUiHighlightParams, VdpUiInspectAtResult,
+    VdpUiInspectorModeParams,
 };
 use vibevalley_workspace::{DiffSpec, PaneKind, TabId};
 
 use crate::hosted::frames::PaletteMode;
 use crate::hosted::{Action, HostedView, ShellDebugHandle};
-use crate::panes::{PaneEntity, tab_title};
-use crate::shell::Shell;
+use crate::panes::PaneEntity;
+use crate::shell::{Shell, tab_title};
 use crate::theme::{ThemeChoice, Ui};
+pub(crate) use crate::vdp_bus::{hit_from_hosted_node, select_deepest_hit};
 
 /// Result of executing a GPUI-thread VDP command; heavy encoding or async webview
 /// captures return a pending handle so neither the GPUI thread nor Tokio blocks.
@@ -252,11 +253,11 @@ pub(crate) fn collect_targets(shell: &Shell, attached_ids: &HashSet<String>, cx:
         }
     }
 
-    if route.as_deref().is_some_and(|r| r.starts_with("/library") || r.starts_with("/artifacts")) {
+    if route.as_deref().is_some_and(|r| r.starts_with("/library") || r.starts_with("/notes")) {
         targets.push(VdpTarget {
             id: "webview".into(),
             kind: VdpTargetKind::Webview,
-            title: "Artifact WebView".into(),
+            title: "Note WebView".into(),
             url: route,
             attached: attached_ids.contains("webview"),
         });
@@ -935,227 +936,4 @@ pub(crate) fn exec_ui_highlight(shell: &mut Shell, params: &VdpUiHighlightParams
 pub(crate) fn exec_ui_set_inspector_mode(shell: &mut Shell, params: &VdpUiInspectorModeParams, cx: &mut Context<Shell>) -> Value {
     shell.set_devtools_inspecting(params.enabled, cx);
     json!(VdpAckResult { ok: true })
-}
-
-fn contains_point(bounds: &VdpUiBounds, x: f32, y: f32) -> bool {
-    bounds.width > 0.0 && bounds.height > 0.0 && x >= bounds.x && x <= (bounds.x + bounds.width) && y >= bounds.y && y <= (bounds.y + bounds.height)
-}
-
-fn bounds_area(bounds: &VdpUiBounds) -> f32 {
-    (bounds.width.max(0.0)) * (bounds.height.max(0.0))
-}
-
-fn is_container_only_node(hit: &VdpUiInspectAtResult) -> bool {
-    matches!(hit.role.as_deref(), Some("root" | "route")) || hit.test_id.as_deref().is_some_and(|id| id.starts_with("view:"))
-}
-
-/// Chooses the tightest (smallest-area) inspect candidate containing `(x, y)`, preferring leaf nodes over root view wrappers.
-pub(crate) fn select_deepest_hit(x: f32, y: f32, candidates: Vec<VdpUiInspectAtResult>) -> Option<VdpUiInspectAtResult> {
-    candidates
-        .into_iter()
-        .filter(|c| c.bounds.as_ref().is_some_and(|b| contains_point(b, x, y)))
-        .min_by(|a, b| {
-            let a_container = is_container_only_node(a);
-            let b_container = is_container_only_node(b);
-            a_container.cmp(&b_container).then_with(|| {
-                let area_a = a.bounds.as_ref().map_or(f32::MAX, bounds_area);
-                let area_b = b.bounds.as_ref().map_or(f32::MAX, bounds_area);
-                area_a.total_cmp(&area_b)
-            })
-        })
-}
-
-/// Translates a `vdpProbe` UI node reported by `surface` at window origin `(ox, oy)` into shell window coordinates.
-pub(crate) fn hit_from_hosted_node(surface: &str, ox: f32, oy: f32, node: &VdpUiNode) -> Option<VdpUiInspectAtResult> {
-    let b = node.bounds?;
-    Some(VdpUiInspectAtResult {
-        hit: true,
-        surface: Some(surface.to_string()),
-        test_id: node.test_id.clone(),
-        role: node.role.clone(),
-        text: node.text.clone(),
-        route: node.route.clone(),
-        source: node.source.clone(),
-        bounds: Some(VdpUiBounds {
-            x: b.x + ox,
-            y: b.y + oy,
-            width: b.width,
-            height: b.height,
-        }),
-    })
-}
-
-/// Collects mounted [`HostedView`] entities and their shell window origins `(surface, ox, oy, view)` overlapping the window.
-pub(crate) fn hosted_view_origins(shell: &Shell, vp_w: f32, vp_h: f32, cx: &App) -> Vec<(String, f32, f32, Entity<HostedView>)> {
-    let mut views = Vec::new();
-    if let Some(palette) = shell.overlays.palette.as_ref().filter(|p| p.open) {
-        let palette_w = (vp_w - 32.0).clamp(280.0, 620.0);
-        let palette_top = if vp_h < 520.0 { 24.0 } else { 72.0 };
-        let ox = ((vp_w - palette_w) * 0.5).max(0.0);
-        views.push(("palette".to_string(), ox, palette_top, palette.view.clone()));
-    }
-    if shell.chrome.native_workspace {
-        if shell.chrome.sidebar_visible {
-            views.push(("sidebar".to_string(), shell.chrome.global_rail_width, 0.0, shell.chrome.sidebar.clone()));
-        }
-        if let Some(inspector) = &shell.chrome.inspector {
-            views.push((
-                "inspector".to_string(),
-                (vp_w - shell.chrome.inspector_width).max(0.0),
-                0.0,
-                inspector.view.clone(),
-            ));
-        }
-        if let Some(project) = shell.workspace.ws.active()
-            && let Some(tab) = project.layout.active_tab()
-            && let Some(PaneEntity::Hosted(pane_view)) = shell.workspace.panes.get(&(project.id(), tab.id)).map(|s| &s.entity)
-        {
-            let left = shell.chrome.global_rail_width
-                + if shell.chrome.sidebar_visible {
-                    shell.chrome.sidebar_width + 1.0
-                } else {
-                    0.0
-                };
-            let module = pane_view.read(cx).view_name().to_string();
-            views.push((format!("pane:{module}"), left, 0.0, pane_view.clone()));
-        }
-    }
-    views.push(("workbench".to_string(), 0.0, 0.0, shell.chrome.workbench.clone()));
-    views
-}
-
-/// Collects native GPUI shell chrome, diorama canvas, and pane elements containing `(x, y)` with `.rs` source locations.
-pub(crate) fn inspect_native_at(shell: &Shell, x: f32, y: f32, vp_w: f32, vp_h: f32, cx: &App) -> Option<VdpUiInspectAtResult> {
-    let mut candidates = Vec::new();
-    let rail_w = shell.chrome.global_rail_width;
-
-    if shell.overlays.devtools.state.enabled {
-        let cap_w = 340.0f32.min(vp_w - 16.0).max(160.0);
-        candidates.push(VdpUiInspectAtResult {
-            hit: true,
-            surface: Some("shell".into()),
-            test_id: Some("devtools-capsule".into()),
-            role: Some("button".into()),
-            text: Some(shell.overlays.devtools.state.format_capsule()),
-            route: None,
-            source: Some("apps/mac/src/shell/devtools.rs:475".into()),
-            bounds: Some(VdpUiBounds {
-                x: (vp_w - cap_w) * 0.5,
-                y: (vp_h - 36.0).max(0.0),
-                width: cap_w,
-                height: 26.0,
-            }),
-        });
-    }
-
-    if let Some(slot) = &shell.chrome.native_diorama {
-        candidates.push(VdpUiInspectAtResult {
-            hit: true,
-            surface: Some("diorama".into()),
-            test_id: Some("diorama-canvas".into()),
-            role: Some("canvas".into()),
-            text: Some(slot.view.read(cx).debug_state()["kind"].as_str().unwrap_or("diorama").to_string()),
-            route: Some("/farm".into()),
-            source: Some("apps/mac/src/diorama/view.rs:1".into()),
-            bounds: Some(VdpUiBounds {
-                x: rail_w,
-                y: 0.0,
-                width: (vp_w - rail_w).max(0.0),
-                height: vp_h,
-            }),
-        });
-    }
-
-    if shell.chrome.native_workspace {
-        if shell.chrome.sidebar_visible {
-            let div_x = rail_w + shell.chrome.sidebar_width;
-            candidates.push(VdpUiInspectAtResult {
-                hit: true,
-                surface: Some("shell".into()),
-                test_id: Some("sidebar-divider".into()),
-                role: Some("separator".into()),
-                text: None,
-                route: None,
-                source: Some("apps/mac/src/shell/render.rs:80".into()),
-                bounds: Some(VdpUiBounds {
-                    x: (div_x - 3.0).max(0.0),
-                    y: 0.0,
-                    width: 6.0,
-                    height: vp_h,
-                }),
-            });
-        }
-        if shell.chrome.inspector.is_some() {
-            let div_x = (vp_w - shell.chrome.inspector_width).max(0.0);
-            candidates.push(VdpUiInspectAtResult {
-                hit: true,
-                surface: Some("shell".into()),
-                test_id: Some("inspector-divider".into()),
-                role: Some("separator".into()),
-                text: None,
-                route: None,
-                source: Some("apps/mac/src/shell/render.rs:98".into()),
-                bounds: Some(VdpUiBounds {
-                    x: (div_x - 3.0).max(0.0),
-                    y: 0.0,
-                    width: 6.0,
-                    height: vp_h,
-                }),
-            });
-        }
-
-        let main_left = rail_w
-            + if shell.chrome.sidebar_visible {
-                shell.chrome.sidebar_width + 1.0
-            } else {
-                0.0
-            };
-        let main_right = vp_w
-            - if shell.chrome.inspector.is_some() {
-                shell.chrome.inspector_width + 1.0
-            } else {
-                0.0
-            };
-        let main_bounds = VdpUiBounds {
-            x: main_left,
-            y: 0.0,
-            width: (main_right - main_left).max(0.0),
-            height: vp_h,
-        };
-        if let Some(project) = shell.workspace.ws.active()
-            && let Some(tab) = project.layout.active_tab()
-        {
-            let (test_id, role, source) = match &tab.kind {
-                PaneKind::Terminal { terminal_id, .. } => (format!("pane:terminal:{terminal_id}"), "terminal", "apps/mac/src/panes.rs:1"),
-                PaneKind::File { path } => {
-                    let is_md = path.extension().and_then(|e| e.to_str()).is_some_and(|e| e.eq_ignore_ascii_case("md"));
-                    (
-                        format!("pane:file:{}", path.file_name().and_then(|n| n.to_str()).unwrap_or("file")),
-                        "document",
-                        if is_md {
-                            "apps/mac/src/markdown_pane.rs:1"
-                        } else {
-                            "apps/mac/src/viewer.rs:1"
-                        },
-                    )
-                }
-                PaneKind::Diff { .. } => ("pane:diff".to_string(), "diff", "apps/mac/src/diff.rs:1"),
-                PaneKind::Diorama { scene, .. } => (format!("pane:diorama:{scene}"), "canvas", "apps/mac/src/diorama/view.rs:1"),
-                PaneKind::Hosted { module, .. } => (format!("pane:hosted:{module}"), "region", "apps/mac/src/hosted/view.rs:1"),
-                PaneKind::Chat { .. } => ("pane:chat".to_string(), "region", "apps/mac/src/panes.rs:1"),
-            };
-            candidates.push(VdpUiInspectAtResult {
-                hit: true,
-                surface: Some("workspace".into()),
-                test_id: Some(test_id),
-                role: Some(role.into()),
-                text: Some(tab_title(shell, tab, cx)),
-                route: Some("/workspace".into()),
-                source: Some(source.into()),
-                bounds: Some(main_bounds),
-            });
-        }
-    }
-
-    select_deepest_hit(x, y, candidates)
 }

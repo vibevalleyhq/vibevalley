@@ -8,10 +8,10 @@ import {
   type AppletInstallInput,
   AppletOpenResult,
   AppletRemoveResult,
-  ArtifactAppletInfo,
   CommandLineState,
   HostCapturedImage,
   MotionChoice,
+  NoteAppletInfo,
   ThemeChoice,
 } from "@vibevalley/protocol/host";
 import { DesktopConnectionSnapshot as DesktopConnectionSnapshotSchema, EnvelopeSchema, sliceDecoders } from "@vibevalley/protocol/schema";
@@ -135,7 +135,10 @@ function ensureEntry(name: string): TopicEntry {
 function attachTopicListener(name: string, entry: TopicEntry): () => void {
   return listenDetached(`frame:${name}`, (payload) => {
     const parsed = FrameEnvelopeSchema.safeParse(payload);
-    if (!parsed.success) return;
+    if (!parsed.success) {
+      console.error(`[bridge] dropped malformed frame envelope (${name})`, { issues: parsed.error.issues });
+      return;
+    }
     entry.latest = parsed.data;
     entry.store.set(parsed.data);
     // A slice receipt releases the next snapshot. Other non-live receipts feed the debug dump.
@@ -206,6 +209,9 @@ function cachedDecode<T>(readRaw: () => unknown, decoder: Decoder<T>): () => T |
       return null;
     }
     const parsed = decoder.safeParse(raw);
+    if (!parsed.success) {
+      console.error("[bridge] dropped malformed decoded frame payload");
+    }
     lastDecoded = parsed.success ? parsed.data : null;
     return lastDecoded;
   };
@@ -262,8 +268,15 @@ export function subscribe(name: string, payload: unknown, on: (event: unknown) =
     if ("end" in message) {
       open = false;
       off();
-      const parsedEnd = EndEnvelopeSchema.safeParse(message.end);
-      ended?.(parsedEnd.success ? parsedEnd.data : null);
+      if (message.end === null || message.end === undefined) {
+        ended?.(null);
+      } else {
+        const parsedEnd = EndEnvelopeSchema.safeParse(message.end);
+        if (!parsedEnd.success) {
+          console.error(`[bridge] malformed subscription end envelope (${name})`, { issues: parsedEnd.error.issues });
+        }
+        ended?.(parsedEnd.success ? parsedEnd.data : null);
+      }
     } else if ("event" in message) {
       on(message.event);
     } else {
@@ -304,7 +317,7 @@ const AssetsDirSchema = z.object({ path: z.string() });
 const PickFileSchema = z.object({ path: z.string(), name: z.string(), type: z.string() }).nullable();
 const PickFolderSchema = z.object({ path: z.string(), name: z.string(), git: z.boolean() }).nullable();
 const ReadFileSchema = z.object({ data: z.string(), type: z.string(), name: z.string() });
-const AppletListSchema = z.array(ArtifactAppletInfo);
+const AppletListSchema = z.array(NoteAppletInfo);
 
 const VdpEndpointInfoSchema = z.object({
   protocolVersion: z.string(),
@@ -371,9 +384,9 @@ export const hostApi = {
   cliInstall: () => callDecoded("host.cliInstall", null, CommandLineState),
   cliRemove: () => callDecoded("host.cliRemove", null, CommandLineState),
   appletList: () => callDecoded("host.appletList", null, AppletListSchema),
-  appletInstall: (input: AppletInstallInput) => callDecoded("host.appletInstall", input, ArtifactAppletInfo),
-  appletUninstall: (artifactId: string) => callDecoded("host.appletUninstall", { artifactId }, AppletRemoveResult),
-  appletOpen: (artifactId: string) => callDecoded("host.appletOpen", { artifactId }, AppletOpenResult),
+  appletInstall: (input: AppletInstallInput) => callDecoded("host.appletInstall", input, NoteAppletInfo),
+  appletUninstall: (noteId: string) => callDecoded("host.appletUninstall", { noteId }, AppletRemoveResult),
+  appletOpen: (noteId: string) => callDecoded("host.appletOpen", { noteId }, AppletOpenResult),
   captureWebView: (options?: { width?: number; height?: number }) =>
     callDecoded("host.captureWebView", options ?? {}, HostCapturedImage.nullable(), { timeoutMs: 8_000 }),
   vdpDiscover: (extraHomes?: readonly string[]) =>

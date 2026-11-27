@@ -296,6 +296,7 @@ impl Inner {
 }
 
 #[cfg(test)]
+#[allow(clippy::disallowed_types, clippy::disallowed_methods, reason = "synchronous macOS FSEvents OS test boundary")]
 mod tests {
     use std::fs;
     use std::sync::{Condvar, Mutex};

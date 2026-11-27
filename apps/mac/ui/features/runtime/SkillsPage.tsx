@@ -3,7 +3,6 @@ import { computed, Scroll, signal, Text, View, windowSize } from "nsh";
 import { list as listed, t } from "@vibevalley/i18n";
 import type { Agent, RuntimeInfo, Skill } from "@vibevalley/protocol";
 
-import { createAct } from "../../design/act";
 import { Button, ButtonLink } from "../../design/Button";
 import { ConfirmButton } from "../../design/ConfirmButton";
 import { AgentFace } from "../../design/domain/Face";
@@ -14,6 +13,7 @@ import { Form, formControl, FormField, formMessages } from "../../design/Form";
 import { ActiveBar, Card, Empty, SidebarSection } from "../../design/layout";
 import { Markdown } from "../../design/Markdown";
 import { Bubble } from "../../design/Tip";
+import { createAct } from "../../infra/act";
 import { api, reasonOf } from "../../infra/api";
 import { Keyed } from "../../infra/base/dom";
 import { matches } from "../../infra/base/search";

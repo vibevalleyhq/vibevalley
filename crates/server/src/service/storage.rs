@@ -11,8 +11,8 @@ use sea_orm::{
 };
 use vibevalley_protocol::{Attachment, MediaInput, MediaInputPhase, MediaInputRequest};
 
-use super::with_write_tx;
-use crate::db::entity::{attachment, media_input, media_input_pin};
+use super::{MAX_SQL_BIND_PARAMS, with_write_tx};
+use crate::db::entity::{attachment, channel_message, issue, media_input, media_input_pin, media_library_item};
 use crate::db::{Database, DbError, DbResult, Tx};
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -317,5 +317,142 @@ impl StorageService {
             .exec(self.db.write_conn())
             .await?;
         Ok(res.rows_affected)
+    }
+
+    /// Lists `(id, size, created_at)` for attachments created before `before_ms`, oldest first.
+    pub(crate) async fn list_attachments_older_than(&self, before_ms: i64) -> DbResult<Vec<(String, i64, i64)>> {
+        let rows: Vec<(String, i64, i64)> = attachment::Entity::find()
+            .select_only()
+            .columns([attachment::Column::Id, attachment::Column::Size, attachment::Column::CreatedAt])
+            .filter(attachment::Column::CreatedAt.lt(before_ms))
+            .order_by_asc(attachment::Column::CreatedAt)
+            .order_by_asc(attachment::Column::Id)
+            .into_tuple()
+            .all(self.db.read_conn())
+            .await?;
+        Ok(rows)
+    }
+
+    /// Lists every `attachment.id` currently tracked in the database.
+    pub(crate) async fn list_all_attachment_ids(&self) -> DbResult<HashSet<String>> {
+        let ids: Vec<String> = attachment::Entity::find()
+            .select_only()
+            .column(attachment::Column::Id)
+            .into_tuple()
+            .all(self.db.read_conn())
+            .await?;
+        Ok(ids.into_iter().collect())
+    }
+
+    /// Computes the set of attachment IDs / hashes referenced across `media_input`,
+    /// active `media_library_item`, `issue`, and non-deleted `channel_message` rows.
+    pub(crate) async fn list_referenced_attachment_ids(&self) -> DbResult<HashSet<String>> {
+        let conn = self.db.read_conn();
+        let mut referenced: HashSet<String> = HashSet::new();
+
+        let input_hashes: Vec<Option<String>> = media_input::Entity::find()
+            .select_only()
+            .column(media_input::Column::Hash)
+            .filter(media_input::Column::Hash.is_not_null())
+            .into_tuple()
+            .all(conn)
+            .await?;
+        for hash in input_hashes.into_iter().flatten() {
+            referenced.insert(hash);
+        }
+
+        let library_ids: Vec<String> = media_library_item::Entity::find()
+            .select_only()
+            .column(media_library_item::Column::AttachmentId)
+            .filter(media_library_item::Column::RemovedAt.is_null())
+            .into_tuple()
+            .all(conn)
+            .await?;
+        referenced.extend(library_ids);
+
+        let all_ids: Vec<String> = attachment::Entity::find()
+            .select_only()
+            .column(attachment::Column::Id)
+            .into_tuple()
+            .all(conn)
+            .await?;
+        let mut unreferenced: Vec<String> = all_ids.into_iter().filter(|id| !referenced.contains(id)).collect();
+        if unreferenced.is_empty() {
+            return Ok(referenced);
+        }
+
+        let issue_blobs: Vec<(String, String, Option<String>, Option<String>)> = issue::Entity::find()
+            .select_only()
+            .columns([
+                issue::Column::Attachments,
+                issue::Column::Description,
+                issue::Column::Answer,
+                issue::Column::DeliveryEvidence,
+            ])
+            .into_tuple()
+            .all(conn)
+            .await?;
+        for (attachments, description, answer, delivery_evidence) in issue_blobs {
+            let fields = [
+                attachments.as_str(),
+                description.as_str(),
+                answer.as_deref().unwrap_or(""),
+                delivery_evidence.as_deref().unwrap_or(""),
+            ];
+            unreferenced.retain(|id| {
+                if fields.iter().any(|text| text.contains(id.as_str())) {
+                    referenced.insert(id.clone());
+                    false
+                } else {
+                    true
+                }
+            });
+            if unreferenced.is_empty() {
+                return Ok(referenced);
+            }
+        }
+
+        let msg_blobs: Vec<(Option<String>, String)> = channel_message::Entity::find()
+            .select_only()
+            .columns([channel_message::Column::Meta, channel_message::Column::Body])
+            .filter(channel_message::Column::DeletedAt.is_null())
+            .into_tuple()
+            .all(conn)
+            .await?;
+        for (meta, body) in msg_blobs {
+            let meta_str = meta.as_deref().unwrap_or("");
+            unreferenced.retain(|id| {
+                if meta_str.contains(id.as_str()) || body.contains(id.as_str()) {
+                    referenced.insert(id.clone());
+                    false
+                } else {
+                    true
+                }
+            });
+            if unreferenced.is_empty() {
+                break;
+            }
+        }
+
+        Ok(referenced)
+    }
+
+    /// Deletes attachments by ID in SQL-bind-safe chunks.
+    pub(crate) async fn delete_attachments_batch(&self, ids: &[String]) -> DbResult<u64> {
+        if ids.is_empty() {
+            return Ok(0);
+        }
+        with_write_tx(&self.db, async |tx| {
+            let mut deleted = 0u64;
+            for chunk in ids.chunks(MAX_SQL_BIND_PARAMS) {
+                let res = attachment::Entity::delete_many()
+                    .filter(attachment::Column::Id.is_in(chunk.iter().cloned()))
+                    .exec(tx)
+                    .await?;
+                deleted += res.rows_affected;
+            }
+            Ok(deleted)
+        })
+        .await
     }
 }

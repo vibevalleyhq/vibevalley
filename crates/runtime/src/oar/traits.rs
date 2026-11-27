@@ -36,7 +36,7 @@ pub trait Session: Send + Sync {
             .and_then(|e| serde_json::from_value(e["usage"]["tokens"].clone()).ok())
     }
     fn records(&self) -> Vec<voyage::Record>;
-    fn subscribe_records(&self, after: Option<u64>) -> mpsc::UnboundedReceiver<voyage::Record>;
+    fn subscribe_records(&self, after: Option<u64>) -> mpsc::Receiver<voyage::Record>;
     fn wait(&self) -> BoxFuture<'_, Result<()>> {
         Box::pin(async move {
             let mut events = self.events();
@@ -72,9 +72,9 @@ pub trait Session: Send + Sync {
     }
     fn runtime_id(&self) -> &str;
     fn status(&self) -> SessionStatus;
-    /// A new receiver that yields every event from now on. May be called
-    /// several times; each receiver gets every event.
-    fn events(&self) -> mpsc::UnboundedReceiver<Event>;
+    /// A new bounded receiver that yields every event from now on. May be called
+    /// several times; slow subscribers are evicted if their buffer fills.
+    fn events(&self) -> mpsc::Receiver<Event>;
     /// Starts a turn. Rejected while a turn is running (use `steer`/`queue`).
     fn prompt(&self, content: Vec<ContentBlock>) -> BoxFuture<'_, Result<()>>;
     fn prompt_with(&self, content: Vec<ContentBlock>, _opts: TurnOptions) -> BoxFuture<'_, Result<()>> {
@@ -112,7 +112,7 @@ pub trait Session: Send + Sync {
     /// Like `events`, but the receiver first yields every event emitted so
     /// far (so a subscriber attached after `open` still sees
     /// `SessionStarted`). Sessions that keep no history fall back to `events`.
-    fn events_with_history(&self) -> mpsc::UnboundedReceiver<Event> {
+    fn events_with_history(&self) -> mpsc::Receiver<Event> {
         self.events()
     }
 }

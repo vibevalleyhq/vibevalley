@@ -3,15 +3,49 @@ import { expect, open, test } from "nsh/test";
 
 import { setLocale } from "@vibevalley/i18n";
 import "@vibevalley/i18n/catalogs";
-import { type Artifact, type Channel, type ChatMessage, type Issue } from "@vibevalley/protocol";
-import { artifactId, issueId, messageId } from "@vibevalley/protocol/schema";
+import { type Channel, type ChatMessage, type Issue, type Note, type NoteType } from "@vibevalley/protocol";
+import { issueId, messageId, noteId } from "@vibevalley/protocol/schema";
 
-import { responses as artifactResponses } from "../../../fixtures/artifacts";
 import { fakeHost } from "../../../fixtures/fakeHost";
 import { SCENARIO_NOW, scenarios } from "../../../fixtures/scenarios";
-import { buildPromotedArtifactDraft, buildPromotedIssueDraft, messageSourcePath } from "../model/promote";
+import { setCoreBridgeForTest } from "../../../infra/rich";
+import { buildPromotedIssueDraft, buildPromotedNoteContent, buildPromotedNoteDraft, messageSourcePath } from "../model/promote";
 
-test("promote helpers carry /chat/<channel>?m=<seq> back-links, body, and attachments", () => {
+const sampleNote: Note = {
+  id: noteId("note-saved-msg"),
+  title: "设计稿和录屏在这，参考 https://example.com/design",
+  noteType: "doc",
+  sortOrder: 0,
+  channel: "general",
+  said: { channel: "general", number: 12 },
+  by: "user",
+  byName: "You",
+  version: 1,
+  seq: 1,
+  versions: [],
+  at: SCENARIO_NOW,
+  updated: SCENARIO_NOW,
+};
+
+function respondNoteDefaults(fake: ReturnType<typeof fakeHost>, list: Note[] = [sampleNote]) {
+  fake.respond("note.list", () => list);
+  fake.respond("note.get", () => list[0] ?? sampleNote);
+  fake.respond("note.file.list", () => ({ noteId: (list[0] ?? sampleNote).id, seq: 1, files: [] }));
+  fake.respond("note.doc.view", () => ({
+    noteId: (list[0] ?? sampleNote).id,
+    title: (list[0] ?? sampleNote).title,
+    blocks: [{ id: "b1", type: "prose", text: "Saved note body" }],
+    slideCount: 1,
+    wordCount: 3,
+    extractedLinks: [],
+  }));
+  fake.respond("note.link.list", () => ({ outgoing: [], backlinks: [] }));
+  fake.respond("note.suggestion.list", () => []);
+  fake.respond("note.history.list", () => []);
+  fake.respond("note.type.list", () => []);
+}
+
+test("promote helpers carry /chat/<channel>?m=<seq> back-links, body, attachments, and 3+1 note JSON payloads", () => {
   setLocale("en");
   const channel: Channel = {
     id: "design",
@@ -57,18 +91,50 @@ test("promote helpers carry /chat/<channel>?m=<seq> back-links, body, and attach
   expect(issueDraft.text).toContain("Fix login redirect loop");
   expect(issueDraft.text).toContain("/chat/design?m=42");
 
-  const artDraft = buildPromotedArtifactDraft(msg, channel);
-  expect(artDraft.title).toBe("Fix login redirect loop");
-  expect(artDraft.backLink).toBe("/chat/design?m=42");
-  expect(artDraft.content).toContain("![flow.png](/api/v1/attachment/att-img)");
-  expect(artDraft.content).toContain("[spec.pdf](/api/v1/attachment/att-pdf)");
-  expect(artDraft.content).toContain("/chat/design?m=42");
+  const noteDraft = buildPromotedNoteDraft(msg, channel);
+  expect(noteDraft.title).toBe("Fix login redirect loop");
+  expect(noteDraft.backLink).toBe("/chat/design?m=42");
+  expect(noteDraft.content).toContain("![flow.png](/api/v1/attachment/att-img)");
+  expect(noteDraft.content).toContain("[spec.pdf](/api/v1/attachment/att-pdf)");
+  expect(noteDraft.content).toContain("/chat/design?m=42");
+
+  const restore = setCoreBridgeForTest({
+    markdownToBlocks: (md) => {
+      const blocks = md
+        .split(/\n\n+/u)
+        .filter((s) => s.trim().length > 0)
+        .map((chunk, i) =>
+          chunk.trim().startsWith(">")
+            ? { id: `b${i + 1}`, type: "quote", text: chunk.trim().replace(/^>\s?/u, "") }
+            : { id: `b${i + 1}`, type: "prose", text: chunk.trim() },
+        );
+      return JSON.stringify(blocks);
+    },
+  });
+  let docJson: { version: number; blocks: { type: string; text?: string }[] };
+  try {
+    docJson = JSON.parse(buildPromotedNoteContent({ title: noteDraft.title, noteType: "doc", content: noteDraft.content })) as {
+      version: number;
+      blocks: { type: string; text?: string }[];
+    };
+  } finally {
+    restore();
+  }
+  expect(docJson.version).toBe(1);
+  expect(docJson.blocks.some((b) => b.type === "prose" && (b.text ?? "").includes("Fix login redirect loop"))).toBe(true);
+  expect(docJson.blocks.some((b) => b.type === "quote" && (b.text ?? "").includes("/chat/design?m=42"))).toBe(true);
+
+  const baseJson = JSON.parse(buildPromotedNoteContent({ title: noteDraft.title, noteType: "base", content: noteDraft.content })) as {
+    sheets: { name: string; rows: unknown[] }[];
+  };
+  expect(baseJson.sheets[0]?.name).toBe("Fix login redirect loop");
+  expect(baseJson.sheets[0]?.rows).toHaveLength(1);
 });
 
 test("MessageTools overflow promotes a channel message to NewIssue with body, attachments, and back-link", async () => {
   setLocale("en");
   const fake = fakeHost(scenarios.typical, { route: "/chat", locale: "en" });
-  for (const [op, answer] of Object.entries(artifactResponses)) fake.respond(op, answer);
+  respondNoteDefaults(fake);
 
   const createdIssues: { title?: string; description?: string; attachments?: string[] }[] = [];
   const baseIssue = scenarios.typical.state.board.issues[0];
@@ -116,40 +182,22 @@ test("MessageTools overflow promotes a channel message to NewIssue with body, at
   expect(createdIssues[0]?.attachments).toEqual(["a1", "a2", "a3", "a4"]);
 });
 
-test("MessageTools overflow saves a channel message as an artifact with channel source and back-link", async () => {
+test("MessageTools overflow saves a channel message as a note with channel source and back-link", async () => {
   setLocale("en");
   const fake = fakeHost(scenarios.typical, { route: "/chat", locale: "en" });
-  for (const [op, answer] of Object.entries(artifactResponses)) fake.respond(op, answer);
+  respondNoteDefaults(fake);
 
-  const createdArtifacts: { title?: string; artifactType?: Artifact["artifactType"]; channel?: string; content?: string }[] = [];
-  const sampleArtifact: Artifact = {
-    id: artifactId("art-saved-msg"),
-    title: "设计稿和录屏在这，参考 https://example.com/design",
-    artifactType: "docs",
-    isDefault: false,
-    channel: "general",
-    said: { channel: "general", number: 12 },
-    by: "user",
-    byName: "You",
-    version: 1,
-    seq: 1,
-    versions: [],
-    at: SCENARIO_NOW,
-    updated: SCENARIO_NOW,
-  };
-  fake.respond("artifact.create", (payload: unknown) => {
-    const p = payload as { title?: string; artifactType?: Artifact["artifactType"]; channel?: string; content?: string };
-    createdArtifacts.push(p);
+  const createdNotes: { title?: string; noteType?: NoteType; channel?: string; content?: string }[] = [];
+  fake.respond("note.create", (payload: unknown) => {
+    const p = payload as { title?: string; noteType?: NoteType; channel?: string; content?: string };
+    createdNotes.push(p);
     return {
-      ...sampleArtifact,
-      title: p.title ?? sampleArtifact.title,
-      artifactType: p.artifactType ?? "docs",
+      ...sampleNote,
+      title: p.title ?? sampleNote.title,
+      noteType: p.noteType ?? "doc",
       channel: p.channel ?? "general",
     };
   });
-  fake.respond("artifact.get", () => sampleArtifact);
-  fake.respond("artifact.list", () => [sampleArtifact]);
-  fake.respond("artifact.file.list", () => ({ artifactId: sampleArtifact.id, seq: 1, files: [] }));
 
   const app = await open("../../../app/main.tsx", {
     width: 1280,
@@ -164,21 +212,21 @@ test("MessageTools overflow saves a channel message as an artifact with channel 
   await app.hover("text:设计稿和录屏在这，参考 https://example.com/design");
   await fake.pumpUntil(app, () => app.count("id:message-tool-more") === 1);
   await app.press("id:message-tool-more");
-  await fake.pumpUntil(app, () => app.count("id:more-save-artifact") === 1);
-  await app.press("id:more-save-artifact");
+  await fake.pumpUntil(app, () => app.count("id:more-save-note") === 1);
+  await app.press("id:more-save-note");
 
-  await fake.pumpUntil(app, () => app.count("id:save-artifact-dialog") === 1);
-  expect(app.value("id:save-artifact-title")).toContain("设计稿和录屏在这");
-  const content = app.value("id:save-artifact-content");
+  await fake.pumpUntil(app, () => app.count("id:save-note-dialog") === 1);
+  expect(app.value("id:save-note-title")).toContain("设计稿和录屏在这");
+  const content = app.value("id:save-note-content");
   expect(content).toContain("/chat/general?m=7");
   expect(content).toContain("/api/v1/attachment/a3");
 
-  await app.press("id:save-artifact-submit");
-  await fake.pumpUntil(app, () => createdArtifacts.length === 1);
-  expect(createdArtifacts[0]).toMatchObject({
-    artifactType: "docs",
+  await app.press("id:save-note-submit");
+  await fake.pumpUntil(app, () => createdNotes.length === 1);
+  expect(createdNotes[0]).toMatchObject({
+    noteType: "doc",
     channel: "general",
   });
-  expect(createdArtifacts[0]?.content ?? "").toContain("/chat/general?m=7");
-  await fake.pumpUntil(app, () => app.count("id:artifact-header") === 1);
+  expect(createdNotes[0]?.content ?? "").toContain("/chat/general?m=7");
+  await fake.pumpUntil(app, () => app.count("id:note-header") === 1);
 });

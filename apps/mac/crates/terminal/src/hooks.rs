@@ -611,7 +611,7 @@ mod tests {
             .join("\n")
     }
 
-    fn wait_for_text(session: &TermSession, events: &flume::Receiver<TermEvent>, needle: &str) {
+    fn wait_for_text(session: &TermSession, events: &std::sync::mpsc::Receiver<TermEvent>, needle: &str) {
         let deadline = Instant::now() + Duration::from_secs(10);
         loop {
             let text = screen_text(session);
@@ -778,7 +778,7 @@ mod tests {
         };
 
         // 1. Spawn tab WITH idegraph hook enabled.
-        let (tx1, rx1) = flume::unbounded();
+        let (tx1, rx1) = std::sync::mpsc::channel();
         let s_enabled = TermSession::spawn_with_hooks(make_opts(&tab_enabled_hist, &enabled_hooks), enabled_hooks, move |ev| {
             let _ = tx1.send(ev);
         })
@@ -809,7 +809,7 @@ mod tests {
         wait_for_text(&s_enabled, &rx1, "history_with_hook_ok");
 
         // 2. Spawn sibling tab WITH hooks disabled (default) and verify ZERO leakage.
-        let (tx2, rx2) = flume::unbounded();
+        let (tx2, rx2) = std::sync::mpsc::channel();
         let s_disabled = TermSession::spawn_with_hooks(make_opts(&tab_disabled_hist, &disabled_hooks), disabled_hooks, move |ev| {
             let _ = tx2.send(ev);
         })
@@ -863,7 +863,7 @@ mod tests {
         tab.set_enabled("devtool", false, true);
         let hooks = cfg.resolve_for_tab(None, &tab);
 
-        let (tx, rx) = flume::unbounded();
+        let (tx, rx) = std::sync::mpsc::channel();
         let session = TermSession::spawn_with_hooks(
             SpawnOptions {
                 cwd: dir.path().to_path_buf(),

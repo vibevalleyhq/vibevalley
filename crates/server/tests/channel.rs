@@ -1,6 +1,7 @@
 //! The chat through its endpoints: places, messages, threads, reactions,
 //! pins, search, reads, the follow stream, attachments and a restart.
 
+use crate::support::{RouterTestExt as _, ServerTestExt as _};
 use std::sync::Arc;
 use std::time::Duration;
 

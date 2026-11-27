@@ -489,7 +489,12 @@ async fn download_http_attempt(
             let _ = tokio::fs::remove_file(part).await;
             0
         }
-        Err(_) => 0,
+        Err(err) => {
+            if err.kind() != std::io::ErrorKind::NotFound {
+                tracing::warn!(target: "vibevalley::update", path = %part.display(), error = %err, "failed to stat partial update file; restarting from byte 0");
+            }
+            0
+        }
     };
 
     let mut req = client.get(url);
@@ -584,7 +589,9 @@ async fn download_http_attempt(
             Ok(Some(chunk)) => chunk,
             Ok(None) => break,
             Err(e) => {
-                let _ = writer.flush().await;
+                if let Err(flush_err) = writer.flush().await {
+                    tracing::warn!(target: "vibevalley::update", path = %part.display(), error = %flush_err, "failed to flush partial update buffer before retry");
+                }
                 return Ok(DownloadOutcome::Retry(UpdateError::network(format!("http: {e}"))));
             }
         };

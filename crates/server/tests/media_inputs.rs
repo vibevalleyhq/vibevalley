@@ -1,3 +1,4 @@
+use crate::support::RouterTestExt as _;
 use serde_json::{Value, json};
 use std::{io::Cursor, path::Path};
 use vibevalley_protocol::{BizCode, Caller, MediaInputPhase, MediaInputRequest};

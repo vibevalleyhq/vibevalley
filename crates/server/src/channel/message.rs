@@ -1,7 +1,7 @@
 use vibevalley_core::SliceMask;
 use vibevalley_i18n::{list, t};
 use vibevalley_protocol::{
-    ApiError, ArtifactCard, Attachment, BizCode, CallState, ChatMessage, MessageHit, MessageKind, NoticeLevel, Preview, SubjectKind, USER_ID,
+    ApiError, Attachment, BizCode, CallState, ChatMessage, MessageHit, MessageKind, NoteCard, NoticeLevel, Preview, SubjectKind, USER_ID,
 };
 
 use super::model::{Q, WriteTx, message_of};
@@ -261,7 +261,7 @@ impl Chat {
                 ..Meta::default()
             };
             match &p.made {
-                Some(Made::Card(card)) => meta.artifact = Some(card.clone()),
+                Some(Made::Card(card)) => meta.note = Some(card.clone()),
                 Some(Made::Attachments(ids)) => meta.attachments = Some(self.attachments_of(ids).await?),
                 None => {}
             }
@@ -279,13 +279,13 @@ impl Chat {
         Ok((to_message(&written.row), written.again))
     }
 
-    /// Posts an artifact announcement card into `channel`.
+    /// Posts a note announcement card into `channel`.
     pub async fn post_card_async(
         &self,
         from: &str,
         channel: &str,
         text: &str,
-        card: ArtifactCard,
+        card: NoteCard,
         run: Option<String>,
         send_key: String,
     ) -> Result<ChatMessage, ApiError> {
@@ -700,7 +700,7 @@ impl crate::context::port::ChannelAnnounce for Chat {
         from: &'a str,
         channel: &'a str,
         text: &'a str,
-        card: ArtifactCard,
+        card: NoteCard,
         run: Option<String>,
         send_key: String,
     ) -> crate::BoxFuture<'a, Result<ChatMessage, ApiError>> {

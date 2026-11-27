@@ -40,7 +40,7 @@ public enum ScrollPhaseKind: String, Codable, Equatable, Sendable {
 }
 
 public enum ShimToHost: Equatable, Sendable {
-  case attach(artifactId: String, width: Double, height: Double, scale: Double, displayId: UInt32?)
+  case attach(noteId: String, width: Double, height: Double, scale: Double, displayId: UInt32?)
   case resize(width: Double, height: Double, scale: Double)
   case mouseDown(x: Double, y: Double, button: MouseButtonKind, clickCount: Int, modifiers: Modifiers)
   case mouseUp(x: Double, y: Double, button: MouseButtonKind, clickCount: Int, modifiers: Modifiers)
@@ -64,8 +64,8 @@ public enum ShimToHost: Equatable, Sendable {
 }
 
 public enum HostToShim: Equatable, Sendable {
-  case readyLayer(contextId: UInt32, title: String, artifactType: String)
-  case readyWebview(html: String, title: String, artifactType: String)
+  case readyLayer(contextId: UInt32, title: String, noteType: String)
+  case readyWebview(html: String, title: String, noteType: String)
   case updateWebview(html: String, title: String)
   case setTitle(title: String)
   case setAlwaysOnTop(enabled: Bool)
@@ -92,7 +92,7 @@ extension ShimToHost: Codable {
 
   private enum CodingKeys: String, CodingKey {
     case type
-    case artifactId
+    case noteId
     case width
     case height
     case scale
@@ -119,7 +119,7 @@ extension ShimToHost: Codable {
     switch kind {
     case .attach:
       self = .attach(
-        artifactId: try container.decode(String.self, forKey: .artifactId),
+        noteId: try container.decode(String.self, forKey: .noteId),
         width: try container.decode(Double.self, forKey: .width),
         height: try container.decode(Double.self, forKey: .height),
         scale: try container.decode(Double.self, forKey: .scale),
@@ -201,9 +201,9 @@ extension ShimToHost: Codable {
   public func encode(to encoder: Encoder) throws {
     var container = encoder.container(keyedBy: CodingKeys.self)
     switch self {
-    case .attach(let artifactId, let width, let height, let scale, let displayId):
+    case .attach(let noteId, let width, let height, let scale, let displayId):
       try container.encode(Kind.attach, forKey: .type)
-      try container.encode(artifactId, forKey: .artifactId)
+      try container.encode(noteId, forKey: .noteId)
       try container.encode(width, forKey: .width)
       try container.encode(height, forKey: .height)
       try container.encode(scale, forKey: .scale)
@@ -287,7 +287,7 @@ extension HostToShim: Codable {
     case type
     case contextId
     case title
-    case artifactType
+    case noteType
     case html
     case enabled
     case message
@@ -301,13 +301,13 @@ extension HostToShim: Codable {
       self = .readyLayer(
         contextId: try container.decode(UInt32.self, forKey: .contextId),
         title: try container.decode(String.self, forKey: .title),
-        artifactType: try container.decode(String.self, forKey: .artifactType)
+        noteType: try container.decode(String.self, forKey: .noteType)
       )
     case .readyWebview:
       self = .readyWebview(
         html: try container.decode(String.self, forKey: .html),
         title: try container.decode(String.self, forKey: .title),
-        artifactType: try container.decode(String.self, forKey: .artifactType)
+        noteType: try container.decode(String.self, forKey: .noteType)
       )
     case .updateWebview:
       self = .updateWebview(
@@ -334,16 +334,16 @@ extension HostToShim: Codable {
   public func encode(to encoder: Encoder) throws {
     var container = encoder.container(keyedBy: CodingKeys.self)
     switch self {
-    case .readyLayer(let contextId, let title, let artifactType):
+    case .readyLayer(let contextId, let title, let noteType):
       try container.encode(Kind.readyLayer, forKey: .type)
       try container.encode(contextId, forKey: .contextId)
       try container.encode(title, forKey: .title)
-      try container.encode(artifactType, forKey: .artifactType)
-    case .readyWebview(let html, let title, let artifactType):
+      try container.encode(noteType, forKey: .noteType)
+    case .readyWebview(let html, let title, let noteType):
       try container.encode(Kind.readyWebview, forKey: .type)
       try container.encode(html, forKey: .html)
       try container.encode(title, forKey: .title)
-      try container.encode(artifactType, forKey: .artifactType)
+      try container.encode(noteType, forKey: .noteType)
     case .updateWebview(let html, let title):
       try container.encode(Kind.updateWebview, forKey: .type)
       try container.encode(html, forKey: .html)

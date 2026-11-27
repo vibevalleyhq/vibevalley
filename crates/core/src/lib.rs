@@ -1,9 +1,9 @@
 //! VibeValley's projection and domain rules: core state folding (`reduce`),
 //! per-domain slice projections (`board_slice`, `sessions_slice`, `collab_slice`,
 //! `inbox_slice`, `ops_slice`, `farm_frame`), schedules (`cron`),
-//! and artifacts (`artifact`).
+//! and notes (`note`).
 
-pub mod artifact;
+pub mod audio;
 pub mod brief;
 pub mod channel;
 pub mod clock;
@@ -17,6 +17,7 @@ pub mod game;
 pub mod health;
 mod inbox;
 pub mod moves;
+pub mod note;
 pub mod pr;
 pub mod projection;
 pub mod prompts;
@@ -41,9 +42,10 @@ pub use crate::deps::{
 pub use crate::health::{MorningDigestInput, RepoHealthInput, assess_repo_health, assess_repos_health, build_morning_digest, suggest_backlog_triage};
 pub use crate::moves::{Move, Refusal, status_move, status_moves};
 pub use crate::projection::{
-    BoardInput, CollabInput, FarmInput, InboxInput, LiveSessionOverlay, LiveSnapshot, OpsInput, SessionInput, apply_session_telemetry, derive_issues,
-    fold_session_telemetry, merge_session_telemetry_usage, overlay_sessions, project_board, project_collab, project_farm, project_inbox, project_ops,
-    project_sessions,
+    BOARD_KEEP_CLOSED_ISSUES, BoardInput, CollabInput, FarmInput, InboxInput, LiveSessionOverlay, LiveSnapshot, OpsInput, SessionInput,
+    SharedProjectionContext, apply_session_telemetry, derive_issues, derive_single_issue, fold_session_telemetry, merge_session_telemetry_usage,
+    overlay_sessions, prepare_shared_context, project_board, project_board_shared, project_collab, project_farm, project_farm_shared, project_inbox,
+    project_inbox_shared, project_ops, project_sessions, project_sessions_shared,
 };
 pub use crate::prompts::work_constraints;
 pub use crate::retro::issue_retro;

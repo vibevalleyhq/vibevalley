@@ -478,18 +478,11 @@ pub(crate) fn fmt_num(v: f64) -> String {
     }
 }
 
-/// Escapes XML metacharacters and strips XML 1.0 illegal control characters.
+/// Escapes XML metacharacters via `quick_xml::escape` and strips XML 1.0 illegal control characters.
 pub(crate) fn push_escaped(out: &mut String, input: &str) {
-    for ch in input.chars() {
-        match ch {
-            '&' => out.push_str("&amp;"),
-            '<' => out.push_str("&lt;"),
-            '>' => out.push_str("&gt;"),
-            '"' => out.push_str("&quot;"),
-            '\'' => out.push_str("&#39;"),
-            '\t' | '\n' | '\r' => out.push(ch),
-            c if (c as u32) < 0x20 || c == '\u{7F}' => {}
-            c => out.push(c),
-        }
-    }
+    let cleaned: String = input
+        .chars()
+        .filter(|&c| matches!(c, '\t' | '\n' | '\r') || ((c as u32) >= 0x20 && c != '\u{7F}'))
+        .collect();
+    out.push_str(&quick_xml::escape::escape(&cleaned));
 }

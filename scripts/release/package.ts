@@ -132,22 +132,13 @@ async function main(): Promise<void> {
     if (res.status !== 0) cpSync(src, dst, { recursive: true });
   };
   if (!values["skip-build"]) {
-    if (values.fast) {
-      // Release and alpha profiles already compile and embed UI bytecode inside apps/mac/build.rs.
-      if (profile === "debug") {
-        const uiDir = join(root, "apps/mac/ui");
-        const nshBin = join(root, ".tools/bin/nsh");
-        await Promise.all([
-          runAsync(nshBin, ["build", "App.tsx", "-o", "build"], uiDir),
-          runAsync(nshBin, ["build", "ShellApp.tsx", "-o", "build-shell"], uiDir),
-        ]);
-      }
-    } else {
+    if (!values.fast) {
       run("vp", ["run", "mac:check"]);
     }
+    // Release, alpha, and `debug` + `VIBEVALLEY_EMBED_UI=1` all compile and embed UI bytecode inside `apps/mac/build.rs`.
     const cargoProfileArgs = profile === "release" ? ["--release"] : profile === "alpha" ? ["--profile", "alpha"] : [];
     const cargoFeatureArgs = profile === "release" ? [] : ["--features", "vibevalley-mac/shot"];
-    const cargoEnv = profile === "release" ? { LIBGHOSTTY_VT_SYS_OPTIMIZE: "ReleaseFast" } : undefined;
+    const cargoEnv = profile === "release" ? { LIBGHOSTTY_VT_SYS_OPTIMIZE: "ReleaseFast" } : profile === "debug" ? { VIBEVALLEY_EMBED_UI: "1" } : undefined;
     const buildTasks: Promise<void>[] = [
       runAsync("cargo", ["build", "--locked", ...cargoProfileArgs, "-p", "vibevalley-mac", "-p", "vibevalley-cli", ...cargoFeatureArgs], root, cargoEnv),
     ];

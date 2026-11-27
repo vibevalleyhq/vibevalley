@@ -29,6 +29,9 @@ pub struct SettingFields {
     /// DeepSeek API key
     #[arg(long)]
     pub deepseek_key: Option<String>,
+    /// GitHub personal access token
+    #[arg(long)]
+    pub github_token: Option<String>,
 }
 
 impl SettingFields {
@@ -36,9 +39,10 @@ impl SettingFields {
         let update = SettingsUpdate {
             locale: self.locale.map(Into::into),
             deepseek_api_key: self.deepseek_key,
+            github_token: self.github_token,
             ..Default::default()
         };
-        let any = update.locale.is_some() || update.deepseek_api_key.is_some();
+        let any = update.locale.is_some() || update.deepseek_api_key.is_some() || update.github_token.is_some();
         (update, any)
     }
 }
@@ -78,6 +82,7 @@ fn status_text(status: &SettingsStatus) -> String {
         line(&["repos", &status.paths.repos]),
         line(&["worktrees", &status.paths.worktrees]),
         key_line("deepseek", &status.deepseek_api_key),
+        key_line("github", &status.github_token),
     ];
     let ready: Vec<&str> = status
         .readiness

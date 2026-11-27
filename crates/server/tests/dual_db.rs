@@ -231,7 +231,7 @@ fn start_server(home: &Path, database_url: Option<String>, weixin_url: &str) -> 
 }
 
 fn ok(started: &vibevalley_server::App, op: &str, payload: Value) -> Value {
-    let env = started.router().call_as(Caller::User, op, payload);
+    let env = vibevalley_runtime::rt::block_on(started.router().call_as_async(Caller::User, op, payload));
     assert_eq!(env.biz_code, 0, "{op} failed (biz={}): {}", env.biz_code, env.message);
     env.data.unwrap_or(Value::Null)
 }
@@ -395,25 +395,30 @@ fn run_full_stack_e2e(home: &Path, database_url: Option<String>) {
     let media_listed = ok(&started, "media.input.list", Value::Null);
     assert!(media_listed.as_array().unwrap().iter().any(|m| m["id"] == media_id && m["phase"] == "ready"));
 
-    // 10. content/artifact (docs + slides directory files)
-    let md_art = ok(
+    // 10. note (doc + canvas directory files)
+    let md_note = ok(
         &started,
-        "artifact.create",
-        json!({ "title": "Dual Markdown", "artifactType": "docs", "content": "# Dual DB", "channel": eng_id }),
+        "note.create",
+        json!({
+            "title": "Dual Markdown",
+            "noteType": "doc",
+            "content": "{\"version\":1,\"blocks\":[{\"id\":\"b1\",\"type\":\"heading\",\"level\":1,\"text\":\"Dual DB\"}]}",
+            "channel": eng_id
+        }),
     );
-    let md_art_id = md_art["id"].as_str().unwrap().to_string();
+    let md_note_id = md_note["id"].as_str().unwrap().to_string();
 
-    let store_art = ok(
+    let store_note = ok(
         &started,
-        "artifact.create",
-        json!({ "title": "Dual Store", "artifactType": "slides", "channel": eng_id }),
+        "note.create",
+        json!({ "title": "Dual Store", "noteType": "canvas", "channel": eng_id }),
     );
-    let store_art_id = store_art["id"].as_str().unwrap().to_string();
+    let store_note_id = store_note["id"].as_str().unwrap().to_string();
     let written = ok(
         &started,
-        "artifact.file.write",
+        "note.file.write",
         json!({
-            "id": store_art_id,
+            "id": store_note_id,
             "files": [{ "path": "structure/notes.txt", "content": "persisted" }]
         }),
     );
@@ -526,11 +531,11 @@ fn run_full_stack_e2e(home: &Path, database_url: Option<String>) {
     let media_listed = ok(&reopened, "media.input.list", json!({}));
     assert!(media_listed.as_array().unwrap().iter().any(|m| m["id"] == media_id && m["phase"] == "ready"));
 
-    let md_got = ok(&reopened, "artifact.get", json!({ "id": md_art_id }));
+    let md_got = ok(&reopened, "note.get", json!({ "id": md_note_id }));
     assert_eq!(md_got["title"], "Dual Markdown");
-    let files = ok(&reopened, "artifact.file.list", json!({ "id": store_art_id, "prefix": "structure/" }));
+    let files = ok(&reopened, "note.file.list", json!({ "id": store_note_id, "prefix": "structure/" }));
     assert!(files["files"].as_array().unwrap().iter().any(|f| f["path"] == "structure/notes.txt"));
-    let file_got = ok(&reopened, "artifact.file.get", json!({ "id": store_art_id, "path": "structure/notes.txt" }));
+    let file_got = ok(&reopened, "note.file.get", json!({ "id": store_note_id, "path": "structure/notes.txt" }));
     assert_eq!(file_got["content"], "persisted");
 
     let mems = ok(&reopened, "memory.list", json!({ "agent": reviewer.id }));

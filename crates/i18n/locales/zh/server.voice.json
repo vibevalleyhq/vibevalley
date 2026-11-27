@@ -3,12 +3,9 @@
   "stopped": "语音服务已经停下",
   "grantGone": "这通电话的语音凭据已经失效，请重新接通",
   "connecting": "这通电话已经在接通",
-  "manyCalls": "有几通电话正在接通，请升级客户端后重试",
-  "noCall": "没有正在接通的电话",
   "moss": {
     "toolFailed": "后台请求未能完成。",
     "noKey": "请先在 AI 服务中为 MOSS Live 绑定已启用的连接",
-    "noAsrKey": "请先在 AI 服务中为 MOSS Live 或语音转写绑定已启用的连接",
     "noTranscribeKey": "请先在 AI 服务中为语音转写绑定已启用的连接",
     "refused": "MOSS Live 不认这个 Key：{why}",
     "unreachable": "连不上 MOSS Live：{why}",

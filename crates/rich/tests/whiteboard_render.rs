@@ -436,7 +436,7 @@ fn vv_whiteboard_component_mounts_and_emits_export_and_chat_events() {
     })
     .to_string();
     entries.push(WhiteboardEntry {
-        artifact_id: "art-wb-test".to_owned(),
+        note_id: "art-wb-test".to_owned(),
         path: "board/meta".to_owned(),
         kind: WhiteboardEntryKind::Json,
         mime: "application/json".to_owned(),
@@ -450,7 +450,7 @@ fn vv_whiteboard_component_mounts_and_emits_export_and_chat_events() {
     for el in &doc.elements {
         let encoded = encode_element_json(el);
         entries.push(WhiteboardEntry {
-            artifact_id: "art-wb-test".to_owned(),
+            note_id: "art-wb-test".to_owned(),
             path: format!("elements/{}", el.id.0),
             kind: WhiteboardEntryKind::Json,
             mime: "application/json".to_owned(),
@@ -798,7 +798,7 @@ fn vv_whiteboard_borderless_inline_editor_commits_on_outside_click_and_cancels_o
     );
     let encoded = encode_element_json(&card);
     let entries = vec![WhiteboardEntry {
-        artifact_id: "art-inline-test".to_owned(),
+        note_id: "art-inline-test".to_owned(),
         path: "elements/card-inline".to_owned(),
         kind: WhiteboardEntryKind::Json,
         mime: "application/json".to_owned(),
@@ -935,7 +935,7 @@ fn vv_whiteboard_hud_anchors_zoom_and_minimap_bottom_right_without_overlap() {
     for el in &doc.elements {
         let encoded = encode_element_json(el);
         entries.push(WhiteboardEntry {
-            artifact_id: "art-hud-test".to_owned(),
+            note_id: "art-hud-test".to_owned(),
             path: format!("elements/{}", el.id.0),
             kind: WhiteboardEntryKind::Json,
             mime: "application/json".to_owned(),

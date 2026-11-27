@@ -147,6 +147,15 @@ async fn moves_words_async(board: &Board, item: &Issue, s: &Settled) -> Result<V
             };
             if let Some(id) = id {
                 if let Some(profile) = driver.profile_info(id) {
+                    if profile.is_external {
+                        return Err(ApiError::new(
+                            BizCode::IssueRefused,
+                            t(
+                                "server.issue.externalNotDispatchable",
+                                &[("name", profile.name.into()), ("code", profile.code.into())],
+                            ),
+                        ));
+                    }
                     Some(profile.name)
                 } else {
                     // Driver without profile registry (e.g. standalone RuntimeDriver) checks via `driver.check`.
@@ -927,6 +936,14 @@ impl Board {
     pub(crate) async fn issue_update_endpoint_async(&self, input: IssueUpdateInput) -> Result<AppliedIssue, ApiError> {
         let issue = self.update_from_input_async(input).await?;
         Ok(AppliedIssue::from_issue(issue, self.seq()))
+    }
+
+    pub(crate) async fn set_body_note_id_async(&self, id: &str, note_id: String) -> Result<Issue, ApiError> {
+        self.state.set_body_note_id_async(id, note_id).await.map_err(api)
+    }
+
+    pub(crate) async fn issues_without_body_note_async(&self) -> Result<Vec<Issue>, ApiError> {
+        self.ctx.service.issue.list_without_body_note().await.map_err(|e| api(BoardError::Store(e)))
     }
 
     pub(crate) async fn issue_delete_endpoint_async(&self, id: &str) -> Result<(), ApiError> {

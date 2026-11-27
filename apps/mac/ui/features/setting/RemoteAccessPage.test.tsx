@@ -91,19 +91,21 @@ test("RemoteAccessPage: disabled -> enable -> pair/QR/copy -> revoke device -> d
     devices,
   };
 
-  const { app, fake } = await mountSettings("/settings/connections/remote", (f) => {
+  const { app, fake } = await mountSettings("/settings/remote", (f) => {
     f.respond("remote.status", () => ({ ...state, devices: [...devices] }));
-    f.respond("remote.enable", () => {
+    f.respond("remote.enable", (payload: unknown) => {
+      const bindAddr = (payload as { bindAddr?: string } | undefined)?.bindAddr ?? "100.64.1.23";
       devices = sampleDevices.map((d) => ({ ...d }));
       state = {
         enabled: true,
         listening: true,
-        bindAddr: "100.64.1.23",
+        bindAddr,
         port: 8791,
+        lanIp: "192.168.1.42",
         tailscaleIp: "100.64.1.23",
         tailscaleHost: "studio-mac.tailnet.ts.net",
         tailscaleOnline: true,
-        url: "http://100.64.1.23:8791",
+        url: `http://${bindAddr}:8791`,
         devices,
       };
       return { ...state, devices: [...devices] };
@@ -147,9 +149,20 @@ test("RemoteAccessPage: disabled -> enable -> pair/QR/copy -> revoke device -> d
   expect(fake.calls.find((c) => c.op === "remote.enable")?.payload).toEqual({});
   expect(app.texts()).toContain(t("web.remote.toggle.enabled"));
   expect(app.texts()).toContain(t("web.remote.tailscale.online"));
+  expect(app.texts()).toContain("192.168.1.42");
   expect(app.texts()).toContain("100.64.1.23");
   expect(app.texts()).toContain("studio-mac.tailnet.ts.net");
   expect(app.texts()).toContain("http://100.64.1.23:8791");
+  expect(app.count("id:remote-mode-switch")).toBe(1);
+
+  await app.press("id:remote-mode-switch-lan");
+  await fake.pumpUntil(app, () => app.texts().includes("http://192.168.1.42:8791"));
+  expect(fake.calls.findLast((c) => c.op === "remote.enable")?.payload).toEqual({ bindAddr: "192.168.1.42" });
+  expect(app.texts()).toContain(t("web.remote.lan.active"));
+
+  await app.press("id:remote-mode-switch-tailscale");
+  await fake.pumpUntil(app, () => app.texts().includes("http://100.64.1.23:8791"));
+  expect(fake.calls.findLast((c) => c.op === "remote.enable")?.payload).toEqual({ bindAddr: "100.64.1.23" });
   expect(app.count("id:remote-url-row")).toBe(1);
   expect(app.count("id:remote-devices-empty")).toBe(0);
   expect(app.count("id:remote-device-dev-ios")).toBe(1);
@@ -200,7 +213,7 @@ test("RemoteAccessPage: disabled -> enable -> pair/QR/copy -> revoke device -> d
   expect(app.count("id:remote-url-row")).toBe(0);
 });
 
-test("SettingsPage: legacy /settings/remote redirect, search words, sub-tab navigation, and action error banner", async () => {
+test("SettingsPage: /settings/remote, search words, sub-tab navigation, and action error banner", async () => {
   setLocale("en");
   const { app, fake } = await mountSettings("/settings/remote", (f) => {
     f.respond("remote.status", () => ({
@@ -240,7 +253,7 @@ test("RemoteAccessPage: Control Plane Connection switches via pair code & bearer
     restartRequired: false,
   } as Record<string, unknown>;
 
-  const { app, fake } = await mountSettings("/settings/connections/remote", (f) => {
+  const { app, fake } = await mountSettings("/settings/remote", (f) => {
     f.respond("remote.status", () => ({
       enabled: false,
       listening: false,
@@ -318,7 +331,7 @@ test("RemoteAccessPage: Control Plane Connection switches via pair code & bearer
 
 test("RemoteAccessPage: Control Plane Connection stays operable when remote server is unreachable and locks edits under env override", async () => {
   setLocale("en");
-  const { app, fake } = await mountSettings("/settings/connections/remote", (f) => {
+  const { app, fake } = await mountSettings("/settings/remote", (f) => {
     f.respond("remote.status", () => ({ bizCode: BizCode.ServiceUnavailable, message: "control plane unreachable" }));
     f.respond("host.connectionState", () => ({
       activeMode: "remote",
@@ -349,7 +362,7 @@ test("RemoteAccessPage: Control Plane Connection stays operable when remote serv
   await fake.pumpUntil(app, () => app.count("id:control-plane-restart") === 1);
   expect(app.texts()).toContain(t("web.remote.controlPlane.restartToEmbedded"));
 
-  const envMounted = await mountSettings("/settings/connections/remote", (f) => {
+  const envMounted = await mountSettings("/settings/remote", (f) => {
     f.respond("remote.status", () => ({
       enabled: false,
       listening: false,
@@ -372,4 +385,57 @@ test("RemoteAccessPage: Control Plane Connection stays operable when remote serv
   expect(envMounted.app.texts()).toContain(t("web.remote.controlPlane.envOverride"));
   expect(envMounted.app.count("id:control-plane-configure")).toBe(0);
   expect(envMounted.app.count("id:control-plane-reset")).toBe(0);
+});
+
+test("RemoteAccessPage: enables and pairs directly over LAN IPv4 when Tailscale is absent", async () => {
+  setLocale("en");
+  let state: RemoteStatus = {
+    enabled: false,
+    listening: false,
+    port: 8890,
+    lanIp: "192.168.1.42",
+    tailscaleOnline: false,
+    devices: [],
+  };
+  const lanPairCode: RemotePairCode = {
+    code: "731-204",
+    pairUrl: "vibevalley://pair?url=http%3A%2F%2F192.168.1.42%3A8890&code=731-204",
+    url: "http://192.168.1.42:8890",
+    expiresAt: SCENARIO_NOW + 300_000,
+  };
+
+  const { app, fake } = await mountSettings("/settings/remote", (f) => {
+    f.respond("remote.status", () => ({ ...state }));
+    f.respond("remote.enable", () => {
+      state = {
+        enabled: true,
+        listening: true,
+        bindAddr: "192.168.1.42",
+        port: 8890,
+        lanIp: "192.168.1.42",
+        tailscaleOnline: false,
+        url: "http://192.168.1.42:8890",
+        devices: [],
+      };
+      return { ...state };
+    });
+    f.respond("remote.pair.create", () => lanPairCode);
+  });
+
+  await fake.pumpUntil(app, () => app.count("id:remote-access-page") === 1);
+  expect(app.count("id:remote-lan-ip")).toBe(1);
+  expect(app.texts()).toContain("192.168.1.42");
+  expect(app.texts()).toContain(t("web.remote.lan.ready"));
+  expect(app.texts()).toContain(t("web.remote.tailscale.offline"));
+  expect(app.count("id:remote-mode-row")).toBe(0);
+
+  await app.press("id:remote-enable");
+  await fake.pumpUntil(app, () => app.count("id:remote-pair-create") === 1);
+  expect(app.texts()).toContain("http://192.168.1.42:8890");
+  expect(app.texts()).toContain(t("web.remote.lan.active"));
+
+  await app.press("id:remote-pair-create");
+  await fake.pumpUntil(app, () => app.count("id:remote-pair-panel") === 1 && fake.calls.some((c) => c.op === "host.qr"));
+  expect(fake.calls.find((c) => c.op === "host.qr")?.payload).toEqual({ text: lanPairCode.pairUrl, border: 2 });
+  expect(app.texts()).toContain(lanPairCode.code);
 });

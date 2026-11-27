@@ -1,11 +1,11 @@
 //! `voice.*` through its endpoints, offline: MOSS Live answered by the test,
 //! the orchestrator by a scripted model.
 
+use crate::support::RouterTestExt as _;
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use base64::Engine as _;
 use serde_json::{Value, json};
 use vibevalley_protocol::{BizCode, Caller, Envelope, VoiceFix};
 use vibevalley_runtime::agent::{ChatRequest, Completion, Delta, FinishReason, Message, ModelClient, Role, Usage};
@@ -94,12 +94,6 @@ impl Farm {
         e.data.unwrap_or(Value::Null)
     }
 
-    fn refused(&self, op: &str, payload: Value, code: BizCode) -> Envelope {
-        let e = self.call(op, payload);
-        assert_eq!(e.biz_code, code.code(), "{op}: {}", e.message);
-        e
-    }
-
     /// One MOSS account bound to Live.
     fn moss(&self) {
         self.ok(
@@ -165,9 +159,11 @@ fn farm(answers: &[&'static str]) -> Farm {
 #[test]
 fn every_voice_endpoint_is_served_and_retired_endpoints_are_gone() {
     let f = farm(&[]);
-    for op in [
+    assert!(f.app.router().answers("voice.moss.verify"));
+    for retired in [
+        "voice.dictate",
+        "voice.grant.renew",
         "voice.hear",
-        "voice.moss.verify",
         "voice.grant.create",
         "voice.call.start",
         "voice.call.stop",
@@ -177,9 +173,6 @@ fn every_voice_endpoint_is_served_and_retired_endpoints_are_gone() {
         "voice.asr.stop",
         "voice.asr.transcribe",
     ] {
-        assert!(f.app.router().answers(op), "{op}");
-    }
-    for retired in ["voice.dictate", "voice.grant.renew"] {
         assert!(!f.app.router().answers(retired), "retired endpoint still registered: {retired}");
     }
 }
@@ -203,30 +196,30 @@ fn moss_live_is_asked_whether_it_takes_the_bound_key() {
 fn a_farm_call_runs_over_moss_live() {
     let f = farm(&["一共三张，两张在做。"]);
     f.ok("setting.update", json!({ "voice": { "persona": "你是助手。", "greeting": "我在呢。" } }));
-    let none = f.refused("voice.grant.create", json!(null), BizCode::VoiceUnavailable);
-    assert_eq!(none.error.unwrap().settings, Some(VoiceFix::Moss));
+    let none = f.voice().grant().unwrap_err();
+    assert_eq!(none.biz_code, BizCode::VoiceUnavailable);
+    assert_eq!(none.detail.settings, Some(VoiceFix::Moss));
     f.moss();
 
-    let grant = f.ok("voice.grant.create", json!(null));
-    let (channel, uid) = (grant["channel"].as_str().unwrap().to_string(), grant["uid"].as_str().unwrap().to_string());
+    let grant = f.voice().grant().unwrap();
+    let (channel, uid) = (grant.channel, grant.uid);
     assert!(
         channel.starts_with("vibevalley-") && uid.parse::<u32>().is_ok_and(|n| (1000..10_000_000).contains(&n)),
-        "{grant}"
+        "{channel} {uid}"
     );
-    assert!(grant.get("appId").is_none() && grant.get("token").is_none(), "{grant}");
 
     // Unknown grant is refused.
-    f.refused(
-        "voice.call.start",
-        json!({ "channel": "vibevalley-0-nobody", "uid": "1000" }),
-        BizCode::VoiceUnavailable,
+    assert_eq!(
+        f.voice().start("vibevalley-0-nobody", "1000", None).unwrap_err().biz_code,
+        BizCode::VoiceUnavailable
     );
 
-    let call = f.ok("voice.call.start", json!({ "channel": channel, "uid": uid }));
+    let call = f.voice().start(&channel, &uid, None).unwrap();
     let agent = format!("moss-{channel}");
-    assert_eq!(call["agentId"], agent.as_str());
+    assert_eq!(call.agent_id, agent);
     // A grant starts only one call.
-    let again = f.refused("voice.call.start", json!({ "channel": channel, "uid": uid }), BizCode::VoiceUnavailable);
+    let again = f.voice().start(&channel, &uid, None).unwrap_err();
+    assert_eq!(again.biz_code, BizCode::VoiceUnavailable);
     assert_eq!(again.message, "这通电话已经在接通");
 
     // The host's line: where to connect, with which key, and the session's settings.
@@ -278,30 +271,31 @@ fn a_farm_call_runs_over_moss_live() {
     assert!(input.ends_with("[来源：通话]\n现在有几张工单？"), "{input}");
 
     // Heard and said transcripts go into chat; sendKey deduplicates, greeting is skipped.
-    f.ok("voice.call.hear", json!({ "agentId": agent, "text": "现在有几张工单？", "sendKey": "m-1" }));
-    f.ok("voice.call.hear", json!({ "agentId": agent, "text": "现在有几张工单？", "sendKey": "m-1" }));
+    vibevalley_runtime::rt::block_on(f.voice().heard_async(&agent, "现在有几张工单？", None, Some("m-1"))).unwrap();
+    vibevalley_runtime::rt::block_on(f.voice().heard_async(&agent, "现在有几张工单？", None, Some("m-1"))).unwrap();
     assert_eq!(f.messages().iter().filter(|m| m["text"] == "现在有几张工单？").count(), 1);
     assert_eq!(f.message("现在有几张工单？").unwrap()["spoken"], true);
 
-    f.ok("voice.hear", json!({ "text": "不带电话号的一句", "sendKey": "m-2" }));
-    assert!(f.message("不带电话号的一句").is_some());
-
-    f.ok("voice.call.say", json!({ "agentId": agent, "text": " 我在呢。 " }));
-    f.ok("voice.call.say", json!({ "agentId": agent, "text": "一共三张，两张在做。" }));
+    vibevalley_runtime::rt::block_on(f.voice().said_async(&agent, " 我在呢。 ")).unwrap();
+    vibevalley_runtime::rt::block_on(f.voice().said_async(&agent, "一共三张，两张在做。")).unwrap();
     assert!(f.message("我在呢。").is_none());
     let said = f.message("一共三张，两张在做。").expect("kept");
     assert_eq!((said["from"].as_str(), said["spoken"].as_bool()), (Some("orchestrator"), Some(true)), "{said}");
 
     // The host's socket closing ends the call.
     drop(line);
-    f.refused("voice.call.hear", json!({ "agentId": agent, "text": "喂" }), BizCode::VoiceCallFailed);
-    f.refused("voice.call.say", json!({ "agentId": agent, "text": "在" }), BizCode::VoiceCallFailed);
     assert_eq!(
-        f.refused("voice.hear", json!({ "text": "喂" }), BizCode::VoiceCallFailed).message,
-        "没有正在接通的电话"
+        vibevalley_runtime::rt::block_on(f.voice().heard_async(&agent, "喂", None, None))
+            .unwrap_err()
+            .biz_code,
+        BizCode::VoiceCallFailed
+    );
+    assert_eq!(
+        vibevalley_runtime::rt::block_on(f.voice().said_async(&agent, "在")).unwrap_err().biz_code,
+        BizCode::VoiceCallFailed
     );
     assert!(!f.voice().speak("没人听"));
-    f.ok("voice.call.stop", json!({ "agentId": agent }));
+    f.voice().stop(&agent).unwrap();
     assert!(f.voice().moss_line().is_ok());
 }
 
@@ -314,11 +308,8 @@ fn a_moss_call_answering_a_ring_speaks_what_rang() {
     let _ = line.session_update();
     line.heard(r#"{"action":"session.updated","data":{"error":""}}"#);
 
-    let grant = f.ok("voice.grant.create", json!(null));
-    let call = f.ok(
-        "voice.call.start",
-        json!({ "channel": grant["channel"], "uid": grant["uid"], "about": "#3 等你验收" }),
-    );
+    let grant = f.voice().grant().unwrap();
+    let call = f.voice().start(&grant.channel, &grant.uid, Some("#3 等你验收")).unwrap();
     let raw = vibevalley_runtime::rt::block_on(async { tokio::time::timeout(Duration::from_secs(30), outgoing.recv()).await })
         .ok()
         .flatten()
@@ -334,14 +325,15 @@ fn a_moss_call_answering_a_ring_speaks_what_rang() {
         "{input}"
     );
     drop(seen);
-    f.ok("voice.call.stop", json!({ "agentId": call["agentId"] }));
+    f.voice().stop(&call.agent_id).unwrap();
 }
 
 #[test]
-fn asr_dictation_and_transcription_endpoints_work_offline() {
+fn asr_dictation_and_transcription_work_offline() {
     let f = farm(&[]);
-    let missing = f.refused("voice.asr.start", json!(null), BizCode::VoiceUnavailable);
-    assert_eq!(missing.error.unwrap().settings, Some(VoiceFix::Moss));
+    let missing = f.voice().asr_line().err().expect("asr_line requires live account");
+    assert_eq!(missing.biz_code, BizCode::VoiceUnavailable);
+    assert_eq!(missing.detail.settings, Some(VoiceFix::Moss));
     assert!(!f.voice().can_transcribe());
 
     f.ok(
@@ -357,23 +349,50 @@ fn asr_dictation_and_transcription_endpoints_work_offline() {
     );
     assert!(f.voice().can_transcribe());
 
-    let asr_grant = f.ok("voice.asr.start", json!(null));
-    let session_id = asr_grant["sessionId"].as_str().unwrap().to_string();
-    assert!(session_id.starts_with("asr-"));
-    assert_eq!(asr_grant["model"], "moss-live-1.0");
-
     let line = f.voice().asr_line().unwrap();
     assert_eq!(line.url(), "wss://api.mosi.cn/v1/realtime?model=moss-live-1.0");
     assert_eq!(line.bearer_token(), "test-key");
     let update: Value = serde_json::from_str(&line.session_update()).unwrap();
     assert_eq!(update["session"]["tools"], json!([]));
 
-    let bad = f.refused("voice.asr.transcribe", json!({ "wavBase64": "bm90LXdhdg==" }), BizCode::InvalidInput);
-    assert_eq!(bad.biz_code, BizCode::InvalidInput.code());
+    let bad = vibevalley_runtime::rt::block_on(f.voice().transcribe_wav_async(b"not-wav".to_vec())).unwrap_err();
+    assert_eq!(bad.biz_code, BizCode::InvalidInput);
 
-    let wav_b64 = base64::engine::general_purpose::STANDARD.encode(pcm16_to_wav(&[1, 0, 2, 0], 16_000, 1));
-    let transcribed = f.ok("voice.asr.transcribe", json!({ "wavBase64": wav_b64, "sessionId": session_id }));
-    assert_eq!(transcribed["text"], "合成听写结果");
+    let wav = pcm16_to_wav(&[1, 0, 2, 0], 16_000, 1);
+    let transcribed = vibevalley_runtime::rt::block_on(f.voice().transcribe_wav_async(wav)).unwrap();
+    assert_eq!(transcribed, "合成听写结果");
 
-    f.ok("voice.asr.stop", json!({ "sessionId": session_id }));
+    // Unbinding Transcription disables batch transcription while leaving Live ASR line available.
+    f.ok(
+        "provider.update",
+        json!({
+            "revision": 1,
+            "connections": [{ "id": "moss", "name": "MOSS", "adapter": "moss", "enabled": true, "key": "test-key" }],
+            "live": { "connection": "moss", "model": "moss-live-1.0" },
+            "transcription": null,
+            "image": null, "understanding": null, "speech": null, "speakers": null,
+            "voiceDesign": null, "vision": null
+        }),
+    );
+    assert!(!f.voice().can_transcribe());
+    assert!(f.voice().asr_line().is_ok());
+}
+
+#[test]
+fn asr_transcript_polish_restores_punctuation_and_preserves_empty_fallback() {
+    let f = farm(&["我想看一下日志。", "   "]);
+    let polished = vibevalley_runtime::rt::block_on(f.voice().polish_transcript_async("呃 那个 我想我想 看一下 日志")).unwrap();
+    assert_eq!(polished, "我想看一下日志。");
+    let seen = f.model.seen.lock().unwrap();
+    assert_eq!(seen.len(), 1);
+    assert_eq!(
+        seen[0].messages[0].content.as_deref(),
+        Some(vibevalley_server::voice::prompt::ASR_POLISH_SYSTEM)
+    );
+    assert_eq!(seen[0].messages[1].content.as_deref(), Some("呃 那个 我想我想 看一下 日志"));
+    drop(seen);
+
+    // Empty model completion falls back cleanly to the trimmed raw transcript.
+    let kept = vibevalley_runtime::rt::block_on(f.voice().polish_transcript_async("  keep raw text  ")).unwrap();
+    assert_eq!(kept, "keep raw text");
 }

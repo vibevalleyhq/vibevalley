@@ -3,7 +3,6 @@ import { computed, Image, signal, Text, View } from "nsh";
 import { t } from "@vibevalley/i18n";
 import type { MediaImageJob, MediaImageRequest } from "@vibevalley/protocol";
 
-import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
 import { Checkbox } from "../../design/Checkbox";
 import { ConfirmButton } from "../../design/ConfirmButton";
@@ -12,6 +11,7 @@ import { Field, Select, TextArea, TextInput } from "../../design/Field";
 import { Icon } from "../../design/Icon";
 import { Card, Quiet } from "../../design/layout";
 import { motionClass } from "../../design/motion";
+import { createAct } from "../../infra/act";
 import { api } from "../../infra/api";
 import { openAttachment, useAttachmentUrl } from "../../infra/attachmentFile";
 import { useCollabSlice, useOpsSlice } from "../../infra/frame";

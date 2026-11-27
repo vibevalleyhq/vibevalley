@@ -13,7 +13,7 @@ export type PersonaMode = (typeof PersonaModeValues)[number];
 /**
  * Capability groups controlling which built-in farm tools an agent profile can call.
  */
-export const ToolsetValues = ["issue", "session", "channel", "repo", "cron", "resource", "memory", "media", "library", "artifact"] as const;
+export const ToolsetValues = ["issue", "session", "channel", "repo", "cron", "resource", "memory", "media", "library", "note"] as const;
 /**
  * Capability groups controlling which built-in farm tools an agent profile can call.
  */
@@ -62,7 +62,20 @@ avatar?: string, };
  */
 export type AgentFrom = { template: string, version: number, };
 
-export type Agent = { id: string, name: string, role: AgentRole,
+/**
+ * How a teammate executes work: `managed` runs through VibeValley's OAR session queue; `external` represents an external coding agent on the roster.
+ */
+export const AgentExecutionModeValues = ["managed", "external"] as const;
+/**
+ * How a teammate executes work: `managed` runs through VibeValley's OAR session queue; `external` represents an external coding agent on the roster.
+ */
+export type AgentExecutionMode = (typeof AgentExecutionModeValues)[number];
+
+export type Agent = { id: string,
+/**
+ * Stable teammate code (`O-01`, `O-02` for orchestrators; `W-01`, `W-02`... for workers).
+ */
+code: string, name: string, role: AgentRole, mode: AgentExecutionMode,
 /**
  * What it does, in a sentence (duty): orchestrators read it to pick who takes a job.
  */
@@ -126,6 +139,20 @@ export type Skill = { id: string, name: string, description: string, body: strin
 builtIn?: boolean, };
 
 export type AgentDeleteInput = { id: string, };
+
+export type AgentRegisterInput = {
+/**
+ * Optional stable teammate id. If omitted, derived deterministically from runtime/name.
+ */
+id?: string, name: string, runtime?: string, duty?: string,
+/**
+ * Optional Papertrails portrait asset id (`avatar-*`).
+ */
+avatar?: string,
+/**
+ * Optional explicit worker code (`W-XX`).
+ */
+code?: string, tags?: Array<string>, };
 
 export type AgentTemplateInstallInput = { id: string, runtime?: string, };
 

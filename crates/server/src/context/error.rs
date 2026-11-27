@@ -20,7 +20,7 @@ pub enum LookIn {
     Template,
     Cron,
     Channel,
-    Artifact,
+    Note,
     Library,
 }
 
@@ -36,7 +36,7 @@ impl LookIn {
             LookIn::Template => ("template", BizCode::AgentNotFound, None),
             LookIn::Cron => ("cron", BizCode::CronNotFound, Some(["cron", "list"])),
             LookIn::Channel => ("channel", BizCode::ChannelNotFound, Some(["channel", "list"])),
-            LookIn::Artifact => ("artifact", BizCode::ArtifactNotFound, Some(["artifact", "list"])),
+            LookIn::Note => ("note", BizCode::NoteNotFound, Some(["note", "list"])),
             LookIn::Library => ("library", BizCode::LibraryNotFound, None),
         }
     }

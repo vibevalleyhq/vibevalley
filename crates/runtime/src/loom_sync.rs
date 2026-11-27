@@ -3,6 +3,7 @@
 //! in their logic.
 
 #![allow(unused_imports)]
+#![allow(clippy::disallowed_types, reason = "loom concurrency model shim")]
 
 #[cfg(feature = "loom")]
 pub(crate) use loom::sync::atomic::{AtomicBool, AtomicU8, AtomicU64, Ordering};

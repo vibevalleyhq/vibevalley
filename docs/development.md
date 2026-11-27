@@ -27,13 +27,13 @@ vp run bump -- alpha             # 递增三位版本号后的 alpha（如 0.1.0
 vp run bump -- beta              # 升至 beta（如 0.1.0-alpha.2 → 0.1.0-beta.1 → 0.1.0-beta.2）
 vp run bump -- release           # 摘掉预发布后缀成为正式版（如 0.1.0-beta.2 → 0.1.0；若已正式版则 patch +1）
 
-vp run build:alpha -- --bump     # 先 bump alpha，再走 [profile.alpha] + --fast 产出 .app、.dmg、.zip 与 release.json，并写入本地更新源（支持 --install 装入 /Applications）
+vp run build:alpha -- --bump     # 先 bump alpha，再复用 debug + VIBEVALLEY_EMBED_UI=1 + --fast 快速产出 .app、.dmg、.zip 与 release.json，并写入本地更新源（支持 --install 装入 /Applications）
 vp run build:beta -- --bump      # 先 bump beta，默认先跑 make verify，再走 [profile.release] 产出 .app、.dmg、.zip 与 release.json
 vp run build:release -- --bump   # 先 bump release，默认先跑 make verify，再走 [profile.release] 产出 .app、.dmg、.zip 与 release.json
 ```
 
 - **本地 git 可选开关**：`bump` 与 `build:*` 默认只改根目录 `package.json` 并产出安装包，不动 git、也不推送远端触发 CI；需要本地留痕时可追加 `-- --commit`（仅提交 `package.json`）和 `-- --tag`（只打本地 `v<version>` tag，不 push），预演加 `-- --dry-run`。
-- **三阶段与打包差异**：`alpha` 使用 `Cargo.toml` 的 `[profile.alpha]`（增量编译、`thin` LTO 关闭、16 codegen-units）与 `--fast`，默认跳过 `make verify`，同时产出 `.app`、`.dmg`、`.zip` 与 `release.json`（可用 `-- --no-zip` 关闭），并自动把本地 `file://.../release.json` 写入 `VibeValley-Alpha.app` 的 `Info.plist`（`VibeValleyUpdateFeed`，可用 `-- --no-local-feed` 关闭）；首次加 `-- --install` 装进 `/Applications/VibeValley-Alpha.app` 后，后续每次 `vp run build:alpha -- --bump` 即可在运行中的应用内直接检查更新、做 SHA-512 与包标识校验并原地替换重启。`beta` 与 `release` 使用 `[profile.release]`（`strip = "symbols"`、`lto = "thin"`、`codegen-units = 1`），默认先跑 `make verify`（可用 `-- --skip-verify` 跳过）并全量打包 `.app`、`.dmg`、`.zip` 和 `release.json`，且绝不读取或写入本地 `file://` 更新源。
+- **三阶段与打包差异**：`alpha` 默认复用 `debug` 产物配合 `VIBEVALLEY_EMBED_UI=1` 内嵌 UI 字节码与 `--fast`（避免单独重建 `target/alpha`，耗时从数分钟压至数十秒；显式传 `--profile alpha` 仍可走 `Cargo.toml` 的 `[profile.alpha]`），默认跳过 `make verify`，同时产出 `.app`、`.dmg`、`.zip` 与 `release.json`（可用 `-- --no-zip` 关闭），并自动把本地 `file://.../release.json` 写入 `VibeValley-Alpha.app` 的 `Info.plist`（`VibeValleyUpdateFeed`，可用 `-- --no-local-feed` 关闭）；首次加 `-- --install` 装进 `/Applications/VibeValley-Alpha.app` 后，后续每次 `vp run build:alpha -- --bump` 即可在运行中的应用内直接检查更新、做 SHA-512 与包标识校验并原地替换重启。`beta` 与 `release` 使用 `[profile.release]`（`strip = "symbols"`、`lto = "thin"`、`codegen-units = 1`），默认先跑 `make verify`（可用 `-- --skip-verify` 跳过）并全量打包 `.app`、`.dmg`、`.zip` 和 `release.json`，且绝不读取或写入本地 `file://` 更新源。
 - **打包脚本细节**：`scripts/release/package.ts` 按 `--version > HEAD 上精确 v* 标签 > 根目录 package.json "version" > "0.0.0"` 解析版本号并按版本号分流通道（`VibeValley-Alpha` / `VibeValley-Beta` / `VibeValley` / `VibeValley-Dev`）；经 `scripts/release/package-assets.ts` 过滤仅官网使用的图片，在 `scripts/release/dmg-layout.ts` 中使用 Apple 原生 `ULFO`（LZFSE）压缩与 Papertrails 风格安装器背景（`apps/mac/resources/dmg-background.png`）。本地默认 ad-hoc 签名；`--sign <Developer ID>` 指定签名身份，`--notary-profile <配置名>` 提交公证并装订票据。两个包的更新验收见[应用验收](.agents/skills/vv-acceptance/references/app.md#打包和更新)。
 - **远端 tag 发版（需要时启用）**：若后续启用 GitHub 发布工作流，可用 `vp run release alpha|beta|final` 检查分支并推送 `v*` 标签。
 - **公开发布**。发布任务使用 Apple 芯片 runner。打包脚本检查应用、CLI 和灵动岛的 Mach-O 架构和最低系统版本。Info.plist 的最低版本为 macOS 14.0。Developer ID 打包还应有应用分发证书及私钥。公证需要当前 runner 钥匙串中可用的 notarytool profile。GitHub 仓库变量仅提供名称。当前托管 runner 的工作流还需接入签名材料及公证凭据的装配步骤。只有当前提交有同名版本标签时，更新清单才给出该版本的 GitHub 发布页。
@@ -41,10 +41,10 @@ vp run build:release -- --bump   # 先 bump release，默认先跑 make verify�
 
 ## 检查和测试
 
-优先运行与改动相关的最窄检查（命令总表见 [AGENTS.md](AGENTS.md#命令)）：
+优先运行与改动相关的最窄检查（命令总表见 [AGENTS.md](AGENTS.md#命令)；若本机使用 `sccache`，建议配置 `SCCACHE_CACHE_SIZE=40G`，日常迭代跑 `make verify-fast`，仅在提 PR 或发版前执行一次全量 `make pr-check` / `make verify` 避免重复跑全仓套件）：
 
 - `make rust`（`cargo xtask check`）：`cargo fmt --check`、`cargo clippy --workspace --all-targets -- -D warnings` 与 `cargo test --workspace`（服务端、命令行、核心规则、原生应用、`xtask`）。
-- `make protocol`（`cargo xtask protocol`）校验 Rust 导出的 TypeScript 契约，并在临时目录生成 artifact 的 golden 与仓库逐个比较。用 `make protocol-write`（`cargo xtask protocol --write`）更新契约产物。
+- `make protocol`（`cargo xtask protocol`）校验 Rust 导出的 TypeScript 契约，并在临时目录生成 `note` 的 golden 与仓库逐个比较。用 `make protocol-write`（`cargo xtask protocol --write`）更新契约产物。
 - `make rust-audit`（`cargo xtask audit`）运行 [boundaries.rs](xtask/src/boundaries.rs) 与 [ratchets.rs](xtask/src/ratchets.rs) 静态检查服务端 `L0`–`L3` 分层、零循环依赖、脊柱与 `apps/mac/src/` 不导入具体业务模块，以及 Rust 异步并发棘轮（纳入 `make verify`）。
 - 跨层导航与 SSOT 巡检：`cargo xtask trace <op|slice|orphans>`（6 层协议到客户端追踪）、`cargo xtask map [filter] --surface`（模块 `pub`/`pub(crate)` 门面与函数复杂度热点）、`cargo xtask deps [crate|ui] --cycles --ui`（模块依赖环与 UI 跨 feature 深层导入）及 `cargo xtask ssot-check [--dupes] [--strict]`（跨端枚举镜像、宿主 DTO 旁路、环境变量漂移与结构克隆雷达）。
 - `vp run mac:check` 对原生页面运行 nsh 类型检查、打包与虚拟时钟 UI 验收套件。[场景用例](apps/mac/ui/app/scenarios.test.tsx)、[交互用例](apps/mac/ui/app/interactions.test.tsx)、[主题令牌用例](apps/mac/ui/app/theme.test.tsx)与[工作区外壳用例](apps/mac/ui/workspace/workspace.test.tsx)
@@ -84,7 +84,7 @@ CI 只在 Linux 上运行：PR 标题与正文、`vp check`、`docs:verify`、�
 
 - **设计原则**：强类型 `clap`（英文 `--help`），纯 HTTP 客户端（不链接 `vibevalley-runtime`），按服务端五大业务域分目录（`crates/cli/src/domains/{work,team,collab,content,infra}`），路径为 `<资源> [<子资源>] <动词>`，不替服务端做决定；离线轨迹评测独立为可选二进制 `vibevalley-eval`（`cargo run -p vibevalley-cli --features eval --bin vibevalley-eval -- …`）。
 - **工单**：`issue list|show|watch|create|edit|status|comment|review|diff|timeline|delete`。`issue show --watch` 等待直到需要用户决策或结清，`issue watch [--follow]` 流式输出工单与轨迹事件（加 `--json` 输出 JSONL）。
-- **其余**：`work`（`session` 含 `events`、`repo` 含 `pr submit`、`cron`）、`team`（`agent`、`orchestrator open|stop|approval list|resolve`、`runtime`、`memory`）、`collab`（`channel` 含 `create|delete|pin|message`、`chat` 经 HTTP 与频道助手对话）、`content`（`artifact` 含 `entry list|get|set|batch` 与大纲导入、`library`、`media job|input`、`attachment`）、`infra`（`auth login|whoami|status|logout`、`remote status|enable|disable|code|revoke`、`state [--watch]`、`setting get|update|validate`、`doctor`）。
+- **其余**：`work`（`session` 含 `events`、`repo` 含 `pr submit`、`cron`）、`team`（`agent`、`orchestrator open|stop|approval list|resolve`、`runtime`、`memory`）、`collab`（`channel` 含 `create|delete|pin|message`、`chat` 经 HTTP 与频道助手对话）、`content`（`note` 含 `doc-view|doc-append|base-view|base-upsert|base-run|file|suggestion|history|type`、`library`、`media job|input`、`attachment`）、`infra`（`auth login|whoami|status|logout`、`remote status|enable|disable|code|revoke`、`state [--watch]`、`setting get|update|validate`、`doctor`）。
 - **输出与试跑**：默认输出单行短文本（首词为后续命令要用的 ID 或编号），全局 `--json` 输出协议原始结构。试跑由协议 `ENDPOINTS` 的 `dry_run` 单源驱动，无试跑的写命令传 `--dry-run` 返回 `NoDryRun`（退出码 `2`）。
 - **错误与退出码**：失败时 stdout 为空，stderr 末行是一行 JSON，退出码按类（`crates/cli/src/client.rs` 的 `exit`）；集成测试在 `crates/cli/tests/cli.rs`，起真的服务端。
 
@@ -133,4 +133,4 @@ design/sync-assets.sh --with-avatars    # 同步品牌、图标、引擎、官�
 design/diorama.sh                       # 单独编译并同步 3D 纸雕场景产物到 assets/diorama/
 ```
 
-素材管线见[工程流程](docs/subsystems/process.md#怎么走)。应用图标位于 `assets/icons/` 与 `apps/mac/resources/icon*.icns`。音效触发在 `apps/mac/ui/design/sound.ts`，合成器在 `apps/mac/src/audio.rs`（[农场的皮](docs/subsystems/farm.md#模型和不变量)）。官网位于 [apps/site/README.md](apps/site/README.md)，通过 `vp run site:deploy` 部署。
+素材管线见[工程流程](docs/subsystems/process.md#怎么走)。应用图标位于 `assets/icons/` 与 `apps/mac/resources/icon*.icns`。音效触发在 `apps/mac/ui/infra/sound.ts`，合成器在 `apps/mac/src/audio.rs`（[农场的皮](docs/subsystems/farm.md#模型和不变量)）。官网位于 [apps/site/README.md](apps/site/README.md)，通过 `vp run site:deploy` 部署。

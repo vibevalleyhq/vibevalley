@@ -3,27 +3,45 @@ import { computed, Text, View } from "nsh";
 import { t } from "@vibevalley/i18n";
 import type { Issue } from "@vibevalley/protocol";
 
-import { createAct } from "../../../design/act";
 import { Button } from "../../../design/Button";
 import { TextArea } from "../../../design/Field";
 import { Icon } from "../../../design/Icon";
-import { Markdown } from "../../../design/Markdown";
 import { toast } from "../../../design/toasts";
+import { createAct } from "../../../infra/act";
 import { shortMomentText } from "../../../infra/base/format";
+import { ready } from "../../../infra/query";
 import { createMemo } from "../../../infra/solid";
 import { useIntents } from "../../../infra/state/intent";
+import { useVdpNode } from "../../../infra/vdpProbe";
+import { IssueBodyEditor, IssueNotes, useNotes } from "../../note";
 import { createIssueActs } from "../model/acts";
 import { useIssues } from "../model/history";
-import { blockerIssuesOf } from "../model/meta";
+import { blockerIssuesOf, relationIssuesOf } from "../model/meta";
 import { stageTone } from "../model/overview";
 import { issueSet, labeledIssue, sendLabel } from "../model/write";
 import { ActLines } from "./ActLines";
-import { BlockedByChips, BlockedByPicker, DatePropertyEditor, OwnerMark, OwnerPicker, ParentPicker, SubIssuesSection, TagEditor } from "./IssueMetaControls";
+import { IssueActivity } from "./IssueActivity";
+import {
+  BlockedByChips,
+  BlockedByPicker,
+  DatePropertyEditor,
+  OwnerMark,
+  OwnerPicker,
+  ParentPicker,
+  RelationChips,
+  RelationsPicker,
+  SubIssuesSection,
+  TagEditor,
+} from "./IssueMetaControls";
 import { StatusMark } from "./Marks";
 import { IssueSheet, IssueTrail, Property, SheetLabel, StagePill } from "./Sheet";
+import { TodoTitle } from "./TodoSections";
 
 export function FamilyDetail(props: { issue: Issue; children: Issue[]; onOpen: (id: string) => void; onClose: (review: boolean) => void }) {
+  useVdpNode({ testId: "family-detail", role: "region" });
   const allIssues = useIssues();
+  const notesQuery = useNotes(() => ({}));
+  const allNotes = computed(() => ready(notesQuery, []));
   const sets = useIntents(issueSet);
   const labeled = createMemo(() => labeledIssue(allIssues().find((item) => item.id === props.issue.id) ?? props.issue, sets.list()));
   const live = () => labeled().issue;
@@ -31,6 +49,7 @@ export function FamilyDetail(props: { issue: Issue; children: Issue[]; onOpen: (
   const setLabel = (label: Omit<Parameters<typeof sendLabel>[1], "id">) => void sendLabel(sets, { id: props.issue.id, ...label });
   const parent = createMemo(() => (live().parent ? allIssues().find((item) => item.id === live().parent) : undefined));
   const blockers = createMemo(() => blockerIssuesOf(live(), allIssues()));
+  const relations = createMemo(() => relationIssuesOf(live(), allIssues()));
   const acts = createIssueActs(() => props.issue, {
     act: createAct(),
     complete: () => props.onClose(true),
@@ -44,12 +63,11 @@ export function FamilyDetail(props: { issue: Issue; children: Issue[]; onOpen: (
   const heading = (
     <View>
       <IssueTrail parentId={live().parent} parent={parent()} onOpenParent={props.onOpen} />
-      <Text role="header" testID="issue-title" class="text-2xl leading-snug font-semibold text-ink">
-        {live().title}
-      </Text>
+      <TodoTitle value={live().title} editable={open()} onCommit={(title) => setLabel({ title })} />
       <View class="mt-2.5 flex-row flex-wrap items-center gap-2">
         <StagePill tone={tone()} label={t(`shared.stage.${props.issue.stage.state}`)} />
         <BlockedByChips blockers={blockers()} max={6} onOpen={props.onOpen} testid="detail-blocked-by" />
+        <RelationChips relations={relations()} max={6} onOpen={props.onOpen} testid="detail-relations" />
       </View>
     </View>
   );
@@ -62,18 +80,32 @@ export function FamilyDetail(props: { issue: Issue; children: Issue[]; onOpen: (
           <TextArea accessibilityLabel={t("shared.act.tell")} value={acts.text()} onInput={acts.setText} />
         </View>
       </If>
-      <If when={live().description}>
-        <View>
-          <SheetLabel first>{t("web.issue.detail.full")}</SheetLabel>
-          <Markdown size="sm" text={live().description} />
-        </View>
+      <If when={live().description !== "" || Boolean(live().bodyNoteId) || open()}>
+        <IssueBodyEditor
+          issue={live()}
+          editable={open()}
+          notes={allNotes()}
+          onOpenIssue={props.onOpen}
+          sectionTitle={t("web.issue.todo.description")}
+          emptyLabel={t("web.issue.todo.addDescription")}
+          testid="issue-requirement"
+        />
       </If>
       <SubIssuesSection
         issueId={live().id}
         allIssues={allIssues().length > 0 ? allIssues() : props.children}
         onOpen={props.onOpen}
-        bordered={Boolean(live().description)}
+        bordered={Boolean(live().description) || Boolean(live().bodyNoteId) || open()}
       />
+      <IssueNotes
+        issue={live().id}
+        heading={
+          <View class="mt-7 border-t border-line pt-5">
+            <Text class="text-xs font-semibold text-muted">{t("web.note.issue.title")}</Text>
+          </View>
+        }
+      />
+      <IssueActivity issue={live()} />
     </>
   );
 
@@ -124,6 +156,17 @@ export function FamilyDetail(props: { issue: Issue; children: Issue[]; onOpen: (
           onChange={(blockedBy) => setLabel({ blockedBy })}
         />
       </Property>
+      <Property align="start" label={t("web.issue.relations.title")} icon={<Icon name="branch" size={13} tone="muted" />} inset>
+        <RelationsPicker
+          issueId={live().id}
+          relations={live().relations ?? []}
+          allIssues={allIssues()}
+          disabled={!open()}
+          state={labeled().state("relations")}
+          onOpen={props.onOpen}
+          onChange={(relations) => setLabel({ relations })}
+        />
+      </Property>
       <Property align="start" label={t("web.issue.tags.label")} icon={<Icon name="catalog" size={13} tone="muted" />} inset>
         <TagEditor tags={live().tags ?? []} disabled={!open()} onChange={(tags) => setLabel({ tags })} />
       </Property>
@@ -148,24 +191,24 @@ export function FamilyDetail(props: { issue: Issue; children: Issue[]; onOpen: (
           onCommit={(dueAt) => setLabel({ dueAt })}
         />
       </Property>
-      <Property label={t("web.issue.detail.opened")}>
+      <Property label={t("web.issue.detail.opened")} icon={<Icon name="clock" size={13} tone="muted" />}>
         <Text class="text-sm text-ink tabular-nums">{shortMomentText(props.issue.createdAt)}</Text>
       </Property>
       <If when={props.issue.closedAt}>
         {(at) => (
-          <Property label={t("web.issue.detail.closedAt")}>
+          <Property label={t("web.issue.detail.closedAt")} icon={<Icon name="clock" size={13} tone="muted" />}>
             <Text class="text-sm text-ink tabular-nums">{shortMomentText(at())}</Text>
           </Property>
         )}
       </If>
       <If when={props.issue.stage.acts.length > 0}>
-        <View class="mt-4 flex-row flex-wrap gap-2 border-t border-line pt-4">
+        <View class="mt-4 flex-row flex-wrap items-center gap-2 border-t border-line pt-4">
           <Each of={props.issue.stage.acts} key={(action) => action.act}>
             {(action) => (
               <Button
                 testID={`act-${action().act}`}
                 disabled={acts.disabled(action().act)}
-                tone={action().act === props.issue.stage.lead ? "primary" : action().act === "close" ? "danger" : "plain"}
+                tone={action().act === "close" ? "danger" : "plain"}
                 onPress={() => acts.go(action().act)}
               >
                 {acts.label(action().act)}

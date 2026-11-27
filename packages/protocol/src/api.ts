@@ -1,7 +1,6 @@
 import { z } from "zod";
 
 import { type AgentHandlers, agentEndpoints } from "./agent/api";
-import { type ArtifactHandlers, artifactEndpoints } from "./artifact/api";
 import { type AttachmentHandlers, attachmentEndpoints } from "./attachment/api";
 import { type ChannelHandlers, channelEndpoints } from "./channel/api";
 import { type ConnectorHandlers, connectorEndpoints } from "./connector/api";
@@ -14,6 +13,7 @@ import { type IssueHandlers, issueEndpoints } from "./issue/api";
 import { type MachineHandlers, machineEndpoints } from "./machine/api";
 import { type MediaHandlers, mediaEndpoints } from "./media/api";
 import { type MemoryHandlers, memoryEndpoints } from "./memory/api";
+import { type NoteHandlers, noteEndpoints } from "./note/api";
 import { type OrchestratorHandlers, orchestratorEndpoints } from "./orchestrator/api";
 import { type ProviderHandlers, providerEndpoints } from "./provider/api";
 import { type RemoteHandlers, remoteEndpoints } from "./remote/api";
@@ -42,7 +42,7 @@ export interface Handlers
     VoiceHandlers,
     IssueHandlers,
     SessionHandlers,
-    ArtifactHandlers,
+    NoteHandlers,
     GameHandlers,
     RuntimeHandlers,
     RepoHandlers,
@@ -65,7 +65,7 @@ export const endpoints: readonly Endpoint[] = [
   ...voiceEndpoints,
   ...issueEndpoints,
   ...sessionEndpoints,
-  ...artifactEndpoints,
+  ...noteEndpoints,
   ...gameEndpoints,
   ...runtimeEndpoints,
   ...repoEndpoints,
@@ -84,12 +84,12 @@ export const subscriptions = {
   /** The turn reports in any channel after the one with this id (by message id, which sorts by time), or the newest
    * when absent, then each report from now on. */
   "channel.reports": { can: userAndRemote, payload: z.object({ after: z.exactOptional(z.string()) }), event: S.ChannelEvent },
-  /** An artifact directory's collaborative file changes after this seq, then each commit from now on. */
-  "artifact.follow": { can: userAndRemote, payload: z.object({ id: z.string(), after: z.number() }), event: S.ArtifactEvent },
-  /** An artifact's suggestions as they now are, then the whole list after each change. */
-  "artifact.suggestion.follow": { can: userAndRemote, payload: z.object({ id: z.string() }), event: S.SuggestionEvent },
-  /** An artifact's ephemeral live presence peers as a snapshot, then incremental upserts and removals. */
-  "artifact.presence.follow": { can: userAndRemote, payload: S.ArtifactPresenceFollowRequest, event: S.ArtifactPresenceEvent },
+  /** A note directory's collaborative file changes after this seq, then each commit from now on. */
+  "note.follow": { can: userAndRemote, payload: z.object({ id: z.string(), after: z.number() }), event: S.NoteEvent },
+  /** A note's suggestions as they now are, then the whole list after each change. */
+  "note.suggestion.follow": { can: userAndRemote, payload: z.object({ id: z.string() }), event: S.SuggestionEvent },
+  /** A note's ephemeral live presence peers as a snapshot, then incremental upserts and removals. */
+  "note.presence.follow": { can: userAndRemote, payload: S.NotePresenceFollowRequest, event: S.NotePresenceEvent },
   /** One session's state, pending permissions/interactions, and live trajectory events after afterSeq. */
   "session.watch": { can: userAndRemote, payload: z.object({ id: z.string(), afterSeq: z.exactOptional(z.number()) }), event: S.SessionWatchEvent },
 } as const;

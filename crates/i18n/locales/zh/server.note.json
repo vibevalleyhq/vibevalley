@@ -1,0 +1,43 @@
+{
+  "noTitle": "笔记要有个标题",
+  "longTitle": "标题太长了，最多 {max} 个字",
+  "badKind": "认不得 {kind} 这种笔记，只认 {kinds}",
+  "missing": "没有 {id} 这篇笔记",
+  "noVersion": "「{title}」没有第 {version} 稿，最新是第 {latest} 稿",
+  "made": "做了「{title}」",
+  "versioned": "「{title}」出了第 {version} 稿",
+  "withNote": "{said}：{note}",
+  "preview": {
+    "remove": "删掉「{title}」和它的 {n} 稿",
+    "cards": "频道里的卡片还在，点开说已经删掉了"
+  },
+  "suggestion": {
+    "empty": "建议里没有要改的东西",
+    "beyond": "建议对着第 {rev} 版，可这一块现在才第 {now} 版",
+    "missing": "没有建议 {id}",
+    "staleFile": "文件 {path} 自校验和 {hash} 起已被修改，请重新读取后再提建议",
+    "deleteConflict": "删除文件的建议不能带文本选区范围"
+  },
+  "file": {
+    "missing": "「{title}」里没有文件 {path}"
+  },
+  "noReference": "{type} 没有叫 {reference} 的参考分册；可选：{available}",
+  "types": {
+    "doc": {
+      "title": "文档",
+      "summary": "Notion 式结构化块级协作文档（structure/doc.json），支持嵌套大纲、图表/GenUI、双向链接与多人多 Agent 实时共编"
+    },
+    "base": {
+      "title": "多维表",
+      "summary": "多 Sheet 结构化数据库（structure/base.json），支持表格/看板/画廊/时间线视图、汇总统计与批量 Agent 执行列"
+    },
+    "canvas": {
+      "title": "画布",
+      "summary": "空间无限画布与结构图表（structure/board.json），支持节点连线、分区框架、视觉草图与审阅建议"
+    },
+    "media": {
+      "title": "媒体笔记",
+      "summary": "音视频转写、配图与播客语音工作台笔记（structure/media.json），集中沉淀会议录音与媒体生成结果"
+    }
+  }
+}

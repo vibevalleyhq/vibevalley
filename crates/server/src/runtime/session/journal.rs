@@ -998,7 +998,9 @@ mod tests {
                     break;
                 }
                 Ok(Ok(_)) => {}
-                Ok(Err(tokio::sync::broadcast::error::RecvError::Lagged(_))) => {}
+                Ok(Err(tokio::sync::broadcast::error::RecvError::Lagged(skipped))) => {
+                    tracing::warn!(skipped, "journal test live receiver lagged");
+                }
                 Ok(Err(tokio::sync::broadcast::error::RecvError::Closed)) | Err(_) => break,
             }
         }

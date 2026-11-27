@@ -81,7 +81,7 @@
     "start": "Started",
     "restart": "Reopened, carrying on",
     "cron": "{missed, select, true {Started on schedule (made up)} other {Started on schedule}}",
-    "runtime": "The machine carried on by itself",
+    "runtime": "The environment carried on by itself",
     "refined": "Drafted",
     "reported": "Handed back",
     "accepted": "Accepted",
@@ -102,6 +102,7 @@
   "deliveryNeedsPr": "Deliver a valid PR/MR before accepting this issue",
   "notFound": "No issue {id}",
   "wordsRequired": "Say something: the words cannot be empty",
+  "externalNotDispatchable": "\"{name}\" ({code}) is an external teammate and cannot be dispatched to VibeValley's OAR work queue; set it as issue assignee instead",
   "triage": {
     "onlyBacklog": "Triage suggestions only apply to Backlog tickets (ticket #{n} is not in Backlog)",
     "emptyPatch": "A triage suggestion must propose at least one field or status change",

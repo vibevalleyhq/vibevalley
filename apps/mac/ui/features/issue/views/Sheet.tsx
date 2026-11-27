@@ -124,10 +124,12 @@ export function Property(props: { label: string; icon?: JSX.Element; align?: "ce
   const start = () => props.align === "start";
   return (
     <View class={`min-h-8 flex-row gap-2 py-0.5 ${start() ? "items-start" : "items-center"}`}>
-      <Text class={`w-18 shrink-0 text-xs text-muted ${start() ? "pt-1.5" : ""}`}>{props.label}</Text>
+      <View class={`w-18 shrink-0 justify-center ${start() ? "h-7" : ""}`}>
+        <Text class="truncate text-xs text-muted">{props.label}</Text>
+      </View>
       <View class={`min-w-0 flex-1 flex-row gap-1 ${start() ? "items-start" : "items-center"}`}>
         <If when={props.icon}>
-          <View class={`w-4 shrink-0 items-center justify-center ${start() ? "pt-1.5" : ""}`}>{props.icon}</View>
+          <View class={`w-4 shrink-0 items-center justify-center ${start() ? "h-7" : ""}`}>{props.icon}</View>
         </If>
         <View class={`min-w-0 flex-1 ${props.inset === true ? "" : "px-2"}`}>
           <Say>{props.children}</Say>
@@ -325,7 +327,7 @@ export function IssueNumberPill(props: { number: number }) {
       accessibilityLabel={copied() ? t("web.base.rich.copied") : t("web.base.rich.copy")}
       tooltip={<Bubble text={copied() ? t("web.base.rich.copied") : t("web.base.rich.copy")} />}
       onPress={copy}
-      class="shrink-0 flex-row items-center gap-1 rounded-md border border-line bg-side px-1.5 py-0.5 hover:border-line-strong hover:bg-hover active:translate-y-px focus-visible:outline-2 focus-visible:outline-focus"
+      class="h-6 shrink-0 flex-row items-center gap-1 rounded-md border border-line bg-side px-2 hover:border-line-strong hover:bg-hover active:translate-y-px focus-visible:outline-2 focus-visible:outline-focus"
     >
       <Text class={`font-mono text-xs tabular-nums ${copied() ? "text-leaf" : "text-muted"}`}>{`#${props.number}`}</Text>
       <Icon name={copied() ? "check" : "copy"} size={12} tone={copied() ? "leaf" : "muted"} />
@@ -347,10 +349,10 @@ export function IssueTrail(props: {
             role="button"
             testID="parent-issue"
             onPress={() => props.onOpenParent?.(parentId())}
-            class="min-w-0 max-w-64 shrink flex-row items-center gap-1 overflow-hidden rounded-md border border-line bg-side px-1.5 py-0.5 hover:border-line-strong hover:bg-hover"
+            class="h-6 min-w-0 max-w-64 shrink flex-row items-center gap-1 overflow-hidden rounded-md border border-line bg-side px-2 hover:border-line-strong hover:bg-hover"
           >
             <Icon name="indent" size={12} tone="water" />
-            <Text class="min-w-0 truncate text-xs text-water">
+            <Text class="min-w-0 flex-1 truncate text-xs text-water">
               {props.parent ? `#${props.parent.number} ${props.parent.title}` : t("web.issue.family.parent")}
             </Text>
           </View>

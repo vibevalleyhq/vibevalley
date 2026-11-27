@@ -1,7 +1,6 @@
 mod support;
 
 mod agent;
-mod artifact;
 mod auth_hard_gate;
 mod channel;
 mod connector;
@@ -11,6 +10,7 @@ mod debug;
 mod game;
 mod issue;
 mod issue_board;
+mod issue_body;
 mod issue_edits;
 mod issue_family;
 mod ledger;
@@ -24,6 +24,7 @@ mod media_kinds;
 mod memory;
 mod module_boundaries;
 mod multi_helper;
+mod note;
 mod orchestrator;
 mod provider;
 mod remote;

@@ -4,7 +4,6 @@ import { t } from "@vibevalley/i18n";
 import { type Channel, type Notify } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
-import { createAct } from "../../../design/act";
 import { Button } from "../../../design/Button";
 import { Checkbox } from "../../../design/Checkbox";
 import { Dialog } from "../../../design/Dialog";
@@ -16,6 +15,7 @@ import { motionClass } from "../../../design/motion";
 import { Segmented } from "../../../design/Segmented";
 import { Bubble } from "../../../design/Tip";
 import { mix } from "../../../design/tone";
+import { createAct } from "../../../infra/act";
 import { useOrchestrators } from "../../../infra/agents";
 import { api } from "../../../infra/api";
 import { useCollabSlice } from "../../../infra/frame";

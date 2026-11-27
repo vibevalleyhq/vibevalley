@@ -958,7 +958,7 @@ mod tests {
             reactions: vec![],
             attachments: vec![],
             embeds: vec![],
-            artifact: None,
+            note: None,
             view_context: None,
         };
         assert_eq!(

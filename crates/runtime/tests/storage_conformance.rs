@@ -61,6 +61,7 @@ async fn sea_orm_sqlite_storage_passes_conformance() -> DurableResult<()> {
     Ok(())
 }
 
+#[cfg(feature = "postgres")]
 struct EphemeralPostgres {
     data_dir: std::path::PathBuf,
     pg_ctl: std::path::PathBuf,
@@ -68,6 +69,7 @@ struct EphemeralPostgres {
     _temp: tempfile::TempDir,
 }
 
+#[cfg(feature = "postgres")]
 impl EphemeralPostgres {
     fn start() -> Option<Self> {
         let initdb = ["/opt/homebrew/bin/initdb", "/usr/local/bin/initdb"]
@@ -149,6 +151,7 @@ impl EphemeralPostgres {
     }
 }
 
+#[cfg(feature = "postgres")]
 impl Drop for EphemeralPostgres {
     fn drop(&mut self) {
         let _ = std::process::Command::new(&self.pg_ctl)
@@ -159,6 +162,7 @@ impl Drop for EphemeralPostgres {
     }
 }
 
+#[cfg(feature = "postgres")]
 #[tokio::test]
 async fn sea_orm_postgres_storage_passes_conformance() -> DurableResult<()> {
     let Some(pg) = EphemeralPostgres::start() else {

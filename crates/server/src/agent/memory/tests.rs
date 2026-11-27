@@ -325,13 +325,16 @@ async fn dual_db_memory_persistence_works_on_sqlite_and_postgres() {
     verify_memory_dual_db(sqlite_service.clone(), sqlite_home.path(), DbBackend::Sqlite).await;
     sqlite_service.close().await;
 
-    let Some(pg) = crate::db::test_pg::EphemeralPostgres::start() else {
-        eprintln!("skipping postgres memory dual-db test: Homebrew initdb/pg_ctl not found");
-        return;
-    };
-    pg.create_database("team_memory_dual").await;
-    let pg_home = tempfile::tempdir().unwrap();
-    let pg_service = Service::open_url(&pg.db_url("team_memory_dual")).await.unwrap();
-    verify_memory_dual_db(pg_service.clone(), pg_home.path(), DbBackend::Postgres).await;
-    pg_service.close().await;
+    #[cfg(feature = "postgres")]
+    {
+        let Some(pg) = crate::db::test_pg::EphemeralPostgres::start() else {
+            eprintln!("skipping postgres memory dual-db test: Homebrew initdb/pg_ctl not found");
+            return;
+        };
+        pg.create_database("team_memory_dual").await;
+        let pg_home = tempfile::tempdir().unwrap();
+        let pg_service = Service::open_url(&pg.db_url("team_memory_dual")).await.unwrap();
+        verify_memory_dual_db(pg_service.clone(), pg_home.path(), DbBackend::Postgres).await;
+        pg_service.close().await;
+    }
 }

@@ -2,6 +2,7 @@
 //! finished round kept as its profile's issue memory, and what a profile
 //! remembers set before the next round's words.
 
+use crate::support::RouterTestExt as _;
 use std::sync::Arc;
 use std::time::Duration;
 

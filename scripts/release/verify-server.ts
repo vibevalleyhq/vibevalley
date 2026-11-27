@@ -73,9 +73,19 @@ export async function runVerification(command: string[] = [], options: Verificat
   const built = join(process.env.CARGO_TARGET_DIR ?? join(root, "target"), "debug");
   const serverBin = process.env.VIBEVALLEY_SERVER_BIN ?? join(built, "vibevalley-server");
   const cliBin = join(built, "vibevalley");
-  if (process.env.VIBEVALLEY_SERVER_BIN === undefined && (!existsSync(serverBin) || !existsSync(cliBin))) {
-    const build = spawnSync("cargo", ["build", "-q", "-p", "vibevalley-server", "-p", "vibevalley-cli"], { cwd: root, stdio: "inherit" });
-    if (build.status !== 0) throw new Error(`cargo build failed (${String(build.status ?? build.error)})`);
+  if (process.env.VIBEVALLEY_SERVER_BIN === undefined) {
+    if (options.scriptedHelper === true) {
+      // Ensure vibevalley-server has the opt-in `fake` feature enabled for VIBEVALLEY_TEST_RUNTIMES=1.
+      const serverBuild = spawnSync("cargo", ["build", "-q", "-p", "vibevalley-server", "--features", "fake"], { cwd: root, stdio: "inherit" });
+      if (serverBuild.status !== 0) throw new Error(`cargo build failed (${String(serverBuild.status ?? serverBuild.error)})`);
+      if (!existsSync(cliBin)) {
+        const cliBuild = spawnSync("cargo", ["build", "-q", "-p", "vibevalley-cli"], { cwd: root, stdio: "inherit" });
+        if (cliBuild.status !== 0) throw new Error(`cargo build failed (${String(cliBuild.status ?? cliBuild.error)})`);
+      }
+    } else if (!existsSync(serverBin) || !existsSync(cliBin)) {
+      const build = spawnSync("cargo", ["build", "-q", "-p", "vibevalley-server", "-p", "vibevalley-cli"], { cwd: root, stdio: "inherit" });
+      if (build.status !== 0) throw new Error(`cargo build failed (${String(build.status ?? build.error)})`);
+    }
   }
   const cli = join(binaries, "vv");
   writeFileSync(cli, `#!/bin/sh\nexec ${JSON.stringify(cliBin)} "$@"\n`, { mode: 0o755 });

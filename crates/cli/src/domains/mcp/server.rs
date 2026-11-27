@@ -4,12 +4,12 @@ use std::path::Path;
 
 use serde_json::{Value, json};
 use vibevalley_mcp::{
-    BoxFuture, McpHandler, RequestContext, RpcError, ServerCapabilities, ServerInfo, SkillCatalog, ToolCallResult, ToolDef, builtin_artifact_skills,
+    BoxFuture, McpHandler, RequestContext, RpcError, ServerCapabilities, ServerInfo, SkillCatalog, ToolCallResult, ToolDef, builtin_note_skills,
     scrub_tool_result,
 };
 use vibevalley_protocol::home::{self, ReleaseChannel};
 
-use super::{McpCmd, artifact, issue, vdp};
+use super::{McpCmd, agent, issue, note, vdp};
 use crate::auth::{self, Secret};
 use crate::client::{Client, Failure, ServerSource};
 use crate::domains::debug::{DebugTargetArgs, ResolvedEndpoint};
@@ -19,19 +19,29 @@ const SERVER_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum McpTool {
+    AgentList,
+    AgentRegister,
     IssueList,
     IssueGet,
+    IssueBodyEnsure,
     IssueCreate,
     IssueUpdate,
     IssueComment,
     AttachmentUpload,
-    ArtifactList,
-    ArtifactGet,
-    ArtifactCreate,
-    ArtifactRead,
-    ArtifactWrite,
-    ArtifactPatch,
-    ArtifactSuggest,
+    NoteList,
+    NoteGet,
+    NoteCreate,
+    NoteRead,
+    NoteWrite,
+    NotePatch,
+    NoteSuggest,
+    NoteTreeMove,
+    NoteLinkList,
+    DocView,
+    DocAppendBlock,
+    BaseView,
+    BaseUpsertRow,
+    BaseRunAgentColumn,
     VdpDiscover,
     VdpTargets,
     VdpState,
@@ -48,19 +58,29 @@ enum McpTool {
 impl McpTool {
     fn from_name(name: &str) -> Option<Self> {
         match name {
+            "vv_agent_list" => Some(Self::AgentList),
+            "vv_agent_register" => Some(Self::AgentRegister),
             "vv_issue_list" => Some(Self::IssueList),
             "vv_issue_get" => Some(Self::IssueGet),
+            "vv_issue_body_ensure" => Some(Self::IssueBodyEnsure),
             "vv_issue_create" => Some(Self::IssueCreate),
             "vv_issue_update" => Some(Self::IssueUpdate),
             "vv_issue_comment" => Some(Self::IssueComment),
             "vv_attachment_upload" => Some(Self::AttachmentUpload),
-            "vv_artifact_list" => Some(Self::ArtifactList),
-            "vv_artifact_get" => Some(Self::ArtifactGet),
-            "vv_artifact_create" => Some(Self::ArtifactCreate),
-            "vv_artifact_read" => Some(Self::ArtifactRead),
-            "vv_artifact_write" => Some(Self::ArtifactWrite),
-            "vv_artifact_patch" => Some(Self::ArtifactPatch),
-            "vv_artifact_suggest" => Some(Self::ArtifactSuggest),
+            "vv_note_list" => Some(Self::NoteList),
+            "vv_note_get" => Some(Self::NoteGet),
+            "vv_note_create" => Some(Self::NoteCreate),
+            "vv_note_read" => Some(Self::NoteRead),
+            "vv_note_write" => Some(Self::NoteWrite),
+            "vv_note_patch" => Some(Self::NotePatch),
+            "vv_note_suggest" => Some(Self::NoteSuggest),
+            "vv_note_tree_move" => Some(Self::NoteTreeMove),
+            "vv_note_link_list" => Some(Self::NoteLinkList),
+            "vv_doc_view" => Some(Self::DocView),
+            "vv_doc_append_block" => Some(Self::DocAppendBlock),
+            "vv_base_view" => Some(Self::BaseView),
+            "vv_base_upsert_row" => Some(Self::BaseUpsertRow),
+            "vv_base_run_agent_column" => Some(Self::BaseRunAgentColumn),
             "vv_vdp_discover" => Some(Self::VdpDiscover),
             "vv_vdp_targets" => Some(Self::VdpTargets),
             "vv_vdp_state" => Some(Self::VdpState),
@@ -86,8 +106,9 @@ pub(super) fn tool_def(name: &str, description: &str, input_schema: Value) -> To
 }
 
 fn tool_definitions() -> Vec<ToolDef> {
-    let mut defs = issue::tool_definitions();
-    defs.extend(artifact::tool_definitions());
+    let mut defs = agent::tool_definitions();
+    defs.extend(issue::tool_definitions());
+    defs.extend(note::tool_definitions());
     defs.extend(vdp::tool_definitions());
     defs
 }
@@ -126,7 +147,7 @@ impl McpServer {
         let explicit_home = cmd.home.or_else(|| channel.map(home::home_for));
         let effective_home = explicit_home.clone().unwrap_or_else(|| base.home.clone());
         let client = build_client_for_home(base, &effective_home, channel);
-        let mut skills = builtin_artifact_skills();
+        let mut skills = builtin_note_skills();
         if let Ok(local) = SkillCatalog::from_directory("local", &effective_home.join("skills")) {
             skills.merge(local);
         }
@@ -194,19 +215,29 @@ impl McpServer {
         let args = if raw_args.is_null() { json!({}) } else { raw_args };
 
         match tool {
+            McpTool::AgentList => self.tool_agent_list(args).await,
+            McpTool::AgentRegister => self.tool_agent_register(args).await,
             McpTool::IssueList => self.tool_issue_list(args).await,
             McpTool::IssueGet => self.tool_issue_get(args).await,
+            McpTool::IssueBodyEnsure => self.tool_issue_body_ensure(args).await,
             McpTool::IssueCreate => self.tool_issue_create(args).await,
             McpTool::IssueUpdate => self.tool_issue_update(args).await,
             McpTool::IssueComment => self.tool_issue_comment(args).await,
             McpTool::AttachmentUpload => self.tool_attachment_upload(args).await,
-            McpTool::ArtifactList => self.tool_artifact_list(args).await,
-            McpTool::ArtifactGet => self.tool_artifact_get(args).await,
-            McpTool::ArtifactCreate => self.tool_artifact_create(args).await,
-            McpTool::ArtifactRead => self.tool_artifact_read(args).await,
-            McpTool::ArtifactWrite => self.tool_artifact_write(args).await,
-            McpTool::ArtifactPatch => self.tool_artifact_patch(args).await,
-            McpTool::ArtifactSuggest => self.tool_artifact_suggest(args).await,
+            McpTool::NoteList => self.tool_note_list(args).await,
+            McpTool::NoteGet => self.tool_note_get(args).await,
+            McpTool::NoteCreate => self.tool_note_create(args).await,
+            McpTool::NoteRead => self.tool_note_read(args).await,
+            McpTool::NoteWrite => self.tool_note_write(args).await,
+            McpTool::NotePatch => self.tool_note_patch(args).await,
+            McpTool::NoteSuggest => self.tool_note_suggest(args).await,
+            McpTool::NoteTreeMove => self.tool_note_tree_move(args).await,
+            McpTool::NoteLinkList => self.tool_note_link_list(args).await,
+            McpTool::DocView => self.tool_doc_view(args).await,
+            McpTool::DocAppendBlock => self.tool_doc_append_block(args).await,
+            McpTool::BaseView => self.tool_base_view(args).await,
+            McpTool::BaseUpsertRow => self.tool_base_upsert_row(args).await,
+            McpTool::BaseRunAgentColumn => self.tool_base_run_agent_column(args).await,
             McpTool::VdpDiscover => self.tool_vdp_discover(args).await,
             McpTool::VdpTargets => self.tool_vdp_targets(args).await,
             McpTool::VdpState => self.tool_vdp_state(args).await,
@@ -271,12 +302,12 @@ fn build_client_for_home(base: &Client, target_home: &Path, channel: Option<Rele
 #[cfg(test)]
 mod tests {
     use super::super::ChannelArg;
-    use super::artifact::ArtifactCreateArgs;
-    use super::issue::{IssueCreateArgs, IssueUpdateArgs};
+    use super::issue::{IssueBodyEnsureArgs, IssueCreateArgs, IssueUpdateArgs};
+    use super::note::NoteCreateArgs;
     use super::vdp::VdpOverrideArgs;
     use super::*;
     use vibevalley_mcp::{ContentBlock, error_code, serve_io};
-    use vibevalley_protocol::{ArtifactType, JsNumber};
+    use vibevalley_protocol::{JsNumber, NoteType};
 
     fn test_client(home_dir: &Path) -> Client {
         Client::from_parts(
@@ -402,36 +433,51 @@ mod tests {
         assert_eq!(updated.tags, Some(vec!["Bug".into()]));
         assert_eq!(updated.start_at, Some(JsNumber::from(0_i64)));
         assert_eq!(updated.due_at, Some(JsNumber::from(1_760_900_000_000_i64)));
+
+        let ensure_def = defs.iter().find(|d| d.name == "vv_issue_body_ensure").expect("vv_issue_body_ensure");
+        assert!(ensure_def.input_schema["properties"].as_object().is_some_and(|p| p.contains_key("id")));
+        assert!(ensure_def.description.contains("vv_doc_view"));
+        let ensured_num: IssueBodyEnsureArgs = serde_json::from_value(json!({ "id": 146 })).unwrap();
+        assert_eq!(ensured_num.id, "146");
+        let ensured_ref: IssueBodyEnsureArgs = serde_json::from_value(json!({ "id": "#146" })).unwrap();
+        assert_eq!(ensured_ref.id, "#146");
     }
 
     #[test]
-    fn artifact_mcp_tools_validate_all_12_types_and_guide_sep2640_skills() {
+    fn note_mcp_tools_validate_all_4_types_and_guide_sep2640_skills() {
         let defs = tool_definitions();
         for expected in [
-            "vv_artifact_list",
-            "vv_artifact_get",
-            "vv_artifact_create",
-            "vv_artifact_read",
-            "vv_artifact_write",
-            "vv_artifact_patch",
-            "vv_artifact_suggest",
+            "vv_note_list",
+            "vv_note_get",
+            "vv_note_create",
+            "vv_note_read",
+            "vv_note_write",
+            "vv_note_patch",
+            "vv_note_suggest",
+            "vv_note_tree_move",
+            "vv_note_link_list",
+            "vv_doc_view",
+            "vv_doc_append_block",
+            "vv_base_view",
+            "vv_base_upsert_row",
+            "vv_base_run_agent_column",
         ] {
             assert!(defs.iter().any(|d| d.name == expected), "missing {expected}");
         }
-        let create_def = defs.iter().find(|d| d.name == "vv_artifact_create").unwrap();
-        assert!(create_def.description.contains("skill://artifact/<type>"));
+        let create_def = defs.iter().find(|d| d.name == "vv_note_create").unwrap();
+        assert!(create_def.description.contains("skill://note/<type>"));
         assert!(create_def.description.contains("skills/list"));
         assert!(create_def.description.contains("skills/get"));
 
-        for ty in ArtifactType::ALL {
-            let parsed: ArtifactCreateArgs = serde_json::from_value(json!({
+        for ty in NoteType::ALL {
+            let parsed: NoteCreateArgs = serde_json::from_value(json!({
                 "title": "Sample",
-                "artifactType": ty.as_str(),
+                "noteType": ty.as_str(),
             }))
             .unwrap();
-            assert_eq!(parsed.artifact_type, ty);
+            assert_eq!(parsed.note_type, ty);
         }
-        assert!(serde_json::from_value::<ArtifactCreateArgs>(json!({ "title": "Bad", "artifactType": "nonexistent" })).is_err());
+        assert!(serde_json::from_value::<NoteCreateArgs>(json!({ "title": "Bad", "noteType": "nonexistent" })).is_err());
     }
 
     #[tokio::test]
@@ -450,7 +496,7 @@ mod tests {
             "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}\n",
             "not valid json\n",
             "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"ping\"}\n",
-            "{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"skills/list\",\"params\":{\"tag\":\"artifact\"}}\n",
+            "{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"skills/list\",\"params\":{\"tag\":\"note\"}}\n",
             "{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"skills/get\",\"params\":{\"name\":\"triage\"}}\n",
             "{\"jsonrpc\":\"2.0\",\"id\":6,\"method\":\"tools/call\",\"params\":{\"name\":\"vv_unknown\",\"arguments\":{}}}\n",
             "{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"unknown/method\"}\n",
@@ -476,7 +522,7 @@ mod tests {
         assert_eq!(lines[3]["result"], json!({}));
 
         assert_eq!(lines[4]["id"], 4);
-        assert_eq!(lines[4]["result"]["skills"].as_array().unwrap().len(), 12);
+        assert_eq!(lines[4]["result"]["skills"].as_array().unwrap().len(), 4);
 
         assert_eq!(lines[5]["id"], 5);
         assert_eq!(lines[5]["result"]["uri"], "skill://local/triage");
@@ -487,5 +533,30 @@ mod tests {
 
         assert_eq!(lines[7]["id"], 7);
         assert_eq!(lines[7]["error"]["code"], error_code::METHOD_NOT_FOUND);
+    }
+
+    #[test]
+    fn agent_mcp_tools_expose_roster_schema_and_decode_register_args() {
+        let defs = tool_definitions();
+        let list_def = defs.iter().find(|d| d.name == "vv_agent_list").expect("vv_agent_list");
+        assert!(list_def.description.contains("O-XX"));
+        let reg_def = defs.iter().find(|d| d.name == "vv_agent_register").expect("vv_agent_register");
+        let props = reg_def.input_schema["properties"].as_object().expect("properties");
+        for key in ["id", "name", "runtime", "duty", "avatar", "code", "tags"] {
+            assert!(props.contains_key(key), "vv_agent_register missing {key}");
+        }
+        let decoded: super::agent::AgentRegisterArgs = serde_json::from_value(json!({
+            "id": "antigravity",
+            "name": "Antigravity",
+            "runtime": "antigravity",
+            "avatar": "avatar-fullstack",
+            "code": "W-12"
+        }))
+        .unwrap();
+        assert_eq!(decoded.id.as_deref(), Some("antigravity"));
+        assert_eq!(decoded.name, "Antigravity");
+        assert_eq!(decoded.runtime.as_deref(), Some("antigravity"));
+        assert_eq!(decoded.avatar.as_deref(), Some("avatar-fullstack"));
+        assert_eq!(decoded.code.as_deref(), Some("W-12"));
     }
 }

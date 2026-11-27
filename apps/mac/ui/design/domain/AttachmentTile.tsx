@@ -4,7 +4,7 @@ import { Image, signal, Text, View } from "nsh";
 import { t } from "@vibevalley/i18n";
 import type { Attachment } from "@vibevalley/protocol";
 
-import { useAttachmentUrl } from "../../infra/attachmentFile";
+import { useDesignAttachmentUrl } from "../host";
 import { Icon } from "../Icon";
 import type { IconName } from "../icons";
 import { motionClass } from "../motion";
@@ -23,7 +23,7 @@ export const sizeText = (bytes: number) =>
 
 export function AttachmentTile(props: { file: Attachment; onRemove?: (() => void) | undefined; testid?: string }) {
   const kind = () => fileKind(props.file.type);
-  const url = useAttachmentUrl(() => props.file.id);
+  const url = useDesignAttachmentUrl(() => props.file.id);
   const removeHover = signal(false);
   return (
     <View testID={props.testid} class="group max-w-64 flex-row items-center gap-2 rounded-md border border-line bg-page p-1.5 pr-2 hover:border-faint">

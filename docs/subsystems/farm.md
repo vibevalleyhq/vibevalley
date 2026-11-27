@@ -23,7 +23,7 @@
 | `apps/mac/src/diorama/opening.rs` | `OpeningView`：按本机时段解码 `assets/brand/opening-{morning,day,night}.webp` 的 Papertrails 开场欢迎画 |
 | `apps/mac/src/assets.rs` | 定位应用运行时的 `assets/` 与 `assets/diorama/` 目录 |
 | `design/sync-assets.sh`、`design/diorama.sh`、`assets/diorama/` | 从同级 `vibevalley-assets` 仓打包并仅同步轻量运行产物（`manifest.json`、`meshes.bin`、`lights.json`、`foley.json` 与 `print/`、`stock/` 贴图）到代码仓 |
-| `apps/mac/ui/design/sound.ts`、`apps/mac/src/audio.rs` | 程序化音效触发与 Rust 侧 32 kHz 实时 WAV 合成器 |
+| `apps/mac/ui/infra/sound.ts`、`apps/mac/src/audio.rs` | 程序化音效触发与 Rust 侧 32 kHz 实时 WAV 合成器 |
 
 ## 模型和不变量
 
@@ -44,7 +44,7 @@
 - **昼夜光影与掀顶交互**：支持 `Dawn` / `Noon` / `Dusk` / `Night` 四档时光（快捷键 `1..4` 或 `diorama_clock` 调试命令）；点击院内建筑可聚焦并触发屋顶掀顶切面，展示内景并弹出对应入口。
 - **农场面板与交互**：点有工单的地块查看详情或执行回答、重试、收获与关闭，点空地块创建工单；有工作目录的地块可右击打开终端进入帮工 worktree。点院内小摊建筑（`panel:shop`）或左上角金币/每日任务徽章打开田头小摊面板（`kind: "shop"`），查看今日轻量任务自动结算、用金币购入庭院摆件或工单模板；已购摆件经 `FarmView.decorations` 实时同步进 `DioramaWorld` 作为纸雕景物呈现。
 - **农场手机**：点手机或按 P 开合。从「游戏」打开方块、推箱子、小恐龙、贪吃虫或种田 2048。方向键对应十字键，空格、Enter 或 Z 对应 A，X 对应 B。点屏幕上沿的「农场通」返回游戏目录。棋盘与最高分按各游戏规则保留在本次农场页面内。
-- **音效没有音频文件**：触发入口在 `apps/mac/ui/design/sound.ts`，每次播放由原生 `apps/mac/src/audio.rs` 合成器实时生成 WAV 并缓存播放（`host.playSound`）。
+- **音效没有音频文件**：触发入口在 `apps/mac/ui/infra/sound.ts`，每次播放由原生 `apps/mac/src/audio.rs` 合成器实时生成 WAV 并缓存播放（`host.playSound`）。
 
 ## 怎么走
 

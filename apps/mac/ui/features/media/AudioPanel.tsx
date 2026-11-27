@@ -2,10 +2,10 @@ import { computed, signal, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 
-import { createAct } from "../../design/act";
 import { IconButton } from "../../design/IconButton";
 import { Empty } from "../../design/layout";
 import { Segmented } from "../../design/Segmented";
+import { createAct } from "../../infra/act";
 import { reasonOf } from "../../infra/api";
 import { useOpsSlice } from "../../infra/frame";
 import { providerQuery, ready, useQuery } from "../../infra/query";

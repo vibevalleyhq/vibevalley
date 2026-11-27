@@ -1,3 +1,4 @@
+use std::net::{IpAddr, Ipv4Addr};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -5,10 +6,12 @@ use vibevalley_core::{Clock, ManualClock, SharedClock};
 use vibevalley_i18n::t;
 use vibevalley_protocol::{BizCode, RemoteEnableRequest, RemotePairExchangeRequest, RemotePlatform, SCOPE_REMOTE_CLIENT, SCOPE_REMOTE_MACHINE};
 
+use super::lan;
 use super::service::{
-    CODE_ALPHABET, LAST_SEEN_THROTTLE_MS, MAX_ACTIVE_PAIR_CODES, PAIR_CODE_LEN, PAIR_CODE_TTL_MS, RATE_LIMIT_WINDOW_MS, Remote, TOKEN_PREFIX,
-    default_scope_for_platform,
+    CODE_ALPHABET, LAST_SEEN_THROTTLE_MS, MAX_ACTIVE_PAIR_CODES, NetworkProbe, PAIR_CODE_LEN, PAIR_CODE_TTL_MS, RATE_LIMIT_WINDOW_MS, Remote, TOKEN_PREFIX,
+    default_scope_for_platform, resolve_auto_bind_ip,
 };
+use super::tailscale::TailscaleInfo;
 use crate::context::{Context, Http, LiveState, Outbox, PublicDownload, StateFeed, TaskGroup};
 use crate::gateway::api::{RemoteAuth, Server};
 use crate::gateway::bridge::fake::FakeServer;
@@ -225,6 +228,159 @@ async fn verify_bearer_async_reads_wal_read_pool_while_writer_holds_transaction(
     .unwrap();
     assert_eq!(second.device_id, exchanged.device.id);
     ctx.service.rollback_tx(tx).await.unwrap();
+
+    remote.disable_async().await.unwrap();
+    remote.close_async().await;
+    ctx.service.close().await;
+}
+
+#[test]
+fn auto_bind_resolution_prefers_online_tailscale_then_lan_then_loopback() {
+    let ts_online = TailscaleInfo {
+        online: true,
+        ipv4: Some("100.64.1.23".into()),
+        host: Some("studio.tailnet.ts.net".into()),
+    };
+    let ts_offline = TailscaleInfo {
+        online: false,
+        ipv4: Some("100.64.1.23".into()),
+        host: Some("studio.tailnet.ts.net".into()),
+    };
+    let ts_absent = TailscaleInfo::default();
+
+    assert_eq!(
+        resolve_auto_bind_ip(&ts_online, Some("192.168.1.42")),
+        IpAddr::V4(Ipv4Addr::new(100, 64, 1, 23))
+    );
+    assert_eq!(
+        resolve_auto_bind_ip(&ts_offline, Some("192.168.1.42")),
+        IpAddr::V4(Ipv4Addr::new(192, 168, 1, 42))
+    );
+    assert_eq!(
+        resolve_auto_bind_ip(&ts_absent, Some("192.168.1.42")),
+        IpAddr::V4(Ipv4Addr::new(192, 168, 1, 42))
+    );
+    assert_eq!(resolve_auto_bind_ip(&ts_absent, None), IpAddr::V4(Ipv4Addr::LOCALHOST));
+}
+
+#[tokio::test]
+async fn enable_pair_and_token_auth_work_without_tailscale() {
+    vibevalley_i18n::set_locale("en");
+    let dir = tempfile::tempdir().unwrap();
+    let clock = Arc::new(ManualClock::new(1_700_000_000_000));
+    let ctx = test_context(dir.path(), clock).await;
+    let fake: Arc<dyn Server> = Arc::new(FakeServer::new());
+    let remote = Remote::open(ctx.clone(), "0.1.0-test".into()).await.unwrap();
+
+    let detected_lan = lan::detect_lan_ipv4();
+    let expected_bind = detected_lan.clone().unwrap_or_else(|| "127.0.0.1".into());
+    let probe = NetworkProbe {
+        tailscale: TailscaleInfo::default(),
+        lan_ip: detected_lan.clone(),
+    };
+
+    let status = remote
+        .enable_with_probe_async(
+            RemoteEnableRequest {
+                bind_addr: None,
+                port: Some(0),
+            },
+            fake,
+            probe,
+        )
+        .await
+        .unwrap();
+    assert!(status.enabled);
+    assert!(status.listening);
+    assert!(!status.tailscale_online);
+    assert_eq!(status.tailscale_ip, None);
+    assert_eq!(status.lan_ip, detected_lan);
+    assert_eq!(status.bind_addr.as_deref(), Some(expected_bind.as_str()));
+    let expected_url = format!("http://{expected_bind}:{}", status.port);
+    assert_eq!(status.url.as_deref(), Some(expected_url.as_str()));
+
+    let pair = remote.pair_create().unwrap();
+    assert_eq!(pair.url, expected_url);
+    assert!(pair.pair_url.starts_with("vibevalley://pair?url="));
+    assert!(pair.pair_url.contains(&pair.code));
+
+    let exchanged = remote
+        .pair_exchange_async(RemotePairExchangeRequest {
+            code: pair.code,
+            device_name: "Wi-Fi Phone".into(),
+            platform: RemotePlatform::Ios,
+            scope: None,
+        })
+        .await
+        .unwrap();
+    assert!(exchanged.token.starts_with(TOKEN_PREFIX));
+    assert_eq!(exchanged.device.scope, SCOPE_REMOTE_CLIENT);
+
+    let identity = RemoteAuth::verify_bearer_async(remote.clone(), exchanged.token).await.unwrap();
+    assert_eq!(identity.device_id, exchanged.device.id);
+    assert_eq!(identity.scope, SCOPE_REMOTE_CLIENT);
+
+    remote.disable_async().await.unwrap();
+    remote.close_async().await;
+    ctx.service.close().await;
+}
+
+#[tokio::test]
+async fn status_exposes_both_lan_and_tailscale_addresses_and_switches_bind_addr() {
+    vibevalley_i18n::set_locale("en");
+    let dir = tempfile::tempdir().unwrap();
+    let ctx = test_context(dir.path(), vibevalley_core::system_clock()).await;
+    let fake: Arc<dyn Server> = Arc::new(FakeServer::new());
+    let remote = Remote::open(ctx.clone(), "0.1.0-test".into()).await.unwrap();
+
+    let dual_probe = NetworkProbe {
+        tailscale: TailscaleInfo {
+            online: true,
+            ipv4: Some("100.64.1.23".into()),
+            host: Some("studio-mac.tailnet.ts.net".into()),
+        },
+        lan_ip: Some("192.168.1.42".into()),
+    };
+    let status = remote.status_with_probe_async(dual_probe).await.unwrap();
+    assert_eq!(status.lan_ip.as_deref(), Some("192.168.1.42"));
+    assert_eq!(status.tailscale_ip.as_deref(), Some("100.64.1.23"));
+    assert_eq!(status.tailscale_host.as_deref(), Some("studio-mac.tailnet.ts.net"));
+    assert!(status.tailscale_online);
+
+    // Switching explicit bind_addr updates both the live listener URL and generated pairing address.
+    let first = remote
+        .enable_with_probe_async(
+            RemoteEnableRequest {
+                bind_addr: Some("127.0.0.1".into()),
+                port: Some(0),
+            },
+            fake.clone(),
+            NetworkProbe::default(),
+        )
+        .await
+        .unwrap();
+    let first_pair = remote.pair_create().unwrap();
+    assert_eq!(first_pair.url, format!("http://127.0.0.1:{}", first.port));
+
+    if let Some(real_lan) = lan::detect_lan_ipv4() {
+        let switched = remote
+            .enable_with_probe_async(
+                RemoteEnableRequest {
+                    bind_addr: Some(real_lan.clone()),
+                    port: None,
+                },
+                fake,
+                NetworkProbe {
+                    tailscale: TailscaleInfo::default(),
+                    lan_ip: Some(real_lan.clone()),
+                },
+            )
+            .await
+            .unwrap();
+        assert_eq!(switched.bind_addr.as_deref(), Some(real_lan.as_str()));
+        let switched_pair = remote.pair_create().unwrap();
+        assert_eq!(switched_pair.url, format!("http://{real_lan}:{}", switched.port));
+    }
 
     remote.disable_async().await.unwrap();
     remote.close_async().await;

@@ -63,8 +63,8 @@ const ChannelRow = z.object({ id: z.string(), type: z.string() });
 const ChannelMsg = z.object({ text: z.string() });
 const AgentRow = z.object({ id: z.string(), name: z.string().optional() });
 const MemoryList = z.object({ memories: z.array(IdObj) });
-const ArtifactShow = z.object({ title: z.string() });
-const ArtifactRead = z.object({ content: z.string() });
+const NoteShow = z.object({ title: z.string() });
+const NoteRead = z.object({ content: z.string() });
 const AttachmentGet = z.object({ data: z.string() });
 const LibraryRow = z.object({ attachment: IdObj });
 const MediaInput = z.object({ id: z.string(), hash: z.string().optional() });
@@ -364,7 +364,7 @@ interface SeedIds {
   channel: string;
   agent: string;
   memory: string;
-  artifact: string;
+  note: string;
   attachment: string;
   mediaInput: string;
   mediaJob: string;
@@ -388,8 +388,16 @@ async function seedOld(c: Client): Promise<SeedIds> {
   const agent = profile.find((p) => p.id === "docs" || p.name === "docs")?.id;
   assert(agent !== undefined, "missing docs agent");
   const memory = IdObj.parse(c.cli("memory", "create", agent, "retain old note", "--key", "legacy-note"));
-  const artifact = IdObj.parse(
-    c.cli("artifact", "create", "Checkpoint", "--kind", "html", "--content", "<!DOCTYPE html><html><body>old artifact</body></html>"),
+  const note = IdObj.parse(
+    c.cli(
+      "note",
+      "create",
+      "Checkpoint",
+      "--type",
+      "doc",
+      "--content",
+      JSON.stringify({ version: 1, blocks: [{ id: "b1", type: "prose", text: "old note" }] }),
+    ),
   );
 
   const tmpDir = c.env.TMPDIR;
@@ -403,6 +411,8 @@ async function seedOld(c: Client): Promise<SeedIds> {
   await c.call("provider.update", {
     revision: 0,
     connections: [{ id: "offline", name: "Offline fixture", adapter: "moss", enabled: true, key: "local-fixture-only" }],
+    orchestrator: null,
+    polish: null,
     image: { connection: "offline", model: "moss-image-base-1.0" },
     speech: null,
     understanding: null,
@@ -411,6 +421,7 @@ async function seedOld(c: Client): Promise<SeedIds> {
     voiceDesign: null,
     transcription: null,
     vision: null,
+    scenePolicies: [],
   });
 
   const due = new Date(Date.now() + 86_400_000).toISOString().replace(/\.\d{3}Z$/u, "Z");
@@ -446,7 +457,7 @@ async function seedOld(c: Client): Promise<SeedIds> {
     channel: general,
     agent,
     memory: memory.id,
-    artifact: artifact.id,
+    note: note.id,
     attachment: attachment.id,
     mediaInput: mediaInput.id,
     mediaJob: job.id,
@@ -479,8 +490,8 @@ async function verifyOldContent(c: Client, ids: SeedIds): Promise<void> {
     memories.some((m) => m.id === ids.memory),
     "missing old memory",
   );
-  assert(ArtifactShow.parse(c.cli("artifact", "show", ids.artifact)).title === "Checkpoint", "artifact title mismatch");
-  assert(ArtifactRead.parse(c.cli("artifact", "read", ids.artifact, "--version", "1")).content.includes("old artifact"), "artifact content mismatch");
+  assert(NoteShow.parse(c.cli("note", "show", ids.note)).title === "Checkpoint", "note title mismatch");
+  assert(NoteRead.parse(c.cli("note", "read", ids.note, "--version", "1")).content.includes("old note"), "note content mismatch");
 
   const lib = z.array(LibraryRow).parse(c.cli("library", "list"));
   assert(
@@ -677,7 +688,7 @@ async function verify(oldBundle: string, newBundle: string, root: string): Promi
     await verifyOldContent(c, ids);
 
     marker = IdObj.parse(c.cli("memory", "create", ids.agent, "upgraded-only note", "--key", "new-only"));
-    c.cli("artifact", "update", ids.artifact, "--title", "New title");
+    c.cli("note", "update", ids.note, "--title", "New title");
     const revision = IssueDiff.parse(c.cli("issue", "diff", ids.issue)).revision;
     c.cli("issue", "review", ids.issue, "--pass", "--base-commit", revision.baseCommit, "--tree", revision.tree);
     const result = IssueShow.parse(c.cli("issue", "status", ids.issue, "done"));
@@ -715,7 +726,7 @@ async function verify(oldBundle: string, newBundle: string, root: string): Promi
     submitted = durableRows.map((r) => [r.request_id, r.status]);
     assertEqualJson(submitted, [[reqId, "done"]], "durable_submission");
 
-    assert(ArtifactShow.parse(c.cli("artifact", "show", ids.artifact)).title === "New title", "updated artifact title missing");
+    assert(NoteShow.parse(c.cli("note", "show", ids.note)).title === "New title", "updated note title missing");
     assert(
       MemoryList.parse(c.cli("memory", "list", ids.agent)).memories.some((m) => m.id === marker.id),
       "new memory missing",
@@ -778,7 +789,7 @@ async function verify(oldBundle: string, newBundle: string, root: string): Promi
         "session",
         "channel",
         "memory",
-        "artifact",
+        "note",
         "attachment",
         "library",
         "media_input",
@@ -787,7 +798,7 @@ async function verify(oldBundle: string, newBundle: string, root: string): Promi
         "terminals",
       ],
       oldConnectorStore: ["paused account", "replayed inbox", "sent, dropped and pending outbox"],
-      newPackage: ["review receipt", "Git merge", "durable reply", "new memory", "artifact title"],
+      newPackage: ["review receipt", "Git merge", "durable reply", "new memory", "note title"],
     },
     ok: true,
   });

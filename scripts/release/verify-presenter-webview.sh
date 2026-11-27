@@ -52,12 +52,12 @@ done
 cd "$root/apps/mac/ui"
 if "$nsh" test app/story.tsx --target gpui > "$probe/workbench.log" 2>&1 <<'JS'
 await app.setViewport(1200, 800);
-await app.press("id:place-artifacts");
-await app.press("id:artifact-row-art-deck");
-await app.waitFor("id:artifact-frame");
+await app.press("id:place-content");
+await app.press("id:page-tree-item-art-deck");
+await app.waitFor("id:note-block-doc-view");
 await app.setViewport(1199, 800);
-await app.waitFor("id:slides-presenter");
-await app.press("id:slides-presenter");
+await app.waitFor("id:doc-presenter-btn");
+await app.press("id:doc-presenter-btn");
 await app.waitFor("id:presenter-current");
 await app.setViewport(1201, 800);
 await app.waitFor("text:先说结论：看板能拖了。", { timeout: 10000 });
@@ -74,9 +74,9 @@ expect(app.count("id:presenter-next-slide")).toBe(0);
 await app.keyboard.press("left");
 await app.waitFor("text:拖拽的手感还要再调。");
 await app.press("id:presenter-back");
-await app.waitFor("id:artifact-frame");
+await app.waitFor("id:note-block-doc-view");
 await app.setViewport(1200, 800);
-await app.waitFor("id:slides-presenter");
+await app.waitFor("id:doc-presenter-btn");
 JS
 then
   printf 'workbench: three pages, notes and return passed\n'

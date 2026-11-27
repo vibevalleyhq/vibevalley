@@ -4,11 +4,11 @@ import { t } from "@vibevalley/i18n";
 import type { Channel, CronView } from "@vibevalley/protocol";
 import { isFreeUserSession, sessionBranch, sessionChannelId, sessionProfile, sessionRepo } from "@vibevalley/protocol/rules";
 
-import { createAct } from "../../../design/act";
-import { Button } from "../../../design/Button";
+import { Button, ButtonLink } from "../../../design/Button";
 import { Icon } from "../../../design/Icon";
 import { IconButton } from "../../../design/IconButton";
 import { Empty } from "../../../design/layout";
+import { createAct } from "../../../infra/act";
 import { api } from "../../../infra/api";
 import { useNow } from "../../../infra/base/dom";
 import { useCollabSlice, useOpsSlice, useSessionsSlice } from "../../../infra/frame";
@@ -33,9 +33,20 @@ export function Sessions(props: { channel: Channel }) {
     <If
       when={sessions().length > 0}
       else={
-        <Empty testid="tab-empty" icon="issues">
-          {t("web.channel.issues.empty")}
-        </Empty>
+        <View class="flex-1 p-4">
+          <Empty
+            variant="firstRun"
+            testid="tab-empty"
+            icon="issues"
+            title={t("web.channel.issues.emptyTitle")}
+            description={t("web.channel.issues.empty")}
+            action={
+              <ButtonLink href="/issues" size="compact" icon="issues">
+                {t("web.channel.issues.openBoard")}
+              </ButtonLink>
+            }
+          />
+        </View>
       }
     >
       <Scroll class="flex-1" contentClass="gap-2.5 p-4">
@@ -87,9 +98,9 @@ export function Crons(props: { channel: Channel }) {
     <If
       when={crons().length > 0}
       else={
-        <Empty testid="tab-empty" icon="clock">
-          {t("web.channel.crons.empty")}
-        </Empty>
+        <View class="flex-1 p-4">
+          <Empty variant="firstRun" testid="tab-empty" icon="clock" title={t("web.channel.crons.emptyTitle")} description={t("web.channel.crons.empty")} />
+        </View>
       }
     >
       <Scroll class="flex-1" contentClass="gap-2.5 p-4">

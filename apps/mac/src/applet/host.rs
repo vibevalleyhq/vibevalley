@@ -1,4 +1,4 @@
-//! Unix domain socket host (`$VIBEVALLEY_HOME/applet.sock`) driving standalone artifact windows.
+//! Unix domain socket host (`$VIBEVALLEY_HOME/applet.sock`) driving standalone note windows.
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -18,14 +18,13 @@ use tokio::io::{AsyncBufReadExt as _, AsyncWriteExt as _, BufReader};
 use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
-use vibevalley_protocol::{Artifact, ArtifactEvent, ArtifactType, HostOp};
+use vibevalley_protocol::{HostOp, Note};
 use vibevalley_server::gateway::bridge::{BizCode, CallerContext, Envelope, Server, refusal};
 
-use crate::hosted::{Action, BridgeHub, HostedEvent, HostedView};
+use crate::hosted::{BridgeHub, HostedEvent, HostedView};
 use crate::theme::Ui;
 
 use super::installer;
-use super::prototype;
 use super::remote_layer::RemoteLayer;
 use super::{AppletInfo, AppletInstallRequest, AppletOpenResult, AppletRemoveResult, HostToShim, ShimToHost, socket_path};
 
@@ -66,18 +65,12 @@ struct NativeSession {
     closed: Arc<AtomicBool>,
 }
 
-struct PrototypeSession {
-    sub_id: Option<u64>,
-    cancel: CancellationToken,
-}
-
 enum SessionKind {
     Native(NativeSession),
-    Prototype(PrototypeSession),
 }
 
 struct AppletConnection {
-    artifact_id: Option<String>,
+    note_id: Option<String>,
     out_tx: mpsc::UnboundedSender<HostToShim>,
     kind: Option<SessionKind>,
     attach_cancel: Option<CancellationToken>,
@@ -124,7 +117,7 @@ impl AppletHost {
             let _ = std::fs::remove_file(&sock_path);
         }
 
-        let rt = vibevalley_runtime::rt::current_or_global_handle();
+        let rt = vibevalley_rt::current_or_global_handle();
         let listener = {
             let _guard = rt.enter();
             match UnixListener::bind(&sock_path) {
@@ -145,10 +138,10 @@ impl AppletHost {
         let host = Self { inner: inner.clone() };
         cx.set_global(host.clone());
 
-        let (cmd_tx, cmd_rx) = flume::unbounded::<HostCommand>();
+        let (cmd_tx, mut cmd_rx) = mpsc::unbounded_channel::<HostCommand>();
         rt.spawn(accept_loop(listener, cmd_tx, cancel));
         cx.spawn(async move |cx| {
-            while let Ok(cmd) = cmd_rx.recv_async().await {
+            while let Some(cmd) = cmd_rx.recv().await {
                 cx.update(|cx| handle_command(&inner, cmd, cx));
             }
         })
@@ -179,16 +172,16 @@ impl AppletHost {
         installer::install(&req)
     }
 
-    pub(crate) fn uninstall_applet(artifact_id: &str) -> Result<AppletRemoveResult, String> {
-        installer::uninstall(artifact_id)
+    pub(crate) fn uninstall_applet(note_id: &str) -> Result<AppletRemoveResult, String> {
+        installer::uninstall(note_id)
     }
 
-    pub(crate) fn open_applet(artifact_id: &str) -> Result<AppletOpenResult, String> {
-        installer::open_installed(artifact_id)
+    pub(crate) fn open_applet(note_id: &str) -> Result<AppletOpenResult, String> {
+        installer::open_installed(note_id)
     }
 }
 
-async fn accept_loop(listener: UnixListener, cmd_tx: flume::Sender<HostCommand>, cancel: CancellationToken) {
+async fn accept_loop(listener: UnixListener, cmd_tx: mpsc::UnboundedSender<HostCommand>, cancel: CancellationToken) {
     let mut next_conn_id = 1u64;
     loop {
         let accepted = tokio::select! {
@@ -205,7 +198,7 @@ async fn accept_loop(listener: UnixListener, cmd_tx: flume::Sender<HostCommand>,
     }
 }
 
-async fn run_connection(conn_id: u64, stream: UnixStream, cmd_tx: flume::Sender<HostCommand>, cancel: CancellationToken) {
+async fn run_connection(conn_id: u64, stream: UnixStream, cmd_tx: mpsc::UnboundedSender<HostCommand>, cancel: CancellationToken) {
     let (read_half, mut write_half) = tokio::io::split(stream);
     let (out_tx, mut out_rx) = mpsc::unbounded_channel::<HostToShim>();
     if cmd_tx
@@ -276,26 +269,14 @@ fn close_connection(mut conn: AppletConnection, cx: &mut App) {
         cancel.cancel();
     }
     let _ = conn.out_tx.send(HostToShim::Closing);
-    if let Some(kind) = conn.kind.take() {
-        match kind {
-            SessionKind::Native(native) => {
-                native.closed.store(true, Ordering::Release);
-                if let Some(mut remote) = native.remote.borrow_mut().take() {
-                    remote.teardown();
-                }
-                let _ = cx.update_window(native.window, |_, window, _| {
-                    window.remove_window();
-                });
-            }
-            SessionKind::Prototype(proto) => {
-                proto.cancel.cancel();
-                if let Some(sub_id) = proto.sub_id
-                    && let Some(hub) = cx.try_global::<BridgeHub>()
-                {
-                    hub.0.server().unsubscribe(sub_id);
-                }
-            }
+    if let Some(SessionKind::Native(native)) = conn.kind.take() {
+        native.closed.store(true, Ordering::Release);
+        if let Some(mut remote) = native.remote.borrow_mut().take() {
+            remote.teardown();
         }
+        let _ = cx.update_window(native.window, |_, window, _| {
+            window.remove_window();
+        });
     }
 }
 
@@ -305,7 +286,7 @@ fn handle_command(inner: &Rc<HostInner>, cmd: HostCommand, cx: &mut App) {
             inner.sessions.borrow_mut().conns.insert(
                 conn_id,
                 AppletConnection {
-                    artifact_id: None,
+                    note_id: None,
                     out_tx,
                     kind: None,
                     attach_cancel: None,
@@ -324,7 +305,7 @@ fn handle_command(inner: &Rc<HostInner>, cmd: HostCommand, cx: &mut App) {
 fn handle_shim_message(inner: &Rc<HostInner>, conn_id: u64, msg: ShimToHost, cx: &mut App) {
     match msg {
         ShimToHost::Attach {
-            artifact_id,
+            note_id,
             width,
             height,
             scale,
@@ -341,7 +322,7 @@ fn handle_shim_message(inner: &Rc<HostInner>, conn_id: u64, msg: ShimToHost, cx:
                 }
                 let cancel = CancellationToken::new();
                 existing.attach_cancel = Some(cancel.clone());
-                existing.artifact_id = Some(artifact_id.clone());
+                existing.note_id = Some(note_id.clone());
                 let prev_kind = existing.kind.take();
                 let out_tx = existing.out_tx.clone();
                 (prev_kind, out_tx, cancel)
@@ -350,7 +331,7 @@ fn handle_shim_message(inner: &Rc<HostInner>, conn_id: u64, msg: ShimToHost, cx:
             if let Some(kind) = prev_kind {
                 close_connection(
                     AppletConnection {
-                        artifact_id: None,
+                        note_id: None,
                         out_tx: out_tx.clone(),
                         kind: Some(kind),
                         attach_cancel: None,
@@ -364,38 +345,30 @@ fn handle_shim_message(inner: &Rc<HostInner>, conn_id: u64, msg: ShimToHost, cx:
                 });
                 return;
             };
-            let rt = vibevalley_runtime::rt::current_or_global_handle();
-            let (tx, rx) = flume::bounded(1);
+            let rt = vibevalley_rt::current_or_global_handle();
+            let (tx, rx) = tokio::sync::oneshot::channel();
             let server_bg = server.clone();
-            let artifact_id_bg = artifact_id.clone();
+            let note_id_bg = note_id.clone();
             let cancel_bg = attach_cancel.clone();
             rt.spawn(async move {
-                let res = prepare_attach(&server_bg, &artifact_id_bg, &cancel_bg).await;
+                let res = prepare_attach(&server_bg, &note_id_bg, &cancel_bg).await;
                 let _ = tx.send(res);
             });
             let inner = inner.clone();
             cx.spawn(async move |cx| {
-                let Ok(prepared) = rx.recv_async().await else {
+                let Ok(prepared) = rx.await else {
                     return;
                 };
                 if attach_cancel.is_cancelled() {
-                    if let Ok(PreparedAttach::Prototype { sub_id: Some(id), .. }) = prepared {
-                        server.unsubscribe(id);
-                    }
                     return;
                 }
                 match prepared {
                     Err(message) => {
                         let _ = out_tx.send(HostToShim::Error { message });
                     }
-                    Ok(PreparedAttach::Prototype { bundle, sub_id, rx: event_rx }) => {
-                        cx.update(|_| {
-                            finish_attach_prototype(&inner, conn_id, &server, &artifact_id, bundle, sub_id, event_rx, out_tx, attach_cancel);
-                        });
-                    }
-                    Ok(PreparedAttach::Native(art)) => {
+                    Ok(note) => {
                         cx.update(|cx| {
-                            attach_native(&inner, conn_id, &art, width, height, scale, display_id, out_tx.clone(), cx);
+                            attach_native(&inner, conn_id, &note, width, height, scale, display_id, out_tx.clone(), cx);
                         });
                     }
                 }
@@ -584,9 +557,9 @@ fn handle_shim_message(inner: &Rc<HostInner>, conn_id: u64, msg: ShimToHost, cx:
             }
         }
         ShimToHost::OpenInHost => {
-            let artifact_id = inner.sessions.borrow().conns.get(&conn_id).and_then(|c| c.artifact_id.clone());
-            if let Some(id) = artifact_id {
-                open_artifact_in_host(&id, cx);
+            let note_id = inner.sessions.borrow().conns.get(&conn_id).and_then(|c| c.note_id.clone());
+            if let Some(id) = note_id {
+                open_note_in_host(&id, cx);
             }
         }
         ShimToHost::Detach => {
@@ -622,134 +595,23 @@ fn dispatch_input(inner: &Rc<HostInner>, conn_id: u64, input: PlatformInput, cx:
     }
 }
 
-async fn fetch_artifact(server: &Arc<dyn Server>, artifact_id: &str) -> Result<Artifact, String> {
+async fn fetch_note(server: &Arc<dyn Server>, note_id: &str) -> Result<Note, String> {
     let env = Arc::clone(server)
-        .call_with_async(CallerContext::local(), "artifact.get".into(), json!({ "id": artifact_id }))
+        .call_with_async(CallerContext::local(), "note.get".into(), json!({ "id": note_id }))
         .await;
     if env.biz_code != 0 {
         return Err(env.message);
     }
-    let data = env.data.ok_or_else(|| "artifact.get returned empty payload".to_string())?;
-    serde_json::from_value(data).map_err(|e| format!("decode artifact.get: {e}"))
-}
-
-enum PreparedAttach {
-    Native(Artifact),
-    Prototype {
-        bundle: prototype::PrototypeBundle,
-        sub_id: Option<u64>,
-        rx: Option<mpsc::UnboundedReceiver<Value>>,
-    },
+    let data = env.data.ok_or_else(|| "note.get returned empty payload".to_string())?;
+    serde_json::from_value(data).map_err(|e| format!("decode note.get: {e}"))
 }
 
 /// Runs all server RPCs and SQLite-backed loads inside the Tokio runtime context.
-async fn prepare_attach(server: &Arc<dyn Server>, artifact_id: &str, cancel: &CancellationToken) -> Result<PreparedAttach, String> {
-    let artifact = tokio::select! {
+async fn prepare_attach(server: &Arc<dyn Server>, note_id: &str, cancel: &CancellationToken) -> Result<Note, String> {
+    tokio::select! {
         biased;
-        _ = cancel.cancelled() => return Err("attach cancelled".to_string()),
-        res = fetch_artifact(server, artifact_id) => res?,
-    };
-    if artifact.artifact_type != ArtifactType::Prototype {
-        return Ok(PreparedAttach::Native(artifact));
-    }
-    let bundle = tokio::select! {
-        biased;
-        _ = cancel.cancelled() => return Err("attach cancelled".to_string()),
-        res = prototype::load_prototype_bundle(server, artifact_id) => res?,
-    };
-    let sub = tokio::select! {
-        biased;
-        _ = cancel.cancelled() => return Err("attach cancelled".to_string()),
-        res = Arc::clone(server).subscribe_with_async(
-            CallerContext::local(),
-            "artifact.follow".into(),
-            json!({ "id": artifact_id, "after": bundle.seq }),
-        ) => res,
-    };
-    let (sub_id, rx) = match sub {
-        Ok((sub_id, rx)) => (Some(sub_id), Some(rx)),
-        Err(err) => {
-            tracing::warn!(target: "vibevalley::applet", artifact_id, err = %err.message, "prototype follow subscription unavailable");
-            (None, None)
-        }
-    };
-    Ok(PreparedAttach::Prototype { bundle, sub_id, rx })
-}
-
-#[allow(clippy::too_many_arguments)]
-fn finish_attach_prototype(
-    inner: &Rc<HostInner>,
-    conn_id: u64,
-    server: &Arc<dyn Server>,
-    artifact_id: &str,
-    initial: prototype::PrototypeBundle,
-    sub_id: Option<u64>,
-    rx: Option<mpsc::UnboundedReceiver<Value>>,
-    out_tx: mpsc::UnboundedSender<HostToShim>,
-    attach_cancel: CancellationToken,
-) {
-    let watch_cancel = CancellationToken::new();
-    let installed = {
-        let mut guard = inner.sessions.borrow_mut();
-        if let Some(conn) = guard.conns.get_mut(&conn_id)
-            && !attach_cancel.is_cancelled()
-        {
-            conn.attach_cancel = None;
-            conn.kind = Some(SessionKind::Prototype(PrototypeSession {
-                sub_id,
-                cancel: watch_cancel.clone(),
-            }));
-            true
-        } else {
-            false
-        }
-    };
-    if !installed {
-        if let Some(id) = sub_id {
-            server.unsubscribe(id);
-        }
-        return;
-    }
-
-    let _ = out_tx.send(HostToShim::ReadyWebview {
-        html: initial.html,
-        title: initial.title,
-        artifact_type: initial.artifact_type,
-    });
-
-    if let Some(mut rx) = rx {
-        let server = server.clone();
-        let artifact_id = artifact_id.to_string();
-        let out_tx = out_tx.clone();
-        vibevalley_runtime::rt::current_or_global_handle().spawn(async move {
-            loop {
-                let event = tokio::select! {
-                    biased;
-                    _ = watch_cancel.cancelled() => break,
-                    maybe = rx.recv() => match maybe {
-                        Some(val) => val,
-                        None => break,
-                    },
-                };
-                let Ok(parsed) = serde_json::from_value::<ArtifactEvent>(event) else {
-                    continue;
-                };
-                match parsed {
-                    ArtifactEvent::Files { .. } | ArtifactEvent::Reset {} => {
-                        if let Ok(updated) = prototype::load_prototype_bundle(&server, &artifact_id).await
-                            && out_tx
-                                .send(HostToShim::UpdateWebview {
-                                    html: updated.html,
-                                    title: updated.title,
-                                })
-                                .is_err()
-                        {
-                            break;
-                        }
-                    }
-                }
-            }
-        });
+        _ = cancel.cancelled() => Err("attach cancelled".to_string()),
+        res = fetch_note(server, note_id) => res,
     }
 }
 
@@ -763,7 +625,7 @@ fn resolve_display_id(display_id: Option<u32>, cx: &App) -> Option<DisplayId> {
 fn attach_native(
     inner: &Rc<HostInner>,
     conn_id: u64,
-    artifact: &Artifact,
+    note: &Note,
     width: f64,
     height: f64,
     scale: f64,
@@ -787,7 +649,7 @@ fn attach_native(
     };
 
     let dark = cx.try_global::<Ui>().is_some_and(|ui| ui.colors.dark);
-    let route = format!("/standalone/artifact/{}", artifact.id);
+    let route = format!("/standalone/note/{}", note.id);
     let mut params: Map<String, Value> = Map::new();
     params.insert("route".into(), json!(route));
     params.insert("applet".into(), json!(true));
@@ -812,7 +674,7 @@ fn attach_native(
         Ok(handle) => handle,
         Err(err) => {
             let _ = out_tx.send(HostToShim::Error {
-                message: format!("failed to open artifact window: {err}"),
+                message: format!("failed to open note window: {err}"),
             });
             return;
         }
@@ -873,8 +735,8 @@ fn attach_native(
 
     let _ = out_tx.send(HostToShim::ReadyLayer {
         context_id,
-        title: artifact.title.clone(),
-        artifact_type: artifact.artifact_type.as_str().to_string(),
+        title: note.title.clone(),
+        note_type: note.note_type.as_str().to_string(),
     });
 
     // Initial render + adaptive timer: 60Hz during active input, ~5Hz idle for live CRDT edits.
@@ -914,7 +776,7 @@ fn attach_native(
     .detach();
 }
 
-fn handle_standalone_host_call(op: HostOp, reply: crate::hosted::Replier, cx: &mut App) {
+fn handle_standalone_host_call(op: HostOp, reply: crate::host_types::Replier, cx: &mut App) {
     if let Some(env) = crate::host::handle_stateless_op(&op) {
         reply.send(env);
         return;
@@ -922,7 +784,7 @@ fn handle_standalone_host_call(op: HostOp, reply: crate::hosted::Replier, cx: &m
     let env = match op {
         HostOp::Info => Envelope::ok(json!({
             "name": "desktop",
-            "version": crate::update::bundle_version(),
+            "version": crate::env::bundle_version(),
             "titleBar": { "top": 0, "left": 0 },
             "terminal": false,
             "theme": Ui::get(cx).settings.theme.as_str(),
@@ -985,47 +847,19 @@ fn handle_standalone_host_call(op: HostOp, reply: crate::hosted::Replier, cx: &m
     reply.send(env);
 }
 
-fn open_artifact_in_host(artifact_id: &str, cx: &mut App) {
-    crate::ensure_main_window(cx);
-    cx.activate(true);
-    let route = format!("/artifacts/{artifact_id}");
-    let shell_window = cx.windows().into_iter().find_map(|w| w.downcast::<crate::shell::Shell>());
-    let Some(handle) = shell_window else {
-        return;
-    };
-    let already_ready = handle
-        .update(cx, |shell, window, cx| {
-            window.activate_window();
-            if shell.chrome.workbench.read(cx).is_ready() {
-                shell.on_action(Action::OpenRoute { path: route.clone() }, window, cx);
-                true
-            } else {
-                false
-            }
-        })
-        .unwrap_or(true);
-    if !already_ready {
-        cx.spawn(async move |cx| {
-            for _ in 0..50 {
-                cx.background_executor().timer(Duration::from_millis(100)).await;
-                let done = handle
-                    .update(cx, |shell, window, cx| {
-                        if shell.chrome.workbench.read(cx).is_ready() {
-                            cx.activate(true);
-                            window.activate_window();
-                            shell.on_action(Action::OpenRoute { path: route.clone() }, window, cx);
-                            true
-                        } else {
-                            false
-                        }
-                    })
-                    .unwrap_or(true);
-                if done {
-                    break;
-                }
-            }
-        })
-        .detach();
+type OpenNoteFn = Arc<dyn Fn(&str, &mut App) + Send + Sync>;
+
+struct OpenNoteHandler(OpenNoteFn);
+
+impl gpui::Global for OpenNoteHandler {}
+
+pub fn set_open_note_handler(cx: &mut App, handler: impl Fn(&str, &mut App) + Send + Sync + 'static) {
+    cx.set_global(OpenNoteHandler(Arc::new(handler)));
+}
+
+fn open_note_in_host(note_id: &str, cx: &mut App) {
+    if let Some(handler) = cx.try_global::<OpenNoteHandler>().map(|h| h.0.clone()) {
+        handler(note_id, cx);
     }
 }
 
@@ -1037,10 +871,10 @@ mod tests {
     fn unix_socket_ndjson_roundtrip_and_invalid_json_reports_error() {
         let dir = tempfile::tempdir().unwrap();
         let sock = dir.path().join("applet.sock");
-        vibevalley_runtime::rt::block_on(async move {
+        vibevalley_rt::block_on(async move {
             let listener = UnixListener::bind(&sock).unwrap();
             let cancel = CancellationToken::new();
-            let (cmd_tx, cmd_rx) = flume::unbounded();
+            let (cmd_tx, mut cmd_rx) = mpsc::unbounded_channel();
             let accept = tokio::spawn(accept_loop(listener, cmd_tx, cancel.clone()));
 
             let stream = UnixStream::connect(&sock).await.unwrap();
@@ -1060,10 +894,10 @@ mod tests {
 
             let mut received = Vec::new();
             for _ in 0..4 {
-                let Ok(cmd) = tokio::time::timeout(Duration::from_secs(2), cmd_rx.recv_async()).await else {
+                let Ok(cmd) = tokio::time::timeout(Duration::from_secs(2), cmd_rx.recv()).await else {
                     break;
                 };
-                if let Ok(cmd) = cmd {
+                if let Some(cmd) = cmd {
                     received.push(cmd);
                 }
             }

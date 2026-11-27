@@ -2,6 +2,10 @@
 //! wake it with the farm's situation; its tool call records an issue; its
 //! words are said in #general; a cron for no profile reaches it.
 
+#![allow(clippy::disallowed_types, reason = "synchronous test barrier for scripted model calls")]
+
+use crate::support::RouterTestExt as _;
+
 use std::collections::VecDeque;
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};

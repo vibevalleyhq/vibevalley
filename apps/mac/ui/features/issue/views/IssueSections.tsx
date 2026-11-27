@@ -3,7 +3,6 @@ import { computed, signal, Text, View } from "nsh";
 import { t } from "@vibevalley/i18n";
 import type { Attachment, Issue, IssueAction, IssueAnswer, Question as QuestionItem } from "@vibevalley/protocol";
 
-import { createAct } from "../../../design/act";
 import { Button } from "../../../design/Button";
 import { Checkbox } from "../../../design/Checkbox";
 import { Icon } from "../../../design/Icon";
@@ -11,12 +10,13 @@ import type { IconName } from "../../../design/icons";
 import { Markdown } from "../../../design/Markdown";
 import { TextLink } from "../../../design/TextLink";
 import { mix } from "../../../design/tone";
+import { createAct } from "../../../infra/act";
 import { useNow } from "../../../infra/base/dom";
 import { shortMomentText, tookText } from "../../../infra/base/format";
+import { perform } from "../../../infra/issueActions";
 import { ready } from "../../../infra/query";
 import { useIntents } from "../../../infra/state/intent";
 import { SubagentProgress } from "../../session";
-import { perform } from "../model/acts";
 import { useIssueRuns } from "../model/history";
 import { issueTag, runText, tagOpen, tagText } from "../model/issue";
 import { localizeIssueError } from "../model/issueError";
@@ -265,18 +265,18 @@ export function OrchestratorIssueDetail(props: { issue: Issue }) {
         {t("web.issue.detail.answered")}
       </Property>
       <SheetLabel divider>{t("web.issue.detail.time")}</SheetLabel>
-      <Property label={t("web.issue.detail.opened")}>
+      <Property label={t("web.issue.detail.opened")} icon={<Icon name="clock" size={13} tone="muted" />}>
         <Text class="text-sm text-ink tabular-nums">{shortMomentText(props.issue.createdAt, now())}</Text>
       </Property>
       <If when={props.issue.closedAt}>
         {(at) => (
-          <Property label={t("web.issue.detail.closedAt")}>
+          <Property label={t("web.issue.detail.closedAt")} icon={<Icon name="clock" size={13} tone="muted" />}>
             <Text class="text-sm text-ink tabular-nums">{shortMomentText(at(), now())}</Text>
           </Property>
         )}
       </If>
       <If when={props.issue.stage.acts.length > 0}>
-        <View class="mt-4 flex-row flex-wrap gap-2 border-t border-line pt-4">
+        <View class="mt-4 flex-row flex-wrap items-center gap-2 border-t border-line pt-4">
           <Each of={props.issue.stage.acts} key={(a) => a.act}>
             {(a) => (
               <Button

@@ -32,8 +32,8 @@ public enum ReleaseChannel: String, Equatable, Sendable, CaseIterable {
 }
 
 public struct BundleConfig: Equatable, Sendable {
-  public var artifactId: String?
-  public var artifactType: String?
+  public var noteId: String?
+  public var noteType: String?
   public var channel: ReleaseChannel
   public var serverHome: String
   public var socketPath: String
@@ -42,8 +42,8 @@ public struct BundleConfig: Equatable, Sendable {
   public var alwaysOnTop: Bool
 
   public init(
-    artifactId: String?,
-    artifactType: String?,
+    noteId: String?,
+    noteType: String?,
     channel: ReleaseChannel,
     serverHome: String,
     socketPath: String,
@@ -51,8 +51,8 @@ public struct BundleConfig: Equatable, Sendable {
     title: String,
     alwaysOnTop: Bool
   ) {
-    self.artifactId = artifactId
-    self.artifactType = artifactType
+    self.noteId = noteId
+    self.noteType = noteType
     self.channel = channel
     self.serverHome = serverHome
     self.socketPath = socketPath
@@ -108,8 +108,8 @@ public struct BundleConfig: Equatable, Sendable {
       ?? ReleaseChannel(raw: plistString("VVChannel"))
       ?? .dev
 
-    let artifactId = cli.artifact ?? plistString("VVArtifactId")
-    let artifactType = plistString("VVArtifactType")
+    let noteId = cli.note ?? plistString("VVNoteId")
+    let noteType = plistString("VVNoteType")
 
     let rawServerHome =
       cli.serverHome
@@ -129,12 +129,12 @@ public struct BundleConfig: Equatable, Sendable {
       cli.title
       ?? plistString("CFBundleDisplayName")
       ?? plistString("CFBundleName")
-      ?? artifactId
+      ?? noteId
       ?? "VibeValley"
 
     return BundleConfig(
-      artifactId: artifactId,
-      artifactType: artifactType,
+      noteId: noteId,
+      noteType: noteType,
       channel: channel,
       serverHome: serverHome,
       socketPath: socketPath,
@@ -146,7 +146,7 @@ public struct BundleConfig: Equatable, Sendable {
 }
 
 private struct ParsedCLI {
-  var artifact: String?
+  var note: String?
   var socket: String?
   var serverHome: String?
   var title: String?
@@ -172,7 +172,7 @@ private struct ParsedCLI {
       case "--no-always-on-top":
         alwaysOnTop = false
         index += 1
-      case "--artifact", "--socket", "--server-home", "--title", "--host-app":
+      case "--note", "--socket", "--server-home", "--title", "--host-app":
         if index + 1 < arguments.count {
           assignValue(flag: arg, value: arguments[index + 1])
           index += 2
@@ -188,8 +188,8 @@ private struct ParsedCLI {
   private mutating func assignValue(flag: String, value: String) {
     let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
     switch flag {
-    case "--artifact":
-      if !trimmed.isEmpty { artifact = trimmed }
+    case "--note":
+      if !trimmed.isEmpty { note = trimmed }
     case "--socket":
       if !trimmed.isEmpty { socket = trimmed }
     case "--server-home":

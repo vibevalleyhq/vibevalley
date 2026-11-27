@@ -15,8 +15,11 @@ import { IssuesTab } from "./features/IssuesTab";
 import { PairScreen } from "./features/PairScreen";
 import { SessionsTab } from "./features/SessionsTab";
 import { syncMobileLocale } from "./infra/i18nBoot";
+import { motionClass, motionEnter } from "./infra/motion";
 import { subscribeNotificationPress, type NotificationRoute } from "./infra/notifications";
-import { createRemoteSession, hapticSelection, type RemoteSessionOptions } from "./infra/session";
+import { createRemoteSession, errorMessage, hapticSelection, type RemoteSessionOptions } from "./infra/session";
+
+const TACTILE_PRESS = "transition-transform duration-120 ease-out active:translate-y-px";
 
 type MobileTabId = "inbox" | "channels" | "sessions" | "issues";
 
@@ -82,7 +85,7 @@ function MobileSplash() {
 }
 
 function MobileErrorFallback(props: { readonly error: unknown; readonly reset: () => void }) {
-  const detail = () => (props.error instanceof Error ? props.error.message : String(props.error));
+  const detail = () => errorMessage(props.error);
   return (
     <SafeScreen testID="mobile-error-fallback">
       <View class="flex-1 items-center justify-center px-6">
@@ -274,7 +277,7 @@ function MobileShell(props: MobileAppProps) {
           testID="mobile-refresh-button"
           accessibilityLabel={t("web.devtools.actions.refresh")}
           onPress={() => session.reconnect()}
-          class="size-8 items-center justify-center rounded-full border border-line bg-page active:bg-hover"
+          class={`size-8 items-center justify-center rounded-full border border-line bg-page active:bg-hover ${motionClass(TACTILE_PRESS)}`}
         >
           <Icon name="refresh" size={14} tone="muted" />
         </View>
@@ -386,7 +389,7 @@ function MobileShell(props: MobileAppProps) {
                                   hapticSelection();
                                   activeTab.set(id());
                                 }}
-                                class={`flex-1 items-center justify-center gap-1 rounded-lg py-1.5 ${active() ? "bg-selected" : "active:bg-hover"}`}
+                                class={`flex-1 items-center justify-center gap-1 rounded-lg py-1.5 ${motionClass(TACTILE_PRESS)} ${active() ? "bg-selected" : "active:bg-hover"}`}
                               >
                                 <View class="flex-row items-center gap-1">
                                   <Icon name={TAB_ICONS[id()].reicon} size={18} tone={active() ? "accent" : "muted"} />
@@ -446,9 +449,9 @@ function MobileShell(props: MobileAppProps) {
                               hapticSelection();
                               activeTab.set(id());
                             }}
-                            class={`w-full flex-row items-center rounded-lg px-1 py-2 ${active() ? "bg-selected" : "active:bg-hover"}`}
+                            class={`w-full flex-row items-center rounded-lg px-1 py-2 ${motionClass(TACTILE_PRESS)} ${active() ? "bg-selected" : "active:bg-hover"}`}
                           >
-                            <View class={`h-5 w-1 shrink-0 rounded-full ${active() ? "bg-accent" : "bg-transparent"}`} />
+                            <View class={`h-5 w-1 shrink-0 rounded-full ${motionEnter("normal")} ${active() ? "bg-accent" : "bg-transparent"}`} />
                             <View class="min-w-0 flex-1 items-center gap-1">
                               <View class="flex-row items-center gap-1">
                                 <Icon name={TAB_ICONS[id()].reicon} size={18} tone={active() ? "accent" : "on-rail"} />
@@ -473,7 +476,7 @@ function MobileShell(props: MobileAppProps) {
                       testID="rail-refresh-button"
                       accessibilityLabel={t("web.devtools.actions.refresh")}
                       onPress={() => session.reconnect()}
-                      class="size-9 items-center justify-center rounded-lg border border-line bg-page active:bg-hover"
+                      class={`size-9 items-center justify-center rounded-lg border border-line bg-page active:bg-hover ${motionClass(TACTILE_PRESS)}`}
                     >
                       <Icon name="refresh" size={16} tone="muted" />
                     </View>
@@ -482,7 +485,7 @@ function MobileShell(props: MobileAppProps) {
                       testID="rail-disconnect-button"
                       accessibilityLabel={t("web.remote.state.disconnect")}
                       onPress={() => handleDisconnect()}
-                      class="size-9 items-center justify-center rounded-lg border border-line bg-page active:bg-hover"
+                      class={`size-9 items-center justify-center rounded-lg border border-line bg-page active:bg-hover ${motionClass(TACTILE_PRESS)}`}
                     >
                       <Icon name="close" size={16} tone="muted" />
                     </View>

@@ -18,7 +18,7 @@ import {
   useTimeout,
   type TagTone,
 } from "../design/ui";
-import { hapticImpact, hapticNotification, hapticSelection, type RemoteSession } from "../infra/session";
+import { errorMessage, hapticImpact, hapticNotification, hapticSelection, type RemoteSession } from "../infra/session";
 
 type IssueFilterKind = "all" | "active" | "review" | "done";
 
@@ -89,11 +89,6 @@ export function IssuesTab(props: {
   const useNativeSegmented = mobileAvailable && platform.os === "ios";
 
   const allIssues = computed(() => props.session.board()?.issues ?? []);
-  const machineNames = computed(() => new Map((props.session.sessions()?.machines ?? []).map((m) => [m.id, m.name] as const)));
-  const machineLabelOf = (machineId: string | undefined): string | undefined => {
-    if (machineId === undefined || machineId === "") return undefined;
-    return machineNames().get(machineId) ?? machineId;
-  };
   const filteredIssues = computed(() => {
     const q = searchQuery().trim().toLowerCase();
     return allIssues().filter((issue) => matchesFilter(issue, filter()) && (q === "" || matchesIssueSearch(issue, q)));
@@ -158,7 +153,7 @@ export function IssuesTab(props: {
         hapticImpact("light");
       }
     } catch (err: unknown) {
-      actionError.set(err instanceof Error ? err.message : String(err));
+      actionError.set(errorMessage(err));
       hapticNotification("error");
     } finally {
       busy.set(false);
@@ -181,7 +176,7 @@ export function IssuesTab(props: {
         hapticNotification(pass ? "success" : "warning");
       }
     } catch (err: unknown) {
-      actionError.set(err instanceof Error ? err.message : String(err));
+      actionError.set(errorMessage(err));
       hapticNotification("error");
     } finally {
       busy.set(false);
@@ -207,7 +202,7 @@ export function IssuesTab(props: {
         hapticImpact("light");
       }
     } catch (err: unknown) {
-      rollback(err instanceof Error ? err.message : String(err));
+      rollback(errorMessage(err));
     } finally {
       busy.set(false);
     }
@@ -299,7 +294,7 @@ export function IssuesTab(props: {
                 <View class="flex-row items-center justify-between gap-2">
                   <Text class="font-mono text-xs text-muted">#{String(issue().number)}</Text>
                   <View class="flex-row items-center gap-1.5">
-                    <If when={machineLabelOf(issue().machineId)}>
+                    <If when={props.session.machineLabel(issue().machineId)}>
                       {(label) => <StatusTag testID={`issue-machine-${issue().id}`} label={label()} icon="devices" tone="info" />}
                     </If>
                     <StatusTag label={issue().status} tone={statusTone(issue().status)} />
@@ -350,7 +345,7 @@ export function IssuesTab(props: {
               <View class="flex-row items-center justify-between gap-2">
                 <Text class="text-xs font-semibold text-muted">{t("web.remote.issue.status")}</Text>
                 <View class="flex-row items-center gap-1.5">
-                  <If when={machineLabelOf(issue().machineId)}>
+                  <If when={props.session.machineLabel(issue().machineId)}>
                     {(label) => <StatusTag testID="issue-detail-machine" label={label()} icon="devices" tone="info" />}
                   </If>
                   <StatusTag testID="issue-detail-status" label={issue().status} tone={statusTone(issue().status)} />

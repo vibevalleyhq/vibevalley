@@ -361,7 +361,7 @@ async fn stream_import_to_staging_async(root: &Path, input: &AttachmentImportPat
         .as_deref()
         .map(str::trim)
         .filter(|s| !s.is_empty())
-        .unwrap_or_else(|| guess_mime_from_path(path))
+        .unwrap_or_else(|| vibevalley_core::note::infer_mime(&path.to_string_lossy()))
         .to_owned();
     Ok((id, name, mime, size, staging))
 }
@@ -383,35 +383,6 @@ fn file_too_big() -> ApiError {
         "server.attachment.fileTooBig",
         &[("mb", ((ATTACHMENT_MAX as f64) / 1024.0 / 1024.0).round().into())],
     ))
-}
-
-fn guess_mime_from_path(path: &Path) -> &'static str {
-    let ext = path.extension().map(|e| e.to_string_lossy().to_ascii_lowercase()).unwrap_or_default();
-    match ext.as_str() {
-        "png" => "image/png",
-        "jpg" | "jpeg" => "image/jpeg",
-        "gif" => "image/gif",
-        "webp" => "image/webp",
-        "heic" => "image/heic",
-        "svg" => "image/svg+xml",
-        "pdf" => "application/pdf",
-        "txt" | "log" => "text/plain",
-        "md" | "markdown" => "text/markdown",
-        "json" => "application/json",
-        "csv" => "text/csv",
-        "html" | "htm" => "text/html",
-        "mp4" | "m4v" => "video/mp4",
-        "mov" => "video/quicktime",
-        "webm" => "video/webm",
-        "mp3" => "audio/mpeg",
-        "m4a" => "audio/mp4",
-        "flac" => "audio/flac",
-        "aac" => "audio/aac",
-        "ogg" | "opus" => "audio/ogg",
-        "wav" => "audio/wav",
-        "zip" => "application/zip",
-        _ => "application/octet-stream",
-    }
 }
 
 #[cfg(test)]

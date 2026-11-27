@@ -69,8 +69,8 @@ pub enum Command {
     /// Talk to the server orchestrator in a channel
     Chat(collab::chat::ChatCmd),
 
-    /// Manage artifacts and structured store entries
-    Artifact(content::artifact::ArtifactCmd),
+    /// Manage notes, block docs, multi-dimensional bases, canvases, and media
+    Note(content::note::NoteCmd),
     /// Manage media library items
     Library(content::library::LibraryCmd),
     /// Inspect media jobs and upload binary media inputs
@@ -111,7 +111,7 @@ pub async fn run(client: &Client, command: Command) -> Done {
         Command::Channel(cmd) => collab::channel::run(client, cmd).await,
         Command::Chat(cmd) => collab::chat::run(client, cmd).await,
 
-        Command::Artifact(cmd) => content::artifact::run(client, cmd).await,
+        Command::Note(cmd) => content::note::run(client, cmd).await,
         Command::Library(cmd) => content::library::run(client, cmd).await,
         Command::Media(cmd) => content::media::run(client, cmd).await,
         Command::Attachment(cmd) => content::attachment::run(client, cmd).await,

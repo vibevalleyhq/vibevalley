@@ -53,7 +53,7 @@
     "voicesHint": "保存语音合成连接后自动拉取可用音色",
     "voicesCount": "{n} 个可用音色",
     "voicesEmpty": "当前连接下暂无可用音色",
-    "manageAll": "在「模型与引擎」中管理全部连接",
+    "manageAll": "在「模型与环境」中管理全部连接",
     "saved": "语音设置已保存"
   }
 }

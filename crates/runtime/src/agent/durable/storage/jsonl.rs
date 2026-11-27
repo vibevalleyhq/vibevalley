@@ -135,17 +135,10 @@ impl JsonlStorage {
     }
 }
 
+const CONV_ID_ENCODE_SET: &percent_encoding::AsciiSet = &percent_encoding::NON_ALPHANUMERIC.remove(b'-').remove(b'_').remove(b'.');
+
 fn encode_conv_id(id: &str) -> String {
-    let mut out = String::with_capacity(id.len());
-    for b in id.bytes() {
-        if matches!(b, b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.') {
-            out.push(b as char);
-        } else {
-            use std::fmt::Write;
-            let _ = write!(out, "%{b:02X}");
-        }
-    }
-    out
+    percent_encoding::utf8_percent_encode(id, CONV_ID_ENCODE_SET).to_string()
 }
 
 fn target_sidecar(dir: &Path, op: &JournalOp) -> PathBuf {

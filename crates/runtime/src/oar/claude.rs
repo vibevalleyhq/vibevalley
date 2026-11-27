@@ -825,7 +825,15 @@ impl Shared {
     }
 
     async fn on_line(&self, line: &str) {
-        let Ok(message) = serde_json::from_str::<Value>(line) else { return };
+        let message = match serde_json::from_str::<Value>(line) {
+            Ok(v) => v,
+            Err(err) => {
+                if !line.trim().is_empty() {
+                    tracing::warn!(runtime = %self.core.runtime_id(), error = %err, line_len = line.len(), "claude dropped malformed JSON stdout line");
+                }
+                return;
+            }
+        };
         let mut questions_to_answer = Vec::new();
         {
             let meta = WireMeta::deserialize(&message).unwrap_or_default();
@@ -915,7 +923,7 @@ impl Shared {
             }
         }
         for request_id in questions_to_answer {
-            let _ = self
+            if let Err(err) = self
                 .answer(
                     &request_id,
                     json!({
@@ -923,7 +931,10 @@ impl Shared {
                         "message": "The question was shown to the user. Stop here; they will answer in their next message.",
                     }),
                 )
-                .await;
+                .await
+            {
+                tracing::warn!(runtime = %self.core.runtime_id(), request_id = %request_id, error = %err, "claude failed to write question control response");
+            }
         }
     }
 
@@ -1502,7 +1513,7 @@ fn usage_from_reply(parsed: WireUsageReply, email: Option<String>) -> Option<Acc
 /// A separate `claude -p --safe-mode` (no hooks, no MCP servers, no prompt)
 /// asked `initialize` and `get_usage`, as oar does.
 pub(crate) async fn read_account_usage(binary: &Path) -> Result<AccountUsage> {
-    let (tx, mut rx) = mpsc::unbounded_channel::<WireControlResponse>();
+    let (tx, mut rx) = mpsc::channel::<WireControlResponse>(64);
     let child = LineChild::spawn(
         Spawn {
             label: "claude-usage",
@@ -1531,7 +1542,7 @@ pub(crate) async fn read_account_usage(binary: &Path) -> Result<AccountUsage> {
                     && env.kind.as_deref() == Some("control_response")
                     && let Some(resp) = env.response
                 {
-                    let _ = tx.send(resp);
+                    let _ = tx.send(resp).await;
                 }
             }
         },
@@ -1540,7 +1551,7 @@ pub(crate) async fn read_account_usage(binary: &Path) -> Result<AccountUsage> {
     let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(30);
     async fn ask(
         child: &Arc<LineChild>,
-        rx: &mut mpsc::UnboundedReceiver<WireControlResponse>,
+        rx: &mut mpsc::Receiver<WireControlResponse>,
         deadline: tokio::time::Instant,
         id: &str,
         subtype: &'static str,

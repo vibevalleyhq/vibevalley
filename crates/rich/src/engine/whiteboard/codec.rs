@@ -23,7 +23,8 @@ pub enum WhiteboardEntryOp {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WhiteboardEntry {
-    pub artifact_id: String,
+    #[serde(alias = "artifactId", alias = "artifact_id", default)]
+    pub note_id: String,
     pub path: String,
     pub kind: WhiteboardEntryKind,
     pub mime: String,

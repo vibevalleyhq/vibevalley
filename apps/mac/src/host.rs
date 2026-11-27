@@ -45,22 +45,7 @@ pub fn worktree_file(worktree: &Path, relative: &Path) -> Option<(PathBuf, PathB
 
 /// `%XX` escapes of a `file:` URL's path decoded (spaces, CJK names).
 pub(crate) fn percent_decode(raw: &str) -> String {
-    let bytes = raw.as_bytes();
-    let mut out = Vec::with_capacity(bytes.len());
-    let mut i = 0;
-    while i < bytes.len() {
-        if bytes[i] == b'%'
-            && let Some(hex) = raw.get(i + 1..i + 3)
-            && let Ok(byte) = u8::from_str_radix(hex, 16)
-        {
-            out.push(byte);
-            i += 3;
-            continue;
-        }
-        out.push(bytes[i]);
-        i += 1;
-    }
-    String::from_utf8_lossy(&out).into_owned()
+    percent_encoding::percent_decode_str(raw).decode_utf8_lossy().into_owned()
 }
 
 /// Whether this application is currently active in the macOS foreground.
@@ -113,7 +98,7 @@ pub fn notify(title: &str, body: &str) -> Result<(), String> {
     let id = NSString::from_str(&uuid::Uuid::new_v4().to_string());
     let request = UNNotificationRequest::requestWithIdentifier_content_trigger(&id, &content, None);
 
-    let (tx, rx) = flume::bounded::<Result<(), String>>(1);
+    let (tx, rx) = std::sync::mpsc::sync_channel::<Result<(), String>>(1);
     let completion = RcBlock::new(move |err: *mut NSError| {
         let result = if err.is_null() {
             Ok(())
@@ -131,26 +116,113 @@ pub fn notify(title: &str, body: &str) -> Result<(), String> {
     }
 }
 
+/// Filters, sorts, and deduplicates system font family names down to monospace/coding fonts.
+pub fn filter_mono_fonts(names: impl IntoIterator<Item = String>) -> Vec<String> {
+    let mut fonts: Vec<String> = names
+        .into_iter()
+        .filter(|name| {
+            let lower = name.to_lowercase();
+            lower.contains("nerd")
+                || lower.contains(" nf")
+                || lower.contains("-nf")
+                || lower.contains("mono")
+                || lower.contains("menlo")
+                || lower.contains("monaco")
+                || lower.contains("consolas")
+                || lower.contains("courier")
+                || lower.contains("fira code")
+                || lower.contains("sarasa")
+                || lower.contains("maple")
+        })
+        .collect();
+    fonts.sort();
+    fonts.dedup();
+    fonts
+}
+
+#[cfg(target_os = "macos")]
+fn system_font_family_names() -> Vec<String> {
+    use std::ffi::CStr;
+
+    type CFArrayRef = *const c_void;
+    type CFStringRef = *const c_void;
+    type CFIndex = isize;
+    const K_CF_STRING_ENCODING_UTF8: u32 = 0x0800_0100;
+
+    #[link(name = "CoreText", kind = "framework")]
+    unsafe extern "C" {
+        fn CTFontManagerCopyAvailableFontFamilyNames() -> CFArrayRef;
+    }
+
+    #[link(name = "CoreFoundation", kind = "framework")]
+    unsafe extern "C" {
+        fn CFArrayGetCount(the_array: CFArrayRef) -> CFIndex;
+        fn CFArrayGetValueAtIndex(the_array: CFArrayRef, idx: CFIndex) -> *const c_void;
+        fn CFStringGetLength(the_string: CFStringRef) -> CFIndex;
+        fn CFStringGetMaximumSizeForEncoding(length: CFIndex, encoding: u32) -> CFIndex;
+        fn CFStringGetCString(the_string: CFStringRef, buffer: *mut c_char, buffer_size: CFIndex, encoding: u32) -> u8;
+        fn CFRelease(cf: *const c_void);
+    }
+
+    // SAFETY: CoreText's CTFontManagerCopyAvailableFontFamilyNames is thread-safe and returns a
+    // retained CFArray<CFString> (or null). Each element is read into a UTF-8 buffer and the array
+    // is released before returning.
+    unsafe {
+        let array = CTFontManagerCopyAvailableFontFamilyNames();
+        if array.is_null() {
+            return Vec::new();
+        }
+        let count = CFArrayGetCount(array);
+        let mut names = Vec::with_capacity(count.max(0) as usize);
+        for idx in 0..count {
+            let item = CFArrayGetValueAtIndex(array, idx);
+            if item.is_null() {
+                continue;
+            }
+            let len = CFStringGetLength(item);
+            let max_bytes = CFStringGetMaximumSizeForEncoding(len, K_CF_STRING_ENCODING_UTF8) + 1;
+            if max_bytes <= 1 {
+                continue;
+            }
+            let mut buf = vec![0u8; max_bytes as usize];
+            if CFStringGetCString(item, buf.as_mut_ptr().cast::<c_char>(), max_bytes, K_CF_STRING_ENCODING_UTF8) != 0
+                && let Ok(text) = CStr::from_ptr(buf.as_ptr().cast::<c_char>()).to_str()
+            {
+                names.push(text.to_string());
+            }
+        }
+        CFRelease(array);
+        names
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn system_font_family_names() -> Vec<String> {
+    Vec::new()
+}
+
+static MONO_FONTS: OnceLock<Vec<String>> = OnceLock::new();
+
+/// Returns cached monospace fonts if background prewarming has completed without blocking.
+pub fn cached_mono_fonts() -> Option<&'static [String]> {
+    MONO_FONTS.get().map(Vec::as_slice)
+}
+
+/// Enumerates and caches installed monospace fonts. Call only on a background thread.
+pub fn mono_fonts() -> Vec<String> {
+    MONO_FONTS.get_or_init(|| filter_mono_fonts(system_font_family_names())).clone()
+}
+
 /// The largest file `read_file` hands a view.
 const MAX_READ: u64 = 50 << 20;
 /// Maximum byte count `random_bytes_hex` yields in a single call.
 const MAX_RANDOM_BYTES: usize = 4096;
 
-fn encode_hex(bytes: &[u8]) -> String {
-    const HEX: &[u8; 16] = b"0123456789abcdef";
-    let mut out = String::with_capacity(bytes.len() * 2);
-    for &b in bytes {
-        out.push(HEX[(b >> 4) as usize] as char);
-        out.push(HEX[(b & 0x0f) as usize] as char);
-    }
-    out
-}
-
 /// Lowercase hex SHA-256 digest of UTF-8 `text`.
 pub fn sha256_hex(text: &str) -> String {
     use sha2::{Digest as _, Sha256};
     let digest = Sha256::digest(text.as_bytes());
-    encode_hex(&digest)
+    hex::encode(digest)
 }
 
 /// Generates `length` uniformly random bytes using OS CSPRNG entropy via `uuid::Uuid::new_v4`
@@ -171,7 +243,7 @@ pub fn random_bytes_hex(length: usize) -> Result<String, String> {
         let take = (length - bytes.len()).min(block.len());
         bytes.extend_from_slice(&block[..take]);
     }
-    Ok(encode_hex(&bytes))
+    Ok(hex::encode(&bytes))
 }
 
 /// 256-bit OS CSPRNG seed (64 lowercase hex chars) injected into each hosted view's `host.params`.
@@ -244,10 +316,6 @@ pub fn handle_stateless_op(op: &vibevalley_protocol::HostOp) -> Option<vibevalle
         | HostOp::AsrStop(_)
         | HostOp::PlayAudio(_)
         | HostOp::PlaySound(_)
-        | HostOp::SeekAudio(_)
-        | HostOp::AudioState
-        | HostOp::PcmStart(_)
-        | HostOp::PcmAppend(_)
         | HostOp::StopAudio
         | HostOp::ReadFile(_)
         | HostOp::AssetsDir
@@ -519,7 +587,7 @@ pub fn warm_editor_cache() {
     if DETECTED_GUI_EDITORS.read().is_some() || EDITOR_WARM_STARTED.swap(true, Ordering::AcqRel) {
         return;
     }
-    vibevalley_runtime::rt::current_or_global_handle().spawn_blocking(|| {
+    vibevalley_rt::current_or_global_handle().spawn_blocking(|| {
         let _ = detect_editors_blocking();
     });
 }
@@ -1358,5 +1426,32 @@ mod tests {
 
         assert!(open_with_app(Path::new("/nonexistent/NoEditor.app"), &file).is_err());
         assert!(open_with_app(dir.path(), &dir.path().join("missing.md")).is_err());
+    }
+
+    #[test]
+    fn filter_mono_fonts_selects_sorts_and_dedups_monospace_families() {
+        let filtered = filter_mono_fonts([
+            "Helvetica".to_string(),
+            "Menlo".to_string(),
+            "JetBrainsMono Nerd Font".to_string(),
+            "PingFang SC".to_string(),
+            "Maple Mono NF CN".to_string(),
+            "Menlo".to_string(),
+            "Fira Code".to_string(),
+            "Sarasa Gothic SC".to_string(),
+            "Times New Roman".to_string(),
+        ]);
+        assert_eq!(
+            filtered,
+            vec!["Fira Code", "JetBrainsMono Nerd Font", "Maple Mono NF CN", "Menlo", "Sarasa Gothic SC",]
+        );
+    }
+
+    #[test]
+    fn mono_fonts_enumerates_and_populates_non_blocking_cache() {
+        let fonts = mono_fonts();
+        assert_eq!(cached_mono_fonts(), Some(fonts.as_slice()));
+        #[cfg(target_os = "macos")]
+        assert!(fonts.iter().any(|name| name == "Menlo" || name == "Monaco" || name.contains("Mono")));
     }
 }

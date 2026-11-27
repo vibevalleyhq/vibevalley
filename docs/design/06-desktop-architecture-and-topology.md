@@ -40,12 +40,12 @@ VibeValley 作为 macOS 全原生桌面应用，将 GPUI 窗口外壳、`nsh` �
 | `/chat`、`/chat/:id` | `chat` | 田头群聊频道列表与无气泡单行实时消息流、斜杠指令 Composer、@ 提及 |
 | `/issues`、`/issues/:id` | `issues` | 四列状态看板、搜索与过滤（`issueSearch`）以及独立全页工单详情、差异审查、关闭交付与快捷终端入口 |
 | `/runs` | `runs` | 运行中心：查询参数 `?session=&scope=&agent=&issue=` 定位与过滤、7 态运行徽标、助手待批栏 `PendingApprovals`、`WaterfallView` 瀑布图、240 步工作日志与子线程协作进度 |
-| `/library` | `library` | 媒体素材库三栏网格（图片/音频/语音/Artifact 统一视图、多选删除与灯箱） |
-| `/artifacts`、`/artifacts/*` | `library` | Artifact 三态（`blocks` 含 `outline` 大纲笔记与 `.md` 导入 / `store` / `HTML`）工作台视图与右侧配套群聊侧栏 |
-| `/present` | 独立演示全屏 | Artifact 演讲者模式，独立于常规窗口 Rail 与侧边栏 |
-| `/agents`、`/agents/:id` | `agents` | 助手置顶 + 帮工列表；点击进入 `AgentConfig` 修改农机、模型、思考深度、技能勾选、MCP 与动物外观（助手的职责/模型/人设/造型由 `OrchestratorProfile.tsx` 承载） |
+| `/library` | `content` | 内容中心：笔记（`doc`/`base`/`canvas`/`media`）与媒体素材统一浏览、多选删除与灯箱 |
+| `/notes`、`/notes/*` | `content` | Note 3+1 原语工作台（`PageTree` 侧栏、24 块 `doc`、`Base` 四视图、`Canvas` 白板、`Media` 工作台、目录视图与右侧频道侧栏） |
+| `/present` | 独立演示全屏 | `doc` 笔记演讲者模式（按 `pageBreak` 分页），独立于常规窗口 Rail 与侧边栏 |
+| `/agents`、`/agents/:id` | `agents` | 助手置顶 + 队友列表；点击进入 `AgentConfig` 修改环境、模型、思考深度、技能勾选、MCP 与动物外观（助手的职责/模型/人设/造型由 `OrchestratorProfile.tsx` 承载） |
 | `/orchestrator`、`/orchestrator/*` | `agents` | 助手的 `memory`（记性）与 `voice`（语音）配置标签页、跳往 `/runs` 的运行轨迹链接以及 `/orchestrator[/id]/trajectory` 兼容重定向（`OrchestratorPage.tsx`） |
-| `/runtimes` | `runtimes` | 农机安装检测、CLI 可用性与额度精力瓶水位仪（`RuntimesPage.tsx`） |
+| `/runtimes` | `runtimes` | 环境安装检测、CLI 可用性与额度精力瓶水位仪（`RuntimesPage.tsx`） |
 | `/repos` | `repos` | 已接入代码仓库管理、并发槽位上限（`maxSessions`）与项目检验命令配置 |
 | `/farm`、`/farm/:repo` | `skin: "farm"` | 农庄主页或指定仓库视角；通过宿主事件在 GPUI 层叠载入 `DioramaView` |
 | `/tree` | 重定向 | 重定向至 `/settings/memory` 记忆管理页 |
@@ -71,13 +71,13 @@ VibeValley 作为 macOS 全原生桌面应用，将 GPUI 窗口外壳、`nsh` �
 | 断点 / 阈值 | 作用对象 | 降级行为 |
 | --- | --- | --- |
 | `< 640px` (`40rem` / `sm`) | 全局 Rail（`Shell.tsx`）与农庄手机（`FarmPhone.tsx`） | Rail 从 `76px` 收缩至 `68px` 且按钮隐去底部文字仅保留居中图标；农庄展开手机宽度不足 `640px` 时收起左侧菜单进入纯聊天布局（`chat_only`） |
-| `< 680px` | 档案列表（`AgentsPage.tsx`） | `AgentsPage` 隐藏行内右侧摘要/标签/农机列 |
+| `< 680px` | 队友列表（`AgentsPage.tsx`） | `AgentsPage` 隐藏行内右侧摘要/标签/环境列 |
 | `< 768px` (`48rem` / `md`) | 工作台多栏详情页面（`/runs`、`/issues`、`/chat` 等） | 左右分栏退化为单栏列表/详情切换，选中条目后切换详情并呈现「返回」按钮（`issues` 保留面包屑返回栈） |
 | `< 1040px` | 原生工作区检查器（`shell/render.rs`） | 右侧文件/Git 检查器栏及拖拽分隔线自动隐去，优先把水平像素留给代码/Diff/终端主视口 |
 
 ## 6.5 全键盘操作与快捷键系统
 
-- **工作台快捷键注册表（`apps/mac/ui/infra/base/shortcuts.ts`）**：涵盖 8 大作用域（`everywhere`、`composer`、`lists`、`issues`、`pictures`、`library`、`farm`、`desktop`），包含 `Cmd/Mod+J` 快速切换、`?` 打开 `ShortcutSheet`、`Esc` 逐层关闭弹窗/退出编辑/回到看板、`C` 在工单页快速新建、`Up`/`Down`/`Enter` 列表漫游与回车进入、`Space`/`Delete` 素材库快速预览与删除、农场 `1…6` 切农具、按住 `Alt` 临时透显全员姓名、`Alt+Shift+Space` 全局语音热键。
+- **工作台快捷键注册表（`apps/mac/ui/design/shortcuts.ts`）**：涵盖 8 大作用域（`everywhere`、`composer`、`lists`、`issues`、`pictures`、`library`、`farm`、`desktop`），包含 `Cmd/Mod+J` 快速切换、`?` 打开 `ShortcutSheet`、`Esc` 逐层关闭弹窗/退出编辑/回到看板、`C` 在工单页快速新建、`Up`/`Down`/`Enter` 列表漫游与回车进入、`Space`/`Delete` 素材库快速预览与删除、农场 `1…6` 切农具、按住 `Alt` 临时透显全员姓名、`Alt+Shift+Space` 全局语音热键。
 - **GPUI 原生作用域严格隔离（`apps/mac/src/shell/menus.rs` `bind_keys`）**：
   - 全局级别保留 `Cmd+,`、`Cmd+K` / `Cmd+Shift+P` 调起命令面板、`Cmd+±/0` 缩放字号等；
   - `Cmd+1..9`（切项目）、`Cmd+B`（侧栏开关）、`Cmd+P`（速开文件）、`Cmd+Shift+F`（全库检索）、`Cmd+T`（新终端）、`Cmd+W`（关标签页）、`Cmd+D` / `Cmd+Shift+D`（左右/上下分屏）**全部限定于 `"Workspace"` 键位上下文**，在工作台输入框或表单聚焦时绝不劫持键位；
@@ -89,4 +89,4 @@ VibeValley 作为 macOS 全原生桌面应用，将 GPUI 窗口外壳、`nsh` �
 - **五源结构化故障（`apps/mac/ui/infra/api.ts` `UiFault`）**：所有桥接响应、语音调用错误、客户端异常与网络连接断落统一归一为 `UiFault`（携带 `tag`、`bizCode`、`reason`、`next` 修复指引与服务端定义 `bizCodeMeta[bizCode].retryable` 标志），阻止静默吞错或将原始 JSON 栈抛给用户。
 - **断线排队、重放去重与局部补读**：
   - `infra/frame.ts` 监控连接 `Link` 三态（`connecting` / `open` / `lost`）；发送消息与建单流使用 `createRequestKey()` / `newSendKey()` 绑定唯一随机 16 字节十六进制发送键，保证断线重传不产生重复消息或工单。
-  - 子线程运行期间发生前端断开时，重连后依靠工作日志最近 `240` 步及服务端摘要字段按 `seq`/`revision` 缝合恢复进度；农机额度即将耗尽时在农场精灵瓶、工作台徽标及托盘同步告警。
+  - 子线程运行期间发生前端断开时，重连后依靠工作日志最近 `240` 步及服务端摘要字段按 `seq`/`revision` 缝合恢复进度；环境额度即将耗尽时在农场精灵瓶、工作台徽标及托盘同步告警。

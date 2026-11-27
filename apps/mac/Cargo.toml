@@ -4,21 +4,21 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-percent-encoding = "2.3.2"
+percent-encoding = { workspace = true }
 raw-window-handle = "0.6.2"
 base64 = { workspace = true }
 block2 = "0.6.2"
+vibevalley-core = { version = "0.1.0", path = "../../crates/core", default-features = false }
 vibevalley-files = { version = "0.1.0", path = "../../crates/files" }
 vibevalley-git = { version = "0.1.0", path = "../../crates/git" }
 vibevalley-i18n = { version = "0.1.0", path = "../../crates/i18n" }
-vibevalley-protocol = { version = "0.1.0", path = "../../crates/protocol" }
+vibevalley-protocol = { version = "0.1.0", path = "../../crates/protocol", features = ["host"] }
 vibevalley-rich = { version = "0.1.0", path = "../../crates/rich" }
-vibevalley-runtime = { version = "0.1.0", path = "../../crates/runtime" }
+vibevalley-rt = { workspace = true }
 vibevalley-server = { version = "0.1.0", path = "../../crates/server" }
 vibevalley-diorama = { version = "0.1.0", path = "crates/diorama" }
 vibevalley-terminal = { version = "0.1.0", path = "crates/terminal" }
 vibevalley-workspace = { version = "0.1.0", path = "crates/workspace" }
-flume = { workspace = true }
 gpui = { package = "gpui-fast", version = "0.1.19", default-features = false, features = ["font-kit"] }
 gpui-platform = { package = "gpui-fast-platform", version = "0.1.19", default-features = false, features = ["font-kit"] }
 image = { workspace = true }
@@ -68,16 +68,20 @@ objc2-user-notifications = { version = "0.3.2", default-features = false, featur
   "UNNotificationTrigger",
   "UNUserNotificationCenter",
 ] }
+hex = { workspace = true }
+quick-xml = { workspace = true }
 reqwest = { workspace = true }
+semver = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
 smallvec = "1.16.5"
+subtle = { workspace = true }
 unicode-segmentation = "1.13.3"
 rustybuzz = "0.20.1"
 unicode-width = "0.2.3"
 uuid = { workspace = true }
-zip = { version = "9.7.1", default-features = false }
+zip = { workspace = true }
 
 axum = { version = "0.8.9", default-features = false, features = ["http1", "json", "query", "tokio", "ws"] }
 backon = { workspace = true }
@@ -93,6 +97,8 @@ futures-util = { workspace = true }
 
 [features]
 default = []
+# Enable scripted test runtimes and offline MOSS media fakes inside the embedded server.
+fake = ["vibevalley-server/fake"]
 # Load hosted views from `nsh dev --server-only` (VIBEVALLEY_UI_DEV=ws://...) with hot reload.
 nsh-dev = ["nsh-platform-gpui/dev"]
 # `shot:<png>` in debug scripts: draws the window and reads the Metal frame back (works while the screen is locked).

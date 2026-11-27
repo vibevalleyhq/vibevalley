@@ -138,7 +138,7 @@ const sampleSnapshot: DebugSnapshot = {
       channels: 2,
       agents: 4,
       repos: 2,
-      artifacts: 5,
+      notes: 5,
       inbox: 1,
       mediaJobs: 0,
     },
@@ -776,7 +776,7 @@ test("DevTools Remote VDP discovers instances, attaches, drives remote shell/scr
               ],
             };
           case "Shell.getState":
-            return { route: remoteRoute, dark: remoteDark, window: { width: remoteWidth, height: remoteHeight } };
+            return { route: remoteRoute, theme_dark: remoteDark, window: { width: remoteWidth, height: remoteHeight } };
           case "Page.getMetrics":
             return { width: remoteWidth, height: remoteHeight, scaleFactor: 2, themeDark: remoteDark, lastFrameMs: 3.4 };
           case "Shell.navigate":
@@ -943,7 +943,7 @@ test("DevTools Remote VDP stays accessible when local debug.snapshot is disabled
           return { bizCode: BizCode.Forbidden, message: "Unauthorized" };
         }
         if (req.method === "Target.list") return { targets: [{ id: "shell", kind: "shell", title: "Remote Shell", attached: true }] };
-        if (req.method === "Shell.getState") return { route: "/farm", dark: true };
+        if (req.method === "Shell.getState") return { route: "/farm", theme_dark: true };
         if (req.method === "Page.getMetrics") return { width: 1024, height: 768, themeDark: true };
         return { ok: true };
       },
@@ -1142,9 +1142,9 @@ test("DevTools StateCacheTab renders live Loro frontiers, version vectors, and E
           ...sampleSnapshot.stateCache,
           collab: [
             {
-              artifactId: "art-doc-1",
+              noteId: "note-doc-1",
               title: "Architecture Spec",
-              artifactType: "doc",
+              noteType: "doc",
               seq: 42,
               snapshotBytes: 1024,
               frontiers: "1@1234",
@@ -1185,7 +1185,7 @@ test("DevTools StateCacheTab renders live Loro frontiers, version vectors, and E
 
   await app.press("id:devtools-tab-state");
   expect(app.count("id:state-collab-section")).toBe(1);
-  expect(app.count("id:state-collab-art-doc-1")).toBe(1);
+  expect(app.count("id:state-collab-note-doc-1")).toBe(1);
   expect(app.texts()).toContain("Architecture Spec");
   expect(app.texts().some((s) => s.includes("1234:1"))).toBe(true);
   expect(app.texts().some((s) => s.includes("1234=2"))).toBe(true);

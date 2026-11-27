@@ -4,15 +4,16 @@ import { t } from "@vibevalley/i18n";
 import { type Agent, type AgentProblem, type RuntimeInfo, sessionAppendSystemPrompt } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 
-import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
 import { type Pose, randomLook, stagePoses } from "../../design/domain/cast";
+import { AgentCodeBadge, AgentModeBadge } from "../../design/domain/Face";
 import { OpenTerminal } from "../../design/domain/OpenTerminal";
 import { runtimeName } from "../../design/domain/RuntimeBadge";
 import { Icon } from "../../design/Icon";
 import { IconButton } from "../../design/IconButton";
 import { MoreMenu } from "../../design/MoreMenu";
 import { TextLink } from "../../design/TextLink";
+import { createAct } from "../../infra/act";
 import { useAgentProblems } from "../../infra/agents";
 import { api, reasonOf } from "../../infra/api";
 import { agentsQuery, ready, useAgents, useQueryClient, useRuntimes } from "../../infra/query";
@@ -29,8 +30,10 @@ function newAgent(runtime: string, catalog: readonly RuntimeInfo[]): Agent {
   const info = catalog.find((r) => r.id === runtime);
   return {
     id: "",
+    code: "",
     name: t("web.agent.newName", { runtime: runtimeName(catalog, runtime) }),
     role: "worker",
+    mode: "managed",
     duty: "",
     enabled: true,
     runtime,
@@ -155,8 +158,12 @@ function Creator(props: { saved?: Agent | undefined; start: Agent; all: readonly
         <Text class="text-sm text-muted group-hover:text-ink">{t("web.agent.all")}</Text>
       </A>
       <Text class="text-sm text-faint">/</Text>
-      <View class="min-w-0 flex-1 flex-row items-center gap-2.5">
+      <View class="min-w-0 flex-1 flex-row items-center gap-2">
+        <AgentCodeBadge code={draft().code} external={draft().mode === "external"} />
         <Text class="truncate text-lg font-semibold text-ink">{draft().name || t("web.agent.unnamed")}</Text>
+        <If when={!isNew}>
+          <AgentModeBadge mode={draft().mode} />
+        </If>
         <View
           testID={`profile-${isNew ? "new" : dirty() ? "dirty" : "saved"}`}
           class={`shrink-0 rounded-sm px-1.5 py-0.5 ${isNew || dirty() ? "bg-warn-soft" : "bg-hover"}`}
@@ -188,7 +195,7 @@ function Creator(props: { saved?: Agent | undefined; start: Agent; all: readonly
                 }}
               />
               <MoreMenu
-                label={t("web.artifact.page.more")}
+                label={t("web.note.page.more")}
                 testid="agent-more"
                 items={[{ key: "delete", label: t("web.agent.remove"), icon: "delete", danger: true, onSelect: () => asking.set(true) }]}
               />
@@ -245,7 +252,17 @@ function Creator(props: { saved?: Agent | undefined; start: Agent; all: readonly
         </View>
         <View class="min-h-120 shrink-0 overflow-hidden rounded-lg border border-line bg-page lg:w-108">
           <ConfigTabs draft={draft()} runtime={runtime()} patch={(a) => draft.set(a)} nameTaken={nameTaken()} isNew={isNew} />
-          <Problems problems={problems()} />
+          <If
+            when={draft().mode !== "external"}
+            else={
+              <View testID="agent-external-notice" class="flex-row items-start gap-2 border-t border-line px-4 py-3">
+                <Icon name="info" size={13} tone="muted" />
+                <Text class="min-w-0 flex-1 text-xs leading-relaxed text-muted">{t("web.agent.mode.externalNotice", { code: draft().code || "W-XX" })}</Text>
+              </View>
+            }
+          >
+            <Problems problems={problems()} />
+          </If>
         </View>
       </Scroll>
     </View>

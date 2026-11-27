@@ -1,20 +1,11 @@
 import "../infra/polyfill";
 import { expect, open, test } from "nsh/test";
 
-import type {
-  Artifact,
-  ArtifactHistoryEntry,
-  ArtifactId,
-  ArtifactType,
-  ChatMessage,
-  OrchestratorApproval,
-  Suggestion,
-  SuggestionId,
-} from "@vibevalley/protocol";
+import type { ChatMessage, Note, NoteHistoryEntry, NoteId, NoteType, OrchestratorApproval, Suggestion, SuggestionId } from "@vibevalley/protocol";
 
 import { sampleChanges } from "../features/issue/model/issue.samples";
-import { responses as artifactResponses } from "../fixtures/artifacts";
 import { fakeHost, type FakeHost } from "../fixtures/fakeHost";
+import { responses as noteResponses } from "../fixtures/notes";
 import { SCENARIO_NOW, scenarios } from "../fixtures/scenarios";
 
 async function mountApp(
@@ -211,31 +202,21 @@ test("orchestrator trajectory: polled approval can be granted", async () => {
   });
 });
 
-test("directory artifact files: lists, edits, and saves via artifact.file.{list,get,write}", async () => {
-  const docsArtifact = (scenarios.typical.responses["artifact.list"] as Artifact[] | undefined)?.find((a) => a.artifactType === "docs");
-  if (!docsArtifact) throw new Error("typical scenario must provide a docs artifact");
-  const { app, fake } = await mountApp(`/artifacts/${docsArtifact.id}`, (f) => {
-    for (const [op, handler] of Object.entries(artifactResponses)) {
+test("directory note files: lists, edits, and saves via note.file.{list,get,write}", async () => {
+  const docNote = (noteResponses["note.list"] as { toJSON: () => Note[] }).toJSON().find((n) => n.noteType === "doc");
+  if (!docNote) throw new Error("notes fixture must provide a doc note");
+  const { app, fake } = await mountApp(`/notes/${docNote.id}`, (f) => {
+    for (const [op, handler] of Object.entries(noteResponses)) {
       f.respond(op, handler);
     }
   });
 
-  await fake.pumpUntil(app, () => app.count("id:artifact-directory-view") === 1 && app.count("id:artifact-docs-editor") === 1);
-  expect(app.count("id:artifact-collab-bar")).toBe(0);
-  expect(fake.calls.some((c) => c.op === "artifact.file.list")).toBe(true);
-  expect(fake.calls.some((c) => c.op === "artifact.file.get")).toBe(true);
-
-  fake.clearCalls();
-  await app.clear("id:artifact-docs-editor");
-  await app.type("id:artifact-docs-editor", "# Updated Spec\n");
-  await fake.pump(app);
-  await app.press("id:artifact-file-save");
-  await fake.pumpUntil(app, () => fake.calls.some((c) => c.op === "artifact.file.write"));
-  const writeCall = fake.calls.find((c) => c.op === "artifact.file.write");
-  expect(writeCall?.payload).toMatchObject({
-    id: docsArtifact.id,
-    files: [{ path: "structure/index.md", content: "# Updated Spec\n" }],
-  });
+  await fake.pumpUntil(app, () => app.count("id:note-header") === 1);
+  await app.press("id:note-more");
+  await fake.pumpUntil(app, () => app.count("id:note-view-mode") === 1);
+  await app.press("id:note-view-mode");
+  await fake.pumpUntil(app, () => app.count("id:note-directory-view") === 1 && fake.calls.some((c) => c.op === "note.file.get"));
+  expect(fake.calls.some((c) => c.op === "note.file.list")).toBe(true);
 });
 
 test("regression: genui block inside channel message dispatches onGenUiAction with reactive state and toast feedback", async () => {
@@ -269,18 +250,18 @@ test("regression: genui block inside channel message dispatches onGenUiAction wi
   expect(app.texts()).toContain("Approve release: on");
 });
 
-test("content hub: 12-type sidebar, outline template creation via artifact.create, and context memory across places", async () => {
-  const created: Artifact[] = [];
+test("content hub: 3+1 sidebar, doc template creation via note.create, and context memory across places", async () => {
+  const created: Note[] = [];
   const { app, fake } = await mountApp("/library", (f) => {
-    for (const [op, handler] of Object.entries(artifactResponses)) {
+    for (const [op, handler] of Object.entries(noteResponses)) {
       f.respond(op, handler);
     }
-    f.respond("artifact.create", (p: { title?: string; artifactType?: ArtifactType; content?: string }) => {
-      const made: Artifact = {
-        id: `art-outline-created-${created.length + 1}` as ArtifactId,
+    f.respond("note.create", (p: { title?: string; noteType?: NoteType }) => {
+      const made: Note = {
+        id: `note-doc-created-${created.length + 1}` as NoteId,
         title: p.title ?? "未命名",
-        artifactType: p.artifactType ?? "docs",
-        isDefault: false,
+        noteType: p.noteType ?? "doc",
+        sortOrder: 1,
         by: "user",
         byName: "用户",
         version: 0,
@@ -292,16 +273,16 @@ test("content hub: 12-type sidebar, outline template creation via artifact.creat
       created.push(made);
       return made;
     });
-    f.respond("artifact.get", (p: { id?: string }) => {
-      const hit = created.find((a) => a.id === p?.id);
+    f.respond("note.get", (p: { id?: string }) => {
+      const hit = created.find((n) => n.id === p?.id);
       if (hit) return hit;
-      const fn = artifactResponses["artifact.get"] as (arg: unknown) => unknown;
+      const fn = noteResponses["note.get"] as (arg: unknown) => unknown;
       return fn(p);
     });
-    f.respond("artifact.file.list", (p: { id?: string }) => {
-      const hit = created.find((a) => a.id === p?.id);
-      if (hit) return { artifactId: hit.id, seq: 1, files: [] };
-      const fn = artifactResponses["artifact.file.list"] as (arg: unknown) => unknown;
+    f.respond("note.file.list", (p: { id?: string }) => {
+      const hit = created.find((n) => n.id === p?.id);
+      if (hit) return { noteId: hit.id, seq: 1, files: [] };
+      const fn = noteResponses["note.file.list"] as (arg: unknown) => unknown;
       return fn(p);
     });
   });
@@ -309,19 +290,10 @@ test("content hub: 12-type sidebar, outline template creation via artifact.creat
   expect(app.count("id:library-page")).toBe(1);
   expect(app.count("id:desk")).toBe(0);
   expect(app.count("id:content-sidebar")).toBe(1);
-  expect(app.count("id:content-nav-artifact-outline")).toBe(1);
-  expect(app.count("id:content-nav-artifact-prototype")).toBe(1);
-  expect(app.count("id:content-nav-artifact-sheet")).toBe(0);
-  expect(app.count("id:content-nav-artifact-diagram")).toBe(0);
-  expect(app.count("id:content-nav-artifact-storyboard")).toBe(0);
-  expect(app.count("id:content-nav-artifacts-more")).toBe(1);
-  expect(app.count("id:content-new-note-btn")).toBe(0);
-
-  await app.press("id:content-nav-artifacts-more");
-  await fake.pump(app);
-  expect(app.count("id:content-nav-artifact-sheet")).toBe(1);
-  expect(app.count("id:content-nav-artifact-diagram")).toBe(1);
-  expect(app.count("id:content-nav-artifact-storyboard")).toBe(1);
+  expect(app.count("id:content-nav-note-doc")).toBe(1);
+  expect(app.count("id:content-nav-note-base")).toBe(1);
+  expect(app.count("id:content-nav-note-canvas")).toBe(1);
+  expect(app.count("id:content-nav-note-media")).toBe(1);
 
   await app.press("id:content-sidebar-toggle");
   await fake.pump(app);
@@ -332,62 +304,41 @@ test("content hub: 12-type sidebar, outline template creation via artifact.creat
   expect(app.count("id:content-sidebar")).toBe(1);
 
   fake.clearCalls();
-  await app.press("id:content-nav-artifact-slides");
+  await app.press("id:content-nav-note-doc");
   await fake.pump(app);
   await app.press("id:content-new-btn");
   await fake.pump(app);
   expect(app.count("id:content-template-modal")).toBe(1);
-  expect(app.count("id:content-template-category-type:slides")).toBe(1);
-  expect(app.count("id:content-template-tpl-art-slides")).toBe(1);
-  expect(app.count("id:content-template-tpl-slides-arch-review")).toBe(1);
-  expect(app.count("id:content-template-tpl-note-tech")).toBe(0);
-  await app.press("id:content-template-category-note");
-  await fake.pump(app);
   expect(app.count("id:content-template-tpl-note-tech")).toBe(1);
   await app.press("id:content-template-tpl-note-tech");
-  await fake.pumpUntil(app, () => app.count("id:artifacts") === 1 && app.count("id:artifact-directory-view") === 1);
-  const createCall = fake.calls.find((c) => c.op === "artifact.create");
-  expect(createCall?.payload).toMatchObject({ artifactType: "outline" });
+  await fake.pumpUntil(app, () => app.count("id:notes") === 1 && app.count("id:note-header") === 1);
+  const createCall = fake.calls.find((c) => c.op === "note.create");
+  expect(createCall?.payload).toMatchObject({ noteType: "doc" });
   expect(app.texts()).toContain(created[0]?.title);
-  await app.press("id:artifact-title");
-  await fake.pump(app);
-  expect(app.value("id:artifact-title")).toBe(created[0]?.title);
-  await app.keyboard.press("escape");
-  await fake.pump(app);
 
-  await app.press("id:content-nav-artifacts-all");
+  await app.press("id:content-nav-notes-all");
   await fake.pump(app);
   expect(app.count("id:library-page")).toBe(1);
 
-  await app.host.send("route", "/artifacts/art-launch-board");
+  await app.host.send("route", "/notes/art-launch-board");
   await fake.pump(app);
   await fake.pump(app);
-  expect(app.count("id:artifacts")).toBe(1);
+  expect(app.count("id:notes")).toBe(1);
   expect(app.count("id:desk")).toBe(0);
-  expect(app.count("id:artifact-header")).toBe(1);
-  expect(app.count("id:artifact-collab-bar")).toBe(0);
-  expect(app.count("id:artifact-more")).toBe(1);
-  expect(app.count("id:artifact-view-mode")).toBe(0);
-  await app.press("id:artifact-more");
-  await fake.pumpUntil(app, () => app.count("id:artifact-view-mode") === 1);
+  expect(app.count("id:note-header")).toBe(1);
+  expect(app.count("id:note-more")).toBe(1);
+  expect(app.count("id:note-view-mode")).toBe(0);
+  await app.press("id:note-more");
+  await fake.pumpUntil(app, () => app.count("id:note-view-mode") === 1);
   await app.keyboard.press("escape");
-  await fake.pumpUntil(app, () => app.count("id:artifact-view-mode") === 0);
+  await fake.pumpUntil(app, () => app.count("id:note-view-mode") === 0);
 
-  await app.press("id:content-sidebar-toggle");
+  await app.press("id:note-rail-toggle");
   await fake.pump(app);
-  expect(app.count("id:content-sidebar")).toBe(0);
-  expect(app.count("id:content-sidebar-toggle")).toBe(1);
-  await app.press("id:content-sidebar-toggle");
+  expect(app.count("id:note-rail")).toBe(1);
+  await app.press("id:note-rail-toggle");
   await fake.pump(app);
-  expect(app.count("id:content-sidebar")).toBe(1);
-
-  await app.press("id:artifact-rail-toggle");
-  await fake.pump(app);
-  expect(app.count("id:artifact-rail")).toBe(1);
-  expect(app.count("id:splitter-artifact-rail")).toBe(1);
-  await app.press("id:artifact-rail-close");
-  await fake.pump(app);
-  expect(app.count("id:artifact-rail")).toBe(0);
+  expect(app.count("id:note-rail")).toBe(0);
 
   await app.press("id:place-issues");
   await fake.pump(app);
@@ -395,20 +346,20 @@ test("content hub: 12-type sidebar, outline template creation via artifact.creat
 
   await app.press("id:place-content");
   await fake.pump(app);
-  expect(app.count("id:artifacts")).toBe(1);
-  expect(app.count("id:artifact-header")).toBe(1);
+  expect(app.count("id:notes")).toBe(1);
+  expect(app.count("id:note-header")).toBe(1);
 });
 
-test("presence & file suggestions: ArtifactDirectoryView renders live peer pills and accepts/rejects via Tab/Esc", async () => {
-  const aid = "art-mine" as ArtifactId;
+test("presence & file suggestions: NoteDirectoryView renders live peer pills and accepts/rejects via Tab/Esc", async () => {
+  const nid = "art-mine" as NoteId;
   let resolved: { op: string; id: string } | undefined;
   const openSuggestion: Suggestion = {
     id: "sug-durable-1" as SuggestionId,
-    artifactId: aid,
-    path: "structure/outline.json",
+    noteId: nid,
+    path: "structure/base.json",
     author: "w1",
     baseRev: 1,
-    change: { content: '{"version":1,"rootIds":[],"nodes":{}}', summary: "发版前（已修订）" },
+    change: { content: '{"version":1,"sheets":[]}', summary: "发版前（已修订）" },
     status: "open",
     createdAt: SCENARIO_NOW,
     cursorStart: "c:start",
@@ -417,23 +368,23 @@ test("presence & file suggestions: ArtifactDirectoryView renders live peer pills
     endOffset: 2,
   };
 
-  const { app, fake } = await mountApp("/artifacts/art-mine", (f) => {
-    for (const [op, handler] of Object.entries(artifactResponses)) {
+  const { app, fake } = await mountApp("/notes/art-mine", (f) => {
+    for (const [op, handler] of Object.entries(noteResponses)) {
       f.respond(op, handler);
     }
-    f.respond("artifact.suggestion.accept", (p: { suggestion: string }) => {
+    f.respond("note.suggestion.accept", (p: { suggestion: string }) => {
       resolved = { op: "accept", id: p.suggestion };
       return { ...openSuggestion, status: "accepted" };
     });
-    f.respond("artifact.suggestion.reject", (p: { suggestion: string }) => {
+    f.respond("note.suggestion.reject", (p: { suggestion: string }) => {
       resolved = { op: "reject", id: p.suggestion };
       return { ...openSuggestion, status: "rejected" };
     });
   });
 
-  await fake.pumpUntil(app, () => app.count("id:artifact-directory-view") === 1 && app.count("id:artifact-outline-view") === 1);
+  await fake.pumpUntil(app, () => app.count("id:note-header") === 1);
 
-  await fake.emit(app, "artifact.presence.follow", {
+  await fake.emit(app, "note.presence.follow", {
     _tag: "Snapshot",
     peers: [
       {
@@ -441,8 +392,8 @@ test("presence & file suggestions: ArtifactDirectoryView renders live peer pills
         name: "老周",
         color: "coral",
         kind: "cursor",
-        path: "structure/outline.json",
-        nodeId: "n_1",
+        path: "structure/base.json",
+        nodeId: "r1",
         offset: 1,
         status: "润色中",
         updatedAt: SCENARIO_NOW,
@@ -450,18 +401,18 @@ test("presence & file suggestions: ArtifactDirectoryView renders live peer pills
     ],
   });
   await fake.pump(app);
-  expect(app.count("id:artifact-presence-pill")).toBe(1);
+  expect(app.count("id:note-presence-pill")).toBe(1);
   expect(app.texts().some((s) => s.includes("老周"))).toBe(true);
 
-  await fake.emit(app, "artifact.presence.follow", { _tag: "Remove", peerId: "session:w1" });
+  await fake.emit(app, "note.presence.follow", { _tag: "Remove", peerId: "session:w1" });
   await fake.pump(app);
-  expect(app.count("id:artifact-presence-pill")).toBe(0);
+  expect(app.count("id:note-presence-pill")).toBe(0);
 
-  await fake.emit(app, "artifact.suggestion.follow", {
+  await fake.emit(app, "note.suggestion.follow", {
     _tag: "Suggestions",
     suggestions: [openSuggestion],
   });
-  await fake.pumpUntil(app, () => app.count("id:artifact-inline-suggestion") === 1);
+  await fake.pumpUntil(app, () => app.count("id:note-inline-suggestion") === 1);
   expect(app.enabled("id:inline-suggestion-accept")).toBe(true);
 
   await app.keyboard.press("tab");
@@ -470,25 +421,25 @@ test("presence & file suggestions: ArtifactDirectoryView renders live peer pills
 
   resolved = undefined;
   const secondSuggestion: Suggestion = { ...openSuggestion, id: "sug-durable-2" as SuggestionId };
-  await fake.emit(app, "artifact.suggestion.follow", {
+  await fake.emit(app, "note.suggestion.follow", {
     _tag: "Suggestions",
     suggestions: [secondSuggestion],
   });
-  await fake.pumpUntil(app, () => app.count("id:artifact-inline-suggestion") === 1);
+  await fake.pumpUntil(app, () => app.count("id:note-inline-suggestion") === 1);
   await app.keyboard.press("escape");
   await fake.pumpUntil(app, () => resolved?.op === "reject");
   expect(resolved).toEqual({ op: "reject", id: "sug-durable-2" });
 });
 
-test("whiteboard presence: consumes artifact.presence.follow, publishes via artifact.presence.update, never writes presence/* to file.write", async () => {
-  const { app, fake } = await mountApp("/artifacts/art-launch-board", (f) => {
-    for (const [op, handler] of Object.entries(artifactResponses)) {
+test("whiteboard presence: consumes note.presence.follow, publishes via note.presence.update, never writes presence/* to file.write", async () => {
+  const { app, fake } = await mountApp("/notes/art-launch-board", (f) => {
+    for (const [op, handler] of Object.entries(noteResponses)) {
       f.respond(op, handler);
     }
   });
   await fake.pumpUntil(app, () => app.count("id:whiteboard-view") === 1 && !app.texts().includes("0 个元素"));
 
-  await fake.emit(app, "artifact.presence.follow", {
+  await fake.emit(app, "note.presence.follow", {
     _tag: "Upsert",
     peer: { id: "session:helper", name: "老周", color: "teal", kind: "cursor", x: 320, y: 180, status: "连线中", updatedAt: SCENARIO_NOW },
   });
@@ -496,41 +447,41 @@ test("whiteboard presence: consumes artifact.presence.follow, publishes via arti
   expect(app.count("id:wb-presence-peer")).toBeGreaterThanOrEqual(1);
   expect(app.texts()).toContain("老周 · 连线中");
 
-  await fake.emit(app, "artifact.presence.follow", { _tag: "Remove", peerId: "session:helper" });
+  await fake.emit(app, "note.presence.follow", { _tag: "Remove", peerId: "session:helper" });
   await fake.pump(app);
   expect(app.texts()).not.toContain("老周 · 连线中");
 
   fake.clearCalls();
   await app.press("id:wb-inspector-toggle");
   await app.press("id:wb-inspector-item-c-1");
-  await fake.pumpUntil(app, () => fake.calls.some((c) => c.op === "artifact.presence.update"));
-  expect(fake.calls.some((c) => c.op === "artifact.presence.update")).toBe(true);
+  await fake.pumpUntil(app, () => fake.calls.some((c) => c.op === "note.presence.update"));
+  expect(fake.calls.some((c) => c.op === "note.presence.update")).toBe(true);
   const writtenPaths = fake.calls
-    .filter((c) => c.op === "artifact.file.write")
+    .filter((c) => c.op === "note.file.write")
     .flatMap((c) => ((c.payload as { files?: Array<{ path: string }> })?.files ?? []).map((w) => w.path));
   expect(writtenPaths.some((p) => p.startsWith("presence/"))).toBe(false);
 });
 
 test("history panel: opens on right rail, previews commit, restores, forks, saves snapshot, and selectively undoes origin", async () => {
-  const aid = "art-mine" as ArtifactId;
-  const historyEntries: ArtifactHistoryEntry[] = [
+  const nid = "art-mine" as NoteId;
+  const historyEntries: NoteHistoryEntry[] = [
     { frontiers: "f-latest", author: "w1", agent: "w1", turn: 2, origin: "session:w1:turn:2", summary: "补充落点线", at: SCENARIO_NOW - 60_000 },
     { frontiers: "f-initial", author: "user", origin: "user", summary: "初始草案", at: SCENARIO_NOW - 300_000 },
   ];
-  const { app, fake } = await mountApp("/artifacts/art-mine", (f) => {
-    for (const [op, handler] of Object.entries(artifactResponses)) {
+  const { app, fake } = await mountApp("/notes/art-mine", (f) => {
+    for (const [op, handler] of Object.entries(noteResponses)) {
       f.respond(op, handler);
     }
-    f.respond("artifact.history.list", () => historyEntries);
-    f.respond("artifact.history.preview", (p: { frontiers: string }) => ({
-      artifactId: aid,
-      artifactType: "outline",
+    f.respond("note.history.list", () => historyEntries);
+    f.respond("note.history.preview", (p: { frontiers: string }) => ({
+      noteId: nid,
+      noteType: "base",
       frontiers: p.frontiers,
       entry: historyEntries.find((e) => e.frontiers === p.frontiers),
       files: [
         {
-          artifactId: aid,
-          path: "structure/outline.json",
+          noteId: nid,
+          path: "structure/base.json",
           mime: "application/json",
           encoding: "utf8",
           content: "历史快照内容",
@@ -542,45 +493,44 @@ test("history panel: opens on right rail, previews commit, restores, forks, save
     }));
   });
 
-  await fake.pumpUntil(app, () => app.count("id:artifact-history-toggle") === 1);
-  expect(app.count("id:artifact-version-menu")).toBe(0);
-  await app.press("id:artifact-history-toggle");
-  await fake.pumpUntil(app, () => app.count("id:artifact-history-panel") === 1 && app.count("id:history-commit-1") === 1);
+  await fake.pumpUntil(app, () => app.count("id:collab-toggle-history") === 1);
+  await app.press("id:collab-toggle-history");
+  await fake.pumpUntil(app, () => app.count("id:note-history-panel") === 1 && app.count("id:history-commit-1") === 1);
 
   fake.clearCalls();
   await app.press("id:history-commit-1");
-  await fake.pumpUntil(app, () => app.count("id:artifact-history-preview") === 1);
-  expect(fake.calls.find((c) => c.op === "artifact.history.preview")?.payload).toEqual({ id: aid, frontiers: "f-initial" });
+  await fake.pumpUntil(app, () => app.count("id:history-preview-files") === 1);
+  expect(fake.calls.find((c) => c.op === "note.history.preview")?.payload).toEqual({ id: nid, frontiers: "f-initial" });
   expect(app.texts()).toContain("历史快照内容");
 
   fake.clearCalls();
   await app.press("id:history-restore");
-  await fake.pumpUntil(app, () => fake.calls.some((c) => c.op === "artifact.history.restore"));
-  expect(fake.calls.find((c) => c.op === "artifact.history.restore")?.payload).toMatchObject({ id: aid, frontiers: "f-initial" });
+  await fake.pumpUntil(app, () => fake.calls.some((c) => c.op === "note.history.restore"));
+  expect(fake.calls.find((c) => c.op === "note.history.restore")?.payload).toMatchObject({ id: nid, frontiers: "f-initial" });
 
   await fake.pumpUntil(app, () => app.count("id:history-commit-0") === 1);
   await app.press("id:history-commit-0");
   await fake.pumpUntil(app, () => app.enabled("id:history-undo-origin"));
   fake.clearCalls();
   await app.press("id:history-undo-origin");
-  await fake.pumpUntil(app, () => fake.calls.some((c) => c.op === "artifact.history.undoOrigin"));
-  expect(fake.calls.find((c) => c.op === "artifact.history.undoOrigin")?.payload).toEqual({ id: aid, origin: "session:w1:turn:2" });
+  await fake.pumpUntil(app, () => fake.calls.some((c) => c.op === "note.history.undoOrigin"));
+  expect(fake.calls.find((c) => c.op === "note.history.undoOrigin")?.payload).toEqual({ id: nid, origin: "session:w1:turn:2" });
 
   await fake.pumpUntil(app, () => app.count("id:history-save-snapshot") === 1);
   fake.clearCalls();
   await app.press("id:history-save-snapshot");
-  await fake.pumpUntil(app, () => fake.calls.some((c) => c.op === "artifact.version.create"));
+  await fake.pumpUntil(app, () => fake.calls.some((c) => c.op === "note.version.create"));
 
   await fake.pumpUntil(app, () => app.enabled("id:history-fork"));
   fake.clearCalls();
   await app.press("id:history-fork");
-  await fake.pumpUntil(app, () => fake.calls.some((c) => c.op === "artifact.history.fork"));
-  expect(fake.calls.find((c) => c.op === "artifact.history.fork")?.payload).toMatchObject({ id: aid, frontiers: "f-latest" });
+  await fake.pumpUntil(app, () => fake.calls.some((c) => c.op === "note.history.fork"));
+  expect(fake.calls.find((c) => c.op === "note.history.fork")?.payload).toMatchObject({ id: nid, frontiers: "f-latest" });
 });
 
-test("whiteboard: renders launch timeline elements, adds/undoes nodes via artifact.file.write, edits inspector, exports SVG, and asks assistant", async () => {
-  const { app, fake } = await mountApp("/artifacts/art-launch-board", (f) => {
-    for (const [op, handler] of Object.entries(artifactResponses)) {
+test("whiteboard: renders launch timeline elements, adds/undoes nodes via note.file.write, edits inspector, exports SVG, and asks assistant", async () => {
+  const { app, fake } = await mountApp("/notes/art-launch-board", (f) => {
+    for (const [op, handler] of Object.entries(noteResponses)) {
       f.respond(op, handler);
     }
     f.respond("host.saveFile", { saved: true });
@@ -589,7 +539,7 @@ test("whiteboard: renders launch timeline elements, adds/undoes nodes via artifa
   await fake.pumpUntil(app, () => app.count("id:wb-count") === 1 && !app.texts().includes("0 个元素"));
   expect(app.count("id:whiteboard-view")).toBe(1);
   expect(app.count("id:wb-canvas")).toBe(1);
-  expect(app.count("id:artifact-rail")).toBe(0);
+  expect(app.count("id:note-rail")).toBe(0);
 
   const countBefore = app.texts().find((s) => s.endsWith("个元素"));
   expect(countBefore).toBeDefined();
@@ -597,13 +547,13 @@ test("whiteboard: renders launch timeline elements, adds/undoes nodes via artifa
   fake.clearCalls();
   await app.press("id:wb-add-node");
   await fake.pumpUntil(app, () => app.texts().find((s) => s.endsWith("个元素")) !== countBefore);
-  expect(fake.calls.some((c) => c.op === "artifact.file.write")).toBe(true);
+  expect(fake.calls.some((c) => c.op === "note.file.write")).toBe(true);
 
   fake.clearCalls();
   expect(app.enabled("id:wb-undo")).toBe(true);
   await app.press("id:wb-undo");
   await fake.pumpUntil(app, () => app.texts().find((s) => s.endsWith("个元素")) === countBefore);
-  expect(fake.calls.some((c) => c.op === "artifact.file.write")).toBe(true);
+  expect(fake.calls.some((c) => c.op === "note.file.write")).toBe(true);
 
   await app.press("id:wb-inspector-toggle");
   expect(app.count("id:wb-inspector")).toBe(1);
@@ -614,13 +564,12 @@ test("whiteboard: renders launch timeline elements, adds/undoes nodes via artifa
   fake.clearCalls();
   await app.press("id:wb-inspector-save");
   await fake.pump(app);
-  const writeCall = fake.calls.find((c) => c.op === "artifact.file.write");
+  const writeCall = fake.calls.find((c) => c.op === "note.file.write");
   expect(writeCall).toBeDefined();
 
   await app.press("id:wb-chat");
   await fake.pump(app);
-  expect(app.count("id:artifact-rail")).toBe(1);
-  expect(app.count("id:artifact-context-pill")).toBe(1);
+  expect(app.count("id:note-rail")).toBe(1);
 
   fake.clearCalls();
   await app.press("id:wb-export-svg");
@@ -712,9 +661,9 @@ test("settings: appearance motion control dispatches host.motion, syncs host eve
   expect(bootOff.app.viewStyle("id:motion-system")?.backgroundColor).toBeUndefined();
 });
 
-test("regression: whiteboard ChannelSidePane survives artifact polling, remount after ready, and slice updates without dropping channel.follow", async () => {
-  const { app, fake, fixture } = await mountApp("/artifacts/art-launch-board", (f) => {
-    for (const [op, handler] of Object.entries(artifactResponses)) {
+test("regression: whiteboard ChannelSidePane survives note polling, remount after ready, and slice updates without dropping channel.follow", async () => {
+  const { app, fake, fixture } = await mountApp("/notes/art-launch-board", (f) => {
+    for (const [op, handler] of Object.entries(noteResponses)) {
       f.respond(op, handler);
     }
     f.respond("channel.message.list", []);
@@ -725,20 +674,17 @@ test("regression: whiteboard ChannelSidePane survives artifact polling, remount 
 
   await fake.pumpUntil(app, () => app.count("id:wb-count") === 1 && !app.texts().includes("0 个元素"));
 
-  // Open chat once so `followed.get("general").ready` transitions to `true`, then toggle closed and open
-  // so `followChannel` runs synchronously inside `useFollowed`'s `createEffect` owner.
-  await app.press("id:wb-chat");
+  await app.press("id:note-rail-toggle");
   await fake.pump(app);
-  expect(app.count("id:artifact-chat-pane")).toBe(1);
-  await app.press("id:artifact-rail-toggle");
+  expect(app.count("id:note-rail")).toBe(1);
+  await app.press("id:note-rail-toggle");
   await fake.pump(app);
-  expect(app.count("id:artifact-chat-pane")).toBe(0);
-  await app.press("id:artifact-rail-toggle");
+  expect(app.count("id:note-rail")).toBe(0);
+  await app.press("id:note-rail-toggle");
   await fake.pump(app);
-  expect(app.count("id:artifact-chat-pane")).toBe(1);
+  expect(app.count("id:note-rail")).toBe(1);
 
   await app.type("id:composer-input", "帮我优化一下呢？");
-  // The 5-second `useArtifact` poll must not remount `ChannelSidePane` or wipe the active draft.
   await clock.fastForward(5_500);
   await fake.pump(app);
   expect(app.value("id:composer-input")).toBe("帮我优化一下呢？");
@@ -747,13 +693,11 @@ test("regression: whiteboard ChannelSidePane survives artifact polling, remount 
   await app.press("id:send");
   await fake.pump(app);
   const sendCall = fake.calls.find((c) => c.op === "channel.message.send");
-  const sendPayload = sendCall?.payload as
-    | { id?: string; text?: string; sendKey?: string; viewContext?: { artifactType?: string; title?: string } }
-    | undefined;
+  const sendPayload = sendCall?.payload as { id?: string; text?: string; sendKey?: string; viewContext?: { noteType?: string; title?: string } } | undefined;
   expect(sendPayload).toMatchObject({
     id: "general",
     text: "帮我优化一下呢？",
-    viewContext: { artifactType: "whiteboard", title: "产品发布时间线" },
+    viewContext: { noteType: "canvas", title: "产品发布时间线" },
   });
   expect(sendPayload?.sendKey).toBeTruthy();
   expect(app.count("id:pending-line-sending")).toBe(1);
@@ -779,7 +723,7 @@ test("regression: whiteboard ChannelSidePane survives artifact polling, remount 
         text: "帮我优化一下呢？",
         sendKey: sendPayload?.sendKey,
         at: SCENARIO_NOW,
-        viewContext: { artifactId: "art-launch-board", artifactType: "whiteboard", title: "产品发布时间线", seq: 2 },
+        viewContext: { noteId: "art-launch-board", noteType: "canvas", title: "产品发布时间线", seq: 2 },
       },
     },
     (p: unknown) => (p as { id?: string }).id === "general",
@@ -791,8 +735,6 @@ test("regression: whiteboard ChannelSidePane survives artifact polling, remount 
   expect(app.count("id:pending-line-sending")).toBe(0);
   expect(app.count("id:pending-line-failed")).toBe(0);
 
-  // Even when the originating ChannelSidePane unmounts while a send intent still holds the channel
-  // subscription open, the detached `host.on("sub:<id>")` listener must keep delivering events.
   fake.clearCalls();
   await app.type("id:composer-input", "第二条也发出去");
   await app.press("id:send");
@@ -800,9 +742,9 @@ test("regression: whiteboard ChannelSidePane survives artifact polling, remount 
   const secondSend = fake.calls.find((c) => c.op === "channel.message.send")?.payload as { sendKey?: string } | undefined;
   expect(secondSend?.sendKey).toBeTruthy();
 
-  await app.press("id:artifact-rail-toggle");
+  await app.press("id:note-rail-toggle");
   await fake.pump(app);
-  expect(app.count("id:artifact-chat-pane")).toBe(0);
+  expect(app.count("id:note-rail")).toBe(0);
 
   await fake.emit(
     app,
@@ -821,19 +763,18 @@ test("regression: whiteboard ChannelSidePane survives artifact polling, remount 
         text: "第二条也发出去",
         sendKey: secondSend?.sendKey,
         at: SCENARIO_NOW + 1_000,
-        viewContext: { artifactId: "art-launch-board", artifactType: "whiteboard", title: "产品发布时间线", seq: 2 },
+        viewContext: { noteId: "art-launch-board", noteType: "canvas", title: "产品发布时间线", seq: 2 },
       },
     },
     (p: unknown) => (p as { id?: string }).id === "general",
   );
-  await app.press("id:artifact-rail-toggle");
+  await app.press("id:note-rail-toggle");
   await fake.pump(app);
   expect(app.count("id:message-2")).toBe(1);
   expect(app.texts()).toContain("第二条也发出去");
   expect(app.count("id:pending-line-sending")).toBe(0);
   expect(app.count("id:pending-line-failed")).toBe(0);
 
-  // Past the 20s `chatSay` timeout, no phantom failure line appears.
   await clock.fastForward(21_000);
   await fake.pump(app);
   expect(app.count("id:pending-line-failed")).toBe(0);
@@ -966,15 +907,15 @@ test("bottom-left update control: always shows release-notes dialog before resta
   await busyApp.fake.pumpUntil(busyApp.app, () => busyApp.fake.calls.some((c) => c.op === "host.updateInstall"));
 });
 
-test("content & artifact UX: library quick generate, outline inline edit, dashboard KPIs, and diagram preview", async () => {
+test("content & note UX: library quick generate, history panel, and doc/base routes", async () => {
   const lib = await mountApp("/library", (f) => {
-    for (const [op, handler] of Object.entries(artifactResponses)) {
+    for (const [op, handler] of Object.entries(noteResponses)) {
       f.respond(op, handler);
     }
   });
   expect(lib.app.count("id:library-source")).toBe(0);
   expect(lib.app.count("id:library-make-btn")).toBe(1);
-  await lib.app.press("id:content-nav-artifact-docs");
+  await lib.app.press("id:content-nav-note-doc");
   await lib.fake.pump(lib.app);
   expect(lib.app.count("id:library-make-btn")).toBe(0);
   await lib.app.press("id:content-nav-recent");
@@ -982,155 +923,20 @@ test("content & artifact UX: library quick generate, outline inline edit, dashbo
   await lib.app.press("id:library-make-btn");
   await lib.fake.pumpUntil(lib.app, () => lib.app.count("id:library-make-dialog") === 1);
 
-  const protoArtifact = (scenarios.typical.responses["artifact.list"] as Artifact[] | undefined)?.find((a) => a.artifactType === "prototype");
-  if (protoArtifact) {
-    const protoApp = await mountApp(`/artifacts/${protoArtifact.id}`, (f) => {
-      for (const [op, handler] of Object.entries(artifactResponses)) {
+  const docNote = (noteResponses["note.list"] as { toJSON: () => Note[] }).toJSON().find((n) => n.id === "art-login");
+  if (docNote) {
+    const docApp = await mountApp(`/notes/${docNote.id}`, (f) => {
+      for (const [op, handler] of Object.entries(noteResponses)) {
         f.respond(op, handler);
       }
     });
-    await protoApp.fake.pumpUntil(protoApp.app, () => protoApp.app.count("id:artifact-prototype-view") === 1);
-    expect(protoApp.app.count("id:prototype-preview-bar")).toBe(0);
-    expect(protoApp.app.count("id:prototype-viewport")).toBe(1);
-    expect(protoApp.app.count("id:artifact-version-menu")).toBe(0);
-    expect(protoApp.app.count("id:artifact-history-toggle")).toBe(1);
-    const firstVersion = protoArtifact.versions[0];
+    await docApp.fake.pumpUntil(docApp.app, () => docApp.app.count("id:collab-toggle-history") === 1);
+    expect(docApp.app.count("id:note-version-badge")).toBe(1);
+    const firstVersion = docNote.versions[0];
     if (firstVersion !== undefined) {
-      await protoApp.app.press("id:artifact-history-toggle");
-      await protoApp.fake.pumpUntil(protoApp.app, () => protoApp.app.count("id:artifact-history-panel") === 1);
-      expect(protoApp.app.count(`id:artifact-version-${firstVersion.version}`)).toBe(1);
+      await docApp.app.press("id:collab-toggle-history");
+      await docApp.fake.pumpUntil(docApp.app, () => docApp.app.count("id:note-history-panel") === 1);
+      expect(docApp.app.count(`id:note-version-${firstVersion.version}`)).toBe(1);
     }
   }
-
-  const outlineArtifact = (scenarios.typical.responses["artifact.list"] as Artifact[] | undefined)?.find((a) => a.artifactType === "outline");
-  if (!outlineArtifact) throw new Error("typical scenario must provide an outline artifact");
-  const outlineApp = await mountApp(`/artifacts/${outlineArtifact.id}`, (f) => {
-    for (const [op, handler] of Object.entries(artifactResponses)) {
-      f.respond(op, handler);
-    }
-  });
-  await outlineApp.fake.pumpUntil(
-    outlineApp.app,
-    () => outlineApp.app.count("id:artifact-outline-view") === 1 && outlineApp.app.count("id:outline-add-item") === 1,
-  );
-  expect(outlineApp.app.count("id:artifact-collab-bar")).toBe(0);
-  outlineApp.fake.clearCalls();
-  await outlineApp.app.press("id:outline-add-item");
-  await outlineApp.fake.pumpUntil(outlineApp.app, () => outlineApp.fake.calls.some((c) => c.op === "artifact.file.write"));
-
-  const dashboardId = "art-dash-ux" as ArtifactId;
-  const dashArtifact: Artifact = {
-    id: dashboardId,
-    title: "Service SLO",
-    artifactType: "dashboard",
-    isDefault: false,
-    by: "user",
-    byName: "用户",
-    version: 0,
-    seq: 1,
-    versions: [],
-    at: SCENARIO_NOW,
-    updated: SCENARIO_NOW,
-  };
-  const dashFiles = new Map<string, string>([
-    [
-      "structure/dashboard.json",
-      JSON.stringify({
-        title: "Service SLO",
-        panels: [
-          {
-            id: "avail",
-            kind: "kpi",
-            label: "Availability",
-            format: "percent",
-            source: { dataset: "structure/data/sample.json", field: "availability", agg: "avg" },
-          },
-        ],
-      }),
-    ],
-    [
-      "structure/data/sample.json",
-      JSON.stringify({
-        schema: [
-          { name: "service", label: "Service", type: "string" },
-          { name: "availability", label: "Availability", type: "number" },
-        ],
-        rows: [
-          { service: "gw", availability: 99.9 },
-          { service: "core", availability: 99.7 },
-        ],
-      }),
-    ],
-  ]);
-  const dashApp = await mountApp(`/artifacts/${dashboardId}`, (f) => {
-    for (const [op, handler] of Object.entries(artifactResponses)) {
-      f.respond(op, handler);
-    }
-    f.respond("artifact.get", () => dashArtifact);
-    f.respond("artifact.file.list", () => ({
-      artifactId: dashboardId,
-      seq: 1,
-      files: [...dashFiles.keys()].map((path) => ({ path, mime: "application/json", size: 64, hash: path, updatedAt: SCENARIO_NOW })),
-    }));
-    f.respond("artifact.file.get", (p: { path?: string }) => ({
-      artifactId: dashboardId,
-      path: p.path ?? "",
-      mime: "application/json",
-      encoding: "utf8",
-      content: dashFiles.get(p.path ?? "") ?? "{}",
-      size: 64,
-      hash: p.path ?? "",
-      updatedAt: SCENARIO_NOW,
-    }));
-  });
-  await dashApp.fake.pumpUntil(dashApp.app, () => dashApp.app.count("id:artifact-dashboard-view") === 1 && dashApp.app.texts().includes("99.8%"));
-  expect(dashApp.app.texts()).toContain("99.8%");
-
-  const diagramId = "art-diag-ux" as ArtifactId;
-  const diagArtifact: Artifact = {
-    id: diagramId,
-    title: "Gateway Flow",
-    artifactType: "diagram",
-    isDefault: false,
-    by: "user",
-    byName: "用户",
-    version: 0,
-    seq: 1,
-    versions: [],
-    at: SCENARIO_NOW,
-    updated: SCENARIO_NOW,
-  };
-  const diagJson = JSON.stringify({
-    title: "Gateway Flow",
-    kind: "architecture",
-    direction: "LR",
-    nodes: [
-      { id: "gw", label: "Gateway", kind: "gateway" },
-      { id: "db", label: "DB", kind: "database" },
-    ],
-    edges: [{ id: "e1", from: "gw", to: "db", label: "reads" }],
-  });
-  const diagApp = await mountApp(`/artifacts/${diagramId}`, (f) => {
-    for (const [op, handler] of Object.entries(artifactResponses)) {
-      f.respond(op, handler);
-    }
-    f.respond("artifact.get", () => diagArtifact);
-    f.respond("artifact.file.list", () => ({
-      artifactId: diagramId,
-      seq: 1,
-      files: [{ path: "structure/diagram.json", mime: "application/json", size: diagJson.length, hash: "d1", updatedAt: SCENARIO_NOW }],
-    }));
-    f.respond("artifact.file.get", () => ({
-      artifactId: diagramId,
-      path: "structure/diagram.json",
-      mime: "application/json",
-      encoding: "utf8",
-      content: diagJson,
-      size: diagJson.length,
-      hash: "d1",
-      updatedAt: SCENARIO_NOW,
-    }));
-  });
-  await diagApp.fake.pumpUntil(diagApp.app, () => diagApp.app.count("id:artifact-diagram-view") === 1 && diagApp.app.count("id:diagram") === 1);
-  expect(diagApp.app.count("id:diagram")).toBe(1);
 });

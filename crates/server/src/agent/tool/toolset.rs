@@ -48,7 +48,7 @@ impl ToolAccess {
 
 /// Maps every farm tool `op` exhaustively to its [`Toolset`] and allowed agent roles.
 pub fn access_of(op: &str) -> Option<ToolAccess> {
-    use Toolset::{Artifact, Channel, Cron, Issue, Library, Media, Memory, Repo, Resource, Session};
+    use Toolset::{Channel, Cron, Issue, Library, Media, Memory, Note, Repo, Resource, Session};
 
     Some(match op {
         "issue.list" | "issue.get" => ToolAccess::new(Issue, true, true),
@@ -76,19 +76,26 @@ pub fn access_of(op: &str) -> Option<ToolAccess> {
         | "media.job.cancel"
         | "media.job.download" => ToolAccess::new(Media, true, false),
         "library.item.list" | "library.item.add" => ToolAccess::new(Library, true, true),
-        "artifact.list"
-        | "artifact.get"
-        | "artifact.content.get"
-        | "artifact.create"
-        | "artifact.version.create"
-        | "artifact.file.list"
-        | "artifact.file.get"
-        | "artifact.file.write"
-        | "artifact.file.delete"
-        | "artifact.suggestion.list"
-        | "artifact.suggestion.create"
-        | "artifact.type.list"
-        | "artifact.type.read" => ToolAccess::new(Artifact, true, true),
+        "note.list"
+        | "note.get"
+        | "note.content.get"
+        | "note.create"
+        | "note.version.create"
+        | "note.tree.move"
+        | "note.link.list"
+        | "note.doc.view"
+        | "note.doc.appendBlock"
+        | "note.base.view"
+        | "note.base.upsertRow"
+        | "note.base.runAgentColumn"
+        | "note.file.list"
+        | "note.file.get"
+        | "note.file.write"
+        | "note.file.delete"
+        | "note.suggestion.list"
+        | "note.suggestion.create"
+        | "note.type.list"
+        | "note.type.read" => ToolAccess::new(Note, true, true),
         _ => return None,
     })
 }

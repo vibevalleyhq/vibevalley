@@ -7,8 +7,8 @@ use serde_json::{Value, json};
 use vibevalley_files::FsChange;
 use vibevalley_workspace::{PaneKind, ProjectId, Store, Workspace, load_all, load_project, prune_missing_projects};
 
+use crate::host_types::SplitBounds;
 use crate::hosted::{HostedEvent, HostedView, Panel};
-use crate::panes::SplitBounds;
 use crate::theme::{MotionChoice, Settings, ThemeChoice, Ui};
 
 use super::{ACTIVE_KEY, HostChrome, NativeOverlays, SETTINGS_KEY, Shell, WorkspaceProjects, devtools, devtools_enabled, projects, startup_error};
@@ -50,9 +50,9 @@ impl Shell {
             }
         })
         .detach();
-        let (fs_tx, fs_rx) = flume::unbounded::<(ProjectId, Vec<FsChange>)>();
+        let (fs_tx, mut fs_rx) = tokio::sync::mpsc::unbounded_channel::<(ProjectId, Vec<FsChange>)>();
         cx.spawn(async move |this, cx| {
-            while let Ok(first) = fs_rx.recv_async().await {
+            while let Some(first) = fs_rx.recv().await {
                 let mut batches = vec![first];
                 while let Ok(more) = fs_rx.try_recv() {
                     batches.push(more);
@@ -88,20 +88,22 @@ impl Shell {
             }
             let running = crate::serving::RunningServer::take_for_shutdown(cx);
             let store = this.workspace.store.take();
-            let background = cx.background_executor().clone();
             async move {
-                background
+                let _ = vibevalley_rt::current_or_global_handle()
                     .spawn(async move {
                         if let Some(store) = store {
                             for job in jobs {
-                                if let Err(e) = job.run(&*store) {
+                                if let Err(e) = job.run(&*store).await {
                                     eprintln!("save on quit: {e}");
                                 }
                             }
+                            if let Ok(store) = Arc::try_unwrap(store) {
+                                let _ = store.close().await;
+                            }
                         }
-                        ws.shutdown_all_and_wait();
+                        ws.shutdown_all_and_wait().await;
                         if let Some(running) = running {
-                            running.shutdown();
+                            let _ = tokio::task::spawn_blocking(move || running.shutdown()).await;
                         }
                     })
                     .await;
@@ -236,15 +238,15 @@ impl Shell {
             .detach();
         }
         match crate::island::Island::start() {
-            Ok(Some((island, opened))) => {
+            Ok(Some((island, mut opened))) => {
                 shell.overlays.island = Some(island);
-                struct IslandOutlet(flume::Sender<(String, Value)>);
+                struct IslandOutlet(tokio::sync::mpsc::UnboundedSender<(String, Value)>);
                 impl vibevalley_server::gateway::bridge::Outlet for IslandOutlet {
                     fn send(&self, event: &str, data: Value) {
                         let _ = self.0.send((event.to_string(), data));
                     }
                 }
-                let (tx, rx) = flume::unbounded::<(String, Value)>();
+                let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<(String, Value)>();
                 let identity = crate::hosted::next_client_identity(vibevalley_server::ClientKind::GpuiShell, "island");
                 let client = Arc::new(cx.global::<crate::hosted::BridgeHub>().0.attach(identity, Arc::new(IslandOutlet(tx))));
                 if let Err(error) = client.watch("slice:board") {
@@ -252,7 +254,7 @@ impl Shell {
                 }
                 shell.overlays.island_client = Some(client.clone());
                 cx.spawn(async move |this, cx| {
-                    while let Ok((event, envelope)) = rx.recv_async().await {
+                    while let Some((event, envelope)) = rx.recv().await {
                         if event != "frame:slice:board" {
                             continue;
                         }
@@ -278,7 +280,7 @@ impl Shell {
                 })
                 .detach();
                 cx.spawn(async move |this, cx| {
-                    while let Ok(issue) = opened.recv_async().await {
+                    while let Some(issue) = opened.recv().await {
                         if this
                             .update(cx, |shell, cx| {
                                 shell.navigate_workbench(&format!("/issues/{issue}"), cx);
@@ -305,26 +307,31 @@ impl Shell {
         let cwd = std::env::current_dir().ok();
         let work_root = crate::serving::work_root();
         let path = crate::host::Storage::configured().database;
-        Self::bg(
+        Self::bg_tokio(
             cx,
-            move || -> Result<_, String> {
+            async move {
                 if let Some(dir) = path.parent() {
-                    std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+                    tokio::fs::create_dir_all(dir).await.map_err(|e| e.to_string())?;
                 }
-                let store = Store::open(&path).map_err(|e| e.to_string())?;
-                let mut projects = prune_missing_projects(&store, load_all(&store).map_err(|e| e.to_string())?);
+                let store = Store::open(&path).await.map_err(|e| e.to_string())?;
+                let loaded = load_all(&store).await.map_err(|e| e.to_string())?;
+                let mut projects = prune_missing_projects(&store, loaded).await;
                 if projects.is_empty() {
-                    let initial = cwd
-                        .filter(|dir| dir != Path::new("/") && vibevalley_git::Repo::discover(dir).ok().flatten().is_some())
-                        .or_else(|| projects::first_workspace_repo(&work_root));
+                    let initial = tokio::task::spawn_blocking(move || {
+                        cwd.filter(|dir| dir != Path::new("/") && vibevalley_git::Repo::discover(dir).ok().flatten().is_some())
+                            .or_else(|| projects::first_workspace_repo(&work_root))
+                    })
+                    .await
+                    .ok()
+                    .flatten();
                     if let Some(dir) = initial {
-                        projects.push(load_project(&store, &dir).map_err(|e| e.to_string())?);
+                        projects.push(load_project(&store, &dir).await.map_err(|e| e.to_string())?);
                     }
                 }
-                let settings: Settings = vibevalley_workspace::persist::load_setting(&store, SETTINGS_KEY);
-                let terminal_hooks = vibevalley_workspace::load_terminal_hooks(&store);
-                let active: Option<ProjectId> = store.setting(ACTIVE_KEY).ok().flatten().and_then(|v| v.as_i64());
-                Ok((Arc::new(store), projects, settings, terminal_hooks, active))
+                let settings: Settings = vibevalley_workspace::persist::load_setting(&store, SETTINGS_KEY).await;
+                let terminal_hooks = vibevalley_workspace::load_terminal_hooks(&store).await;
+                let active: Option<ProjectId> = store.setting(ACTIVE_KEY).await.ok().flatten().and_then(|v| v.as_i64());
+                Ok::<_, String>((Arc::new(store), projects, settings, terminal_hooks, active))
             },
             |this, result, cx| match result {
                 Ok((store, projects, settings, terminal_hooks, active)) => {
@@ -424,13 +431,13 @@ impl Drop for Shell {
         let jobs = self.workspace.ws.save_jobs();
         let mut ws = std::mem::take(&mut self.workspace.ws);
         let store = self.workspace.store.take();
-        std::thread::spawn(move || {
+        vibevalley_rt::current_or_global_handle().spawn(async move {
             if let Some(store) = store {
                 for job in jobs {
-                    let _ = job.run(&*store);
+                    let _ = job.run(&*store).await;
                 }
             }
-            ws.shutdown_all_and_wait();
+            ws.shutdown_all_and_wait().await;
         });
     }
 }

@@ -489,7 +489,7 @@ function SkillPicker(props: { draft: Agent; runtime?: RuntimeInfo | undefined; p
   );
 }
 
-const workerToolsets: readonly Toolset[] = ["issue", "session", "channel", "resource", "memory", "library", "artifact"];
+const workerToolsets: readonly Toolset[] = ToolsetValues.filter((ts) => ts !== "repo" && ts !== "cron" && ts !== "media");
 
 export const defaultToolsets = (role: Agent["role"]): Toolset[] => (role === "orchestrator" ? [...ToolsetValues] : [...workerToolsets]);
 
@@ -555,11 +555,11 @@ function Tools(props: { draft: Agent; runtime?: RuntimeInfo | undefined; patch: 
         <View class={`gap-1.5 ${mcpRefused() ? "opacity-50" : ""}`}>
           <Each of={props.draft.mcpServers} key={(s) => s.name}>
             {(s) => (
-              <View class="flex-row items-center gap-2 rounded-md bg-side px-3 py-2">
-                <View class="rounded-sm bg-selected px-1.5 py-0.5">
+              <View class="min-w-0 flex-row items-center gap-2 rounded-md bg-side px-3 py-2">
+                <View class="shrink-0 rounded-sm bg-selected px-1.5 py-0.5">
                   <Text class="font-mono text-2xs font-medium text-ink">{s().type}</Text>
                 </View>
-                <Text class="text-sm font-medium text-ink">{s().name}</Text>
+                <Text class="max-w-36 shrink-0 truncate text-sm font-medium text-ink">{s().name}</Text>
                 <View class="min-w-0 flex-1" tooltip={<Bubble text={mcpTarget(s())} />}>
                   <Text class="truncate font-mono text-xs text-muted">{mcpTarget(s())}</Text>
                 </View>
@@ -568,7 +568,7 @@ function Tools(props: { draft: Agent; runtime?: RuntimeInfo | undefined; patch: 
                   disabled={!!mcpRefused()}
                   accessibilityLabel={t("web.agent.removeNamed", { name: s().name })}
                   onPress={() => props.patch({ ...props.draft, mcpServers: props.draft.mcpServers.filter((x) => x.name !== s().name) })}
-                  class="group rounded-sm px-1.5 py-0.5 hover:bg-hover"
+                  class="group shrink-0 rounded-sm px-1.5 py-0.5 hover:bg-hover"
                 >
                   <Text class="text-xs text-muted group-hover:text-berry">{t("web.agent.remove")}</Text>
                 </View>

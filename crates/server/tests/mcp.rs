@@ -1,6 +1,7 @@
 //! A helper reaches the farm through `/mcp`: the board hands it the door
 //! and a token, the token names it, and its tools act as it.
 
+use crate::support::RouterTestExt as _;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
@@ -165,13 +166,15 @@ fn a_helper_calls_its_tools_through_the_door_it_was_given() {
         .iter()
         .map(|t| t["name"].as_str().unwrap())
         .collect();
-    assert_eq!(names.len(), 27, "{names:?}");
+    assert_eq!(names.len(), 33, "{names:?}");
     assert!(names.contains(&"issue_list"));
     assert!(names.contains(&"issue_get"));
     assert!(names.contains(&"issue_report"));
-    assert!(names.contains(&"artifact_file_list"));
-    assert!(names.contains(&"artifact_file_write"));
-    assert!(names.contains(&"artifact_suggestion_create"));
+    assert!(names.contains(&"note_file_list"));
+    assert!(names.contains(&"note_file_write"));
+    assert!(names.contains(&"note_suggestion_create"));
+    assert!(names.contains(&"note_doc_view"));
+    assert!(names.contains(&"note_base_view"));
     assert!(!names.contains(&"pkm_search"));
 
     let listed_issues = rpc(&door, &token, 21, "tools/call", json!({ "name": "issue_list", "arguments": {} }));
@@ -284,34 +287,34 @@ fn a_helper_calls_its_tools_through_the_door_it_was_given() {
     assert_eq!(none["result"]["isError"], true);
     assert!(text_of(&none).contains("没有 no_such_tool 这个工具"));
 
-    // Artifact MCP tools: directory create, file list/get/write, and human-owned suggestion diversion.
+    // Note MCP tools: directory create, file list/get/write, and human-owned suggestion diversion.
     let created_res = rpc(
         &door,
         &token,
         10,
         "tools/call",
         json!({
-            "name": "artifact_create",
+            "name": "note_create",
             "arguments": {
-                "title": "Sprint Outline",
-                "artifactType": "outline",
+                "title": "Sprint Doc",
+                "noteType": "doc",
                 "files": [{ "path": "structure/notes.md", "content": "Initial agent notes" }],
                 "announce": false
             }
         }),
     );
     assert_eq!(created_res["result"]["isError"], false, "{created_res}");
-    let created_art: Value = serde_json::from_str(&text_of(&created_res)).unwrap();
-    let outline_id = created_art["id"].as_str().unwrap().to_string();
-    assert_eq!(created_art["title"], "Sprint Outline");
-    assert_eq!(created_art["artifactType"], "outline");
+    let created_note: Value = serde_json::from_str(&text_of(&created_res)).unwrap();
+    let doc_id = created_note["id"].as_str().unwrap().to_string();
+    assert_eq!(created_note["title"], "Sprint Doc");
+    assert_eq!(created_note["noteType"], "doc");
 
     let list_res = rpc(
         &door,
         &token,
         11,
         "tools/call",
-        json!({ "name": "artifact_file_list", "arguments": { "id": outline_id, "prefix": "structure/" } }),
+        json!({ "name": "note_file_list", "arguments": { "id": doc_id, "prefix": "structure/" } }),
     );
     assert_eq!(list_res["result"]["isError"], false, "{list_res}");
     let listed: Value = serde_json::from_str(&text_of(&list_res)).unwrap();
@@ -320,9 +323,9 @@ fn a_helper_calls_its_tools_through_the_door_it_was_given() {
 
     // Human edits `structure/notes.md` directly; subsequent helper write diverts to a review suggestion.
     let human_write = call(
-        "artifact.file.write",
+        "note.file.write",
         json!({
-            "id": outline_id,
+            "id": doc_id,
             "files": [{ "path": "structure/notes.md", "content": "Human edited note" }],
             "summary": "user tweak"
         }),
@@ -335,9 +338,9 @@ fn a_helper_calls_its_tools_through_the_door_it_was_given() {
         12,
         "tools/call",
         json!({
-            "name": "artifact_file_write",
+            "name": "note_file_write",
             "arguments": {
-                "id": outline_id,
+                "id": doc_id,
                 "summary": "suggest improvement",
                 "files": [
                     { "path": "structure/notes.md", "content": "Agent proposed rewrite" },
@@ -356,7 +359,7 @@ fn a_helper_calls_its_tools_through_the_door_it_was_given() {
         &token,
         13,
         "tools/call",
-        json!({ "name": "artifact_file_get", "arguments": { "id": outline_id, "path": "structure/notes.md" } }),
+        json!({ "name": "note_file_get", "arguments": { "id": doc_id, "path": "structure/notes.md" } }),
     );
     let notes_file: Value = serde_json::from_str(&text_of(&notes_res)).unwrap();
     assert_eq!(notes_file["content"], "Human edited note");
@@ -366,7 +369,7 @@ fn a_helper_calls_its_tools_through_the_door_it_was_given() {
         &token,
         14,
         "tools/call",
-        json!({ "name": "artifact_file_get", "arguments": { "id": outline_id, "path": "structure/appendix.md" } }),
+        json!({ "name": "note_file_get", "arguments": { "id": doc_id, "path": "structure/appendix.md" } }),
     );
     let appendix_file: Value = serde_json::from_str(&text_of(&appendix_res)).unwrap();
     assert_eq!(appendix_file["content"], "Brand new section");
@@ -688,7 +691,7 @@ fn helper_toolsets_narrow_mcp_tools_and_serve_user_and_builtin_skills() {
         .collect();
     assert!(skill_uris.contains(&"skill://local/deploy-check"), "{skill_uris:?}");
     assert!(skill_uris.contains(&"skill://built-in/reviewer"), "{skill_uris:?}");
-    assert!(skill_uris.contains(&"skill://artifact/outline"), "{skill_uris:?}");
+    assert!(skill_uris.contains(&"skill://note/doc"), "{skill_uris:?}");
 
     let user_skill = rpc(&door, &token, 4, "skills/get", json!({ "uri": "skill://local/deploy-check" }));
     assert!(

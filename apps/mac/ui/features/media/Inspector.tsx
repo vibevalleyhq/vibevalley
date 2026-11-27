@@ -3,13 +3,13 @@ import { cleanup, Clipboard, effect, Image, Scroll, signal, Text, untracked, Vie
 import { t } from "@vibevalley/i18n";
 import type { Channel, LibraryItem } from "@vibevalley/protocol";
 
-import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
 import { sizeText } from "../../design/domain/AttachmentTile";
 import { Icon } from "../../design/Icon";
 import { IconButton } from "../../design/IconButton";
 import { MoreMenu } from "../../design/MoreMenu";
 import { toast } from "../../design/toasts";
+import { createAct } from "../../infra/act";
 import { openAttachment, playAudio, saveFile, useAttachmentFile, useAttachmentUrl } from "../../infra/attachmentFile";
 import { useNow } from "../../infra/base/dom";
 import { ago } from "../../infra/base/format";

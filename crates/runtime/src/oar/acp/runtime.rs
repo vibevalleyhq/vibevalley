@@ -24,6 +24,9 @@ use crate::oar::{
     PermissionMode, Result, Runtime, Session, SessionOptions, SubagentSnapshot, SwarmSnapshot, runtime_spec,
 };
 
+const ACP_COMMAND_CHANNEL_CAPACITY: usize = 256;
+const ACP_INCOMING_CHANNEL_CAPACITY: usize = 1024;
+
 struct AcpDriver {
     shared: Arc<Shared>,
 }
@@ -34,10 +37,13 @@ impl AcpDriver {
     }
 
     fn send(&self, command: Command) -> Result<()> {
-        self.shared
-            .commands
-            .send(command)
-            .map_err(|_| AgentError::Io("the ACP connection is closed".into()))
+        self.shared.commands.try_send(command).map_err(|err| match err {
+            mpsc::error::TrySendError::Full(_) => {
+                tracing::warn!(runtime_id = %self.shared.runtime_id, capacity = ACP_COMMAND_CHANNEL_CAPACITY, "acp command channel full; rejecting command");
+                AgentError::Io("the ACP command queue is full".into())
+            }
+            mpsc::error::TrySendError::Closed(_) => AgentError::Io("the ACP connection is closed".into()),
+        })
     }
 }
 
@@ -168,7 +174,7 @@ impl Driver for AcpDriver {
 
     fn dispose(&self) -> BoxFuture<'_, ()> {
         Box::pin(async move {
-            let _ = self.shared.commands.send(Command::Shutdown);
+            let _ = self.shared.commands.try_send(Command::Shutdown);
             if let Some(child) = self.shared.child.get() {
                 child.kill().await;
                 if let Some(core) = self.shared.core.get() {
@@ -180,7 +186,7 @@ impl Driver for AcpDriver {
     }
 
     fn signal_dispose(&self) {
-        let _ = self.shared.commands.send(Command::Shutdown);
+        let _ = self.shared.commands.try_send(Command::Shutdown);
         if let Some(child) = self.shared.child.get() {
             child.signal_kill();
             if let Some(core) = self.shared.core.get() {
@@ -224,7 +230,7 @@ impl AcpRuntime {
             AcpFlavor::Generic => opts.env.clone(),
             AcpFlavor::Antigravity => antigravity::spawn_env(opts),
         };
-        let (commands_tx, commands_rx) = mpsc::unbounded_channel();
+        let (commands_tx, commands_rx) = mpsc::channel(ACP_COMMAND_CHANNEL_CAPACITY);
         let shared = Arc::new(Shared {
             runtime_id: self.spec.id.clone(),
             flavor,
@@ -255,7 +261,7 @@ impl AcpRuntime {
             commands: commands_tx,
             cwd: opts.cwd.clone(),
         });
-        let (incoming_tx, incoming_rx) = mpsc::unbounded_channel::<Option<std::io::Result<String>>>();
+        let (incoming_tx, incoming_rx) = mpsc::channel::<Option<std::io::Result<String>>>(ACP_INCOMING_CHANNEL_CAPACITY);
         let (ready_tx, mut ready_rx) = mpsc::channel(2);
         let on_line = {
             let incoming = incoming_tx.clone();
@@ -277,18 +283,23 @@ impl AcpRuntime {
                         }
                         return;
                     }
+                    // Reserve capacity first so stdout reading applies backpressure when
+                    // the connection consumer falls behind and keeps `shared.updates` bounded.
+                    let Ok(permit) = incoming.reserve().await else {
+                        return;
+                    };
                     if let Ok(v) = serde_json::from_str::<Value>(&line)
                         && v["method"] == "session/update"
                     {
                         shared.updates.lock().push_back(line.clone());
                     }
-                    let _ = incoming.send(Some(Ok(line)));
+                    permit.send(Some(Ok(line)));
                 }
             }
         };
         // Closing the stream is how the connection learns the agent is gone.
         let on_exit = move |_code: Option<i32>, _stderr: String| async move {
-            let _ = incoming_tx.send(None);
+            let _ = incoming_tx.send(None).await;
         };
         let child = LineChild::spawn(
             Spawn {
@@ -414,7 +425,7 @@ impl Runtime for AcpRuntime {
                 ..Default::default()
             };
             let connected = self.connect(&opts, true).await?;
-            let _ = connected.shared.commands.send(Command::Shutdown);
+            let _ = connected.shared.commands.try_send(Command::Shutdown);
             if let Some(child) = connected.shared.child.get() {
                 child.kill().await;
             }

@@ -3,11 +3,9 @@ import { colorScheme, computed, effect, host, keymap, Scroll, signal, Text, untr
 import { t } from "@vibevalley/i18n";
 import { isFreeUserSession } from "@vibevalley/protocol/rules";
 
-import { Button } from "../design/Button";
-import { Dialog, hasOpenModal } from "../design/Dialog";
+import { hasOpenModal } from "../design/Dialog";
 import { UserAvatar } from "../design/domain/Face";
 import { Icon } from "../design/Icon";
-import { OutLink } from "../design/IconButton";
 import type { IconName } from "../design/icons";
 import { motionClass } from "../design/motion";
 import { ShortcutSheet } from "../design/ShortcutSheet";
@@ -16,6 +14,7 @@ import { toast } from "../design/toasts";
 import { mix } from "../design/tone";
 import { QuickSwitcher, switcher } from "../features/channel";
 import { waitingOnUser } from "../features/inbox";
+import { UpdateDialog } from "../features/setting";
 import { reasonOf } from "../infra/api";
 import { Keyed, variant } from "../infra/base/dom";
 import { hostApi } from "../infra/bridge";
@@ -191,63 +190,15 @@ function RailUpdateControl(props: { small: boolean; working: number }) {
                 </Text>
               </If>
             </View>
-            <Dialog
+            <UpdateDialog
               open={dialogOpen()}
               onClose={() => dialogOpen.set(false)}
-              title={t("web.base.updateReadyTitle", { next: stripVersionPrefix(r().next) })}
-              testid="rail-update-confirm-dialog"
-            >
-              <View class="gap-3.5">
-                <View class="flex-row flex-wrap items-center justify-between gap-2">
-                  <View testID="rail-update-version-badge" class="rounded-sm border border-line bg-side px-2 py-0.5">
-                    <Text class="font-mono text-xs text-muted tabular-nums">{`v${stripVersionPrefix(r().version)} → v${stripVersionPrefix(r().next)}`}</Text>
-                  </View>
-                  <If when={r().page.trim()}>{(page) => <OutLink href={page()} label={t("web.base.updateReleasePage")} />}</If>
-                </View>
-                <If when={props.working > 0 || r().newFarm} else={<Text class="text-sm text-muted">{t("web.base.updateReadyHint")}</Text>}>
-                  <View
-                    testID="rail-update-warning"
-                    class="flex-row items-start gap-2 rounded-md border bg-warn-soft px-3 py-2"
-                    style={{ borderColor: mix("wheat", 0.4) }}
-                  >
-                    <Icon name="warn" size={14} tone="wheat" />
-                    <Text class="min-w-0 flex-1 text-xs leading-relaxed font-medium text-warn-ink">
-                      {r().newFarm ? t("web.setting.about.newFarmQuestion") : t("web.setting.about.workingQuestion", { n: props.working })}
-                    </Text>
-                  </View>
-                </If>
-                <If when={r().notes.length > 0}>
-                  <View testID="rail-update-notes" class="gap-1.5 rounded-md border border-line bg-side p-3">
-                    <Text class="text-xs font-semibold text-muted">{t("web.base.updateNotesTitle")}</Text>
-                    <Each of={r().notes} key={(_, i) => String(i)}>
-                      {(note) => (
-                        <View class="flex-row items-start gap-2">
-                          <View class="mt-1.5 size-1.5 shrink-0 rounded-full bg-accent" />
-                          <Text class="min-w-0 flex-1 text-xs leading-relaxed text-ink">{note()}</Text>
-                        </View>
-                      )}
-                    </Each>
-                  </View>
-                </If>
-                <View class="flex-row items-center justify-end gap-2">
-                  <Button tone="quiet" testID="rail-update-confirm-cancel" onPress={() => dialogOpen.set(false)}>
-                    {t("web.base.updateLaterOnQuit")}
-                  </Button>
-                  <Button
-                    tone="primary"
-                    icon="update"
-                    testID="rail-update-confirm-sure"
-                    disabled={installing()}
-                    onPress={() => {
-                      dialogOpen.set(false);
-                      doInstall();
-                    }}
-                  >
-                    {installing() ? t("web.base.updateInstalling") : t("web.setting.about.restart")}
-                  </Button>
-                </View>
-              </View>
-            </Dialog>
+              state={updates()}
+              working={props.working}
+              installing={installing()}
+              onInstall={doInstall}
+              testidPrefix="rail-update"
+            />
           </>
         )}
       </If>

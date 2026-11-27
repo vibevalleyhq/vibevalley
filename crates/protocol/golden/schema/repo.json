@@ -1,16 +1,23 @@
 {
+ "GitHubAuthMode": [
+  "token",
+  "gh",
+  "none"
+ ],
  "GitHubStatus": [
   {
    "installed": true,
    "version": "s477",
    "loggedIn": true,
    "account": "s479",
+   "authMode": "gh",
    "reason": "s480",
    "checkedAt": 481
   },
   {
    "installed": true,
    "loggedIn": false,
+   "authMode": "none",
    "reason": "s484",
    "checkedAt": 485
   }

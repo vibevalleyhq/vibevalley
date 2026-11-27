@@ -3,13 +3,13 @@ import { computed, effect, keymap, signal, Text, View } from "nsh";
 import { list, t } from "@vibevalley/i18n";
 import type { AgentTemplate, RuntimeInfo, TemplateCategory } from "@vibevalley/protocol";
 
-import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
 import { AgentFace, OrchestratorFace } from "../../design/domain/Face";
 import { runtimeName } from "../../design/domain/RuntimeBadge";
 import { IconButton } from "../../design/IconButton";
 import { CountPill, Dot } from "../../design/Tag";
 import { toast } from "../../design/toasts";
+import { createAct } from "../../infra/act";
 import { sortRuntimes } from "../../infra/agents";
 import { api } from "../../infra/api";
 import { ready, useQueryClient } from "../../infra/query";

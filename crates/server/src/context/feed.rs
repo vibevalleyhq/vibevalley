@@ -65,11 +65,15 @@ pub fn encode_slice<T: Serialize>(value: &T) -> Result<Arc<str>, ApiError> {
         .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))
 }
 
-/// Lock-free dirty-slice sequence tracker and coalescing wakeup gate.
+/// Lock-free dirty-slice sequence tracker, watcherless lazy-deferral mask, and coalescing wakeup gate.
 struct SliceWakeGate {
     seq: LoomAtomicI64,
     dirty_seqs: [LoomAtomicI64; SLICE_COUNT],
     pending_mask: LoomAtomicU8,
+    /// Slices whose `mark_dirty` fired while no watcher was subscribed; projected on first `subscribe`/`flush`.
+    deferred_lazy_mask: LoomAtomicU8,
+    /// Slices explicitly demanded via `subscribe` or `flush` (bypassing watcherless skip and throttle).
+    demand_mask: LoomAtomicU8,
 }
 
 impl SliceWakeGate {
@@ -78,6 +82,8 @@ impl SliceWakeGate {
             seq: LoomAtomicI64::new(initial_seq),
             dirty_seqs: std::array::from_fn(|_| LoomAtomicI64::new(initial_seq)),
             pending_mask: LoomAtomicU8::new(0),
+            deferred_lazy_mask: LoomAtomicU8::new(0),
+            demand_mask: LoomAtomicU8::new(0),
         }
     }
 
@@ -104,12 +110,42 @@ impl SliceWakeGate {
         (seq, prev == 0)
     }
 
+    fn mark_lazy_deferred(&self, mask: u8) {
+        let mask = mask & SLICE_MASK_ALL;
+        if mask != 0 {
+            self.deferred_lazy_mask.fetch_or(mask, LoomOrdering::AcqRel);
+        }
+    }
+
+    fn request_demand(&self, mask: u8) -> bool {
+        let mask = mask & SLICE_MASK_ALL;
+        if mask == 0 {
+            return false;
+        }
+        self.deferred_lazy_mask.fetch_and(!mask, LoomOrdering::AcqRel);
+        self.demand_mask.fetch_or(mask, LoomOrdering::AcqRel);
+        let prev = self.pending_mask.fetch_or(mask, LoomOrdering::AcqRel);
+        prev == 0
+    }
+
     fn take_pending(&self) -> u8 {
         self.pending_mask.swap(0, LoomOrdering::AcqRel)
     }
 
+    fn take_demand(&self) -> u8 {
+        self.demand_mask.swap(0, LoomOrdering::AcqRel)
+    }
+
     fn pending_bits(&self) -> u8 {
         self.pending_mask.load(LoomOrdering::Acquire)
+    }
+
+    fn deferred_lazy_bits(&self) -> u8 {
+        self.deferred_lazy_mask.load(LoomOrdering::Acquire)
+    }
+
+    fn demand_bits(&self) -> u8 {
+        self.demand_mask.load(LoomOrdering::Acquire)
     }
 }
 
@@ -237,74 +273,6 @@ impl SliceFeed {
             topic: self.topic,
             rx: self.frame_tx.subscribe(),
             strip_initial_effects: self.strip_initial_effects,
-        }
-    }
-
-    /// Blocking bounded-1 watch helper for synchronous callers passing JSON `&str`.
-    pub fn watch_since_json(&self, after_seq: Option<i64>, stop: &tokio_util::sync::CancellationToken, receive: &mut dyn FnMut(i64, &str)) {
-        self.watch_since_json_with_gate(after_seq, None, stop, receive);
-    }
-
-    /// Blocking bounded-1 watch helper honoring an optional DevTools [`crate::SharedFaultGate`].
-    pub fn watch_since_json_with_gate(
-        &self,
-        after_seq: Option<i64>,
-        gate: Option<&crate::SharedFaultGate>,
-        stop: &tokio_util::sync::CancellationToken,
-        receive: &mut dyn FnMut(i64, &str),
-    ) {
-        let mut emit = |seq: i64, json: &str| {
-            if let Some(gate) = gate {
-                if gate.should_disconnect(self.topic) {
-                    return false;
-                }
-                let delay = gate.delay_ms(self.topic);
-                if delay > 0 {
-                    std::thread::sleep(Duration::from_millis(delay));
-                }
-            }
-            receive(seq, json);
-            true
-        };
-        let mut sub = self.subscribe();
-        let initial = sub.borrow_and_update(after_seq.is_none());
-        let mut seen_gen = initial.generation;
-        if after_seq != Some(initial.seq) && !stop.is_cancelled() && !emit(initial.seq, &initial.json) {
-            return;
-        }
-        let (tx, mut rx) = tokio::sync::mpsc::channel::<SliceFrame>(1);
-        let handle = vibevalley_runtime::rt::current_or_global_handle();
-        let stop_task = stop.clone();
-        handle.spawn(async move {
-            loop {
-                let changed = tokio::select! {
-                    biased;
-                    _ = stop_task.cancelled() => false,
-                    changed = sub.changed() => changed,
-                };
-                if !changed {
-                    break;
-                }
-                let frame = sub.borrow_and_update(false);
-                let sent = tokio::select! {
-                    biased;
-                    _ = stop_task.cancelled() => false,
-                    res = tx.send(frame) => res.is_ok(),
-                };
-                if !sent {
-                    break;
-                }
-            }
-        });
-        while !stop.is_cancelled() {
-            let Some(frame) = rx.blocking_recv() else { break };
-            if frame.generation == seen_gen {
-                continue;
-            }
-            seen_gen = frame.generation;
-            if !emit(frame.seq, &frame.json) {
-                return;
-            }
         }
     }
 }
@@ -511,7 +479,7 @@ impl StateFeed {
     }
 
     /// Returns all 6 pre-encoded feeds.
-    #[cfg(test)]
+    #[cfg(all(test, not(feature = "loom")))]
     fn feeds(&self) -> &SliceFeedSet {
         &self.feeds
     }
@@ -522,13 +490,36 @@ impl StateFeed {
     }
 
     /// Subscribes to pre-encoded JSON updates on `kind` via `tokio::sync::watch<Arc<str>>`.
+    /// If `kind` was dirtied while watcherless, immediately schedules an on-demand projection.
     pub fn subscribe_json(&self, kind: SliceKind) -> watch::Receiver<Arc<str>> {
-        self.feeds.get(kind).subscribe_json()
+        let rx = self.feeds.get(kind).subscribe_json();
+        self.wake_if_stale(kind);
+        rx
     }
 
     /// Subscribes to `kind` preserving `seq` and SSE `Last-Event-ID` semantics.
+    /// If `kind` was dirtied while watcherless, immediately schedules an on-demand projection.
     pub fn subscribe(&self, kind: SliceKind) -> SliceSubscription {
-        self.feeds.get(kind).subscribe()
+        let sub = self.feeds.get(kind).subscribe();
+        self.wake_if_stale(kind);
+        sub
+    }
+
+    /// Returns `true` if any slice has an unprojected dirty watermark or lazy-deferred bit.
+    pub fn has_unprojected_dirty(&self) -> bool {
+        self.gate.pending_bits() != 0
+            || self.gate.deferred_lazy_bits() != 0
+            || self.gate.demand_bits() != 0
+            || SliceKind::ALL.into_iter().any(|k| self.feed(k).seq() < self.dirty_seq(k))
+    }
+
+    fn wake_if_stale(&self, kind: SliceKind) {
+        let bit = SliceMask::from_kind(kind).bits();
+        let deferred = (self.gate.deferred_lazy_bits() & bit) != 0;
+        if deferred || self.feed(kind).seq() < self.dirty_seq(kind) {
+            self.gate.request_demand(bit);
+            self.notify.notify_one();
+        }
     }
 
     /// Subscribes to `mark_dirty` sequence bumps (wakes even if `start` hasn't run).
@@ -552,11 +543,36 @@ impl StateFeed {
         seq
     }
 
-    /// Spawns the single-flight projector worker on `task` using `projector`.
-    pub fn start<F, Fut, E>(self: &Arc<Self>, task: &TaskGroup, mut projector: F)
+    /// Spawns the single-flight projector worker on `task` using single-slice `projector`.
+    pub fn start<F, Fut, E>(self: &Arc<Self>, task: &TaskGroup, projector: F)
     where
         F: FnMut(SliceKind, i64) -> Fut + Send + 'static,
         Fut: std::future::Future<Output = Result<Arc<str>, E>> + Send + 'static,
+        E: std::fmt::Display + Send + 'static,
+    {
+        let projector = Arc::new(tokio::sync::Mutex::new(projector));
+        self.start_batch(task, move |batch| {
+            let projector = projector.clone();
+            async move {
+                let mut out = Vec::with_capacity(batch.len());
+                let mut f = projector.lock().await;
+                for (kind, seq) in batch {
+                    out.push((kind, seq, f(kind, seq).await));
+                }
+                out
+            }
+        });
+    }
+
+    /// Spawns the single-flight batch projector worker on `task`.
+    ///
+    /// Slices dirtied in the same flush cycle are delivered together to `projector` so
+    /// shared snapshots (`issues`, `sessions`) are queried from the database once per batch.
+    /// Slices with no active watcher are deferred lazily until `subscribe` or `flush`.
+    pub fn start_batch<F, Fut, E>(self: &Arc<Self>, task: &TaskGroup, mut projector: F)
+    where
+        F: FnMut(Vec<(SliceKind, i64)>) -> Fut + Send + 'static,
+        Fut: std::future::Future<Output = Vec<(SliceKind, i64, Result<Arc<str>, E>)>> + Send + 'static,
         E: std::fmt::Display + Send + 'static,
     {
         self.running.store(true, Ordering::Release);
@@ -574,7 +590,9 @@ impl StateFeed {
 
             loop {
                 let pending = this.gate.take_pending();
-                if pending == 0 {
+                let demanded = this.gate.take_demand();
+                let work = pending | demanded;
+                if work == 0 {
                     tokio::select! {
                         biased;
                         _ = cancel.cancelled() => return,
@@ -582,23 +600,47 @@ impl StateFeed {
                     }
                 }
 
-                let mut deferred = 0u8;
+                let mut ready: Vec<(SliceKind, i64)> = Vec::new();
+                let mut ready_record_throttle = 0u8;
+                let mut deferred_throttle = 0u8;
+                let mut lazy_skip = 0u8;
+
                 for kind in SliceKind::ALL {
                     let bit = SliceMask::from_kind(kind).bits();
-                    if (pending & bit) == 0 {
+                    if (work & bit) == 0 {
                         continue;
                     }
-                    if this.can_publish_leading(kind) {
-                        this.project_one(&mut projector, kind).await;
-                    } else {
-                        deferred |= bit;
+                    let is_demanded = (demanded & bit) != 0;
+                    if !is_demanded && !this.feed(kind).has_watchers() {
+                        lazy_skip |= bit;
+                        continue;
                     }
+                    let target_seq = this.dirty_seq(kind);
+                    if this.feed(kind).seq() >= target_seq {
+                        continue;
+                    }
+                    if is_demanded || this.can_publish_leading(kind) {
+                        ready.push((kind, target_seq));
+                        if !is_demanded {
+                            ready_record_throttle |= bit;
+                        }
+                    } else {
+                        deferred_throttle |= bit;
+                    }
+                }
+
+                if lazy_skip != 0 {
+                    this.gate.mark_lazy_deferred(lazy_skip);
+                }
+
+                if !ready.is_empty() {
+                    this.project_batch(&mut projector, ready, ready_record_throttle).await;
                     if cancel.is_cancelled() {
                         return;
                     }
                 }
 
-                if deferred != 0 && !this.throttle.is_zero() {
+                if deferred_throttle != 0 && !this.throttle.is_zero() {
                     let sleep = tokio::time::sleep(this.throttle);
                     tokio::pin!(sleep);
                     tokio::select! {
@@ -610,12 +652,36 @@ impl StateFeed {
                     if cancel.is_cancelled() {
                         return;
                     }
-                    let trailing = deferred | this.gate.take_pending();
+                    let trailing_pending = this.gate.take_pending();
+                    let trailing_demanded = this.gate.take_demand();
+                    let trailing = deferred_throttle | trailing_pending | trailing_demanded;
+                    let mut trailing_ready: Vec<(SliceKind, i64)> = Vec::new();
+                    let mut trailing_record_throttle = 0u8;
+                    let mut trailing_lazy = 0u8;
                     for kind in SliceKind::ALL {
                         let bit = SliceMask::from_kind(kind).bits();
-                        if (trailing & bit) != 0 {
-                            this.project_one(&mut projector, kind).await;
+                        if (trailing & bit) == 0 {
+                            continue;
                         }
+                        let is_demanded = (trailing_demanded & bit) != 0 || (deferred_throttle & bit) != 0;
+                        if !is_demanded && !this.feed(kind).has_watchers() {
+                            trailing_lazy |= bit;
+                            continue;
+                        }
+                        let target_seq = this.dirty_seq(kind);
+                        if this.feed(kind).seq() >= target_seq {
+                            continue;
+                        }
+                        trailing_ready.push((kind, target_seq));
+                        if (trailing_demanded & bit) == 0 {
+                            trailing_record_throttle |= bit;
+                        }
+                    }
+                    if trailing_lazy != 0 {
+                        this.gate.mark_lazy_deferred(trailing_lazy);
+                    }
+                    if !trailing_ready.is_empty() {
+                        this.project_batch(&mut projector, trailing_ready, trailing_record_throttle).await;
                         if cancel.is_cancelled() {
                             return;
                         }
@@ -627,25 +693,48 @@ impl StateFeed {
         });
     }
 
-    /// Wakes the projector immediately (bypassing any throttle cooldown) and waits until
-    /// all currently dirty slices are projected or the projector stops.
+    /// Wakes the projector immediately (bypassing throttle cooldown and watcherless deferral)
+    /// and waits until all currently dirty slices are projected or the projector stops.
     pub async fn flush(&self) {
         if !self.running.load(Ordering::Acquire) {
             return;
         }
         let mut cycle_rx = self.cycle_tx.subscribe();
         let _ = *cycle_rx.borrow_and_update();
+
+        let mut need_mask = self.gate.pending_bits() | self.gate.deferred_lazy_bits();
+        for kind in SliceKind::ALL {
+            if self.feed(kind).seq() < self.dirty_seq(kind) {
+                need_mask |= SliceMask::from_kind(kind).bits();
+            }
+        }
+        if need_mask != 0 {
+            self.gate.request_demand(need_mask);
+        }
         self.flush_notify.notify_one();
         self.notify.notify_one();
 
         while self.running.load(Ordering::Acquire) {
             let pending = self.gate.pending_bits();
+            let demanded = self.gate.demand_bits();
             let all_synced = SliceKind::ALL.into_iter().all(|k| self.feed(k).seq() >= self.dirty_seq(k));
-            if pending == 0 && all_synced {
+            if pending == 0 && demanded == 0 && all_synced {
                 break;
             }
             if cycle_rx.changed().await.is_err() {
                 break;
+            }
+            // Re-demand any slice dirtied or deferred while flush was waiting so `flush()` never stalls on watcherless slices.
+            let mut late_mask = self.gate.deferred_lazy_bits();
+            for kind in SliceKind::ALL {
+                if self.feed(kind).seq() < self.dirty_seq(kind) {
+                    late_mask |= SliceMask::from_kind(kind).bits();
+                }
+            }
+            if late_mask != 0 {
+                self.gate.request_demand(late_mask);
+                self.flush_notify.notify_one();
+                self.notify.notify_one();
             }
         }
     }
@@ -654,6 +743,11 @@ impl StateFeed {
         if self.throttle.is_zero() {
             return true;
         }
+        // Farm coalesces transient `GameEffect` bursts across the `STATE_EVERY_MS` window
+        // instead of draining the first effect on the leading edge.
+        if kind == SliceKind::Farm {
+            return false;
+        }
         let last = self.last_published.lock()[slice_index(kind)];
         match last {
             None => true,
@@ -661,28 +755,30 @@ impl StateFeed {
         }
     }
 
-    async fn project_one<F, Fut, E>(&self, projector: &mut F, kind: SliceKind)
+    async fn project_batch<F, Fut, E>(&self, projector: &mut F, batch: Vec<(SliceKind, i64)>, record_throttle_mask: u8)
     where
-        F: FnMut(SliceKind, i64) -> Fut + Send + 'static,
-        Fut: std::future::Future<Output = Result<Arc<str>, E>> + Send + 'static,
+        F: FnMut(Vec<(SliceKind, i64)>) -> Fut + Send + 'static,
+        Fut: std::future::Future<Output = Vec<(SliceKind, i64, Result<Arc<str>, E>)>> + Send + 'static,
         E: std::fmt::Display + Send + 'static,
     {
-        let target_seq = self.dirty_seq(kind);
-        let feed = self.feed(kind);
-        if feed.seq() >= target_seq && kind != SliceKind::Farm {
-            return;
-        }
-        match projector(kind, target_seq).await {
-            Ok(json) => {
-                if kind == SliceKind::Farm {
-                    feed.publish(target_seq, json);
-                } else {
-                    feed.publish_if_newer(target_seq, json);
+        let results = projector(batch).await;
+        let now = Instant::now();
+        for (kind, target_seq, outcome) in results {
+            let feed = self.feed(kind);
+            match outcome {
+                Ok(json) => {
+                    if kind == SliceKind::Farm {
+                        feed.publish(target_seq, json);
+                    } else {
+                        feed.publish_if_newer(target_seq, json);
+                    }
+                    if (record_throttle_mask & SliceMask::from_kind(kind).bits()) != 0 {
+                        self.last_published.lock()[slice_index(kind)] = Some(now);
+                    }
                 }
-                self.last_published.lock()[slice_index(kind)] = Some(Instant::now());
-            }
-            Err(err) => {
-                tracing::warn!(slice = kind.as_str(), seq = target_seq, error = %err, "slice.project failed");
+                Err(err) => {
+                    tracing::warn!(slice = kind.as_str(), seq = target_seq, error = %err, "slice.project failed");
+                }
             }
         }
     }
@@ -855,6 +951,62 @@ pub mod loom_models {
             assert_eq!(gate.take_pending(), 0);
         });
     }
+
+    #[test]
+    fn lazy_deferral_and_concurrent_demand_never_miss_wakeup() {
+        bounded_model(|| {
+            let gate = Arc::new(SliceWakeGate::new(0));
+            let notify = Arc::new(Notify::new());
+
+            // Producer marks slice 0 dirty (no watcher yet).
+            let (_seq, should_wake) = gate.record_commit(1 << 0);
+            if should_wake {
+                notify.notify();
+            }
+
+            // Consumer thread sees watcherless slice 0 and defers it lazily, then waits for demand.
+            let consumer = {
+                let gate = gate.clone();
+                let notify = notify.clone();
+                thread::spawn(move || {
+                    let mut projected = false;
+                    for _ in 0..4 {
+                        let pending = gate.take_pending();
+                        let demanded = gate.take_demand();
+                        let work = pending | demanded;
+                        if work == 0 {
+                            notify.wait();
+                            continue;
+                        }
+                        if (demanded & (1 << 0)) != 0 {
+                            assert!(gate.dirty_seq(0) >= 1);
+                            projected = true;
+                            break;
+                        }
+                        gate.mark_lazy_deferred(work);
+                    }
+                    projected
+                })
+            };
+
+            // Concurrent subscriber/flush thread demands slice 0.
+            let subscriber = {
+                let gate = gate.clone();
+                let notify = notify.clone();
+                thread::spawn(move || {
+                    let _ = gate.request_demand(1 << 0);
+                    notify.notify();
+                })
+            };
+
+            subscriber.join().unwrap();
+            let projected = consumer.join().unwrap();
+            assert!(
+                projected || (gate.take_demand() & (1 << 0)) != 0 || (gate.take_pending() & (1 << 0)) != 0,
+                "demanded lazy slice must either be projected or remain visibly pending"
+            );
+        });
+    }
 }
 
 #[cfg(all(test, not(feature = "loom")))]
@@ -1007,5 +1159,103 @@ mod tests {
         assert_eq!(seq6, 6);
         let parsed6: Value = serde_json::from_str(&json6).unwrap();
         assert_eq!(parsed6["effects"], json!([{ "kind": "levelUp", "level": 3 }]));
+    }
+
+    #[tokio::test]
+    async fn watcherless_slices_defer_lazily_until_subscribe_or_flush() {
+        let task = TaskGroup::new();
+        let feed = Arc::new(StateFeed::with_throttle(Duration::ZERO));
+        let batches = Arc::new(Mutex::new(Vec::<Vec<(SliceKind, i64)>>::new()));
+        let batches_c = batches.clone();
+
+        feed.start_batch(&task, move |batch| {
+            let batches = batches_c.clone();
+            async move {
+                batches.lock().push(batch.clone());
+                batch
+                    .into_iter()
+                    .map(|(k, seq)| {
+                        (
+                            k,
+                            seq,
+                            Ok::<_, String>(Arc::<str>::from(json!({ "slice": k.as_str(), "seq": seq }).to_string())),
+                        )
+                    })
+                    .collect()
+            }
+        });
+
+        // Watch only Board; Inbox, Sessions, and Farm have zero watchers.
+        let mut board_sub = feed.subscribe(SliceKind::Board);
+        assert_eq!(board_sub.borrow_and_update(true).seq, 0);
+
+        let seq = feed.mark_dirty(SliceMask::BOARD | SliceMask::SESSIONS | SliceMask::INBOX | SliceMask::FARM);
+        assert_eq!(seq, 1);
+        assert!(board_sub.changed().await);
+        assert_eq!(board_sub.borrow_and_update(false).seq, 1);
+
+        // Give projector one yield to finish cycle; watcherless slices MUST NOT have projected.
+        tokio::task::yield_now().await;
+        assert_eq!(batches.lock().len(), 1);
+        assert_eq!(batches.lock()[0], vec![(SliceKind::Board, 1)]);
+        assert_eq!(feed.feeds().session.seq(), 0);
+        assert_eq!(feed.feeds().inbox.seq(), 0);
+        assert_eq!(feed.feeds().farm.seq(), 0);
+
+        // Subscribing to Inbox triggers on-demand projection of Inbox only.
+        let mut inbox_sub = feed.subscribe(SliceKind::Inbox);
+        assert!(inbox_sub.changed().await);
+        assert_eq!(inbox_sub.borrow_and_update(false).seq, 1);
+        assert_eq!(feed.feeds().session.seq(), 0);
+        assert_eq!(feed.feeds().farm.seq(), 0);
+
+        // Explicit flush() projects the remaining dirty watcherless slices (Sessions + Farm) together in ONE batch!
+        feed.flush().await;
+        assert_eq!(feed.feeds().session.seq(), 1);
+        assert_eq!(feed.feeds().farm.seq(), 1);
+        let recorded = batches.lock().clone();
+        assert_eq!(
+            recorded.last().unwrap(),
+            &vec![(SliceKind::Sessions, 1), (SliceKind::Farm, 1)],
+            "flush must coalesce remaining dirty slices into a single shared batch"
+        );
+
+        assert!(task.shutdown(Duration::from_secs(1)).await);
+    }
+
+    #[tokio::test]
+    async fn watched_four_slice_dirty_mark_delivers_single_shared_batch() {
+        let task = TaskGroup::new();
+        let feed = Arc::new(StateFeed::with_throttle(Duration::ZERO));
+        let batches = Arc::new(Mutex::new(Vec::<Vec<(SliceKind, i64)>>::new()));
+        let batches_c = batches.clone();
+
+        feed.start_batch(&task, move |batch| {
+            let batches = batches_c.clone();
+            async move {
+                batches.lock().push(batch.clone());
+                batch
+                    .into_iter()
+                    .map(|(k, seq)| (k, seq, Ok::<_, String>(Arc::<str>::from(json!({ "seq": seq }).to_string()))))
+                    .collect()
+            }
+        });
+
+        let _w_board = feed.subscribe(SliceKind::Board);
+        let _w_sessions = feed.subscribe(SliceKind::Sessions);
+        let _w_inbox = feed.subscribe(SliceKind::Inbox);
+        let _w_farm = feed.subscribe(SliceKind::Farm);
+
+        feed.mark_dirty(SliceMask::BOARD | SliceMask::SESSIONS | SliceMask::INBOX | SliceMask::FARM);
+        feed.flush().await;
+
+        let recorded = batches.lock().clone();
+        assert_eq!(recorded.len(), 1, "all 4 dirty watched slices must be delivered in 1 batch: {recorded:?}");
+        assert_eq!(
+            recorded[0],
+            vec![(SliceKind::Board, 1), (SliceKind::Sessions, 1), (SliceKind::Inbox, 1), (SliceKind::Farm, 1),]
+        );
+
+        assert!(task.shutdown(Duration::from_secs(1)).await);
     }
 }

@@ -1,10 +1,10 @@
 //! Shared cross-domain text helpers: UTF-16 clipping, Markdown plain-text
-//! flattening, and fenced artifact view context.
+//! flattening, and fenced note view context.
 
 use std::sync::LazyLock;
 
 use regex::{Captures, Regex};
-use vibevalley_protocol::ArtifactViewContext;
+use vibevalley_protocol::NoteViewContext;
 
 fn re(pattern: &str) -> Regex {
     Regex::new(pattern).expect("a pattern")
@@ -72,7 +72,7 @@ pub fn head(s: &str, n: usize) -> String {
 }
 
 /// Formats untrusted client view state inside a fenced XML block so titles or summaries cannot break out.
-pub fn format_artifact_view_context(vc: &ArtifactViewContext) -> String {
+pub fn format_note_view_context(vc: &NoteViewContext) -> String {
     let safe_json = serde_json::to_string(vc).unwrap_or_default().replace("</", "<\\/");
-    format!("<artifact-view-context>\n{safe_json}\n</artifact-view-context>")
+    format!("<note-view-context>\n{safe_json}\n</note-view-context>")
 }

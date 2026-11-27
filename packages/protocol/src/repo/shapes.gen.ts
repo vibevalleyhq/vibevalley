@@ -1,5 +1,8 @@
 // Generated from crates/protocol/src/contract (vp run protocol:ts). Do not edit.
 
+export const GitHubAuthModeValues = ["token", "gh", "none"] as const;
+export type GitHubAuthMode = (typeof GitHubAuthModeValues)[number];
+
 export type GitHubStatus = { installed: boolean,
 /**
  * gh's version, when it says one.
@@ -9,6 +12,10 @@ version?: string, loggedIn: boolean,
  * The logged-in account, when logged in.
  */
 account?: string,
+/**
+ * Active GitHub authentication mode (`token`, `gh`, or `none`).
+ */
+authMode: GitHubAuthMode,
 /**
  * Why it is not usable, when it is not.
  */

@@ -9,6 +9,13 @@ import { z } from "zod";
 export const REVIEW_THEMES = ["light", "dark"] as const;
 export type ReviewTheme = (typeof REVIEW_THEMES)[number];
 
+export interface VdpUiBounds {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
 export interface VdpUiNode {
   readonly testId?: string | null | undefined;
   readonly role?: string | null | undefined;
@@ -16,6 +23,7 @@ export interface VdpUiNode {
   readonly route?: string | null | undefined;
   readonly source?: string | null | undefined;
   readonly pressable?: boolean | undefined;
+  readonly bounds?: VdpUiBounds | null | undefined;
   readonly children?: readonly VdpUiNode[] | null | undefined;
 }
 
@@ -105,6 +113,13 @@ export const PageMetricsSchema: z.ZodType<VdpPageMetrics> = z.object({
   lastFrameMs: z.number().nullable().optional(),
 });
 
+export const VdpUiBoundsSchema: z.ZodType<VdpUiBounds> = z.object({
+  x: z.number(),
+  y: z.number(),
+  width: z.number(),
+  height: z.number(),
+});
+
 export const UiNodeSchema: z.ZodType<VdpUiNode> = z.lazy(() =>
   z.object({
     testId: z.string().nullable().optional(),
@@ -113,6 +128,7 @@ export const UiNodeSchema: z.ZodType<VdpUiNode> = z.lazy(() =>
     route: z.string().nullable().optional(),
     source: z.string().nullable().optional(),
     pressable: z.boolean().optional(),
+    bounds: VdpUiBoundsSchema.nullable().optional(),
     children: z.array(UiNodeSchema).nullable().optional(),
   }),
 );
@@ -130,23 +146,21 @@ export const UiPressResultSchema: z.ZodType<VdpUiPressResult> = z.object({
   testId: z.string().optional(),
 });
 
-export const UiWaitForResultSchema: z.ZodType<VdpUiWaitForResult> = z.object({
-  found: z.boolean().default(false),
-  node: UiNodeSchema.nullable().optional(),
-});
+export const UiWaitForResultSchema: z.ZodType<VdpUiWaitForResult> = z
+  .object({
+    matched: z.boolean().optional(),
+    found: z.boolean().optional(),
+    node: UiNodeSchema.nullable().optional(),
+  })
+  .transform((val) => ({
+    found: val.matched ?? val.found ?? false,
+    ...(val.node !== undefined ? { node: val.node } : {}),
+  }));
 
 export const UiTreeResultSchema: z.ZodType<VdpUiTreeResult> = z.object({
   view: z.string().default("workbench"),
   route: z.string().nullable().optional(),
   nodes: z.array(UiNodeSchema).default([]),
-});
-
-export const ScreenshotSavedSchema: z.ZodType<VdpScreenshotInfo> = z.object({
-  path: z.string(),
-  mime: z.string(),
-  width: z.number(),
-  height: z.number(),
-  bytes: z.number(),
 });
 
 export const DebugEndpointFileSchema = z.object({
@@ -156,19 +170,6 @@ export const DebugEndpointFileSchema = z.object({
   wsUrl: z.string().min(1),
   token: z.string().min(1).optional(),
 });
-
-export const ServerReceiptSchema = z.object({
-  port: z.number().int().positive().optional(),
-  url: z.string().min(1).optional(),
-});
-
-export const CreatedEntitySchema = z.union([
-  z
-    .string()
-    .min(1)
-    .transform((id) => ({ id })),
-  z.object({ id: z.string().min(1) }),
-]);
 
 const WsScreenshotPayloadSchema = z.object({
   data: z.string().min(1),
@@ -207,14 +208,6 @@ export function parsePositiveInt(flag: string, raw: string): number {
   return parsed;
 }
 
-export function parsePort(raw: string): number {
-  const port = parsePositiveInt("--port", raw);
-  if (port > 65_535) {
-    throw new Error(`--port must be between 1 and 65535 (got "${raw}")`);
-  }
-  return port;
-}
-
 export function countUiTreeNodes(nodes: readonly VdpUiNode[]): number {
   let count = 0;
   for (const node of nodes) {
@@ -224,20 +217,6 @@ export function countUiTreeNodes(nodes: readonly VdpUiNode[]): number {
     }
   }
   return count;
-}
-
-export function flattenUiNodes(nodes: readonly VdpUiNode[]): VdpUiNode[] {
-  const flat: VdpUiNode[] = [];
-  const visit = (list: readonly VdpUiNode[]) => {
-    for (const node of list) {
-      flat.push(node);
-      if (node.children && node.children.length > 0) {
-        visit(node.children);
-      }
-    }
-  };
-  visit(nodes);
-  return flat;
 }
 
 export function extractShellErrors(rawState: unknown): {
@@ -296,40 +275,6 @@ export function runChecked(
   return typeof res.stdout === "string" ? res.stdout : "";
 }
 
-export function runSoft(
-  command: string,
-  args: readonly string[],
-  options: { cwd: string; env?: NodeJS.ProcessEnv; timeoutMs?: number },
-): { readonly ok: boolean; readonly stdout: string; readonly stderr: string } {
-  const res = spawnSync(command, args, {
-    cwd: options.cwd,
-    env: options.env ?? process.env,
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"],
-    timeout: options.timeoutMs ?? 20_000,
-  });
-  return {
-    ok: !res.error && res.status === 0,
-    stdout: typeof res.stdout === "string" ? res.stdout : "",
-    stderr: typeof res.stderr === "string" ? res.stderr : "",
-  };
-}
-
-export function parseJsonOutput<T>(raw: string, schema: z.ZodType<T>, label: string): T {
-  let decoded: unknown;
-  try {
-    decoded = JSON.parse(raw);
-  } catch (err) {
-    throw new Error(`failed to parse JSON from ${label}: ${raw.slice(0, 240)}`, { cause: err });
-  }
-  const parsed = schema.safeParse(decoded);
-  if (!parsed.success) {
-    const detail = parsed.error.issues.map((i) => `${i.path.join(".") || "<root>"}: ${i.message}`).join("; ");
-    throw new Error(`unexpected JSON shape from ${label} (${detail}): ${raw.slice(0, 240)}`);
-  }
-  return parsed.data;
-}
-
 export function isolatedEnv(root: string, homeDir: string, workDir: string, storeDb: string): Record<string, string> {
   const env: Record<string, string> = {};
   for (const [key, value] of Object.entries(process.env)) {
@@ -350,12 +295,6 @@ export function isolatedEnv(root: string, homeDir: string, workDir: string, stor
     VIBEVALLEY_VOICE_LINE_PORT: "0",
     VIBEVALLEY_PATROL_HEARTBEAT_MINUTES: "0",
   };
-}
-
-export function writeTempPayload(payloadDir: string, fileName: string, content: string): string {
-  const filePath = join(payloadDir, fileName);
-  writeFileSync(filePath, content, "utf8");
-  return filePath;
 }
 
 export function readValidJsonFile<T>(filePath: string, schema: z.ZodType<T>): T | null {
@@ -670,90 +609,6 @@ export function createWsVdpDriver(client: VdpWsClient): VdpDriver {
   };
 }
 
-export function createCliVdpDriver(params: {
-  readonly cliBin: string;
-  readonly root: string;
-  readonly env: NodeJS.ProcessEnv;
-  readonly targetFlags: readonly string[];
-}): VdpDriver {
-  const runDebug = (args: readonly string[], timeoutMs = 20_000): string =>
-    runChecked(params.cliBin, ["debug", ...params.targetFlags, ...args], {
-      cwd: params.root,
-      env: params.env,
-      capture: true,
-      timeoutMs,
-    });
-
-  return {
-    async navigate(route: string): Promise<void> {
-      runDebug(["navigate", route, "--json"]);
-    },
-    async resize(width: number, height: number): Promise<void> {
-      runDebug(["resize", String(width), String(height), "--json"]);
-    },
-    async setTheme(theme: ReviewTheme): Promise<void> {
-      runDebug(["theme", theme === "dark" ? "--dark" : "--light", "--json"]);
-    },
-    async getState(): Promise<unknown> {
-      return JSON.parse(runDebug(["state", "--json"]));
-    },
-    async getMetrics(): Promise<VdpPageMetrics | null> {
-      const res = runSoft(params.cliBin, ["debug", ...params.targetFlags, "call", "Page.getMetrics", "--json"], { cwd: params.root, env: params.env });
-      if (!res.ok) return null;
-      try {
-        const parsed = PageMetricsSchema.safeParse(JSON.parse(res.stdout));
-        return parsed.success ? parsed.data : null;
-      } catch {
-        return null;
-      }
-    },
-    async uiQuery(query): Promise<VdpUiQueryResult> {
-      const payload: Record<string, string> = {};
-      if (query.testId !== undefined) payload.testId = query.testId;
-      if (query.text !== undefined) payload.text = query.text;
-      if (query.role !== undefined) payload.role = query.role;
-      if (query.view !== undefined) payload.view = query.view;
-      return parseJsonOutput(runDebug(["call", "UI.query", JSON.stringify(payload), "--json"]), UiQueryResultSchema, "UI.query");
-    },
-    async uiPress(testId: string, view?: string): Promise<VdpUiPressResult> {
-      const payload: Record<string, string> = { testId };
-      if (view !== undefined) payload.view = view;
-      return parseJsonOutput(runDebug(["call", "UI.press", JSON.stringify(payload), "--json"]), UiPressResultSchema, `UI.press(${testId})`);
-    },
-    async uiWaitFor(wait): Promise<VdpUiWaitForResult> {
-      const args = ["ui-wait"];
-      if (wait.testId !== undefined) args.push("--test-id", wait.testId);
-      if (wait.text !== undefined) args.push("--text", wait.text);
-      if (wait.view !== undefined) args.push("--view", wait.view);
-      args.push("--timeout-ms", String(wait.timeoutMs ?? 4_000), "--json");
-      const res = runSoft(params.cliBin, ["debug", ...params.targetFlags, ...args], {
-        cwd: params.root,
-        env: params.env,
-        timeoutMs: (wait.timeoutMs ?? 4_000) + 4_000,
-      });
-      if (!res.ok) return { found: false };
-      try {
-        return parseJsonOutput(res.stdout, UiWaitForResultSchema, "UI.waitFor");
-      } catch {
-        return { found: false };
-      }
-    },
-    async uiGetTree(view = "workbench", maxDepth = 10): Promise<VdpUiTreeResult> {
-      return parseJsonOutput(runDebug(["ui-tree", "--view", view, "--max-depth", String(maxDepth), "--json"]), UiTreeResultSchema, "UI.getTree");
-    },
-    async captureScreenshot(outPath: string, target: "shell" | "webview" = "shell"): Promise<VdpScreenshotInfo> {
-      return parseJsonOutput(
-        runDebug(["screenshot", outPath, "--target", target, "--json"], 25_000),
-        ScreenshotSavedSchema,
-        `Page.captureScreenshot(${basename(outPath)})`,
-      );
-    },
-    async settle(ms: number): Promise<void> {
-      await sleep(ms);
-    },
-  };
-}
-
 export async function captureVdpScreenshot(
   driver: VdpDriver,
   shotsDir: string,
@@ -780,7 +635,6 @@ export async function captureVdpScreenshot(
 export interface VdpWorkspacePaths {
   readonly root: string;
   readonly macBin: string;
-  readonly cliBin: string;
   readonly uiBundle: string;
   readonly uiShellBundle: string;
   readonly nshBin: string;
@@ -791,70 +645,29 @@ export function resolveVdpWorkspacePaths(root: string): VdpWorkspacePaths {
   return {
     root,
     macBin: resolve(targetDir, "debug/vibevalley-mac"),
-    cliBin: resolve(targetDir, "debug/vibevalley"),
     uiBundle: resolve(root, "apps/mac/ui/build/bundle.nshc"),
     uiShellBundle: resolve(root, "apps/mac/ui/build-shell/bundle.nshc"),
     nshBin: resolve(root, ".tools/bin/nsh"),
   };
 }
 
-export function ensureVdpArtifactsBuilt(paths: VdpWorkspacePaths, opts: { readonly skipBuild: boolean; readonly cliOnly?: boolean }): void {
-  if (!opts.skipBuild || !existsSync(paths.cliBin)) {
-    runChecked("cargo", ["build", "-p", "vibevalley-cli"], { cwd: paths.root, timeoutMs: 300_000 });
-  }
-  if (opts.cliOnly === true) return;
-  if (!opts.skipBuild || !existsSync(paths.uiBundle) || !existsSync(paths.uiShellBundle)) {
-    runChecked(paths.nshBin, ["build", "App.tsx", "-o", "build"], { cwd: resolve(paths.root, "apps/mac/ui"), timeoutMs: 180_000 });
-    runChecked(paths.nshBin, ["build", "ShellApp.tsx", "-o", "build-shell"], { cwd: resolve(paths.root, "apps/mac/ui"), timeoutMs: 180_000 });
-  }
-  if (!opts.skipBuild || !existsSync(paths.macBin)) {
-    runChecked("cargo", ["build", "-p", "vibevalley-mac", "--features", "shot"], { cwd: paths.root, timeoutMs: 600_000 });
-  }
+export function ensureUiBundlesBuilt(paths: VdpWorkspacePaths): void {
+  const uiDir = resolve(paths.root, "apps/mac/ui");
+  runChecked(paths.nshBin, ["build", "App.tsx", "-o", "build"], { cwd: uiDir, timeoutMs: 180_000 });
+  runChecked(paths.nshBin, ["build", "ShellApp.tsx", "-o", "build-shell"], { cwd: uiDir, timeoutMs: 180_000 });
 }
 
-export async function waitForSandboxReady(params: {
-  readonly homeDir: string;
-  readonly cliBin: string;
-  readonly root: string;
-  readonly cliEnv: NodeJS.ProcessEnv;
-  readonly appExited: () => number | null;
-  readonly logPath: string;
-  readonly requireWorkbenchReady?: boolean;
-}): Promise<void> {
-  const debugJsonPath = join(params.homeDir, "debug.json");
-  const serverJsonPath = join(params.homeDir, "server.json");
-  const deadline = Date.now() + 60_000;
+export function resolveVdpCargoBuildArgs(): string[] {
+  return ["build", "-p", "vibevalley-mac", "--features", "vibevalley-mac/shot"];
+}
 
-  while (Date.now() < deadline) {
-    const code = params.appExited();
-    if (code !== null) {
-      throw new Error(`vibevalley-mac exited early with code ${code} (see ${params.logPath})`);
-    }
-    const debugInfo = readValidJsonFile(debugJsonPath, DebugEndpointFileSchema);
-    const serverInfo = readValidJsonFile(serverJsonPath, ServerReceiptSchema);
-    if (debugInfo && serverInfo) {
-      const stateRes = runSoft(params.cliBin, ["debug", "--home", params.homeDir, "state", "--json"], {
-        cwd: params.root,
-        env: params.cliEnv,
-        timeoutMs: 10_000,
-      });
-      if (stateRes.ok) {
-        try {
-          const raw: unknown = JSON.parse(stateRes.stdout);
-          if (params.requireWorkbenchReady === true) {
-            const parsed = ShellStateSchema.safeParse(raw);
-            if (parsed.success && parsed.data.loaded && parsed.data.workbench?.ready === true) return;
-          } else if (extractShellErrors(raw).loaded) {
-            return;
-          }
-        } catch {
-          // Retry while shell finishes hydrating its initial state snapshot.
-        }
-      }
-    }
-    await sleep(150);
+export function ensureVdpArtifactsBuilt(paths: VdpWorkspacePaths, opts: { readonly skipBuild: boolean }): void {
+  if (!opts.skipBuild || !existsSync(paths.uiBundle) || !existsSync(paths.uiShellBundle)) {
+    ensureUiBundlesBuilt(paths);
   }
-  throw new Error(`timed out waiting for VDP readiness in ${params.homeDir} (see ${params.logPath})`);
+  if (!opts.skipBuild || !existsSync(paths.macBin)) {
+    runChecked("cargo", resolveVdpCargoBuildArgs(), { cwd: paths.root, timeoutMs: 600_000 });
+  }
 }
 
 function signalGroup(pid: number | undefined, sig: "SIGTERM" | "SIGKILL"): boolean {
@@ -881,7 +694,40 @@ function groupAlive(pid: number | undefined): boolean {
   }
 }
 
-export async function withVdpSandbox<T>(
+export async function waitForVdpWorkbenchWs(
+  client: VdpWsClient,
+  opts: {
+    readonly homeDir: string;
+    readonly logPath: string;
+    readonly appExited?: () => number | null;
+    readonly requireWorkbenchReady?: boolean;
+    readonly timeoutMs?: number;
+  },
+): Promise<void> {
+  const deadline = Date.now() + (opts.timeoutMs ?? 60_000);
+  while (Date.now() < deadline) {
+    const code = opts.appExited?.();
+    if (code !== null && code !== undefined) {
+      throw new Error(`vibevalley-mac exited early with code ${code} (see ${opts.logPath})`);
+    }
+    try {
+      const raw = await client.call("Shell.getState", {}, { timeoutMs: 5_000 });
+      if (opts.requireWorkbenchReady === true) {
+        const parsed = ShellStateSchema.safeParse(raw);
+        if (parsed.success && parsed.data.loaded && parsed.data.workbench?.ready === true) return;
+      } else if (extractShellErrors(raw).loaded) {
+        return;
+      }
+    } catch {
+      // Retry while shell finishes hydrating its initial state snapshot.
+    }
+    await sleep(120);
+  }
+  throw new Error(`timed out waiting for VDP workbench readiness in ${opts.homeDir} (see ${opts.logPath})`);
+}
+
+/** Spawns an isolated `vibevalley-mac` sandbox and connects a single persistent `VdpWsClient` without spawning CLI helpers. */
+export async function withVdpWsSandbox<T>(
   options: {
     readonly prefix: string;
     readonly logTag: string;
@@ -894,10 +740,14 @@ export async function withVdpSandbox<T>(
     readonly homeDir: string;
     readonly workDir: string;
     readonly payloadDir: string;
-    readonly cliEnv: Record<string, string>;
+    readonly appEnv: Record<string, string>;
+    readonly client: VdpWsClient;
     readonly driver: VdpDriver;
   }) => Promise<T>,
 ): Promise<T> {
+  if (!existsSync(options.paths.macBin)) {
+    throw new Error(`missing desktop binary at ${options.paths.macBin} (build vibevalley-mac --features shot first)`);
+  }
   const sandboxDir = mkdtempSync(join(tmpdir(), options.prefix));
   const homeDir = join(sandboxDir, "home");
   const workDir = join(sandboxDir, "work");
@@ -906,14 +756,14 @@ export async function withVdpSandbox<T>(
   const sandboxLogPath = join(sandboxDir, "app.log");
   const outLogPath = resolve(options.outDir, "app.log");
   for (const dir of [homeDir, workDir, payloadDir]) mkdirSync(dir, { recursive: true });
+  mkdirSync(options.outDir, { recursive: true });
 
   const appEnv = isolatedEnv(options.paths.root, homeDir, workDir, storeDb);
-  const cliEnv: Record<string, string> = { ...appEnv, VIBEVALLEY_HOME: homeDir };
-
   const logFd = openSync(sandboxLogPath, "w");
   let child: ChildProcess | undefined;
   let exitCode: number | null = null;
   let exitedPromise: Promise<number> = Promise.resolve(0);
+  let client: VdpWsClient | undefined;
 
   const onSignal = () => {
     signalGroup(child?.pid, "SIGTERM");
@@ -941,25 +791,33 @@ export async function withVdpSandbox<T>(
       });
     });
 
-    await waitForSandboxReady({
+    const endpoint = await waitForVdpEndpoint({
       homeDir,
-      cliBin: options.paths.cliBin,
-      root: options.paths.root,
-      cliEnv,
+      ...(child.pid !== undefined ? { expectedPid: child.pid } : {}),
+      timeoutMs: 30_000,
       appExited: () => exitCode,
       logPath: sandboxLogPath,
+    });
+    client = await VdpWsClient.connect(endpoint, 10_000);
+    await waitForVdpWorkbenchWs(client, {
+      homeDir,
+      logPath: sandboxLogPath,
+      appExited: () => exitCode,
       ...(options.requireWorkbenchReady !== undefined ? { requireWorkbenchReady: options.requireWorkbenchReady } : {}),
     });
 
-    const driver = createCliVdpDriver({ cliBin: options.paths.cliBin, root: options.paths.root, env: cliEnv, targetFlags: ["--home", homeDir] });
-    const result = await fn({ homeDir, workDir, payloadDir, cliEnv, driver });
+    const driver = createWsVdpDriver(client);
+    const result = await fn({ homeDir, workDir, payloadDir, appEnv, client, driver });
 
-    runSoft(options.paths.cliBin, ["debug", "--home", homeDir, "key", "cmd-q", "--json"], {
-      cwd: options.paths.root,
-      env: cliEnv,
-      timeoutMs: 8_000,
-    });
-    const quitDeadline = Date.now() + 6_000;
+    try {
+      await client.call("Shell.quit", {}, { timeoutMs: 2_000 });
+    } catch {
+      // Shutdown cleanup proceeds to signal termination if Shell.quit disconnects immediately.
+    }
+    client.close();
+    client = undefined;
+
+    const quitDeadline = Date.now() + 5_000;
     while (exitCode === null && Date.now() < quitDeadline) {
       await sleep(100);
     }
@@ -968,10 +826,11 @@ export async function withVdpSandbox<T>(
   } finally {
     process.off("SIGINT", onSignal);
     process.off("SIGTERM", onSignal);
+    client?.close();
 
     if (child && exitCode === null) {
       signalGroup(child.pid, "SIGTERM");
-      const termDeadline = Date.now() + 6_000;
+      const termDeadline = Date.now() + 5_000;
       while (groupAlive(child.pid) && Date.now() < termDeadline) {
         await sleep(100);
       }

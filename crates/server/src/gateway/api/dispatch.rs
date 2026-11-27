@@ -18,43 +18,16 @@ pub trait ClientRpc: Send + Sync {
     fn subscribe(&self, id: &str, name: &str, payload: Value);
 }
 
-/// What the server provides to views and transports.
+/// What the server provides to views and transports (async-first).
 pub trait Server: Send + Sync + 'static {
-    /// One endpoint by name (`issue.status.update`, ...). Blocking; never
-    /// called on the UI thread.
-    fn call(&self, op: &str, payload: Value) -> Envelope;
-    /// Endpoint invocation carrying caller identity, principal, and trace id.
-    fn call_with(&self, ctx: &CallerContext, op: &str, payload: Value) -> Envelope {
-        let _ = ctx;
-        self.call(op, payload)
-    }
     /// Asynchronous endpoint invocation carrying caller identity, principal, and trace id.
-    fn call_with_async(self: Arc<Self>, ctx: CallerContext, op: String, payload: Value) -> BoxFuture<'static, Envelope> {
-        Box::pin(async move {
-            match crate::log::spawn_blocking_traced(move || self.call_with(&ctx, &op, payload)).await {
-                Ok(env) => env,
-                Err(e) => refusal(BizCode::InternalError, e.to_string()),
-            }
-        })
-    }
-    /// Current JSON snapshot for one domain slice.
-    fn slice_snapshot(&self, slice: SliceKind) -> Value;
-    /// Current pre-encoded UTF-8 JSON snapshot for one domain slice.
-    fn slice_snapshot_json(&self, slice: SliceKind) -> Arc<str> {
-        Arc::<str>::from(serde_json::to_string(&self.slice_snapshot(slice)).unwrap_or_else(|_| "null".into()))
-    }
+    fn call_with_async(self: Arc<Self>, ctx: CallerContext, op: String, payload: Value) -> BoxFuture<'static, Envelope>;
+    /// Cached pre-encoded UTF-8 JSON snapshot for one domain slice (O(1) non-blocking read).
+    fn slice_snapshot_json(&self, slice: SliceKind) -> Arc<str>;
     /// Asynchronous pre-encoded UTF-8 JSON snapshot for one domain slice.
     fn slice_snapshot_json_async(self: Arc<Self>, slice: SliceKind) -> BoxFuture<'static, Arc<str>> {
-        Box::pin(async move {
-            crate::log::spawn_blocking_traced(move || self.slice_snapshot_json(slice))
-                .await
-                .unwrap_or_else(|_| Arc::<str>::from("null"))
-        })
+        Box::pin(async move { self.slice_snapshot_json(slice) })
     }
-    /// Watches one domain slice with Bounded-1 coalescing.
-    /// If `after_seq == Some(latest_seq)`, skips the initial send; otherwise
-    /// delivers the latest snapshot immediately. Blocks until `stop` cancels.
-    fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &tokio_util::sync::CancellationToken, receive: &mut dyn FnMut(i64, &Value));
     /// Optional asynchronous readiness hook for proxies that finish startup
     /// off-thread (such as desktop `LateServer`). Returning `None` indicates
     /// the server is immediately ready for [`Self::subscribe_slice`] and
@@ -69,28 +42,18 @@ pub trait Server: Send + Sync + 'static {
     }
     /// Asynchronous `tokio::sync::watch` subscription for a domain slice.
     fn subscribe_slice_async(self: Arc<Self>, slice: SliceKind) -> BoxFuture<'static, Option<crate::context::SliceSubscription>> {
-        Box::pin(async move { crate::log::spawn_blocking_traced(move || self.subscribe_slice(slice)).await.ok().flatten() })
+        Box::pin(async move { self.subscribe_slice(slice) })
     }
     /// Current fault-injection gate, if attached.
     fn fault_gate(&self) -> Option<SharedFaultGate> {
         None
     }
-    /// `LiveEvent`s from now on; a new receiver per call.
-    fn live(&self) -> tokio::sync::mpsc::UnboundedReceiver<LiveEvent>;
+    /// `LiveEvent`s from now on; a new bounded receiver per call.
+    fn live(&self) -> tokio::sync::mpsc::Receiver<LiveEvent>;
     /// Broadcast subscription for `LiveEvent`s when backed by a broadcast ring
     /// buffer, allowing SSE and bridge consumers to stream directly.
     fn subscribe_live(&self) -> Option<tokio::sync::broadcast::Receiver<LiveEvent>> {
         None
-    }
-    /// One of `api.ts`'s subscriptions. `Err` is a refusal before the first
-    /// event. The stream ends when the server drops its sender.
-    #[allow(clippy::result_large_err, reason = "the approved contract returns the refusal envelope itself")]
-    fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope>;
-    /// Subscription invocation carrying caller identity and principal for `can` RBAC enforcement.
-    #[allow(clippy::result_large_err, reason = "the approved contract returns the refusal envelope itself")]
-    fn subscribe_with(&self, ctx: &CallerContext, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
-        let _ = ctx;
-        self.subscribe(name, payload)
     }
     /// Asynchronous subscription invocation carrying caller identity and principal for `can` RBAC enforcement.
     #[allow(clippy::result_large_err, reason = "the approved contract returns the refusal envelope itself")]
@@ -99,34 +62,7 @@ pub trait Server: Send + Sync + 'static {
         ctx: CallerContext,
         name: String,
         payload: Value,
-    ) -> BoxFuture<'static, Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope>> {
-        use std::sync::atomic::{AtomicBool, Ordering};
-        Box::pin(async move {
-            struct CancelFlag(Arc<AtomicBool>);
-            impl Drop for CancelFlag {
-                fn drop(&mut self) {
-                    self.0.store(true, Ordering::Release);
-                }
-            }
-            let cancelled = Arc::new(AtomicBool::new(false));
-            let guard = CancelFlag(cancelled.clone());
-            let result = crate::log::spawn_blocking_traced(move || {
-                let opened = self.subscribe_with(&ctx, &name, payload);
-                if cancelled.load(Ordering::Acquire)
-                    && let Ok((id, _)) = &opened
-                {
-                    self.unsubscribe(*id);
-                }
-                opened
-            })
-            .await;
-            std::mem::forget(guard);
-            match result {
-                Ok(res) => res,
-                Err(e) => Err(refusal(BizCode::InternalError, e.to_string())),
-            }
-        })
-    }
+    ) -> BoxFuture<'static, Result<(u64, tokio::sync::mpsc::Receiver<Value>), Envelope>>;
     fn unsubscribe(&self, id: u64);
     /// Non-RPC stream and protocol ports (`mcp`, `remote`, `machine`, `media_input`, `voice`, `speech`).
     fn ports(&self) -> GatewayPorts {
@@ -269,7 +205,7 @@ pub(crate) async fn open_subscription_channel<F, Fut>(
     name: &str,
     payload: Value,
     open_domain: F,
-) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope>
+) -> Result<(u64, tokio::sync::mpsc::Receiver<Value>), Envelope>
 where
     F: FnOnce(DomainSubscription, crate::context::Sink) -> Fut,
     Fut: std::future::Future<Output = Result<(), ApiError>>,
@@ -289,17 +225,16 @@ where
     let domain_sub = match spec.name {
         "channel.follow" => sub!(ChannelFollow),
         "channel.reports" => sub!(ChannelReports),
-        "artifact.follow" => sub!(ArtifactFollow),
-        "artifact.suggestion.follow" => sub!(ArtifactSuggestionFollow),
-        "artifact.presence.follow" => sub!(ArtifactPresenceFollow),
+        "note.follow" => sub!(NoteFollow),
+        "note.suggestion.follow" => sub!(NoteSuggestionFollow),
+        "note.presence.follow" => sub!(NotePresenceFollow),
         "session.watch" => sub!(SessionWatch),
         "issue.watch" => sub!(IssueWatch),
         other => return Err(refusal(BizCode::RouteNotFound, format!("no subscription {other}"))),
     };
-    let (events, rx) = tokio::sync::mpsc::unbounded_channel();
     let stop = tokio_util::sync::CancellationToken::new();
     let id = gw.subs.next_id.fetch_add(1, Ordering::Relaxed);
-    let sink = crate::context::Sink { events, stop: stop.clone() };
+    let (sink, rx) = crate::context::Sink::with_default_capacity(stop.clone());
     if let Err(err) = open_domain(domain_sub, sink).await {
         return Err(Envelope::failure(&err));
     }
@@ -307,25 +242,6 @@ where
     active.insert(id, stop);
     gw.subs.count.store(active.len(), Ordering::Release);
     Ok((id, rx))
-}
-
-pub(crate) fn slice_snapshot_value(ctx: &crate::context::Context, slice: SliceKind) -> Value {
-    serde_json::from_str(&ctx.feed.snapshot_json(slice)).unwrap_or(Value::Null)
-}
-
-pub(crate) fn watch_slice_value(
-    ctx: &crate::context::Context,
-    fault_gate: Option<&SharedFaultGate>,
-    slice: SliceKind,
-    after_seq: Option<i64>,
-    stop: &tokio_util::sync::CancellationToken,
-    receive: &mut dyn FnMut(i64, &Value),
-) {
-    ctx.feed.feed(slice).watch_since_json_with_gate(after_seq, fault_gate, stop, &mut |seq, json| {
-        if let Ok(v) = serde_json::from_str::<Value>(json) {
-            receive(seq, &v);
-        }
-    });
 }
 
 pub(crate) async fn flush_and_snapshot_json(ctx: Arc<crate::context::Context>, slice: SliceKind) -> Arc<str> {
@@ -340,18 +256,6 @@ pub(crate) async fn flush_and_subscribe_slice(ctx: Arc<crate::context::Context>,
         ctx.feed.flush().await;
     }
     Some(ctx.feed.subscribe(slice))
-}
-
-pub(crate) fn invoke_server_op<O: vibevalley_protocol::Op>(server: &dyn Server, ctx: &CallerContext, input: O::Input) -> Result<O::Result, ApiError>
-where
-    O::Result: serde::de::DeserializeOwned,
-{
-    let p = serde_json::to_value(input).map_err(|e| ApiError::new(BizCode::InvalidInput, e.to_string()))?;
-    let env = server.call_with(ctx, O::NAME, p);
-    if let Some(err) = env.error() {
-        return Err(err);
-    }
-    serde_json::from_value(env.data.unwrap_or(Value::Null)).map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))
 }
 
 #[derive(Default)]

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { ARTIFACT_TYPES } from "@vibevalley/protocol";
+import { NOTE_TYPES } from "@vibevalley/protocol";
 
-import { artifactTypeParityProblems, glyphLabelProblems, ZH_ASCII_ALLOWLIST, zhUntranslatedProblems } from "./i18n.ts";
+import { glyphLabelProblems, noteTypeParityProblems, ZH_ASCII_ALLOWLIST, zhUntranslatedProblems } from "./i18n.ts";
 
 describe("i18n glyph label anti-regression check", () => {
   it("flags leading and trailing glyph icon substitutes in web.* catalogs", () => {
@@ -30,44 +30,44 @@ describe("i18n glyph label anti-regression check", () => {
       ["web.issue.issue.changes", "{branch} → {base} · {commits} commits · +{added} -{removed}"],
       ["web.media.dimensions", "{w} × {h} px"],
       ["web.setting.hint", "Adjust with ⌘+ / ⌘-"],
-      ["server.artifact.note", 'Changed: "{old}" → "{new}"'],
+      ["server.note.note", 'Changed: "{old}" → "{new}"'],
     ]);
     expect(glyphLabelProblems("en", entries)).toEqual([]);
   });
 });
 
-describe("i18n zh non-acronym ASCII and ArtifactType parity guards", () => {
+describe("i18n zh non-acronym ASCII and NoteType parity guards", () => {
   it("flags non-whitelisted untranslated ASCII/English entries in zh while allowing whitelisted unit templates", () => {
     const zh = new Map<string, string>([
-      ["web.artifact.types.sheet", "Sheet"],
+      ["web.note.types.base", "Base"],
       ["web.audio.metadataRate", "{value} Hz"],
       ["web.audio.customRate", "{value} kHz"],
-      ["web.artifact.types.docs", "协作文档"],
+      ["web.note.types.doc", "块文档"],
       ["shared.join.labeled", "{label}：{text}"],
     ]);
     const en = new Map<string, string>([
-      ["web.artifact.types.sheet", "Sheet"],
+      ["web.note.types.base", "Base"],
       ["web.audio.metadataRate", "{value} Hz"],
       ["web.audio.customRate", "{value} kHz"],
-      ["web.artifact.types.docs", "Document"],
+      ["web.note.types.doc", "Block Doc"],
       ["shared.join.labeled", "{label}: {text}"],
     ]);
 
     expect(ZH_ASCII_ALLOWLIST.has("web.audio.metadataRate")).toBe(true);
     const problems = zhUntranslatedProblems(zh, en);
     expect(problems).toHaveLength(2);
-    expect(problems[0]).toContain("web.artifact.types.sheet");
+    expect(problems[0]).toContain("web.note.types.base");
     expect(problems[1]).toContain("web.audio.customRate");
   });
 
-  it("asserts web.artifact.types.* parity against all 12 ARTIFACT_TYPES", () => {
-    expect(ARTIFACT_TYPES).toHaveLength(12);
+  it("asserts web.note.types.* parity against all 4 NOTE_TYPES", () => {
+    expect(NOTE_TYPES).toHaveLength(4);
     const partial = new Map<string, string>([
-      ["web.artifact.types.docs", "协作文档"],
-      ["web.artifact.types.designSystem", "设计体系"],
+      ["web.note.types.doc", "块文档"],
+      ["web.note.types.base", "多维库"],
     ]);
-    const problems = artifactTypeParityProblems("zh", partial);
-    expect(problems).toHaveLength(10);
-    expect(problems.some((p) => p.includes("web.artifact.types.storyboard"))).toBe(true);
+    const problems = noteTypeParityProblems("zh", partial);
+    expect(problems).toHaveLength(2);
+    expect(problems.some((p) => p.includes("web.note.types.media"))).toBe(true);
   });
 });

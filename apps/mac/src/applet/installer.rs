@@ -1,4 +1,4 @@
-//! Pure-Rust macOS `.app` bundle and `.icns` icon generator for artifact applets.
+//! Pure-Rust macOS `.app` bundle and `.icns` icon generator for note applets.
 
 use std::collections::HashMap;
 use std::ffi::OsStr;
@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use image::{ImageEncoder as _, Rgba, RgbaImage};
-use vibevalley_protocol::ArtifactType;
+use vibevalley_protocol::NoteType;
 
 use super::{AppletInfo, AppletInstallRequest, AppletOpenResult, AppletRemoveResult, apps_dir};
 
@@ -17,10 +17,10 @@ const ICON_FILE_NAME: &str = "AppIcon.icns";
 const LSREGISTER_PATH: &str = "/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister";
 const ICON_SIZE: u32 = 512;
 
-pub fn bundle_id_for(artifact_id: &str) -> String {
-    let mut sanitized = String::with_capacity(artifact_id.len());
+pub fn bundle_id_for(note_id: &str) -> String {
+    let mut sanitized = String::with_capacity(note_id.len());
     let mut prev_dash = false;
-    for ch in artifact_id.chars() {
+    for ch in note_id.chars() {
         if ch.is_ascii_alphanumeric() {
             sanitized.push(ch.to_ascii_lowercase());
             prev_dash = false;
@@ -102,66 +102,26 @@ struct TilePalette {
     emblem: [u8; 3],
 }
 
-fn palette_for(artifact_type: &str) -> TilePalette {
-    match ArtifactType::parse(artifact_type) {
-        Some(ArtifactType::Docs) => TilePalette {
+fn palette_for(note_type: &str) -> TilePalette {
+    match NoteType::parse(note_type) {
+        Some(NoteType::Doc) => TilePalette {
             top: [76, 132, 232],
             bottom: [45, 92, 188],
             emblem: [255, 255, 255],
         },
-        Some(ArtifactType::Outline) => TilePalette {
-            top: [100, 146, 212],
-            bottom: [62, 102, 168],
-            emblem: [255, 255, 255],
-        },
-        Some(ArtifactType::Slides) => TilePalette {
-            top: [232, 118, 66],
-            bottom: [188, 76, 36],
-            emblem: [255, 255, 255],
-        },
-        Some(ArtifactType::Dashboard) => TilePalette {
-            top: [44, 168, 134],
-            bottom: [24, 124, 96],
-            emblem: [255, 255, 255],
-        },
-        Some(ArtifactType::Motion) => TilePalette {
-            top: [168, 92, 224],
-            bottom: [118, 52, 178],
-            emblem: [255, 255, 255],
-        },
-        Some(ArtifactType::Whiteboard) => TilePalette {
-            top: [234, 168, 52],
-            bottom: [188, 122, 24],
-            emblem: [255, 255, 255],
-        },
-        Some(ArtifactType::Design) => TilePalette {
-            top: [224, 78, 134],
-            bottom: [176, 42, 94],
-            emblem: [255, 255, 255],
-        },
-        Some(ArtifactType::DesignSystem) => TilePalette {
-            top: [124, 106, 228],
-            bottom: [82, 66, 184],
-            emblem: [255, 255, 255],
-        },
-        Some(ArtifactType::Sheet) => TilePalette {
+        Some(NoteType::Base) => TilePalette {
             top: [54, 162, 86],
             bottom: [32, 118, 58],
             emblem: [255, 255, 255],
         },
-        Some(ArtifactType::Prototype) => TilePalette {
-            top: [52, 174, 214],
-            bottom: [26, 128, 168],
+        Some(NoteType::Canvas) => TilePalette {
+            top: [234, 168, 52],
+            bottom: [188, 122, 24],
             emblem: [255, 255, 255],
         },
-        Some(ArtifactType::Diagram) => TilePalette {
-            top: [72, 152, 184],
-            bottom: [42, 108, 140],
-            emblem: [255, 255, 255],
-        },
-        Some(ArtifactType::Storyboard) => TilePalette {
-            top: [212, 98, 92],
-            bottom: [164, 58, 54],
+        Some(NoteType::Media) => TilePalette {
+            top: [168, 92, 224],
+            bottom: [118, 52, 178],
             emblem: [255, 255, 255],
         },
         None => TilePalette {
@@ -191,7 +151,7 @@ fn blend(dst: &mut [u8; 4], src: [u8; 3], alpha: f32) {
     dst[2] = (dst[2] as f32 * inv + src[2] as f32 * a).round() as u8;
 }
 
-fn emblem_coverage(artifact_type: &str, nx: f32, ny: f32) -> f32 {
+fn emblem_coverage(note_type: &str, nx: f32, ny: f32) -> f32 {
     let in_rect = |x0: f32, y0: f32, x1: f32, y1: f32, r: f32| -> bool {
         let cx = (x0 + x1) * 0.5;
         let cy = (y0 + y1) * 0.5;
@@ -203,62 +163,25 @@ fn emblem_coverage(artifact_type: &str, nx: f32, ny: f32) -> f32 {
     };
     let in_circle = |cx: f32, cy: f32, r: f32| -> bool { ((nx - cx).powi(2) + (ny - cy).powi(2)).sqrt() <= r };
 
-    let hit = match ArtifactType::parse(artifact_type) {
-        Some(ArtifactType::Docs) => {
-            in_rect(-0.34, -0.34, 0.34, -0.22, 0.05) || in_rect(-0.34, -0.06, 0.34, 0.06, 0.05) || in_rect(-0.34, 0.22, 0.14, 0.34, 0.05)
-        }
-        Some(ArtifactType::Outline) => {
-            in_circle(-0.32, -0.26, 0.07)
-                || in_rect(-0.16, -0.31, 0.36, -0.21, 0.04)
-                || in_circle(-0.20, 0.0, 0.07)
-                || in_rect(-0.04, -0.05, 0.36, 0.05, 0.04)
-                || in_circle(-0.20, 0.26, 0.07)
-                || in_rect(-0.04, 0.21, 0.30, 0.31, 0.04)
-        }
-        Some(ArtifactType::Slides) => {
-            (in_rect(-0.40, -0.28, 0.40, 0.28, 0.06) && !in_rect(-0.31, -0.19, 0.31, 0.19, 0.02)) || in_rect(-0.16, -0.06, 0.16, 0.06, 0.02)
-        }
-        Some(ArtifactType::Dashboard) => {
-            in_rect(-0.36, 0.04, -0.16, 0.34, 0.04) || in_rect(-0.10, -0.22, 0.10, 0.34, 0.04) || in_rect(0.16, -0.36, 0.36, 0.34, 0.04)
-        }
-        Some(ArtifactType::Motion) => {
-            // Right-pointing play triangle centered inside tile.
-            (-0.24..=0.34).contains(&nx) && ny.abs() <= (0.34 - nx) * 0.62
-        }
-        Some(ArtifactType::Whiteboard) => in_rect(-0.36, -0.32, 0.06, 0.06, 0.05) || in_rect(-0.04, -0.04, 0.36, 0.34, 0.05),
-        Some(ArtifactType::Design) => in_circle(0.0, 0.0, 0.36) && !in_circle(0.0, 0.0, 0.18) || in_circle(0.0, 0.0, 0.09),
-        Some(ArtifactType::DesignSystem) => {
-            in_rect(-0.34, -0.34, -0.04, -0.04, 0.06)
-                || in_rect(0.04, -0.34, 0.34, -0.04, 0.06)
-                || in_rect(-0.34, 0.04, -0.04, 0.34, 0.06)
-                || in_circle(0.19, 0.19, 0.15)
-        }
-        Some(ArtifactType::Sheet) => {
+    let hit = match NoteType::parse(note_type) {
+        Some(NoteType::Doc) => in_rect(-0.34, -0.34, 0.34, -0.22, 0.05) || in_rect(-0.34, -0.06, 0.34, 0.06, 0.05) || in_rect(-0.34, 0.22, 0.14, 0.34, 0.05),
+        Some(NoteType::Base) => {
             in_rect(-0.36, -0.34, 0.36, -0.16, 0.04)
                 || in_rect(-0.36, -0.08, -0.04, 0.10, 0.03)
                 || in_rect(0.04, -0.08, 0.36, 0.10, 0.03)
                 || in_rect(-0.36, 0.18, -0.04, 0.34, 0.03)
                 || in_rect(0.04, 0.18, 0.36, 0.34, 0.03)
         }
-        Some(ArtifactType::Prototype) => {
-            // Code/preview diamond + window bar.
-            in_rect(-0.36, -0.32, 0.36, -0.18, 0.04) || (nx.abs() + (ny - 0.10).abs() <= 0.24)
-        }
-        Some(ArtifactType::Diagram) => {
-            in_rect(-0.18, -0.36, 0.18, -0.12, 0.05)
-                || in_rect(-0.03, -0.12, 0.03, 0.12, 0.0)
-                || in_rect(-0.38, 0.12, -0.06, 0.36, 0.05)
-                || in_rect(0.06, 0.12, 0.38, 0.36, 0.05)
-        }
-        Some(ArtifactType::Storyboard) => in_rect(-0.38, -0.26, -0.06, 0.26, 0.04) || in_rect(0.06, -0.26, 0.38, 0.26, 0.04),
+        Some(NoteType::Canvas) => in_rect(-0.36, -0.32, 0.06, 0.06, 0.05) || in_rect(-0.04, -0.04, 0.36, 0.34, 0.05),
+        Some(NoteType::Media) => (-0.24..=0.34).contains(&nx) && ny.abs() <= (0.34 - nx) * 0.62,
         None => in_circle(0.0, 0.0, 0.28),
     };
     if hit { 1.0 } else { 0.0 }
 }
 
-pub fn render_tile_rgba(artifact_type: &str) -> RgbaImage {
+pub fn render_tile_rgba(note_type: &str) -> RgbaImage {
     let size = ICON_SIZE;
-    let palette = palette_for(artifact_type);
+    let palette = palette_for(note_type);
     let mut img = RgbaImage::new(size, size);
     let half = size as f32 * 0.5;
     let tile_half = 224.0;
@@ -291,7 +214,7 @@ pub fn render_tile_rgba(artifact_type: &str) -> RgbaImage {
             let mut cov = 0.0;
             for sy in [-0.25f32, 0.25] {
                 for sx in [-0.25f32, 0.25] {
-                    cov += emblem_coverage(artifact_type, (px + sx) / emblem_scale, (py + sy) / emblem_scale);
+                    cov += emblem_coverage(note_type, (px + sx) / emblem_scale, (py + sy) / emblem_scale);
                 }
             }
             cov *= 0.25;
@@ -322,39 +245,26 @@ pub fn encode_icns(image: &RgbaImage) -> Result<Vec<u8>, String> {
     Ok(out)
 }
 
-pub fn build_icns(artifact_type: &str) -> Result<Vec<u8>, String> {
-    let img = render_tile_rgba(artifact_type);
+pub fn build_icns(note_type: &str) -> Result<Vec<u8>, String> {
+    let img = render_tile_rgba(note_type);
     encode_icns(&img)
 }
 
 fn xml_escape(raw: &str) -> String {
-    let mut out = String::with_capacity(raw.len());
-    for ch in raw.chars() {
-        match ch {
-            '&' => out.push_str("&amp;"),
-            '<' => out.push_str("&lt;"),
-            '>' => out.push_str("&gt;"),
-            '"' => out.push_str("&quot;"),
-            '\'' => out.push_str("&apos;"),
-            _ => out.push(ch),
-        }
-    }
-    out
+    quick_xml::escape::escape(raw).into_owned()
 }
 
 fn xml_unescape(raw: &str) -> String {
-    raw.replace("&lt;", "<")
-        .replace("&gt;", ">")
-        .replace("&quot;", "\"")
-        .replace("&apos;", "'")
-        .replace("&amp;", "&")
+    quick_xml::escape::unescape(raw)
+        .map(std::borrow::Cow::into_owned)
+        .unwrap_or_else(|_| raw.to_owned())
 }
 
 pub struct InfoPlistParams<'a> {
     pub bundle_id: &'a str,
     pub app_name: &'a str,
-    pub artifact_id: &'a str,
-    pub artifact_type: &'a str,
+    pub note_id: &'a str,
+    pub note_type: &'a str,
     pub server_home: &'a Path,
     pub channel: &'a str,
     pub host_app_path: &'a Path,
@@ -364,8 +274,8 @@ pub struct InfoPlistParams<'a> {
 pub fn build_info_plist(params: &InfoPlistParams<'_>) -> String {
     let bundle_id = xml_escape(params.bundle_id);
     let app_name = xml_escape(params.app_name);
-    let artifact_id = xml_escape(params.artifact_id);
-    let artifact_type = xml_escape(params.artifact_type);
+    let note_id = xml_escape(params.note_id);
+    let note_type = xml_escape(params.note_type);
     let server_home = xml_escape(&params.server_home.to_string_lossy());
     let channel = xml_escape(params.channel);
     let host_app_path = xml_escape(&params.host_app_path.to_string_lossy());
@@ -396,10 +306,10 @@ pub fn build_info_plist(params: &InfoPlistParams<'_>) -> String {
   <string>13.0</string>
   <key>NSHighResolutionCapable</key>
   <true/>
-  <key>VVArtifactId</key>
-  <string>{artifact_id}</string>
-  <key>VVArtifactType</key>
-  <string>{artifact_type}</string>
+  <key>VVNoteId</key>
+  <string>{note_id}</string>
+  <key>VVNoteType</key>
+  <string>{note_type}</string>
   <key>VVServerHome</key>
   <string>{server_home}</string>
   <key>VVChannel</key>
@@ -467,14 +377,14 @@ fn read_bundle_info(bundle_path: &Path) -> Option<AppletInfo> {
     if !bundle_id.starts_with(BUNDLE_ID_PREFIX) {
         return None;
     }
-    let artifact_id = plist_string(&fields, "VVArtifactId")?;
-    let artifact_type = plist_string(&fields, "VVArtifactType").unwrap_or_default();
+    let note_id = plist_string(&fields, "VVNoteId")?;
+    let note_type = plist_string(&fields, "VVNoteType").unwrap_or_default();
     let app_name = plist_string(&fields, "CFBundleDisplayName")
         .or_else(|| plist_string(&fields, "CFBundleName"))
         .unwrap_or_else(|| bundle_path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default());
     Some(AppletInfo {
-        artifact_id,
-        artifact_type,
+        note_id,
+        note_type,
         app_name,
         bundle_id,
         bundle_path: bundle_path.to_string_lossy().into_owned(),
@@ -520,7 +430,7 @@ pub(crate) fn list_installed_in(apps_root: &Path) -> Result<Vec<AppletInfo>, Str
             out.push(info);
         }
     }
-    out.sort_by(|a, b| a.app_name.cmp(&b.app_name).then_with(|| a.artifact_id.cmp(&b.artifact_id)));
+    out.sort_by(|a, b| a.app_name.cmp(&b.app_name).then_with(|| a.note_id.cmp(&b.note_id)));
     Ok(out)
 }
 
@@ -542,8 +452,8 @@ pub(crate) fn install_in(
     req: &AppletInstallRequest,
     register_launch_services: bool,
 ) -> Result<AppletInfo, String> {
-    if req.artifact_id.trim().is_empty() {
-        return Err("artifactId cannot be empty".to_string());
+    if req.note_id.trim().is_empty() {
+        return Err("noteId cannot be empty".to_string());
     }
     if !shim_bin.is_file() {
         return Err(format!("VibeValleyShim binary missing: {}", shim_bin.display()));
@@ -551,12 +461,12 @@ pub(crate) fn install_in(
     std::fs::create_dir_all(apps_root).map_err(|e| format!("create {}: {e}", apps_root.display()))?;
 
     let app_name = sanitize_app_name(&req.app_name);
-    let bundle_id = bundle_id_for(&req.artifact_id);
+    let bundle_id = bundle_id_for(&req.note_id);
     let bundle_path = apps_root.join(format!("{app_name}.app"));
 
-    // Remove any previously installed bundle for the same artifact (e.g. after rename) once verified.
+    // Remove any previously installed bundle for the same note (e.g. after rename) once verified.
     for existing in list_installed_in(apps_root)? {
-        if existing.artifact_id == req.artifact_id {
+        if existing.note_id == req.note_id {
             let old_path = PathBuf::from(&existing.bundle_path);
             if old_path != bundle_path {
                 verify_safe_applet_bundle(apps_root, &old_path)?;
@@ -582,14 +492,14 @@ pub(crate) fn install_in(
     perms.set_mode(0o755);
     std::fs::set_permissions(&dst_shim, perms).map_err(|e| format!("chmod {}: {e}", dst_shim.display()))?;
 
-    let icns = build_icns(&req.artifact_type)?;
+    let icns = build_icns(&req.note_type)?;
     std::fs::write(resources_dir.join(ICON_FILE_NAME), icns).map_err(|e| format!("write icon: {e}"))?;
 
     let plist = build_info_plist(&InfoPlistParams {
         bundle_id: &bundle_id,
         app_name: &app_name,
-        artifact_id: &req.artifact_id,
-        artifact_type: &req.artifact_type,
+        note_id: &req.note_id,
+        note_type: &req.note_type,
         server_home,
         channel,
         host_app_path: host_app,
@@ -612,8 +522,8 @@ pub(crate) fn install_in(
     }
 
     Ok(AppletInfo {
-        artifact_id: req.artifact_id.clone(),
-        artifact_type: req.artifact_type.clone(),
+        note_id: req.note_id.clone(),
+        note_type: req.note_type.clone(),
         app_name,
         bundle_id,
         bundle_path: bundle_path.to_string_lossy().into_owned(),
@@ -622,11 +532,11 @@ pub(crate) fn install_in(
     })
 }
 
-pub fn uninstall(artifact_id: &str) -> Result<AppletRemoveResult, String> {
-    uninstall_in(&apps_dir(), artifact_id)
+pub fn uninstall(note_id: &str) -> Result<AppletRemoveResult, String> {
+    uninstall_in(&apps_dir(), note_id)
 }
 
-pub(crate) fn uninstall_in(apps_root: &Path, artifact_id: &str) -> Result<AppletRemoveResult, String> {
+pub(crate) fn uninstall_in(apps_root: &Path, note_id: &str) -> Result<AppletRemoveResult, String> {
     if !apps_root.exists() {
         return Ok(AppletRemoveResult {
             removed: false,
@@ -645,7 +555,7 @@ pub(crate) fn uninstall_in(apps_root: &Path, artifact_id: &str) -> Result<Applet
             continue;
         };
         let fields = parse_plist_fields(&raw);
-        if plist_string(&fields, "VVArtifactId").as_deref() == Some(artifact_id) {
+        if plist_string(&fields, "VVNoteId").as_deref() == Some(note_id) {
             verify_safe_applet_bundle(apps_root, &path)?;
             std::fs::remove_dir_all(&path).map_err(|e| format!("remove {}: {e}", path.display()))?;
             removed_path = Some(path.to_string_lossy().into_owned());
@@ -657,15 +567,15 @@ pub(crate) fn uninstall_in(apps_root: &Path, artifact_id: &str) -> Result<Applet
     })
 }
 
-pub fn open_installed(artifact_id: &str) -> Result<AppletOpenResult, String> {
-    open_installed_in(&apps_dir(), artifact_id)
+pub fn open_installed(note_id: &str) -> Result<AppletOpenResult, String> {
+    open_installed_in(&apps_dir(), note_id)
 }
 
-pub(crate) fn open_installed_in(apps_root: &Path, artifact_id: &str) -> Result<AppletOpenResult, String> {
+pub(crate) fn open_installed_in(apps_root: &Path, note_id: &str) -> Result<AppletOpenResult, String> {
     let found = list_installed_in(apps_root)?
         .into_iter()
-        .find(|info| info.artifact_id == artifact_id)
-        .ok_or_else(|| format!("applet for artifact {artifact_id} is not installed"))?;
+        .find(|info| info.note_id == note_id)
+        .ok_or_else(|| format!("applet for note {note_id} is not installed"))?;
     crate::host::open(Path::new(&found.bundle_path))?;
     Ok(AppletOpenResult {
         opened: true,
@@ -696,8 +606,8 @@ mod tests {
     }
 
     #[test]
-    fn icns_encoder_produces_valid_ic09_container_for_every_artifact_type() {
-        for kind in ArtifactType::ALL {
+    fn icns_encoder_produces_valid_ic09_container_for_every_note_type() {
+        for kind in NoteType::ALL {
             let icns = build_icns(kind.as_str()).unwrap();
             assert_eq!(&icns[0..4], b"icns");
             let total_len = u32::from_be_bytes(icns[4..8].try_into().unwrap()) as usize;
@@ -716,8 +626,8 @@ mod tests {
         let xml = build_info_plist(&InfoPlistParams {
             bundle_id: "dev.vibevalley.applet.art-1",
             app_name: "R&D <Spec> \"v1\"",
-            artifact_id: "art-1",
-            artifact_type: "docs",
+            note_id: "note-1",
+            note_type: "doc",
             server_home: Path::new("/tmp/vv home/.vibevalley-dev"),
             channel: "dev",
             host_app_path: Path::new("/Applications/VibeValley.app"),
@@ -729,8 +639,8 @@ mod tests {
         assert_eq!(plist_string(&fields, "CFBundleDisplayName").as_deref(), Some("R&D <Spec> \"v1\""));
         assert_eq!(plist_string(&fields, "CFBundleExecutable").as_deref(), Some("VibeValleyShim"));
         assert_eq!(plist_string(&fields, "CFBundleIconFile").as_deref(), Some("AppIcon.icns"));
-        assert_eq!(plist_string(&fields, "VVArtifactId").as_deref(), Some("art-1"));
-        assert_eq!(plist_string(&fields, "VVArtifactType").as_deref(), Some("docs"));
+        assert_eq!(plist_string(&fields, "VVNoteId").as_deref(), Some("note-1"));
+        assert_eq!(plist_string(&fields, "VVNoteType").as_deref(), Some("doc"));
         assert_eq!(plist_string(&fields, "VVServerHome").as_deref(), Some("/tmp/vv home/.vibevalley-dev"));
         assert_eq!(plist_string(&fields, "VVChannel").as_deref(), Some("dev"));
         assert_eq!(plist_string(&fields, "VVHostAppPath").as_deref(), Some("/Applications/VibeValley.app"));
@@ -784,8 +694,8 @@ mod tests {
             "dev",
             host_app,
             &AppletInstallRequest {
-                artifact_id: "art-42".into(),
-                artifact_type: "whiteboard".into(),
+                note_id: "art-42".into(),
+                note_type: "canvas".into(),
                 app_name: "System Canvas".into(),
                 always_on_top: false,
             },
@@ -804,8 +714,8 @@ mod tests {
             "dev",
             host_app,
             &AppletInstallRequest {
-                artifact_id: "art-42".into(),
-                artifact_type: "whiteboard".into(),
+                note_id: "art-42".into(),
+                note_type: "canvas".into(),
                 app_name: "Renamed Canvas".into(),
                 always_on_top: true,
             },
@@ -831,8 +741,8 @@ mod tests {
         let foreign_plist = build_info_plist(&InfoPlistParams {
             bundle_id: "com.example.other",
             app_name: "Foreign",
-            artifact_id: "art-foreign",
-            artifact_type: "docs",
+            note_id: "art-foreign",
+            note_type: "doc",
             server_home: tmp.path(),
             channel: "dev",
             host_app_path: Path::new("/Applications/VibeValley.app"),

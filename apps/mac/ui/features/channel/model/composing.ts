@@ -12,11 +12,12 @@ import {
 } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
-import { createAct } from "../../../design/act";
+import { createAct } from "../../../infra/act";
 import { useOrchestrators } from "../../../infra/agents";
 import { api, reasonOf } from "../../../infra/api";
 import { attachmentData } from "../../../infra/attachment";
 import type { Mark } from "../../../infra/base/typedMarks";
+import { followed, useMessage } from "../../../infra/channelFollow";
 import { orchestratorMood } from "../../../infra/frame";
 import { ready, settingsQuery, useQuery } from "../../../infra/query";
 import { type Accessor, createMemo, createSignal, onSettled } from "../../../infra/solid";
@@ -25,7 +26,6 @@ import { defineIntent, type Intent, type Intents } from "../../../infra/state/in
 import { defineStored, orFallback } from "../../../infra/state/stored";
 import { useSkills } from "../../runtime";
 import { commandNameables, commandOf, type ParsedCommand, runCommand, typedCommand } from "./commands";
-import { followed, useMessage } from "./follow";
 import { insertName, type Nameable, nameables, offeredFor, typedName } from "./mentions";
 
 export type Said = Omit<SayRequest, "sendKey">;

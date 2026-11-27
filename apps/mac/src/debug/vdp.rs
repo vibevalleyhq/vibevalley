@@ -2,13 +2,11 @@
 //! GPUI foreground dispatcher, `UI.*` probe bridge, and `host.vdpCall` loopback proxy.
 
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::future::Future;
-use std::net::{IpAddr, SocketAddr};
+use std::net::SocketAddr;
 use std::path::PathBuf;
-use std::pin::Pin;
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, OnceLock};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
 use axum::extract::ws::{Message as WsMessage, WebSocket, WebSocketUpgrade};
 use axum::extract::{FromRequestParts, Query, State};
@@ -26,13 +24,15 @@ use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio_util::sync::{CancellationToken, DropGuard};
 use vibevalley_protocol::home::{DebugEndpointGuard, write_debug_endpoint};
 use vibevalley_protocol::{
-    HostVdpCallPayload, SliceKind, VDP_PROTOCOL_VERSION, VdpAckResult, VdpBufferedEvent, VdpCommand, VdpEndpointInfo, VdpError, VdpEvent, VdpLogEntriesResult,
-    VdpNotification, VdpRequest, VdpResponse, VdpScreenshotResult, VdpTarget, VdpTargetAttachResult, VdpTargetListResult, VdpUiInspectAtResult, VdpUiNode,
-    VdpVersionInfo, VdpWireMessage,
+    SliceKind, VDP_PROTOCOL_VERSION, VdpAckResult, VdpBufferedEvent, VdpCommand, VdpEndpointInfo, VdpError, VdpEvent, VdpLogEntriesResult, VdpNotification,
+    VdpRequest, VdpResponse, VdpScreenshotResult, VdpTarget, VdpTargetAttachResult, VdpTargetListResult, VdpUiInspectAtResult, VdpUiNode, VdpVersionInfo,
 };
-use vibevalley_server::gateway::bridge::{BizCode, CallerContext, Envelope, Server as BridgeServer, refusal};
+use vibevalley_server::gateway::bridge::{CallerContext, Server as BridgeServer};
 
 use crate::shell::Shell;
+pub(crate) use crate::vdp_bus::{BoxFuture, VdpDispatcher, now_millis, ui_requests};
+#[cfg(test)]
+pub(crate) use crate::vdp_bus::{call_remote_vdp, resolve_loopback_ws_url, resolve_ui_response};
 
 use super::executor::{self, GpuiExecResult};
 
@@ -40,127 +40,6 @@ const EVENT_BROADCAST_CAPACITY: usize = 256;
 const EVENT_RING_CAPACITY: usize = 512;
 const GPUI_DISPATCH_TIMEOUT: Duration = Duration::from_secs(10);
 const UI_REQUEST_DEFAULT_TIMEOUT: Duration = Duration::from_secs(5);
-const REMOTE_CALL_DEFAULT_TIMEOUT_MS: u64 = 10_000;
-const REMOTE_CALL_MIN_TIMEOUT_MS: u64 = 500;
-const REMOTE_CALL_MAX_TIMEOUT_MS: u64 = 60_000;
-
-pub(crate) type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
-
-pub(crate) fn now_millis() -> i64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0)
-}
-
-// ---------------------------------------------------------------------------
-// Process-wide UI probe response table & active hub reference
-// ---------------------------------------------------------------------------
-
-pub(crate) struct PendingUiRequests {
-    pending: Mutex<HashMap<String, oneshot::Sender<Result<Value, VdpError>>>>,
-}
-
-impl PendingUiRequests {
-    fn new() -> Self {
-        Self {
-            pending: Mutex::new(HashMap::new()),
-        }
-    }
-
-    pub(crate) fn register(&self, req_id: String) -> (oneshot::Receiver<Result<Value, VdpError>>, PendingUiGuard<'_>) {
-        let (tx, rx) = oneshot::channel();
-        self.pending.lock().insert(req_id.clone(), tx);
-        let guard = PendingUiGuard {
-            map: &self.pending,
-            req_id,
-            armed: true,
-        };
-        (rx, guard)
-    }
-
-    pub(crate) fn resolve(&self, value: &Value) -> bool {
-        let Some(req_id) = value.get("reqId").and_then(Value::as_str) else {
-            return false;
-        };
-        let Some(tx) = self.pending.lock().remove(req_id) else {
-            return false;
-        };
-        let outcome = if let Some(err) = value.get("error").filter(|v| !v.is_null()) {
-            let vdp_err = if let Some(msg) = err.as_str() {
-                VdpError::internal(msg)
-            } else {
-                let code = err
-                    .get("code")
-                    .and_then(Value::as_i64)
-                    .and_then(|c| i32::try_from(c).ok())
-                    .unwrap_or(VdpError::INTERNAL_ERROR);
-                let message = err.get("message").and_then(Value::as_str).unwrap_or("UI probe error").to_string();
-                VdpError::new(code, message)
-            };
-            Err(vdp_err)
-        } else {
-            Ok(value.get("result").cloned().unwrap_or(Value::Null))
-        };
-        tx.send(outcome).is_ok()
-    }
-}
-
-pub(crate) struct PendingUiGuard<'a> {
-    map: &'a Mutex<HashMap<String, oneshot::Sender<Result<Value, VdpError>>>>,
-    req_id: String,
-    armed: bool,
-}
-
-impl PendingUiGuard<'_> {
-    pub(crate) fn disarm(&mut self) {
-        self.armed = false;
-    }
-}
-
-impl Drop for PendingUiGuard<'_> {
-    fn drop(&mut self) {
-        if self.armed {
-            self.map.lock().remove(&self.req_id);
-        }
-    }
-}
-
-pub(crate) fn ui_requests() -> &'static PendingUiRequests {
-    static PENDING: OnceLock<PendingUiRequests> = OnceLock::new();
-    PENDING.get_or_init(PendingUiRequests::new)
-}
-
-pub(crate) fn resolve_ui_response(value: &Value) -> bool {
-    ui_requests().resolve(value)
-}
-
-fn active_hub_slot() -> &'static RwLock<Option<Arc<VdpHub>>> {
-    static HUB: OnceLock<RwLock<Option<Arc<VdpHub>>>> = OnceLock::new();
-    HUB.get_or_init(|| RwLock::new(None))
-}
-
-pub(crate) fn install_active_hub(hub: Arc<VdpHub>) {
-    *active_hub_slot().write() = Some(hub);
-}
-
-pub(crate) fn clear_active_hub() {
-    *active_hub_slot().write() = None;
-}
-
-pub(crate) fn emit_notification(notification: VdpNotification) {
-    let hub = active_hub_slot().read().clone();
-    if let Some(hub) = hub {
-        hub.emit(notification);
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Dispatcher trait (mockable in tests without GPUI)
-// ---------------------------------------------------------------------------
-
-pub(crate) trait VdpDispatcher: Send + Sync + 'static {
-    fn list_targets(&self, attached: HashSet<String>) -> BoxFuture<'_, Result<Vec<VdpTarget>, VdpError>>;
-    fn dispatch(&self, command: VdpCommand, attached_target: Option<String>) -> BoxFuture<'_, Result<Value, VdpError>>;
-    fn set_ui_log_enabled(&self, enabled: bool) -> BoxFuture<'_, ()>;
-}
 
 // ---------------------------------------------------------------------------
 // GPUI foreground command channel & production dispatcher
@@ -196,20 +75,20 @@ pub(crate) enum GpuiCommand {
 }
 
 pub(crate) struct GpuiVdpDispatcher {
-    tx: RwLock<flume::Sender<GpuiCommand>>,
+    tx: RwLock<tokio::sync::mpsc::UnboundedSender<GpuiCommand>>,
     server: Option<Arc<dyn BridgeServer>>,
 }
 
 impl GpuiVdpDispatcher {
-    pub(crate) fn new(tx: flume::Sender<GpuiCommand>, server: Option<Arc<dyn BridgeServer>>) -> Self {
+    pub(crate) fn new(tx: tokio::sync::mpsc::UnboundedSender<GpuiCommand>, server: Option<Arc<dyn BridgeServer>>) -> Self {
         Self { tx: RwLock::new(tx), server }
     }
 
-    pub(crate) fn rebind_window(&self, tx: flume::Sender<GpuiCommand>) {
+    pub(crate) fn rebind_window(&self, tx: tokio::sync::mpsc::UnboundedSender<GpuiCommand>) {
         *self.tx.write() = tx;
     }
 
-    fn sender(&self) -> flume::Sender<GpuiCommand> {
+    fn sender(&self) -> tokio::sync::mpsc::UnboundedSender<GpuiCommand> {
         self.tx.read().clone()
     }
 
@@ -224,10 +103,7 @@ impl GpuiVdpDispatcher {
             params,
             reply: send_tx,
         };
-        self.sender()
-            .send_async(cmd)
-            .await
-            .map_err(|_| VdpError::unavailable("main window is closed"))?;
+        self.sender().send(cmd).map_err(|_| VdpError::unavailable("main window is closed"))?;
 
         match tokio::time::timeout(GPUI_DISPATCH_TIMEOUT, send_rx).await {
             Ok(Ok(Ok(_resolved_view))) => {}
@@ -249,8 +125,7 @@ impl GpuiVdpDispatcher {
     async fn dispatch_inspect_at(&self, x: f32, y: f32) -> Result<Value, VdpError> {
         let (tx, rx) = oneshot::channel();
         self.sender()
-            .send_async(GpuiCommand::PrepareInspectAt { x, y, reply: tx })
-            .await
+            .send(GpuiCommand::PrepareInspectAt { x, y, reply: tx })
             .map_err(|_| VdpError::unavailable("main window is closed"))?;
         let (hosted_views, native_hit) = match tokio::time::timeout(GPUI_DISPATCH_TIMEOUT, rx).await {
             Ok(Ok(pair)) => pair,
@@ -281,67 +156,20 @@ impl GpuiVdpDispatcher {
         });
         if best.hit {
             let (htx, hrx) = oneshot::channel();
-            let _ = self
-                .sender()
-                .send_async(GpuiCommand::Execute {
-                    command: VdpCommand::UiHighlight(vibevalley_protocol::VdpUiHighlightParams {
-                        test_id: best.test_id.clone(),
-                        bounds: best.bounds,
-                        label: best.text.clone(),
-                        source: best.source.clone(),
-                        surface: best.surface.clone(),
-                    }),
-                    reply: htx,
-                })
-                .await;
+            let _ = self.sender().send(GpuiCommand::Execute {
+                command: VdpCommand::UiHighlight(vibevalley_protocol::VdpUiHighlightParams {
+                    test_id: best.test_id.clone(),
+                    bounds: best.bounds,
+                    label: best.text.clone(),
+                    source: best.source.clone(),
+                    surface: best.surface.clone(),
+                }),
+                reply: htx,
+            });
             let _ = tokio::time::timeout(GPUI_DISPATCH_TIMEOUT, hrx).await;
         }
         serde_json::to_value(best).map_err(|e| VdpError::internal(e.to_string()))
     }
-}
-
-/// Probes mounted [`crate::hosted::HostedView`] instances for Canvas Inspector clicks on the GPUI executor.
-pub(crate) async fn inspect_hosted_views_at(
-    hosted_views: Vec<(String, f32, f32, Entity<crate::hosted::HostedView>)>,
-    x: f32,
-    y: f32,
-    native_fallback: Option<VdpUiInspectAtResult>,
-    timeout: Duration,
-) -> Option<VdpUiInspectAtResult> {
-    let hub_opt = active_hub_slot().read().clone();
-    let dispatcher = hub_opt.map(|h| h.dispatcher.clone());
-    let mut candidates = Vec::new();
-    if let Some(native) = native_fallback {
-        candidates.push(native);
-    }
-    if let Some(disp) = dispatcher {
-        for (surface, ox, oy, _) in hosted_views {
-            if let Ok(val) = disp
-                .dispatch(
-                    VdpCommand::UiQuery(vibevalley_protocol::VdpUiQueryParams {
-                        test_id: None,
-                        text: None,
-                        role: None,
-                        view: Some(surface.clone()),
-                    }),
-                    None,
-                )
-                .await
-                && let Some(nodes) = val.get("nodes").and_then(Value::as_array)
-            {
-                for raw in nodes {
-                    if let Ok(node) = serde_json::from_value::<VdpUiNode>(raw.clone())
-                        && let Some(hit) = executor::hit_from_hosted_node(&surface, ox, oy, &node)
-                    {
-                        candidates.push(hit);
-                    }
-                }
-            }
-        }
-    } else {
-        let _ = (hosted_views, timeout);
-    }
-    executor::select_deepest_hit(x, y, candidates)
 }
 
 fn parse_slice_kind(name: &str) -> Result<SliceKind, VdpError> {
@@ -367,8 +195,7 @@ impl VdpDispatcher for GpuiVdpDispatcher {
         Box::pin(async move {
             let (tx, rx) = oneshot::channel();
             self.sender()
-                .send_async(GpuiCommand::ListTargets { attached, reply: tx })
-                .await
+                .send(GpuiCommand::ListTargets { attached, reply: tx })
                 .map_err(|_| VdpError::unavailable("main window is closed"))?;
             match tokio::time::timeout(GPUI_DISPATCH_TIMEOUT, rx).await {
                 Ok(Ok(res)) => res,
@@ -388,9 +215,8 @@ impl VdpDispatcher for GpuiVdpDispatcher {
                         .as_ref()
                         .ok_or_else(|| VdpError::unavailable("embedded server bridge is unavailable"))?
                         .clone();
-                    tokio::task::spawn_blocking(move || server.slice_snapshot(kind))
-                        .await
-                        .map_err(|e| VdpError::internal(format!("slice snapshot failed: {e}")))
+                    let raw = server.slice_snapshot_json_async(kind).await;
+                    serde_json::from_str::<Value>(&raw).map_err(|e| VdpError::internal(format!("slice snapshot decode failed: {e}")))
                 }
                 VdpCommand::ServerInvoke(params) => {
                     let server = self
@@ -427,8 +253,7 @@ impl VdpDispatcher for GpuiVdpDispatcher {
                 other => {
                     let (tx, rx) = oneshot::channel();
                     self.sender()
-                        .send_async(GpuiCommand::Execute { command: other, reply: tx })
-                        .await
+                        .send(GpuiCommand::Execute { command: other, reply: tx })
                         .map_err(|_| VdpError::unavailable("main window is closed"))?;
                     let outcome = match tokio::time::timeout(GPUI_DISPATCH_TIMEOUT, rx).await {
                         Ok(Ok(outcome)) => outcome,
@@ -464,15 +289,20 @@ impl VdpDispatcher for GpuiVdpDispatcher {
 
     fn set_ui_log_enabled(&self, enabled: bool) -> BoxFuture<'_, ()> {
         Box::pin(async move {
-            let _ = self.sender().send_async(GpuiCommand::SetUiLogEnabled { enabled }).await;
+            let _ = self.sender().send(GpuiCommand::SetUiLogEnabled { enabled });
         })
     }
 }
 
 /// Drains VDP commands on the GPUI foreground thread without blocking Tokio or GPUI.
-pub(crate) fn spawn_gpui_command_loop(shell: Entity<Shell>, window: WindowHandle<Shell>, rx: flume::Receiver<GpuiCommand>, cx: &mut App) {
+pub(crate) fn spawn_gpui_command_loop(
+    shell: Entity<Shell>,
+    window: WindowHandle<Shell>,
+    mut rx: tokio::sync::mpsc::UnboundedReceiver<GpuiCommand>,
+    cx: &mut App,
+) {
     cx.spawn(async move |cx| {
-        while let Ok(cmd) = rx.recv_async().await {
+        while let Some(cmd) = rx.recv().await {
             let updated = cx.update_window(window.into(), |_, window, cx| match cmd {
                 GpuiCommand::ListTargets { attached, reply } => {
                     let targets = executor::collect_targets(shell.read(cx), &attached, cx);
@@ -481,8 +311,8 @@ pub(crate) fn spawn_gpui_command_loop(shell: Entity<Shell>, window: WindowHandle
                 GpuiCommand::PrepareInspectAt { x, y, reply } => {
                     let vp = window.viewport_size();
                     let s = shell.read(cx);
-                    let hosted = executor::hosted_view_origins(s, f32::from(vp.width), f32::from(vp.height), cx);
-                    let native = executor::inspect_native_at(s, x, y, f32::from(vp.width), f32::from(vp.height), cx);
+                    let hosted = s.hosted_view_origins(f32::from(vp.width), f32::from(vp.height), cx);
+                    let native = s.inspect_native_at(x, y, f32::from(vp.width), f32::from(vp.height), cx);
                     let _ = reply.send((hosted, native));
                 }
                 GpuiCommand::Execute { command, reply } => {
@@ -764,14 +594,8 @@ struct TokenQuery {
 }
 
 fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
-    if a.len() != b.len() {
-        return false;
-    }
-    let mut diff = 0u8;
-    for (&x, &y) in a.iter().zip(b.iter()) {
-        diff |= x ^ y;
-    }
-    diff == 0
+    use subtle::ConstantTimeEq as _;
+    a.ct_eq(b).into()
 }
 
 fn bearer_from_headers(headers: &HeaderMap) -> Option<&str> {
@@ -974,7 +798,7 @@ impl VdpServer {
                 shutdown: cancel.clone(),
             });
 
-        let handle = vibevalley_runtime::rt::current_or_global_handle();
+        let handle = vibevalley_rt::current_or_global_handle();
         let _entered = handle.enter();
         let listener = tokio::net::TcpListener::from_std(std_listener).map_err(|e| format!("failed to adopt tokio TcpListener: {e}"))?;
         handle.spawn(async move {
@@ -1000,118 +824,5 @@ impl VdpServer {
     /// Cancels the Axum server and drops the `debug.json` guard.
     pub fn shutdown(self) {
         self.cancel.cancel();
-    }
-}
-
-// ---------------------------------------------------------------------------
-// HostOp::VdpCall loopback client proxy (for DevToolsApp remote attachment)
-// ---------------------------------------------------------------------------
-
-fn is_loopback_host(host: &str) -> bool {
-    let trimmed = host.trim_matches(['[', ']']);
-    if trimmed.eq_ignore_ascii_case("localhost") {
-        return true;
-    }
-    trimmed.parse::<IpAddr>().is_ok_and(|ip| ip.is_loopback())
-}
-
-pub(crate) fn resolve_loopback_ws_url(req: &HostVdpCallPayload) -> Result<String, String> {
-    let base = if let Some(ws_url) = req.ws_url.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
-        let parsed = url::Url::parse(ws_url).map_err(|e| format!("invalid wsUrl: {e}"))?;
-        if parsed.scheme() != "ws" {
-            return Err("vdpCall only permits loopback ws:// URLs".into());
-        }
-        let host = parsed.host_str().ok_or_else(|| "wsUrl missing host".to_string())?;
-        if !is_loopback_host(host) {
-            return Err(format!("vdpCall refused non-loopback host {host:?}"));
-        }
-        parsed
-    } else if let Some(port) = req.port {
-        if port == 0 {
-            return Err("vdpCall requires a non-zero port".into());
-        }
-        url::Url::parse(&format!("ws://127.0.0.1:{port}/devtools")).map_err(|e| e.to_string())?
-    } else {
-        return Err("vdpCall requires wsUrl or port".into());
-    };
-
-    let mut target = base;
-    if let Some(token) = req.token.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
-        let has_token = target.query_pairs().any(|(k, _)| k == "token");
-        if !has_token {
-            target.query_pairs_mut().append_pair("token", token);
-        }
-    }
-    Ok(target.into())
-}
-
-fn biz_code_for_vdp_error(code: i32) -> BizCode {
-    match code {
-        VdpError::UNAUTHORIZED => BizCode::Unauthorized,
-        VdpError::METHOD_NOT_FOUND => BizCode::RouteNotFound,
-        VdpError::INVALID_PARAMS | VdpError::INVALID_REQUEST | VdpError::PARSE_ERROR => BizCode::InvalidInput,
-        VdpError::TIMEOUT | VdpError::UNAVAILABLE => BizCode::ServiceUnavailable,
-        _ => BizCode::Refused,
-    }
-}
-
-/// Executes one JSON-RPC call against a local running VibeValley instance's VDP WebSocket
-/// on behalf of `DevToolsApp.tsx` (`host.vdpCall`).
-pub async fn call_remote_vdp(req: HostVdpCallPayload) -> Envelope {
-    let url = match resolve_loopback_ws_url(&req) {
-        Ok(url) => url,
-        Err(msg) => return refusal(BizCode::InvalidInput, msg),
-    };
-    let timeout = Duration::from_millis(
-        req.timeout_ms
-            .unwrap_or(REMOTE_CALL_DEFAULT_TIMEOUT_MS)
-            .clamp(REMOTE_CALL_MIN_TIMEOUT_MS, REMOTE_CALL_MAX_TIMEOUT_MS),
-    );
-    let method = req.method;
-    let params = req.params.unwrap_or_else(|| json!({}));
-    let session_id = req.session_id;
-
-    let work = async move {
-        let (mut ws, _) = match tokio_tungstenite::connect_async(&url).await {
-            Ok(conn) => conn,
-            Err(tokio_tungstenite::tungstenite::Error::Http(resp)) if resp.status().as_u16() == 401 || resp.status().as_u16() == 403 => {
-                return refusal(BizCode::Unauthorized, format!("VDP rejected credentials (HTTP {})", resp.status()));
-            }
-            Err(err) => return refusal(BizCode::ServiceUnavailable, format!("VDP connect failed: {err}")),
-        };
-
-        let request = VdpRequest::new(1, method, params, session_id);
-        let wire = match serde_json::to_string(&request) {
-            Ok(s) => s,
-            Err(err) => return refusal(BizCode::InvalidInput, format!("serialize VDP request: {err}")),
-        };
-        if let Err(err) = ws.send(tokio_tungstenite::tungstenite::Message::Text(wire.into())).await {
-            return refusal(BizCode::ServiceUnavailable, format!("VDP send failed: {err}"));
-        }
-
-        while let Some(frame) = ws.next().await {
-            match frame {
-                Ok(tokio_tungstenite::tungstenite::Message::Text(text)) => {
-                    if let Ok(VdpWireMessage::Response(resp)) = serde_json::from_str::<VdpWireMessage>(&text)
-                        && resp.id == 1
-                    {
-                        let _ = ws.close(None).await;
-                        return match resp.into_result() {
-                            Ok(val) => Envelope::ok(val),
-                            Err(err) => refusal(biz_code_for_vdp_error(err.code), err.message),
-                        };
-                    }
-                }
-                Ok(tokio_tungstenite::tungstenite::Message::Close(_)) => break,
-                Ok(_) => {}
-                Err(err) => return refusal(BizCode::ServiceUnavailable, format!("VDP read failed: {err}")),
-            }
-        }
-        refusal(BizCode::ServiceUnavailable, "VDP connection closed before response")
-    };
-
-    match tokio::time::timeout(timeout, work).await {
-        Ok(env) => env,
-        Err(_) => refusal(BizCode::ServiceUnavailable, format!("VDP call timed out after {}ms", timeout.as_millis())),
     }
 }

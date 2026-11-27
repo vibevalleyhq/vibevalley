@@ -321,14 +321,14 @@ test("NewIssue unified AgentSelect surfaces agent.validate readiness diagnostics
   await fake.pump(app);
   expect(app.texts()).toContain("小林");
   expect(app.texts()).toContain("Codex 未配置密钥");
-  await app.press("text:小林");
+  await app.press("id:issue-new-helper-option-xiaolin");
   await fake.pumpUntil(app, () => app.count("id:issue-new-helper-status") === 1);
   expect(app.texts()).toContain("Codex 未配置密钥");
 
   // Choose a ready agent -> shows ready status instead of problem text.
   await app.press("id:issue-new-helper");
   await fake.pump(app);
-  await app.press("text:老周");
+  await app.press("id:issue-new-helper-option-laozhou");
   await fake.pump(app);
   expect(app.texts()).toContain("就绪");
 });
@@ -394,4 +394,65 @@ test("regression: Board cards and List rows omit full-body hover tooltips while 
   await app.hover("id:row-attachments");
   await app.wait(400);
   expect(app.texts()).toContain(t("web.issue.attachments.count", { n: 1 }));
+});
+
+test("Kanban drag-and-drop persists exact cross-lane and same-lane insertion slots", async () => {
+  setLocale("zh");
+  const b1: Issue = {
+    ...makeTodoIssue("i-b1", "Backlog 待拖入卡片", "laozhou"),
+    number: 201,
+    status: "backlog",
+    moves: ["backlog", "todo", "done", "canceled"],
+  };
+  const t1: Issue = { ...makeTodoIssue("i-t1", "Todo 第一张", "laozhou"), number: 202, status: "todo", moves: ["backlog", "todo", "done", "canceled"] };
+  const t2: Issue = { ...makeTodoIssue("i-t2", "Todo 第二张", "laozhou"), number: 203, status: "todo", moves: ["backlog", "todo", "done", "canceled"] };
+  const state: SliceBundle = {
+    ...scenarios.empty.state,
+    board: { seq: 10, issues: [b1, t1, t2] },
+  };
+  const statusCalls: unknown[] = [];
+  const updateCalls: unknown[] = [];
+  const { app, fake } = await mountBoard(
+    "typical",
+    (f) => {
+      f.respond("issue.history.list", [
+        { issue: b1, sessions: [], missingSessions: [] },
+        { issue: t1, sessions: [], missingSessions: [] },
+        { issue: t2, sessions: [], missingSessions: [] },
+      ]);
+      f.respond("issue.status.update", (input: unknown) => {
+        statusCalls.push(input);
+        return { issue: { ...b1, status: "todo" }, seq: 11 };
+      });
+      f.respond("issue.update", (input: unknown) => {
+        updateCalls.push(input);
+        return { ...t1 };
+      });
+    },
+    { state },
+  );
+  await fake.pumpUntil(app, () => app.count("id:issue-card") === 3);
+
+  // Cross-lane drag: backlog card -> top half of todo's second card (inserts between t1 and t2).
+  const b1Box = app.layout("id:lane-backlog >> id:issue-card >> nth=0")!;
+  const t2Box = app.layout("id:lane-todo >> id:issue-card >> nth=1")!;
+  await app.drag("id:lane-backlog >> id:issue-card >> nth=0", {
+    x: t2Box.x + t2Box.width / 2 - (b1Box.x + b1Box.width / 2),
+    y: t2Box.y + t2Box.height * 0.25 - (b1Box.y + b1Box.height / 2),
+  });
+  await fake.pump(app);
+  expect(statusCalls.length).toBe(1);
+  expect(statusCalls[0]).toMatchObject({ id: "i-b1", status: "todo", edit: { before: "i-t2" } });
+
+  // Same-lane drag: move t1 below t2's vertical midline -> appends to end (`before: ""`).
+  await app.wait(350);
+  const t1Box = app.layout("id:lane-todo >> id:issue-card >> nth=0")!;
+  const lastBox = app.layout("id:lane-todo >> id:issue-card >> nth=2")!;
+  await app.drag("id:lane-todo >> id:issue-card >> nth=0", {
+    x: 0,
+    y: lastBox.y + lastBox.height * 0.85 - (t1Box.y + t1Box.height / 2),
+  });
+  await fake.pump(app);
+  expect(updateCalls.length).toBe(1);
+  expect(updateCalls[0]).toMatchObject({ id: "i-t1", before: "" });
 });

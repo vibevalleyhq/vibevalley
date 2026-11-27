@@ -38,6 +38,7 @@
    "listening": true,
    "bindAddr": "100.99.221.58",
    "port": 8890,
+   "lanIp": "192.168.1.42",
    "tailscaleIp": "100.99.221.58",
    "tailscaleHost": "macbook.tail1234.ts.net",
    "tailscaleOnline": true,
@@ -52,6 +53,16 @@
      "lastSeenAt": 1700000060000
     }
    ]
+  },
+  {
+   "enabled": true,
+   "listening": true,
+   "bindAddr": "192.168.1.42",
+   "port": 8890,
+   "lanIp": "192.168.1.42",
+   "tailscaleOnline": false,
+   "url": "http://192.168.1.42:8890",
+   "devices": []
   },
   {
    "enabled": false,

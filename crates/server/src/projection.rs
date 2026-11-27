@@ -5,17 +5,17 @@ use std::sync::Arc;
 
 use vibevalley_core::SliceMask;
 use vibevalley_core::projection::{
-    BoardInput, CollabInput, FarmInput, InboxInput, OpsInput, SessionInput, project_board, project_collab, project_farm, project_inbox, project_ops,
-    project_sessions,
+    CollabInput, OpsInput, prepare_shared_context, project_board_shared, project_collab, project_farm_shared, project_inbox_shared, project_ops,
+    project_sessions_shared,
 };
 use vibevalley_protocol::{ApiError, SliceKind};
 
-use crate::artifact::Manager as ArtifactManager;
 use crate::channel::Chat;
 use crate::context::{Context, encode_slice};
 use crate::cron::Scheduler as CronScheduler;
 use crate::game::Game;
 use crate::issue::Board;
+use crate::note::Manager as NoteManager;
 use crate::repo::Repo;
 use crate::service::DbError;
 
@@ -26,100 +26,133 @@ pub(crate) struct SliceSources {
     pub board: Arc<Board>,
     pub channel: Arc<Chat>,
     pub cron: Arc<CronScheduler>,
-    pub artifact: Arc<ArtifactManager>,
+    pub note: Arc<NoteManager>,
     pub game: Arc<Game>,
     pub repo: Arc<Repo>,
 }
 
-pub(crate) async fn project_slice_json(sources: &SliceSources, kind: SliceKind, seq: i64) -> Result<Arc<str>, String> {
+/// Projects a batch of dirty slices sharing a single `(raw_issues, raw_sessions)` DB read
+/// and single `derive_issues` pass across `Board`, `Sessions`, `Inbox`, and `Farm`.
+pub(crate) async fn project_slices_batch_json(sources: &SliceSources, batch: &[(SliceKind, i64)]) -> Vec<(SliceKind, i64, Result<Arc<str>, String>)> {
+    if batch.is_empty() {
+        return Vec::new();
+    }
     let err = |e: ApiError| e.message;
     let dberr = |e: DbError| e.to_string();
-    match kind {
-        SliceKind::Board => {
-            let (raw_issues, raw_sessions, channels) = tokio::join!(
-                sources.board.raw_issues_async(),
-                sources.ctx.service.session.all(),
-                sources.channel.channels_snapshot_async(),
-            );
-            let input = BoardInput {
-                issues: raw_issues.map_err(|e| e.to_string())?,
-                sessions: raw_sessions.map_err(dberr)?,
-                channels: channels.map_err(err)?,
-                commits: sources.ctx.live.commits_snapshot(),
-                repos: sources.repo.cached_health_inputs(),
-                evaluated_at: Some(sources.ctx.clock.now_ms()),
-            };
-            let live = sources.ctx.live.to_core_snapshot(false);
-            encode_slice(&project_board(&input, &live, seq)).map_err(err)
-        }
-        SliceKind::Sessions => {
-            let (raw_sessions, telemetry_map, raw_issues) = tokio::join!(
-                sources.ctx.service.session.all(),
-                sources.ctx.service.session.telemetry_by_session(),
-                sources.board.raw_issues_async(),
-            );
-            let mut sessions = raw_sessions.map_err(dberr)?;
-            let mut telemetry_map = telemetry_map.map_err(dberr)?;
-            for s in &mut sessions {
-                if let Some(tel) = telemetry_map.remove(&s.id) {
-                    s.telemetry = Some(tel);
+
+    let needs_core_snapshot = batch
+        .iter()
+        .any(|(k, _)| matches!(k, SliceKind::Board | SliceKind::Sessions | SliceKind::Inbox | SliceKind::Farm));
+    let needs_farm = batch.iter().any(|(k, _)| *k == SliceKind::Farm);
+
+    let shared_bundle = if needs_core_snapshot {
+        match sources.board.projection_snapshot_async().await {
+            Ok((raw_sessions, raw_issues)) => {
+                let mut live = sources.ctx.live.to_core_snapshot(needs_farm);
+                if needs_farm {
+                    live.plays = sources.game.plays_snapshot();
                 }
+                let shared = prepare_shared_context(&raw_issues, &raw_sessions, &live);
+                Ok(Some((raw_issues, live, shared)))
             }
-            let input = SessionInput {
-                sessions,
-                issues: raw_issues.map_err(|e| e.to_string())?,
-                machines: sources.ctx.live.machines_snapshot(),
-            };
-            let live = sources.ctx.live.to_core_snapshot(false);
-            encode_slice(&project_sessions(&input, &live, seq)).map_err(err)
+            Err(e) => Err(e.to_string()),
         }
-        SliceKind::Collab => {
-            let chat = sources.channel.slice_chat_async().await.map_err(err)?;
-            let input = CollabInput {
-                chat: Some(chat),
-                connectors: sources.ctx.live.connectors_snapshot(),
-            };
-            encode_slice(&project_collab(&input, seq)).map_err(err)
-        }
-        SliceKind::Inbox => {
-            let (raw_issues, raw_sessions, user_mentions) = tokio::join!(
-                sources.board.raw_issues_async(),
-                sources.ctx.service.session.all(),
-                sources.channel.user_mentions_snapshot_async(),
-            );
-            let crons = sources.cron.list();
-            let (call, call_reason) = sources.ctx.live.call_snapshot();
-            let input = InboxInput {
-                issues: raw_issues.map_err(|e| e.to_string())?,
-                sessions: raw_sessions.map_err(dberr)?,
-                crons,
-                user_mentions: user_mentions.map_err(err)?,
-                runtime_inbox_items: sources.ctx.live.runtime_inbox_snapshot(),
-                call,
-                call_reason,
-            };
-            let live = sources.ctx.live.to_core_snapshot(false);
-            encode_slice(&project_inbox(&input, &live, seq)).map_err(err)
-        }
-        SliceKind::Ops => {
-            let crons = sources.cron.list();
-            let media = sources.artifact.media.list_async().await.map_err(err)?;
-            let input = OpsInput { crons, media: Some(media) };
-            encode_slice(&project_ops(&input, seq)).map_err(err)
-        }
-        SliceKind::Farm => {
-            let (raw_issues, raw_sessions) = tokio::join!(sources.board.raw_issues_async(), sources.ctx.service.session.all());
-            let input = FarmInput {
-                issues: raw_issues.map_err(|e| e.to_string())?,
-                sessions: raw_sessions.map_err(dberr)?,
-                progress: sources.ctx.live.progress_snapshot(),
-                commits: sources.ctx.live.commits_snapshot(),
-            };
-            let mut live = sources.ctx.live.to_core_snapshot(true);
-            live.plays = sources.game.plays_snapshot();
-            encode_slice(&project_farm(&input, &live, seq)).map_err(err)
-        }
+    } else {
+        Ok(None)
+    };
+
+    let mut out = Vec::with_capacity(batch.len());
+    for &(kind, seq) in batch {
+        let result = match kind {
+            SliceKind::Board => match &shared_bundle {
+                Ok(Some((_, _, shared))) => match sources.channel.channels_snapshot_async().await {
+                    Ok(channels) => encode_slice(&project_board_shared(
+                        shared,
+                        &channels,
+                        sources.ctx.live.commits_snapshot(),
+                        &sources.repo.cached_health_inputs(),
+                        Some(sources.ctx.clock.now_ms()),
+                        seq,
+                    ))
+                    .map_err(err),
+                    Err(e) => Err(err(e)),
+                },
+                Ok(None) => unreachable!("core snapshot always loaded for Board"),
+                Err(e) => Err(e.clone()),
+            },
+            SliceKind::Sessions => match &shared_bundle {
+                Ok(Some((raw_issues, live, shared))) => match sources.ctx.service.session.telemetry_by_session().await {
+                    Ok(mut telemetry_map) => encode_slice(&project_sessions_shared(
+                        shared,
+                        raw_issues,
+                        live,
+                        &mut telemetry_map,
+                        sources.ctx.live.machines_snapshot(),
+                        seq,
+                    ))
+                    .map_err(err),
+                    Err(e) => Err(dberr(e)),
+                },
+                Ok(None) => unreachable!("core snapshot always loaded for Sessions"),
+                Err(e) => Err(e.clone()),
+            },
+            SliceKind::Collab => match sources.channel.slice_chat_async().await {
+                Ok(chat) => {
+                    let input = CollabInput {
+                        chat: Some(chat),
+                        connectors: sources.ctx.live.connectors_snapshot(),
+                    };
+                    encode_slice(&project_collab(&input, seq)).map_err(err)
+                }
+                Err(e) => Err(err(e)),
+            },
+            SliceKind::Inbox => match &shared_bundle {
+                Ok(Some((_, _, shared))) => match sources.channel.user_mentions_snapshot_async().await {
+                    Ok(user_mentions) => {
+                        let crons = sources.cron.list();
+                        let (call, call_reason) = sources.ctx.live.call_snapshot();
+                        encode_slice(&project_inbox_shared(
+                            shared,
+                            &crons,
+                            &user_mentions,
+                            &sources.ctx.live.runtime_inbox_snapshot(),
+                            call,
+                            call_reason,
+                            seq,
+                        ))
+                        .map_err(err)
+                    }
+                    Err(e) => Err(err(e)),
+                },
+                Ok(None) => unreachable!("core snapshot always loaded for Inbox"),
+                Err(e) => Err(e.clone()),
+            },
+            SliceKind::Ops => match sources.note.media.list_async().await {
+                Ok(media) => {
+                    let input = OpsInput {
+                        crons: sources.cron.list(),
+                        media: Some(media),
+                    };
+                    encode_slice(&project_ops(&input, seq)).map_err(err)
+                }
+                Err(e) => Err(err(e)),
+            },
+            SliceKind::Farm => match &shared_bundle {
+                Ok(Some((_, live, shared))) => encode_slice(&project_farm_shared(
+                    shared,
+                    live,
+                    sources.ctx.live.progress_snapshot(),
+                    sources.ctx.live.commits_snapshot(),
+                    seq,
+                ))
+                .map_err(err),
+                Ok(None) => unreachable!("core snapshot always loaded for Farm"),
+                Err(e) => Err(e.clone()),
+            },
+        };
+        out.push((kind, seq, result));
     }
+    out
 }
 
 pub(crate) fn finish_boot_and_start_feeds(
@@ -127,7 +160,7 @@ pub(crate) fn finish_boot_and_start_feeds(
     board: &Arc<Board>,
     channel: &Arc<Chat>,
     cron: &Arc<CronScheduler>,
-    artifact: &Arc<ArtifactManager>,
+    note: &Arc<NoteManager>,
     game: &Arc<Game>,
     repo: &Arc<Repo>,
 ) {
@@ -136,16 +169,16 @@ pub(crate) fn finish_boot_and_start_feeds(
         board: board.clone(),
         channel: channel.clone(),
         cron: cron.clone(),
-        artifact: artifact.clone(),
+        note: note.clone(),
         game: game.clone(),
         repo: repo.clone(),
     };
     sources.ctx.outbox.start(&sources.ctx.task);
-    sources.ctx.feed.start(&sources.ctx.task, {
+    sources.ctx.feed.start_batch(&sources.ctx.task, {
         let sources = sources.clone();
-        move |kind, seq| {
+        move |batch| {
             let sources = sources.clone();
-            Box::pin(async move { project_slice_json(&sources, kind, seq).await })
+            async move { project_slices_batch_json(&sources, &batch).await }
         }
     });
     sources.ctx.mark_dirty(SliceMask::ALL);

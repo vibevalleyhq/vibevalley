@@ -1,6 +1,6 @@
 {
   "tab": {
-    "chat": "Chat",
+    "chat": "Channels",
     "issues": "Tickets",
     "crons": "Scheduled tasks"
   },
@@ -20,15 +20,15 @@
   "channelsTitle": "Channels",
   "directsTitle": "Direct messages",
   "newChannel": "Create a channel",
-  "newChat": "New chat",
+  "newChat": "New channel or DM",
   "filter": {
-    "label": "Filter chats",
+    "label": "Filter channels",
     "all": "All",
     "group": "Channels",
     "direct": "Direct"
   },
   "emptyPreview": "No messages yet",
-  "emptyList": "No chats yet",
+  "emptyList": "No channels yet",
   "runsEntry": "View running sessions",
   "mood": {
     "idle": "resting",
@@ -59,10 +59,13 @@
     "save": "Save"
   },
   "issues": {
-    "empty": "No tickets in this channel yet. Tell the assistant something to do in the chat; it sends a helper, and the ticket is listed here.",
+    "emptyTitle": "No tickets yet",
+    "empty": "No tickets in this channel yet. Tell the assistant something to do in a channel; it sends a helper, and the ticket is listed here.",
+    "openBoard": "Open issues board",
     "thread": "Ticket thread"
   },
   "crons": {
+    "emptyTitle": "No scheduled tasks",
     "empty": "No scheduled tasks: tell the assistant \"run the tests every day at nine\".",
     "next": "next {next}",
     "direct": "straight to {agent}",
@@ -150,16 +153,18 @@
     "attach": "Attach a file",
     "uploadFailed": "Not uploaded: {why}",
     "command": "Commands",
-    "artifactContext": "Context: {title}",
-    "artifactSlide": "Slide {n}",
-    "artifactSelected": "{n} selected",
+    "noteContext": "Context: {title}",
+    "noteSlide": "Slide {n}",
+    "noteSelected": "{n} selected",
     "clearContext": "Remove attached context",
     "runningHint": "Working — send a follow-up or click stop",
-    "dictateStart": "Voice dictation (MOSS ASR)",
+    "dictateStart": "Voice dictation (ASR)",
     "dictateStop": "Stop dictation",
     "dictateConnecting": "Connecting audio…",
     "dictateListening": "Listening…",
-    "dictateFinishing": "Transcribing…"
+    "dictateFinishing": "Transcribing…",
+    "dictatePolishing": "Polishing…",
+    "dictateRevertRaw": "Revert to raw"
   },
   "manage": {
     "name": "Name",
@@ -198,17 +203,17 @@
     "markUnread": "Mark unread from here",
     "jump": "Jump to it",
     "promoteIssue": "Promote to ticket",
-    "saveArtifact": "Save as artifact"
+    "saveNote": "Save as note"
   },
   "promote": {
     "source": "From {where}",
-    "saveTitle": "Save message as artifact",
-    "artifactTitle": "Title",
-    "artifactType": "Type",
-    "artifactContent": "Content",
-    "artifactSave": "Save artifact",
-    "artifactSaved": "Saved as \"{title}\"",
-    "artifactNote": "Saved from {where}",
+    "saveTitle": "Save message as note",
+    "noteTitle": "Title",
+    "noteType": "Type",
+    "noteContent": "Content",
+    "noteSave": "Save note",
+    "noteSaved": "Saved as \"{title}\"",
+    "noteNote": "Saved from {where}",
     "fallbackTitle": "Message #{number}"
   },
   "switcher": {

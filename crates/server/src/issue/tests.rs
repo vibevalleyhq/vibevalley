@@ -937,3 +937,133 @@ async fn issue_relations_sync_bidirectionally_and_never_block_or_cycle_and_triag
     board.close_async().await;
     let _ = ctx.shutdown(Duration::from_secs(1)).await;
 }
+
+#[tokio::test]
+async fn issue_state_decoupled_from_runtime_write_lock_and_uses_targeted_derivation() {
+    use vibevalley_protocol::{Issue, IssueUpdate, Priority};
+
+    let dir = tempfile::tempdir().unwrap();
+    let service = Service::open(dir.path()).await.unwrap();
+    let outbox = Arc::new(Outbox::new(service.clone()));
+    let http: Arc<dyn crate::context::Fetch> = Arc::new(Http);
+    let ctx = Arc::new(Context::new(
+        service,
+        TaskGroup::new(),
+        Arc::new(LiveState::new()),
+        outbox,
+        Arc::new(StateFeed::new()),
+        vibevalley_core::system_clock(),
+        http.clone(),
+        http,
+    ));
+    let board = Board::open_standalone_async(ctx.clone(), Arc::new(Registry::new()), BoardConfig::under(dir.path()))
+        .await
+        .unwrap();
+
+    // 1. Seed 120 archived closed issues + 1 parent + 1 open child to verify board window & local derivation.
+    let mut archived = Vec::with_capacity(120);
+    for n in 1..=120i64 {
+        let mut item = Issue::new(format!("arch-{n}"), n, format!("Archived #{n}"), 1_000 + n);
+        item.delivered = Some(Landing::Merged);
+        item.closed_at = Some(2_000 + n);
+        archived.push(item);
+    }
+    board.state.put_issues_async(&archived).await.unwrap();
+
+    let parent = board
+        .create_async(NewIssue {
+            title: "Parent feature".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    let child = board
+        .create_async(NewIssue {
+            title: "Child task".into(),
+            parent: Some(parent.id.clone()),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    let sibling = board
+        .create_async(NewIssue {
+            title: "Independent task".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+    // Board window returns only open issues + top 50 closed issues (not all 120 archived rows).
+    let window = board.raw_issues_for_board_async(&[]).await.unwrap();
+    assert_eq!(window.len(), 50 + 3, "board window must prune archived history beyond top 50 closed");
+
+    // Targeted single-issue lookup (by id, number, #number) matches full-table derivation.
+    let full = board.issues_async().await.unwrap();
+    let full_parent = full.iter().find(|i| i.id == parent.id).unwrap();
+    assert_eq!(board.issue_async(&parent.id).await.unwrap().unwrap(), *full_parent);
+    assert_eq!(board.issue_async(&format!("#{}", parent.number)).await.unwrap().unwrap(), *full_parent);
+    assert_eq!(board.issue_async(&parent.number.to_string()).await.unwrap().unwrap(), *full_parent);
+
+    // 2. Hold `runtime.write_lock()` exclusively (simulating an active SessionEngine turn commit).
+    //    Unrelated IssueState edits MUST proceed immediately without blocking on runtime.write_lock().
+    let _held_session_lock = board.runtime.write_lock().lock().await;
+    let drafted = tokio::time::timeout(
+        Duration::from_secs(2),
+        board.state.change_async(
+            &sibling.id,
+            IssueChange::Drafted {
+                title: "Drafted while session write_lock held".into(),
+                description: "Targeted single-issue write".into(),
+                criteria: vec!["fast".into()],
+                questions: vec![],
+            },
+        ),
+    )
+    .await
+    .expect("IssueState::change_async must never block on SessionEngine write_lock")
+    .unwrap();
+    assert_eq!(drafted.title, "Drafted while session write_lock held");
+
+    let edited = tokio::time::timeout(
+        Duration::from_secs(2),
+        board.edit_async(
+            &sibling.id,
+            &IssueUpdate {
+                priority: Some(Priority::High),
+                ..Default::default()
+            },
+        ),
+    )
+    .await
+    .expect("Board::edit_async must never block on SessionEngine write_lock")
+    .unwrap();
+    assert_eq!(edited.priority, Priority::High);
+
+    // 3. Concurrent changes on two different issues succeed cleanly while runtime.write_lock() is held.
+    let (r1, r2) = tokio::join!(
+        board.state.change_async(
+            &child.id,
+            IssueChange::Drafted {
+                title: "Child updated".into(),
+                description: String::new(),
+                criteria: vec![],
+                questions: vec![],
+            },
+        ),
+        board.state.change_async(
+            &sibling.id,
+            IssueChange::Drafted {
+                title: "Sibling updated".into(),
+                description: String::new(),
+                criteria: vec![],
+                questions: vec![],
+            },
+        ),
+    );
+    assert_eq!(r1.unwrap().title, "Child updated");
+    assert_eq!(r2.unwrap().title, "Sibling updated");
+
+    drop(_held_session_lock);
+    board.close_async().await;
+    let _ = ctx.shutdown(Duration::from_secs(1)).await;
+}

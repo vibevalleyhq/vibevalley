@@ -1,4 +1,4 @@
-export { followed, useFollowed } from "./model/follow";
+export { followed, useFollowed } from "../../infra/channelFollow";
 export { issueThreadOf, unreadTotal } from "./model/places";
 export { ChannelSidePane } from "./views/ChannelPanels";
 export { ChatPage } from "./views/ChatPage";

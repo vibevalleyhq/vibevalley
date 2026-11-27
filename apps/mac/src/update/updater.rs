@@ -336,7 +336,7 @@ impl Updater {
         let plist_feed = plist.as_deref().and_then(releases::plist_update_feed);
         let asked = std::env::var("VIBEVALLEY_UPDATE_FEED").ok();
         let feed = feed_of(asked.as_deref(), plist_feed, bundle.is_some(), &version);
-        let dir = crate::hosted::server_home().join("updates");
+        let dir = crate::env::server_home().join("updates");
         Updater::new(version, bundle, dir, feed)
     }
 
@@ -614,7 +614,7 @@ pub fn install(cx: &mut App) {
         let asking = updater.clone();
         let cancel = tokio_util::sync::CancellationToken::new();
         let task_cancel = cancel.clone();
-        vibevalley_runtime::rt::current_or_global_handle().spawn(async move {
+        vibevalley_rt::current_or_global_handle().spawn(async move {
             let mut interval = tokio::time::interval(EVERY);
             interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
             loop {
@@ -634,7 +634,7 @@ pub fn install(cx: &mut App) {
             cancel.cancel();
         }
         let updater = updater.clone();
-        let handle = vibevalley_runtime::rt::current_or_global_handle().spawn(async move {
+        let handle = vibevalley_rt::current_or_global_handle().spawn(async move {
             let _ = updater.swap(false).await;
         });
         async move {
@@ -655,7 +655,7 @@ pub enum UpdateOp {
     Install,
 }
 
-pub fn host_call(op: UpdateOp, reply: crate::hosted::Replier, cx: &mut App) {
+pub fn host_call(op: UpdateOp, reply: crate::host_types::Replier, cx: &mut App) {
     use vibevalley_server::gateway::bridge::{BizCode, Envelope, refusal};
     let updater = updater().clone();
     match op {
@@ -664,7 +664,7 @@ pub fn host_call(op: UpdateOp, reply: crate::hosted::Replier, cx: &mut App) {
         UpdateOp::Check => {
             if updater.begin_check() {
                 let running = updater.clone();
-                vibevalley_runtime::rt::current_or_global_handle().spawn(async move {
+                vibevalley_rt::current_or_global_handle().spawn(async move {
                     running.run_check().await;
                 });
             }
@@ -672,7 +672,7 @@ pub fn host_call(op: UpdateOp, reply: crate::hosted::Replier, cx: &mut App) {
         }
         // Restarts into the new version.
         UpdateOp::Install => {
-            let handle = vibevalley_runtime::rt::current_or_global_handle().spawn(async move { updater.swap(true).await });
+            let handle = vibevalley_rt::current_or_global_handle().spawn(async move { updater.swap(true).await });
             cx.spawn(async move |cx| match handle.await {
                 Ok(Ok(())) => {
                     reply.send(Envelope::ok(Value::Null));

@@ -726,8 +726,8 @@ mod tests {
         write("packages/protocol/src/shapes.gen.ts");
         write("packages/protocol/src/types.d.ts");
         write("packages/protocol/dist/api.js");
-        write("apps/mac/ui/features/artifact/HtmlView.tsx");
-        write("apps/mac/ui/features/artifact/HtmlView.spec.tsx");
+        write("apps/mac/ui/features/note/HtmlView.tsx");
+        write("apps/mac/ui/features/note/HtmlView.spec.tsx");
         write("apps/mac/ui/build/App.js");
         write("node_modules/pkg/index.ts");
         write("target/debug/build.rs");
@@ -737,7 +737,7 @@ mod tests {
         assert_eq!(
             rels,
             vec![
-                "apps/mac/ui/features/artifact/HtmlView.tsx",
+                "apps/mac/ui/features/note/HtmlView.tsx",
                 "crates/core/src/lib.rs",
                 "packages/protocol/src/api.ts",
             ]

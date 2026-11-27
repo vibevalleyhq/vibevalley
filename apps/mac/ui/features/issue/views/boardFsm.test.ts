@@ -1,9 +1,11 @@
 import "../../../infra/polyfill";
 import { expect, test } from "nsh/test";
 
-import type { Issue, IssueId } from "@vibevalley/protocol";
+import type { AppliedIssue, Issue, IssueId } from "@vibevalley/protocol";
 
+import type { Intent } from "../../../infra/state/intent";
 import type { BoardCard } from "../model/cards";
+import { type IssueMove, movedCards, placedCards } from "../model/moves";
 import {
   BOARD_LANE_GAP,
   BOARD_PAD_X,
@@ -140,16 +142,22 @@ test("Board drag FSM transitions idle -> measuring -> dragging -> idle and ignor
   expect(state.phase).toBe("dragging");
   if (state.phase === "dragging") {
     expect(state.over).toBe("todo");
-    expect(state.before).toBeUndefined();
+    expect(state.before).toBe("c-2");
   }
 
-  // Move over c-2 -> sets `before: "c-2"` for manual ordering; drop outcome is `place`.
+  // Move over top half of c-2 (y=130..210, mid=170) -> `before: "c-2"`; drop outcome is `place`.
   state = dragTransition(state, { kind: "move", at: { x: 280, y: 150 }, isPlaceable: placeable });
   expect(dragDropOutcome(state, true)).toEqual({ kind: "place", card: cardA, before: "c-2" });
 
-  // Move over backlog lane -> outcome is `drop` on backlog.
+  // Move past bottom half of c-2 (y=190 >= 170) -> `before: ""` (end of lane); drop outcome is `place` with `before: undefined`.
+  state = dragTransition(state, { kind: "move", at: { x: 280, y: 190 }, isPlaceable: placeable });
+  expect(state.phase).toBe("dragging");
+  if (state.phase === "dragging") expect(state.before).toBe("");
+  expect(dragDropOutcome(state, true)).toEqual({ kind: "place", card: cardA, before: undefined });
+
+  // Move over empty backlog lane -> outcome is `drop` on backlog at end (`before: ""`).
   state = dragTransition(state, { kind: "move", at: { x: 50, y: 50 }, isPlaceable: placeable });
-  expect(dragDropOutcome(state, true)).toEqual({ kind: "drop", card: cardA, lane: "backlog" });
+  expect(dragDropOutcome(state, true)).toEqual({ kind: "drop", card: cardA, lane: "backlog", before: "" });
   expect(dragDropOutcome(state, false)).toEqual({ kind: "none" });
 
   // Terminating or starting a new card drag while dragging resets cleanly.
@@ -176,24 +184,79 @@ test("boardLaneWidth fits all 6 lanes cleanly at 1680px and avoids awkward parti
   expect(avail1280 - fiveLanes1280).toBeLessThan(BOARD_LANE_GAP);
 });
 
-test("cross-lane drag over placeable cards in another lane drops on target lane instead of placing before", () => {
+test("cross-lane drag computes exact midline insertion slot (first / middle / end) on manually ordered open lanes", () => {
   const cardBacklog = makeTodoCard("c-backlog", "backlog");
-  const cardTodo = makeTodoCard("c-2", "todo");
   const placeable = (id: string) => id === "c-1" || id === "c-2";
 
   let state = dragTransition(initialDragState(), { kind: "start", card: cardBacklog, number: "#10", title: "From backlog", at: { x: 80, y: 60 } });
   state = dragTransition(state, { kind: "measured", epoch: state.epoch, ghost: sampleGhost, targets: sampleTargets, isPlaceable: placeable });
-  // Hover directly over placeable `c-2` in the `todo` lane -> must drop on `todo`, NEVER set `before: "c-2"`.
-  state = dragTransition(state, { kind: "move", at: { x: 280, y: 150 }, isPlaceable: placeable });
-  expect(state.phase).toBe("dragging");
-  if (state.phase === "dragging") {
-    expect(state.over).toBe("todo");
-    expect(state.before).toBeUndefined();
-  }
-  expect(dragDropOutcome(state, true)).toEqual({ kind: "drop", card: cardBacklog, lane: "todo" });
 
-  // Moving back to another card inside its own `backlog` lane keeps cross-lane vs same-lane behavior distinct.
-  expect(cardTodo.lane).toBe("todo");
+  // Above c-1 midline (y=40..120, mid=80) -> insert before c-1.
+  state = dragTransition(state, { kind: "move", at: { x: 280, y: 60 }, isPlaceable: placeable });
+  expect(dragDropOutcome(state, true)).toEqual({ kind: "drop", card: cardBacklog, lane: "todo", before: "c-1" });
+
+  // Between c-1 midline (80) and c-2 midline (170) -> insert before c-2.
+  state = dragTransition(state, { kind: "move", at: { x: 280, y: 150 }, isPlaceable: placeable });
+  expect(dragDropOutcome(state, true)).toEqual({ kind: "drop", card: cardBacklog, lane: "todo", before: "c-2" });
+
+  // Below c-2 midline (170) -> insert at end of todo lane (`before: ""`).
+  state = dragTransition(state, { kind: "move", at: { x: 280, y: 200 }, isPlaceable: placeable });
+  expect(dragDropOutcome(state, true)).toEqual({ kind: "drop", card: cardBacklog, lane: "todo", before: "" });
+});
+
+test("non-manual ordering, closed lanes, and started issues omit manual slot placement (`before: undefined`)", () => {
+  const todoCard = makeTodoCard("c-backlog", "backlog");
+  const placeable = (id: string) => id === "c-1" || id === "c-2";
+  const targetsWithDone: DragTargets = {
+    ...sampleTargets,
+    laneRects: [...sampleTargets.laneRects, ["done", { x: 690, y: 0, w: 220, h: 400 }]],
+  };
+
+  // Non-manual ordering (priority) on open lane: cross-lane drop has no fake mid-column slot, same-lane rejected.
+  let prioState = dragTransition(initialDragState(), { kind: "start", card: todoCard, title: "Priority sort", at: { x: 80, y: 60 } });
+  prioState = dragTransition(prioState, {
+    kind: "measured",
+    epoch: prioState.epoch,
+    ghost: sampleGhost,
+    targets: { ...targetsWithDone, ordering: "priority" },
+    isPlaceable: placeable,
+  });
+  prioState = dragTransition(prioState, { kind: "move", at: { x: 280, y: 150 }, isPlaceable: placeable });
+  expect(dragDropOutcome(prioState, true)).toEqual({ kind: "drop", card: todoCard, lane: "todo" });
+  prioState = dragTransition(prioState, { kind: "move", at: { x: 80, y: 60 }, isPlaceable: placeable });
+  expect(dragDropOutcome(prioState, true)).toEqual({ kind: "none" });
+
+  // Closed target lane (`done`): never sets `before`.
+  let closedState = dragTransition(initialDragState(), { kind: "start", card: todoCard, title: "Close drop", at: { x: 80, y: 60 } });
+  closedState = dragTransition(closedState, {
+    kind: "measured",
+    epoch: closedState.epoch,
+    ghost: sampleGhost,
+    targets: targetsWithDone,
+    isPlaceable: placeable,
+  });
+  closedState = dragTransition(closedState, { kind: "move", at: { x: 750, y: 100 }, isPlaceable: placeable });
+  expect(dragDropOutcome(closedState, true)).toEqual({ kind: "drop", card: todoCard, lane: "done" });
+
+  // Started issue (`kind: "issue"`): cannot set `before` even on open manually-ordered lanes.
+  const startedCard: BoardCard = {
+    id: "c-started",
+    kind: "issue",
+    lane: "in_progress",
+    issue: { ...makeIssue("c-started", "in_progress"), moves: ["todo", "in_progress", "done"] },
+    sessions: [],
+    tag: "working",
+  };
+  let startedState = dragTransition(initialDragState(), { kind: "start", card: startedCard, title: "Started", at: { x: 500, y: 60 } });
+  startedState = dragTransition(startedState, {
+    kind: "measured",
+    epoch: startedState.epoch,
+    ghost: sampleGhost,
+    targets: targetsWithDone,
+    isPlaceable: placeable,
+  });
+  startedState = dragTransition(startedState, { kind: "move", at: { x: 280, y: 150 }, isPlaceable: placeable });
+  expect(dragDropOutcome(startedState, true)).toEqual({ kind: "drop", card: startedCard, lane: "todo" });
 });
 
 test("drag hit-testing tolerates empty space below short lanes and 10px inter-lane gaps while rejecting outside board", () => {
@@ -206,11 +269,11 @@ test("drag hit-testing tolerates empty space below short lanes and 10px inter-la
 
   // Empty vertical area below `in_progress` (lane rect h=240, boardRect h=600).
   state = dragTransition(state, { kind: "move", at: { x: 520, y: 500 }, isPlaceable: placeable });
-  expect(dragDropOutcome(state, true)).toEqual({ kind: "drop", card: cardA, lane: "in_progress" });
+  expect(dragDropOutcome(state, true)).toEqual({ kind: "drop", card: cardA, lane: "in_progress", before: "" });
 
   // Inside the 10px gap between `todo` (ends 450) and `in_progress` (starts 460), closer to `in_progress`.
   state = dragTransition(state, { kind: "move", at: { x: 458, y: 120 }, isPlaceable: placeable });
-  expect(dragDropOutcome(state, true)).toEqual({ kind: "drop", card: cardA, lane: "in_progress" });
+  expect(dragDropOutcome(state, true)).toEqual({ kind: "drop", card: cardA, lane: "in_progress", before: "" });
 
   // Outside `boardRect` bottom -> resolves to none.
   state = dragTransition(state, { kind: "move", at: { x: 520, y: 720 }, isPlaceable: placeable });
@@ -230,19 +293,22 @@ test("fast-drag release during measuring preserves drop target and resolves clea
   }
 
   state = dragTransition(state, { kind: "measured", epoch: state.epoch, ghost: sampleGhost, targets: sampleTargets, isPlaceable: placeable });
-  expect(dragDropOutcome(state, true)).toEqual({ kind: "drop", card: cardA, lane: "backlog" });
+  expect(dragDropOutcome(state, true)).toEqual({ kind: "drop", card: cardA, lane: "backlog", before: "" });
 });
 
-test("grouped swimlane hit-testing tracks exact hovered cell overKey and vertical bounds", () => {
+test("grouped swimlane hit-testing tracks exact hovered cell overKey, vertical bounds, and per-cell card slots", () => {
   const baseCard = makeTodoCard("c-1", "todo");
   const cardA: BoardCard = { ...baseCard, issue: { ...baseCard.issue, moves: ["backlog", "todo", "in_progress", "done", "canceled"] } };
-  const placeable = () => false;
+  const placeable = (id: string) => id === "ra-1" || id === "rb-1";
   const groupedTargets: DragTargets = {
     laneRects: [
-      ["in_progress", { x: 460, y: 40, w: 220, h: 120 }, "repoA:in_progress"],
-      ["in_progress", { x: 460, y: 220, w: 220, h: 120 }, "repoB:in_progress"],
+      ["in_progress", { x: 460, y: 40, w: 220, h: 140 }, "repoA:in_progress"],
+      ["in_progress", { x: 460, y: 220, w: 220, h: 140 }, "repoB:in_progress"],
     ],
-    cardRects: [],
+    cardRects: [
+      ["ra-1", { x: 470, y: 50, w: 200, h: 80 }, "in_progress", "repoA:in_progress"],
+      ["rb-1", { x: 470, y: 230, w: 200, h: 80 }, "in_progress", "repoB:in_progress"],
+    ],
     boardRect: { x: 0, y: 0, w: 720, h: 600 },
     grouped: true,
   };
@@ -250,14 +316,39 @@ test("grouped swimlane hit-testing tracks exact hovered cell overKey and vertica
   let state = dragTransition(initialDragState(), { kind: "start", card: cardA, title: "Grouped drag", at: { x: 260, y: 60 } });
   state = dragTransition(state, { kind: "measured", epoch: state.epoch, ghost: sampleGhost, targets: groupedTargets, isPlaceable: placeable });
 
-  state = dragTransition(state, { kind: "move", at: { x: 500, y: 260 }, isPlaceable: placeable });
+  // Top half of rb-1 (y=230..310, mid=270) inside repoB cell -> picks rb-1, ignores ra-1.
+  state = dragTransition(state, { kind: "move", at: { x: 500, y: 250 }, isPlaceable: placeable });
   expect(state.phase).toBe("dragging");
   if (state.phase === "dragging") {
     expect(state.over).toBe("in_progress");
     expect(state.overKey).toBe("repoB:in_progress");
+    expect(state.before).toBe("rb-1");
   }
+  expect(dragDropOutcome(state, true)).toEqual({ kind: "drop", card: cardA, lane: "in_progress", before: "rb-1" });
+
+  // Bottom half of rb-1 -> appends to end of repoB cell (`before: ""`).
+  state = dragTransition(state, { kind: "move", at: { x: 500, y: 295 }, isPlaceable: placeable });
+  expect(dragDropOutcome(state, true)).toEqual({ kind: "drop", card: cardA, lane: "in_progress", before: "" });
 
   // Below all swimlane cells in grouped mode -> should NOT expand vertically across group boundaries.
   state = dragTransition(state, { kind: "move", at: { x: 500, y: 450 }, isPlaceable: placeable });
   expect(dragDropOutcome(state, true)).toEqual({ kind: "none" });
+});
+
+test("movedCards and placedCards optimistically place dragged cards at the exact target slot", () => {
+  const c1 = makeTodoCard("c-1", "todo");
+  const c2 = makeTodoCard("c-2", "todo");
+  const c3 = makeTodoCard("c-3", "backlog");
+
+  const crossMove: Intent<IssueMove, AppliedIssue> = {
+    key: "k-1",
+    phase: "sending",
+    input: { id: "c-3", status: "todo", lane: "todo", before: "c-2", edit: { before: "c-2" } },
+  };
+  const afterCross = movedCards([c1, c2, c3], [crossMove]);
+  expect(afterCross.map((c) => `${c.id}:${c.lane}`)).toEqual(["c-1:todo", "c-3:todo", "c-2:todo"]);
+
+  // Append to end via empty string `before: ""`.
+  const afterSame = placedCards([c1, c2, c3], [{ id: "c-1", before: "" }]);
+  expect(afterSame.map((c) => c.id)).toEqual(["c-2", "c-3", "c-1"]);
 });

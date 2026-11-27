@@ -4,11 +4,11 @@ import { t } from "@vibevalley/i18n";
 import { type Memory, type MemorySourceInfo, memoryKeep } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
-import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
 import { Select, TextArea, TextInput } from "../../design/Field";
 import { Quiet } from "../../design/layout";
 import { CountPill } from "../../design/Tag";
+import { createAct } from "../../infra/act";
 import { api, createRequestKey } from "../../infra/api";
 import { useNow } from "../../infra/base/dom";
 import { ago } from "../../infra/base/format";

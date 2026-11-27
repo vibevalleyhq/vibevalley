@@ -1,13 +1,5 @@
 import { t } from "@vibevalley/i18n";
-import type { Changes, Issue } from "@vibevalley/protocol";
-
-import { api } from "../../../infra/api";
-
-export async function approveShownChanges(issue: Issue, shown: Changes) {
-  const revision = issue.deliver === "change" && !issue.parent ? shown.revision : undefined;
-  if (revision) await api.issue.review({ id: issue.id, pass: true, revision });
-  return { revision };
-}
+import type { Changes } from "@vibevalley/protocol";
 
 /** A binary file counts -1: not counted. */
 export const lineCounts = (c: Changes): [number, number] => [

@@ -1,11 +1,11 @@
 import { type Channel, type Chat, type ChatMessage, type CollabSlice, type Notify, userId } from "@vibevalley/protocol";
 
 import { api } from "../../../infra/api";
+import { type Followed, followed, useFollowed } from "../../../infra/channelFollow";
 import { useCollabSlice } from "../../../infra/frame";
 import { type Accessor, createEffect, createMemo } from "../../../infra/solid";
 import { defineAtom } from "../../../infra/state/atom";
 import { defineIntent, type Intent, type Intents, sendReplacing, useIntents } from "../../../infra/state/intent";
-import { type Followed, followed, useFollowed } from "./follow";
 import { newestUnread } from "./places";
 
 export interface ReactionMark {

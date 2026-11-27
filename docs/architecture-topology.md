@@ -48,7 +48,7 @@ flowchart TB
   subgraph Control["1. 总控端 Control Plane (vibevalley-server)"]
     GATE["接入网关 gateway/ (api · bridge · http · remote · 统一主体鉴权)"]
     SPINE["浅层装配与地基 (app.rs · router.rs · log/ · db/ · service/ · context/ · storage/)"]
-    DOMAINS["扁平单数业务域 (runtime · agent · issue · artifact · channel · connector · cron · voice · machine · debug · game.rs)"]
+    DOMAINS["扁平单数业务域 (runtime · agent · issue · note · channel · connector · cron · voice · machine · debug · game.rs)"]
     GATE --> SPINE
     SPINE --> DOMAINS
   end
@@ -116,10 +116,10 @@ flowchart LR
 
 | 逻辑平面 | 物理载体 | 应负责（Owns） | 不应负责（Does NOT Own） | 对外唯一端口 |
 |---|---|---|---|---|
-| **总控端 `Control Plane`** | [crates/server](crates/server/src/lib.rs) | 持久化单一真源（`db/` + `service/`）、`Outbox`、`LiveState`、6 路 `StateFeed` 投影、任务队列与依赖推进、频道投递、主助手轮次、作品目录与统一实时协同、记忆持久化、三类 `Principal` 鉴权、`machine/` 注册表 | 具体的子进程管理、远端宿主机文件读写、UI 组件树排版 | `gateway/api/`（含 `Router` 与 `GatewayPorts`）及单一 HTTP/WS 网关（`gateway/http/` + `gateway/remote/`） |
+| **总控端 `Control Plane`** | [crates/server](crates/server/src/lib.rs) | 持久化单一真源（`db/` + `service/`）、`Outbox`、`LiveState`、6 路 `StateFeed` 投影、任务队列与依赖推进、频道投递、主助手轮次、笔记目录与统一实时协同、记忆持久化、三类 `Principal` 鉴权、`machine/` 注册表 | 具体的子进程管理、远端宿主机文件读写、UI 组件树排版 | `gateway/api/`（含 `Router` 与 `GatewayPorts`）及单一 HTTP/WS 网关（`gateway/http/` + `gateway/remote/`） |
 | **桌面端 GUI `Desktop`** | [apps/mac](apps/mac/Cargo.toml) + [apps/mac/ui](apps/mac/ui) | GPUI 原生窗口、工作台页面、本地终端（`terminal`）、3D 纸雕农场渲染（`diorama`）、可选「单机合体启动器」与可选连接远端总控端 | 业务规则计算、擅自改写服务端持久化状态、越过协议直调服务端内部业务域 | `Client Protocol`（连远端总控端）或 `gateway/bridge/` + 进程内主机端口 |
 | **手机端 `Mobile`** | [apps/mobile](apps/mobile) | iOS / Android 移动界面（收件箱、频道、会话、任务）、设备配对、Keychain / Keystore 凭据存储、折叠屏双栏自适应 | 任何服务端状态存储、本地模型或 CLI 执行 | `Client Protocol`（`@vibevalley/protocol/remote`） |
-| **命令行 `CLI`** | [crates/cli](crates/cli/src/main.rs) | 1）`Client` 模式：经认证向总控端查询、创建任务、频道发言与提交作品版本；2）`Machine` 模式：在执行机上探针 CLI、维持反向 WS、驱动子进程 | 总控端全量状态镜像、多用户看板 UI 呈现 | `Client Protocol`（模式 1）与 `Machine Protocol`（模式 2） |
+| **命令行 `CLI`** | [crates/cli](crates/cli/src/main.rs) | 1）`Client` 模式：经认证向总控端查询、创建任务、频道发言与提交笔记版本；2）`Machine` 模式：在执行机上探针 CLI、维持反向 WS、驱动子进程 | 总控端全量状态镜像、多用户看板 UI 呈现 | `Client Protocol`（模式 1）与 `Machine Protocol`（模式 2） |
 | **执行层 `Execution Layer`** | `Machine` + `Runtime`（含 [crates/runtime/src/oar](crates/runtime/src/oar/mod.rs)） | `Machine` 在线注册、会话持久化存活、工作目录预置与清理、驱动 `claude`/`codex`/`acp` 子进程、回传事件与轨迹、本地 MCP 代理隧道 | 任务优先级队列、频道受众路由、用户账号或跨机器授权策略 | `Machine` trait 与 `Runtime` trait |
 
 ---
@@ -130,14 +130,14 @@ flowchart LR
 
 | 子模块 | 路径 | 应负责（Owns） | 不应负责（Does NOT Own） | 当前边界缺口与收敛目标 |
 |---|---|---|---|---|
-| **协议契约源** | [crates/protocol](crates/protocol/src/contract/mod.rs) | 全部线上结构体、`ENDPOINTS`、`NATIVE_ENDPOINTS`、`SUBSCRIPTIONS` 权限表、`BizCode`、`home.rs`、TS 声明生成器；作品仅保留单一 12 类 `ArtifactType`（消除 `ArtifactKind` × `ArtifactBody`） | 业务执行逻辑、数据库建表、网络客户端 | 将桌面专有 `contract/host.rs` 收归 `host` feature，避免 CLI 与移动端编译背负桌面外壳类型 |
-| **TS 边界编解码** | [packages/protocol](packages/protocol) | Rust 生成的类型、`api.ts`、`client.ts`、运行期边界 Zod Schema、`remote/transport.ts`（纯 Fetch + SSE 续读） | UI 状态缓存、平台持久化存储 | 同步清理旧 `artifact.block.*` / `artifact.entry.*` / `artifact.html.edit` / `artifact.outline.import` 与 `artifact.entry.follow` 声明 |
-| **纯状态、规则与协同内核** | [crates/core](crates/core/src/lib.rs) | 纯投影函数（`projection.rs` 6 路切片）、`SliceMask`、任务状态迁移校验、收件箱（`inbox.rs`）、定时到期计算（`cron/`）、内容平面 Loro 协同内核（`collab/`：`PresenceHub` 与 `CollabDoc`） | 任何 I/O、时间系统调用、网络请求、数据库访问，以及旧 `Blocks` / `Html` 划词引擎 | 多客户端不同语言时，将切片文案改为结构化词典键并在客户端本地化 |
-| **多语言词典** | [crates/i18n](crates/i18n/src/lib.rs) + [packages/i18n](packages/i18n) | 中英双语词典查询与参数插值（对用户文本，含 12 类作品名称与摘要） | 业务逻辑与提示词正文（提示词正文归 `crates/server/assets`） | 边界清晰，维持现状 |
+| **协议契约源** | [crates/protocol](crates/protocol/src/contract/mod.rs) | 全部线上结构体、`ENDPOINTS`、`NATIVE_ENDPOINTS`、`SUBSCRIPTIONS` 权限表、`BizCode`、`home.rs`、TS 声明生成器；笔记收敛为 3+1 `NoteType` 原语（`doc`/`base`/`canvas`/`media`）与 24 块 `BlockKind` | 业务执行逻辑、数据库建表、网络客户端 | 将桌面专有 `contract/host.rs` 收归 `host` feature，避免 CLI 与移动端编译背负桌面外壳类型 |
+| **TS 边界编解码** | [packages/protocol](packages/protocol) | Rust 生成的类型、`api.ts`、`client.ts`、运行期边界 Zod Schema、`remote/transport.ts`（纯 Fetch + SSE 续读） | UI 状态缓存、平台持久化存储 | 保持与 Rust `note` 契约单源同步 |
+| **纯状态、规则与协同内核** | [crates/core](crates/core/src/lib.rs) | 纯投影函数（`projection.rs` 6 路切片）、`SliceMask`、任务状态迁移校验、收件箱（`inbox.rs`）、定时到期计算（`cron/`）、笔记解析投影（`note/`）与内容平面 Loro 协同内核（`collab/`：`PresenceHub` 与 `CollabDoc`） | 任何 I/O、时间系统调用、网络请求、数据库访问 | 多客户端不同语言时，将切片文案改为结构化词典键并在客户端本地化 |
+| **多语言词典** | [crates/i18n](crates/i18n/src/lib.rs) + [packages/i18n](packages/i18n) | 中英双语词典查询与参数插值（对用户文本，含 3+1 原语笔记名称与摘要） | 业务逻辑与提示词正文（提示词正文归 `crates/server/assets`） | 边界清晰，维持现状 |
 
 ### 3.2 总控端扁平单数架构与无环 DAG（`Control Plane`）
 
-总控端不再按 `work/`、`team/`、`collab/`、`content/`、`skin/`、`infra/` 人工嵌套，改为扁平单数顶层目录 + 浅层组合根 `create_app(config) -> App` + 薄入口门 `router.rs` + 独立顶层 `service/` + 一表一文件 `db/entity/`（35 表），全部模块构成严格无环 DAG：
+总控端不再按 `work/`、`team/`、`collab/`、`content/`、`skin/`、`infra/` 人工嵌套，改为扁平单数顶层目录 + 浅层组合根 `create_app(config) -> App` + 薄入口门 `router.rs` + 独立顶层 `service/` + 一表一文件 `db/entity/`（36 表），全部模块构成严格无环 DAG：
 
 ```mermaid
 flowchart TD
@@ -150,16 +150,16 @@ flowchart TD
     RT["runtime/ (session · worktree)"]
     AG["agent/ (profile · memory · tool · mcp · orchestrator)"]
     IS["issue/ (board · edit · family · refine · pull · chat)"]
-    ART["artifact/ (目录化存储 · 统一多人/多 Agent 实时协同 · 12 类技能 · library · media/)"]
+    NOTE["note/ (目录化存储 · 24 块 doc · base · 统一实时协同 · 3+1 技能 · library · media/)"]
     REST["channel/ · connector/ · cron/ · voice/ · machine/ · debug/ · game.rs"]
   end
 
   subgraph BASE["共享地基、数据服务与存储"]
     CTX["context/ (Context: service · task · live · outbox · feed · clock · port.rs)"]
-    STG["storage/ (Storage: 附件 · 媒体输入 · 作品目录与版本快照)"]
+    STG["storage/ (Storage: 附件 · 媒体输入 · 笔记目录与版本快照)"]
     LEAF["setting.rs · provider.rs · repo.rs · log/"]
     SVC["独立顶层 service/ (Service: 全部业务视角持久化查询)"]
-    DB["db/ (SQLite / PostgreSQL Database · migration/ · 一表一文件 entity/ 共 35 表)"]
+    DB["db/ (SQLite / PostgreSQL Database · migration/ · 一表一文件 entity/ 共 36 表)"]
   end
 
   subgraph L0["共享契约与纯规则层"]
@@ -176,10 +176,10 @@ flowchart TD
 
 | 边界 | 唯一机制 | 硬规矩 |
 |---|---|---|
-| **持久化读写** | 独立顶层 `crates/server/src/service/`（`Service`，挂载于 `ctx.service`） | `crates/server/src/db/entity/` 严格一表一文件（`<table_name>.rs`，共 35 表）；**`crates/server/src/{db,service}/` 之外零 `sea_orm::` 与 `db::entity` 导入** |
+| **持久化读写** | 独立顶层 `crates/server/src/service/`（`Service`，挂载于 `ctx.service`） | `crates/server/src/db/entity/` 严格一表一文件（`<table_name>.rs`，共 36 表）；**`crates/server/src/{db,service}/` 之外零 `sea_orm::` 与 `db::entity` 导入** |
 | **入口分发** | `router.rs`（`Router` 编译期穷尽 `match`）+ `GatewayPorts` | 零运行时 handler `HashMap` 与 `attach_*` 晚绑定槽位；`gateway/` 不导入任何业务域 |
 | **状态广播与异步因果** | 同事务写 `Outbox` + `ctx.mark_dirty(SliceMask)` → `StateFeed` 单航班纯投影；瞬态流与农场特效进 `LiveState` | 零内存影子库、零启动重放水合、零 `EventBus` |
-| **作品目录与统一实时协同** | `storage/` 托管 `<storage>/artifact/<artifact_id>/{manifest.json,structure/,asset/}`，5 张作品表（`artifact`、`artifact_version`、`artifact_collab`、`artifact_change`、`artifact_suggestion`）覆盖全部 12 类 `ArtifactType` | 全类型不可妥协地支持多人 + 多 Agent 实时协同、在场、按 `origin` 历史与评审建议；彻底删除 `artifact_block`、`artifact_block_revision`、`artifact_entry`、`block.rs`、`entry.rs` 与旧 `Html` patcher（详见 [Artifact](docs/subsystems/artifact.md)） |
+| **笔记目录与统一实时协同** | `storage/` 托管 `<storage>/note/<note_id>/{manifest.json,structure/,asset/}`，6 张表（`note`、`note_version`、`note_collab`、`note_change`、`note_suggestion`、`note_link`）覆盖 3+1 `NoteType` 原语 | 全类型支持多人 + 多 Agent Loro 实时协同、在场、按 `origin` 历史、评审建议与双向链接图谱（详见 [Note](docs/subsystems/note.md)） |
 
 #### 3.2.2 静态防退化门禁
 
@@ -196,10 +196,10 @@ flowchart TD
 |---|---|---|
 | **`main.rs`、`app.rs`、`router.rs`** | `log::init` → `create_app(config) -> App` → `gateway::serve` 浅层装配；`App::close()` 统一停机；`Router` 鉴权、`trace_id` span、`FaultGate`、`InvokeObserver` 与 `EndpointId` / `NativeEndpointId` 编译期穷尽分发 | 具体业务规则或直连 SQL |
 | **`log/`、`context/`、`storage/`** | 统一日志与跨任务 span（`log/`）；共享上下文 `Context`（`service`、`task`、`live`、`outbox`、`feed`、`clock`）、`error.rs`、`http.rs`、`text.rs`、`port.rs`；统一对象与作品目录存储 `Storage` | 业务域编排或向上导入业务域 |
-| **`db/` 与独立顶层 `service/`** | `db/` 管双后端 `Database`、`migration/` 与严格一表一文件 `db/entity/<table_name>.rs`（35 表）；`service/`（`Service`）管全部业务视角持久化查询与事务性 `Outbox` 写入 | 协议鉴权、HTTP/WS 传输或前端切片展示逻辑 |
+| **`db/` 与独立顶层 `service/`** | `db/` 管双后端 `Database`、`migration/` 与严格一表一文件 `db/entity/<table_name>.rs`（36 表）；`service/`（`Service`）管全部业务视角持久化查询与事务性 `Outbox` 写入 | 协议鉴权、HTTP/WS 传输或前端切片展示逻辑 |
 | **`gateway/{api,bridge,http,remote}`** | 窄契约与 `GatewayPorts`、GPUI 进程内桥、Axum HTTP/SSE/`/mcp`/`/api/v1/attachment/{id}`/`/api/v1/machine/ws` 网关、默认关闭的受认证远程监听门 | 导入任何业务域模块或直连数据库 |
 | **`runtime/`、`machine/`、`issue/`、`agent/`** | 执行会话与 worktree（经 `SessionDriver` 与 `agent/` 解耦）；动态 `Machine` 注册路由；任务板、父子任务、起草、PR 与话题；角色档案、记忆、工具、MCP 与主助手 | 直接调用 `sea_orm::` 或绕过 `ctx.service` 写表 |
-| **`artifact/`** | `storage/` 作品目录生命周期、统一多人/多 Agent 实时协同层（`artifact_collab`、`artifact_change`、`artifact_suggestion`、`PresenceHub`）、12 类 `ArtifactType` 双语技能，以及并列的 `library` 与 `media/` | 旧 `Blocks` 块表、SQL-KV `artifact_entry` 行表或旧 `Html` 字符串划词引擎 |
+| **`note/`** | `storage/` 笔记目录生命周期、24 块 `doc` 与多维库 `base`、统一多人/多 Agent 实时协同层（`note_collab`、`note_change`、`note_suggestion`、`note_link`、`PresenceHub`）、3+1 `NoteType` 双语技能，以及并列的 `library` 与 `media/` | 直接调用 `sea_orm::` 或绕过 `ctx.service` 写表 |
 | **`channel/`、`connector/`、`cron/`、`voice/`、`debug/`、`game.rs`** | 频道受众投递、外联平台桥、定时任务、MOSS Live 实时通话与语音、门控 `DebugKit`、游戏账本与成就 | 音频硬件驱动（在 `apps/mac`）或直连 `sea_orm::` |
 
 ### 3.3 执行层子模块（`Execution Layer`：`Machine` + `Runtime`）
@@ -233,7 +233,7 @@ flowchart TD
 |---|---|---|---|
 | **`LocalMachine`** | 与总控端同进程（单机合体 / 个人中枢模式） | 包装本机 `worktree` 与 [crates/runtime/src/oar](crates/runtime/src/oar/mod.rs)，0 网络序列化 | 一台永远在 `local` 的普通 `Machine`，唯一支持免推送本地即时 Diff 与合并的节点 |
 | **`RemoteMachine`** | 任意开发机 / GPU 机（运行 `vibevalley machine up`） | 反向连接总控端 WS，探针本机 `claude`/`codex`/`acp`，用本地 `oar` 驱动子进程并把事件按 `seq` 写盘缓冲支持断线续读；本机起临时 `127.0.0.1:<port>/mcp` 经同一 WS 隧道回调总控端 | 一台与本机完全平权的 `Machine`；下线时注册表置为 `offline`，但已启动的远端会话继续运行等待重连 |
-| **`SandboxMachine`** | Docker / Apple Containers / 云沙箱（批量验证与赛马） | 容器镜像内置轻量 `vibevalley` 二进制与一次性 `Principal::Machine` 令牌，启动后自动挂上指定 `Runtime` 与仓库快照，跑完测试并回传验证证据（测试日志、截图、PR 链接）后退出销毁 | 一台声明为 `ephemeral` 的 `Machine`，任务完结自动注销并清理凭证 |
+| **`SandboxMachine`** | Docker / Apple Containers / 云沙箱（批量验证与赛马，当前由 `vibevalley-runtime/sandbox` Cargo feature 门控，待第三刀总控编排接线） | 容器镜像内置轻量 `vibevalley` 二进制与一次性 `Principal::Machine` 令牌，启动后自动挂上指定 `Runtime` 与仓库快照，跑完测试并回传验证证据（测试日志、截图、PR 链接）后退出销毁 | 一台声明为 `ephemeral` 的 `Machine`，任务完结自动注销并清理凭证 |
 | **`AcpRemoteRuntime`** | 外部独立暴露标准 ACP-over-WS 的 Agent 服务 | 在总控端或 `Machine` 内将远程 JSON-RPC 2.0 ACP 流适配为标准 `oar::Session` | 当作单个独立 `Runtime` 挂载于某台虚拟或宿主 `Machine` 之下 |
 
 ### 3.4 操纵层子模块（`Desktop GUI`、`Mobile`、`CLI`）
@@ -242,7 +242,7 @@ flowchart TD
 |---|---|---|---|---|
 | **桌面端 GUI (`apps/mac`)** | 1）`shell`（`WorkspaceProjects` / `HostChrome` / `NativeOverlays`）；2）`hosted`（单 `workbench` QuickJS 宿主）；3）`native`（纯 GPUI `MarkdownPane`、终端、文件浏览、像素农场）；4）`embedded`（可选单机合体启动器） | 多窗口与工作区面板编排；连接到本地或远端总控端；本地文件与终端展示 | 自己实现业务状态机；直调服务端业务域模块 | `apps/mac/ui/design/` 脱离 `infra/` 倒置，抽为跨桌面/移动共享原语；连接方式抽象为 `ClientTransport` 支持切换本地内嵌与远端总控端 |
 | **手机端 (`apps/mobile`)** | 1）`infra`（`HttpRemoteTransport` + `SecureStorage` + `lifecycle` / `Notifications`）；2）`features`（4 标签页 + `PairScreen`）；3）`design`（与桌面原语逐步对齐） | 移动交互、后台挂起 SSE 与前台 `Last-Event-ID` 瞬间续读、折叠屏与 iPhone Duo 主从自适应双栏 | 本机直连执行引擎、桌面像素场景与多窗工作区布局 | Token 迁入 iOS Keychain / Android Keystore；接通 `nsh` 的 `lifecycle`、`wakeCount`、`Notifications` 与复用 `<List>` |
-| **命令行 (`crates/cli`)** | 1）`client`（`Principal::Client`：`auth`、`issue`、`chat`、`session`、`artifact`、`pull`）；2）`machine`（`Principal::Machine`：`up`、`status`、`doctor`） | **传达端**：人在远端终端、CI 流水线或代理内部向总控端发出结构化指令与回报；**执行宿主机端**：在有 Coding Agent 的机器上以统一协议接通总控端 | 直接读写总控端数据库，或维护一套独立于总控端的任务数据库 | 保持 `auth` 持久化 Bearer 凭据（`auth.json`，`0600`）与 `machine` 子命令域承载反向 WS 守护与 `oar` 驱动 |
+| **命令行 (`crates/cli`)** | 1）`client`（`Principal::Client`：`auth`、`issue`、`chat`、`session`、`note`、`pull`）；2）`machine`（`Principal::Machine`：`up`、`status`、`doctor`） | **传达端**：人在远端终端、CI 流水线或代理内部向总控端发出结构化指令与回报；**执行宿主机端**：在有 Coding Agent 的机器上以统一协议接通总控端 | 直接读写总控端数据库，或维护一套独立于总控端的任务数据库 | 保持 `auth` 持久化 Bearer 凭据（`auth.json`，`0600`）与 `machine` 子命令域承载反向 WS 守护与 `oar` 驱动 |
 
 ---
 
@@ -263,13 +263,13 @@ flowchart TD
 1. **Client Protocol（面向桌面 GUI / Mobile / CLI 传达端）**：
    - `POST /api/v1/{op}`：强类型 RPC 命令，统一经 `Router` 校验 `Principal` 与端点 `can`。
    - `GET /api/v1/slice/{name}`：支持快照与 `WatchStream` SSE（携带 `Last-Event-ID` 断线续读），共享 `Arc<str>` 零克隆输出。
-   - `GET /api/v1/subscribe/{name}` 与 `issue/watch/{id}`：显式携带 `CallerContext` 并在 `Router` 按协议声明的 `can` 统一鉴权（`channel.follow`、`channel.reports`、`artifact.follow`、`artifact.suggestion.follow`、`artifact.presence.follow`、`session.watch`、`issue.watch`）。
+   - `GET /api/v1/subscribe/{name}` 与 `issue/watch/{id}`：显式携带 `CallerContext` 并在 `Router` 按协议声明的 `can` 统一鉴权（`channel.follow`、`channel.reports`、`note.follow`、`note.suggestion.follow`、`note.presence.follow`、`session.watch`、`issue.watch`）。
    - `GET /api/v1/attachment/{id}`：校验 `CallerContext`，支持 HTTP `Range` 与短时效签名媒体 URL 分块流式传输。
 2. **Machine Protocol（单条反向双向 WebSocket，面向一切执行机与沙箱）**：
    - **注册与保活帧**：`machine.hello`（平台、能力、工作区支持情况）、`machine.inventory`（可用 `Runtime` 与模型列表全量上报）、`machine.ping`/`pong`。
    - **固定对话帧（OAR Wire / ACP 对齐）**：`session.open`（携带 `runtime_id`、`workdir_spec`、`system_prompt` 与会话级 MCP 配置）、`session.input`（`prompt`/`steer`/`queue`/`abort`/`set_config`/`dispose`，带幂等 `input_id`）、`session.respond`（权限与交互应答）、`session.attach(session_id, after_seq)`（断线重连无损补齐）、`session.event` 与 `session.record`。
    - **MCP 反向隧道帧**：`mcp.request` / `mcp.response`（将远端子进程访问本地临时 `127.0.0.1/mcp` 的 JSON-RPC 请求原路透传给总控端 `agent/mcp/`）。
-   - **产物与工作区帧**：`artifact.upload` / `attachment.fetch(id)` 与轻量目录隔离 `worktree.prepare` / `worktree.cleanup`（不包含远程全量 Diff / 本地 Merge RPC）。
+   - **产物与工作区帧**：`note.upload` / `attachment.fetch(id)` 与轻量目录隔离 `worktree.prepare` / `worktree.cleanup`（不包含远程全量 Diff / 本地 Merge RPC）。
 
 ### 4.3 跨边界资源 ID 化规则
 
@@ -301,7 +301,7 @@ sequenceDiagram
   Reg->>Mach: WS 下发 session.open (含 repo_ref · prompt · session_token)
   Mach->>Mach: 确定性隔离目录 (git worktree add 或容器克隆)
   Mach->>Agent: 启动 CLI 子进程 (注入本地临时 http://127.0.0.1/mcp 代理)
-  Agent->>Mach: 调用本地 /mcp 工具 (channel_message_send / artifact_create)
+  Agent->>Mach: 调用本地 /mcp 工具 (channel_message_send / note_create)
   Mach->>Gate: 同一 WS 隧道转发 mcp.request (Principal::Session)
   Gate-->>Mach: 返回 mcp.response
   Mach->>Gate: 持续推送带递增 seq 的 session.event 与 voyage::Record
@@ -341,9 +341,9 @@ stateDiagram-v2
 
 ### 6.1 分阶段路线
 
-1. **第一刀 — 服务端扁平单数架构与作品目录化统一协同直接切换（已落地）**
-   - 落地 `main.rs` → `create_app(config) -> App`、薄 `router.rs`、统一 `log/`、严格一表一文件 `db/entity/<table_name>.rs`（35 表）、独立顶层 `service/`（`Service` 挂于 `Context::service`，`{db,service}/` 外零 `sea_orm::` 与 `db::entity` 导入）、`storage/` 与 `gateway/` 隔离（[地基](docs/subsystems/foundation.md)、[架构](docs/architecture.md)）。
-   - 消除旧 `Blocks` / `Html` patcher / SQL-KV `artifact_entry` 三引擎割裂与 `ArtifactKind` × `ArtifactBody` 重叠，落地 `<storage>/artifact/<artifact_id>/{manifest.json,structure/,asset/}` 目录化存储 + 5 表统一多人/多 Agent 实时协同层 + 12 类 `ArtifactType` 渐进披露技能（[Artifact](docs/subsystems/artifact.md)）。
+1. **第一刀 — 服务端扁平单数架构与笔记目录化统一协同直接切换（已落地）**
+   - 落地 `main.rs` → `create_app(config) -> App`、薄 `router.rs`、统一 `log/`、严格一表一文件 `db/entity/<table_name>.rs`（36 表）、独立顶层 `service/`（`Service` 挂于 `Context::service`，`{db,service}/` 外零 `sea_orm::` 与 `db::entity` 导入）、`storage/` 与 `gateway/` 隔离（[地基](docs/subsystems/foundation.md)、[架构](docs/architecture.md)）。
+   - 收敛为 `<storage>/note/<note_id>/{manifest.json,structure/,asset/}` 目录化存储 + 6 表统一多人/多 Agent 实时协同与双向链接图谱 + 3+1 `NoteType` 原语渐进披露技能（[Note](docs/subsystems/note.md)）。
    - 启用 `cargo xtask audit`（[xtask/src/boundaries.rs](xtask/src/boundaries.rs) 与 [xtask/src/ratchets.rs](xtask/src/ratchets.rs)）守住扁平无环 DAG、`gateway/` 隔离与 `{db,service}/` 数据访问边界。
 2. **第二刀 — 统一 `Machine` + `Runtime` 执行层与无头部署**
    - 完善 `LocalMachine` 与 `RemoteMachine`（`vibevalley machine up`、本地 `127.0.0.1/mcp` 代理隧道、断线 `after_seq` 续读与 `input_id` 幂等）。

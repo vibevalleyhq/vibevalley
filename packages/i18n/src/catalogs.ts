@@ -81,7 +81,7 @@ export const catalogs = {
     "web.agent": {
       newName: "新的 {runtime}",
       noProfiles: "问不到服务端的角色：",
-      noRuntimes: "读不到引擎：{why}",
+      noRuntimes: "读不到环境：{why}",
       loading: "读取配置…",
       noSuch: "没有这份角色。",
       backToAll: "回到全部角色",
@@ -105,7 +105,7 @@ export const catalogs = {
       missingApiKey: "还没填模型 API 密钥",
       random: "随机一个",
       avatar: "角色头像",
-      avatarHint: "在工作台与聊天里展示这个头像；留空时显示农场里的小动物。",
+      avatarHint: "在工作台与频道里展示这个头像；留空时显示农场里的小动物。",
       avatarAnimal: "默认小动物",
       avatarLabels: {
         orchestrator: "全能主助手",
@@ -124,7 +124,7 @@ export const catalogs = {
         collector: "素材收集员",
       },
       looksAs: "在农场里是",
-      looksHint: "只是长相：同一个引擎可以是不同的动物。",
+      looksHint: "只是长相：同一个环境可以是不同的动物。",
       wears: "穿什么",
       tab: { who: "身份", runtime: "能力", persona: "人设", skills: "技能", tools: "工具", env: "环境", memory: "记忆" },
       tabs: "角色的",
@@ -146,24 +146,24 @@ export const catalogs = {
       voiceSettingsLink: "语音与通话",
       voiceSettingsAfter: "配好后再选音色。",
       workdir: "默认仓库",
-      workdirTip: "工作区（VIBEVALLEY_WORK_ROOT）下的一个文件夹。主助手派活没说仓库时用它；留空时派活必须说在哪个仓库。",
+      workdirTip: "项目根目录（VIBEVALLEY_WORK_ROOT）下的一个文件夹。主助手派活没说仓库时用它；留空时派活必须说在哪个仓库。",
       workdirHint: "比如 clock-in",
       worktree: "每个执行会话一个 git worktree",
       worktreeHint: "每个执行会话在自己的分支上改，几个执行会话不会互相覆盖；完成时合进仓库。关掉就直接在仓库里改，没有分支可合。",
       env: "环境变量",
-      envHint: "叠加在引擎设置的环境变量之上。",
-      machine: "引擎",
-      machineTip: "换引擎会清掉模型和推理强度；长相（动物和衣服）不变。",
-      readingMachines: "读取引擎…",
+      envHint: "叠加在环境设置的环境变量之上。",
+      machine: "环境",
+      machineTip: "换环境会清掉模型和推理强度；长相（动物和衣服）不变。",
+      readingMachines: "读取环境…",
       available: "可用",
       disabled: "已停用",
       checking: "检测中…",
       notHere: "这台机器上没有",
       model: "模型",
-      noModels: "这个引擎现在报不出模型列表。",
+      noModels: "这个环境现在报不出模型列表。",
       modelLevels: "{name}（{n} 档推理）",
       effort: "推理强度",
-      effortDefault: "默认由引擎决定。",
+      effortDefault: "默认由环境决定。",
       defaultEffort: "默认",
       can: "{runtime} 能做什么",
       steer: "能在干活时接话（steer）",
@@ -173,31 +173,31 @@ export const catalogs = {
       refuses: "不接受 ",
       colon: "：",
       persona: {
-        append: { label: "追加到系统提示", detail: "保留引擎自带的工作方式，在后面加上人设。大多数情况选这个。" },
-        replace: { label: "替换系统提示", detail: "整段换掉引擎自带的系统提示。只有你清楚自己在做什么时才用。" },
-        prompt: { label: "写进工单开头", detail: "每个工单前面加上人设。所有引擎都能用，但会被长对话冲淡。" },
+        append: { label: "追加到系统提示", detail: "保留环境自带的工作方式，在后面加上人设。大多数情况选这个。" },
+        replace: { label: "替换系统提示", detail: "整段换掉环境自带的系统提示。只有你清楚自己在做什么时才用。" },
+        prompt: { label: "写进工单开头", detail: "每个工单前面加上人设。所有环境都能用，但会被长对话冲淡。" },
       },
       personaLabel: "人设",
-      personaTip: "它是谁、怎么干活、什么不做。会按下面的方式交给引擎。",
+      personaTip: "它是谁、怎么干活、什么不做。会按下面的方式交给环境。",
       personaHint: "你是一个谨慎的后端工程师。先读懂现有代码再动手……",
-      personaMode: "交给引擎的方式",
+      personaMode: "交给环境的方式",
       library: "技能库",
       libraryTip: "选中的技能跟人设一起交给执行会话，每个技能一节。",
       manageLibrary: "管理技能库",
       ownSkills: "{runtime} 自己装的技能",
-      ownSkillsTip: "引擎自己报告的，在这台机器上已经能用，不用在这里勾。",
+      ownSkillsTip: "环境自己报告的，在这台机器上已经能用，不用在这里勾。",
       mcp: "MCP 服务器",
-      mcpHint: "派出执行会话时交给引擎（oar 的 SessionOptions.mcpServers）。",
+      mcpHint: "派出执行会话时交给环境（oar 的 SessionOptions.mcpServers）。",
       removeNamed: "删除 {name}",
       mcpKind: "MCP 的种类",
       mcpName: "MCP 名字",
       mcpTarget: "MCP 命令或地址",
       add: "添加",
       disallowed: "禁用的工具",
-      disallowedHint: "这些工具这个 agent 不能用。下面引擎报告的工具点一下就能加进来。",
+      disallowedHint: "这些工具这个 agent 不能用。下面环境报告的工具点一下就能加进来。",
       disallowedExample: "比如 WebSearch",
       ownMcp: "{runtime} 自己连的 MCP",
-      ownMcpTip: "引擎自己报告的，和上面加的叠在一起。",
+      ownMcpTip: "环境自己报告的，和上面加的叠在一起。",
       toolsets: "能力集",
       toolsetsTip: "控制这个角色能调用哪些农场内建工具（服务端也会按角色权限兜底校验）。",
       toolset: {
@@ -210,23 +210,28 @@ export const catalogs = {
         memory: "记忆",
         media: "媒体",
         library: "资料库",
-        artifact: "作品",
+        note: "笔记",
       },
-      unreported: "这个引擎不报告这一项。",
+      unreported: "这个环境不报告这一项。",
       none: "没有。",
       role: { orchestrator: "主助手", worker: "执行角色" },
+      mode: {
+        managed: "本机调度",
+        external: "外部接入",
+        externalNotice: "这是外部接入的编码队友（{code}），不会自动派进 VibeValley 执行队列；可直接作为工单负责人或笔记协作者。",
+      },
       templates: {
         title: "模板",
         intro:
-          "每个模板是一份 agent 的配方：角色、职责、人设、推荐的引擎和长相。装一份就多一份角色，同一个模板能装好几份；装好的随便改，模板出了新版本，角色页会提示更新。",
+          "每个模板是一份 agent 的配方：角色、职责、人设、推荐的环境和长相。装一份就多一份角色，同一个模板能装好几份；装好的随便改，模板出了新版本，角色页会提示更新。",
         open: "模板库",
         openLine: "主助手与执行角色的配方，挑着装",
         folder: "模板文件夹",
         folderHint: "本机上一个模板文件夹的路径（里面有 agent.json）",
         add: "加进来",
         added: "模板「{name}」加进来了，还没装",
-        onServer: "跑在内置引擎",
-        notHere: "写给 {runtime}，这台机器上没有：装上以后在角色里换一个引擎",
+        onServer: "跑在内置环境",
+        notHere: "写给 {runtime}，这台机器上没有：装上以后在角色里换一个环境",
         noPersona: "没写人设。",
         addedHere: " · 本机加进来的",
         skill: "技能「{name}」：{description}",
@@ -234,7 +239,7 @@ export const catalogs = {
         removeSure: "真的删掉模板",
         from: "来自模板「{name}」第 {version} 版",
         update: "照模板更新到第 {version} 版",
-        updateHint: "用模板的新版本盖掉职责、适合的活、人设和交给引擎的方式；名字、长相、引擎、模型和环境不动。",
+        updateHint: "用模板的新版本盖掉职责、适合的活、人设和交给环境的方式；名字、长相、环境、模型和环境变量不动。",
         updated: "照模板更新好了",
         galleryTitle: "开箱即用的模板",
         galleryIntro: "按分工挑一份模板：自带风格、人设与技能，一键采用即可派活。",
@@ -268,7 +273,7 @@ export const catalogs = {
         orchestrators: "主助手",
         helpers: "执行角色",
         search: "搜索角色",
-        searchHint: "搜名字、职责、引擎、标签…",
+        searchHint: "搜编号、名字、职责、环境、标签…",
         make: "新建执行角色",
         makeOrchestrator: "新建主助手",
         orchestratorLine: "专职统筹：拆解任务、分配执行、跟踪进度、汇总结果。",
@@ -281,8 +286,8 @@ export const catalogs = {
         emptySearch: "没有符合条件的角色。",
         clearFilter: "清掉筛选",
       },
-      runtimeDefault: "引擎默认",
-      runtimeDefaultModel: "引擎默认（{model}）",
+      runtimeDefault: "环境默认",
+      runtimeDefaultModel: "环境默认（{model}）",
       noEffort: "这个模型没有推理强度可选。",
       noEffortModel: "{model}没有推理强度可选。",
       targetMachine: "执行机器",
@@ -291,260 +296,6 @@ export const catalogs = {
       targetMachineOffline: "{name}（离线）",
       targetMachineDraining: "{name}（排空中）",
       selector: { ready: "就绪", warn: "提醒", error: "不可用", checking: "检测中…", fix: "去设置" },
-    },
-    "web.artifact": {
-      card: { version: "第 {version} 稿", open: "打开「{title}」" },
-      preview: { slides: "{n} 页", shots: "{n} 镜", scenes: "{n} 场", nodes: "{n} 节点", edges: "{n} 连线" },
-      page: {
-        delete: "删掉",
-        deleteAsk: "删掉「{title}」？对话里的卡片还在。",
-        deleted: "删掉了「{title}」",
-        gone: "这份作品已经删掉了，或者没有这份作品。",
-        new: "新建",
-        none: "还没有作品：写个标题新建一篇，或者让执行会话交一份上来。",
-        all: "全部作品",
-        title: "标题",
-        more: "更多",
-        rail: "这篇的旁注",
-        railShow: "打开旁注",
-        railHide: "收起旁注",
-        backToLibrary: "返回作品库",
-        previewTab: "预览",
-        filesTab: "文件",
-        filesTabCount: "文件 ({n})",
-        viewMode: "视图模式",
-        liveVersion: "实时",
-        directory: "目录",
-        newFileLabel: "新文件路径",
-        discard: "放弃更改",
-        unsaved: "未保存",
-        deleteFileAsk: "删除文件「{path}」？",
-        snapshotNote: "手动快照",
-      },
-      docs: { split: "分栏", edit: "编辑", read: "阅读" },
-      outline: {
-        progress: "{done}/{total} 已完成",
-        hideDone: "隐藏已完成",
-        showDone: "显示已完成",
-        quickAdd: "输入内容后按回车快速添加…",
-        kindHeading: "标题",
-        kindBullet: "要点",
-        kindTodo: "待办",
-        cycleKind: "切换类型 ({kind})",
-        indent: "缩进",
-        outdent: "取消缩进",
-        addChild: "添加子项",
-        untitled: "新条目",
-      },
-      sheet: { filterPlaceholder: "筛选行…", addRow: "新增一行", empty: "暂无工作表", rowsCount: "{n} 行" },
-      diagram: { visual: "图谱视图", structure: "节点与连线", nodes: "节点", edges: "连线" },
-      motion: {
-        timeline: "时间线片段",
-        layers: "{n} 个图层",
-        play: "播放",
-        stop: "暂停",
-        restart: "回到开头",
-        loop: "循环播放",
-        prevStep: "后退 0.5 秒",
-        nextStep: "前进 0.5 秒",
-        chapters: "章节",
-      },
-      storyboard: {
-        gridMode: "分镜卡片",
-        animaticMode: "动态预演",
-        totalDuration: "总时长 {sec} 秒",
-        shotOf: "第 {n} / {total} 镜",
-        sfx: "音效",
-        transition: "转场",
-      },
-      prototype: { viewportLabel: "视口尺寸", viewportFull: "铺满", viewportTablet: "平板", viewportMobile: "手机", reload: "重新载入" },
-      files: { codeMode: "源码", htmlPreviewMode: "网页预览" },
-      issue: {
-        title: "作品",
-        empty: "还没有关联作品",
-        linkExisting: "关联已有作品…",
-        linkPlaceholder: "搜索作品…",
-        linkEmpty: "没有可关联的作品",
-        new: "新建作品",
-        newDialogTitle: "新建关联作品",
-        newTitle: "标题",
-        newTitlePlaceholder: "给作品起个标题…",
-        newType: "类型",
-        newCreate: "创建",
-        unlink: "取消关联「{title}」",
-        linkedToast: "已关联「{title}」",
-        unlinkedToast: "已取消关联「{title}」",
-      },
-      blocks: { saved: "都存好了", user: "你", start: "从这里开始写……" },
-      canvas: { label: "打开的作品", close: "关掉", openPage: "在作品页打开" },
-      suggestions: { title: "建议（{n}）", by: "{name} 提的", accept: "接受", reject: "不要", delete: "删掉这一块" },
-      types: {
-        defaultBadge: "默认体系",
-        setDefault: "设为默认设计体系",
-        unsetDefault: "取消默认",
-        docs: "协作文档",
-        outline: "大纲笔记",
-        slides: "幻灯片",
-        dashboard: "数据看板",
-        motion: "动态短片",
-        whiteboard: "无限白板",
-        design: "界面画板",
-        designSystem: "设计体系",
-        sheet: "电子表格",
-        prototype: "交互原型",
-        diagram: "结构图表",
-        storyboard: "分镜脚本",
-      },
-      timeline: {
-        title: "历史记录",
-        show: "打开历史记录",
-        hide: "收起历史记录",
-        savedVersions: "已保存版本",
-        commits: "变更记录",
-        loading: "正在载入历史…",
-        empty: "还没有可回放的提交",
-        backToLive: "回到最新",
-        previewBanner: "历史只读预览 · {summary}",
-        versionBanner: "正在查看第 {version} 稿（只读）{note}",
-        turn: "第 {n} 轮",
-        restore: "恢复到此版本",
-        restored: "已恢复到所选版本",
-        fork: "分叉为新作品",
-        forkTitle: "{title}（分支）",
-        forked: "已分叉为「{title}」",
-        undoTurn: "撤销此轮改动",
-        undoneOrigin: "已撤销该来源的改动",
-        compact: "压缩历史",
-        compacted: "已压缩历史快照",
-      },
-      dashboard: { exportCsv: "导出 CSV" },
-      whiteboard: {
-        pan: "平移",
-        select: "选择",
-        rect: "矩形",
-        sticky: "便签",
-        card: "卡片",
-        diamond: "菱形",
-        text: "文字",
-        container: "分区容器",
-        pen: "画笔",
-        sticker: "贴纸",
-        arrow: "连线箭头",
-        timeline: "时间线",
-        undo: "撤销",
-        redo: "重做",
-        duplicate: "复制",
-        chatWithOrchestrator: "问助手",
-        templateTimeline: "时间线模板",
-        templateArchitecture: "架构图模板",
-        inspector: "属性检查器",
-        label: "标题",
-        body: "正文",
-        noSticker: "无贴纸",
-        save: "保存",
-        entryJson: "条目 JSON",
-        saveJson: "保存 JSON",
-        exportedSvg: "已导出 SVG",
-        exportedPng: "已导出 PNG",
-        exportedJson: "已导出 JSON",
-        exportedJsonCanvas: "已导出 JSON Canvas",
-        deleteSelected: "删除选中",
-        zoomIn: "放大",
-        zoomOut: "缩小",
-        fitView: "适应画布",
-        elements: "{n} 个元素",
-        emptyHint: "从底部工具栏放置卡片、时间线、连线与贴纸，或一键载入模板开始协作",
-        fillDefault: "默认",
-        fillSun: "暖黄",
-        fillPeach: "暖橘",
-        fillLeaf: "叶绿",
-        fillWater: "湖蓝",
-        fillLavender: "淡紫",
-        fillBerry: "莓红",
-        fillSide: "灰底",
-        curveSmooth: "平滑曲线",
-        curveOrthogonal: "直角折线",
-        curveStraight: "直线",
-        styleSolid: "实线",
-        styleDashed: "虚线",
-      },
-      design: {
-        themeLight: "浅色",
-        themeDark: "深色",
-        propsTitle: "属性控制杆",
-        enabled: "开启",
-        disabled: "关闭",
-        emptyCanvas: "暂无画板元素，可在工作区中添加组件",
-      },
-      designSystem: {
-        components: "组件预览",
-        colors: "色彩令牌",
-        typography: "字体排印",
-        spacing: "间距尺度",
-        radius: "圆角尺度",
-        guidelinesDo: "推荐",
-        guidelinesDont: "避免",
-        previewTheme: "预览主题",
-        specimen: "Aa Bb 永和九年 0123456789",
-      },
-      slidesStore: { addSlide: "加一页" },
-      edit: { save: "存成新的一稿", saved: "存成了第 {version} 稿" },
-      slides: {
-        previous: "上一页",
-        next: "下一页",
-        present: "全屏放映",
-        presenter: "演讲者视图",
-        editSlide: "编辑本页",
-        doneEdit: "完成编辑",
-        slideTitleLabel: "标题",
-        slideSubtitleLabel: "副标题",
-        slideLayoutLabel: "版式",
-        layoutCover: "封面",
-        layoutContent: "正文",
-        slideBulletsLabel: "要点（每行一条）",
-        slideNotesLabel: "演讲备注",
-      },
-      presenter: {
-        missing: "没说要讲哪一份幻灯片：从作品的「演讲者视图」打开。",
-        current: "这一页",
-        next: "下一页",
-        end: "这是最后一页",
-        notes: "备注",
-        noNotes: "这一页没有备注",
-        clock: "讲了多久",
-        restart: "重新计时",
-        aside: "下一页和备注",
-        waiting: "等待演示页就绪",
-        empty: "没有可演示的页",
-        loadFailure: "演示页未能载入：{reason}",
-      },
-      standalone: { missing: "这份作品已经删掉了，或者没有这份作品。", version: "第 {version} 稿", live: "最新" },
-      applet: {
-        button: "安装为桌面应用",
-        badgeInstalled: "已安装",
-        modalTitle: "本地桌面应用",
-        subtitle: "将这份作品安装为独立 Mac 应用，可从聚焦搜索或程序坞直接打开。",
-        appNameLabel: "应用名称",
-        appNamePlaceholder: "输入应用显示名称",
-        alwaysOnTopLabel: "窗口置顶",
-        alwaysOnTopHint: "独立应用窗口保持在其它窗口之上。",
-        statusInstalled: "已安装",
-        statusNotInstalled: "尚未安装",
-        bundlePathLabel: "应用位置",
-        bundleIdLabel: "应用标识",
-        install: "安装应用",
-        reinstall: "更新并重装",
-        installing: "正在安装…",
-        open: "打开应用",
-        openApp: "打开独立应用",
-        manageApp: "管理应用",
-        uninstall: "卸载",
-        installedToast: "已安装「{name}.app」",
-        uninstalledToast: "已卸载「{name}.app」",
-        openedToast: "正在打开「{name}.app」",
-        nameRequired: "请先输入应用名称",
-        unavailable: "当前宿主不支持安装本地桌面应用",
-      },
     },
     "web.audio": {
       title: "音频工作台",
@@ -594,7 +345,7 @@ export const catalogs = {
       executionStreaming: "流式文字与说话人",
       partialTitle: "部分转写",
       partialTranscript: "部分转写——并非完整结果。",
-      savePartialTranscript: "将部分转写保存为作品",
+      savePartialTranscript: "将部分转写保存为笔记",
       chooseFile: "选一个音频文件",
       copyTranscript: "复制转写",
       copyPartialTranscript: "复制部分转写",
@@ -603,8 +354,8 @@ export const catalogs = {
       transcribe: "开始转写",
       timeline: "说话人时间轴",
       noTimestamps: "厂商没有返回带时间戳的分段。",
-      saveTranscript: "将转写保存为作品",
-      openTranscript: "打开已保存的转写作品",
+      saveTranscript: "将转写保存为笔记",
+      openTranscript: "打开已保存的转写笔记",
       downloadAudio: "下载音频",
       history: "音频任务",
       empty: "还没有音频任务。",
@@ -643,14 +394,14 @@ export const catalogs = {
       route: { missing: "这个页面不存在", invalid: "这个地址无效", home: "返回应用" },
       place: {
         dashboard: { label: "总览", hint: "个人名片、活跃会话、待办摘要与运行记录" },
-        chat: { label: "对话", hint: "频道与话题" },
+        chat: { label: "频道", hint: "频道与话题" },
         issues: { label: "工单", hint: "每张工单从记下到完成" },
-        workspace: { hint: "管理仓库与工作区", name: "工作区" },
-        content: { label: "作品", hint: "作品、大纲笔记与素材" },
+        workspace: { hint: "管理仓库与项目", name: "项目" },
+        content: { label: "笔记", hint: "文档、白板、多维表与素材" },
         farm: { label: "农场", hint: "3D 纸雕农场与院落现场" },
-        runtimes: { label: "引擎", hint: "本机与远端已安装的编码引擎" },
-        team: { label: "专家", hint: "专家角色与能力模板" },
-        settings: { label: "设置", hint: "个人资料、通用与外观、模型与引擎、MCP 接入、语音与连接、数据与关于" },
+        runtimes: { label: "环境", hint: "本机与远端已安装的编码环境" },
+        team: { label: "队友", hint: "队友角色与能力模板" },
+        settings: { label: "设置", hint: "个人资料、通用与外观、模型与环境、MCP 接入、语音与连接、数据与关于" },
       },
       dashboard: {
         title: "总览仪表盘",
@@ -712,11 +463,11 @@ export const catalogs = {
             reworkLine: "返工率：{reworkRate}（{issues} 张工单，{findings} 条问题，未解决 {unresolved} 条）",
           },
         },
-        profile: { defaultName: "工作台用户", defaultTagline: "在工作台与默认频道统筹角色与工单" },
+        profile: { defaultName: "工作台用户", defaultTagline: "在工作台与默认频道统筹队友与工单" },
         stats: { working: "运行中会话", waiting: "等你回应", issues: "待办与进行中", review: "待验收" },
         pulse: {
-          title: "活跃引擎与执行脉搏",
-          empty: "当前没有运行中的执行会话，随时去工单或对话里派活。",
+          title: "活跃环境与执行脉搏",
+          empty: "当前没有运行中的执行会话，随时去工单或频道里派活。",
           active: "{n} 个会话正在干活",
           openRuns: "查看全部运行记录",
         },
@@ -725,6 +476,7 @@ export const catalogs = {
           waiting: "正在等你答复",
           inReview: "工单待验收",
           todo: "待办工单",
+          zeroTitle: "全部处理完了",
           empty: "暂无需要立即处理的事项。",
           openIssues: "打开工单看板",
         },
@@ -743,16 +495,7 @@ export const catalogs = {
       orchestrator: "主助手",
       unreachable: "暂时连不上服务端，请等它恢复后重试。",
       query: { invalidResponse: "返回的数据格式不符，已有的有效结果已保留。" },
-      table: {
-        columns: "显示的列",
-        stale: "新页还在读取，当前显示的是上一次的结果，暂时不能操作这些行。",
-        selectPage: "选择本页",
-        selectRow: "选择行 {id}",
-        empty: "暂无数据",
-        previous: "上一页",
-        next: "下一页",
-        page: "第 {n} 页",
-      },
+      table: { empty: "暂无数据" },
       form: {
         invalid: "请检查这一项。",
         validationUnavailable: "暂时无法校验，输入已保留。",
@@ -910,7 +653,7 @@ export const catalogs = {
       stop: "停止",
     },
     "web.channel": {
-      tab: { chat: "对话", issues: "工单", crons: "定时任务" },
+      tab: { chat: "频道", issues: "工单", crons: "定时任务" },
       defaultRepo: "默认仓库 {repo}",
       channels: "频道列表",
       defaultHint: "默认的频道：你、主助手和执行会话都在这儿",
@@ -927,10 +670,10 @@ export const catalogs = {
       channelsTitle: "频道",
       directsTitle: "私聊",
       newChannel: "创建频道",
-      newChat: "发起对话",
-      filter: { label: "筛选会话", all: "全部", group: "频道", direct: "私聊" },
+      newChat: "新建频道或私聊",
+      filter: { label: "筛选频道", all: "全部", group: "频道", direct: "私聊" },
       emptyPreview: "暂无消息",
-      emptyList: "这里还没有对话",
+      emptyList: "这里还没有频道",
       runsEntry: "查看执行会话",
       mood: { idle: "在歇着", listening: "在听", thinking: "在想", speaking: "在说" },
       orchestrator: "主助手",
@@ -955,8 +698,14 @@ export const catalogs = {
         settingsOf: "# {name} 的设置",
         save: "保存",
       },
-      issues: { empty: "这个频道里还没有工单。在聊天里跟主助手说一件要做的事，它会派执行会话，工单就列在这里。", thread: "工单话题" },
+      issues: {
+        emptyTitle: "还没有工单",
+        empty: "这个频道里还没有工单。在频道里跟主助手说一件要做的事，它会派执行会话，工单就列在这里。",
+        openBoard: "打开工单看板",
+        thread: "工单话题",
+      },
       crons: {
+        emptyTitle: "还没有定时任务",
         empty: "还没有定时任务：跟主助手说「每天九点跑一遍测试」。",
         next: "下次 {next}",
         direct: "直接派 {agent}",
@@ -1033,16 +782,18 @@ export const catalogs = {
         attach: "附上文件",
         uploadFailed: "没传上去：{why}",
         command: "命令",
-        artifactContext: "当前上下文：{title}",
-        artifactSlide: "第 {n} 页",
-        artifactSelected: "已选 {n} 个元素",
+        noteContext: "当前上下文：{title}",
+        noteSlide: "第 {n} 页",
+        noteSelected: "已选 {n} 个元素",
         clearContext: "移除本次附带的上下文",
         runningHint: "正在处理中，可直接补充说明或点击停止",
-        dictateStart: "语音输入（MOSS ASR）",
+        dictateStart: "语音听写（ASR）",
         dictateStop: "停止语音输入",
         dictateConnecting: "正在连接语音…",
         dictateListening: "正在听写…",
-        dictateFinishing: "正在整理文字…",
+        dictateFinishing: "识别中…",
+        dictatePolishing: "润色中…",
+        dictateRevertRaw: "还原原文",
       },
       manage: {
         name: "名称",
@@ -1081,17 +832,17 @@ export const catalogs = {
         markUnread: "从这里标成未读",
         jump: "跳到这条",
         promoteIssue: "转为工单",
-        saveArtifact: "存为作品",
+        saveNote: "存为笔记",
       },
       promote: {
         source: "来自 {where}",
-        saveTitle: "将消息存为作品",
-        artifactTitle: "标题",
-        artifactType: "类型",
-        artifactContent: "内容",
-        artifactSave: "保存作品",
-        artifactSaved: "已存为「{title}」",
-        artifactNote: "存自 {where}",
+        saveTitle: "将消息存为笔记",
+        noteTitle: "标题",
+        noteType: "类型",
+        noteContent: "内容",
+        noteSave: "保存笔记",
+        noteSaved: "已存为「{title}」",
+        noteNote: "存自 {where}",
         fallbackTitle: "第 {number} 条消息",
       },
       switcher: {
@@ -1259,7 +1010,7 @@ export const catalogs = {
         activeSubscriptions: "活跃订阅",
         latestSeq: "最新序号",
         lastFrameMs: "最近帧耗时",
-        runtimes: "引擎状态",
+        runtimes: "环境状态",
         installed: "已安装",
         notInstalled: "未安装",
         ready: "就绪",
@@ -1282,7 +1033,7 @@ export const catalogs = {
         correlationId: "关联 #{id}",
       },
       trajectory: {
-        kind: { issueSession: "工单", workspaceChat: "对话", orchestrator: "主助手" },
+        kind: { issueSession: "工单", workspaceChat: "项目对话", orchestrator: "主助手" },
         silentError: "静默错误",
         tokens: "Token 消耗",
         rawPayload: "原始载荷",
@@ -1315,12 +1066,12 @@ export const catalogs = {
         channels: "频道",
         agents: "角色",
         repos: "仓库",
-        artifacts: "作品",
+        notes: "笔记",
         inbox: "收件箱",
         mediaJobs: "媒体",
         emptyCaches: "暂无缓存统计。",
         collab: "Loro 协同与瞬态在场",
-        emptyCollab: "暂无活跃协同作品。",
+        emptyCollab: "暂无活跃协同笔记。",
         frontiers: "Frontiers 前沿",
         presence: "EphemeralStore 在场节点",
         noPeers: "暂无活跃在场节点",
@@ -1554,13 +1305,13 @@ export const catalogs = {
       owner: {
         label: "负责人",
         pick: "选择负责人",
-        search: "搜索人员或专家…",
+        search: "搜索人员或队友…",
         self: "我（本人）",
         selfNamed: "{name}（本人）",
         unassigned: "未指定负责人",
         clear: "清除负责人",
         peopleGroup: "人员",
-        expertsGroup: "专家角色",
+        expertsGroup: "队友",
       },
       groupBy: { label: "分组", none: "不分组", repo: "仓库", owner: "负责人", agent: "角色", priority: "优先级", parent: "父工单", noParent: "无父工单" },
       hierarchy: { label: "层级", all: "全部工单", top_level: "仅顶层", parents_only: "仅父工单" },
@@ -1821,7 +1572,7 @@ export const catalogs = {
         save: "存下改动",
         remove: "删掉",
         newRepo: "新建仓库",
-        repoHint: "仓库名，也是工作区下的文件夹名",
+        repoHint: "仓库名，也是项目根目录下的文件夹名",
         repoName: "仓库名",
         create: "新建",
         edit: "编辑",
@@ -1848,7 +1599,7 @@ export const catalogs = {
         cron: "定时任务",
         missed: "定时任务（补跑）",
         refine: "起草",
-        runtime: "引擎自己",
+        runtime: "环境自己",
       },
       run: { working: "正在干", heard: "中途听到 {n} 句", reconcile: "需要核对工作区", currentChanges: "查看工单当前改动" },
       card: {
@@ -1916,10 +1667,10 @@ export const catalogs = {
         machineAuto: "自动分配机器",
         missingRepo: "还没有添加仓库，可先记在待办，添加仓库后再派发。",
         goRepos: "去添加仓库",
-        missingRuntime: "尚未启用可用引擎，配置好编码引擎后就能自动起草和开工。",
-        goRuntimes: "去配置引擎",
+        missingRuntime: "尚未启用可用环境，配置好编码环境后就能自动起草和开工。",
+        goRuntimes: "去配置环境",
       },
-      conversation: { older: "加载更早的消息", placeholder: "写一条评论、补充说明或反馈…" },
+      conversation: { older: "加载更早的消息", placeholder: "写一条评论、补充说明或反馈…", postComment: "发表评论" },
       activity: { title: "动态记录", empty: "需求讨论、进展节点与执行步骤会汇总在这里" },
       attachments: {
         title: "附件",
@@ -1953,24 +1704,6 @@ export const catalogs = {
         collapseDay: "收起",
       },
       deps: { blockedBy: "阻塞于", pick: "选择前置工单…", none: "无前置阻塞", clear: "清除前置依赖", blockedByChip: "被 #{n} 阻塞" },
-      triage: {
-        selected: "已选 {n} 项",
-        selectIssue: "选择工单 #{n}",
-        clear: "取消选择",
-        status: "改状态",
-        agent: "派执行会话",
-        noAgent: "清除执行会话",
-        owner: "负责人",
-        noOwner: "清除负责人",
-        repo: "仓库",
-        noRepo: "清除仓库",
-        priority: "优先级",
-        tags: "标签",
-        addTags: "追加标签",
-        replaceTags: "替换标签",
-        updated: "已批量更新 {n} 张工单",
-        partial: "已更新 {ok} 张工单，{failed} 张未能更新",
-      },
       relations: {
         title: "非阻塞关联",
         pick: "添加关联或重复工单…",
@@ -2003,8 +1736,8 @@ export const catalogs = {
       make: "生成",
       makeTitle: "生成",
       empty: "还没有媒体文件",
-      emptyHow: "生成一张图或一段语音、上传或拖进来一个文件，或者在对话里让执行会话把找到的东西放进来。",
-      nothingShown: "没有符合筛选的作品。",
+      emptyHow: "生成一张图或一段语音、上传或拖进来一个文件，或者在频道里让执行会话把找到的东西放进来。",
+      nothingShown: "没有符合筛选的笔记或素材。",
       drop: "松开，放进媒体库",
       kind: { all: "全部", image: "图片", audio: "音频", video: "视频", other: "其它" },
       sortLabel: "排序",
@@ -2042,8 +1775,8 @@ export const catalogs = {
       sendTo: "发到频道",
       sentTo: "发到了 {channel}",
       remove: "从库里拿掉",
-      removeAsk: "从媒体库拿掉「{name}」？对话里发过的照样能打开。",
-      removeSome: "从媒体库拿掉这 {n} 个？对话里发过的照样能打开。",
+      removeAsk: "从媒体库拿掉「{name}」？频道里发过的照样能打开。",
+      removeSome: "从媒体库拿掉这 {n} 个？频道里发过的照样能打开。",
       removeSure: "拿掉",
       keep: "算了",
       understand: "理解",
@@ -2051,28 +1784,27 @@ export const catalogs = {
       understood: "理解的结果",
       makeTabs: { image: "生图", speech: "单人语音", audio: "音频工作台" },
       content: {
-        title: "作品",
+        title: "笔记",
         new: "新建",
-        searchAll: "搜索全部作品…",
-        sidebarToggle: "展开或收起作品导航",
+        searchAll: "搜索全部笔记…",
+        sidebarToggle: "展开或收起笔记导航",
         recent: "全部最近",
         pinned: "置顶收藏",
-        pinnedEmpty: "还没有置顶作品。悬停任意作品或素材并点击图钉即可置顶到这里。",
+        pinnedEmpty: "还没有置顶笔记。悬停任意笔记或素材并点击图钉即可置顶到这里。",
         installedApps: "已安装应用",
-        installedAppsEmpty: "还没有安装独立应用。在任意作品卡片或详情右上角点击「安装为应用」，即可把它装成独立的 macOS 桌面应用并在此集中启动与管理。",
+        installedAppsEmpty: "还没有安装独立应用。在任意笔记卡片或详情右上角点击「安装为应用」，即可把它装成独立的 macOS 桌面应用并在此集中启动与管理。",
         pin: "置顶",
         unpin: "取消置顶",
         pinnedToast: "已置顶收藏",
         unpinnedToast: "已取消置顶",
-        artifacts: "作品",
+        artifacts: "笔记",
         media: "素材",
         moreTypes: "更多类型 ({n})",
         fewerTypes: "收起空类型",
-        sendArtifact: "发到频道",
         exportArtifact: "导出",
         turnIntoIssue: "转为工单",
         issueCreated: "已创建工单",
-        artifactType: { all: "全部作品" },
+        artifactType: { all: "全部笔记" },
         inspector: {
           openExternal: "系统打开",
           saveAs: "另存为",
@@ -2082,7 +1814,7 @@ export const catalogs = {
           stopAudio: "停止播放",
         },
         templates: {
-          title: "新建作品",
+          title: "新建笔记",
           search: "搜索模板…",
           searchCount: "找到 {n} 个模板",
           empty: "没有匹配的模板",
@@ -2092,7 +1824,7 @@ export const catalogs = {
             engineering: "研发工程",
             note: "大纲笔记",
             whiteboard: "白板与图表",
-            deliverable: "交付作品",
+            deliverable: "交付文档",
             ai: "AI 生成",
           },
           items: {
@@ -2195,9 +1927,9 @@ export const catalogs = {
             wbTlP3Title: "阶段三 · 验收发布",
             wbTlP3Body: "双主题截图核验与发布上线",
             wbJourneyJ1Title: "1. 触发入口",
-            wbJourneyJ1Body: "进入统一作品工作台",
+            wbJourneyJ1Body: "进入统一笔记工作台",
             wbJourneyJ2Title: "2. 定位筛选",
-            wbJourneyJ2Body: "一次定位笔记、作品与素材",
+            wbJourneyJ2Body: "一次定位文档、白板与素材",
             wbJourneyJ3Title: "3. 协作交付",
             wbJourneyJ3Body: "发到频道或转为工单推进",
             wbJourneyS1Title: "痛点观察",
@@ -2298,12 +2030,12 @@ export const catalogs = {
             diagErdRepo: "代码仓库 (repo)",
             diagErdIssue: "工单 (issue)",
             diagErdSession: "执行会话 (session)",
-            diagErdArtifact: "协作作品",
+            diagErdArtifact: "协作笔记",
             diagErdVersion: "版本快照 (version)",
             diagErdE1: "绑定仓库",
             diagErdE2: "派发会话",
             diagErdE3: "归属角色",
-            diagErdE4: "生成作品",
+            diagErdE4: "生成笔记",
             diagErdE5: "1:N 快照",
             diagCiLint: "静态检查与格式",
             diagCiUnit: "单测与契约校验",
@@ -2405,7 +2137,7 @@ export const catalogs = {
             sheetApiR1Stab: "稳定 v1",
             sheetApiR2Auth: "令牌鉴权 (Bearer)",
             sheetApiR2Rate: "60 次/分钟",
-            sheetApiR2Owner: "作品域",
+            sheetApiR2Owner: "笔记域",
             sheetApiR2Stab: "稳定 v1",
             sheetApiR3Auth: "Bearer + 角色",
             sheetApiR3Rate: "30 次/分钟",
@@ -2425,7 +2157,7 @@ export const catalogs = {
             dashSloBudgetCol: "预算剩余",
             dashSloAlertsCol: "告警",
             dashSloR1: "接入网关 (Gateway)",
-            dashSloR2: "核心状态引擎 (Core)",
+            dashSloR2: "核心状态 (Core)",
             dashSloR3: "协同与存储 (Storage)",
             dashSloR4: "实时订阅流 (SSE)",
             dashDoraP1: "周部署次数",
@@ -2486,7 +2218,7 @@ export const catalogs = {
             slidesRelS5Title: "下一步计划与 Q&A",
             slidesRelS5Sub: "后续演进路线与反馈收集",
             slidesRelS5B1: "补齐更多团队自定义模板能力",
-            slidesRelS5B2: "打通工单流转一键沉淀到作品库",
+            slidesRelS5B2: "打通工单流转一键沉淀到笔记库",
             slidesRelS5B3: "欢迎在团队频道留下使用反馈",
             slidesRelS5Notes: "预留 5 分钟问答并记录反馈问题。",
             protoApiTitle: "接口报文与 Schema 沙盒",
@@ -2540,7 +2272,7 @@ export const catalogs = {
             sbTone: "暖纸胶片 · 克制沉稳",
             sbS1Scene: "开场 · 工作台全景",
             sbS1Visual: "清晨光线洒在桌面工作台，卡片与时间线逐层展开。",
-            sbS1Dialogue: "把每一次对话里的灵感，直接沉淀为可运行的作品。",
+            sbS1Dialogue: "把每一次频道里的灵感，直接沉淀为可运行的笔记。",
             sbS2Scene: "演示 · 一键独立安装",
             sbS2Visual: "点击右上角安装按钮，交互应用以透明沉浸标题栏窗口弹出。",
             sbS2Dialogue: "无需浏览器标签页，它本身就是一个趁手的 Mac 桌面工具。",
@@ -2550,12 +2282,12 @@ export const catalogs = {
           },
         },
         search: {
-          title: "搜索作品",
-          placeholder: "搜索笔记、作品和素材…",
-          empty: "未找到匹配的笔记、作品或素材",
+          title: "搜索笔记",
+          placeholder: "搜索笔记和素材…",
+          empty: "未找到匹配的笔记或素材",
           typeMedia: "素材",
           scopeAll: "全部",
-          scopeArtifacts: "作品",
+          scopeArtifacts: "笔记",
           scopeMedia: "素材",
         },
       },
@@ -2615,8 +2347,8 @@ export const catalogs = {
         history: "最近的理解任务",
         truncated: "结果不完整，已收到的文字保留在下方。要增加输出上限，需要发起新请求，可能再次计费。",
         usage: "供应商回报：输入 {input} token · 输出 {output} token · 总计 {total}",
-        save: "将文字存为作品",
-        open: "打开保存的作品",
+        save: "将文字存为笔记",
+        open: "打开保存的笔记",
         cleanup: "清理远端文件",
         cleanupAsk: "删除已知远端文件并释放本机输入的保留？供应商可能还在处理结果未知的请求。没有确认 ID 的上传可能仍有文件，需要人工核对；这不会重复理解。",
       },
@@ -2711,6 +2443,279 @@ export const catalogs = {
         recalledLast: "想起过 {n} 次，上次 {last}",
       },
     },
+    "web.note": {
+      card: { version: "第 {version} 稿", open: "打开「{title}」" },
+      preview: { blocks: "{n} 个块", slides: "{n} 页" },
+      page: {
+        delete: "删掉",
+        deleteAsk: "删掉「{title}」？频道里的卡片还在。",
+        deleted: "删掉了「{title}」",
+        gone: "这篇笔记已经删掉了，或者没有这篇笔记。",
+        new: "新建笔记",
+        none: "还没有笔记：写个标题新建一篇，或者让执行会话交一份上来。",
+        all: "全部笔记",
+        title: "标题",
+        more: "更多",
+        rail: "这篇的旁注",
+        railShow: "打开旁注",
+        railHide: "收起旁注",
+        backToLibrary: "返回笔记列表",
+        previewTab: "预览",
+        filesTab: "文件",
+        viewMode: "视图模式",
+        liveVersion: "实时",
+        directory: "目录",
+        newFileLabel: "新文件路径",
+        discard: "放弃更改",
+        unsaved: "未保存",
+        deleteFileAsk: "删除文件「{path}」？",
+        snapshotNote: "手动快照",
+      },
+      tree: { title: "页面树", newRoot: "新建页面", newChild: "添加子页面", moveToRoot: "移到顶层", empty: "页面树里还没有笔记" },
+      links: { outgoing: "引用去向 ({n})", backlinks: "反向链接 ({n})", relation: { link: "引用", embed: "嵌入", ref: "关联" } },
+      doc: {
+        addBlock: "添加内容块",
+        slashHint: "输入 / 插入内容块，或输入 [[ 关联笔记或工单",
+        slidesCount: "{n} 页",
+        empty: "空白文档——添加一个内容块开始",
+        presenter: "演示模式",
+        outline: "大纲",
+        bold: "加粗",
+        italic: "斜体",
+        inlineCode: "行内代码",
+        strike: "删除线",
+        link: "关联笔记或工单",
+        moveUp: "上移",
+        moveDown: "下移",
+        duplicate: "复制",
+        convertToIssue: "转为工单",
+        turnInto: "转换为",
+        edit: "编辑",
+        preview: "预览",
+        render: "渲染",
+        add: "添加",
+        tocTitle: "目录",
+        tocEmpty: "添加标题后自动生成目录",
+        orderedList: "1. 有序",
+        bulletedList: "• 无序",
+        listItemPlaceholder: "列表项…",
+        todoPlaceholder: "待办事项…",
+        quotePlaceholder: "引用内容…",
+        attributionPlaceholder: "出处（可选）",
+        headingPlaceholder: "{level} 级标题",
+        toggleTitlePlaceholder: "折叠标题…",
+        toggleBodyPlaceholder: "折叠内容…",
+        calloutPlaceholder: "提示正文…",
+        codePlaceholder: "// 在此输入代码…",
+        codeLanguagePlaceholder: "语言",
+        addCol: "+列",
+        addRow: "+行",
+        bookmarkOpen: "打开链接",
+        bookmarkEdit: "编辑书签",
+        titleOptional: "标题（可选）",
+        descOptional: "描述（可选）",
+        mathBlock: "块级",
+        mathInline: "行内",
+        columnsCount: "{n} 栏",
+        columnsOption: "{n} 栏",
+        slideLabel: "第 {n} 页",
+        slideTitlePlaceholder: "幻灯片标题…",
+        speakerNotesPlaceholder: "演讲者备注…",
+        kpiEdit: "编辑指标",
+        chartTitle: "图表",
+        chartEdit: "编辑图表",
+        compareEdit: "编辑对比",
+        noBeforeAsset: "暂无对比前素材",
+        noAfterAsset: "暂无对比后素材",
+        mediaEdit: "编辑媒体",
+        previewTitle: "沙箱预览",
+        previewEdit: "编辑预览",
+        selectBase: "选择多维库",
+        pickBase: "选择多维库",
+        selectIssue: "选择工单",
+        pickIssue: "选择工单",
+        issuesTitle: "工单 ({n})",
+        filterIssues: "筛选工单",
+        repoFilter: "仓库筛选",
+        statusFilter: "状态（如 todo）",
+        tagFilter: "标签",
+        calloutTones: { info: "信息", tip: "提示", warn: "注意", danger: "危险", note: "备注" },
+        slashCat: { basic: "基础块", structure: "结构与富文本", data: "数据与协作" },
+        slash: {
+          prose: { label: "正文", desc: "普通段落，支持双链与 #工单引用" },
+          heading1: { label: "一级标题", desc: "大章节标题" },
+          heading2: { label: "二级标题", desc: "中章节标题" },
+          heading3: { label: "三级标题", desc: "小节标题" },
+          listBullet: { label: "无序列表", desc: "项目符号列表" },
+          listOrdered: { label: "有序列表", desc: "数字编号列表" },
+          todo: { label: "待办事项", desc: "可勾选的任务项" },
+          quote: { label: "引用", desc: "带出处的引述块" },
+          divider: { label: "分割线", desc: "水平分隔线" },
+          toggle: { label: "折叠块", desc: "可展开收起的嵌套内容区" },
+          callout: { label: "提示框", desc: "带语义色调的高亮提示" },
+          code: { label: "代码块", desc: "支持语法高亮的代码段" },
+          table: { label: "表格", desc: "支持列对齐的可编辑表格" },
+          bookmark: { label: "网页书签", desc: "富链接卡片" },
+          toc: { label: "目录", desc: "根据标题实时生成大纲" },
+          math: { label: "数学公式", desc: "LaTeX 公式块" },
+          columns: { label: "分栏布局", desc: "并排 2–3 栏排版" },
+          pageBreak: { label: "幻灯片分页", desc: "将文档拆分为演示分页" },
+          kpi: { label: "指标卡片", desc: "核心指标与变化趋势卡" },
+          chart: { label: "图表", desc: "柱状图、折线图与面积图" },
+          diagram: { label: "架构图", desc: "Mermaid 流程图与架构图" },
+          compare: { label: "前后对比", desc: "并排或聚焦图片对比" },
+          media: { label: "媒体", desc: "嵌入图片、音频或视频" },
+          preview: { label: "原型预览", desc: "隔离沙箱 HTML 预览" },
+          baseEmbed: { label: "嵌入多维库", desc: "内嵌多维数据表" },
+          issueCard: { label: "工单卡片", desc: "内嵌实时工单状态卡" },
+          issueList: { label: "工单列表", desc: "按条件筛选的实时工单列表" },
+        },
+      },
+      base: {
+        table: "表格",
+        board: "看板",
+        gallery: "画廊",
+        timeline: "时间线",
+        addRow: "新增一行",
+        runAgentColumn: "运行 Agent",
+        runningAgentColumn: "运行中…",
+        agentRanToast: "已对 {n} 行执行 Agent 列",
+        filterPlaceholder: "筛选行…",
+        empty: "暂无数据行",
+        rowsCount: "{n} 行",
+        uncategorized: "未分类",
+        summary: { count: "计数", sum: "求和", avg: "平均", min: "最小", max: "最大" },
+      },
+      media: {
+        storyboard: "分镜板",
+        motion: "动效",
+        grid: "网格",
+        animatic: "动态预览",
+        loop: "循环",
+        shot: "镜头",
+        transcriptPreview: "转写预览",
+        videoPreview: "播放预览",
+      },
+      files: { codeMode: "源码", htmlPreviewMode: "网页预览" },
+      issue: {
+        title: "关联笔记",
+        empty: "还没有关联笔记",
+        linkExisting: "关联已有笔记…",
+        linkPlaceholder: "搜索笔记…",
+        linkEmpty: "没有可关联的笔记",
+        new: "新建笔记",
+        newDialogTitle: "新建关联笔记",
+        newTitle: "标题",
+        newTitlePlaceholder: "给笔记起个标题…",
+        newType: "基元类型",
+        newCreate: "创建",
+        unlink: "取消关联「{title}」",
+        linkedToast: "已关联「{title}」",
+        unlinkedToast: "已取消关联「{title}」",
+      },
+      blocks: { saved: "都存好了", user: "你", start: "从这里开始写……" },
+      canvas: { label: "打开的笔记", close: "关掉", openPage: "在笔记页打开" },
+      suggestions: { title: "建议（{n}）", by: "{name} 提的", accept: "接受", reject: "不要", delete: "删掉这一块" },
+      types: { doc: "块文档", base: "多维库", canvas: "自由画布", media: "媒体记录" },
+      timeline: {
+        title: "历史记录",
+        savedVersions: "已保存版本",
+        commits: "变更记录",
+        loading: "正在载入历史…",
+        empty: "还没有可回放的提交",
+        backToLive: "回到最新",
+        previewBanner: "历史只读预览 · {summary}",
+        versionBanner: "正在查看第 {version} 稿（只读）{note}",
+        turn: "第 {n} 轮",
+        restore: "恢复到此版本",
+        restored: "已恢复到所选版本",
+        fork: "分叉为新笔记",
+        forkTitle: "{title}（分支）",
+        forked: "已分叉为「{title}」",
+        undoTurn: "撤销此轮改动",
+        undoneOrigin: "已撤销该来源的改动",
+        compact: "压缩历史",
+        compacted: "已压缩历史快照",
+      },
+      edit: { save: "存成新的一稿", saved: "存成了第 {version} 稿" },
+      whiteboard: {
+        pan: "平移",
+        select: "选择",
+        rect: "矩形",
+        sticky: "便签",
+        card: "卡片",
+        diamond: "菱形",
+        text: "文字",
+        container: "分区容器",
+        pen: "画笔",
+        sticker: "贴纸",
+        arrow: "连线箭头",
+        timeline: "时间线",
+        undo: "撤销",
+        redo: "重做",
+        duplicate: "复制",
+        chatWithOrchestrator: "问助手",
+        templateTimeline: "时间线模板",
+        templateArchitecture: "架构图模板",
+        inspector: "属性检查器",
+        label: "标题",
+        body: "正文",
+        noSticker: "无贴纸",
+        save: "保存",
+        entryJson: "条目 JSON",
+        saveJson: "保存 JSON",
+        exportedSvg: "已导出 SVG",
+        exportedPng: "已导出 PNG",
+        exportedJson: "已导出 JSON",
+        exportedJsonCanvas: "已导出 JSON Canvas",
+        deleteSelected: "删除选中",
+        zoomIn: "放大",
+        zoomOut: "缩小",
+        fitView: "适应画布",
+        elements: "{n} 个元素",
+        emptyHint: "从底部工具栏放置卡片、时间线、连线与贴纸，或一键载入模板开始协作",
+        fillDefault: "默认",
+        fillSun: "暖黄",
+        fillPeach: "暖橘",
+        fillLeaf: "叶绿",
+        fillWater: "湖蓝",
+        fillLavender: "淡紫",
+        fillBerry: "莓红",
+        fillSide: "灰底",
+        curveSmooth: "平滑曲线",
+        curveOrthogonal: "直角折线",
+        curveStraight: "直线",
+        styleSolid: "实线",
+        styleDashed: "虚线",
+      },
+      standalone: { missing: "这篇笔记已经删掉了，或者没有这篇笔记。", version: "第 {version} 稿", live: "最新" },
+      applet: {
+        button: "安装为桌面应用",
+        badgeInstalled: "已安装",
+        modalTitle: "本地桌面应用",
+        subtitle: "将这篇笔记安装为独立 Mac 应用，可从聚焦搜索或程序坞直接打开。",
+        appNameLabel: "应用名称",
+        appNamePlaceholder: "输入应用显示名称",
+        alwaysOnTopLabel: "窗口置顶",
+        alwaysOnTopHint: "独立应用窗口保持在其它窗口之上。",
+        statusInstalled: "已安装",
+        statusNotInstalled: "尚未安装",
+        bundlePathLabel: "应用位置",
+        bundleIdLabel: "应用标识",
+        install: "安装应用",
+        reinstall: "更新并重装",
+        installing: "正在安装…",
+        open: "打开应用",
+        openApp: "打开独立应用",
+        manageApp: "管理应用",
+        uninstall: "卸载",
+        installedToast: "已安装「{name}.app」",
+        uninstalledToast: "已卸载「{name}.app」",
+        openedToast: "正在打开「{name}.app」",
+        nameRequired: "请先输入应用名称",
+        unavailable: "当前宿主不支持安装本地桌面应用",
+      },
+    },
     "web.orchestrator": {
       looks: {
         farmer: { name: "青年农夫", blurb: "草帽、背带裤，爱笑的年轻人。" },
@@ -2738,56 +2743,111 @@ export const catalogs = {
       approval: { title: "待审批的工具调用", allow: "允许这次调用", deny: "拒绝这次调用", unavailable: "读不到待审批的工具调用：{why}" },
     },
     "web.provider": {
-      speechNotice:
-        "可独立选择 Flash 或 Pro，再到媒体库的「生成」里生成单人语音。完整音频生成后可播放并保存为 WAV 或 MP3，不是流式播放；保存设置不会生成音频。",
-      title: "用途",
-      intro: "每个功能用哪个账号和模型。账号和钥匙在「账号与钥匙」里填。",
-      words: "供应商 MOSS 连接 模型 密钥 生图 快照 理解 语音 音频 AI",
-      understandingNotice: "配置独立的连接和模型。在媒体库的一张图或视频上点「理解」并明确确认上传；保存配置不会上传文件或发起推理。",
-      imageNotice: "保存默认连接和模型后，在「生图」页提交生成任务。保存配置不会发起生图。",
-      add: "添加 MOSS 连接",
+      speechNotice: "在媒体库生成单人语音（WAV/MP3，非流式）；保存设置不触发生成。",
+      title: "模型与模型策略",
+      intro: "按场景指定主选模型与备选回退策略；候选仅来自已配置并拉取成功的模型商。",
+      words: "模型商 DeepSeek MiniMax MOSS OpenAI Anthropic API Key 密钥 验证 拉取 能力 策略 备选 回退",
+      understandingNotice: "在媒体库选择图片或视频并确认上传后执行视觉理解；保存设置不触发推理。",
+      imageNotice: "在媒体库「生图」页提交生成任务；保存设置不触发生成。",
+      add: "配置模型商",
       reload: "重新加载",
       reloadAsk: "放弃未保存的修改，读取最新设置？",
-      console: "MOSS 开放平台",
-      empty: "还没有供应商连接。添加 MOSS 连接后，可以配置默认用途。",
-      name: "连接名称",
+      console: "开放平台",
+      empty: "还没有已配置并验证的模型商。请先前往「模型商」填写 API 密钥并拉取可用模型。",
+      emptyCta: "前往配置模型商",
+      emptyScene: "暂无支持 {capability} 的可用模型，请先前往模型商验证对应凭据。",
+      manageProviders: "管理模型商",
+      name: "名称",
       enabled: "启用",
-      remove: "删除连接",
-      removeAsk: "从草稿中移除这条连接？保存后生效，仍被用途引用时不能保存。",
-      discover: "查询模型",
-      saveFirst: "先保存修改，再查询账号可用模型。",
-      discoveryHint: "只查询目录，不发推理请求；模型可见不代表推理已验证。",
-      noModels: "此账号返回的模型目录为空。",
+      remove: "清除凭据",
+      removeAsk: "清除这个模型商的密钥？保存后生效，仍被场景引用时不能保存。",
+      discover: "验证并拉取模型",
+      verifying: "验证中…",
+      verifiedBadge: "已连接 · {n} 个模型",
+      failedBadge: "连接失败",
+      unverifiedBadge: "待验证",
+      notConfiguredBadge: "未配置",
+      fromConfigBadge: "来自启动参数",
+      baseUrl: "自定义接口地址（可选）",
+      baseUrlToggle: "高级地址设置",
+      baseUrlPlaceholder: "默认：{url}",
+      discoveredModels: "可用模型（{n}）",
+      saveAndVerify: "保存并验证",
+      saveFirst: "先保存修改，再拉取可用模型。",
+      discoveryHint: "只验证连通性并拉取模型目录，不发推理请求。",
+      noModels: "此模型商返回的模型目录为空。",
       unbound: "不使用",
-      liveHint: "MOSS Live 使用独立的连接和模型，用于实时语音通话。",
-      bindingHint: "删除、禁用或清除密钥前，先将引用它的用途设为「不使用」。在途请求使用发起时的配置；新请求读取新设置。",
-      manage: "管理 AI 服务连接",
-      connections: "连接",
-      uses: "用途",
-      usesIntro: "每个用途选一个连接和模型；不选就是不使用。",
-      groupImage: "图像",
-      groupVoice: "语音",
-      groupLive: "实时",
+      liveHint: "用于实时语音通话与实时交互。",
+      polishHint: "语音听写结束后用于断句、标点恢复与口语顺句润色。",
+      orchestratorHint: "主助手对话、任务拆解与频道协作使用。",
+      transcriptionHint: "频道语音输入（ASR 听写）与音频文件转写使用。",
+      bindingHint: "禁用或清除模型商密钥前，先将引用它的场景主选与备选设为「不使用」。在途请求使用发起时的配置；新请求读取新设置。",
+      manage: "管理模型商",
+      connections: "模型商凭据",
+      uses: "按场景模型策略",
+      usesIntro: "每个场景仅可从已配置模型商拉取到的能力匹配模型中选择；可按需添加备选回退链路。",
+      groupChat: "对话与文本",
+      groupImage: "视觉与生图",
+      groupVoice: "语音与听写",
+      groupLive: "实时交互",
+      fallbackTitle: "备选模型（按序回退）",
+      addFallback: "添加备选",
+      removeFallback: "移除备选",
+      moveFallbackUp: "上移",
+      moveFallbackDown: "下移",
+      fallbackEmpty: "未配置备选模型（主选失败时直接报错）",
+      fallbackSelect: "选择备选模型…",
+      unverifiedModelTag: "未在目录中",
+      capability: { chat: "Chat 对话", asr: "ASR 听写", tts: "TTS 语音", realtime: "Realtime 实时", vision: "Vision 视觉", image: "Image 生图" },
+      vendorHint: {
+        deepseek: "DeepSeek 大模型（主助手对话、文本润色）",
+        minimax: "MiniMax 文本、语音与多模态模型",
+        moss: "MOSS 语音听写（ASR）、语音合成（TTS）、实时通话、视觉与生图",
+        openai: "OpenAI GPT、Whisper、TTS 与图像模型",
+        anthropic: "Anthropic Claude 对话与视觉理解模型",
+      },
       use: {
-        image: "生图",
+        orchestrator: "主助手对话",
+        polish: "文本润色",
+        image: "图像生成",
         understanding: "媒体理解",
-        speech: "单人语音",
+        speech: "单人语音 (TTS)",
         speakers: "多人语音",
         voiceDesign: "音色设计",
-        transcription: "音频转写",
-        live: "MOSS Live",
+        transcription: "语音听写 (ASR)",
+        live: "实时语音通话",
         vision: "实时视觉",
       },
-      connectionFor: "{use}用的连接",
+      connectionFor: "{use}用的模型商",
       modelFor: "{use}用的模型",
       openSpeechShort: "去生成",
-      adapted: "能用的模型",
+      adapted: "已拉取模型",
     },
     "web.remote": {
       title: "远程访问",
-      subtitle: "通过 Tailscale 从手机远程查看与操作这台 Mac 上的 VibeValley。",
+      subtitle: "在同一 Wi-Fi 局域网直连，或通过可选的 Tailscale 跨网从手机查看与操作这台 Mac 上的 VibeValley。",
       toggle: { enable: "开启远程访问", disable: "关闭远程访问", enabled: "已开启", disabled: "未开启" },
-      tailscale: { online: "Tailscale 在线", offline: "Tailscale 未连接", ip: "Tailscale IP", url: "访问地址" },
+      mode: {
+        label: "连接方式",
+        lan: "局域网直连",
+        tailscale: "Tailscale 跨网",
+        lanHint: "同一 Wi-Fi 下手机直连这台 Mac，无需安装 Tailscale",
+        tailscaleHint: "通过 Tailscale 加密组网从外网或移动网络连接到这台 Mac",
+      },
+      lan: {
+        label: "局域网直连（同一 Wi-Fi）",
+        hint: "无需 Tailscale，自动检测本机非回环局域网 IPv4",
+        ready: "局域网就绪",
+        active: "当前使用",
+        unavailable: "未检测到局域网",
+      },
+      tailscale: {
+        online: "Tailscale 在线",
+        offline: "Tailscale 未连接",
+        ip: "Tailscale 跨网（可选）",
+        optionalHint: "可选的跨网增强，未安装或未连接时仍可用局域网直连",
+        url: "访问地址",
+      },
       pair: {
         action: "配对新设备",
         qrHint: "在手机上扫描二维码，或手动输入地址与配对码",
@@ -2805,7 +2865,7 @@ export const catalogs = {
       },
       mobile: {
         pairTitle: "连接到 Mac",
-        pairSubtitle: "输入 Mac 远程访问面板显示的地址和一次性配对码。",
+        pairSubtitle: "扫描 Mac 远程访问面板的二维码，或输入局域网 / Tailscale 地址与一次性配对码。",
         urlLabel: "Mac 地址",
         codeLabel: "配对码",
         deviceNameLabel: "设备名称",
@@ -2872,14 +2932,14 @@ export const catalogs = {
     "web.repo": {
       list: "仓库列表",
       add: "新增仓库",
-      openWorkspace: "工作区",
+      openWorkspace: "项目",
       repos: "代码库",
       all: "全部",
       allLine: "整张地图：每个仓库一座岛",
       selectPrompt: "从左侧选择一个仓库查看健康度、语言分布与提交历史。",
       notGit: "还不是 git 仓库",
       finding: "在找……",
-      none: "工作区里还没有仓库。点「新增仓库」新建一个，或从 GitHub 下载一个。",
+      none: "项目里还没有仓库。点「新增仓库」新建一个，或从 GitHub 下载一个。",
       copied: "复制好了：{path}",
       notCopied: "复制不了：选中路径自己复制吧。",
       recency: {
@@ -2905,13 +2965,9 @@ export const catalogs = {
       recount: "重新统计",
       countedAgo: "{ago}数过",
       whatLanguages: "用了哪些语言",
-      byLines: "按行数，不算空行 · tokei 数的",
+      byLines: "按行数，不算空行",
       linesAndFiles: "{lines} 行 · {files} 个文件",
       empty: "还没有数得出来的代码。",
-      noTokei: "数代码行数要用 tokei，这台机器上还没有。",
-      install: "在终端里装一个：",
-      or: "（或 ",
-      thenRecount: "），装好点上面的「重新统计」。",
       level: { "0": "没有提交", "1": "少", "2": "一些", "3": "较多", "4": "很多" },
       year: "过去一年 · 一格一天，提交越多格子越满",
       dayCommits: "{n} 次提交，{level}",
@@ -2938,13 +2994,13 @@ export const catalogs = {
       githubAddress: "GitHub 地址",
       githubHint: "公开仓库的主页地址。下载到本地后，就能查看仓库和安排执行会话。",
       name: "仓库名",
-      nameHint: "保存在工作区里；已有同名仓库不会被覆盖。",
+      nameHint: "保存在项目目录里；已有同名仓库不会被覆盖。",
       nameExample: "比如 raft-source",
       downloading: "正在下载仓库… 大仓库需要多等一会儿，最多 3 分钟。",
       making: "正在新建…",
       cancel: "取消",
       busy: "进行中…",
-      download: "下载到工作区",
+      download: "下载到项目",
       create: "创建仓库",
       otherLang: "其他",
       mountLocal: "关联本地仓库",
@@ -2958,7 +3014,7 @@ export const catalogs = {
       initGit: "若还不是 Git 仓库则顺便初始化",
       initGitHint: "如果所选目录尚未初始化 Git，会创建仓库并提交初始空提交以便派发工作树。",
       nameOptionalHint: "可选；留空默认使用目录名，若重名会自动追加后缀。",
-      badgeManaged: "工作区托管",
+      badgeManaged: "项目托管",
       badgeLocal: "本地关联",
       unmount: "取消关联",
       unmounting: "取消中…",
@@ -2991,7 +3047,7 @@ export const catalogs = {
       unsupported: "不支持",
       notFound: "没找到",
       checking: "检测中…",
-      noRuntimes: "读不到引擎：",
+      noRuntimes: "读不到环境：",
       usedBy: " · {n} 个 agent",
       reading: "读取中…",
       unsupportedWhy: "不支持：{why}",
@@ -3005,7 +3061,7 @@ export const catalogs = {
       makeAgent: "用它捏一个新 agent",
       noneYet: "还没有。",
       afterInstall: "装好以后才能读到。",
-      noUsage: "这个引擎不报告账户用量。",
+      noUsage: "这个环境不报告账户用量。",
       signedOut: "没登录。在这台机器上运行 {runtime} 登录一次。",
       unreadable: "读不到：{why}",
       balance: "{enough, select, true {按量计费，这里是 {provider} 账户余额。} other {按量计费，这里是 {provider} 账户余额，不够用了。}}",
@@ -3033,7 +3089,7 @@ export const catalogs = {
       auto: "自动查找",
       defaultModel: "默认模型",
       defaultModelHint: "agent 没指定模型时用它。",
-      ownDefault: "引擎自己的默认",
+      ownDefault: "环境自己的默认",
       defaultEffort: "默认推理强度",
       default: "默认",
       maxWorking: "最多同时干活",
@@ -3045,37 +3101,37 @@ export const catalogs = {
         "{pi, select, true {今天已经花了 {spent}（按 pi 的价目表估算）。到了预算就不再派新活，正在干的会干完。留空不设上限。} other {今天已经花了 {spent}（按模型的价目表估算）。到了预算就不再派新活，正在干的会干完。留空不设上限。}}",
       unlimited: "不设上限",
       env: "环境变量",
-      envHint: "叠加到这个引擎上的每个执行会话；agent 自己的环境变量优先。",
+      envHint: "叠加到这个环境上的每个执行会话；agent 自己的环境变量优先。",
       models: "模型",
       modelCount: "{n} 个",
-      noModels: "这个引擎不报告模型列表。",
+      noModels: "这个环境不报告模型列表。",
       effort: "推理强度",
-      unreported: "当前引擎未上报这一项。",
+      unreported: "当前环境未上报这一项。",
       none: "暂无。",
       library: {
         book: "技能书",
         search: "搜索技能",
-        searchHint: "搜名字、说明、引擎……",
-        noRuntimes: "读不到引擎：",
+        searchHint: "搜名字、说明、环境……",
+        noRuntimes: "读不到环境：",
         installed: "这台电脑上装的 · {count}",
-        noneReported: "引擎还没报告装了哪些技能（或者还在读）。",
+        noneReported: "环境还没报告装了哪些技能（或者还在读）。",
         noMatch: "没有对得上的。",
         own: "你写的 · {count}",
         newSkill: "新技能",
-        noSkills: "还没有技能：写一个 VibeValley 自己的，或者在引擎上装好再回来看。",
+        noSkills: "还没有技能：写一个 VibeValley 自己的，或者在环境上装好再回来看。",
         builtIn: "VibeValley 自带 · {count}",
         builtInNote:
           "VibeValley 自带的技能：跟着 VibeValley 更新，不能在这里改或删。在 agent 的「技能」页签里勾上它，执行会话的提示里就带着它；想换一种做法，新建一个你自己的技能。",
         builtInTag: "自带",
-        installedNote: "装在引擎上的技能：用这些引擎的执行会话会自己按需加载，不用在角色里勾。要改它，去它的文件里改。",
-        where: "哪些引擎有它",
+        installedNote: "装在环境上的技能：用这些环境的执行会话会自己按需加载，不用在角色里勾。要改它，去它的文件里改。",
+        where: "哪些环境有它",
         inUse: "{n} 个 agent 在用，删掉会从它们身上去掉。",
         removeIt: "删掉？",
         name: "名字",
         nameLabel: "技能名字",
         nameHint: "比如：先写测试",
         when: "什么时候用",
-        whenHint: "一句话。按需加载技能的引擎先读这句，再决定要不要读正文。",
+        whenHint: "一句话。按需加载技能的环境先读这句，再决定要不要读正文。",
         description: "技能说明",
         descriptionHint: "改行为之前，先补一个会失败的测试。",
         body: "正文",
@@ -3097,16 +3153,16 @@ export const catalogs = {
         worktree: "工作树",
         worktreeYes: "支持",
         worktreeNo: "不支持",
-        installedCount: "已装引擎",
+        installedCount: "已装环境",
         lastSeen: "最近在线",
       },
-      sidebarToggle: "收起或展开引擎列表",
-      refreshAll: "刷新机器与引擎",
+      sidebarToggle: "收起或展开环境列表",
+      refreshAll: "刷新机器与环境",
       inspectorTitle: "机器与检查器",
       inspectorShow: "展开右侧检查器",
       inspectorHide: "收起右侧检查器",
-      noneInstalled: "未检测到已安装的编码引擎",
-      noneInstalledHint: "在本机或远端主机安装编码引擎后，点刷新即可查看并配置。",
+      noneInstalled: "未检测到已安装的编码环境",
+      noneInstalledHint: "在本机或远端主机安装编码环境后，点刷新即可查看并配置。",
       remoteSummary: "运行在 {machine} 上，由该执行主机托管。",
       sessions: "相关会话",
       noSessions: "暂无活跃或最近的会话。",
@@ -3119,7 +3175,7 @@ export const catalogs = {
         failuresDetail: "{failed} 失败 · {errors} 次错误",
         retriesDetail: "{retried} 个会话 · {retries} 次重试",
         cumulativeSpend: "累计用量与花费",
-        empty: "该引擎暂无近期运行记录。",
+        empty: "该环境暂无近期运行记录。",
       },
       quickActions: "快捷操作",
       installation: "安装与路径",
@@ -3258,19 +3314,19 @@ export const catalogs = {
         recovery: {
           resumeSame: "按原配置继续",
           retrySame: "按原配置重试",
-          rerunOther: "换个角色/引擎重跑",
+          rerunOther: "换个队友/环境重跑",
           openWorktree: "打开 Worktree 终端",
           resumedToast: "已按原配置重新发起运行",
-          rerunTitle: "换个角色或引擎重新运行",
-          rerunTarget: "选择角色或引擎",
-          rerunTargetPlaceholder: "选择一个角色或引擎",
+          rerunTitle: "换个队友或环境重新运行",
+          rerunTarget: "选择队友或环境",
+          rerunTargetPlaceholder: "选择一个队友或环境",
           rerunNote: "补充说明（可选）",
           rerunNotePlaceholder: "可补充指引，留空则沿用当前任务继续重跑…",
           rerunConfirm: "开始重跑",
           rerunStartedToast: "已交由 {target} 重新运行",
           resumePrompt: "从上一步继续执行并完成任务。",
-          groupExperts: "角色",
-          groupEngines: "引擎",
+          groupExperts: "队友",
+          groupEngines: "环境",
           noWorktree: "该会话未记录工作区目录",
         },
         compact: { button: "压缩上下文", compacted: "已压缩上下文", skipped: "当前暂无需压缩的新内容" },
@@ -3318,7 +3374,7 @@ export const catalogs = {
         en: "English",
         label: "界面语言",
       },
-      keys: { deepseekHint: "sk-…（不改就空着）", saved: "存好了，马上就用上。" },
+      keys: { saved: "存好了，马上就用上。" },
       source: {
         off: "没接",
         on: "接上了",
@@ -3340,14 +3396,21 @@ export const catalogs = {
         everythingHint: "不只读 VibeValley 替执行会话记的，你在里面的记忆每个执行会话都读得到",
       },
       github: {
-        noGh: "没装 gh",
-        note: "能提 PR 的仓库在「仓库」里看；完成时提 PR 要在配置里打开（github.pr_repos）。",
+        noGh: "未安装（可选）",
+        note: "配置 GitHub Token 直连或使用本机 gh 命令行登录后，即可在项目交付时自动推送并创建或合并 PR。",
         recheck: "重新检测",
-        cli: "gh 命令行",
-        cliHint: "合并时开 PR、读仓库用它",
-        login: "登录",
-        loginHint: "gh auth login 登录的账号",
-        notLoggedIn: "没登录",
+        status: "连接状态",
+        statusHint: "优先使用 GitHub Token 直连，未配置时回退到本机 gh 登录",
+        mode: { token: "已通过 Token 直连", gh: "已通过 gh 登录", none: "均未配置" },
+        token: "GitHub 令牌",
+        tokenHint: "用于直接调用 GitHub REST API（创建、刷新、合并 PR 与检查状态），也可用环境变量 GITHUB_TOKEN",
+        tokenPlaceholder: "ghp_… 或 github_pat_…（不改就空着）",
+        tokenConfigured: "已配置 Token",
+        cli: "gh 命令行（可选）",
+        cliHint: "未配置 Token 时可用本机 gh 命令行开 PR 和读项目",
+        login: "当前账号",
+        loginHint: "当前 Token 或 gh 对应的 GitHub 账号",
+        notLoggedIn: "未登录",
       },
       nav: {
         label: "设置的分区",
@@ -3355,7 +3418,8 @@ export const catalogs = {
         profile: "个人资料",
         general: "通用",
         appearance: "外观",
-        models: "模型与引擎",
+        providers: "模型商",
+        models: "模型与模型策略",
         skills: "技能",
         mcp: "MCP 接入",
         voice: "语音与通话",
@@ -3365,7 +3429,7 @@ export const catalogs = {
         memory: "记忆",
         chat: "聊天通道",
         width: "导航的宽窄（拖动，双击回默认）",
-        groupWorkspace: "个人与工作区",
+        groupWorkspace: "个人与项目",
         groupConnect: "连接与集成",
         groupAbout: "数据与关于",
       },
@@ -3373,14 +3437,15 @@ export const catalogs = {
         profile: "个人资料 头像 昵称 签名 avatar profile display name",
         general: "语言 language 启动 打开 工作台 农场",
         appearance: "主题 深色 浅色 暗色 dark light 界面大小 缩放 字体 字号 动画 无动画 动效 motion animation",
-        models: "密钥 钥匙 账号 DeepSeek MOSS API Key 模型 绑定 引擎",
+        providers: "模型商 密钥 钥匙 API Key 凭据 验证 拉取 DeepSeek MiniMax MOSS OpenAI Anthropic",
+        models: "模型 策略 场景 备选 回退 主助手 润色 听写 语音 实时 视觉 生图 ASR TTS",
         skills: "技能 skill skills 内置 安装 指南 提示词",
         memory: "记忆 memory 来源 source Nowledge EverOS 外部记忆 读 写",
         mcp: "MCP Antigravity Claude Code Codex Cursor stdio streamableHttp 接入 配置",
         voice: "电话 通话 MOSS Live 实时 视觉 转写 语音",
         chat: "微信 飞书 QQ 聊天通道 连接器 配对",
-        github: "GitHub gh PR 登录",
-        remote: "远程 手机 Tailscale 配对 二维码 设备 iOS Android CLI 命令行 执行机 沙箱 监听 令牌 总控端 内嵌 远端",
+        github: "GitHub Token gh PR 登录 直连",
+        remote: "远程 手机 局域网 LAN Wi-Fi 直连 Tailscale 配对 二维码 设备 iOS Android CLI 命令行 执行机 沙箱 监听 令牌 总控端 内嵌 远端",
         data: "家目录 设置文件 仓库 目录 工作树 存储 后端 数据 data storage",
         about: "版本 更新 命令行 CLI version update",
       },
@@ -3412,7 +3477,7 @@ export const catalogs = {
         fontEmpty: "没有匹配的字体",
         fontFallbackBadge: "未安装",
         terminalFontSize: "终端字号",
-        terminalFontSizeHint: "也可在工作区随时按 ⌘+ / ⌘- / ⌘0 调整",
+        terminalFontSizeHint: "也可在项目终端随时按 ⌘+ / ⌘- / ⌘0 调整",
         previewTitle: "实时排版预览",
         previewNote: "随界面缩放、等宽字体与终端字号即时更新",
         previewUiHeading: "界面正文",
@@ -3466,12 +3531,13 @@ export const catalogs = {
         intro: "查看本机数据目录、Git 仓库与工作树路径，以及当前存储后端。",
         storageTitle: "存储后端",
         backend: "当前后端",
-        backendHint: "附件、媒体输入与作品目录的底层存储引擎",
+        backendHint: "附件、媒体输入与笔记目录的底层存储后端",
         backendLocalFs: "本地文件系统 (LocalFs)",
         backendS3: "对象存储 (S3)",
         backendMemory: "内存存储 (Memory)",
       },
-      models: { intro: "配置主助手、执行会话与语音功能的模型账号和 API 密钥。", deepseekHint: "主助手和 VibeValley 自研执行会话用它" },
+      providers: { intro: "统一配置 DeepSeek、MiniMax、MOSS 等模型商凭据（1 个模型商对应 1 个 API 密钥），验证连通性并自动拉取带能力标签的可用模型。" },
+      models: { intro: "按场景选择主选模型与备选回退策略；仅从已配置并拉取到可用模型的模型商中选择。" },
       memory: { intro: "执行会话还能去外面的记忆来源里查、往里记。" },
       about: {
         intro: "查看服务端版本、桌面自动更新状态与命令行工具安装情况。",
@@ -3517,8 +3583,9 @@ export const catalogs = {
         },
         check: "检查更新",
         retry: "重试",
+        details: "查看详情",
+        dialogTitle: "应用更新",
         restart: "立即重启更新",
-        restartQuestion: "重启到新版本？",
         workingQuestion: "{n} 个执行会话正在运行，重启会中断它们。确认现在重启？",
         newFarmQuestion: "新版本将从新数据开始，旧数据会保留在家目录里。确认现在重启？",
         download: "前往下载",
@@ -3552,11 +3619,11 @@ export const catalogs = {
         call: "通话",
       },
       readiness: { ready: "{feature}：可以用了", lacks: "{feature}：{why}", fix: "去设置" },
-      remote: { toggleLabel: "手机与客户端接入", toggleHint: "开启后允许已配对设备经 Tailscale 连接到这台 Mac。" },
+      remote: { toggleLabel: "手机与客户端接入", toggleHint: "开启后允许已配对设备通过局域网直连或 Tailscale 连接到这台 Mac。" },
     },
     "web.shell": {
       sidebar: {
-        title: "工作区",
+        title: "项目",
         toggleSidebar: "收起侧边栏",
         toggleSidebarTooltip: "收起侧边栏 (⌘B)",
         addRepo: "添加仓库",
@@ -3592,9 +3659,9 @@ export const catalogs = {
         copyPath: "复制路径",
         removeWorktree: "删除工作树",
         files: "文件",
-        filesTip: "工作区文件",
+        filesTip: "项目文件",
         gitChanges: "变更",
-        gitChangesTip: "工作区改动与暂存",
+        gitChangesTip: "项目改动与暂存",
         gitBranches: "分支",
         gitBranchesTip: "本地分支与工作树",
         gitCommits: "提交",
@@ -3640,7 +3707,7 @@ export const catalogs = {
         stagedEmpty: "暂无已暂存的文件。",
         changes: "未暂存",
         stageAll: "全部暂存",
-        clean: "工作区干净，没有未提交改动。",
+        clean: "项目目录干净，没有未提交改动。",
         branches: "本地分支",
         filterBranches: "过滤分支名…",
         noMatchingBranches: "没有匹配的本地分支。",
@@ -3671,17 +3738,17 @@ export const catalogs = {
       },
       section: { collapse: "折叠 {title}", expand: "展开 {title}" },
       palette: {
-        placeholder: { commands: "输入命令，或搜索 #工单、作品、运行轨迹…", files: "跳转到文件…", search: "在项目中搜索文本…" },
+        placeholder: { commands: "输入命令，或搜索 #工单、笔记、运行轨迹…", files: "跳转到文件…", search: "在项目中搜索文本…" },
         mode: { commands: "命令", files: "文件", search: "搜索" },
-        groups: { issues: "工单", artifacts: "作品", runs: "运行轨迹" },
+        groups: { issues: "工单", artifacts: "笔记", runs: "运行轨迹" },
         a11y: { commands: "命令", files: "文件", search: "搜索结果" },
         searching: "搜索中…",
         empty: { commands: "没有匹配的命令。", files: "没有匹配的文件。", search: "没有匹配结果。" },
         footer: { select: "选择", run: "执行", close: "关闭" },
       },
       chat: {
-        title: "工作区对话",
-        runtime: "编码引擎",
+        title: "项目对话",
+        runtime: "编码环境",
         model: "模型",
         thoughtLevel: "思考深度",
         thoughtLow: "低",
@@ -3689,8 +3756,8 @@ export const catalogs = {
         thoughtHigh: "高",
         thoughtMax: "极深",
         statusWaiting: "等待确认",
-        emptyTitle: "在当前工作区直接对话",
-        emptyHint: "选择引擎后直接提问，工具调用结果可一键在右侧分栏打开源码或 Diff。",
+        emptyTitle: "在当前项目直接对话",
+        emptyHint: "选择环境后直接提问，工具调用结果可一键在右侧分栏打开源码或 Diff。",
         steerTag: "轮中引导",
         todoTitle: "任务进度",
         todoToolLabel: "更新进度",
@@ -3739,19 +3806,19 @@ export const catalogs = {
         telemetryHide: "收起遥测",
         telemetryContextTitle: "上下文窗口",
         telemetryCacheTitle: "Prompt Cache 与工具",
-        telemetryQuotaTitle: "引擎配额",
+        telemetryQuotaTitle: "环境配额",
         telemetryCached: "缓存读取",
         telemetryUncached: "新增输入",
         telemetryOutput: "输出",
         telemetryReasoning: "思考",
-        telemetryQuotaUnavailable: "当前引擎未上报配额窗口。",
+        telemetryQuotaUnavailable: "当前环境未上报配额窗口。",
         sendFailed: "发送失败：{why}",
         configFailed: "切换配置失败：{why}",
         respondFailed: "提交回复失败：{why}",
         stopFailed: "中断会话失败：{why}",
         attachFile: "添加文件",
         removeFile: "移除 {name}",
-        chooseModel: "切换引擎与模型",
+        chooseModel: "切换环境与模型",
       },
       swarm: {
         pill: "Swarm · {working}/{active}",
@@ -3795,7 +3862,7 @@ export const catalogs = {
         repoType: "类型",
         typeGit: "Git 仓库",
         typeFolder: "普通目录",
-        activity: "工作区",
+        activity: "项目",
         activitySummary: "{worktrees} 工作树 · {tabs} 标签",
         openIssues: "进行中工单",
         runningSessions: "运行中会话",
@@ -3807,7 +3874,7 @@ export const catalogs = {
         languages: "语言构成",
         worktrees: "工作树",
         tabsCount: "{n} 标签",
-        closeFolder: "从工作区关闭目录",
+        closeFolder: "从项目中关闭目录",
       },
     },
     "web.voice": {
@@ -3859,7 +3926,7 @@ export const catalogs = {
         voicesHint: "保存语音合成连接后自动拉取可用音色",
         voicesCount: "{n} 个可用音色",
         voicesEmpty: "当前连接下暂无可用音色",
-        manageAll: "在「模型与引擎」中管理全部连接",
+        manageAll: "在「模型与环境」中管理全部连接",
         saved: "语音设置已保存",
       },
     },
@@ -3957,7 +4024,7 @@ export const catalogs = {
     "web.agent": {
       newName: "New {runtime}",
       noProfiles: "The server's profiles could not be read: ",
-      noRuntimes: "The machines could not be read: {why}",
+      noRuntimes: "The environments could not be read: {why}",
       loading: "Reading the configuration…",
       noSuch: "There is no such profile.",
       backToAll: "Back to all profiles",
@@ -4000,9 +4067,9 @@ export const catalogs = {
         collector: "Asset Collector",
       },
       looksAs: "On the farm it is",
-      looksHint: "Only looks: the same runtime can be different animals.",
+      looksHint: "Only looks: the same environment can be different animals.",
       wears: "Wears",
-      tab: { who: "Who", runtime: "Machine", persona: "Persona", skills: "Skills", tools: "Tools", env: "Environment", memory: "Memory" },
+      tab: { who: "Who", runtime: "Environment", persona: "Persona", skills: "Skills", tools: "Tools", env: "Environment", memory: "Memory" },
       tabs: "Profile",
       name: "Name",
       nameTip: "The assistant and the captions call it this, and you can name it when you speak.",
@@ -4023,25 +4090,25 @@ export const catalogs = {
       voiceSettingsAfter: "to pick voices.",
       workdir: "Default repo",
       workdirTip:
-        "A folder under the work folder (VIBEVALLEY_WORK_ROOT). Used when the assistant sends work without naming a repo; when empty, the repo must be named.",
+        "A folder under the projects root (VIBEVALLEY_WORK_ROOT). Used when the assistant sends work without naming a repo; when empty, the repo must be named.",
       workdirHint: "such as clock-in",
       worktree: "A git worktree for each helper",
       worktreeHint:
         "Each helper changes its own branch, so helpers do not overwrite each other; completing merges it into the repo. Off, it changes the repo directly, with no branch to merge.",
       env: "Environment variables",
-      envHint: "On top of the runtime's own environment variables.",
-      machine: "Machine",
-      machineTip: "Changing the machine clears the model and the effort; the looks (animal and outfit) stay.",
-      readingMachines: "Reading the machines…",
+      envHint: "On top of the environment's own variables.",
+      machine: "Environment",
+      machineTip: "Changing the environment clears the model and the effort; the looks (animal and outfit) stay.",
+      readingMachines: "Reading the environments…",
       available: "available",
       disabled: "disabled",
       checking: "checking…",
       notHere: "not on this machine",
       model: "Model",
-      noModels: "This runtime cannot list its models right now.",
+      noModels: "This environment cannot list its models right now.",
       modelLevels: "{name} ({n} effort levels)",
       effort: "Effort",
-      effortDefault: "By default the runtime decides.",
+      effortDefault: "By default the environment decides.",
       defaultEffort: "Default",
       can: "What {runtime} can do",
       steer: "Takes words while it works (steer)",
@@ -4051,34 +4118,34 @@ export const catalogs = {
       refuses: "Refuses ",
       colon: ": ",
       persona: {
-        append: { label: "Append to the system prompt", detail: "Keeps the runtime's own way of working and adds the persona after it. Usually this one." },
-        replace: { label: "Replace the system prompt", detail: "Replaces the runtime's own system prompt whole. Only when you know what you are doing." },
+        append: { label: "Append to the system prompt", detail: "Keeps the environment's own way of working and adds the persona after it. Usually this one." },
+        replace: { label: "Replace the system prompt", detail: "Replaces the environment's own system prompt whole. Only when you know what you are doing." },
         prompt: {
           label: "Put at the top of each ticket",
-          detail: "Adds the persona before each ticket. Every runtime can do it, but a long conversation dilutes it.",
+          detail: "Adds the persona before each ticket. Every environment can do it, but a long conversation dilutes it.",
         },
       },
       personaLabel: "Persona",
-      personaTip: "Who it is, how it works, what it does not do. It goes to the runtime the way picked below.",
+      personaTip: "Who it is, how it works, what it does not do. It goes to the environment the way picked below.",
       personaHint: "You are a careful backend engineer. Understand the code before you change it…",
-      personaMode: "How it goes to the runtime",
+      personaMode: "How it goes to the environment",
       library: "Skill library",
       libraryTip: "The skills picked go to the helper with the persona, a section each.",
       manageLibrary: "Manage the skill library",
       ownSkills: "Skills {runtime} installed itself",
-      ownSkillsTip: "Reported by the runtime: already usable on this machine, no need to tick them here.",
+      ownSkillsTip: "Reported by the environment: already usable on this machine, no need to tick them here.",
       mcp: "MCP servers",
-      mcpHint: "Given to the runtime when a session opens (oar's SessionOptions.mcpServers).",
+      mcpHint: "Given to the environment when a session opens (oar's SessionOptions.mcpServers).",
       removeNamed: "Delete {name}",
       mcpKind: "MCP kind",
       mcpName: "MCP name",
       mcpTarget: "MCP command or address",
       add: "Add",
       disallowed: "Disallowed tools",
-      disallowedHint: "This agent cannot use these tools. Click a tool the runtime reports below to add it.",
+      disallowedHint: "This agent cannot use these tools. Click a tool the environment reports below to add it.",
       disallowedExample: "such as WebSearch",
       ownMcp: "MCP servers {runtime} connects itself",
-      ownMcpTip: "Reported by the runtime, together with those added above.",
+      ownMcpTip: "Reported by the environment, together with those added above.",
       toolsets: "Toolsets",
       toolsetsTip: "Controls which built-in farm toolsets this profile can call (the server also enforces role permissions).",
       toolset: {
@@ -4091,15 +4158,21 @@ export const catalogs = {
         memory: "Memory",
         media: "Media",
         library: "Library",
-        artifact: "Artifacts",
+        note: "Notes",
       },
-      unreported: "This runtime does not report this.",
+      unreported: "This environment does not report this.",
       none: "None.",
       role: { orchestrator: "Assistant", worker: "Helper" },
+      mode: {
+        managed: "Managed",
+        external: "External",
+        externalNotice:
+          "Registered as an external coding teammate ({code}). It is not auto-dispatched to VibeValley's OAR queue and can serve as issue assignee or note collaborator.",
+      },
       templates: {
         title: "Templates",
         intro:
-          "Each template is a recipe for an agent: its role, duty, persona, the machine it is written for and its look. Installing one adds a profile, and one template can be installed many times; change what is installed as you like, and when the template has a new version the profile says so.",
+          "Each template is a recipe for an agent: its role, duty, persona, the environment it is written for and its look. Installing one adds a profile, and one template can be installed many times; change what is installed as you like, and when the template has a new version the profile says so.",
         open: "Templates",
         openLine: "Recipes for assistants and helpers, to pick from",
         folder: "Template folder",
@@ -4107,7 +4180,7 @@ export const catalogs = {
         add: "Add it",
         added: 'The template "{name}" is added, not installed yet',
         onServer: "Uses built-in",
-        notHere: "Written for {runtime}, which this machine lacks: once installed, pick another machine in the profile",
+        notHere: "Written for {runtime}, which this machine lacks: once installed, pick another environment in the profile",
         noPersona: "No persona.",
         addedHere: " · added on this machine",
         skill: 'Skill "{name}": {description}',
@@ -4115,7 +4188,7 @@ export const catalogs = {
         removeSure: "Really delete the template",
         from: 'From the template "{name}", version {version}',
         update: "Update to the template's version {version}",
-        updateHint: "The template's new version replaces the duty, tags, persona and how it is given; the name, look, machine, model and environment stay.",
+        updateHint: "The template's new version replaces the duty, tags, persona and how it is given; the name, look, environment, model and variables stay.",
         updated: "Updated from the template",
         galleryTitle: "Starter templates",
         galleryIntro: "Adopt a ready-to-use role with a working style, persona, and skills.",
@@ -4149,7 +4222,7 @@ export const catalogs = {
         orchestrators: "Assistants",
         helpers: "Helpers",
         search: "Search profiles",
-        searchHint: "Search name, duty, machine, tags…",
+        searchHint: "Search code, name, duty, environment, tags…",
         make: "New helper",
         makeOrchestrator: "Add assistant",
         orchestratorLine: "Not a helper: sends work, watches progress, passes on results.",
@@ -4162,8 +4235,8 @@ export const catalogs = {
         emptySearch: "No profiles match the current filters.",
         clearFilter: "Clear filters",
       },
-      runtimeDefault: "The runtime's default",
-      runtimeDefaultModel: "The runtime's default ({model})",
+      runtimeDefault: "The environment's default",
+      runtimeDefaultModel: "The environment's default ({model})",
       noEffort: "This model has no effort levels.",
       noEffortModel: "{model} has no effort levels.",
       targetMachine: "Execution machine",
@@ -4172,260 +4245,6 @@ export const catalogs = {
       targetMachineOffline: "{name} (offline)",
       targetMachineDraining: "{name} (draining)",
       selector: { ready: "Ready", warn: "Warning", error: "Unavailable", checking: "Checking…", fix: "Fix" },
-    },
-    "web.artifact": {
-      card: { version: "Version {version}", open: 'Open "{title}"' },
-      preview: { slides: "{n} slides", shots: "{n} shots", scenes: "{n} scenes", nodes: "{n} nodes", edges: "{n} edges" },
-      page: {
-        delete: "Delete",
-        deleteAsk: "Delete “{title}”? Its cards stay in the conversation.",
-        deleted: 'Deleted "{title}"',
-        gone: "This artifact was deleted, or there is no such artifact.",
-        new: "New",
-        none: "No artifacts yet: give one a title to start it, or have a helper hand one in.",
-        all: "All artifacts",
-        title: "Title",
-        more: "More",
-        rail: "Beside this artifact",
-        railShow: "Show the side panel",
-        railHide: "Hide the side panel",
-        backToLibrary: "Back to artifacts",
-        previewTab: "Preview",
-        filesTab: "Files",
-        filesTabCount: "Files ({n})",
-        viewMode: "View mode",
-        liveVersion: "Live",
-        directory: "Directory",
-        newFileLabel: "New file path",
-        discard: "Discard",
-        unsaved: "Unsaved",
-        deleteFileAsk: "Delete file “{path}”?",
-        snapshotNote: "Snapshot",
-      },
-      docs: { split: "Split", edit: "Edit", read: "Read" },
-      outline: {
-        progress: "{done}/{total} done",
-        hideDone: "Hide done",
-        showDone: "Show done",
-        quickAdd: "Type and press Enter to add…",
-        kindHeading: "Heading",
-        kindBullet: "Bullet",
-        kindTodo: "Todo",
-        cycleKind: "Switch type ({kind})",
-        indent: "Indent",
-        outdent: "Outdent",
-        addChild: "Add child",
-        untitled: "New item",
-      },
-      sheet: { filterPlaceholder: "Filter rows…", addRow: "Add row", empty: "No sheets", rowsCount: "{n} rows" },
-      diagram: { visual: "Diagram", structure: "Nodes & edges", nodes: "Nodes", edges: "Edges" },
-      motion: {
-        timeline: "Timeline scenes",
-        layers: "{n} layers",
-        play: "Play",
-        stop: "Stop",
-        restart: "Restart",
-        loop: "Loop",
-        prevStep: "Step back 0.5s",
-        nextStep: "Step forward 0.5s",
-        chapters: "Chapters",
-      },
-      storyboard: {
-        gridMode: "Grid",
-        animaticMode: "Animatic",
-        totalDuration: "{sec}s total",
-        shotOf: "Shot {n} of {total}",
-        sfx: "SFX",
-        transition: "Transition",
-      },
-      prototype: { viewportLabel: "Viewport", viewportFull: "Full", viewportTablet: "Tablet", viewportMobile: "Mobile", reload: "Reload" },
-      files: { codeMode: "Code", htmlPreviewMode: "Preview" },
-      issue: {
-        title: "Artifacts",
-        empty: "No linked artifacts yet",
-        linkExisting: "Link existing artifact…",
-        linkPlaceholder: "Search artifacts…",
-        linkEmpty: "No matching unlinked artifacts",
-        new: "New artifact",
-        newDialogTitle: "New linked artifact",
-        newTitle: "Title",
-        newTitlePlaceholder: "Give this artifact a title…",
-        newType: "Type",
-        newCreate: "Create",
-        unlink: 'Unlink "{title}"',
-        linkedToast: 'Linked "{title}"',
-        unlinkedToast: 'Unlinked "{title}"',
-      },
-      blocks: { saved: "All saved", user: "You", start: "Start writing here…" },
-      canvas: { label: "Open artifact", close: "Close", openPage: "Open its page" },
-      suggestions: { title: "Suggestions ({n})", by: "From {name}", accept: "Accept", reject: "Dismiss", delete: "Delete this block" },
-      types: {
-        defaultBadge: "Default DS",
-        setDefault: "Set as default design system",
-        unsetDefault: "Unset default",
-        docs: "Document",
-        outline: "Outline Note",
-        slides: "Slide Deck",
-        dashboard: "Dashboard",
-        motion: "Motion Film",
-        whiteboard: "Whiteboard",
-        design: "Design Canvas",
-        designSystem: "Design System",
-        sheet: "Sheet",
-        prototype: "Prototype",
-        diagram: "Diagram",
-        storyboard: "Storyboard",
-      },
-      timeline: {
-        title: "Version history",
-        show: "Show version history",
-        hide: "Hide version history",
-        savedVersions: "Saved versions",
-        commits: "Changes",
-        loading: "Loading history…",
-        empty: "No history commits yet",
-        backToLive: "Back to live",
-        previewBanner: "Read-only history preview · {summary}",
-        versionBanner: "Viewing version {version} (read-only){note}",
-        turn: "Turn {n}",
-        restore: "Restore",
-        restored: "Restored to selected commit",
-        fork: "Fork",
-        forkTitle: "{title} (Fork)",
-        forked: "Forked as “{title}”",
-        undoTurn: "Undo this turn",
-        undoneOrigin: "Undid edits from this origin",
-        compact: "Compact",
-        compacted: "Compacted history snapshot",
-      },
-      dashboard: { exportCsv: "Export CSV" },
-      whiteboard: {
-        pan: "Pan",
-        select: "Select",
-        rect: "Rectangle",
-        sticky: "Sticky note",
-        card: "Card",
-        diamond: "Diamond",
-        text: "Text",
-        container: "Container",
-        pen: "Pen",
-        sticker: "Sticker",
-        arrow: "Arrow",
-        timeline: "Timeline",
-        undo: "Undo",
-        redo: "Redo",
-        duplicate: "Duplicate",
-        chatWithOrchestrator: "Ask Assistant",
-        templateTimeline: "Timeline template",
-        templateArchitecture: "Architecture template",
-        inspector: "Inspector",
-        label: "Title / Label",
-        body: "Body",
-        noSticker: "None",
-        save: "Save",
-        entryJson: "Entry JSON",
-        saveJson: "Save JSON",
-        exportedSvg: "Exported SVG",
-        exportedPng: "Exported PNG",
-        exportedJson: "Exported JSON",
-        exportedJsonCanvas: "Exported JSON Canvas",
-        deleteSelected: "Delete selected",
-        zoomIn: "Zoom in",
-        zoomOut: "Zoom out",
-        fitView: "Fit view",
-        elements: "{n} elements",
-        emptyHint: "Place cards, timelines, connectors, and stickers from the bottom bar, or start from a template",
-        fillDefault: "Default",
-        fillSun: "Sun",
-        fillPeach: "Peach",
-        fillLeaf: "Leaf",
-        fillWater: "Water",
-        fillLavender: "Lavender",
-        fillBerry: "Berry",
-        fillSide: "Neutral",
-        curveSmooth: "Smooth",
-        curveOrthogonal: "Orthogonal",
-        curveStraight: "Straight",
-        styleSolid: "Solid",
-        styleDashed: "Dashed",
-      },
-      design: {
-        themeLight: "Light",
-        themeDark: "Dark",
-        propsTitle: "Props Inspector",
-        enabled: "Enabled",
-        disabled: "Disabled",
-        emptyCanvas: "No layers in this artboard yet",
-      },
-      designSystem: {
-        components: "Components",
-        colors: "Color Tokens",
-        typography: "Typography",
-        spacing: "Spacing",
-        radius: "Radius",
-        guidelinesDo: "Do",
-        guidelinesDont: "Don't",
-        previewTheme: "Preview Theme",
-        specimen: "The quick brown fox jumps · 0123456789",
-      },
-      slidesStore: { addSlide: "Add slide" },
-      edit: { save: "Save as a new version", saved: "Saved as version {version}" },
-      slides: {
-        previous: "Previous slide",
-        next: "Next slide",
-        present: "Present full screen",
-        presenter: "Presenter view",
-        editSlide: "Edit slide",
-        doneEdit: "Done",
-        slideTitleLabel: "Title",
-        slideSubtitleLabel: "Subtitle",
-        slideLayoutLabel: "Layout",
-        layoutCover: "Cover",
-        layoutContent: "Content",
-        slideBulletsLabel: "Bullets (one per line)",
-        slideNotesLabel: "Speaker notes",
-      },
-      presenter: {
-        missing: "No deck named: open the presenter view from an artifact's controls.",
-        current: "This slide",
-        next: "Next slide",
-        end: "This is the last slide",
-        notes: "Notes",
-        noNotes: "No notes on this slide",
-        clock: "Time so far",
-        restart: "Restart timer",
-        aside: "Next slide and notes",
-        waiting: "Waiting for the slide deck",
-        empty: "This deck has no slides",
-        loadFailure: "Could not load the slide deck: {reason}",
-      },
-      standalone: { missing: "This artifact was deleted, or there is no such artifact.", version: "v{version}", live: "Live" },
-      applet: {
-        button: "Install as App",
-        badgeInstalled: "Installed",
-        modalTitle: "Local Desktop App",
-        subtitle: "Install this artifact as a standalone Mac app you can launch from Spotlight or the Dock.",
-        appNameLabel: "App Name",
-        appNamePlaceholder: "Enter app display name",
-        alwaysOnTopLabel: "Always on Top",
-        alwaysOnTopHint: "Keep the standalone applet window floating above other windows.",
-        statusInstalled: "Installed",
-        statusNotInstalled: "Not installed",
-        bundlePathLabel: "Bundle Path",
-        bundleIdLabel: "Bundle ID",
-        install: "Install App",
-        reinstall: "Update & Reinstall",
-        installing: "Installing…",
-        open: "Open App",
-        openApp: "Open Standalone App",
-        manageApp: "Manage App",
-        uninstall: "Uninstall",
-        installedToast: "Installed “{name}.app”",
-        uninstalledToast: "Uninstalled “{name}.app”",
-        openedToast: "Opening “{name}.app”",
-        nameRequired: "Enter an app name first",
-        unavailable: "Local desktop app installation is unavailable in this host",
-      },
     },
     "web.audio": {
       title: "Audio studio",
@@ -4476,7 +4295,7 @@ export const catalogs = {
       executionStreaming: "Streaming text and speakers",
       partialTitle: "Partial transcript",
       partialTranscript: "Partial transcript — not a completed result.",
-      savePartialTranscript: "Save partial transcript as artifact",
+      savePartialTranscript: "Save partial transcript as note",
       chooseFile: "Choose an audio file",
       copyTranscript: "Copy transcript",
       copyPartialTranscript: "Copy partial transcript",
@@ -4485,7 +4304,7 @@ export const catalogs = {
       transcribe: "Start transcription",
       timeline: "Speaker timeline",
       noTimestamps: "The provider returned no timestamped segments.",
-      saveTranscript: "Save transcript as artifact",
+      saveTranscript: "Save transcript as note",
       openTranscript: "Open saved transcript",
       downloadAudio: "Download audio",
       history: "Audio tasks",
@@ -4525,14 +4344,14 @@ export const catalogs = {
       route: { missing: "This page does not exist", invalid: "This address is invalid", home: "Back to the app" },
       place: {
         dashboard: { label: "Dashboard", hint: "Profile, active sessions, attention summary, and runs" },
-        chat: { label: "Chat", hint: "Channels and threads" },
+        chat: { label: "Channels", hint: "Channels and threads" },
         issues: { label: "Issues", hint: "Every issue from creation to completion" },
-        workspace: { hint: "Manage repositories and workspaces", name: "Workspace" },
-        content: { label: "Artifacts", hint: "Artifacts, notes, and media" },
+        workspace: { hint: "Manage repositories and projects", name: "Projects" },
+        content: { label: "Notes", hint: "Notes, canvases, databases, and media" },
         farm: { label: "Farm", hint: "3D papercraft farm courtyard" },
-        runtimes: { label: "Engines", hint: "Installed coding engines across machines" },
-        team: { label: "Experts", hint: "Experts and templates" },
-        settings: { label: "Settings", hint: "Profile, general & appearance, models & engines, MCP, connections, data & about" },
+        runtimes: { label: "Environments", hint: "Installed coding environments across machines" },
+        team: { label: "Teammates", hint: "Teammates and templates" },
+        settings: { label: "Settings", hint: "Profile, general & appearance, models & environments, MCP, connections, data & about" },
       },
       dashboard: {
         title: "Dashboard",
@@ -4601,11 +4420,11 @@ export const catalogs = {
             reworkLine: "Rework: {reworkRate} ({issues} issues, {findings} findings, {unresolved} unresolved)",
           },
         },
-        profile: { defaultName: "Workspace User", defaultTagline: "Coordinating roles and issues across your workspace" },
+        profile: { defaultName: "Workspace User", defaultTagline: "Coordinating teammates and issues across your projects" },
         stats: { working: "Active sessions", waiting: "Needs response", issues: "Open issues", review: "In review" },
         pulse: {
           title: "Live Execution Pulse",
-          empty: "No active helper sessions right now. Dispatch work from Issues or Chat.",
+          empty: "No active helper sessions right now. Dispatch work from Issues or Channels.",
           active: "{n} active sessions",
           openRuns: "Open all runs",
         },
@@ -4614,6 +4433,7 @@ export const catalogs = {
           waiting: "Waiting on your reply",
           inReview: "Issues in review",
           todo: "Todo issues",
+          zeroTitle: "All caught up",
           empty: "Nothing needs your attention right now.",
           openIssues: "Open issues board",
         },
@@ -4641,16 +4461,7 @@ export const catalogs = {
       orchestrator: "Assistant",
       unreachable: "The server cannot be reached for now: try again when it is back.",
       query: { invalidResponse: "The response does not match the expected data format. The last valid result has been kept." },
-      table: {
-        columns: "Columns",
-        stale: "Showing the previous result while the requested page loads. Row actions are unavailable.",
-        selectPage: "Select this page",
-        selectRow: "Select row {id}",
-        empty: "No rows",
-        previous: "Previous page",
-        next: "Next page",
-        page: "Page {n}",
-      },
+      table: { empty: "No rows" },
       form: {
         invalid: "Check this field.",
         validationUnavailable: "Validation is unavailable. Your input has been kept.",
@@ -4814,7 +4625,7 @@ export const catalogs = {
       stop: "Stop",
     },
     "web.channel": {
-      tab: { chat: "Chat", issues: "Tickets", crons: "Scheduled tasks" },
+      tab: { chat: "Channels", issues: "Tickets", crons: "Scheduled tasks" },
       defaultRepo: "default repo {repo}",
       channels: "Channels",
       defaultHint: "The default channel: you, the assistant and the helpers are all here",
@@ -4831,10 +4642,10 @@ export const catalogs = {
       channelsTitle: "Channels",
       directsTitle: "Direct messages",
       newChannel: "Create a channel",
-      newChat: "New chat",
-      filter: { label: "Filter chats", all: "All", group: "Channels", direct: "Direct" },
+      newChat: "New channel or DM",
+      filter: { label: "Filter channels", all: "All", group: "Channels", direct: "Direct" },
       emptyPreview: "No messages yet",
-      emptyList: "No chats yet",
+      emptyList: "No channels yet",
       runsEntry: "View running sessions",
       mood: { idle: "resting", listening: "listening", thinking: "thinking", speaking: "speaking" },
       orchestrator: "Assistant",
@@ -4860,10 +4671,13 @@ export const catalogs = {
         save: "Save",
       },
       issues: {
-        empty: "No tickets in this channel yet. Tell the assistant something to do in the chat; it sends a helper, and the ticket is listed here.",
+        emptyTitle: "No tickets yet",
+        empty: "No tickets in this channel yet. Tell the assistant something to do in a channel; it sends a helper, and the ticket is listed here.",
+        openBoard: "Open issues board",
         thread: "Ticket thread",
       },
       crons: {
+        emptyTitle: "No scheduled tasks",
         empty: 'No scheduled tasks: tell the assistant "run the tests every day at nine".',
         next: "next {next}",
         direct: "straight to {agent}",
@@ -4940,16 +4754,18 @@ export const catalogs = {
         attach: "Attach a file",
         uploadFailed: "Not uploaded: {why}",
         command: "Commands",
-        artifactContext: "Context: {title}",
-        artifactSlide: "Slide {n}",
-        artifactSelected: "{n} selected",
+        noteContext: "Context: {title}",
+        noteSlide: "Slide {n}",
+        noteSelected: "{n} selected",
         clearContext: "Remove attached context",
         runningHint: "Working — send a follow-up or click stop",
-        dictateStart: "Voice dictation (MOSS ASR)",
+        dictateStart: "Voice dictation (ASR)",
         dictateStop: "Stop dictation",
         dictateConnecting: "Connecting audio…",
         dictateListening: "Listening…",
         dictateFinishing: "Transcribing…",
+        dictatePolishing: "Polishing…",
+        dictateRevertRaw: "Revert to raw",
       },
       manage: {
         name: "Name",
@@ -4988,17 +4804,17 @@ export const catalogs = {
         markUnread: "Mark unread from here",
         jump: "Jump to it",
         promoteIssue: "Promote to ticket",
-        saveArtifact: "Save as artifact",
+        saveNote: "Save as note",
       },
       promote: {
         source: "From {where}",
-        saveTitle: "Save message as artifact",
-        artifactTitle: "Title",
-        artifactType: "Type",
-        artifactContent: "Content",
-        artifactSave: "Save artifact",
-        artifactSaved: 'Saved as "{title}"',
-        artifactNote: "Saved from {where}",
+        saveTitle: "Save message as note",
+        noteTitle: "Title",
+        noteType: "Type",
+        noteContent: "Content",
+        noteSave: "Save note",
+        noteSaved: 'Saved as "{title}"',
+        noteNote: "Saved from {where}",
         fallbackTitle: "Message #{number}",
       },
       switcher: {
@@ -5190,7 +5006,7 @@ export const catalogs = {
         activeSubscriptions: "Active Subscriptions",
         latestSeq: "Latest Seq",
         lastFrameMs: "Last Frame",
-        runtimes: "Engines",
+        runtimes: "Environments",
         installed: "Installed",
         notInstalled: "Not Installed",
         ready: "Ready",
@@ -5213,7 +5029,7 @@ export const catalogs = {
         correlationId: "Correlation #{id}",
       },
       trajectory: {
-        kind: { issueSession: "Ticket", workspaceChat: "Chat", orchestrator: "Assistant" },
+        kind: { issueSession: "Ticket", workspaceChat: "Project chat", orchestrator: "Assistant" },
         silentError: "Silent Error",
         tokens: "Tokens",
         rawPayload: "Raw Payload",
@@ -5246,12 +5062,12 @@ export const catalogs = {
         channels: "Channels",
         agents: "Profiles",
         repos: "Repos",
-        artifacts: "Artifacts",
+        notes: "Notes",
         inbox: "Inbox",
         mediaJobs: "Media",
         emptyCaches: "No cache metrics reported.",
         collab: "Loro Collab & EphemeralStore",
-        emptyCollab: "No active collaborative artifacts.",
+        emptyCollab: "No active collaborative notes.",
         frontiers: "Frontiers",
         presence: "EphemeralStore Peers",
         noPeers: "No active ephemeral peers",
@@ -5424,7 +5240,7 @@ export const catalogs = {
       },
       manager: "Assistant",
       hangUp: "Hang up",
-      app: { missed: "Missed", channels: "Chat", games: "Games" },
+      app: { missed: "Missed", channels: "Channels", games: "Games" },
       game: { blocks: "Blocks", sokoban: "Sokoban", dino: "Dino", bugs: "Bug snake", merge: "Farm 2048" },
       brand: "FarmTel",
       openChat: "Open the farm chat",
@@ -5523,13 +5339,13 @@ export const catalogs = {
       owner: {
         label: "Assignee",
         pick: "Set assignee",
-        search: "Search people or experts…",
+        search: "Search people or teammates…",
         self: "Me (Self)",
         selfNamed: "{name} (Me)",
         unassigned: "Unassigned",
         clear: "Clear assignee",
         peopleGroup: "People",
-        expertsGroup: "Experts",
+        expertsGroup: "Teammates",
       },
       groupBy: {
         label: "Group by",
@@ -5801,7 +5617,7 @@ export const catalogs = {
         save: "Save",
         remove: "Delete",
         newRepo: "New repo",
-        repoHint: "The repo's name, which is also its folder under the work folder",
+        repoHint: "The repo's name, which is also its folder under the projects root",
         repoName: "Repo name",
         create: "Create",
         edit: "Edit",
@@ -5828,7 +5644,7 @@ export const catalogs = {
         cron: "scheduled task",
         missed: "scheduled task (made up)",
         refine: "drafting",
-        runtime: "the machine itself",
+        runtime: "the environment itself",
       },
       run: {
         working: "working",
@@ -5901,10 +5717,10 @@ export const catalogs = {
         machineAuto: "Auto machine",
         missingRepo: "No repo added yet. Add a repo before dispatching this ticket.",
         goRepos: "Add repo",
-        missingRuntime: "No ready engine configured yet. Set up an engine to draft and run tickets.",
-        goRuntimes: "Configure engines",
+        missingRuntime: "No ready environment configured yet. Set up an environment to draft and run tickets.",
+        goRuntimes: "Configure environments",
       },
-      conversation: { older: "Load earlier messages", placeholder: "Write a comment, note, or feedback…" },
+      conversation: { older: "Load earlier messages", placeholder: "Write a comment, note, or feedback…", postComment: "Comment" },
       activity: { title: "Activity", empty: "Discussion, milestones, and run steps appear here" },
       attachments: {
         title: "Attachments",
@@ -5938,24 +5754,6 @@ export const catalogs = {
         collapseDay: "Less",
       },
       deps: { blockedBy: "Blocked by", pick: "Add blockers…", none: "No blockers", clear: "Clear blockers", blockedByChip: "Blocked by #{n}" },
-      triage: {
-        selected: "{n} selected",
-        selectIssue: "Select issue #{n}",
-        clear: "Clear",
-        status: "Status",
-        agent: "Helper",
-        noAgent: "Unassigned",
-        owner: "Assignee",
-        noOwner: "Clear assignee",
-        repo: "Repo",
-        noRepo: "No repo",
-        priority: "Priority",
-        tags: "Tags",
-        addTags: "Add tags",
-        replaceTags: "Replace tags",
-        updated: "Updated {n} issues",
-        partial: "Updated {ok} issues; {failed} could not be updated",
-      },
       relations: {
         title: "Relations",
         pick: "Link related or duplicate…",
@@ -5988,7 +5786,7 @@ export const catalogs = {
       make: "Generate",
       makeTitle: "Generate",
       empty: "Nothing here yet",
-      emptyHow: "Generate an image or speech, upload or drop in a file, or ask a helper in the chat to put what it found here.",
+      emptyHow: "Generate an image or speech, upload or drop in a file, or ask a helper in a channel to put what it found here.",
       nothingShown: "Nothing matches these filters.",
       drop: "Let go to put it in the library",
       kind: { all: "All", image: "Images", audio: "Audio", video: "Video", other: "Other" },
@@ -6036,29 +5834,28 @@ export const catalogs = {
       understood: "What it shows",
       makeTabs: { image: "Image", speech: "Speech", audio: "Audio workbench" },
       content: {
-        title: "Artifacts",
+        title: "Notes",
         new: "New",
-        searchAll: "Search all artifacts…",
-        sidebarToggle: "Toggle artifacts sidebar",
+        searchAll: "Search all notes…",
+        sidebarToggle: "Toggle notes sidebar",
         recent: "All recent",
         pinned: "Pinned",
-        pinnedEmpty: "Nothing pinned yet. Hover any artifact or media item and click the pin icon to keep it handy here.",
+        pinnedEmpty: "Nothing pinned yet. Hover any note or media item and click the pin icon to keep it handy here.",
         installedApps: "Installed Apps",
         installedAppsEmpty:
-          "No standalone apps installed yet. Click “Install as App” on any artifact card or toolbar to install it as an independent macOS app and manage it here.",
+          "No standalone apps installed yet. Click “Install as App” on any note card or toolbar to install it as an independent macOS app and manage it here.",
         pin: "Pin",
         unpin: "Unpin",
         pinnedToast: "Pinned",
         unpinnedToast: "Unpinned",
-        artifacts: "Artifacts",
+        artifacts: "Notes",
         media: "Media",
         moreTypes: "More types ({n})",
         fewerTypes: "Hide empty types",
-        sendArtifact: "Send to channel",
         exportArtifact: "Export",
         turnIntoIssue: "Turn into ticket",
         issueCreated: "Ticket created",
-        artifactType: { all: "All artifacts" },
+        artifactType: { all: "All notes" },
         inspector: {
           openExternal: "Open externally",
           saveAs: "Save as",
@@ -6068,7 +5865,7 @@ export const catalogs = {
           stopAudio: "Stop audio",
         },
         templates: {
-          title: "New artifact",
+          title: "New note",
           search: "Search templates…",
           searchCount: "{n} matching templates",
           empty: "No matching templates",
@@ -6205,7 +6002,7 @@ export const catalogs = {
             wbTlP3Title: "Phase 3 · Launch",
             wbTlP3Body: "Visual check across themes and release",
             wbJourneyJ1Title: "1. Entry",
-            wbJourneyJ1Body: "Open unified Content workspace",
+            wbJourneyJ1Body: "Open unified Notes workspace",
             wbJourneyJ2Title: "2. Discover",
             wbJourneyJ2Body: "Search or browse across notes and media",
             wbJourneyJ3Title: "3. Deliver",
@@ -6275,7 +6072,7 @@ export const catalogs = {
             docApiSpecBody:
               '# {title}\n\n- **Version**: v1\n- **Auth**: Bearer Token / HMAC\n- **Idempotency**: `Idempotency-Key`\n\n## 1. Endpoints Overview\n\n| Method | Path | Description | Rate Limit |\n|---|---|---|---|\n| GET | `/api/v1/resources` | Paginated list | 120 req/min |\n| POST | `/api/v1/resources` | Create resource | 30 req/min |\n| PUT | `/api/v1/resources/:id` | Replace resource | 60 req/min |\n\n## 2. Request & Response Contract\n\n### Request Payload\n```json\n{\n  "id": "res_01",\n  "name": "example",\n  "options": {}\n}\n```\n\n### Success Response (`200 OK`)\n```json\n{\n  "bizCode": 0,\n  "message": "ok",\n  "data": {}\n}\n```\n\n## 3. Business Error Codes\n\n| HTTP Status | `bizCode` | Meaning | Client Handling |\n|---|---|---|---|\n| 400 | 400001 | Validation failed | Highlight invalid field |\n| 409 | 409001 | Version conflict | Reload snapshot and retry |\n\n## 4. Compatibility Policy\n- Follow additive evolution; never break existing fields without a version bump.\n',
             docRunbookBody:
-              "# {title}\n\n- **Service**:\n- **Owning Team / Channel**:\n- **Dashboard Link**:\n\n## 1. Dependencies & Degraded Modes\n- List hard and soft dependencies along with expected fallback behavior.\n\n## 2. Common Alerts & Triage\n\n### Alert A: Error Rate > 1% or P99 Latency Breach\n1. Check deploys and config changes in the last 30 minutes.\n2. Verify health, connection pool saturation, and disk headroom:\n```bash\ncurl -fsS http://127.0.0.1:8787/healthz\n```\n3. Inspect aggregated error logs to distinguish upstream timeouts, DB locks, or bad payloads.\n\n## 3. Emergency Kill Switches\n- **Load shedding / feature flags**: Document config keys, reload mechanism, and side effects.\n- **Traffic failover**: Document steps to shift traffic to healthy instances.\n\n## 4. Rollback Procedure\n```bash\n# Identify last known good artifact and trigger rollback\n```\n\n## 5. Escalation\n- Escalate to the module lead if not mitigated within 15 minutes.\n",
+              "# {title}\n\n- **Service**:\n- **Owning Team / Channel**:\n- **Dashboard Link**:\n\n## 1. Dependencies & Degraded Modes\n- List hard and soft dependencies along with expected fallback behavior.\n\n## 2. Common Alerts & Triage\n\n### Alert A: Error Rate > 1% or P99 Latency Breach\n1. Check deploys and config changes in the last 30 minutes.\n2. Verify health, connection pool saturation, and disk headroom:\n```bash\ncurl -fsS http://127.0.0.1:8787/healthz\n```\n3. Inspect aggregated error logs to distinguish upstream timeouts, DB locks, or bad payloads.\n\n## 3. Emergency Kill Switches\n- **Load shedding / feature flags**: Document config keys, reload mechanism, and side effects.\n- **Traffic failover**: Document steps to shift traffic to healthy instances.\n\n## 4. Rollback Procedure\n```bash\n# Identify last known good build and trigger rollback\n```\n\n## 5. Escalation\n- Escalate to the module lead if not mitigated within 15 minutes.\n",
             docSecurityBody:
               "# {title}\n\n- **Scope**:\n- **Data Classification**: Public / Internal / Sensitive Credentials\n\n## 1. Assets & Trust Boundaries\n- List sensitive assets (keys, tokens, repositories, databases).\n- Mark untrusted inputs (external HTTP, webhooks, user uploads, model tool calls).\n\n## 2. STRIDE Threat Matrix\n\n| Category | Threat Scenario | Existing Control | Residual Risk & Follow-up |\n|---|---|---|---|\n| Spoofing | Forged origin or stolen token | Boundary auth check | Add token expiry enforcement |\n| Tampering | Path traversal or payload injection | Path canonicalization & parameterized SQL | Add static audit check |\n| Info Disclosure | Secrets leaked in logs or errors | `Secret` redaction wrapper | Audit error formatting paths |\n| Denial of Service | Oversized payloads or request floods | Size caps and rate limits | Enforce per-route timeouts |\n| Elevation | Unauthorized admin endpoint access | Role capability gates | Add negative auth tests |\n\n## 3. Security Release Sign-off\n- [ ] No secrets committed or logged\n- [ ] Untrusted inputs decoded strictly at boundaries\n",
             docMigrationBody:
@@ -6308,7 +6105,7 @@ export const catalogs = {
             diagErdRepo: "Repository (repo)",
             diagErdIssue: "Ticket (issue)",
             diagErdSession: "Session (session)",
-            diagErdArtifact: "Artifact (artifact)",
+            diagErdArtifact: "Note (note)",
             diagErdVersion: "Snapshot (version)",
             diagErdE1: "scoped to",
             diagErdE2: "launches",
@@ -6415,7 +6212,7 @@ export const catalogs = {
             sheetApiR1Stab: "Stable v1",
             sheetApiR2Auth: "Bearer",
             sheetApiR2Rate: "60 req/min",
-            sheetApiR2Owner: "Artifact",
+            sheetApiR2Owner: "Note",
             sheetApiR2Stab: "Stable v1",
             sheetApiR3Auth: "Bearer + Role",
             sheetApiR3Rate: "30 req/min",
@@ -6496,7 +6293,7 @@ export const catalogs = {
             slidesRelS5Title: "Roadmap & Q&A",
             slidesRelS5Sub: "Upcoming improvements and feedback loop",
             slidesRelS5B1: "Support team-authored custom template packs",
-            slidesRelS5B2: "One-click ticket handoff from content artifacts",
+            slidesRelS5B2: "One-click ticket handoff from notes",
             slidesRelS5B3: "Share feedback in the engineering channel",
             slidesRelS5Notes: "Leave 5 minutes for open Q&A.",
             protoApiTitle: "API & JSON Payload Sandbox",
@@ -6550,7 +6347,7 @@ export const catalogs = {
             sbTone: "Warm Editorial · Crisp Contrast",
             sbS1Scene: "Opening · Studio Overview",
             sbS1Visual: "Morning light illuminates the desktop workbench as cards and timelines fan out cleanly.",
-            sbS1Dialogue: "Turn every conversation idea directly into a runnable artifact.",
+            sbS1Dialogue: "Turn every channel idea directly into a runnable note.",
             sbS2Scene: "Demo · One-Click Install as App",
             sbS2Visual: "User clicks Install as App; an interactive mini-app opens in a unified immersive titlebar window.",
             sbS2Dialogue: "No browser chrome — just a focused Mac utility ready from Spotlight or your Dock.",
@@ -6560,12 +6357,12 @@ export const catalogs = {
           },
         },
         search: {
-          title: "Search artifacts",
-          placeholder: "Search notes, artifacts, and media…",
-          empty: "No matching notes, artifacts, or media",
+          title: "Search notes",
+          placeholder: "Search notes and media…",
+          empty: "No matching notes or media",
           typeMedia: "Media",
           scopeAll: "All",
-          scopeArtifacts: "Artifacts",
+          scopeArtifacts: "Notes",
           scopeMedia: "Media",
         },
       },
@@ -6628,8 +6425,8 @@ export const catalogs = {
         truncated:
           "This result is incomplete. The retained text is shown below; increasing the output limit requires a new request and may incur another charge.",
         usage: "Provider reported: {input} input tokens · {output} output tokens · {total} total",
-        save: "Save text as a document",
-        open: "Open saved document",
+        save: "Save text as a note",
+        open: "Open saved note",
         cleanup: "Clean remote files",
         cleanupAsk:
           "Delete known remote files and release retained local inputs? The provider may still be processing an unknown request. Uploads without a confirmed ID may remain and need manual inspection. This does not repeat understanding.",
@@ -6729,6 +6526,279 @@ export const catalogs = {
         recalledLast: "recalled {n} times, last {last}",
       },
     },
+    "web.note": {
+      card: { version: "Version {version}", open: 'Open "{title}"' },
+      preview: { blocks: "{n} blocks", slides: "{n} slides" },
+      page: {
+        delete: "Delete",
+        deleteAsk: "Delete “{title}”? Its cards stay in the conversation.",
+        deleted: 'Deleted "{title}"',
+        gone: "This note was deleted, or there is no such note.",
+        new: "New note",
+        none: "No notes yet: give one a title to start writing, or have a helper hand one in.",
+        all: "All notes",
+        title: "Title",
+        more: "More",
+        rail: "Beside this note",
+        railShow: "Show the side panel",
+        railHide: "Hide the side panel",
+        backToLibrary: "Back to notes",
+        previewTab: "Preview",
+        filesTab: "Files",
+        viewMode: "View mode",
+        liveVersion: "Live",
+        directory: "Directory",
+        newFileLabel: "New file path",
+        discard: "Discard",
+        unsaved: "Unsaved",
+        deleteFileAsk: "Delete file “{path}”?",
+        snapshotNote: "Snapshot",
+      },
+      tree: { title: "Pages", newRoot: "New page", newChild: "Add subpage", moveToRoot: "Move to top level", empty: "No pages in tree yet" },
+      links: { outgoing: "Outgoing links ({n})", backlinks: "Backlinks ({n})", relation: { link: "link", embed: "embed", ref: "ref" } },
+      doc: {
+        addBlock: "Add block",
+        slashHint: "Type / for blocks or [[ to link a note or issue",
+        slidesCount: "{n} slides",
+        empty: "Empty document — add a block to start",
+        presenter: "Presenter",
+        outline: "Outline",
+        bold: "Bold",
+        italic: "Italic",
+        inlineCode: "Inline code",
+        strike: "Strikethrough",
+        link: "Link note or issue",
+        moveUp: "Move up",
+        moveDown: "Move down",
+        duplicate: "Duplicate",
+        convertToIssue: "Convert to Issue",
+        turnInto: "Turn into",
+        edit: "Edit",
+        preview: "Preview",
+        render: "Render",
+        add: "Add",
+        tocTitle: "Table of Contents",
+        tocEmpty: "Add headings to populate outline",
+        orderedList: "1. Ordered",
+        bulletedList: "• Bulleted",
+        listItemPlaceholder: "List item…",
+        todoPlaceholder: "To-do…",
+        quotePlaceholder: "Quote…",
+        attributionPlaceholder: "Attribution (optional)",
+        headingPlaceholder: "Heading {level}",
+        toggleTitlePlaceholder: "Toggle heading…",
+        toggleBodyPlaceholder: "Toggle notes…",
+        calloutPlaceholder: "Callout content…",
+        codePlaceholder: "// Write code…",
+        codeLanguagePlaceholder: "language",
+        addCol: "+Col",
+        addRow: "+Row",
+        bookmarkOpen: "Open URL",
+        bookmarkEdit: "Edit bookmark",
+        titleOptional: "Title (optional)",
+        descOptional: "Description (optional)",
+        mathBlock: "Block",
+        mathInline: "Inline",
+        columnsCount: "{n} Columns",
+        columnsOption: "{n} Col",
+        slideLabel: "Slide {n}",
+        slideTitlePlaceholder: "Slide title…",
+        speakerNotesPlaceholder: "Speaker notes…",
+        kpiEdit: "Edit KPI",
+        chartTitle: "Chart",
+        chartEdit: "Edit chart",
+        compareEdit: "Edit compare",
+        noBeforeAsset: "No before asset",
+        noAfterAsset: "No after asset",
+        mediaEdit: "Edit media",
+        previewTitle: "Sandbox Preview",
+        previewEdit: "Edit preview",
+        selectBase: "Select a Base note",
+        pickBase: "Pick Base",
+        selectIssue: "Select an issue",
+        pickIssue: "Select issue",
+        issuesTitle: "Issues ({n})",
+        filterIssues: "Filter issues",
+        repoFilter: "Repo filter",
+        statusFilter: "Status (e.g. todo)",
+        tagFilter: "Tag",
+        calloutTones: { info: "Info", tip: "Tip", warn: "Warn", danger: "Danger", note: "Note" },
+        slashCat: { basic: "Basic", structure: "Structure & Rich Writing", data: "Data & VibeValley" },
+        slash: {
+          prose: { label: "Text", desc: "Plain paragraph with wikilinks and #issue refs" },
+          heading1: { label: "Heading 1", desc: "Large section heading" },
+          heading2: { label: "Heading 2", desc: "Medium section heading" },
+          heading3: { label: "Heading 3", desc: "Small subsection heading" },
+          listBullet: { label: "Bulleted List", desc: "Unordered list of items" },
+          listOrdered: { label: "Numbered List", desc: "Ordered list with numbers" },
+          todo: { label: "To-do", desc: "Checkable task item" },
+          quote: { label: "Quote", desc: "Blockquote with optional attribution" },
+          divider: { label: "Divider", desc: "Visual horizontal separator" },
+          toggle: { label: "Toggle", desc: "Collapsible section with nested blocks" },
+          callout: { label: "Callout", desc: "Highlighted notice box with tone" },
+          code: { label: "Code", desc: "Syntax-highlighted code block" },
+          table: { label: "Table", desc: "Editable grid with column alignment" },
+          bookmark: { label: "Bookmark", desc: "Rich web link card" },
+          toc: { label: "Table of Contents", desc: "Live outline from document headings" },
+          math: { label: "Math Formula", desc: "LaTeX equation block" },
+          columns: { label: "Columns", desc: "Side-by-side 2-3 column layout" },
+          pageBreak: { label: "Slide Page Break", desc: "Split document into presentation slides" },
+          kpi: { label: "KPI Metrics", desc: "Numeric metric summary cards" },
+          chart: { label: "Chart", desc: "Bar or line chart visualization" },
+          diagram: { label: "Diagram", desc: "Mermaid flowchart or architecture diagram" },
+          compare: { label: "Before / After Compare", desc: "Visual side-by-side or slider diff" },
+          media: { label: "Media", desc: "Image, audio, or video embed" },
+          preview: { label: "Sandbox Preview", desc: "Isolated HTML prototype preview" },
+          baseEmbed: { label: "Base Embed", desc: "Embed a VibeValley Base table" },
+          issueCard: { label: "Issue Card", desc: "Embed a live Issue card" },
+          issueList: { label: "Issue List", desc: "Filtered live Issue query list" },
+        },
+      },
+      base: {
+        table: "Table",
+        board: "Board",
+        gallery: "Gallery",
+        timeline: "Timeline",
+        addRow: "Add row",
+        runAgentColumn: "Run Agent",
+        runningAgentColumn: "Running…",
+        agentRanToast: "Ran agent column on {n} row(s)",
+        filterPlaceholder: "Filter rows…",
+        empty: "No rows yet",
+        rowsCount: "{n} rows",
+        uncategorized: "Uncategorized",
+        summary: { count: "Count", sum: "Sum", avg: "Avg", min: "Min", max: "Max" },
+      },
+      media: {
+        storyboard: "Storyboard",
+        motion: "Motion",
+        grid: "Grid",
+        animatic: "Animatic",
+        loop: "Loop",
+        shot: "Shot",
+        transcriptPreview: "Transcript",
+        videoPreview: "Preview",
+      },
+      files: { codeMode: "Code", htmlPreviewMode: "Preview" },
+      issue: {
+        title: "Notes",
+        empty: "No linked notes yet",
+        linkExisting: "Link existing note…",
+        linkPlaceholder: "Search notes…",
+        linkEmpty: "No matching unlinked notes",
+        new: "New note",
+        newDialogTitle: "New linked note",
+        newTitle: "Title",
+        newTitlePlaceholder: "Give this note a title…",
+        newType: "Primitive",
+        newCreate: "Create",
+        unlink: 'Unlink "{title}"',
+        linkedToast: 'Linked "{title}"',
+        unlinkedToast: 'Unlinked "{title}"',
+      },
+      blocks: { saved: "All saved", user: "You", start: "Start writing here…" },
+      canvas: { label: "Open note", close: "Close", openPage: "Open note page" },
+      suggestions: { title: "Suggestions ({n})", by: "From {name}", accept: "Accept", reject: "Dismiss", delete: "Delete this block" },
+      types: { doc: "Block Doc", base: "Base", canvas: "Canvas", media: "Media" },
+      timeline: {
+        title: "Version history",
+        savedVersions: "Saved versions",
+        commits: "Changes",
+        loading: "Loading history…",
+        empty: "No history commits yet",
+        backToLive: "Back to live",
+        previewBanner: "Read-only history preview · {summary}",
+        versionBanner: "Viewing version {version} (read-only){note}",
+        turn: "Turn {n}",
+        restore: "Restore",
+        restored: "Restored to selected commit",
+        fork: "Fork",
+        forkTitle: "{title} (Fork)",
+        forked: "Forked as “{title}”",
+        undoTurn: "Undo this turn",
+        undoneOrigin: "Undid edits from this origin",
+        compact: "Compact",
+        compacted: "Compacted history snapshot",
+      },
+      edit: { save: "Save as a new version", saved: "Saved as version {version}" },
+      whiteboard: {
+        pan: "Pan",
+        select: "Select",
+        rect: "Rectangle",
+        sticky: "Sticky note",
+        card: "Card",
+        diamond: "Diamond",
+        text: "Text",
+        container: "Container",
+        pen: "Pen",
+        sticker: "Sticker",
+        arrow: "Arrow",
+        timeline: "Timeline",
+        undo: "Undo",
+        redo: "Redo",
+        duplicate: "Duplicate",
+        chatWithOrchestrator: "Ask Assistant",
+        templateTimeline: "Timeline template",
+        templateArchitecture: "Architecture template",
+        inspector: "Inspector",
+        label: "Title / Label",
+        body: "Body",
+        noSticker: "None",
+        save: "Save",
+        entryJson: "Entry JSON",
+        saveJson: "Save JSON",
+        exportedSvg: "Exported SVG",
+        exportedPng: "Exported PNG",
+        exportedJson: "Exported JSON",
+        exportedJsonCanvas: "Exported JSON Canvas",
+        deleteSelected: "Delete selected",
+        zoomIn: "Zoom in",
+        zoomOut: "Zoom out",
+        fitView: "Fit view",
+        elements: "{n} elements",
+        emptyHint: "Place cards, timelines, connectors, and stickers from the bottom bar, or start from a template",
+        fillDefault: "Default",
+        fillSun: "Sun",
+        fillPeach: "Peach",
+        fillLeaf: "Leaf",
+        fillWater: "Water",
+        fillLavender: "Lavender",
+        fillBerry: "Berry",
+        fillSide: "Neutral",
+        curveSmooth: "Smooth",
+        curveOrthogonal: "Orthogonal",
+        curveStraight: "Straight",
+        styleSolid: "Solid",
+        styleDashed: "Dashed",
+      },
+      standalone: { missing: "This note was deleted, or there is no such note.", version: "v{version}", live: "Live" },
+      applet: {
+        button: "Install as App",
+        badgeInstalled: "Installed",
+        modalTitle: "Local Desktop App",
+        subtitle: "Install this note as a standalone Mac app you can launch from Spotlight or the Dock.",
+        appNameLabel: "App Name",
+        appNamePlaceholder: "Enter app display name",
+        alwaysOnTopLabel: "Always on Top",
+        alwaysOnTopHint: "Keep the standalone applet window floating above other windows.",
+        statusInstalled: "Installed",
+        statusNotInstalled: "Not installed",
+        bundlePathLabel: "Bundle Path",
+        bundleIdLabel: "Bundle ID",
+        install: "Install App",
+        reinstall: "Update & Reinstall",
+        installing: "Installing…",
+        open: "Open App",
+        openApp: "Open Standalone App",
+        manageApp: "Manage App",
+        uninstall: "Uninstall",
+        installedToast: "Installed “{name}.app”",
+        uninstalledToast: "Uninstalled “{name}.app”",
+        openedToast: "Opening “{name}.app”",
+        nameRequired: "Enter an app name first",
+        unavailable: "Local desktop app installation is unavailable in this host",
+      },
+    },
     "web.orchestrator": {
       looks: {
         farmer: { name: "Young farmer", blurb: "Straw hat and overalls, always smiling." },
@@ -6761,58 +6831,112 @@ export const catalogs = {
       },
     },
     "web.provider": {
-      speechNotice:
-        "Choose a separate Flash or Pro binding, then generate one speaker from Generate in the Library. The completed audio can be played and saved as WAV or MP3; this is not streaming playback. Saving settings does not generate audio.",
-      title: "Uses",
-      intro: "Which account and model each feature uses. Accounts and keys are set under Accounts and keys.",
-      words: "provider MOSS connection model key image generation snapshot understanding speech audio AI",
-      understandingNotice:
-        "Configure the independent connection and model. Choose Understand on an image or video in the Library and explicitly approve the upload. Saving this configuration does not upload or run inference.",
-      imageNotice: "Save a default connection and model, then submit a task on the Images page. Saving settings does not generate an image.",
-      add: "Add MOSS connection",
+      speechNotice: "Generate single-speaker audio (WAV/MP3, non-streaming) in Library; saving does not run generation.",
+      title: "Models & Model Policy",
+      intro: "Assign primary models and fallback chains per scene from verified providers only.",
+      words: "provider DeepSeek MiniMax MOSS OpenAI Anthropic API key verify fetch capability policy fallback",
+      understandingNotice: "Analyze images or videos from Library after explicit upload confirmation; saving does not run inference.",
+      imageNotice: "Submit image generation tasks from Library Images; saving does not generate an image.",
+      add: "Configure provider",
       reload: "Reload",
       reloadAsk: "Discard unsaved changes and load the latest settings?",
-      console: "MOSS platform",
-      empty: "No provider connections yet. Add a MOSS connection to configure default uses.",
-      name: "Connection name",
+      console: "Platform console",
+      empty: "No verified provider models available yet. Configure an API key under Model Providers to fetch models first.",
+      emptyCta: "Go to Model Providers",
+      emptyScene: "No discovered model supports {capability}. Verify a provider with {capability} models first.",
+      manageProviders: "Manage providers",
+      name: "Name",
       enabled: "Enabled",
-      remove: "Delete connection",
-      removeAsk: "Remove this connection from the draft? Saving applies the change and requires unbinding its uses first.",
-      discover: "Query models",
-      saveFirst: "Save changes before querying the account's available models.",
-      discoveryHint: "Catalog only, no inference. A listed model has not been verified by inference.",
-      noModels: "This account returned an empty model catalog.",
+      remove: "Clear credentials",
+      removeAsk: "Clear credentials for this provider? Saving applies the change and requires unbinding its scenes first.",
+      discover: "Verify & Fetch Models",
+      verifying: "Verifying…",
+      verifiedBadge: "Connected · {n} models",
+      failedBadge: "Connection failed",
+      unverifiedBadge: "Unverified",
+      notConfiguredBadge: "Not configured",
+      fromConfigBadge: "From startup config",
+      baseUrl: "Custom Base URL (optional)",
+      baseUrlToggle: "Base URL settings",
+      baseUrlPlaceholder: "Default: {url}",
+      discoveredModels: "Available models ({n})",
+      saveAndVerify: "Save & Verify",
+      saveFirst: "Save changes before fetching available models.",
+      discoveryHint: "Checks connectivity and fetches the model catalog only; no inference is run.",
+      noModels: "This provider returned an empty model catalog.",
       unbound: "Not in use",
-      liveHint: "MOSS Live uses its own connection and model for realtime voice calls.",
+      liveHint: "Used for realtime voice calls and interactive sessions.",
+      polishHint: "Used after voice dictation to restore punctuation and clean up phrasing.",
+      orchestratorHint: "Used by the assistant for chat, triage, and channel coordination.",
+      transcriptionHint: "Used for Composer ASR voice dictation and audio transcription.",
       bindingHint:
-        "Unbind uses before deleting, disabling or clearing a connection's key. In-flight requests keep their starting configuration; new requests use the updated settings.",
-      manage: "Manage AI service connections",
-      connections: "Connections",
-      uses: "Uses",
-      usesIntro: "Pick a connection and model for each use; none leaves it unused.",
-      groupImage: "Images",
-      groupVoice: "Voice",
-      groupLive: "Live",
+        "Unbind scenes and fallbacks before disabling or clearing a provider's key. In-flight requests keep their starting configuration; new requests use updated settings.",
+      manage: "Manage providers",
+      connections: "Provider Credentials",
+      uses: "Per-Scene Model Policy",
+      usesIntro: "Select only from models discovered from configured providers with matching capabilities, and optionally add ordered fallbacks.",
+      groupChat: "Chat & Text",
+      groupImage: "Vision & Image",
+      groupVoice: "Voice & Dictation",
+      groupLive: "Realtime",
+      fallbackTitle: "Fallback chain",
+      addFallback: "Add fallback",
+      removeFallback: "Remove fallback",
+      moveFallbackUp: "Move up",
+      moveFallbackDown: "Move down",
+      fallbackEmpty: "No fallback models configured",
+      fallbackSelect: "Choose fallback model…",
+      unverifiedModelTag: "Not in catalog",
+      capability: { chat: "Chat", asr: "ASR", tts: "TTS", realtime: "Realtime", vision: "Vision", image: "Image" },
+      vendorHint: {
+        deepseek: "DeepSeek models for assistant chat and text polish",
+        minimax: "MiniMax chat, speech, and multimodal models",
+        moss: "MOSS ASR dictation, TTS speech, realtime voice, vision, and image generation",
+        openai: "OpenAI GPT, Whisper, TTS, and image models",
+        anthropic: "Anthropic Claude chat and vision models",
+      },
       use: {
+        orchestrator: "Assistant chat",
+        polish: "Text polish",
         image: "Image generation",
         understanding: "Media understanding",
-        speech: "Speech",
+        speech: "Speech (TTS)",
         speakers: "Dialogue",
         voiceDesign: "Voice design",
-        transcription: "Transcription",
-        live: "MOSS Live",
+        transcription: "Dictation (ASR)",
+        live: "Realtime voice",
         vision: "Live vision",
       },
-      connectionFor: "Connection for {use}",
+      connectionFor: "Provider for {use}",
       modelFor: "Model for {use}",
       openSpeechShort: "Open",
-      adapted: "Models it can use",
+      adapted: "Discovered models",
     },
     "web.remote": {
       title: "Remote Access",
-      subtitle: "View and control VibeValley on this Mac from your phone over Tailscale.",
+      subtitle: "View and control VibeValley on this Mac from your phone directly over the same Wi-Fi LAN, or over optional Tailscale WAN.",
       toggle: { enable: "Enable remote access", disable: "Disable remote access", enabled: "Enabled", disabled: "Disabled" },
-      tailscale: { online: "Tailscale online", offline: "Tailscale offline", ip: "Tailscale IP", url: "Access URL" },
+      mode: {
+        label: "Connection mode",
+        lan: "LAN direct",
+        tailscale: "Tailscale WAN",
+        lanHint: "Connect phones on the same Wi-Fi directly without Tailscale",
+        tailscaleHint: "Connect from outside your local network over encrypted Tailscale WAN",
+      },
+      lan: {
+        label: "LAN direct (same Wi-Fi)",
+        hint: "No Tailscale required; auto-detects this Mac's non-loopback LAN IPv4",
+        ready: "LAN ready",
+        active: "Active",
+        unavailable: "No LAN IPv4",
+      },
+      tailscale: {
+        online: "Tailscale online",
+        offline: "Tailscale offline",
+        ip: "Tailscale WAN (optional)",
+        optionalHint: "Optional WAN enhancement; LAN direct works even without Tailscale",
+        url: "Access URL",
+      },
       pair: {
         action: "Pair new device",
         qrHint: "Scan the QR code on your phone, or enter the address and pairing code",
@@ -6830,7 +6954,7 @@ export const catalogs = {
       },
       mobile: {
         pairTitle: "Connect to Mac",
-        pairSubtitle: "Enter the address and one-time pairing code shown in Remote Access settings on your Mac.",
+        pairSubtitle: "Scan the QR code in Remote Access settings on your Mac, or enter the LAN / Tailscale address and one-time pairing code.",
         urlLabel: "Mac address",
         codeLabel: "Pairing code",
         deviceNameLabel: "Device name",
@@ -6903,14 +7027,14 @@ export const catalogs = {
     "web.repo": {
       list: "Repos",
       add: "New repo",
-      openWorkspace: "Workspace",
+      openWorkspace: "Projects",
       repos: "Code bases",
       all: "All",
       allLine: "The whole map: an island for each repo",
       selectPrompt: "Select a repository from the list to inspect its health, languages, and commit history.",
       notGit: "Not a git repository yet",
       finding: "Looking…",
-      none: "No repos in the work folder yet. Press New repo to add one, or download one from GitHub.",
+      none: "No repos in your projects yet. Press New repo to add one, or download one from GitHub.",
       copied: "Copied: {path}",
       notCopied: "Cannot copy: select the path and copy it yourself.",
       recency: {
@@ -6936,13 +7060,9 @@ export const catalogs = {
       recount: "Count again",
       countedAgo: "counted {ago}",
       whatLanguages: "Languages used",
-      byLines: "By lines, blank lines left out · counted by tokei",
+      byLines: "By lines, blank lines left out",
       linesAndFiles: "{lines} lines · {files} files",
       empty: "No code that can be counted yet.",
-      noTokei: "Counting lines needs tokei, which is not on this computer yet.",
-      install: "Install it in a terminal: ",
-      or: " (or ",
-      thenRecount: "), then press Count again above.",
       level: { "0": "none", "1": "a few", "2": "some", "3": "many", "4": "the most" },
       year: "The past year · a cell a day, fuller with more commits",
       dayCommits: "{n} commits, {level}",
@@ -6969,13 +7089,13 @@ export const catalogs = {
       githubAddress: "GitHub address",
       githubHint: "A public repository's home page. Once downloaded, you can see the repo and set helpers on it.",
       name: "Repo name",
-      nameHint: "Kept in the work folder; a repo of the same name is never overwritten.",
+      nameHint: "Kept in the projects folder; a repo of the same name is never overwritten.",
       nameExample: "such as raft-source",
       downloading: "Downloading the repository… a big one takes longer, up to 3 minutes.",
       making: "Creating…",
       cancel: "Cancel",
       busy: "Working…",
-      download: "Download to the work folder",
+      download: "Download to projects",
       create: "Create the repo",
       otherLang: "Other",
       mountLocal: "Mount local repo",
@@ -6989,7 +7109,7 @@ export const catalogs = {
       initGit: "Initialize Git repository if needed",
       initGitHint: "Creates an initial Git commit if the chosen folder is not yet tracked by Git.",
       nameOptionalHint: "Optional. Defaults to the folder name and appends a suffix if that name is already taken.",
-      badgeManaged: "Workspace",
+      badgeManaged: "Project",
       badgeLocal: "Local mount",
       unmount: "Unmount",
       unmounting: "Unmounting…",
@@ -7022,7 +7142,7 @@ export const catalogs = {
       unsupported: "unsupported",
       notFound: "not found",
       checking: "checking…",
-      noRuntimes: "The machines could not be read: ",
+      noRuntimes: "The environments could not be read: ",
       usedBy: " · {n} agents",
       reading: "Reading…",
       unsupportedWhy: "Unsupported: {why}",
@@ -7036,7 +7156,7 @@ export const catalogs = {
       makeAgent: "Make a new agent with it",
       noneYet: "None yet.",
       afterInstall: "Readable once it is installed.",
-      noUsage: "This runtime does not report account usage.",
+      noUsage: "This environment does not report account usage.",
       signedOut: "Not signed in. Run {runtime} on this computer and sign in once.",
       unreadable: "Cannot be read: {why}",
       balance:
@@ -7065,7 +7185,7 @@ export const catalogs = {
       auto: "Find it",
       defaultModel: "Default model",
       defaultModelHint: "Used when an agent names no model.",
-      ownDefault: "The runtime's own default",
+      ownDefault: "The environment's own default",
       defaultEffort: "Default effort",
       default: "Default",
       maxWorking: "At most at once",
@@ -7078,38 +7198,38 @@ export const catalogs = {
         "{pi, select, true {Spent {spent} today (estimated from pi's price list). At the budget no new work is sent; work under way finishes. Empty sets no limit.} other {Spent {spent} today (estimated from the model's price list). At the budget no new work is sent; work under way finishes. Empty sets no limit.}}",
       unlimited: "No limit",
       env: "Environment variables",
-      envHint: "Added to every session of this runtime; the agent's own environment variables win.",
+      envHint: "Added to every session of this environment; the agent's own environment variables win.",
       models: "Models",
       modelCount: "{n}",
-      noModels: "This runtime does not report its models.",
+      noModels: "This environment does not report its models.",
       effort: "Effort",
-      unreported: "Not reported by this engine.",
+      unreported: "Not reported by this environment.",
       none: "None.",
       library: {
         book: "Skill book",
         search: "Search skills",
-        searchHint: "Search names, descriptions, machines…",
-        noRuntimes: "The machines could not be read: ",
+        searchHint: "Search names, descriptions, environments…",
+        noRuntimes: "The environments could not be read: ",
         installed: "Installed on this computer · {count}",
         noneReported: "The machines have not reported their skills yet (or are still being read).",
         noMatch: "Nothing matches.",
         own: "Written by you · {count}",
         newSkill: "New skill",
-        noSkills: "No skills yet: write one of VibeValley's own, or install some on a runtime and come back.",
+        noSkills: "No skills yet: write one of VibeValley's own, or install some in an environment and come back.",
         builtIn: "Ships with VibeValley · {count}",
         builtInNote:
           "A skill that ships with VibeValley: it is updated with VibeValley and can't be changed or deleted here. Tick it on a profile's Skills tab and the helper's prompt carries it; to work another way, make a skill of your own.",
         builtInTag: "Built in",
         installedNote:
-          "A skill installed on the machines: helpers using these machines load it when needed, no need to tick it in a profile. To change it, edit its file.",
-        where: "Machines that have it",
+          "A skill installed in an environment: helpers using that environment load it when needed, no need to tick it in a profile. To change it, edit its file.",
+        where: "Environments that have it",
         inUse: "{n} agents use it; deleting it takes it off them.",
         removeIt: "Delete it?",
         name: "Name",
         nameLabel: "Skill name",
         nameHint: "Such as: write the test first",
         when: "When to use it",
-        whenHint: "A sentence. A runtime that loads skills when needed reads this first, then decides whether to read the body.",
+        whenHint: "A sentence. An environment that loads skills when needed reads this first, then decides whether to read the body.",
         description: "Skill description",
         descriptionHint: "Before changing behavior, add a test that fails.",
         body: "Body",
@@ -7141,13 +7261,13 @@ export const catalogs = {
         installedCount: "Installed",
         lastSeen: "Last seen",
       },
-      sidebarToggle: "Toggle engines sidebar",
-      refreshAll: "Refresh machines and engines",
+      sidebarToggle: "Toggle environments sidebar",
+      refreshAll: "Refresh machines and environments",
       inspectorTitle: "Machine & Inspector",
       inspectorShow: "Show inspector",
       inspectorHide: "Hide inspector",
-      noneInstalled: "No installed coding engines found",
-      noneInstalledHint: "Install a coding engine on this machine or a connected host, then refresh.",
+      noneInstalled: "No installed coding environments found",
+      noneInstalledHint: "Install a coding environment on this machine or a connected host, then refresh.",
       remoteSummary: "Hosted on {machine} and dispatched remotely.",
       sessions: "Related sessions",
       noSessions: "No active or recent sessions.",
@@ -7160,7 +7280,7 @@ export const catalogs = {
         failuresDetail: "{failed} failed · {errors} errors",
         retriesDetail: "{retried} sessions · {retries} retries",
         cumulativeSpend: "Cumulative usage",
-        empty: "No recent runs recorded for this engine.",
+        empty: "No recent runs recorded for this environment.",
       },
       quickActions: "Quick actions",
       installation: "Installation",
@@ -7208,7 +7328,7 @@ export const catalogs = {
         thought: "Thought",
         subagentSaid: "Subagent said",
         said: "Said",
-        farm: "Chat",
+        farm: "Channels",
         running: "running",
         ok: "succeeded",
         failed: "failed",
@@ -7218,11 +7338,11 @@ export const catalogs = {
       },
       runs: {
         farm: {
-          channel_message_send: "speaking in the chat",
-          channel_message_list: "reading the chat",
+          channel_message_send: "speaking in the channel",
+          channel_message_list: "reading the channel",
           channel_unread_list: "checking for words to it",
-          session_list: "seeing who is in the chat",
-          other: "Chat: {tool}",
+          session_list: "seeing who is in the channel",
+          other: "Channel: {tool}",
         },
         span: {
           heard: "Heard",
@@ -7232,7 +7352,7 @@ export const catalogs = {
           retry: "Retry",
           cache: "Cache",
           error: "Error",
-          farm: "Chat",
+          farm: "Channels",
           tool: "Tool",
         },
         earlier: "Earlier steps",
@@ -7309,19 +7429,19 @@ export const catalogs = {
         recovery: {
           resumeSame: "Resume with same config",
           retrySame: "Retry with same config",
-          rerunOther: "Rerun with another expert/engine",
+          rerunOther: "Rerun with another teammate/environment",
           openWorktree: "Open Worktree Terminal",
           resumedToast: "Resumed run with current configuration",
-          rerunTitle: "Rerun with another expert or engine",
-          rerunTarget: "Expert or engine",
-          rerunTargetPlaceholder: "Choose an expert or engine",
+          rerunTitle: "Rerun with another teammate or environment",
+          rerunTarget: "Teammate or environment",
+          rerunTargetPlaceholder: "Choose a teammate or environment",
           rerunNote: "Guidance for this run (optional)",
           rerunNotePlaceholder: "Add extra context or leave blank to rerun from the current task…",
           rerunConfirm: "Start rerun",
           rerunStartedToast: "Started rerun with {target}",
           resumePrompt: "Resume from the previous step and finish the task.",
-          groupExperts: "Experts",
-          groupEngines: "Engines",
+          groupExperts: "Teammates",
+          groupEngines: "Environments",
           noWorktree: "No worktree directory recorded for this session",
         },
         compact: { button: "Compact context", compacted: "Context compacted", skipped: "Nothing new to compact yet" },
@@ -7369,7 +7489,7 @@ export const catalogs = {
         en: "English",
         label: "Page language",
       },
-      keys: { deepseekHint: "sk-… (leave empty to keep)", saved: "Saved, in use at once." },
+      keys: { saved: "Saved, in use at once." },
       source: {
         off: "Not set up",
         on: "On",
@@ -7391,13 +7511,20 @@ export const catalogs = {
         everythingHint: "Not only what VibeValley remembered for helpers: every helper reads your own memories there too",
       },
       github: {
-        noGh: "gh is not installed",
-        note: "Which repos can open PRs is on the Repos page; opening a PR on completion is turned on in the configuration (github.pr_repos).",
+        noGh: "Not installed (optional)",
+        note: "Configure a GitHub Token for direct REST API access or sign in with the local gh CLI to push branches and open or merge PRs for your projects.",
         recheck: "Check again",
-        cli: "gh command line",
-        cliHint: "Used to open PRs and read repositories when merging",
-        login: "Login",
-        loginHint: "The account gh auth login signed in",
+        status: "Connection status",
+        statusHint: "Uses GitHub Token when configured; falls back to local gh login",
+        mode: { token: "Connected via Token", gh: "Signed in via gh", none: "Not configured" },
+        token: "GitHub Token",
+        tokenHint: "Used to call the GitHub REST API directly for PRs and checks; can also be set via GITHUB_TOKEN",
+        tokenPlaceholder: "ghp_… or github_pat_… (leave empty to keep)",
+        tokenConfigured: "Token configured",
+        cli: "gh CLI (optional)",
+        cliHint: "Used when no Token is configured to open PRs and inspect projects",
+        login: "Account",
+        loginHint: "GitHub account for the active Token or gh session",
         notLoggedIn: "Not signed in",
       },
       nav: {
@@ -7406,7 +7533,8 @@ export const catalogs = {
         profile: "Profile",
         general: "General",
         appearance: "Appearance",
-        models: "Models & Engines",
+        providers: "Model Providers",
+        models: "Models & Model Policy",
         skills: "Skills",
         mcp: "MCP Integrations",
         voice: "Voice & Calls",
@@ -7416,7 +7544,7 @@ export const catalogs = {
         memory: "Memory",
         chat: "Chat Channels",
         width: "Navigation width (drag; double-click for the default)",
-        groupWorkspace: "Profile & Workspace",
+        groupWorkspace: "Profile & Projects",
         groupConnect: "Connections & Integrations",
         groupAbout: "Data & About",
       },
@@ -7424,14 +7552,16 @@ export const catalogs = {
         profile: "profile avatar display name tagline bio",
         general: "language start workbench farm startup",
         appearance: "theme dark light size zoom scale font animation motion reduce",
-        models: "keys accounts DeepSeek MOSS API key models binding engines",
+        providers: "providers credentials API key verify fetch DeepSeek MiniMax MOSS OpenAI Anthropic",
+        models: "models policy scene fallback orchestrator chat polish ASR dictation TTS speech realtime vision image",
         skills: "skills skill built-in installed library prompt",
         memory: "memory source sources Nowledge EverOS external read write",
         mcp: "MCP Antigravity Claude Code Codex Cursor stdio streamableHttp integration",
         voice: "call phone recognition speech MOSS live realtime vision transcription",
         chat: "WeChat Feishu Lark QQ connectors chat pairing",
-        github: "GitHub gh PR login",
-        remote: "remote mobile phone Tailscale pair pairing QR device iOS Android CLI machine sandbox listener token control plane embedded",
+        github: "GitHub Token gh PR login",
+        remote:
+          "remote mobile phone lan wifi local direct Tailscale pair pairing QR device iOS Android CLI machine sandbox listener token control plane embedded",
         data: "home folder settings repos worktrees data storage backend",
         about: "version update cli command line",
       },
@@ -7517,12 +7647,16 @@ export const catalogs = {
         intro: "Inspect local data paths, repository and worktree folders, and the active storage backend.",
         storageTitle: "Storage Backend",
         backend: "Active backend",
-        backendHint: "Storage engine backing attachments, media inputs, and artifacts",
+        backendHint: "Storage backend for attachments, media inputs, and notes",
         backendLocalFs: "Local Filesystem (LocalFs)",
         backendS3: "Object Storage (S3)",
         backendMemory: "In-Memory (Memory)",
       },
-      models: { intro: "Configure model accounts, API keys, and feature bindings.", deepseekHint: "The assistant and VibeValley's own helpers use it" },
+      providers: {
+        intro:
+          "Manage credentials for DeepSeek, MiniMax, MOSS, and other providers (1 provider = 1 API key), verify connectivity, and auto-fetch capability-tagged models.",
+      },
+      models: { intro: "Configure per-scene primary models and fallback policies from discovered provider models only." },
       memory: { intro: "Helpers can also look things up in, and write to, memory outside VibeValley." },
       about: {
         intro: "Inspect server version, desktop auto-update status, and CLI installation.",
@@ -7568,8 +7702,9 @@ export const catalogs = {
         },
         check: "Check for updates",
         retry: "Retry",
+        details: "Details",
+        dialogTitle: "App update",
         restart: "Restart to update",
-        restartQuestion: "Restart into the new version?",
         workingQuestion: "{n} active sessions are running; restarting will interrupt them. Restart now?",
         newFarmQuestion: "The new version starts from fresh data; the old stays in the home folder. Restart now?",
         download: "Download",
@@ -7603,11 +7738,11 @@ export const catalogs = {
         call: "Calls",
       },
       readiness: { ready: "{feature}: ready", lacks: "{feature}: {why}", fix: "Set it up" },
-      remote: { toggleLabel: "Mobile & client listener", toggleHint: "Allow paired devices to connect to this Mac over Tailscale." },
+      remote: { toggleLabel: "Mobile & client listener", toggleHint: "Allow paired devices to connect to this Mac over local Wi-Fi LAN or Tailscale." },
     },
     "web.shell": {
       sidebar: {
-        title: "Workspace",
+        title: "Projects",
         toggleSidebar: "Hide sidebar",
         toggleSidebarTooltip: "Hide sidebar (⌘B)",
         addRepo: "Add repository",
@@ -7643,9 +7778,9 @@ export const catalogs = {
         copyPath: "Copy path",
         removeWorktree: "Delete worktree",
         files: "Files",
-        filesTip: "Workspace files",
+        filesTip: "Project files",
         gitChanges: "Changes",
-        gitChangesTip: "Workspace changes & staged",
+        gitChangesTip: "Project changes & staged",
         gitBranches: "Branches",
         gitBranchesTip: "Local branches & worktrees",
         gitCommits: "Commits",
@@ -7722,17 +7857,17 @@ export const catalogs = {
       },
       section: { collapse: "Collapse {title}", expand: "Expand {title}" },
       palette: {
-        placeholder: { commands: "Type a command, #issue, artifact, or run…", files: "Jump to a file…", search: "Search text in project…" },
+        placeholder: { commands: "Type a command, #issue, note, or run…", files: "Jump to a file…", search: "Search text in project…" },
         mode: { commands: "Commands", files: "Files", search: "Search" },
-        groups: { issues: "Issues", artifacts: "Artifacts", runs: "Trajectory Runs" },
+        groups: { issues: "Issues", artifacts: "Notes", runs: "Trajectory Runs" },
         a11y: { commands: "Commands", files: "Files", search: "Search results" },
         searching: "Searching…",
         empty: { commands: "No matching commands.", files: "No matching files.", search: "No matching results." },
         footer: { select: "Select", run: "Run", close: "Close" },
       },
       chat: {
-        title: "Workspace Chat",
-        runtime: "Runtime",
+        title: "Project Chat",
+        runtime: "Environment",
         model: "Model",
         thoughtLevel: "Thinking",
         thoughtLow: "Low",
@@ -7740,8 +7875,8 @@ export const catalogs = {
         thoughtHigh: "High",
         thoughtMax: "Max",
         statusWaiting: "Needs reply",
-        emptyTitle: "Direct coding chat in this workspace",
-        emptyHint: "Pick a runtime and start chatting. Tool call cards open files and diffs directly in an adjacent split pane.",
+        emptyTitle: "Direct coding chat in this project",
+        emptyHint: "Pick an environment and start chatting. Tool call cards open files and diffs directly in an adjacent split pane.",
         steerTag: "Steer",
         todoTitle: "Progress",
         todoToolLabel: "Update steps",
@@ -7790,19 +7925,19 @@ export const catalogs = {
         telemetryHide: "Hide telemetry",
         telemetryContextTitle: "Context window",
         telemetryCacheTitle: "Prompt cache & tools",
-        telemetryQuotaTitle: "Runtime quota",
+        telemetryQuotaTitle: "Environment quota",
         telemetryCached: "Cached",
         telemetryUncached: "Uncached",
         telemetryOutput: "Output",
         telemetryReasoning: "Reasoning",
-        telemetryQuotaUnavailable: "Quota window not reported by this runtime.",
+        telemetryQuotaUnavailable: "Quota window not reported by this environment.",
         sendFailed: "Send failed: {why}",
         configFailed: "Failed to update config: {why}",
         respondFailed: "Failed to submit reply: {why}",
         stopFailed: "Failed to stop session: {why}",
         attachFile: "Attach file",
         removeFile: "Remove {name}",
-        chooseModel: "Switch runtime & model",
+        chooseModel: "Switch environment & model",
       },
       swarm: {
         pill: "Swarm · {working}/{active}",
@@ -7846,7 +7981,7 @@ export const catalogs = {
         repoType: "Type",
         typeGit: "Git repository",
         typeFolder: "Folder",
-        activity: "Workspace",
+        activity: "Project",
         activitySummary: "{worktrees} worktrees · {tabs} tabs",
         openIssues: "Open issues",
         runningSessions: "Running sessions",
@@ -7858,7 +7993,7 @@ export const catalogs = {
         languages: "Languages",
         worktrees: "Worktrees",
         tabsCount: "{n} tabs",
-        closeFolder: "Close folder from workspace",
+        closeFolder: "Close folder from project",
       },
     },
     "web.voice": {
@@ -7913,7 +8048,7 @@ export const catalogs = {
         voicesHint: "Loaded from the saved Speech connection",
         voicesCount: "{n} voices available",
         voicesEmpty: "No voices returned by this connection",
-        manageAll: "Manage all connections in Models & Engines",
+        manageAll: "Manage all connections in Models & Environments",
         saved: "Voice settings saved",
       },
     },
@@ -8089,6 +8224,9 @@ export interface Messages {
   "web.agent.mcpName": undefined;
   "web.agent.mcpTarget": undefined;
   "web.agent.missingApiKey": undefined;
+  "web.agent.mode.external": undefined;
+  "web.agent.mode.externalNotice": { readonly code: string | number };
+  "web.agent.mode.managed": undefined;
   "web.agent.model": undefined;
   "web.agent.modelLevels": { readonly n: string | number; readonly name: string | number };
   "web.agent.name": undefined;
@@ -8203,13 +8341,13 @@ export interface Messages {
   "web.agent.templates.updateHint": undefined;
   "web.agent.templates.updated": undefined;
   "web.agent.templates.willUse": { readonly runtime: string | number };
-  "web.agent.toolset.artifact": undefined;
   "web.agent.toolset.channel": undefined;
   "web.agent.toolset.cron": undefined;
   "web.agent.toolset.issue": undefined;
   "web.agent.toolset.library": undefined;
   "web.agent.toolset.media": undefined;
   "web.agent.toolset.memory": undefined;
+  "web.agent.toolset.note": undefined;
   "web.agent.toolset.repo": undefined;
   "web.agent.toolset.resource": undefined;
   "web.agent.toolset.session": undefined;
@@ -8231,261 +8369,6 @@ export interface Messages {
   "web.agent.workdirTip": undefined;
   "web.agent.worktree": undefined;
   "web.agent.worktreeHint": undefined;
-  "web.artifact.applet.alwaysOnTopHint": undefined;
-  "web.artifact.applet.alwaysOnTopLabel": undefined;
-  "web.artifact.applet.appNameLabel": undefined;
-  "web.artifact.applet.appNamePlaceholder": undefined;
-  "web.artifact.applet.badgeInstalled": undefined;
-  "web.artifact.applet.bundleIdLabel": undefined;
-  "web.artifact.applet.bundlePathLabel": undefined;
-  "web.artifact.applet.button": undefined;
-  "web.artifact.applet.install": undefined;
-  "web.artifact.applet.installedToast": { readonly name: string | number };
-  "web.artifact.applet.installing": undefined;
-  "web.artifact.applet.manageApp": undefined;
-  "web.artifact.applet.modalTitle": undefined;
-  "web.artifact.applet.nameRequired": undefined;
-  "web.artifact.applet.open": undefined;
-  "web.artifact.applet.openApp": undefined;
-  "web.artifact.applet.openedToast": { readonly name: string | number };
-  "web.artifact.applet.reinstall": undefined;
-  "web.artifact.applet.statusInstalled": undefined;
-  "web.artifact.applet.statusNotInstalled": undefined;
-  "web.artifact.applet.subtitle": undefined;
-  "web.artifact.applet.unavailable": undefined;
-  "web.artifact.applet.uninstall": undefined;
-  "web.artifact.applet.uninstalledToast": { readonly name: string | number };
-  "web.artifact.blocks.saved": undefined;
-  "web.artifact.blocks.start": undefined;
-  "web.artifact.blocks.user": undefined;
-  "web.artifact.canvas.close": undefined;
-  "web.artifact.canvas.label": undefined;
-  "web.artifact.canvas.openPage": undefined;
-  "web.artifact.card.open": { readonly title: string | number };
-  "web.artifact.card.version": { readonly version: string | number };
-  "web.artifact.dashboard.exportCsv": undefined;
-  "web.artifact.design.disabled": undefined;
-  "web.artifact.design.emptyCanvas": undefined;
-  "web.artifact.design.enabled": undefined;
-  "web.artifact.design.propsTitle": undefined;
-  "web.artifact.design.themeDark": undefined;
-  "web.artifact.design.themeLight": undefined;
-  "web.artifact.designSystem.colors": undefined;
-  "web.artifact.designSystem.components": undefined;
-  "web.artifact.designSystem.guidelinesDo": undefined;
-  "web.artifact.designSystem.guidelinesDont": undefined;
-  "web.artifact.designSystem.previewTheme": undefined;
-  "web.artifact.designSystem.radius": undefined;
-  "web.artifact.designSystem.spacing": undefined;
-  "web.artifact.designSystem.specimen": undefined;
-  "web.artifact.designSystem.typography": undefined;
-  "web.artifact.diagram.edges": undefined;
-  "web.artifact.diagram.nodes": undefined;
-  "web.artifact.diagram.structure": undefined;
-  "web.artifact.diagram.visual": undefined;
-  "web.artifact.docs.edit": undefined;
-  "web.artifact.docs.read": undefined;
-  "web.artifact.docs.split": undefined;
-  "web.artifact.edit.save": undefined;
-  "web.artifact.edit.saved": { readonly version: string | number };
-  "web.artifact.files.codeMode": undefined;
-  "web.artifact.files.htmlPreviewMode": undefined;
-  "web.artifact.issue.empty": undefined;
-  "web.artifact.issue.linkEmpty": undefined;
-  "web.artifact.issue.linkExisting": undefined;
-  "web.artifact.issue.linkPlaceholder": undefined;
-  "web.artifact.issue.linkedToast": { readonly title: string | number };
-  "web.artifact.issue.new": undefined;
-  "web.artifact.issue.newCreate": undefined;
-  "web.artifact.issue.newDialogTitle": undefined;
-  "web.artifact.issue.newTitle": undefined;
-  "web.artifact.issue.newTitlePlaceholder": undefined;
-  "web.artifact.issue.newType": undefined;
-  "web.artifact.issue.title": undefined;
-  "web.artifact.issue.unlink": { readonly title: string | number };
-  "web.artifact.issue.unlinkedToast": { readonly title: string | number };
-  "web.artifact.motion.chapters": undefined;
-  "web.artifact.motion.layers": { readonly n: string | number };
-  "web.artifact.motion.loop": undefined;
-  "web.artifact.motion.nextStep": undefined;
-  "web.artifact.motion.play": undefined;
-  "web.artifact.motion.prevStep": undefined;
-  "web.artifact.motion.restart": undefined;
-  "web.artifact.motion.stop": undefined;
-  "web.artifact.motion.timeline": undefined;
-  "web.artifact.outline.addChild": undefined;
-  "web.artifact.outline.cycleKind": { readonly kind: string | number };
-  "web.artifact.outline.hideDone": undefined;
-  "web.artifact.outline.indent": undefined;
-  "web.artifact.outline.kindBullet": undefined;
-  "web.artifact.outline.kindHeading": undefined;
-  "web.artifact.outline.kindTodo": undefined;
-  "web.artifact.outline.outdent": undefined;
-  "web.artifact.outline.progress": { readonly done: string | number; readonly total: string | number };
-  "web.artifact.outline.quickAdd": undefined;
-  "web.artifact.outline.showDone": undefined;
-  "web.artifact.outline.untitled": undefined;
-  "web.artifact.page.all": undefined;
-  "web.artifact.page.backToLibrary": undefined;
-  "web.artifact.page.delete": undefined;
-  "web.artifact.page.deleteAsk": { readonly title: string | number };
-  "web.artifact.page.deleteFileAsk": { readonly path: string | number };
-  "web.artifact.page.deleted": { readonly title: string | number };
-  "web.artifact.page.directory": undefined;
-  "web.artifact.page.discard": undefined;
-  "web.artifact.page.filesTab": undefined;
-  "web.artifact.page.filesTabCount": { readonly n: string | number };
-  "web.artifact.page.gone": undefined;
-  "web.artifact.page.liveVersion": undefined;
-  "web.artifact.page.more": undefined;
-  "web.artifact.page.new": undefined;
-  "web.artifact.page.newFileLabel": undefined;
-  "web.artifact.page.none": undefined;
-  "web.artifact.page.previewTab": undefined;
-  "web.artifact.page.rail": undefined;
-  "web.artifact.page.railHide": undefined;
-  "web.artifact.page.railShow": undefined;
-  "web.artifact.page.snapshotNote": undefined;
-  "web.artifact.page.title": undefined;
-  "web.artifact.page.unsaved": undefined;
-  "web.artifact.page.viewMode": undefined;
-  "web.artifact.presenter.aside": undefined;
-  "web.artifact.presenter.clock": undefined;
-  "web.artifact.presenter.current": undefined;
-  "web.artifact.presenter.empty": undefined;
-  "web.artifact.presenter.end": undefined;
-  "web.artifact.presenter.loadFailure": { readonly reason: string | number };
-  "web.artifact.presenter.missing": undefined;
-  "web.artifact.presenter.next": undefined;
-  "web.artifact.presenter.noNotes": undefined;
-  "web.artifact.presenter.notes": undefined;
-  "web.artifact.presenter.restart": undefined;
-  "web.artifact.presenter.waiting": undefined;
-  "web.artifact.preview.edges": { readonly n: string | number };
-  "web.artifact.preview.nodes": { readonly n: string | number };
-  "web.artifact.preview.scenes": { readonly n: string | number };
-  "web.artifact.preview.shots": { readonly n: string | number };
-  "web.artifact.preview.slides": { readonly n: string | number };
-  "web.artifact.prototype.reload": undefined;
-  "web.artifact.prototype.viewportFull": undefined;
-  "web.artifact.prototype.viewportLabel": undefined;
-  "web.artifact.prototype.viewportMobile": undefined;
-  "web.artifact.prototype.viewportTablet": undefined;
-  "web.artifact.sheet.addRow": undefined;
-  "web.artifact.sheet.empty": undefined;
-  "web.artifact.sheet.filterPlaceholder": undefined;
-  "web.artifact.sheet.rowsCount": { readonly n: string | number };
-  "web.artifact.slides.doneEdit": undefined;
-  "web.artifact.slides.editSlide": undefined;
-  "web.artifact.slides.layoutContent": undefined;
-  "web.artifact.slides.layoutCover": undefined;
-  "web.artifact.slides.next": undefined;
-  "web.artifact.slides.present": undefined;
-  "web.artifact.slides.presenter": undefined;
-  "web.artifact.slides.previous": undefined;
-  "web.artifact.slides.slideBulletsLabel": undefined;
-  "web.artifact.slides.slideLayoutLabel": undefined;
-  "web.artifact.slides.slideNotesLabel": undefined;
-  "web.artifact.slides.slideSubtitleLabel": undefined;
-  "web.artifact.slides.slideTitleLabel": undefined;
-  "web.artifact.slidesStore.addSlide": undefined;
-  "web.artifact.standalone.live": undefined;
-  "web.artifact.standalone.missing": undefined;
-  "web.artifact.standalone.version": { readonly version: string | number };
-  "web.artifact.storyboard.animaticMode": undefined;
-  "web.artifact.storyboard.gridMode": undefined;
-  "web.artifact.storyboard.sfx": undefined;
-  "web.artifact.storyboard.shotOf": { readonly n: string | number; readonly total: string | number };
-  "web.artifact.storyboard.totalDuration": { readonly sec: string | number };
-  "web.artifact.storyboard.transition": undefined;
-  "web.artifact.suggestions.accept": undefined;
-  "web.artifact.suggestions.by": { readonly name: string | number };
-  "web.artifact.suggestions.delete": undefined;
-  "web.artifact.suggestions.reject": undefined;
-  "web.artifact.suggestions.title": { readonly n: string | number };
-  "web.artifact.timeline.backToLive": undefined;
-  "web.artifact.timeline.commits": undefined;
-  "web.artifact.timeline.compact": undefined;
-  "web.artifact.timeline.compacted": undefined;
-  "web.artifact.timeline.empty": undefined;
-  "web.artifact.timeline.fork": undefined;
-  "web.artifact.timeline.forkTitle": { readonly title: string | number };
-  "web.artifact.timeline.forked": { readonly title: string | number };
-  "web.artifact.timeline.hide": undefined;
-  "web.artifact.timeline.loading": undefined;
-  "web.artifact.timeline.previewBanner": { readonly summary: string | number };
-  "web.artifact.timeline.restore": undefined;
-  "web.artifact.timeline.restored": undefined;
-  "web.artifact.timeline.savedVersions": undefined;
-  "web.artifact.timeline.show": undefined;
-  "web.artifact.timeline.title": undefined;
-  "web.artifact.timeline.turn": { readonly n: string | number };
-  "web.artifact.timeline.undoTurn": undefined;
-  "web.artifact.timeline.undoneOrigin": undefined;
-  "web.artifact.timeline.versionBanner": { readonly note: string | number; readonly version: string | number };
-  "web.artifact.types.dashboard": undefined;
-  "web.artifact.types.defaultBadge": undefined;
-  "web.artifact.types.design": undefined;
-  "web.artifact.types.designSystem": undefined;
-  "web.artifact.types.diagram": undefined;
-  "web.artifact.types.docs": undefined;
-  "web.artifact.types.motion": undefined;
-  "web.artifact.types.outline": undefined;
-  "web.artifact.types.prototype": undefined;
-  "web.artifact.types.setDefault": undefined;
-  "web.artifact.types.sheet": undefined;
-  "web.artifact.types.slides": undefined;
-  "web.artifact.types.storyboard": undefined;
-  "web.artifact.types.unsetDefault": undefined;
-  "web.artifact.types.whiteboard": undefined;
-  "web.artifact.whiteboard.arrow": undefined;
-  "web.artifact.whiteboard.body": undefined;
-  "web.artifact.whiteboard.card": undefined;
-  "web.artifact.whiteboard.chatWithOrchestrator": undefined;
-  "web.artifact.whiteboard.container": undefined;
-  "web.artifact.whiteboard.curveOrthogonal": undefined;
-  "web.artifact.whiteboard.curveSmooth": undefined;
-  "web.artifact.whiteboard.curveStraight": undefined;
-  "web.artifact.whiteboard.deleteSelected": undefined;
-  "web.artifact.whiteboard.diamond": undefined;
-  "web.artifact.whiteboard.duplicate": undefined;
-  "web.artifact.whiteboard.elements": { readonly n: string | number };
-  "web.artifact.whiteboard.emptyHint": undefined;
-  "web.artifact.whiteboard.entryJson": undefined;
-  "web.artifact.whiteboard.exportedJson": undefined;
-  "web.artifact.whiteboard.exportedJsonCanvas": undefined;
-  "web.artifact.whiteboard.exportedPng": undefined;
-  "web.artifact.whiteboard.exportedSvg": undefined;
-  "web.artifact.whiteboard.fillBerry": undefined;
-  "web.artifact.whiteboard.fillDefault": undefined;
-  "web.artifact.whiteboard.fillLavender": undefined;
-  "web.artifact.whiteboard.fillLeaf": undefined;
-  "web.artifact.whiteboard.fillPeach": undefined;
-  "web.artifact.whiteboard.fillSide": undefined;
-  "web.artifact.whiteboard.fillSun": undefined;
-  "web.artifact.whiteboard.fillWater": undefined;
-  "web.artifact.whiteboard.fitView": undefined;
-  "web.artifact.whiteboard.inspector": undefined;
-  "web.artifact.whiteboard.label": undefined;
-  "web.artifact.whiteboard.noSticker": undefined;
-  "web.artifact.whiteboard.pan": undefined;
-  "web.artifact.whiteboard.pen": undefined;
-  "web.artifact.whiteboard.rect": undefined;
-  "web.artifact.whiteboard.redo": undefined;
-  "web.artifact.whiteboard.save": undefined;
-  "web.artifact.whiteboard.saveJson": undefined;
-  "web.artifact.whiteboard.select": undefined;
-  "web.artifact.whiteboard.sticker": undefined;
-  "web.artifact.whiteboard.sticky": undefined;
-  "web.artifact.whiteboard.styleDashed": undefined;
-  "web.artifact.whiteboard.styleSolid": undefined;
-  "web.artifact.whiteboard.templateArchitecture": undefined;
-  "web.artifact.whiteboard.templateTimeline": undefined;
-  "web.artifact.whiteboard.text": undefined;
-  "web.artifact.whiteboard.timeline": undefined;
-  "web.artifact.whiteboard.undo": undefined;
-  "web.artifact.whiteboard.zoomIn": undefined;
-  "web.artifact.whiteboard.zoomOut": undefined;
   "web.audio.account": undefined;
   "web.audio.addSpeaker": undefined;
   "web.audio.addTurn": undefined;
@@ -8634,6 +8517,7 @@ export interface Messages {
   "web.base.dashboard.pending.title": undefined;
   "web.base.dashboard.pending.todo": undefined;
   "web.base.dashboard.pending.waiting": undefined;
+  "web.base.dashboard.pending.zeroTitle": undefined;
   "web.base.dashboard.profile.defaultName": undefined;
   "web.base.dashboard.profile.defaultTagline": undefined;
   "web.base.dashboard.pulse.active": { readonly n: string | number };
@@ -8835,14 +8719,7 @@ export interface Messages {
   "web.base.shortcuts.say.voice": undefined;
   "web.base.shortcuts.title": undefined;
   "web.base.stop": undefined;
-  "web.base.table.columns": undefined;
   "web.base.table.empty": undefined;
-  "web.base.table.next": undefined;
-  "web.base.table.page": { readonly n: string | number };
-  "web.base.table.previous": undefined;
-  "web.base.table.selectPage": undefined;
-  "web.base.table.selectRow": { readonly id: string | number };
-  "web.base.table.stale": undefined;
   "web.base.time.clock": { readonly am: boolean; readonly hh: string | number; readonly mm: string | number };
   "web.base.time.date": { readonly d: string | number; readonly m: string | number; readonly y: string | number };
   "web.base.time.day": { readonly d: string | number; readonly m: string | number; readonly weekday: string | number };
@@ -8918,9 +8795,6 @@ export interface Messages {
   "web.channel.commands.stop.name": undefined;
   "web.channel.commands.stop.needs": undefined;
   "web.channel.commands.stop.note": undefined;
-  "web.channel.composer.artifactContext": { readonly title: string | number };
-  "web.channel.composer.artifactSelected": { readonly n: string | number };
-  "web.channel.composer.artifactSlide": { readonly n: string | number };
   "web.channel.composer.attach": undefined;
   "web.channel.composer.cancelReply": undefined;
   "web.channel.composer.clearContext": undefined;
@@ -8928,10 +8802,15 @@ export interface Messages {
   "web.channel.composer.dictateConnecting": undefined;
   "web.channel.composer.dictateFinishing": undefined;
   "web.channel.composer.dictateListening": undefined;
+  "web.channel.composer.dictatePolishing": undefined;
+  "web.channel.composer.dictateRevertRaw": undefined;
   "web.channel.composer.dictateStart": undefined;
   "web.channel.composer.dictateStop": undefined;
   "web.channel.composer.mention": undefined;
   "web.channel.composer.notSent": { readonly why: string | number };
+  "web.channel.composer.noteContext": { readonly title: string | number };
+  "web.channel.composer.noteSelected": { readonly n: string | number };
+  "web.channel.composer.noteSlide": { readonly n: string | number };
   "web.channel.composer.replying": { readonly name: string | number };
   "web.channel.composer.runningHint": undefined;
   "web.channel.composer.send": undefined;
@@ -8944,6 +8823,7 @@ export interface Messages {
   "web.channel.crons.byOrchestrator": undefined;
   "web.channel.crons.direct": { readonly agent: string | number };
   "web.channel.crons.empty": undefined;
+  "web.channel.crons.emptyTitle": undefined;
   "web.channel.crons.label": { readonly name: string | number };
   "web.channel.crons.next": { readonly next: string | number };
   "web.channel.crons.off": undefined;
@@ -8996,6 +8876,8 @@ export interface Messages {
   "web.channel.findMessages": undefined;
   "web.channel.inChannel": undefined;
   "web.channel.issues.empty": undefined;
+  "web.channel.issues.emptyTitle": undefined;
+  "web.channel.issues.openBoard": undefined;
   "web.channel.issues.thread": undefined;
   "web.channel.lacks": { readonly why: string | number };
   "web.channel.lacksFix": undefined;
@@ -9074,7 +8956,7 @@ export interface Messages {
   "web.channel.more.label": undefined;
   "web.channel.more.markUnread": undefined;
   "web.channel.more.promoteIssue": undefined;
-  "web.channel.more.saveArtifact": undefined;
+  "web.channel.more.saveNote": undefined;
   "web.channel.names.everyone": undefined;
   "web.channel.names.everyoneNote": undefined;
   "web.channel.names.issueThread": undefined;
@@ -9092,13 +8974,13 @@ export interface Messages {
   "web.channel.pins.none": undefined;
   "web.channel.pins.open": undefined;
   "web.channel.pins.title": undefined;
-  "web.channel.promote.artifactContent": undefined;
-  "web.channel.promote.artifactNote": { readonly where: string | number };
-  "web.channel.promote.artifactSave": undefined;
-  "web.channel.promote.artifactSaved": { readonly title: string | number };
-  "web.channel.promote.artifactTitle": undefined;
-  "web.channel.promote.artifactType": undefined;
   "web.channel.promote.fallbackTitle": { readonly number: string | number };
+  "web.channel.promote.noteContent": undefined;
+  "web.channel.promote.noteNote": { readonly where: string | number };
+  "web.channel.promote.noteSave": undefined;
+  "web.channel.promote.noteSaved": { readonly title: string | number };
+  "web.channel.promote.noteTitle": undefined;
+  "web.channel.promote.noteType": undefined;
   "web.channel.promote.saveTitle": undefined;
   "web.channel.promote.source": { readonly where: string | number };
   "web.channel.replies": { readonly n: number };
@@ -9312,7 +9194,6 @@ export interface Messages {
   "web.devtools.routes.empty": undefined;
   "web.devtools.routes.searchPlaceholder": undefined;
   "web.devtools.state.agents": undefined;
-  "web.devtools.state.artifacts": undefined;
   "web.devtools.state.caches": undefined;
   "web.devtools.state.channels": undefined;
   "web.devtools.state.collab": undefined;
@@ -9325,6 +9206,7 @@ export interface Messages {
   "web.devtools.state.issues": undefined;
   "web.devtools.state.mediaJobs": undefined;
   "web.devtools.state.noPeers": undefined;
+  "web.devtools.state.notes": undefined;
   "web.devtools.state.presence": undefined;
   "web.devtools.state.repos": undefined;
   "web.devtools.state.seq": undefined;
@@ -9662,6 +9544,7 @@ export interface Messages {
   "web.issue.close.working": { readonly who: string | number };
   "web.issue.conversation.older": undefined;
   "web.issue.conversation.placeholder": undefined;
+  "web.issue.conversation.postComment": undefined;
   "web.issue.dates.clearDate": undefined;
   "web.issue.dates.dueAt": undefined;
   "web.issue.dates.notSet": undefined;
@@ -10005,22 +9888,6 @@ export interface Messages {
   "web.issue.todo.whatHint": undefined;
   "web.issue.todo.whatLabel": undefined;
   "web.issue.todo.whichRepo": undefined;
-  "web.issue.triage.addTags": undefined;
-  "web.issue.triage.agent": undefined;
-  "web.issue.triage.clear": undefined;
-  "web.issue.triage.noAgent": undefined;
-  "web.issue.triage.noOwner": undefined;
-  "web.issue.triage.noRepo": undefined;
-  "web.issue.triage.owner": undefined;
-  "web.issue.triage.partial": { readonly failed: string | number; readonly ok: string | number };
-  "web.issue.triage.priority": undefined;
-  "web.issue.triage.replaceTags": undefined;
-  "web.issue.triage.repo": undefined;
-  "web.issue.triage.selectIssue": { readonly n: string | number };
-  "web.issue.triage.selected": { readonly n: string | number };
-  "web.issue.triage.status": undefined;
-  "web.issue.triage.tags": undefined;
-  "web.issue.triage.updated": { readonly n: string | number };
   "web.issue.trigger.comment": undefined;
   "web.issue.trigger.commentNumbered": { readonly id: string | number };
   "web.issue.trigger.cron": undefined;
@@ -10057,7 +9924,6 @@ export interface Messages {
   "web.library.content.search.title": undefined;
   "web.library.content.search.typeMedia": undefined;
   "web.library.content.searchAll": undefined;
-  "web.library.content.sendArtifact": undefined;
   "web.library.content.sidebarToggle": undefined;
   "web.library.content.templates.cat.ai": undefined;
   "web.library.content.templates.cat.apps": undefined;
@@ -10770,6 +10636,321 @@ export interface Messages {
   "web.memory.memory.words": undefined;
   "web.memory.memory.wordsHint": undefined;
   "web.memory.memory.yours": undefined;
+  "web.note.applet.alwaysOnTopHint": undefined;
+  "web.note.applet.alwaysOnTopLabel": undefined;
+  "web.note.applet.appNameLabel": undefined;
+  "web.note.applet.appNamePlaceholder": undefined;
+  "web.note.applet.badgeInstalled": undefined;
+  "web.note.applet.bundleIdLabel": undefined;
+  "web.note.applet.bundlePathLabel": undefined;
+  "web.note.applet.button": undefined;
+  "web.note.applet.install": undefined;
+  "web.note.applet.installedToast": { readonly name: string | number };
+  "web.note.applet.installing": undefined;
+  "web.note.applet.manageApp": undefined;
+  "web.note.applet.modalTitle": undefined;
+  "web.note.applet.nameRequired": undefined;
+  "web.note.applet.open": undefined;
+  "web.note.applet.openApp": undefined;
+  "web.note.applet.openedToast": { readonly name: string | number };
+  "web.note.applet.reinstall": undefined;
+  "web.note.applet.statusInstalled": undefined;
+  "web.note.applet.statusNotInstalled": undefined;
+  "web.note.applet.subtitle": undefined;
+  "web.note.applet.unavailable": undefined;
+  "web.note.applet.uninstall": undefined;
+  "web.note.applet.uninstalledToast": { readonly name: string | number };
+  "web.note.base.addRow": undefined;
+  "web.note.base.agentRanToast": { readonly n: string | number };
+  "web.note.base.board": undefined;
+  "web.note.base.empty": undefined;
+  "web.note.base.filterPlaceholder": undefined;
+  "web.note.base.gallery": undefined;
+  "web.note.base.rowsCount": { readonly n: string | number };
+  "web.note.base.runAgentColumn": undefined;
+  "web.note.base.runningAgentColumn": undefined;
+  "web.note.base.summary.avg": undefined;
+  "web.note.base.summary.count": undefined;
+  "web.note.base.summary.max": undefined;
+  "web.note.base.summary.min": undefined;
+  "web.note.base.summary.sum": undefined;
+  "web.note.base.table": undefined;
+  "web.note.base.timeline": undefined;
+  "web.note.base.uncategorized": undefined;
+  "web.note.blocks.saved": undefined;
+  "web.note.blocks.start": undefined;
+  "web.note.blocks.user": undefined;
+  "web.note.canvas.close": undefined;
+  "web.note.canvas.label": undefined;
+  "web.note.canvas.openPage": undefined;
+  "web.note.card.open": { readonly title: string | number };
+  "web.note.card.version": { readonly version: string | number };
+  "web.note.doc.add": undefined;
+  "web.note.doc.addBlock": undefined;
+  "web.note.doc.addCol": undefined;
+  "web.note.doc.addRow": undefined;
+  "web.note.doc.attributionPlaceholder": undefined;
+  "web.note.doc.bold": undefined;
+  "web.note.doc.bookmarkEdit": undefined;
+  "web.note.doc.bookmarkOpen": undefined;
+  "web.note.doc.bulletedList": undefined;
+  "web.note.doc.calloutPlaceholder": undefined;
+  "web.note.doc.calloutTones.danger": undefined;
+  "web.note.doc.calloutTones.info": undefined;
+  "web.note.doc.calloutTones.note": undefined;
+  "web.note.doc.calloutTones.tip": undefined;
+  "web.note.doc.calloutTones.warn": undefined;
+  "web.note.doc.chartEdit": undefined;
+  "web.note.doc.chartTitle": undefined;
+  "web.note.doc.codeLanguagePlaceholder": undefined;
+  "web.note.doc.codePlaceholder": undefined;
+  "web.note.doc.columnsCount": { readonly n: string | number };
+  "web.note.doc.columnsOption": { readonly n: string | number };
+  "web.note.doc.compareEdit": undefined;
+  "web.note.doc.convertToIssue": undefined;
+  "web.note.doc.descOptional": undefined;
+  "web.note.doc.duplicate": undefined;
+  "web.note.doc.edit": undefined;
+  "web.note.doc.empty": undefined;
+  "web.note.doc.filterIssues": undefined;
+  "web.note.doc.headingPlaceholder": { readonly level: string | number };
+  "web.note.doc.inlineCode": undefined;
+  "web.note.doc.issuesTitle": { readonly n: string | number };
+  "web.note.doc.italic": undefined;
+  "web.note.doc.kpiEdit": undefined;
+  "web.note.doc.link": undefined;
+  "web.note.doc.listItemPlaceholder": undefined;
+  "web.note.doc.mathBlock": undefined;
+  "web.note.doc.mathInline": undefined;
+  "web.note.doc.mediaEdit": undefined;
+  "web.note.doc.moveDown": undefined;
+  "web.note.doc.moveUp": undefined;
+  "web.note.doc.noAfterAsset": undefined;
+  "web.note.doc.noBeforeAsset": undefined;
+  "web.note.doc.orderedList": undefined;
+  "web.note.doc.outline": undefined;
+  "web.note.doc.pickBase": undefined;
+  "web.note.doc.pickIssue": undefined;
+  "web.note.doc.presenter": undefined;
+  "web.note.doc.preview": undefined;
+  "web.note.doc.previewEdit": undefined;
+  "web.note.doc.previewTitle": undefined;
+  "web.note.doc.quotePlaceholder": undefined;
+  "web.note.doc.render": undefined;
+  "web.note.doc.repoFilter": undefined;
+  "web.note.doc.selectBase": undefined;
+  "web.note.doc.selectIssue": undefined;
+  "web.note.doc.slash.baseEmbed.desc": undefined;
+  "web.note.doc.slash.baseEmbed.label": undefined;
+  "web.note.doc.slash.bookmark.desc": undefined;
+  "web.note.doc.slash.bookmark.label": undefined;
+  "web.note.doc.slash.callout.desc": undefined;
+  "web.note.doc.slash.callout.label": undefined;
+  "web.note.doc.slash.chart.desc": undefined;
+  "web.note.doc.slash.chart.label": undefined;
+  "web.note.doc.slash.code.desc": undefined;
+  "web.note.doc.slash.code.label": undefined;
+  "web.note.doc.slash.columns.desc": undefined;
+  "web.note.doc.slash.columns.label": undefined;
+  "web.note.doc.slash.compare.desc": undefined;
+  "web.note.doc.slash.compare.label": undefined;
+  "web.note.doc.slash.diagram.desc": undefined;
+  "web.note.doc.slash.diagram.label": undefined;
+  "web.note.doc.slash.divider.desc": undefined;
+  "web.note.doc.slash.divider.label": undefined;
+  "web.note.doc.slash.heading1.desc": undefined;
+  "web.note.doc.slash.heading1.label": undefined;
+  "web.note.doc.slash.heading2.desc": undefined;
+  "web.note.doc.slash.heading2.label": undefined;
+  "web.note.doc.slash.heading3.desc": undefined;
+  "web.note.doc.slash.heading3.label": undefined;
+  "web.note.doc.slash.issueCard.desc": undefined;
+  "web.note.doc.slash.issueCard.label": undefined;
+  "web.note.doc.slash.issueList.desc": undefined;
+  "web.note.doc.slash.issueList.label": undefined;
+  "web.note.doc.slash.kpi.desc": undefined;
+  "web.note.doc.slash.kpi.label": undefined;
+  "web.note.doc.slash.listBullet.desc": undefined;
+  "web.note.doc.slash.listBullet.label": undefined;
+  "web.note.doc.slash.listOrdered.desc": undefined;
+  "web.note.doc.slash.listOrdered.label": undefined;
+  "web.note.doc.slash.math.desc": undefined;
+  "web.note.doc.slash.math.label": undefined;
+  "web.note.doc.slash.media.desc": undefined;
+  "web.note.doc.slash.media.label": undefined;
+  "web.note.doc.slash.pageBreak.desc": undefined;
+  "web.note.doc.slash.pageBreak.label": undefined;
+  "web.note.doc.slash.preview.desc": undefined;
+  "web.note.doc.slash.preview.label": undefined;
+  "web.note.doc.slash.prose.desc": undefined;
+  "web.note.doc.slash.prose.label": undefined;
+  "web.note.doc.slash.quote.desc": undefined;
+  "web.note.doc.slash.quote.label": undefined;
+  "web.note.doc.slash.table.desc": undefined;
+  "web.note.doc.slash.table.label": undefined;
+  "web.note.doc.slash.toc.desc": undefined;
+  "web.note.doc.slash.toc.label": undefined;
+  "web.note.doc.slash.todo.desc": undefined;
+  "web.note.doc.slash.todo.label": undefined;
+  "web.note.doc.slash.toggle.desc": undefined;
+  "web.note.doc.slash.toggle.label": undefined;
+  "web.note.doc.slashCat.basic": undefined;
+  "web.note.doc.slashCat.data": undefined;
+  "web.note.doc.slashCat.structure": undefined;
+  "web.note.doc.slashHint": undefined;
+  "web.note.doc.slideLabel": { readonly n: string | number };
+  "web.note.doc.slideTitlePlaceholder": undefined;
+  "web.note.doc.slidesCount": { readonly n: string | number };
+  "web.note.doc.speakerNotesPlaceholder": undefined;
+  "web.note.doc.statusFilter": undefined;
+  "web.note.doc.strike": undefined;
+  "web.note.doc.tagFilter": undefined;
+  "web.note.doc.titleOptional": undefined;
+  "web.note.doc.tocEmpty": undefined;
+  "web.note.doc.tocTitle": undefined;
+  "web.note.doc.todoPlaceholder": undefined;
+  "web.note.doc.toggleBodyPlaceholder": undefined;
+  "web.note.doc.toggleTitlePlaceholder": undefined;
+  "web.note.doc.turnInto": undefined;
+  "web.note.edit.save": undefined;
+  "web.note.edit.saved": { readonly version: string | number };
+  "web.note.files.codeMode": undefined;
+  "web.note.files.htmlPreviewMode": undefined;
+  "web.note.issue.empty": undefined;
+  "web.note.issue.linkEmpty": undefined;
+  "web.note.issue.linkExisting": undefined;
+  "web.note.issue.linkPlaceholder": undefined;
+  "web.note.issue.linkedToast": { readonly title: string | number };
+  "web.note.issue.new": undefined;
+  "web.note.issue.newCreate": undefined;
+  "web.note.issue.newDialogTitle": undefined;
+  "web.note.issue.newTitle": undefined;
+  "web.note.issue.newTitlePlaceholder": undefined;
+  "web.note.issue.newType": undefined;
+  "web.note.issue.title": undefined;
+  "web.note.issue.unlink": { readonly title: string | number };
+  "web.note.issue.unlinkedToast": { readonly title: string | number };
+  "web.note.links.backlinks": { readonly n: string | number };
+  "web.note.links.outgoing": { readonly n: string | number };
+  "web.note.links.relation.embed": undefined;
+  "web.note.links.relation.link": undefined;
+  "web.note.links.relation.ref": undefined;
+  "web.note.media.animatic": undefined;
+  "web.note.media.grid": undefined;
+  "web.note.media.loop": undefined;
+  "web.note.media.motion": undefined;
+  "web.note.media.shot": undefined;
+  "web.note.media.storyboard": undefined;
+  "web.note.media.transcriptPreview": undefined;
+  "web.note.media.videoPreview": undefined;
+  "web.note.page.all": undefined;
+  "web.note.page.backToLibrary": undefined;
+  "web.note.page.delete": undefined;
+  "web.note.page.deleteAsk": { readonly title: string | number };
+  "web.note.page.deleteFileAsk": { readonly path: string | number };
+  "web.note.page.deleted": { readonly title: string | number };
+  "web.note.page.directory": undefined;
+  "web.note.page.discard": undefined;
+  "web.note.page.filesTab": undefined;
+  "web.note.page.gone": undefined;
+  "web.note.page.liveVersion": undefined;
+  "web.note.page.more": undefined;
+  "web.note.page.new": undefined;
+  "web.note.page.newFileLabel": undefined;
+  "web.note.page.none": undefined;
+  "web.note.page.previewTab": undefined;
+  "web.note.page.rail": undefined;
+  "web.note.page.railHide": undefined;
+  "web.note.page.railShow": undefined;
+  "web.note.page.snapshotNote": undefined;
+  "web.note.page.title": undefined;
+  "web.note.page.unsaved": undefined;
+  "web.note.page.viewMode": undefined;
+  "web.note.preview.blocks": { readonly n: string | number };
+  "web.note.preview.slides": { readonly n: string | number };
+  "web.note.standalone.live": undefined;
+  "web.note.standalone.missing": undefined;
+  "web.note.standalone.version": { readonly version: string | number };
+  "web.note.suggestions.accept": undefined;
+  "web.note.suggestions.by": { readonly name: string | number };
+  "web.note.suggestions.delete": undefined;
+  "web.note.suggestions.reject": undefined;
+  "web.note.suggestions.title": { readonly n: string | number };
+  "web.note.timeline.backToLive": undefined;
+  "web.note.timeline.commits": undefined;
+  "web.note.timeline.compact": undefined;
+  "web.note.timeline.compacted": undefined;
+  "web.note.timeline.empty": undefined;
+  "web.note.timeline.fork": undefined;
+  "web.note.timeline.forkTitle": { readonly title: string | number };
+  "web.note.timeline.forked": { readonly title: string | number };
+  "web.note.timeline.loading": undefined;
+  "web.note.timeline.previewBanner": { readonly summary: string | number };
+  "web.note.timeline.restore": undefined;
+  "web.note.timeline.restored": undefined;
+  "web.note.timeline.savedVersions": undefined;
+  "web.note.timeline.title": undefined;
+  "web.note.timeline.turn": { readonly n: string | number };
+  "web.note.timeline.undoTurn": undefined;
+  "web.note.timeline.undoneOrigin": undefined;
+  "web.note.timeline.versionBanner": { readonly note: string | number; readonly version: string | number };
+  "web.note.tree.empty": undefined;
+  "web.note.tree.moveToRoot": undefined;
+  "web.note.tree.newChild": undefined;
+  "web.note.tree.newRoot": undefined;
+  "web.note.tree.title": undefined;
+  "web.note.types.base": undefined;
+  "web.note.types.canvas": undefined;
+  "web.note.types.doc": undefined;
+  "web.note.types.media": undefined;
+  "web.note.whiteboard.arrow": undefined;
+  "web.note.whiteboard.body": undefined;
+  "web.note.whiteboard.card": undefined;
+  "web.note.whiteboard.chatWithOrchestrator": undefined;
+  "web.note.whiteboard.container": undefined;
+  "web.note.whiteboard.curveOrthogonal": undefined;
+  "web.note.whiteboard.curveSmooth": undefined;
+  "web.note.whiteboard.curveStraight": undefined;
+  "web.note.whiteboard.deleteSelected": undefined;
+  "web.note.whiteboard.diamond": undefined;
+  "web.note.whiteboard.duplicate": undefined;
+  "web.note.whiteboard.elements": { readonly n: string | number };
+  "web.note.whiteboard.emptyHint": undefined;
+  "web.note.whiteboard.entryJson": undefined;
+  "web.note.whiteboard.exportedJson": undefined;
+  "web.note.whiteboard.exportedJsonCanvas": undefined;
+  "web.note.whiteboard.exportedPng": undefined;
+  "web.note.whiteboard.exportedSvg": undefined;
+  "web.note.whiteboard.fillBerry": undefined;
+  "web.note.whiteboard.fillDefault": undefined;
+  "web.note.whiteboard.fillLavender": undefined;
+  "web.note.whiteboard.fillLeaf": undefined;
+  "web.note.whiteboard.fillPeach": undefined;
+  "web.note.whiteboard.fillSide": undefined;
+  "web.note.whiteboard.fillSun": undefined;
+  "web.note.whiteboard.fillWater": undefined;
+  "web.note.whiteboard.fitView": undefined;
+  "web.note.whiteboard.inspector": undefined;
+  "web.note.whiteboard.label": undefined;
+  "web.note.whiteboard.noSticker": undefined;
+  "web.note.whiteboard.pan": undefined;
+  "web.note.whiteboard.pen": undefined;
+  "web.note.whiteboard.rect": undefined;
+  "web.note.whiteboard.redo": undefined;
+  "web.note.whiteboard.save": undefined;
+  "web.note.whiteboard.saveJson": undefined;
+  "web.note.whiteboard.select": undefined;
+  "web.note.whiteboard.sticker": undefined;
+  "web.note.whiteboard.sticky": undefined;
+  "web.note.whiteboard.styleDashed": undefined;
+  "web.note.whiteboard.styleSolid": undefined;
+  "web.note.whiteboard.templateArchitecture": undefined;
+  "web.note.whiteboard.templateTimeline": undefined;
+  "web.note.whiteboard.text": undefined;
+  "web.note.whiteboard.timeline": undefined;
+  "web.note.whiteboard.undo": undefined;
+  "web.note.whiteboard.zoomIn": undefined;
+  "web.note.whiteboard.zoomOut": undefined;
   "web.orchestrator.approval.allow": undefined;
   "web.orchestrator.approval.deny": undefined;
   "web.orchestrator.approval.title": undefined;
@@ -10801,14 +10982,33 @@ export interface Messages {
   "web.orchestrator.orchestrator.trajectory": undefined;
   "web.provider.adapted": undefined;
   "web.provider.add": undefined;
+  "web.provider.addFallback": undefined;
+  "web.provider.baseUrl": undefined;
+  "web.provider.baseUrlPlaceholder": { readonly url: string | number };
+  "web.provider.baseUrlToggle": undefined;
   "web.provider.bindingHint": undefined;
+  "web.provider.capability.asr": undefined;
+  "web.provider.capability.chat": undefined;
+  "web.provider.capability.image": undefined;
+  "web.provider.capability.realtime": undefined;
+  "web.provider.capability.tts": undefined;
+  "web.provider.capability.vision": undefined;
   "web.provider.connectionFor": { readonly use: string | number };
   "web.provider.connections": undefined;
   "web.provider.console": undefined;
   "web.provider.discover": undefined;
+  "web.provider.discoveredModels": { readonly n: string | number };
   "web.provider.discoveryHint": undefined;
   "web.provider.empty": undefined;
+  "web.provider.emptyCta": undefined;
+  "web.provider.emptyScene": { readonly capability: string | number };
   "web.provider.enabled": undefined;
+  "web.provider.failedBadge": undefined;
+  "web.provider.fallbackEmpty": undefined;
+  "web.provider.fallbackSelect": undefined;
+  "web.provider.fallbackTitle": undefined;
+  "web.provider.fromConfigBadge": undefined;
+  "web.provider.groupChat": undefined;
   "web.provider.groupImage": undefined;
   "web.provider.groupLive": undefined;
   "web.provider.groupVoice": undefined;
@@ -10816,21 +11016,34 @@ export interface Messages {
   "web.provider.intro": undefined;
   "web.provider.liveHint": undefined;
   "web.provider.manage": undefined;
+  "web.provider.manageProviders": undefined;
   "web.provider.modelFor": { readonly use: string | number };
+  "web.provider.moveFallbackDown": undefined;
+  "web.provider.moveFallbackUp": undefined;
   "web.provider.name": undefined;
   "web.provider.noModels": undefined;
+  "web.provider.notConfiguredBadge": undefined;
   "web.provider.openSpeechShort": undefined;
+  "web.provider.orchestratorHint": undefined;
+  "web.provider.polishHint": undefined;
   "web.provider.reload": undefined;
   "web.provider.reloadAsk": undefined;
   "web.provider.remove": undefined;
   "web.provider.removeAsk": undefined;
+  "web.provider.removeFallback": undefined;
+  "web.provider.saveAndVerify": undefined;
   "web.provider.saveFirst": undefined;
   "web.provider.speechNotice": undefined;
   "web.provider.title": undefined;
+  "web.provider.transcriptionHint": undefined;
   "web.provider.unbound": undefined;
   "web.provider.understandingNotice": undefined;
+  "web.provider.unverifiedBadge": undefined;
+  "web.provider.unverifiedModelTag": undefined;
   "web.provider.use.image": undefined;
   "web.provider.use.live": undefined;
+  "web.provider.use.orchestrator": undefined;
+  "web.provider.use.polish": undefined;
   "web.provider.use.speakers": undefined;
   "web.provider.use.speech": undefined;
   "web.provider.use.transcription": undefined;
@@ -10839,6 +11052,13 @@ export interface Messages {
   "web.provider.use.voiceDesign": undefined;
   "web.provider.uses": undefined;
   "web.provider.usesIntro": undefined;
+  "web.provider.vendorHint.anthropic": undefined;
+  "web.provider.vendorHint.deepseek": undefined;
+  "web.provider.vendorHint.minimax": undefined;
+  "web.provider.vendorHint.moss": undefined;
+  "web.provider.vendorHint.openai": undefined;
+  "web.provider.verifiedBadge": { readonly n: string | number };
+  "web.provider.verifying": undefined;
   "web.provider.words": undefined;
   "web.remote.channel.empty": undefined;
   "web.remote.channel.replyPlaceholder": undefined;
@@ -10896,6 +11116,11 @@ export interface Messages {
   "web.remote.issue.filter.done": undefined;
   "web.remote.issue.filter.review": undefined;
   "web.remote.issue.status": undefined;
+  "web.remote.lan.active": undefined;
+  "web.remote.lan.hint": undefined;
+  "web.remote.lan.label": undefined;
+  "web.remote.lan.ready": undefined;
+  "web.remote.lan.unavailable": undefined;
   "web.remote.mobile.codeLabel": undefined;
   "web.remote.mobile.deviceNameLabel": undefined;
   "web.remote.mobile.invalidInput": undefined;
@@ -10904,6 +11129,11 @@ export interface Messages {
   "web.remote.mobile.pairTitle": undefined;
   "web.remote.mobile.pairing": undefined;
   "web.remote.mobile.urlLabel": undefined;
+  "web.remote.mode.label": undefined;
+  "web.remote.mode.lan": undefined;
+  "web.remote.mode.lanHint": undefined;
+  "web.remote.mode.tailscale": undefined;
+  "web.remote.mode.tailscaleHint": undefined;
   "web.remote.pair.action": undefined;
   "web.remote.pair.code": undefined;
   "web.remote.pair.copied": undefined;
@@ -10929,6 +11159,7 @@ export interface Messages {
   "web.remote.tailscale.ip": undefined;
   "web.remote.tailscale.offline": undefined;
   "web.remote.tailscale.online": undefined;
+  "web.remote.tailscale.optionalHint": undefined;
   "web.remote.tailscale.url": undefined;
   "web.remote.title": undefined;
   "web.remote.toggle.disable": undefined;
@@ -10980,7 +11211,6 @@ export interface Messages {
   "web.repo.inYear": undefined;
   "web.repo.initGit": undefined;
   "web.repo.initGitHint": undefined;
-  "web.repo.install": undefined;
   "web.repo.kinds": { readonly n: string | number };
   "web.repo.languages": undefined;
   "web.repo.level.0": undefined;
@@ -11007,12 +11237,10 @@ export interface Messages {
   "web.repo.nameOptionalHint": undefined;
   "web.repo.noCommits": undefined;
   "web.repo.noCommitsThatDay": undefined;
-  "web.repo.noTokei": undefined;
   "web.repo.none": undefined;
   "web.repo.notCopied": undefined;
   "web.repo.notGit": undefined;
   "web.repo.openWorkspace": undefined;
-  "web.repo.or": undefined;
   "web.repo.otherLang": undefined;
   "web.repo.pickFolder": undefined;
   "web.repo.readingCommits": undefined;
@@ -11034,7 +11262,6 @@ export interface Messages {
   "web.repo.rows.5": undefined;
   "web.repo.rows.6": undefined;
   "web.repo.selectPrompt": undefined;
-  "web.repo.thenRecount": undefined;
   "web.repo.times": { readonly n: string | number };
   "web.repo.uncounted": undefined;
   "web.repo.unmount": undefined;
@@ -11395,6 +11622,8 @@ export interface Messages {
   "web.setting.about.cliTaken": { readonly link: string | number };
   "web.setting.about.copied": undefined;
   "web.setting.about.copy": undefined;
+  "web.setting.about.details": undefined;
+  "web.setting.about.dialogTitle": undefined;
   "web.setting.about.disabled": undefined;
   "web.setting.about.download": undefined;
   "web.setting.about.downloading": { readonly next: string | number; readonly percent: string | number };
@@ -11423,7 +11652,6 @@ export interface Messages {
   "web.setting.about.repos": undefined;
   "web.setting.about.reposHint": undefined;
   "web.setting.about.restart": undefined;
-  "web.setting.about.restartQuestion": undefined;
   "web.setting.about.retry": undefined;
   "web.setting.about.reveal": undefined;
   "web.setting.about.settings": undefined;
@@ -11495,11 +11723,19 @@ export interface Messages {
   "web.setting.github.cliHint": undefined;
   "web.setting.github.login": undefined;
   "web.setting.github.loginHint": undefined;
+  "web.setting.github.mode.gh": undefined;
+  "web.setting.github.mode.none": undefined;
+  "web.setting.github.mode.token": undefined;
   "web.setting.github.noGh": undefined;
   "web.setting.github.notLoggedIn": undefined;
   "web.setting.github.note": undefined;
   "web.setting.github.recheck": undefined;
-  "web.setting.keys.deepseekHint": undefined;
+  "web.setting.github.status": undefined;
+  "web.setting.github.statusHint": undefined;
+  "web.setting.github.token": undefined;
+  "web.setting.github.tokenConfigured": undefined;
+  "web.setting.github.tokenHint": undefined;
+  "web.setting.github.tokenPlaceholder": undefined;
   "web.setting.keys.saved": undefined;
   "web.setting.language.en": undefined;
   "web.setting.language.label": undefined;
@@ -11532,7 +11768,6 @@ export interface Messages {
   "web.setting.missing.mossAccount": undefined;
   "web.setting.missing.mossKey": undefined;
   "web.setting.missing.mossOff": undefined;
-  "web.setting.models.deepseekHint": undefined;
   "web.setting.models.intro": undefined;
   "web.setting.nav.about": undefined;
   "web.setting.nav.appearance": undefined;
@@ -11547,6 +11782,7 @@ export interface Messages {
   "web.setting.nav.memory": undefined;
   "web.setting.nav.models": undefined;
   "web.setting.nav.profile": undefined;
+  "web.setting.nav.providers": undefined;
   "web.setting.nav.remote": undefined;
   "web.setting.nav.search": undefined;
   "web.setting.nav.skills": undefined;
@@ -11569,6 +11805,7 @@ export interface Messages {
   "web.setting.profile.taglinePlaceholder": undefined;
   "web.setting.profile.upload": undefined;
   "web.setting.profile.uploading": undefined;
+  "web.setting.providers.intro": undefined;
   "web.setting.readiness.fix": undefined;
   "web.setting.readiness.lacks": { readonly feature: string | number; readonly why: string | number };
   "web.setting.readiness.ready": { readonly feature: string | number };
@@ -11604,6 +11841,7 @@ export interface Messages {
   "web.setting.words.memory": undefined;
   "web.setting.words.models": undefined;
   "web.setting.words.profile": undefined;
+  "web.setting.words.providers": undefined;
   "web.setting.words.remote": undefined;
   "web.setting.words.skills": undefined;
   "web.setting.words.voice": undefined;

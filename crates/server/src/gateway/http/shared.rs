@@ -77,7 +77,7 @@ pub(super) fn file_range_stream(file: tokio::fs::File, length: u64, truncated_ms
 }
 
 pub(super) fn is_media_input_uuid(id: &str) -> bool {
-    id.len() == 36 && id.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f' | b'-'))
+    id.len() == 36 && !id.bytes().any(|b| b.is_ascii_uppercase()) && uuid::Uuid::parse_str(id).is_ok()
 }
 
 pub(super) fn parse_byte_range(text: &str, size: u64) -> Option<(u64, u64)> {
@@ -119,17 +119,10 @@ pub(super) enum FileServeError {
     Seek(io::Error),
 }
 
+const RFC5987_ENCODE_SET: &percent_encoding::AsciiSet = &percent_encoding::NON_ALPHANUMERIC.remove(b'-').remove(b'.').remove(b'_').remove(b'~');
+
 fn rfc5987_encode(name: &str) -> String {
-    let mut out = String::with_capacity(name.len());
-    for &b in name.as_bytes() {
-        if b.is_ascii_alphanumeric() || matches!(b, b'-' | b'.' | b'_' | b'~') {
-            out.push(b as char);
-        } else {
-            use std::fmt::Write as _;
-            let _ = write!(out, "%{b:02X}");
-        }
-    }
-    out
+    percent_encoding::utf8_percent_encode(name, RFC5987_ENCODE_SET).to_string()
 }
 
 pub(super) async fn serve_file_range(headers: &HeaderMap, spec: FileRangeSpec<'_>) -> Result<Response, FileServeError> {

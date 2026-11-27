@@ -373,6 +373,18 @@ async fn event_of_impl<C: ConnectionTrait>(conn: &C, message: &str) -> DbResult<
         .map(Into::into))
 }
 
+fn meta_has_file(meta: Option<&str>) -> bool {
+    meta.is_some_and(|m| m.contains("\"attachments\""))
+}
+
+fn meta_has_image(meta: Option<&str>) -> bool {
+    meta.is_some_and(|m| m.contains("\"type\":\"image/"))
+}
+
+fn body_has_link(body: &str) -> bool {
+    body.contains("http://") || body.contains("https://")
+}
+
 async fn insert_message_impl<C: ConnectionTrait>(conn: &C, msg: &NewMessage<'_>) -> DbResult<i64> {
     let next_num_subquery = Query::select()
         .expr(Expr::expr(Func::coalesce([Expr::col(channel_message::Column::Number).max(), Expr::val(0i64)])).add(1))
@@ -395,6 +407,9 @@ async fn insert_message_impl<C: ConnectionTrait>(conn: &C, msg: &NewMessage<'_>)
             channel_message::Column::CreatedAt,
             channel_message::Column::Revision,
             channel_message::Column::ReplyNumber,
+            channel_message::Column::HasFile,
+            channel_message::Column::HasImage,
+            channel_message::Column::HasLink,
         ])
         .values_panic([
             Expr::val(msg.id.to_owned()),
@@ -409,6 +424,9 @@ async fn insert_message_impl<C: ConnectionTrait>(conn: &C, msg: &NewMessage<'_>)
             Expr::val(msg.at),
             Expr::val(msg.revision),
             Expr::val(msg.reply_number),
+            Expr::val(meta_has_file(msg.meta)),
+            Expr::val(meta_has_image(msg.meta)),
+            Expr::val(body_has_link(msg.body)),
         ])
         .returning_col(channel_message::Column::Number)
         .to_owned();
@@ -418,14 +436,14 @@ async fn insert_message_impl<C: ConnectionTrait>(conn: &C, msg: &NewMessage<'_>)
 }
 
 async fn update_message_meta_impl<C: ConnectionTrait>(conn: &C, id: &str, meta: Option<&str>) -> DbResult<()> {
-    super::super::update_col_by_id::<channel_message::Entity, _, _>(
-        conn,
-        channel_message::Column::Id,
-        id,
-        channel_message::Column::Meta,
-        meta.map(str::to_owned),
-    )
-    .await
+    Update::many(channel_message::Entity)
+        .col_expr(channel_message::Column::Meta, Expr::value(meta.map(str::to_owned)))
+        .col_expr(channel_message::Column::HasFile, Expr::value(meta_has_file(meta)))
+        .col_expr(channel_message::Column::HasImage, Expr::value(meta_has_image(meta)))
+        .filter(channel_message::Column::Id.eq(id))
+        .exec(conn)
+        .await?;
+    Ok(())
 }
 
 async fn user_mentions_impl<C: ConnectionTrait>(conn: &C) -> DbResult<Vec<PlacedRow>> {
@@ -471,15 +489,18 @@ async fn user_mentions_impl<C: ConnectionTrait>(conn: &C) -> DbResult<Vec<Placed
 }
 
 async fn recent_duplicate_impl<C: ConnectionTrait>(conn: &C, sender: &str, channel_id: &str, body: &str, since: i64) -> DbResult<Option<String>> {
-    Ok(channel_message::Entity::find()
-        .filter(channel_message::Column::SenderId.eq(sender))
+    let id: Option<String> = channel_message::Entity::find()
+        .select_only()
+        .column(channel_message::Column::Id)
         .filter(channel_message::Column::ChannelId.eq(channel_id))
+        .filter(channel_message::Column::SenderId.eq(sender))
         .filter(channel_message::Column::Body.eq(body))
         .filter(channel_message::Column::CreatedAt.gt(since))
         .order_by_desc(channel_message::Column::Id)
+        .into_tuple()
         .one(conn)
-        .await?
-        .map(|r| r.id))
+        .await?;
+    Ok(id)
 }
 
 async fn user_unread_impl<C: ConnectionTrait>(conn: &C, channel_id: &str, read: i64) -> DbResult<i64> {
@@ -602,6 +623,7 @@ async fn notice_since_user_impl<C: ConnectionTrait>(conn: &C, channel_id: &str, 
 async fn edit_message_impl<C: ConnectionTrait>(conn: &C, id: &str, body: &str, at: i64, revision: i64) -> DbResult<()> {
     Update::many(channel_message::Entity)
         .col_expr(channel_message::Column::Body, Expr::value(body.to_owned()))
+        .col_expr(channel_message::Column::HasLink, Expr::value(body_has_link(body)))
         .col_expr(channel_message::Column::EditedAt, Expr::value(Some(at)))
         .col_expr(channel_message::Column::Revision, Expr::value(revision))
         .filter(channel_message::Column::Id.eq(id))
@@ -616,6 +638,9 @@ async fn delete_message_impl<C: ConnectionTrait>(conn: &C, id: &str, at: i64, re
         .col_expr(channel_message::Column::Meta, Expr::value(Option::<String>::None))
         .col_expr(channel_message::Column::SystemCode, Expr::value(Option::<String>::None))
         .col_expr(channel_message::Column::Reactions, Expr::value(Option::<String>::None))
+        .col_expr(channel_message::Column::HasFile, Expr::value(false))
+        .col_expr(channel_message::Column::HasImage, Expr::value(false))
+        .col_expr(channel_message::Column::HasLink, Expr::value(false))
         .col_expr(channel_message::Column::DeletedAt, Expr::value(Some(at)))
         .col_expr(channel_message::Column::Revision, Expr::value(revision))
         .filter(channel_message::Column::Id.eq(id))
@@ -641,6 +666,7 @@ async fn update_message_field_impl<C: ConnectionTrait, V: Into<sea_orm::Value>>(
 }
 
 async fn search_messages_impl<C: ConnectionTrait>(conn: &C, q: &SearchParams<'_>) -> DbResult<Vec<PlacedRow>> {
+    let backend = conn.get_database_backend();
     let c = Alias::new("c");
     let ch = Alias::new("ch");
     let mut stmt = select_placed_msg(&c, &ch);
@@ -650,8 +676,22 @@ async fn search_messages_impl<C: ConnectionTrait>(conn: &C, q: &SearchParams<'_>
         .and_where(Expr::col((channel_message::Entity, channel_message::Column::CreatedAt)).lt(q.before));
 
     if !q.text.is_empty() {
-        let pattern = format!("%{}%", super::super::escape_like(&q.text.to_lowercase()));
-        stmt.and_where(Expr::expr(Func::lower(Expr::col((channel_message::Entity, channel_message::Column::Body)))).like(LikeExpr::new(pattern).escape('\\')));
+        if backend == sea_orm::DatabaseBackend::Sqlite
+            && let Some(phrase) = super::super::fts5_trigram_phrase(q.text)
+        {
+            let fts = Alias::new("channel_message_fts");
+            stmt.join(
+                JoinType::InnerJoin,
+                fts.clone(),
+                Expr::col((fts, Alias::new("rowid"))).equals((channel_message::Entity, Alias::new("rowid"))),
+            )
+            .and_where(Expr::cust_with_values("channel_message_fts MATCH ?", [sea_orm::Value::from(phrase)]));
+        } else {
+            let pattern = format!("%{}%", super::super::escape_like(&q.text.to_lowercase()));
+            stmt.and_where(
+                Expr::expr(Func::lower(Expr::col((channel_message::Entity, channel_message::Column::Body)))).like(LikeExpr::new(pattern).escape('\\')),
+            );
+        }
     }
     if !q.channel.is_empty() {
         stmt.cond_where(
@@ -668,23 +708,19 @@ async fn search_messages_impl<C: ConnectionTrait>(conn: &C, q: &SearchParams<'_>
         );
     }
     if q.has_file {
-        stmt.and_where(Expr::col((channel_message::Entity, channel_message::Column::Meta)).like(LikeExpr::new("%\"attachments\"%").escape('\\')));
+        stmt.and_where(Expr::col((channel_message::Entity, channel_message::Column::HasFile)).eq(true));
     }
     if q.has_image {
-        stmt.and_where(Expr::col((channel_message::Entity, channel_message::Column::Meta)).like(LikeExpr::new("%\"type\":\"image/%").escape('\\')));
+        stmt.and_where(Expr::col((channel_message::Entity, channel_message::Column::HasImage)).eq(true));
     }
     if q.has_link {
-        stmt.cond_where(
-            Condition::any()
-                .add(Expr::col((channel_message::Entity, channel_message::Column::Body)).like(LikeExpr::new("%http://%").escape('\\')))
-                .add(Expr::col((channel_message::Entity, channel_message::Column::Body)).like(LikeExpr::new("%https://%").escape('\\'))),
-        );
+        stmt.and_where(Expr::col((channel_message::Entity, channel_message::Column::HasLink)).eq(true));
     }
 
     stmt.order_by((channel_message::Entity, channel_message::Column::Id), Order::Desc)
         .limit(limit_u64(q.n));
 
-    let rows = PlacedQueryRow::find_by_statement(conn.get_database_backend().build(&stmt)).all(conn).await?;
+    let rows = PlacedQueryRow::find_by_statement(backend.build(&stmt)).all(conn).await?;
     Ok(rows.into_iter().map(Into::into).collect())
 }
 
@@ -998,7 +1034,15 @@ impl ChannelService {
     }
 
     pub(crate) async fn set_meta_in_tx(&self, tx: &Tx, id: &str, meta: Option<&str>, revision: i64) -> DbResult<()> {
-        update_message_field_impl(tx, id, channel_message::Column::Meta, meta.map(str::to_owned), revision).await
+        Update::many(channel_message::Entity)
+            .col_expr(channel_message::Column::Meta, Expr::value(meta.map(str::to_owned)))
+            .col_expr(channel_message::Column::HasFile, Expr::value(meta_has_file(meta)))
+            .col_expr(channel_message::Column::HasImage, Expr::value(meta_has_image(meta)))
+            .col_expr(channel_message::Column::Revision, Expr::value(revision))
+            .filter(channel_message::Column::Id.eq(id))
+            .exec(tx)
+            .await?;
+        Ok(())
     }
 
     pub(crate) async fn pinned_in(&self, channel_id: &str) -> DbResult<Vec<MsgRow>> {
@@ -1011,7 +1055,14 @@ impl ChannelService {
     }
 
     pub(crate) async fn search_messages(&self, params: &SearchParams<'_>) -> DbResult<Vec<PlacedRow>> {
-        search_messages_impl(self.db.read_conn(), params).await
+        self.db
+            .query_metrics()
+            .observe(
+                "channel.search_messages",
+                "SELECT channel_message (search)",
+                search_messages_impl(self.db.read_conn(), params),
+            )
+            .await
     }
 
     pub(crate) async fn notification_receipt(&self, id: &str) -> DbResult<Option<(Option<i64>, bool)>> {
@@ -1070,5 +1121,38 @@ impl ChannelService {
 
     pub(crate) async fn message_locations(&self, ids: &[String]) -> DbResult<HashMap<String, (String, i64)>> {
         message_locations_impl(self.db.read_conn(), ids).await
+    }
+
+    /// Deletes up to `limit` settled (`status != 'pending'`) delivery rows with `settled_at < before_ms`.
+    pub(crate) async fn prune_settled_deliveries_batch(&self, before_ms: i64, limit: u64) -> DbResult<u64> {
+        if limit == 0 {
+            return Ok(0);
+        }
+        super::super::with_write_tx(&self.db, async |tx| {
+            let ids: Vec<i64> = channel_delivery::Entity::find()
+                .select_only()
+                .column(channel_delivery::Column::Id)
+                .filter(channel_delivery::Column::Status.ne("pending"))
+                .filter(channel_delivery::Column::SettledAt.is_not_null())
+                .filter(channel_delivery::Column::SettledAt.lt(before_ms))
+                .order_by_asc(channel_delivery::Column::Id)
+                .limit(limit)
+                .into_tuple()
+                .all(tx)
+                .await?;
+            if ids.is_empty() {
+                return Ok(0);
+            }
+            let mut deleted = 0u64;
+            for chunk in ids.chunks(super::super::MAX_SQL_BIND_PARAMS) {
+                let res = channel_delivery::Entity::delete_many()
+                    .filter(channel_delivery::Column::Id.is_in(chunk.iter().copied()))
+                    .exec(tx)
+                    .await?;
+                deleted += res.rows_affected;
+            }
+            Ok(deleted)
+        })
+        .await
     }
 }

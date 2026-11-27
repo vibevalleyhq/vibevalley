@@ -25,7 +25,7 @@ export function PairScreen(props: { readonly session: RemoteSession; readonly la
       <FieldInput
         testID="pair-url-input"
         label={t("web.remote.mobile.urlLabel")}
-        placeholder="http://100.x.y.z:8890"
+        placeholder="http://192.168.1.x:8890"
         value={serverUrl()}
         onInput={(v) => serverUrl.set(v)}
         disabled={props.session.pairing()}

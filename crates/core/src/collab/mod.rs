@@ -1,7 +1,7 @@
 //! Loro 1.18.0 collaborative content-plane kernel (`crates/core/src/collab/`).
 //!
-//! Strictly scoped to VibeValley's **Content Plane** (artifacts: whiteboard,
-//! outline/blocks, HTML/slides/dashboard/design/motion/design-system). Never
+//! Strictly scoped to VibeValley's **Content Plane** (notes: doc,
+//! base, canvas, media). Never
 //! used for the control plane (`SpaceState`), event stream plane, or code plane.
 
 pub mod doc;

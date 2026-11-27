@@ -3,7 +3,7 @@ use std::sync::OnceLock;
 use nsh_platform_gpui::Bundle;
 use serde_json::{Value, json};
 
-use super::hub::server_home;
+use crate::env::{server_home, work_root};
 
 /// The bundle's capabilities with the folders the views show files from
 /// added to `fs.read`: VibeValley's assets and the farm (attachments).
@@ -12,7 +12,7 @@ pub(super) fn capabilities_from(raw: &str) -> String {
     let mut caps: Value = serde_json::from_str(raw).unwrap_or_else(|_| json!({}));
     let assets = crate::assets::assets_dir();
     let home = server_home();
-    let work_root = crate::serving::work_root();
+    let work_root = work_root();
     let _ = std::fs::create_dir_all(&home);
     let roots = [assets, home, work_root];
     if !caps["fs"].is_object() {
@@ -37,23 +37,23 @@ pub(super) fn capabilities_from(raw: &str) -> String {
     caps.to_string()
 }
 
-#[cfg(not(debug_assertions))]
+#[cfg(any(not(debug_assertions), vv_embed_ui))]
 const BUNDLE_JS: &str = include_str!(concat!(env!("OUT_DIR"), "/ui/bundle.js"));
-#[cfg(not(debug_assertions))]
+#[cfg(any(not(debug_assertions), vv_embed_ui))]
 const BUNDLE_NSHC: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/ui/bundle.nshc"));
-#[cfg(debug_assertions)]
+#[cfg(all(debug_assertions, not(vv_embed_ui)))]
 const BUNDLE_JS: &str = "throw new Error('VibeValley UI bundle missing on disk: run vp run mac:check.');\n";
-#[cfg(debug_assertions)]
+#[cfg(all(debug_assertions, not(vv_embed_ui)))]
 const BUNDLE_NSHC: &[u8] = &[];
 const CAPABILITIES: &str = include_str!(concat!(env!("OUT_DIR"), "/ui/capabilities.json"));
 
-#[cfg(not(debug_assertions))]
+#[cfg(any(not(debug_assertions), vv_embed_ui))]
 const SHELL_BUNDLE_JS: &str = include_str!(concat!(env!("OUT_DIR"), "/ui-shell/bundle.js"));
-#[cfg(not(debug_assertions))]
+#[cfg(any(not(debug_assertions), vv_embed_ui))]
 const SHELL_BUNDLE_NSHC: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/ui-shell/bundle.nshc"));
-#[cfg(debug_assertions)]
+#[cfg(all(debug_assertions, not(vv_embed_ui)))]
 const SHELL_BUNDLE_JS: &str = "throw new Error('VibeValley shell UI bundle missing on disk: run vp run mac:check.');\n";
-#[cfg(debug_assertions)]
+#[cfg(all(debug_assertions, not(vv_embed_ui)))]
 const SHELL_BUNDLE_NSHC: &[u8] = &[];
 const SHELL_CAPABILITIES: &str = include_str!(concat!(env!("OUT_DIR"), "/ui-shell/capabilities.json"));
 
@@ -90,7 +90,7 @@ pub(super) fn resolve_bundle_dir_from(override_dir: Option<&std::path::Path>, ui
         }
         return Some(dir.to_path_buf());
     }
-    if cfg!(debug_assertions) {
+    if cfg!(all(debug_assertions, not(vv_embed_ui))) {
         if !workbench {
             let shell = ui_root.join("build-shell");
             if dir_has_bundle(&shell) {

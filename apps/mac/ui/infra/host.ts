@@ -72,8 +72,8 @@ const desktop: Host = (() => {
     applet: {
       list: () => unwrap(hostApi.appletList()),
       install: (input) => unwrap(hostApi.appletInstall(input)),
-      uninstall: (artifactId) => unwrap(hostApi.appletUninstall(artifactId)),
-      open: (artifactId) => unwrap(hostApi.appletOpen(artifactId)),
+      uninstall: (noteId) => unwrap(hostApi.appletUninstall(noteId)),
+      open: (noteId) => unwrap(hostApi.appletOpen(noteId)),
     },
     captureWebView: async (options) => {
       const e = await hostApi.captureWebView(options);
@@ -134,7 +134,10 @@ const desktop: Host = (() => {
             pushOff = host.on("update_state", (payload) => {
               if (stopped) return;
               const decoded = UpdateState.safeParse(payload);
-              if (!decoded.success) return;
+              if (!decoded.success) {
+                console.error("[host] dropped malformed update_state payload", { issues: decoded.error.issues });
+                return;
+              }
               pushSeq += 1;
               listener(decoded.data);
               scheduleRefresh();

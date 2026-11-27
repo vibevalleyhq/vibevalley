@@ -1,0 +1,50 @@
+{
+  "validPaths": [
+    { "path": "manifest.json", "zone": "manifest", "mime": "application/json", "encoding": "utf8" },
+    { "path": "structure/doc.json", "zone": "structure", "mime": "application/json", "encoding": "utf8" },
+    { "path": "structure/base.json", "zone": "structure", "mime": "application/json", "encoding": "utf8" },
+    { "path": "structure/board.json", "zone": "structure", "mime": "application/json", "encoding": "utf8" },
+    { "path": "structure/media.json", "zone": "structure", "mime": "application/json", "encoding": "utf8" },
+    { "path": "structure/index.md", "zone": "structure", "mime": "text/markdown", "encoding": "utf8" },
+    { "path": "structure/diagram.mmd", "zone": "structure", "mime": "text/vnd.mermaid", "encoding": "utf8" },
+    { "path": "asset/hero.png", "zone": "asset", "mime": "image/png", "encoding": "base64" },
+    { "path": "asset/frames/sh01-key.webp", "zone": "asset", "mime": "image/webp", "encoding": "base64" },
+    { "path": "asset/audio/sh01-vo.wav", "zone": "asset", "mime": "audio/wav", "encoding": "base64" },
+    { "path": "asset/raw.csv", "zone": "asset", "mime": "text/csv", "encoding": "utf8" },
+    { "path": "asset/logo.svg", "zone": "asset", "mime": "image/svg+xml", "encoding": "utf8" }
+  ],
+  "invalidPaths": [
+    "",
+    "/",
+    "/structure/doc.json",
+    "structure/",
+    "asset/",
+    "structure/../asset/a.png",
+    "structure/./doc.json",
+    "../manifest.json",
+    "structure\\doc.json",
+    "structure//doc.json",
+    "C:/structure/doc.json",
+    "structure/bad\u0000name.md",
+    "other/file.txt",
+    "readme.md"
+  ],
+  "typeEntries": [
+    { "type": "doc", "entry": "structure/doc.json" },
+    { "type": "base", "entry": "structure/base.json" },
+    { "type": "canvas", "entry": "structure/board.json" },
+    { "type": "media", "entry": "structure/media.json" }
+  ],
+  "mergePatches": [
+    {
+      "current": "{\"title\":\"Old\",\"nested\":{\"a\":1,\"b\":2}}",
+      "patch": "{\"title\":\"New\",\"nested\":{\"b\":null,\"c\":3}}",
+      "expected": { "title": "New", "nested": { "a": 1, "c": 3 } }
+    },
+    {
+      "current": null,
+      "patch": "{\"version\":1}",
+      "expected": { "version": 1 }
+    }
+  ]
+}

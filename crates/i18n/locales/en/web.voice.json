@@ -53,7 +53,7 @@
     "voicesHint": "Loaded from the saved Speech connection",
     "voicesCount": "{n} voices available",
     "voicesEmpty": "No voices returned by this connection",
-    "manageAll": "Manage all connections in Models & Engines",
+    "manageAll": "Manage all connections in Models & Environments",
     "saved": "Voice settings saved"
   }
 }

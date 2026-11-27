@@ -22,7 +22,7 @@ fn text(s: &str) -> Vec<ContentBlock> {
     vec![ContentBlock::Text(s.into())]
 }
 
-async fn until(rx: &mut tokio::sync::mpsc::UnboundedReceiver<Event>, stop: impl Fn(&EventKind) -> bool) -> Vec<Event> {
+async fn until(rx: &mut tokio::sync::mpsc::Receiver<Event>, stop: impl Fn(&EventKind) -> bool) -> Vec<Event> {
     let mut out = Vec::new();
     loop {
         let event = tokio::time::timeout(WAIT, rx.recv())

@@ -1,7 +1,7 @@
 import type { LibraryFileKind } from "@vibevalley/protocol";
 
 import type { ContentBucket } from "../../infra/state/contentNav";
-import { type ArtifactTypeFilter, between } from "./items";
+import { between, type NoteTypeFilter } from "./items";
 
 export interface PriorFileSelection {
   readonly ids: readonly string[];
@@ -20,12 +20,12 @@ export interface PickMode {
 
 export const initialLibrarySelection: LibrarySelection = { kind: "none" };
 
-export function showsArtifactsInBucket(bucket: ContentBucket): boolean {
+export function showsNotesInBucket(bucket: ContentBucket): boolean {
   switch (bucket.kind) {
     case "recent":
     case "pinned":
     case "apps":
-    case "artifacts":
+    case "notes":
       return true;
     case "media":
       return false;
@@ -39,13 +39,13 @@ export function showsMediaInBucket(bucket: ContentBucket): boolean {
     case "media":
       return true;
     case "apps":
-    case "artifacts":
+    case "notes":
       return false;
   }
 }
 
-export function bucketArtifactType(bucket: ContentBucket): ArtifactTypeFilter | undefined {
-  return bucket.kind === "artifacts" ? bucket.artifactType : undefined;
+export function bucketNoteType(bucket: ContentBucket): NoteTypeFilter | undefined {
+  return bucket.kind === "notes" ? bucket.noteType : undefined;
 }
 
 export function bucketFileKind(bucket: ContentBucket): LibraryFileKind | undefined {

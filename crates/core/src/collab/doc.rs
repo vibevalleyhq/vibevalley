@@ -1,4 +1,4 @@
-//! Phase B & C: `CollabDoc` wrapping `loro::LoroDoc` for content-plane artifacts.
+//! Phase B & C: `CollabDoc` wrapping `loro::LoroDoc` for content-plane notes.
 //!
 //! Container layout inside a `LoroDoc`:
 //! - `"texts"` (`LoroMap` of mergeable `LoroText`s): character-level Fugue CRDT

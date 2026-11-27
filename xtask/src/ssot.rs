@@ -33,12 +33,12 @@ const INTERNAL_HOST_DTO_ALLOWLIST: &[(&str, &str, &str)] = &[
     ("apps/mac/src/theme.rs", "ThemeChoice", "local desktop settings.json enum"),
     ("apps/mac/src/theme.rs", "MotionChoice", "local desktop settings.json enum"),
     ("apps/mac/src/theme.rs", "Settings", "local desktop settings.json persistence struct"),
-    (
-        "apps/mac/src/hosted/connection.rs",
-        "Secret",
-        "local desktop-connection.json redacted token wrapper",
-    ),
     ("apps/mac/src/hosted/connection.rs", "Mode", "local desktop-connection.json persistence enum"),
+    (
+        "apps/mac/src/debug/vdp.rs",
+        "TokenQuery",
+        "internal VDP Axum HTTP query extractor for loopback bearer auth",
+    ),
     ("apps/mac/src/update/releases.rs", "Build", "external updater release.json feed schema"),
     ("apps/mac/src/update/releases.rs", "Release", "external updater release.json feed schema"),
     ("apps/mac/src/update/releases.rs", "ListedRelease", "external GitHub Releases API schema"),
@@ -49,6 +49,10 @@ const INTERNAL_HOST_DTO_ALLOWLIST: &[(&str, &str, &str)] = &[
     ("apps/mac/src/live_voice.rs", "Turn", "external MOSS WebSocket protocol frame"),
     ("apps/mac/src/live_voice.rs", "Transcript", "external MOSS WebSocket protocol frame"),
     ("apps/mac/src/live_voice.rs", "Event", "external MOSS WebSocket protocol frame"),
+    ("apps/mac/src/voice_asr.rs", "Attached", "external MOSS WebSocket protocol frame"),
+    ("apps/mac/src/voice_asr.rs", "Updated", "external MOSS WebSocket protocol frame"),
+    ("apps/mac/src/voice_asr.rs", "Transcript", "external MOSS WebSocket protocol frame"),
+    ("apps/mac/src/voice_asr.rs", "Event", "external MOSS WebSocket protocol frame"),
     (
         "apps/mac/src/applet/protocol.rs",
         "Modifiers",
@@ -103,6 +107,7 @@ const STANDARD_ENV_VARS: &[&str] = &[
     "TERM",
     "TERM_PROGRAM",
     "SHELL",
+    "ZDOTDIR",
     "USER",
     "USERNAME",
     "LOGNAME",
@@ -1189,7 +1194,12 @@ fn best_matching_protocol_enum<'a>(ts_items: &BTreeSet<String>, enums: &'a [Prot
     let mut best: Option<(&ProtocolEnum, Vec<String>)> = None;
     for proto in enums {
         let overlap: Vec<String> = ts_items.intersection(&proto.variants).cloned().collect();
-        if overlap.len() < 3 {
+        // Every element in the TS array must belong to the protocol enum (avoids false positives on
+        // unrelated supersets like file-extension lists, search keywords, or JS console methods),
+        // and it must either mirror all variants (>= 3) or duplicate at least 4 variants.
+        let is_full_mirror = overlap.len() == proto.variants.len() && overlap.len() >= 3;
+        let is_large_subset = overlap.len() >= 4;
+        if overlap.len() != ts_items.len() || (!is_full_mirror && !is_large_subset) {
             continue;
         }
         let replace = match &best {
@@ -2215,6 +2225,8 @@ pub enum TaggedNotClosed {
 // Ignored comment: ["backlog", "todo", "in_progress"]
 export const ACTIVE_STATUSES = ["todo", "in_progress", "in_review", "done"] as const;
 export const TOO_SHORT_OVERLAP = ["todo", "done", "other"] as const;
+export const SUPERSET_NOT_ENUM = ["backlog", "todo", "in_progress", "done", "custom_extra"] as const;
+export const THREE_OF_FIVE_SUBSET = ["backlog", "todo", "done"] as const;
 export const UNRELATED = ["alpha", "beta", "gamma"] as const;
 "#,
         );

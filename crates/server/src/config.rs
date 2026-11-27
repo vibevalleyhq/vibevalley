@@ -11,6 +11,7 @@ use vibevalley_runtime::oar::Registry;
 use crate::context::Fetch;
 use crate::context::api::SharedHostDebug;
 use crate::log::SharedInvokeObserver;
+use crate::setting::Secret;
 
 /// Server configuration read from environment or test harness.
 #[derive(Clone)]
@@ -22,6 +23,8 @@ pub struct Config {
     pub version: String,
     /// Optional fallback API key outside `settings.json` (`DEEPSEEK_API_KEY`).
     pub deepseek_api_key: String,
+    /// Optional fallback GitHub token outside `settings.json` (`GITHUB_TOKEN`).
+    pub github_token: Option<Secret>,
     /// Built-in templates installed beside the orchestrator on a fresh farm.
     pub starters: Vec<String>,
     /// Override runtime registry (tests inject `ScriptedRuntime` here).
@@ -78,6 +81,7 @@ impl Config {
             work_root: dir,
             version: env!("CARGO_PKG_VERSION").into(),
             deepseek_api_key: String::new(),
+            github_token: None,
             starters: vec![],
             registry: None,
             tool_permissions: Permissions::default(),
@@ -112,6 +116,7 @@ impl Config {
             work_root: Self::default_work_root(),
             version: version.into(),
             deepseek_api_key: env_str("DEEPSEEK_API_KEY").unwrap_or_default(),
+            github_token: env_str("GITHUB_TOKEN").map(|s| Secret::new(s.trim())).filter(|s| !s.is_empty()),
             starters: csv("VIBEVALLEY_AGENT_STARTERS"),
             git_emails: csv("VIBEVALLEY_GIT_EMAILS"),
             poll_pulls: Some(env_str("VIBEVALLEY_GITHUB_PR_POLL_SECONDS").and_then(|s| s.parse::<u64>().ok()).unwrap_or(180)),
@@ -145,6 +150,23 @@ impl StartError {
             message: message.into(),
             detail: None,
             db_path: None,
+        }
+    }
+
+    pub(crate) fn from_db(err: crate::service::DbError, fallback_path: Option<PathBuf>) -> Self {
+        if let Some(r) = err.schema_mismatch() {
+            return Self {
+                kind: StartErrorKind::DatabaseSchema,
+                message: format!("the database: {r}"),
+                detail: Some(r.format_detail()),
+                db_path: r.db_path.clone().or(fallback_path),
+            };
+        }
+        Self {
+            kind: StartErrorKind::Database,
+            message: format!("the database: {err}"),
+            detail: None,
+            db_path: fallback_path,
         }
     }
 }

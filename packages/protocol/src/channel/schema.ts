@@ -1,9 +1,9 @@
 import { z } from "zod";
 
-import { ArtifactCard, ArtifactViewContext } from "../artifact/schema";
 import { Attachment } from "../attachment/schema";
 import type { Codec } from "../codec";
 import { Actor, MessageId, Outcome, SessionId, Spent } from "../common/schema";
+import { NoteCard, NoteViewContext } from "../note/schema";
 import * as T from "./shapes.gen";
 
 const MessageKind = z.enum(T.MessageKindValues) satisfies Codec<T.MessageKind>;
@@ -46,8 +46,8 @@ export const ChatMessage = z.object({
   reactions: z.array(Reaction),
   attachments: z.array(Attachment),
   embeds: z.array(Embed),
-  artifact: z.exactOptional(ArtifactCard),
-  viewContext: z.exactOptional(ArtifactViewContext),
+  note: z.exactOptional(NoteCard),
+  viewContext: z.exactOptional(NoteViewContext),
 }) satisfies Codec<T.ChatMessage>;
 
 const ChannelType = z.enum(T.ChannelTypeValues) satisfies Codec<T.ChannelType>;
@@ -111,7 +111,7 @@ const ChannelCommand = z.object({
 export const SayRequest = z.object({
   id: z.string(),
   text: z.string(),
-  viewContext: z.exactOptional(ArtifactViewContext),
+  viewContext: z.exactOptional(NoteViewContext),
   replyTo: z.exactOptional(z.number()),
   attachments: z.exactOptional(z.array(z.string())),
   station: z.exactOptional(z.number()),

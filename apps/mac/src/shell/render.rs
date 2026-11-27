@@ -9,14 +9,14 @@ use super::{Shell, should_mount_inspector, should_raise_workbench_overlay};
 
 impl Render for Shell {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let vdp_on = crate::debug::vdp_enabled();
+        let vdp_on = crate::vdp_bus::vdp_enabled();
         let frame_start = (self.overlays.devtools.state.enabled || vdp_on).then(std::time::Instant::now);
         self.ensure_panes(window, cx);
         self.sync_inspector(window, cx);
         self.ensure_devtools_overlay(window, cx);
         let colors = Ui::get(cx).colors.clone();
         let sidebar_w: Pixels = px(self.chrome.sidebar_width);
-        let main = crate::panes::render_main(self, window, cx);
+        let main = super::pane_layout::render_main(self, window, cx);
         let palette = self.overlays.palette.as_ref().filter(|p| p.open).map(|p| {
             let vp = window.viewport_size();
             let palette_w = (f32::from(vp.width) - 32.0).clamp(280.0, 620.0);
@@ -328,9 +328,9 @@ impl Render for Shell {
                     handle.set_last_frame_ms(ms);
                 }
             }
-            if vdp_on && crate::debug::is_vdp_log_active() {
+            if vdp_on && crate::vdp_bus::is_vdp_log_active() {
                 let vp = window.viewport_size();
-                crate::debug::emit_page_frame(ms, f32::from(vp.width), f32::from(vp.height));
+                crate::vdp_bus::emit_page_frame(ms, f32::from(vp.width), f32::from(vp.height));
             }
         }
         root

@@ -1,15 +1,47 @@
 import { computed, Image, pixelRatio, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
-import { defaultOrchestrator, type Look, type UserProfile } from "@vibevalley/protocol";
+import { type Agent, type AgentExecutionMode, defaultOrchestrator, type Look, type OrchestratorLook, type UserProfile } from "@vibevalley/protocol";
 
-import { orchestratorLookOf } from "../../infra/agents";
-import { useAttachmentUrl } from "../../infra/attachmentFile";
-import { ready, useAgents, useSettings } from "../../infra/query";
 import { orchestratorPortraitUrl, ownerPortraitUrl, ROLE_AVATARS, roleAvatarUrl, speciesPortraitUrl, useAssetsDir } from "../art";
-import { tone } from "../tone";
+import { useDesignAttachmentUrl, useDesignHost } from "../host";
+import { mix, tone } from "../tone";
 import { castOf, hexColor, orchestratorLooks } from "./cast";
 import { initialOf, RuntimeBadge } from "./RuntimeBadge";
+
+const orchestratorLookOf = (agents: readonly Agent[], id = defaultOrchestrator): OrchestratorLook =>
+  agents.find((a) => a.id === id)?.look.orchestrator ?? "farmer";
+
+/** Compact monospace badge showing a teammate's permanent `O-XX` / `W-XX` code. */
+export function AgentCodeBadge(props: { code?: string | undefined; external?: boolean | undefined; compact?: boolean | undefined }) {
+  return (
+    <If when={props.code?.trim()}>
+      {(code) => (
+        <View
+          class={`shrink-0 rounded-sm px-1 ${props.compact === true ? "py-0" : "py-px"}`}
+          style={{ backgroundColor: props.external === true ? mix("water", 0.14) : tone("hover") }}
+        >
+          <Text class={`font-mono text-2xs tabular-nums ${props.external === true ? "text-water" : "text-muted"}`}>{code()}</Text>
+        </View>
+      )}
+    </If>
+  );
+}
+
+/** Pill distinguishing locally dispatched (`managed`) vs externally registered (`external`) teammates. */
+export function AgentModeBadge(props: { mode?: AgentExecutionMode | undefined; compact?: boolean | undefined }) {
+  const isExternal = () => props.mode === "external";
+  return (
+    <View
+      class={`shrink-0 rounded-full px-1.5 ${props.compact === true ? "py-0" : "py-px"}`}
+      style={{ backgroundColor: isExternal() ? mix("water", 0.14) : tone("hover") }}
+    >
+      <Text class={`text-2xs font-medium ${isExternal() ? "text-water" : "text-muted"}`}>
+        {isExternal() ? t("web.agent.mode.external") : t("web.agent.mode.managed")}
+      </Text>
+    </View>
+  );
+}
 
 /** `hex` moved `part` of the way to white. */
 const toward = (hex: string, part: number) => {
@@ -56,7 +88,7 @@ export function AgentFace(props: {
   name?: string;
 }) {
   const assetsDir = useAssetsDir();
-  const agents = useAgents();
+  const agents = useDesignHost().useAgents();
   const size = () => props.size ?? 24;
   const src = computed(() => {
     const dir = assetsDir();
@@ -66,7 +98,7 @@ export function AgentFace(props: {
     const { species } = castOf(props.look, props.agentId);
     return speciesPortraitUrl(dir, species);
   });
-  const name = computed(() => props.name ?? ready(agents, []).find((a) => a.id === props.agentId)?.name ?? props.agentId);
+  const name = computed(() => props.name ?? agents().find((a) => a.id === props.agentId)?.name ?? props.agentId);
   const ground = () => (props.look?.hat ? toward(hexColor(props.look.hat), 0.6) : tone("avatar-leaf"));
   return (
     <View class="shrink-0" style={{ width: size(), height: size() }}>
@@ -81,23 +113,22 @@ export function AgentFace(props: {
 /** An orchestrator's portrait, preferring an explicit or profile role avatar before its Papertrails manager look. */
 export function OrchestratorFace(props: { size?: number; agent?: string | undefined; look?: string; avatar?: string | undefined }) {
   const assetsDir = useAssetsDir();
-  const agents = useAgents();
+  const agents = useDesignHost().useAgents();
   const size = () => props.size ?? 24;
   const src = computed(() => {
     const dir = assetsDir();
     if (!dir) return undefined;
-    const candidate =
-      props.avatar ?? (props.look === undefined ? ready(agents, []).find((a) => a.id === (props.agent ?? defaultOrchestrator))?.look.avatar : undefined);
+    const candidate = props.avatar ?? (props.look === undefined ? agents().find((a) => a.id === (props.agent ?? defaultOrchestrator))?.look.avatar : undefined);
     const roleUrl = roleAvatarUrl(dir, candidate);
     if (roleUrl) return roleUrl;
-    const look = props.look ?? orchestratorLookOf(ready(agents, []), props.agent);
+    const look = props.look ?? orchestratorLookOf(agents(), props.agent);
     if (size() <= 40) {
       return orchestratorPortraitUrl(dir, look, pixelRatio() >= 2 ? 2 : 1);
     }
     return orchestratorPortraitUrl(dir, look);
   });
   const letter = computed(() => {
-    const agent = props.look === undefined ? ready(agents, []).find((a) => a.id === (props.agent ?? defaultOrchestrator)) : undefined;
+    const agent = props.look === undefined ? agents().find((a) => a.id === (props.agent ?? defaultOrchestrator)) : undefined;
     return initialOf(agent?.name ?? orchestratorLooks.find((l) => l.id === (props.look ?? "farmer"))?.name ?? "?");
   });
   return (
@@ -129,11 +160,11 @@ export function UserAvatar(props: {
   class?: string | undefined;
   rounded?: "sm" | "full" | undefined;
 }) {
-  const settings = useSettings();
+  const settings = useDesignHost().useSettings();
   const assetsDir = useAssetsDir();
   const size = () => props.size ?? 24;
-  const profile = computed(() => props.profile ?? ready(settings, undefined)?.profile);
-  const attachmentUrl = useAttachmentUrl(() => profile()?.avatarAttachmentId ?? "");
+  const profile = computed(() => props.profile ?? settings()?.profile);
+  const attachmentUrl = useDesignAttachmentUrl(() => profile()?.avatarAttachmentId ?? "");
   const src = computed(() => {
     const custom = attachmentUrl();
     if (custom) return custom;

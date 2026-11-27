@@ -7,7 +7,6 @@ import { cleanup, signal, Text, View, type JSX } from "nsh";
 import { t } from "@vibevalley/i18n";
 import type { MediaAudioFormat, MediaJob, MediaSource, MediaSpeechJob } from "@vibevalley/protocol";
 
-import { createAct, type Act } from "../../design/act";
 import { Button } from "../../design/Button";
 import { ConfirmButton } from "../../design/ConfirmButton";
 import { Icon } from "../../design/Icon";
@@ -18,6 +17,7 @@ import { motionClass } from "../../design/motion";
 import { CountPill, Dot, type DotTone } from "../../design/Tag";
 import { Bubble } from "../../design/Tip";
 import { mix } from "../../design/tone";
+import { createAct, type Act } from "../../infra/act";
 import { api } from "../../infra/api";
 import { playAudio, saveFile, useAttachmentFile, useInputFile } from "../../infra/attachmentFile";
 import { hostApi } from "../../infra/bridge";

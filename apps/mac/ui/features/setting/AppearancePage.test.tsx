@@ -7,9 +7,10 @@ import { BizCode } from "@vibevalley/protocol/api";
 
 import { fakeHost, type FakeHost } from "../../fixtures/fakeHost";
 import { SCENARIO_NOW, scenarios } from "../../fixtures/scenarios";
-import { buildMonoFontOptions, defaultMonoFonts, fontFamilyStack } from "./AppearancePage";
+import { buildMonoFontOptions, defaultMonoFonts, fontFamilyStack, resetAppearanceFontCache } from "./AppearancePage";
 
 async function mountAppearance(locale: "en" | "zh", configure?: (fake: FakeHost) => void) {
+  resetAppearanceFontCache();
   setLocale(locale);
   const fake = fakeHost(scenarios.typical, { route: "/settings/appearance", locale });
   configure?.(fake);
@@ -48,7 +49,7 @@ test("buildMonoFontOptions sorts installed host fonts before fallback presets an
   expect(noHostOptions.every((o) => !o.installed && o.group === undefined)).toBe(true);
 });
 
-test("AppearancePage renders WYSIWYG font selector, installed-first order, search, and live specimen card", async () => {
+test("AppearancePage renders lightweight font selector without per-option fontFamily rasterization spike and previews in live specimen card", async () => {
   const { app, fake } = await mountAppearance("en", (f) => {
     f.respond("host.info", {
       capabilities: ["theme", "motion", "font"],
@@ -83,9 +84,14 @@ test("AppearancePage renders WYSIWYG font selector, installed-first order, searc
 
   expect(app.count("id:mono-font-option-SF Mono")).toBe(1);
   expect(app.count("id:mono-font-option-Zed Mono")).toBe(1);
-  expect(app.spanStyle("id:mono-font-option-SF Mono >> text:SF Mono").fontFamily).toContain("SF Mono");
-  expect(app.spanStyle("id:mono-font-option-SF Mono >> text:Aa 01 中文").fontFamily).toContain("SF Mono");
-  expect(app.spanStyle("id:mono-font-option-Zed Mono >> text:Zed Mono").fontFamily).toContain("Zed Mono");
+  // Dropdown items stay in uniform UI font so opening the popup never rasterizes dozens of fonts in one frame.
+  expect(app.spanStyle("id:mono-font-option-SF Mono >> text:SF Mono").fontFamily ?? "").not.toContain("SF Mono");
+  expect(app.spanStyle("id:mono-font-option-Zed Mono >> text:Zed Mono").fontFamily ?? "").not.toContain("Zed Mono");
+
+  // Hovering a dropdown option previews that single font in the live specimen card below.
+  await app.hover("id:mono-font-option-SF Mono");
+  await fake.pumpUntil(app, () => app.texts().includes("SF Mono · 13pt"));
+  expect(app.spanStyle("id:appearance-specimen >> text:const check").fontFamily).toContain("SF Mono");
 
   await app.type("id:mono-font-search", "Zed");
   await fake.pumpUntil(app, () => app.count("id:mono-font-option-Menlo") === 0);

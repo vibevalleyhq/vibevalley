@@ -26,6 +26,8 @@ export interface IssueHandlers {
   readonly "issue.timeline.get": (a: { readonly id: string }) => Promise<T.IssueTimeline>;
   readonly "issue.create": (a: T.IssueRequest) => Promise<T.AppliedIssue>;
   readonly "issue.update": (a: { readonly id: string } & T.IssueUpdate) => Promise<T.AppliedIssue>;
+  /** Lazily materializes or returns an issue's collaborative Block Doc body note. */
+  readonly "issue.body.ensure": (a: { readonly id: string }) => Promise<T.IssueBodyEnsureResult>;
   readonly "issue.delete": (a: { readonly id: string }) => Promise<void>;
   /** What issue.delete would do, refused as it would be; nothing changes. */
   readonly "issue.previewDelete": (a: { readonly id: string }) => Promise<T.Preview>;
@@ -126,6 +128,13 @@ export const issueEndpoints: readonly Endpoint[] = [
     about: ["id"],
     input: input({ id: z.string() }, S.IssueUpdate),
     result: S.AppliedIssue,
+    can: ["user", "remote", "orchestrator"],
+  },
+  {
+    op: "issue.body.ensure",
+    about: ["id"],
+    input: S.IssueBodyEnsureInput,
+    result: S.IssueBodyEnsureResult,
     can: ["user", "remote", "orchestrator"],
   },
   {

@@ -224,9 +224,10 @@ test("IssuesPage supports Timeline (Gantt) direct drag/resize, short-bar #N labe
   expect(app.count("id:timeline-edit-dates")).toBe(0);
   expect(app.texts()).toContain("2026 年 11 月");
 
-  // Short bar (2 days = 52px >= 36px && < 92px) renders compact #12 instead of blank pill.
+  // Short bar (2 days = 52px >= 36px && < 92px) keeps compact #12 inside the bar and places its full title externally to the right (#142).
   expect(app.count("id:timeline-lane-i-extra-a >> id:timeline-bar >> text:#12")).toBe(1);
   expect(app.count("id:timeline-lane-i-extra-a >> id:timeline-bar >> text:Calendar overlap A")).toBe(0);
+  expect(app.count("id:timeline-lane-i-extra-a >> id:timeline-bar-external-label >> text:Calendar overlap A")).toBe(1);
 
   // Scale switcher cycles week / quarter / month cleanly and keeps month header visible.
   await app.press("id:timeline-scale-week");

@@ -53,8 +53,8 @@ impl HostedView {
     /// `host.params`.
     pub fn new(view: &str, params: Map<String, Value>, dark: bool, window: &mut Window, cx: &mut Context<Self>) -> Self {
         ensure_ui_sets();
-        let (tx, rx) = flume::unbounded::<EngineMessage>();
-        let (err_tx, err_rx) = flume::unbounded::<String>();
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<EngineMessage>();
+        let (err_tx, mut err_rx) = tokio::sync::mpsc::unbounded_channel::<String>();
         let options = AppOptions {
             appearance: Appearance::System,
             data_dir: Some(crate::host::Storage::configured().views),
@@ -85,7 +85,7 @@ impl HostedView {
             params.entry("motion").or_insert_with(|| json!(motion.as_str()));
             params.entry("connectionMode").or_insert_with(|| json!(active_connection.as_str()));
             params.entry("randomSeed").or_insert_with(|| json!(crate::host::random_seed_hex()));
-            if crate::debug::vdp_enabled() || crate::shell::devtools_enabled() {
+            if crate::vdp_bus::vdp_enabled() || crate::env::devtools_enabled() {
                 params.entry("vdpEnabled").or_insert_with(|| json!(true));
             }
             let assets_dir = crate::assets::assets_dir();
@@ -105,11 +105,11 @@ impl HostedView {
                 let v = call.data();
                 match v["type"].as_str() {
                     Some("vdp_ui_res") => {
-                        crate::debug::resolve_ui_response(v);
+                        crate::vdp_bus::resolve_ui_response(v);
                         return;
                     }
                     Some("vdp_ui_log") => {
-                        crate::debug::emit_ui_console(&vdp_view_name, v);
+                        crate::vdp_bus::emit_ui_console(&vdp_view_name, v);
                         return;
                     }
                     _ => {}
@@ -126,7 +126,7 @@ impl HostedView {
                             let reply_id = id.to_string();
                             let reply_host = reply_host.clone();
                             let active = active_connection.clone();
-                            vibevalley_runtime::rt::current_or_global_handle().spawn_blocking(move || {
+                            vibevalley_rt::current_or_global_handle().spawn_blocking(move || {
                                 let env = handle_desktop_connection_op(&op_name, payload, &server_home(), &active);
                                 let _ = reply_host.send(format!("reply:{reply_id}"), serde_json::to_value(env).unwrap_or(Value::Null));
                             });
@@ -177,14 +177,14 @@ impl HostedView {
             let label = name.clone();
             app.on_error(move |message| {
                 eprintln!("hosted view {label}: {message}");
-                crate::debug::emit_ui_error(&label, message);
+                crate::vdp_bus::emit_ui_error(&label, message);
                 let _ = err_tx.send(message.to_string());
             });
             load(&app, &name, cx);
             app
         });
         cx.spawn(async move |this, cx| {
-            while let Ok(message) = rx.recv_async().await {
+            while let Some(message) = rx.recv().await {
                 let alive = this.update(cx, |view, cx| view.on_message(message, cx));
                 if alive.is_err() {
                     break;
@@ -193,7 +193,7 @@ impl HostedView {
         })
         .detach();
         cx.spawn(async move |this, cx| {
-            while let Ok(message) = err_rx.recv_async().await {
+            while let Some(message) = err_rx.recv().await {
                 if this.update(cx, |view, _| view.errors.push(message)).is_err() {
                     break;
                 }
@@ -214,10 +214,7 @@ impl HostedView {
     fn on_message(&mut self, message: EngineMessage, cx: &mut Context<Self>) {
         match message {
             EngineMessage::HostCall { id, op } => {
-                let reply = Replier {
-                    channel: self.app.read(cx).host(),
-                    id,
-                };
+                let reply = Replier::new(self.app.read(cx).host(), id);
                 cx.emit(HostedEvent::HostCall { op, reply });
             }
             EngineMessage::Action(value) => match bridge::parse_action(&value) {
@@ -228,16 +225,13 @@ impl HostedView {
                     self.ready = true;
                     self.outbox.reset();
                     self.applied.clear();
-                    if crate::debug::is_vdp_log_active() {
+                    if crate::vdp_bus::is_vdp_log_active() {
                         self.set_vdp_log_enabled(true, cx);
                     }
                     cx.emit(HostedEvent::Ready);
                 }
                 Ok(Action::Call { id, op, payload }) => {
-                    let reply = Replier {
-                        channel: self.app.read(cx).host(),
-                        id,
-                    };
+                    let reply = Replier::new(self.app.read(cx).host(), id);
                     match crate::host::decode_host_op(&op, payload) {
                         Ok(host_op) => cx.emit(HostedEvent::HostCall { op: host_op, reply }),
                         Err(envelope) => reply.send(*envelope),

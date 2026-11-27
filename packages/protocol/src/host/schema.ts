@@ -309,19 +309,6 @@ export const HostPlaySoundPayload = z.object({
   name: HostSoundName,
 }) satisfies Codec<T.HostPlaySoundPayload>;
 
-export const HostSeekAudioPayload = z.object({
-  position: z.number(),
-}) satisfies Codec<T.HostSeekAudioPayload>;
-
-export const HostPcmStartPayload = z.object({
-  sampleRate: z.number(),
-  channels: z.number(),
-}) satisfies Codec<T.HostPcmStartPayload>;
-
-export const HostPcmAppendPayload = z.object({
-  data: z.string(),
-}) satisfies Codec<T.HostPcmAppendPayload>;
-
 export const HostReadFilePayload = z.object({
   path: z.string(),
 }) satisfies Codec<T.HostReadFilePayload>;
@@ -339,25 +326,25 @@ export const HostQrPayload = z.object({
   border: z.exactOptional(z.number()),
 }) satisfies Codec<T.HostQrPayload>;
 
-export const ArtifactAppletInfo = z.object({
-  artifactId: z.string(),
-  artifactType: z.string(),
+export const NoteAppletInfo = z.object({
+  noteId: z.string(),
+  noteType: z.string(),
   appName: z.string(),
   bundleId: z.string(),
   bundlePath: z.string(),
   alwaysOnTop: z.boolean(),
   installed: z.boolean(),
-}) satisfies Codec<T.ArtifactAppletInfo>;
+}) satisfies Codec<T.NoteAppletInfo>;
 
 export const HostAppletInstallPayload = z.object({
-  artifactId: z.string(),
-  artifactType: z.string(),
+  noteId: z.string(),
+  noteType: z.string(),
   appName: z.string(),
   alwaysOnTop: z.boolean(),
 }) satisfies Codec<T.HostAppletInstallPayload>;
 
 export const HostAppletIdPayload = z.object({
-  artifactId: z.string(),
+  noteId: z.string(),
 }) satisfies Codec<T.HostAppletIdPayload>;
 
 const HostCaptureWebViewPayload = z.object({
@@ -383,6 +370,7 @@ export const HostAsrState = z.object({
   micLevel: z.number(),
   text: z.string(),
   partial: z.string(),
+  rawText: z.exactOptional(z.string()),
   problem: z.string().nullable(),
 }) satisfies Codec<T.HostAsrState>;
 
@@ -420,10 +408,6 @@ export const HostOp = z.discriminatedUnion("op", [
   z.object({ op: z.literal("host.voiceMute"), payload: HostVoiceMutePayload }),
   z.object({ op: z.literal("host.playAudio"), payload: HostPlayAudioPayload }),
   z.object({ op: z.literal("host.playSound"), payload: HostPlaySoundPayload }),
-  z.object({ op: z.literal("host.seekAudio"), payload: HostSeekAudioPayload }),
-  z.object({ op: z.literal("host.audioState") }),
-  z.object({ op: z.literal("host.pcmStart"), payload: HostPcmStartPayload }),
-  z.object({ op: z.literal("host.pcmAppend"), payload: HostPcmAppendPayload }),
   z.object({ op: z.literal("host.stopAudio") }),
   z.object({ op: z.literal("host.readFile"), payload: HostReadFilePayload }),
   z.object({ op: z.literal("host.assetsDir") }),

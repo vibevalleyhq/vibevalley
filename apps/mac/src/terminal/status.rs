@@ -477,7 +477,7 @@ pub(super) fn classify_terminal_status(
         }
         let label = title
             .map(str::trim)
-            .filter(|s| !s.is_empty() && !crate::panes::is_default_title(s))
+            .filter(|s| !s.is_empty() && !crate::host_types::is_default_title(s))
             .map(String::from)
             .unwrap_or_else(|| "运行中".into());
         return TerminalStatus {
@@ -522,7 +522,7 @@ pub(crate) fn classify_busy_label(
     if let Some(cmd) = trimmed_command {
         return Some(cmd.to_string());
     }
-    if let Some(title) = osc_title.map(str::trim).filter(|t| !t.is_empty() && !crate::panes::is_default_title(t)) {
+    if let Some(title) = osc_title.map(str::trim).filter(|t| !t.is_empty() && !crate::host_types::is_default_title(t)) {
         return Some(title.to_string());
     }
     if let Some(label) = status.label.as_deref().map(str::trim).filter(|l| !l.is_empty() && *l != "运行中") {

@@ -3,7 +3,6 @@ import { Clipboard, Scroll, signal, Text, View } from "nsh";
 import { list, t } from "@vibevalley/i18n";
 import type { RepoActivity, RepoHealth, RepoHealthStatus, RepoLanguages, RepoSummary } from "@vibevalley/protocol";
 
-import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
 import { ConfirmButton } from "../../design/ConfirmButton";
 import { Dialog } from "../../design/Dialog";
@@ -14,17 +13,19 @@ import { Empty, ListCard, ListRow, Card } from "../../design/layout";
 import { Bubble } from "../../design/Tip";
 import { toast } from "../../design/toasts";
 import { mix } from "../../design/tone";
+import { createAct } from "../../infra/act";
 import { api } from "../../infra/api";
 import { Keyed, useNow } from "../../infra/base/dom";
 import { act as hostAct } from "../../infra/bridge";
 import { useBoardSlice } from "../../infra/frame";
 import { readHostParams } from "../../infra/hostParams";
 import { defineQuery, ready, retryRead, useQuery, useQueryClient, useRepos } from "../../infra/query";
+import { languageShares, number, sortRepos } from "../../infra/repos";
 import { useRouter } from "../../infra/router";
 import { createMemo, untrack } from "../../infra/solid";
+import { useVdpNode } from "../../infra/vdpProbe";
 import { dateText, type Recency, recencyOf, recencyText, since } from "./calendar";
 import { type Asked, CommitCalendar, Hands, Languages, NewRepoForm, Stat } from "./RepoPanels";
-import { languageShares, number, sortRepos } from "./repos";
 
 const languagesQuery = defineQuery({
   key: (id: string) => ["repo-languages", id],
@@ -93,6 +94,7 @@ function Plot(props: { recency: Recency; size: number; label?: string }) {
 
 /** `rest` is the path after /repos/. */
 export function ReposPage(props: { rest: string }) {
+  useVdpNode({ testId: "repos-page", role: "region" });
   const router = useRouter();
   // A minute at a time: enough for "3h ago".
   const now = useNow(60_000);

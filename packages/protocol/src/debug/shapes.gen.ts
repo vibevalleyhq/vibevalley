@@ -46,11 +46,11 @@ export type DebugCollabClock = { peerId: string, counter: number, };
 
 export type DebugCollabPresence = { id: string, name: string, color?: string, kind: string, status?: string, nodeId?: string, path?: string, offset?: number, endOffset?: number, sessionId?: string, updatedAt: number, };
 
-export type DebugCollabArtifactState = { artifactId: string, title: string, artifactType: string, seq: number, snapshotBytes: number, frontiers: string, frontierIds: Array<DebugCollabClock>, versionVector: string, vvEntries: Array<DebugCollabClock>, ephemeralTtlMs: number, presenceCount: number, presence: Array<DebugCollabPresence>, updatedAt: number, };
+export type DebugCollabNoteState = { noteId: string, title: string, noteType: string, seq: number, snapshotBytes: number, frontiers: string, frontierIds: Array<DebugCollabClock>, versionVector: string, vvEntries: Array<DebugCollabClock>, ephemeralTtlMs: number, presenceCount: number, presence: Array<DebugCollabPresence>, updatedAt: number, };
 
-export type DebugStateCounts = { issues: number, sessions: number, channels: number, agents: number, repos: number, artifacts: number, inbox: number, mediaJobs: number, };
+export type DebugStateCounts = { issues: number, sessions: number, channels: number, agents: number, repos: number, notes: number, inbox: number, mediaJobs: number, };
 
-export type DebugStateCache = { seq: number, sliceSeqs: { [key in string]: number }, sliceWatchers: { [key in string]: number }, counts: DebugStateCounts, caches: Array<DebugCacheStat>, collab: Array<DebugCollabArtifactState>, };
+export type DebugStateCache = { seq: number, sliceSeqs: { [key in string]: number }, sliceWatchers: { [key in string]: number }, counts: DebugStateCounts, caches: Array<DebugCacheStat>, collab: Array<DebugCollabNoteState>, };
 
 export type DebugOverrideConfig = { rpcDelayMs: number, sliceDelayMs: number, targetFilter?: string, disconnectTopic?: string, };
 

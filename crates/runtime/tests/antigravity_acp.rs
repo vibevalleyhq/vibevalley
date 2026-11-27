@@ -22,7 +22,7 @@ fn write_executable(dir: &Path, name: &str, body: &str) -> PathBuf {
     path
 }
 
-async fn recv_until(rx: &mut tokio::sync::mpsc::UnboundedReceiver<Event>, stop: impl Fn(&EventKind) -> bool) -> Vec<Event> {
+async fn recv_until(rx: &mut tokio::sync::mpsc::Receiver<Event>, stop: impl Fn(&EventKind) -> bool) -> Vec<Event> {
     let mut out = Vec::new();
     loop {
         let ev = tokio::time::timeout(WAIT, rx.recv())

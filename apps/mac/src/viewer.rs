@@ -493,7 +493,7 @@ pub(crate) fn is_html_path(path: &Path) -> bool {
 }
 
 pub(crate) fn build_html_preview_document(raw_html: &str) -> String {
-    crate::applet::prototype::with_policy(raw_html)
+    crate::host_types::with_policy(raw_html)
 }
 
 fn build_html_preview_bundle() -> Result<Bundle, String> {
@@ -504,7 +504,7 @@ fn build_html_preview_bundle() -> Result<Bundle, String> {
 
 fn html_mode_labels() -> (String, String) {
     (
-        vibevalley_i18n::t("web.artifact.page.previewTab", &[]),
+        vibevalley_i18n::t("web.note.page.previewTab", &[]),
         vibevalley_i18n::t("web.base.rich.viewSource", &[]),
     )
 }

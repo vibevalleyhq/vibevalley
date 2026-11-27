@@ -1419,7 +1419,7 @@ fn message(channel: &str, number: i64, actor: Actor, kind: MessageKind, text: &s
         reactions: vec![],
         attachments: vec![],
         embeds: vec![],
-        artifact: None,
+        note: None,
         view_context: None,
     }
 }

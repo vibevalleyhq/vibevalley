@@ -16,7 +16,7 @@
     "thought": "Thought",
     "subagentSaid": "Subagent said",
     "said": "Said",
-    "farm": "Chat",
+    "farm": "Channels",
     "running": "running",
     "ok": "succeeded",
     "failed": "failed",
@@ -26,11 +26,11 @@
   },
   "runs": {
     "farm": {
-      "channel_message_send": "speaking in the chat",
-      "channel_message_list": "reading the chat",
+      "channel_message_send": "speaking in the channel",
+      "channel_message_list": "reading the channel",
       "channel_unread_list": "checking for words to it",
-      "session_list": "seeing who is in the chat",
-      "other": "Chat: {tool}"
+      "session_list": "seeing who is in the channel",
+      "other": "Channel: {tool}"
     },
     "span": {
       "heard": "Heard",
@@ -40,7 +40,7 @@
       "retry": "Retry",
       "cache": "Cache",
       "error": "Error",
-      "farm": "Chat",
+      "farm": "Channels",
       "tool": "Tool"
     },
     "earlier": "Earlier steps",
@@ -140,19 +140,19 @@
     "recovery": {
       "resumeSame": "Resume with same config",
       "retrySame": "Retry with same config",
-      "rerunOther": "Rerun with another expert/engine",
+      "rerunOther": "Rerun with another teammate/environment",
       "openWorktree": "Open Worktree Terminal",
       "resumedToast": "Resumed run with current configuration",
-      "rerunTitle": "Rerun with another expert or engine",
-      "rerunTarget": "Expert or engine",
-      "rerunTargetPlaceholder": "Choose an expert or engine",
+      "rerunTitle": "Rerun with another teammate or environment",
+      "rerunTarget": "Teammate or environment",
+      "rerunTargetPlaceholder": "Choose a teammate or environment",
       "rerunNote": "Guidance for this run (optional)",
       "rerunNotePlaceholder": "Add extra context or leave blank to rerun from the current task…",
       "rerunConfirm": "Start rerun",
       "rerunStartedToast": "Started rerun with {target}",
       "resumePrompt": "Resume from the previous step and finish the task.",
-      "groupExperts": "Experts",
-      "groupEngines": "Engines",
+      "groupExperts": "Teammates",
+      "groupEngines": "Environments",
       "noWorktree": "No worktree directory recorded for this session"
     },
     "compact": {

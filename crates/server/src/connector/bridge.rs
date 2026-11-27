@@ -499,6 +499,14 @@ impl Bridge {
         }
     }
 
+    /// Withdraws one specific pending push message by exact `message_id` so newer
+    /// push rounds for the same issue are never cancelled by a stale withdrawal.
+    pub async fn withdraw_push_message_async(self: &Arc<Self>, message_id: &str) {
+        if self.env.ctx.service.connector.withdraw(message_id).await.is_ok() {
+            self.tell_async().await;
+        }
+    }
+
     /// Withdraws any pending issue push rows when the issue has already been handled in the workbench.
     pub async fn withdraw_issue_pushes_async(self: &Arc<Self>, issue_id: &str) {
         let connectors = &self.env.ctx.service.connector;
@@ -735,8 +743,7 @@ impl Bridge {
         };
         let target = issue_target_label(Some(issue.number), Some(&issue.title));
         if !issue_matches_category(&issue, category) {
-            let _ = connectors.withdraw(push_msg_id).await;
-            self.withdraw_issue_pushes_async(&issue.id).await;
+            self.withdraw_push_message_async(push_msg_id).await;
             return self
                 .send_reply_receipt_async(&m.id, &t("server.connector.reply.alreadyHandled", &[("target", target.into())]), cancel)
                 .await;
@@ -770,8 +777,10 @@ impl Bridge {
         };
         let receipt = match outcome {
             Ok(ok_receipt) => {
-                let _ = connectors.withdraw(push_msg_id).await;
-                self.withdraw_issue_pushes_async(&issue.id).await;
+                self.withdraw_push_message_async(push_msg_id).await;
+                if matches!(action, IssueReplyAction::Accept) {
+                    self.withdraw_issue_pushes_async(&issue.id).await;
+                }
                 ok_receipt
             }
             Err(e) => t("server.connector.reply.actionFailed", &[("target", target.into()), ("why", e.message.into())]),
@@ -1521,6 +1530,7 @@ mod tests {
             work_root: work,
             version: "0.1.0".into(),
             deepseek_api_key: String::new(),
+            github_token: None,
             storage_backend: None,
         })
         .await;
@@ -1827,6 +1837,7 @@ mod tests {
                 work_root: work,
                 version: "0.1.0".into(),
                 deepseek_api_key: String::new(),
+                github_token: None,
                 storage_backend: None,
             })
             .await;

@@ -2,7 +2,7 @@
 import type { OpenOptions } from "nsh/test";
 
 import { SliceKindValues, type SliceBundle, type SliceKind } from "@vibevalley/protocol";
-import type { AppletInstallInput, ArtifactAppletInfo } from "@vibevalley/protocol/host";
+import type { AppletInstallInput, NoteAppletInfo } from "@vibevalley/protocol/host";
 
 import type { SliceMap } from "../infra/transport";
 
@@ -58,33 +58,33 @@ export function fakeHost(fixture: { state: SliceBundle; responses: Record<string
   const watchedSlices = new Set<SliceKind>();
   const liveRev = { value: 0 };
   const subscriptions = new Map<string, { name: string; payload: unknown }>();
-  const installedApplets = new Map<string, ArtifactAppletInfo>();
+  const installedApplets = new Map<string, NoteAppletInfo>();
   const deferredOps = new Set<string>();
   const bound: { app: App | null; seenPosts: number } = { app: null, seenPosts: 0 };
   const defaultHostAnswers: Record<string, (payload: unknown) => unknown> = {
     "host.appletList": () => [...installedApplets.values()],
     "host.appletInstall": (payload: unknown) => {
       const input = payload as AppletInstallInput;
-      const slug = input.artifactId.replace(/[^a-zA-Z0-9._-]+/gu, "-").replace(/^-+|-+$/gu, "") || "artifact";
-      const info: ArtifactAppletInfo = {
-        artifactId: input.artifactId,
-        artifactType: input.artifactType,
+      const slug = input.noteId.replace(/[^a-zA-Z0-9._-]+/gu, "-").replace(/^-+|-+$/gu, "") || "note";
+      const info: NoteAppletInfo = {
+        noteId: input.noteId,
+        noteType: input.noteType,
         appName: input.appName,
         bundleId: `dev.vibevalley.applet.${slug}`,
         bundlePath: `/Users/demo/Applications/VibeValley Apps/${input.appName}.app`,
         alwaysOnTop: input.alwaysOnTop,
         installed: true,
       };
-      installedApplets.set(input.artifactId, info);
+      installedApplets.set(input.noteId, info);
       return info;
     },
     "host.appletUninstall": (payload: unknown) => {
-      const { artifactId } = payload as { artifactId: string };
-      return { removed: installedApplets.delete(artifactId) };
+      const { noteId } = payload as { noteId: string };
+      return { removed: installedApplets.delete(noteId) };
     },
     "host.appletOpen": (payload: unknown) => {
-      const { artifactId } = payload as { artifactId: string };
-      return { opened: installedApplets.has(artifactId) };
+      const { noteId } = payload as { noteId: string };
+      return { opened: installedApplets.has(noteId) };
     },
     "host.captureWebView": () => null,
   };

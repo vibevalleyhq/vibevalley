@@ -11,6 +11,7 @@ import { Dot, type DotTone } from "../../../design/Tag";
 import { Bubble } from "../../../design/Tip";
 import { mix } from "../../../design/tone";
 import { useNow } from "../../../infra/base/dom";
+import { useVdpNode } from "../../../infra/vdpProbe";
 import type { BoardCard } from "../model/cards";
 import { type BoardDensity, defaultFields, type IssueFieldVisibility } from "../model/display";
 import { formatIsoDate } from "../model/meta";
@@ -59,6 +60,7 @@ export function IssueCalendar(props: {
   onNew: (at: NewIssueAt) => void;
   onClearFilter?: (() => void) | undefined;
 }) {
+  useVdpNode({ testId: "issue-calendar", role: "region" });
   const now = useNow(60_000);
   const compactHeight = () => windowSize().height < 780;
   const compact = computed(() => props.density === "compact");
@@ -98,7 +100,7 @@ export function IssueCalendar(props: {
           </View>
           <View class="flex-row items-center gap-1">
             <IconButton testid="calendar-prev" icon="previous" size={14} label={t("web.issue.calendar.prevMonth")} onClick={() => goMonth(-1)} />
-            <Button size="compact" tone="plain" testID="calendar-today" onPress={goToday}>
+            <Button tone="plain" testID="calendar-today" onPress={goToday}>
               {t("web.issue.timeline.today")}
             </Button>
             <IconButton testid="calendar-next" icon="next" size={14} label={t("web.issue.calendar.nextMonth")} onClick={() => goMonth(1)} />

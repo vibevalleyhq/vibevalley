@@ -3,7 +3,6 @@
 //! (`crate::typescript`).
 
 pub mod agent;
-pub mod artifact;
 pub mod attachment;
 pub mod channel;
 pub mod common;
@@ -13,12 +12,14 @@ pub mod cron;
 pub mod debug;
 pub mod endpoints;
 pub mod game;
+#[cfg(feature = "host")]
 pub mod host;
 pub mod inbox;
 pub mod issue;
 pub mod machine;
 pub mod media;
 pub mod memory;
+pub mod note;
 pub mod orchestrator;
 pub mod provider;
 pub mod remote;
@@ -29,7 +30,6 @@ pub mod setting;
 pub mod voice;
 
 pub use agent::*;
-pub use artifact::*;
 pub use attachment::*;
 pub use channel::*;
 pub use common::*;
@@ -39,12 +39,14 @@ pub use cron::*;
 pub use debug::*;
 pub use endpoints::*;
 pub use game::*;
+#[cfg(feature = "host")]
 pub use host::*;
 pub use inbox::*;
 pub use issue::*;
 pub use machine::*;
 pub use media::*;
 pub use memory::*;
+pub use note::*;
 pub use orchestrator::*;
 pub use provider::*;
 pub use remote::*;
@@ -59,7 +61,6 @@ pub use voice::*;
 pub(crate) fn ts_modules(cfg: &ts_rs::Config) -> Vec<crate::typescript::Module> {
     vec![
         agent::ts_module(cfg),
-        artifact::ts_module(cfg),
         attachment::ts_module(cfg),
         channel::ts_module(cfg),
         common::ts_module(cfg),
@@ -74,6 +75,7 @@ pub(crate) fn ts_modules(cfg: &ts_rs::Config) -> Vec<crate::typescript::Module> 
         machine::ts_module(cfg),
         media::ts_module(cfg),
         memory::ts_module(cfg),
+        note::ts_module(cfg),
         orchestrator::ts_module(cfg),
         provider::ts_module(cfg),
         remote::ts_module(cfg),

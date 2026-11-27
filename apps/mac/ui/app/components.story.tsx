@@ -1,6 +1,5 @@
 import "../infra/polyfill";
 import { mount, Scroll, signal, Text, View } from "nsh";
-import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
 import "@vibevalley/i18n/catalogs";
@@ -11,7 +10,6 @@ import { Checkbox } from "../design/Checkbox";
 import { ChipsInput } from "../design/Chips";
 import { CodeBlock } from "../design/code/CodeBlock";
 import { ConfirmButton } from "../design/ConfirmButton";
-import { DataTable, tableCell } from "../design/DataTable";
 import { Dialog } from "../design/Dialog";
 import { AgentFace, OrchestratorFace } from "../design/domain/Face";
 import { RuntimeBadge } from "../design/domain/RuntimeBadge";
@@ -36,29 +34,10 @@ import { createSettled, useNow } from "../infra/base/dom";
 import { ago, shortMomentText } from "../infra/base/format";
 import { fixtureTransport } from "../infra/fixtures";
 import { Root } from "../infra/Root";
-import { defineColumns, useTable } from "../infra/table";
 import { setTransport } from "../infra/transport";
 import { WorkbenchDesignHost } from "./DesignHost";
 
 setTransport(fixtureTransport(scenarios.typical));
-
-const RowSchema = z.object({ id: z.string(), title: z.string(), score: z.number() });
-type Row = z.infer<typeof RowSchema>;
-const col = defineColumns(RowSchema);
-const columns = [col("title", { value: (r) => r.title, hideable: false }), col("score", { value: (r) => r.score, compare: (a, b) => a - b })] as const;
-
-const cells = {
-  title: tableCell(
-    columns[0],
-    () => "标题",
-    (v) => <Text class="text-sm text-ink">{v()}</Text>,
-  ),
-  score: tableCell(
-    columns[1],
-    () => "分值",
-    (v) => <Text class="font-mono text-sm text-ink tabular-nums">{String(v())}</Text>,
-  ),
-};
 
 const sampleLongCode = Array.from({ length: 20 }, (_, i) => `export const line${i + 1} = ${i + 1};`).join("\n");
 
@@ -196,22 +175,6 @@ function ComponentBench() {
   const settledVal = createSettled(settledInput, 250);
   const now = useNow(30_000);
 
-  const table = useTable({
-    rows: () => [
-      { id: "r1", title: "第一行指标", score: 20 },
-      { id: "r2", title: "第二行指标", score: 90 },
-    ],
-    columns,
-    rowId: (r) => r.id,
-    mode: "local",
-  });
-  const emptyTable = useTable({
-    rows: () => [] as Row[],
-    columns,
-    rowId: (r) => r.id,
-    mode: "local",
-  });
-
   const subagentData = scenarios.typical.state.sessions.sessions.find((s) => s.subagents)?.subagents;
 
   return (
@@ -339,8 +302,6 @@ function ComponentBench() {
             </Button>
           </View>
         </Dialog>
-        <DataTable testid="comp-table" table={table} cells={cells} caption="指标表" selection />
-        <DataTable testid="comp-table-empty" table={emptyTable} cells={cells} caption="空指标表" />
       </View>
 
       <View testID="comp-rich" class="gap-2 rounded-lg border border-line bg-side p-3">

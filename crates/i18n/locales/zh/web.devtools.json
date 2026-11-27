@@ -59,7 +59,7 @@
     "activeSubscriptions": "活跃订阅",
     "latestSeq": "最新序号",
     "lastFrameMs": "最近帧耗时",
-    "runtimes": "引擎状态",
+    "runtimes": "环境状态",
     "installed": "已安装",
     "notInstalled": "未安装",
     "ready": "就绪",
@@ -87,7 +87,7 @@
   "trajectory": {
     "kind": {
       "issueSession": "工单",
-      "workspaceChat": "对话",
+      "workspaceChat": "项目对话",
       "orchestrator": "主助手"
     },
     "silentError": "静默错误",
@@ -122,12 +122,12 @@
     "channels": "频道",
     "agents": "角色",
     "repos": "仓库",
-    "artifacts": "作品",
+    "notes": "笔记",
     "inbox": "收件箱",
     "mediaJobs": "媒体",
     "emptyCaches": "暂无缓存统计。",
     "collab": "Loro 协同与瞬态在场",
-    "emptyCollab": "暂无活跃协同作品。",
+    "emptyCollab": "暂无活跃协同笔记。",
     "frontiers": "Frontiers 前沿",
     "presence": "EphemeralStore 在场节点",
     "noPeers": "暂无活跃在场节点",

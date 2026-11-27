@@ -2,7 +2,7 @@
 // vibevalley-canvas + ImageSrc::svg_markup), with a clean fallback for stock `nsh test`.
 import { Text, View } from "nsh";
 
-import { richNative } from "../../infra/rich";
+import { useDesignHost } from "../host";
 
 export interface CanvasProps {
   data: string;
@@ -12,7 +12,7 @@ export interface CanvasProps {
 }
 
 export function Canvas(props: CanvasProps) {
-  const native = richNative();
+  const native = useDesignHost().rich();
   if (native) {
     const VvCanvas = native.VvCanvas;
     return <VvCanvas data={props.data} showGrid={props.showGrid} padding={props.padding} class={props.class} />;

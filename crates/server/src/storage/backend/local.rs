@@ -201,7 +201,7 @@ mod tests {
         assert!(meta.etag.is_some());
 
         backend.put("attachments/a2", b"world!".to_vec(), None).await.unwrap();
-        backend.put("artifact/x/manifest.json", b"{}".to_vec(), Some("application/json")).await.unwrap();
+        backend.put("note/x/manifest.json", b"{}".to_vec(), Some("application/json")).await.unwrap();
 
         assert_eq!(backend.get("attachments/a1").await.unwrap(), Some(b"hello".to_vec()));
         assert!(backend.exists("attachments/a1").await.unwrap());
@@ -214,7 +214,7 @@ mod tests {
 
         let all = backend.list("").await.unwrap();
         let all_keys: Vec<&str> = all.iter().map(|m| m.key.as_str()).collect();
-        assert_eq!(all_keys, vec!["artifact/x/manifest.json", "attachments/a1", "attachments/a2"]);
+        assert_eq!(all_keys, vec!["attachments/a1", "attachments/a2", "note/x/manifest.json"]);
 
         assert!(backend.delete("attachments/a1").await.unwrap());
         assert!(!backend.delete("attachments/a1").await.unwrap());

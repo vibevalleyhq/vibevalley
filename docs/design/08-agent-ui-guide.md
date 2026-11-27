@@ -38,12 +38,19 @@
      - 所有携带 `shadow-float` 的弹窗（`Dialog`）、菜单（`MoreMenu` / 工作区右键菜单）、下拉列表（`Select`）、弹层（`Popover` / `DisplayMenu`）、浮动操作条以及在 `bg-side` 容器内抬起的控件（`Segmented` 滑块、看板卡片 `Board`、命令面板 `Palette`）统一使用 `bg-elevated`。
      - 开关与滑块的圆钮（`ToggleSwitch`、`Slider`）在浅/深双主题下统一使用暖纸白 `bg-paper` 保持实体触感。
      - 工作台与工作区外壳禁止写死 `rgba(...)` 或亮/暗手工特例。
+7. **编辑态克制与高频布局防错（实测避坑）**：
+   - **去装饰框与按需显露**：拒绝盒套盒（外框套内框再套微标）与常驻编辑 chrome（如恒亮块级标签、双重导航栏或重复预览条）；操作工具条与切换按钮只在 hover 或块/行激活时浮现。
+   - **浮动工具条零遮挡**：激活块上方的行内格式化条或悬浮菜单必须预留安全间距或置于安全侧，禁止盖住前一条卡片、标题或正文文字。
+   - **横向滚动必须显式 `flex-row`**：在 `nsh` 中使用 `<Scroll horizontal>` 时，`contentClass` 必须显式包含 `flex-row`（如 `flex-row items-start gap-3 p-3`），否则多列看板或画廊会退化成垂直堆叠。
+   - **原生自绘表面必须双主题对齐**：`Canvas` / 白板等基于底图或自定义画布的控件在深色模式下不得继续渲染刺眼 `#ffffff` 亮白背景，必须随主题切换暗色表面。
+   - **密排表格与侧栏防截断**：表格中的引用单元格只保留单一主交互入口（不要把链接胶囊与选择下拉并排挤成双重省略号）；右栏大纲与窄标题容器必须显式加 `truncate` 或 `line-clamp-*`，禁止在容器右缘硬切掉半个汉字。
+   - **零开销挂接 VDP 探针**：核心页面根容器、视图切换控件与高频交互锚点优先使用 `Button` / `Segmented` 或在 `apps/mac/ui/infra/vdpProbe.ts` 中通过零开销 `useVdpNode` / `<VdpAnchor>` 登记（未开启 VDP 时即时返回，零运行时损耗），供 `scripts/vdp/` 场景脚本稳定点击与等待。
 
 ## 8.3 状态、并发与键盘可达性
 
 1. **核心状态只读不折**：禁止在 TS 组件内部自行推算工单阶段文案、农田作物状态或帮工排队位置；缺字段时到 `crates/protocol/src/contract/` 补契约与 Rust `reduce` 后执行 `cargo xtask protocol --write` 重生成协议。
 2. **显式状态机与幂等保护**：多步弹窗、提交锁与复杂视图选择必须抽离至独立纯函数模型文件（如 `closeFlow.ts`、`draftSubmit.ts`、`libraryView.ts`），销毁动作使用 `ConfirmButton`，发消息与建单使用 `createAct` / `newSendKey` 防重放，绝不引入硬编码睡眠等待。
-3. **键盘一等可达与无障碍完备**：可点击 `<View>` 须附带 `role="button"`（或对应语义角色）、`accessibilityLabel` 与明确焦点环样式（`focus-visible:outline-2 focus-visible:outline-focus`）；新快捷键登记入 `apps/mac/ui/infra/base/shortcuts.ts` 以便 `ShortcutSheet` 自动收录，不与全局或 `Workspace` 热键冲突。
+3. **键盘一等可达与无障碍完备**：可点击 `<View>` 须附带 `role="button"`（或对应语义角色）、`accessibilityLabel` 与明确焦点环样式（`focus-visible:outline-2 focus-visible:outline-focus`）；新快捷键登记入 `apps/mac/ui/design/shortcuts.ts` 以便 `ShortcutSheet` 自动收录，不与全局或 `Workspace` 热键冲突。
 4. **多语言不漏键**：面向用户的全部文案必须录入 `crates/i18n/locales/{zh,en}/` 词典并以 `t("key")` 调用，同时在页面中核验中英文双语长度不会挤乱排版。
 
 ## 8.4 提交前强制自查清单
@@ -55,4 +62,4 @@
 - [ ] **词典漏翻与多余检查**：运行 `vpx scripts/gen/i18n.ts check` 确认无缺失或未用键（若改动词典则先运行 `vp run i18n:gen`）。
 - [ ] **生成产物一致性检查**：运行 `vpx scripts/gen/primitives.ts --check`（若有导出原语增删先运行 `vpx scripts/gen/primitives.ts` 刷新）。
 - [ ] **文档与术语核对**：涉及文档或规范更新时运行 `vpx scripts/docs/doc-links.ts`、`vpx scripts/docs/glossary.ts` 与 `vpx scripts/docs/stale-names.ts`。
-- [ ] **双主题真实截图比对**：按 [vv-acceptance 的应用分册](.agents/skills/vv-acceptance/references/app.md)在真实启动的 `vibevalley-mac`（浅色 + 深色两套主题、典型与极端密级或窄窗 `< 768px`）采集修改前后截图并核验无截断、无重叠、无失真色块。
+- [ ] **双主题真实截图比对（两层脚本化 VDP）**：按 [vv-acceptance 的应用分册](.agents/skills/vv-acceptance/references/app.md)优先运行内置 TS 场景脚本 `vp run vdp <场景...> --ui-only --out /tmp/vv-vdp`（纯改 `apps/mac/ui` 时只重打 JS 包，跳过 Cargo 重编），打开产出的 `index.html` / `manifest.json` 与浅色/深色 PNG 集中核验无截断、无遮挡重叠、无深浅主题表面失真；新增页面流程直接沉淀进 `scripts/vdp/scenarios/`。

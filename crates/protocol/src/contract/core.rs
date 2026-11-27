@@ -325,25 +325,6 @@ pub struct ChannelReportsPayload {
     pub after: Option<String>,
 }
 
-#[skip_serializing_none]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts-gen", derive(TS))]
-#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
-#[serde(rename_all = "camelCase")]
-pub struct ArtifactFollowPayload {
-    pub id: String,
-    pub after: i64,
-}
-
-#[skip_serializing_none]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts-gen", derive(TS))]
-#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
-#[serde(rename_all = "camelCase")]
-pub struct ArtifactSuggestionFollowPayload {
-    pub id: String,
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts-gen", derive(TS))]
 pub enum RetroWindow {
@@ -495,8 +476,6 @@ crate::typescript::module! {
     LiveEvent,
     ChannelFollowPayload,
     ChannelReportsPayload,
-    ArtifactFollowPayload,
-    ArtifactSuggestionFollowPayload,
     RetroWindow,
     IssueRetroGetInput,
     RetroDurationStats,

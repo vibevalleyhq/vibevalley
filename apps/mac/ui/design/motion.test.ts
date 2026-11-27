@@ -2,7 +2,7 @@ import "../infra/polyfill";
 import { effect, reduceMotion } from "nsh";
 import { afterEach, describe, expect, test } from "nsh/test";
 
-import { applyMotion, chooseMotion, fadeAnimation, motionChoice, motionClass, motionDuration, motionOff, popupTransition } from "./motion";
+import { applyMotion, chooseMotion, fadeAnimation, motionChoice, motionClass, motionDuration, motionEnter, motionOff, popupTransition } from "./motion";
 
 afterEach(() => {
   applyMotion("system");
@@ -69,5 +69,23 @@ describe("design/motion", () => {
       { off: true, fade: "none", duration: 0 },
       { off: reduceMotion(), fade: reduceMotion() ? "none" : "fade", duration: reduceMotion() ? 0 : 180 },
     ]);
+  });
+
+  test("resolves tiered timing tokens (120/180/280ms) and respects deterministic no-animation override", () => {
+    applyMotion("on");
+    expect(motionEnter("fast")).toBe("transition-transform duration-120 ease-out");
+    expect(motionEnter("normal")).toBe("transition-opacity duration-180 ease-out");
+    expect(motionEnter("slow")).toBe("transition-opacity duration-280 ease-out");
+
+    const prev = Reflect.get(globalThis, "__VIBEVALLEY_NO_ANIMATION__");
+    try {
+      Reflect.set(globalThis, "__VIBEVALLEY_NO_ANIMATION__", true);
+      expect(motionOff()).toBe(true);
+      expect(motionDuration(180)).toBe(0);
+      expect(motionEnter("slow")).toBe("");
+    } finally {
+      if (prev === undefined) Reflect.deleteProperty(globalThis, "__VIBEVALLEY_NO_ANIMATION__");
+      else Reflect.set(globalThis, "__VIBEVALLEY_NO_ANIMATION__", prev);
+    }
   });
 });

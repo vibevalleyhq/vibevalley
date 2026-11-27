@@ -1,8 +1,9 @@
 //! `runtime.mcp.*` endpoint contract & delegation tests.
 
+use crate::support::{RouterTestExt as _, ServerTestExt as _};
 use serde_json::{Value, json};
 use vibevalley_protocol::Caller;
-use vibevalley_server::{App, Config, Server, create_app_blocking};
+use vibevalley_server::{App, Config, create_app_blocking};
 
 fn app(dir: &std::path::Path) -> App {
     create_app_blocking(Config {

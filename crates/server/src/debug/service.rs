@@ -5,7 +5,7 @@ use std::sync::Arc;
 use serde::Deserialize;
 use serde_json::{Value, json};
 use vibevalley_protocol::{
-    ApiError, BizCode, DebugBundleResult, DebugCacheStat, DebugCollabArtifactState, DebugGraph, DebugGraphClient, DebugGraphSession, DebugOverrideConfig,
+    ApiError, BizCode, DebugBundleResult, DebugCacheStat, DebugCollabNoteState, DebugGraph, DebugGraphClient, DebugGraphSession, DebugOverrideConfig,
     DebugOverview, DebugRuntimeSummary, DebugSnapshot, DebugStateCache, DebugStateCounts, DebugTimelinePage, DebugTimelineQuery, DebugTrajectoryDetail,
     DebugTrajectoryExportRequest, DebugTrajectoryExportResult, DebugTrajectoryGetRequest, DebugTrajectoryKind, DebugTrajectorySummary, Issue, Session,
 };
@@ -62,7 +62,7 @@ struct StateMetrics {
     sessions: u32,
     channels: u32,
     repos: u32,
-    artifacts: u32,
+    notes: u32,
     media_jobs: u32,
     inbox: u32,
     active_sessions: u32,
@@ -74,7 +74,7 @@ fn extract_state_metrics(snap: &DebugStateSnapshot) -> StateMetrics {
         sessions: snap.sessions.len() as u32,
         channels: snap.channel_count,
         repos: snap.repo_count,
-        artifacts: snap.artifact_count,
+        notes: snap.note_count,
         media_jobs: snap.media_job_count,
         inbox: snap.inbox_count,
         active_sessions: snap.sessions.iter().filter(|s| s.phase.is_working()).count() as u32,
@@ -192,7 +192,7 @@ impl DebugKit {
         self.ctx.feed.watcher_counts()
     }
 
-    fn redact_collab_states(collab: &[DebugCollabArtifactState], redactor: &Redactor, count: &mut u32) -> Vec<DebugCollabArtifactState> {
+    fn redact_collab_states(collab: &[DebugCollabNoteState], redactor: &Redactor, count: &mut u32) -> Vec<DebugCollabNoteState> {
         collab
             .iter()
             .map(|c| {
@@ -214,7 +214,7 @@ impl DebugKit {
         metrics: &StateMetrics,
         mut caches: Vec<DebugCacheStat>,
         agent_count: u32,
-        collab: &[DebugCollabArtifactState],
+        collab: &[DebugCollabNoteState],
         redactor: &Redactor,
         count: &mut u32,
     ) -> DebugStateCache {
@@ -229,7 +229,7 @@ impl DebugKit {
                 channels: metrics.channels,
                 agents: agent_count,
                 repos: metrics.repos,
-                artifacts: metrics.artifacts,
+                notes: metrics.notes,
                 inbox: metrics.inbox,
                 media_jobs: metrics.media_jobs,
             },
@@ -268,14 +268,14 @@ impl DebugKit {
         let raw_sessions = extract_graph_sessions(&snap.issues, &snap.sessions, &probe.orchestrator_ids);
         let active_clients = host.clients.len() as u32;
         let graph = finish_graph(raw_sessions, std::mem::take(&mut host.clients), &redactor, &mut prior_redactions);
-        let state_cache = self.build_state_cache(
-            &metrics,
-            std::mem::take(&mut host.caches),
-            probe.agent_count,
-            &snap.collab,
-            &redactor,
-            &mut prior_redactions,
-        );
+        let outbox_failed = self.ctx.outbox.failed_count_async().await.unwrap_or(0);
+        let mut caches = std::mem::take(&mut host.caches);
+        caches.push(DebugCacheStat {
+            name: "outbox.failed".into(),
+            entries: outbox_failed.min(u32::MAX as u64) as u32,
+            detail: Some(format!("dead-lettered outbox items ({outbox_failed})")),
+        });
+        let state_cache = self.build_state_cache(&metrics, caches, probe.agent_count, &snap.collab, &redactor, &mut prior_redactions);
         let overview = self.build_overview(metrics.active_sessions, active_clients, &mut host, probe.runtimes);
         let routes = host.routes.unwrap_or_else(Self::default_routes);
         let overrides = self.collector.overrides();
@@ -288,6 +288,19 @@ impl DebugKit {
             state_cache,
             recent_timeline,
         })
+    }
+
+    pub async fn outbox_failed_list_async(&self, limit: u64) -> Result<Vec<crate::context::OutboxDeadLetter>, ApiError> {
+        self.ensure_enabled()?;
+        self.ctx.outbox.list_failed_async(limit).await
+    }
+
+    pub async fn outbox_replay_async(&self, id: Option<i64>) -> Result<u64, ApiError> {
+        self.ensure_enabled()?;
+        match id {
+            Some(item_id) => Ok(u64::from(self.ctx.outbox.replay_failed_async(item_id).await?)),
+            None => self.ctx.outbox.replay_all_failed_async().await,
+        }
     }
 
     pub fn timeline_list(&self, q: &DebugTimelineQuery) -> Result<DebugTimelinePage, ApiError> {
@@ -383,14 +396,14 @@ impl DebugKit {
         let index = trajectory::extract_trajectory_index(&snap.issues, &snap.sessions);
         let active_clients = host.clients.len() as u32;
         let graph = finish_graph(raw_sessions, std::mem::take(&mut host.clients), &redactor, &mut prior_redactions);
-        let state_cache = self.build_state_cache(
-            &metrics,
-            std::mem::take(&mut host.caches),
-            probe.agent_count,
-            &snap.collab,
-            &redactor,
-            &mut prior_redactions,
-        );
+        let outbox_failed = self.ctx.outbox.failed_count_async().await.unwrap_or(0);
+        let mut caches = std::mem::take(&mut host.caches);
+        caches.push(DebugCacheStat {
+            name: "outbox.failed".into(),
+            entries: outbox_failed.min(u32::MAX as u64) as u32,
+            detail: Some(format!("dead-lettered outbox items ({outbox_failed})")),
+        });
+        let state_cache = self.build_state_cache(&metrics, caches, probe.agent_count, &snap.collab, &redactor, &mut prior_redactions);
         let overview = self.build_overview(metrics.active_sessions, active_clients, &mut host, probe.runtimes);
         let routes = host.routes.unwrap_or_else(Self::default_routes);
         let overrides = self.collector.overrides();

@@ -6,7 +6,7 @@ use vibevalley_protocol::{Actor, AgentRole, ChannelUpdate};
 use super::registry::{ToolRegistry, Who, given};
 use crate::agent::profile::text;
 use crate::channel::{AddressedMessage, ReadOptions, Speaking, Spoken};
-use crate::context::text::format_artifact_view_context;
+use crate::context::text::format_note_view_context;
 
 /// `messageLine`: line breaks are marked, so no message can pass for a header.
 pub fn message_line(m: &AddressedMessage) -> String {
@@ -25,19 +25,14 @@ pub fn message_line(m: &AddressedMessage) -> String {
     }
     let files: String = m.attachments.iter().flatten().map(|a| format!("\n  │ [附件 {}：{}]", a.name, a.path)).collect();
     let made = m
-        .artifact
+        .note
         .as_ref()
-        .map(|a| {
-            format!(
-                "\n  │ [Artifact「{}」第 {} 稿：id={}，原文用 artifact_content_get 读]",
-                a.title, a.version, a.id
-            )
-        })
+        .map(|a| format!("\n  │ [笔记「{}」第 {} 稿：id={}，原文用 note_content_get 读]", a.title, a.version, a.id))
         .unwrap_or_default();
     let view = m
         .view_context
         .as_ref()
-        .map(|vc| format!("\n  │ {}", format_artifact_view_context(vc).replace('\n', "\n  │ ")))
+        .map(|vc| format!("\n  │ {}", format_note_view_context(vc).replace('\n', "\n  │ ")))
         .unwrap_or_default();
     let edited = if m.edited == Some(true) { "（改过）" } else { "" };
     format!("{head}{edited} {}{files}{made}{view}", m.text.trim().replace('\n', "\n  │ "))

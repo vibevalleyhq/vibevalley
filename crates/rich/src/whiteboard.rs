@@ -1095,7 +1095,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
             let ro = props.read_only.get();
             let l = loc_str();
             let is_en = l.starts_with("en");
-            let count_txt = t_in(l.as_str(), "web.artifact.whiteboard.elements", &[("n", snap.count.into())]);
+            let count_txt = t_in(l.as_str(), "web.note.whiteboard.elements", &[("n", snap.count.into())]);
 
             let next_grid = match snap.grid {
                 GridStyle::Architectural => GridStyle::Dots,
@@ -1139,7 +1139,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                 .child(pill_divider())
                 .child(pill_icon_btn(
                     "wb-undo",
-                    &t_in(l.as_str(), "web.artifact.whiteboard.undo", &[]),
+                    &t_in(l.as_str(), "web.note.whiteboard.undo", &[]),
                     ICON_UNDO,
                     false,
                     !snap.can_undo || ro,
@@ -1150,7 +1150,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                 ))
                 .child(pill_icon_btn(
                     "wb-redo",
-                    &t_in(l.as_str(), "web.artifact.whiteboard.redo", &[]),
+                    &t_in(l.as_str(), "web.note.whiteboard.redo", &[]),
                     ICON_REDO,
                     false,
                     !snap.can_redo || ro,
@@ -1320,7 +1320,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                 .child(pill_divider())
                 .child(pill_text_btn(
                     "wb-inspector-toggle",
-                    &t_in(l.as_str(), "web.artifact.whiteboard.inspector", &[]),
+                    &t_in(l.as_str(), "web.note.whiteboard.inspector", &[]),
                     inspector_open.get(),
                     false,
                     move || inspector_open.set(!inspector_open.get_untracked()),
@@ -1399,7 +1399,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
             let items = [
                 (
                     TemplateKind::Timeline,
-                    t_in(l.as_str(), "web.artifact.whiteboard.templateTimeline", &[]),
+                    t_in(l.as_str(), "web.note.whiteboard.templateTimeline", &[]),
                     "wb-tpl-timeline",
                 ),
                 (
@@ -1409,7 +1409,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                 ),
                 (
                     TemplateKind::Architecture,
-                    t_in(l.as_str(), "web.artifact.whiteboard.templateArchitecture", &[]),
+                    t_in(l.as_str(), "web.note.whiteboard.templateArchitecture", &[]),
                     "wb-tpl-arch",
                 ),
                 (
@@ -1468,49 +1468,44 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                     crate::engine::whiteboard::WbFill::Default,
                     "#fffdf9",
                     "wb-fill-default",
-                    "web.artifact.whiteboard.fillDefault",
+                    "web.note.whiteboard.fillDefault",
                 ),
-                (
-                    crate::engine::whiteboard::WbFill::Sun,
-                    "#ffe57f",
-                    "wb-fill-sun",
-                    "web.artifact.whiteboard.fillSun",
-                ),
+                (crate::engine::whiteboard::WbFill::Sun, "#ffe57f", "wb-fill-sun", "web.note.whiteboard.fillSun"),
                 (
                     crate::engine::whiteboard::WbFill::Peach,
                     "#f9ba7b",
                     "wb-fill-peach",
-                    "web.artifact.whiteboard.fillPeach",
+                    "web.note.whiteboard.fillPeach",
                 ),
                 (
                     crate::engine::whiteboard::WbFill::Leaf,
                     "#cce6b6",
                     "wb-fill-leaf",
-                    "web.artifact.whiteboard.fillLeaf",
+                    "web.note.whiteboard.fillLeaf",
                 ),
                 (
                     crate::engine::whiteboard::WbFill::Water,
                     "#cde2f8",
                     "wb-fill-water",
-                    "web.artifact.whiteboard.fillWater",
+                    "web.note.whiteboard.fillWater",
                 ),
                 (
                     crate::engine::whiteboard::WbFill::Lavender,
                     "#dfd4f8",
                     "wb-fill-lavender",
-                    "web.artifact.whiteboard.fillLavender",
+                    "web.note.whiteboard.fillLavender",
                 ),
                 (
                     crate::engine::whiteboard::WbFill::Berry,
                     "#f8d0ca",
                     "wb-fill-berry",
-                    "web.artifact.whiteboard.fillBerry",
+                    "web.note.whiteboard.fillBerry",
                 ),
                 (
                     crate::engine::whiteboard::WbFill::Side,
                     "#f6f5f3",
                     "wb-fill-side",
-                    "web.artifact.whiteboard.fillSide",
+                    "web.note.whiteboard.fillSide",
                 ),
             ] {
                 let active = snap.selection_kind.fill.as_deref() == Some(fill.as_str());
@@ -1540,13 +1535,9 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
             if snap.selection_kind.is_arrow {
                 row = row.child(pill_divider());
                 for (c, lbl, slug) in [
-                    (ArrowCurve::Smooth, t_in(l.as_str(), "web.artifact.whiteboard.curveSmooth", &[]), "smooth"),
-                    (
-                        ArrowCurve::Orthogonal,
-                        t_in(l.as_str(), "web.artifact.whiteboard.curveOrthogonal", &[]),
-                        "ortho",
-                    ),
-                    (ArrowCurve::Straight, t_in(l.as_str(), "web.artifact.whiteboard.curveStraight", &[]), "straight"),
+                    (ArrowCurve::Smooth, t_in(l.as_str(), "web.note.whiteboard.curveSmooth", &[]), "smooth"),
+                    (ArrowCurve::Orthogonal, t_in(l.as_str(), "web.note.whiteboard.curveOrthogonal", &[]), "ortho"),
+                    (ArrowCurve::Straight, t_in(l.as_str(), "web.note.whiteboard.curveStraight", &[]), "straight"),
                 ] {
                     row = row.child(pill_text_btn(&format!("wb-curve-{slug}"), &lbl, snap.selection_kind.curve == Some(c), false, {
                         let run = run_action.clone();
@@ -1555,8 +1546,8 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                 }
                 row = row.child(pill_divider());
                 for (st, lbl, slug) in [
-                    (StrokeStyle::Solid, t_in(l.as_str(), "web.artifact.whiteboard.styleSolid", &[]), "solid"),
-                    (StrokeStyle::Dashed, t_in(l.as_str(), "web.artifact.whiteboard.styleDashed", &[]), "dashed"),
+                    (StrokeStyle::Solid, t_in(l.as_str(), "web.note.whiteboard.styleSolid", &[]), "solid"),
+                    (StrokeStyle::Dashed, t_in(l.as_str(), "web.note.whiteboard.styleDashed", &[]), "dashed"),
                 ] {
                     row = row.child(pill_text_btn(
                         &format!("wb-style-{slug}"),
@@ -1596,7 +1587,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                 .child(pill_divider())
                 .child(pill_text_btn(
                     "wb-duplicate",
-                    &t_in(l.as_str(), "web.artifact.whiteboard.duplicate", &[]),
+                    &t_in(l.as_str(), "web.note.whiteboard.duplicate", &[]),
                     false,
                     false,
                     {
@@ -1622,7 +1613,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                 ))
                 .child(pill_text_btn(
                     "wb-delete",
-                    &t_in(l.as_str(), "web.artifact.whiteboard.deleteSelected", &[]),
+                    &t_in(l.as_str(), "web.note.whiteboard.deleteSelected", &[]),
                     false,
                     true,
                     {
@@ -1676,7 +1667,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                 .flex_wrap()
                 .child(pill_icon_btn(
                     "wb-tool-select",
-                    &t_in(l.as_str(), "web.artifact.whiteboard.select", &[]),
+                    &t_in(l.as_str(), "web.note.whiteboard.select", &[]),
                     ICON_CURSOR,
                     snap.tool == ToolKindTag::Select,
                     false,
@@ -1687,7 +1678,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                 ))
                 .child(pill_icon_btn(
                     "wb-tool-pan",
-                    &t_in(l.as_str(), "web.artifact.whiteboard.pan", &[]),
+                    &t_in(l.as_str(), "web.note.whiteboard.pan", &[]),
                     ICON_HAND,
                     snap.tool == ToolKindTag::Hand,
                     false,
@@ -1702,7 +1693,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                     .child(pill_divider())
                     .child(pill_icon_btn(
                         "wb-tool-text",
-                        &t_in(l.as_str(), "web.artifact.whiteboard.text", &[]),
+                        &t_in(l.as_str(), "web.note.whiteboard.text", &[]),
                         ICON_TEXT,
                         snap.tool == ToolKindTag::Text,
                         false,
@@ -1713,7 +1704,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                     ))
                     .child(pill_icon_btn(
                         "wb-add-frame",
-                        &t_in(l.as_str(), "web.artifact.whiteboard.container", &[]),
+                        &t_in(l.as_str(), "web.note.whiteboard.container", &[]),
                         ICON_FRAME,
                         snap.tool == ToolKindTag::Container,
                         false,
@@ -1724,7 +1715,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                     ))
                     .child(pill_icon_btn(
                         "wb-add-node",
-                        &t_in(l.as_str(), "web.artifact.whiteboard.card", &[]),
+                        &t_in(l.as_str(), "web.note.whiteboard.card", &[]),
                         ICON_CARD,
                         snap.tool == ToolKindTag::Card,
                         false,
@@ -1735,7 +1726,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                     ))
                     .child(pill_icon_btn(
                         "wb-tool-sticky",
-                        &t_in(l.as_str(), "web.artifact.whiteboard.sticky", &[]),
+                        &t_in(l.as_str(), "web.note.whiteboard.sticky", &[]),
                         ICON_STICKY,
                         snap.tool == ToolKindTag::Sticky,
                         false,
@@ -1746,7 +1737,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                     ))
                     .child(pill_icon_btn(
                         "wb-tool-rect",
-                        &t_in(l.as_str(), "web.artifact.whiteboard.rect", &[]),
+                        &t_in(l.as_str(), "web.note.whiteboard.rect", &[]),
                         ICON_RECT,
                         snap.tool == ToolKindTag::Rect,
                         false,
@@ -1757,7 +1748,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                     ))
                     .child(pill_icon_btn(
                         "wb-tool-arrow",
-                        &t_in(l.as_str(), "web.artifact.whiteboard.arrow", &[]),
+                        &t_in(l.as_str(), "web.note.whiteboard.arrow", &[]),
                         ICON_ARROW,
                         snap.tool == ToolKindTag::Arrow,
                         false,
@@ -1768,7 +1759,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                     ))
                     .child(pill_icon_btn(
                         "wb-tool-timeline",
-                        &t_in(l.as_str(), "web.artifact.whiteboard.timeline", &[]),
+                        &t_in(l.as_str(), "web.note.whiteboard.timeline", &[]),
                         ICON_TIMELINE,
                         snap.tool == ToolKindTag::Timeline,
                         false,
@@ -1791,7 +1782,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                     .child(pill_divider())
                     .child(pill_icon_btn(
                         "wb-tool-pen",
-                        &t_in(l.as_str(), "web.artifact.whiteboard.pen", &[]),
+                        &t_in(l.as_str(), "web.note.whiteboard.pen", &[]),
                         ICON_PEN,
                         snap.tool == ToolKindTag::Pen,
                         false,
@@ -1824,7 +1815,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                     ))
                     .child(pill_icon_btn(
                         "wb-tool-sticker",
-                        &t_in(l.as_str(), "web.artifact.whiteboard.sticker", &[]),
+                        &t_in(l.as_str(), "web.note.whiteboard.sticker", &[]),
                         ICON_STICKER,
                         sticker_picker_open.get() || snap.tool == ToolKindTag::Sticker,
                         false,
@@ -1852,7 +1843,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                         move |_: &PressEvent| run(BoardAction::AskOrchestrator)
                     })
                     .child(
-                        text(t_in(l.as_str(), "web.artifact.whiteboard.chatWithOrchestrator", &[]))
+                        text(t_in(l.as_str(), "web.note.whiteboard.chatWithOrchestrator", &[]))
                             .text_size(px(11.5))
                             .font_weight(FontWeight::SEMIBOLD)
                             .text_color(nsh_core::prelude::AdaptiveColor {
@@ -2015,7 +2006,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                         let run = run_action.clone();
                         move || run(BoardAction::ZoomBy(-0.15))
                     })
-                    .label(SharedString::from(t_in(l.as_str(), "web.artifact.whiteboard.zoomOut", &[]))),
+                    .label(SharedString::from(t_in(l.as_str(), "web.note.whiteboard.zoomOut", &[]))),
                 )
                 .child(pill_text_btn("wb-zoom-reset", &format!("{cur_zoom_pct}%"), false, false, {
                     let run = run_action.clone();
@@ -2026,19 +2017,13 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                         let run = run_action.clone();
                         move || run(BoardAction::ZoomBy(0.15))
                     })
-                    .label(SharedString::from(t_in(l.as_str(), "web.artifact.whiteboard.zoomIn", &[]))),
+                    .label(SharedString::from(t_in(l.as_str(), "web.note.whiteboard.zoomIn", &[]))),
                 )
                 .child(pill_divider())
-                .child(pill_text_btn(
-                    "wb-fit",
-                    &t_in(l.as_str(), "web.artifact.whiteboard.fitView", &[]),
-                    false,
-                    false,
-                    {
-                        let run = run_action.clone();
-                        move || run(BoardAction::FitToContent)
-                    },
-                ))
+                .child(pill_text_btn("wb-fit", &t_in(l.as_str(), "web.note.whiteboard.fitView", &[]), false, false, {
+                    let run = run_action.clone();
+                    move || run(BoardAction::FitToContent)
+                }))
                 .child(pill_divider())
                 .child(pill_text_btn(
                     "wb-minimap-toggle",
@@ -2479,7 +2464,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                         let r = run_action.clone();
                         move || r(BoardAction::SelectAll)
                     }))
-                    .child(ctx_item(t_in(l.as_str(), "web.artifact.whiteboard.chatWithOrchestrator", &[]), {
+                    .child(ctx_item(t_in(l.as_str(), "web.note.whiteboard.chatWithOrchestrator", &[]), {
                         let r = run_action.clone();
                         move || r(BoardAction::AskOrchestrator)
                     }));
@@ -2505,7 +2490,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                 .flex_col()
                 .gap(px(10.0))
                 .child(
-                    text(t_in(l.as_str(), "web.artifact.whiteboard.emptyHint", &[]))
+                    text(t_in(l.as_str(), "web.note.whiteboard.emptyHint", &[]))
                         .text_size(px(12.5))
                         .text_color(AdaptiveUi::MUTED),
                 )
@@ -2516,7 +2501,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                         .gap(px(6.0))
                         .child(pill_text_btn(
                             "wb-empty-timeline",
-                            &t_in(l.as_str(), "web.artifact.whiteboard.templateTimeline", &[]),
+                            &t_in(l.as_str(), "web.note.whiteboard.templateTimeline", &[]),
                             false,
                             false,
                             {
@@ -2536,7 +2521,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                         ))
                         .child(pill_text_btn(
                             "wb-empty-arch",
-                            &t_in(l.as_str(), "web.artifact.whiteboard.templateArchitecture", &[]),
+                            &t_in(l.as_str(), "web.note.whiteboard.templateArchitecture", &[]),
                             false,
                             false,
                             {
@@ -2742,7 +2727,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                             .flex_col()
                             .gap(px(4.0))
                             .child(
-                                text(t_in(l.as_str(), "web.artifact.whiteboard.label", &[]))
+                                text(t_in(l.as_str(), "web.note.whiteboard.label", &[]))
                                     .text_size(px(11.5))
                                     .text_color(AdaptiveUi::MUTED),
                             )
@@ -2770,7 +2755,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                             .flex_col()
                             .gap(px(4.0))
                             .child(
-                                text(t_in(l.as_str(), "web.artifact.whiteboard.body", &[]))
+                                text(t_in(l.as_str(), "web.note.whiteboard.body", &[]))
                                     .text_size(px(11.5))
                                     .text_color(AdaptiveUi::MUTED),
                             )
@@ -2796,10 +2781,10 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                     // Quick shape & top sticker toggles inside inspector.
                     let mut shape_row = view().flex_row().flex_wrap().gap(px(4.0));
                     for (sk, sname) in [
-                        (ShapeKind::Card, t_in(l.as_str(), "web.artifact.whiteboard.card", &[])),
-                        (ShapeKind::Sticky, t_in(l.as_str(), "web.artifact.whiteboard.sticky", &[])),
-                        (ShapeKind::Rect, t_in(l.as_str(), "web.artifact.whiteboard.rect", &[])),
-                        (ShapeKind::Diamond, t_in(l.as_str(), "web.artifact.whiteboard.diamond", &[])),
+                        (ShapeKind::Card, t_in(l.as_str(), "web.note.whiteboard.card", &[])),
+                        (ShapeKind::Sticky, t_in(l.as_str(), "web.note.whiteboard.sticky", &[])),
+                        (ShapeKind::Rect, t_in(l.as_str(), "web.note.whiteboard.rect", &[])),
+                        (ShapeKind::Diamond, t_in(l.as_str(), "web.note.whiteboard.diamond", &[])),
                         (ShapeKind::Ellipse, if is_en { "Ellipse".to_owned() } else { "椭圆".to_owned() }),
                         (ShapeKind::Cylinder, if is_en { "Cylinder".to_owned() } else { "圆柱".to_owned() }),
                     ] {
@@ -2818,7 +2803,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
 
                     let mut st_row = view().flex_row().flex_wrap().gap(px(4.0)).child(pill_text_btn(
                         "wb-insp-sticker-none",
-                        &t_in(l.as_str(), "web.artifact.whiteboard.noSticker", &[]),
+                        &t_in(l.as_str(), "web.note.whiteboard.noSticker", &[]),
                         snap.selection_kind.sticker.is_none(),
                         false,
                         {
@@ -2857,7 +2842,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                 body = body
                     .child(view().flex_row().justify_end().child(pill_text_btn(
                         "wb-inspector-save",
-                        &t_in(l.as_str(), "web.artifact.whiteboard.save", &[]),
+                        &t_in(l.as_str(), "web.note.whiteboard.save", &[]),
                         true,
                         false,
                         {
@@ -2877,7 +2862,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                             .flex_col()
                             .gap(px(4.0))
                             .child(
-                                text(t_in(l.as_str(), "web.artifact.whiteboard.entryJson", &[]))
+                                text(t_in(l.as_str(), "web.note.whiteboard.entryJson", &[]))
                                     .text_size(px(11.5))
                                     .text_color(AdaptiveUi::MUTED),
                             )
@@ -2900,7 +2885,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                             )
                             .child(view().flex_row().justify_end().child(pill_text_btn(
                                 "wb-inspector-save-json",
-                                &t_in(l.as_str(), "web.artifact.whiteboard.saveJson", &[]),
+                                &t_in(l.as_str(), "web.note.whiteboard.saveJson", &[]),
                                 true,
                                 false,
                                 {
@@ -2987,7 +2972,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                         .bg(AdaptiveUi::SIDE)
                         .child(
                             text(snap.selection.first().map_or_else(
-                                || t_in(l.as_str(), "web.artifact.whiteboard.elements", &[("n", snap.count.into())]),
+                                || t_in(l.as_str(), "web.note.whiteboard.elements", &[("n", snap.count.into())]),
                                 |i| i.0.clone(),
                             ))
                             .text_size(px(12.0))
@@ -3186,7 +3171,7 @@ fn emit_export_request(cx: Scope<VvWhiteboardEvent>, fmt: crate::engine::whitebo
             drop(spawn(async move {
                 match answer.await {
                     Ok(bytes) => {
-                        let b64 = encode_base64(&bytes);
+                        let b64 = BASE64.encode(&bytes);
                         cx.emit(VvWhiteboardEvent::Export(VvWhiteboardExportEvent {
                             format: SharedString::from("png"),
                             filename: SharedString::from(format!("{base}.png")),
@@ -3384,7 +3369,7 @@ impl WhiteboardLoroReplica {
     fn entry_for_value(path: String, val: &Value, seq: i64) -> WhiteboardEntry {
         let encoded = serde_json::to_string(val).unwrap_or_else(|_| "{}".to_owned());
         WhiteboardEntry {
-            artifact_id: String::new(),
+            note_id: String::new(),
             path,
             kind: WhiteboardEntryKind::Json,
             mime: "application/json".to_owned(),
@@ -3612,26 +3597,6 @@ fn ctx_item(label: impl Into<String>, on_press: impl Fn() + 'static) -> AnyEleme
         .on_press(move |_: &PressEvent| on_press())
         .child(text(label.into()).text_size(px(12.0)).text_color(AdaptiveUi::INK))
         .into_element()
-}
-
-fn encode_base64(bytes: &[u8]) -> String {
-    const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
-    for chunk in bytes.chunks(3) {
-        let b0 = u32::from(chunk[0]);
-        let b1 = if chunk.len() > 1 { u32::from(chunk[1]) } else { 0 };
-        let b2 = if chunk.len() > 2 { u32::from(chunk[2]) } else { 0 };
-        let triple = (b0 << 16) | (b1 << 8) | b2;
-        out.push(TABLE[((triple >> 18) & 0x3f) as usize] as char);
-        out.push(TABLE[((triple >> 12) & 0x3f) as usize] as char);
-        out.push(if chunk.len() > 1 {
-            TABLE[((triple >> 6) & 0x3f) as usize] as char
-        } else {
-            '='
-        });
-        out.push(if chunk.len() > 2 { TABLE[(triple & 0x3f) as usize] as char } else { '=' });
-    }
-    out
 }
 
 const ICON_CURSOR: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4l13 7-6 2-3 6z"/></svg>"#;

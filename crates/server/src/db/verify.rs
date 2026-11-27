@@ -138,11 +138,6 @@ macro_rules! entity_table {
 
 fn expected_server_schema() -> Vec<ExpectedTable> {
     vec![
-        entity_table!(artifact),
-        entity_table!(artifact_change),
-        entity_table!(artifact_collab),
-        entity_table!(artifact_suggestion),
-        entity_table!(artifact_version),
         entity_table!(attachment),
         entity_table!(channel),
         entity_table!(channel_delivery),
@@ -163,6 +158,12 @@ fn expected_server_schema() -> Vec<ExpectedTable> {
         entity_table!(media_job),
         entity_table!(media_library_item),
         entity_table!(memory),
+        entity_table!(note),
+        entity_table!(note_change),
+        entity_table!(note_collab),
+        entity_table!(note_link),
+        entity_table!(note_suggestion),
+        entity_table!(note_version),
         entity_table!(outbox_item),
         entity_table!(pull),
         entity_table!(pull_event),
@@ -182,6 +183,14 @@ struct ActualColumn {
     required_without_default: bool,
 }
 
+const SQLITE_FTS_PREFIXES: &[&str] = &["channel_message_fts", "memory_fts", "attachment_fts"];
+
+fn is_sqlite_fts_auxiliary_table(name: &str) -> bool {
+    SQLITE_FTS_PREFIXES
+        .iter()
+        .any(|prefix| name == *prefix || name.starts_with(&format!("{prefix}_")))
+}
+
 async fn list_existing_tables(conn: &DatabaseConnection, backend: DatabaseBackend) -> DbResult<BTreeSet<String>> {
     let sql = match backend {
         DatabaseBackend::Postgres => "SELECT table_name FROM information_schema.tables WHERE table_schema = current_schema() AND table_type = 'BASE TABLE'",
@@ -191,6 +200,9 @@ async fn list_existing_tables(conn: &DatabaseConnection, backend: DatabaseBacken
     let mut tables = BTreeSet::new();
     for row in rows {
         let name: String = row.try_get_by_index(0)?;
+        if backend == DatabaseBackend::Sqlite && is_sqlite_fts_auxiliary_table(&name) {
+            continue;
+        }
         tables.insert(name);
     }
     Ok(tables)
@@ -459,30 +471,6 @@ mod tests {
             .await
             .expect("legacy pre-SeaORM db must upgrade cleanly via baseline reconciliation migration");
 
-        let artifact_row = db
-            .read_conn()
-            .query_one_raw(Statement::from_string(
-                DatabaseBackend::Sqlite,
-                "SELECT id, title, artifact_type, seq FROM artifact WHERE id = 'a1'",
-            ))
-            .await
-            .unwrap()
-            .expect("artifact row preserved");
-        assert_eq!(artifact_row.try_get_by_index::<String>(1).unwrap(), "Legacy Whiteboard");
-        assert_eq!(artifact_row.try_get_by_index::<String>(2).unwrap(), "whiteboard");
-        assert_eq!(artifact_row.try_get_by_index::<i64>(3).unwrap(), 5);
-
-        let collab_row = db
-            .read_conn()
-            .query_one_raw(Statement::from_string(
-                DatabaseBackend::Sqlite,
-                "SELECT snapshot FROM artifact_collab WHERE artifact_id = 'a1'",
-            ))
-            .await
-            .unwrap()
-            .expect("artifact_collab snapshot preserved");
-        assert_eq!(collab_row.try_get_by_index::<Vec<u8>>(0).unwrap(), vec![1, 2, 3]);
-
         let session_row = db
             .read_conn()
             .query_one_raw(Statement::from_string(
@@ -502,6 +490,9 @@ mod tests {
         let existing = list_existing_tables(db.read_conn(), DatabaseBackend::Sqlite).await.unwrap();
         assert!(!existing.contains("pkm_term"));
         assert!(!existing.contains("artifact_entry"));
+        assert!(!existing.contains("artifact"));
+        assert!(existing.contains("note"));
+        assert!(existing.contains("note_link"));
 
         let actual_columns = load_actual_columns(db.read_conn(), DatabaseBackend::Sqlite, &existing).await.unwrap();
         let issue_cols: BTreeSet<&str> = actual_columns
@@ -517,6 +508,7 @@ mod tests {
         assert!(issue_cols.contains("status"), "issue table must include status column");
         assert!(issue_cols.contains("owner"), "issue table must include owner column");
         assert!(issue_cols.contains("relations"), "issue table must include relations column");
+        assert!(issue_cols.contains("body_note_id"), "issue table must include body_note_id column");
 
         let memory_cols: BTreeSet<&str> = actual_columns
             .get("memory")
@@ -541,8 +533,25 @@ mod tests {
         assert_eq!(memory_row.try_get_by_index::<i64>(2).unwrap(), 0);
         assert_eq!(memory_row.try_get_by_index::<Option<String>>(3).unwrap(), None);
 
+        let msg_cols: BTreeSet<&str> = actual_columns
+            .get("channel_message")
+            .expect("channel_message table must exist")
+            .iter()
+            .map(|c| c.name.as_str())
+            .collect();
+        for col in ["has_file", "has_image", "has_link"] {
+            assert!(msg_cols.contains(col), "channel_message table must include {col} column");
+        }
+        let ev_cols: BTreeSet<&str> = actual_columns
+            .get("session_event")
+            .expect("session_event table must exist")
+            .iter()
+            .map(|c| c.name.as_str())
+            .collect();
+        assert!(ev_cols.contains("event_type"), "session_event table must include event_type column");
+
         let migrations = list_applied_migrations(db.read_conn(), DatabaseBackend::Sqlite, &existing).await.unwrap();
-        assert_eq!(migrations.len(), 9);
+        assert_eq!(migrations.len(), 12);
         db.close().await;
     }
 

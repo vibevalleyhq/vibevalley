@@ -2,10 +2,11 @@ import { computed, effect, List, Scroll, signal, Text, untracked, View } from "n
 
 import { t } from "@vibevalley/i18n";
 import type { InboxItem, SessionPermissionDecision } from "@vibevalley/protocol";
+import { sessionIdsOf, sessionIssueId } from "@vibevalley/protocol/rules";
 
 import type { MobileLayout } from "../design/layout";
 import { EmptyPanel, FieldInput, MarkdownText, PillButton, SectionCard, SplitPane, StatusTag, TopBar, type TagTone } from "../design/ui";
-import { hapticImpact, hapticNotification, type PendingInteractionItem, type PendingPermissionItem, type RemoteSession } from "../infra/session";
+import { errorMessage, hapticImpact, hapticNotification, type PendingInteractionItem, type PendingPermissionItem, type RemoteSession } from "../infra/session";
 
 type InboxEntry =
   | { readonly kind: "permission"; readonly key: string; readonly item: PendingPermissionItem }
@@ -132,9 +133,10 @@ export function InboxTab(props: {
         return item.target.id;
       case "session": {
         const sessId = item.target.id;
-        const fromBinding = (props.session.sessions()?.sessions ?? []).find((s) => s.id === sessId)?.bindings.find((b) => b.kind === "issue")?.id;
+        const sess = (props.session.sessions()?.sessions ?? []).find((s) => s.id === sessId);
+        const fromBinding = sess ? sessionIssueId(sess) : undefined;
         if (fromBinding !== undefined) return fromBinding;
-        return (props.session.board()?.issues ?? []).find((issue) => issue.assignments.some((a) => a.executions.some((e) => e.session === sessId)))?.id;
+        return (props.session.board()?.issues ?? []).find((issue) => sessionIdsOf(issue).some((id) => id === sessId))?.id;
       }
       case "chat":
       case "runtime":
@@ -160,7 +162,7 @@ export function InboxTab(props: {
         hapticNotification("success");
       }
     } catch (err: unknown) {
-      actionError.set(err instanceof Error ? err.message : String(err));
+      actionError.set(errorMessage(err));
       hapticNotification("error");
     } finally {
       busyKey.set(undefined);
@@ -188,7 +190,7 @@ export function InboxTab(props: {
         hapticNotification("warning");
       }
     } catch (err: unknown) {
-      actionError.set(err instanceof Error ? err.message : String(err));
+      actionError.set(errorMessage(err));
       hapticNotification("error");
     } finally {
       busyKey.set(undefined);
@@ -212,7 +214,7 @@ export function InboxTab(props: {
         hapticImpact("light");
       }
     } catch (err: unknown) {
-      actionError.set(err instanceof Error ? err.message : String(err));
+      actionError.set(errorMessage(err));
       hapticNotification("error");
     } finally {
       busyKey.set(undefined);
@@ -237,7 +239,7 @@ export function InboxTab(props: {
         hapticNotification(decision === "deny" ? "warning" : "success");
       }
     } catch (err: unknown) {
-      actionError.set(err instanceof Error ? err.message : String(err));
+      actionError.set(errorMessage(err));
       hapticNotification("error");
     } finally {
       busyKey.set(undefined);
@@ -263,7 +265,7 @@ export function InboxTab(props: {
         hapticImpact("light");
       }
     } catch (err: unknown) {
-      actionError.set(err instanceof Error ? err.message : String(err));
+      actionError.set(errorMessage(err));
       hapticNotification("error");
     } finally {
       busyKey.set(undefined);

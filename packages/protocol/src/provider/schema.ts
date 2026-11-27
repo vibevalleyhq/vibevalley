@@ -2,48 +2,73 @@ import { z } from "zod";
 
 import type { Codec } from "../codec";
 import { codePoints, KeyStatus } from "../common/schema";
-import type * as T from "./shapes.gen";
+import * as T from "./shapes.gen";
 
-const ProviderModel = z.object({ id: z.string(), owner: z.string() }) satisfies Codec<T.ProviderModel>;
+export const ModelCapability = z.enum(T.ModelCapabilityValues) satisfies Codec<T.ModelCapability>;
+export const ProviderConnectionAdapter = z.enum(T.ProviderConnectionAdapterValues) satisfies Codec<T.ProviderConnectionAdapter>;
+export const ProviderVerificationStatus = z.enum(T.ProviderVerificationStatusValues) satisfies Codec<T.ProviderVerificationStatus>;
+export const ProviderScene = z.enum(T.ProviderSceneValues) satisfies Codec<T.ProviderScene>;
+
+const ProviderModel = z.object({
+  id: z.string(),
+  owner: z.string(),
+  capabilities: z.array(ModelCapability),
+}) satisfies Codec<T.ProviderModel>;
+
+const ProviderVerification = z.object({
+  status: ProviderVerificationStatus,
+  checkedAt: z.exactOptional(z.number().int()),
+  error: z.exactOptional(z.string()),
+}) satisfies Codec<T.ProviderVerification>;
+
 const ProviderConnection = z.object({
   id: z.string(),
   name: z.string(),
-  adapter: z.literal("moss"),
+  adapter: ProviderConnectionAdapter,
   enabled: z.boolean(),
   key: KeyStatus,
+  baseUrl: z.exactOptional(z.string()),
+  models: z.array(ProviderModel),
+  verification: z.exactOptional(ProviderVerification),
 }) satisfies Codec<T.ProviderConnection>;
+
 const ProviderBinding = z.object({ connection: z.string(), model: z.string() }) satisfies Codec<T.ProviderBinding>;
+const ProviderScenePolicy = z.object({
+  scene: ProviderScene,
+  fallbacks: z.array(ProviderBinding),
+}) satisfies Codec<T.ProviderScenePolicy>;
+
 export const ProviderStatus = z.object({
   revision: z.number().int(),
   connections: z.array(ProviderConnection),
+  orchestrator: ProviderBinding.nullable(),
+  polish: ProviderBinding.nullable(),
   image: ProviderBinding.nullable(),
   live: ProviderBinding.nullable(),
-  liveModels: z.array(z.string()),
   speakers: ProviderBinding.nullable(),
-  speakersModels: z.array(z.string()),
   voiceDesign: ProviderBinding.nullable(),
-  voiceDesignModels: z.array(z.string()),
   transcription: ProviderBinding.nullable(),
-  transcriptionModels: z.array(z.string()),
   vision: ProviderBinding.nullable(),
-  visionModels: z.array(z.string()),
-  imageModels: z.array(z.string()),
   understanding: ProviderBinding.nullable(),
-  understandingModels: z.array(z.string()),
   speech: ProviderBinding.nullable(),
-  speechModels: z.array(z.string()),
+  scenePolicies: z.array(ProviderScenePolicy),
 }) satisfies Codec<T.ProviderStatus>;
+
 const ProviderConnectionUpdate = z.object({
   id: z.string(),
   name: z.string(),
-  adapter: z.literal("moss"),
+  adapter: ProviderConnectionAdapter,
   enabled: z.boolean(),
   key: z.exactOptional(z.string().nullable()),
+  baseUrl: z.exactOptional(z.string().nullable()),
 }) satisfies Codec<T.ProviderConnectionUpdate>;
+
 export const ProviderUpdate = z.object({
-  speech: ProviderBinding.nullable(),
   revision: z.number().int(),
   connections: z.array(ProviderConnectionUpdate),
+  orchestrator: ProviderBinding.nullable(),
+  polish: ProviderBinding.nullable(),
+  speech: ProviderBinding.nullable(),
   understanding: ProviderBinding.nullable(),
   image: ProviderBinding.nullable(),
   live: ProviderBinding.nullable(),
@@ -51,8 +76,10 @@ export const ProviderUpdate = z.object({
   voiceDesign: ProviderBinding.nullable(),
   transcription: ProviderBinding.nullable(),
   vision: ProviderBinding.nullable(),
+  scenePolicies: z.array(ProviderScenePolicy),
 }) satisfies Codec<T.ProviderUpdate>;
-export const ProviderModelRequest = z.object({ connection: z.string(), revision: z.number().int() }) satisfies Codec<T.ProviderModelRequest>;
+
+export const ProviderVerifyRequest = z.object({ connection: z.string(), revision: z.number().int() }) satisfies Codec<T.ProviderVerifyRequest>;
 export const ProviderVoiceRequest = z.object({
   connection: z.string(),
   revision: z.number().int(),
@@ -68,8 +95,3 @@ export const ProviderVoiceListing = z.object({
   hasMore: z.boolean(),
   nextCursor: z.string().nullable(),
 }) satisfies Codec<T.ProviderVoiceListing>;
-export const ProviderModelListing = z.object({
-  connection: z.string(),
-  revision: z.number().int(),
-  models: z.array(ProviderModel),
-}) satisfies Codec<T.ProviderModelListing>;

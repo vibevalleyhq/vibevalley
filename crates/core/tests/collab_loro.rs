@@ -4,11 +4,11 @@
 use std::collections::HashSet;
 
 use serde_json::json;
-use vibevalley_core::artifact::{presence_highlight_from_payloads, presence_highlight_script};
 use vibevalley_core::collab::{
     CollabDoc, CommitMeta, DEFAULT_PRESENCE_TTL_MS, HTML_TEXT_KEY, PresenceHub, PresenceKind, PresencePayload, PresenceViewport, SuggestionSpan,
     coalesce_suggestions, decode_frontiers, decode_version_vector, encode_frontiers, encode_version_vector,
 };
+use vibevalley_core::note::{presence_highlight_from_payloads, presence_highlight_script};
 
 fn sample_presence(id: &str, name: &str, updated_at: i64) -> PresencePayload {
     PresencePayload {

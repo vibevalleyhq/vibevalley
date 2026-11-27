@@ -235,7 +235,7 @@ export function buildMachineRuntimeGroups(
   return groups;
 }
 
-/** Resolves `/runtimes/<machine>/<runtime>` or legacy `/runtimes/<runtime>` against installed groups. */
+/** Resolves `/runtimes/<machine>/<runtime>` against installed groups. */
 export function resolveRuntimeSelection(groups: readonly MachineRuntimeGroup[], rest: string): SelectedMachineRuntime | undefined {
   const flat: SelectedMachineRuntime[] = [];
   for (const group of groups) {
@@ -253,12 +253,6 @@ export function resolveRuntimeSelection(groups: readonly MachineRuntimeGroup[], 
       const runtimeId = decodeURIComponent(parts.slice(1).join("/"));
       const exact = flat.find((item) => item.machine.id === machineId && item.entry.runtimeId === runtimeId);
       if (exact) return exact;
-    } else if (parts.length === 1) {
-      const runtimeId = decodeURIComponent(parts[0] ?? "");
-      const localMatch = flat.find((item) => item.machine.here && item.entry.runtimeId === runtimeId);
-      if (localMatch) return localMatch;
-      const anyMatch = flat.find((item) => item.entry.runtimeId === runtimeId);
-      if (anyMatch) return anyMatch;
     }
   }
 

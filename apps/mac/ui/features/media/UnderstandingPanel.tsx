@@ -1,9 +1,8 @@
 import { cleanup, Clipboard, computed, Image, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
-import type { ArtifactId, Attachment, MediaUnderstandingAuthorizationRequest, MediaUnderstandingJob, MediaUnderstandingRequest } from "@vibevalley/protocol";
+import type { Attachment, MediaUnderstandingAuthorizationRequest, MediaUnderstandingJob, MediaUnderstandingRequest, NoteId } from "@vibevalley/protocol";
 
-import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
 import { Checkbox } from "../../design/Checkbox";
 import { ConfirmButton } from "../../design/ConfirmButton";
@@ -14,11 +13,14 @@ import { IconButton } from "../../design/IconButton";
 import { Card, Quiet } from "../../design/layout";
 import { Dot } from "../../design/Tag";
 import { TextLink } from "../../design/TextLink";
+import { createAct } from "../../infra/act";
 import { api, reasonOf } from "../../infra/api";
 import { useAttachmentUrl } from "../../infra/attachmentFile";
 import { useTimeout } from "../../infra/base/timer";
 import { useCollabSlice, useOpsSlice } from "../../infra/frame";
 import { providerQuery, ready, useQuery } from "../../infra/query";
+import { noteHref } from "../note";
+import { textToDocJson } from "./items";
 import { FactGrid, JobActions, NoticeBanner, PhasePill, Refusal, SectionHeading, SourceLine } from "./JobFacts";
 import { publicationKey } from "./publication";
 
@@ -238,7 +240,7 @@ export function UnderstandingPanel(props: { file: Attachment }) {
 
 function UnderstandingCard(props: { job: MediaUnderstandingJob }) {
   const error = signal<string | undefined>(undefined);
-  const saved = signal<ArtifactId | undefined>(undefined);
+  const saved = signal<NoteId | undefined>(undefined);
   const copied = signal(false);
   const later = useTimeout();
   const sent = signal(false);
@@ -246,8 +248,8 @@ function UnderstandingCard(props: { job: MediaUnderstandingJob }) {
   const save = () => {
     const job = props.job;
     if (!job.result) return;
-    const content = job.result.text;
-    return act.run(async () => saved.set((await api.artifact.create({ title: job.prompt.slice(0, 80), artifactType: "docs", content })).id));
+    const content = textToDocJson(job.result.text);
+    return act.run(async () => saved.set((await api.note.create({ title: job.prompt.slice(0, 80), noteType: "doc", content })).id));
   };
   return (
     <Card title={props.job.model} action={<PhasePill phase={props.job.phase} text={props.job.phaseText} />}>
@@ -320,13 +322,13 @@ function UnderstandingCard(props: { job: MediaUnderstandingJob }) {
                   <If
                     when={saved()}
                     else={
-                      <Button testID="understanding-save" icon="artifacts" disabled={act.busy()} onPress={() => void save()}>
+                      <Button testID="understanding-save" icon="notes" disabled={act.busy()} onPress={() => void save()}>
                         {t("web.media.understanding.save")}
                       </Button>
                     }
                   >
                     {(id) => (
-                      <TextLink href={`/artifacts/${id()}`} testid="understanding-saved">
+                      <TextLink href={noteHref(id())} testid="understanding-saved">
                         {t("web.media.understanding.open")}
                       </TextLink>
                     )}

@@ -15,8 +15,10 @@
   "agent.list": [
     {
       "id": "orchestrator",
+      "code": "O-01",
       "name": "管家",
       "role": "orchestrator",
+      "mode": "managed",
       "duty": "替用户派活、转告结果",
       "enabled": true,
       "runtime": "vibevalley",
@@ -49,8 +51,10 @@
     },
     {
       "id": "agent-5367d7cfc3e4eb8d1b242551",
+      "code": "W-01",
       "name": "owl",
       "role": "worker",
+      "mode": "managed",
       "duty": "",
       "enabled": true,
       "runtime": "pi",
@@ -79,8 +83,10 @@
     },
     {
       "id": "agent-842c2d39b35d2250516b3d7e",
+      "code": "W-02",
       "name": "fox",
       "role": "worker",
+      "mode": "managed",
       "duty": "",
       "enabled": true,
       "runtime": "pi",
@@ -109,8 +115,10 @@
     },
     {
       "id": "docs",
+      "code": "W-03",
       "name": "文档员 Kimi",
       "role": "worker",
+      "mode": "managed",
       "duty": "通读文档、写 README、整理说明",
       "enabled": true,
       "runtime": "pi",

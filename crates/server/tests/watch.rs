@@ -4,6 +4,7 @@
 //! show in previews, the report lands in the thread, and a slow session wakeup
 //! never blocks `Chat::say` in other channels.
 
+use crate::support::RouterTestExt as _;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant};

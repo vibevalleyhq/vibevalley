@@ -2,9 +2,9 @@ import { keymap, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 
-import { keyCap, shortcutPlaces, shortcuts } from "../infra/base/shortcuts";
 import { Dialog } from "./Dialog";
 import { Kbd } from "./layout";
+import { keyCap, shortcutPlaces, shortcuts } from "./shortcuts";
 
 export function ShortcutSheet() {
   const open = signal(false);

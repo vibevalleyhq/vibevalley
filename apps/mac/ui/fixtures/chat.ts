@@ -51,7 +51,7 @@ const messages: ChatMessage[] = [
   orchestrator("派给老周了，在工单 #18 里。"),
   orchestrator("他说半小时左右。"),
   helper("收到，先看 session.ts。", {
-    artifact: { id: "art-login", title: "登录流程", artifactType: "prototype", version: 2, note: "多一条测试" } as ChatMessage["artifact"],
+    note: { id: "art-login", title: "登录流程", noteType: "doc", version: 2, note: "多一条测试" } as NonNullable<ChatMessage["note"]>,
   }),
   helper("改好了：过期回到登录页，加了两条测试。", { kind: "report", run: "run-1", outcome: "completed", spent: { tokens: 32_800, cny: 0.42 } }),
   helper("测试起不来：缺一个环境变量。", { kind: "report", outcome: "failed", spent: { tokens: 9_100, cny: 0.11 } }),
@@ -155,13 +155,14 @@ const settings: SettingsStatus = {
   version: "0.42.0",
   locale: "zh",
   deepseekApiKey: { source: "settings", hint: "…3f9a" },
+  githubToken: { source: null },
   voice,
   voiceDefaults: voice,
   readiness,
   memorySources: [{ kind: "nowledge", url: "http://127.0.0.1:14242/mcp/", enabled: true, read: true, write: true, everything: false, key: { source: null } }],
 };
 
-const github: GitHubStatus = { installed: true, version: "2.62.0", loggedIn: true, account: "lucas", reason: "", checkedAt: now };
+const github: GitHubStatus = { installed: true, version: "2.62.0", loggedIn: true, account: "lucas", authMode: "gh", reason: "", checkedAt: now };
 
 export const responses: Record<string, unknown> = {
   "channel.message.list": messages,

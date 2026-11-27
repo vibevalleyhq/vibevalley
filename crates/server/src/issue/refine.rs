@@ -117,7 +117,9 @@ impl Board {
             ),
         };
         let sessions = self.session_engine();
-        let _ = sessions.end_run_async(&session.id, outcome, &said_back, spent.clone()).await;
+        if let Err(err) = sessions.end_run_async(&session.id, outcome, &said_back, spent.clone()).await {
+            tracing::warn!(issue_id = %issue.id, session_id = %session.id, error = %err, "issue.refine failed to record run end");
+        }
         // What the issue's thread is told (`handedBack`).
         let name = |key: &str, extra: (&str, String)| vibevalley_i18n::t(key, &[("name", session.name.clone().into()), (extra.0, extra.1.into())]);
         let told = match read {
@@ -149,7 +151,9 @@ impl Board {
             Err(problem) if reason == StopReason::Completed => name("server.issue.refinement.unread", ("problem", problem)),
             Err(_) => name("server.issue.refinement.unfinished", ("summary", vibevalley_core::text::summary_of(&said))),
         };
-        let _ = sessions.settle_report_async(&session, outcome, told, spent, None, None, None).await;
+        if let Err(err) = sessions.settle_report_async(&session, outcome, told, spent, None, None, None).await {
+            tracing::warn!(issue_id = %issue.id, session_id = %session.id, error = %err, "issue.refine failed to settle report");
+        }
         // Not under `work`: a draft only touches its own issue and session.
         if let Err(e) = sessions.dismiss_async(&session.id, Leave::Discard).await {
             eprintln!("vibevalley: draft session {}: {e}", session.id);

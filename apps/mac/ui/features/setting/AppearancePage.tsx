@@ -31,8 +31,20 @@ export const defaultMonoFonts = [
 ] as const;
 const fontSizes = [11, 12, 13, 14, 15, 16, 18, 20] as const;
 // Escaped CJK glyphs keep `no-cjk-literal` clean while rendering literal bilingual font specimens.
-const fontOptionSpecimen = "Aa 01 \u4e2d\u6587";
 const specimenCodeComment = "// \u4e2d\u82f1\u6587\u7b49\u5bbd\u5bf9\u9f50\uff1a\u8fde\u5b57\u4e0e\u6613\u6df7\u6dc6\u5b57\u7b26";
+
+interface CachedHostFont {
+  readonly monoFont?: string;
+  readonly monoFonts?: readonly string[];
+  readonly terminalFontSize?: number;
+}
+
+let cachedHostFont: CachedHostFont | undefined;
+
+/** Resets cached host font metadata (used by tests to isolate fresh-mount behavior). */
+export function resetAppearanceFontCache(): void {
+  cachedHostFont = undefined;
+}
 
 export interface MonoFontOption {
   readonly value: string;
@@ -120,11 +132,14 @@ const chooseTheme = (theme: ThemeChoice) => {
 export function AppearanceGroups() {
   const theme = usePrefs((p) => p.theme);
   const scale = usePrefs((p) => p.scale);
-  const monoFont = signal("Maple Mono NF CN");
-  const installedFonts = signal<readonly string[]>([]);
-  const termSize = signal(13);
+  // Avoid triggering an eager heavy font load for Maple Mono before host.info resolves the real configured font.
+  const monoFont = signal(cachedHostFont?.monoFont ?? (host.available() ? "" : defaultMonoFonts[0]));
+  const previewFont = signal<string | undefined>(undefined);
+  const installedFonts = signal<readonly string[]>(cachedHostFont?.monoFonts ?? []);
+  const termSize = signal(cachedHostFont?.terminalFontSize ?? 13);
   const error = signal<string | undefined>(undefined);
 
+  const activeSpecimenFont = computed(() => previewFont() ?? monoFont());
   const fontOptions = computed(() => buildMonoFontOptions(installedFonts(), monoFont()));
   const installedSet = computed(
     () =>
@@ -150,9 +165,17 @@ export function AppearanceGroups() {
       const parsedTheme = ThemeChoice.safeParse(env.data.theme);
       if (parsedTheme.success && parsedTheme.data !== prefsNow().theme) setTheme(parsedTheme.data);
       if (env.data.motion) applyMotion(env.data.motion);
-      if (env.data.monoFont) monoFont.set(env.data.monoFont);
-      if (Array.isArray(env.data.monoFonts)) installedFonts.set(env.data.monoFonts);
-      if (typeof env.data.terminalFontSize === "number") termSize.set(Math.round(env.data.terminalFontSize));
+      const nextFont = env.data.monoFont?.trim() || monoFont() || defaultMonoFonts[0];
+      const nextFonts = Array.isArray(env.data.monoFonts) ? env.data.monoFonts : installedFonts();
+      const nextTermSize = typeof env.data.terminalFontSize === "number" ? Math.round(env.data.terminalFontSize) : termSize();
+      cachedHostFont = {
+        monoFont: nextFont,
+        monoFonts: nextFonts,
+        terminalFontSize: nextTermSize,
+      };
+      monoFont.set(nextFont);
+      installedFonts.set(nextFonts);
+      termSize.set(nextTermSize);
       if (typeof env.data.uiFontSize === "number") {
         const pct = Math.round((env.data.uiFontSize / 13) * 100);
         const closest = ScaleValues.reduce((best, cur) => (Math.abs(cur - pct) < Math.abs(best - pct) ? cur : best));
@@ -244,23 +267,26 @@ export function AppearanceGroups() {
             value={monoFont()}
             options={fontOptions()}
             renderValue={({ value, label }) => (
-              <Text testID="mono-font-trigger-label" class="min-w-0 flex-1 truncate text-sm text-ink" style={{ fontFamily: fontFamilyStack(value()) }}>
-                {label()}
+              <Text
+                testID="mono-font-trigger-label"
+                class={`min-w-0 flex-1 truncate text-sm ${value() ? "text-ink" : "text-muted"}`}
+                style={value() ? { fontFamily: fontFamilyStack(value()) } : undefined}
+              >
+                {label() || t("web.setting.appearance.monoFont")}
               </Text>
             )}
             renderOption={(entry) => {
               const isFallback = () => installedSet().size > 0 && !installedSet().has(entry.value);
               return (
-                <View testID={`mono-font-option-${entry.value}`} class="min-w-0 flex-1 flex-row items-center gap-2">
-                  <Text
-                    class={`min-w-0 flex-1 truncate text-sm group-selected:font-medium ${isFallback() ? "text-muted" : "text-ink"}`}
-                    style={{ fontFamily: fontFamilyStack(entry.value) }}
-                  >
-                    {entry.title}
-                  </Text>
-                  <Text class="shrink-0 text-xs text-muted" style={{ fontFamily: fontFamilyStack(entry.value) }}>
-                    {fontOptionSpecimen}
-                  </Text>
+                <View
+                  testID={`mono-font-option-${entry.value}`}
+                  onMouseEnter={() => previewFont.set(entry.value)}
+                  onMouseLeave={() => {
+                    if (previewFont() === entry.value) previewFont.set(undefined);
+                  }}
+                  class="min-w-0 flex-1 flex-row items-center gap-2"
+                >
+                  <Text class={`min-w-0 flex-1 truncate text-sm group-selected:font-medium ${isFallback() ? "text-muted" : "text-ink"}`}>{entry.title}</Text>
                   <If when={isFallback()}>
                     <View class="shrink-0 rounded-sm bg-hover px-1.5 py-px">
                       <Text class="text-2xs text-faint">{t("web.setting.appearance.fontFallbackBadge")}</Text>
@@ -271,8 +297,13 @@ export function AppearanceGroups() {
             }}
             onChange={(next) => {
               const prev = monoFont();
+              previewFont.set(undefined);
               monoFont.set(next);
-              void applyFont({ monoFont: next }, () => monoFont.set(prev));
+              cachedHostFont = { ...cachedHostFont, monoFont: next };
+              void applyFont({ monoFont: next }, () => {
+                monoFont.set(prev);
+                cachedHostFont = { ...cachedHostFont, monoFont: prev };
+              });
             }}
           />
         </SettingRow>
@@ -310,18 +341,18 @@ export function AppearanceGroups() {
           <View class="flex-row items-center justify-between gap-2">
             <Text class="text-2xs font-medium text-faint">{t("web.setting.appearance.previewCodeHeading")}</Text>
             <Text testID="specimen-code-meta" class="font-mono text-2xs text-muted tabular-nums">
-              {`${monoFont()} · ${termSize()}pt`}
+              {`${activeSpecimenFont() || "Menlo"} · ${termSize()}pt`}
             </Text>
           </View>
           <View class="gap-0.5 rounded-md border border-line bg-page px-3 py-2.5">
-            <Text testID="specimen-code-comment" class="text-muted" style={{ fontFamily: fontFamilyStack(monoFont()), fontSize: termSize() }}>
+            <Text testID="specimen-code-comment" class="text-muted" style={{ fontFamily: fontFamilyStack(activeSpecimenFont()), fontSize: termSize() }}>
               {specimenCodeComment}
             </Text>
-            <Text testID="specimen-code-line" class="text-ink" style={{ fontFamily: fontFamilyStack(monoFont()), fontSize: termSize() }}>
+            <Text testID="specimen-code-line" class="text-ink" style={{ fontFamily: fontFamilyStack(activeSpecimenFont()), fontSize: termSize() }}>
               {"const check = (x: number) => x !== 0O1lI;"}
             </Text>
-            <Text testID="specimen-code-meta-line" class="text-accent" style={{ fontFamily: fontFamilyStack(monoFont()), fontSize: termSize() }}>
-              {`const font = "${monoFont()}"; // ${termSize()}pt`}
+            <Text testID="specimen-code-meta-line" class="text-accent" style={{ fontFamily: fontFamilyStack(activeSpecimenFont()), fontSize: termSize() }}>
+              {`const font = "${activeSpecimenFont() || "Menlo"}"; // ${termSize()}pt`}
             </Text>
           </View>
         </View>

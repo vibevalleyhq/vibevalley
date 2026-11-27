@@ -3,7 +3,8 @@
 
 use std::os::fd::{AsRawFd, FromRawFd, OwnedFd, RawFd};
 use std::path::PathBuf;
-use std::sync::{Arc, Condvar, Mutex};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex, mpsc};
 
 use portable_pty::{CommandBuilder, MasterPty, PtySize, SlavePty, native_pty_system};
 
@@ -27,37 +28,54 @@ pub(crate) fn pty_size(size: TermSize) -> PtySize {
 /// Backpressure between the reader thread and the session thread, so a flood
 /// of output cannot queue without bound.
 pub(crate) struct Budget {
-    state: Mutex<(usize, bool)>,
-    cv: Condvar,
+    outstanding: AtomicUsize,
+    closed: AtomicBool,
+    waiter: Mutex<Option<std::thread::Thread>>,
 }
 
 impl Budget {
     fn new() -> Self {
         Self {
-            state: Mutex::new((0, false)),
-            cv: Condvar::new(),
+            outstanding: AtomicUsize::new(0),
+            closed: AtomicBool::new(false),
+            waiter: Mutex::new(None),
         }
     }
 
     /// Returns false once the budget is closed.
     fn acquire(&self, n: usize) -> bool {
-        let mut state = self.state.lock().unwrap();
-        while state.0 >= MAX_OUTSTANDING && !state.1 {
-            state = self.cv.wait(state).unwrap();
+        loop {
+            if self.closed.load(Ordering::Acquire) {
+                return false;
+            }
+            if self.outstanding.load(Ordering::Acquire) < MAX_OUTSTANDING {
+                self.outstanding.fetch_add(n, Ordering::AcqRel);
+                return !self.closed.load(Ordering::Acquire);
+            }
+            let mut waiter = self.waiter.lock().unwrap();
+            if self.closed.load(Ordering::Acquire) || self.outstanding.load(Ordering::Acquire) < MAX_OUTSTANDING {
+                continue;
+            }
+            *waiter = Some(std::thread::current());
+            drop(waiter);
+            std::thread::park();
         }
-        state.0 += n;
-        !state.1
     }
 
     pub(crate) fn release(&self, n: usize) {
-        let mut state = self.state.lock().unwrap();
-        state.0 = state.0.saturating_sub(n);
-        self.cv.notify_all();
+        let _ = self
+            .outstanding
+            .try_update(Ordering::AcqRel, Ordering::Acquire, |cur| Some(cur.saturating_sub(n)));
+        if let Some(thread) = self.waiter.lock().unwrap().take() {
+            thread.unpark();
+        }
     }
 
     fn close(&self) {
-        self.state.lock().unwrap().1 = true;
-        self.cv.notify_all();
+        self.closed.store(true, Ordering::Release);
+        if let Some(thread) = self.waiter.lock().unwrap().take() {
+            thread.unpark();
+        }
     }
 }
 
@@ -68,7 +86,7 @@ pub(crate) struct Pty {
     pub slave: Option<Box<dyn SlavePty + Send>>,
     pub pid: Option<i32>,
     pub budget: Arc<Budget>,
-    pub writer: flume::Sender<Vec<u8>>,
+    pub writer: mpsc::Sender<Vec<u8>>,
     /// Closing this end stops the reader and writer threads.
     wake: Option<OwnedFd>,
     /// Isolated per-tab temp shims / ZDOTDIR wrapper, removed on shutdown or drop.
@@ -157,7 +175,7 @@ fn command(opts: &SpawnOptions, hooks: &ResolvedTerminalHooks) -> Result<(Comman
 
 /// Opens the PTY, starts the child and the three helper threads. Returns the
 /// PTY plus a duplicate of the master descriptor for the session handle.
-pub(crate) fn spawn(opts: &SpawnOptions, hooks: &ResolvedTerminalHooks, tx: flume::Sender<Msg>) -> Result<(Pty, OwnedFd)> {
+pub(crate) fn spawn(opts: &SpawnOptions, hooks: &ResolvedTerminalHooks, tx: mpsc::Sender<Msg>) -> Result<(Pty, OwnedFd)> {
     let pair = native_pty_system().openpty(pty_size(opts.size)).map_err(spawn_err)?;
     let (cmd, hook_runtime) = command(opts, hooks)?;
     let mut child = pair.slave.spawn_command(cmd).map_err(spawn_err)?;
@@ -177,7 +195,7 @@ pub(crate) fn spawn(opts: &SpawnOptions, hooks: &ResolvedTerminalHooks, tx: flum
     let wake_r2 = dup(wake_r.as_raw_fd()).map_err(spawn_err)?;
 
     let budget = Arc::new(Budget::new());
-    let (writer_tx, writer_rx) = flume::unbounded::<Vec<u8>>();
+    let (writer_tx, writer_rx) = mpsc::channel::<Vec<u8>>();
 
     let thread = |name: &str| std::thread::Builder::new().name(name.to_string());
 
@@ -243,7 +261,7 @@ fn wait_ready(fd: RawFd, events: libc::c_short, wake: RawFd) -> bool {
     }
 }
 
-fn read_loop(fd: OwnedFd, wake: OwnedFd, budget: &Budget, tx: &flume::Sender<Msg>) {
+fn read_loop(fd: OwnedFd, wake: OwnedFd, budget: &Budget, tx: &mpsc::Sender<Msg>) {
     let mut buf = vec![0u8; READ_CHUNK];
     loop {
         if !wait_ready(fd.as_raw_fd(), libc::POLLIN, wake.as_raw_fd()) {
@@ -269,7 +287,7 @@ fn read_loop(fd: OwnedFd, wake: OwnedFd, budget: &Budget, tx: &flume::Sender<Msg
     }
 }
 
-fn write_loop(fd: OwnedFd, wake: OwnedFd, rx: &flume::Receiver<Vec<u8>>) {
+fn write_loop(fd: OwnedFd, wake: OwnedFd, rx: &mpsc::Receiver<Vec<u8>>) {
     while let Ok(bytes) = rx.recv() {
         let mut rest = &bytes[..];
         while !rest.is_empty() {

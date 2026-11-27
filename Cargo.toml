@@ -2,6 +2,7 @@
 resolver = "3"
 members = [
   "crates/protocol",
+  "crates/rt",
   "crates/mcp",
   "crates/i18n",
   "crates/core",
@@ -32,15 +33,21 @@ arc-swap = "1"
 backon = "1"
 base64 = "0.23.1"
 bytemuck = { version = "1.25.2", features = ["derive"] }
-flume = "0.12.0"
 futures-util = { version = "0.3.34", features = ["sink"] }
+hex = "0.4.3"
+hmac = "0.13.0"
 image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "webp"] }
+imagesize = "0.15.0"
 jiff = { version = "1.0.1", default-features = false, features = ["std", "tz-system", "tzdb-zoneinfo", "perf-inline"] }
 loom = "0.7"
 loro = { version = "1.18.0", default-features = false }
 parking_lot = "0.12"
+percent-encoding = "2.3.2"
+png = "0.18.1"
+quick-xml = "0.41.0"
 regex = "1.13.1"
 reqwest = { version = "0.13.5", default-features = false, features = ["rustls-no-provider", "json", "stream"] }
+roxmltree = "0.21.2"
 rustls = { version = "0.23.46", default-features = false, features = ["ring", "std"] }
 sea-orm = { version = "2.0.4", default-features = false, features = [
   "macros",
@@ -48,20 +55,16 @@ sea-orm = { version = "2.0.4", default-features = false, features = [
   "with-uuid",
   "runtime-tokio-rustls",
   "sqlx-sqlite",
-  "sqlx-postgres",
   "sqlite-use-returning-for-3_35",
 ] }
-sea-orm-migration = { version = "2.0.4", default-features = false, features = [
-  "runtime-tokio-rustls",
-  "sqlx-sqlite",
-  "sqlx-postgres",
-  "sqlite-use-returning-for-3_35",
-] }
-sea-query = { version = "1.0.2", default-features = false, features = ["backend-sqlite", "backend-postgres", "with-json", "with-uuid", "thread-safe"] }
+sea-orm-migration = { version = "2.0.4", default-features = false, features = ["runtime-tokio-rustls", "sqlx-sqlite", "sqlite-use-returning-for-3_35"] }
+sea-query = { version = "1.0.2", default-features = false, features = ["backend-sqlite", "with-json", "with-uuid", "thread-safe"] }
+semver = "1.0.28"
 serde = { version = "1.0.229", features = ["derive", "rc"] }
 serde_json = "1.0.154"
 sha2 = "0.11.1"
-sqlx = { version = "0.9.1", default-features = false, features = ["sqlite", "postgres", "derive"] }
+sqlx = { version = "0.9.1", default-features = false, features = ["sqlite", "derive"] }
+subtle = "2.6.1"
 tempfile = "3.27.0"
 thiserror = "2.0.21"
 tokio = { version = "1.54.1", features = ["fs", "macros", "net", "process", "rt", "rt-multi-thread", "signal", "sync", "time"] }
@@ -73,7 +76,10 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 url = "2.5.8"
 uuid = { version = "1.29.2", features = ["v4", "v7"] }
 vibevalley-mcp = { path = "crates/mcp" }
+vibevalley-rt = { path = "crates/rt" }
 wgpu = "29.0.4"
+which = "8.0.6"
+zip = { version = "9.7.1", default-features = false, features = ["deflate"] }
 
 [profile.dev]
 opt-level = 0
@@ -103,16 +109,7 @@ opt-level = 2
 [profile.dev.package.tiny-skia]
 opt-level = 2
 
-[profile.dev.package.vibevalley-files]
-opt-level = 2
-
 [profile.dev.package.vibevalley-pele]
-opt-level = 2
-
-[profile.dev.package.vibevalley-diorama]
-opt-level = 2
-
-[profile.dev.package.vibevalley-rich]
 opt-level = 2
 
 [profile.release]
@@ -123,11 +120,13 @@ strip = "symbols"
 
 [profile.alpha]
 inherits = "release"
-opt-level = 2
+opt-level = 0
+debug = "line-tables-only"
+split-debuginfo = "unpacked"
 lto = false
-codegen-units = 16
+codegen-units = 256
 incremental = true
-strip = "symbols"
+strip = "none"
 
 [profile.loom]
 inherits = "dev"

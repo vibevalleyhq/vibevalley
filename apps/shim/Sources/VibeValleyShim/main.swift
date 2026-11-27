@@ -14,7 +14,7 @@ final class ShimAppDelegate: NSObject, NSApplicationDelegate {
     self.config = config
     self.windowController = ShimWindowController(
       title: config.title,
-      artifactId: config.artifactId,
+      noteId: config.noteId,
       serverHome: config.serverHome,
       alwaysOnTop: config.alwaysOnTop
     )
@@ -38,9 +38,9 @@ final class ShimAppDelegate: NSObject, NSApplicationDelegate {
       self?.openInHost(nil)
     }
 
-    guard let artifactId = config.artifactId, !artifactId.isEmpty else {
+    guard let noteId = config.noteId, !noteId.isEmpty else {
       windowController.setConnectionState(
-        .failed("Missing artifact identifier (set VVArtifactId in Info.plist or pass --artifact).")
+        .failed("Missing note identifier (set VVNoteId in Info.plist or pass --note).")
       )
       return
     }
@@ -55,7 +55,7 @@ final class ShimAppDelegate: NSObject, NSApplicationDelegate {
           let metrics = self.windowController.currentAttachmentMetrics()
           self.socketClient?.send(
             .attach(
-              artifactId: artifactId,
+              noteId: noteId,
               width: metrics.width,
               height: metrics.height,
               scale: metrics.scale,

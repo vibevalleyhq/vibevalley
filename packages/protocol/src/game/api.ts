@@ -5,7 +5,6 @@ import type * as T from "../shapes";
 export interface GameHandlers {
   readonly "game.shop.list": () => Promise<T.FarmShopView>;
   readonly "game.shop.buy": (a: T.ShopPurchaseRequest) => Promise<T.FarmShopView>;
-  readonly "game.daily.list": () => Promise<T.DailyTaskBoard>;
 }
 
 export const gameEndpoints: readonly Endpoint[] = [
@@ -21,13 +20,6 @@ export const gameEndpoints: readonly Endpoint[] = [
     about: ["id"],
     input: S.ShopPurchaseRequest,
     result: S.FarmShopView,
-    can: ["user", "remote"],
-  },
-  {
-    op: "game.daily.list",
-    about: [],
-    input: undefined,
-    result: S.DailyTaskBoard,
     can: ["user", "remote"],
   },
 ];

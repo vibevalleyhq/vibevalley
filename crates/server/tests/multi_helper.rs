@@ -3,6 +3,7 @@
 //! 2. Thread `@<agent>` readonly collaborators without clobbering the primary worker.
 //! 3. Single write-lock handoff ("Hoe Handoff") committing or stashing uncommitted worktree edits.
 
+use crate::support::RouterTestExt as _;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, mpsc};
@@ -37,8 +38,10 @@ fn default_look() -> Look {
 fn worker_profile(id: &str, name: &str, runtime: &str) -> Agent {
     Agent {
         id: id.into(),
+        code: String::new(),
         name: name.into(),
         role: AgentRole::Worker,
+        mode: vibevalley_protocol::AgentExecutionMode::Managed,
         duty: format!("{name} worker"),
         enabled: true,
         runtime: runtime.into(),
@@ -177,7 +180,7 @@ impl Session for InteractiveSession {
     fn records(&self) -> Vec<vibevalley_runtime::oar::voyage::Record> {
         self.inner.records()
     }
-    fn subscribe_records(&self, after: Option<u64>) -> tokio::sync::mpsc::UnboundedReceiver<vibevalley_runtime::oar::voyage::Record> {
+    fn subscribe_records(&self, after: Option<u64>) -> tokio::sync::mpsc::Receiver<vibevalley_runtime::oar::voyage::Record> {
         self.inner.subscribe_records(after)
     }
     fn control<'a>(
@@ -208,7 +211,7 @@ impl Session for InteractiveSession {
     fn status(&self) -> vibevalley_runtime::oar::SessionStatus {
         self.inner.status()
     }
-    fn events(&self) -> tokio::sync::mpsc::UnboundedReceiver<vibevalley_runtime::oar::Event> {
+    fn events(&self) -> tokio::sync::mpsc::Receiver<vibevalley_runtime::oar::Event> {
         self.inner.events()
     }
     fn prompt(&self, content: Vec<ContentBlock>) -> vibevalley_runtime::BoxFuture<'_, vibevalley_runtime::oar::Result<()>> {
@@ -302,7 +305,7 @@ fn auto_reviewer_dispatches_on_in_review_rejects_and_passes_within_max_bot_round
         assert!(tool_names.iter().any(|n| n == "issue_diff_get"), "{tool_names:?}");
         assert!(tool_names.iter().any(|n| n == "issue_review"), "{tool_names:?}");
         assert!(!tool_names.iter().any(|n| n == "issue_update"), "{tool_names:?}");
-        assert!(!tool_names.iter().any(|n| n == "artifact_file_write"), "{tool_names:?}");
+        assert!(!tool_names.iter().any(|n| n == "note_file_write"), "{tool_names:?}");
 
         let denied = rpc(
             &door,
@@ -572,7 +575,7 @@ fn thread_agent_mentions_dispatch_readonly_collaborators_without_clobbering_prim
         assert!(names.iter().any(|n| n == "channel_message_send"), "{names:?}");
         assert!(names.iter().any(|n| n == "issue_report"), "{names:?}");
         assert!(!names.iter().any(|n| n == "issue_review"), "{names:?}");
-        assert!(!names.iter().any(|n| n == "artifact_file_write"), "{names:?}");
+        assert!(!names.iter().any(|n| n == "note_file_write"), "{names:?}");
 
         let denied = rpc(
             &door,

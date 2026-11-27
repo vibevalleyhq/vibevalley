@@ -1,8 +1,10 @@
 //! End-to-end tests: real programs run through a real PTY, assertions are on
 //! published snapshots and events.
 
+#![allow(clippy::disallowed_methods, reason = "synchronous PTY integration test harness without Tokio runtime")]
+
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, mpsc};
 use std::time::{Duration, Instant};
 
 use vibevalley_terminal::{
@@ -32,7 +34,7 @@ fn size(cols: u16, rows: u16) -> TermSize {
 
 struct Harness {
     session: TermSession,
-    events: flume::Receiver<TermEvent>,
+    events: mpsc::Receiver<TermEvent>,
 }
 
 fn options(program: &str, args: &[&str], size: TermSize) -> SpawnOptions {
@@ -48,7 +50,7 @@ fn options(program: &str, args: &[&str], size: TermSize) -> SpawnOptions {
 }
 
 fn spawn(opts: SpawnOptions) -> Harness {
-    let (tx, events) = flume::unbounded();
+    let (tx, events) = mpsc::channel();
     let session = TermSession::spawn(opts, move |event| {
         let _ = tx.send(event);
     })
@@ -651,7 +653,7 @@ fn default_program_is_the_login_shell() {
 
 #[test]
 fn spawn_failure_is_an_error() {
-    let (tx, _rx) = flume::unbounded();
+    let (tx, _rx) = mpsc::channel();
     let result = TermSession::spawn(options("/nonexistent/program", &[], size(80, 24)), move |event| {
         let _ = tx.send(event);
     });
@@ -706,7 +708,7 @@ fn kill_takes_the_shells_children_with_it() {
 
 #[test]
 fn history_shows_above_the_new_prompt() {
-    let (tx, events) = flume::unbounded();
+    let (tx, events) = mpsc::channel();
     let session = TermSession::spawn_with_history(
         options("/bin/sh", &["-c", "printf NEW-OUTPUT; sleep 5"], size(40, 10)),
         "old line one\nold line two",

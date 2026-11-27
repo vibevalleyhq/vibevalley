@@ -10,13 +10,13 @@
   "owner": {
     "label": "负责人",
     "pick": "选择负责人",
-    "search": "搜索人员或专家…",
+    "search": "搜索人员或队友…",
     "self": "我（本人）",
     "selfNamed": "{name}（本人）",
     "unassigned": "未指定负责人",
     "clear": "清除负责人",
     "peopleGroup": "人员",
-    "expertsGroup": "专家角色"
+    "expertsGroup": "队友"
   },
   "groupBy": {
     "label": "分组",
@@ -326,7 +326,7 @@
     "save": "存下改动",
     "remove": "删掉",
     "newRepo": "新建仓库",
-    "repoHint": "仓库名，也是工作区下的文件夹名",
+    "repoHint": "仓库名，也是项目根目录下的文件夹名",
     "repoName": "仓库名",
     "create": "新建",
     "edit": "编辑",
@@ -379,7 +379,7 @@
     "cron": "定时任务",
     "missed": "定时任务（补跑）",
     "refine": "起草",
-    "runtime": "引擎自己"
+    "runtime": "环境自己"
   },
   "run": {
     "working": "正在干",
@@ -465,12 +465,13 @@
     "machineAuto": "自动分配机器",
     "missingRepo": "还没有添加仓库，可先记在待办，添加仓库后再派发。",
     "goRepos": "去添加仓库",
-    "missingRuntime": "尚未启用可用引擎，配置好编码引擎后就能自动起草和开工。",
-    "goRuntimes": "去配置引擎"
+    "missingRuntime": "尚未启用可用环境，配置好编码环境后就能自动起草和开工。",
+    "goRuntimes": "去配置环境"
   },
   "conversation": {
     "older": "加载更早的消息",
-    "placeholder": "写一条评论、补充说明或反馈…"
+    "placeholder": "写一条评论、补充说明或反馈…",
+    "postComment": "发表评论"
   },
   "activity": {
     "title": "动态记录",
@@ -529,24 +530,6 @@
     "none": "无前置阻塞",
     "clear": "清除前置依赖",
     "blockedByChip": "被 #{n} 阻塞"
-  },
-  "triage": {
-    "selected": "已选 {n} 项",
-    "selectIssue": "选择工单 #{n}",
-    "clear": "取消选择",
-    "status": "改状态",
-    "agent": "派执行会话",
-    "noAgent": "清除执行会话",
-    "owner": "负责人",
-    "noOwner": "清除负责人",
-    "repo": "仓库",
-    "noRepo": "清除仓库",
-    "priority": "优先级",
-    "tags": "标签",
-    "addTags": "追加标签",
-    "replaceTags": "替换标签",
-    "updated": "已批量更新 {n} 张工单",
-    "partial": "已更新 {ok} 张工单，{failed} 张未能更新"
   },
   "relations": {
     "title": "非阻塞关联",

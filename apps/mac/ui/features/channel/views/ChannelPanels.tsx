@@ -5,7 +5,6 @@ import { t } from "@vibevalley/i18n";
 import { type Channel, type ChatMessage, type MessageHit, userId } from "@vibevalley/protocol";
 import { channelOf, defaultOf, isFreeUserSession, sessionChannelId, sessionProfile } from "@vibevalley/protocol/rules";
 
-import { createAct } from "../../../design/act";
 import { Dialog } from "../../../design/Dialog";
 import { OrchestratorFace, UserFace } from "../../../design/domain/Face";
 import { Select, TextInput } from "../../../design/Field";
@@ -13,6 +12,7 @@ import { Icon } from "../../../design/Icon";
 import { CountPill } from "../../../design/Tag";
 import { Bubble } from "../../../design/Tip";
 import { toast } from "../../../design/toasts";
+import { createAct } from "../../../infra/act";
 import { useOrchestrators } from "../../../infra/agents";
 import { api } from "../../../infra/api";
 import { Keyed, useNow } from "../../../infra/base/dom";
@@ -21,6 +21,7 @@ import { Link as A, useRouter } from "../../../infra/router";
 import { localizeRuntimeError } from "../../../infra/runtimeError";
 import { useLatest } from "../../../infra/state/atom";
 import { useIntents } from "../../../infra/state/intent";
+import { NoteCard } from "../../note";
 import { archiveSet, markState, notifySet, sameMessage, setMark, useMarkedChat } from "../model/marks";
 import { channelLabel, chatPath, issueThreadOf, messagePath, threadOwnerOf, threadsIn, threadTitle, topsOf, workbenchClock } from "../model/places";
 import { BarButton, orchestratorMoodLabels } from "./ChannelSidebar";
@@ -82,6 +83,7 @@ export function Pins(props: { channel: Channel; onPick: () => void }) {
                 <Text class="shrink-0 text-2xs text-faint tabular-nums">{workbenchClock(m().at)}</Text>
               </View>
               <Text class="line-clamp-3 text-sm text-ink">{localizeRuntimeError(m().text).text}</Text>
+              <If when={m().deleted === undefined ? m().note : undefined}>{(card) => <NoteCard card={card()} />}</If>
             </View>
           )}
         </Each>
@@ -234,7 +236,7 @@ export function ThreadPane(props: { thread: Channel; point: number | undefined; 
   );
 }
 
-/** Embedded live channel pane used beside an artifact canvas so the user can discuss it in place. */
+/** Embedded live channel pane used beside a note canvas so the user can discuss it in place. */
 export function ChannelSidePane(props: {
   channel?: string | undefined;
   issue?: string | undefined;
@@ -265,15 +267,15 @@ export function ChannelSidePane(props: {
       {(c) => (
         <Keyed key={c().id}>
           {() => (
-            <View testID="artifact-chat-pane" class="min-h-0 min-w-0 flex-1">
+            <View testID="note-chat-pane" class="min-h-0 min-w-0 flex-1">
               <View desktop={{ windowDrag: true }} class="h-11 shrink-0 flex-row items-center justify-between gap-1.5 border-b border-line px-2.5">
-                <A href={href()} testID="artifact-message" class="min-w-0 flex-1 flex-row items-center gap-1.5 rounded-md px-1.5 py-1 hover:bg-hover">
+                <A href={href()} testID="note-message" class="min-w-0 flex-1 flex-row items-center gap-1.5 rounded-md px-1.5 py-1 hover:bg-hover">
                   <Icon name="chat" size={14} tone="muted" />
                   <Text class="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{channelLabel(c())}</Text>
                   <Icon name="open" size={12} tone="muted" />
                 </A>
                 <If when={props.onClose}>
-                  <BarButton icon="close" size={14} testid="artifact-rail-close" label={t("web.artifact.page.railHide")} onPress={() => props.onClose?.()} />
+                  <BarButton icon="close" size={14} testid="note-rail-close" label={t("web.note.page.railHide")} onPress={() => props.onClose?.()} />
                 </If>
               </View>
               <FileDrop channel={c()}>

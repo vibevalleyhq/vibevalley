@@ -11,18 +11,18 @@ use crate::protocol::{ResourceContent, ResourceDef, ResourceTemplateDef};
 
 pub const SKILL_URI_SCHEME: &str = "skill://";
 
-include!(concat!(env!("OUT_DIR"), "/artifact_skills.rs"));
+include!(concat!(env!("OUT_DIR"), "/note_skills.rs"));
 
-static BUILTIN_ARTIFACT_SKILLS: LazyLock<SkillCatalog> = LazyLock::new(|| SkillCatalog::from_embedded_entries("artifact", ARTIFACT_SKILL_ENTRIES));
+static BUILTIN_NOTE_SKILLS: LazyLock<SkillCatalog> = LazyLock::new(|| SkillCatalog::from_embedded_entries("note", NOTE_SKILL_ENTRIES));
 
-/// Returns the cached SEP-2640 catalog containing all 12 built-in `skill://artifact/*` guides.
-pub fn builtin_artifact_skill_catalog() -> &'static SkillCatalog {
-    &BUILTIN_ARTIFACT_SKILLS
+/// Returns the cached SEP-2640 catalog containing all 4 built-in `skill://note/*` guides.
+pub fn builtin_note_skill_catalog() -> &'static SkillCatalog {
+    &BUILTIN_NOTE_SKILLS
 }
 
-/// Returns a cloned SEP-2640 catalog containing all 12 built-in `skill://artifact/*` guides.
-pub fn builtin_artifact_skills() -> SkillCatalog {
-    BUILTIN_ARTIFACT_SKILLS.clone()
+/// Returns a cloned SEP-2640 catalog containing all 4 built-in `skill://note/*` guides.
+pub fn builtin_note_skills() -> SkillCatalog {
+    BUILTIN_NOTE_SKILLS.clone()
 }
 
 /// Skill metadata entry returned by `skills/list`.
@@ -426,6 +426,9 @@ fn parse_skill_markdown(raw: &str) -> ParsedSkillMeta {
             let fm = &after_open[..end_idx];
             parse_frontmatter(fm, &mut name, &mut description, &mut tags);
             &after_open[end_idx + 5..]
+        } else if let Some(fm) = after_open.strip_suffix("\n---") {
+            parse_frontmatter(fm, &mut name, &mut description, &mut tags);
+            ""
         } else {
             normalized.as_str()
         }
@@ -455,30 +458,207 @@ fn parse_skill_markdown(raw: &str) -> ParsedSkillMeta {
     ParsedSkillMeta { name, description, tags }
 }
 
-fn parse_frontmatter(fm: &str, name: &mut Option<String>, description: &mut Option<String>, tags: &mut Vec<String>) {
-    for line in fm.lines() {
-        let trimmed = line.trim();
-        let Some((key, val)) = trimmed.split_once(':') else {
-            continue;
-        };
-        let key = key.trim();
-        let val = val.trim().trim_matches('"').trim_matches('\'').trim();
-        if val.is_empty() {
+fn strip_unquoted_comment(raw: &str) -> &str {
+    let mut quote: Option<char> = None;
+    let mut escaped = false;
+    let mut prev_space = true;
+    for (idx, ch) in raw.char_indices() {
+        if let Some(q) = quote {
+            if q == '"' {
+                if escaped {
+                    escaped = false;
+                } else if ch == '\\' {
+                    escaped = true;
+                } else if ch == '"' {
+                    quote = None;
+                }
+            } else if ch == '\'' {
+                quote = None;
+            }
+            prev_space = false;
             continue;
         }
+        match ch {
+            '"' | '\'' => {
+                quote = Some(ch);
+                prev_space = false;
+            }
+            '#' if prev_space => return raw[..idx].trim_end(),
+            _ => prev_space = ch.is_whitespace(),
+        }
+    }
+    raw.trim_end()
+}
+
+fn unquote_yaml_scalar(raw: &str) -> String {
+    let trimmed = strip_unquoted_comment(raw.trim()).trim();
+    if let Some(inner) = trimmed.strip_prefix('"').and_then(|s| s.strip_suffix('"')) {
+        let mut out = String::with_capacity(inner.len());
+        let mut chars = inner.chars();
+        while let Some(ch) = chars.next() {
+            if ch == '\\' {
+                match chars.next() {
+                    Some('"') => out.push('"'),
+                    Some('\\') => out.push('\\'),
+                    Some('n') => out.push('\n'),
+                    Some('t') => out.push('\t'),
+                    Some('r') => out.push('\r'),
+                    Some(other) => {
+                        out.push('\\');
+                        out.push(other);
+                    }
+                    None => out.push('\\'),
+                }
+            } else {
+                out.push(ch);
+            }
+        }
+        return out;
+    }
+    if let Some(inner) = trimmed.strip_prefix('\'').and_then(|s| s.strip_suffix('\'')) {
+        return inner.replace("''", "'");
+    }
+    trimmed.to_owned()
+}
+
+fn parse_flow_list(inner: &str) -> Vec<String> {
+    let mut items = Vec::new();
+    let mut start = 0usize;
+    let mut quote: Option<char> = None;
+    let mut escaped = false;
+
+    for (idx, ch) in inner.char_indices() {
+        if let Some(q) = quote {
+            if q == '"' {
+                if escaped {
+                    escaped = false;
+                } else if ch == '\\' {
+                    escaped = true;
+                } else if ch == '"' {
+                    quote = None;
+                }
+            } else if ch == '\'' {
+                quote = None;
+            }
+            continue;
+        }
+        match ch {
+            '"' | '\'' => quote = Some(ch),
+            ',' => {
+                let clean = unquote_yaml_scalar(&inner[start..idx]);
+                if !clean.is_empty() {
+                    items.push(clean);
+                }
+                start = idx + 1;
+            }
+            _ => {}
+        }
+    }
+    let clean = unquote_yaml_scalar(&inner[start..]);
+    if !clean.is_empty() {
+        items.push(clean);
+    }
+    items
+}
+
+fn parse_frontmatter(fm: &str, name: &mut Option<String>, description: &mut Option<String>, tags: &mut Vec<String>) {
+    let mut active_list_key: Option<&str> = None;
+
+    for line in fm.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
+
+        if let Some(rest) = trimmed.strip_prefix('-').filter(|r| r.is_empty() || r.starts_with([' ', '\t'])) {
+            if active_list_key == Some("tags") {
+                let item = unquote_yaml_scalar(rest);
+                if !item.is_empty() {
+                    tags.push(item);
+                }
+            }
+            continue;
+        }
+
+        if line.starts_with([' ', '\t']) && active_list_key.is_some() {
+            // Indented line that is not a list item ends the active list unless it defines a new key.
+            if !trimmed.contains(':') {
+                continue;
+            }
+        }
+        active_list_key = None;
+
+        let Some((raw_key, raw_val)) = trimmed.split_once(':') else {
+            continue;
+        };
+        let key = raw_key.trim();
+        let val_no_comment = strip_unquoted_comment(raw_val.trim()).trim();
+
         match key {
-            "name" => *name = Some(val.to_owned()),
-            "description" => *description = Some(val.to_owned()),
+            "name" => {
+                let clean = unquote_yaml_scalar(val_no_comment);
+                if !clean.is_empty() {
+                    *name = Some(clean);
+                }
+            }
+            "description" => {
+                let clean = unquote_yaml_scalar(val_no_comment);
+                if !clean.is_empty() {
+                    *description = Some(clean);
+                }
+            }
             "tags" => {
-                let inner = val.trim_start_matches('[').trim_end_matches(']');
-                for item in inner.split(',') {
-                    let clean = item.trim().trim_matches('"').trim_matches('\'').trim();
+                if val_no_comment.is_empty() {
+                    active_list_key = Some("tags");
+                } else if let Some(inner) = val_no_comment.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
+                    tags.extend(parse_flow_list(inner));
+                } else {
+                    let clean = unquote_yaml_scalar(val_no_comment);
                     if !clean.is_empty() {
-                        tags.push(clean.to_owned());
+                        tags.push(clean);
                     }
                 }
             }
             _ => {}
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_frontmatter_handles_multiline_lists_quoted_colons_and_edge_cases() {
+        let md = r#"---
+name: "ns:my-skill"
+description: "Step 1: check 'items' & \"escape\": ok" # trailing comment
+tags:
+  - alpha
+  - "beta: two" # comment on item
+  - 'it''s: fine'
+---
+
+# Ignored heading
+"#;
+        let parsed = parse_skill_markdown(md);
+        assert_eq!(parsed.name.as_deref(), Some("ns:my-skill"));
+        assert_eq!(parsed.description.as_deref(), Some("Step 1: check 'items' & \"escape\": ok"));
+        assert_eq!(parsed.tags, vec!["alpha", "beta: two", "it's: fine"]);
+    }
+
+    #[test]
+    fn parse_frontmatter_handles_flow_lists_unindented_lists_and_eof_closing() {
+        let flow = "---\nname: 'a:b'\ndescription: 'colon: ''quoted'''\ntags: [one, \"two: 2\", 'three, 3']\n---";
+        let parsed_flow = parse_skill_markdown(flow);
+        assert_eq!(parsed_flow.name.as_deref(), Some("a:b"));
+        assert_eq!(parsed_flow.description.as_deref(), Some("colon: 'quoted'"));
+        assert_eq!(parsed_flow.tags, vec!["one", "two: 2", "three, 3"]);
+
+        let unindented = "---\nname: doc\ntags:\n- first\n- second\nother: value\n- ignored\n---\nBody line\n";
+        let parsed_unindented = parse_skill_markdown(unindented);
+        assert_eq!(parsed_unindented.name.as_deref(), Some("doc"));
+        assert_eq!(parsed_unindented.description.as_deref(), Some("Body line"));
+        assert_eq!(parsed_unindented.tags, vec!["first", "second"]);
     }
 }

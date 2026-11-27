@@ -1,41 +1,42 @@
-// Embeds dictionaries used by Rust services and native scenes.
+// Embeds only Rust-consumed dictionaries as path-free literals so frontend-only
+// `web.*` edits never invalidate workspace crates and cross-worktree sccache hits stay 100%.
 use std::fmt::Write;
+
+fn is_rust_catalog(stem: &str) -> bool {
+    stem == "shared"
+        || stem == "desktop"
+        || stem == "server"
+        || stem.starts_with("server.")
+        || stem == "web.base"
+        || stem == "web.note"
+        || stem == "web.farm"
+        || stem.starts_with("web.farm.")
+}
 
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
-    println!("cargo:rerun-if-env-changed=CARGO_FEATURE_WEB");
-    let include_all_web = std::env::var_os("CARGO_FEATURE_WEB").is_some();
-    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("locales");
+    let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let dir = manifest_dir.join("locales");
     let mut out = String::from("pub(crate) static CATALOGS: &[(&str, &str, &str)] = &[\n");
     let mut entries = vec![];
     for lang in std::fs::read_dir(&dir).unwrap().flatten().filter(|e| e.path().is_dir()) {
-        println!("cargo:rerun-if-changed={}", lang.path().display());
+        let lang_name = lang.file_name().to_string_lossy().into_owned();
         for file in std::fs::read_dir(lang.path()).unwrap().flatten() {
             let path = file.path();
-            let stem = path.file_stem().unwrap().to_string_lossy();
-            if path.extension().is_some_and(|e| e == "json")
-                && (stem == "shared"
-                    || stem == "desktop"
-                    || stem == "server"
-                    || stem.starts_with("server.")
-                    || (include_all_web && stem.starts_with("web."))
-                    || stem == "web.base"
-                    || stem == "web.artifact"
-                    || stem == "web.farm"
-                    || stem.starts_with("web.farm."))
-            {
-                println!("cargo:rerun-if-changed={}", path.display());
-                entries.push((
-                    lang.file_name().to_string_lossy().into_owned(),
-                    path.file_stem().unwrap().to_string_lossy().into_owned(),
-                    path.display().to_string(),
-                ));
+            let Some(stem) = path.file_stem().map(|s| s.to_string_lossy().into_owned()) else {
+                continue;
+            };
+            if path.extension().is_some_and(|e| e == "json") && is_rust_catalog(&stem) {
+                let rel = path.strip_prefix(manifest_dir).unwrap_or(&path);
+                println!("cargo:rerun-if-changed={}", rel.display());
+                let content = std::fs::read_to_string(&path).unwrap();
+                entries.push((lang_name.clone(), stem, content));
             }
         }
     }
-    entries.sort();
-    for (lang, ns, path) in entries {
-        writeln!(out, "    ({lang:?}, {ns:?}, include_str!({path:?})),").unwrap();
+    entries.sort_by(|a, b| (&a.0, &a.1).cmp(&(&b.0, &b.1)));
+    for (lang, ns, content) in entries {
+        writeln!(out, "    ({lang:?}, {ns:?}, {content:?}),").unwrap();
     }
     out.push_str("];\n");
     let target = std::path::Path::new(&std::env::var("OUT_DIR").unwrap()).join("catalogs.rs");

@@ -70,7 +70,7 @@ struct Inner {
     responses: HashMap<String, Value>,
     calls: Vec<(String, Value)>,
     last_client: Option<ClientIdentity>,
-    subs: HashMap<u64, (String, tokio::sync::mpsc::UnboundedSender<Value>)>,
+    subs: HashMap<u64, (String, tokio::sync::mpsc::Sender<Value>)>,
     next_sub: u64,
 }
 
@@ -171,11 +171,19 @@ impl FakeServer {
     }
 
     pub fn emit(&self, name: &str, event: Value) {
-        for (n, tx) in self.inner.lock().subs.values() {
-            if n == name {
-                let _ = tx.send(event.clone());
+        self.inner.lock().subs.retain(|_, (n, tx)| {
+            if n != name {
+                return true;
             }
-        }
+            match tx.try_send(event.clone()) {
+                Ok(()) => true,
+                Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {
+                    tracing::warn!(subscription = name, "fake server subscription buffer full; disconnecting slow consumer");
+                    false
+                }
+                Err(tokio::sync::mpsc::error::TrySendError::Closed(_)) => false,
+            }
+        });
     }
 
     /// Ends every subscription of `name` (drops its sender).
@@ -198,14 +206,12 @@ impl FakeServer {
     pub fn subscriber_count(&self) -> usize {
         self.inner.lock().subs.len()
     }
-}
 
-impl Server for FakeServer {
-    fn call(&self, op: &str, payload: Value) -> Envelope {
-        self.call_with(&CallerContext::local(), op, payload)
+    pub fn call_sync(&self, op: &str, payload: Value) -> Envelope {
+        self.call_with_sync(&CallerContext::local(), op, payload)
     }
 
-    fn call_with(&self, ctx: &CallerContext, op: &str, payload: Value) -> Envelope {
+    pub fn call_with_sync(&self, ctx: &CallerContext, op: &str, payload: Value) -> Envelope {
         {
             let mut inner = self.inner.lock();
             inner.calls.push((op.to_string(), payload.clone()));
@@ -275,8 +281,27 @@ impl Server for FakeServer {
         }
     }
 
-    fn slice_snapshot(&self, slice: SliceKind) -> Value {
+    pub fn slice_snapshot(&self, slice: SliceKind) -> Value {
         serde_json::from_str(&self.slice_snapshot_json(slice)).unwrap_or(Value::Null)
+    }
+
+    #[allow(clippy::result_large_err)]
+    pub fn subscribe_sync(&self, name: &str, _payload: Value) -> Result<(u64, tokio::sync::mpsc::Receiver<Value>), Envelope> {
+        if name == "fake.refuse" {
+            return Err(refusal(BizCode::ChannelNotFound, "no such channel"));
+        }
+        let (tx, rx) = tokio::sync::mpsc::channel(crate::context::live::DEFAULT_SUBSCRIPTION_CAPACITY);
+        let mut inner = self.inner.lock();
+        inner.next_sub += 1;
+        let id = inner.next_sub;
+        inner.subs.insert(id, (name.to_string(), tx));
+        Ok((id, rx))
+    }
+}
+
+impl Server for FakeServer {
+    fn call_with_async(self: Arc<Self>, ctx: CallerContext, op: String, payload: Value) -> crate::gateway::api::BoxFuture<'static, Envelope> {
+        Box::pin(async move { self.call_with_sync(&ctx, &op, payload) })
     }
 
     fn slice_snapshot_json(&self, slice: SliceKind) -> Arc<str> {
@@ -287,21 +312,6 @@ impl Server for FakeServer {
             SliceKind::Inbox => self.feeds.inbox.snapshot_json(),
             SliceKind::Ops => self.feeds.ops.snapshot_json(),
             SliceKind::Farm => self.feeds.farm.snapshot_json(),
-        }
-    }
-
-    fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &CancellationToken, receive: &mut dyn FnMut(i64, &Value)) {
-        let mut forward = |seq: i64, json: &str| {
-            let value: Value = serde_json::from_str(json).unwrap_or(Value::Null);
-            receive(seq, &value);
-        };
-        match slice {
-            SliceKind::Board => self.feeds.board.watch_since_json(after_seq, stop, &mut forward),
-            SliceKind::Sessions => self.feeds.sessions.watch_since_json(after_seq, stop, &mut forward),
-            SliceKind::Collab => self.feeds.collab.watch_since_json(after_seq, stop, &mut forward),
-            SliceKind::Inbox => self.feeds.inbox.watch_since_json(after_seq, stop, &mut forward),
-            SliceKind::Ops => self.feeds.ops.watch_since_json(after_seq, stop, &mut forward),
-            SliceKind::Farm => self.feeds.farm.watch_since_json(after_seq, stop, &mut forward),
         }
     }
 
@@ -316,7 +326,7 @@ impl Server for FakeServer {
         })
     }
 
-    fn live(&self) -> tokio::sync::mpsc::UnboundedReceiver<LiveEvent> {
+    fn live(&self) -> tokio::sync::mpsc::Receiver<LiveEvent> {
         bridge_live_receiver(self.live.subscribe(), CancellationToken::new())
     }
 
@@ -324,16 +334,13 @@ impl Server for FakeServer {
         Some(self.live.subscribe())
     }
 
-    fn subscribe(&self, name: &str, _payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
-        if name == "fake.refuse" {
-            return Err(refusal(BizCode::ChannelNotFound, "no such channel"));
-        }
-        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
-        let mut inner = self.inner.lock();
-        inner.next_sub += 1;
-        let id = inner.next_sub;
-        inner.subs.insert(id, (name.to_string(), tx));
-        Ok((id, rx))
+    fn subscribe_with_async(
+        self: Arc<Self>,
+        _ctx: CallerContext,
+        name: String,
+        payload: Value,
+    ) -> crate::gateway::api::BoxFuture<'static, Result<(u64, tokio::sync::mpsc::Receiver<Value>), Envelope>> {
+        Box::pin(async move { self.subscribe_sync(&name, payload) })
     }
 
     fn unsubscribe(&self, id: u64) {
@@ -361,18 +368,18 @@ mod tests {
     #[test]
     fn canned_answers_and_driving_calls() {
         let fake = FakeServer::new();
-        assert_eq!(fake.call("issue.list", json!({})).biz_code, 100005);
-        fake.call("fake.respond", json!({ "op": "issue.list", "data": [1, 2] }));
-        assert_eq!(fake.call("issue.list", json!({})).data, Some(json!([1, 2])));
+        assert_eq!(fake.call_sync("issue.list", json!({})).biz_code, 100005);
+        fake.call_sync("fake.respond", json!({ "op": "issue.list", "data": [1, 2] }));
+        assert_eq!(fake.call_sync("issue.list", json!({})).data, Some(json!([1, 2])));
         fake.respond("issue.create", json!({ "bizCode": 300002, "message": "no" }));
-        assert_eq!(fake.call("issue.create", json!({})).biz_code, 300002);
-        fake.call("fake.setBundle", json!({ "bundle": empty_bundle(0) }));
+        assert_eq!(fake.call_sync("issue.create", json!({})).biz_code, 300002);
+        fake.call_sync("fake.setBundle", json!({ "bundle": empty_bundle(0) }));
         assert_eq!(fake.bundle_now().seq, 1);
         assert_eq!(fake.slice_snapshot(SliceKind::Board)["seq"], 1);
-        let live = fake.call("fake.live", json!({ "event": { "type": "notice", "at": 1, "level": "info", "text": "hi" } }));
+        let live = fake.call_sync("fake.live", json!({ "event": { "type": "notice", "at": 1, "level": "info", "text": "hi" } }));
         assert_eq!(live.biz_code, 0, "{live:?}");
-        assert_eq!(fake.call("fake.live", json!({ "event": { "type": "bogus" } })).biz_code, 100001);
-        let calls = fake.call("fake.calls", Value::Null).data.unwrap();
+        assert_eq!(fake.call_sync("fake.live", json!({ "event": { "type": "bogus" } })).biz_code, 100001);
+        let calls = fake.call_sync("fake.calls", Value::Null).data.unwrap();
         assert_eq!(calls.as_array().unwrap().len(), 8, "fake.calls counts itself");
     }
 
@@ -386,7 +393,7 @@ mod tests {
         tokio::fs::write(dir.join("responses.json"), r#"{"repo.list": [{"id": "r"}]}"#).await.unwrap();
         let fake = FakeServer::from_dir_async(&dir).await.unwrap();
         assert_eq!(fake.slice_snapshot(SliceKind::Board)["issues"][0]["id"], "i1");
-        assert_eq!(fake.call("repo.list", Value::Null).data.unwrap()[0]["id"], "r");
+        assert_eq!(fake.call_sync("repo.list", Value::Null).data.unwrap()[0]["id"], "r");
         tokio::fs::remove_dir_all(&dir).await.unwrap();
     }
 }

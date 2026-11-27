@@ -12,6 +12,7 @@ use vibevalley_protocol::{
     RemotePairExchangeResult, RemotePlatform, RemoteStatus, RemoteWhoami, SCOPE_REMOTE_CLIENT, SCOPE_REMOTE_MACHINE,
 };
 
+use super::lan;
 use super::tailscale::{self, TailscaleInfo};
 use crate::context::Context;
 use crate::gateway::api::{BoxFuture, CallerPrincipal, RemoteAuth, RemoteDeviceIdentity, Server};
@@ -76,13 +77,7 @@ pub struct Remote {
 }
 
 fn sha256_hex(input: &str) -> String {
-    let digest = Sha256::digest(input.as_bytes());
-    let mut out = String::with_capacity(digest.len() * 2);
-    for b in digest {
-        use std::fmt::Write as _;
-        let _ = write!(&mut out, "{b:02x}");
-    }
-    out
+    hex::encode(Sha256::digest(input.as_bytes()))
 }
 
 /// Derives 32 uniform OS-random bytes from three UUID v4 values (366 bits of CSPRNG input).
@@ -106,13 +101,7 @@ fn generate_pair_code() -> String {
 
 fn generate_device_token() -> String {
     let bytes = random_32_bytes();
-    let mut out = String::with_capacity(TOKEN_PREFIX.len() + bytes.len() * 2);
-    out.push_str(TOKEN_PREFIX);
-    for b in bytes {
-        use std::fmt::Write as _;
-        let _ = write!(&mut out, "{b:02x}");
-    }
-    out
+    format!("{TOKEN_PREFIX}{}", hex::encode(bytes))
 }
 
 fn server_name() -> String {
@@ -138,6 +127,30 @@ fn build_pair_url(url: &str, code: &str, scope: Option<&str>) -> String {
         }
     }
     deep.to_string()
+}
+
+#[derive(Debug, Clone, Default)]
+pub(super) struct NetworkProbe {
+    pub(super) tailscale: TailscaleInfo,
+    pub(super) lan_ip: Option<String>,
+}
+
+async fn probe_network_async() -> NetworkProbe {
+    let tailscale = tailscale::probe_async().await;
+    let lan_ip = lan::detect_lan_ipv4();
+    NetworkProbe { tailscale, lan_ip }
+}
+
+pub(super) fn resolve_auto_bind_ip(ts: &TailscaleInfo, lan_ip: Option<&str>) -> IpAddr {
+    if ts.online
+        && let Some(ip) = ts.ipv4.as_deref().and_then(|s| s.parse::<IpAddr>().ok())
+    {
+        ip
+    } else if let Some(ip) = lan_ip.and_then(|s| s.parse::<IpAddr>().ok()) {
+        ip
+    } else {
+        IpAddr::V4(Ipv4Addr::LOCALHOST)
+    }
 }
 
 /// Gracefully stops a running remote listener asynchronously without blocking Tokio workers.
@@ -194,14 +207,8 @@ impl Remote {
                 }
             },
             None => {
-                let ts = tailscale::probe_async().await;
-                if ts.online
-                    && let Some(ip) = ts.ipv4.as_deref().and_then(|s| s.parse::<IpAddr>().ok())
-                {
-                    ip
-                } else {
-                    IpAddr::V4(Ipv4Addr::LOCALHOST)
-                }
+                let probe = probe_network_async().await;
+                resolve_auto_bind_ip(&probe.tailscale, probe.lan_ip.as_deref())
             }
         };
         let port = if cfg.port == 0 { default_remote_port() } else { cfg.port };
@@ -225,10 +232,10 @@ impl Remote {
     }
 
     pub async fn status_async(&self) -> Result<RemoteStatus, ApiError> {
-        self.status_with_tailscale_async(tailscale::probe_async().await).await
+        self.status_with_probe_async(probe_network_async().await).await
     }
 
-    async fn status_with_tailscale_async(&self, ts: TailscaleInfo) -> Result<RemoteStatus, ApiError> {
+    pub(super) async fn status_with_probe_async(&self, probe: NetworkProbe) -> Result<RemoteStatus, ApiError> {
         let cfg = self.ctx.service.remote.get_config().await?;
         let devices = self.ctx.service.remote.list_devices().await?;
         let live_addr = self.listener.lock().as_ref().map(|l| (l.addr, l.url()));
@@ -246,17 +253,26 @@ impl Remote {
             listening,
             bind_addr,
             port,
-            tailscale_ip: ts.ipv4,
-            tailscale_host: ts.host,
-            tailscale_online: ts.online,
+            lan_ip: probe.lan_ip,
+            tailscale_ip: probe.tailscale.ipv4,
+            tailscale_host: probe.tailscale.host,
+            tailscale_online: probe.tailscale.online,
             url,
             devices,
         })
     }
 
     pub async fn enable_async(&self, req: RemoteEnableRequest, server: Arc<dyn Server>) -> Result<RemoteStatus, ApiError> {
+        self.enable_with_probe_async(req, server, probe_network_async().await).await
+    }
+
+    pub(super) async fn enable_with_probe_async(
+        &self,
+        req: RemoteEnableRequest,
+        server: Arc<dyn Server>,
+        probe: NetworkProbe,
+    ) -> Result<RemoteStatus, ApiError> {
         let _guard = self.lifecycle.lock().await;
-        let ts = tailscale::probe_async().await;
         let stored = self.ctx.service.remote.get_config().await?;
         let requested_bind = req
             .bind_addr
@@ -267,15 +283,7 @@ impl Remote {
             .or_else(env_bind_addr);
         let ip = match requested_bind {
             Some(raw) => raw.parse::<IpAddr>().map_err(|e| bind_failed(&raw, e))?,
-            None => {
-                if ts.online
-                    && let Some(ip) = ts.ipv4.as_deref().and_then(|s| s.parse::<IpAddr>().ok())
-                {
-                    ip
-                } else {
-                    IpAddr::V4(Ipv4Addr::LOCALHOST)
-                }
-            }
+            None => resolve_auto_bind_ip(&probe.tailscale, probe.lan_ip.as_deref()),
         };
         let port = req
             .port
@@ -293,7 +301,7 @@ impl Remote {
                 .save_config(true, Some(&target.ip().to_string()), target.port(), self.ctx.now())
                 .await?;
             self.enabled.store(true, Ordering::Release);
-            return self.status_with_tailscale_async(ts).await;
+            return self.status_with_probe_async(probe).await;
         }
 
         // Release an existing listener first if it holds the same port so re-binding does not collide.
@@ -308,7 +316,7 @@ impl Remote {
             Err(err) => {
                 if need_drop_first {
                     self.enabled.store(false, Ordering::Release);
-                    let _ = self
+                    if let Err(save_err) = self
                         .ctx
                         .service
                         .remote
@@ -318,7 +326,10 @@ impl Remote {
                             stored.as_ref().map(|c| c.port).unwrap_or_else(default_remote_port),
                             self.ctx.now(),
                         )
-                        .await;
+                        .await
+                    {
+                        tracing::warn!(error = %save_err, "remote.service failed to persist disabled config after bind error");
+                    }
                 }
                 return Err(bind_failed(&target.to_string(), err));
             }
@@ -333,7 +344,7 @@ impl Remote {
         let old = self.listener.lock().replace(next);
         stop_listener_async(old).await;
         self.enabled.store(true, Ordering::Release);
-        self.status_with_tailscale_async(ts).await
+        self.status_with_probe_async(probe).await
     }
 
     pub async fn disable_async(&self) -> Result<RemoteStatus, ApiError> {
@@ -441,7 +452,16 @@ impl Remote {
             if state.failed_attempts.len() >= MAX_FAILED_ATTEMPTS {
                 return Err(ApiError::new(BizCode::Refused, t("server.remote.rateLimited", &[])));
             }
-            let Some(pos) = state.codes.iter().position(|entry| entry.code == submitted) else {
+            let Some(pos) = ({
+                use subtle::ConstantTimeEq as _;
+                let mut matched = None;
+                for (idx, entry) in state.codes.iter().enumerate() {
+                    if bool::from(entry.code.as_bytes().ct_eq(submitted.as_bytes())) {
+                        matched = Some(idx);
+                    }
+                }
+                matched
+            }) else {
                 state.failed_attempts.push_back(now);
                 return Err(ApiError::new(BizCode::AuthRefused, t("server.remote.invalidCode", &[])));
             };
@@ -551,8 +571,8 @@ impl Remote {
                 }
             }
         };
-        if should_touch {
-            let _ = self.ctx.service.remote.touch_device_last_seen(&device.id, now).await;
+        if should_touch && let Err(err) = self.ctx.service.remote.touch_device_last_seen(&device.id, now).await {
+            tracing::warn!(device_id = %device.id, error = %err, "failed to persist remote device last_seen_at");
         }
 
         Ok(RemoteDeviceIdentity {

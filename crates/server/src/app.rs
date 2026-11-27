@@ -5,11 +5,10 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::{Arc, OnceLock};
 
 use crate::agent::{Agent, AgentDriver, Mcp, Memory, Orchestrator, OrchestratorParts, PendingExecution, Profile, Resource, ToolRegistry};
-use crate::artifact::Manager as ArtifactManager;
 pub use crate::boot::Overrides;
 use crate::boot::{
     LazyCronOrchestrator, apply_env_overrides, build_runtimes, open_context, register_session_reported_outbox, seat_orchestrators_and_watch,
-    seed_starter_issues_on_boot, spawn_chat_artifact_bridge, spawn_skin_event_bridge,
+    seed_starter_issues_on_boot, spawn_chat_note_bridge, spawn_skin_event_bridge,
 };
 use crate::channel::Chat;
 use crate::config::failed;
@@ -25,6 +24,7 @@ use crate::gateway::api::{GatewayMeta, GatewayPorts, Server};
 use crate::gateway::remote::Remote;
 use crate::issue::{Board, IssueChat, Pull, SessionChat};
 use crate::machine::Machine;
+use crate::note::Manager as NoteManager;
 use crate::projection::finish_boot_and_start_feeds;
 use crate::provider::Provider;
 use crate::repo::Repo;
@@ -51,7 +51,7 @@ pub struct TestInternals<'a> {
     pub issue_chat: &'a Arc<IssueChat>,
     pub session_chat: &'a Arc<SessionChat>,
     pub agent: &'a Arc<Agent>,
-    pub artifact: &'a Arc<ArtifactManager>,
+    pub note: &'a Arc<NoteManager>,
     pub channel: &'a Arc<Chat>,
     pub connector: &'a Arc<Connector>,
     pub cron: &'a Arc<CronScheduler>,
@@ -101,7 +101,7 @@ impl App {
             issue_chat: &c.issue_chat,
             session_chat: &c.session_chat,
             agent: &c.agent,
-            artifact: &c.artifact,
+            note: &c.note,
             channel: &c.channel,
             connector: &c.connector,
             cron: &c.cron,
@@ -156,6 +156,7 @@ async fn create_app_inner(mut config: Config, storage_config: StorageConfig, ove
         work_root: config.work_root.clone(),
         version: config.version.clone(),
         deepseek_api_key: config.deepseek_api_key.clone(),
+        github_token: config.github_token.clone(),
         storage_backend: Some(storage_config.kind().to_string()),
     })
     .await;
@@ -194,8 +195,8 @@ async fn create_app_inner(mut config: Config, storage_config: StorageConfig, ove
         .map_err(|e| failed("the chat")(&e.message))?;
     Box::pin(seat_orchestrators_and_watch(&ctx, &profile, &channel)).await;
 
-    let chat_msg_rx = spawn_chat_artifact_bridge(&ctx, &channel);
-    let artifact = Box::pin(ArtifactManager::open_async(
+    let chat_msg_rx = spawn_chat_note_bridge(&ctx, &channel);
+    let note = Box::pin(NoteManager::open_async(
         ctx.clone(),
         setting.clone(),
         storage.clone(),
@@ -203,11 +204,15 @@ async fn create_app_inner(mut config: Config, storage_config: StorageConfig, ove
         Some(chat_msg_rx),
     ))
     .await
-    .map_err(|e| failed("artifacts")(&e.message))?;
+    .map_err(|e| failed("notes")(&e.message))?;
 
-    let repo = Box::pin(Repo::open_async(&config.work_root, RuntimeConfig::under(&config.home).per_repo))
-        .await
-        .map_err(|e| failed("the repos")(&e))?;
+    let repo = Box::pin(Repo::open_with_setting_async(
+        &config.work_root,
+        RuntimeConfig::under(&config.home).per_repo,
+        Some(setting.clone()),
+    ))
+    .await
+    .map_err(|e| failed("the repos")(&e))?;
     if config.probe_runtimes {
         repo.probe_in_context(&ctx);
     }
@@ -234,7 +239,7 @@ async fn create_app_inner(mut config: Config, storage_config: StorageConfig, ove
     .await
     .map_err(|e| failed("the board")(&e))?;
     seed_starter_issues_on_boot(&config, &setting, &board).await;
-    let publisher = overrides.publisher.unwrap_or_default();
+    let publisher = overrides.publisher.unwrap_or_else(|| Arc::new(crate::issue::Publisher::from_setting(&setting)));
     let pull = Box::pin(Pull::open_async(ctx.clone(), publisher, Some(repo.clone()), Some(board.clone()), None, None))
         .await
         .map_err(|e| failed("the pulls")(&e.message))?;
@@ -263,7 +268,7 @@ async fn create_app_inner(mut config: Config, storage_config: StorageConfig, ove
         repo: repo.clone(),
         chat: channel.clone(),
         pull: pull.clone(),
-        artifact: artifact.clone(),
+        note: note.clone(),
         storage: storage.clone(),
         repos_root: repo.root().to_path_buf(),
     });
@@ -281,7 +286,7 @@ async fn create_app_inner(mut config: Config, storage_config: StorageConfig, ove
         runtime: runtime.clone(),
         repo: repo.clone(),
         memory: memory.clone(),
-        artifact: artifact.clone(),
+        note: note.clone(),
         home: config.home.clone(),
         key: Arc::new(move || key.deepseek_api_key()),
         client: config.model_client.clone(),
@@ -320,7 +325,7 @@ async fn create_app_inner(mut config: Config, storage_config: StorageConfig, ove
         &board,
         &agent,
         &repo,
-        &artifact,
+        &note,
         &channel,
         &cron,
         &setting,
@@ -339,7 +344,7 @@ async fn create_app_inner(mut config: Config, storage_config: StorageConfig, ove
         machine: Some(machine.bus()),
         media_input: Some(storage.clone()),
         voice: Some(voice.clone()),
-        speech: Some(artifact.speech_streams()),
+        speech: Some(note.speech_streams()),
     };
     let core = Arc::new(AppCore {
         ctx,
@@ -355,7 +360,7 @@ async fn create_app_inner(mut config: Config, storage_config: StorageConfig, ove
         issue_chat,
         session_chat,
         agent,
-        artifact,
+        note,
         channel,
         connector,
         cron,
@@ -369,7 +374,8 @@ async fn create_app_inner(mut config: Config, storage_config: StorageConfig, ove
     let gw = GatewayMeta::new(ports, observer, fault_gate, config.host_debug, active_subscriptions);
     let router = Router::new(core.clone(), remote.clone(), gw);
 
-    finish_boot_and_start_feeds(&core.ctx, &core.board, &core.channel, &core.cron, &core.artifact, &core.game, &core.repo);
+    finish_boot_and_start_feeds(&core.ctx, &core.board, &core.channel, &core.cron, &core.note, &core.game, &core.repo);
+    crate::router::note::backfill_issue_bodies_async(&core).await;
     core.ctx.feed.flush().await;
     core.board.refresh_queue_async().await.map_err(|e| failed("the queue")(&e))?;
     remote.restore_if_enabled_async(router.clone()).await;

@@ -14,6 +14,8 @@ export interface AgentHandlers {
   /** Create allocates an identity; callers with an existing identity use save. */
   readonly "agent.create": (a: T.Agent) => Promise<T.Agent>;
   readonly "agent.update": (a: T.Agent) => Promise<T.Agent>;
+  /** Idempotently register or update an external coding agent teammate with a W-XX code. */
+  readonly "agent.register": (a: T.AgentRegisterInput) => Promise<T.Agent>;
   readonly "agent.delete": (a: { readonly id: string }) => Promise<void>;
   /** What delete would do, refused as it would be; nothing changes. */
   readonly "agent.previewDelete": (a: { readonly id: string }) => Promise<T.Preview>;
@@ -62,6 +64,13 @@ export const agentEndpoints: readonly Endpoint[] = [
     input: S.Agent,
     result: S.Agent,
     can: ["user"],
+  },
+  {
+    op: "agent.register",
+    about: ["id"],
+    input: S.AgentRegisterInput,
+    result: S.Agent,
+    can: ["user", "remote"],
   },
   {
     op: "agent.delete",

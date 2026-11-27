@@ -105,9 +105,9 @@ interface CommandLine {
   readonly remove: () => Promise<CommandLineState>;
 }
 
-export interface ArtifactAppletInfo {
-  readonly artifactId: string;
-  readonly artifactType: string;
+export interface NoteAppletInfo {
+  readonly noteId: string;
+  readonly noteType: string;
   readonly appName: string;
   readonly bundleId: string;
   readonly bundlePath: string;
@@ -115,26 +115,26 @@ export interface ArtifactAppletInfo {
   readonly installed: boolean;
 }
 
-export const ArtifactAppletInfo = z.object({
-  artifactId: z.string(),
-  artifactType: z.string(),
+export const NoteAppletInfo = z.object({
+  noteId: z.string(),
+  noteType: z.string(),
   appName: z.string(),
   bundleId: z.string(),
   bundlePath: z.string(),
   alwaysOnTop: z.boolean(),
   installed: z.boolean(),
-}) satisfies Codec<ArtifactAppletInfo>;
+}) satisfies Codec<NoteAppletInfo>;
 
 export interface AppletInstallInput {
-  readonly artifactId: string;
-  readonly artifactType: string;
+  readonly noteId: string;
+  readonly noteType: string;
   readonly appName: string;
   readonly alwaysOnTop: boolean;
 }
 
 export const AppletInstallInput = z.object({
-  artifactId: z.string(),
-  artifactType: z.string(),
+  noteId: z.string(),
+  noteType: z.string(),
   appName: z.string(),
   alwaysOnTop: z.boolean(),
 }) satisfies Codec<AppletInstallInput>;
@@ -155,11 +155,11 @@ export const AppletOpenResult = z.object({
   opened: z.boolean(),
 }) satisfies Codec<AppletOpenResult>;
 
-export interface ArtifactApplets {
-  readonly list: () => Promise<readonly ArtifactAppletInfo[]>;
-  readonly install: (input: AppletInstallInput) => Promise<ArtifactAppletInfo>;
-  readonly uninstall: (artifactId: string) => Promise<AppletRemoveResult>;
-  readonly open: (artifactId: string) => Promise<AppletOpenResult>;
+export interface NoteApplets {
+  readonly list: () => Promise<readonly NoteAppletInfo[]>;
+  readonly install: (input: AppletInstallInput) => Promise<NoteAppletInfo>;
+  readonly uninstall: (noteId: string) => Promise<AppletRemoveResult>;
+  readonly open: (noteId: string) => Promise<AppletOpenResult>;
 }
 
 export interface HostCapturedImage {
@@ -206,7 +206,7 @@ export interface Host {
   readonly opening?: (opening: Opening) => Promise<void>;
   readonly update?: Updates;
   readonly commandLine?: CommandLine;
-  readonly applet?: ArtifactApplets;
+  readonly applet?: NoteApplets;
   readonly captureWebView?: (options?: HostCaptureWebViewOptions) => Promise<HostCapturedImage | null>;
 }
 

@@ -2,11 +2,11 @@
 
 use std::sync::Arc;
 
-use sea_orm::sea_query::{Expr, OnConflict};
-use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, EntityTrait, ExprTrait, QueryFilter, QueryOrder};
+use sea_orm::sea_query::{Alias, Expr, JoinType, LikeExpr, OnConflict, Order, Query};
+use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, EntityTrait, ExprTrait, FromQueryResult, QueryFilter, QueryOrder};
 use vibevalley_protocol::{ActorKind, Memory, MemoryKind};
 
-use super::with_write_tx;
+use super::{MAX_SQL_BIND_PARAMS, batch_chunk_rows, fts5_trigram_phrase, with_write_tx};
 use crate::db::column::{db_word, read_db_word};
 use crate::db::entity::memory;
 use crate::db::{Database, DbResult, Tx};
@@ -99,8 +99,11 @@ async fn list_active_scope_impl<C: ConnectionTrait>(db: &C, agent: &str, kind: M
     Ok(rows.into_iter().map(read_memory).collect())
 }
 
-async fn insert_impl<C: ConnectionTrait>(db: &C, entry: &NewMemory) -> DbResult<()> {
-    memory::ActiveModel {
+const MEMORY_BATCH_ROWS: usize = batch_chunk_rows(15);
+const MEMORY_IN_CHUNK_SIZE: usize = MAX_SQL_BIND_PARAMS - 4;
+
+fn memory_active_model(entry: &NewMemory) -> DbResult<memory::ActiveModel> {
+    Ok(memory::ActiveModel {
         id: Set(entry.id.clone()),
         agent: Set(entry.agent.clone()),
         kind: Set(db_word(&entry.kind)?),
@@ -116,9 +119,22 @@ async fn insert_impl<C: ConnectionTrait>(db: &C, entry: &NewMemory) -> DbResult<
         updated_at: Set(entry.created_at),
         recalled: Set(0),
         recalled_at: Set(None),
+    })
+}
+
+async fn insert_impl<C: ConnectionTrait>(db: &C, entry: &NewMemory) -> DbResult<()> {
+    memory_active_model(entry)?.insert(db).await?;
+    Ok(())
+}
+
+async fn insert_many_impl<C: ConnectionTrait>(db: &C, entries: &[NewMemory]) -> DbResult<()> {
+    if entries.is_empty() {
+        return Ok(());
     }
-    .insert(db)
-    .await?;
+    for chunk in entries.chunks(MEMORY_BATCH_ROWS) {
+        let models: Vec<memory::ActiveModel> = chunk.iter().map(memory_active_model).collect::<DbResult<_>>()?;
+        memory::Entity::insert_many(models).exec_without_returning(db).await?;
+    }
     Ok(())
 }
 
@@ -126,13 +142,17 @@ async fn mark_replaced_by_impl<C: ConnectionTrait>(db: &C, ids: &[String], repla
     if ids.is_empty() {
         return Ok(0);
     }
-    let res = memory::Entity::update_many()
-        .col_expr(memory::Column::ReplacedBy, Expr::value(Some(replaced_by.to_owned())))
-        .col_expr(memory::Column::UpdatedAt, Expr::value(at))
-        .filter(memory::Column::Id.is_in(ids.iter().cloned()))
-        .exec(db)
-        .await?;
-    Ok(res.rows_affected)
+    let mut affected = 0u64;
+    for chunk in ids.chunks(MEMORY_IN_CHUNK_SIZE) {
+        let res = memory::Entity::update_many()
+            .col_expr(memory::Column::ReplacedBy, Expr::value(Some(replaced_by.to_owned())))
+            .col_expr(memory::Column::UpdatedAt, Expr::value(at))
+            .filter(memory::Column::Id.is_in(chunk.iter().cloned()))
+            .exec(db)
+            .await?;
+        affected += res.rows_affected;
+    }
+    Ok(affected)
 }
 
 async fn delete_agent_notes_impl<C: ConnectionTrait>(db: &C, agent: &str) -> DbResult<u64> {
@@ -158,12 +178,16 @@ async fn delete_many_impl<C: ConnectionTrait>(db: &C, agent: &str, ids: &[String
     if ids.is_empty() {
         return Ok(0);
     }
-    let res = memory::Entity::delete_many()
-        .filter(memory::Column::Agent.eq(agent))
-        .filter(memory::Column::Id.is_in(ids.iter().cloned()))
-        .exec(db)
-        .await?;
-    Ok(res.rows_affected)
+    let mut affected = 0u64;
+    for chunk in ids.chunks(MEMORY_IN_CHUNK_SIZE) {
+        let res = memory::Entity::delete_many()
+            .filter(memory::Column::Agent.eq(agent))
+            .filter(memory::Column::Id.is_in(chunk.iter().cloned()))
+            .exec(db)
+            .await?;
+        affected += res.rows_affected;
+    }
+    Ok(affected)
 }
 
 async fn upsert_issue_memory_impl<C: ConnectionTrait>(db: &C, entry: &NewMemory) -> DbResult<()> {
@@ -254,9 +278,7 @@ impl MemoryService {
     pub(crate) async fn rewrite_agent_notes(&self, agent: &str, notes: &[NewMemory]) -> DbResult<usize> {
         with_write_tx(&self.db, async |tx| {
             delete_agent_notes_impl(tx, agent).await?;
-            for entry in notes {
-                insert_impl(tx, entry).await?;
-            }
+            insert_many_impl(tx, notes).await?;
             Ok(notes.len())
         })
         .await
@@ -274,16 +296,84 @@ impl MemoryService {
         if ids.is_empty() {
             return Ok(0);
         }
-        let res = memory::Entity::update_many()
-            .col_expr(memory::Column::Recalled, Expr::col(memory::Column::Recalled).add(1))
-            .col_expr(memory::Column::RecalledAt, Expr::value(Some(at)))
-            .filter(memory::Column::Id.is_in(ids.iter().cloned()))
-            .exec(self.db.write_conn())
-            .await?;
-        Ok(res.rows_affected)
+        let mut affected = 0u64;
+        for chunk in ids.chunks(MEMORY_IN_CHUNK_SIZE) {
+            let res = memory::Entity::update_many()
+                .col_expr(memory::Column::Recalled, Expr::col(memory::Column::Recalled).add(1))
+                .col_expr(memory::Column::RecalledAt, Expr::value(Some(at)))
+                .filter(memory::Column::Id.is_in(chunk.iter().cloned()))
+                .exec(self.db.write_conn())
+                .await?;
+            affected += res.rows_affected;
+        }
+        Ok(affected)
     }
 
     pub(crate) async fn upsert_issue_memory_in_tx(&self, tx: &Tx, entry: &NewMemory) -> DbResult<()> {
         upsert_issue_memory_impl(tx, entry).await
+    }
+
+    /// Searches active memories for `agent` using SQLite FTS5 (`memory_fts`) or PostgreSQL
+    /// trigram GIN (`memory_text_trgm_idx`) with exact case-insensitive substring fallback.
+    #[allow(dead_code)]
+    pub(crate) async fn search(&self, agent: &str, text: &str, limit: u64) -> DbResult<Vec<Memory>> {
+        let trimmed = text.trim();
+        if trimmed.is_empty() || limit == 0 {
+            return Ok(Vec::new());
+        }
+        let conn = self.db.read_conn();
+        let backend = conn.get_database_backend();
+        let mut stmt = Query::select();
+        stmt.columns([
+            (memory::Entity, memory::Column::Id),
+            (memory::Entity, memory::Column::Agent),
+            (memory::Entity, memory::Column::Kind),
+            (memory::Entity, memory::Column::Scope),
+            (memory::Entity, memory::Column::Title),
+            (memory::Entity, memory::Column::Body),
+            (memory::Entity, memory::Column::Repo),
+            (memory::Entity, memory::Column::Session),
+            (memory::Entity, memory::Column::Author),
+            (memory::Entity, memory::Column::Importance),
+            (memory::Entity, memory::Column::ReplacedBy),
+            (memory::Entity, memory::Column::CreatedAt),
+            (memory::Entity, memory::Column::UpdatedAt),
+            (memory::Entity, memory::Column::Recalled),
+            (memory::Entity, memory::Column::RecalledAt),
+        ])
+        .from(memory::Entity)
+        .and_where(Expr::col((memory::Entity, memory::Column::Agent)).eq(agent))
+        .and_where(Expr::col((memory::Entity, memory::Column::ReplacedBy)).is_null());
+
+        if backend == sea_orm::DatabaseBackend::Sqlite
+            && let Some(phrase) = fts5_trigram_phrase(trimmed)
+        {
+            let fts = Alias::new("memory_fts");
+            stmt.join(
+                JoinType::InnerJoin,
+                fts.clone(),
+                Expr::col((fts, Alias::new("rowid"))).equals((memory::Entity, Alias::new("rowid"))),
+            )
+            .and_where(Expr::cust_with_values("memory_fts MATCH ?", [sea_orm::Value::from(phrase)]));
+        } else {
+            let pattern = format!("%{}%", super::escape_like(&trimmed.to_lowercase()));
+            let combined = Expr::cust("LOWER(COALESCE(memory.title, '') || ' ' || memory.body)");
+            stmt.and_where(combined.like(LikeExpr::new(pattern).escape('\\')));
+        }
+
+        stmt.order_by((memory::Entity, memory::Column::CreatedAt), Order::Desc)
+            .order_by((memory::Entity, memory::Column::Id), Order::Desc)
+            .limit(limit);
+
+        let rows = self
+            .db
+            .query_metrics()
+            .observe(
+                "memory.search",
+                "SELECT memory (search)",
+                memory::Model::find_by_statement(backend.build(&stmt)).all(conn),
+            )
+            .await?;
+        Ok(rows.into_iter().map(read_memory).collect())
     }
 }

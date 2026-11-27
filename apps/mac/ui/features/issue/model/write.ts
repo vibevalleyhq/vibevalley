@@ -1,57 +1,9 @@
-import { type ActorRef, type Applied, type AppliedIssue, type Issue, type IssueUpdate, VibeValleyApiError } from "@vibevalley/protocol";
+import { type Applied, type AppliedIssue, type Issue, type IssueUpdate } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 import { issueId } from "@vibevalley/protocol/schema";
 
-import { api, newSendKey } from "../../../infra/api";
+import { api } from "../../../infra/api";
 import { bySeq, defineIntent, type Intent, type Intents, sendReplacing } from "../../../infra/state/intent";
-import { newIssueTitle } from "./issue";
-/** The request key of the issue a box writes: the same words written again after a failure (a lost reply) are the same issue, made once. */
-export function createWriteKey() {
-  let last: { words: string; agent: string; repo: string; key: string } | undefined;
-  return {
-    for: (words: string, agent: string, repo: string) => {
-      if (last?.words !== words || last.agent !== agent || last.repo !== repo) last = { words, agent, repo, key: newSendKey() };
-      return last.key;
-    },
-    used: () => void (last = undefined),
-  };
-}
-
-/** The plus: an issue made at once in the backlog. With words, they are its title and its draft starts from them. */
-export async function writeIssue(
-  text: string,
-  agent: string,
-  repo: string,
-  requestKey: string,
-  machineId = "",
-  attachments?: readonly string[],
-  tags?: readonly string[],
-  dates?: { startAt?: number | undefined; dueAt?: number | undefined; parent?: string | undefined; owner?: ActorRef | undefined },
-): Promise<{ issue: Issue; refused: string }> {
-  const words = text.trim();
-  const made = await api.issue.create(
-    omitUndefined({
-      title: words || newIssueTitle,
-      repo: repo || undefined,
-      agent: agent || undefined,
-      machineId: machineId || undefined,
-      attachments: attachments && attachments.length > 0 ? [...attachments] : undefined,
-      tags: tags && tags.length > 0 ? [...tags] : undefined,
-      parent: dates?.parent ? issueId(dates.parent) : undefined,
-      startAt: dates?.startAt,
-      dueAt: dates?.dueAt,
-      owner: dates?.owner,
-      requestKey,
-    }),
-  );
-  if (!words) return { issue: made, refused: "" };
-  try {
-    return { issue: await api.issue.refine({ id: made.id, text: words }), refused: "" };
-  } catch (e) {
-    if (e instanceof VibeValleyApiError) return { issue: made, refused: e.reason };
-    throw e;
-  }
-}
 
 /** Replaces the attachment list on an open issue. */
 export function updateIssueAttachments(id: string, attachments: readonly string[]): Promise<AppliedIssue> {

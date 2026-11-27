@@ -396,7 +396,7 @@ pub fn pcm16_to_wav(pcm: &[u8], sample_rate: u32, channels: u16) -> Vec<u8> {
     wav
 }
 
-/// One-shot speech-to-text provider used by `voice.asr.transcribe` and batch ASR fallback.
+/// One-shot speech-to-text provider used by `Voice::transcribe_wav_async` for batch ASR fallback.
 pub trait Transcriber: Send + Sync {
     fn transcribe_wav_async<'a>(&'a self, key: &'a Secret, model: &'a str, wav: Vec<u8>) -> crate::BoxFuture<'a, Result<String, String>>;
 }

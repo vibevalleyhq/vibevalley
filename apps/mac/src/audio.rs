@@ -8,10 +8,10 @@ use serde::Serialize;
 
 type AudioWork = Box<dyn FnOnce() + Send>;
 
-fn worker() -> &'static flume::Sender<AudioWork> {
-    static WORKER: std::sync::OnceLock<flume::Sender<AudioWork>> = std::sync::OnceLock::new();
+fn worker() -> &'static std::sync::mpsc::SyncSender<AudioWork> {
+    static WORKER: std::sync::OnceLock<std::sync::mpsc::SyncSender<AudioWork>> = std::sync::OnceLock::new();
     WORKER.get_or_init(|| {
-        let (send, receive) = flume::bounded::<AudioWork>(64);
+        let (send, receive) = std::sync::mpsc::sync_channel::<AudioWork>(64);
         std::thread::Builder::new()
             .name("audio-commands".into())
             .spawn(move || {
@@ -49,7 +49,7 @@ pub struct CallAudio {
 }
 
 fn flush_worker() -> Result<(), String> {
-    let (sent, received) = flume::bounded(1);
+    let (sent, received) = std::sync::mpsc::sync_channel(1);
     worker()
         .send(Box::new(move || {
             let _ = sent.send(());
@@ -103,7 +103,7 @@ pub fn pcm16_rms_level(bytes: &[u8]) -> f64 {
     (rms * 4.0).clamp(0.0, 1.0)
 }
 
-pub fn dispatch<T: Serialize + 'static>(reply: crate::hosted::Replier, run: impl FnOnce() -> Result<T, String> + Send + 'static) {
+pub fn dispatch<T: Serialize + 'static>(reply: crate::host_types::Replier, run: impl FnOnce() -> Result<T, String> + Send + 'static) {
     use vibevalley_server::gateway::bridge::{BizCode, Envelope, refusal};
     let answer = reply.clone();
     if worker()
@@ -759,20 +759,7 @@ mod synth {
         let mut level = 0.0_f64;
 
         let data_bytes = (out.len() * 2) as u32;
-        let mut wav = Vec::with_capacity(44 + out.len() * 2);
-        wav.extend_from_slice(b"RIFF");
-        wav.extend_from_slice(&(36 + data_bytes).to_le_bytes());
-        wav.extend_from_slice(b"WAVE");
-        wav.extend_from_slice(b"fmt ");
-        wav.extend_from_slice(&16u32.to_le_bytes());
-        wav.extend_from_slice(&1u16.to_le_bytes());
-        wav.extend_from_slice(&1u16.to_le_bytes());
-        wav.extend_from_slice(&RATE.to_le_bytes());
-        wav.extend_from_slice(&(RATE * 2).to_le_bytes());
-        wav.extend_from_slice(&2u16.to_le_bytes());
-        wav.extend_from_slice(&16u16.to_le_bytes());
-        wav.extend_from_slice(b"data");
-        wav.extend_from_slice(&data_bytes.to_le_bytes());
+        let mut wav = vibevalley_core::audio::wav_with_header_pcm16(RATE, 1, data_bytes);
 
         for sample in out {
             let x = sample * VOLUME;
@@ -830,7 +817,7 @@ mod tests {
 
     #[test]
     fn regression_audio_commands_keep_the_order_the_host_accepted_them() {
-        let (send, received) = flume::unbounded();
+        let (send, received) = std::sync::mpsc::channel();
         for command in ["play", "stop", "play", "seek", "stop"] {
             let send = send.clone();
             worker()

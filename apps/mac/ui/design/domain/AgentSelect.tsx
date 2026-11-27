@@ -4,12 +4,24 @@ import { Select as Base } from "nsh/base";
 import { t } from "@vibevalley/i18n";
 import type { Agent } from "@vibevalley/protocol";
 
-import type { AgentReadinessStatus, AgentReadinessSummary } from "../../infra/agents";
 import { Button } from "../Button";
 import { Icon } from "../Icon";
 import { motionClass, popupTransition } from "../motion";
 import { TextLink } from "../TextLink";
-import { AgentFace } from "./Face";
+import { AgentCodeBadge, AgentFace } from "./Face";
+
+type AgentReadinessStatus = "ready" | "warn" | "error" | "checking";
+
+interface AgentReadinessProblem {
+  readonly text: string;
+  readonly fixHref?: string | undefined;
+}
+
+interface AgentReadinessSummary {
+  readonly status: AgentReadinessStatus;
+  readonly runtimeLabel: string;
+  readonly problems: readonly AgentReadinessProblem[];
+}
 
 const statusDotClass = (status: AgentReadinessStatus): string => {
   switch (status) {
@@ -105,10 +117,11 @@ export function AgentSelect(props: {
         const info = () => (entry.value ? props.readiness()[entry.value] : undefined);
         const problem = () => info()?.problems[0];
         return (
-          <View class="min-w-0 flex-1 flex-row items-center gap-2">
+          <View testID={props.testid ? `${props.testid}-option-${entry.value}` : undefined} class="min-w-0 flex-1 flex-row items-center gap-2">
             <If when={agent()}>{(a) => <AgentFace agentId={a().id} name={a().name} look={a().look} runtime={a().runtime} size={22} />}</If>
             <View class="min-w-0 flex-1 gap-0.5">
               <View class="flex-row items-center gap-1.5">
+                <If when={agent()}>{(a) => <AgentCodeBadge code={a().code} compact />}</If>
                 <Text class={`min-w-0 truncate text-sm group-selected:font-medium ${agent() ? "text-ink" : "text-muted"}`}>{entry.title}</Text>
                 <If when={info()}>{(s) => <Text class="shrink-0 text-2xs text-muted">{s().runtimeLabel}</Text>}</If>
               </View>
@@ -143,7 +156,14 @@ export function AgentSelect(props: {
             disabled() ? "opacity-50" : "aria-expanded:border-focus focus-visible:outline-2 focus-visible:outline-focus",
           ].join(" ")}
         >
-          <If when={selectedAgent()}>{(a) => <AgentFace agentId={a().id} name={a().name} look={a().look} runtime={a().runtime} size={16} />}</If>
+          <If when={selectedAgent()}>
+            {(a) => (
+              <>
+                <AgentFace agentId={a().id} name={a().name} look={a().look} runtime={a().runtime} size={16} />
+                <AgentCodeBadge code={a().code} compact />
+              </>
+            )}
+          </If>
           <Text class={`min-w-0 flex-1 truncate text-sm ${selectedAgent() ? "text-ink" : "text-faint"}`}>
             {selectedAgent()?.name ?? props.placeholder ?? ""}
           </Text>

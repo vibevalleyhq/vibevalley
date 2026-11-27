@@ -132,19 +132,19 @@ describe("the API client envelope and error boundary", () => {
     await expect(api.repo.list()).rejects.toMatchObject({ status: 500, reason: "unexpected" });
   });
 
-  it("round-trips artifact.collab.export and artifact.collab.import with Zod decoding", async () => {
+  it("round-trips note.collab.export and note.collab.import with Zod decoding", async () => {
     const requests: [string, unknown][] = [];
     const api = new VibeValleyApi("http://farm", (url, init) => {
       const body: unknown = typeof init.body === "string" ? JSON.parse(init.body) : undefined;
       requests.push([url, body]);
-      if (url.endsWith("/api/v1/artifact/collab/export")) {
+      if (url.endsWith("/api/v1/note/collab/export")) {
         return Promise.resolve(
           new Response(
             JSON.stringify({
               bizCode: 0,
               message: "ok",
               data: {
-                artifactId: "art_1",
+                noteId: "note_1",
                 seq: 2,
                 versionVector: "dnYx",
                 frontiers: "ZjE=",
@@ -161,11 +161,11 @@ describe("the API client envelope and error boundary", () => {
             bizCode: 0,
             message: "ok",
             data: {
-              artifactId: "art_1",
+              noteId: "note_1",
               seq: 3,
               versionVector: "dnYy",
               frontiers: "ZjI=",
-              files: [{ path: "structure/index.md", mime: "text/markdown", size: 12, hash: "h1", updatedAt: 1000 }],
+              files: [{ path: "structure/doc.json", mime: "application/json", size: 12, hash: "h1", updatedAt: 1000 }],
               deleted: [],
               serverUpdate: "c2VydmVy",
               serverSnapshot: false,
@@ -175,13 +175,13 @@ describe("the API client envelope and error boundary", () => {
       );
     });
 
-    const exported = await api.artifact.collab.export({ id: "art_1" as never, versionVector: "dnYw" });
+    const exported = await api.note.collab.export({ id: "note_1" as never, versionVector: "dnYw" });
     expect(exported.seq).toBe(2);
     expect(exported.snapshot).toBe(false);
     expect(exported.update).toBe("dXBkYXRl");
 
-    const imported = await api.artifact.collab.import({
-      id: "art_1" as never,
+    const imported = await api.note.collab.import({
+      id: "note_1" as never,
       update: "Y2xpZW50",
       clientVersionVector: "dnYw",
       origin: "user",
@@ -190,8 +190,8 @@ describe("the API client envelope and error boundary", () => {
     expect(imported.serverUpdate).toBe("c2VydmVy");
     expect(imported.serverSnapshot).toBe(false);
     expect(requests).toEqual([
-      ["http://farm/api/v1/artifact/collab/export", { id: "art_1", versionVector: "dnYw" }],
-      ["http://farm/api/v1/artifact/collab/import", { id: "art_1", update: "Y2xpZW50", clientVersionVector: "dnYw", origin: "user" }],
+      ["http://farm/api/v1/note/collab/export", { id: "note_1", versionVector: "dnYw" }],
+      ["http://farm/api/v1/note/collab/import", { id: "note_1", update: "Y2xpZW50", clientVersionVector: "dnYw", origin: "user" }],
     ]);
   });
 });

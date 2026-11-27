@@ -3,7 +3,6 @@ import { computed, host, Image, signal, Text, untracked, View } from "nsh";
 import { t } from "@vibevalley/i18n";
 import type { SettingsStatus, UserProfile } from "@vibevalley/protocol";
 
-import { createAct } from "../../design/act";
 import { ownerPortraitUrl, roleAvatarUrl, useAssetsDir } from "../../design/art";
 import { Button } from "../../design/Button";
 import { USER_AVATAR_PRESETS, UserAvatar } from "../../design/domain/Face";
@@ -12,6 +11,7 @@ import { TextInput } from "../../design/Field";
 import { SaveBar } from "../../design/KeyField";
 import { Banner, Quiet } from "../../design/layout";
 import { toast } from "../../design/toasts";
+import { createAct } from "../../infra/act";
 import { reasonOf } from "../../infra/api";
 import { importLocalAttachment } from "../../infra/attachmentFile";
 import { Keyed } from "../../infra/base/dom";

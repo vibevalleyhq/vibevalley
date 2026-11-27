@@ -15,10 +15,10 @@ public final class AppletStorage: @unchecked Sendable {
     self.entries = Self.loadFromDisk(at: fileURL)
   }
 
-  public convenience init(serverHome: String, artifactId: String) {
+  public convenience init(serverHome: String, noteId: String) {
     let dir = URL(fileURLWithPath: serverHome, isDirectory: true)
       .appendingPathComponent("applet_data", isDirectory: true)
-    let file = dir.appendingPathComponent("\(Self.sanitizeIdentifier(artifactId)).json", isDirectory: false)
+    let file = dir.appendingPathComponent("\(Self.sanitizeIdentifier(noteId)).json", isDirectory: false)
     self.init(fileURL: file)
   }
 
@@ -44,8 +44,8 @@ public final class AppletStorage: @unchecked Sendable {
     return trimmed.isEmpty ? "default" : trimmed
   }
 
-  public static func windowAutosaveName(forArtifactId artifactId: String) -> String {
-    "VibeValleyApplet.\(sanitizeIdentifier(artifactId))"
+  public static func windowAutosaveName(forNoteId noteId: String) -> String {
+    "VibeValleyApplet.\(sanitizeIdentifier(noteId))"
   }
 
   public func snapshot() -> [String: String] {

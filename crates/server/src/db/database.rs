@@ -5,15 +5,17 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use parking_lot::Mutex;
+use sea_orm::sqlx::ConnectOptions as _;
 use sea_orm::sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous};
 use sea_orm::{
     ConnectOptions, ConnectionTrait, Database as SeaDatabase, DatabaseBackend, DatabaseConnection, DatabaseTransaction, DbErr, SqliteTransactionMode,
     SqlxSqliteConnector, TransactionOptions, TransactionTrait,
 };
 use sea_orm_migration::MigratorTrait;
+use tokio_util::sync::CancellationToken;
 use vibevalley_core::SliceMask;
 
-use super::{DbBackend, DbError, DbResult, entity, migration, verify};
+use super::{DEFAULT_SLOW_QUERY_THRESHOLD, DbBackend, DbError, DbResult, QueryMetrics, entity, migration, verify};
 
 /// Active database write transaction passed to `*_in_tx` methods on `crate::service::Service` sub-services.
 pub type Tx = DatabaseTransaction;
@@ -23,7 +25,17 @@ pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
 const READ_POOL_MAX_CONNECTIONS: u32 = 6;
 const WRITE_POOL_MAX_CONNECTIONS: u32 = 1;
-const DEFAULT_POSTGRES_MAX_CONNECTIONS: u32 = 16;
+const SQLITE_ACQUIRE_TIMEOUT: Duration = Duration::from_secs(10);
+const SQLITE_CACHE_SIZE_KIB: &str = "-32000";
+const SQLITE_TEMP_STORE: &str = "MEMORY";
+const SQLITE_MMAP_SIZE_BYTES: &str = "134217728";
+const SQLITE_OPTIMIZE_INTERVAL: Duration = Duration::from_secs(4 * 60 * 60);
+
+pub const DEFAULT_POSTGRES_MAX_CONNECTIONS: u32 = 16;
+pub const DEFAULT_POSTGRES_MIN_CONNECTIONS: u32 = 2;
+pub const DEFAULT_POSTGRES_ACQUIRE_TIMEOUT: Duration = Duration::from_secs(10);
+pub const DEFAULT_POSTGRES_IDLE_TIMEOUT: Duration = Duration::from_secs(300);
+pub const DEFAULT_POSTGRES_MAX_LIFETIME: Duration = Duration::from_secs(1800);
 
 fn redact_db_url(raw: &str) -> String {
     if let Ok(mut parsed) = url::Url::parse(raw) {
@@ -55,18 +67,38 @@ fn parse_sqlite_url(url: &str) -> DbResult<PathBuf> {
 
 #[derive(Clone, PartialEq, Eq)]
 pub enum DatabaseConfig {
-    Sqlite { path: PathBuf },
-    Postgres { url: String, max_connections: u32 },
+    Sqlite {
+        path: PathBuf,
+    },
+    Postgres {
+        url: String,
+        max_connections: u32,
+        min_connections: u32,
+        acquire_timeout: Duration,
+        idle_timeout: Duration,
+        max_lifetime: Duration,
+    },
 }
 
 impl std::fmt::Debug for DatabaseConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Sqlite { path } => f.debug_struct("Sqlite").field("path", path).finish(),
-            Self::Postgres { url, max_connections } => f
+            Self::Postgres {
+                url,
+                max_connections,
+                min_connections,
+                acquire_timeout,
+                idle_timeout,
+                max_lifetime,
+            } => f
                 .debug_struct("Postgres")
                 .field("url", &redact_db_url(url))
                 .field("max_connections", max_connections)
+                .field("min_connections", min_connections)
+                .field("acquire_timeout", acquire_timeout)
+                .field("idle_timeout", idle_timeout)
+                .field("max_lifetime", max_lifetime)
                 .finish(),
         }
     }
@@ -80,6 +112,10 @@ impl DatabaseConfig {
             return Ok(Self::Postgres {
                 url: trimmed.to_owned(),
                 max_connections: DEFAULT_POSTGRES_MAX_CONNECTIONS,
+                min_connections: DEFAULT_POSTGRES_MIN_CONNECTIONS,
+                acquire_timeout: DEFAULT_POSTGRES_ACQUIRE_TIMEOUT,
+                idle_timeout: DEFAULT_POSTGRES_IDLE_TIMEOUT,
+                max_lifetime: DEFAULT_POSTGRES_MAX_LIFETIME,
             });
         }
         if trimmed.starts_with("sqlite:") {
@@ -89,6 +125,37 @@ impl DatabaseConfig {
         }
         Err(DbError::custom(format!("unsupported database URL scheme: {}", redact_db_url(trimmed))))
     }
+}
+
+fn postgres_connect_options(
+    url: &str,
+    max_connections: u32,
+    min_connections: u32,
+    acquire_timeout: Duration,
+    idle_timeout: Duration,
+    max_lifetime: Duration,
+) -> ConnectOptions {
+    let max_conns = max_connections.max(1);
+    let min_conns = min_connections.min(max_conns);
+    let mut opts = ConnectOptions::new(url);
+    opts.max_connections(max_conns)
+        .min_connections(min_conns)
+        .acquire_timeout(acquire_timeout)
+        .idle_timeout(idle_timeout)
+        .max_lifetime(max_lifetime)
+        .sqlx_logging(false)
+        .sqlx_slow_statements_logging_settings(tracing::log::LevelFilter::Warn, DEFAULT_SLOW_QUERY_THRESHOLD);
+    opts
+}
+
+fn sqlite_base_options(path: &Path) -> SqliteConnectOptions {
+    SqliteConnectOptions::new()
+        .filename(path)
+        .busy_timeout(Duration::from_secs(5))
+        .pragma("cache_size", SQLITE_CACHE_SIZE_KIB)
+        .pragma("temp_store", SQLITE_TEMP_STORE)
+        .pragma("mmap_size", SQLITE_MMAP_SIZE_BYTES)
+        .log_slow_statements(tracing::log::LevelFilter::Warn, DEFAULT_SLOW_QUERY_THRESHOLD)
 }
 
 enum DbBackendState {
@@ -106,6 +173,9 @@ pub struct Database {
     read_conn: DatabaseConnection,
     write_conn: DatabaseConnection,
     durable: Mutex<Option<vibevalley_runtime::agent::durable::Store>>,
+    metrics: Arc<QueryMetrics>,
+    optimize_cancel: CancellationToken,
+    optimize_task: Mutex<Option<tokio::task::JoinHandle<()>>>,
 }
 
 async fn run_migrations_and_verify(conn: &DatabaseConnection, backend: DbBackend, db_path: Option<&Path>) -> DbResult<()> {
@@ -151,26 +221,27 @@ impl Database {
 
         let (backend_state, read_conn, write_conn) = match &config_owned {
             DatabaseConfig::Sqlite { path } => {
-                let write_options = SqliteConnectOptions::new()
-                    .filename(path)
+                let write_options = sqlite_base_options(path)
                     .create_if_missing(true)
-                    .busy_timeout(Duration::from_secs(5))
                     .journal_mode(SqliteJournalMode::Wal)
                     .synchronous(SqliteSynchronous::Normal)
                     .foreign_keys(true);
                 let write_pool = SqlitePoolOptions::new()
                     .max_connections(WRITE_POOL_MAX_CONNECTIONS)
                     .min_connections(1)
+                    .acquire_timeout(SQLITE_ACQUIRE_TIMEOUT)
                     .connect_with(write_options)
                     .await
                     .map_err(|e| DbErr::Conn(sea_orm::RuntimeErr::SqlxError(Arc::new(e))))?;
                 let write_conn = SqlxSqliteConnector::from_sqlx_sqlite_pool(write_pool);
                 run_migrations_and_verify(&write_conn, DbBackend::Sqlite, Some(path.as_path())).await?;
+                let _ = write_conn.execute_unprepared("PRAGMA optimize(0x10002);").await;
 
-                let read_options = SqliteConnectOptions::new().filename(path).read_only(true).busy_timeout(Duration::from_secs(5));
+                let read_options = sqlite_base_options(path).read_only(true);
                 let read_pool = SqlitePoolOptions::new()
                     .max_connections(READ_POOL_MAX_CONNECTIONS)
                     .min_connections(1)
+                    .acquire_timeout(SQLITE_ACQUIRE_TIMEOUT)
                     .connect_with(read_options)
                     .await
                     .map_err(|e| DbErr::Conn(sea_orm::RuntimeErr::SqlxError(Arc::new(e))))?;
@@ -178,9 +249,15 @@ impl Database {
 
                 (DbBackendState::Sqlite { path: path.clone() }, read_conn, write_conn)
             }
-            DatabaseConfig::Postgres { url, max_connections } => {
-                let mut opts = ConnectOptions::new(url);
-                opts.max_connections((*max_connections).max(1)).sqlx_logging(false);
+            DatabaseConfig::Postgres {
+                url,
+                max_connections,
+                min_connections,
+                acquire_timeout,
+                idle_timeout,
+                max_lifetime,
+            } => {
+                let opts = postgres_connect_options(url, *max_connections, *min_connections, *acquire_timeout, *idle_timeout, *max_lifetime);
                 let conn = SeaDatabase::connect(opts).await.inspect_err(|err| {
                     tracing::error!(url = %redact_db_url(url), error = %err, "failed to connect to postgres database");
                 })?;
@@ -189,12 +266,38 @@ impl Database {
             }
         };
 
+        let optimize_cancel = CancellationToken::new();
+        let optimize_task = if matches!(backend_state, DbBackendState::Sqlite { .. }) {
+            let conn = write_conn.clone();
+            let cancel = optimize_cancel.clone();
+            Some(tokio::spawn(async move {
+                let mut ticker = tokio::time::interval(SQLITE_OPTIMIZE_INTERVAL);
+                ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+                ticker.tick().await;
+                loop {
+                    tokio::select! {
+                        () = cancel.cancelled() => break,
+                        _ = ticker.tick() => {
+                            if let Err(err) = conn.execute_unprepared("PRAGMA optimize;").await {
+                                tracing::debug!(error = %err, "periodic sqlite PRAGMA optimize failed");
+                            }
+                        }
+                    }
+                }
+            }))
+        } else {
+            None
+        };
+
         Ok(Arc::new(Self {
             config: config_owned,
             backend_state,
             read_conn,
             write_conn,
             durable: Mutex::new(None),
+            metrics: Arc::new(QueryMetrics::default()),
+            optimize_cancel,
+            optimize_task: Mutex::new(optimize_task),
         }))
     }
 
@@ -219,6 +322,18 @@ impl Database {
 
     pub fn database_config(&self) -> &DatabaseConfig {
         &self.config
+    }
+
+    pub fn query_metrics(&self) -> &Arc<QueryMetrics> {
+        &self.metrics
+    }
+
+    /// Runs `PRAGMA optimize` on SQLite (no-op on PostgreSQL) to refresh query planner statistics.
+    pub async fn run_pragma_optimize(&self) -> DbResult<()> {
+        if matches!(self.backend_state, DbBackendState::Sqlite { .. }) {
+            self.write_conn.execute_unprepared("PRAGMA optimize;").await?;
+        }
+        Ok(())
     }
 
     pub fn path(&self) -> Option<&Path> {
@@ -258,6 +373,11 @@ impl Database {
     /// Coordinated async database shutdown: closes the durable store handle, then closes
     /// SQLite connections (with WAL `TRUNCATE` + `PRAGMA optimize`) or the PostgreSQL pool.
     pub async fn close(&self) {
+        self.optimize_cancel.cancel();
+        let handle = self.optimize_task.lock().take();
+        if let Some(handle) = handle {
+            let _ = handle.await;
+        }
         let store = self.durable.lock().take();
         if let Some(store) = store {
             let _ = store.close().await;
@@ -381,6 +501,19 @@ async fn next_seq_impl(db: &impl ConnectionTrait, name: &str, at_least: i64) -> 
     Ok(saved.last_number)
 }
 
+/// Opens a read transaction pinning a single consistent snapshot across multiple queries
+/// (`BEGIN DEFERRED` on SQLite WAL, non-blocking with concurrent writers).
+pub(crate) async fn begin_read_tx(conn: &DatabaseConnection) -> DbResult<Tx> {
+    let opts = match conn.get_database_backend() {
+        DatabaseBackend::Sqlite => TransactionOptions {
+            sqlite_transaction_mode: Some(SqliteTransactionMode::Deferred),
+            ..Default::default()
+        },
+        _ => TransactionOptions::default(),
+    };
+    conn.begin_with_options(opts).await.map_err(DbError::from)
+}
+
 /// Opens a write transaction, using `BEGIN IMMEDIATE` on SQLite so writers serialize at begin.
 pub(crate) async fn begin_write_tx(conn: &DatabaseConnection) -> DbResult<Tx> {
     let opts = match conn.get_database_backend() {
@@ -393,7 +526,7 @@ pub(crate) async fn begin_write_tx(conn: &DatabaseConnection) -> DbResult<Tx> {
     conn.begin_with_options(opts).await.map_err(DbError::from)
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "postgres"))]
 pub(crate) mod test_pg {
     use std::io::Write;
     use std::path::PathBuf;
@@ -590,6 +723,42 @@ mod tests {
         assert!(DatabaseConfig::from_url("mysql://localhost/db").is_err());
     }
 
+    #[test]
+    fn postgres_config_defaults_and_connect_options_clamp_bounds() {
+        let cfg = DatabaseConfig::from_url("postgres://postgres@127.0.0.1:5432/vibevalley").unwrap();
+        let DatabaseConfig::Postgres {
+            url,
+            max_connections,
+            min_connections,
+            acquire_timeout,
+            idle_timeout,
+            max_lifetime,
+        } = cfg
+        else {
+            panic!("expected postgres config");
+        };
+        assert_eq!(max_connections, DEFAULT_POSTGRES_MAX_CONNECTIONS);
+        assert_eq!(min_connections, DEFAULT_POSTGRES_MIN_CONNECTIONS);
+        assert_eq!(acquire_timeout, DEFAULT_POSTGRES_ACQUIRE_TIMEOUT);
+        assert_eq!(idle_timeout, DEFAULT_POSTGRES_IDLE_TIMEOUT);
+        assert_eq!(max_lifetime, DEFAULT_POSTGRES_MAX_LIFETIME);
+
+        let opts = postgres_connect_options(&url, max_connections, min_connections, acquire_timeout, idle_timeout, max_lifetime);
+        assert_eq!(opts.get_max_connections(), Some(DEFAULT_POSTGRES_MAX_CONNECTIONS));
+        assert_eq!(opts.get_min_connections(), Some(DEFAULT_POSTGRES_MIN_CONNECTIONS));
+        assert_eq!(opts.get_acquire_timeout(), Some(DEFAULT_POSTGRES_ACQUIRE_TIMEOUT));
+        assert_eq!(opts.get_idle_timeout(), Some(Some(DEFAULT_POSTGRES_IDLE_TIMEOUT)));
+        assert_eq!(opts.get_max_lifetime(), Some(Some(DEFAULT_POSTGRES_MAX_LIFETIME)));
+        assert!(!opts.get_sqlx_logging());
+
+        let clamped = postgres_connect_options(&url, 0, 8, Duration::from_secs(3), Duration::from_secs(60), Duration::from_secs(600));
+        assert_eq!(clamped.get_max_connections(), Some(1));
+        assert_eq!(clamped.get_min_connections(), Some(1));
+        assert_eq!(clamped.get_acquire_timeout(), Some(Duration::from_secs(3)));
+        assert_eq!(clamped.get_idle_timeout(), Some(Some(Duration::from_secs(60))));
+        assert_eq!(clamped.get_max_lifetime(), Some(Some(Duration::from_secs(600))));
+    }
+
     #[tokio::test]
     async fn sqlite_open_url_migrates_and_allocates_monotonic_sequences() {
         let dir = tempfile::tempdir().unwrap();
@@ -612,5 +781,45 @@ mod tests {
         let reopened = Database::open_config(&DatabaseConfig::Sqlite { path: db_path }).await.unwrap();
         assert_eq!(reopened.next_seq("issue", 0).await.unwrap(), 13);
         reopened.close().await;
+    }
+
+    #[tokio::test]
+    async fn sqlite_pools_apply_engine_pragmas_and_optimize() {
+        use sea_orm::Statement;
+
+        let dir = tempfile::tempdir().unwrap();
+        let db = Database::open(dir.path()).await.unwrap();
+
+        for conn in [db.write_conn(), db.read_conn()] {
+            let cache_size: i64 = conn
+                .query_one_raw(Statement::from_string(DatabaseBackend::Sqlite, "PRAGMA cache_size;"))
+                .await
+                .unwrap()
+                .unwrap()
+                .try_get_by_index(0)
+                .unwrap();
+            assert_eq!(cache_size, -32000, "cache_size must be tuned to -32000 KiB");
+
+            let temp_store: i64 = conn
+                .query_one_raw(Statement::from_string(DatabaseBackend::Sqlite, "PRAGMA temp_store;"))
+                .await
+                .unwrap()
+                .unwrap()
+                .try_get_by_index(0)
+                .unwrap();
+            assert_eq!(temp_store, 2, "temp_store must be MEMORY (2)");
+
+            let mmap_size: i64 = conn
+                .query_one_raw(Statement::from_string(DatabaseBackend::Sqlite, "PRAGMA mmap_size;"))
+                .await
+                .unwrap()
+                .unwrap()
+                .try_get_by_index(0)
+                .unwrap();
+            assert!(mmap_size > 0, "mmap_size must be enabled (> 0), got {mmap_size}");
+        }
+
+        db.run_pragma_optimize().await.unwrap();
+        db.close().await;
     }
 }

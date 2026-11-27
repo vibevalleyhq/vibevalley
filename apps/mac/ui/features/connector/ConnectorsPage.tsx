@@ -4,7 +4,6 @@ import { t } from "@vibevalley/i18n";
 import { type ConnectorID, ConnectorIDValues, type ConnectorLogin, type ConnectorState, type ConnectorStatus } from "@vibevalley/protocol";
 import { defaultOf } from "@vibevalley/protocol/rules";
 
-import { createAct } from "../../design/act";
 import { connectorEmblemUrl, useAssetsDir } from "../../design/art";
 import { Button } from "../../design/Button";
 import { ConfirmButton } from "../../design/ConfirmButton";
@@ -14,6 +13,7 @@ import { Qr } from "../../design/Qr";
 import { CountPill } from "../../design/Tag";
 import { TextLink } from "../../design/TextLink";
 import { Bubble } from "../../design/Tip";
+import { createAct } from "../../infra/act";
 import { api } from "../../infra/api";
 import { Keyed } from "../../infra/base/dom";
 import { momentText, wallClockText } from "../../infra/base/format";

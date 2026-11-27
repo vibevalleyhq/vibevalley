@@ -1,5 +1,6 @@
 {
   "deepseekKey": "The DeepSeek API Key does not look right: a string with no spaces, usually starting with sk-",
+  "githubToken": "GitHub Token must not contain spaces",
   "memory": {
     "twice": "Only one memory source of each kind: {kind}",
     "noUrl": "To connect a memory source, fill in its address first",

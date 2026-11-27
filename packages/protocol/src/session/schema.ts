@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import type { Codec } from "../codec";
-import { ArtifactId, IssueId, Outcome, Retry, SessionId, Spent } from "../common/schema";
+import { IssueId, NoteId, Outcome, Retry, SessionId, Spent } from "../common/schema";
 import { AgentRoleValues } from "../common/shapes.gen";
 import { MachinePlatform, MachineStatus } from "../machine/schema";
 import * as T from "./shapes.gen";
@@ -115,8 +115,8 @@ export const ContextRef = z.discriminatedUnion("kind", [
     id: z.string(),
   }),
   z.object({
-    kind: z.literal("artifact"),
-    id: ArtifactId,
+    kind: z.literal("note"),
+    id: NoteId,
   }),
 ]) satisfies Codec<T.ContextRef>;
 

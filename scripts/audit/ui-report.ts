@@ -315,7 +315,7 @@ function classifyShot(name: string): { scenarios: string[]; views: string[] } {
   if (parts.includes("issues") || parts.includes("issue")) views.push("issues");
   if (parts.includes("runs")) views.push("runs");
   if (parts.includes("chat")) views.push("chat");
-  if (parts.includes("library") || parts.includes("artifacts")) views.push("media");
+  if (parts.includes("library") || parts.includes("notes")) views.push("media");
   if (
     parts.includes("workspace") ||
     parts.includes("palette") ||
@@ -325,7 +325,7 @@ function classifyShot(name: string): { scenarios: string[]; views: string[] } {
     parts.includes("runtimes") ||
     parts.includes("settings") ||
     parts.includes("connectors") ||
-    parts.includes("artifacts")
+    parts.includes("notes")
   ) {
     views.push("workspace");
   }
@@ -362,7 +362,7 @@ const componentRows = [
     target: "Checkbox / Segmented / Tabs / Tag / Slider / Field / ChipsInput / KeyField",
     verified: "状态切换、逗号分片、Slider 调节、只读 Key 脱敏操作",
   },
-  { group: "浮层与表格", target: "Dialog / MoreMenu / ToastHost / DataTable", verified: "开关弹窗、菜单动作、虚拟时钟 4.1s Toast 自动消失、排序与勾选空态" },
+  { group: "浮层与反馈", target: "Dialog / MoreMenu / ToastHost", verified: "开关弹窗、菜单动作、虚拟时钟 4.1s Toast 自动消失" },
   { group: "富文本与代码", target: "Markdown / CodeBlock", verified: "超长代码折叠展开、剪贴板复制及虚拟时钟 1.6s 已复制状态复位" },
   {
     group: "时钟与领域件",
@@ -386,9 +386,9 @@ const frontendFsmRows = [
   },
   {
     module: "features/media/libraryView.ts",
-    states: "LibraryScope (all | media | artifact) × LibrarySelection (none | files | artifact | lightbox)",
+    states: "ContentBucket (recent | pinned | apps | notes | media) × LibrarySelection (none | files | lightbox)",
     testSuite: "features/media/libraryView.test.ts",
-    summary: "收口素材库互斥筛选域、文件/Artifact 选区、Shift 范围多选与灯箱切换，移除清理 effect",
+    summary: "收口内容中心筛选桶、文件选区、Shift 范围多选与灯箱切换，移除清理 effect",
   },
   {
     module: "features/session/runsView.ts",

@@ -6,7 +6,7 @@
 
 use axum::extract::{FromRequestParts, Query};
 use axum::http::request::Parts;
-use axum::http::{HeaderMap, StatusCode, Uri};
+use axum::http::{HeaderMap, Uri};
 use axum::response::Response;
 use vibevalley_protocol::{ApiError, BizCode, Caller, Envelope, SCOPE_REMOTE_MACHINE};
 
@@ -161,21 +161,6 @@ impl FromRequestParts<HttpState> for LocalOnly {
     async fn from_request_parts(parts: &mut Parts, state: &HttpState) -> Result<Self, Self::Rejection> {
         if state.is_remote || !from_the_farm(&parts.headers) {
             return Err(refuse(BizCode::Forbidden, "forbidden"));
-        }
-        Ok(Self)
-    }
-}
-
-/// Enforces loopback listener and `from_the_farm` headers, rejecting with a plain
-/// `403 Forbidden` status code (used by binary media playback).
-pub(super) struct LocalOnlyStatus;
-
-impl FromRequestParts<HttpState> for LocalOnlyStatus {
-    type Rejection = StatusCode;
-
-    async fn from_request_parts(parts: &mut Parts, state: &HttpState) -> Result<Self, Self::Rejection> {
-        if state.is_remote || !from_the_farm(&parts.headers) {
-            return Err(StatusCode::FORBIDDEN);
         }
         Ok(Self)
     }

@@ -44,8 +44,10 @@ const baseLook: Agent["look"] = {
 function makeAgent(id: string, role: Agent["role"], name: string, duty = ""): Agent {
   return {
     id,
+    code: role === "orchestrator" ? "O-01" : "W-01",
     name,
     role,
+    mode: "managed",
     duty,
     enabled: true,
     runtime: role === "orchestrator" ? "vibevalley" : "claude",
@@ -54,7 +56,7 @@ function makeAgent(id: string, role: Agent["role"], name: string, duty = ""): Ag
     persona: "",
     personaMode: "append",
     skills: [],
-    toolsets: ["issue", "session", "channel", "resource", "memory", "library", "artifact"],
+    toolsets: ["issue", "session", "channel", "resource", "memory", "library", "note"],
     mcpServers: [],
     disallowedTools: [],
     env: {},

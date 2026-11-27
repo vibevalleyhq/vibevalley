@@ -92,7 +92,7 @@ impl From<ScrollPhaseKind> for gpui::TouchPhase {
 pub enum ShimToHost {
     #[serde(rename_all = "camelCase")]
     Attach {
-        artifact_id: String,
+        note_id: String,
         width: f64,
         height: f64,
         scale: f64,
@@ -188,13 +188,13 @@ pub enum HostToShim {
     ReadyLayer {
         context_id: u32,
         title: String,
-        artifact_type: String,
+        note_type: String,
     },
     #[serde(rename_all = "camelCase")]
     ReadyWebview {
         html: String,
         title: String,
-        artifact_type: String,
+        note_type: String,
     },
     #[serde(rename_all = "camelCase")]
     UpdateWebview {
@@ -216,4 +216,4 @@ pub enum HostToShim {
     Closing,
 }
 
-pub use vibevalley_protocol::{AppletOpenResult, AppletRemoveResult, ArtifactAppletInfo as AppletInfo, HostAppletInstallPayload as AppletInstallRequest};
+pub use vibevalley_protocol::{AppletOpenResult, AppletRemoveResult, HostAppletInstallPayload as AppletInstallRequest, NoteAppletInfo as AppletInfo};

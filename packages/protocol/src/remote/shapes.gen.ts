@@ -8,7 +8,7 @@ export type RemotePlatform = (typeof RemotePlatformValues)[number];
  */
 export type RemoteDeviceSummary = { id: string, name: string, platform: RemotePlatform, scope: string, createdAt: number, lastSeenAt?: number, revokedAt?: number, };
 
-export type RemoteStatus = { enabled: boolean, listening: boolean, bindAddr?: string, port: number, tailscaleIp?: string, tailscaleHost?: string, tailscaleOnline: boolean, url?: string, devices: Array<RemoteDeviceSummary>, };
+export type RemoteStatus = { enabled: boolean, listening: boolean, bindAddr?: string, port: number, lanIp?: string, tailscaleIp?: string, tailscaleHost?: string, tailscaleOnline: boolean, url?: string, devices: Array<RemoteDeviceSummary>, };
 
 export type RemoteEnableRequest = { bindAddr?: string, port?: number, };
 

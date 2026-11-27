@@ -120,32 +120,40 @@ const COMMANDS: &[&str] = &[
     "agent delete",
     "agent list",
     "agent update",
-    "artifact create",
-    "artifact delete",
-    "artifact file batch",
-    "artifact file delete",
-    "artifact file get",
-    "artifact file list",
-    "artifact file write",
-    "artifact history compact",
-    "artifact history fork",
-    "artifact history list",
-    "artifact history preview",
-    "artifact history restore",
-    "artifact history undo-origin",
-    "artifact list",
-    "artifact read",
-    "artifact show",
-    "artifact suggestion accept",
-    "artifact suggestion create",
-    "artifact suggestion list",
-    "artifact suggestion reject",
-    "artifact type list",
-    "artifact type read",
-    "artifact update",
-    "artifact version",
     "attachment get",
     "attachment upload",
+    "note base-run",
+    "note base-upsert",
+    "note base-view",
+    "note cover",
+    "note create",
+    "note delete",
+    "note doc-append",
+    "note doc-view",
+    "note file batch",
+    "note file delete",
+    "note file get",
+    "note file list",
+    "note file write",
+    "note history compact",
+    "note history fork",
+    "note history list",
+    "note history preview",
+    "note history restore",
+    "note history undo-origin",
+    "note links",
+    "note list",
+    "note move",
+    "note read",
+    "note show",
+    "note suggestion accept",
+    "note suggestion create",
+    "note suggestion list",
+    "note suggestion reject",
+    "note type list",
+    "note type read",
+    "note update",
+    "note version",
     "auth login",
     "auth logout",
     "auth status",
@@ -417,23 +425,23 @@ fn state_snapshot_and_doctor_verify_sse_and_channel() {
 }
 
 #[test]
-fn content_domain_artifacts_entries_attachments_library_media_and_channel_flags() {
+fn content_domain_notes_entries_attachments_library_media_and_channel_flags() {
     let srv = spawn_server();
 
-    // 1. Artifact create, update, file write/batch/list/get/delete, and dry-run delete
-    let created = srv.run(&["artifact", "create", "System Map", "--type", "whiteboard", "--json"]).json();
-    let art_id = created["id"].as_str().unwrap().to_string();
-    assert_eq!(created["artifactType"], "whiteboard");
+    // 1. Note create, update, file write/batch/list/get/delete, and dry-run delete
+    let created = srv.run(&["note", "create", "System Map", "--type", "canvas", "--json"]).json();
+    let note_id = created["id"].as_str().unwrap().to_string();
+    assert_eq!(created["noteType"], "canvas");
 
-    let renamed = srv.run(&["artifact", "update", &art_id, "--title", "System Map v2", "--json"]).json();
+    let renamed = srv.run(&["note", "update", &note_id, "--title", "System Map v2", "--json"]).json();
     assert_eq!(renamed["title"], "System Map v2");
 
     let wrote_meta = srv
         .run(&[
-            "artifact",
+            "note",
             "file",
             "write",
-            &art_id,
+            &note_id,
             "structure/notes.md",
             "Architecture overview",
             "--summary",
@@ -457,20 +465,20 @@ fn content_domain_artifacts_entries_attachments_library_media_and_channel_flags(
     .unwrap();
     let batch_arg = format!("@{}", batch_file.display());
     let batched = srv
-        .run(&["artifact", "file", "batch", &art_id, &batch_arg, "--summary", "seed node", "--json"])
+        .run(&["note", "file", "batch", &note_id, &batch_arg, "--summary", "seed node", "--json"])
         .json();
     assert!(batched["seq"].as_i64().unwrap() >= 3, "{batched}");
 
-    let file_list = srv.run(&["artifact", "file", "list", &art_id, "--prefix", "structure/", "--json"]).json();
+    let file_list = srv.run(&["note", "file", "list", &note_id, "--prefix", "structure/", "--json"]).json();
     let files = file_list["files"].as_array().unwrap();
     assert!(!files.is_empty() && files.iter().all(|f| f["path"].as_str().unwrap().starts_with("structure/")));
     assert!(files.iter().any(|f| f["path"] == "structure/n1.json"));
-    let file_get = srv.run(&["artifact", "file", "get", &art_id, "structure/n1.json", "--json"]).json();
+    let file_get = srv.run(&["note", "file", "get", &note_id, "structure/n1.json", "--json"]).json();
     assert_eq!(file_get["path"], "structure/n1.json");
     assert!(file_get["content"].as_str().unwrap().contains("API"));
 
-    let listed_wb = srv.run(&["artifact", "list", "--type", "whiteboard", "--json"]).json();
-    assert_eq!(listed_wb.as_array().unwrap().len(), 1);
+    let listed_canvas = srv.run(&["note", "list", "--type", "canvas", "--json"]).json();
+    assert_eq!(listed_canvas.as_array().unwrap().len(), 1);
 
     // 2. Attachment upload & download (both --out and raw stdout)
     let sample_file = srv.dir.path().join("hello.txt");
@@ -523,8 +531,8 @@ fn content_domain_artifacts_entries_attachments_library_media_and_channel_flags(
     let ch_id = ch_created.json().as_str().unwrap().to_string();
 
     let view_ctx = json!({
-        "artifactId": art_id,
-        "artifactType": "whiteboard",
+        "noteId": note_id,
+        "noteType": "canvas",
         "title": "System Map v2",
         "selectedIds": ["n1"]
     })
@@ -550,7 +558,7 @@ fn content_domain_artifacts_entries_attachments_library_media_and_channel_flags(
     let msg = &msgs.as_array().unwrap()[0];
     let msg_id = msg["id"].as_str().unwrap().to_string();
     assert_eq!(msg["sendKey"], "sk-1");
-    assert_eq!(msg["viewContext"]["artifactId"], art_id);
+    assert_eq!(msg["viewContext"]["noteId"], note_id);
     assert_eq!(msg["attachments"][0]["id"], att_id);
 
     assert_eq!(srv.run(&["channel", "pin", "set", &msg_id]).code, 0);
@@ -560,9 +568,9 @@ fn content_domain_artifacts_entries_attachments_library_media_and_channel_flags(
     assert_eq!(srv.run(&["channel", "message", "delete", &msg_id, "--dry-run"]).code, 0);
     assert_eq!(srv.run(&["channel", "delete", &ch_id, "--dry-run"]).code, 0);
 
-    // Artifact dry-run delete + actual delete
-    assert_eq!(srv.run(&["artifact", "delete", &art_id, "--dry-run"]).code, 0);
-    assert_eq!(srv.run(&["artifact", "delete", &art_id]).code, 0);
+    // Note dry-run delete + actual delete
+    assert_eq!(srv.run(&["note", "delete", &note_id, "--dry-run"]).code, 0);
+    assert_eq!(srv.run(&["note", "delete", &note_id]).code, 0);
 }
 
 #[test]

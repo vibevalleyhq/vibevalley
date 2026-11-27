@@ -5,15 +5,14 @@ import { t } from "@vibevalley/i18n";
 import { type Channel, type SessionView, userId } from "@vibevalley/protocol";
 import { isFreeUserSession, sessionProfile } from "@vibevalley/protocol/rules";
 
-import { createAct } from "../../../design/act";
 import { OrchestratorFace, UserFace } from "../../../design/domain/Face";
 import { Icon } from "../../../design/Icon";
 import { ActiveBar, Kbd, SidebarSection } from "../../../design/layout";
 import { motionClass } from "../../../design/motion";
 import { Segmented } from "../../../design/Segmented";
 import { type DotTone } from "../../../design/Tag";
-import { TextLink } from "../../../design/TextLink";
 import { Bubble } from "../../../design/Tip";
+import { createAct } from "../../../infra/act";
 import { useAgent, useOrchestrators } from "../../../infra/agents";
 import { api } from "../../../infra/api";
 import { useNow } from "../../../infra/base/dom";
@@ -272,17 +271,6 @@ export function Sidebar(props: { channel: Channel | undefined; thread: Channel |
           </SidebarSection>
         </If>
       </Scroll>
-      <If when={lacks()}>
-        {(fix) => (
-          <View testID="channel-readiness-alert" class="flex-row items-center gap-2 border-t border-line bg-bad-soft px-3 py-2">
-            <Icon name="warn" size={14} tone="berry" />
-            <Text class="min-w-0 flex-1 truncate text-xs font-medium text-berry">{t("web.channel.lacks", { why: fix().words })}</Text>
-            <TextLink href={fix().href} testid="orchestrator-fix" danger>
-              {t("web.channel.lacksFix")}
-            </TextLink>
-          </View>
-        )}
-      </If>
     </View>
   );
 }

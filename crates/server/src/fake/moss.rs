@@ -92,19 +92,7 @@ async fn never_async(timeout: Duration, cancel: CancellationToken) -> Result<Res
 /// Synthesizes a 440 Hz tone as 24 kHz mono 16-bit WAV.
 pub fn wav(samples: usize) -> Vec<u8> {
     let rate: u32 = 24000;
-    let mut b = Vec::with_capacity(44 + samples * 2);
-    b.extend_from_slice(b"RIFF");
-    b.extend_from_slice(&((36 + samples * 2) as u32).to_le_bytes());
-    b.extend_from_slice(b"WAVEfmt ");
-    b.extend_from_slice(&16u32.to_le_bytes());
-    b.extend_from_slice(&1u16.to_le_bytes());
-    b.extend_from_slice(&1u16.to_le_bytes());
-    b.extend_from_slice(&rate.to_le_bytes());
-    b.extend_from_slice(&(rate * 2).to_le_bytes());
-    b.extend_from_slice(&2u16.to_le_bytes());
-    b.extend_from_slice(&16u16.to_le_bytes());
-    b.extend_from_slice(b"data");
-    b.extend_from_slice(&((samples * 2) as u32).to_le_bytes());
+    let mut b = vibevalley_core::audio::wav_with_header_pcm16(rate, 1, (samples * 2) as u32);
     for i in 0..samples {
         let v = ((i as f64 * 2.0 * std::f64::consts::PI * 440.0 / rate as f64).sin() * 4096.0).round() as i16;
         b.extend_from_slice(&v.to_le_bytes());
@@ -134,6 +122,7 @@ struct Frames {
 }
 
 impl Read for Frames {
+    #[allow(clippy::disallowed_methods, reason = "blocking std::io::Read fake SSE test body")]
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         loop {
             let n = self.current.read(buf)?;

@@ -4,7 +4,7 @@
     "noFile": "不是模板：没有 {file}",
     "badId": "模板的 id「{id}」不行（{file}）：只能用小写字母、数字和 -，最多 32 个字",
     "badVersion": "模板的 version 要是 1 以上的整数（{file}）",
-    "noRuntime": "执行会话的模板要写推荐的引擎（{file}）",
+    "noRuntime": "执行会话的模板要写推荐的环境（{file}）",
     "noTemplate": "没有 {id} 这个模板",
     "taken": "已经有叫 {id} 的模板了",
     "builtIn": "{id} 是内置的模板，删不了",
@@ -19,11 +19,16 @@
   "defaultStaysOrchestrator": "默认主助手只能是主助手：至少要有一个主助手",
   "noAgent": "没有 {id} 这个角色",
   "noSkill": "没有 {id} 这个技能",
-  "orchestratorRuntime": "主助手只在 VibeValley 自己的 agent 上跑：引擎要是 {runtime}",
+  "orchestratorRuntime": "主助手只在 VibeValley 自己的 agent 上跑：环境要是 {runtime}",
   "newAgentId": "新角色的 id 要留空；指定 id 请用保存",
   "newSkillId": "新技能的 id 要留空；指定 id 请用保存",
   "removeAgent": "删掉角色「{name}」（{id}，跑在 {runtime} 上）：已经派给它的工单不跟着改",
   "removeSkill": "删掉技能「{name}」",
   "unequip": "从 {holders} 的角色里摘掉它",
-  "quoted": "「{name}」"
+  "quoted": "「{name}」",
+  "invalidCode": "队友编号「{code}」格式不对：主助手用 O-01 这类编号，队友用 W-01 这类编号",
+  "duplicateCode": "队友编号「{code}」已经被 {other} 占用了",
+  "registerMissingName": "登记外部队友需要填写名字",
+  "invalidAvatar": "头像「{avatar}」不在 Papertrails 角色头像列表中",
+  "cannotOverwriteManaged": "「{id}」是 VibeValley 本机调度的队友，不能被外部登记覆盖"
 }

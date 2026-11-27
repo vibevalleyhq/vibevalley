@@ -16,13 +16,13 @@ pub struct RemoteCmd {
 
 #[derive(Debug, Subcommand)]
 pub enum RemoteAction {
-    /// Show remote listener status, Tailscale address, and paired devices
+    /// Show remote listener status, LAN / Tailscale addresses, and paired devices
     #[command(after_help = "Examples:\n  vibevalley remote status\n  vibevalley remote status --json")]
     Status,
     /// Enable and start the authenticated remote HTTP listener
     #[command(after_help = "Examples:\n  vibevalley remote enable\n  vibevalley remote enable --bind 127.0.0.1 --port 8890")]
     Enable {
-        /// Optional bind IP address (defaults to Tailscale IPv4 or 127.0.0.1)
+        /// Optional bind IP address (defaults to Tailscale IPv4, detected LAN IPv4, or 127.0.0.1)
         #[arg(long)]
         bind: Option<String>,
         /// Optional listening port
@@ -61,6 +61,9 @@ fn status_text(status: &RemoteStatus) -> String {
     ])];
     if let Some(addr) = &status.bind_addr {
         lines.push(line(&["bind", &format!("{addr}:{}", status.port)]));
+    }
+    if let Some(lan_ip) = &status.lan_ip {
+        lines.push(line(&["lan", lan_ip]));
     }
     if status.tailscale_online {
         lines.push(line(&[

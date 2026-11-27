@@ -9,6 +9,7 @@ mod host_bridge;
 mod lifecycle;
 mod menus;
 mod palette;
+mod pane_layout;
 mod panes;
 mod projects;
 mod render;
@@ -20,6 +21,7 @@ mod tests;
 
 pub use devtools::devtools_enabled;
 pub use menus::{bind_keys, update_menus};
+pub use pane_layout::{numbered_titles, tab_title};
 pub use slots::{ChatTabStatus, DioramaSlot, GitSummary, InspectorSlot, Palette, PaneSlot, ProjectView, TerminalSlot};
 
 use std::collections::{BTreeSet, HashMap};
@@ -31,8 +33,8 @@ use vibevalley_files::FsChange;
 use vibevalley_terminal::TermSession;
 use vibevalley_workspace::{ProjectId, Store, TabId, Workspace};
 
+use crate::host_types::SplitBounds;
 use crate::hosted::{HostedView, Panel};
-use crate::panes::SplitBounds;
 
 pub(super) const SETTINGS_KEY: &str = crate::theme::SETTINGS_KEY;
 pub(super) const ACTIVE_KEY: &str = "app.active_project";
@@ -62,7 +64,7 @@ pub struct WorkspaceProjects {
     pub terminal_hooks: vibevalley_terminal::TerminalHooksConfig,
     pub terminal_hooks_menu_group: Option<vibevalley_workspace::GroupId>,
     pub(super) save_pending: bool,
-    pub(super) fs_tx: flume::Sender<(ProjectId, Vec<FsChange>)>,
+    pub(super) fs_tx: tokio::sync::mpsc::UnboundedSender<(ProjectId, Vec<FsChange>)>,
     pub(super) dir_refresh_pending: BTreeSet<ProjectId>,
     pub(super) git_refresh_pending: BTreeSet<ProjectId>,
     pub(super) summaries_gen: u64,

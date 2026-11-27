@@ -18,7 +18,20 @@
 
 改宿主项目加载或终端恢复时，运行 `vpx scripts/release/verify-workspace-store.ts target/debug/vibevalley-mac`。脚本从窗口动作打开新目录，并保持另一个 SQLite 写事务到下一次绘制。两个入口都应成功保存新项目。脚本只使用临时目录。
 
-## 一键验收画廊（推荐先跑）
+## 推荐：TS 场景脚本一键采图（vp run vdp）
+
+按「执行采图（Layer 1）+ 视觉评审（Layer 2）」分层，日常改 UI 一律直接调用固定 TS 场景脚本（复用单条 WebSocket 长连接与 `scripts/vdp/fixtures/`，无需手动拼脚本或反复启 CLI）：
+
+```bash
+vp run vdp --list                                     # 查看全部内置场景
+vp run vdp note --ui-only --out /tmp/vv-vdp-note      # 纯改 apps/mac/ui（仅跑 ~3s nsh build，免编 Rust）
+vp run vdp all --skip-build --out /tmp/vv-vdp-all     # 一次起 App 连续扫完 note/issues/chat/library/dashboard/settings
+vp run vdp note --attach /tmp/vv-sandbox --out /tmp/r # 复连已启动的隔离沙箱
+```
+
+内置场景位于 `scripts/vdp/scenarios/`（`note` / `issues` / `chat` / `library` / `dashboard` / `settings`），产出全套 Light/Dark PNG、`manifest.json`（零 Error 硬断言 + 每步耗时/节点数）与可交互对比画廊 `index.html`。新功能或高频页面需要回归时，在 `scripts/vdp/scenarios/` 新增模块并在 `scripts/vdp/scenarios/index.ts` 注册即可。
+
+## 一键验收画廊（静态场景矩阵）
 
 需要核对一组固定高频页面（`/issues`、`/chat`、`/runs`、`/agents`、`/settings`、`/library`、`/workspace` 与 `/farm`，含 Light/Dark 与窄窗）并生成汇总报告时，直接运行：
 
@@ -118,9 +131,9 @@ vp run ui:gallery -- --out /tmp/vv-app-gallery
 
 ### 演示页的就绪回执
 
-运行 [WebView 验收脚本](scripts/release/verify-presenter-webview.sh)。它先在 AppKit 和 GPUI 中各读取一次本地 HTML 正文，再在真实 GPUI 窗口打开工作台的三页样例。脚本从侧栏进入 Artifact，打开演讲者视图，核对每一页的页码、下一页、讲稿、末页按钮和返回入口。三个日志保存在脚本输出的目录。比较其他 nsh 版本时，传入对应命令的绝对路径，两个宿主需与命令版本一致。
+运行 [WebView 验收脚本](scripts/release/verify-presenter-webview.sh)。它先在 AppKit 和 GPUI 中各读取一次本地 HTML 正文，再在真实 GPUI 窗口打开工作台的三页样例。脚本从侧栏进入笔记页，打开演讲者视图，核对每一页的页码、下一页、讲稿、末页按钮和返回入口。三个日志保存在脚本输出的目录。比较其他 nsh 版本时，传入对应命令的绝对路径，两个宿主需与命令版本一致。
 
-验收存储与真实应用时，用 `artifact.create` 保存一份 `kind: html`、`display: slides` 的三页文稿。给前两页写不同的 `aside.notes`，末页留空。从该文稿的演讲者按钮进入，用右方向键、Page Down、左方向键依次到第 2、3、2 页，再返回文稿。分别核对当前正文、下一页正文、讲稿，以及末页提示。
+验收存储与真实应用时，用 `note.create` 保存一份带 `pageBreak` 块的三页 `doc` 笔记。给前两页写不同的 `speakerNotes`，末页留空。从该笔记的演讲者按钮进入，用右方向键、Page Down、左方向键依次到第 2、3、2 页，再返回笔记。分别核对当前正文、下一页正文、讲稿，以及末页提示。
 
 锁屏时，显示器会暂停请求新帧。脚本在 WebView 挂载后改变一次窗口宽度，让 GPUI 创建原生子视图。用应用的调试脚本验收时，在进入新页面后执行 `draw`，等网页回执后再绘制一次。`shot` 只记录 GPUI 的 Metal 纹理。WebView 的文字和图片应从解锁窗口直接查看，或用 WKWebView 的 `takeSnapshot` 对两个子视图分别取证。
 
@@ -144,6 +157,6 @@ vp run ui:gallery -- --out /tmp/vv-app-gallery
 
 ### 数据库升级和回退
 
-用旧包和候选包分别传给 `vpx scripts/release/verify-native-data.ts <旧.app> <新.app>`。脚本限制外部网络，在临时目录运行真实应用及包内 CLI。终端输出证据目录。旧包写入工单、工单目录、消息、记性、Artifact、媒体和宿主布局。连接器加载[旧版离线存储样本](scripts/release/fixtures/connector-275732ef1.json)。脚本平移样本时间以保留其有效期，并将待发分片关联到本次旧包生成的汇报。
+用旧包和候选包分别传给 `vpx scripts/release/verify-native-data.ts <旧.app> <新.app>`。脚本限制外部网络，在临时目录运行真实应用及包内 CLI。终端输出证据目录。旧包写入工单、工单目录、消息、记性、笔记（Note）、媒体和宿主布局。连接器加载[旧版离线存储样本](scripts/release/fixtures/connector-275732ef1.json)。脚本平移样本时间以保留其有效期，并将待发分片关联到本次旧包生成的汇报。
 
 新包应能审查旧工单、合并原改动并结算一次新回复。回退前先归档升级后的完整数据，再将旧包的备份恢复到原绝对路径。查看 `result.json` 的新旧提交、实际 SQLite 版本、宿主与服务库版本和启动耗时。`backup-files.json` 记录冷备份清单。

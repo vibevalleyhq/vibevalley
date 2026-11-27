@@ -33,6 +33,7 @@ fn registry_exports_sync_vv_core_functions() {
         "collapsedStepSummary",
         "readableInput",
         "mergeSteps",
+        "markdownToBlocks",
     ] {
         let func = core_mod
             .functions
@@ -51,7 +52,7 @@ fn quickjs_native_module_calls_vv_core_synchronously() {
     };
     let host = Host::with_options(options).expect("QuickJS host with vibevalley/rich UI set");
 
-    let script = r#"
+    let script = r###"
         import { nativeModule } from "nsh";
         const rich = nativeModule("vibevalley/rich");
 
@@ -72,7 +73,15 @@ fn quickjs_native_module_calls_vv_core_synchronously() {
 
         const summary = rich.collapsedStepSummary("user/message", "【现在】10:00\n[来源：用户]\n用户说：修 bug");
         if (summary !== "修 bug") throw new Error("collapsedStepSummary failed: " + summary);
-    "#;
+
+        const blocks = JSON.parse(rich.markdownToBlocks("## Roadmap\n- Ship UI\n- [x] Run checks\n> Ship small\n---\n$$E = mc^2$$\n"));
+        if (!blocks.some((b) => b.type === "heading" && b.text === "Roadmap")) throw new Error("markdownToBlocks heading failed");
+        if (!blocks.some((b) => b.type === "list" && b.items.includes("Ship UI"))) throw new Error("markdownToBlocks list failed");
+        if (!blocks.some((b) => b.type === "todo" && b.checked && b.text === "Run checks")) throw new Error("markdownToBlocks todo failed");
+        if (!blocks.some((b) => b.type === "quote" && b.text === "Ship small")) throw new Error("markdownToBlocks quote failed");
+        if (!blocks.some((b) => b.type === "divider")) throw new Error("markdownToBlocks divider failed");
+        if (!blocks.some((b) => b.type === "math" && b.expression === "E = mc^2")) throw new Error("markdownToBlocks math failed");
+    "###;
 
     host.eval_source(script)
         .expect("QuickJS eval calling nativeModule(\"vibevalley/rich\") VvCore functions should succeed");

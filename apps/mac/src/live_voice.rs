@@ -49,7 +49,7 @@ pub fn start(voice: SharedLiveVoice, owner: String) -> Result<State, String> {
     current.owner = owner;
     let state = current.state.clone();
     drop(current);
-    vibevalley_runtime::rt::current_or_global_handle().spawn(async move {
+    vibevalley_rt::current_or_global_handle().spawn(async move {
         let result = run(voice, cancel).await;
         let mut current = call().lock();
         current.state.phase = Phase::Idle;

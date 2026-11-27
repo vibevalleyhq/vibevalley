@@ -7,8 +7,11 @@ import type { Attachment, Channel, ChatMessage, Issue, IssueId, MessageId, Slice
 
 import { fakeHost } from "../fixtures/fakeHost";
 import { SCENARIO_NOW, scenarios } from "../fixtures/scenarios";
-import { setCoreBridgeForTest } from "../infra/rich";
+import { coreBridge, setCoreBridgeForTest } from "../infra/rich";
 import { CompareSpecSchema, formatCompareBlock, parseCompareSpec, splitMarkdownCompareBlocks, type CompareSpec } from "./compareModel";
+import { registerDesignCoreBridge } from "./host";
+
+registerDesignCoreBridge(coreBridge);
 
 const SAMPLE_PNG_BYTES = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
 

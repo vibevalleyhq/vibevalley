@@ -201,6 +201,7 @@ impl Issue {
             due_at: None,
             owner: None,
             relations: vec![],
+            body_note_id: None,
         }
     }
 }
@@ -208,14 +209,14 @@ impl Issue {
 fn issue_binding(bindings: &[ContextRef]) -> Option<(&str, bool)> {
     bindings.iter().find_map(|b| match b {
         ContextRef::Issue { id, refining } => Some((id.as_str(), refining.unwrap_or(false))),
-        ContextRef::Channel { .. } | ContextRef::Artifact { .. } => None,
+        ContextRef::Channel { .. } | ContextRef::Note { .. } => None,
     })
 }
 
 fn channel_binding(bindings: &[ContextRef]) -> Option<&str> {
     bindings.iter().find_map(|b| match b {
         ContextRef::Channel { id } => Some(id.as_str()),
-        ContextRef::Issue { .. } | ContextRef::Artifact { .. } => None,
+        ContextRef::Issue { .. } | ContextRef::Note { .. } => None,
     })
 }
 
@@ -238,7 +239,7 @@ fn same_binding_key(a: &ContextRef, b: &ContextRef) -> bool {
     match (a, b) {
         (ContextRef::Issue { id: x, .. }, ContextRef::Issue { id: y, .. }) => x == y,
         (ContextRef::Channel { id: x }, ContextRef::Channel { id: y }) => x == y,
-        (ContextRef::Artifact { id: x }, ContextRef::Artifact { id: y }) => x == y,
+        (ContextRef::Note { id: x }, ContextRef::Note { id: y }) => x == y,
         _ => false,
     }
 }

@@ -3,12 +3,9 @@
   "stopped": "The voice service has stopped",
   "grantGone": "This call's voice credentials have expired: connect again",
   "connecting": "This call is already connecting",
-  "manyCalls": "Several calls are connecting: update the app and try again",
-  "noCall": "No call is connecting",
   "moss": {
     "toolFailed": "The background request could not be completed.",
     "noKey": "Bind an enabled connection to MOSS Live in AI services first",
-    "noAsrKey": "Bind an enabled connection to MOSS Live or Speech Transcription in AI services first",
     "noTranscribeKey": "Bind an enabled connection to Speech Transcription in AI services first",
     "refused": "MOSS Live refused the key: {why}",
     "unreachable": "Cannot reach MOSS Live: {why}",

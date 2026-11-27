@@ -249,14 +249,16 @@ pub struct TermSession {
 }
 
 struct Inner {
-    tx: flume::Sender<Msg>,
-    done: flume::Receiver<()>,
+    tx: std::sync::Mutex<std::sync::mpsc::Sender<Msg>>,
+    done: std::sync::Mutex<std::sync::mpsc::Receiver<()>>,
     shared: Arc<Shared>,
 }
 
 impl Drop for Inner {
     fn drop(&mut self) {
-        let _ = self.tx.send(Msg::Shutdown);
+        if let Ok(tx) = self.tx.lock() {
+            let _ = tx.send(Msg::Shutdown);
+        }
     }
 }
 
@@ -286,34 +288,40 @@ impl TermSession {
         hooks: ResolvedTerminalHooks,
         on_event: impl Fn(TermEvent) + Send + 'static,
     ) -> Result<TermSession> {
-        let (tx, rx) = flume::unbounded();
-        let (done_tx, done) = flume::bounded(1);
+        let (tx, rx) = std::sync::mpsc::channel();
+        let (done_tx, done) = std::sync::mpsc::sync_channel(1);
         let (pty, master_fd) = pty::spawn(&opts, &hooks, tx.clone())?;
         let shared = Arc::new(Shared::new(opts.size, master_fd, pty.pid));
-        let (ready_tx, ready_rx) = flume::bounded(1);
+        let (ready_tx, ready_rx) = std::sync::mpsc::sync_channel(1);
         let thread_shared = shared.clone();
         let history = history.to_string();
         std::thread::Builder::new()
             .name("vibevalley-terminal".to_string())
             .spawn(move || {
-                let _done = done_tx;
                 session::run_with_history(opts, &history, pty, thread_shared, rx, Box::new(on_event), ready_tx);
+                let _ = done_tx.send(());
             })
             .map_err(|e| TermError::Spawn(e.to_string()))?;
         ready_rx
             .recv()
             .map_err(|_| TermError::Backend("session thread stopped during startup".into()))??;
         Ok(TermSession {
-            inner: Arc::new(Inner { tx, done, shared }),
+            inner: Arc::new(Inner {
+                tx: std::sync::Mutex::new(tx),
+                done: std::sync::Mutex::new(done),
+                shared,
+            }),
         })
     }
 
     fn post(&self, msg: Msg) {
-        let _ = self.inner.tx.send(msg);
+        if let Ok(tx) = self.inner.tx.lock() {
+            let _ = tx.send(msg);
+        }
     }
 
-    fn ask<T>(&self, msg: impl FnOnce(flume::Sender<T>) -> Msg) -> Option<T> {
-        let (tx, rx) = flume::bounded(1);
+    fn ask<T>(&self, msg: impl FnOnce(std::sync::mpsc::SyncSender<T>) -> Msg) -> Option<T> {
+        let (tx, rx) = std::sync::mpsc::sync_channel(1);
         self.post(msg(tx));
         rx.recv().ok()
     }
@@ -438,7 +446,8 @@ impl TermSession {
 
     /// Waits up to `timeout` for a previously initiated shutdown to finish.
     pub fn wait_shutdown(&self, timeout: std::time::Duration) -> bool {
-        self.inner.done.recv_timeout(timeout).is_ok()
+        let Ok(done) = self.inner.done.lock() else { return false };
+        matches!(done.recv_timeout(timeout), Ok(()) | Err(std::sync::mpsc::RecvTimeoutError::Disconnected))
     }
 
     /// Stops the session thread, reaps its PTY child, and waits up to `timeout`

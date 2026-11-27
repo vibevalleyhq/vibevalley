@@ -1,3 +1,5 @@
+#![allow(clippy::disallowed_types, reason = "standalone synchronous test fixture binary")]
+
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::env;
 use std::fs::{self, OpenOptions};

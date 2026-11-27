@@ -215,15 +215,9 @@ pub fn normalize_prefix(prefix: &str) -> Result<String, StorageError> {
     if had_slash { Ok(format!("{body}/")) } else { Ok(body.to_owned()) }
 }
 
-/// Encodes `bytes` as lowercase hexadecimal without extra crate dependencies.
+/// Encodes `bytes` as lowercase hexadecimal.
 pub(crate) fn hex_lower(bytes: &[u8]) -> String {
-    const TABLE: &[u8; 16] = b"0123456789abcdef";
-    let mut out = String::with_capacity(bytes.len() * 2);
-    for &b in bytes {
-        out.push(TABLE[(b >> 4) as usize] as char);
-        out.push(TABLE[(b & 0x0f) as usize] as char);
-    }
-    out
+    hex::encode(bytes)
 }
 
 /// Computes lowercase hex SHA-256 of `bytes`.
@@ -238,8 +232,8 @@ mod tests {
     #[test]
     fn normalize_key_accepts_valid_relative_keys() {
         assert_eq!(normalize_key("attachments/abc123").unwrap(), "attachments/abc123");
-        assert_eq!(normalize_key("artifact/id1/structure/main.md").unwrap(), "artifact/id1/structure/main.md");
-        assert_eq!(normalize_key("artifact/id1/.cover.json").unwrap(), "artifact/id1/.cover.json");
+        assert_eq!(normalize_key("note/id1/structure/main.md").unwrap(), "note/id1/structure/main.md");
+        assert_eq!(normalize_key("note/id1/.cover.json").unwrap(), "note/id1/.cover.json");
         assert_eq!(normalize_key("single-file").unwrap(), "single-file");
     }
 
@@ -270,7 +264,7 @@ mod tests {
         assert_eq!(normalize_prefix("").unwrap(), "");
         assert_eq!(normalize_prefix("attachments").unwrap(), "attachments");
         assert_eq!(normalize_prefix("attachments/").unwrap(), "attachments/");
-        assert_eq!(normalize_prefix("artifact/a1/structure/").unwrap(), "artifact/a1/structure/");
+        assert_eq!(normalize_prefix("note/a1/structure/").unwrap(), "note/a1/structure/");
 
         for bad in ["/", "/abs", "a//b", "a/../b", "..", ".", "a\\b", "a\0b", "a\tb", "a//"] {
             assert!(normalize_prefix(bad).is_err(), "expected prefix `{bad}` to be rejected");

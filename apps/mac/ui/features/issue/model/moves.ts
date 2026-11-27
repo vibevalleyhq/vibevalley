@@ -15,6 +15,13 @@ export interface IssueMove {
   readonly edit?: IssueUpdate;
   /** The lane it was dropped on, when it was dragged: where the card shows until the frame catches up. */
   readonly lane?: Lane;
+  /** Target sibling card id to insert before (`""` appends to the end) for optimistic board ordering. */
+  readonly before?: string;
+}
+
+export interface PendingPlacement {
+  readonly id: string;
+  readonly before: string;
 }
 
 export const issueMove = defineIntent<IssueMove, AppliedIssue, "board">({
@@ -58,12 +65,45 @@ export function movedIssue(issue: Issue, moves: readonly Intent<IssueMove, Appli
   return m && m.phase !== "failed" && m.input.status !== issue.status ? { ...issue, status: m.input.status } : issue;
 }
 
-/** The newest move of each card, laid over the board's cards. */
+/** Moves `id` right before `before` (`""` or missing target appends to the end) without mutating input. */
+function reorderCard(cards: readonly BoardCard[], id: string, before: string): BoardCard[] {
+  const from = cards.findIndex((c) => c.id === id);
+  if (from === -1) return [...cards];
+  const next = [...cards];
+  const moving = next[from];
+  if (moving === undefined) return next;
+  next.splice(from, 1);
+  if (before === "") {
+    next.push(moving);
+    return next;
+  }
+  const at = next.findIndex((c) => c.id === before);
+  if (at === -1) next.push(moving);
+  else next.splice(at, 0, moving);
+  return next;
+}
+
+/** The newest move of each card, laid over the board's cards with optimistic lane and target slot placement. */
 export function movedCards(cards: readonly BoardCard[], moves: readonly Intent<IssueMove, AppliedIssue>[]): BoardCard[] {
   const latest = new Map(moves.map((m) => [m.input.id, m]));
-  return cards.map((c) => {
+  let next = cards.map((c) => {
     const m = latest.get(c.id);
     if (!m) return c;
     return { ...c, lane: m.input.lane ?? c.lane, move: cardMoveOf(m) };
   });
+  for (const m of latest.values()) {
+    if (m.phase !== "failed" && m.input.before !== undefined) {
+      next = reorderCard(next, m.input.id, m.input.before);
+    }
+  }
+  return next;
+}
+
+/** Applies in-flight same-lane manual placements optimistically until `issue.update` settles. */
+export function placedCards(cards: readonly BoardCard[], placements: readonly PendingPlacement[]): BoardCard[] {
+  let next = [...cards];
+  for (const p of placements) {
+    next = reorderCard(next, p.id, p.before);
+  }
+  return next;
 }

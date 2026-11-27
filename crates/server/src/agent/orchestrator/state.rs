@@ -21,10 +21,10 @@ use super::types::Instance;
 use crate::agent::memory::Memory;
 use crate::agent::profile::Profile;
 use crate::agent::tool::{Route, ToolRegistry};
-use crate::artifact::Manager as ArtifactManager;
 use crate::channel::Chat;
 use crate::context::Context;
 use crate::issue::Board;
+use crate::note::Manager as NoteManager;
 use crate::repo::Repo;
 use crate::runtime::Runtime;
 
@@ -73,7 +73,7 @@ pub struct Orchestrator {
     pub(super) runtime: Arc<Runtime>,
     pub(super) repo: Arc<Repo>,
     pub(super) memory: Arc<Memory>,
-    pub(super) artifact: Arc<ArtifactManager>,
+    pub(super) note: Arc<NoteManager>,
     pub(super) home: PathBuf,
     pub(super) key: Arc<dyn Fn() -> Option<String> + Send + Sync>,
     pub(super) client: Option<Arc<dyn ModelClient>>,
@@ -98,7 +98,7 @@ pub struct Parts {
     pub runtime: Arc<Runtime>,
     pub repo: Arc<Repo>,
     pub memory: Arc<Memory>,
-    pub artifact: Arc<ArtifactManager>,
+    pub note: Arc<NoteManager>,
     pub home: PathBuf,
     /// The DeepSeek key, read at each turn.
     pub key: Arc<dyn Fn() -> Option<String> + Send + Sync>,

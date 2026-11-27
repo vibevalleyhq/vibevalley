@@ -20,64 +20,8 @@ pub struct BridgeHub(
 
 impl gpui::Global for BridgeHub {}
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum StartupFailureKind {
-    DatabaseSchema,
-    Database,
-    ServerBoot,
-    HttpBind,
-    RemoteConnection,
-    WorkspaceStore,
-}
-
-impl StartupFailureKind {
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::DatabaseSchema => "database_schema",
-            Self::Database => "database",
-            Self::ServerBoot => "server_boot",
-            Self::HttpBind => "http_bind",
-            Self::RemoteConnection => "remote_connection",
-            Self::WorkspaceStore => "workspace_store",
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct StartupFailure {
-    pub kind: StartupFailureKind,
-    pub summary: String,
-    pub detail: Option<String>,
-    pub db_path: Option<std::path::PathBuf>,
-    pub home_dir: std::path::PathBuf,
-}
-
-impl StartupFailure {
-    pub fn simple(kind: StartupFailureKind, summary: impl Into<String>, home_dir: std::path::PathBuf) -> Self {
-        Self {
-            kind,
-            summary: summary.into(),
-            detail: None,
-            db_path: None,
-            home_dir,
-        }
-    }
-
-    pub fn from_start_error(err: &vibevalley_server::StartError, home_dir: std::path::PathBuf) -> Self {
-        let kind = match err.kind {
-            vibevalley_server::StartErrorKind::DatabaseSchema => StartupFailureKind::DatabaseSchema,
-            vibevalley_server::StartErrorKind::Database => StartupFailureKind::Database,
-            vibevalley_server::StartErrorKind::Storage | vibevalley_server::StartErrorKind::Boot => StartupFailureKind::ServerBoot,
-        };
-        Self {
-            kind,
-            summary: err.to_string(),
-            detail: err.detail.clone(),
-            db_path: err.db_path.clone(),
-            home_dir,
-        }
-    }
-}
+pub use crate::env::{StartupFailure, StartupFailureKind, server_home};
+pub use crate::host_types::Replier;
 
 pub struct ServerStartup(pub tokio::sync::watch::Receiver<Option<Result<(), StartupFailure>>>);
 impl gpui::Global for ServerStartup {}
@@ -173,14 +117,6 @@ impl FailedServer {
 }
 
 impl vibevalley_server::gateway::bridge::Server for FailedServer {
-    fn call(&self, _op: &str, _payload: Value) -> vibevalley_server::gateway::bridge::Envelope {
-        self.unavailable()
-    }
-
-    fn call_with(&self, _ctx: &vibevalley_server::gateway::bridge::CallerContext, _op: &str, _payload: Value) -> vibevalley_server::gateway::bridge::Envelope {
-        self.unavailable()
-    }
-
     fn call_with_async(
         self: Arc<Self>,
         _ctx: vibevalley_server::gateway::bridge::CallerContext,
@@ -191,33 +127,16 @@ impl vibevalley_server::gateway::bridge::Server for FailedServer {
         Box::pin(async move { envelope })
     }
 
-    fn slice_snapshot(&self, slice: vibevalley_server::gateway::bridge::SliceKind) -> Value {
-        serde_json::from_str(&self.feeds.feed(slice).snapshot_json()).unwrap_or(Value::Null)
-    }
-
     fn slice_snapshot_json(&self, slice: vibevalley_server::gateway::bridge::SliceKind) -> Arc<str> {
         self.feeds.feed(slice).snapshot_json()
-    }
-
-    fn watch_slice(
-        &self,
-        slice: vibevalley_server::gateway::bridge::SliceKind,
-        after_seq: Option<i64>,
-        stop: &tokio_util::sync::CancellationToken,
-        receive: &mut dyn FnMut(i64, &Value),
-    ) {
-        self.feeds.feed(slice).watch_since_json(after_seq, stop, &mut |seq, json| {
-            let value: Value = serde_json::from_str(json).unwrap_or(Value::Null);
-            receive(seq, &value);
-        });
     }
 
     fn subscribe_slice(&self, slice: vibevalley_server::gateway::bridge::SliceKind) -> Option<vibevalley_server::SliceSubscription> {
         Some(self.feeds.feed(slice).subscribe())
     }
 
-    fn live(&self) -> tokio::sync::mpsc::UnboundedReceiver<vibevalley_server::gateway::bridge::LiveEvent> {
-        let (_tx, rx) = tokio::sync::mpsc::unbounded_channel();
+    fn live(&self) -> tokio::sync::mpsc::Receiver<vibevalley_server::gateway::bridge::LiveEvent> {
+        let (_tx, rx) = tokio::sync::mpsc::channel(1);
         rx
     }
 
@@ -226,21 +145,15 @@ impl vibevalley_server::gateway::bridge::Server for FailedServer {
         Some(rx)
     }
 
-    fn subscribe(
-        &self,
-        _name: &str,
+    fn subscribe_with_async(
+        self: Arc<Self>,
+        _ctx: vibevalley_server::gateway::bridge::CallerContext,
+        _name: String,
         _payload: Value,
-    ) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), vibevalley_server::gateway::bridge::Envelope> {
-        Err(self.unavailable())
-    }
-
-    fn subscribe_with(
-        &self,
-        _ctx: &vibevalley_server::gateway::bridge::CallerContext,
-        _name: &str,
-        _payload: Value,
-    ) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), vibevalley_server::gateway::bridge::Envelope> {
-        Err(self.unavailable())
+    ) -> vibevalley_server::gateway::api::BoxFuture<'static, Result<(u64, tokio::sync::mpsc::Receiver<Value>), vibevalley_server::gateway::bridge::Envelope>>
+    {
+        let envelope = self.unavailable();
+        Box::pin(async move { Err(envelope) })
     }
 
     fn unsubscribe(&self, _id: u64) {}
@@ -263,9 +176,9 @@ impl BridgeHub {
         let host_debug = ShellDebugHandle::new();
         cx.set_global(host_debug.clone());
         let host_debug_for_boot = host_debug.clone();
-        let (running_tx, running_rx) = flume::bounded::<crate::serving::Running>(1);
+        let (running_tx, running_rx) = tokio::sync::oneshot::channel::<crate::serving::Running>();
         cx.spawn(async move |cx| {
-            if let Ok(running) = running_rx.recv_async().await {
+            if let Ok(running) = running_rx.await {
                 let close_now = cx.update(|cx| cx.global_mut::<crate::serving::RunningServer>().install(running));
                 if let Some(running) = close_now {
                     cx.background_executor().spawn(async move { running.shutdown() }).detach();
@@ -367,7 +280,7 @@ impl BridgeHub {
                                     wake_task.notify_wake();
                                 });
                                 let running = crate::serving::Running::new(app, listener, announced, Some(wake_observer));
-                                if let Err(flume::SendError(running)) = running_tx.send(running) {
+                                if let Err(running) = running_tx.send(running) {
                                     running.shutdown();
                                 }
                                 server
@@ -412,27 +325,6 @@ impl vibevalley_server::gateway::bridge::Outlet for ChannelOutlet {
     }
 }
 
-/// Answers one `host.*` call of a view (event `reply:<id>`).
-#[derive(Clone)]
-pub struct Replier {
-    pub(super) channel: nsh_engine::HostChannel,
-    pub(super) id: String,
-}
-
-impl std::fmt::Debug for Replier {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Replier({})", self.id)
-    }
-}
-
-impl Replier {
-    pub fn send(self, envelope: vibevalley_server::gateway::bridge::Envelope) {
-        let _ = self
-            .channel
-            .send(format!("reply:{}", self.id), serde_json::to_value(envelope).unwrap_or(Value::Null));
-    }
-}
-
 /// Handles desktop Control Plane connection inspection and switching without touching `crates/protocol`.
 pub(super) fn handle_desktop_connection_op(
     op: &str,
@@ -465,11 +357,6 @@ pub(super) fn handle_desktop_connection_op(
         },
         _ => refusal(BizCode::RouteNotFound, format!("unknown desktop connection op {op}")),
     }
-}
-
-/// The farm's home: `VIBEVALLEY_HOME`, else `$HOME/<current_channel().home_dir_name()>`.
-pub fn server_home() -> std::path::PathBuf {
-    vibevalley_server::home::home()
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

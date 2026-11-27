@@ -12,7 +12,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use vibevalley_protocol::{
-    Agent, AgentRole, AgentTemplate, AgentValidation, ApiError, Installation, PersonaMode, Preview, RuntimeInfo, RuntimeSettings, Skill,
+    Agent, AgentRegisterInput, AgentRole, AgentTemplate, AgentValidation, ApiError, Installation, PersonaMode, Preview, RuntimeInfo, RuntimeSettings, Skill,
 };
 use vibevalley_runtime::machine::MachineRegistry;
 use vibevalley_runtime::oar::Registry;
@@ -68,6 +68,10 @@ impl Profile {
 
     pub fn agents(&self) -> Vec<Agent> {
         self.store.agents()
+    }
+
+    pub fn managed_workers(&self) -> Vec<Agent> {
+        self.store.managed_workers()
     }
 
     pub fn orchestrators(&self) -> Vec<Agent> {
@@ -130,6 +134,10 @@ impl Profile {
 
     pub async fn agent_update_async(&self, a: Agent) -> Result<Agent, ApiError> {
         self.store.save_async(a).await
+    }
+
+    pub async fn agent_register_async(&self, input: AgentRegisterInput) -> Result<Agent, ApiError> {
+        self.store.register_external_async(input).await
     }
 
     pub async fn agent_delete_async(&self, id: &str) -> Result<(), ApiError> {

@@ -2,6 +2,7 @@
 //! `session.respondPermission`, `session.respondInteraction`,
 //! `session.setConfig`, `session.stop`, and `session.watch` end-to-end.
 
+use crate::support::{RouterTestExt as _, ServerTestExt as _};
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -150,7 +151,7 @@ struct MockSession {
     runtime_id: String,
     seq: AtomicU64,
     history: Mutex<Vec<Event>>,
-    subs: Mutex<Vec<tokio::sync::mpsc::UnboundedSender<Event>>>,
+    subs: Mutex<Vec<tokio::sync::mpsc::Sender<Event>>>,
     turns: Arc<Mutex<VecDeque<MockTurn>>>,
     log: Arc<Mutex<MockLog>>,
     perm_waiter: Mutex<Option<(String, tokio::sync::oneshot::Sender<PermissionDecision>)>>,
@@ -171,7 +172,7 @@ impl MockSession {
             kind,
         };
         self.history.lock().unwrap().push(ev.clone());
-        self.subs.lock().unwrap().retain(|tx| tx.send(ev.clone()).is_ok());
+        self.subs.lock().unwrap().retain(|tx| tx.try_send(ev.clone()).is_ok());
     }
 }
 
@@ -218,8 +219,8 @@ impl Session for MockSession {
         vec![]
     }
 
-    fn subscribe_records(&self, _after: Option<u64>) -> tokio::sync::mpsc::UnboundedReceiver<voyage::Record> {
-        let (_, rx) = tokio::sync::mpsc::unbounded_channel();
+    fn subscribe_records(&self, _after: Option<u64>) -> tokio::sync::mpsc::Receiver<voyage::Record> {
+        let (_, rx) = tokio::sync::mpsc::channel(1);
         rx
     }
 
@@ -235,16 +236,17 @@ impl Session for MockSession {
         }
     }
 
-    fn events(&self) -> tokio::sync::mpsc::UnboundedReceiver<Event> {
-        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+    fn events(&self) -> tokio::sync::mpsc::Receiver<Event> {
+        let (tx, rx) = tokio::sync::mpsc::channel(256);
         self.subs.lock().unwrap().push(tx);
         rx
     }
 
-    fn events_with_history(&self) -> tokio::sync::mpsc::UnboundedReceiver<Event> {
-        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
-        for ev in self.history.lock().unwrap().iter() {
-            let _ = tx.send(ev.clone());
+    fn events_with_history(&self) -> tokio::sync::mpsc::Receiver<Event> {
+        let history = self.history.lock().unwrap().clone();
+        let (tx, rx) = tokio::sync::mpsc::channel(history.len().saturating_add(256));
+        for ev in history {
+            let _ = tx.try_send(ev);
         }
         self.subs.lock().unwrap().push(tx);
         rx
@@ -315,7 +317,7 @@ impl Session for MockSession {
                                     kind,
                                 };
                                 for s in &subs {
-                                    let _ = s.send(ev.clone());
+                                    let _ = s.try_send(ev.clone());
                                 }
                             }
                         }
@@ -342,7 +344,7 @@ impl Session for MockSession {
                                 kind,
                             };
                             for s in &subs {
-                                let _ = s.send(ev.clone());
+                                let _ = s.try_send(ev.clone());
                             }
                         };
                         if let Ok(Ok(p_dec)) = tokio::time::timeout(Duration::from_secs(10), prx).await {
@@ -413,7 +415,7 @@ impl Session for MockSession {
                                 },
                             };
                             for s in &subs {
-                                let _ = s.send(ev.clone());
+                                let _ = s.try_send(ev.clone());
                             }
                         }
                     });
@@ -506,13 +508,13 @@ fn start_with(home: &Path, runtime: Arc<MockRuntime>) -> App {
     .unwrap()
 }
 
-fn recv_timeout(rx: &mut tokio::sync::mpsc::UnboundedReceiver<Value>, wait: Duration) -> Option<Value> {
+fn recv_timeout(rx: &mut tokio::sync::mpsc::Receiver<Value>, wait: Duration) -> Option<Value> {
     vibevalley_runtime::rt::block_on(async { tokio::time::timeout(wait, rx.recv()).await })
         .ok()
         .flatten()
 }
 
-fn recv_until(rx: &mut tokio::sync::mpsc::UnboundedReceiver<Value>, what: &str, mut pred: impl FnMut(&Value) -> bool) -> Value {
+fn recv_until(rx: &mut tokio::sync::mpsc::Receiver<Value>, what: &str, mut pred: impl FnMut(&Value) -> bool) -> Value {
     let deadline = Instant::now() + Duration::from_secs(10);
     let mut seen = Vec::new();
     loop {

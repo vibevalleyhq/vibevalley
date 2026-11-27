@@ -13,7 +13,7 @@ import {
   TrajectoryWaterfallLaneValues,
 } from "@vibevalley/protocol";
 import { oneLine } from "@vibevalley/protocol/rules";
-import { SessionTrajectoryProjection as SessionTrajectoryProjectionSchema } from "@vibevalley/protocol/schema";
+import { jsonString, SessionTrajectoryProjection as SessionTrajectoryProjectionSchema } from "@vibevalley/protocol/schema";
 
 import { big, tookText } from "../../infra/base/format";
 import { coreBridge } from "../../infra/rich";
@@ -60,11 +60,13 @@ function stepsEqual(a: readonly SessionEvent[], b: readonly SessionEvent[]): boo
   return true;
 }
 
+const SessionTrajectoryProjectionJsonSchema = jsonString(SessionTrajectoryProjectionSchema);
+
 /** Projects a full `SessionTrajectoryProjection` from raw events via Rust `VvCore` (used for live/unprojected updates). */
 export function projectTrajectory(steps: readonly SessionEvent[], end: number): SessionTrajectoryProjection | undefined {
   const json = coreBridge()?.projectTrajectory?.(JSON.stringify(steps), end);
   if (!json) return undefined;
-  const parsed = SessionTrajectoryProjectionSchema.safeParse(JSON.parse(json));
+  const parsed = SessionTrajectoryProjectionJsonSchema.safeParse(json);
   return parsed.success ? parsed.data : undefined;
 }
 
@@ -235,12 +237,14 @@ export function runLabel(steps: SessionEvent[], orchestrator: boolean) {
   return tools > 0 ? t("web.session.runs.usedTools", { n: tools }) : t("web.session.runs.process");
 }
 
+const NumberArrayJsonSchema = jsonString(NumberArraySchema);
+
 /** Allocates damped horizontal pixel widths for waterfall runs via Rust `VvCore`. */
 export function waterfallWidths(durations: readonly number[], room: number): number[] {
   if (room <= 0 || durations.length === 0) return [];
   const json = coreBridge()?.waterfallWidths?.(JSON.stringify(durations), room);
   if (json !== undefined) {
-    const parsed = NumberArraySchema.safeParse(JSON.parse(json));
+    const parsed = NumberArrayJsonSchema.safeParse(json);
     if (parsed.success) return parsed.data;
   }
   return durations.map(() => room / durations.length);

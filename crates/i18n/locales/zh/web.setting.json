@@ -7,7 +7,6 @@
     "label": "界面语言"
   },
   "keys": {
-    "deepseekHint": "sk-…（不改就空着）",
     "saved": "存好了，马上就用上。"
   },
   "source": {
@@ -31,14 +30,25 @@
     "everythingHint": "不只读 VibeValley 替执行会话记的，你在里面的记忆每个执行会话都读得到"
   },
   "github": {
-    "noGh": "没装 gh",
-    "note": "能提 PR 的仓库在「仓库」里看；完成时提 PR 要在配置里打开（github.pr_repos）。",
+    "noGh": "未安装（可选）",
+    "note": "配置 GitHub Token 直连或使用本机 gh 命令行登录后，即可在项目交付时自动推送并创建或合并 PR。",
     "recheck": "重新检测",
-    "cli": "gh 命令行",
-    "cliHint": "合并时开 PR、读仓库用它",
-    "login": "登录",
-    "loginHint": "gh auth login 登录的账号",
-    "notLoggedIn": "没登录"
+    "status": "连接状态",
+    "statusHint": "优先使用 GitHub Token 直连，未配置时回退到本机 gh 登录",
+    "mode": {
+      "token": "已通过 Token 直连",
+      "gh": "已通过 gh 登录",
+      "none": "均未配置"
+    },
+    "token": "GitHub 令牌",
+    "tokenHint": "用于直接调用 GitHub REST API（创建、刷新、合并 PR 与检查状态），也可用环境变量 GITHUB_TOKEN",
+    "tokenPlaceholder": "ghp_… 或 github_pat_…（不改就空着）",
+    "tokenConfigured": "已配置 Token",
+    "cli": "gh 命令行（可选）",
+    "cliHint": "未配置 Token 时可用本机 gh 命令行开 PR 和读项目",
+    "login": "当前账号",
+    "loginHint": "当前 Token 或 gh 对应的 GitHub 账号",
+    "notLoggedIn": "未登录"
   },
   "nav": {
     "label": "设置的分区",
@@ -46,7 +56,8 @@
     "profile": "个人资料",
     "general": "通用",
     "appearance": "外观",
-    "models": "模型与引擎",
+    "providers": "模型商",
+    "models": "模型与模型策略",
     "skills": "技能",
     "mcp": "MCP 接入",
     "voice": "语音与通话",
@@ -56,7 +67,7 @@
     "memory": "记忆",
     "chat": "聊天通道",
     "width": "导航的宽窄（拖动，双击回默认）",
-    "groupWorkspace": "个人与工作区",
+    "groupWorkspace": "个人与项目",
     "groupConnect": "连接与集成",
     "groupAbout": "数据与关于"
   },
@@ -64,14 +75,15 @@
     "profile": "个人资料 头像 昵称 签名 avatar profile display name",
     "general": "语言 language 启动 打开 工作台 农场",
     "appearance": "主题 深色 浅色 暗色 dark light 界面大小 缩放 字体 字号 动画 无动画 动效 motion animation",
-    "models": "密钥 钥匙 账号 DeepSeek MOSS API Key 模型 绑定 引擎",
+    "providers": "模型商 密钥 钥匙 API Key 凭据 验证 拉取 DeepSeek MiniMax MOSS OpenAI Anthropic",
+    "models": "模型 策略 场景 备选 回退 主助手 润色 听写 语音 实时 视觉 生图 ASR TTS",
     "skills": "技能 skill skills 内置 安装 指南 提示词",
     "memory": "记忆 memory 来源 source Nowledge EverOS 外部记忆 读 写",
     "mcp": "MCP Antigravity Claude Code Codex Cursor stdio streamableHttp 接入 配置",
     "voice": "电话 通话 MOSS Live 实时 视觉 转写 语音",
     "chat": "微信 飞书 QQ 聊天通道 连接器 配对",
-    "github": "GitHub gh PR 登录",
-    "remote": "远程 手机 Tailscale 配对 二维码 设备 iOS Android CLI 命令行 执行机 沙箱 监听 令牌 总控端 内嵌 远端",
+    "github": "GitHub Token gh PR 登录 直连",
+    "remote": "远程 手机 局域网 LAN Wi-Fi 直连 Tailscale 配对 二维码 设备 iOS Android CLI 命令行 执行机 沙箱 监听 令牌 总控端 内嵌 远端",
     "data": "家目录 设置文件 仓库 目录 工作树 存储 后端 数据 data storage",
     "about": "版本 更新 命令行 CLI version update"
   },
@@ -117,7 +129,7 @@
     "fontEmpty": "没有匹配的字体",
     "fontFallbackBadge": "未安装",
     "terminalFontSize": "终端字号",
-    "terminalFontSizeHint": "也可在工作区随时按 ⌘+ / ⌘- / ⌘0 调整",
+    "terminalFontSizeHint": "也可在项目终端随时按 ⌘+ / ⌘- / ⌘0 调整",
     "previewTitle": "实时排版预览",
     "previewNote": "随界面缩放、等宽字体与终端字号即时更新",
     "previewUiHeading": "界面正文",
@@ -171,14 +183,16 @@
     "intro": "查看本机数据目录、Git 仓库与工作树路径，以及当前存储后端。",
     "storageTitle": "存储后端",
     "backend": "当前后端",
-    "backendHint": "附件、媒体输入与作品目录的底层存储引擎",
+    "backendHint": "附件、媒体输入与笔记目录的底层存储后端",
     "backendLocalFs": "本地文件系统 (LocalFs)",
     "backendS3": "对象存储 (S3)",
     "backendMemory": "内存存储 (Memory)"
   },
+  "providers": {
+    "intro": "统一配置 DeepSeek、MiniMax、MOSS 等模型商凭据（1 个模型商对应 1 个 API 密钥），验证连通性并自动拉取带能力标签的可用模型。"
+  },
   "models": {
-    "intro": "配置主助手、执行会话与语音功能的模型账号和 API 密钥。",
-    "deepseekHint": "主助手和 VibeValley 自研执行会话用它"
+    "intro": "按场景选择主选模型与备选回退策略；仅从已配置并拉取到可用模型的模型商中选择。"
   },
   "memory": {
     "intro": "执行会话还能去外面的记忆来源里查、往里记。"
@@ -227,8 +241,9 @@
     },
     "check": "检查更新",
     "retry": "重试",
+    "details": "查看详情",
+    "dialogTitle": "应用更新",
     "restart": "立即重启更新",
-    "restartQuestion": "重启到新版本？",
     "workingQuestion": "{n} 个执行会话正在运行，重启会中断它们。确认现在重启？",
     "newFarmQuestion": "新版本将从新数据开始，旧数据会保留在家目录里。确认现在重启？",
     "download": "前往下载",
@@ -268,6 +283,6 @@
   },
   "remote": {
     "toggleLabel": "手机与客户端接入",
-    "toggleHint": "开启后允许已配对设备经 Tailscale 连接到这台 Mac。"
+    "toggleHint": "开启后允许已配对设备通过局域网直连或 Tailscale 连接到这台 Mac。"
   }
 }

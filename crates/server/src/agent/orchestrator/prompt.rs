@@ -97,7 +97,7 @@ impl Orchestrator {
     /// The farm as it is shown before an input (`situation`).
     async fn situation_async(&self, channel: &str) -> String {
         let mut agents = vec![];
-        for a in self.profile.agents() {
+        for a in self.profile.managed_workers() {
             let assessed = self.profile.fleet.assess_async(&a).await;
             let p = &assessed.agent;
             let mut traits = vec![];

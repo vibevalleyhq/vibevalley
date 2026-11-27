@@ -2,32 +2,31 @@
 // with a stock `nsh/base` `TextView` fallback when running headless under `nsh test`.
 // Issue numbers (#12), @mentions, Shiki code blocks, Mermaid diagrams,
 // JSON Canvas, SVG Charts, reactive GenUI, and LaTeX math are all handled natively in Rust.
-import { cleanup, Clipboard, computed, Image, signal, Text, untracked, View } from "nsh";
+import { cleanup, Clipboard, computed, effect, Image, signal, Text, untracked, View } from "nsh";
 import { TextView, type TextViewImage } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
+import { jsonString } from "@vibevalley/protocol/schema";
 
-import { fileUrl, openAttachment, useAttachmentFile } from "../infra/attachmentFile";
-import {
-  formatGenUiAction,
-  richNative,
-  type VvCodeCopyEvent,
-  type VvDiagramPressEvent,
-  type VvGenUiActionEvent,
-  type VvIssuePressEvent,
-  type VvMentionPressEvent,
-  type VvTaskPressEvent,
-} from "../infra/rich";
-import { createEffect } from "../infra/solid";
 import { Canvas } from "./code/Canvas";
 import { Chart } from "./code/Chart";
 import { CodeBlock } from "./code/CodeBlock";
 import { Diagram } from "./code/Diagram";
-import { GenUi } from "./code/GenUi";
+import { formatGenUiAction, GenUi } from "./code/GenUi";
 import { Compare } from "./Compare";
 import { CompareSpecSchema, splitMarkdownCompareBlocks, type CompareSpec } from "./compareModel";
 import { fileKind, kindIcon } from "./domain/AttachmentTile";
-import { followDesignHref, useDesignHost } from "./host";
+import {
+  fileUrl,
+  followDesignHref,
+  useDesignHost,
+  type DesignCodeCopyEvent,
+  type DesignDiagramPressEvent,
+  type DesignGenUiActionEvent,
+  type DesignIssuePressEvent,
+  type DesignMentionPressEvent,
+  type DesignTaskPressEvent,
+} from "./host";
 import { Icon } from "./Icon";
 import { Lightbox, type Picture } from "./Lightbox";
 import { RichPreviewModal, type RichPreviewPayload } from "./RichPreviewModal";
@@ -413,12 +412,12 @@ export interface MarkdownProps {
   mentions?: boolean;
   streaming?: boolean;
   selectable?: boolean;
-  onIssuePress?: (event: VvIssuePressEvent) => void;
-  onMentionPress?: (event: VvMentionPressEvent) => void;
-  onTaskPress?: (event: VvTaskPressEvent) => void;
-  onCodeCopy?: (event: VvCodeCopyEvent) => void;
-  onGenUiAction?: (event: VvGenUiActionEvent) => void;
-  onDiagramPress?: (event: VvDiagramPressEvent) => void;
+  onIssuePress?: (event: DesignIssuePressEvent) => void;
+  onMentionPress?: (event: DesignMentionPressEvent) => void;
+  onTaskPress?: (event: DesignTaskPressEvent) => void;
+  onCodeCopy?: (event: DesignCodeCopyEvent) => void;
+  onGenUiAction?: (event: DesignGenUiActionEvent) => void;
+  onDiagramPress?: (event: DesignDiagramPressEvent) => void;
 }
 
 interface MarkdownChunkProps {
@@ -429,12 +428,12 @@ interface MarkdownChunkProps {
   readonly mentions?: boolean | undefined;
   readonly streaming?: boolean | undefined;
   readonly selectable?: boolean | undefined;
-  readonly onIssuePress?: ((event: VvIssuePressEvent) => void) | undefined;
-  readonly onMentionPress?: ((event: VvMentionPressEvent) => void) | undefined;
-  readonly onTaskPress?: ((event: VvTaskPressEvent) => void) | undefined;
-  readonly onCodeCopy?: ((event: VvCodeCopyEvent) => void) | undefined;
-  readonly onGenUiAction: (event: VvGenUiActionEvent) => void;
-  readonly onDiagramPress: (event: VvDiagramPressEvent) => void;
+  readonly onIssuePress?: ((event: DesignIssuePressEvent) => void) | undefined;
+  readonly onMentionPress?: ((event: DesignMentionPressEvent) => void) | undefined;
+  readonly onTaskPress?: ((event: DesignTaskPressEvent) => void) | undefined;
+  readonly onCodeCopy?: ((event: DesignCodeCopyEvent) => void) | undefined;
+  readonly onGenUiAction: (event: DesignGenUiActionEvent) => void;
+  readonly onDiagramPress: (event: DesignDiagramPressEvent) => void;
   readonly onOpenLink: (url: string) => void;
   readonly onDefaultIssuePress: (number: number) => void;
   readonly onOpenFallbackImage: (image: TextViewImage) => void;
@@ -446,7 +445,7 @@ function MarkdownAttachmentImage(props: {
   readonly onOpen: (key: string) => void;
 }) {
   const designHost = useDesignHost();
-  const file = useAttachmentFile(() => props.item.id);
+  const file = designHost.useAttachmentFile(() => props.item.id);
   const resolved = computed(() => {
     const f = file();
     const label = props.item.alt || f?.name || props.item.id;
@@ -465,12 +464,10 @@ function MarkdownAttachmentImage(props: {
     return { kind: "missing" as const, name: label };
   });
 
-  createEffect(
-    () => resolved(),
-    (res) => {
-      props.onPicture(props.item.key, res.kind === "image" ? res.picture : undefined);
-    },
-  );
+  effect(() => {
+    const res = resolved();
+    untracked(() => props.onPicture(props.item.key, res.kind === "image" ? res.picture : undefined));
+  });
   cleanup(() => {
     const key = untracked(() => props.item.key);
     props.onPicture(key, undefined);
@@ -487,7 +484,7 @@ function MarkdownAttachmentImage(props: {
           role="button"
           testID={`markdown-attachment-${props.item.id}`}
           accessibilityLabel={resolved().name}
-          onPress={() => void openAttachment(props.item.id).catch((e: unknown) => designHost.toast(designHost.formatError(e), "bad"))}
+          onPress={() => void designHost.openAttachment(props.item.id).catch((e: unknown) => designHost.toast(designHost.formatError(e), "bad"))}
           class="max-w-full flex-row items-center gap-1.5 rounded-md border border-line bg-side px-2.5 py-1.5 hover:bg-hover"
         >
           <Icon
@@ -517,17 +514,15 @@ function MarkdownAttachmentImage(props: {
   );
 }
 
+const CompareSpecFallbackJsonSchema = jsonString(CompareSpecSchema);
+
 function parseCompareJsonForFallback(raw: string): CompareSpec | undefined {
-  try {
-    const checked = CompareSpecSchema.safeParse(JSON.parse(raw));
-    return checked.success ? checked.data : undefined;
-  } catch {
-    return undefined;
-  }
+  const checked = CompareSpecFallbackJsonSchema.safeParse(raw);
+  return checked.success ? checked.data : undefined;
 }
 
 function MarkdownChunk(props: MarkdownChunkProps) {
-  const native = richNative();
+  const native = useDesignHost().rich();
   if (native) {
     const VvMarkdown = native.VvMarkdown;
     return (
@@ -608,20 +603,20 @@ export function Markdown(props: MarkdownProps) {
   const openLink = (url: string) => {
     const attachmentId = extractAttachmentId(url);
     if (attachmentId !== undefined) {
-      void openAttachment(attachmentId).catch((e: unknown) => designHost.toast(designHost.formatError(e), "bad"));
+      void designHost.openAttachment(attachmentId).catch((e: unknown) => designHost.toast(designHost.formatError(e), "bad"));
       return;
     }
     followDesignHref(designHost, url);
   };
   const openIssue = (number: number) => designHost.navigate(`/issues/${number}`);
-  const handleDiagramPress = (event: VvDiagramPressEvent) => {
+  const handleDiagramPress = (event: DesignDiagramPressEvent) => {
     if (props.onDiagramPress) {
       props.onDiagramPress(event);
       return;
     }
     preview.set({ kind: "mermaid", source: event.source });
   };
-  const handleGenUiAction = (event: VvGenUiActionEvent) => {
+  const handleGenUiAction = (event: DesignGenUiActionEvent) => {
     if (props.onGenUiAction) {
       props.onGenUiAction(event);
       return;

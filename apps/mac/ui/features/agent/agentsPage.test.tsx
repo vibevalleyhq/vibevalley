@@ -42,18 +42,18 @@ test("localizeAgentProblem translates raw DeepSeek and generic API key errors wi
   setLocale("zh");
   expect(localizeAgentProblem("no DeepSeek API key is set")).toEqual({
     text: "还没填 DeepSeek 的钥匙",
-    fixHref: "/settings/models",
+    fixHref: "/settings/providers",
   });
   expect(localizeAgentProblem("no API key is set for the model")).toEqual({
     text: "还没填模型 API 密钥",
-    fixHref: "/settings/models",
+    fixHref: "/settings/providers",
   });
   expect(localizeAgentProblem("custom error")).toEqual({ text: "custom error" });
 
   setLocale("en");
   expect(localizeAgentProblem("no DeepSeek API key is set")).toEqual({
     text: "No DeepSeek key yet",
-    fixHref: "/settings/models",
+    fixHref: "/settings/providers",
   });
 });
 
@@ -84,7 +84,7 @@ test("AgentsPage uses unified top bar, localizes API-key readiness errors with c
   expect(app.count("id:gallery-manage-templates")).toBe(0);
   expect(app.count("id:new-orchestrator")).toBe(1);
   expect(app.count("id:new-agent")).toBe(1);
-  expect(app.texts()).toContain("专家");
+  expect(app.texts()).toContain("队友");
   expect(app.texts()).toContain("模板库");
 
   // Localized Chinese error text replaces raw English, paired with a direct 去设置 link.
@@ -96,13 +96,13 @@ test("AgentsPage uses unified top bar, localizes API-key readiness errors with c
   expect(app.count("id:template-look")).toBe(0);
   await app.press("id:agents-templates-toggle");
   await fake.pumpUntil(app, () => app.count("id:template-look") > 0);
-  expect(app.texts()).toContain("跑在内置引擎");
+  expect(app.texts()).toContain("跑在内置环境");
   expect(app.texts().some((line) => line.includes("跑在 VibeValley 自己的 agent"))).toBe(false);
 
-  // Clicking 去设置 navigates directly to /settings/models.
+  // Clicking 去设置 navigates directly to /settings/providers.
   await app.press("id:agent-card-fix-laozhou");
-  await fake.pumpUntil(app, () => app.count("id:settings-models") === 1);
-  expect(app.count("id:settings-models")).toBe(1);
+  await fake.pumpUntil(app, () => app.count("id:settings-providers") === 1);
+  expect(app.count("id:settings-providers")).toBe(1);
 });
 
 test("AgentPage avatar picker has unique labels for every role avatar and Stage omits redundant name/duty pill", async () => {
@@ -171,4 +171,48 @@ test("AgentsPage keeps primary + New CTA unclipped at 900x720 by collapsing seco
     expect(roleFilter.x + roleFilter.width).toBeLessThanOrEqual(more.x);
     expect(more.x + more.width).toBeLessThanOrEqual(newAgent.x);
   }
+});
+
+test("AgentsPage renders O-XX/W-XX codes, Managed vs External mode badges, and searches by code without showing OAR errors on external teammates", async () => {
+  setLocale("zh");
+  const baseAgents = scenarios.typical.responses["agent.list"] as Agent[];
+  const externalTeammate: Agent = {
+    ...baseAgents[1],
+    id: "antigravity-ide",
+    code: "W-04",
+    name: "Antigravity",
+    role: "worker",
+    mode: "external",
+    runtime: "antigravity",
+    enabled: true,
+    look: { ...baseLook, avatar: "avatar-architect" },
+  };
+  const fake = fakeHost(scenarios.typical, { route: "/agents", locale: "zh" });
+  fake.respond("agent.list", () => [...baseAgents, externalTeammate]);
+  fake.respond("agent.validate", () => [
+    { id: "laozhou", problems: [{ field: "runtime", level: "error", text: "no DeepSeek API key is set" }] },
+    { id: "antigravity-ide", problems: [{ field: "runtime", level: "error", text: "ignored for external" }] },
+  ]);
+
+  const app = await open("../../app/main.tsx", {
+    width: 1280,
+    height: 820,
+    colorScheme: "light",
+    platform: "macos",
+    clock: { time: SCENARIO_NOW },
+    host: fake.options,
+  });
+  await fake.pumpUntil(app, () => app.texts().includes("Antigravity"));
+
+  expect(app.texts()).toContain("O-01");
+  expect(app.texts()).toContain("W-01");
+  expect(app.texts()).toContain("W-04");
+  expect(app.texts()).toContain("本机调度");
+  expect(app.texts()).toContain("外部接入");
+  expect(app.count("id:agent-card-error")).toBe(1);
+
+  await app.type("id:agents-search", "W-04");
+  await fake.pump(app);
+  expect(app.texts()).toContain("Antigravity");
+  expect(app.texts()).not.toContain("老周");
 });

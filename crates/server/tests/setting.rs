@@ -1,11 +1,12 @@
 //! `setting.*`, ported from VibeValley `platform/setting/setting.test.ts`.
 
+use crate::support::ServerTestExt as _;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 
 use serde_json::{Value, json};
 use vibevalley_server::setting::{Setting, SettingConfig};
-use vibevalley_server::{App, Config, Server, create_app_blocking};
+use vibevalley_server::{App, Config, create_app_blocking};
 
 fn config(home: &Path) -> SettingConfig {
     SettingConfig {
@@ -61,7 +62,11 @@ fn a_key_saved_here_wins_over_the_configurations_and_only_its_end_is_shown() {
     assert!(!after.to_string().contains("sk-saved"));
     let mode = std::fs::metadata(dir.path().join("settings.json")).unwrap().permissions().mode() & 0o777;
     assert_eq!(mode, 0o600);
-    assert_eq!(file(dir.path()), json!({ "locale": "en", "deepseekApiKey": "sk-saved-in-settings-1234" }));
+    let saved_file = file(dir.path());
+    assert_eq!(saved_file["locale"], "en");
+    assert!(saved_file.get("deepseekApiKey").is_none());
+    assert_eq!(saved_file["providers"]["connections"][0]["adapter"], "deepseek");
+    assert_eq!(saved_file["providers"]["connections"][0]["key"], "sk-saved-in-settings-1234");
     let cleared = call(&app, "setting.update", json!({ "deepseekApiKey": "" }))["data"].clone();
     assert_eq!(cleared["deepseekApiKey"], json!({ "source": "config", "hint": "…0000" }));
     assert!(file(dir.path()).get("deepseekApiKey").is_none());
@@ -69,6 +74,23 @@ fn a_key_saved_here_wins_over_the_configurations_and_only_its_end_is_shown() {
     let again = vibevalley_runtime::rt::block_on(Setting::open_async(config(dir.path())));
     assert_eq!(again.status().locale, vibevalley_protocol::Locale::En);
     app.close_blocking();
+}
+
+#[test]
+fn legacy_top_level_deepseek_key_folds_into_unified_providers_on_open() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("settings.json"), r#"{"deepseekApiKey":"sk-legacy-5678"}"#).unwrap();
+    let setting = vibevalley_runtime::rt::block_on(Setting::open_async(SettingConfig {
+        home: dir.path().to_path_buf(),
+        work_root: dir.path().join("work"),
+        version: "test".into(),
+        ..Default::default()
+    }));
+    assert_eq!(setting.deepseek_api_key().as_deref(), Some("sk-legacy-5678"));
+    let p_status = setting.provider_status();
+    assert_eq!(p_status.connections.len(), 1);
+    assert_eq!(p_status.connections[0].adapter, vibevalley_protocol::ProviderConnectionAdapter::DeepSeek);
+    assert_eq!(p_status.connections[0].key.hint.as_deref(), Some("…5678"));
 }
 
 #[test]
@@ -198,6 +220,43 @@ fn user_profile_persists_merges_and_clears_fields() {
     let too_long = "x".repeat(81);
     let refused = call(&app, "setting.update", json!({ "profile": { "displayName": too_long } }));
     assert_eq!(refused["bizCode"], 700007);
+
+    app.close_blocking();
+}
+
+#[test]
+fn github_token_saves_masks_clears_and_never_leaks_via_debug() {
+    use vibevalley_server::setting::Secret;
+
+    let dir = tempfile::tempdir().unwrap();
+    let cfg = Config {
+        home: dir.path().to_path_buf(),
+        work_root: dir.path().join("work"),
+        version: "test".into(),
+        deepseek_api_key: "sk-from-config-0000".into(),
+        github_token: Some(Secret::new("ghp_from_config_0000")),
+        probe_runtimes: false,
+        orchestrator_listens: false,
+        link_previews: false,
+        tick_crons: false,
+        ..Config::under(dir.path())
+    };
+    let debug_cfg = format!("{:?}", cfg.github_token);
+    assert!(!debug_cfg.contains("ghp_from_config_0000"), "Secret Debug must mask github_token");
+
+    let app = create_app_blocking(cfg).unwrap();
+    let before = call(&app, "setting.get", Value::Null)["data"].clone();
+    assert_eq!(before["githubToken"], json!({ "source": "config", "hint": "…0000" }));
+    assert!(!before.to_string().contains("ghp_from_config"));
+
+    let saved = call(&app, "setting.update", json!({ "githubToken": " github_pat_saved_9999 " }))["data"].clone();
+    assert_eq!(saved["githubToken"], json!({ "source": "settings", "hint": "…9999" }));
+    assert!(!saved.to_string().contains("github_pat_saved"));
+    assert_eq!(file(dir.path())["githubToken"], "github_pat_saved_9999");
+
+    let cleared = call(&app, "setting.update", json!({ "githubToken": "" }))["data"].clone();
+    assert_eq!(cleared["githubToken"], json!({ "source": "config", "hint": "…0000" }));
+    assert!(file(dir.path()).get("githubToken").is_none());
 
     app.close_blocking();
 }

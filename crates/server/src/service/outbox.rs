@@ -3,10 +3,10 @@
 use std::sync::Arc;
 
 use sea_orm::sea_query::Expr;
-use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, EntityTrait, ExprTrait, QueryFilter, QueryOrder, QuerySelect};
+use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, EntityTrait, ExprTrait, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect};
 use vibevalley_protocol::ApiError;
 
-use super::with_write_tx;
+use super::{MAX_SQL_BIND_PARAMS, with_write_tx};
 use crate::db::entity::outbox_item;
 use crate::db::{Database, DbError, Tx};
 
@@ -103,19 +103,21 @@ impl OutboxService {
             return Ok(Vec::new());
         }
         with_write_tx(&self.db, async |tx| {
-            let candidates = outbox_item::Entity::find()
+            let ids: Vec<i64> = outbox_item::Entity::find()
+                .select_only()
+                .column(outbox_item::Column::Id)
                 .filter(outbox_item::Column::Status.eq(OUTBOX_STATUS_PENDING))
                 .filter(outbox_item::Column::AvailableAt.lte(now_ms))
                 .order_by_asc(outbox_item::Column::AvailableAt)
                 .order_by_asc(outbox_item::Column::Id)
                 .limit(limit)
+                .into_tuple()
                 .all(tx)
                 .await
                 .map_err(DbError::from)?;
-            if candidates.is_empty() {
+            if ids.is_empty() {
                 return Ok(Vec::new());
             }
-            let ids: Vec<i64> = candidates.into_iter().map(|row| row.id).collect();
             let mut claimed = outbox_item::Entity::update_many()
                 .col_expr(outbox_item::Column::Status, Expr::value(OUTBOX_STATUS_PROCESSING))
                 .col_expr(outbox_item::Column::Attempts, Expr::col(outbox_item::Column::Attempts).add(1i64))
@@ -132,15 +134,18 @@ impl OutboxService {
 
     /// Earliest `available_at` timestamp among `pending` items, if any.
     pub(crate) async fn next_pending_at(&self) -> Result<Option<i64>, ApiError> {
-        let row = outbox_item::Entity::find()
+        let row: Option<i64> = outbox_item::Entity::find()
+            .select_only()
+            .column(outbox_item::Column::AvailableAt)
             .filter(outbox_item::Column::Status.eq(OUTBOX_STATUS_PENDING))
             .order_by_asc(outbox_item::Column::AvailableAt)
             .order_by_asc(outbox_item::Column::Id)
             .limit(1)
+            .into_tuple()
             .one(self.db.read_conn())
             .await
             .map_err(DbError::from)?;
-        Ok(row.map(|m| m.available_at))
+        Ok(row)
     }
 
     async fn finish_with(&self, id: i64, status: &str, available_at: Option<i64>, error: Option<&str>) -> Result<(), ApiError> {
@@ -168,6 +173,94 @@ impl OutboxService {
     /// Dead-letters an outbox item as `failed`, recording `error`.
     pub(crate) async fn fail(&self, id: i64, error: &str) -> Result<(), ApiError> {
         self.finish_with(id, OUTBOX_STATUS_FAILED, None, Some(error)).await
+    }
+
+    /// Lists dead-lettered (`failed`) outbox items newest first, up to `limit`.
+    pub(crate) async fn list_failed(&self, limit: u64) -> Result<Vec<OutboxItem>, ApiError> {
+        if limit == 0 {
+            return Ok(Vec::new());
+        }
+        let rows = outbox_item::Entity::find()
+            .filter(outbox_item::Column::Status.eq(OUTBOX_STATUS_FAILED))
+            .order_by_desc(outbox_item::Column::Id)
+            .limit(limit)
+            .all(self.db.read_conn())
+            .await
+            .map_err(DbError::from)?;
+        Ok(rows.into_iter().map(OutboxItem::from).collect())
+    }
+
+    /// Counts dead-lettered (`failed`) outbox items.
+    pub(crate) async fn count_failed(&self) -> Result<u64, ApiError> {
+        let count = outbox_item::Entity::find()
+            .filter(outbox_item::Column::Status.eq(OUTBOX_STATUS_FAILED))
+            .count(self.db.read_conn())
+            .await
+            .map_err(DbError::from)?;
+        Ok(count)
+    }
+
+    /// Requeues a single dead-lettered (`failed`) item back to `pending` with `attempts = 0`.
+    pub(crate) async fn replay_failed(&self, id: i64, now_ms: i64) -> Result<bool, ApiError> {
+        let res = outbox_item::Entity::update_many()
+            .col_expr(outbox_item::Column::Status, Expr::value(OUTBOX_STATUS_PENDING))
+            .col_expr(outbox_item::Column::Attempts, Expr::value(0i64))
+            .col_expr(outbox_item::Column::AvailableAt, Expr::value(now_ms))
+            .col_expr(outbox_item::Column::LastError, Expr::value(Option::<String>::None))
+            .filter(outbox_item::Column::Id.eq(id))
+            .filter(outbox_item::Column::Status.eq(OUTBOX_STATUS_FAILED))
+            .exec(self.db.write_conn())
+            .await
+            .map_err(DbError::from)?;
+        Ok(res.rows_affected > 0)
+    }
+
+    /// Requeues all dead-lettered (`failed`) items back to `pending` with `attempts = 0`.
+    pub(crate) async fn replay_all_failed(&self, now_ms: i64) -> Result<u64, ApiError> {
+        let res = outbox_item::Entity::update_many()
+            .col_expr(outbox_item::Column::Status, Expr::value(OUTBOX_STATUS_PENDING))
+            .col_expr(outbox_item::Column::Attempts, Expr::value(0i64))
+            .col_expr(outbox_item::Column::AvailableAt, Expr::value(now_ms))
+            .col_expr(outbox_item::Column::LastError, Expr::value(Option::<String>::None))
+            .filter(outbox_item::Column::Status.eq(OUTBOX_STATUS_FAILED))
+            .exec(self.db.write_conn())
+            .await
+            .map_err(DbError::from)?;
+        Ok(res.rows_affected)
+    }
+
+    /// Deletes up to `limit` completed (`done`) outbox rows older than `before_ms` in one write transaction.
+    pub(crate) async fn prune_done_batch(&self, before_ms: i64, limit: u64) -> Result<u64, ApiError> {
+        if limit == 0 {
+            return Ok(0);
+        }
+        with_write_tx(&self.db, async |tx| {
+            let ids: Vec<i64> = outbox_item::Entity::find()
+                .select_only()
+                .column(outbox_item::Column::Id)
+                .filter(outbox_item::Column::Status.eq(OUTBOX_STATUS_DONE))
+                .filter(outbox_item::Column::CreatedAt.lt(before_ms))
+                .order_by_asc(outbox_item::Column::Id)
+                .limit(limit)
+                .into_tuple()
+                .all(tx)
+                .await
+                .map_err(DbError::from)?;
+            if ids.is_empty() {
+                return Ok(0);
+            }
+            let mut deleted = 0u64;
+            for chunk in ids.chunks(MAX_SQL_BIND_PARAMS) {
+                let res = outbox_item::Entity::delete_many()
+                    .filter(outbox_item::Column::Id.is_in(chunk.iter().copied()))
+                    .exec(tx)
+                    .await
+                    .map_err(DbError::from)?;
+                deleted += res.rows_affected;
+            }
+            Ok(deleted)
+        })
+        .await
     }
 
     /// Lists all outbox items in insertion order.

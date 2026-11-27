@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 
 mod fuzzy;
 mod load;
+mod loc;
 mod search;
 mod walk;
 mod watch;
@@ -243,4 +244,20 @@ pub struct HighlightSpan {
     /// Byte range within its line.
     pub range: Range<usize>,
     pub kind: HighlightKind,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LocStat {
+    pub name: &'static str,
+    pub files: usize,
+    pub code: usize,
+    pub comments: usize,
+    pub blanks: usize,
+}
+
+/// Counts lines of code, comments, and blank lines per language under `root`,
+/// honoring `.gitignore`, skipping binary files and excluded directories/lockfiles.
+/// Blank-only languages are omitted and results are sorted descending by `code + comments`.
+pub fn count_loc(root: &Path) -> Result<Vec<LocStat>> {
+    loc::count_loc(root)
 }

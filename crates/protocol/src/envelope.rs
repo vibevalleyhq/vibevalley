@@ -75,8 +75,8 @@ biz_codes! {
     CronNotFound = 500004 => 404, Missing, false;
     CronRefused = 500005 => 409, Refused, false;
     GameRefused = 500006 => 409, Refused, false;
-    ArtifactNotFound = 600001 => 404, Missing, false;
-    ArtifactRefused = 600002 => 409, Refused, false;
+    NoteNotFound = 600001 => 404, Missing, false;
+    NoteRefused = 600002 => 409, Refused, false;
     MemoryNotFound = 600005 => 404, Missing, false;
     MemoryRefused = 600006 => 409, Refused, false;
     LibraryNotFound = 600007 => 404, Missing, false;

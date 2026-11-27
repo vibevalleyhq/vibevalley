@@ -10,13 +10,13 @@
   "owner": {
     "label": "Assignee",
     "pick": "Set assignee",
-    "search": "Search people or experts…",
+    "search": "Search people or teammates…",
     "self": "Me (Self)",
     "selfNamed": "{name} (Me)",
     "unassigned": "Unassigned",
     "clear": "Clear assignee",
     "peopleGroup": "People",
-    "expertsGroup": "Experts"
+    "expertsGroup": "Teammates"
   },
   "groupBy": {
     "label": "Group by",
@@ -326,7 +326,7 @@
     "save": "Save",
     "remove": "Delete",
     "newRepo": "New repo",
-    "repoHint": "The repo's name, which is also its folder under the work folder",
+    "repoHint": "The repo's name, which is also its folder under the projects root",
     "repoName": "Repo name",
     "create": "Create",
     "edit": "Edit",
@@ -379,7 +379,7 @@
     "cron": "scheduled task",
     "missed": "scheduled task (made up)",
     "refine": "drafting",
-    "runtime": "the machine itself"
+    "runtime": "the environment itself"
   },
   "run": {
     "working": "working",
@@ -465,12 +465,13 @@
     "machineAuto": "Auto machine",
     "missingRepo": "No repo added yet. Add a repo before dispatching this ticket.",
     "goRepos": "Add repo",
-    "missingRuntime": "No ready engine configured yet. Set up an engine to draft and run tickets.",
-    "goRuntimes": "Configure engines"
+    "missingRuntime": "No ready environment configured yet. Set up an environment to draft and run tickets.",
+    "goRuntimes": "Configure environments"
   },
   "conversation": {
     "older": "Load earlier messages",
-    "placeholder": "Write a comment, note, or feedback…"
+    "placeholder": "Write a comment, note, or feedback…",
+    "postComment": "Comment"
   },
   "activity": {
     "title": "Activity",
@@ -529,24 +530,6 @@
     "none": "No blockers",
     "clear": "Clear blockers",
     "blockedByChip": "Blocked by #{n}"
-  },
-  "triage": {
-    "selected": "{n} selected",
-    "selectIssue": "Select issue #{n}",
-    "clear": "Clear",
-    "status": "Status",
-    "agent": "Helper",
-    "noAgent": "Unassigned",
-    "owner": "Assignee",
-    "noOwner": "Clear assignee",
-    "repo": "Repo",
-    "noRepo": "No repo",
-    "priority": "Priority",
-    "tags": "Tags",
-    "addTags": "Add tags",
-    "replaceTags": "Replace tags",
-    "updated": "Updated {n} issues",
-    "partial": "Updated {ok} issues; {failed} could not be updated"
   },
   "relations": {
     "title": "Relations",
