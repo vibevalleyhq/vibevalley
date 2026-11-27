@@ -8,12 +8,14 @@ use std::sync::Arc;
 use vibevalley_protocol::{Deliverable, Issue, LOCAL_MACHINE_ID, Session};
 use vibevalley_runtime::oar::{Installation, Registry, Runtime};
 
-/// The 3 execution modes for issue-bound helper sessions (`执行 / 起草 / 只读问答`).
+/// Execution modes for issue-bound helper sessions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RunMode {
     Execution,
     Drafting,
     ReadOnlyAnswer,
+    ReadOnlyReview,
+    ReadOnlyCollaborator,
 }
 
 impl RunMode {
@@ -21,6 +23,8 @@ impl RunMode {
     pub fn from_session_issue(session: &Session, issue: Option<&Issue>) -> Self {
         if session.is_refining() {
             Self::Drafting
+        } else if session.is_readonly_issue_helper() {
+            Self::ReadOnlyCollaborator
         } else if issue.is_some_and(|i| i.deliver == Deliverable::Answer) {
             Self::ReadOnlyAnswer
         } else {
@@ -29,7 +33,28 @@ impl RunMode {
     }
 
     pub fn is_read_only(self) -> bool {
-        matches!(self, Self::Drafting | Self::ReadOnlyAnswer)
+        matches!(self, Self::Drafting | Self::ReadOnlyAnswer | Self::ReadOnlyReview | Self::ReadOnlyCollaborator)
+    }
+
+    /// Returns `true` when this mode may mutate the worktree and must hold the single-writer hoe lock.
+    pub fn needs_write_lock(self) -> bool {
+        self == Self::Execution
+    }
+
+    pub fn as_doc_tag(self) -> Option<&'static str> {
+        match self {
+            Self::ReadOnlyReview => Some("review"),
+            Self::ReadOnlyCollaborator => Some("collaborator"),
+            Self::Execution | Self::Drafting | Self::ReadOnlyAnswer => None,
+        }
+    }
+
+    pub fn from_doc_tag(tag: &str) -> Option<Self> {
+        match tag {
+            "review" => Some(Self::ReadOnlyReview),
+            "collaborator" => Some(Self::ReadOnlyCollaborator),
+            _ => None,
+        }
     }
 
     pub fn label_zh(self) -> &'static str {
@@ -37,6 +62,8 @@ impl RunMode {
             Self::Execution => "执行",
             Self::Drafting => "起草",
             Self::ReadOnlyAnswer => "只读问答",
+            Self::ReadOnlyReview => "只读审查",
+            Self::ReadOnlyCollaborator => "只读协同",
         }
     }
 }
@@ -120,6 +147,16 @@ pub trait SessionDriver: Send + Sync {
         None
     }
 
+    /// Returns the enabled non-orchestrator reviewer profile for automatic `in_review` gates, if any.
+    fn reviewer_profile(&self) -> Option<AgentProfileInfo> {
+        None
+    }
+
+    /// Resolves a `@<agent>` discussion mention token to an enabled non-orchestrator worker profile.
+    fn resolve_mention_agent(&self, _token: &str) -> Option<AgentProfileInfo> {
+        None
+    }
+
     /// What the agent remembers for a round on `input`, set before the input; `""` is nothing.
     fn recall<'a>(&'a self, _agent: &'a str, _session: &'a str, _repo: &'a str, _input: &'a str) -> BoxFuture<'a, String> {
         Box::pin(async { String::new() })
@@ -133,6 +170,28 @@ pub trait SessionDriver: Send + Sync {
     /// The rules a drafting session works by (`起草` mode, read-only).
     fn draft_rules(&self, _place: &HelperPlace) -> String {
         "你处于「起草」模式，只读查看代码与上下文以整理 VibeValley 工单草案；严禁修改、创建或提交任何文件，也不要调用写工具。".to_string()
+    }
+
+    /// The rules an automated readonly reviewer follows during `in_review`.
+    fn review_rules(&self, place: &HelperPlace, issue_id: &str, issue_number: i64) -> String {
+        format!(
+            "你处于「只读审查」模式，正在自动审查工单 #{issue_number}（id={issue_id}，工作区={}）。\n\
+             严禁修改、创建、删除或提交任何代码文件。\n\
+             请先使用 `issue_get` 与 `issue_diff_get`（并按需只读查看工作区代码与测试）核对工单验收标准与当前改动：\n\
+             - 若全部达标且无阻塞问题，调用 `issue_review(id=\"{issue_id}\", pass=true, text=\"...\")`。\n\
+             - 若存在问题或未达标，列出具体可操作的 `findings` 并调用 `issue_review(id=\"{issue_id}\", pass=false, findings=[...], text=\"...\")` 打回修复。",
+            place.cwd
+        )
+    }
+
+    /// The rules a `@<agent>` readonly collaborator follows when invited into an issue discussion thread.
+    fn collaborator_rules(&self, place: &HelperPlace, issue_id: &str, issue_number: i64) -> String {
+        format!(
+            "你处于「只读协同」模式，受邀就工单 #{issue_number}（id={issue_id}，工作区={}）参与只读评审或解答，不会抢占主工单执行会话。\n\
+             严禁修改、创建、删除或提交任何文件，也不要修改工单状态。\n\
+             请只读查看工单详情（`issue_get`）、改动（`issue_diff_get`）及相关源码后给出结论；完成后在讨论中回复或调用 `issue_report` 提交结论摘要。",
+            place.cwd
+        )
     }
 
     /// The rules a helper talks by in a channel, with no issue.

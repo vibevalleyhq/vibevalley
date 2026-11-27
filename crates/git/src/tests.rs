@@ -1199,3 +1199,19 @@ fn regression_a_project_check_that_rewrites_a_tracked_file_cannot_publish() {
     assert!(matches!(result, VerifiedMerge::CheckFailed(_)));
     assert_eq!(f.repo.head().unwrap(), base);
 }
+
+#[test]
+fn stash_push_captures_tracked_and_untracked_changes_and_skips_clean_trees() {
+    let f = Fixture::new();
+    assert!(!f.repo.has_uncommitted().unwrap());
+    assert_eq!(f.repo.stash_push("nothing").unwrap(), None);
+
+    f.write("a.txt", "modified content\n");
+    f.write("untracked_handoff.txt", "draft work\n");
+    assert!(f.repo.has_uncommitted().unwrap());
+
+    let stash = f.repo.stash_push("handoff stash").unwrap();
+    assert!(stash.is_some());
+    assert!(!f.repo.has_uncommitted().unwrap());
+    assert!(!f.root().join("untracked_handoff.txt").exists());
+}

@@ -542,6 +542,34 @@ impl Repo {
         block_on(self.commit_all_async(message))
     }
 
+    /// Returns `true` when the working tree or index has uncommitted or untracked non-ignored changes.
+    pub async fn has_uncommitted_async(&self) -> Result<bool> {
+        Ok(!self.status_async().await?.entries.is_empty())
+    }
+
+    /// Synchronous wrapper around [`Repo::has_uncommitted_async`].
+    pub fn has_uncommitted(&self) -> Result<bool> {
+        block_on(self.has_uncommitted_async())
+    }
+
+    /// Stashes all tracked and untracked (non-ignored) changes cleanly, returning the stash commit SHA or `None` when clean.
+    pub async fn stash_push_async(&self, message: &str) -> Result<Option<String>> {
+        if !self.has_uncommitted_async().await? {
+            return Ok(None);
+        }
+        self.git("stash")
+            .args(["push", "--include-untracked", "-m", message])
+            .user_facing()
+            .run_async()
+            .await?;
+        self.rev_parse_async("refs/stash").await
+    }
+
+    /// Synchronous wrapper around [`Repo::stash_push_async`].
+    pub fn stash_push(&self, message: &str) -> Result<Option<String>> {
+        block_on(self.stash_push_async(message))
+    }
+
     pub async fn log_async(&self, rev: Option<&str>, skip: usize, limit: usize) -> Result<Vec<Commit>> {
         let rev = match rev {
             Some(rev) => {

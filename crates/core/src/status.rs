@@ -33,7 +33,7 @@ pub(crate) fn session_of<'a>(state: &'a SpaceState, id: &str) -> Option<&'a Sess
 pub(crate) fn session_on_issue<'a>(state: &'a SpaceState, issue: &str) -> Option<&'a Session> {
     let mut on: Option<&Session> = None;
     for h in &state.sessions {
-        if h.issue_id() == Some(issue) && on.is_none_or(|o| h.hired_at >= o.hired_at) {
+        if h.issue_id() == Some(issue) && !h.is_readonly_issue_helper() && on.is_none_or(|o| h.hired_at >= o.hired_at) {
             on = Some(h);
         }
     }

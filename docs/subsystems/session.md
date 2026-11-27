@@ -58,7 +58,8 @@
 - **在场阶段（`Session.phase`）**：`working`（可带 `quiet_since`）、`done`、`failed`、`resting`、`closed`。显式交回且没有待答问题才 `done`。
 - **结构化交接（`issue_report`）**：帮工经 `/mcp` 的 `issue_report` 交状态、问题、`checks` 与 `answer`（`Board::report`）；一轮没交汇报就从它说的话里读问题。
 - **统一持久信箱 `session_mailbox` 与带话**：工作区输入、私聊消息、工单评论与助手频道投递（`MailboxSource::ChannelOrchestrator`）均经 `session_mailbox`（按 `idempotency_key` 幂等去重，并记录 `source_message_id` 与部分索引，`pending` / `claimed` / `done` / `failed` / `withdrawn`）入队；频道消息删除时按 `source_message_id` 通过 `withdraw_mailbox_by_message` 统一撤回未领用的投递，重启可恢复。会话在干活时插进当前一轮，歇着时开下一轮，排队工单的话随派工一并交给帮工。
-- **并发上限**：全农场最多 6 个在干活的工单受控会话，单仓库默认 3 个；满了工单留在 `todo`（`stage: queued`），空出来按看板顺序补派；工作区直连会话（`controller: User`）不占工单并发槽位。
+- **只读协作模式（`ReadOnlyReview` / `ReadOnlyCollaborator`）与单写锁（`HoeRegistry`）**：`RunMode` 区分 `Execution`（需独占工作树写租约）、`Drafting`、`ReadOnlyAnswer`、`ReadOnlyReview` 与 `ReadOnlyCollaborator`。只读审查与只读协同会话以 `ExecutionPolicy::DirectCwd(ReadOnly)`、`PermissionMode::Plan` 及禁用写工具运行，不占用工单并发槽位、不推入 `Issue.assignments`、不覆盖主会话汇报结果，MCP 仅按模式放行读接口及对应裁决（`issue_review`）/发言（`channel_message_send`）工具；可写工作区由 `worktree/handoff.rs` 的 `HoeRegistry` 按 `WorktreeKey`（本地规范路径或远端 `(machineId, repo, branch)`）保证单写者独占并在交接前自动提交或暂存未提交改动。
+- **并发上限**：全农场最多 6 个在干活的工单受控会话，单仓库默认 3 个；满了工单留在 `todo`（`stage: queued`），空出来按看板顺序补派；工作区直连会话（`controller: User`）与只读协作会话不占工单并发槽位。
 - **无沙箱与无逐条权限确认（本地工单帮工）**：本地工单帮工在 worktree 里直接执行命令，农机的权限请求一律放行（`PermissionMode::Bypass`）；安全边界是主回环门只听 `127.0.0.1`。需要强隔离或远端算力时，可将角色或任务路由到经 `/api/v1/machine/ws` 接入的远程宿主机或一次性容器沙箱（`SandboxMachine`，见[执行层与运行机器](docs/subsystems/runtime.md)）。
 - **多机器路由、PR 优先远端交付与断线续传**：角色（`Agent.machineId`）与任务（`Issue.machineId`）均可指定目标执行机器（省略时默认由控制面路由到本地 `local`）。控制面通过无锁 `MachineRegistry` 解析 `RuntimeRef`（`(machineId, runtimeId)`）：命中 `LocalMachine` 时沿进程内路径零开销执行；命中 `RemoteMachine` 时由远端 `vibevalley machine up` 准备隔离 worktree（PR 优先分支推送交付）、通过本地回环代理将 `/mcp` 隧道回传控制面，并在 WebSocket 闪断重连后借带 `afterSeq` 的 `MachineSessionAttach` 无损补放事件而不中断正在运行的引擎进程。
 - **工作区直连对话、Swarm 旁路与独立交互提问通道**：工作区直连会话（`controller: User`、`policy: DirectCwd`、0 绑定启动）复用同一套 `AgentSession`、`oar::Session`、`session_mailbox`、`session_event` 与 `oar-voyage/3` 记录流，不占工单板 `space_limit` / `per_repo` 并发配额，也不进收件箱与像素农场；关闭标签页时由原生壳直接调 `session.closeWorkspace` 确定性停机回收；会话内可切换模型、思考深度与权限模式（`Ask` / `AcceptEdits` / `Bypass` / `ReadOnly`），真实会话标题经 `Session.title` 与 `SessionsSlice` 实时同步，Antigravity Swarm 与子代理通过只读旁路（mtime 缓存 + `256 KiB` 尾部裁剪 + 防符号链接/路径穿越）按需暴露 `swarm` 状态与 `session.childTranscript`；其中 `InteractionRequested`（如 Antigravity 的 `interaction_*` 提问）进入 `WaitingReply`，**即使在 `Bypass` 模式下也绝不自动放行**。
@@ -88,7 +89,7 @@
 
 ## 怎么验证
 
-- `crates/server/tests/issue_board.rs`、`crates/server/tests/issue_family.rs`：开工、提问、失败、打断与续上、排队与上限、重启、静默、权限放行，并通过 `TurnGate`（[support/mod.rs](crates/server/tests/support/mod.rs)）确定性卡住并放行帮工轮次。
+- `crates/server/tests/issue_board.rs`、`crates/server/tests/issue_family.rs`、`crates/server/tests/multi_helper.rs`：开工、提问、失败、打断与续上、排队与上限、重启、静默、权限放行、自动只读审查、`@<agent>` 协同与单写锁交接，并通过 `TurnGate`（[support/mod.rs](crates/server/tests/support/mod.rs)）确定性卡住并放行帮工轮次。
 - `crates/server/tests/session.rs`、`crates/server/tests/session/workspace.rs`：轨迹的流式步骤、子 agent 的步骤、落盘读回、`issue.watch` / `session.watch` 与工作区直连会话全链路（权限、交互提问、在线改配、重启续接、与工单板并发隔离）。
 - `crates/server/tests/mcp.rs`：`/mcp` 帮工门。
 - `crates/runtime/src/oar/tests.rs`、`crates/runtime/tests/antigravity_acp.rs`、`crates/runtime/tests/antigravity_swarm.rs`、`crates/runtime/tests/live.rs`：各家农机、Antigravity ACP 与 Swarm 旁路（离线单元、模拟 stdio 协议测试、只读旁路边界测试及 `#[ignore]` 实机冒烟）。

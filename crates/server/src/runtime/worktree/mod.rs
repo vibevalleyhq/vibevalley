@@ -5,6 +5,8 @@
 //! issue's number, repository and the worktree its session works in.
 
 pub(crate) mod check;
+mod handoff;
 mod manager;
 
+pub use handoff::{HandoffCleanup, HandoffRecord, HoeRegistry, WorktreeKey, WriteLease};
 pub use manager::{Changes, Delivery, Joined, Landed, Leave, Leaving, OnDisk, Worktree, issue_branch};

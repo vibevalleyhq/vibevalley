@@ -188,11 +188,18 @@ pub struct ReviewArgs {
 }
 
 pub async fn review(f: &ToolRegistry, who: &Who, a: ReviewArgs) -> Result<String, String> {
-    authorize_who(f, who, AuthTier::Update)?;
     let item = match f.issue_async(&a.id).await {
         Ok(i) => i,
         Err(why) => return Ok(why),
     };
+    match who {
+        Who::Orchestrator(_) => authorize_who(f, who, AuthTier::Update)?,
+        Who::Helper(h) => {
+            if f.session_mode_async(h).await != crate::agent::mcp::HelperRunMode::ReadOnlyReview || h.issue_id() != Some(item.id.as_str()) {
+                return Err("没成：只有正在审查这个工单的只读审查会话能调用 issue_review。".into());
+            }
+        }
+    }
     let findings = a.findings.map(|f| match f {
         OneOrMany::One(one) => vec![one],
         OneOrMany::Many(many) => many,

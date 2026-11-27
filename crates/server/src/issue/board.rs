@@ -17,8 +17,8 @@ use tokio::sync::Mutex as AsyncMutex;
 use vibevalley_core::{Move, status_move};
 use vibevalley_protocol::{
     ActorRef, ApiError, AppliedIssue, Assignment, Attachment, BacklogTriageSuggestion, BizCode, Deliverable, HumanPause, HumanPauseSource, Issue,
-    IssueCanceled, IssueConstraints, IssueMandate, IssueRelation, IssueStageKind as StageKind, IssueStatus, JsNumber, Landing, Priority, ResumeCondition, Run,
-    RunTriggerKind, Session, SliceBundle, StuckReason,
+    IssueCanceled, IssueConstraints, IssueMandate, IssueRelation, IssueStageKind as StageKind, IssueStatus, JsNumber, Landing, Outcome, Phase, Priority,
+    ResumeCondition, Run, RunTriggerKind, Session, SliceBundle, StuckReason,
 };
 use vibevalley_runtime::oar::Registry;
 
@@ -27,7 +27,7 @@ use crate::channel::Chat;
 use crate::context::{AsyncRequestKeys, Context, now};
 use crate::repo::Repo;
 use crate::runtime::{
-    Changes, Delivery, DraftEnd, Hire, Landed, Leave, MailboxSource, MailboxStatus, OnDisk, Rounds, Runtime, SessionEngine, Worktree, find_issue, io,
+    Changes, Delivery, DraftEnd, Hire, Landed, Leave, MailboxSource, MailboxStatus, OnDisk, Rounds, RunMode, Runtime, SessionEngine, Worktree, find_issue, io,
     issue_branch, trigger_of,
 };
 use crate::storage::Storage;
@@ -226,6 +226,17 @@ pub enum Sent {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AutoReviewDoc {
+    #[serde(default)]
+    rounds: i64,
+    #[serde(default)]
+    last_session_id: Option<String>,
+    #[serde(default)]
+    last_session_runs: i64,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub(super) struct TriageStore {
     #[serde(default)]
     pub custom: Vec<BacklogTriageSuggestion>,
@@ -385,7 +396,7 @@ impl Board {
         Ok(board)
     }
 
-    async fn issue_lock(&self, id: &str) -> tokio::sync::OwnedMutexGuard<()> {
+    pub(super) async fn issue_lock(&self, id: &str) -> tokio::sync::OwnedMutexGuard<()> {
         let lock = {
             let mut map = self.issue_locks.lock();
             map.retain(|_, v| v.strong_count() > 0);
@@ -1023,6 +1034,7 @@ impl Board {
         }
         self.refresh_queue_unlocked_async().await;
         self.retry_replies_unlocked_async().await;
+        self.dispatch_auto_reviews_async().await;
     }
 
     async fn retry_replies_unlocked_async(&self) {
@@ -1105,7 +1117,7 @@ impl Board {
         self.send_for_issue_async(id, words, kind).await
     }
 
-    fn send_for_issue_async<'a>(
+    pub(super) fn send_for_issue_async<'a>(
         &'a self,
         id: &'a str,
         words: Option<String>,
@@ -1299,6 +1311,225 @@ impl Board {
                 brief: issue.title.clone(),
                 drafting: false,
             })
+            .await
+    }
+
+    async fn load_auto_review_async(&self, issue_id: &str) -> AutoReviewDoc {
+        self.session_engine()
+            .durable_store()
+            .read_with_async(issue_id.to_string(), |tx, id| {
+                Box::pin(async move { tx.document_async("issue", id, "auto_review").await })
+            })
+            .await
+            .ok()
+            .flatten()
+            .and_then(|d| serde_json::from_value::<AutoReviewDoc>(d.state).ok())
+            .unwrap_or_default()
+    }
+
+    async fn save_auto_review_async(&self, issue_id: &str, doc: &AutoReviewDoc) {
+        if let Ok(val) = serde_json::to_value(doc) {
+            let _ = self
+                .session_engine()
+                .durable_store()
+                .write_with_async((issue_id.to_string(), val), |tx, (id, val)| {
+                    Box::pin(async move { tx.put_document_async("issue", id, "auto_review", val).await })
+                })
+                .await;
+        }
+    }
+
+    async fn readonly_issue_place_async(&self, issue: &Issue, drive_is_local: bool) -> Result<(PathBuf, Option<String>, Option<String>)> {
+        let wp = self.worktree();
+        if let Some(worker) = self.on_board_async(issue).await
+            && let Some(cwd) = worker.cwd.as_deref().filter(|c| !c.is_empty())
+        {
+            return Ok((
+                PathBuf::from(cwd),
+                worker.worktree_branch().map(String::from),
+                self.session_engine().base_branch(&worker.id),
+            ));
+        }
+        if !drive_is_local {
+            return Ok((PathBuf::new(), issue.repo.as_ref().map(|_| issue_branch(issue.number)), None));
+        }
+        if let Some(main) = wp.main_repo_async(issue.repo.as_deref()).await? {
+            return Ok((main.root().to_path_buf(), None, None));
+        }
+        Ok((wp.context_async(&issue.id).await?, None, None))
+    }
+
+    /// Dispatches a readonly auto-reviewer for `InReview` issues when an eligible
+    /// enabled reviewer profile applies and `mandate.max_bot_review_rounds` has remaining budget.
+    pub(super) async fn dispatch_auto_reviews_async(&self) {
+        let Some(reviewer) = self.runtime.driver().reviewer_profile() else {
+            return;
+        };
+        let (issues, sessions) = match tokio::try_join!(self.issues_async(), self.sessions_async()) {
+            Ok(pair) => pair,
+            Err(_) => return,
+        };
+        for issue in issues {
+            if issue.status != IssueStatus::InReview
+                || issue.stage.state != StageKind::Reviewing
+                || issue.parent.is_some()
+                || issue.reviewed_at.is_some()
+                || !issue.was_sent()
+                || issue.mandate.is_paused()
+                || issue.mandate.max_bot_review_rounds <= 0
+                || issue.deliver == Deliverable::Answer
+                || (issue.repo.is_none() && issue.criteria.is_empty())
+                || issue.assigned_agent() == Some(reviewer.id.as_str())
+            {
+                continue;
+            }
+            let issue_guard = self.issue_lock(&issue.id).await;
+            let Some(fresh) = self.issue_async(&issue.id).await.ok().flatten() else {
+                continue;
+            };
+            if fresh.status != IssueStatus::InReview
+                || fresh.stage.state != StageKind::Reviewing
+                || fresh.reviewed_at.is_some()
+                || fresh.mandate.is_paused()
+                || fresh.mandate.max_bot_review_rounds <= 0
+            {
+                continue;
+            }
+            let Some(worker) = self.on_board_async(&fresh).await else {
+                continue;
+            };
+            if worker.phase.is_working() || worker.last_run.as_ref().is_none_or(|r| r.outcome != Outcome::Completed) {
+                continue;
+            }
+            let review_running = sessions.iter().any(|s| {
+                s.issue_id() == Some(fresh.id.as_str()) && s.is_readonly_issue_helper() && s.profile_id() == Some(reviewer.id.as_str()) && s.phase.is_working()
+            });
+            if review_running {
+                continue;
+            }
+            let previous_doc = self.load_auto_review_async(&fresh.id).await;
+            if previous_doc.rounds >= fresh.mandate.max_bot_review_rounds {
+                continue;
+            }
+            if previous_doc.last_session_id.as_deref() == Some(worker.id.as_str()) && previous_doc.last_session_runs == worker.runs {
+                continue;
+            }
+            let Ok(drive) = self.runtime.driver().drive(Some(&reviewer.id), &fresh).await else {
+                continue;
+            };
+            let Ok((cwd, branch, base)) = self.readonly_issue_place_async(&fresh, drive.is_local).await else {
+                continue;
+            };
+            let next_round = previous_doc.rounds + 1;
+            let next_doc = AutoReviewDoc {
+                rounds: next_round,
+                last_session_id: Some(worker.id.clone()),
+                last_session_runs: worker.runs,
+            };
+            self.save_auto_review_async(&fresh.id, &next_doc).await;
+            drop(issue_guard);
+
+            let summary = worker
+                .last_run
+                .as_ref()
+                .map(|r| r.summary.trim())
+                .filter(|s| !s.is_empty())
+                .unwrap_or("(no summary provided)");
+            let criteria = if fresh.criteria.is_empty() {
+                "- (none specified)".to_string()
+            } else {
+                fresh.criteria.iter().map(|c| format!("- {c}")).collect::<Vec<_>>().join("\n")
+            };
+            let prompt = format!(
+                "Automated review round {next_round}/{} for issue #{} ({}): {}\n\n\
+                 Acceptance criteria:\n{criteria}\n\n\
+                 Primary worker ({}) latest summary:\n{summary}\n\n\
+                 Inspect the acceptance criteria and git diff (`issue_diff_get`), never modify or commit any files, \
+                 and record your verdict via `issue_review(id=\"{}\", pass=true|false, findings=..., text=...)`.",
+                fresh.mandate.max_bot_review_rounds, fresh.number, fresh.id, fresh.title, worker.name, fresh.id
+            );
+            let name = format!("{} #{}", reviewer.name, fresh.number);
+            let hire = Hire {
+                issue: &fresh,
+                prompt,
+                trigger: trigger_of(RunTriggerKind::Issue, None),
+                drive,
+                cwd,
+                branch,
+                base,
+                name,
+                brief: format!("Review #{}: {}", fresh.number, fresh.title),
+                drafting: false,
+            };
+            if let Err(e) = self.session_engine().hire_readonly_async(hire, RunMode::ReadOnlyReview).await {
+                self.save_auto_review_async(&fresh.id, &previous_doc).await;
+                eprintln!("vibevalley: auto-reviewer dispatch for #{}: {e}", fresh.number);
+            }
+        }
+    }
+
+    /// Dispatches or re-engages a readonly `@<agent>` collaborator session for `issue_id`
+    /// without acquiring write ownership or disturbing the issue's primary worker.
+    pub(super) async fn dispatch_collaborator_async(&self, issue_id: &str, agent_id: &str, message_body: &str, _message_id: &str) -> Result<String> {
+        let fresh = self.stored_async(issue_id).await?;
+        if fresh.status.is_closed() {
+            return Err(BoardError::Api(ApiError::new(
+                BizCode::IssueRefused,
+                vibevalley_i18n::t("server.issue.closed", &[]),
+            )));
+        }
+        let drive = self.runtime.driver().drive(Some(agent_id), &fresh).await?;
+        let prompt = format!(
+            "You were @mentioned in the discussion thread of issue #{} ({}): \"{}\"\n\n\
+             Comment:\n{}\n\n\
+             Inspect the issue, diff (`issue_diff_get`), and workspace read-only without modifying any files or changing issue status, \
+             and provide a helpful review/answer in your report.",
+            fresh.number,
+            fresh.id,
+            fresh.title,
+            message_body.trim()
+        );
+        let sessions = self.sessions_async().await?;
+        for s in sessions {
+            if s.issue_id() == Some(fresh.id.as_str())
+                && s.is_readonly_issue_helper()
+                && s.profile_id() == Some(agent_id)
+                && !matches!(s.phase, Phase::Closed(_))
+                && self.session_engine().helper_mode_async(&s, Some(&fresh)).await == RunMode::ReadOnlyCollaborator
+            {
+                if let Some(steered) = self.session_engine().steer_async(&s, &prompt).await {
+                    return steered.map(|()| s.id);
+                }
+                return self
+                    .session_engine()
+                    .next_readonly_round_async(
+                        &fresh,
+                        &s,
+                        prompt.clone(),
+                        |_| prompt.clone(),
+                        trigger_of(RunTriggerKind::Comment, Some(message_body.to_string())),
+                    )
+                    .await;
+            }
+        }
+        let (cwd, branch, base) = self.readonly_issue_place_async(&fresh, drive.is_local).await?;
+        let name = format!("{} #{}", drive.name, fresh.number);
+        self.session_engine()
+            .hire_readonly_async(
+                Hire {
+                    issue: &fresh,
+                    prompt,
+                    trigger: trigger_of(RunTriggerKind::Comment, Some(message_body.to_string())),
+                    drive,
+                    cwd,
+                    branch,
+                    base,
+                    name,
+                    brief: format!("Collaborate #{}: {}", fresh.number, fresh.title),
+                    drafting: false,
+                },
+                RunMode::ReadOnlyCollaborator,
+            )
             .await
     }
 

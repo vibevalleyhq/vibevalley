@@ -165,6 +165,49 @@ impl SessionDriver for AgentDriver {
         })
     }
 
+    fn reviewer_profile(&self) -> Option<AgentProfileInfo> {
+        let agents = self.profile.agents();
+        let to_info = |a: Agent| AgentProfileInfo {
+            id: a.id,
+            name: a.name,
+            enabled: a.enabled,
+            is_orchestrator: false,
+        };
+        agents
+            .iter()
+            .find(|a| a.enabled && a.role == AgentRole::Worker && a.id == "reviewer")
+            .cloned()
+            .or_else(|| {
+                agents
+                    .into_iter()
+                    .find(|a| a.enabled && a.role == AgentRole::Worker && a.from.as_ref().is_some_and(|f| f.template == "reviewer"))
+            })
+            .map(to_info)
+    }
+
+    fn resolve_mention_agent(&self, token: &str) -> Option<AgentProfileInfo> {
+        let needle = token.trim();
+        if needle.is_empty() {
+            return None;
+        }
+        let workers: Vec<Agent> = self.profile.agents().into_iter().filter(|a| a.enabled && a.role == AgentRole::Worker).collect();
+        let found = workers
+            .iter()
+            .find(|a| a.id == needle)
+            .or_else(|| workers.iter().find(|a| a.name == needle))
+            .or_else(|| {
+                workers
+                    .iter()
+                    .find(|a| a.id.eq_ignore_ascii_case(needle) || a.name.eq_ignore_ascii_case(needle))
+            })?;
+        Some(AgentProfileInfo {
+            id: found.id.clone(),
+            name: found.name.clone(),
+            enabled: found.enabled,
+            is_orchestrator: false,
+        })
+    }
+
     fn rules(&self, place: &HelperPlace, deliver: Deliverable) -> String {
         let words = &PROMPTS.workplace;
         if deliver == Deliverable::Answer {

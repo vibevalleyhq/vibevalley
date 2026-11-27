@@ -37,6 +37,8 @@ pub enum HelperRunMode {
     Execution,
     Drafting,
     ReadOnlyAnswer,
+    ReadOnlyReview,
+    ReadOnlyCollaborator,
 }
 
 impl HelperRunMode {
@@ -45,6 +47,8 @@ impl HelperRunMode {
             Self::Execution => "执行",
             Self::Drafting => "起草",
             Self::ReadOnlyAnswer => "只读问答",
+            Self::ReadOnlyReview => "只读审查",
+            Self::ReadOnlyCollaborator => "只读协同",
         }
     }
 }
@@ -71,9 +75,11 @@ pub fn tool_allowed_in_mode(name: &str, mode: HelperRunMode) -> bool {
             | "library_item_list"
     );
     match mode {
-        HelperRunMode::Execution => true,
+        HelperRunMode::Execution => !matches!(name, "issue_diff_get" | "issue_review"),
         HelperRunMode::Drafting => readonly,
         HelperRunMode::ReadOnlyAnswer => readonly || name == "issue_report",
+        HelperRunMode::ReadOnlyReview => readonly || matches!(name, "issue_diff_get" | "issue_review" | "issue_report"),
+        HelperRunMode::ReadOnlyCollaborator => readonly || matches!(name, "issue_diff_get" | "channel_message_send" | "issue_report"),
     }
 }
 
@@ -82,6 +88,9 @@ pub trait ToolDispatchPort: Send + Sync {
     fn helper_tools(&self) -> Vec<ToolSpecWire>;
     fn helper_tools_for(&self, _session: Option<&Session>) -> Vec<ToolSpecWire> {
         self.helper_tools()
+    }
+    fn helper_tools_for_mode(&self, session: Option<&Session>, _mode: HelperRunMode) -> Vec<ToolSpecWire> {
+        self.helper_tools_for(session)
     }
     fn session_for_token<'a>(&'a self, token: &'a str) -> BoxFuture<'a, Option<Session>>;
     fn session_mode_async<'a>(&'a self, session: &'a Session) -> BoxFuture<'a, HelperRunMode>;
@@ -101,7 +110,7 @@ pub async fn tools_for_token_async(dispatch: &dyn ToolDispatchPort, tools: &[Too
     let me = dispatch.session_for_token(token).await?;
     let mode = dispatch.session_mode_async(&me).await;
     Some(
-        to_tool_defs(dispatch.helper_tools_for(Some(&me)))
+        to_tool_defs(dispatch.helper_tools_for_mode(Some(&me), mode))
             .into_iter()
             .filter(|t| tool_allowed_in_mode(&t.name, mode))
             .collect(),

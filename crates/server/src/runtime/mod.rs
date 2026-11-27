@@ -20,4 +20,6 @@ pub use session::{
 pub(crate) use session::{OUTBOX_SESSION_REPORTED, OutboxSessionReported};
 pub use types::{BoardConfig, BoardError, IssueChange, Opened, Result, RuntimeConfig, RuntimeError, Step, Undelivered};
 pub(crate) use types::{derive_all_issues, find_issue, io};
-pub use worktree::{Changes, Delivery, Joined, Landed, Leave, Leaving, OnDisk, Worktree, issue_branch};
+pub use worktree::{
+    Changes, Delivery, HandoffCleanup, HandoffRecord, HoeRegistry, Joined, Landed, Leave, Leaving, OnDisk, Worktree, WorktreeKey, WriteLease, issue_branch,
+};

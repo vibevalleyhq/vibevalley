@@ -88,6 +88,43 @@ pub fn mentions_in(text: &str, names: &Nameable) -> Vec<String> {
     found
 }
 
+/// Extracts raw `@<token>` mention identifiers outside code fences/inline code,
+/// ignoring email/word-interior `@` signs via [`leads`].
+pub fn extract_at_tokens(text: &str) -> Vec<String> {
+    let prose = FENCE.replace_all(text, " ");
+    let prose = TICK.replace_all(&prose, " ");
+    let mut found: Vec<String> = Vec::new();
+    let mut cursor = 0;
+    while let Some(rel) = prose[cursor..].find('@') {
+        let at_idx = cursor + rel;
+        let rest = &prose[at_idx + 1..];
+        let end = rest
+            .char_indices()
+            .find(|&(_, c)| {
+                c.is_whitespace()
+                    || matches!(
+                        c,
+                        '@' | ':' | ',' | '，' | '.' | '。' | ';' | '；' | '!' | '！' | '?' | '？' | ')' | '）' | ']' | '】' | '>' | '"' | '\'' | '`'
+                    )
+            })
+            .map(|(i, _)| i)
+            .unwrap_or(rest.len());
+        if end == 0 {
+            cursor = at_idx + 1;
+            continue;
+        }
+        let token = &rest[..end];
+        cursor = at_idx + 1 + end;
+        if !leads(prose[..at_idx].chars().next_back()) {
+            continue;
+        }
+        if !found.iter().any(|t| t == token) {
+            found.push(token.to_string());
+        }
+    }
+    found
+}
+
 static CHANNEL_NAME: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^[\p{L}\p{N}_-]{1,24}$").expect("name"));
 static THREAD_TARGET: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^[\p{L}\p{N}_-]{1,24}:([0-9]+)$").expect("thread"));
 static DIRECT_TARGET: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^@(\S+)$").expect("direct"));

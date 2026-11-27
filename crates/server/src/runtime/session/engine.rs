@@ -3,7 +3,7 @@
 //! persistent checkpoints, stopping it and letting it go.
 
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 
@@ -16,7 +16,8 @@ use vibevalley_core::{SliceMask, derive_issues, overlay_sessions};
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
     ApiError, Deliverable, Doing, Issue, IssueAnswer, IssueReportMemoryScope, LastRun, Millis, Outcome, Phase, PhaseDone, PhaseFailed, PhaseResting,
-    PhaseWorking, ProjectCheckStatus, Question, RunTrigger, Session, SessionAction, SessionClose, SessionPermissionRequest, SessionSubagents, Spent,
+    PhaseWorking, ProjectCheckStatus, Question, RunTrigger, Session, SessionAction, SessionClose, SessionPermissionMode, SessionPermissionRequest,
+    SessionSubagents, Spent,
 };
 use vibevalley_runtime::agent::durable::BoxFuture;
 use vibevalley_runtime::oar::{ContentBlock, EventKind, McpServer, PermissionDecision, PermissionMode, SessionOptions, StopReason};
@@ -28,7 +29,7 @@ use super::report::{Report, ReportQuestion, ReportStatus};
 use crate::context::error::{LookIn, missing};
 use crate::context::live::LiveSessionSnapshot;
 use crate::context::{Context, now};
-use crate::runtime::worktree::{Leave, Leaving, Worktree};
+use crate::runtime::worktree::{HandoffCleanup, HandoffRecord, Leave, Leaving, Worktree, WorktreeKey, WriteLease};
 use crate::runtime::{IssueChange, Result, RuntimeConfig, RuntimeError, Step, find_issue};
 use crate::service::DbError;
 use crate::service::session::SessionExtra;
@@ -146,6 +147,7 @@ pub(super) struct Inner {
     /// Held while a direct talk finds or hires its session.
     pub talking: AsyncMutex<()>,
     pub(super) workspaces: Mutex<HashMap<String, super::workspace::WorkspaceState>>,
+    pub(super) helper_modes: Mutex<HashMap<String, RunMode>>,
 }
 
 impl SessionEngine {
@@ -159,6 +161,9 @@ impl SessionEngine {
     ) -> Result<SessionEngine> {
         let durable = ctx.service.durable().await?;
         let (extras, configs) = tokio::try_join!(ctx.service.session.extras(), ctx.service.session.configs())?;
+        let mode_docs = durable
+            .read_async(|r| Box::pin(async move { r.documents_by_kind_async("session", "helper_mode").await }))
+            .await?;
         let mut workspaces = HashMap::new();
         for (id, cfg) in configs {
             workspaces.insert(
@@ -168,6 +173,14 @@ impl SessionEngine {
                     ..Default::default()
                 },
             );
+        }
+        let mut helper_modes = HashMap::new();
+        for doc in mode_docs {
+            if let Some(tag) = doc.state.as_str()
+                && let Some(mode) = RunMode::from_doc_tag(tag)
+            {
+                helper_modes.insert(doc.scope_id, mode);
+            }
         }
         let (events, _) = broadcast::channel(256);
         let (doing_events, _) = broadcast::channel(512);
@@ -192,6 +205,7 @@ impl SessionEngine {
             recovering: Default::default(),
             talking: AsyncMutex::new(()),
             workspaces: Mutex::new(workspaces),
+            helper_modes: Mutex::new(helper_modes),
         })))
     }
 
@@ -456,6 +470,81 @@ impl SessionEngine {
         }
     }
 
+    /// Resolves the execution mode of `session`, consulting persisted helper-mode metadata before issue fallback.
+    pub async fn helper_mode_async(&self, session: &Session, issue: Option<&Issue>) -> RunMode {
+        if let Some(mode) = self.0.helper_modes.lock().get(&session.id).copied() {
+            return mode;
+        }
+        if session.is_readonly_issue_helper()
+            && let Ok(Some(doc)) = self
+                .0
+                .durable
+                .read_with_async(session.id.clone(), |tx, id| {
+                    Box::pin(async move { tx.document_async("session", id, "helper_mode").await })
+                })
+                .await
+            && let Some(mode) = doc.state.as_str().and_then(RunMode::from_doc_tag)
+        {
+            self.0.helper_modes.lock().insert(session.id.clone(), mode);
+            return mode;
+        }
+        RunMode::from_session_issue(session, issue)
+    }
+
+    /// Computes the normalized [`WorktreeKey`] for a writable session, or `None` when no writable git worktree applies.
+    pub async fn worktree_key_for_async(&self, session: &Session) -> Option<WorktreeKey> {
+        if session.is_readonly_issue_helper() || session.is_refining() || !session.is_board_worker() {
+            return None;
+        }
+        if let Some(machine_id) = session.machine.as_deref()
+            && let (Some(repo), Some(branch)) = (session.repo_name(), session.worktree_branch())
+        {
+            return Some(WorktreeKey::remote(machine_id, repo, branch));
+        }
+        if session.repo_name().is_some()
+            && let Some(cwd) = session.cwd.as_deref().filter(|c| !c.is_empty())
+        {
+            return Some(WorktreeKey::local_async(Path::new(cwd)).await);
+        }
+        None
+    }
+
+    /// Aborts any active turn on `from_session` (or the current lease holder), cleans uncommitted worktree
+    /// edits via commit or stash, and transfers or releases write ownership on `key`.
+    pub async fn handoff_worktree_async(
+        &self,
+        from_session: Option<&str>,
+        key: &WorktreeKey,
+        to: Option<WriteLease>,
+        cleanup: HandoffCleanup,
+    ) -> Result<HandoffRecord> {
+        let active = from_session
+            .map(str::to_string)
+            .or_else(|| self.0.worktree.hoe().owner(key).map(|l| l.session_id));
+        if let Some(sid) = active.as_deref()
+            && let Some(agent) = self.0.live.get(sid)
+            && self.session_async(sid).await.is_some_and(|s| s.phase.is_working())
+        {
+            let _ = agent.abort().await;
+        }
+        self.0.worktree.hoe().handoff_async(key, from_session, to, cleanup).await
+    }
+
+    async fn record_helper_mode_async(&self, session_id: &str, mode: RunMode) -> Result<()> {
+        self.0.helper_modes.lock().insert(session_id.to_string(), mode);
+        if let Some(tag) = mode.as_doc_tag() {
+            let sid = session_id.to_string();
+            let val = serde_json::Value::String(tag.to_string());
+            self.0
+                .durable
+                .write_with_async((sid, val), |tx, (sid, val)| {
+                    Box::pin(async move { tx.put_document_async("session", sid, "helper_mode", val).await })
+                })
+                .await?;
+        }
+        Ok(())
+    }
+
     /// A new session on an issue, its agent opened and its first prompt sent.
     pub async fn hire_async(&self, h: Hire<'_>) -> Result<String> {
         let number = {
@@ -484,8 +573,75 @@ impl SessionEngine {
             id: h.issue.id.clone(),
             refining: h.drafting.then_some(true),
         });
-        let started = self.start_async(h.drive, session, h.issue, h.prompt, false, h.trigger).await;
+        let mode = RunMode::from_session_issue(&session, Some(h.issue));
+        let acquired_key = if mode.needs_write_lock() {
+            if let Some(key) = self.worktree_key_for_async(&session).await {
+                let lease = WriteLease::new(
+                    &id,
+                    session.profile.clone(),
+                    session.machine.clone(),
+                    session.worktree_branch().map(String::from),
+                );
+                self.0.worktree.hoe().acquire_async(&key, lease).await?;
+                Some(key)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        let issue_change = IssueChange::Started {
+            session: id.clone(),
+            worker: !session.is_refining(),
+        };
+        let started = self
+            .start_with_change_async(h.drive, session, h.issue, h.prompt, false, h.trigger, Some(issue_change))
+            .await;
         if started.is_err() {
+            if let Some(key) = acquired_key {
+                self.0.worktree.hoe().release(&key, &id);
+            }
+            self.0.extras.lock().remove(&id);
+        }
+        started
+    }
+
+    /// Dispatches an isolated readonly helper session (`ReadOnlyReview` or `ReadOnlyCollaborator`)
+    /// bound to an issue without acquiring write ownership or mutating primary assignments.
+    pub async fn hire_readonly_async(&self, h: Hire<'_>, mode: RunMode) -> Result<String> {
+        if !matches!(mode, RunMode::ReadOnlyReview | RunMode::ReadOnlyCollaborator) {
+            return Err(RuntimeError::Other(format!("expected readonly helper mode, got {}", mode.label_zh())));
+        }
+        let number = {
+            let _write = self.0.write_lock.lock().await;
+            self.0.ctx.service.next_seq("session", 0).await?
+        };
+        let id = format!("w{number}");
+        let policy = vibevalley_protocol::ExecutionPolicy::DirectCwd {
+            repo: h.issue.repo.clone(),
+            permission_mode: SessionPermissionMode::ReadOnly,
+        };
+        let mut session = Session::new(
+            &id,
+            vibevalley_protocol::SessionController::IssueBoard,
+            h.name,
+            h.drive.runtime_id.clone(),
+            policy,
+            now(),
+        );
+        session.profile = (!h.drive.agent.is_empty()).then(|| h.drive.agent.clone());
+        session.machine = (!h.drive.is_local).then(|| h.drive.machine_id.clone());
+        session.brief = h.brief;
+        self.0.extras.lock().entry(id.clone()).or_default().base = h.base;
+        session.cwd = (!h.cwd.as_os_str().is_empty()).then(|| h.cwd.to_string_lossy().into_owned());
+        session.attach_binding(vibevalley_protocol::ContextRef::Issue {
+            id: h.issue.id.clone(),
+            refining: None,
+        });
+        self.record_helper_mode_async(&id, mode).await?;
+        let started = self.start_with_change_async(h.drive, session, h.issue, h.prompt, false, h.trigger, None).await;
+        if started.is_err() {
+            self.0.helper_modes.lock().remove(&id);
             self.0.extras.lock().remove(&id);
         }
         started
@@ -493,16 +649,31 @@ impl SessionEngine {
 
     /// Opens the agent for `session`, puts it on the board and sends the
     /// first prompt. `resume` reopens the runtime's own session.
-    async fn start_async(&self, drive: Drive, mut session: Session, issue: &Issue, prompt: String, resume: bool, trigger: RunTrigger) -> Result<String> {
+    async fn start_async(&self, drive: Drive, session: Session, issue: &Issue, prompt: String, resume: bool, trigger: RunTrigger) -> Result<String> {
+        let change = (!session.is_readonly_issue_helper()).then(|| IssueChange::Started {
+            session: session.id.clone(),
+            worker: !session.is_refining(),
+        });
+        self.start_with_change_async(drive, session, issue, prompt, resume, trigger, change).await
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    async fn start_with_change_async(
+        &self,
+        drive: Drive,
+        mut session: Session,
+        issue: &Issue,
+        prompt: String,
+        resume: bool,
+        trigger: RunTrigger,
+        issue_change: Option<IssueChange>,
+    ) -> Result<String> {
         let _ = tokio::fs::remove_file(self.report_path(&session.id)).await;
         let is_remote = !drive.is_local;
         let (agent, prompt) = self.open_for_async(drive, &session, issue, prompt, resume).await?;
         session.phase = Phase::working(now(), SessionAction::Thinking, "");
-        let started = IssueChange::Started {
-            session: session.id.clone(),
-            worker: !session.is_refining(),
-        };
-        self.go_live_async(agent.clone(), session.clone(), Some((issue.id.as_str(), started))).await?;
+        let issue_update = issue_change.map(|change| (issue.id.as_str(), change));
+        self.go_live_async(agent.clone(), session.clone(), issue_update).await?;
         let run = self.begin_run_async(&session.id, &issue.id, trigger).await?;
         let prompt = self.with_recall_async(&session, prompt).await;
         self.record_async(&session.id, Step::Asked { text: prompt.clone() }).await;
@@ -583,7 +754,7 @@ impl SessionEngine {
         resume: bool,
     ) -> Result<(Arc<dyn vibevalley_runtime::oar::Session>, String)> {
         let cwd = PathBuf::from(session.cwd.clone().unwrap_or_default());
-        let mode = RunMode::from_session_issue(session, Some(issue));
+        let mode = self.helper_mode_async(session, Some(issue)).await;
         let place = HelperPlace {
             repo: session.repo_name().unwrap_or("").to_string(),
             branch: session.worktree_branch().map(String::from),
@@ -594,6 +765,8 @@ impl SessionEngine {
         };
         let instructions = match mode {
             RunMode::Drafting => self.0.drivers.draft_rules(&place),
+            RunMode::ReadOnlyReview => self.0.drivers.review_rules(&place, &issue.id, issue.number),
+            RunMode::ReadOnlyCollaborator => self.0.drivers.collaborator_rules(&place, &issue.id, issue.number),
             RunMode::ReadOnlyAnswer | RunMode::Execution => self.0.drivers.rules(&place, issue.deliver),
         };
         let system_prompt = match &drive.persona {
@@ -808,6 +981,18 @@ impl SessionEngine {
         again: impl FnOnce(&str) -> String,
         trigger: RunTrigger,
     ) -> Result<String> {
+        let mode = self.helper_mode_async(session, Some(issue)).await;
+        if mode.needs_write_lock()
+            && let Some(key) = self.worktree_key_for_async(session).await
+        {
+            let lease = WriteLease::new(
+                &session.id,
+                session.profile.clone(),
+                session.machine.clone(),
+                session.worktree_branch().map(String::from),
+            );
+            self.0.worktree.hoe().acquire_async(&key, lease).await?;
+        }
         let agent = self.0.live.get(&session.id);
         match agent {
             Some(agent) => {
@@ -858,6 +1043,34 @@ impl SessionEngine {
                 let prompt = if resume { words } else { again(&words) };
                 self.start_async(drive, session.clone(), issue, prompt, resume, trigger).await
             }
+        }
+    }
+
+    /// Runs another turn on an existing readonly collaborator/reviewer session without mutating the bound issue.
+    pub async fn next_readonly_round_async(
+        &self,
+        issue: &Issue,
+        session: &Session,
+        words: String,
+        again: impl FnOnce(&str) -> String,
+        trigger: RunTrigger,
+    ) -> Result<String> {
+        if let Some(agent) = self.0.live.get(&session.id) {
+            let _ = tokio::fs::remove_file(self.report_path(&session.id)).await;
+            let phase = Phase::working(now(), SessionAction::Thinking, "");
+            let mut updated_session = session.clone();
+            updated_session.phase = phase.clone();
+            self.persist_session_update_async(&updated_session).await?;
+            let run = self.begin_run_async(&session.id, &issue.id, trigger).await?;
+            let words = self.with_recall_async(session, words).await;
+            self.record_async(&session.id, Step::Asked { text: words.clone() }).await;
+            Self::prompt_run_async(&agent, session.machine.is_some(), &run, &words).await?;
+            Ok(session.id.clone())
+        } else {
+            let drive = self.0.drivers.drive(session.profile_id().filter(|a| !a.is_empty()), issue).await?;
+            let resume = drive.runtime.capabilities().resume && self.extra(&session.id).agent_session.is_some();
+            let prompt = if resume { words } else { again(&words) };
+            self.start_with_change_async(drive, session.clone(), issue, prompt, resume, trigger, None).await
         }
     }
 
@@ -1057,6 +1270,8 @@ impl SessionEngine {
             self.0.ctx.service.session.remove_extra(session_id).await?;
         }
         self.0.extras.lock().remove(session_id);
+        self.0.helper_modes.lock().remove(session_id);
+        self.0.worktree.hoe().release_session(session_id);
         self.remove_workspace_meta(session_id);
         Ok(())
     }
@@ -1677,10 +1892,18 @@ impl SessionEngine {
         }
         let run_id = extra.run;
         let outcome = round.outcome;
-        let change = IssueChange::Reported {
-            questions: (round.outcome != Outcome::Interrupted).then_some(round.questions),
-            checks: round.checks,
-            answer: round.answer.clone(),
+        let mode = self.helper_mode_async(&session, Some(&issue)).await;
+        let issue_change = if matches!(mode, RunMode::ReadOnlyReview | RunMode::ReadOnlyCollaborator) {
+            None
+        } else {
+            Some((
+                issue.id.clone(),
+                IssueChange::Reported {
+                    questions: (round.outcome != Outcome::Interrupted).then_some(round.questions),
+                    checks: round.checks,
+                    answer: round.answer.clone(),
+                },
+            ))
         };
         if let Some(id) = run_id.clone() {
             if let Some(extra) = self.0.extras.lock().get_mut(session_id)
@@ -1691,7 +1914,7 @@ impl SessionEngine {
             self.record_async(session_id, Step::RunEnded { run: id, outcome }).await;
         }
         if let Err(error) = self
-            .settle_report_async(&session, outcome, round.summary, spent, round.answer, run_id, Some((issue.id.clone(), change)))
+            .settle_report_async(&session, outcome, round.summary, spent, round.answer, run_id, issue_change)
             .await
         {
             eprintln!("vibevalley: settling {session_id}: {error}");

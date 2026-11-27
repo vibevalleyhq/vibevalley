@@ -270,8 +270,21 @@ macro_rules! impl_session_readers {
                 self.profile.as_deref()
             }
 
+            pub fn is_readonly_issue_helper(&self) -> bool {
+                self.controller == SessionController::IssueBoard
+                    && self.issue_id().is_some()
+                    && matches!(
+                        self.policy,
+                        ExecutionPolicy::DirectCwd {
+                            permission_mode: SessionPermissionMode::ReadOnly,
+                            ..
+                        }
+                    )
+            }
+
             pub fn is_board_worker(&self) -> bool {
-                self.controller == SessionController::IssueBoard || self.issue_id().is_some()
+                (self.controller == SessionController::IssueBoard && !self.is_readonly_issue_helper())
+                    || (self.controller != SessionController::Orchestrator && self.controller != SessionController::IssueBoard && self.issue_id().is_some())
             }
 
             pub fn is_direct_talker(&self) -> bool {

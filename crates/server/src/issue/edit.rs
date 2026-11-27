@@ -10,7 +10,7 @@ use vibevalley_protocol::{Assignment, Deliverable, Finding, Issue, IssueStatus, 
 use super::board::Board;
 use super::store::{BoardError, IssueChange, Result};
 use crate::context::now;
-use crate::runtime::Leave;
+use crate::runtime::{HandoffCleanup, HandoffRecord, Leave, WriteLease};
 
 const RANK_STEP: i64 = 1024;
 const RANK_BOUND: i64 = 2_000_000_000;
@@ -388,8 +388,24 @@ impl Board {
                 send_words = Some(failed_text(&all, if findings.is_empty() { text } else { "" }));
                 self.change_async(&issue.id, IssueChange::Failed { findings: all }).await?;
             }
+            let mut handoff_note = None;
             if let Some(s) = self.on_board_async(&issue).await {
+                if let Some(key) = self.session_engine().worktree_key_for_async(&s).await {
+                    let cleanup = HandoffCleanup::Commit {
+                        message: format!("{}: uncommitted work handed over", s.name),
+                    };
+                    let rec = self.session_engine().handoff_worktree_async(Some(&s.id), &key, None, cleanup).await?;
+                    if let Some(commit) = rec.cleanup_commit {
+                        handoff_note = Some(format!("Handed over uncommitted worktree state in commit {commit}."));
+                    }
+                }
                 self.session_engine().dismiss_async(&s.id, Leave::KeepBranch).await?;
+            }
+            if let Some(note) = handoff_note {
+                send_words = Some(match send_words {
+                    Some(w) if !w.trim().is_empty() => format!("{w}\n\n{note}"),
+                    _ => note,
+                });
             }
             self.change_async(&issue.id, IssueChange::Assigned(agent.to_string())).await?;
             if issue.mandate.is_paused() {
@@ -412,6 +428,72 @@ impl Board {
     pub async fn set_mandate_async(&self, id: &str, mandate: vibevalley_protocol::IssueMandate) -> Result<Issue> {
         let _work = self.work.lock().await;
         self.change_async(id, IssueChange::Mandate(mandate)).await
+    }
+
+    /// Cleanly commits or stashes any uncommitted changes on `reference`'s active worktree,
+    /// transfers single-writer ownership ("Hoe Handoff") to `agent`, and dispatches `agent`.
+    pub async fn handoff_async(&self, reference: &str, agent: &str, text: &str, cleanup: HandoffCleanup) -> Result<HandoffRecord> {
+        let initial = self.stored_async(reference).await?;
+        let _issue_guard = self.issue_lock(&initial.id).await;
+        let issue = self.stored_async(&initial.id).await?;
+        let next_agent = self.runtime.driver().resolve_agent_key(agent);
+        if next_agent.is_empty() {
+            return Err(refused("server.issue.noAssignee", &[]));
+        }
+        self.runtime.driver().check(&next_agent)?;
+
+        let prev = self.on_board_async(&issue).await;
+        let mut record = HandoffRecord {
+            previous_owner: prev
+                .as_ref()
+                .map(|s| WriteLease::new(&s.id, s.profile.clone(), s.machine.clone(), s.worktree_branch().map(String::from))),
+            new_owner: None,
+            cleanup_commit: None,
+            cleanup_stash: None,
+        };
+        if let Some(s) = prev.as_ref() {
+            if let Some(key) = self.session_engine().worktree_key_for_async(s).await {
+                record = self.session_engine().handoff_worktree_async(Some(&s.id), &key, None, cleanup).await?;
+            }
+            self.session_engine().dismiss_async(&s.id, Leave::KeepBranch).await?;
+        }
+        self.change_async(&issue.id, IssueChange::Assigned(next_agent.clone())).await?;
+        if issue.mandate.is_paused() {
+            self.change_async(&issue.id, IssueChange::Resumed).await?;
+        }
+        let mut words = text.trim().to_string();
+        if let Some(commit) = record.cleanup_commit.as_deref() {
+            words = if words.is_empty() {
+                format!("Previous helper work was committed at {commit}.")
+            } else {
+                format!("{words}\n\nPrevious helper work was committed at {commit}.")
+            };
+        } else if let Some(stash) = record.cleanup_stash.as_deref() {
+            words = if words.is_empty() {
+                format!("Previous helper uncommitted edits were stashed at {stash}.")
+            } else {
+                format!("{words}\n\nPrevious helper uncommitted edits were stashed at {stash}.")
+            };
+        }
+        if issue.status.is_closed() {
+            self.change_async(&issue.id, IssueChange::Reopened).await?;
+        } else if issue.status == IssueStatus::Backlog {
+            self.change_async(&issue.id, IssueChange::Queued).await?;
+        }
+        let sent = self
+            .send_for_issue_async(&issue.id, (!words.is_empty()).then_some(words), vibevalley_protocol::RunTriggerKind::Comment)
+            .await?;
+        if let super::board::Sent::Working { session } = sent
+            && let Some(new_sess) = self.session_async(&session).await
+        {
+            record.new_owner = Some(WriteLease::new(
+                &new_sess.id,
+                new_sess.profile.clone(),
+                new_sess.machine.clone(),
+                new_sess.worktree_branch().map(String::from),
+            ));
+        }
+        Ok(record)
     }
 
     /// Why one more session cannot start on `issue` now (`noRoom`), or ""

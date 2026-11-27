@@ -412,13 +412,61 @@ impl IssueChat {
                 None => return Ok(()),
             },
         };
-        if !s.is_board_worker() || s.issue_id().is_none() {
+        if !(s.is_board_worker() || s.is_readonly_issue_helper()) || s.issue_id().is_none() {
             return Ok(());
         }
         if let Err(e) = self.post_report_async(&s, report).await {
             warn("the report", &e);
         }
         Ok(())
+    }
+
+    /// Parses `@<agent>` discussion mentions and dispatches readonly collaborator sessions.
+    /// Returns `None` if no collaborators matched, `Some(true)` if handled without waking
+    /// the primary worker, or `Some(false)` if collaborators were dispatched alongside primary delivery.
+    async fn dispatch_mentioned_collaborators_async(&self, issue_id: &str, c: &Committed, primary_session_id: Option<&str>) -> Option<bool> {
+        if matches!(c.row.kind.as_str(), "report" | "dispatch" | "notice") {
+            return None;
+        }
+        let tokens = crate::channel::words::extract_at_tokens(&c.row.body);
+        if tokens.is_empty() {
+            return None;
+        }
+        let issue = self.board.issue_async(issue_id).await.ok().flatten();
+        let primary_agent = issue.as_ref().and_then(|i| i.assigned_agent()).map(str::to_string);
+        let driver = self.board.runtime().driver();
+        let mut collaborators = Vec::new();
+        let mut explicit_primary_wake = false;
+        for tok in &tokens {
+            if let Some(primary_id) = primary_session_id
+                && tok == primary_id
+            {
+                explicit_primary_wake = true;
+                continue;
+            }
+            if matches!(tok.as_str(), "everyone" | "所有人") {
+                explicit_primary_wake = true;
+                continue;
+            }
+            if let Some(agent) = driver.resolve_mention_agent(tok) {
+                if primary_session_id.is_some() && primary_agent.as_deref() == Some(agent.id.as_str()) {
+                    explicit_primary_wake = true;
+                } else if !collaborators.iter().any(|existing: &String| existing == &agent.id) {
+                    collaborators.push(agent.id);
+                }
+            }
+        }
+        if collaborators.is_empty() {
+            return None;
+        }
+        let mut all_ok = true;
+        for agent_id in &collaborators {
+            if let Err(e) = self.board.dispatch_collaborator_async(issue_id, agent_id, &c.row.body, &c.row.id).await {
+                all_ok = false;
+                self.ctx.live.publish_notice(now(), NoticeLevel::Warn, e.to_string());
+            }
+        }
+        Some(all_ok && !explicit_primary_wake)
     }
 
     async fn issue_sessions_async(&self) -> Vec<Session> {
@@ -432,10 +480,17 @@ impl IssueChat {
     }
 
     async fn on_issue_async(&self, issue: &str) -> Option<Session> {
+        if let Ok(Some(item)) = self.board.issue_async(issue).await
+            && let Some(id) = item.latest_session_id()
+            && let Some(session) = self.board.session_async(id).await
+            && !session.is_readonly_issue_helper()
+        {
+            return Some(session);
+        }
         self.issue_sessions_async()
             .await
             .into_iter()
-            .filter(|h| h.issue_id() == Some(issue))
+            .filter(|h| h.issue_id() == Some(issue) && !h.is_readonly_issue_helper())
             .max_by_key(|h| h.hired_at)
     }
 
@@ -645,6 +700,16 @@ impl IssueChat {
         else {
             return Ok(());
         };
+        if h.is_readonly_issue_helper() && self.channel.home_of(&h.id).is_none() {
+            self.channel
+                .seat_async(&Seat {
+                    id: h.id.clone(),
+                    name: h.name.clone(),
+                    agent: h.profile.clone(),
+                    home: None,
+                })
+                .await?;
+        }
         self.deliver_report_async(
             Note {
                 channel: thread,
@@ -795,6 +860,13 @@ impl IssueChat {
             return;
         };
         let on = self.on_issue_async(&delivery.recipient_id).await.map(|h| h.id);
+        if let Some(suppressed) = self.dispatch_mentioned_collaborators_async(&delivery.recipient_id, &c, on.as_deref()).await
+            && suppressed
+        {
+            let _ = self.board.session_engine().withdraw_mailbox_by_message_async(&delivery.message_id).await;
+            let _ = self.channel.settle_delivery_async(delivery.id, true).await;
+            return;
+        }
         let mut text = c.row.body.trim().to_string();
         if let Some(vc) = view_context_of(&c) {
             text = format!("{}\n{text}", format_artifact_view_context(&vc));
@@ -875,6 +947,13 @@ impl IssueChat {
             };
             match loaded {
                 Some(ec) => {
+                    if let Some(suppressed) = self.dispatch_mentioned_collaborators_async(issue_id, &ec, Some(&delivery.recipient_id)).await
+                        && suppressed
+                    {
+                        let _ = self.board.session_engine().withdraw_mailbox_by_message_async(&d.message_id).await;
+                        let _ = self.channel.settle_delivery_async(d.id, true).await;
+                        continue;
+                    }
                     if ec.row.sender_kind == "user" {
                         from_user = true;
                     }

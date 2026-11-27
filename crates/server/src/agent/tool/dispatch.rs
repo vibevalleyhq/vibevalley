@@ -3,7 +3,7 @@ use std::sync::{Arc, LazyLock};
 use parking_lot::Mutex;
 use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
-use vibevalley_protocol::{Agent, Deliverable, Session};
+use vibevalley_protocol::{Agent, Session};
 
 use super::registry::{Route, ToolRegistry, Who, Words};
 use super::{chat, content, issue, memory, plan, toolset};
@@ -38,17 +38,42 @@ impl ToolRegistry {
             .collect()
     }
 
+    /// Returns helper tool definitions for `mode`, exposing readonly review/diff tools from orchestrator specs when appropriate.
+    pub fn helper_tools_for_mode(&self, session: Option<&Session>, mode: HelperRunMode) -> Vec<ToolSpecWire> {
+        let profile = session.and_then(|s| s.profile.as_deref()).and_then(|id| self.profile.agent(id));
+        let extras: Vec<Tool> = if matches!(mode, HelperRunMode::ReadOnlyReview | HelperRunMode::ReadOnlyCollaborator) {
+            orchestrator()
+                .into_iter()
+                .filter(|t| matches!(t.words.name.as_str(), "issue_diff_get" | "issue_review"))
+                .collect()
+        } else {
+            Vec::new()
+        };
+        helper()
+            .into_iter()
+            .chain(extras)
+            .filter(|t| toolset::allows(profile.as_ref(), &t.words.op, &t.words.name, toolset::Role::Helper))
+            .filter(|t| tool_allowed_in_mode(&t.words.name, mode))
+            .map(|t| ToolSpecWire {
+                name: t.words.name,
+                description: t.words.description,
+                parameters_json: t.words.parameters.to_string(),
+            })
+            .collect()
+    }
+
     pub async fn session_mode_async(&self, session: &Session) -> HelperRunMode {
-        if session.is_refining() {
-            return HelperRunMode::Drafting;
+        let item = match session.issue_id() {
+            Some(issue_id) => self.ctx.service.issue.get(issue_id).await.ok().flatten(),
+            None => None,
+        };
+        match self.runtime.session_engine().helper_mode_async(session, item.as_ref()).await {
+            crate::runtime::RunMode::Execution => HelperRunMode::Execution,
+            crate::runtime::RunMode::Drafting => HelperRunMode::Drafting,
+            crate::runtime::RunMode::ReadOnlyAnswer => HelperRunMode::ReadOnlyAnswer,
+            crate::runtime::RunMode::ReadOnlyReview => HelperRunMode::ReadOnlyReview,
+            crate::runtime::RunMode::ReadOnlyCollaborator => HelperRunMode::ReadOnlyCollaborator,
         }
-        if let Some(issue_id) = session.issue_id()
-            && let Ok(Some(item)) = self.ctx.service.issue.get(issue_id).await
-            && item.deliver == Deliverable::Answer
-        {
-            return HelperRunMode::ReadOnlyAnswer;
-        }
-        HelperRunMode::Execution
     }
 
     pub async fn call_helper_async(&self, session: Session, name: &str, args_json: &str) -> Result<String, String> {
@@ -56,7 +81,11 @@ impl ToolRegistry {
         if !tool_allowed_in_mode(name, mode) {
             return Err(format!("没成：当前{}模式只读，不能调用 {name}", mode.label_zh()));
         }
-        let tools = helper();
+        let tools = helper().into_iter().chain(
+            orchestrator()
+                .into_iter()
+                .filter(|t| matches!(t.words.name.as_str(), "issue_diff_get" | "issue_review")),
+        );
         match tools.into_iter().find(|t| t.words.name == name) {
             Some(t) => t.run_async(self, &Who::Helper(Box::new(session)), args_json).await,
             None => Err(format!("没成：没有 {name} 这个工具")),
@@ -82,6 +111,10 @@ impl ToolDispatchPort for ToolRegistry {
 
     fn helper_tools_for(&self, session: Option<&Session>) -> Vec<ToolSpecWire> {
         ToolRegistry::helper_tools_for(self, session)
+    }
+
+    fn helper_tools_for_mode(&self, session: Option<&Session>, mode: HelperRunMode) -> Vec<ToolSpecWire> {
+        ToolRegistry::helper_tools_for_mode(self, session, mode)
     }
 
     fn session_for_token<'a>(&'a self, token: &'a str) -> BoxFuture<'a, Option<Session>> {

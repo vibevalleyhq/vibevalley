@@ -20,5 +20,6 @@
     "emptyMessage": "消息内容不能为空",
     "notLive": "执行会话当前未运行",
     "interactionDecisionRequired": "需要选择选项、填写回复或取消"
-  }
+  },
+  "writeLockHeld": "工作区 {worktree} 当前正由执行会话 {holder} 独占写入，请先交接或让其收工"
 }

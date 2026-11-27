@@ -52,14 +52,10 @@ pub fn access_of(op: &str) -> Option<ToolAccess> {
 
     Some(match op {
         "issue.list" | "issue.get" => ToolAccess::new(Issue, true, true),
-        "issue.create"
-        | "issue.update"
-        | "issue.status.update"
-        | "issue.comment.create"
-        | "issue.review"
-        | "issue.diff.get"
-        | "issue.digest.get"
-        | "issue.triage.suggest" => ToolAccess::new(Issue, true, false),
+        "issue.create" | "issue.update" | "issue.status.update" | "issue.comment.create" | "issue.digest.get" | "issue.triage.suggest" => {
+            ToolAccess::new(Issue, true, false)
+        }
+        "issue.diff.get" | "issue.review" => ToolAccess::new(Issue, true, true),
         "issue.split" | "issue.report" | "issue.pr.submit" => ToolAccess::new(Issue, false, true),
         "session.list" => ToolAccess::new(Session, true, true),
         "session.stop" => ToolAccess::new(Session, true, false),
@@ -118,8 +114,8 @@ pub fn can_role(op: &str, role: Role) -> bool {
     if ep.can.iter().any(|caller| role.matches_caller(*caller)) {
         return true;
     }
-    // Helpers retain read-only access to `issue.list` and `issue.get` over `/mcp`.
-    role == Role::Helper && matches!(op, "issue.list" | "issue.get")
+    // Helpers retain read-only inspection and review access over `/mcp` when enabled by mode.
+    role == Role::Helper && matches!(op, "issue.list" | "issue.get" | "issue.diff.get" | "issue.review")
 }
 
 /// Checks whether `agent` (if backed by a profile) is permitted to list or run
