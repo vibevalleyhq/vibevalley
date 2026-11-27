@@ -23,13 +23,7 @@ export interface SlashCommandItem {
   readonly keywords: readonly string[];
 }
 
-export const SLASH_CATEGORY_LABELS: Record<SlashCategory, string> = {
-  basic: "Basic",
-  structure: "Structure & Rich Writing",
-  data: "Data & VibeValley",
-};
-
-export const SLASH_CATEGORIES: readonly SlashCategory[] = ["basic", "structure", "data"];
+const SLASH_CATEGORIES: readonly SlashCategory[] = ["basic", "structure", "data"];
 
 export const SLASH_COMMANDS: readonly SlashCommandItem[] = [
   {
@@ -393,7 +387,7 @@ export function createDefaultBlock(
   }
 }
 
-export function slashCategoryLabel(category: SlashCategory): string {
+function slashCategoryLabel(category: SlashCategory): string {
   switch (category) {
     case "basic":
       return t("web.note.doc.slashCat.basic");
@@ -732,7 +726,7 @@ export const TURN_INTO_OPTIONS: readonly TurnIntoOption[] = [
   { key: "math", type: "math", label: "Math Formula", icon: "understand" },
 ];
 
-export function extractBlockText(block: DocBlock): string {
+function extractBlockText(block: DocBlock): string {
   switch (block.type) {
     case "prose":
     case "heading":
@@ -829,7 +823,7 @@ export function turnBlockInto(block: DocBlock, targetType: BlockType, opts?: { r
   }
 }
 
-export function cloneBlockWithFreshIds(block: DocBlock): DocBlock {
+function cloneBlockWithFreshIds(block: DocBlock): DocBlock {
   const id = makeBlockId();
   const children = block.children?.map(cloneBlockWithFreshIds);
   if (block.type === "columns") {
@@ -1007,16 +1001,6 @@ export function appendChildToToggle(blocks: readonly DocBlock[], toggleId: strin
     collapsed: false,
     children: [...(b.children ?? []), child],
   }));
-}
-
-export function appendBlockToColumn(blocks: readonly DocBlock[], columnsId: string, colIndex: number, child: DocBlock): DocBlock[] {
-  return replaceBlockById(blocks, columnsId, (b) => {
-    if (b.type !== "columns") return b;
-    return {
-      ...b,
-      columns: b.columns.map((col, idx) => (idx === colIndex ? { blocks: [...col.blocks, child] } : col)),
-    };
-  });
 }
 
 export function setColumnsCount(block: Extract<DocBlock, { type: "columns" }>, count: 2 | 3): Extract<DocBlock, { type: "columns" }> {
@@ -1261,7 +1245,7 @@ export function filterIssuesForList(
 
 export const CALLOUT_TONES: readonly CalloutTone[] = ["info", "tip", "warn", "danger", "note"];
 
-export function normalizeCalloutTone(tone: string): CalloutTone {
+function normalizeCalloutTone(tone: string): CalloutTone {
   switch (tone) {
     case "tip":
     case "ok":

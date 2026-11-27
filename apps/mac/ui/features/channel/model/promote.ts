@@ -63,7 +63,7 @@ export function buildPromotedNoteDraft(
 }
 
 /** Converts Markdown lines into a canonical `DocDocument` (`structure/doc.json`) payload. */
-export function markdownToDocJson(markdown: string): string {
+function markdownToDocJson(markdown: string): string {
   const blocks: DocBlock[] = [];
   let seq = 1;
   const nextId = () => `b${seq++}`;

@@ -406,10 +406,6 @@ const COVER_CAPTURE_HEIGHT = 400;
 /** Tracks `${noteId}:${seq}` pairs already attempted this session so failed or no-op captures do not loop. */
 const attemptedCoverCaptures = new Set<string>();
 
-export function resetCapturedCoverCache(): void {
-  attemptedCoverCaptures.clear();
-}
-
 export function PreviewBlockView(props: {
   readonly block: PreviewBlockData;
   readonly note?: Note | undefined;

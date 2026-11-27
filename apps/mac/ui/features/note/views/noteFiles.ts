@@ -11,9 +11,6 @@ import type {
   NoteId,
   NotePresence,
   NotePresenceEvent,
-  Suggestion,
-  SuggestionCreate,
-  SuggestionId,
 } from "@vibevalley/protocol";
 import { subscriptions } from "@vibevalley/protocol/api";
 
@@ -82,13 +79,10 @@ function subscribeNoteStream<E>(
   };
 }
 
-export const followNote = (id: string, after: number, on: (ev: NoteEvent) => void, ended?: () => void) =>
+const followNote = (id: string, after: number, on: (ev: NoteEvent) => void, ended?: () => void) =>
   subscribeNoteStream("note.follow", { id, after }, subscriptions["note.follow"].event, on, ended);
 
-export const followNoteSuggestions = (id: string, on: (ev: { readonly _tag: "Suggestions"; readonly suggestions: Suggestion[] }) => void, ended?: () => void) =>
-  subscribeNoteStream("note.suggestion.follow", { id }, subscriptions["note.suggestion.follow"].event, on, ended);
-
-export const followNotePresence = (id: NoteId, on: (ev: NotePresenceEvent) => void, ended?: () => void) =>
+const followNotePresence = (id: NoteId, on: (ev: NotePresenceEvent) => void, ended?: () => void) =>
   subscribeNoteStream("note.presence.follow", { id }, subscriptions["note.presence.follow"].event, on, ended);
 
 function isTextMime(mime: string, path: string): boolean {
@@ -428,59 +422,6 @@ export function useNotePresence(id: () => NoteId, opts?: { readonly enabled?: ()
   return { peers, publish, clear };
 }
 
-export interface NoteSuggestionsHandle {
-  readonly suggestions: Accessor<readonly Suggestion[]>;
-  readonly open: Accessor<readonly Suggestion[]>;
-  readonly accept: (suggestion: SuggestionId) => Promise<Suggestion>;
-  readonly reject: (suggestion: SuggestionId) => Promise<Suggestion>;
-  readonly create: (input: SuggestionCreate) => Promise<Suggestion>;
-}
-
-export function useNoteSuggestions(id: () => NoteId): NoteSuggestionsHandle {
-  const suggestions = signal<readonly Suggestion[]>([]);
-
-  effect(() => {
-    const currentId = id();
-    let active = true;
-    suggestions.set([]);
-    void api.note.suggestion.list({ id: currentId }).then(
-      (list) => {
-        if (active) suggestions.set(list);
-      },
-      () => {},
-    );
-    const stop = followNoteSuggestions(String(currentId), (ev) => {
-      if (active) suggestions.set(ev.suggestions);
-    });
-    return () => {
-      active = false;
-      stop();
-    };
-  });
-
-  const open = () => suggestions().filter((s) => s.status === "open");
-
-  const accept = async (suggestion: SuggestionId): Promise<Suggestion> => {
-    const res = await api.note.suggestion.accept({ id: untracked(id), suggestion });
-    suggestions.set(untracked(suggestions).map((s) => (s.id === suggestion ? res : s)));
-    return res;
-  };
-
-  const reject = async (suggestion: SuggestionId): Promise<Suggestion> => {
-    const res = await api.note.suggestion.reject({ id: untracked(id), suggestion });
-    suggestions.set(untracked(suggestions).map((s) => (s.id === suggestion ? res : s)));
-    return res;
-  };
-
-  const create = async (input: SuggestionCreate): Promise<Suggestion> => {
-    const res = await api.note.suggestion.create({ id: untracked(id), ...input });
-    suggestions.set([...untracked(suggestions), res]);
-    return res;
-  };
-
-  return { suggestions, open, accept, reject, create };
-}
-
 function utf8ToBase64(text: string): string {
   const bytes = new TextEncoder().encode(text);
   const pieces = Array.from({ length: Math.ceil(bytes.length / 0x8000) }, (_, i) => String.fromCharCode(...bytes.subarray(i * 0x8000, (i + 1) * 0x8000)));
@@ -559,11 +500,4 @@ export function buildSandboxedHtml(files: ReadonlyMap<string, string>, entryPath
   });
 
   return injectSandboxPolicy(assembled);
-}
-
-export function formatCellValue(val: unknown): string {
-  if (val === null || val === undefined) return "";
-  if (typeof val === "string") return val;
-  if (typeof val === "number" || typeof val === "boolean" || typeof val === "bigint") return `${val}`;
-  return JSON.stringify(val) ?? "";
 }

@@ -261,7 +261,6 @@
 | `closeTemplatePicker` | `state/contentNav.ts` |  |
 | `openContentSearch` | `state/contentNav.ts` |  |
 | `closeContentSearch` | `state/contentNav.ts` |  |
-| `contentPrefixes` | `state/contentNav.ts` |  |
 | `recordContentPath` | `state/contentNav.ts` |  |
 | `safeLastContentPath` | `state/contentNav.ts` |  |
 | `noteFacetOf` | `state/contentNav.ts` |  |

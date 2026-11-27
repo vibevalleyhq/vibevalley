@@ -23,7 +23,7 @@ import { useBoardSlice } from "../../../infra/frame";
 import { ready } from "../../../infra/query";
 import { createMemo } from "../../../infra/solid";
 import { useIntents } from "../../../infra/state/intent";
-import { IssueBodyEditor, IssueNotes, NoteLinkPills, type ResolvedNoteLink, resolveDescriptionNoteLinks, useNotes } from "../../note";
+import { IssueBodyEditor, IssueNotes, useNotes } from "../../note";
 import { SubagentProgress } from "../../session";
 import { createIssueActs } from "../model/acts";
 import type { Tone } from "../model/cards";
@@ -63,8 +63,6 @@ const askIcon: Record<Tone, IconName> = {
   muted: "info",
   faint: "info",
 };
-
-export { NoteLinkPills, type ResolvedNoteLink, resolveDescriptionNoteLinks };
 
 /** The workbench's issue page, answering the user top to bottom. the side holds the facts. */
 export function IssueDetail(props: {

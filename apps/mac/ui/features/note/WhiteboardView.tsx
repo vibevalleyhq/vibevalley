@@ -22,7 +22,7 @@ import {
 } from "../../infra/rich";
 import { type NoteDirectoryClient, saveBase64File, saveTextFile, useNoteDirectory, useNotePresence } from "./views/noteFiles";
 
-export const BOARD_FILE_PATH = "structure/board.json";
+const BOARD_FILE_PATH = "structure/board.json";
 
 export interface WhiteboardViewerProps {
   readonly note: Note;
@@ -60,7 +60,7 @@ const BoardElementSchema = z
 
 type BoardElement = z.output<typeof BoardElementSchema>;
 
-export function parseBoardElement(elKey: string, rawEl: unknown, context: string): BoardElement | undefined {
+function parseBoardElement(elKey: string, rawEl: unknown, context: string): BoardElement | undefined {
   const parsed = BoardElementSchema.safeParse(rawEl);
   if (!parsed.success) {
     console.warn(`[WhiteboardView] ignored malformed board element (${context})`, { elKey, issues: parsed.error.issues });

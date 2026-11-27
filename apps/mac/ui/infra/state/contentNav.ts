@@ -103,7 +103,7 @@ export function closeContentSearch(): void {
   contentSearchOpen.set(false);
 }
 
-export const contentPrefixes = ["/library", "/notes"] as const;
+const contentPrefixes = ["/library", "/notes"] as const;
 
 function isContentPath(path: string): boolean {
   return contentPrefixes.some((prefix) => path === prefix || path.startsWith(`${prefix}/`) || path.startsWith(`${prefix}?`));

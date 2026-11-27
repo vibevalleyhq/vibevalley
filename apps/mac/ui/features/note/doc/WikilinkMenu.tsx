@@ -59,7 +59,7 @@ function noteTypeLabel(noteType: NoteType): string {
   }
 }
 
-export function filterWikilinkSuggestions(mode: WikilinkMode, query: string, notes: readonly Note[], issues: readonly Issue[]): readonly WikilinkSuggestion[] {
+function filterWikilinkSuggestions(mode: WikilinkMode, query: string, notes: readonly Note[], issues: readonly Issue[]): readonly WikilinkSuggestion[] {
   const q = query.trim().toLowerCase();
   const out: WikilinkSuggestion[] = [];
   if (mode !== "issue") {
