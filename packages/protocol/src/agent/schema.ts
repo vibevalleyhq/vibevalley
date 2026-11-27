@@ -76,6 +76,7 @@ export const Agent = z.object({
   worktree: z.boolean(),
   tags: z.array(z.string()),
   look: Look,
+  voice: z.exactOptional(z.string()),
   from: z.exactOptional(AgentFrom),
 }) satisfies Codec<T.Agent>;
 

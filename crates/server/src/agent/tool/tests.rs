@@ -98,6 +98,7 @@ fn every_tool_maps_to_a_toolset_and_respects_role_can_narrowing() {
             eye: String::new(),
             avatar: None,
         },
+        voice: None,
         from: None,
     };
 

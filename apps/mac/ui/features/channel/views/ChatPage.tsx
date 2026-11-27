@@ -17,6 +17,7 @@ import { createMemo } from "../../../infra/solid";
 import { ArtifactCanvas } from "../../artifact";
 import { useMarkedChat } from "../model/marks";
 import { channelLabel, channelName, chatPath, pointedAt, topOf, topsOf } from "../model/places";
+import { listenToReports, setListenToReports, useChannelReportPlayback } from "../model/reportPlayback";
 import { FarmSearch, Members, Pins, ThreadList, ThreadPane } from "./ChannelPanels";
 import { BarButton, ChannelAvatar, Sidebar } from "./ChannelSidebar";
 import { Composer, FileDrop } from "./Composer";
@@ -183,6 +184,7 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
     })),
   );
   const name = () => channelName(props.channel);
+  useChannelReportPlayback(() => props.channel?.id);
   const about = () =>
     [props.channel?.description, props.channel?.repo ? t("web.channel.defaultRepo", { repo: props.channel.repo }) : ""].filter(Boolean).join(" · ");
   return (
@@ -289,6 +291,15 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
               }}
             />
           </If>
+          <BarButton
+            icon="audio"
+            size={16}
+            testid="listen-reports-toggle"
+            label={listenToReports() ? t("web.channel.listenReportsActive") : t("web.channel.listenReports")}
+            pressed={listenToReports()}
+            disabled={!props.channel}
+            onPress={() => setListenToReports(!listenToReports())}
+          />
           <BarButton
             icon="settings"
             size={16}

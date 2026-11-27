@@ -57,6 +57,7 @@ fn draft() -> Agent {
             eye: String::new(),
             avatar: None,
         },
+        voice: None,
         from: None,
     }
 }
@@ -656,5 +657,24 @@ fn user_skills_migrate_to_skills_directory_and_roundtrip_on_disk() {
 
         s.remove_skill_async("migrated-skill").await.unwrap();
         assert!(!skill_md.exists());
+    });
+}
+
+#[test]
+fn agent_optional_voice_persists_through_config_without_migration() {
+    let home = tempfile::tempdir().unwrap();
+    vibevalley_runtime::rt::block_on(async {
+        let s = open(home.path());
+        let created = s
+            .create_async(Agent {
+                name: "VoiceWorker".into(),
+                voice: Some("voice-one".into()),
+                ..draft()
+            })
+            .await
+            .unwrap();
+        assert_eq!(created.voice.as_deref(), Some("voice-one"));
+        let reopened = open(home.path());
+        assert_eq!(reopened.agent(&created.id).unwrap().voice.as_deref(), Some("voice-one"));
     });
 }

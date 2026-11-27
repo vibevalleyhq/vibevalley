@@ -443,6 +443,9 @@ pub struct Agent {
     pub worktree: bool,
     pub tags: Vec<String>,
     pub look: Look,
+    /// Optional MOSS voice ID paired with serialized channel report playback.
+    #[serde(default)]
+    pub voice: Option<String>,
     /// The template it was installed from, at that template's version; none for one made by hand.
     pub from: Option<AgentFrom>,
 }

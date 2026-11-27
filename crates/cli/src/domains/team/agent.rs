@@ -148,6 +148,7 @@ pub async fn run(client: &Client, cmd: AgentCmd) -> Done {
                 worktree: true,
                 tags: vec![],
                 look: default_look(role),
+                voice: None,
                 from: None,
             };
             client.mutate::<ops::AgentCreate>("agent create", &profile, agent_line).await

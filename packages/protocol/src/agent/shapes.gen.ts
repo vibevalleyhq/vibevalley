@@ -72,6 +72,10 @@ duty: string, enabled: boolean, runtime: string,
  */
 machineId?: string, model: string, effort: string, persona: string, personaMode: PersonaMode, skills: Array<string>, toolsets: Array<Toolset>, mcpServers: Array<MCPServer>, disallowedTools: Array<string>, env: { [key in string]: string }, workdir: string, worktree: boolean, tags: Array<string>, look: Look,
 /**
+ * Optional MOSS voice ID paired with serialized channel report playback.
+ */
+voice?: string,
+/**
  * The template it was installed from, at that template's version; none for one made by hand.
  */
 from?: AgentFrom, };

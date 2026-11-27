@@ -123,6 +123,12 @@ export const catalogs = {
       tagsHint: "前端、测试、文档…",
       enabled: "启用",
       enabledHint: "停用后主助手不会派它，名字点到也会拒绝。",
+      voice: "播报音色",
+      voiceTip: "在频道开启「听汇报」时，按此音色顺序朗读这个执行会话的汇报；留空则静默跳过。",
+      voiceNone: "不使用音色",
+      voiceNoSpeech: "还没有配置语音合成（Speech）连接，去",
+      voiceSettingsLink: "语音与通话",
+      voiceSettingsAfter: "配好后再选音色。",
       workdir: "默认仓库",
       workdirTip: "工作区（VIBEVALLEY_WORK_ROOT）下的一个文件夹。主助手派活没说仓库时用它；留空时派活必须说在哪个仓库。",
       workdirHint: "比如 clock-in",
@@ -888,6 +894,8 @@ export const catalogs = {
       find: "在这个频道里找",
       findMessages: "找消息",
       settings: "频道设置",
+      listenReports: "听汇报",
+      listenReportsActive: "正在听汇报（点击关闭）",
       inChannel: "频道里的",
       empty: "{label} 还没人说话：跟主助手说一件要做的事。",
       sendTo: "发送消息至 {label}",
@@ -3959,6 +3967,12 @@ export const catalogs = {
       tagsHint: "frontend, tests, docs…",
       enabled: "Enabled",
       enabledHint: "Disabled, the assistant does not send it, and refuses when it is named.",
+      voice: "Report voice",
+      voiceTip: "Voice used to read this helper's reports aloud sequentially when Listen to reports is on; empty skips playback.",
+      voiceNone: "No voice assigned",
+      voiceNoSpeech: "Configure a Speech connection in",
+      voiceSettingsLink: "Voice & Calls",
+      voiceSettingsAfter: "to pick voices.",
       workdir: "Default repo",
       workdirTip:
         "A folder under the work folder (VIBEVALLEY_WORK_ROOT). Used when the assistant sends work without naming a repo; when empty, the repo must be named.",
@@ -4758,6 +4772,8 @@ export const catalogs = {
       find: "Find in this channel",
       findMessages: "Find messages",
       settings: "Channel settings",
+      listenReports: "Listen to reports",
+      listenReportsActive: "Listening to reports (click to turn off)",
       inChannel: "In the channel",
       empty: "Nobody has spoken in {label}: tell the assistant something to do.",
       sendTo: "Message {label}",
@@ -8130,6 +8146,12 @@ export interface Messages {
   "web.agent.unnamedAgent": undefined;
   "web.agent.unreported": undefined;
   "web.agent.unsaved": undefined;
+  "web.agent.voice": undefined;
+  "web.agent.voiceNoSpeech": undefined;
+  "web.agent.voiceNone": undefined;
+  "web.agent.voiceSettingsAfter": undefined;
+  "web.agent.voiceSettingsLink": undefined;
+  "web.agent.voiceTip": undefined;
   "web.agent.wears": undefined;
   "web.agent.workdir": undefined;
   "web.agent.workdirHint": undefined;
@@ -8904,6 +8926,8 @@ export interface Messages {
   "web.channel.issues.thread": undefined;
   "web.channel.lacks": { readonly why: string | number };
   "web.channel.lacksFix": undefined;
+  "web.channel.listenReports": undefined;
+  "web.channel.listenReportsActive": undefined;
   "web.channel.manage.archive": undefined;
   "web.channel.manage.archiveHint": undefined;
   "web.channel.manage.archivedTitle": undefined;

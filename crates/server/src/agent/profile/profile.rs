@@ -461,6 +461,7 @@ fn profile_of(item: &AgentTemplate, id: String, name: String) -> Agent {
         worktree: item.worktree,
         tags: item.tags.clone(),
         look: item.look.clone(),
+        voice: None,
         from: Some(AgentFrom {
             template: item.id.clone(),
             version: item.version,

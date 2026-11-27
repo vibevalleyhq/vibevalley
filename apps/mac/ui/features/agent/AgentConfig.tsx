@@ -29,7 +29,7 @@ import { Segmented } from "../../design/Segmented";
 import { Tabs } from "../../design/Tabs";
 import { Bubble } from "../../design/Tip";
 import { sortRuntimes } from "../../infra/agents";
-import { ready, useRuntimes } from "../../infra/query";
+import { providerQuery, providerVoicesQuery, ready, useQuery, useRuntimes } from "../../infra/query";
 import { Link as A } from "../../infra/router";
 import { MemoryPanel } from "../memory";
 import { type DisplayMachine, useMergedMachines, useSkills } from "../runtime";
@@ -93,6 +93,7 @@ export function ConfigTabs(props: { draft: Agent; runtime?: RuntimeInfo | undefi
             checked={draft().enabled}
             onChange={(enabled) => props.patch({ ...draft(), enabled })}
           />
+          <AgentVoiceChoice draft={draft()} patch={props.patch} />
         </If>
         <If when={tab() === "runtime"}>
           <MachineTargetChoice draft={draft()} patch={props.patch} />
@@ -158,6 +159,61 @@ function machineOptionLabel(machine: DisplayMachine): string {
     case "draining":
       return t("web.agent.targetMachineDraining", { name: machine.name });
   }
+}
+
+function AgentVoiceChoice(props: { draft: Agent; patch: Patch }) {
+  const providers = useQuery(providerQuery);
+  const speech = computed(() => ready(providers, undefined)?.speech);
+  const revision = computed(() => ready(providers, undefined)?.revision ?? 0);
+  const voices = useQuery(
+    () => {
+      const s = speech();
+      return providerVoicesQuery({ connection: s?.connection ?? "", revision: revision(), limit: 40 });
+    },
+    { enabled: () => Boolean(speech()?.connection) },
+  );
+  const options = computed(() => {
+    const items = [
+      { value: "", label: t("web.agent.voiceNone") },
+      ...(ready(voices, undefined)?.voices ?? []).map((v) => ({
+        value: v.id,
+        label: v.name ? `${v.name} · ${v.id}` : v.id,
+      })),
+    ];
+    const current = props.draft.voice?.trim();
+    if (current && !items.some((item) => item.value === current)) {
+      items.push({ value: current, label: current });
+    }
+    return items;
+  });
+  const setVoice = (next: string) => {
+    const { voice: _, ...rest } = props.draft;
+    props.patch(next ? { ...rest, voice: next } : rest);
+  };
+  return (
+    <Labeled label={t("web.agent.voice")} tip={t("web.agent.voiceTip")}>
+      <View class="gap-1.5">
+        <Select
+          testid="agent-voice"
+          label={t("web.agent.voice")}
+          placeholder={t("web.agent.voiceNone")}
+          disabled={voices.fetching() || (!speech()?.connection && !props.draft.voice)}
+          value={props.draft.voice ?? ""}
+          options={options()}
+          onChange={setVoice}
+        />
+        <If when={!speech()?.connection}>
+          <View class="flex-row flex-wrap items-center gap-1">
+            <Text class="text-xs text-muted">{t("web.agent.voiceNoSpeech")}</Text>
+            <A href="/settings/voice" class="rounded-sm px-0.5 hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus">
+              <Text class="text-xs font-medium text-water underline">{t("web.agent.voiceSettingsLink")}</Text>
+            </A>
+            <Text class="text-xs text-muted">{t("web.agent.voiceSettingsAfter")}</Text>
+          </View>
+        </If>
+      </View>
+    </Labeled>
+  );
 }
 
 function MachineTargetChoice(props: { draft: Agent; patch: Patch }) {

@@ -625,6 +625,7 @@ mod tests {
                 eye: String::new(),
                 avatar: None,
             },
+            voice: None,
             from: None,
         };
 
@@ -750,6 +751,7 @@ mod tests {
                 eye: String::new(),
                 avatar: None,
             },
+            voice: None,
             from: None,
         };
 

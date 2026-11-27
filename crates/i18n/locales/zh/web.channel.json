@@ -11,6 +11,8 @@
   "find": "在这个频道里找",
   "findMessages": "找消息",
   "settings": "频道设置",
+  "listenReports": "听汇报",
+  "listenReportsActive": "正在听汇报（点击关闭）",
   "inChannel": "频道里的",
   "empty": "{label} 还没人说话：跟主助手说一件要做的事。",
   "sendTo": "发送消息至 {label}",

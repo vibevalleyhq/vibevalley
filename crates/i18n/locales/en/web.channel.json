@@ -11,6 +11,8 @@
   "find": "Find in this channel",
   "findMessages": "Find messages",
   "settings": "Channel settings",
+  "listenReports": "Listen to reports",
+  "listenReportsActive": "Listening to reports (click to turn off)",
   "inChannel": "In the channel",
   "empty": "Nobody has spoken in {label}: tell the assistant something to do.",
   "sendTo": "Message {label}",
