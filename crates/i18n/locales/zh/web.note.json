@@ -9,7 +9,7 @@
   },
   "page": {
     "delete": "删掉",
-    "deleteAsk": "删掉「{title}」？对话里的卡片还在。",
+    "deleteAsk": "删掉「{title}」？频道里的卡片还在。",
     "deleted": "删掉了「{title}」",
     "gone": "这篇笔记已经删掉了，或者没有这篇笔记。",
     "new": "新建笔记",

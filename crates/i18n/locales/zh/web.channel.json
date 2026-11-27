@@ -1,6 +1,6 @@
 {
   "tab": {
-    "chat": "对话",
+    "chat": "频道",
     "issues": "工单",
     "crons": "定时任务"
   },
@@ -20,15 +20,15 @@
   "channelsTitle": "频道",
   "directsTitle": "私聊",
   "newChannel": "创建频道",
-  "newChat": "发起对话",
+  "newChat": "新建频道或私聊",
   "filter": {
-    "label": "筛选会话",
+    "label": "筛选频道",
     "all": "全部",
     "group": "频道",
     "direct": "私聊"
   },
   "emptyPreview": "暂无消息",
-  "emptyList": "这里还没有对话",
+  "emptyList": "这里还没有频道",
   "runsEntry": "查看执行会话",
   "mood": {
     "idle": "在歇着",
@@ -59,7 +59,7 @@
     "save": "保存"
   },
   "issues": {
-    "empty": "这个频道里还没有工单。在聊天里跟主助手说一件要做的事，它会派执行会话，工单就列在这里。",
+    "empty": "这个频道里还没有工单。在频道里跟主助手说一件要做的事，它会派执行会话，工单就列在这里。",
     "thread": "工单话题"
   },
   "crons": {

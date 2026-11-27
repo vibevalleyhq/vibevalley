@@ -10,7 +10,7 @@
       "hint": "Profile, active sessions, attention summary, and runs"
     },
     "chat": {
-      "label": "Chat",
+      "label": "Channels",
       "hint": "Channels and threads"
     },
     "issues": {
@@ -18,28 +18,28 @@
       "hint": "Every issue from creation to completion"
     },
     "workspace": {
-      "hint": "Manage repositories and workspaces",
-      "name": "Workspace"
+      "hint": "Manage repositories and projects",
+      "name": "Projects"
     },
     "content": {
-      "label": "Artifacts",
-      "hint": "Artifacts, notes, and media"
+      "label": "Notes",
+      "hint": "Notes, canvases, databases, and media"
     },
     "farm": {
       "label": "Farm",
       "hint": "3D papercraft farm courtyard"
     },
     "runtimes": {
-      "label": "Engines",
-      "hint": "Installed coding engines across machines"
+      "label": "Environments",
+      "hint": "Installed coding environments across machines"
     },
     "team": {
-      "label": "Experts",
-      "hint": "Experts and templates"
+      "label": "Teammates",
+      "hint": "Teammates and templates"
     },
     "settings": {
       "label": "Settings",
-      "hint": "Profile, general & appearance, models & engines, MCP, connections, data & about"
+      "hint": "Profile, general & appearance, models & environments, MCP, connections, data & about"
     }
   },
   "dashboard": {
@@ -120,7 +120,7 @@
     },
     "profile": {
       "defaultName": "Workspace User",
-      "defaultTagline": "Coordinating roles and issues across your workspace"
+      "defaultTagline": "Coordinating teammates and issues across your projects"
     },
     "stats": {
       "working": "Active sessions",
@@ -130,7 +130,7 @@
     },
     "pulse": {
       "title": "Live Execution Pulse",
-      "empty": "No active helper sessions right now. Dispatch work from Issues or Chat.",
+      "empty": "No active helper sessions right now. Dispatch work from Issues or Channels.",
       "active": "{n} active sessions",
       "openRuns": "Open all runs"
     },

@@ -1,6 +1,6 @@
 {
   "tab": {
-    "chat": "Chat",
+    "chat": "Channels",
     "issues": "Tickets",
     "crons": "Scheduled tasks"
   },
@@ -20,15 +20,15 @@
   "channelsTitle": "Channels",
   "directsTitle": "Direct messages",
   "newChannel": "Create a channel",
-  "newChat": "New chat",
+  "newChat": "New channel or DM",
   "filter": {
-    "label": "Filter chats",
+    "label": "Filter channels",
     "all": "All",
     "group": "Channels",
     "direct": "Direct"
   },
   "emptyPreview": "No messages yet",
-  "emptyList": "No chats yet",
+  "emptyList": "No channels yet",
   "runsEntry": "View running sessions",
   "mood": {
     "idle": "resting",
@@ -59,7 +59,7 @@
     "save": "Save"
   },
   "issues": {
-    "empty": "No tickets in this channel yet. Tell the assistant something to do in the chat; it sends a helper, and the ticket is listed here.",
+    "empty": "No tickets in this channel yet. Tell the assistant something to do in a channel; it sends a helper, and the ticket is listed here.",
     "thread": "Ticket thread"
   },
   "crons": {

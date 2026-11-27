@@ -84,14 +84,14 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着 Papertrails 纸�
 | 执行会话 | helper | `Session`（[concepts](docs/concepts.md#session-和-oar-会话)） | 工人、子 agent、worker、执行（指执行会话时）、帮工（中文界面） |
 | 在场 | here | `Session.hired`（核心状态里雇来的会话） | 地里 |
 | 一轮 | a round of work | `Run` | 一次干活、turn（指一轮时） |
-| 角色 | profile | agent（`Agent`） | 帮工档案、档案（中文界面） |
-| 引擎 | engine | runtime（`RuntimeInfo`） | harness、runtime（中文界面）、农机（中文界面） |
+| 队友 | teammate | agent（`Agent`） | 专家、帮工档案、档案（中文界面） |
+| 环境 | environment | runtime（`RuntimeInfo`） | 引擎、harness、runtime（中文界面）、农机（中文界面） |
 | 工单 | ticket | issue（`Issue`） | job、ticket（中文界面）、任务（中文界面，指工单时） |
-| 笔记 | note | note（`Note`，原语 `doc`、`base`、`canvas`、`media`） | 稿子、草稿（指笔记时）、产出、Artifact（中文界面） |
-| 仓库 | repo | repo（`RepoSummary`） | 一块地 |
+| 笔记 | note | note（`Note`，原语 `doc`、`base`、`canvas`、`media`） | 作品、稿子、草稿（指笔记时）、产出、Artifact（中文界面） |
+| 项目 | project | repo（`RepoSummary`） | 一块地（指农场皮肤外）、工作区（指项目导航时） |
 | 空间 | space | `SpaceState`；目录是 `work_root`（`VIBEVALLEY_WORK_ROOT`） | 世界、全图 |
 | 宿主 | host | `ServerConfig.home`（`$VIBEVALLEY_HOME`） |  |
-| 并发上限 | spot | `ServerConfig.repo.maxSessions`（配置 `repo.max_sessions`）、`Session.room`；每个引擎另有 `maxWorking` | 并发位、空地、空位（中文界面） |
+| 并发上限 | spot | `ServerConfig.repo.maxSessions`（配置 `repo.max_sessions`）、`Session.room`；每个环境另有 `maxWorking` | 并发位、空地、空位（中文界面） |
 | 角色模板 | profile template | `AgentTemplate`（`agent.template.*`） | 种子、预设 |
 | 工单模板 | ticket template | issue template（`IssueTemplate`、`repo.template.list`） | seed |
 | 阶段 | what it is doing | phase（`Session.phase`） | 状态（指阶段时） |
@@ -123,7 +123,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着 Papertrails 纸�
 | 默认频道 | the farm chat | 默认频道（`default_channel`） | 群（指默认频道时）、田头（中文界面） |
 | 私聊 | direct message | direct | 私信 |
 | 和执行会话私聊 | talk | `Channel.direct`、`Session.channel` |  |
-| 频道 | channel | channel（`Channel`） | 群（指频道时）、群聊 |
+| 频道 | channel | channel（`Channel`） | 对话（指频道导航时）、群（指频道时）、群聊 |
 | 话题 | thread | thread | 子频道、串（指话题时） |
 | 附件 | attachment | `Attachment`（`attachment` 表） |  |
 | 媒体库 | library | `Library`（`media_library_item` 表） | 媒体（指这一页时）、素材库（中文界面） |
@@ -155,7 +155,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着 Papertrails 纸�
 | 地里 | in the field | 在场的执行会话 | `Session.hired` |
 | 帮工 | helper | 在农场地里干活的执行会话 | `Session.hired` |
 | 来电 | call | 收件箱里的一件 | `InboxItem` |
-| 农机、农具 | machine, tools | 引擎 | `RuntimeInfo` |
+| 农机、农具 | machine, tools | 环境 | `RuntimeInfo` |
 | 田头 | the farm chat | 默认频道 | `default_channel` |
 | 记性 | memory | 记忆 | `Memory` |
 | 空位 | spot | 并发上限 | `ServerConfig.repo.maxSessions`、`maxWorking` |

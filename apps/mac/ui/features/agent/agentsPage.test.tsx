@@ -84,7 +84,7 @@ test("AgentsPage uses unified top bar, localizes API-key readiness errors with c
   expect(app.count("id:gallery-manage-templates")).toBe(0);
   expect(app.count("id:new-orchestrator")).toBe(1);
   expect(app.count("id:new-agent")).toBe(1);
-  expect(app.texts()).toContain("专家");
+  expect(app.texts()).toContain("队友");
   expect(app.texts()).toContain("模板库");
 
   // Localized Chinese error text replaces raw English, paired with a direct 去设置 link.
@@ -96,7 +96,7 @@ test("AgentsPage uses unified top bar, localizes API-key readiness errors with c
   expect(app.count("id:template-look")).toBe(0);
   await app.press("id:agents-templates-toggle");
   await fake.pumpUntil(app, () => app.count("id:template-look") > 0);
-  expect(app.texts()).toContain("跑在内置引擎");
+  expect(app.texts()).toContain("跑在内置环境");
   expect(app.texts().some((line) => line.includes("跑在 VibeValley 自己的 agent"))).toBe(false);
 
   // Clicking 去设置 navigates directly to /settings/models.

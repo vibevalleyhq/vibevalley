@@ -3,7 +3,7 @@
     "issue": "列出工单，找它的编号",
     "session": "列出执行会话，找它的 id",
     "repo": "列出仓库，找它的名字",
-    "runtime": "列出引擎，找它的 id",
+    "runtime": "列出环境，找它的 id",
     "agent": "列出角色，找它的 id",
     "skill": "列出技能，找它的 id",
     "template": "列出模板，找它的 id",

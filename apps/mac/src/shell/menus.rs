@@ -168,15 +168,15 @@ pub(super) fn shell_palette_commands() -> Vec<HostPaletteItem> {
         })
     };
     let mut items = vec![
-        cmd("nav.workspace", "前往工作区", "/workspace", "导航", None),
-        cmd("nav.chat", "前往对话", "/chat", "导航", None),
-        cmd("nav.issues", "前往任务", "/issues", "导航", None),
+        cmd("nav.workspace", "前往项目", "/workspace", "导航", None),
+        cmd("nav.chat", "前往频道", "/chat", "导航", None),
+        cmd("nav.issues", "前往工单", "/issues", "导航", None),
         cmd("nav.dashboard", "前往总览仪表盘", "/dashboard", "导航", None),
         cmd("nav.dashboard.runs", "前往运行轨迹", "/dashboard/runs", "导航", None),
         cmd("nav.dashboard.retro", "前往复盘统计", "/dashboard/retro", "导航", None),
-        cmd("nav.content", "前往内容", "/library", "导航", None),
-        cmd("nav.team", "前往专家", "/agents", "导航", None),
-        cmd("nav.runtimes", "前往引擎", "/runtimes", "导航", None),
+        cmd("nav.content", "前往笔记", "/library", "导航", None),
+        cmd("nav.team", "前往队友", "/agents", "导航", None),
+        cmd("nav.runtimes", "前往环境", "/runtimes", "导航", None),
         cmd("nav.repos", "前往仓库", "/repos", "导航", None),
         cmd("nav.farm", "前往农场", "/farm", "导航", None),
         cmd("nav.settings", "前往设置", "/settings", "导航", Some("mod+,")),

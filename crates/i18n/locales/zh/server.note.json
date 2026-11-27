@@ -9,7 +9,7 @@
   "withNote": "{said}：{note}",
   "preview": {
     "remove": "删掉「{title}」和它的 {n} 稿",
-    "cards": "对话里的卡片还在，点开说已经删掉了"
+    "cards": "频道里的卡片还在，点开说已经删掉了"
   },
   "suggestion": {
     "empty": "建议里没有要改的东西",

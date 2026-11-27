@@ -332,6 +332,13 @@ const RULES: readonly Rule[] = [
     except: /^apps\/server\/src\/(?!.*\/words\.ts$)/u,
   },
   {
+    name: "retired user-facing terms 作品 / 专家 / 引擎",
+    pattern: /作品|专家|引擎/u,
+    says: "user-facing copy and docs/README.md 用语 use 笔记 (Notes), 队友 (Teammates), and 环境 (Environments) instead of 作品, 专家, or 引擎",
+    dirs: ["apps/mac/ui/app", "apps/mac/ui/design", "apps/mac/ui/features", "apps/mac/ui/infra", "apps/mac/ui/workspace", "apps/mobile/src", "apps/server/src"],
+    except: /^apps\/server\/src\/(?!.*\/words\.ts$)/u,
+  },
+  {
     name: "a profile seeded in code",
     pattern: /\b(seedAgents|orchestratorProfile)\b/u,
     says: "a template (agent/template.ts: builtInTemplates, profileOf); a new farm installs the default orchestrator from its template, and agent.starters",

@@ -1,6 +1,6 @@
 {
   "sidebar": {
-    "title": "Workspace",
+    "title": "Projects",
     "toggleSidebar": "Hide sidebar",
     "toggleSidebarTooltip": "Hide sidebar (⌘B)",
     "addRepo": "Add repository",
@@ -36,9 +36,9 @@
     "copyPath": "Copy path",
     "removeWorktree": "Delete worktree",
     "files": "Files",
-    "filesTip": "Workspace files",
+    "filesTip": "Project files",
     "gitChanges": "Changes",
-    "gitChangesTip": "Workspace changes & staged",
+    "gitChangesTip": "Project changes & staged",
     "gitBranches": "Branches",
     "gitBranchesTip": "Local branches & worktrees",
     "gitCommits": "Commits",
@@ -124,7 +124,7 @@
   },
   "palette": {
     "placeholder": {
-      "commands": "Type a command, #issue, artifact, or run…",
+      "commands": "Type a command, #issue, note, or run…",
       "files": "Jump to a file…",
       "search": "Search text in project…"
     },
@@ -135,7 +135,7 @@
     },
     "groups": {
       "issues": "Issues",
-      "artifacts": "Artifacts",
+      "artifacts": "Notes",
       "runs": "Trajectory Runs"
     },
     "a11y": {
@@ -156,8 +156,8 @@
     }
   },
   "chat": {
-    "title": "Workspace Chat",
-    "runtime": "Runtime",
+    "title": "Project Chat",
+    "runtime": "Environment",
     "model": "Model",
     "thoughtLevel": "Thinking",
     "thoughtLow": "Low",
@@ -165,8 +165,8 @@
     "thoughtHigh": "High",
     "thoughtMax": "Max",
     "statusWaiting": "Needs reply",
-    "emptyTitle": "Direct coding chat in this workspace",
-    "emptyHint": "Pick a runtime and start chatting. Tool call cards open files and diffs directly in an adjacent split pane.",
+    "emptyTitle": "Direct coding chat in this project",
+    "emptyHint": "Pick an environment and start chatting. Tool call cards open files and diffs directly in an adjacent split pane.",
     "steerTag": "Steer",
     "todoTitle": "Progress",
     "todoToolLabel": "Update steps",
@@ -215,19 +215,19 @@
     "telemetryHide": "Hide telemetry",
     "telemetryContextTitle": "Context window",
     "telemetryCacheTitle": "Prompt cache & tools",
-    "telemetryQuotaTitle": "Runtime quota",
+    "telemetryQuotaTitle": "Environment quota",
     "telemetryCached": "Cached",
     "telemetryUncached": "Uncached",
     "telemetryOutput": "Output",
     "telemetryReasoning": "Reasoning",
-    "telemetryQuotaUnavailable": "Quota window not reported by this runtime.",
+    "telemetryQuotaUnavailable": "Quota window not reported by this environment.",
     "sendFailed": "Send failed: {why}",
     "configFailed": "Failed to update config: {why}",
     "respondFailed": "Failed to submit reply: {why}",
     "stopFailed": "Failed to stop session: {why}",
     "attachFile": "Attach file",
     "removeFile": "Remove {name}",
-    "chooseModel": "Switch runtime & model"
+    "chooseModel": "Switch environment & model"
   },
   "swarm": {
     "pill": "Swarm · {working}/{active}",
@@ -271,7 +271,7 @@
     "repoType": "Type",
     "typeGit": "Git repository",
     "typeFolder": "Folder",
-    "activity": "Workspace",
+    "activity": "Project",
     "activitySummary": "{worktrees} worktrees · {tabs} tabs",
     "openIssues": "Open issues",
     "runningSessions": "Running sessions",
@@ -283,6 +283,6 @@
     "languages": "Languages",
     "worktrees": "Worktrees",
     "tabsCount": "{n} tabs",
-    "closeFolder": "Close folder from workspace"
+    "closeFolder": "Close folder from project"
   }
 }

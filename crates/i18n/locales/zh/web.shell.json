@@ -1,6 +1,6 @@
 {
   "sidebar": {
-    "title": "工作区",
+    "title": "项目",
     "toggleSidebar": "收起侧边栏",
     "toggleSidebarTooltip": "收起侧边栏 (⌘B)",
     "addRepo": "添加仓库",
@@ -36,9 +36,9 @@
     "copyPath": "复制路径",
     "removeWorktree": "删除工作树",
     "files": "文件",
-    "filesTip": "工作区文件",
+    "filesTip": "项目文件",
     "gitChanges": "变更",
-    "gitChangesTip": "工作区改动与暂存",
+    "gitChangesTip": "项目改动与暂存",
     "gitBranches": "分支",
     "gitBranchesTip": "本地分支与工作树",
     "gitCommits": "提交",
@@ -89,7 +89,7 @@
     "stagedEmpty": "暂无已暂存的文件。",
     "changes": "未暂存",
     "stageAll": "全部暂存",
-    "clean": "工作区干净，没有未提交改动。",
+    "clean": "项目目录干净，没有未提交改动。",
     "branches": "本地分支",
     "filterBranches": "过滤分支名…",
     "noMatchingBranches": "没有匹配的本地分支。",
@@ -124,7 +124,7 @@
   },
   "palette": {
     "placeholder": {
-      "commands": "输入命令，或搜索 #工单、作品、运行轨迹…",
+      "commands": "输入命令，或搜索 #工单、笔记、运行轨迹…",
       "files": "跳转到文件…",
       "search": "在项目中搜索文本…"
     },
@@ -135,7 +135,7 @@
     },
     "groups": {
       "issues": "工单",
-      "artifacts": "作品",
+      "artifacts": "笔记",
       "runs": "运行轨迹"
     },
     "a11y": {
@@ -156,8 +156,8 @@
     }
   },
   "chat": {
-    "title": "工作区对话",
-    "runtime": "编码引擎",
+    "title": "项目对话",
+    "runtime": "编码环境",
     "model": "模型",
     "thoughtLevel": "思考深度",
     "thoughtLow": "低",
@@ -165,8 +165,8 @@
     "thoughtHigh": "高",
     "thoughtMax": "极深",
     "statusWaiting": "等待确认",
-    "emptyTitle": "在当前工作区直接对话",
-    "emptyHint": "选择引擎后直接提问，工具调用结果可一键在右侧分栏打开源码或 Diff。",
+    "emptyTitle": "在当前项目直接对话",
+    "emptyHint": "选择环境后直接提问，工具调用结果可一键在右侧分栏打开源码或 Diff。",
     "steerTag": "轮中引导",
     "todoTitle": "任务进度",
     "todoToolLabel": "更新进度",
@@ -215,19 +215,19 @@
     "telemetryHide": "收起遥测",
     "telemetryContextTitle": "上下文窗口",
     "telemetryCacheTitle": "Prompt Cache 与工具",
-    "telemetryQuotaTitle": "引擎配额",
+    "telemetryQuotaTitle": "环境配额",
     "telemetryCached": "缓存读取",
     "telemetryUncached": "新增输入",
     "telemetryOutput": "输出",
     "telemetryReasoning": "思考",
-    "telemetryQuotaUnavailable": "当前引擎未上报配额窗口。",
+    "telemetryQuotaUnavailable": "当前环境未上报配额窗口。",
     "sendFailed": "发送失败：{why}",
     "configFailed": "切换配置失败：{why}",
     "respondFailed": "提交回复失败：{why}",
     "stopFailed": "中断会话失败：{why}",
     "attachFile": "添加文件",
     "removeFile": "移除 {name}",
-    "chooseModel": "切换引擎与模型"
+    "chooseModel": "切换环境与模型"
   },
   "swarm": {
     "pill": "Swarm · {working}/{active}",
@@ -271,7 +271,7 @@
     "repoType": "类型",
     "typeGit": "Git 仓库",
     "typeFolder": "普通目录",
-    "activity": "工作区",
+    "activity": "项目",
     "activitySummary": "{worktrees} 工作树 · {tabs} 标签",
     "openIssues": "进行中工单",
     "runningSessions": "运行中会话",
@@ -283,6 +283,6 @@
     "languages": "语言构成",
     "worktrees": "工作树",
     "tabsCount": "{n} 标签",
-    "closeFolder": "从工作区关闭目录"
+    "closeFolder": "从项目中关闭目录"
   }
 }

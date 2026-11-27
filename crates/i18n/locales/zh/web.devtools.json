@@ -59,7 +59,7 @@
     "activeSubscriptions": "活跃订阅",
     "latestSeq": "最新序号",
     "lastFrameMs": "最近帧耗时",
-    "runtimes": "引擎状态",
+    "runtimes": "环境状态",
     "installed": "已安装",
     "notInstalled": "未安装",
     "ready": "就绪",
@@ -87,7 +87,7 @@
   "trajectory": {
     "kind": {
       "issueSession": "工单",
-      "workspaceChat": "对话",
+      "workspaceChat": "项目对话",
       "orchestrator": "主助手"
     },
     "silentError": "静默错误",

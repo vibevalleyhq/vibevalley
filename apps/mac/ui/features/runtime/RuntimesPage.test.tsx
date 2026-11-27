@@ -485,10 +485,10 @@ test("regression: repeated /runtimes mount/unmount cycles keep subscription and 
 
 test("i18n: runtime inventory unreported copy avoids literal fragment in zh and en", () => {
   setLocale("zh");
-  expect(t("web.runtime.unreported")).toBe("当前引擎未上报这一项。");
+  expect(t("web.runtime.unreported")).toBe("当前环境未上报这一项。");
   expect(t("web.runtime.none")).toBe("暂无。");
   setLocale("en");
-  expect(t("web.runtime.unreported")).toBe("Not reported by this engine.");
+  expect(t("web.runtime.unreported")).toBe("Not reported by this environment.");
   expect(t("web.runtime.none")).toBe("None.");
 });
 

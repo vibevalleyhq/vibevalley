@@ -81,7 +81,7 @@
     "start": "开工",
     "restart": "重开，接着做",
     "cron": "{missed, select, true {定时开工（补跑）} other {定时开工}}",
-    "runtime": "引擎自己接着做",
+    "runtime": "环境自己接着做",
     "refined": "起草好了",
     "reported": "交回来了",
     "accepted": "验收通过",

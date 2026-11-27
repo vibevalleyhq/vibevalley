@@ -11,11 +11,11 @@
 | 概念 | 农场里 | 页面 | 协议 | HTTP |
 |---|---|---|---|---|
 | Host | — | — | 服务端 `ServerConfig` 的 `home`（`$VIBEVALLEY_HOME`，不进协议） | — |
-| 空间 | 纸雕农场（`apps/mac/src/diorama/`） | `/repos` | `SpaceState`、6 路切片（`SliceKind`）；目录是服务端 `ServerConfig` 的 `work_root` | `/api/v1/slice/{name}`、`/api/v1/live` |
+| 项目（空间） | 纸雕农场（`apps/mac/src/diorama/`） | `/repos` | `SpaceState`、6 路切片（`SliceKind`）；目录是服务端 `ServerConfig` 的 `work_root` | `/api/v1/slice/{name}`、`/api/v1/live` |
 | 仓库 | 仓库院落 | `/repos/:repo`（`features/repo`） | `RepoSummary`、`RepoActivity`、`RepoLanguages` | `/api/v1/repo/…` |
 | 助手 | 田头的助手 | `/orchestrator`、`/orchestrator/<档案 id>`（`features/orchestrator`） | `SpaceState.sessions`（`role: "orchestrator"`）、`Channel.orchestrator` | `/api/v1/channel/message/send`、`/api/v1/orchestrator/…` |
-| 档案、技能 | 小动物、技能书 | `/agents`（`features/agent`）、`/settings/skills`（`features/runtime/SkillsPage.tsx`） | `Agent`、`AgentTemplate`、`Skill` | `/api/v1/agent/…`、`/api/v1/skill/…` |
-| 农机 | 农具 | `/runtimes`（`features/runtime`） | `RuntimeInfo`、`RuntimeSettings` | `/api/v1/runtime/…` |
+| 队友、技能 | 小动物、技能书 | `/agents`（`features/agent`）、`/settings/skills`（`features/runtime/SkillsPage.tsx`） | `Agent`、`AgentTemplate`、`Skill` | `/api/v1/agent/…`、`/api/v1/skill/…` |
+| 环境 | 农具 | `/runtimes`（`features/runtime`） | `RuntimeInfo`、`RuntimeSettings` | `/api/v1/runtime/…` |
 | 工单、父子工单 | 图纸桌卡片、一块地 | `/issues`（`features/issue`、`FamilyDetail.tsx`） | `Issue`（`assignments`、`parent`、`blockedBy`）、`Changes`、`Landing` | `/api/v1/issue/…` |
 | 帮工、一轮 | 地里干活的小动物、一季庄稼 | `features/session/WorkLog.tsx`、`Trajectory.tsx` | `Session`、`Run`、`RunTrigger`、`SessionEvent` | `/api/v1/session/…`、`/api/v1/issue/run/list` |
 | 频道、私聊、工单串 | 田头、频道、工单串 | `/chat`（`features/channel`） | `Channel`（`type`：`channel`、`direct`、`thread`）、`ChatMessage`（`actor: Actor`）、`Attachment` | `/api/v1/channel/…`、`/api/v1/attachment/…` |

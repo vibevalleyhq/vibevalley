@@ -59,7 +59,7 @@
     "activeSubscriptions": "Active Subscriptions",
     "latestSeq": "Latest Seq",
     "lastFrameMs": "Last Frame",
-    "runtimes": "Engines",
+    "runtimes": "Environments",
     "installed": "Installed",
     "notInstalled": "Not Installed",
     "ready": "Ready",
@@ -87,7 +87,7 @@
   "trajectory": {
     "kind": {
       "issueSession": "Ticket",
-      "workspaceChat": "Chat",
+      "workspaceChat": "Project chat",
       "orchestrator": "Assistant"
     },
     "silentError": "Silent Error",

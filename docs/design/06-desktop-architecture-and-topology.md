@@ -43,9 +43,9 @@ VibeValley 作为 macOS 全原生桌面应用，将 GPUI 窗口外壳、`nsh` �
 | `/library` | `content` | 内容中心：笔记（`doc`/`base`/`canvas`/`media`）与媒体素材统一浏览、多选删除与灯箱 |
 | `/notes`、`/notes/*` | `content` | Note 3+1 原语工作台（`PageTree` 侧栏、24 块 `doc`、`Base` 四视图、`Canvas` 白板、`Media` 工作台、目录视图与右侧频道侧栏） |
 | `/present` | 独立演示全屏 | `doc` 笔记演讲者模式（按 `pageBreak` 分页），独立于常规窗口 Rail 与侧边栏 |
-| `/agents`、`/agents/:id` | `agents` | 助手置顶 + 帮工列表；点击进入 `AgentConfig` 修改农机、模型、思考深度、技能勾选、MCP 与动物外观（助手的职责/模型/人设/造型由 `OrchestratorProfile.tsx` 承载） |
+| `/agents`、`/agents/:id` | `agents` | 助手置顶 + 队友列表；点击进入 `AgentConfig` 修改环境、模型、思考深度、技能勾选、MCP 与动物外观（助手的职责/模型/人设/造型由 `OrchestratorProfile.tsx` 承载） |
 | `/orchestrator`、`/orchestrator/*` | `agents` | 助手的 `memory`（记性）与 `voice`（语音）配置标签页、跳往 `/runs` 的运行轨迹链接以及 `/orchestrator[/id]/trajectory` 兼容重定向（`OrchestratorPage.tsx`） |
-| `/runtimes` | `runtimes` | 农机安装检测、CLI 可用性与额度精力瓶水位仪（`RuntimesPage.tsx`） |
+| `/runtimes` | `runtimes` | 环境安装检测、CLI 可用性与额度精力瓶水位仪（`RuntimesPage.tsx`） |
 | `/repos` | `repos` | 已接入代码仓库管理、并发槽位上限（`maxSessions`）与项目检验命令配置 |
 | `/farm`、`/farm/:repo` | `skin: "farm"` | 农庄主页或指定仓库视角；通过宿主事件在 GPUI 层叠载入 `DioramaView` |
 | `/tree` | 重定向 | 重定向至 `/settings/memory` 记忆管理页 |
@@ -71,7 +71,7 @@ VibeValley 作为 macOS 全原生桌面应用，将 GPUI 窗口外壳、`nsh` �
 | 断点 / 阈值 | 作用对象 | 降级行为 |
 | --- | --- | --- |
 | `< 640px` (`40rem` / `sm`) | 全局 Rail（`Shell.tsx`）与农庄手机（`FarmPhone.tsx`） | Rail 从 `76px` 收缩至 `68px` 且按钮隐去底部文字仅保留居中图标；农庄展开手机宽度不足 `640px` 时收起左侧菜单进入纯聊天布局（`chat_only`） |
-| `< 680px` | 档案列表（`AgentsPage.tsx`） | `AgentsPage` 隐藏行内右侧摘要/标签/农机列 |
+| `< 680px` | 队友列表（`AgentsPage.tsx`） | `AgentsPage` 隐藏行内右侧摘要/标签/环境列 |
 | `< 768px` (`48rem` / `md`) | 工作台多栏详情页面（`/runs`、`/issues`、`/chat` 等） | 左右分栏退化为单栏列表/详情切换，选中条目后切换详情并呈现「返回」按钮（`issues` 保留面包屑返回栈） |
 | `< 1040px` | 原生工作区检查器（`shell/render.rs`） | 右侧文件/Git 检查器栏及拖拽分隔线自动隐去，优先把水平像素留给代码/Diff/终端主视口 |
 
@@ -89,4 +89,4 @@ VibeValley 作为 macOS 全原生桌面应用，将 GPUI 窗口外壳、`nsh` �
 - **五源结构化故障（`apps/mac/ui/infra/api.ts` `UiFault`）**：所有桥接响应、语音调用错误、客户端异常与网络连接断落统一归一为 `UiFault`（携带 `tag`、`bizCode`、`reason`、`next` 修复指引与服务端定义 `bizCodeMeta[bizCode].retryable` 标志），阻止静默吞错或将原始 JSON 栈抛给用户。
 - **断线排队、重放去重与局部补读**：
   - `infra/frame.ts` 监控连接 `Link` 三态（`connecting` / `open` / `lost`）；发送消息与建单流使用 `createRequestKey()` / `newSendKey()` 绑定唯一随机 16 字节十六进制发送键，保证断线重传不产生重复消息或工单。
-  - 子线程运行期间发生前端断开时，重连后依靠工作日志最近 `240` 步及服务端摘要字段按 `seq`/`revision` 缝合恢复进度；农机额度即将耗尽时在农场精灵瓶、工作台徽标及托盘同步告警。
+  - 子线程运行期间发生前端断开时，重连后依靠工作日志最近 `240` 步及服务端摘要字段按 `seq`/`revision` 缝合恢复进度；环境额度即将耗尽时在农场精灵瓶、工作台徽标及托盘同步告警。

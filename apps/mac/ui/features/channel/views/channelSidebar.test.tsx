@@ -194,9 +194,10 @@ test("Sidebar only renders channel-readiness-alert when orchestrator readiness i
   const warnText = "回不了话：还没填 DeepSeek 的钥匙";
   expect(missingChat.app.texts().filter((line) => line === warnText).length).toBe(1);
   expect(missingChat.app.shows("id:channel-row-d-orchestrator >> text:我随时待命")).toBe(true);
-  // Rail, sidebar header, and chat tab use unified 对话 terminology.
+  // Rail, sidebar header, and chat tab use unified 频道 terminology.
   expect(missingChat.app.texts()).not.toContain("聊天");
-  expect(missingChat.app.texts().filter((line) => line === "对话").length).toBeGreaterThanOrEqual(2);
+  expect(missingChat.app.texts()).not.toContain("对话");
+  expect(missingChat.app.texts().filter((line) => line === "频道").length).toBeGreaterThanOrEqual(2);
 });
 
 test("Chat localizes raw runtime API-key error in channel sidebar preview, thread preview card, and threads list", async () => {

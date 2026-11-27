@@ -34,7 +34,7 @@
     "newChat": "New Chat",
     "newTerminal": "New Terminal",
     "newChatWith": "New {runtime} chat",
-    "chooseRuntime": "Choose chat runtime"
+    "chooseRuntime": "Choose chat environment"
   },
   "tab": {
     "closeBusy": {
@@ -51,14 +51,14 @@
     "agentTurnDone": "{agent} finished its turn",
     "hooks": {
       "title": "Terminal Hooks",
-      "subtitle": "Scoped to this tab/workspace · global dotfiles untouched",
+      "subtitle": "Scoped to this tab/project · global dotfiles untouched",
       "tooltipOff": "Terminal hooks: Off (click to configure)",
       "tooltipActive": "Active hooks: {hooks}",
       "tooltipPending": "Hooks updated ({hooks}) · restart shell to apply",
       "tabSection": "This tab",
-      "workspaceSection": "Workspace default",
+      "workspaceSection": "Project default",
       "workspaceToggle": "Enable {hook} for new tabs in {repo}",
-      "sourceWorkspace": "Workspace",
+      "sourceWorkspace": "Project",
       "sourceTab": "Tab",
       "sourceOff": "Off",
       "pendingRestart": "Restart shell to apply updated hooks",

@@ -43,6 +43,6 @@
     "notFound": "Folder does not exist: {path}",
     "notDir": "Path is not a folder: {path}",
     "notGit": "\"{path}\" is not a Git repository yet (enable Git initialization to mount it)",
-    "unmountManaged": "\"{name}\" is a managed workspace repository and cannot be unmounted"
+    "unmountManaged": "\"{name}\" is a managed project repository and cannot be unmounted"
   }
 }

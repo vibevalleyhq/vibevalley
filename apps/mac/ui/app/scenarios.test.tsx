@@ -644,7 +644,6 @@ test("english locale renders issues, chat, and settings cleanly with zero crashe
   await fake.pump(app);
   expect(app.count("id:chat-page")).toBe(1);
   const chatTexts = app.texts();
-  expect(chatTexts).toContain("Chat");
   expect(chatTexts).toContain("Channels");
   expect(chatTexts).toContain("Direct");
 

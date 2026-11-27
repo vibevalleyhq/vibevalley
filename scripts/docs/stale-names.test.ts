@@ -56,4 +56,7 @@ it("regression: native mac workbench UI, Rust crates, and i18n catalogs enforce 
   expect(staleNamesIn("crates/i18n/locales/zh/server.game.json", '{ "done": "收获了" }')).toEqual([]);
   expect(staleNamesIn("crates/i18n/locales/zh/web.farm.hud.json", '{ "done": "收获了" }')).toEqual([]);
   expect(staleNamesIn("crates/i18n/locales/zh/web.issue.json", '{ "done": "收获了" }')).toHaveLength(1);
+  expect(staleNamesIn("crates/i18n/locales/zh/web.base.json", '{ "nav": "专家" }')).toHaveLength(1);
+  expect(staleNamesIn("crates/i18n/locales/zh/web.runtime.json", '{ "empty": "没有引擎" }')).toHaveLength(1);
+  expect(staleNamesIn("apps/mac/ui/features/agent/AgentsPage.tsx", "const title = '作品';")).toHaveLength(1);
 });

@@ -50,8 +50,8 @@
     "history": "Recent understanding tasks",
     "truncated": "This result is incomplete. The retained text is shown below; increasing the output limit requires a new request and may incur another charge.",
     "usage": "Provider reported: {input} input tokens · {output} output tokens · {total} total",
-    "save": "Save text as a document",
-    "open": "Open saved document",
+    "save": "Save text as a note",
+    "open": "Open saved note",
     "cleanup": "Clean remote files",
     "cleanupAsk": "Delete known remote files and release retained local inputs? The provider may still be processing an unknown request. Uploads without a confirmed ID may remain and need manual inspection. This does not repeat understanding."
   },

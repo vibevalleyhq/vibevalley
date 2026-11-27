@@ -25,16 +25,16 @@ export interface BuiltPaletteEntries {
 const MAX_ENTITY_RESULTS = 12;
 
 const COMMAND_KEYWORDS: Readonly<Record<string, readonly string[]>> = {
-  "nav.workspace": ["workspace", "/workspace"],
-  "nav.chat": ["chat", "channel", "/chat"],
+  "nav.workspace": ["projects", "workspace", "/workspace"],
+  "nav.chat": ["channels", "chat", "channel", "/chat"],
   "nav.issues": ["issues", "board", "/issues"],
   "nav.dashboard": ["dashboard", "overview", "/dashboard"],
   "nav.dashboard.runs": ["dashboard", "runs", "trajectory", "/dashboard/runs"],
   "nav.dashboard.retro": ["dashboard", "retro", "analytics", "cycle", "/dashboard/retro"],
   "nav.content": ["library", "notes", "/library"],
-  "nav.team": ["agents", "experts", "/agents"],
-  "nav.runtimes": ["runtimes", "engines", "/runtimes"],
-  "nav.repos": ["repos", "repositories", "/repos"],
+  "nav.team": ["teammates", "agents", "experts", "/agents"],
+  "nav.runtimes": ["environments", "runtimes", "engines", "/runtimes"],
+  "nav.repos": ["repos", "repositories", "projects", "/repos"],
   "nav.farm": ["farm", "diorama", "/farm"],
   "nav.settings": ["settings", "preferences", "/settings"],
   "issue.new": ["issue.new", "new issue", "create issue", "/issues/new"],

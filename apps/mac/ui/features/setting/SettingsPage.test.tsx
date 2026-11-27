@@ -70,7 +70,7 @@ test("SettingsPage search finds 技能 and 记忆 in Chinese locale", async () =
 test("SettingsPage general and appearance render separate sections with split IA groups (zh & en)", async () => {
   const zh = await mountSettings("/settings/general", "zh");
   const zhTexts = zh.app.texts();
-  expect(zhTexts).toContain("个人与工作区");
+  expect(zhTexts).toContain("个人与项目");
   expect(zhTexts).toContain("连接与集成");
   expect(zhTexts).toContain("数据与关于");
   expect(zhTexts).toContain("调整界面语言与启动默认页面。");
@@ -95,7 +95,7 @@ test("SettingsPage general and appearance render separate sections with split IA
 
   const en = await mountSettings("/settings/general", "en");
   const enTexts = en.app.texts();
-  expect(enTexts).toContain("Profile & Workspace");
+  expect(enTexts).toContain("Profile & Projects");
   expect(enTexts).toContain("Connections & Integrations");
   expect(enTexts).toContain("Data & About");
   expect(enTexts).toContain("Configure interface language and startup behavior.");

@@ -81,7 +81,7 @@
     "start": "Started",
     "restart": "Reopened, carrying on",
     "cron": "{missed, select, true {Started on schedule (made up)} other {Started on schedule}}",
-    "runtime": "The machine carried on by itself",
+    "runtime": "The environment carried on by itself",
     "refined": "Drafted",
     "reported": "Handed back",
     "accepted": "Accepted",
