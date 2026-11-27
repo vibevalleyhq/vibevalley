@@ -1,16 +1,31 @@
 {
   "title": "远程访问",
-  "subtitle": "通过 Tailscale 从手机远程查看与操作这台 Mac 上的 VibeValley。",
+  "subtitle": "在同一 Wi-Fi 局域网直连，或通过可选的 Tailscale 跨网从手机查看与操作这台 Mac 上的 VibeValley。",
   "toggle": {
     "enable": "开启远程访问",
     "disable": "关闭远程访问",
     "enabled": "已开启",
     "disabled": "未开启"
   },
+  "mode": {
+    "label": "连接方式",
+    "lan": "局域网直连",
+    "tailscale": "Tailscale 跨网",
+    "lanHint": "同一 Wi-Fi 下手机直连这台 Mac，无需安装 Tailscale",
+    "tailscaleHint": "通过 Tailscale 加密组网从外网或移动网络连接到这台 Mac"
+  },
+  "lan": {
+    "label": "局域网直连（同一 Wi-Fi）",
+    "hint": "无需 Tailscale，自动检测本机非回环局域网 IPv4",
+    "ready": "局域网就绪",
+    "active": "当前使用",
+    "unavailable": "未检测到局域网"
+  },
   "tailscale": {
     "online": "Tailscale 在线",
     "offline": "Tailscale 未连接",
-    "ip": "Tailscale IP",
+    "ip": "Tailscale 跨网（可选）",
+    "optionalHint": "可选的跨网增强，未安装或未连接时仍可用局域网直连",
     "url": "访问地址"
   },
   "pair": {
@@ -37,7 +52,7 @@
   },
   "mobile": {
     "pairTitle": "连接到 Mac",
-    "pairSubtitle": "输入 Mac 远程访问面板显示的地址和一次性配对码。",
+    "pairSubtitle": "扫描 Mac 远程访问面板的二维码，或输入局域网 / Tailscale 地址与一次性配对码。",
     "urlLabel": "Mac 地址",
     "codeLabel": "配对码",
     "deviceNameLabel": "设备名称",

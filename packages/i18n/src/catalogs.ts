@@ -2803,9 +2803,29 @@ export const catalogs = {
     },
     "web.remote": {
       title: "远程访问",
-      subtitle: "通过 Tailscale 从手机远程查看与操作这台 Mac 上的 VibeValley。",
+      subtitle: "在同一 Wi-Fi 局域网直连，或通过可选的 Tailscale 跨网从手机查看与操作这台 Mac 上的 VibeValley。",
       toggle: { enable: "开启远程访问", disable: "关闭远程访问", enabled: "已开启", disabled: "未开启" },
-      tailscale: { online: "Tailscale 在线", offline: "Tailscale 未连接", ip: "Tailscale IP", url: "访问地址" },
+      mode: {
+        label: "连接方式",
+        lan: "局域网直连",
+        tailscale: "Tailscale 跨网",
+        lanHint: "同一 Wi-Fi 下手机直连这台 Mac，无需安装 Tailscale",
+        tailscaleHint: "通过 Tailscale 加密组网从外网或移动网络连接到这台 Mac",
+      },
+      lan: {
+        label: "局域网直连（同一 Wi-Fi）",
+        hint: "无需 Tailscale，自动检测本机非回环局域网 IPv4",
+        ready: "局域网就绪",
+        active: "当前使用",
+        unavailable: "未检测到局域网",
+      },
+      tailscale: {
+        online: "Tailscale 在线",
+        offline: "Tailscale 未连接",
+        ip: "Tailscale 跨网（可选）",
+        optionalHint: "可选的跨网增强，未安装或未连接时仍可用局域网直连",
+        url: "访问地址",
+      },
       pair: {
         action: "配对新设备",
         qrHint: "在手机上扫描二维码，或手动输入地址与配对码",
@@ -2823,7 +2843,7 @@ export const catalogs = {
       },
       mobile: {
         pairTitle: "连接到 Mac",
-        pairSubtitle: "输入 Mac 远程访问面板显示的地址和一次性配对码。",
+        pairSubtitle: "扫描 Mac 远程访问面板的二维码，或输入局域网 / Tailscale 地址与一次性配对码。",
         urlLabel: "Mac 地址",
         codeLabel: "配对码",
         deviceNameLabel: "设备名称",
@@ -2923,13 +2943,9 @@ export const catalogs = {
       recount: "重新统计",
       countedAgo: "{ago}数过",
       whatLanguages: "用了哪些语言",
-      byLines: "按行数，不算空行 · tokei 数的",
+      byLines: "按行数，不算空行",
       linesAndFiles: "{lines} 行 · {files} 个文件",
       empty: "还没有数得出来的代码。",
-      noTokei: "数代码行数要用 tokei，这台机器上还没有。",
-      install: "在终端里装一个：",
-      or: "（或 ",
-      thenRecount: "），装好点上面的「重新统计」。",
       level: { "0": "没有提交", "1": "少", "2": "一些", "3": "较多", "4": "很多" },
       year: "过去一年 · 一格一天，提交越多格子越满",
       dayCommits: "{n} 次提交，{level}",
@@ -3358,14 +3374,21 @@ export const catalogs = {
         everythingHint: "不只读 VibeValley 替执行会话记的，你在里面的记忆每个执行会话都读得到",
       },
       github: {
-        noGh: "没装 gh",
-        note: "能提 PR 的仓库在「仓库」里看；完成时提 PR 要在配置里打开（github.pr_repos）。",
+        noGh: "未安装（可选）",
+        note: "配置 GitHub Token 直连或使用本机 gh 命令行登录后，即可在项目交付时自动推送并创建或合并 PR。",
         recheck: "重新检测",
-        cli: "gh 命令行",
-        cliHint: "合并时开 PR、读仓库用它",
-        login: "登录",
-        loginHint: "gh auth login 登录的账号",
-        notLoggedIn: "没登录",
+        status: "连接状态",
+        statusHint: "优先使用 GitHub Token 直连，未配置时回退到本机 gh 登录",
+        mode: { token: "已通过 Token 直连", gh: "已通过 gh 登录", none: "均未配置" },
+        token: "GitHub 令牌",
+        tokenHint: "用于直接调用 GitHub REST API（创建、刷新、合并 PR 与检查状态），也可用环境变量 GITHUB_TOKEN",
+        tokenPlaceholder: "ghp_… 或 github_pat_…（不改就空着）",
+        tokenConfigured: "已配置 Token",
+        cli: "gh 命令行（可选）",
+        cliHint: "未配置 Token 时可用本机 gh 命令行开 PR 和读项目",
+        login: "当前账号",
+        loginHint: "当前 Token 或 gh 对应的 GitHub 账号",
+        notLoggedIn: "未登录",
       },
       nav: {
         label: "设置的分区",
@@ -3397,8 +3420,8 @@ export const catalogs = {
         mcp: "MCP Antigravity Claude Code Codex Cursor stdio streamableHttp 接入 配置",
         voice: "电话 通话 MOSS Live 实时 视觉 转写 语音",
         chat: "微信 飞书 QQ 聊天通道 连接器 配对",
-        github: "GitHub gh PR 登录",
-        remote: "远程 手机 Tailscale 配对 二维码 设备 iOS Android CLI 命令行 执行机 沙箱 监听 令牌 总控端 内嵌 远端",
+        github: "GitHub Token gh PR 登录 直连",
+        remote: "远程 手机 局域网 LAN Wi-Fi 直连 Tailscale 配对 二维码 设备 iOS Android CLI 命令行 执行机 沙箱 监听 令牌 总控端 内嵌 远端",
         data: "家目录 设置文件 仓库 目录 工作树 存储 后端 数据 data storage",
         about: "版本 更新 命令行 CLI version update",
       },
@@ -3570,7 +3593,7 @@ export const catalogs = {
         call: "通话",
       },
       readiness: { ready: "{feature}：可以用了", lacks: "{feature}：{why}", fix: "去设置" },
-      remote: { toggleLabel: "手机与客户端接入", toggleHint: "开启后允许已配对设备经 Tailscale 连接到这台 Mac。" },
+      remote: { toggleLabel: "手机与客户端接入", toggleHint: "开启后允许已配对设备通过局域网直连或 Tailscale 连接到这台 Mac。" },
     },
     "web.shell": {
       sidebar: {
@@ -6846,9 +6869,29 @@ export const catalogs = {
     },
     "web.remote": {
       title: "Remote Access",
-      subtitle: "View and control VibeValley on this Mac from your phone over Tailscale.",
+      subtitle: "View and control VibeValley on this Mac from your phone directly over the same Wi-Fi LAN, or over optional Tailscale WAN.",
       toggle: { enable: "Enable remote access", disable: "Disable remote access", enabled: "Enabled", disabled: "Disabled" },
-      tailscale: { online: "Tailscale online", offline: "Tailscale offline", ip: "Tailscale IP", url: "Access URL" },
+      mode: {
+        label: "Connection mode",
+        lan: "LAN direct",
+        tailscale: "Tailscale WAN",
+        lanHint: "Connect phones on the same Wi-Fi directly without Tailscale",
+        tailscaleHint: "Connect from outside your local network over encrypted Tailscale WAN",
+      },
+      lan: {
+        label: "LAN direct (same Wi-Fi)",
+        hint: "No Tailscale required; auto-detects this Mac's non-loopback LAN IPv4",
+        ready: "LAN ready",
+        active: "Active",
+        unavailable: "No LAN IPv4",
+      },
+      tailscale: {
+        online: "Tailscale online",
+        offline: "Tailscale offline",
+        ip: "Tailscale WAN (optional)",
+        optionalHint: "Optional WAN enhancement; LAN direct works even without Tailscale",
+        url: "Access URL",
+      },
       pair: {
         action: "Pair new device",
         qrHint: "Scan the QR code on your phone, or enter the address and pairing code",
@@ -6866,7 +6909,7 @@ export const catalogs = {
       },
       mobile: {
         pairTitle: "Connect to Mac",
-        pairSubtitle: "Enter the address and one-time pairing code shown in Remote Access settings on your Mac.",
+        pairSubtitle: "Scan the QR code in Remote Access settings on your Mac, or enter the LAN / Tailscale address and one-time pairing code.",
         urlLabel: "Mac address",
         codeLabel: "Pairing code",
         deviceNameLabel: "Device name",
@@ -6972,13 +7015,9 @@ export const catalogs = {
       recount: "Count again",
       countedAgo: "counted {ago}",
       whatLanguages: "Languages used",
-      byLines: "By lines, blank lines left out · counted by tokei",
+      byLines: "By lines, blank lines left out",
       linesAndFiles: "{lines} lines · {files} files",
       empty: "No code that can be counted yet.",
-      noTokei: "Counting lines needs tokei, which is not on this computer yet.",
-      install: "Install it in a terminal: ",
-      or: " (or ",
-      thenRecount: "), then press Count again above.",
       level: { "0": "none", "1": "a few", "2": "some", "3": "many", "4": "the most" },
       year: "The past year · a cell a day, fuller with more commits",
       dayCommits: "{n} commits, {level}",
@@ -7427,13 +7466,20 @@ export const catalogs = {
         everythingHint: "Not only what VibeValley remembered for helpers: every helper reads your own memories there too",
       },
       github: {
-        noGh: "gh is not installed",
-        note: "Which repos can open PRs is on the Repos page; opening a PR on completion is turned on in the configuration (github.pr_repos).",
+        noGh: "Not installed (optional)",
+        note: "Configure a GitHub Token for direct REST API access or sign in with the local gh CLI to push branches and open or merge PRs for your projects.",
         recheck: "Check again",
-        cli: "gh command line",
-        cliHint: "Used to open PRs and read repositories when merging",
-        login: "Login",
-        loginHint: "The account gh auth login signed in",
+        status: "Connection status",
+        statusHint: "Uses GitHub Token when configured; falls back to local gh login",
+        mode: { token: "Connected via Token", gh: "Signed in via gh", none: "Not configured" },
+        token: "GitHub Token",
+        tokenHint: "Used to call the GitHub REST API directly for PRs and checks; can also be set via GITHUB_TOKEN",
+        tokenPlaceholder: "ghp_… or github_pat_… (leave empty to keep)",
+        tokenConfigured: "Token configured",
+        cli: "gh CLI (optional)",
+        cliHint: "Used when no Token is configured to open PRs and inspect projects",
+        login: "Account",
+        loginHint: "GitHub account for the active Token or gh session",
         notLoggedIn: "Not signed in",
       },
       nav: {
@@ -7466,8 +7512,9 @@ export const catalogs = {
         mcp: "MCP Antigravity Claude Code Codex Cursor stdio streamableHttp integration",
         voice: "call phone recognition speech MOSS live realtime vision transcription",
         chat: "WeChat Feishu Lark QQ connectors chat pairing",
-        github: "GitHub gh PR login",
-        remote: "remote mobile phone Tailscale pair pairing QR device iOS Android CLI machine sandbox listener token control plane embedded",
+        github: "GitHub Token gh PR login",
+        remote:
+          "remote mobile phone lan wifi local direct Tailscale pair pairing QR device iOS Android CLI machine sandbox listener token control plane embedded",
         data: "home folder settings repos worktrees data storage backend",
         about: "version update cli command line",
       },
@@ -7639,7 +7686,7 @@ export const catalogs = {
         call: "Calls",
       },
       readiness: { ready: "{feature}: ready", lacks: "{feature}: {why}", fix: "Set it up" },
-      remote: { toggleLabel: "Mobile & client listener", toggleHint: "Allow paired devices to connect to this Mac over Tailscale." },
+      remote: { toggleLabel: "Mobile & client listener", toggleHint: "Allow paired devices to connect to this Mac over local Wi-Fi LAN or Tailscale." },
     },
     "web.shell": {
       sidebar: {
@@ -10991,6 +11038,11 @@ export interface Messages {
   "web.remote.issue.filter.done": undefined;
   "web.remote.issue.filter.review": undefined;
   "web.remote.issue.status": undefined;
+  "web.remote.lan.active": undefined;
+  "web.remote.lan.hint": undefined;
+  "web.remote.lan.label": undefined;
+  "web.remote.lan.ready": undefined;
+  "web.remote.lan.unavailable": undefined;
   "web.remote.mobile.codeLabel": undefined;
   "web.remote.mobile.deviceNameLabel": undefined;
   "web.remote.mobile.invalidInput": undefined;
@@ -10999,6 +11051,11 @@ export interface Messages {
   "web.remote.mobile.pairTitle": undefined;
   "web.remote.mobile.pairing": undefined;
   "web.remote.mobile.urlLabel": undefined;
+  "web.remote.mode.label": undefined;
+  "web.remote.mode.lan": undefined;
+  "web.remote.mode.lanHint": undefined;
+  "web.remote.mode.tailscale": undefined;
+  "web.remote.mode.tailscaleHint": undefined;
   "web.remote.pair.action": undefined;
   "web.remote.pair.code": undefined;
   "web.remote.pair.copied": undefined;
@@ -11024,6 +11081,7 @@ export interface Messages {
   "web.remote.tailscale.ip": undefined;
   "web.remote.tailscale.offline": undefined;
   "web.remote.tailscale.online": undefined;
+  "web.remote.tailscale.optionalHint": undefined;
   "web.remote.tailscale.url": undefined;
   "web.remote.title": undefined;
   "web.remote.toggle.disable": undefined;
@@ -11075,7 +11133,6 @@ export interface Messages {
   "web.repo.inYear": undefined;
   "web.repo.initGit": undefined;
   "web.repo.initGitHint": undefined;
-  "web.repo.install": undefined;
   "web.repo.kinds": { readonly n: string | number };
   "web.repo.languages": undefined;
   "web.repo.level.0": undefined;
@@ -11102,12 +11159,10 @@ export interface Messages {
   "web.repo.nameOptionalHint": undefined;
   "web.repo.noCommits": undefined;
   "web.repo.noCommitsThatDay": undefined;
-  "web.repo.noTokei": undefined;
   "web.repo.none": undefined;
   "web.repo.notCopied": undefined;
   "web.repo.notGit": undefined;
   "web.repo.openWorkspace": undefined;
-  "web.repo.or": undefined;
   "web.repo.otherLang": undefined;
   "web.repo.pickFolder": undefined;
   "web.repo.readingCommits": undefined;
@@ -11129,7 +11184,6 @@ export interface Messages {
   "web.repo.rows.5": undefined;
   "web.repo.rows.6": undefined;
   "web.repo.selectPrompt": undefined;
-  "web.repo.thenRecount": undefined;
   "web.repo.times": { readonly n: string | number };
   "web.repo.uncounted": undefined;
   "web.repo.unmount": undefined;
@@ -11590,10 +11644,19 @@ export interface Messages {
   "web.setting.github.cliHint": undefined;
   "web.setting.github.login": undefined;
   "web.setting.github.loginHint": undefined;
+  "web.setting.github.mode.gh": undefined;
+  "web.setting.github.mode.none": undefined;
+  "web.setting.github.mode.token": undefined;
   "web.setting.github.noGh": undefined;
   "web.setting.github.notLoggedIn": undefined;
   "web.setting.github.note": undefined;
   "web.setting.github.recheck": undefined;
+  "web.setting.github.status": undefined;
+  "web.setting.github.statusHint": undefined;
+  "web.setting.github.token": undefined;
+  "web.setting.github.tokenConfigured": undefined;
+  "web.setting.github.tokenHint": undefined;
+  "web.setting.github.tokenPlaceholder": undefined;
   "web.setting.keys.deepseekHint": undefined;
   "web.setting.keys.saved": undefined;
   "web.setting.language.en": undefined;

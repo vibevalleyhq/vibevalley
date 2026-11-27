@@ -43,7 +43,7 @@
       "about": "主助手：上线、停下、评测"
     },
     "remote": {
-      "about": "远程访问：开关、Tailscale 监听、设备配对与撤销"
+      "about": "远程访问：开关、局域网直连与可选 Tailscale 监听、设备配对与撤销"
     },
     "repo": {
       "about": "仓库：工作区下的 git 仓库"
@@ -449,8 +449,8 @@
       }
     },
     "remote": {
-      "status": "查看远程访问状态、Tailscale 信息与已配对设备",
-      "enable": "开启远程访问监听（默认绑定 Tailscale IPv4 或指定回环地址）",
+      "status": "查看远程访问状态、局域网 IPv4 / Tailscale 信息与已配对设备",
+      "enable": "开启远程访问监听（默认绑定在线 Tailscale IPv4、检测到的局域网 IPv4 或回环地址）",
       "disable": "关闭远程访问监听",
       "pair": {
         "create": "生成 5 分钟有效的一次性配对码与配对深链",

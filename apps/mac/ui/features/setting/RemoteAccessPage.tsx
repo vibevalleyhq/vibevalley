@@ -21,6 +21,7 @@ import { hostApi } from "../../infra/bridge";
 import { onSettled } from "../../infra/solid";
 
 type AuthMethod = "pair" | "token";
+type RemoteAccessMode = "lan" | "tailscale";
 
 const DEFAULT_CONNECTION: DesktopConnectionSnapshot = {
   activeMode: "embedded",
@@ -337,8 +338,21 @@ export function RemoteAccessPage() {
   const pair = signal<RemotePairCode | undefined>(undefined);
   const copied = signal(false);
   const revokingId = signal<string | undefined>(undefined);
+  const preferredMode = signal<RemoteAccessMode | undefined>(undefined);
   const resetCopied = useTimeout();
   const act = createAct((reason) => actionError.set(reason));
+
+  const activeMode = computed((): RemoteAccessMode => {
+    const current = status();
+    const bind = current?.bindAddr;
+    if (bind !== undefined) {
+      if (bind === current?.lanIp) return "lan";
+      if (bind === current?.tailscaleIp) return "tailscale";
+    }
+    const pref = preferredMode();
+    if (pref !== undefined) return pref;
+    return current?.tailscaleOnline === true ? "tailscale" : "lan";
+  });
 
   let alive = true;
   let loadSeq = 0;
@@ -369,10 +383,28 @@ export function RemoteAccessPage() {
 
   const onEnable = async () => {
     actionError.set(undefined);
-    const next = await act.run(() => api.remote.enable({}));
+    const current = status();
+    const pref = preferredMode();
+    const bindAddr = pref === "lan" ? current?.lanIp : pref === "tailscale" && current?.tailscaleOnline === true ? current.tailscaleIp : undefined;
+    const next = await act.run(() => api.remote.enable(bindAddr !== undefined ? { bindAddr } : {}));
     if (!alive || !next) return;
     loadSeq++;
     status.set(next);
+  };
+
+  const onSelectMode = async (mode: RemoteAccessMode) => {
+    preferredMode.set(mode);
+    const current = status();
+    if (current?.enabled !== true) return;
+    const targetIp = mode === "lan" ? current.lanIp : current.tailscaleOnline ? current.tailscaleIp : undefined;
+    if (targetIp === undefined || (current.listening && current.bindAddr === targetIp)) return;
+    actionError.set(undefined);
+    const next = await act.run(() => api.remote.enable({ bindAddr: targetIp }));
+    if (!alive || !next) return;
+    loadSeq++;
+    status.set(next);
+    pair.set(undefined);
+    copied.set(false);
   };
 
   const onDisable = async () => {
@@ -437,6 +469,9 @@ export function RemoteAccessPage() {
         {(s) => {
           const liveUrl = () => (s().listening ? s().url : undefined);
           const devices = computed(() => activeDevicesOf(s()));
+          const hasBothModes = () => s().lanIp !== undefined && s().tailscaleOnline && s().tailscaleIp !== undefined;
+          const lanActive = () => s().listening && s().lanIp !== undefined && s().bindAddr === s().lanIp;
+          const tailscaleHint = () => s().tailscaleHost ?? t("web.remote.tailscale.optionalHint");
           return (
             <View testID="remote-access-page" class="gap-5">
               <If when={actionError()}>
@@ -470,11 +505,47 @@ export function RemoteAccessPage() {
                   </If>
                 </SettingRow>
 
-                <SettingRow label={t("web.remote.tailscale.ip")} hint={s().tailscaleHost} testid="remote-tailscale-row" last={!liveUrl()}>
+                <If when={hasBothModes()}>
+                  <SettingRow
+                    label={t("web.remote.mode.label")}
+                    hint={activeMode() === "lan" ? t("web.remote.mode.lanHint") : t("web.remote.mode.tailscaleHint")}
+                    testid="remote-mode-row"
+                  >
+                    <Segmented<RemoteAccessMode>
+                      testid="remote-mode-switch"
+                      label={t("web.remote.mode.label")}
+                      value={activeMode()}
+                      onChange={(v) => void onSelectMode(v)}
+                      options={[
+                        { value: "lan", label: t("web.remote.mode.lan"), icon: "web", disabled: act.busy() },
+                        { value: "tailscale", label: t("web.remote.mode.tailscale"), icon: "link", disabled: act.busy() },
+                      ]}
+                    />
+                  </SettingRow>
+                </If>
+
+                <SettingRow label={t("web.remote.lan.label")} hint={t("web.remote.lan.hint")} testid="remote-lan-row">
+                  <View testID="remote-lan-badge">
+                    <Tag
+                      icon={s().lanIp !== undefined ? "check" : "wait"}
+                      tone={s().lanIp !== undefined ? (lanActive() ? "ok" : "info") : "neutral"}
+                      label={s().lanIp !== undefined ? (lanActive() ? t("web.remote.lan.active") : t("web.remote.lan.ready")) : t("web.remote.lan.unavailable")}
+                    />
+                  </View>
+                  <If when={s().lanIp}>
+                    {(ip) => (
+                      <View testID="remote-lan-ip" class="rounded-sm bg-page px-2 py-0.5">
+                        <Text class="select-text font-mono text-xs tabular-nums text-ink">{ip()}</Text>
+                      </View>
+                    )}
+                  </If>
+                </SettingRow>
+
+                <SettingRow label={t("web.remote.tailscale.ip")} hint={tailscaleHint()} testid="remote-tailscale-row" last={!liveUrl()}>
                   <View testID="remote-tailscale-badge">
                     <Tag
-                      icon={s().tailscaleOnline ? "check" : "warn"}
-                      tone={s().tailscaleOnline ? "ok" : "wait"}
+                      icon={s().tailscaleOnline ? "check" : "info"}
+                      tone={s().tailscaleOnline ? "ok" : "neutral"}
                       label={s().tailscaleOnline ? t("web.remote.tailscale.online") : t("web.remote.tailscale.offline")}
                     />
                   </View>

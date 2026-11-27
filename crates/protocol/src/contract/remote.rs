@@ -92,6 +92,7 @@ pub struct RemoteStatus {
     pub listening: bool,
     pub bind_addr: Option<String>,
     pub port: u16,
+    pub lan_ip: Option<String>,
     pub tailscale_ip: Option<String>,
     pub tailscale_host: Option<String>,
     pub tailscale_online: bool,

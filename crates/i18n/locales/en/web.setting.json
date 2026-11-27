@@ -82,7 +82,7 @@
     "voice": "call phone recognition speech MOSS live realtime vision transcription",
     "chat": "WeChat Feishu Lark QQ connectors chat pairing",
     "github": "GitHub Token gh PR login",
-    "remote": "remote mobile phone Tailscale pair pairing QR device iOS Android CLI machine sandbox listener token control plane embedded",
+    "remote": "remote mobile phone lan wifi local direct Tailscale pair pairing QR device iOS Android CLI machine sandbox listener token control plane embedded",
     "data": "home folder settings repos worktrees data storage backend",
     "about": "version update cli command line"
   },
@@ -279,6 +279,6 @@
   },
   "remote": {
     "toggleLabel": "Mobile & client listener",
-    "toggleHint": "Allow paired devices to connect to this Mac over Tailscale."
+    "toggleHint": "Allow paired devices to connect to this Mac over local Wi-Fi LAN or Tailscale."
   }
 }

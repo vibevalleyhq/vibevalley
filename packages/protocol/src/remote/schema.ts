@@ -20,6 +20,7 @@ export const RemoteStatus = z.object({
   listening: z.boolean(),
   bindAddr: z.exactOptional(z.string()),
   port: z.number(),
+  lanIp: z.exactOptional(z.string()),
   tailscaleIp: z.exactOptional(z.string()),
   tailscaleHost: z.exactOptional(z.string()),
   tailscaleOnline: z.boolean(),
