@@ -17,69 +17,33 @@ use vibevalley_protocol::{
 
 use super::types::{Machine, MachineDescriptor, MachinePlatform as RtPlatform, MachineStatus as RtStatus, WorkdirHandle, WorkdirSpec};
 use crate::BoxFuture;
-use crate::oar::core::{HISTORY_LIMIT, RECORD_HISTORY_LIMIT, StatusFold};
+use crate::oar::core::{EVENT_SUBSCRIBER_CAPACITY, HISTORY_LIMIT, RECORD_HISTORY_LIMIT, RECORD_SUBSCRIBER_CAPACITY, StatusFold};
 use crate::oar::{
     self, AgentError, Capabilities, ContentBlock, ControlAction, ControlOutcome, ControlStatus, Event, EventKind, Installation, InteractionDecision, McpServer,
     ModelInfo, PermissionDecision, PermissionMode, Result as OarResult, Runtime, Session, SessionOptions, SessionStatus, StopReason, Usage, voyage,
 };
 
+pub use crate::oar::RemoteDispatchMeta;
+
 const DEFAULT_RPC_TIMEOUT: Duration = Duration::from_secs(30);
 
-/// Internal `SessionOptions::env` keys used to pass server-side PR-first
-/// dispatch metadata through the executor-agnostic `oar::SessionOptions`
-/// boundary. Stripped before wire send.
-const ENV_SESSION_ID: &str = "__VIBEVALLEY_REMOTE_SESSION_ID";
-const ENV_REPO_REF: &str = "__VIBEVALLEY_REMOTE_REPO_REF";
-const ENV_BRANCH: &str = "__VIBEVALLEY_REMOTE_BRANCH";
-const ENV_BASE_REF: &str = "__VIBEVALLEY_REMOTE_BASE_REF";
-const ENV_MCP_TOKEN: &str = "__VIBEVALLEY_REMOTE_MCP_TOKEN";
-
-/// PR-first remote dispatch metadata carried into `MachineSessionOpen`.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct RemoteDispatchMeta {
-    pub session_id: Option<String>,
-    pub repo_ref: Option<String>,
-    pub branch: Option<String>,
-    pub base_ref: Option<String>,
-    pub mcp_session_token: Option<String>,
+fn non_empty(value: Option<String>) -> Option<String> {
+    value.filter(|s| !s.is_empty())
 }
 
-/// Encodes `meta` into `env` so `RemoteRuntime::open` forwards them on
-/// `MachineSessionOpen` and strips these internal keys from the child env.
-pub fn attach_dispatch_meta(env: &mut Vec<(String, String)>, meta: &RemoteDispatchMeta) {
-    if let Some(id) = meta.session_id.as_deref().filter(|s| !s.is_empty()) {
-        env.push((ENV_SESSION_ID.into(), id.into()));
-    }
-    if let Some(repo) = meta.repo_ref.as_deref().filter(|s| !s.is_empty()) {
-        env.push((ENV_REPO_REF.into(), repo.into()));
-    }
-    if let Some(branch) = meta.branch.as_deref().filter(|s| !s.is_empty()) {
-        env.push((ENV_BRANCH.into(), branch.into()));
-    }
-    if let Some(base) = meta.base_ref.as_deref().filter(|s| !s.is_empty()) {
-        env.push((ENV_BASE_REF.into(), base.into()));
-    }
-    if let Some(token) = meta.mcp_session_token.as_deref().filter(|s| !s.is_empty()) {
-        env.push((ENV_MCP_TOKEN.into(), token.into()));
-    }
-}
-
-fn extract_dispatch_meta(env: &[(String, String)], mcp_servers: &[McpServer]) -> (RemoteDispatchMeta, BTreeMap<String, String>) {
-    let mut meta = RemoteDispatchMeta::default();
-    let mut clean = BTreeMap::new();
-    for (k, v) in env {
-        match k.as_str() {
-            ENV_SESSION_ID => meta.session_id = (!v.is_empty()).then(|| v.clone()),
-            ENV_REPO_REF => meta.repo_ref = (!v.is_empty()).then(|| v.clone()),
-            ENV_BRANCH => meta.branch = (!v.is_empty()).then(|| v.clone()),
-            ENV_BASE_REF => meta.base_ref = (!v.is_empty()).then(|| v.clone()),
-            ENV_MCP_TOKEN => meta.mcp_session_token = (!v.is_empty()).then(|| v.clone()),
-            _ => {
-                clean.insert(k.clone(), v.clone());
-            }
-        }
-    }
-    if meta.mcp_session_token.is_none() {
+/// Normalizes strongly-typed `SessionOptions::remote_dispatch` metadata and
+/// falls back to the `vibevalley` HTTP MCP `Authorization: Bearer` header when
+/// `mcp_session_token` was not provided explicitly.
+fn resolve_dispatch_meta(meta: Option<RemoteDispatchMeta>, mcp_servers: &[McpServer]) -> RemoteDispatchMeta {
+    let raw = meta.unwrap_or_default();
+    let mut resolved = RemoteDispatchMeta {
+        session_id: non_empty(raw.session_id),
+        repo_ref: non_empty(raw.repo_ref),
+        branch: non_empty(raw.branch),
+        base_ref: non_empty(raw.base_ref),
+        mcp_session_token: non_empty(raw.mcp_session_token),
+    };
+    if resolved.mcp_session_token.is_none() {
         for server in mcp_servers {
             if let McpServer::Http { name, headers, .. } = server
                 && name == "vibevalley"
@@ -91,7 +55,7 @@ fn extract_dispatch_meta(env: &[(String, String)], mcp_servers: &[McpServer]) ->
                     {
                         let token = token.trim();
                         if !token.is_empty() {
-                            meta.mcp_session_token = Some(token.to_string());
+                            resolved.mcp_session_token = Some(token.to_string());
                             break;
                         }
                     }
@@ -99,7 +63,7 @@ fn extract_dispatch_meta(env: &[(String, String)], mcp_servers: &[McpServer]) ->
             }
         }
     }
-    (meta, clean)
+    resolved
 }
 
 fn to_rt_platform(platform: MachinePlatform) -> RtPlatform {
@@ -713,7 +677,8 @@ impl Runtime for RemoteRuntime {
             if self.machine.status() != MachineStatus::Online {
                 return Err(AgentError::NotAvailable(format!("machine `{}` is offline", self.machine.machine_id)));
             }
-            let (meta, env) = extract_dispatch_meta(&opts.env, &opts.mcp_servers);
+            let meta = resolve_dispatch_meta(opts.remote_dispatch, &opts.mcp_servers);
+            let env: BTreeMap<String, String> = opts.env.into_iter().collect();
             let session_id = meta
                 .session_id
                 .or_else(|| opts.resume.clone())
@@ -783,9 +748,9 @@ struct RemoteSessionState {
     last_record_seq: Option<u64>,
     fold: StatusFold,
     history: VecDeque<Event>,
-    subscribers: Vec<mpsc::UnboundedSender<Event>>,
+    subscribers: Vec<mpsc::Sender<Event>>,
     records: VecDeque<voyage::Record>,
-    record_subscribers: Vec<mpsc::UnboundedSender<voyage::Record>>,
+    record_subscribers: Vec<mpsc::Sender<voyage::Record>>,
     workdir: Option<String>,
     ended: bool,
     disposed: bool,
@@ -819,9 +784,20 @@ impl RemoteSessionInner {
         })
     }
 
-    fn emit_local_locked(state: &mut RemoteSessionState, event: Event) {
+    fn emit_local_locked(session_id: &str, state: &mut RemoteSessionState, event: Event) {
         state.fold.apply(&event);
-        state.subscribers.retain(|tx| tx.send(event.clone()).is_ok());
+        state.subscribers.retain(|tx| match tx.try_send(event.clone()) {
+            Ok(()) => true,
+            Err(mpsc::error::TrySendError::Full(_)) => {
+                tracing::warn!(
+                    session_id = %session_id,
+                    capacity = EVENT_SUBSCRIBER_CAPACITY,
+                    "remote session event subscriber full; evicting slow consumer"
+                );
+                false
+            }
+            Err(mpsc::error::TrySendError::Closed(_)) => false,
+        });
         if state.history.len() == HISTORY_LIMIT {
             state.history.pop_front();
         }
@@ -850,10 +826,11 @@ impl RemoteSessionInner {
             state.last_seq = ev.seq;
         }
         let is_session_ended = matches!(event.kind, EventKind::SessionEnded);
-        Self::emit_local_locked(&mut state, event);
+        Self::emit_local_locked(&self.session_id, &mut state, event);
         if ev.terminal && !is_session_ended {
             let end_seq = state.last_seq.saturating_add(1);
             Self::emit_local_locked(
+                &self.session_id,
                 &mut state,
                 Event {
                     seq: end_seq,
@@ -878,7 +855,18 @@ impl RemoteSessionInner {
             return;
         }
         state.last_record_seq = Some(rec.seq);
-        state.record_subscribers.retain(|tx| tx.send(record.clone()).is_ok());
+        state.record_subscribers.retain(|tx| match tx.try_send(record.clone()) {
+            Ok(()) => true,
+            Err(mpsc::error::TrySendError::Full(_)) => {
+                tracing::warn!(
+                    session_id = %self.session_id,
+                    capacity = RECORD_SUBSCRIBER_CAPACITY,
+                    "remote session record subscriber full; evicting slow consumer"
+                );
+                false
+            }
+            Err(mpsc::error::TrySendError::Closed(_)) => false,
+        });
         if state.records.len() == RECORD_HISTORY_LIMIT {
             state.records.pop_front();
         }
@@ -893,6 +881,7 @@ impl RemoteSessionInner {
         let at_ms = voyage::now_ms();
         let err_seq = state.last_seq.saturating_add(1);
         Self::emit_local_locked(
+            &self.session_id,
             &mut state,
             Event {
                 seq: err_seq,
@@ -904,6 +893,7 @@ impl RemoteSessionInner {
         if state.fold.turn_active() {
             let turn_seq = err_seq.saturating_add(1);
             Self::emit_local_locked(
+                &self.session_id,
                 &mut state,
                 Event {
                     seq: turn_seq,
@@ -918,6 +908,7 @@ impl RemoteSessionInner {
         }
         let end_seq = state.last_seq.saturating_add(2);
         Self::emit_local_locked(
+            &self.session_id,
             &mut state,
             Event {
                 seq: end_seq,
@@ -1046,15 +1037,17 @@ impl Session for RemoteSession {
         self.inner.state.lock().records.iter().cloned().collect()
     }
 
-    fn subscribe_records(&self, after: Option<u64>) -> mpsc::UnboundedReceiver<voyage::Record> {
-        let (tx, rx) = mpsc::unbounded_channel();
+    fn subscribe_records(&self, after: Option<u64>) -> mpsc::Receiver<voyage::Record> {
+        let (tx, rx) = mpsc::channel(RECORD_SUBSCRIBER_CAPACITY);
         let mut state = self.inner.state.lock();
+        let mut keep = true;
         for rec in &state.records {
-            if after.is_none_or(|a| rec.seq > a) {
-                let _ = tx.send(rec.clone());
+            if after.is_none_or(|a| rec.seq > a) && tx.try_send(rec.clone()).is_err() {
+                keep = false;
+                break;
             }
         }
-        if !state.ended {
+        if keep && !state.ended {
             state.record_subscribers.push(tx);
         }
         rx
@@ -1068,8 +1061,8 @@ impl Session for RemoteSession {
         self.inner.state.lock().fold.status()
     }
 
-    fn events(&self) -> mpsc::UnboundedReceiver<Event> {
-        let (tx, rx) = mpsc::unbounded_channel();
+    fn events(&self) -> mpsc::Receiver<Event> {
+        let (tx, rx) = mpsc::channel(EVENT_SUBSCRIBER_CAPACITY);
         let mut state = self.inner.state.lock();
         if !state.ended {
             state.subscribers.push(tx);
@@ -1077,13 +1070,18 @@ impl Session for RemoteSession {
         rx
     }
 
-    fn events_with_history(&self) -> mpsc::UnboundedReceiver<Event> {
-        let (tx, rx) = mpsc::unbounded_channel();
+    fn events_with_history(&self) -> mpsc::Receiver<Event> {
+        let (tx, rx) = mpsc::channel(EVENT_SUBSCRIBER_CAPACITY);
         let mut state = self.inner.state.lock();
-        for event in &state.history {
-            let _ = tx.send(event.clone());
+        let skip = state.history.len().saturating_sub(EVENT_SUBSCRIBER_CAPACITY);
+        let mut keep = true;
+        for event in state.history.iter().skip(skip) {
+            if tx.try_send(event.clone()).is_err() {
+                keep = false;
+                break;
+            }
         }
-        if !state.ended {
+        if keep && !state.ended {
             state.subscribers.push(tx);
         }
         rx
@@ -1201,6 +1199,7 @@ impl RemoteSession {
         if !state.ended {
             let end_seq = state.last_seq.saturating_add(1);
             RemoteSessionInner::emit_local_locked(
+                &self.inner.session_id,
                 &mut state,
                 Event {
                     seq: end_seq,

@@ -3,6 +3,7 @@
 //! 2. Thread `@<agent>` readonly collaborators without clobbering the primary worker.
 //! 3. Single write-lock handoff ("Hoe Handoff") committing or stashing uncommitted worktree edits.
 
+use crate::support::RouterTestExt as _;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, mpsc};
@@ -179,7 +180,7 @@ impl Session for InteractiveSession {
     fn records(&self) -> Vec<vibevalley_runtime::oar::voyage::Record> {
         self.inner.records()
     }
-    fn subscribe_records(&self, after: Option<u64>) -> tokio::sync::mpsc::UnboundedReceiver<vibevalley_runtime::oar::voyage::Record> {
+    fn subscribe_records(&self, after: Option<u64>) -> tokio::sync::mpsc::Receiver<vibevalley_runtime::oar::voyage::Record> {
         self.inner.subscribe_records(after)
     }
     fn control<'a>(
@@ -210,7 +211,7 @@ impl Session for InteractiveSession {
     fn status(&self) -> vibevalley_runtime::oar::SessionStatus {
         self.inner.status()
     }
-    fn events(&self) -> tokio::sync::mpsc::UnboundedReceiver<vibevalley_runtime::oar::Event> {
+    fn events(&self) -> tokio::sync::mpsc::Receiver<vibevalley_runtime::oar::Event> {
         self.inner.events()
     }
     fn prompt(&self, content: Vec<ContentBlock>) -> vibevalley_runtime::BoxFuture<'_, vibevalley_runtime::oar::Result<()>> {

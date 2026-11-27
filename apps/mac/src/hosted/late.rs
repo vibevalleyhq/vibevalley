@@ -55,7 +55,7 @@ impl LateServer {
     pub fn spawn(make: impl FnOnce() -> Arc<dyn Server> + Send + 'static) -> LateServer {
         let late = LateServer::new();
         let handle = late.clone();
-        let _ = std::thread::Builder::new().name("vibevalley-server-start".into()).spawn(move || {
+        if let Err(err) = std::thread::Builder::new().name("vibevalley-server-start".into()).spawn(move || {
             // Drop `ready_tx` even if `make` unwinds so async waiters never hang.
             struct CloseOnDrop(LateServer);
             impl Drop for CloseOnDrop {
@@ -66,24 +66,15 @@ impl LateServer {
             let guard = CloseOnDrop(handle.clone());
             handle.attach(make());
             drop(guard);
-        });
+        }) {
+            tracing::error!(target: "vibevalley::hosted", error = %err, "failed to spawn embedded server startup thread");
+            let _ = late.ready_tx.lock().take();
+        }
         late
-    }
-
-    fn server(&self) -> &Arc<dyn Server> {
-        self.cell.wait()
     }
 }
 
 impl Server for LateServer {
-    fn call(&self, op: &str, payload: Value) -> Envelope {
-        self.server().call(op, payload)
-    }
-
-    fn call_with(&self, ctx: &CallerContext, op: &str, payload: Value) -> Envelope {
-        self.server().call_with(ctx, op, payload)
-    }
-
     fn call_with_async(self: Arc<Self>, ctx: CallerContext, op: String, payload: Value) -> BoxFuture<'static, Envelope> {
         if let Some(inner) = self.cell.get() {
             return Arc::clone(inner).call_with_async(ctx, op, payload);
@@ -98,12 +89,8 @@ impl Server for LateServer {
         })
     }
 
-    fn slice_snapshot(&self, slice: SliceKind) -> Value {
-        self.server().slice_snapshot(slice)
-    }
-
     fn slice_snapshot_json(&self, slice: SliceKind) -> Arc<str> {
-        self.server().slice_snapshot_json(slice)
+        self.cell.get().map_or_else(|| Arc::<str>::from("null"), |s| s.slice_snapshot_json(slice))
     }
 
     fn slice_snapshot_json_async(self: Arc<Self>, slice: SliceKind) -> BoxFuture<'static, Arc<str>> {
@@ -118,28 +105,6 @@ impl Server for LateServer {
                 None => Arc::<str>::from("null"),
             }
         })
-    }
-
-    fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &tokio_util::sync::CancellationToken, receive: &mut dyn FnMut(i64, &Value)) {
-        if self.cell.get().is_none() {
-            let (done_tx, done_rx) = std::sync::mpsc::channel::<()>();
-            let stop_wait = stop.clone();
-            let mut ready = self.ready.clone();
-            vibevalley_runtime::rt::current_or_global_handle().spawn(async move {
-                tokio::select! {
-                    biased;
-                    _ = stop_wait.cancelled() => {}
-                    _ = ready.wait_for(|is_ready| *is_ready) => {}
-                }
-                drop(done_tx);
-            });
-            let _ = done_rx.recv();
-        }
-        if !stop.is_cancelled()
-            && let Some(server) = self.cell.get()
-        {
-            server.watch_slice(slice, after_seq, stop, receive);
-        }
     }
 
     fn ready_async(&self) -> Option<Pin<Box<dyn Future<Output = ()> + Send>>> {
@@ -170,14 +135,14 @@ impl Server for LateServer {
         })
     }
 
-    fn live(&self) -> tokio::sync::mpsc::UnboundedReceiver<LiveEvent> {
+    fn live(&self) -> tokio::sync::mpsc::Receiver<LiveEvent> {
         if let Some(server) = self.cell.get() {
             return server.live();
         }
-        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+        let (tx, rx) = tokio::sync::mpsc::channel(512);
         let cell = self.cell.clone();
         let mut ready = self.ready.clone();
-        vibevalley_runtime::rt::current_or_global_handle().spawn(async move {
+        vibevalley_rt::current_or_global_handle().spawn(async move {
             tokio::select! {
                 biased;
                 _ = tx.closed() => return,
@@ -198,11 +163,19 @@ impl Server for LateServer {
                         _ = tx.closed() => break,
                         res = live_rx.recv() => match res {
                             Ok(ev) => {
-                                if tx.send(ev).is_err() {
-                                    break;
+                                match tx.try_send(ev) {
+                                    Ok(()) => {}
+                                    Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {
+                                        tracing::warn!("late_server.live buffer full; disconnecting slow consumer");
+                                        break;
+                                    }
+                                    Err(tokio::sync::mpsc::error::TrySendError::Closed(_)) => break,
                                 }
                             }
-                            Err(broadcast::error::RecvError::Lagged(_)) => continue,
+                            Err(broadcast::error::RecvError::Lagged(skipped)) => {
+                                tracing::warn!(skipped, "late_server.live broadcast lagged; skipped live events");
+                                continue;
+                            }
                             Err(broadcast::error::RecvError::Closed) => break,
                         },
                     }
@@ -215,7 +188,7 @@ impl Server for LateServer {
                         _ = tx.closed() => break,
                         item = from.recv() => match item {
                             Some(item) => {
-                                if tx.send(item).is_err() {
+                                if tx.send(item).await.is_err() {
                                     break;
                                 }
                             }
@@ -232,20 +205,12 @@ impl Server for LateServer {
         self.cell.get().and_then(|s| s.subscribe_live())
     }
 
-    fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
-        self.server().subscribe(name, payload)
-    }
-
-    fn subscribe_with(&self, ctx: &CallerContext, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
-        self.server().subscribe_with(ctx, name, payload)
-    }
-
     fn subscribe_with_async(
         self: Arc<Self>,
         ctx: CallerContext,
         name: String,
         payload: Value,
-    ) -> BoxFuture<'static, Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope>> {
+    ) -> BoxFuture<'static, Result<(u64, tokio::sync::mpsc::Receiver<Value>), Envelope>> {
         if let Some(inner) = self.cell.get() {
             return Arc::clone(inner).subscribe_with_async(ctx, name, payload);
         }
@@ -308,7 +273,7 @@ mod tests {
         }
 
         fn wait_for(&self, what: &str, mut f: impl FnMut(&Self) -> bool) {
-            vibevalley_runtime::rt::block_on(async {
+            vibevalley_rt::block_on(async {
                 tokio::time::timeout(Duration::from_secs(3), async {
                     loop {
                         let notified = self.notify.notified();
@@ -343,7 +308,7 @@ mod tests {
         }
 
         fn wait_live_watchers(&self, what: &str, expected: usize) {
-            vibevalley_runtime::rt::block_on(async {
+            vibevalley_rt::block_on(async {
                 tokio::time::timeout(Duration::from_secs(3), async {
                     loop {
                         let notified = self.on_live.notified();
@@ -361,7 +326,7 @@ mod tests {
         }
 
         fn wait_subscribers(&self, what: &str, expected: usize) {
-            vibevalley_runtime::rt::block_on(async {
+            vibevalley_rt::block_on(async {
                 tokio::time::timeout(Duration::from_secs(3), async {
                     loop {
                         let notified = self.on_subscribe.notified();
@@ -380,31 +345,19 @@ mod tests {
     }
 
     impl Server for FastPathOnlyServer {
-        fn call(&self, op: &str, payload: Value) -> Envelope {
-            self.inner.call(op, payload)
-        }
-
-        fn call_with(&self, ctx: &CallerContext, op: &str, payload: Value) -> Envelope {
-            self.inner.call_with(ctx, op, payload)
-        }
-
-        fn slice_snapshot(&self, slice: SliceKind) -> Value {
-            self.inner.slice_snapshot(slice)
+        fn call_with_async(self: Arc<Self>, ctx: CallerContext, op: String, payload: Value) -> BoxFuture<'static, Envelope> {
+            Arc::clone(&self.inner).call_with_async(ctx, op, payload)
         }
 
         fn slice_snapshot_json(&self, slice: SliceKind) -> Arc<str> {
             self.inner.slice_snapshot_json(slice)
         }
 
-        fn watch_slice(&self, _slice: SliceKind, _after_seq: Option<i64>, _stop: &tokio_util::sync::CancellationToken, _receive: &mut dyn FnMut(i64, &Value)) {
-            panic!("blocking watch_slice fallback must not be used when subscribe_slice is available");
-        }
-
         fn subscribe_slice(&self, slice: SliceKind) -> Option<SliceSubscription> {
             self.inner.subscribe_slice(slice)
         }
 
-        fn live(&self) -> tokio::sync::mpsc::UnboundedReceiver<LiveEvent> {
+        fn live(&self) -> tokio::sync::mpsc::Receiver<LiveEvent> {
             panic!("blocking live fallback must not be used when subscribe_live is available");
         }
 
@@ -414,16 +367,17 @@ mod tests {
             rx
         }
 
-        fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
-            let res = self.inner.subscribe(name, payload);
-            self.on_subscribe.notify_waiters();
-            res
-        }
-
-        fn subscribe_with(&self, ctx: &CallerContext, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
-            let res = self.inner.subscribe_with(ctx, name, payload);
-            self.on_subscribe.notify_waiters();
-            res
+        fn subscribe_with_async(
+            self: Arc<Self>,
+            ctx: CallerContext,
+            name: String,
+            payload: Value,
+        ) -> BoxFuture<'static, Result<(u64, tokio::sync::mpsc::Receiver<Value>), Envelope>> {
+            Box::pin(async move {
+                let res = Arc::clone(&self.inner).subscribe_with_async(ctx, name, payload).await;
+                self.on_subscribe.notify_waiters();
+                res
+            })
         }
 
         fn unsubscribe(&self, id: u64) {
@@ -443,19 +397,25 @@ mod tests {
     #[test]
     fn regression_a_closed_workbench_does_not_wait_for_server_startup() {
         let (release, starting) = std::sync::mpsc::sync_channel::<()>(0);
-        let late = LateServer::spawn(move || {
+        let late = Arc::new(LateServer::spawn(move || {
             starting.recv().unwrap();
             Arc::new(FakeServer::new())
-        });
+        }));
         let stop = tokio_util::sync::CancellationToken::new();
         let stopped = stop.clone();
-        let (done, finished) = std::sync::mpsc::sync_channel(1);
-        std::thread::spawn(move || {
-            late.watch_slice(SliceKind::Board, None, &stopped, &mut |_, _| panic!("closed view received a snapshot"));
-            done.send(()).unwrap();
+        let late_wait = Arc::clone(&late);
+        let finished = vibevalley_rt::block_on(async move {
+            let task = tokio::spawn(async move {
+                tokio::select! {
+                    biased;
+                    _ = stopped.cancelled() => true,
+                    _ = late_wait.subscribe_slice_async(SliceKind::Board) => false,
+                }
+            });
+            stop.cancel();
+            tokio::time::timeout(Duration::from_secs(2), task).await.unwrap().unwrap()
         });
-        stop.cancel();
-        finished.recv_timeout(Duration::from_secs(2)).unwrap();
+        assert!(finished);
         release.send(()).unwrap();
     }
 
@@ -465,27 +425,24 @@ mod tests {
         let fake = Arc::new(FakeServer::from_bundle(empty_bundle(4)));
         fake.respond("issue.list", json!([]));
         let inner = fake.clone();
-        let late = LateServer::spawn(move || {
+        let late = Arc::new(LateServer::spawn(move || {
             let _ = go_rx.recv();
             inner
+        }));
+        vibevalley_rt::block_on(async {
+            let late_sub = Arc::clone(&late);
+            let sub_task = tokio::spawn(async move { late_sub.subscribe_slice_async(SliceKind::Board).await });
+            tokio::time::sleep(Duration::from_millis(15)).await;
+            assert!(!sub_task.is_finished(), "no frame before the server is up");
+            go_tx.send(()).unwrap();
+            let env = Arc::clone(&late).call_with_async(CallerContext::local(), "issue.list".into(), json!({})).await;
+            assert_eq!(env.data, Some(json!([])));
+            let mut sub = tokio::time::timeout(Duration::from_secs(5), sub_task).await.unwrap().unwrap().unwrap();
+            let frame = sub.borrow_and_update(true);
+            assert_eq!(frame.seq, 4);
+            let val: Value = serde_json::from_str(&frame.json).unwrap();
+            assert_eq!(val["seq"], 4);
         });
-        let stop = tokio_util::sync::CancellationToken::new();
-        let stopped = stop.clone();
-        let (seen_tx, seen_rx) = std::sync::mpsc::sync_channel(1);
-        let watcher = late.clone();
-        let handle = std::thread::spawn(move || {
-            watcher.watch_slice(SliceKind::Board, None, &stopped, &mut |seq, val| {
-                let _ = seen_tx.send((seq, val.clone()));
-            });
-        });
-        assert!(seen_rx.try_recv().is_err(), "no frame before the server is up");
-        go_tx.send(()).unwrap();
-        assert_eq!(late.call("issue.list", json!({})).data, Some(json!([])));
-        let (seq, val) = seen_rx.recv_timeout(Duration::from_secs(5)).unwrap();
-        assert_eq!(seq, 4);
-        assert_eq!(val["seq"], 4);
-        stop.cancel();
-        handle.join().unwrap();
     }
 
     #[test]
@@ -552,36 +509,28 @@ mod tests {
         assert!(cancelled_rec.named("frame:live").is_empty());
     }
 
-    /// Panics if sync `call` / `call_with` is used instead of `call_with_async`.
     struct AsyncCallOnlyServer(Arc<FakeServer>);
 
     impl Server for AsyncCallOnlyServer {
-        fn call(&self, _op: &str, _payload: Value) -> Envelope {
-            panic!("sync Server::call must not be used when call_with_async is called");
-        }
-
-        fn call_with(&self, _ctx: &CallerContext, _op: &str, _payload: Value) -> Envelope {
-            panic!("sync Server::call_with must not be used when call_with_async is called");
-        }
-
         fn call_with_async(self: Arc<Self>, ctx: CallerContext, op: String, payload: Value) -> BoxFuture<'static, Envelope> {
-            Box::pin(async move { self.0.call_with(&ctx, &op, payload) })
+            Arc::clone(&self.0).call_with_async(ctx, op, payload)
         }
 
-        fn slice_snapshot(&self, slice: SliceKind) -> Value {
-            self.0.slice_snapshot(slice)
+        fn slice_snapshot_json(&self, slice: SliceKind) -> Arc<str> {
+            self.0.slice_snapshot_json(slice)
         }
 
-        fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &tokio_util::sync::CancellationToken, receive: &mut dyn FnMut(i64, &Value)) {
-            self.0.watch_slice(slice, after_seq, stop, receive);
-        }
-
-        fn live(&self) -> tokio::sync::mpsc::UnboundedReceiver<LiveEvent> {
+        fn live(&self) -> tokio::sync::mpsc::Receiver<LiveEvent> {
             self.0.live()
         }
 
-        fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
-            self.0.subscribe(name, payload)
+        fn subscribe_with_async(
+            self: Arc<Self>,
+            ctx: CallerContext,
+            name: String,
+            payload: Value,
+        ) -> BoxFuture<'static, Result<(u64, tokio::sync::mpsc::Receiver<Value>), Envelope>> {
+            Arc::clone(&self.0).subscribe_with_async(ctx, name, payload)
         }
 
         fn unsubscribe(&self, id: u64) {
@@ -591,7 +540,7 @@ mod tests {
 
     #[test]
     fn call_with_async_waits_pre_attach_and_delegates_directly_post_attach() {
-        vibevalley_runtime::rt::block_on(async {
+        vibevalley_rt::block_on(async {
             let late = Arc::new(LateServer::new());
             let fake = Arc::new(FakeServer::new());
             fake.respond("issue.list", json!([{ "id": "i1" }]));
@@ -642,24 +591,25 @@ mod tests {
         }
 
         impl Server for MachineBusServer {
-            fn call(&self, op: &str, payload: Value) -> Envelope {
-                self.inner.call(op, payload)
+            fn call_with_async(self: Arc<Self>, ctx: CallerContext, op: String, payload: Value) -> BoxFuture<'static, Envelope> {
+                Arc::clone(&self.inner).call_with_async(ctx, op, payload)
             }
 
-            fn slice_snapshot(&self, slice: SliceKind) -> Value {
-                self.inner.slice_snapshot(slice)
+            fn slice_snapshot_json(&self, slice: SliceKind) -> Arc<str> {
+                self.inner.slice_snapshot_json(slice)
             }
 
-            fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &tokio_util::sync::CancellationToken, receive: &mut dyn FnMut(i64, &Value)) {
-                self.inner.watch_slice(slice, after_seq, stop, receive);
-            }
-
-            fn live(&self) -> tokio::sync::mpsc::UnboundedReceiver<LiveEvent> {
+            fn live(&self) -> tokio::sync::mpsc::Receiver<LiveEvent> {
                 self.inner.live()
             }
 
-            fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
-                self.inner.subscribe(name, payload)
+            fn subscribe_with_async(
+                self: Arc<Self>,
+                ctx: CallerContext,
+                name: String,
+                payload: Value,
+            ) -> BoxFuture<'static, Result<(u64, tokio::sync::mpsc::Receiver<Value>), Envelope>> {
+                Arc::clone(&self.inner).subscribe_with_async(ctx, name, payload)
             }
 
             fn unsubscribe(&self, id: u64) {
@@ -719,7 +669,7 @@ mod tests {
         assert_eq!(pre_rec.named("sub:s1")[0], json!({ "event": { "text": "hello-after-attach" } }));
         assert!(cancelled_rec.named("sub:s2").is_empty());
 
-        vibevalley_runtime::rt::block_on(async {
+        vibevalley_rt::block_on(async {
             let snap = late.clone().slice_snapshot_json_async(SliceKind::Board).await;
             assert!(snap.contains("\"seq\":11"));
             assert!(late.clone().subscribe_slice_async(SliceKind::Board).await.is_some());

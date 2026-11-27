@@ -495,10 +495,10 @@ async fn watch_board_events(
         let sessions = env.ctx.service.session.all().await.unwrap_or_default();
         let now_ms = env.ctx.now();
         let (events, settled) = notify.diff_board_issues(&board.issues, &sessions, now_ms, |issue| issue_top_channel(&env.chat, issue, &sessions));
-        for issue_id in settled {
+        for settled_msg_id in settled {
             for b in &bridges {
                 if b.is_paired() {
-                    b.withdraw_issue_pushes_async(&issue_id).await;
+                    b.withdraw_push_message_async(&settled_msg_id).await;
                 }
             }
         }

@@ -140,16 +140,7 @@ export const servedEndpoints = [
   { op: "library.item.add", can: ["user", "remote", "orchestrator", "session"], about: [] },
   { op: "library.item.delete", can: ["user", "remote"], about: ["id"], dryRun: "library.item.previewDelete" },
   { op: "library.item.previewDelete", can: ["user", "remote"], about: ["id"] },
-  { op: "voice.hear", can: ["user", "remote"], about: [] },
   { op: "voice.moss.verify", can: ["user"], about: [] },
-  { op: "voice.grant.create", can: ["user", "remote"], about: [] },
-  { op: "voice.call.start", can: ["user", "remote"], about: [] },
-  { op: "voice.call.stop", can: ["user", "remote"], about: [] },
-  { op: "voice.call.hear", can: ["user", "remote"], about: [] },
-  { op: "voice.call.say", can: ["user", "remote"], about: [] },
-  { op: "voice.asr.start", can: ["user", "remote"], about: [] },
-  { op: "voice.asr.stop", can: ["user", "remote"], about: [] },
-  { op: "voice.asr.transcribe", can: ["user", "remote"], about: [] },
   { op: "note.list", can: ["user", "remote", "orchestrator", "session"], about: [] },
   { op: "note.get", can: ["user", "remote", "orchestrator", "session"], about: ["id"] },
   { op: "note.content.get", can: ["user", "remote", "orchestrator", "session"], about: ["id"] },
@@ -189,7 +180,6 @@ export const servedEndpoints = [
   { op: "provider.update", can: ["user"], about: [] },
   { op: "provider.verify", can: ["user"], about: [] },
   { op: "provider.voice.list", can: ["user"], about: ["connection"] },
-  { op: "provider.model.list", can: ["user"], about: [] },
   { op: "setting.get", can: ["user", "remote"], about: [] },
   { op: "setting.validate", can: ["user", "remote"], about: [] },
   { op: "setting.update", can: ["user"], about: [] },
@@ -219,7 +209,6 @@ export const servedEndpoints = [
   { op: "machine.list", can: ["user", "remote"], about: [] },
   { op: "game.shop.list", can: ["user", "remote"], about: [] },
   { op: "game.shop.buy", can: ["user", "remote"], about: ["id"] },
-  { op: "game.daily.list", can: ["user", "remote"], about: [] },
 ] as const;
 
 export const servedSubscriptions = [

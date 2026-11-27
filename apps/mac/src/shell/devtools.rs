@@ -17,14 +17,9 @@ use super::menus::{CloseWindow, ToggleDevtools};
 pub const DEVTOOLS_VISIBLE_TOPIC: &str = "devtools_visible";
 pub const INSPECTOR_STATE_TOPIC: &str = "inspector";
 
-pub fn devtools_enabled_from(raw: Option<&str>) -> bool {
-    raw.map(str::trim) == Some("1")
-}
-
-/// DevTools gate: enabled only when `VIBEVALLEY_DEBUG=1`.
-pub fn devtools_enabled() -> bool {
-    devtools_enabled_from(std::env::var("VIBEVALLEY_DEBUG").ok().as_deref())
-}
+pub use crate::env::devtools_enabled;
+#[cfg(test)]
+pub use crate::env::devtools_enabled_from;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct CapsuleMetrics {
@@ -223,8 +218,8 @@ impl Shell {
                         if !server_ready {
                             return (port, 0, active_subs, 0);
                         }
-                        let raw = bridge.server().slice_snapshot(SliceKind::Sessions);
-                        let (active_sessions, latest_seq) = serde_json::from_value::<SessionsSlice>(raw)
+                        let raw = bridge.server().clone().slice_snapshot_json_async(SliceKind::Sessions).await;
+                        let (active_sessions, latest_seq) = serde_json::from_str::<SessionsSlice>(&raw)
                             .map(|slice| (slice.sessions.len() as u32, slice.seq))
                             .unwrap_or((0, 0));
                         (port, active_sessions, active_subs, latest_seq)
@@ -480,12 +475,184 @@ impl Shell {
         false
     }
 
+    /// Collects mounted [`HostedView`] entities and their shell window origins `(surface, ox, oy, view)` overlapping the window.
+    pub(crate) fn hosted_view_origins(&self, vp_w: f32, vp_h: f32, cx: &App) -> Vec<(String, f32, f32, Entity<HostedView>)> {
+        let mut views = Vec::new();
+        if let Some(palette) = self.overlays.palette.as_ref().filter(|p| p.open) {
+            let palette_w = (vp_w - 32.0).clamp(280.0, 620.0);
+            let palette_top = if vp_h < 520.0 { 24.0 } else { 72.0 };
+            let ox = ((vp_w - palette_w) * 0.5).max(0.0);
+            views.push(("palette".to_string(), ox, palette_top, palette.view.clone()));
+        }
+        if self.chrome.native_workspace {
+            if self.chrome.sidebar_visible {
+                views.push(("sidebar".to_string(), self.chrome.global_rail_width, 0.0, self.chrome.sidebar.clone()));
+            }
+            if let Some(inspector) = &self.chrome.inspector {
+                views.push((
+                    "inspector".to_string(),
+                    (vp_w - self.chrome.inspector_width).max(0.0),
+                    0.0,
+                    inspector.view.clone(),
+                ));
+            }
+            if let Some(project) = self.workspace.ws.active()
+                && let Some(tab) = project.layout.active_tab()
+                && let Some(crate::panes::PaneEntity::Hosted(pane_view)) = self.workspace.panes.get(&(project.id(), tab.id)).map(|s| &s.entity)
+            {
+                let left = self.chrome.global_rail_width + if self.chrome.sidebar_visible { self.chrome.sidebar_width + 1.0 } else { 0.0 };
+                let module = pane_view.read(cx).view_name().to_string();
+                views.push((format!("pane:{module}"), left, 0.0, pane_view.clone()));
+            }
+        }
+        views.push(("workbench".to_string(), 0.0, 0.0, self.chrome.workbench.clone()));
+        views
+    }
+
+    /// Collects native GPUI shell chrome, diorama canvas, and pane elements containing `(x, y)` with `.rs` source locations.
+    pub(crate) fn inspect_native_at(&self, x: f32, y: f32, vp_w: f32, vp_h: f32, cx: &App) -> Option<vibevalley_protocol::VdpUiInspectAtResult> {
+        use vibevalley_protocol::{VdpUiBounds, VdpUiInspectAtResult};
+        use vibevalley_workspace::PaneKind;
+
+        let mut candidates = Vec::new();
+        let rail_w = self.chrome.global_rail_width;
+
+        if self.overlays.devtools.state.enabled {
+            let cap_w = 340.0f32.min(vp_w - 16.0).max(160.0);
+            candidates.push(VdpUiInspectAtResult {
+                hit: true,
+                surface: Some("shell".into()),
+                test_id: Some("devtools-capsule".into()),
+                role: Some("button".into()),
+                text: Some(self.overlays.devtools.state.format_capsule()),
+                route: None,
+                source: Some("apps/mac/src/shell/devtools.rs:475".into()),
+                bounds: Some(VdpUiBounds {
+                    x: (vp_w - cap_w) * 0.5,
+                    y: (vp_h - 36.0).max(0.0),
+                    width: cap_w,
+                    height: 26.0,
+                }),
+            });
+        }
+
+        if let Some(slot) = &self.chrome.native_diorama {
+            candidates.push(VdpUiInspectAtResult {
+                hit: true,
+                surface: Some("diorama".into()),
+                test_id: Some("diorama-canvas".into()),
+                role: Some("canvas".into()),
+                text: Some(slot.view.read(cx).debug_state()["kind"].as_str().unwrap_or("diorama").to_string()),
+                route: Some("/farm".into()),
+                source: Some("apps/mac/src/diorama/view.rs:1".into()),
+                bounds: Some(VdpUiBounds {
+                    x: rail_w,
+                    y: 0.0,
+                    width: (vp_w - rail_w).max(0.0),
+                    height: vp_h,
+                }),
+            });
+        }
+
+        if self.chrome.native_workspace {
+            if self.chrome.sidebar_visible {
+                let div_x = rail_w + self.chrome.sidebar_width;
+                candidates.push(VdpUiInspectAtResult {
+                    hit: true,
+                    surface: Some("shell".into()),
+                    test_id: Some("sidebar-divider".into()),
+                    role: Some("separator".into()),
+                    text: None,
+                    route: None,
+                    source: Some("apps/mac/src/shell/render.rs:80".into()),
+                    bounds: Some(VdpUiBounds {
+                        x: (div_x - 3.0).max(0.0),
+                        y: 0.0,
+                        width: 6.0,
+                        height: vp_h,
+                    }),
+                });
+            }
+            if self.chrome.inspector.is_some() {
+                let div_x = (vp_w - self.chrome.inspector_width).max(0.0);
+                candidates.push(VdpUiInspectAtResult {
+                    hit: true,
+                    surface: Some("shell".into()),
+                    test_id: Some("inspector-divider".into()),
+                    role: Some("separator".into()),
+                    text: None,
+                    route: None,
+                    source: Some("apps/mac/src/shell/render.rs:98".into()),
+                    bounds: Some(VdpUiBounds {
+                        x: (div_x - 3.0).max(0.0),
+                        y: 0.0,
+                        width: 6.0,
+                        height: vp_h,
+                    }),
+                });
+            }
+
+            let main_left = rail_w + if self.chrome.sidebar_visible { self.chrome.sidebar_width + 1.0 } else { 0.0 };
+            let main_right = vp_w
+                - if self.chrome.inspector.is_some() {
+                    self.chrome.inspector_width + 1.0
+                } else {
+                    0.0
+                };
+            let main_bounds = VdpUiBounds {
+                x: main_left,
+                y: 0.0,
+                width: (main_right - main_left).max(0.0),
+                height: vp_h,
+            };
+            if let Some(project) = self.workspace.ws.active()
+                && let Some(tab) = project.layout.active_tab()
+            {
+                let (test_id, role, source) = match &tab.kind {
+                    PaneKind::Terminal { terminal_id, .. } => (format!("pane:terminal:{terminal_id}"), "terminal", "apps/mac/src/panes.rs:1"),
+                    PaneKind::File { path } => {
+                        let is_md = path.extension().and_then(|e| e.to_str()).is_some_and(|e| e.eq_ignore_ascii_case("md"));
+                        (
+                            format!("pane:file:{}", path.file_name().and_then(|n| n.to_str()).unwrap_or("file")),
+                            "document",
+                            if is_md {
+                                "apps/mac/src/markdown_pane.rs:1"
+                            } else {
+                                "apps/mac/src/viewer.rs:1"
+                            },
+                        )
+                    }
+                    PaneKind::Diff { .. } => ("pane:diff".to_string(), "diff", "apps/mac/src/diff.rs:1"),
+                    PaneKind::Diorama { scene, .. } => (format!("pane:diorama:{scene}"), "canvas", "apps/mac/src/diorama/view.rs:1"),
+                    PaneKind::Hosted { module, .. } => (format!("pane:hosted:{module}"), "region", "apps/mac/src/hosted/view.rs:1"),
+                    PaneKind::Chat { .. } => ("pane:chat".to_string(), "region", "apps/mac/src/panes.rs:1"),
+                };
+                candidates.push(VdpUiInspectAtResult {
+                    hit: true,
+                    surface: Some("workspace".into()),
+                    test_id: Some(test_id),
+                    role: Some(role.into()),
+                    text: Some(super::tab_title(self, tab, cx)),
+                    route: Some("/workspace".into()),
+                    source: Some(source.into()),
+                    bounds: Some(main_bounds),
+                });
+            }
+        }
+
+        crate::vdp_bus::select_deepest_hit(x, y, candidates)
+    }
+
     pub fn handle_inspector_click(&mut self, x: f32, y: f32, window: &Window, cx: &mut Context<Self>) {
         let vp = window.viewport_size();
         let vp_w = f32::from(vp.width);
         let vp_h = f32::from(vp.height);
-        let native_hit = crate::debug::executor::inspect_native_at(self, x, y, vp_w, vp_h, cx);
-        let hosted_views = crate::debug::executor::hosted_view_origins(self, vp_w, vp_h, cx);
+        let native_hit = self.inspect_native_at(x, y, vp_w, vp_h, cx);
+        let hosted_views: Vec<(String, f32, f32)> = self
+            .hosted_view_origins(vp_w, vp_h, cx)
+            .into_iter()
+            .map(|(surface, ox, oy, _)| (surface, ox, oy))
+            .collect();
         self.overlays.devtools.inspecting = false;
         self.overlays.devtools.highlighted = native_hit.clone();
         self.push_devtools_inspector(cx);
@@ -494,7 +661,7 @@ impl Shell {
         let shell_weak = cx.weak_entity();
         let win_handle = window.window_handle();
         cx.spawn(async move |_, cx| {
-            let best = crate::debug::vdp::inspect_hosted_views_at(hosted_views, x, y, native_hit, Duration::from_millis(800)).await;
+            let best = crate::vdp_bus::inspect_hosted_views_at(hosted_views, x, y, native_hit, Duration::from_millis(800)).await;
             if let Some(hit) = best {
                 let _ = cx.update_window(win_handle, |_, _, cx| {
                     let _ = shell_weak.update(cx, |shell, cx| {

@@ -10,7 +10,7 @@ mod tests;
 
 pub use local::LocalMachine;
 pub use registry::MachineRegistry;
-pub use remote::{RemoteDispatchMeta, RemoteMachine, RemoteRuntime, RemoteSession, attach_dispatch_meta};
+pub use remote::{RemoteDispatchMeta, RemoteMachine, RemoteRuntime, RemoteSession};
 pub use types::{
     LOCAL_MACHINE_ID, Machine, MachineDescriptor, MachinePlatform, MachineRegistryEvent, MachineStatus, RuntimeRef, RuntimeRefParseError, WorkdirHandle,
     WorkdirSpec,

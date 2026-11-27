@@ -152,6 +152,23 @@ impl StartError {
             db_path: None,
         }
     }
+
+    pub(crate) fn from_db(err: crate::service::DbError, fallback_path: Option<PathBuf>) -> Self {
+        if let Some(r) = err.schema_mismatch() {
+            return Self {
+                kind: StartErrorKind::DatabaseSchema,
+                message: format!("the database: {r}"),
+                detail: Some(r.format_detail()),
+                db_path: r.db_path.clone().or(fallback_path),
+            };
+        }
+        Self {
+            kind: StartErrorKind::Database,
+            message: format!("the database: {err}"),
+            detail: None,
+            db_path: fallback_path,
+        }
+    }
 }
 
 impl std::fmt::Display for StartError {

@@ -65,7 +65,7 @@ pub fn start(voice: SharedLiveVoice, owner: String) -> Result<State, String> {
     current.owner = owner;
     let initial = current.state.clone();
     drop(current);
-    vibevalley_runtime::rt::current_or_global_handle().spawn(async move {
+    vibevalley_rt::current_or_global_handle().spawn(async move {
         let result = run(voice, stop_capture, abort).await;
         let mut current = dictation().lock();
         if !current.state.partial.is_empty() {

@@ -388,8 +388,6 @@ export {
   HostPaletteMode,
   HostPaletteSearchHit,
   HostPanel,
-  HostPcmAppendPayload,
-  HostPcmStartPayload,
   HostPlayAudioPayload,
   HostPlaySoundPayload,
   HostQrPayload,
@@ -401,7 +399,6 @@ export {
   HostRandomBytesPayload,
   HostReadFilePayload,
   HostSaveFilePayload,
-  HostSeekAudioPayload,
   HostSha256Payload,
   HostSoundName,
   HostThemeChoice,
@@ -412,24 +409,11 @@ export {
 } from "./host/schema";
 export { Attachment, AttachmentImportPathInput, AttachmentUpload } from "./attachment/schema";
 export { ConnectorLogin, ConnectorsChannelRequest, ConnectorStatus, VerifyRequest } from "./connector/schema";
-export {
-  SettingsUpdateVoice,
-  VoiceAsrGrant,
-  VoiceAsrResult,
-  VoiceAsrStopInput,
-  VoiceAsrTranscribeInput,
-  VoiceCall,
-  VoiceCallStart,
-  VoiceGrant,
-  VoiceHeard,
-  VoiceSaid,
-} from "./voice/schema";
+export { SettingsUpdateVoice } from "./voice/schema";
 export { MemorySourceKind, SettingsStatus, SettingsUpdate, UserProfile } from "./setting/schema";
 export {
   ModelCapability,
   ProviderConnectionAdapter,
-  ProviderModelListing,
-  ProviderModelRequest,
   ProviderScene,
   ProviderStatus,
   ProviderUpdate,

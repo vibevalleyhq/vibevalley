@@ -160,7 +160,7 @@ fn parse_slice_topic(topic: &str) -> Option<SliceKind> {
 
 /// Forwards every item from `rx` until `cancel` fires or the source closes.
 async fn pump_mpsc_async<T: Send + 'static>(
-    mut rx: tokio::sync::mpsc::UnboundedReceiver<T>,
+    mut rx: tokio::sync::mpsc::Receiver<T>,
     cancel: CancellationToken,
     mut each: impl FnMut(T) + Send + 'static,
     ended: impl FnOnce(bool) + Send + 'static,
@@ -248,7 +248,21 @@ async fn pump_slice_subscription(
         }
         seen_gen = Some(generation);
         is_initial = false;
-        let data: Value = serde_json::from_str(&frame.json).unwrap_or(Value::Null);
+        let data: Value = match serde_json::from_str(&frame.json) {
+            Ok(data) => data,
+            Err(err) => {
+                tracing::error!(topic = slice_topic, seq = frame.seq, error = %err, "bridge.slice decode failed; skipping malformed frame");
+                let changed = tokio::select! {
+                    biased;
+                    _ = task_cancel.cancelled() => break,
+                    ok = sub.changed() => ok,
+                };
+                if !changed {
+                    break;
+                }
+                continue;
+            }
+        };
         let notified = receipt.ack.notified();
         tokio::pin!(notified);
         notified.as_mut().enable();
@@ -271,57 +285,6 @@ async fn pump_slice_subscription(
     }
 }
 
-/// Fallback for `Server` implementations without `SliceFeed` (e.g. custom test doubles).
-/// Bridges blocking `watch_slice` onto a bounded mpsc channel so Bounded-1 ack waiting
-/// stays purely async without blocking the Tokio runtime.
-async fn pump_slice_blocking_fallback(
-    server: Arc<dyn Server>,
-    slice_kind: SliceKind,
-    receipt: Arc<SliceReceipt>,
-    revisions: Arc<AtomicU64>,
-    outlet: Arc<dyn Outlet>,
-    event_name: String,
-    task_cancel: CancellationToken,
-) {
-    let handle = vibevalley_runtime::rt::current_or_global_handle();
-    let stop = task_cancel.child_token();
-    let (frame_tx, mut frame_rx) = tokio::sync::mpsc::channel::<Value>(1);
-    let watch_stop = stop.clone();
-    handle.spawn_blocking(move || {
-        server.watch_slice(slice_kind, None, &watch_stop, &mut |_seq, frame| {
-            if watch_stop.is_cancelled() {
-                return;
-            }
-            if frame_tx.blocking_send(frame.clone()).is_err() {
-                watch_stop.cancel();
-            }
-        });
-    });
-
-    loop {
-        let frame = tokio::select! {
-            biased;
-            _ = task_cancel.cancelled() => break,
-            res = frame_rx.recv() => match res {
-                Some(frame) => frame,
-                None => break,
-            },
-        };
-        let notified = receipt.ack.notified();
-        tokio::pin!(notified);
-        notified.as_mut().enable();
-        let rev = revisions.fetch_add(1, Ordering::Relaxed) + 1;
-        receipt.pending.store(rev, Ordering::Release);
-        outlet.send(&event_name, json!({ "rev": rev, "data": frame }));
-        tokio::select! {
-            biased;
-            _ = task_cancel.cancelled() => break,
-            _ = notified => {}
-        }
-    }
-    stop.cancel();
-}
-
 async fn pump_live_broadcast(mut rx: broadcast::Receiver<LiveEvent>, outlet: Arc<dyn Outlet>, task_cancel: CancellationToken) {
     let mut rev = 0u64;
     loop {
@@ -330,12 +293,21 @@ async fn pump_live_broadcast(mut rx: broadcast::Receiver<LiveEvent>, outlet: Arc
             _ = task_cancel.cancelled() => break,
             res = rx.recv() => match res {
                 Ok(ev) => ev,
-                Err(broadcast::error::RecvError::Lagged(_)) => continue,
+                Err(broadcast::error::RecvError::Lagged(skipped)) => {
+                    tracing::warn!(skipped, "bridge.live broadcast lagged; skipped live events");
+                    continue;
+                }
                 Err(broadcast::error::RecvError::Closed) => break,
             },
         };
+        let data = match serde_json::to_value(&event) {
+            Ok(data) => data,
+            Err(err) => {
+                tracing::error!(error = %err, "bridge.live serialize failed; skipping malformed event");
+                continue;
+            }
+        };
         rev += 1;
-        let data = serde_json::to_value(event).unwrap_or(Value::Null);
         outlet.send("frame:live", json!({ "rev": rev, "data": data }));
     }
 }
@@ -365,10 +337,10 @@ impl Client {
             let server = self.bridge.server.clone();
             let event_name = format!("frame:{topic}");
             spawn_when_ready(server, cancel.clone(), move |server, task_cancel| async move {
-                if let Some(sub) = server.subscribe_slice(slice_kind) {
+                if let Some(sub) = server.clone().subscribe_slice_async(slice_kind).await {
                     pump_slice_subscription(server, sub, receipt, revisions, outlet, event_name, task_cancel).await;
                 } else {
-                    pump_slice_blocking_fallback(server, slice_kind, receipt, revisions, outlet, event_name, task_cancel).await;
+                    tracing::warn!(slice = slice_kind.as_str(), "bridge.watch slice stream unavailable");
                 }
             });
         } else if topic == "live" {
@@ -381,10 +353,14 @@ impl Client {
                     pump_mpsc_async(
                         server.live(),
                         task_cancel,
-                        move |event| {
-                            rev += 1;
-                            let data = serde_json::to_value(event).unwrap_or(Value::Null);
-                            outlet.send("frame:live", json!({ "rev": rev, "data": data }));
+                        move |event| match serde_json::to_value(&event) {
+                            Ok(data) => {
+                                rev += 1;
+                                outlet.send("frame:live", json!({ "rev": rev, "data": data }));
+                            }
+                            Err(err) => {
+                                tracing::error!(error = %err, "bridge.live serialize failed; skipping malformed event");
+                            }
                         },
                         |_| {},
                     )
@@ -449,7 +425,18 @@ impl ClientRpc for Client {
             trace_id: 0,
         };
         self.bridge.call_with(ctx, op, payload, move |envelope| {
-            outlet.send(&event, serde_json::to_value(envelope).unwrap_or(Value::Null));
+            let wire = match serde_json::to_value(&envelope) {
+                Ok(v) => v,
+                Err(err) => {
+                    tracing::error!(event = %event, error = %err, "bridge.call serialize failed");
+                    json!({
+                        "bizCode": BizCode::InternalError.code(),
+                        "message": format!("failed to serialize envelope: {err}"),
+                        "data": Value::Null,
+                    })
+                }
+            };
+            outlet.send(&event, wire);
         });
     }
 
@@ -657,22 +644,16 @@ mod tests {
     }
 
     impl Server for SignaledFake {
-        fn call(&self, op: &str, payload: Value) -> Envelope {
-            self.inner.call(op, payload)
+        fn call_with_async(self: Arc<Self>, ctx: CallerContext, op: String, payload: Value) -> crate::gateway::api::BoxFuture<'static, Envelope> {
+            self.inner.clone().call_with_async(ctx, op, payload)
         }
-        fn call_with(&self, ctx: &CallerContext, op: &str, payload: Value) -> Envelope {
-            self.inner.call_with(ctx, op, payload)
-        }
-        fn slice_snapshot(&self, slice: SliceKind) -> Value {
-            self.inner.slice_snapshot(slice)
-        }
-        fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &CancellationToken, receive: &mut dyn FnMut(i64, &Value)) {
-            self.inner.watch_slice(slice, after_seq, stop, receive)
+        fn slice_snapshot_json(&self, slice: SliceKind) -> Arc<str> {
+            self.inner.slice_snapshot_json(slice)
         }
         fn subscribe_slice(&self, slice: SliceKind) -> Option<SliceSubscription> {
             self.inner.subscribe_slice(slice)
         }
-        fn live(&self) -> tokio::sync::mpsc::UnboundedReceiver<vibevalley_protocol::LiveEvent> {
+        fn live(&self) -> tokio::sync::mpsc::Receiver<vibevalley_protocol::LiveEvent> {
             let rx = self.inner.live();
             self.on_live.notify_waiters();
             rx
@@ -682,15 +663,17 @@ mod tests {
             self.on_live.notify_waiters();
             rx
         }
-        fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
-            let res = self.inner.subscribe(name, payload);
-            self.on_subscribe.notify_waiters();
-            res
-        }
-        fn subscribe_with(&self, ctx: &CallerContext, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
-            let res = self.inner.subscribe_with(ctx, name, payload);
-            self.on_subscribe.notify_waiters();
-            res
+        fn subscribe_with_async(
+            self: Arc<Self>,
+            ctx: CallerContext,
+            name: String,
+            payload: Value,
+        ) -> crate::gateway::api::BoxFuture<'static, Result<(u64, tokio::sync::mpsc::Receiver<Value>), Envelope>> {
+            Box::pin(async move {
+                let res = self.inner.clone().subscribe_with_async(ctx, name, payload).await;
+                self.on_subscribe.notify_waiters();
+                res
+            })
         }
         fn unsubscribe(&self, id: u64) {
             self.inner.unsubscribe(id);
@@ -819,5 +802,79 @@ mod tests {
         drop(client);
         wait_task_cleanup("drop unsubscribes", || fake.inner.subscriber_count() == 0);
         assert!(hub.clients_snapshot().is_empty());
+    }
+
+    #[test]
+    fn pump_live_broadcast_recovers_after_lag() {
+        vibevalley_runtime::rt::block_on(async {
+            let (tx, rx) = broadcast::channel::<LiveEvent>(2);
+            for (at, text) in [(1, "drop-1"), (2, "drop-2"), (3, "keep-1"), (4, "keep-2")] {
+                let ev: LiveEvent = serde_json::from_value(json!({ "type": "notice", "at": at, "level": "info", "text": text })).unwrap();
+                let _ = tx.send(ev);
+            }
+            let rec = Arc::new(Recorder::default());
+            let cancel = CancellationToken::new();
+            let task = tokio::spawn(pump_live_broadcast(rx, rec.clone(), cancel.clone()));
+
+            tokio::time::timeout(Duration::from_secs(2), async {
+                loop {
+                    if rec.named("frame:live").len() >= 2 {
+                        break;
+                    }
+                    tokio::task::yield_now().await;
+                }
+            })
+            .await
+            .expect("pump_live_broadcast should recover after broadcast lag");
+
+            let live = rec.named("frame:live");
+            assert_eq!(live[0]["data"]["text"], "keep-1");
+            assert_eq!(live[1]["data"]["text"], "keep-2");
+            cancel.cancel();
+            let _ = task.await;
+        });
+    }
+
+    #[test]
+    fn pump_slice_subscription_skips_malformed_json_without_emitting_null() {
+        vibevalley_runtime::rt::block_on(async {
+            let feed = crate::context::StateFeed::new();
+            feed.feed(SliceKind::Board).publish(1, "{not valid json");
+            let sub = feed.subscribe(SliceKind::Board);
+            let receipt = Arc::new(SliceReceipt {
+                pending: AtomicU64::new(0),
+                ack: Notify::new(),
+            });
+            let revisions = Arc::new(AtomicU64::new(0));
+            let rec = Arc::new(Recorder::default());
+            let cancel = CancellationToken::new();
+            let fake = SignaledFake::new();
+            let task = tokio::spawn(pump_slice_subscription(
+                fake,
+                sub,
+                receipt.clone(),
+                revisions,
+                rec.clone(),
+                "frame:slice:board".into(),
+                cancel.clone(),
+            ));
+
+            tokio::time::sleep(Duration::from_millis(20)).await;
+            assert!(rec.named("frame:slice:board").is_empty(), "malformed JSON must not emit null frame");
+
+            feed.feed(SliceKind::Board).publish(2, r#"{"seq":2,"issues":[]}"#);
+            tokio::time::timeout(Duration::from_secs(2), async {
+                while rec.named("frame:slice:board").is_empty() {
+                    tokio::task::yield_now().await;
+                }
+            })
+            .await
+            .expect("valid subsequent frame must be delivered after skipping malformed JSON");
+            let frames = rec.named("frame:slice:board");
+            assert_eq!(frames.len(), 1);
+            assert_eq!(frames[0]["data"]["seq"], 2);
+            cancel.cancel();
+            let _ = task.await;
+        });
     }
 }

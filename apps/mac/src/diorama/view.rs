@@ -99,7 +99,7 @@ impl FrameSurface {
     }
 }
 
-struct SliceOutlet(flume::Sender<(String, Value)>);
+struct SliceOutlet(tokio::sync::mpsc::UnboundedSender<(String, Value)>);
 
 impl vibevalley_server::gateway::bridge::Outlet for SliceOutlet {
     fn send(&self, event: &str, data: Value) {
@@ -112,8 +112,11 @@ const DIORAMA_SLICES: &[SliceKind] = &[SliceKind::Farm, SliceKind::Board, SliceK
 fn attach_diorama_bridge(
     bridge: &vibevalley_server::gateway::bridge::Bridge,
     kind: &str,
-) -> (Arc<vibevalley_server::gateway::bridge::Client>, flume::Receiver<(String, Value)>) {
-    let (tx, rx) = flume::unbounded::<(String, Value)>();
+) -> (
+    Arc<vibevalley_server::gateway::bridge::Client>,
+    tokio::sync::mpsc::UnboundedReceiver<(String, Value)>,
+) {
+    let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<(String, Value)>();
     let identity = crate::hosted::next_client_identity(vibevalley_server::ClientKind::GpuiPixel, kind);
     let client = Arc::new(bridge.attach(identity, Arc::new(SliceOutlet(tx))));
     for slice in DIORAMA_SLICES {
@@ -133,11 +136,11 @@ fn decode_slice_frame<'a>(event: &'a str, envelope: &Value) -> Option<(&'a str, 
 }
 
 async fn pump_diorama_slices(
-    rx: flume::Receiver<(String, Value)>,
+    mut rx: tokio::sync::mpsc::UnboundedReceiver<(String, Value)>,
     ack_client: Weak<vibevalley_server::gateway::bridge::Client>,
     mut apply: impl FnMut(&str, Value) -> bool,
 ) {
-    while let Ok((event, envelope)) = rx.recv_async().await {
+    while let Some((event, envelope)) = rx.recv().await {
         let Some((topic, rev, data)) = decode_slice_frame(&event, &envelope) else {
             continue;
         };
@@ -315,7 +318,7 @@ impl DioramaView {
 
     fn fetch_agents(&mut self, cx: &mut Context<Self>) {
         let server = cx.global::<BridgeHub>().0.server().clone();
-        let task = vibevalley_runtime::rt::current_or_global_handle().spawn(async move {
+        let task = vibevalley_rt::current_or_global_handle().spawn(async move {
             server
                 .call_with_async(vibevalley_server::gateway::bridge::CallerContext::local(), "agent.list".into(), json!({}))
                 .await
@@ -1482,7 +1485,7 @@ mod tests {
             let task_topics = seen_topics.clone();
             let task_notify = notify.clone();
             let task_ack = weak_client.clone();
-            let pump_handle = vibevalley_runtime::rt::current_or_global_handle().spawn(async move {
+            let pump_handle = vibevalley_rt::current_or_global_handle().spawn(async move {
                 super::pump_diorama_slices(rx, task_ack, move |topic, _data| {
                     task_topics.lock().insert(topic.to_string());
                     task_notify.notify_waiters();
@@ -1491,7 +1494,7 @@ mod tests {
                 .await;
             });
 
-            vibevalley_runtime::rt::block_on(async {
+            vibevalley_rt::block_on(async {
                 tokio::time::timeout(Duration::from_secs(3), async {
                     loop {
                         let notified = notify.notified();
@@ -1507,7 +1510,7 @@ mod tests {
             })
             .expect("all 5 diorama slices should deliver initial frames");
 
-            vibevalley_runtime::rt::block_on(async {
+            vibevalley_rt::block_on(async {
                 let _ = tokio::time::timeout(Duration::from_secs(1), async {
                     while Arc::strong_count(&client) != 1 {
                         tokio::task::yield_now().await;
@@ -1528,7 +1531,7 @@ mod tests {
                 drop(client);
                 assert_eq!(weak_client.strong_count(), 0);
                 assert!(weak_client.upgrade().is_none());
-                vibevalley_runtime::rt::block_on(async {
+                vibevalley_rt::block_on(async {
                     tokio::time::timeout(Duration::from_secs(3), pump_handle)
                         .await
                         .expect("slice pump task should exit once SliceOutlet drops")
@@ -1537,7 +1540,7 @@ mod tests {
             } else {
                 // Cancel task first (matching DioramaView dropping _slice_task before _bridge), then drop _bridge.
                 pump_handle.abort();
-                vibevalley_runtime::rt::block_on(async {
+                vibevalley_rt::block_on(async {
                     let _ = tokio::time::timeout(Duration::from_secs(1), pump_handle).await;
                 });
                 drop(client);
@@ -1546,7 +1549,7 @@ mod tests {
             }
 
             assert!(bridge.clients_snapshot().is_empty(), "visit {visit}: bridge client leaked");
-            vibevalley_runtime::rt::block_on(async {
+            vibevalley_rt::block_on(async {
                 tokio::time::timeout(Duration::from_secs(3), async {
                     let mut yields = 0usize;
                     while super::DIORAMA_SLICES.iter().any(|slice| fake.slice_watchers(*slice) != 0) {

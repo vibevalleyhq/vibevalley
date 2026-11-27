@@ -184,10 +184,6 @@ export class VibeValleyApi {
       list: (a: T.ProviderVoiceRequest, options?: { signal?: AbortSignal }): Promise<T.ProviderVoiceListing> =>
         this.call<T.ProviderVoiceListing>("provider.voice.list", "/api/v1/provider/voice/list", a, options),
     },
-    model: {
-      list: (a: T.ProviderModelRequest, options?: { signal?: AbortSignal }): Promise<T.ProviderModelListing> =>
-        this.call<T.ProviderModelListing>("provider.model.list", "/api/v1/provider/model/list", a, options),
-    },
   };
 
   readonly media = {
@@ -365,32 +361,10 @@ export class VibeValleyApi {
   };
 
   readonly voice = {
-    /** A line heard on the call that is on, without its id: refused unless one call is. */
-    hear: (a: { text: string; agent?: string; sendKey?: string }, options?: { signal?: AbortSignal }): Promise<void> =>
-      this.call<void>("voice.hear", "/api/v1/voice/hear", a, options),
     moss: {
       /** Whether MOSS Live takes the key: a session is attached and closed again, nothing is said. */
       verify: (options?: { signal?: AbortSignal }): Promise<T.Validation> =>
         this.call<T.Validation>("voice.moss.verify", "/api/v1/voice/moss/verify", undefined, options),
-    },
-    grant: {
-      create: (options?: { signal?: AbortSignal }): Promise<T.VoiceGrant> =>
-        this.call<T.VoiceGrant>("voice.grant.create", "/api/v1/voice/grant/create", undefined, options),
-    },
-    call: {
-      start: (a: T.VoiceCallStart, options?: { signal?: AbortSignal }): Promise<T.VoiceCall> =>
-        this.call<T.VoiceCall>("voice.call.start", "/api/v1/voice/call/start", a, options),
-      stop: (a: T.VoiceCall, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("voice.call.stop", "/api/v1/voice/call/stop", a, options),
-      hear: (a: T.VoiceHeard, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("voice.call.hear", "/api/v1/voice/call/hear", a, options),
-      say: (a: T.VoiceSaid, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("voice.call.say", "/api/v1/voice/call/say", a, options),
-    },
-    asr: {
-      start: (options?: { signal?: AbortSignal }): Promise<T.VoiceAsrGrant> =>
-        this.call<T.VoiceAsrGrant>("voice.asr.start", "/api/v1/voice/asr/start", undefined, options),
-      stop: (a: T.VoiceAsrStopInput, options?: { signal?: AbortSignal }): Promise<void> =>
-        this.call<void>("voice.asr.stop", "/api/v1/voice/asr/stop", a, options),
-      transcribe: (a: T.VoiceAsrTranscribeInput, options?: { signal?: AbortSignal }): Promise<T.VoiceAsrResult> =>
-        this.call<T.VoiceAsrResult>("voice.asr.transcribe", "/api/v1/voice/asr/transcribe", a, options),
     },
   };
 
@@ -648,10 +622,6 @@ export class VibeValleyApi {
         this.call<T.FarmShopView>("game.shop.list", "/api/v1/game/shop/list", undefined, options),
       buy: (a: T.ShopPurchaseRequest, options?: { signal?: AbortSignal }): Promise<T.FarmShopView> =>
         this.call<T.FarmShopView>("game.shop.buy", "/api/v1/game/shop/buy", a, options),
-    },
-    daily: {
-      list: (options?: { signal?: AbortSignal }): Promise<T.DailyTaskBoard> =>
-        this.call<T.DailyTaskBoard>("game.daily.list", "/api/v1/game/daily/list", undefined, options),
     },
   };
 

@@ -900,34 +900,6 @@ pub struct HostPlaySoundPayload {
 #[cfg_attr(feature = "ts-gen", derive(TS))]
 #[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
-pub struct HostSeekAudioPayload {
-    pub position: f64,
-}
-
-#[skip_serializing_none]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts-gen", derive(TS))]
-#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct HostPcmStartPayload {
-    pub sample_rate: u32,
-    pub channels: u32,
-}
-
-#[skip_serializing_none]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts-gen", derive(TS))]
-#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
-#[serde(rename_all = "camelCase")]
-pub struct HostPcmAppendPayload {
-    pub data: String,
-}
-
-#[skip_serializing_none]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts-gen", derive(TS))]
-#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
-#[serde(rename_all = "camelCase")]
 pub struct HostReadFilePayload {
     pub path: String,
 }
@@ -1276,14 +1248,6 @@ pub enum HostOp {
     PlayAudio(HostPlayAudioPayload),
     #[serde(rename = "host.playSound")]
     PlaySound(HostPlaySoundPayload),
-    #[serde(rename = "host.seekAudio")]
-    SeekAudio(HostSeekAudioPayload),
-    #[serde(rename = "host.audioState")]
-    AudioState,
-    #[serde(rename = "host.pcmStart")]
-    PcmStart(HostPcmStartPayload),
-    #[serde(rename = "host.pcmAppend")]
-    PcmAppend(HostPcmAppendPayload),
     #[serde(rename = "host.stopAudio")]
     StopAudio,
     #[serde(rename = "host.readFile")]
@@ -1347,10 +1311,6 @@ impl HostOp {
         "host.voiceMute",
         "host.playAudio",
         "host.playSound",
-        "host.seekAudio",
-        "host.audioState",
-        "host.pcmStart",
-        "host.pcmAppend",
         "host.stopAudio",
         "host.readFile",
         "host.assetsDir",
@@ -1405,10 +1365,6 @@ impl HostOp {
             HostOp::VoiceMute(_) => "host.voiceMute",
             HostOp::PlayAudio(_) => "host.playAudio",
             HostOp::PlaySound(_) => "host.playSound",
-            HostOp::SeekAudio(_) => "host.seekAudio",
-            HostOp::AudioState => "host.audioState",
-            HostOp::PcmStart(_) => "host.pcmStart",
-            HostOp::PcmAppend(_) => "host.pcmAppend",
             HostOp::StopAudio => "host.stopAudio",
             HostOp::ReadFile(_) => "host.readFile",
             HostOp::AssetsDir => "host.assetsDir",
@@ -1504,10 +1460,6 @@ impl HostOp {
                 .map(HostOp::PlayAudio)
                 .map_err(|_| "playAudio requires a file path".to_string()),
             "host.playSound" => serde_json::from_value(payload).map(HostOp::PlaySound).map_err(|e| format!("playSound: {e}")),
-            "host.seekAudio" => serde_json::from_value(payload).map(HostOp::SeekAudio).map_err(|e| format!("seekAudio: {e}")),
-            "host.audioState" => expect_empty(&payload).map(|()| HostOp::AudioState),
-            "host.pcmStart" => serde_json::from_value(payload).map(HostOp::PcmStart).map_err(|e| e.to_string()),
-            "host.pcmAppend" => serde_json::from_value(payload).map(HostOp::PcmAppend).map_err(|e| format!("pcmAppend: {e}")),
             "host.stopAudio" => expect_empty(&payload).map(|()| HostOp::StopAudio),
             "host.readFile" => serde_json::from_value(payload).map(HostOp::ReadFile).map_err(|e| format!("readFile: {e}")),
             "host.assetsDir" => expect_empty(&payload).map(|()| HostOp::AssetsDir),
@@ -1579,9 +1531,6 @@ crate::typescript::module! {
     HostVoiceMutePayload,
     HostPlayAudioPayload,
     HostPlaySoundPayload,
-    HostSeekAudioPayload,
-    HostPcmStartPayload,
-    HostPcmAppendPayload,
     HostReadFilePayload,
     HostSha256Payload,
     HostRandomBytesPayload,
@@ -1762,25 +1711,6 @@ mod tests {
                 json!({ "name": "levelUp" }),
                 HostOp::PlaySound(HostPlaySoundPayload { name: HostSoundName::LevelUp }),
             ),
-            (
-                "host.seekAudio",
-                json!({ "position": 4.25 }),
-                HostOp::SeekAudio(HostSeekAudioPayload { position: 4.25 }),
-            ),
-            ("host.audioState", json!(null), HostOp::AudioState),
-            (
-                "host.pcmStart",
-                json!({ "sampleRate": 24000, "channels": 1 }),
-                HostOp::PcmStart(HostPcmStartPayload {
-                    sample_rate: 24000,
-                    channels: 1,
-                }),
-            ),
-            (
-                "host.pcmAppend",
-                json!({ "data": "AAAA" }),
-                HostOp::PcmAppend(HostPcmAppendPayload { data: "AAAA".into() }),
-            ),
             ("host.stopAudio", json!({}), HostOp::StopAudio),
             (
                 "host.readFile",
@@ -1897,7 +1827,10 @@ mod tests {
         assert!(HostOp::from_wire("host.reveal", json!(42)).is_err());
         assert!(HostOp::from_wire("host.voiceMute", json!({ "id": "v1" })).is_err());
         assert!(HostOp::from_wire("host.playSound", json!({ "name": "tap", "extra": true })).is_err());
-        assert!(HostOp::from_wire("host.pcmStart", json!({ "sampleRate": 24000, "channels": 1, "extra": 1 })).is_err());
+        assert!(!HostOp::is_known_op("host.seekAudio"));
+        assert!(!HostOp::is_known_op("host.audioState"));
+        assert!(!HostOp::is_known_op("host.pcmStart"));
+        assert!(!HostOp::is_known_op("host.pcmAppend"));
         assert!(HostOp::from_wire("host.sha256", json!({ "text": "a", "extra": 1 })).is_err());
         assert!(HostOp::from_wire("host.randomBytes", json!({ "length": -1 })).is_err());
         assert!(HostOp::from_wire("host.qr", json!({ "text": "hi", "extra": 1 })).is_err());

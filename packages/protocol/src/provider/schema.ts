@@ -80,7 +80,6 @@ export const ProviderUpdate = z.object({
 }) satisfies Codec<T.ProviderUpdate>;
 
 export const ProviderVerifyRequest = z.object({ connection: z.string(), revision: z.number().int() }) satisfies Codec<T.ProviderVerifyRequest>;
-export const ProviderModelRequest = z.object({ connection: z.string(), revision: z.number().int() }) satisfies Codec<T.ProviderModelRequest>;
 export const ProviderVoiceRequest = z.object({
   connection: z.string(),
   revision: z.number().int(),
@@ -96,8 +95,3 @@ export const ProviderVoiceListing = z.object({
   hasMore: z.boolean(),
   nextCursor: z.string().nullable(),
 }) satisfies Codec<T.ProviderVoiceListing>;
-export const ProviderModelListing = z.object({
-  connection: z.string(),
-  revision: z.number().int(),
-  models: z.array(ProviderModel),
-}) satisfies Codec<T.ProviderModelListing>;

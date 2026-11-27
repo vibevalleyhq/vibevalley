@@ -170,39 +170,34 @@ impl SignaledFake {
 }
 
 impl Server for SignaledFake {
-    fn call(&self, op: &str, payload: Value) -> Envelope {
-        self.inner.call(op, payload)
+    fn call_with_async(self: Arc<Self>, ctx: CallerContext, op: String, payload: Value) -> BoxFuture<'static, Envelope> {
+        self.inner.clone().call_with_async(ctx, op, payload)
     }
-    fn call_with(&self, ctx: &CallerContext, op: &str, payload: Value) -> Envelope {
-        self.inner.call_with(ctx, op, payload)
-    }
-    fn slice_snapshot(&self, slice: SliceKind) -> Value {
-        self.inner.slice_snapshot(slice)
-    }
-    fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &tokio_util::sync::CancellationToken, receive: &mut dyn FnMut(i64, &Value)) {
-        self.on_watch.notify_waiters();
-        self.inner.watch_slice(slice, after_seq, stop, receive)
+    fn slice_snapshot_json(&self, slice: SliceKind) -> Arc<str> {
+        self.inner.slice_snapshot_json(slice)
     }
     fn subscribe_slice(&self, slice: SliceKind) -> Option<SliceSubscription> {
         let sub = self.inner.subscribe_slice(slice);
         self.on_watch.notify_waiters();
         sub
     }
-    fn live(&self) -> tokio::sync::mpsc::UnboundedReceiver<vibevalley_protocol::LiveEvent> {
+    fn live(&self) -> tokio::sync::mpsc::Receiver<vibevalley_protocol::LiveEvent> {
         self.inner.live()
     }
     fn subscribe_live(&self) -> Option<tokio::sync::broadcast::Receiver<vibevalley_protocol::LiveEvent>> {
         self.inner.subscribe_live()
     }
-    fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
-        let res = self.inner.subscribe(name, payload);
-        self.on_subscribe.notify_waiters();
-        res
-    }
-    fn subscribe_with(&self, ctx: &CallerContext, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
-        let res = self.inner.subscribe_with(ctx, name, payload);
-        self.on_subscribe.notify_waiters();
-        res
+    fn subscribe_with_async(
+        self: Arc<Self>,
+        ctx: CallerContext,
+        name: String,
+        payload: Value,
+    ) -> BoxFuture<'static, Result<(u64, tokio::sync::mpsc::Receiver<Value>), Envelope>> {
+        Box::pin(async move {
+            let res = self.inner.clone().subscribe_with_async(ctx, name, payload).await;
+            self.on_subscribe.notify_waiters();
+            res
+        })
     }
     fn unsubscribe(&self, id: u64) {
         self.inner.unsubscribe(id)
@@ -277,26 +272,22 @@ fn issue_watch_streams_the_subscription_and_refusals_are_an_empty_404() {
 
     struct Refuses;
     impl Server for Refuses {
-        fn call(&self, _: &str, _: Value) -> Envelope {
-            Envelope::void()
+        fn call_with_async(self: Arc<Self>, _: CallerContext, _: String, _: Value) -> BoxFuture<'static, Envelope> {
+            Box::pin(async { Envelope::void() })
         }
-        fn slice_snapshot(&self, _: SliceKind) -> Value {
-            json!({ "seq": 0 })
+        fn slice_snapshot_json(&self, _: SliceKind) -> Arc<str> {
+            Arc::from(r#"{"seq":0}"#)
         }
-        fn watch_slice(&self, _: SliceKind, _: Option<i64>, stop: &tokio_util::sync::CancellationToken, _: &mut dyn FnMut(i64, &Value)) {
-            let (tx, rx) = std::sync::mpsc::channel::<()>();
-            let stop = stop.clone();
-            vibevalley_runtime::rt::current_or_global_handle().spawn(async move {
-                stop.cancelled().await;
-                drop(tx);
-            });
-            let _ = rx.recv();
+        fn live(&self) -> tokio::sync::mpsc::Receiver<vibevalley_protocol::LiveEvent> {
+            tokio::sync::mpsc::channel(1).1
         }
-        fn live(&self) -> tokio::sync::mpsc::UnboundedReceiver<vibevalley_protocol::LiveEvent> {
-            tokio::sync::mpsc::unbounded_channel().1
-        }
-        fn subscribe(&self, _: &str, _: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
-            Err(Envelope::failure(&ApiError::new(BizCode::IssueNotFound, "no such issue")))
+        fn subscribe_with_async(
+            self: Arc<Self>,
+            _: CallerContext,
+            _: String,
+            _: Value,
+        ) -> BoxFuture<'static, Result<(u64, tokio::sync::mpsc::Receiver<Value>), Envelope>> {
+            Box::pin(async { Err(Envelope::failure(&ApiError::new(BizCode::IssueNotFound, "no such issue"))) })
         }
         fn unsubscribe(&self, _: u64) {}
     }
@@ -361,34 +352,30 @@ fn regression_native_file_operations_never_reach_the_server_over_http() {
 
 #[test]
 fn events_aliases_live_sse_stream() {
-    struct LiveOnly(parking_lot::Mutex<Option<tokio::sync::mpsc::UnboundedReceiver<vibevalley_protocol::LiveEvent>>>);
+    struct LiveOnly(parking_lot::Mutex<Option<tokio::sync::mpsc::Receiver<vibevalley_protocol::LiveEvent>>>);
     impl Server for LiveOnly {
-        fn call(&self, _: &str, _: Value) -> Envelope {
-            Envelope::void()
+        fn call_with_async(self: Arc<Self>, _: CallerContext, _: String, _: Value) -> BoxFuture<'static, Envelope> {
+            Box::pin(async { Envelope::void() })
         }
-        fn slice_snapshot(&self, _: SliceKind) -> Value {
-            json!({ "seq": 0 })
+        fn slice_snapshot_json(&self, _: SliceKind) -> Arc<str> {
+            Arc::from(r#"{"seq":0}"#)
         }
-        fn watch_slice(&self, _: SliceKind, _: Option<i64>, stop: &tokio_util::sync::CancellationToken, _: &mut dyn FnMut(i64, &Value)) {
-            let (tx, rx) = std::sync::mpsc::channel::<()>();
-            let stop = stop.clone();
-            vibevalley_runtime::rt::current_or_global_handle().spawn(async move {
-                stop.cancelled().await;
-                drop(tx);
-            });
-            let _ = rx.recv();
+        fn live(&self) -> tokio::sync::mpsc::Receiver<vibevalley_protocol::LiveEvent> {
+            self.0.lock().take().unwrap_or_else(|| tokio::sync::mpsc::channel(1).1)
         }
-        fn live(&self) -> tokio::sync::mpsc::UnboundedReceiver<vibevalley_protocol::LiveEvent> {
-            self.0.lock().take().unwrap_or_else(|| tokio::sync::mpsc::unbounded_channel().1)
-        }
-        fn subscribe(&self, _: &str, _: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
-            Err(Envelope::failure(&ApiError::new(BizCode::RouteNotFound, "no subscription")))
+        fn subscribe_with_async(
+            self: Arc<Self>,
+            _: CallerContext,
+            _: String,
+            _: Value,
+        ) -> BoxFuture<'static, Result<(u64, tokio::sync::mpsc::Receiver<Value>), Envelope>> {
+            Box::pin(async { Err(Envelope::failure(&ApiError::new(BizCode::RouteNotFound, "no subscription"))) })
         }
         fn unsubscribe(&self, _: u64) {}
     }
-    let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+    let (tx, rx) = tokio::sync::mpsc::channel(16);
     let listener = serve(Arc::new(LiveOnly(parking_lot::Mutex::new(Some(rx)))), "127.0.0.1:0".parse().unwrap()).unwrap();
-    tx.send(vibevalley_protocol::LiveEvent::Notice(vibevalley_protocol::LiveEventNotice {
+    tx.try_send(vibevalley_protocol::LiveEvent::Notice(vibevalley_protocol::LiveEventNotice {
         level: vibevalley_protocol::NoticeLevel::Info,
         text: "ready".into(),
         at: 1,
@@ -453,26 +440,25 @@ struct WithRemoteAuth {
 }
 
 impl Server for WithRemoteAuth {
-    fn call(&self, op: &str, payload: Value) -> Envelope {
-        self.inner.call(op, payload)
+    fn call_with_async(self: Arc<Self>, ctx: CallerContext, op: String, payload: Value) -> BoxFuture<'static, Envelope> {
+        self.inner.clone().call_with_async(ctx, op, payload)
     }
-    fn call_with(&self, ctx: &CallerContext, op: &str, payload: Value) -> Envelope {
-        self.inner.call_with(ctx, op, payload)
-    }
-    fn slice_snapshot(&self, kind: SliceKind) -> Value {
-        self.inner.slice_snapshot(kind)
-    }
-    fn watch_slice(&self, kind: SliceKind, after_seq: Option<i64>, stop: &tokio_util::sync::CancellationToken, emit: &mut dyn FnMut(i64, &Value)) {
-        self.inner.watch_slice(kind, after_seq, stop, emit)
+    fn slice_snapshot_json(&self, kind: SliceKind) -> Arc<str> {
+        self.inner.slice_snapshot_json(kind)
     }
     fn subscribe_slice(&self, slice: SliceKind) -> Option<SliceSubscription> {
         self.inner.subscribe_slice(slice)
     }
-    fn live(&self) -> tokio::sync::mpsc::UnboundedReceiver<vibevalley_protocol::LiveEvent> {
+    fn live(&self) -> tokio::sync::mpsc::Receiver<vibevalley_protocol::LiveEvent> {
         self.inner.live()
     }
-    fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
-        self.inner.subscribe(name, payload)
+    fn subscribe_with_async(
+        self: Arc<Self>,
+        ctx: CallerContext,
+        name: String,
+        payload: Value,
+    ) -> BoxFuture<'static, Result<(u64, tokio::sync::mpsc::Receiver<Value>), Envelope>> {
+        self.inner.clone().subscribe_with_async(ctx, name, payload)
     }
     fn unsubscribe(&self, id: u64) {
         self.inner.unsubscribe(id)
@@ -542,31 +528,16 @@ fn auth_extractors_enforce_authenticated_query_local_only_and_local_only_status(
     assert_eq!(res.status().as_u16(), 200);
     assert_eq!(res.text().unwrap(), "hello attachment");
 
-    // LocalOnly: /mcp, media::upload, media::speech reject on remote listener with JSON BizCode::Forbidden envelope.
+    // LocalOnly: /mcp rejects on remote listener with JSON BizCode::Forbidden envelope.
     let media_id = "0196f8e2-7c0a-7f10-8b2d-9e5a4c1d2e3f";
-    for res in [
-        agent()
-            .post(format!("{}/mcp", remote.url()))
-            .header("authorization", "Bearer vv_dev_good")
-            .json(&json!({}))
-            .send()
-            .unwrap(),
-        agent()
-            .put(format!("{}/api/v1/media/input/{media_id}/content", remote.url()))
-            .header("authorization", "Bearer vv_dev_good")
-            .header("content-type", "application/octet-stream")
-            .body(vec![1, 2, 3])
-            .send()
-            .unwrap(),
-        agent()
-            .get(format!("{}/api/v1/media/speech/{media_id}/stream", remote.url()))
-            .header("authorization", "Bearer vv_dev_good")
-            .send()
-            .unwrap(),
-    ] {
-        assert_eq!(res.status().as_u16(), 403);
-        assert_eq!(res.json::<Value>().unwrap()["bizCode"], BizCode::Forbidden.code());
-    }
+    let res = agent()
+        .post(format!("{}/mcp", remote.url()))
+        .header("authorization", "Bearer vv_dev_good")
+        .json(&json!({}))
+        .send()
+        .unwrap();
+    assert_eq!(res.status().as_u16(), 403);
+    assert_eq!(res.json::<Value>().unwrap()["bizCode"], BizCode::Forbidden.code());
 
     // LocalOnly on /mcp still rejects vv_dev_ bearer tokens on loopback.
     let res = agent()
@@ -578,21 +549,47 @@ fn auth_extractors_enforce_authenticated_query_local_only_and_local_only_status(
     assert_eq!(res.status().as_u16(), 403);
     assert_eq!(res.json::<Value>().unwrap()["bizCode"], BizCode::Forbidden.code());
 
-    // LocalOnlyStatus: GET media::content rejects on remote listener and cross-origin loopback with plain 403 and empty body.
-    for res in [
-        agent()
-            .get(format!("{}/api/v1/media/input/{media_id}/content", remote.url()))
-            .header("authorization", "Bearer vv_dev_good")
-            .send()
-            .unwrap(),
-        agent()
-            .get(format!("{}/api/v1/media/input/{media_id}/content", local.url()))
-            .header("origin", "http://evil.example")
-            .send()
-            .unwrap(),
+    // Remote media routes require valid non-machine auth (403 missing, 401 bad token, cross-origin loopback 403)
+    // and proceed past auth with valid remote client Bearer or ?token= (reaching media_input/speech port check).
+    let res = agent().get(format!("{}/api/v1/media/input/{media_id}/content", remote.url())).send().unwrap();
+    assert_eq!(res.status().as_u16(), 403);
+    let res = agent()
+        .get(format!("{}/api/v1/media/input/{media_id}/content?token=vv_dev_bad", remote.url()))
+        .send()
+        .unwrap();
+    assert_eq!(res.status().as_u16(), 401);
+    let res = agent()
+        .get(format!("{}/api/v1/media/input/{media_id}/content", local.url()))
+        .header("origin", "http://evil.example")
+        .send()
+        .unwrap();
+    assert_eq!(res.status().as_u16(), 403);
+    // Valid client token passes auth on content (no media_input port attached -> 404).
+    let res = agent()
+        .get(format!("{}/api/v1/media/input/{media_id}/content?token=vv_dev_good", remote.url()))
+        .send()
+        .unwrap();
+    assert_eq!(res.status().as_u16(), 404);
+    // Valid client Bearer passes auth on upload (no media_input port attached -> 503).
+    let res = agent()
+        .put(format!("{}/api/v1/media/input/{media_id}/content", remote.url()))
+        .header("authorization", "Bearer vv_dev_good")
+        .header("content-type", "application/octet-stream")
+        .body(vec![1, 2, 3])
+        .send()
+        .unwrap();
+    assert_eq!(res.status().as_u16(), 503);
+    // Valid client Bearer or ?token= passes auth on speech stream (no speech port attached -> 503).
+    for url in [
+        format!("{}/api/v1/media/speech/{media_id}/stream?token=vv_dev_good", remote.url()),
+        format!("{}/api/v1/media/speech/{media_id}/stream", remote.url()),
     ] {
-        assert_eq!(res.status().as_u16(), 403);
-        assert_eq!(res.text().unwrap(), "");
+        let mut req = agent().get(&url);
+        if !url.contains("token=") {
+            req = req.header("authorization", "Bearer vv_dev_good");
+        }
+        let res = req.send().unwrap();
+        assert_eq!(res.status().as_u16(), 503);
     }
 
     // MachineAuth: wrong scope rejected with 403 envelope even on plain GET before WS upgrade.
@@ -763,26 +760,25 @@ struct WithMediaInputs {
 }
 
 impl Server for WithMediaInputs {
-    fn call(&self, op: &str, payload: Value) -> Envelope {
-        self.inner.call(op, payload)
+    fn call_with_async(self: Arc<Self>, ctx: CallerContext, op: String, payload: Value) -> BoxFuture<'static, Envelope> {
+        self.inner.clone().call_with_async(ctx, op, payload)
     }
-    fn call_with(&self, ctx: &CallerContext, op: &str, payload: Value) -> Envelope {
-        self.inner.call_with(ctx, op, payload)
-    }
-    fn slice_snapshot(&self, kind: SliceKind) -> Value {
-        self.inner.slice_snapshot(kind)
-    }
-    fn watch_slice(&self, kind: SliceKind, after_seq: Option<i64>, stop: &tokio_util::sync::CancellationToken, emit: &mut dyn FnMut(i64, &Value)) {
-        self.inner.watch_slice(kind, after_seq, stop, emit)
+    fn slice_snapshot_json(&self, kind: SliceKind) -> Arc<str> {
+        self.inner.slice_snapshot_json(kind)
     }
     fn subscribe_slice(&self, slice: SliceKind) -> Option<SliceSubscription> {
         self.inner.subscribe_slice(slice)
     }
-    fn live(&self) -> tokio::sync::mpsc::UnboundedReceiver<vibevalley_protocol::LiveEvent> {
+    fn live(&self) -> tokio::sync::mpsc::Receiver<vibevalley_protocol::LiveEvent> {
         self.inner.live()
     }
-    fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
-        self.inner.subscribe(name, payload)
+    fn subscribe_with_async(
+        self: Arc<Self>,
+        ctx: CallerContext,
+        name: String,
+        payload: Value,
+    ) -> BoxFuture<'static, Result<(u64, tokio::sync::mpsc::Receiver<Value>), Envelope>> {
+        self.inner.clone().subscribe_with_async(ctx, name, payload)
     }
     fn unsubscribe(&self, id: u64) {
         self.inner.unsubscribe(id)
@@ -884,20 +880,22 @@ fn attachment_and_media_content_share_security_headers_rfc5987_ranges_and_zero_b
 fn slice_returns_service_unavailable_when_server_has_no_async_subscription() {
     struct NoSliceFeed;
     impl Server for NoSliceFeed {
-        fn call(&self, _: &str, _: Value) -> Envelope {
-            Envelope::void()
+        fn call_with_async(self: Arc<Self>, _: CallerContext, _: String, _: Value) -> BoxFuture<'static, Envelope> {
+            Box::pin(async { Envelope::void() })
         }
-        fn slice_snapshot(&self, _: SliceKind) -> Value {
-            json!({ "seq": 0 })
+        fn slice_snapshot_json(&self, _: SliceKind) -> Arc<str> {
+            Arc::from(r#"{"seq":0}"#)
         }
-        fn watch_slice(&self, _: SliceKind, _: Option<i64>, _: &tokio_util::sync::CancellationToken, _: &mut dyn FnMut(i64, &Value)) {
-            panic!("http::slice must never invoke blocking watch_slice fallback");
+        fn live(&self) -> tokio::sync::mpsc::Receiver<vibevalley_protocol::LiveEvent> {
+            tokio::sync::mpsc::channel(1).1
         }
-        fn live(&self) -> tokio::sync::mpsc::UnboundedReceiver<vibevalley_protocol::LiveEvent> {
-            tokio::sync::mpsc::unbounded_channel().1
-        }
-        fn subscribe(&self, _: &str, _: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
-            Err(Envelope::failure(&ApiError::new(BizCode::RouteNotFound, "none")))
+        fn subscribe_with_async(
+            self: Arc<Self>,
+            _: CallerContext,
+            _: String,
+            _: Value,
+        ) -> BoxFuture<'static, Result<(u64, tokio::sync::mpsc::Receiver<Value>), Envelope>> {
+            Box::pin(async { Err(Envelope::failure(&ApiError::new(BizCode::RouteNotFound, "none"))) })
         }
         fn unsubscribe(&self, _: u64) {}
     }
@@ -977,20 +975,22 @@ fn gateway_mcp_route_serves_stateless_discover_skills_and_routable_headers() {
     }
 
     impl Server for WithMcpDoor {
-        fn call(&self, op: &str, payload: Value) -> Envelope {
-            self.inner.call(op, payload)
+        fn call_with_async(self: Arc<Self>, ctx: CallerContext, op: String, payload: Value) -> BoxFuture<'static, Envelope> {
+            self.inner.clone().call_with_async(ctx, op, payload)
         }
-        fn slice_snapshot(&self, kind: SliceKind) -> Value {
-            self.inner.slice_snapshot(kind)
+        fn slice_snapshot_json(&self, kind: SliceKind) -> Arc<str> {
+            self.inner.slice_snapshot_json(kind)
         }
-        fn watch_slice(&self, kind: SliceKind, after_seq: Option<i64>, stop: &tokio_util::sync::CancellationToken, emit: &mut dyn FnMut(i64, &Value)) {
-            self.inner.watch_slice(kind, after_seq, stop, emit)
-        }
-        fn live(&self) -> tokio::sync::mpsc::UnboundedReceiver<vibevalley_protocol::LiveEvent> {
+        fn live(&self) -> tokio::sync::mpsc::Receiver<vibevalley_protocol::LiveEvent> {
             self.inner.live()
         }
-        fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
-            self.inner.subscribe(name, payload)
+        fn subscribe_with_async(
+            self: Arc<Self>,
+            ctx: CallerContext,
+            name: String,
+            payload: Value,
+        ) -> BoxFuture<'static, Result<(u64, tokio::sync::mpsc::Receiver<Value>), Envelope>> {
+            self.inner.clone().subscribe_with_async(ctx, name, payload)
         }
         fn unsubscribe(&self, id: u64) {
             self.inner.unsubscribe(id)
@@ -1051,4 +1051,191 @@ fn gateway_mcp_route_serves_stateless_discover_skills_and_routable_headers() {
     assert_eq!(mismatch.status().as_u16(), 400);
     let mismatch_body: Value = mismatch.json().unwrap();
     assert_eq!(mismatch_body["error"]["code"], error_code::HEADER_MISMATCH);
+}
+
+#[test]
+fn live_sse_emits_lagged_event_and_recovers_subsequent_events() {
+    struct LaggedLiveServer(parking_lot::Mutex<Option<tokio::sync::broadcast::Receiver<vibevalley_protocol::LiveEvent>>>);
+    impl Server for LaggedLiveServer {
+        fn call_with_async(self: Arc<Self>, _: CallerContext, _: String, _: Value) -> BoxFuture<'static, Envelope> {
+            Box::pin(async { Envelope::void() })
+        }
+        fn slice_snapshot_json(&self, _: SliceKind) -> Arc<str> {
+            Arc::from(r#"{"seq":0}"#)
+        }
+        fn live(&self) -> tokio::sync::mpsc::Receiver<vibevalley_protocol::LiveEvent> {
+            tokio::sync::mpsc::channel(1).1
+        }
+        fn subscribe_live(&self) -> Option<tokio::sync::broadcast::Receiver<vibevalley_protocol::LiveEvent>> {
+            self.0.lock().take()
+        }
+        fn subscribe_with_async(
+            self: Arc<Self>,
+            _: CallerContext,
+            _: String,
+            _: Value,
+        ) -> BoxFuture<'static, Result<(u64, tokio::sync::mpsc::Receiver<Value>), Envelope>> {
+            Box::pin(async { Err(Envelope::failure(&ApiError::new(BizCode::RouteNotFound, "none"))) })
+        }
+        fn unsubscribe(&self, _: u64) {}
+    }
+
+    let (tx, rx) = tokio::sync::broadcast::channel(2);
+    for (at, text) in [(1, "dropped"), (2, "surviving-1"), (3, "surviving-2")] {
+        let _ = tx.send(vibevalley_protocol::LiveEvent::Notice(vibevalley_protocol::LiveEventNotice {
+            level: vibevalley_protocol::NoticeLevel::Info,
+            text: text.into(),
+            at,
+        }));
+    }
+
+    let listener = serve(Arc::new(LaggedLiveServer(parking_lot::Mutex::new(Some(rx)))), "127.0.0.1:0".parse().unwrap()).unwrap();
+    let res = agent().get(format!("{}/api/v1/live", listener.url())).send().unwrap();
+    assert_eq!(res.status().as_u16(), 200);
+    let mut reader = io::BufReader::new(res);
+    let mut lines = Vec::new();
+    let mut line = String::new();
+    while lines.len() < 12 {
+        line.clear();
+        if reader.read_line(&mut line).unwrap() == 0 {
+            break;
+        }
+        let trimmed = line.trim().to_string();
+        if !trimmed.is_empty() {
+            lines.push(trimmed);
+            if lines.iter().any(|l| l.contains("surviving-2")) {
+                break;
+            }
+        }
+    }
+    assert!(lines.iter().any(|l| l == "event: lagged"), "expected lagged SSE event in {lines:?}");
+    assert!(lines.iter().any(|l| l.contains(r#""skipped":1"#)), "expected skipped count in {lines:?}");
+    assert!(lines.iter().any(|l| l.contains("surviving-1")), "expected recovery of surviving-1 in {lines:?}");
+    assert!(lines.iter().any(|l| l.contains("surviving-2")), "expected recovery of surviving-2 in {lines:?}");
+}
+
+#[test]
+fn remote_media_routes_reject_machine_scope_and_support_range_playback_with_client_token() {
+    struct StubMediaPort {
+        file: std::path::PathBuf,
+    }
+    impl crate::gateway::api::media::MediaInputs for StubMediaPort {
+        fn upload_async(
+            self: Arc<Self>,
+            _id: String,
+            _source: Box<dyn io::Read + Send>,
+        ) -> BoxFuture<'static, Result<vibevalley_protocol::MediaInput, ApiError>> {
+            Box::pin(async { Err(ApiError::new(BizCode::InvalidInput, "unused")) })
+        }
+        fn content_async(self: Arc<Self>, _id: String) -> BoxFuture<'static, Result<vibevalley_protocol::AttachmentFile, ApiError>> {
+            let path = self.file.to_string_lossy().into_owned();
+            Box::pin(async move {
+                Ok(vibevalley_protocol::AttachmentFile {
+                    path,
+                    r#type: "application/octet-stream".into(),
+                    name: "sample.bin".into(),
+                })
+            })
+        }
+    }
+    struct RemoteMediaServer {
+        inner: Arc<FakeServer>,
+        auth: Arc<dyn RemoteAuth>,
+        media: crate::gateway::api::media::SharedMediaInputs,
+    }
+    impl Server for RemoteMediaServer {
+        fn call_with_async(self: Arc<Self>, ctx: CallerContext, op: String, payload: Value) -> BoxFuture<'static, Envelope> {
+            self.inner.clone().call_with_async(ctx, op, payload)
+        }
+        fn slice_snapshot_json(&self, kind: SliceKind) -> Arc<str> {
+            self.inner.slice_snapshot_json(kind)
+        }
+        fn live(&self) -> tokio::sync::mpsc::Receiver<vibevalley_protocol::LiveEvent> {
+            self.inner.live()
+        }
+        fn subscribe_with_async(
+            self: Arc<Self>,
+            ctx: CallerContext,
+            name: String,
+            payload: Value,
+        ) -> BoxFuture<'static, Result<(u64, tokio::sync::mpsc::Receiver<Value>), Envelope>> {
+            self.inner.clone().subscribe_with_async(ctx, name, payload)
+        }
+        fn unsubscribe(&self, id: u64) {
+            self.inner.unsubscribe(id)
+        }
+        fn ports(&self) -> GatewayPorts {
+            GatewayPorts {
+                remote: Some(self.auth.clone()),
+                media_input: Some(self.media.clone()),
+                ..Default::default()
+            }
+        }
+    }
+
+    let dir = tempfile::tempdir().unwrap();
+    let media_file = dir.path().join("sample.bin");
+    std::fs::write(&media_file, b"0123456789abcdef").unwrap();
+    let media_id = "0196f8e2-7c0a-7f10-8b2d-9e5a4c1d2e3f";
+    let port: crate::gateway::api::media::SharedMediaInputs = Arc::new(StubMediaPort { file: media_file });
+
+    // Client scope gets 200 full body and 206 Range via both Bearer and ?token=.
+    let client_server: Shared = Arc::new(RemoteMediaServer {
+        inner: Arc::new(FakeServer::new()),
+        auth: Arc::new(StaticRemoteAuth {
+            enabled: true,
+            valid_token: "vv_dev_good",
+            scope: SCOPE_REMOTE_CLIENT,
+        }),
+        media: port.clone(),
+    });
+    let remote = serve_remote(client_server, "127.0.0.1:0".parse().unwrap()).unwrap();
+    let full = agent()
+        .get(format!("{}/api/v1/media/input/{media_id}/content?token=vv_dev_good", remote.url()))
+        .send()
+        .unwrap();
+    assert_eq!(full.status().as_u16(), 200);
+    assert_eq!(full.bytes().unwrap().as_ref(), b"0123456789abcdef");
+
+    let partial = agent()
+        .get(format!("{}/api/v1/media/input/{media_id}/content", remote.url()))
+        .header("authorization", "Bearer vv_dev_good")
+        .header("range", "bytes=4-9")
+        .send()
+        .unwrap();
+    assert_eq!(partial.status().as_u16(), 206);
+    assert_eq!(partial.headers()["content-range"], "bytes 4-9/16");
+    assert_eq!(partial.bytes().unwrap().as_ref(), b"456789");
+
+    // Machine scope is rejected with 403 across content, upload, and speech routes.
+    let machine_server: Shared = Arc::new(RemoteMediaServer {
+        inner: Arc::new(FakeServer::new()),
+        auth: Arc::new(StaticRemoteAuth {
+            enabled: true,
+            valid_token: "vv_dev_machine",
+            scope: SCOPE_REMOTE_MACHINE,
+        }),
+        media: port,
+    });
+    let machine_remote = serve_remote(machine_server, "127.0.0.1:0".parse().unwrap()).unwrap();
+    let res = agent()
+        .get(format!("{}/api/v1/media/input/{media_id}/content?token=vv_dev_machine", machine_remote.url()))
+        .send()
+        .unwrap();
+    assert_eq!(res.status().as_u16(), 403);
+    let res = agent()
+        .put(format!("{}/api/v1/media/input/{media_id}/content", machine_remote.url()))
+        .header("authorization", "Bearer vv_dev_machine")
+        .header("content-type", "application/octet-stream")
+        .body(vec![1, 2, 3])
+        .send()
+        .unwrap();
+    assert_eq!(res.status().as_u16(), 403);
+    assert_eq!(res.json::<Value>().unwrap()["bizCode"], BizCode::Forbidden.code());
+    let res = agent()
+        .get(format!("{}/api/v1/media/speech/{media_id}/stream?token=vv_dev_machine", machine_remote.url()))
+        .send()
+        .unwrap();
+    assert_eq!(res.status().as_u16(), 403);
+    assert_eq!(res.json::<Value>().unwrap()["bizCode"], BizCode::Forbidden.code());
 }

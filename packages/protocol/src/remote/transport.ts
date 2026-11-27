@@ -18,11 +18,19 @@ export type RemoteEnvelope = Envelope;
 
 export type RemoteSliceMap = SliceMap;
 
+export interface RemoteDecodeError {
+  readonly stream: "slice" | "live" | "subscribe";
+  readonly topic: string;
+  readonly reason: string;
+  readonly raw: string;
+}
+
 export interface HttpRemoteTransportOptions {
   readonly baseUrl: string;
   readonly token: string;
   readonly fetch?: typeof fetch;
   readonly onConnectionChange?: (state: RemoteConnectionState) => void;
+  readonly onDecodeError?: (error: RemoteDecodeError) => void;
 }
 
 export interface HttpRemoteTransport {
@@ -167,6 +175,7 @@ export async function pairWithServer(
 
 interface SseMessage {
   readonly id: string | undefined;
+  readonly event: string | undefined;
   readonly data: string;
 }
 
@@ -182,14 +191,19 @@ async function readSseStream(body: ReadableStream<Uint8Array>, signal: AbortSign
   let buffer = "";
   let skipLeadingLf = false;
   let lastEventId: string | undefined;
+  let eventType: string | undefined;
   let dataLines: string[] = [];
 
   const handleLine = (line: string) => {
     if (line === "") {
       if (dataLines.length > 0) {
         const data = dataLines.join("\n");
+        const event = eventType;
         dataLines = [];
-        onMessage({ id: lastEventId, data });
+        eventType = undefined;
+        onMessage({ id: lastEventId, event, data });
+      } else {
+        eventType = undefined;
       }
       return;
     }
@@ -200,6 +214,8 @@ async function readSseStream(body: ReadableStream<Uint8Array>, signal: AbortSign
     if (value.startsWith(" ")) value = value.slice(1);
     if (field === "data") {
       dataLines.push(value);
+    } else if (field === "event") {
+      eventType = value;
     } else if (field === "id" && !value.includes("\0")) {
       lastEventId = value;
     }
@@ -560,6 +576,25 @@ export function createHttpRemoteTransport(options: HttpRemoteTransportOptions): 
     }
   };
 
+  const DECODE_WARN_THROTTLE_MS = 5_000;
+  const lastWarnAt = new Map<string, number>();
+
+  const warnThrottled = (key: string, message: string, detail?: unknown) => {
+    const now = Date.now();
+    const prev = lastWarnAt.get(key) ?? 0;
+    if (now - prev >= DECODE_WARN_THROTTLE_MS) {
+      lastWarnAt.set(key, now);
+      if (detail !== undefined) console.warn(message, detail);
+      else console.warn(message);
+    }
+  };
+
+  const reportDecodeError = (stream: RemoteDecodeError["stream"], topic: string, reason: string, raw: string) => {
+    const info: RemoteDecodeError = { stream, topic, reason, raw: raw.slice(0, 200) };
+    options.onDecodeError?.(info);
+    warnThrottled(`decode:${stream}:${topic}`, `[remote/${stream}] dropped malformed frame (${topic}): ${reason}`);
+  };
+
   const slice: HttpRemoteTransport["slice"] = (kind, listener) => {
     const decoder = sliceDecoders[kind];
     let lastEventId: string | undefined;
@@ -572,7 +607,11 @@ export function createHttpRemoteTransport(options: HttpRemoteTransportOptions): 
           if (msg.id) lastEventId = msg.id;
           const parsed = parseJsonSafe(msg.data);
           const decoded = decoder.safeParse(parsed);
-          if (!decoded.success) return;
+          if (!decoded.success) {
+            const reason = parsed === undefined ? "invalid JSON" : decoded.error.issues.map((i) => `${i.path.join(".") || "<root>"}: ${i.message}`).join("; ");
+            reportDecodeError("slice", kind, reason, msg.data);
+            return;
+          }
           if (!msg.id) lastEventId = String(decoded.data.seq);
           listener(decoded.data);
         },
@@ -587,9 +626,18 @@ export function createHttpRemoteTransport(options: HttpRemoteTransportOptions): 
         `${base}/api/v1/live`,
         () => undefined,
         (msg) => {
+          if (msg.event === "lagged") {
+            warnThrottled("live:lagged", "[remote/live] server broadcast lagged", parseJsonSafe(msg.data));
+            return;
+          }
           const parsed = parseJsonSafe(msg.data);
           const decoded = LiveEvent.safeParse(parsed);
-          if (decoded.success) listener(decoded.data);
+          if (!decoded.success) {
+            const reason = parsed === undefined ? "invalid JSON" : decoded.error.issues.map((i) => `${i.path.join(".") || "<root>"}: ${i.message}`).join("; ");
+            reportDecodeError("live", "live", reason, msg.data);
+            return;
+          }
+          listener(decoded.data);
         },
       );
     });
@@ -657,7 +705,11 @@ export function createHttpRemoteTransport(options: HttpRemoteTransportOptions): 
               if (attemptLink.signal.aborted || signal.aborted || closed) return;
               if (msg.id) lastEventId = msg.id;
               const parsed = parseJsonSafe(msg.data);
-              if (parsed !== undefined) on(parsed);
+              if (parsed !== undefined) {
+                on(parsed);
+              } else if (msg.data.trim() !== "") {
+                reportDecodeError("subscribe", name, "invalid JSON", msg.data);
+              }
             });
             if (signal.aborted || closed) return;
             if (!suspended && resumeGeneration === generationAtStart) {

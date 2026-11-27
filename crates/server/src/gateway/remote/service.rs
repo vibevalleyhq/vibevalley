@@ -316,7 +316,7 @@ impl Remote {
             Err(err) => {
                 if need_drop_first {
                     self.enabled.store(false, Ordering::Release);
-                    let _ = self
+                    if let Err(save_err) = self
                         .ctx
                         .service
                         .remote
@@ -326,7 +326,10 @@ impl Remote {
                             stored.as_ref().map(|c| c.port).unwrap_or_else(default_remote_port),
                             self.ctx.now(),
                         )
-                        .await;
+                        .await
+                    {
+                        tracing::warn!(error = %save_err, "remote.service failed to persist disabled config after bind error");
+                    }
                 }
                 return Err(bind_failed(&target.to_string(), err));
             }
@@ -568,8 +571,8 @@ impl Remote {
                 }
             }
         };
-        if should_touch {
-            let _ = self.ctx.service.remote.touch_device_last_seen(&device.id, now).await;
+        if should_touch && let Err(err) = self.ctx.service.remote.touch_device_last_seen(&device.id, now).await {
+            tracing::warn!(device_id = %device.id, error = %err, "failed to persist remote device last_seen_at");
         }
 
         Ok(RemoteDeviceIdentity {

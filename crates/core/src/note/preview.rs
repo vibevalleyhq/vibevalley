@@ -7,7 +7,7 @@ use serde_json::Value;
 use vibevalley_protocol::{BlockKind, DocBlock, JsNumber, NotePreview, NotePreviewMinimapShape, NotePreviewOutlineItem, NoteType};
 
 use crate::note::base::{cell_as_text, evaluate_row_formulas, parse_base_document};
-use crate::note::doc::{markdown_to_blocks, parse_doc_document};
+use crate::note::doc::parse_doc_document;
 use crate::note::path::{infer_mime, validate_note_path};
 
 const DOC_EXCERPT_MAX_CHARS: usize = 220;
@@ -209,8 +209,6 @@ fn extract_doc(files: &BTreeMap<String, Vec<u8>>) -> NotePreview {
         && let Ok(doc) = parse_doc_document(raw_json)
     {
         doc.blocks
-    } else if let Some(raw_md) = read_text(files, "structure/index.md") {
-        markdown_to_blocks(raw_md)
     } else {
         Vec::new()
     };

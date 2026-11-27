@@ -355,7 +355,7 @@ impl Board {
             }
             tokio::time::sleep(Duration::from_millis(50)).await;
         }
-        let state = Arc::new(IssueState::new(ctx.clone(), runtime.write_lock().clone()));
+        let state = Arc::new(IssueState::new(ctx.clone()));
         let triage_path = config.data_dir.join("triage.json");
         let triage_store: TriageStore = match tokio::fs::read_to_string(&triage_path).await {
             Ok(raw) => serde_json::from_str(&raw).unwrap_or_default(),
@@ -503,6 +503,14 @@ impl Board {
         self.state.raw_issues_async().await
     }
 
+    pub async fn raw_issues_for_board_async(&self, include_ids: &[String]) -> Result<Vec<Issue>> {
+        self.state.raw_issues_for_board_async(include_ids).await
+    }
+
+    pub async fn projection_snapshot_async(&self) -> Result<(Vec<Session>, Vec<Issue>)> {
+        self.state.projection_snapshot_async().await
+    }
+
     pub async fn sessions_async(&self) -> Result<Vec<Session>> {
         self.state.sessions_async().await
     }
@@ -646,12 +654,15 @@ impl Board {
         };
         let created = self.stored_async(&id).await?;
         let links = vibevalley_core::note::links::extract_markdown_links(&created.description);
-        let _ = self
+        if let Err(err) = self
             .ctx
             .service
             .note
             .replace_links_for_source(vibevalley_protocol::LinkEntityKind::Issue, &created.id, &links, now())
-            .await;
+            .await
+        {
+            tracing::warn!(issue_id = %created.id, error = %err, "issue.create failed to sync markdown note links");
+        }
         Ok(created)
     }
 
@@ -890,7 +901,9 @@ impl Board {
         }
         if issue.status.is_closed() {
             let e = BoardError::Api(ApiError::new(BizCode::IssueRefused, vibevalley_i18n::t("server.issue.closedReopen", &[])));
-            let _ = sessions.settle_mailbox_async(mail_entry.id, false, Some(&e.to_string())).await;
+            if let Err(err) = sessions.settle_mailbox_async(mail_entry.id, false, Some(&e.to_string())).await {
+                tracing::warn!(issue_id = %issue.id, mailbox_id = mail_entry.id, error = %err, "issue.tell failed to settle closed-issue mailbox");
+            }
             sessions.settle_words_async(&sub.id, false, Some(&e.to_string())).await?;
             return Err(e);
         }
@@ -899,14 +912,19 @@ impl Board {
             && sessions.is_live(&session.id)
             && sessions.bind_to_active_run_async(&session.id, &sub).await?
         {
-            let _ = sessions.claim_mailbox_by_key_async(&mail_key).await;
+            if let Err(err) = sessions.claim_mailbox_by_key_async(&mail_key).await {
+                tracing::warn!(issue_id = %issue.id, mail_key = %mail_key, error = %err, "issue.tell failed to claim active-run mailbox");
+            }
             let result = sessions
                 .steer_async(&session, words)
                 .await
                 .unwrap_or_else(|| Err(BoardError::Other("the active run ended during handoff".into())));
-            let _ = sessions
+            if let Err(err) = sessions
                 .settle_mailbox_async(mail_entry.id, result.is_ok(), result.as_ref().err().map(|e| e.to_string()).as_deref())
-                .await;
+                .await
+            {
+                tracing::warn!(issue_id = %issue.id, mailbox_id = mail_entry.id, error = %err, "issue.tell failed to settle steered mailbox");
+            }
             if let Err(e) = &result {
                 sessions.settle_words_async(&sub.id, false, Some(&e.to_string())).await?;
             }
@@ -915,11 +933,16 @@ impl Board {
         if matches!(issue.status, IssueStatus::Backlog | IssueStatus::Todo) {
             return Ok(());
         }
-        let _ = sessions.claim_mailbox_by_key_async(&mail_key).await;
+        if let Err(err) = sessions.claim_mailbox_by_key_async(&mail_key).await {
+            tracing::warn!(issue_id = %issue.id, mail_key = %mail_key, error = %err, "issue.tell failed to claim dispatch mailbox");
+        }
         let res = self.dispatch_replies_for_issue_async(&issue).await;
-        let _ = sessions
+        if let Err(err) = sessions
             .settle_mailbox_async(mail_entry.id, res.is_ok(), res.as_ref().err().map(|e| e.to_string()).as_deref())
-            .await;
+            .await
+        {
+            tracing::warn!(issue_id = %issue.id, mailbox_id = mail_entry.id, error = %err, "issue.tell failed to settle reply mailbox");
+        }
         res
     }
 
@@ -1005,9 +1028,11 @@ impl Board {
         for id in queued {
             if let Err(e) = self.send_unlocked_async(&id, None, RunTriggerKind::Issue).await {
                 // One that cannot go any more leaves the queue.
-                eprintln!("vibevalley: issue {id} could not be sent: {e}");
+                tracing::warn!(issue_id = %id, error = %e, "issue.board queued issue could not be sent; unqueuing");
                 let _work = self.work.lock().await;
-                let _ = self.change_async(&id, IssueChange::Unqueued).await;
+                if let Err(err) = self.change_async(&id, IssueChange::Unqueued).await {
+                    tracing::warn!(issue_id = %id, error = %err, "issue.board failed to persist Unqueued state");
+                }
             }
         }
     }
@@ -1016,7 +1041,7 @@ impl Board {
         let issues = match self.issues_async().await {
             Ok(issues) => issues,
             Err(e) => {
-                eprintln!("vibevalley: reading queued issues: {e}");
+                tracing::warn!(error = %e, "issue.board failed to read queued issues");
                 return;
             }
         };
@@ -1028,8 +1053,10 @@ impl Board {
         for id in queued {
             if let Err(e) = self.send_async(&id, None, RunTriggerKind::Issue).await {
                 // One that cannot go any more leaves the queue.
-                eprintln!("vibevalley: issue {id} could not be sent: {e}");
-                let _ = self.change_async(&id, IssueChange::Unqueued).await;
+                tracing::warn!(issue_id = %id, error = %e, "issue.board queued issue could not be sent; unqueuing");
+                if let Err(err) = self.change_async(&id, IssueChange::Unqueued).await {
+                    tracing::warn!(issue_id = %id, error = %err, "issue.board failed to persist Unqueued state");
+                }
             }
         }
     }
@@ -1180,10 +1207,14 @@ impl Board {
                 Ok(session) => Ok(Sent::Working { session }),
                 Err(e) => {
                     let _work = self.work.lock().await;
-                    if let Some(w) = &retry_words {
-                        let _ = self.keep_words_async(id, w).await;
+                    if let Some(w) = &retry_words
+                        && let Err(err) = self.keep_words_async(id, w).await
+                    {
+                        tracing::warn!(issue_id = id, error = %err, "issue.board failed to preserve retry words after dispatch error");
                     }
-                    let _ = self.change_async(id, IssueChange::Unqueued).await;
+                    if let Err(err) = self.change_async(id, IssueChange::Unqueued).await {
+                        tracing::warn!(issue_id = id, error = %err, "issue.board failed to unqueue issue after dispatch error");
+                    }
                     Err(e)
                 }
             }
@@ -1265,10 +1296,14 @@ impl Board {
                 Ok(session) => Ok(Sent::Working { session }),
                 Err(e) => {
                     // Not sent: it leaves the queue, the words stay for the next try.
-                    if let Some(w) = &retry_words {
-                        let _ = self.keep_words_async(id, w).await;
+                    if let Some(w) = &retry_words
+                        && let Err(err) = self.keep_words_async(id, w).await
+                    {
+                        tracing::warn!(issue_id = id, error = %err, "issue.board failed to preserve retry words after send_async error");
                     }
-                    let _ = self.change_async(id, IssueChange::Unqueued).await;
+                    if let Err(err) = self.change_async(id, IssueChange::Unqueued).await {
+                        tracing::warn!(issue_id = id, error = %err, "issue.board failed to unqueue issue after send_async error");
+                    }
                     Err(e)
                 }
             }
@@ -1339,14 +1374,22 @@ impl Board {
     }
 
     async fn save_auto_review_async(&self, issue_id: &str, doc: &AutoReviewDoc) {
-        if let Ok(val) = serde_json::to_value(doc) {
-            let _ = self
-                .session_engine()
-                .durable_store()
-                .write_with_async((issue_id.to_string(), val), |tx, (id, val)| {
-                    Box::pin(async move { tx.put_document_async("issue", id, "auto_review", val).await })
-                })
-                .await;
+        match serde_json::to_value(doc) {
+            Ok(val) => {
+                if let Err(err) = self
+                    .session_engine()
+                    .durable_store()
+                    .write_with_async((issue_id.to_string(), val), |tx, (id, val)| {
+                        Box::pin(async move { tx.put_document_async("issue", id, "auto_review", val).await })
+                    })
+                    .await
+                {
+                    tracing::warn!(issue_id, error = %err, "issue.board failed to persist auto_review state");
+                }
+            }
+            Err(err) => {
+                tracing::warn!(issue_id, error = %err, "issue.board failed to serialize auto_review state");
+            }
         }
     }
 
@@ -1378,7 +1421,10 @@ impl Board {
         };
         let (issues, sessions) = match tokio::try_join!(self.issues_async(), self.sessions_async()) {
             Ok(pair) => pair,
-            Err(_) => return,
+            Err(err) => {
+                tracing::warn!(error = %err, "issue.board auto-review dispatch failed to load issues/sessions");
+                return;
+            }
         };
         for issue in issues {
             if issue.status != IssueStatus::InReview
@@ -1585,7 +1631,9 @@ impl Board {
         let done = {
             let _work = self.work.lock().await;
             let done = self.change_async(&updated.id, change).await?;
-            let _ = self.take_words_async(&updated.id).await;
+            if let Err(err) = self.take_words_async(&updated.id).await {
+                tracing::warn!(issue_id = %updated.id, error = %err, "issue.board failed to clear queued words on settle_pull");
+            }
             done
         };
         drop(issue_guard);
@@ -1759,8 +1807,9 @@ impl Board {
             let session = self.on_board_async(issue).await;
             if let Some(s) = &session
                 && s.phase.is_working()
+                && let Err(err) = self.session_engine().abort_turn_async(&s.id).await
             {
-                let _ = self.session_engine().abort_turn_async(&s.id).await;
+                tracing::warn!(issue_id = %issue.id, session_id = %s.id, error = %err, "issue.board failed to abort active turn before completing issue");
             }
             let all_issues = self.issues_async().await?;
             let has_merged_child = all_issues
@@ -1870,7 +1919,9 @@ impl Board {
         }
         let _work = self.work.lock().await;
         self.change_async(&issue.id, IssueChange::Delivered(landing, merged)).await?;
-        let _ = self.take_words_async(&issue.id).await;
+        if let Err(err) = self.take_words_async(&issue.id).await {
+            tracing::warn!(issue_id = %issue.id, error = %err, "issue.board failed to clear queued words on delivery");
+        }
         Ok(())
     }
 
@@ -1897,7 +1948,9 @@ impl Board {
                 self.session_engine().dismiss_async(&s.id, Leave::KeepBranch).await?;
             }
             let _work = self.work.lock().await;
-            let _ = self.take_words_async(&issue.id).await;
+            if let Err(err) = self.take_words_async(&issue.id).await {
+                tracing::warn!(issue_id = %issue.id, error = %err, "issue.board failed to clear queued words on close");
+            }
             self.change_async(&issue.id, IssueChange::Canceled(why)).await?;
             Ok(())
         })

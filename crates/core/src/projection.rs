@@ -17,7 +17,10 @@ use crate::channel::trim_and_sort_channels;
 use crate::core::{channel_summary, cron_view, media_summary, session_view};
 use crate::game::farm_view;
 use crate::inbox::inbox_items;
-use crate::status::{apply_issue_statuses, board_summary, retain_recent_closed_and_sort};
+use crate::status::{KEEP_CLOSED_ISSUES, apply_issue_statuses, board_summary, retain_recent_closed_and_sort};
+
+/// Maximum number of closed top-level issues retained in board/inbox/farm projections.
+pub const BOARD_KEEP_CLOSED_ISSUES: usize = KEEP_CLOSED_ISSUES;
 
 /// Ephemeral in-memory overlay for a single running or live-updated session.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -115,7 +118,13 @@ pub struct FarmInput {
 fn overlay_session(session: &Session, overlay: &LiveSessionOverlay) -> Session {
     let mut next = session.clone();
     if let Some(phase) = &overlay.phase {
-        next.phase = phase.clone();
+        // Issue-bound sessions commit `Working <-> Resting` atomically with `last_run` and
+        // `issue.questions` in SQLite; never let a newer `Resting` live overlay downgrade a
+        // pre-commit `Working` DB row onto stale `last_run` metadata.
+        let would_tear_issue_finish = session.issue_id().is_some() && session.phase.is_working() && !phase.is_working();
+        if !would_tear_issue_finish {
+            next.phase = phase.clone();
+        }
     }
     if let Some(channel) = &overlay.channel {
         match channel {
@@ -228,23 +237,127 @@ pub fn derive_issues(issues: &[Issue], sessions: &[Session]) -> Vec<Issue> {
     out
 }
 
-/// Projects [`BoardSlice`] directly from [`BoardInput`] + [`LiveSnapshot`].
-pub fn project_board(input: &BoardInput, live: &LiveSnapshot, seq: i64) -> BoardSlice {
-    let sessions = overlay_sessions(&input.sessions, &live.sessions);
-    let issues = derive_issues(&input.issues, &sessions);
-    let summary = board_summary(&issues, &sessions, &input.channels, input.evaluated_at);
-    let repo_health = if input.repos.is_empty() {
+/// Derives `status`, `refining`, `stage`, and `moves` for a single `target` issue
+/// using only its `descendants` subtree and relevant `sessions`, avoiding a full-board scan.
+pub fn derive_single_issue(target: &Issue, descendants: &[Issue], sessions: &[Session]) -> Issue {
+    let mut subset = Vec::with_capacity(1 + descendants.len());
+    subset.push(target.clone());
+    subset.extend(descendants.iter().cloned());
+    apply_issue_statuses(&mut subset, sessions);
+    subset.swap_remove(0)
+}
+
+/// Shared overlaid sessions + derived issues reused across `Board`, `Sessions`,
+/// `Inbox`, and `Farm` projections within a single `StateFeed` flush batch.
+#[derive(Debug, Clone)]
+pub struct SharedProjectionContext {
+    pub overlaid_sessions: Vec<Session>,
+    pub derived_issues: Vec<Issue>,
+}
+
+/// Builds a [`SharedProjectionContext`] once for a flush batch so `Board`, `Sessions`,
+/// `Inbox`, and `Farm` reuse the same overlaid sessions and derived issues.
+pub fn prepare_shared_context(raw_issues: &[Issue], raw_sessions: &[Session], live: &LiveSnapshot) -> SharedProjectionContext {
+    let overlaid_sessions = overlay_sessions(raw_sessions, &live.sessions);
+    let derived_issues = derive_issues(raw_issues, &overlaid_sessions);
+    SharedProjectionContext {
+        overlaid_sessions,
+        derived_issues,
+    }
+}
+
+/// Projects [`BoardSlice`] reusing a batch-shared [`SharedProjectionContext`].
+pub fn project_board_shared(
+    shared: &SharedProjectionContext,
+    channels: &[Channel],
+    commits: Option<CommitCount>,
+    repos: &[crate::health::RepoHealthInput],
+    evaluated_at: Option<i64>,
+    seq: i64,
+) -> BoardSlice {
+    let summary = board_summary(&shared.derived_issues, &shared.overlaid_sessions, channels, evaluated_at);
+    let repo_health = if repos.is_empty() {
         Vec::new()
     } else {
-        crate::health::assess_repos_health(&input.repos, &issues, &[], input.evaluated_at.unwrap_or(0))
+        crate::health::assess_repos_health(repos, &shared.derived_issues, &[], evaluated_at.unwrap_or(0))
     };
     BoardSlice {
         seq,
-        issues,
+        issues: shared.derived_issues.clone(),
         board_summary: Some(summary),
-        commits: input.commits.clone(),
+        commits,
         repo_health,
     }
+}
+
+/// Projects [`SessionsSlice`] reusing a batch-shared [`SharedProjectionContext`],
+/// applying DB-folded telemetry only where the live overlay did not override it.
+pub fn project_sessions_shared(
+    shared: &SharedProjectionContext,
+    raw_issues: &[Issue],
+    live: &LiveSnapshot,
+    telemetry: &mut HashMap<String, SessionTelemetry>,
+    machines: Vec<Machine>,
+    seq: i64,
+) -> SessionsSlice {
+    let conflicts: HashMap<&str, Option<&Conflict>> = raw_issues.iter().map(|i| (i.id.as_str(), i.conflict.as_ref())).collect();
+    let sessions = shared
+        .overlaid_sessions
+        .iter()
+        .map(|h| {
+            let live_has_tel = live.sessions.get(&h.id).is_some_and(|o| o.telemetry.is_some());
+            if !live_has_tel && let Some(tel) = telemetry.remove(&h.id) {
+                let mut with_tel = h.clone();
+                with_tel.telemetry = Some(tel);
+                return session_view(&with_tel, with_tel.issue_id().and_then(|i| conflicts.get(i).copied().flatten()));
+            }
+            session_view(h, h.issue_id().and_then(|i| conflicts.get(i).copied().flatten()))
+        })
+        .collect();
+    SessionsSlice { seq, sessions, machines }
+}
+
+/// Projects [`InboxSlice`] reusing a batch-shared [`SharedProjectionContext`].
+pub fn project_inbox_shared(
+    shared: &SharedProjectionContext,
+    crons: &[Cron],
+    user_mentions: &[UserMention],
+    runtime_inbox_items: &[InboxItem],
+    call: CallState,
+    call_reason: String,
+    seq: i64,
+) -> InboxSlice {
+    let items = inbox_items(&shared.derived_issues, &shared.overlaid_sessions, crons, user_mentions, runtime_inbox_items);
+    InboxSlice { seq, items, call, call_reason }
+}
+
+/// Projects [`FarmFrame`] reusing a batch-shared [`SharedProjectionContext`].
+pub fn project_farm_shared(
+    shared: &SharedProjectionContext,
+    live: &LiveSnapshot,
+    progress: Option<Progress>,
+    commits: Option<CommitCount>,
+    seq: i64,
+) -> FarmFrame {
+    let view = farm_view(
+        &shared.derived_issues,
+        &shared.overlaid_sessions,
+        Some(&live.plays),
+        commits.as_ref(),
+        progress.as_ref(),
+    );
+    FarmFrame {
+        seq,
+        view,
+        progress,
+        effects: live.effects.clone(),
+    }
+}
+
+/// Projects [`BoardSlice`] directly from [`BoardInput`] + [`LiveSnapshot`].
+pub fn project_board(input: &BoardInput, live: &LiveSnapshot, seq: i64) -> BoardSlice {
+    let shared = prepare_shared_context(&input.issues, &input.sessions, live);
+    project_board_shared(&shared, &input.channels, input.commits.clone(), &input.repos, input.evaluated_at, seq)
 }
 
 /// Projects [`SessionsSlice`] directly from [`SessionInput`] + [`LiveSnapshot`].
@@ -670,5 +783,83 @@ mod tests {
         assert_eq!(got.context_window, Some(200_000));
         assert_eq!(got.llm_retries, 1);
         assert_eq!(got.run_errors, 1);
+    }
+
+    #[test]
+    fn derive_single_issue_and_shared_projection_match_full_projection() {
+        let parent = Issue::new("iss-parent", 1, "Parent", 100);
+        let mut child = Issue::new("iss-child", 2, "Child", 101);
+        child.parent = Some("iss-parent".into());
+        child.queued_at = Some(150);
+        let mut archived = Issue::new("iss-old", 3, "Old", 50);
+        archived.delivered = Some(Landing::Merged);
+        archived.closed_at = Some(60);
+
+        let all_issues = vec![parent.clone(), child.clone(), archived.clone()];
+        let sessions = vec![];
+        let full = derive_issues(&all_issues, &sessions);
+        let full_parent = full.iter().find(|i| i.id == "iss-parent").unwrap();
+        let single_parent = derive_single_issue(&parent, std::slice::from_ref(&child), &sessions);
+        assert_eq!(
+            single_parent, *full_parent,
+            "derive_single_issue must match full derive_issues for parent+child"
+        );
+
+        let full_child = full.iter().find(|i| i.id == "iss-child").unwrap();
+        let single_child = derive_single_issue(&child, &[], &sessions);
+        assert_eq!(single_child, *full_child, "derive_single_issue must match full derive_issues for leaf");
+
+        // Shared projection parity across Board, Sessions, Inbox, Farm.
+        let live = LiveSnapshot::default();
+        let shared = prepare_shared_context(&all_issues, &sessions, &live);
+        let board_shared = project_board_shared(&shared, &[], None, &[], Some(500), 9);
+        let board_direct = project_board(
+            &BoardInput {
+                issues: all_issues.clone(),
+                sessions: sessions.clone(),
+                evaluated_at: Some(500),
+                ..Default::default()
+            },
+            &live,
+            9,
+        );
+        assert_eq!(board_shared, board_direct);
+
+        let inbox_shared = project_inbox_shared(&shared, &[], &[], &[], CallState::Idle, String::new(), 9);
+        let inbox_direct = project_inbox(
+            &InboxInput {
+                issues: all_issues.clone(),
+                sessions: sessions.clone(),
+                ..Default::default()
+            },
+            &live,
+            9,
+        );
+        assert_eq!(inbox_shared, inbox_direct);
+
+        let farm_shared = project_farm_shared(&shared, &live, None, None, 9);
+        let farm_direct = project_farm(
+            &FarmInput {
+                issues: all_issues.clone(),
+                sessions: sessions.clone(),
+                ..Default::default()
+            },
+            &live,
+            9,
+        );
+        assert_eq!(farm_shared, farm_direct);
+
+        let mut tel = HashMap::new();
+        let sess_shared = project_sessions_shared(&shared, &all_issues, &live, &mut tel, vec![], 9);
+        let sess_direct = project_sessions(
+            &SessionInput {
+                sessions,
+                issues: all_issues,
+                machines: vec![],
+            },
+            &live,
+            9,
+        );
+        assert_eq!(sess_shared, sess_direct);
     }
 }

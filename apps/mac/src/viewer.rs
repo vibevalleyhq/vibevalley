@@ -493,7 +493,7 @@ pub(crate) fn is_html_path(path: &Path) -> bool {
 }
 
 pub(crate) fn build_html_preview_document(raw_html: &str) -> String {
-    crate::applet::prototype::with_policy(raw_html)
+    crate::host_types::with_policy(raw_html)
 }
 
 fn build_html_preview_bundle() -> Result<Bundle, String> {

@@ -1,11 +1,12 @@
 //! `setting.*`, ported from VibeValley `platform/setting/setting.test.ts`.
 
+use crate::support::ServerTestExt as _;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 
 use serde_json::{Value, json};
 use vibevalley_server::setting::{Setting, SettingConfig};
-use vibevalley_server::{App, Config, Server, create_app_blocking};
+use vibevalley_server::{App, Config, create_app_blocking};
 
 fn config(home: &Path) -> SettingConfig {
     SettingConfig {

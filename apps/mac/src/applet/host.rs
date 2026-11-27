@@ -21,7 +21,7 @@ use tokio_util::sync::CancellationToken;
 use vibevalley_protocol::{HostOp, Note};
 use vibevalley_server::gateway::bridge::{BizCode, CallerContext, Envelope, Server, refusal};
 
-use crate::hosted::{Action, BridgeHub, HostedEvent, HostedView};
+use crate::hosted::{BridgeHub, HostedEvent, HostedView};
 use crate::theme::Ui;
 
 use super::installer;
@@ -117,7 +117,7 @@ impl AppletHost {
             let _ = std::fs::remove_file(&sock_path);
         }
 
-        let rt = vibevalley_runtime::rt::current_or_global_handle();
+        let rt = vibevalley_rt::current_or_global_handle();
         let listener = {
             let _guard = rt.enter();
             match UnixListener::bind(&sock_path) {
@@ -138,10 +138,10 @@ impl AppletHost {
         let host = Self { inner: inner.clone() };
         cx.set_global(host.clone());
 
-        let (cmd_tx, cmd_rx) = flume::unbounded::<HostCommand>();
+        let (cmd_tx, mut cmd_rx) = mpsc::unbounded_channel::<HostCommand>();
         rt.spawn(accept_loop(listener, cmd_tx, cancel));
         cx.spawn(async move |cx| {
-            while let Ok(cmd) = cmd_rx.recv_async().await {
+            while let Some(cmd) = cmd_rx.recv().await {
                 cx.update(|cx| handle_command(&inner, cmd, cx));
             }
         })
@@ -181,7 +181,7 @@ impl AppletHost {
     }
 }
 
-async fn accept_loop(listener: UnixListener, cmd_tx: flume::Sender<HostCommand>, cancel: CancellationToken) {
+async fn accept_loop(listener: UnixListener, cmd_tx: mpsc::UnboundedSender<HostCommand>, cancel: CancellationToken) {
     let mut next_conn_id = 1u64;
     loop {
         let accepted = tokio::select! {
@@ -198,7 +198,7 @@ async fn accept_loop(listener: UnixListener, cmd_tx: flume::Sender<HostCommand>,
     }
 }
 
-async fn run_connection(conn_id: u64, stream: UnixStream, cmd_tx: flume::Sender<HostCommand>, cancel: CancellationToken) {
+async fn run_connection(conn_id: u64, stream: UnixStream, cmd_tx: mpsc::UnboundedSender<HostCommand>, cancel: CancellationToken) {
     let (read_half, mut write_half) = tokio::io::split(stream);
     let (out_tx, mut out_rx) = mpsc::unbounded_channel::<HostToShim>();
     if cmd_tx
@@ -345,8 +345,8 @@ fn handle_shim_message(inner: &Rc<HostInner>, conn_id: u64, msg: ShimToHost, cx:
                 });
                 return;
             };
-            let rt = vibevalley_runtime::rt::current_or_global_handle();
-            let (tx, rx) = flume::bounded(1);
+            let rt = vibevalley_rt::current_or_global_handle();
+            let (tx, rx) = tokio::sync::oneshot::channel();
             let server_bg = server.clone();
             let note_id_bg = note_id.clone();
             let cancel_bg = attach_cancel.clone();
@@ -356,7 +356,7 @@ fn handle_shim_message(inner: &Rc<HostInner>, conn_id: u64, msg: ShimToHost, cx:
             });
             let inner = inner.clone();
             cx.spawn(async move |cx| {
-                let Ok(prepared) = rx.recv_async().await else {
+                let Ok(prepared) = rx.await else {
                     return;
                 };
                 if attach_cancel.is_cancelled() {
@@ -776,7 +776,7 @@ fn attach_native(
     .detach();
 }
 
-fn handle_standalone_host_call(op: HostOp, reply: crate::hosted::Replier, cx: &mut App) {
+fn handle_standalone_host_call(op: HostOp, reply: crate::host_types::Replier, cx: &mut App) {
     if let Some(env) = crate::host::handle_stateless_op(&op) {
         reply.send(env);
         return;
@@ -784,7 +784,7 @@ fn handle_standalone_host_call(op: HostOp, reply: crate::hosted::Replier, cx: &m
     let env = match op {
         HostOp::Info => Envelope::ok(json!({
             "name": "desktop",
-            "version": crate::update::bundle_version(),
+            "version": crate::env::bundle_version(),
             "titleBar": { "top": 0, "left": 0 },
             "terminal": false,
             "theme": Ui::get(cx).settings.theme.as_str(),
@@ -847,47 +847,19 @@ fn handle_standalone_host_call(op: HostOp, reply: crate::hosted::Replier, cx: &m
     reply.send(env);
 }
 
+type OpenNoteFn = Arc<dyn Fn(&str, &mut App) + Send + Sync>;
+
+struct OpenNoteHandler(OpenNoteFn);
+
+impl gpui::Global for OpenNoteHandler {}
+
+pub fn set_open_note_handler(cx: &mut App, handler: impl Fn(&str, &mut App) + Send + Sync + 'static) {
+    cx.set_global(OpenNoteHandler(Arc::new(handler)));
+}
+
 fn open_note_in_host(note_id: &str, cx: &mut App) {
-    crate::ensure_main_window(cx);
-    cx.activate(true);
-    let route = format!("/notes/{note_id}");
-    let shell_window = cx.windows().into_iter().find_map(|w| w.downcast::<crate::shell::Shell>());
-    let Some(handle) = shell_window else {
-        return;
-    };
-    let already_ready = handle
-        .update(cx, |shell, window, cx| {
-            window.activate_window();
-            if shell.chrome.workbench.read(cx).is_ready() {
-                shell.on_action(Action::OpenRoute { path: route.clone() }, window, cx);
-                true
-            } else {
-                false
-            }
-        })
-        .unwrap_or(true);
-    if !already_ready {
-        cx.spawn(async move |cx| {
-            for _ in 0..50 {
-                cx.background_executor().timer(Duration::from_millis(100)).await;
-                let done = handle
-                    .update(cx, |shell, window, cx| {
-                        if shell.chrome.workbench.read(cx).is_ready() {
-                            cx.activate(true);
-                            window.activate_window();
-                            shell.on_action(Action::OpenRoute { path: route.clone() }, window, cx);
-                            true
-                        } else {
-                            false
-                        }
-                    })
-                    .unwrap_or(true);
-                if done {
-                    break;
-                }
-            }
-        })
-        .detach();
+    if let Some(handler) = cx.try_global::<OpenNoteHandler>().map(|h| h.0.clone()) {
+        handler(note_id, cx);
     }
 }
 
@@ -899,10 +871,10 @@ mod tests {
     fn unix_socket_ndjson_roundtrip_and_invalid_json_reports_error() {
         let dir = tempfile::tempdir().unwrap();
         let sock = dir.path().join("applet.sock");
-        vibevalley_runtime::rt::block_on(async move {
+        vibevalley_rt::block_on(async move {
             let listener = UnixListener::bind(&sock).unwrap();
             let cancel = CancellationToken::new();
-            let (cmd_tx, cmd_rx) = flume::unbounded();
+            let (cmd_tx, mut cmd_rx) = mpsc::unbounded_channel();
             let accept = tokio::spawn(accept_loop(listener, cmd_tx, cancel.clone()));
 
             let stream = UnixStream::connect(&sock).await.unwrap();
@@ -922,10 +894,10 @@ mod tests {
 
             let mut received = Vec::new();
             for _ in 0..4 {
-                let Ok(cmd) = tokio::time::timeout(Duration::from_secs(2), cmd_rx.recv_async()).await else {
+                let Ok(cmd) = tokio::time::timeout(Duration::from_secs(2), cmd_rx.recv()).await else {
                     break;
                 };
-                if let Ok(cmd) = cmd {
+                if let Some(cmd) = cmd {
                     received.push(cmd);
                 }
             }

@@ -40,48 +40,5 @@
    "greeting": "s3454"
   },
   {}
- ],
- "VoiceSaid": [
-  {
-   "agentId": "s3469",
-   "text": "s3470"
-  },
-  {
-   "agentId": "s3471",
-   "text": "s3472"
-  }
- ],
- "VoiceHeard": [
-  {
-   "agentId": "s3473",
-   "text": "s3474",
-   "agent": "s3475",
-   "sendKey": "s3476"
-  },
-  {
-   "agentId": "s3477",
-   "text": "s3478"
-  }
- ],
- "VoiceCallStart": [
-  {
-   "channel": "s3479",
-   "uid": "s3480",
-   "about": "s3481"
-  },
-  {
-   "channel": "s3482",
-   "uid": "s3483"
-  }
- ],
- "VoiceHearInput": [
-  {
-   "text": "s7104",
-   "agent": "s7105",
-   "sendKey": "s7106"
-  },
-  {
-   "text": "s7107"
-  }
  ]
 }

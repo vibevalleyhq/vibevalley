@@ -1,6 +1,7 @@
 //! A helper reaches the farm through `/mcp`: the board hands it the door
 //! and a token, the token names it, and its tools act as it.
 
+use crate::support::RouterTestExt as _;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;

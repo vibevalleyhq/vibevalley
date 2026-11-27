@@ -1,7 +1,7 @@
 //! Open projects and the registry that keeps their terminal sessions alive
 //! while another project is on screen. Pure state: nothing here blocks. The
-//! blocking halves (`load_*`, `SaveJob::run`) are separate functions meant for
-//! background threads.
+//! async I/O halves (`load_*`, `SaveJob::run`, `shutdown_all_and_wait`) run
+//! non-blocking on Tokio and offload blocking PTY operations to the blocking pool.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -82,36 +82,40 @@ pub struct LoadedProject {
     pub terminals: Vec<SavedTerminal>,
 }
 
-/// Blocking. Registers `path` (or finds it) and reads its saved state.
-pub fn load_project(store: &dyn Persistence, path: &Path) -> crate::store::Result<LoadedProject> {
-    let info = store.add_project(path)?;
-    load_existing(store, info)
+/// Registers `path` (or finds it) and reads its saved state.
+pub async fn load_project(store: &(impl Persistence + ?Sized), path: &Path) -> crate::store::Result<LoadedProject> {
+    let info = store.add_project(path).await?;
+    load_existing(store, info).await
 }
 
-/// Blocking. Reads every stored project, in rail order.
-pub fn load_all(store: &dyn Persistence) -> crate::store::Result<Vec<LoadedProject>> {
-    let mut projects = store.projects()?;
+/// Reads every stored project, in rail order.
+pub async fn load_all(store: &(impl Persistence + ?Sized)) -> crate::store::Result<Vec<LoadedProject>> {
+    let mut projects = store.projects().await?;
     projects.sort_by_key(|p| p.position);
-    projects.into_iter().map(|info| load_existing(store, info)).collect()
+    let mut loaded = Vec::with_capacity(projects.len());
+    for info in projects {
+        loaded.push(load_existing(store, info).await?);
+    }
+    Ok(loaded)
 }
 
-/// Blocking. Drops stored projects whose directory no longer exists on disk
+/// Drops stored projects whose directory no longer exists on disk
 /// (such as removed git worktrees) and deletes their stale rows from the store.
-pub fn prune_missing_projects(store: &dyn Persistence, projects: Vec<LoadedProject>) -> Vec<LoadedProject> {
+pub async fn prune_missing_projects(store: &(impl Persistence + ?Sized), projects: Vec<LoadedProject>) -> Vec<LoadedProject> {
     let mut kept = Vec::with_capacity(projects.len());
     for project in projects {
-        if project.info.path.is_dir() {
+        if tokio::fs::metadata(&project.info.path).await.is_ok_and(|m| m.is_dir()) {
             kept.push(project);
         } else {
-            let _ = store.remove_project(project.info.id);
+            let _ = store.remove_project(project.info.id).await;
         }
     }
     kept
 }
 
-fn load_existing(store: &dyn Persistence, info: Project) -> crate::store::Result<LoadedProject> {
-    let layout = store.layout(info.id)?;
-    let terminals = store.terminals(info.id)?;
+async fn load_existing(store: &(impl Persistence + ?Sized), info: Project) -> crate::store::Result<LoadedProject> {
+    let layout = store.layout(info.id).await?;
+    let terminals = store.terminals(info.id).await?;
     Ok(LoadedProject { info, layout, terminals })
 }
 
@@ -264,20 +268,29 @@ pub struct SaveJob<T> {
 }
 
 impl<T: TerminalHandle> SaveJob<T> {
-    /// Blocking: asks each session for its scrollback, then writes.
-    pub fn run(self, store: &dyn Persistence) -> crate::store::Result<()> {
+    /// Captures scrollback from live PTY sessions on the blocking pool, then writes to `store`.
+    pub async fn run(self, store: &(impl Persistence + ?Sized)) -> crate::store::Result<()> {
+        let project = self.project;
+        let live = self.live;
         let mut saved = self.dormant;
-        for (id, title, initial_cwd, handle) in self.live {
-            saved.push(SavedTerminal {
-                id,
-                project_id: self.project,
-                cwd: handle.cwd().unwrap_or(initial_cwd),
-                title,
-                scrollback: handle.scrollback_text(SAVED_SCROLLBACK_LINES),
-            });
+        if !live.is_empty() {
+            let captured = tokio::task::spawn_blocking(move || {
+                live.into_iter()
+                    .map(|(id, title, initial_cwd, handle)| SavedTerminal {
+                        id,
+                        project_id: project,
+                        cwd: handle.cwd().unwrap_or(initial_cwd),
+                        title,
+                        scrollback: handle.scrollback_text(SAVED_SCROLLBACK_LINES),
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .await
+            .map_err(|e| crate::store::StoreError::Io(format!("capture scrollback: {e}")))?;
+            saved.extend(captured);
         }
-        store.set_layout(self.project, &self.layout)?;
-        store.set_terminals(self.project, &saved)
+        store.set_layout(self.project, &self.layout).await?;
+        store.set_terminals(self.project, &saved).await
     }
 }
 
@@ -389,7 +402,7 @@ impl<T: TerminalHandle> Workspace<T> {
         }
     }
 
-    pub fn shutdown_all_and_wait(&mut self) {
+    pub async fn shutdown_all_and_wait(&mut self) {
         let handles: Vec<T> = self
             .projects
             .iter_mut()
@@ -401,24 +414,16 @@ impl<T: TerminalHandle> Workspace<T> {
         for handle in &handles {
             handle.begin_shutdown();
         }
-        let deadline = std::time::Instant::now() + SHUTDOWN_BUDGET;
-        let (done_tx, done_rx) = std::sync::mpsc::channel();
-        let total = handles.len();
+        let deadline = tokio::time::Instant::now() + SHUTDOWN_BUDGET;
+        let mut join_set = tokio::task::JoinSet::new();
         for handle in handles {
-            let tx = done_tx.clone();
-            std::thread::spawn(move || {
-                let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+            join_set.spawn_blocking(move || {
+                let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
                 handle.shutdown_and_wait_with_timeout(remaining);
-                let _ = tx.send(());
             });
         }
-        drop(done_tx);
-        for _ in 0..total {
-            let remaining = deadline.saturating_duration_since(std::time::Instant::now());
-            if remaining.is_zero() || done_rx.recv_timeout(remaining).is_err() {
-                break;
-            }
-        }
+        let _ = tokio::time::timeout_at(deadline, async { while join_set.join_next().await.is_some() {} }).await;
+        join_set.abort_all();
     }
 }
 
@@ -463,31 +468,31 @@ mod tests {
     use super::*;
     use crate::testing::{FakeTerm, MemStore};
 
-    fn open(store: &MemStore, ws: &mut Workspace<FakeTerm>, path: &str) -> ProjectId {
-        ws.open(load_project(store, Path::new(path)).unwrap())
+    async fn open(store: &MemStore, ws: &mut Workspace<FakeTerm>, path: &str) -> ProjectId {
+        ws.open(load_project(store, Path::new(path)).await.unwrap())
     }
 
     fn first_terminal<T: TerminalHandle>(ws: &Workspace<T>, id: ProjectId) -> String {
         ws.project(id).unwrap().layout.terminal_ids()[0].clone()
     }
 
-    #[test]
-    fn a_new_project_starts_with_one_terminal_tab_and_becomes_active() {
+    #[tokio::test]
+    async fn a_new_project_starts_with_one_terminal_tab_and_becomes_active() {
         let store = MemStore::default();
         let mut ws = Workspace::new();
-        let a = open(&store, &mut ws, "/code/alpha");
+        let a = open(&store, &mut ws, "/code/alpha").await;
         assert_eq!(ws.active_id(), Some(a));
         assert_eq!(ws.active().unwrap().layout.terminal_ids().len(), 1);
-        assert_eq!(open(&store, &mut ws, "/code/alpha"), a, "opening twice does not duplicate");
+        assert_eq!(open(&store, &mut ws, "/code/alpha").await, a, "opening twice does not duplicate");
         assert_eq!(ws.projects().len(), 1);
     }
 
-    #[test]
-    fn switching_projects_keeps_every_session_alive() {
+    #[tokio::test]
+    async fn switching_projects_keeps_every_session_alive() {
         let store = MemStore::default();
         let mut ws = Workspace::new();
-        let a = open(&store, &mut ws, "/code/alpha");
-        let b = open(&store, &mut ws, "/code/beta");
+        let a = open(&store, &mut ws, "/code/alpha").await;
+        let b = open(&store, &mut ws, "/code/beta").await;
         let term_a = FakeTerm::new("/code/alpha", "");
         let term_b = FakeTerm::new("/code/beta", "");
         let (ta, tb) = (first_terminal(&ws, a), first_terminal(&ws, b));
@@ -504,11 +509,11 @@ mod tests {
         assert_eq!(ws.project(b).unwrap().live_terminals(), 1);
     }
 
-    #[test]
-    fn closing_a_tab_kills_only_its_session() {
+    #[tokio::test]
+    async fn closing_a_tab_kills_only_its_session() {
         let store = MemStore::default();
         let mut ws = Workspace::new();
-        let a = open(&store, &mut ws, "/code/alpha");
+        let a = open(&store, &mut ws, "/code/alpha").await;
         let project = ws.project_mut(a).unwrap();
         let first = project.layout.terminal_ids()[0].clone();
         let (second, tab) = project.new_terminal_tab();
@@ -520,12 +525,12 @@ mod tests {
         assert!(project.terminal(&second).is_none());
     }
 
-    #[test]
-    fn closing_a_project_kills_its_sessions_and_activates_a_neighbour() {
+    #[tokio::test]
+    async fn closing_a_project_kills_its_sessions_and_activates_a_neighbour() {
         let store = MemStore::default();
         let mut ws = Workspace::new();
-        let a = open(&store, &mut ws, "/code/alpha");
-        let b = open(&store, &mut ws, "/code/beta");
+        let a = open(&store, &mut ws, "/code/alpha").await;
+        let b = open(&store, &mut ws, "/code/beta").await;
         let term_b = FakeTerm::new("/code/beta/src", "$ ls\n");
         let tb = first_terminal(&ws, b);
         ws.project_mut(b).unwrap().attach_terminal(&tb, term_b.clone(), "/code/beta".into(), None);
@@ -534,16 +539,16 @@ mod tests {
         assert!(term_b.was_killed());
         assert_eq!(ws.active_id(), Some(a));
         // The final state is still saved.
-        job.run(&store).unwrap();
+        job.run(&store).await.unwrap();
         assert_eq!(store.terminals.lock().unwrap()[&b][0].scrollback, "$ ls\n");
         assert!(ws.close(b).is_none());
     }
 
-    #[test]
-    fn save_and_restore_round_trip() {
+    #[tokio::test]
+    async fn save_and_restore_round_trip() {
         let store = MemStore::default();
         let mut ws = Workspace::new();
-        let a = open(&store, &mut ws, "/code/alpha");
+        let a = open(&store, &mut ws, "/code/alpha").await;
         let project = ws.project_mut(a).unwrap();
         let live = project.layout.terminal_ids()[0].clone();
         project.attach_terminal(
@@ -559,11 +564,11 @@ mod tests {
             .split(group, crate::layout::Axis::Horizontal, PaneKind::File { path: "Cargo.toml".into() });
         let layout_before = project.layout.clone();
         for job in ws.save_jobs() {
-            job.run(&store).unwrap();
+            job.run(&store).await.unwrap();
         }
 
         let mut ws2: Workspace<FakeTerm> = Workspace::new();
-        for loaded in load_all(&store).unwrap() {
+        for loaded in load_all(&store).await.unwrap() {
             ws2.open(loaded);
         }
         let restored = ws2.project_mut(a).unwrap();
@@ -576,30 +581,34 @@ mod tests {
         assert!(restored.take_restorable(&live).is_none());
     }
 
-    #[test]
-    fn terminals_never_shown_survive_a_second_save() {
+    #[tokio::test]
+    async fn terminals_never_shown_survive_a_second_save() {
         let store = MemStore::default();
         let mut ws = Workspace::new();
-        let a = open(&store, &mut ws, "/code/alpha");
+        let a = open(&store, &mut ws, "/code/alpha").await;
         let id = first_terminal(&ws, a);
         ws.project_mut(a)
             .unwrap()
             .attach_terminal(&id, FakeTerm::new("/x", "history\n"), "/x".into(), None);
-        ws.save_jobs().into_iter().for_each(|j| j.run(&store).unwrap());
+        for job in ws.save_jobs() {
+            job.run(&store).await.unwrap();
+        }
 
         // Second run: the project is opened but its terminal is never shown.
         let mut ws2: Workspace<FakeTerm> = Workspace::new();
-        load_all(&store).unwrap().into_iter().for_each(|l| {
-            ws2.open(l);
-        });
-        ws2.save_jobs().into_iter().for_each(|j| j.run(&store).unwrap());
+        for loaded in load_all(&store).await.unwrap() {
+            ws2.open(loaded);
+        }
+        for job in ws2.save_jobs() {
+            job.run(&store).await.unwrap();
+        }
         assert_eq!(store.terminals.lock().unwrap()[&a][0].scrollback, "history\n");
     }
 
-    #[test]
-    fn saved_terminals_without_a_tab_are_dropped() {
+    #[tokio::test]
+    async fn saved_terminals_without_a_tab_are_dropped() {
         let store = MemStore::default();
-        let info = store.add_project(Path::new("/code/alpha")).unwrap();
+        let info = store.add_project(Path::new("/code/alpha")).await.unwrap();
         store
             .set_terminals(
                 info.id,
@@ -611,19 +620,20 @@ mod tests {
                     scrollback: "x".into(),
                 }],
             )
+            .await
             .unwrap();
         let mut ws: Workspace<FakeTerm> = Workspace::new();
-        let a = ws.open(load_project(&store, Path::new("/code/alpha")).unwrap());
+        let a = ws.open(load_project(&store, Path::new("/code/alpha")).await.unwrap());
         assert!(ws.project_mut(a).unwrap().take_restorable("orphan").is_none());
     }
 
-    #[test]
-    fn reorder_reports_the_new_rail_order() {
+    #[tokio::test]
+    async fn reorder_reports_the_new_rail_order() {
         let store = MemStore::default();
         let mut ws = Workspace::new();
-        let a = open(&store, &mut ws, "/code/alpha");
-        let b = open(&store, &mut ws, "/code/beta");
-        let c = open(&store, &mut ws, "/code/gamma");
+        let a = open(&store, &mut ws, "/code/alpha").await;
+        let b = open(&store, &mut ws, "/code/beta").await;
+        let c = open(&store, &mut ws, "/code/gamma").await;
         assert_eq!(ws.reorder(c, 0), vec![c, a, b]);
         assert_eq!(ws.reorder(c, 99), vec![a, b, c]);
     }
@@ -657,25 +667,25 @@ mod tests {
         let _ = std::fs::remove_dir_all(dir);
     }
 
-    #[test]
-    fn regression_prune_missing_projects_removes_deleted_directories_from_store() {
+    #[tokio::test]
+    async fn regression_prune_missing_projects_removes_deleted_directories_from_store() {
         let store = MemStore::default();
         let live_dir = std::env::temp_dir().join(format!("vibevalley-ws-live-{}", new_id()));
         std::fs::create_dir_all(&live_dir).unwrap();
         let gone_dir = std::env::temp_dir().join(format!("vibevalley-ws-gone-{}", new_id()));
         let _ = std::fs::remove_dir_all(&gone_dir);
 
-        load_project(&store, &live_dir).unwrap();
-        load_project(&store, &gone_dir).unwrap();
+        load_project(&store, &live_dir).await.unwrap();
+        load_project(&store, &gone_dir).await.unwrap();
 
-        let loaded = load_all(&store).unwrap();
+        let loaded = load_all(&store).await.unwrap();
         assert_eq!(loaded.len(), 2);
 
-        let kept = prune_missing_projects(&store, loaded);
+        let kept = prune_missing_projects(&store, loaded).await;
         assert_eq!(kept.len(), 1);
         assert_eq!(kept[0].info.path, live_dir);
 
-        let stored = store.projects().unwrap();
+        let stored = store.projects().await.unwrap();
         assert_eq!(stored.len(), 1);
         assert_eq!(stored[0].path, live_dir);
 
@@ -683,6 +693,7 @@ mod tests {
     }
 
     #[derive(Clone)]
+    #[allow(clippy::disallowed_types, reason = "synchronous terminal shutdown barrier test")]
     struct BarrierFakeTerm {
         gate: std::sync::Arc<(std::sync::Mutex<bool>, std::sync::Condvar)>,
         barrier: Option<std::sync::Arc<std::sync::Barrier>>,
@@ -718,15 +729,16 @@ mod tests {
         }
     }
 
-    #[test]
-    fn shutdown_all_and_wait_fans_out_concurrently_within_budget() {
+    #[tokio::test]
+    #[allow(clippy::disallowed_types, reason = "synchronous terminal shutdown barrier test")]
+    async fn shutdown_all_and_wait_fans_out_concurrently_within_budget() {
         use std::sync::atomic::{AtomicUsize, Ordering};
         use std::sync::{Arc, Barrier, Condvar, Mutex};
         use std::time::{Duration, Instant};
 
         let store = MemStore::default();
         let mut ws: Workspace<BarrierFakeTerm> = Workspace::new();
-        let project_id = ws.open(load_project(&store, Path::new("/code/alpha")).unwrap());
+        let project_id = ws.open(load_project(&store, Path::new("/code/alpha")).await.unwrap());
         let begun = Arc::new(AtomicUsize::new(0));
         let finished = Arc::new(AtomicUsize::new(0));
         let gate = Arc::new((Mutex::new(false), Condvar::new()));
@@ -754,7 +766,7 @@ mod tests {
         }
 
         let start = Instant::now();
-        ws.shutdown_all_and_wait();
+        ws.shutdown_all_and_wait().await;
         let elapsed = start.elapsed();
 
         assert_eq!(begun.load(Ordering::SeqCst), 5);
@@ -765,15 +777,16 @@ mod tests {
         );
     }
 
-    #[test]
-    fn shutdown_all_and_wait_bounds_hung_terminals_to_budget() {
+    #[tokio::test]
+    #[allow(clippy::disallowed_types, reason = "synchronous terminal shutdown barrier test")]
+    async fn shutdown_all_and_wait_bounds_hung_terminals_to_budget() {
         use std::sync::atomic::{AtomicUsize, Ordering};
         use std::sync::{Arc, Condvar, Mutex};
         use std::time::{Duration, Instant};
 
         let store = MemStore::default();
         let mut ws: Workspace<BarrierFakeTerm> = Workspace::new();
-        let project_id = ws.open(load_project(&store, Path::new("/code/beta")).unwrap());
+        let project_id = ws.open(load_project(&store, Path::new("/code/beta")).await.unwrap());
         let begun = Arc::new(AtomicUsize::new(0));
         let finished = Arc::new(AtomicUsize::new(0));
         let fast_gate = Arc::new((Mutex::new(true), Condvar::new()));
@@ -807,7 +820,7 @@ mod tests {
         );
 
         let start = Instant::now();
-        ws.shutdown_all_and_wait();
+        ws.shutdown_all_and_wait().await;
         let elapsed = start.elapsed();
 
         // Release the stuck waiter thread immediately after assertion.

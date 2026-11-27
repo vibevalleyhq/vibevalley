@@ -160,15 +160,6 @@ fn authenticated_api_routes() -> Router<HttpState> {
         .route("/api/v1/issue/watch/{id}", get(issue_watch).post(command))
         .route("/api/v1/attachment/{id}", get(attachment).post(command))
         .route("/api/v1/note/{id}/cover", get(note_cover).post(command))
-        .route("/api/v1/{*path}", post(command).get(not_allowed))
-}
-
-fn machine_routes() -> Router<HttpState> {
-    Router::new().route("/api/v1/machine/ws", get(machine_ws::upgrade).post(command))
-}
-
-fn local_only_routes() -> Router<HttpState> {
-    Router::new()
         .route(
             "/api/v1/media/input/{id}/content",
             get(media::content)
@@ -177,7 +168,15 @@ fn local_only_routes() -> Router<HttpState> {
                 .post(command),
         )
         .route("/api/v1/media/speech/{id}/stream", get(media::speech).post(command))
-        .route("/mcp", post(mcp).get(not_allowed))
+        .route("/api/v1/{*path}", post(command).get(not_allowed))
+}
+
+fn machine_routes() -> Router<HttpState> {
+    Router::new().route("/api/v1/machine/ws", get(machine_ws::upgrade).post(command))
+}
+
+fn local_only_routes() -> Router<HttpState> {
+    Router::new().route("/mcp", post(mcp).get(not_allowed))
 }
 
 async fn trace_request(req: Request, next: Next) -> Response {
@@ -391,13 +390,16 @@ async fn live(State(state): State<HttpState>, _auth: Authenticated) -> Response 
                     let data = serde_json::to_string(&ev).unwrap_or_else(|_| "null".into());
                     Some(Event::default().data(data))
                 }
-                Err(BroadcastStreamRecvError::Lagged(_)) => None,
+                Err(BroadcastStreamRecvError::Lagged(skipped)) => {
+                    tracing::warn!(skipped, "http.sse.live broadcast lagged; skipped live events");
+                    Some(Event::default().event("lagged").data(serde_json::json!({ "skipped": skipped }).to_string()))
+                }
             };
             std::future::ready(event)
         });
         return sse_with_shutdown(stream, state.shutdown);
     }
-    let stream = tokio_stream::wrappers::UnboundedReceiverStream::new(state.server.live()).map(|item| {
+    let stream = tokio_stream::wrappers::ReceiverStream::new(state.server.live()).map(|item| {
         let data = serde_json::to_string(&item).unwrap_or_else(|_| "null".into());
         Event::default().data(data)
     });
@@ -514,7 +516,7 @@ async fn issue_watch(State(state): State<HttpState>, Authenticated(ctx): Authent
 async fn open(server: Shared, shutdown: CancellationToken, ctx: CallerContext, name: String, payload: Value) -> Result<Response, Envelope> {
     let (id, rx) = server.clone().subscribe_with_async(ctx, name, payload).await?;
     let guard = Subscription { server, id };
-    let stream = tokio_stream::wrappers::UnboundedReceiverStream::new(rx).map(move |item| {
+    let stream = tokio_stream::wrappers::ReceiverStream::new(rx).map(move |item| {
         let _keep = &guard;
         let data = serde_json::to_string(&item).unwrap_or_else(|_| "null".into());
         Event::default().data(data)

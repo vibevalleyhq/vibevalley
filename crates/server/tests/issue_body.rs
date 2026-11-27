@@ -1,6 +1,7 @@
 //! Issue = Note Body (`body_note_id` lazy materialization, startup migration backfill,
 //! Doc -> `issue.description` Markdown sync, PKM list exclusion, and Agent `note_suggestion` diversion).
 
+use crate::support::RouterTestExt as _;
 use std::sync::Arc;
 
 use serde_json::{Value, json};

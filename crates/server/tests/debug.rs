@@ -3,6 +3,7 @@
 //! bounded per-lane ring buffers, fault-injection overrides, and multi-kind
 //! trajectory inspection.
 
+use crate::support::{RouterTestExt as _, ServerTestExt as _};
 use std::fs::File;
 use std::io::BufWriter;
 use std::path::Path;
@@ -20,7 +21,6 @@ use vibevalley_runtime::agent::durable::Store;
 use vibevalley_runtime::agent::eval::{ReplaySpec, analyze_store};
 use vibevalley_runtime::oar::voyage::{Header as VoyageHeader, Kind as VoyageKind, Record as VoyageRecord, Writer as VoyageWriter};
 use vibevalley_runtime::oar::{Event as OarEvent, EventKind as OarEventKind, OarObserver, Registry, StopReason, Usage as OarUsage};
-use vibevalley_server::Server as _;
 use vibevalley_server::gateway::api::{CallerContext, CallerPrincipal, ClientIdentity, ClientKind, FaultGate, HostDebugBridge, InvokeObserver};
 use vibevalley_server::runtime::Step;
 use vibevalley_server::{App, Config, create_app_blocking};

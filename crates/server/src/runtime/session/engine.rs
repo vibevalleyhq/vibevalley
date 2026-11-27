@@ -781,23 +781,22 @@ impl SessionEngine {
         let mut mcp_servers: Vec<McpServer> = self.door_for(&session.id).into_iter().collect();
         mcp_servers.extend(drive.mcp_servers.iter().cloned());
         let (append_system_prompt, prompt) = drive.work_instructions(instructions, prompt);
-        let mut env = drive.env.clone();
-        if !drive.is_local {
+        let env = drive.env.clone();
+        let remote_dispatch = (!drive.is_local).then(|| {
             let repo_ref = issue
                 .repo
                 .as_deref()
                 .map(|r| self.0.worktree.repo_remote_url(r).unwrap_or_else(|| r.to_string()));
             let branch = session.worktree_branch().map(String::from);
             let base_ref = self.extra(&session.id).base;
-            let meta = crate::machine::RemoteDispatchMeta {
+            vibevalley_runtime::oar::RemoteDispatchMeta {
                 session_id: Some(session.id.clone()),
                 repo_ref,
                 branch,
                 base_ref,
                 mcp_session_token: Some(self.mcp_token_for(&session.id)),
-            };
-            crate::machine::attach_dispatch_meta(&mut env, &meta);
-        }
+            }
+        });
         let permission_mode = if mode.is_read_only() {
             PermissionMode::Plan
         } else {
@@ -836,6 +835,7 @@ impl SessionEngine {
             mcp_servers,
             disallowed_tools,
             system_prompt,
+            remote_dispatch,
             ..Default::default()
         };
         let agent = self.open_runtime_for_session_async(drive.runtime.as_ref(), session, opts).await?;
@@ -872,6 +872,11 @@ impl SessionEngine {
             .filter(|s| s.disconnected_at.is_some() && s.root_thread_id == agent.id())
             .cloned();
         let run_id = extra.run.clone();
+        let seeded_telemetry = if session.telemetry.is_some() {
+            session.telemetry.clone()
+        } else {
+            self.0.ctx.service.session.telemetry_for_session(&id).await.ok().flatten()
+        };
         {
             let _write = self.0.write_lock.lock().await;
             let at = now();
@@ -891,7 +896,11 @@ impl SessionEngine {
             let s = session.clone();
             let e = extra.clone();
             let sid = id.clone();
-            let (_, written_dirty) = service
+            // Update the live overlay before committing so a concurrent `StateFeed` projection
+            // can never combine newly committed issue changes with a stale `Idle` phase.
+            let prev_live = self.0.ctx.live.session(&id);
+            self.sync_live_snapshot(&session, run_id.as_deref(), seeded_telemetry);
+            let write_res = service
                 .write_dirty_with(RuntimeError::Store, |tx| {
                     let service = service.clone();
                     Box::pin(async move {
@@ -903,16 +912,22 @@ impl SessionEngine {
                         Ok(((), dirty))
                     })
                 })
-                .await?;
+                .await;
+            let (_, written_dirty) = match write_res {
+                Ok(res) => res,
+                Err(err) => {
+                    match prev_live {
+                        Some(snap) => self.0.ctx.live.set_session(id.clone(), snap),
+                        None => {
+                            self.0.ctx.live.remove_session(&id);
+                        }
+                    }
+                    return Err(err);
+                }
+            };
             self.0.ctx.mark_dirty(written_dirty);
         }
         self.0.door.lock().opening.remove(&id);
-        let seeded_telemetry = if session.telemetry.is_some() {
-            session.telemetry.clone()
-        } else {
-            self.0.ctx.service.session.telemetry_for_session(&id).await.ok().flatten()
-        };
-        self.sync_live_snapshot(&session, run_id.as_deref(), seeded_telemetry);
         self.emit_lifecycle(SessionLifecycleEvent::Changed(Box::new(session)));
         if let Some(before) = previous {
             let me = self.clone();
@@ -1014,7 +1029,14 @@ impl SessionEngine {
                     let dirty = change.dirty_mask() | SliceMask::SESSIONS;
                     change.fold(&mut item, at);
                     let s_for_tx = updated_session.clone();
-                    let (_, written_dirty) = service
+                    // Update the live overlay before committing so a concurrent `StateFeed` projection
+                    // can never see cleared questions (`IssueChange::Answered`) overlaid with a stale `Idle` phase.
+                    let prev_live = self.0.ctx.live.session(&sid);
+                    self.0.ctx.live.update_session(&sid, |snap| {
+                        snap.phase = Some(phase);
+                        snap.last_event_at = Some(now());
+                    });
+                    let write_res = service
                         .write_dirty_with(RuntimeError::Store, |tx| {
                             let service = service.clone();
                             Box::pin(async move {
@@ -1023,13 +1045,21 @@ impl SessionEngine {
                                 Ok(((), dirty))
                             })
                         })
-                        .await?;
+                        .await;
+                    let (_, written_dirty) = match write_res {
+                        Ok(res) => res,
+                        Err(err) => {
+                            match prev_live {
+                                Some(snap) => self.0.ctx.live.set_session(sid.clone(), snap),
+                                None => {
+                                    self.0.ctx.live.remove_session(&sid);
+                                }
+                            }
+                            return Err(err);
+                        }
+                    };
                     self.0.ctx.mark_dirty(written_dirty);
                 }
-                self.0.ctx.live.update_session(&sid, |snap| {
-                    snap.phase = Some(phase);
-                    snap.last_event_at = Some(now());
-                });
                 let run = self.begin_run_async(&session.id, &issue.id, trigger).await?;
                 let words = self.with_recall_async(session, words).await;
                 self.record_async(&session.id, Step::Asked { text: words.clone() }).await;
@@ -1160,13 +1190,13 @@ impl SessionEngine {
                 })
             })
             .await?;
-        self.0.ctx.mark_dirty(written_dirty);
         self.0.ctx.live.update_session(&session.id, |snap| {
             snap.phase = Some(session.phase.clone());
             snap.channel = Some(session.channel_id().map(str::to_string));
             snap.brief = (!session.brief.is_empty()).then(|| session.brief.clone());
             snap.last_event_at = Some(now());
         });
+        self.0.ctx.mark_dirty(written_dirty);
         self.emit_lifecycle(SessionLifecycleEvent::Changed(Box::new(session.clone())));
         Ok(())
     }
@@ -1257,9 +1287,9 @@ impl SessionEngine {
                         })
                     })
                     .await?;
+                self.0.ctx.live.remove_session(session_id);
                 self.0.ctx.mark_dirty(written_dirty);
             }
-            self.0.ctx.live.remove_session(session_id);
             self.emit_lifecycle(SessionLifecycleEvent::Left {
                 at,
                 id: session_id.to_string(),
@@ -1282,13 +1312,7 @@ impl SessionEngine {
 
     /// Turns the agent's events into live state and checkpoints until the session
     /// ends or leaves, without pinning an OS thread while idle between events.
-    async fn pump_async(
-        &self,
-        session_id: String,
-        generation: u64,
-        mut events: mpsc::UnboundedReceiver<vibevalley_runtime::oar::Event>,
-        cancel: CancellationToken,
-    ) {
+    async fn pump_async(&self, session_id: String, generation: u64, mut events: mpsc::Receiver<vibevalley_runtime::oar::Event>, cancel: CancellationToken) {
         let span = tracing::debug_span!("session.pump", session_id = %session_id, generation);
         async move {
             let quiet_after = self.0.config.quiet_after;
@@ -1570,10 +1594,9 @@ impl SessionEngine {
         let updated = {
             let _write = self.0.write_lock.lock().await;
             let service = self.0.ctx.service.clone();
+            let has_brief = brief.is_some();
+            let has_spent = spent.is_some();
             let id = id.to_string();
-            let phase = phase.clone();
-            let brief = brief.clone();
-            let spent = spent.clone();
             let dirty = SliceMask::BOARD | SliceMask::SESSIONS | SliceMask::INBOX | SliceMask::FARM;
             let (updated, written_dirty) = service
                 .write_dirty_with(RuntimeError::Store, |tx| {
@@ -1594,20 +1617,22 @@ impl SessionEngine {
                     })
                 })
                 .await?;
+            if let Some(session) = &updated {
+                self.0.ctx.live.update_session(&session.id, |snap| {
+                    snap.phase = Some(session.phase.clone());
+                    if has_brief {
+                        snap.brief = Some(session.brief.clone());
+                    }
+                    if has_spent {
+                        snap.spent = session.spent.clone();
+                    }
+                    snap.last_event_at = Some(at);
+                });
+            }
             self.0.ctx.mark_dirty(written_dirty);
             updated
         };
         if let Some(session) = updated {
-            self.0.ctx.live.update_session(id, |snap| {
-                snap.phase = Some(session.phase.clone());
-                if brief.is_some() {
-                    snap.brief = Some(session.brief.clone());
-                }
-                if spent.is_some() {
-                    snap.spent = session.spent.clone();
-                }
-                snap.last_event_at = Some(at);
-            });
             self.emit_lifecycle(SessionLifecycleEvent::Changed(Box::new(session)));
         }
         Ok(())
@@ -1808,6 +1833,13 @@ impl SessionEngine {
                     },
                 )
                 .await?;
+            if let Some(updated_session) = &updated.0 {
+                self.0.ctx.live.update_session(&updated_session.id, |snap| {
+                    snap.phase = Some(updated_session.phase.clone());
+                    snap.spent = updated_session.spent.clone();
+                    snap.last_event_at = Some(at);
+                });
+            }
             self.0.ctx.mark_dirty(dirty);
             if updated.1 {
                 self.0.ctx.outbox.wake();
@@ -1815,11 +1847,6 @@ impl SessionEngine {
             updated.0
         };
         if let Some(updated_session) = updated {
-            self.0.ctx.live.update_session(&updated_session.id, |snap| {
-                snap.phase = Some(updated_session.phase.clone());
-                snap.spent = updated_session.spent.clone();
-                snap.last_event_at = Some(at);
-            });
             self.emit_lifecycle(SessionLifecycleEvent::Changed(Box::new(updated_session)));
         }
         Ok(())
@@ -2097,8 +2124,8 @@ mod tests {
 
     struct StubSession {
         id: String,
-        tx: mpsc::UnboundedSender<Event>,
-        rx: Mutex<Option<mpsc::UnboundedReceiver<Event>>>,
+        tx: mpsc::Sender<Event>,
+        rx: Mutex<Option<mpsc::Receiver<Event>>>,
     }
 
     impl OarSession for StubSession {
@@ -2129,8 +2156,8 @@ mod tests {
             vec![]
         }
 
-        fn subscribe_records(&self, _: Option<u64>) -> mpsc::UnboundedReceiver<voyage::Record> {
-            let (_tx, rx) = mpsc::unbounded_channel();
+        fn subscribe_records(&self, _: Option<u64>) -> mpsc::Receiver<voyage::Record> {
+            let (_tx, rx) = mpsc::channel(1);
             rx
         }
 
@@ -2142,8 +2169,8 @@ mod tests {
             SessionStatus::Idle
         }
 
-        fn events(&self) -> mpsc::UnboundedReceiver<Event> {
-            self.rx.lock().take().unwrap_or_else(|| mpsc::unbounded_channel().1)
+        fn events(&self) -> mpsc::Receiver<Event> {
+            self.rx.lock().take().unwrap_or_else(|| mpsc::channel(1).1)
         }
 
         fn prompt(&self, _: Vec<ContentBlock>) -> BoxFuture<'_, vibevalley_runtime::oar::Result<()>> {
@@ -2172,7 +2199,7 @@ mod tests {
         }
 
         fn signal_dispose(&self) {
-            let _ = self.tx.send(Event {
+            let _ = self.tx.try_send(Event {
                 seq: 0,
                 at_ms: 0,
                 agent_path: vec![],
@@ -2211,7 +2238,7 @@ mod tests {
 
         fn open(&self, _: SessionOptions) -> BoxFuture<'_, vibevalley_runtime::oar::Result<Arc<dyn OarSession>>> {
             Box::pin(async {
-                let (tx, rx) = mpsc::unbounded_channel();
+                let (tx, rx) = mpsc::channel(64);
                 Ok(Arc::new(StubSession {
                     id: "stub-1".into(),
                     tx,
@@ -2259,7 +2286,7 @@ mod tests {
                 .await
                 .unwrap();
 
-            let (tx, rx) = mpsc::unbounded_channel();
+            let (tx, rx) = mpsc::channel(64);
             let agent = Arc::new(StubSession {
                 id: "stub-quiet".into(),
                 tx: tx.clone(),
@@ -2308,7 +2335,7 @@ mod tests {
                 wall_start.elapsed()
             );
 
-            tx.send(Event {
+            tx.try_send(Event {
                 seq: 1,
                 at_ms: now() as u64,
                 agent_path: vec![],
@@ -2402,7 +2429,7 @@ mod tests {
             .await
             .unwrap();
 
-        let (tx, rx) = mpsc::unbounded_channel();
+        let (tx, rx) = mpsc::channel(64);
         let agent = Arc::new(StubSession {
             id: "stub-disc".into(),
             tx: tx.clone(),
@@ -2444,7 +2471,7 @@ mod tests {
             .await
             .unwrap();
 
-        tx.send(Event {
+        tx.try_send(Event {
             seq: 1,
             at_ms: now() as u64,
             agent_path: vec![],
@@ -2462,7 +2489,7 @@ mod tests {
             )
             .await
             .unwrap();
-        tx.send(Event {
+        tx.try_send(Event {
             seq: 2,
             at_ms: now() as u64,
             agent_path: vec![],
@@ -2471,7 +2498,7 @@ mod tests {
             },
         })
         .unwrap();
-        tx.send(Event {
+        tx.try_send(Event {
             seq: 3,
             at_ms: now() as u64,
             agent_path: vec![],

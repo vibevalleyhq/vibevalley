@@ -12,6 +12,7 @@ pub mod cron;
 pub mod debug;
 pub mod endpoints;
 pub mod game;
+#[cfg(feature = "host")]
 pub mod host;
 pub mod inbox;
 pub mod issue;
@@ -38,6 +39,7 @@ pub use cron::*;
 pub use debug::*;
 pub use endpoints::*;
 pub use game::*;
+#[cfg(feature = "host")]
 pub use host::*;
 pub use inbox::*;
 pub use issue::*;

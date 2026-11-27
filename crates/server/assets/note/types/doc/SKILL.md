@@ -6,7 +6,7 @@ tags: [note, writing, doc]
 
 # doc：块级协作文档
 
-`doc` 是 VibeValley 的统一块级写作与方案文档原语（原 `docs`/`outline`/`slides`/`dashboard` 写作与汇报能力统一收敛于此）。目录存放在 `<storage>/note/<id>/`，主入口为 `structure/doc.json`（兼容导出 `structure/index.md`）。
+`doc` 是 VibeValley 的统一块级写作与方案文档原语（原 `docs`/`outline`/`slides`/`dashboard` 写作与汇报能力统一收敛于此）。目录存放在 `<storage>/note/<id>/`，主入口为 `structure/doc.json`。
 
 ## 目录结构
 

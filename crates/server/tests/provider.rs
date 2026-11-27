@@ -166,7 +166,7 @@ fn updates_keep_the_key_and_follow_revisions() {
             .unwrap();
         assert_eq!(first.revision, 1);
         let shown = serde_json::to_value(&first).unwrap();
-        assert_eq!(shown["connections"][0]["key"], json!({ "source": "settings", "hint": "…-key" }));
+        assert_eq!(shown["connections"][0]["key"], json!({ "source": "settings", "hint": "[redacted]" }));
         // Omitted keeps the key; a stale revision is refused.
         let mut again = update(|u| {
             u["revision"] = 1.into();
@@ -174,7 +174,7 @@ fn updates_keep_the_key_and_follow_revisions() {
         });
         assert_eq!(p.update_async(&update(|_| {})).await.unwrap_err().biz_code, BizCode::ProviderRefused);
         let kept = p.update_async(&again).await.unwrap();
-        assert_eq!(serde_json::to_value(&kept).unwrap()["connections"][0]["key"]["hint"], "…-key");
+        assert_eq!(serde_json::to_value(&kept).unwrap()["connections"][0]["key"]["hint"], "[redacted]");
         // Cleared while bound is refused.
         again.revision = 2;
         again.connections[0].key = Some(None);
@@ -192,8 +192,17 @@ fn updates_keep_the_key_and_follow_revisions() {
         .await;
         assert_eq!(serde_json::to_value(reopened.providers()).unwrap()["connections"][0]["key"], "test-key");
         let _ = Arc::strong_count(&setting);
-        // Model discovery refuses an old revision before any call.
-        assert_eq!(p.models_async("moss", 0).await.unwrap_err().biz_code, BizCode::ProviderRefused);
+        // Verification refuses an old revision before any call.
+        assert_eq!(
+            p.verify_async(&vibevalley_protocol::ProviderVerifyRequest {
+                connection: "moss".into(),
+                revision: 0,
+            })
+            .await
+            .unwrap_err()
+            .biz_code,
+            BizCode::ProviderRefused
+        );
     });
 }
 

@@ -208,7 +208,6 @@ export {
   type BaseRunAgentColumnRequest,
   type BaseRunAgentColumnResult,
   type BaseSelectOption,
-  type BaseSheet,
   type BaseSummaryOp,
   type BaseUpsertRowRequest,
   type BaseViewKind,
@@ -348,7 +347,7 @@ export type {
   OrchestratorEval,
   OrchestratorEvalRequest,
 } from "./orchestrator/shapes.gen";
-export type { AchievementList, DailyTask, DailyTaskBoard, FarmFrame, FarmShopView, ShopItem, ShopPurchaseRequest } from "./game/shapes.gen";
+export type { AchievementList, DailyTask, FarmFrame, FarmShopView, ShopItem, ShopPurchaseRequest } from "./game/shapes.gen";
 export { type Attachment, type AttachmentImportPathInput, type AttachmentUpload } from "./attachment/shapes.gen";
 export {
   type ConnectorID,
@@ -359,20 +358,7 @@ export {
   type ConnectorStatus,
   type VerifyRequest,
 } from "./connector/shapes.gen";
-export {
-  type VoiceAsrGrant,
-  type VoiceAsrResult,
-  type VoiceAsrStopInput,
-  type VoiceAsrTranscribeInput,
-  type VoiceCall,
-  type VoiceCallStart,
-  type VoiceFix,
-  VoiceFixValues,
-  type VoiceGrant,
-  type VoiceHeard,
-  type VoiceSaid,
-  type VoiceSettings,
-} from "./voice/shapes";
+export { type VoiceFix, VoiceFixValues, type VoiceSettings } from "./voice/shapes";
 export {
   type Feature,
   FeatureValues,
@@ -386,21 +372,20 @@ export {
   type SettingsUpdate,
   type UserProfile,
 } from "./setting/shapes.gen";
-export type {
-  ModelCapability,
-  ProviderBinding,
-  ProviderConnection,
-  ProviderConnectionAdapter,
-  ProviderConnectionUpdate,
-  ProviderModelListing,
-  ProviderModelRequest,
-  ProviderScene,
-  ProviderScenePolicy,
-  ProviderStatus,
-  ProviderUpdate,
-  ProviderVerifyRequest,
-  ProviderVoiceListing,
-  ProviderVoiceRequest,
+export {
+  type ModelCapability,
+  ModelCapabilityValues,
+  type ProviderBinding,
+  type ProviderConnection,
+  type ProviderConnectionAdapter,
+  type ProviderConnectionUpdate,
+  type ProviderScene,
+  type ProviderScenePolicy,
+  type ProviderStatus,
+  type ProviderUpdate,
+  type ProviderVerifyRequest,
+  type ProviderVoiceListing,
+  type ProviderVoiceRequest,
 } from "./provider/shapes.gen";
 export {
   type RemoteDeviceRevokeRequest,
@@ -440,6 +425,7 @@ export {
   type MediaImageJob,
   type MediaImageRequest,
   type MediaInput,
+  MediaInputKindValues,
   type MediaInputRequest,
   type MediaJob,
   type MediaJobRequest,

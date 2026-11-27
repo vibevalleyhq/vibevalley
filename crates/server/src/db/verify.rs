@@ -183,6 +183,14 @@ struct ActualColumn {
     required_without_default: bool,
 }
 
+const SQLITE_FTS_PREFIXES: &[&str] = &["channel_message_fts", "memory_fts", "attachment_fts"];
+
+fn is_sqlite_fts_auxiliary_table(name: &str) -> bool {
+    SQLITE_FTS_PREFIXES
+        .iter()
+        .any(|prefix| name == *prefix || name.starts_with(&format!("{prefix}_")))
+}
+
 async fn list_existing_tables(conn: &DatabaseConnection, backend: DatabaseBackend) -> DbResult<BTreeSet<String>> {
     let sql = match backend {
         DatabaseBackend::Postgres => "SELECT table_name FROM information_schema.tables WHERE table_schema = current_schema() AND table_type = 'BASE TABLE'",
@@ -192,6 +200,9 @@ async fn list_existing_tables(conn: &DatabaseConnection, backend: DatabaseBacken
     let mut tables = BTreeSet::new();
     for row in rows {
         let name: String = row.try_get_by_index(0)?;
+        if backend == DatabaseBackend::Sqlite && is_sqlite_fts_auxiliary_table(&name) {
+            continue;
+        }
         tables.insert(name);
     }
     Ok(tables)
@@ -522,8 +533,25 @@ mod tests {
         assert_eq!(memory_row.try_get_by_index::<i64>(2).unwrap(), 0);
         assert_eq!(memory_row.try_get_by_index::<Option<String>>(3).unwrap(), None);
 
+        let msg_cols: BTreeSet<&str> = actual_columns
+            .get("channel_message")
+            .expect("channel_message table must exist")
+            .iter()
+            .map(|c| c.name.as_str())
+            .collect();
+        for col in ["has_file", "has_image", "has_link"] {
+            assert!(msg_cols.contains(col), "channel_message table must include {col} column");
+        }
+        let ev_cols: BTreeSet<&str> = actual_columns
+            .get("session_event")
+            .expect("session_event table must exist")
+            .iter()
+            .map(|c| c.name.as_str())
+            .collect();
+        assert!(ev_cols.contains("event_type"), "session_event table must include event_type column");
+
         let migrations = list_applied_migrations(db.read_conn(), DatabaseBackend::Sqlite, &existing).await.unwrap();
-        assert_eq!(migrations.len(), 11);
+        assert_eq!(migrations.len(), 12);
         db.close().await;
     }
 

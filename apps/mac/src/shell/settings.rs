@@ -27,11 +27,11 @@ impl Shell {
     pub fn save_now(&mut self, cx: &mut Context<Self>) {
         let Some(store) = self.workspace.store.clone() else { return };
         let jobs = self.workspace.ws.save_jobs();
-        Self::bg(
+        Self::bg_tokio(
             cx,
-            move || {
+            async move {
                 for job in jobs {
-                    if let Err(e) = job.run(&*store) {
+                    if let Err(e) = job.run(&*store).await {
                         eprintln!("save: {e}");
                     }
                 }
@@ -48,9 +48,9 @@ impl Shell {
         settings.inspector_open = self.chrome.inspector_open;
         settings.inspector_width = self.chrome.inspector_width;
         settings.last_route = self.chrome.last_route.clone();
-        Self::bg(
+        Self::bg_tokio(
             cx,
-            move || vibevalley_workspace::persist::save_setting(&*store, SETTINGS_KEY, &settings),
+            async move { vibevalley_workspace::persist::save_setting(&*store, SETTINGS_KEY, &settings).await },
             |_, r, _| {
                 if let Err(e) = r {
                     eprintln!("save settings: {e}");

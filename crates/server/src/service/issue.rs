@@ -3,13 +3,14 @@
 //!
 //! Derived issue status and stage are rebuilt from issues and sessions, never persisted.
 
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use sea_orm::sea_query::{Alias, Expr, Func, OnConflict};
 use sea_orm::{ActiveValue::Set, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Update};
 use vibevalley_protocol::{Issue, JsNumber, PublishPlatform, PullRequestState};
 
-use super::with_write_tx;
+use super::{MAX_SQL_BIND_PARAMS, batch_chunk_rows, with_write_tx};
 use crate::db::column::{db_json, db_word, read_db_json, read_db_word};
 use crate::db::entity::{issue, pull, pull_event};
 use crate::db::{Database, DbError, DbResult, Tx};
@@ -120,8 +121,10 @@ async fn get_issue_impl<C: ConnectionTrait>(db: &C, id: &str) -> DbResult<Option
     issue::Entity::find_by_id(id).one(db).await?.map(read_issue).transpose()
 }
 
-async fn put_issue_impl<C: ConnectionTrait>(db: &C, t: &Issue) -> DbResult<()> {
-    let model = issue::ActiveModel {
+const ISSUE_BATCH_ROWS: usize = batch_chunk_rows(37);
+
+fn issue_active_model(t: &Issue) -> DbResult<issue::ActiveModel> {
+    Ok(issue::ActiveModel {
         id: Set(t.id.clone()),
         number: Set(t.number),
         title: Set(t.title.clone()),
@@ -159,8 +162,11 @@ async fn put_issue_impl<C: ConnectionTrait>(db: &C, t: &Issue) -> DbResult<()> {
         owner: Set(t.owner.as_ref().map(db_json).transpose()?),
         relations: Set(db_json(&t.relations)?),
         body_note_id: Set(t.body_note_id.clone()),
-    };
-    let on_conflict = OnConflict::column(issue::Column::Id)
+    })
+}
+
+fn issue_on_conflict() -> OnConflict {
+    OnConflict::column(issue::Column::Id)
         .update_columns([
             issue::Column::Number,
             issue::Column::Title,
@@ -198,8 +204,39 @@ async fn put_issue_impl<C: ConnectionTrait>(db: &C, t: &Issue) -> DbResult<()> {
             issue::Column::Relations,
             issue::Column::BodyNoteId,
         ])
-        .to_owned();
-    issue::Entity::insert(model).on_conflict(on_conflict).exec(db).await?;
+        .to_owned()
+}
+
+async fn put_issue_impl<C: ConnectionTrait>(db: &C, t: &Issue) -> DbResult<()> {
+    let model = issue_active_model(t)?;
+    issue::Entity::insert(model).on_conflict(issue_on_conflict()).exec(db).await?;
+    Ok(())
+}
+
+async fn put_issues_batch_impl<C: ConnectionTrait>(db: &C, issues: &[Issue]) -> DbResult<()> {
+    if issues.is_empty() {
+        return Ok(());
+    }
+    // Deduplicate by `id` (last-write-wins) so PostgreSQL never sees duplicate conflict keys in one statement.
+    let mut index_by_id: HashMap<&str, usize> = HashMap::with_capacity(issues.len());
+    let mut deduped: Vec<&Issue> = Vec::with_capacity(issues.len());
+    for item in issues {
+        if let Some(&idx) = index_by_id.get(item.id.as_str()) {
+            deduped[idx] = item;
+        } else {
+            index_by_id.insert(item.id.as_str(), deduped.len());
+            deduped.push(item);
+        }
+    }
+
+    let on_conflict = issue_on_conflict();
+    for chunk in deduped.chunks(ISSUE_BATCH_ROWS) {
+        let models: Vec<issue::ActiveModel> = chunk.iter().map(|item| issue_active_model(item)).collect::<DbResult<_>>()?;
+        issue::Entity::insert_many(models)
+            .on_conflict(on_conflict.clone())
+            .exec_without_returning(db)
+            .await?;
+    }
     Ok(())
 }
 
@@ -293,6 +330,105 @@ impl IssueService {
         get_issue_impl(self.db.read_conn(), id).await
     }
 
+    /// Resolves a single issue by `id`, `number`, or `#number` using primary/unique index lookups.
+    pub(crate) async fn get_by_ref(&self, reference: &str) -> DbResult<Option<Issue>> {
+        let trimmed = reference.trim();
+        let stripped = trimmed.trim_start_matches('#');
+        if stripped.is_empty() {
+            return Ok(None);
+        }
+        let looks_numeric = trimmed.starts_with('#') || stripped.bytes().all(|b| b.is_ascii_digit());
+        if looks_numeric && let Ok(number) = stripped.parse::<i64>() {
+            if let Some(row) = issue::Entity::find().filter(issue::Column::Number.eq(number)).one(self.db.read_conn()).await? {
+                return read_issue(row).map(Some);
+            }
+            return get_issue_impl(self.db.read_conn(), stripped).await;
+        }
+        if let Some(found) = get_issue_impl(self.db.read_conn(), stripped).await? {
+            return Ok(Some(found));
+        }
+        if let Ok(number) = stripped.parse::<i64>() {
+            return issue::Entity::find()
+                .filter(issue::Column::Number.eq(number))
+                .one(self.db.read_conn())
+                .await?
+                .map(read_issue)
+                .transpose();
+        }
+        Ok(None)
+    }
+
+    /// Loads all descendant sub-issues of `root_id` via indexed `issue_parent` traversal.
+    pub(crate) async fn list_descendants(&self, root_id: &str) -> DbResult<Vec<Issue>> {
+        let mut out = Vec::new();
+        let mut visited: HashSet<String> = HashSet::from([root_id.to_owned()]);
+        let mut frontier: Vec<String> = vec![root_id.to_owned()];
+        while !frontier.is_empty() {
+            let mut next = Vec::new();
+            for chunk in frontier.chunks(MAX_SQL_BIND_PARAMS) {
+                let rows = issue::Entity::find()
+                    .filter(issue::Column::Parent.is_in(chunk.iter().cloned()))
+                    .order_by_asc(issue::Column::Number)
+                    .all(self.db.read_conn())
+                    .await?;
+                for row in rows {
+                    let item = read_issue(row)?;
+                    if visited.insert(item.id.clone()) {
+                        next.push(item.id.clone());
+                        out.push(item);
+                    }
+                }
+            }
+            frontier = next;
+        }
+        Ok(out)
+    }
+
+    /// Loads the active board window: all open issues (`closed_at IS NULL`), the latest
+    /// `keep_closed` closed top-level issues and their descendants, plus any explicit `include_ids`
+    /// (e.g. issues currently bound to active sessions). Avoids deserializing archived history.
+    pub(crate) async fn list_board_window(&self, keep_closed: usize, include_ids: &[String]) -> DbResult<Vec<Issue>> {
+        self.db
+            .query_metrics()
+            .observe("issue.list_board_window", "SELECT issue (board window)", async {
+                list_board_window_impl(self.db.read_conn(), keep_closed, include_ids).await
+            })
+            .await
+    }
+
+    pub(crate) async fn list_board_window_in_tx(&self, tx: &Tx, keep_closed: usize, include_ids: &[String]) -> DbResult<Vec<Issue>> {
+        self.db
+            .query_metrics()
+            .observe("issue.list_board_window", "SELECT issue (board window)", async {
+                list_board_window_impl(tx, keep_closed, include_ids).await
+            })
+            .await
+    }
+
+    /// Reads active sessions and the board issue window inside one consistent read transaction
+    /// so slice projections never observe a torn `(session, issue)` pair across a concurrent commit.
+    pub(crate) async fn board_projection_snapshot(
+        &self,
+        sessions: &super::SessionService,
+        keep_closed: usize,
+    ) -> DbResult<(Vec<vibevalley_protocol::Session>, Vec<Issue>)> {
+        let tx = crate::db::begin_read_tx(self.db.read_conn()).await?;
+        let result = async {
+            let raw_sessions = sessions.all_in_tx(&tx).await?;
+            let active_issue_ids: Vec<String> = raw_sessions
+                .iter()
+                .filter_map(|s| s.issue_id().map(str::to_owned))
+                .collect::<HashSet<_>>()
+                .into_iter()
+                .collect();
+            let raw_issues = self.list_board_window_in_tx(&tx, keep_closed, &active_issue_ids).await?;
+            Ok::<_, DbError>((raw_sessions, raw_issues))
+        }
+        .await;
+        let _ = crate::db::rollback_tx(tx).await;
+        result
+    }
+
     pub(crate) async fn get_in_tx(&self, tx: &Tx, id: &str) -> DbResult<Option<Issue>> {
         get_issue_impl(tx, id).await
     }
@@ -329,13 +465,7 @@ impl IssueService {
         if issues.is_empty() {
             return Ok(());
         }
-        with_write_tx(&self.db, async |tx| {
-            for item in issues {
-                put_issue_impl(tx, item).await?;
-            }
-            Ok(())
-        })
-        .await
+        with_write_tx(&self.db, async |tx| put_issues_batch_impl(tx, issues).await).await
     }
 
     pub(crate) async fn remove(&self, id: &str) -> DbResult<()> {
@@ -430,4 +560,130 @@ impl IssueService {
     pub(crate) async fn keep_pull_event(&self, pull_id: &str, key: &str, bot_round_key: Option<&str>, bot_round: Option<i64>) -> DbResult<()> {
         keep_pull_event_impl(self.db.write_conn(), pull_id, key, bot_round_key, bot_round).await
     }
+
+    /// Deletes up to `limit` `pull_event` rows belonging to closed/merged pulls with `updated_at < before_ms`.
+    pub(crate) async fn prune_closed_pull_events_batch(&self, before_ms: i64, limit: u64) -> DbResult<u64> {
+        if limit == 0 {
+            return Ok(0);
+        }
+        with_write_tx(&self.db, async |tx| {
+            let pull_ids: Vec<String> = pull::Entity::find()
+                .select_only()
+                .column(pull::Column::Id)
+                .filter(pull::Column::State.is_in(["merged", "closed"]))
+                .filter(pull::Column::UpdatedAt.lt(before_ms))
+                .into_tuple()
+                .all(tx)
+                .await?;
+            if pull_ids.is_empty() {
+                return Ok(0);
+            }
+            let mut remaining = usize::try_from(limit).unwrap_or(usize::MAX);
+            let mut pairs: Vec<(String, String)> = Vec::new();
+            for chunk in pull_ids.chunks(super::MAX_SQL_BIND_PARAMS) {
+                if remaining == 0 {
+                    break;
+                }
+                let batch: Vec<(String, String)> = pull_event::Entity::find()
+                    .select_only()
+                    .columns([pull_event::Column::PullId, pull_event::Column::Key])
+                    .filter(pull_event::Column::PullId.is_in(chunk.iter().cloned()))
+                    .order_by_asc(pull_event::Column::PullId)
+                    .order_by_asc(pull_event::Column::Key)
+                    .limit(remaining as u64)
+                    .into_tuple()
+                    .all(tx)
+                    .await?;
+                remaining = remaining.saturating_sub(batch.len());
+                pairs.extend(batch);
+            }
+            if pairs.is_empty() {
+                return Ok(0);
+            }
+            let mut by_pull: HashMap<String, Vec<String>> = HashMap::new();
+            for (pull_id, key) in pairs {
+                by_pull.entry(pull_id).or_default().push(key);
+            }
+            let mut deleted = 0u64;
+            for (pull_id, keys) in by_pull {
+                for key_chunk in keys.chunks(super::MAX_SQL_BIND_PARAMS - 1) {
+                    let res = pull_event::Entity::delete_many()
+                        .filter(pull_event::Column::PullId.eq(&pull_id))
+                        .filter(pull_event::Column::Key.is_in(key_chunk.iter().cloned()))
+                        .exec(tx)
+                        .await?;
+                    deleted += res.rows_affected;
+                }
+            }
+            Ok(deleted)
+        })
+        .await
+    }
+}
+
+async fn list_board_window_impl(conn: &impl ConnectionTrait, keep_closed: usize, include_ids: &[String]) -> DbResult<Vec<Issue>> {
+    let mut by_id: HashMap<String, Issue> = HashMap::new();
+
+    // 1. All non-closed issues.
+    let open_rows = issue::Entity::find()
+        .filter(issue::Column::ClosedAt.is_null())
+        .order_by_asc(issue::Column::Number)
+        .all(conn)
+        .await?;
+    for row in open_rows {
+        let item = read_issue(row)?;
+        by_id.insert(item.id.clone(), item);
+    }
+
+    // 2. Latest `keep_closed` closed top-level issues.
+    if keep_closed > 0 {
+        let recent_closed = issue::Entity::find()
+            .filter(issue::Column::Parent.is_null())
+            .filter(issue::Column::ClosedAt.is_not_null())
+            .order_by_desc(issue::Column::ClosedAt)
+            .order_by_desc(issue::Column::Number)
+            .limit(keep_closed as u64)
+            .all(conn)
+            .await?;
+        for row in recent_closed {
+            let item = read_issue(row)?;
+            by_id.insert(item.id.clone(), item);
+        }
+    }
+
+    // 3. Closed descendants of retained issues.
+    let mut frontier: Vec<String> = by_id.keys().cloned().collect();
+    let mut expanded: HashSet<String> = frontier.iter().cloned().collect();
+    while !frontier.is_empty() {
+        let mut next = Vec::new();
+        for chunk in frontier.chunks(MAX_SQL_BIND_PARAMS) {
+            let rows = issue::Entity::find()
+                .filter(issue::Column::Parent.is_in(chunk.iter().cloned()))
+                .filter(issue::Column::ClosedAt.is_not_null())
+                .all(conn)
+                .await?;
+            for row in rows {
+                let item = read_issue(row)?;
+                if expanded.insert(item.id.clone()) {
+                    next.push(item.id.clone());
+                }
+                by_id.entry(item.id.clone()).or_insert(item);
+            }
+        }
+        frontier = next;
+    }
+
+    // 4. Any explicitly requested IDs (e.g. issues bound to active sessions).
+    let missing_ids: Vec<String> = include_ids.iter().filter(|id| !by_id.contains_key(id.as_str())).cloned().collect();
+    for chunk in missing_ids.chunks(MAX_SQL_BIND_PARAMS) {
+        let rows = issue::Entity::find().filter(issue::Column::Id.is_in(chunk.iter().cloned())).all(conn).await?;
+        for row in rows {
+            let item = read_issue(row)?;
+            by_id.insert(item.id.clone(), item);
+        }
+    }
+
+    let mut out: Vec<Issue> = by_id.into_values().collect();
+    out.sort_by_key(|i| i.number);
+    Ok(out)
 }

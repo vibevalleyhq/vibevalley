@@ -488,6 +488,39 @@ impl Index {
             self.parse_endpoint_table(&clean, &lines, endpoints_path, "ENDPOINTS", false);
             self.parse_endpoint_ids_macro(&clean, &lines, endpoints_path);
             self.parse_subscriptions_table(&clean, &lines, endpoints_path);
+        } else {
+            let endpoints_dir = root.join("crates/protocol/src/contract/endpoints");
+            if endpoints_dir.is_dir() {
+                let mut entries: Vec<String> = fs::read_dir(&endpoints_dir)
+                    .map_err(|err| format!("failed to read {}: {err}", endpoints_dir.display()))?
+                    .filter_map(|e| e.ok())
+                    .filter_map(|e| {
+                        let name = e.file_name().to_str()?.to_owned();
+                        name.ends_with(".rs").then_some(name)
+                    })
+                    .collect();
+                entries.sort();
+                let mut id_files: Vec<(String, String)> = Vec::new();
+                for name in entries {
+                    let rel = format!("crates/protocol/src/contract/endpoints/{name}");
+                    let Some(raw) = read_optional_file(root, &rel)? else {
+                        continue;
+                    };
+                    if name == "mod.rs" || name == "id.rs" {
+                        id_files.push((rel, raw));
+                        continue;
+                    }
+                    let clean = strip_rust_comments_keep_strings_non_test(&raw, &rel);
+                    let lines = LineIndex::new(&raw);
+                    self.parse_endpoint_table(&clean, &lines, &rel, "ENDPOINTS", false);
+                    self.parse_subscriptions_table(&clean, &lines, &rel);
+                }
+                for (rel, raw) in id_files {
+                    let clean = strip_rust_comments_keep_strings_non_test(&raw, &rel);
+                    let lines = LineIndex::new(&raw);
+                    self.parse_endpoint_ids_macro(&clean, &lines, &rel);
+                }
+            }
         }
 
         let native_path = "crates/protocol/src/native.rs";

@@ -258,7 +258,7 @@ fn markdown_capabilities_json(path: &Path) -> String {
     {
         roots.push(canon);
     }
-    let work_root = crate::serving::work_root();
+    let work_root = crate::env::work_root();
     if let Ok(canon) = std::fs::canonicalize(work_root) {
         roots.push(canon);
     }

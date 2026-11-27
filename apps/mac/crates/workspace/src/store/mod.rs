@@ -1,6 +1,6 @@
 //! Persistent app state in one SQLite file: projects, per-project layout,
 //! terminal restore data, and settings. Source files never go in here.
-//! `Store` is `Send + Sync`; calls block briefly.
+//! `Store` is `Send + Sync`; all database methods are async.
 
 mod entities;
 mod schema;

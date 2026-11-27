@@ -3105,9 +3105,6 @@ name = "fastrand"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "da7c62ceae207dd37ea5b845da6a0696c799f85e97da1ab5b7910be3c1c80223"
-dependencies = [
- "getrandom 0.4.3",
-]
 
 [[package]]
 name = "fax"
@@ -3239,7 +3236,6 @@ version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5e139bc46ca777eb5efaf62df0ab8cc5fd400866427e56c68b22e414e53bd3be"
 dependencies = [
- "fastrand",
  "futures-core",
  "futures-sink",
  "spin 0.9.9",
@@ -12530,7 +12526,6 @@ dependencies = [
  "backon",
  "base64 0.23.1",
  "block2 0.6.2",
- "flume 0.12.0",
  "futures-util",
  "gpui-fast",
  "gpui-fast-platform",
@@ -12575,7 +12570,7 @@ dependencies = [
  "vibevalley-i18n",
  "vibevalley-protocol",
  "vibevalley-rich",
- "vibevalley-runtime",
+ "vibevalley-rt",
  "vibevalley-server",
  "vibevalley-terminal",
  "vibevalley-workspace",
@@ -12650,6 +12645,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "vibevalley-rt"
+version = "0.1.0"
+dependencies = [
+ "rustls",
+ "tokio",
+]
+
+[[package]]
 name = "vibevalley-runtime"
 version = "0.1.0"
 dependencies = [
@@ -12691,10 +12694,12 @@ dependencies = [
  "tokio",
  "tokio-util",
  "toml_edit 0.25.19+spec-1.1.0",
+ "tracing",
  "uuid",
  "vibevalley-git",
  "vibevalley-mcp",
  "vibevalley-protocol",
+ "vibevalley-rt",
  "which",
 ]
 
@@ -12749,6 +12754,7 @@ dependencies = [
  "vibevalley-mcp",
  "vibevalley-protocol",
  "vibevalley-runtime",
+ "vibevalley-server",
  "zip",
 ]
 
@@ -12767,7 +12773,6 @@ dependencies = [
 name = "vibevalley-terminal"
 version = "0.1.0"
 dependencies = [
- "flume 0.12.0",
  "libc",
  "libghostty-vt",
  "percent-encoding",
@@ -12789,8 +12794,8 @@ dependencies = [
  "serde_json",
  "tempfile",
  "thiserror 2.0.21",
+ "tokio",
  "vibevalley-git",
- "vibevalley-runtime",
  "vibevalley-terminal",
 ]
 

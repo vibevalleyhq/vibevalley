@@ -2,6 +2,7 @@
 //! hierarchical page tree, bidirectional links, Block Doc projection, Multi-Dimensional Base
 //! with Agent Action columns, real-time Loro collaboration, suggestions, and presence tests.
 
+use crate::support::{RouterTestExt as _, ServerTestExt as _};
 use std::sync::Arc;
 
 use serde_json::{Value, json};
@@ -321,7 +322,7 @@ fn collab_suggestions_presence_and_history_work_for_notes() {
     assert!(!hist.as_array().unwrap().is_empty());
 
     let (sub_id, mut rx) = hub.subscribe("note.presence.follow", json!({ "id": id })).unwrap();
-    let recv = |rx: &mut tokio::sync::mpsc::UnboundedReceiver<Value>| {
+    let recv = |rx: &mut tokio::sync::mpsc::Receiver<Value>| {
         vibevalley_runtime::rt::block_on(async { tokio::time::timeout(std::time::Duration::from_secs(3), rx.recv()).await })
             .unwrap()
             .unwrap()

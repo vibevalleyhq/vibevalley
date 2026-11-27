@@ -40,12 +40,8 @@ export type ProviderUpdate = { revision: number, connections: Array<ProviderConn
 
 export type ProviderVerifyRequest = { connection: string, revision: number, };
 
-export type ProviderModelRequest = { connection: string, revision: number, };
-
 export type ProviderVoiceRequest = { connection: string, revision: number, limit?: number, offset?: number, after?: string, status?: string, };
 
 export type ProviderVoiceListingVoices = { id: string, name: string, createdAtSeconds: number, };
 
 export type ProviderVoiceListing = { connection: string, revision: number, voices: Array<ProviderVoiceListingVoices>, hasMore: boolean, nextCursor: string | null, };
-
-export type ProviderModelListing = { connection: string, revision: number, models: Array<ProviderModel>, };

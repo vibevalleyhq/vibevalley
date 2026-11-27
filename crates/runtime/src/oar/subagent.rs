@@ -170,16 +170,16 @@ impl Session for Child {
     fn status(&self) -> SessionStatus {
         self.inner.status()
     }
-    fn events(&self) -> mpsc::UnboundedReceiver<Event> {
+    fn events(&self) -> mpsc::Receiver<Event> {
         self.inner.events()
     }
-    fn events_with_history(&self) -> mpsc::UnboundedReceiver<Event> {
+    fn events_with_history(&self) -> mpsc::Receiver<Event> {
         self.inner.events_with_history()
     }
     fn records(&self) -> Vec<Record> {
         self.inner.records()
     }
-    fn subscribe_records(&self, after: Option<u64>) -> mpsc::UnboundedReceiver<Record> {
+    fn subscribe_records(&self, after: Option<u64>) -> mpsc::Receiver<Record> {
         self.inner.subscribe_records(after)
     }
     fn control<'a>(&'a self, op: ControlAction, arg: &'a str, id: &'a str, span: &'a str) -> BoxFuture<'a, Result<ControlOutcome>> {

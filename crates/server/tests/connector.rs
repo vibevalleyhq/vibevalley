@@ -3,6 +3,7 @@
 //! long connection. An echo plays the orchestrator: it answers each of the
 //! user's words in the place they were said.
 
+use crate::support::ServerTestExt as _;
 use std::collections::{HashMap, VecDeque};
 use std::future::Future;
 use std::net::{TcpListener, TcpStream};
@@ -19,7 +20,6 @@ use tokio_tungstenite::tungstenite::{self, Message};
 use tokio_util::sync::{CancellationToken, DropGuard};
 use vibevalley_server::channel::{ChannelEvent, Posting};
 use vibevalley_server::connector::{Options, Vendors};
-use vibevalley_server::gateway::api::Server;
 use vibevalley_server::{App, Config};
 
 const USER: &str = "o9cq80wkM5NnUserOfThisFarm@im.wechat";

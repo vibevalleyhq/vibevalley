@@ -1,5 +1,5 @@
 //! Thin compile-time exhaustive [`Router`] implementing [`Server`] over all
-//! `EndpointId` (203), `NativeEndpointId` (3), and `SUBSCRIPTIONS` (8).
+//! `EndpointId`, `NativeEndpointId`, and `SUBSCRIPTIONS`.
 
 mod glue;
 pub(crate) mod note;
@@ -15,7 +15,7 @@ pub(crate) use self::glue::AppCore;
 use crate::context::{SliceSubscription, bridge_live_receiver};
 use crate::gateway::api::{
     BoxFuture, CallerContext, GatewayMeta, GatewayPorts, Server, SharedFaultGate, SharedHostDebug, decode, dispatch_boundary_async, flush_and_snapshot_json,
-    flush_and_subscribe_slice, invoke_server_op, ok_json, open_subscription_channel, slice_snapshot_value, watch_slice_value,
+    flush_and_subscribe_slice, ok_json, open_subscription_channel,
 };
 use crate::gateway::remote::Remote;
 
@@ -62,24 +62,29 @@ impl Router {
         pub fn answers_subscription(&self, name: &str) -> bool { SUBSCRIPTIONS.iter().any(|s| s.name == name) }
         pub fn slice_seqs(&self) -> BTreeMap<String, i64> { self.core.ctx.feed.slice_seqs() }
         pub fn slice_watcher_counts(&self) -> BTreeMap<String, u32> { self.core.ctx.feed.watcher_counts() }
-        pub fn call_as(&self, caller: Caller, op: &str, payload: Value) -> Envelope { self.call_with(&CallerContext::from_caller(caller), op, payload) }
+        pub async fn call_as_async(&self, caller: Caller, op: &str, payload: Value) -> Envelope { self.dispatch_op_async(CallerContext::from_caller(caller), op, payload).await }
         pub(crate) fn close_subscriptions(&self) { self.gw.subs.close_all(); }
         fn server_arc(&self) -> Result<Arc<dyn Server>, ApiError> { self.me.upgrade().map(|r| r as Arc<dyn Server>).ok_or_else(|| ApiError::new(BizCode::ServiceUnavailable, "router dropped")) }
     }
-    pub fn invoke<O: Op>(&self, ctx: &CallerContext, input: O::Input) -> Result<O::Result, ApiError>
+    pub async fn invoke_async<O: Op>(&self, ctx: &CallerContext, input: O::Input) -> Result<O::Result, ApiError>
     where
         O::Result: DeserializeOwned,
     {
-        invoke_server_op::<O>(self, ctx, input)
+        let p = serde_json::to_value(input).map_err(|e| ApiError::new(BizCode::InvalidInput, e.to_string()))?;
+        let env = self.dispatch_op_async(ctx.clone(), O::NAME, p).await;
+        if let Some(err) = env.error() {
+            return Err(err);
+        }
+        serde_json::from_value(env.data.unwrap_or(Value::Null)).map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))
     }
-    pub fn invoke_as<O: Op>(&self, caller: Caller, input: O::Input) -> Result<O::Result, ApiError>
+    pub async fn invoke_as_async<O: Op>(&self, caller: Caller, input: O::Input) -> Result<O::Result, ApiError>
     where
         O::Result: DeserializeOwned,
     {
-        self.invoke::<O>(&CallerContext::from_caller(caller), input)
+        self.invoke_async::<O>(&CallerContext::from_caller(caller), input).await
     }
     #[allow(clippy::result_large_err)]
-    async fn open_sub_async(&self, ctx: &CallerContext, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
+    async fn open_sub_async(&self, ctx: &CallerContext, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::Receiver<Value>), Envelope> {
         open_subscription_channel(&self.gw, ctx, name, payload, |sub, sink| glue::open_sub_domain_async(&self.core, sub, sink)).await
     }
     router_methods! {
@@ -284,21 +289,11 @@ impl Router {
             E::ConnectorVerify => on!(p, ConnectorVerify, |r| c.connector.handle_verify(r).await?),
             E::ConnectorLogout => on!(p, ConnectorLogout, |r| c.connector.handle_logout(r).await?),
             E::ConnectorChannelSet => on!(p, ConnectorChannelSet, |r| c.connector.handle_channel_set(r).await?),
-            E::VoiceHear => void!(p, VoiceHear, |r| c.voice.handle_hear(r).await?),
             E::VoiceMossVerify => ret!(ok_json(c.voice.handle_moss_verify().await)),
-            E::VoiceGrantCreate => ret!(ok_json(c.voice.handle_grant_create()?)),
-            E::VoiceCallStart => on!(p, VoiceCallStart, |r| c.voice.handle_call_start(r)?),
-            E::VoiceCallStop => void!(p, VoiceCallStop, |r| c.voice.handle_call_stop(r)?),
-            E::VoiceCallHear => void!(p, VoiceCallHear, |r| c.voice.handle_call_hear(r).await?),
-            E::VoiceCallSay => void!(p, VoiceCallSay, |r| c.voice.handle_call_say(r).await?),
-            E::VoiceAsrStart => ret!(ok_json(c.voice.handle_asr_start()?)),
-            E::VoiceAsrStop => void!(p, VoiceAsrStop, |r| c.voice.handle_asr_stop(r)?),
-            E::VoiceAsrTranscribe => on!(p, VoiceAsrTranscribe, |r| c.voice.handle_asr_transcribe(r).await?),
             E::ProviderGet => ret!(ok_json(c.provider.status())),
             E::ProviderUpdate => on!(p, ProviderUpdate, |r| c.provider.update_async(&r).await?),
             E::ProviderVerify => on!(p, ProviderVerify, |r| c.provider.verify_async(&r).await?),
             E::ProviderVoiceList => on!(p, ProviderVoiceList, |r| c.provider.voices_async(&r).await?),
-            E::ProviderModelList => on!(p, ProviderModelList, |r| c.provider.models_async(&r.connection, r.revision).await?),
             E::SettingGet => ret!(ok_json(c.setting.status())),
             E::SettingValidate => on!(p, SettingValidate, |r| c.setting.validate(&r)),
             E::SettingUpdate => on!(p, SettingUpdate, |r| glue::setting_update(c, r).await?),
@@ -321,32 +316,23 @@ impl Router {
             E::MachineList => ret!(ok_json(c.machine.list())),
             E::GameShopList => ret!(ok_json(c.game.shop_list_async().await?)),
             E::GameShopBuy => on!(p, GameShopBuy, |r| c.game.shop_buy_async(&r).await?),
-            E::GameDailyList => ret!(ok_json(c.game.daily_list_async().await?)),
         }
     }
 }
 
 impl Server for Router {
     router_methods! {
-        fn call(&self, op: &str, payload: Value) -> Envelope { self.call_with(&CallerContext::local(), op, payload) }
-        fn call_with(&self, ctx: &CallerContext, op: &str, payload: Value) -> Envelope { vibevalley_runtime::rt::block_on(self.dispatch_op_async(ctx.clone(), op, payload)) }
         fn call_with_async(self: Arc<Self>, ctx: CallerContext, op: String, payload: Value) -> BoxFuture<'static, Envelope> { Box::pin(async move { self.dispatch_op_async(ctx, &op, payload).await }) }
-        fn slice_snapshot(&self, slice: SliceKind) -> Value { slice_snapshot_value(&self.core.ctx, slice) }
         fn slice_snapshot_json(&self, slice: SliceKind) -> Arc<str> { self.core.ctx.feed.snapshot_json(slice) }
         fn slice_snapshot_json_async(self: Arc<Self>, slice: SliceKind) -> BoxFuture<'static, Arc<str>> { Box::pin(flush_and_snapshot_json(self.core.ctx.clone(), slice)) }
         fn subscribe_slice(&self, slice: SliceKind) -> Option<SliceSubscription> { Some(self.core.ctx.feed.subscribe(slice)) }
         fn subscribe_slice_async(self: Arc<Self>, slice: SliceKind) -> BoxFuture<'static, Option<SliceSubscription>> { Box::pin(flush_and_subscribe_slice(self.core.ctx.clone(), slice)) }
         fn fault_gate(&self) -> Option<SharedFaultGate> { self.gw.fault_gate.clone() }
-        fn live(&self) -> tokio::sync::mpsc::UnboundedReceiver<LiveEvent> { bridge_live_receiver(self.core.ctx.live.subscribe_live(), self.core.ctx.token()) }
+        fn live(&self) -> tokio::sync::mpsc::Receiver<LiveEvent> { bridge_live_receiver(self.core.ctx.live.subscribe_live(), self.core.ctx.token()) }
         fn subscribe_live(&self) -> Option<tokio::sync::broadcast::Receiver<LiveEvent>> { Some(self.core.ctx.live.subscribe_live()) }
-        fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> { self.subscribe_with(&CallerContext::local(), name, payload) }
-        fn subscribe_with(&self, ctx: &CallerContext, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> { vibevalley_runtime::rt::block_on(self.open_sub_async(ctx, name, payload)) }
-        fn subscribe_with_async(self: Arc<Self>, ctx: CallerContext, name: String, payload: Value) -> BoxFuture<'static, Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope>> { Box::pin(async move { self.open_sub_async(&ctx, &name, payload).await }) }
+        fn subscribe_with_async(self: Arc<Self>, ctx: CallerContext, name: String, payload: Value) -> BoxFuture<'static, Result<(u64, tokio::sync::mpsc::Receiver<Value>), Envelope>> { Box::pin(async move { self.open_sub_async(&ctx, &name, payload).await }) }
         fn ports(&self) -> GatewayPorts { self.gw.ports.clone() }
         fn host_debug(&self) -> Option<SharedHostDebug> { self.gw.host_debug.clone() }
-    }
-    fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &tokio_util::sync::CancellationToken, receive: &mut dyn FnMut(i64, &Value)) {
-        watch_slice_value(&self.core.ctx, self.gw.fault_gate.as_ref(), slice, after_seq, stop, receive);
     }
     fn unsubscribe(&self, id: u64) {
         self.gw.subs.remove(id);

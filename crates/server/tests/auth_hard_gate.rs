@@ -5,6 +5,10 @@
 //! 3. Persistent human pause across server restarts and explicit user resume.
 //! 4. Retaining both `issue_report` summary and disconnect error facts.
 
+#![allow(clippy::disallowed_types, reason = "synchronous test barrier for scripted model calls")]
+
+use crate::support::RouterTestExt as _;
+
 use std::collections::VecDeque;
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};

@@ -13,7 +13,7 @@ use tracing_subscriber::EnvFilter;
 use tracing_subscriber::layer::SubscriberExt as _;
 use tracing_subscriber::util::SubscriberInitExt as _;
 
-use crate::hosted::StartupFailure;
+use crate::env::StartupFailure;
 
 const MAX_LOG_LINES: usize = 400;
 const MAX_LOG_BYTES: u64 = 2 * 1024 * 1024;
@@ -74,7 +74,7 @@ fn log_ring() -> &'static Mutex<LogRing> {
 }
 
 fn default_log_file_path() -> PathBuf {
-    crate::hosted::server_home().join("logs").join("desktop.log")
+    crate::env::server_home().join("logs").join("desktop.log")
 }
 
 pub fn log_file_path() -> PathBuf {
@@ -145,7 +145,7 @@ impl<S: tracing::Subscriber> tracing_subscriber::Layer<S> for LogBufferLayer {
         let meta = event.metadata();
         let mut visitor = LineVisitor::new();
         event.record(&mut visitor);
-        if crate::debug::is_vdp_log_active() {
+        if crate::vdp_bus::is_vdp_log_active() {
             let level = match *meta.level() {
                 tracing::Level::TRACE => vibevalley_protocol::VdpLogLevel::Trace,
                 tracing::Level::DEBUG => vibevalley_protocol::VdpLogLevel::Debug,
@@ -154,7 +154,7 @@ impl<S: tracing::Subscriber> tracing_subscriber::Layer<S> for LogBufferLayer {
                 tracing::Level::ERROR => vibevalley_protocol::VdpLogLevel::Error,
             };
             let fields = (!visitor.fields.is_empty()).then(|| serde_json::json!({ "raw": visitor.fields }));
-            crate::debug::emit_log_entry(level, meta.target(), visitor.message.clone(), fields);
+            crate::vdp_bus::emit_log_entry(level, meta.target(), visitor.message.clone(), fields);
         }
         let line = visitor.format_line(meta.level(), meta.target());
         log_ring().lock().push_line(line);
@@ -163,7 +163,7 @@ impl<S: tracing::Subscriber> tracing_subscriber::Layer<S> for LogBufferLayer {
 
 pub fn init() {
     let _ = log_ring();
-    let default_spec = if crate::shell::devtools_enabled() {
+    let default_spec = if crate::env::devtools_enabled() {
         "info"
     } else {
         "warn,vibevalley_mac=info,vibevalley_server=info,vibevalley_runtime=info,sea_orm_migration=info"
@@ -185,8 +185,8 @@ pub fn init() {
 
 pub fn format_diagnostic_report(failure: Option<&StartupFailure>, lines: &[String], log_path: &Path, extra_note: Option<&str>) -> String {
     let channel = vibevalley_protocol::home::current_channel();
-    let version = crate::update::bundle_version();
-    let home_dir = failure.map(|f| f.home_dir.clone()).unwrap_or_else(crate::hosted::server_home);
+    let version = crate::env::bundle_version();
+    let home_dir = failure.map(|f| f.home_dir.clone()).unwrap_or_else(crate::env::server_home);
     let store_path = crate::host::Storage::configured().database;
 
     let mut out = String::new();
@@ -243,7 +243,7 @@ pub fn build_diagnostic_report(failure: Option<&StartupFailure>, extra_note: Opt
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hosted::StartupFailureKind;
+    use crate::env::StartupFailureKind;
 
     #[test]
     fn ring_buffer_caps_at_max_lines() {

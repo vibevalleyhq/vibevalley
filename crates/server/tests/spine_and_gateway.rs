@@ -3,6 +3,7 @@
 //! auth & HTTP `Range` streaming), `Fact::RuntimeInboxChanged`, pre-encoded
 //! `SliceFeed` JSON caching, generalized remote platforms/scopes, and `LiveVoicePort`.
 
+use crate::support::{RouterTestExt as _, ServerTestExt as _};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -523,6 +524,68 @@ fn spine_exposes_live_voice_port_and_narrow_started_surface() {
     let voice: vibevalley_server::gateway::api::SharedLiveVoice = started.server().ports().voice.expect("LiveVoicePort attached on Router");
     assert!(voice.grant().is_err(), "grant without configured MOSS provider must return ApiError");
     voice.stop("nonexistent-agent");
+
+    started.close_blocking();
+}
+
+#[test]
+fn state_feed_batch_flush_eliminates_four_times_read_amplification_and_defers_watcherless_slices() {
+    let dir = tempfile::tempdir().unwrap();
+    let started = start_server(dir.path());
+
+    // Initial boot flushed once to settle baseline.
+    vibevalley_runtime::rt::block_on(started.ctx().feed.flush());
+
+    // 1. With ZERO watchers on Sessions / Inbox / Farm (only Board has the connector watcher),
+    //    marking Sessions | Inbox | Farm dirty must defer lazily with ZERO DB queries or projections.
+    let before_lazy = started.ctx().service.query_metrics().snapshot().total_queries;
+    let seq_lazy = started.ctx().mark_dirty(SliceMask::SESSIONS | SliceMask::INBOX | SliceMask::FARM);
+    vibevalley_runtime::rt::block_on(async {
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    });
+    assert_eq!(
+        started.ctx().service.query_metrics().snapshot().total_queries,
+        before_lazy,
+        "watcherless dirty mark must not run DB queries or slice projections"
+    );
+    for kind in [SliceKind::Sessions, SliceKind::Inbox, SliceKind::Farm] {
+        assert!(started.ctx().feed.feed(kind).seq() < seq_lazy, "{kind:?} should stay lazily deferred");
+    }
+
+    // 2. Subscribe to all 4 core slices (Board | Sessions | Inbox | Farm), prime leading edge so
+    //    the burst enters the trailing coalescing window, then mark all 4 dirty at once: ONE shared
+    //    `issue.list_board_window` query + ONE `session.telemetry_by_session` query (2 observed
+    //    metrics queries total, NOT 4× board reads).
+    let _w_board = started.ctx().feed.subscribe(SliceKind::Board);
+    let _w_sessions = started.ctx().feed.subscribe(SliceKind::Sessions);
+    let _w_inbox = started.ctx().feed.subscribe(SliceKind::Inbox);
+    let _w_farm = started.ctx().feed.subscribe(SliceKind::Farm);
+    vibevalley_runtime::rt::block_on(started.ctx().feed.flush());
+    let seq_prime = started.ctx().mark_dirty(SliceMask::BOARD | SliceMask::SESSIONS | SliceMask::INBOX);
+    vibevalley_runtime::rt::block_on(async {
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(2);
+        while [SliceKind::Board, SliceKind::Sessions, SliceKind::Inbox]
+            .into_iter()
+            .any(|k| started.ctx().feed.feed(k).seq() < seq_prime)
+        {
+            assert!(tokio::time::Instant::now() < deadline, "leading prime timed out");
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    });
+
+    let before_batch = started.ctx().service.query_metrics().snapshot().total_queries;
+    let seq_batch = started
+        .ctx()
+        .mark_dirty(SliceMask::BOARD | SliceMask::SESSIONS | SliceMask::INBOX | SliceMask::FARM);
+    vibevalley_runtime::rt::block_on(started.ctx().feed.flush());
+    let delta_queries = started.ctx().service.query_metrics().snapshot().total_queries - before_batch;
+    assert_eq!(
+        delta_queries, 2,
+        "4-slice batch (Board|Sessions|Inbox|Farm) should run exactly 1 shared issue window query + 1 session telemetry query, got {delta_queries}"
+    );
+    for kind in [SliceKind::Board, SliceKind::Sessions, SliceKind::Inbox, SliceKind::Farm] {
+        assert_eq!(started.ctx().feed.feed(kind).seq(), seq_batch);
+    }
 
     started.close_blocking();
 }

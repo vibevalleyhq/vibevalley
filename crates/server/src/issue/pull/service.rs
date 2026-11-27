@@ -293,9 +293,13 @@ impl Pull {
         self.publisher.merge_pull_async(&hosted, number, method).await?;
         let existing = self.find(repo, number).or_else(|| self.find(&hosted.name, number));
         if let Some(row) = existing {
-            let _ = self.set_state_async(&row.id, PullRequestState::Merged, now()).await;
-            if let (Some(board), Some(issue_id)) = (self.board.as_ref(), row.issue_id.as_deref()) {
-                let _ = board.settle_pull_async(issue_id, PullRequestState::Merged).await;
+            if let Err(err) = self.set_state_async(&row.id, PullRequestState::Merged, now()).await {
+                tracing::warn!(pull_id = %row.id, error = %err, "pull.merge failed to persist merged PR state");
+            }
+            if let (Some(board), Some(issue_id)) = (self.board.as_ref(), row.issue_id.as_deref())
+                && let Err(err) = board.settle_pull_async(issue_id, PullRequestState::Merged).await
+            {
+                tracing::warn!(pull_id = %row.id, issue_id, error = %err, "pull.merge failed to settle linked issue");
             }
         }
         Ok(PullRequestState::Merged)

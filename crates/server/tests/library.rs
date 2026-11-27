@@ -1,5 +1,6 @@
 //! VibeValley `modules/media/library.test.ts`, through `start()`.
 
+use crate::support::RouterTestExt as _;
 use std::sync::Arc;
 use std::time::Duration;
 

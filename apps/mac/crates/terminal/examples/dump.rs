@@ -17,7 +17,7 @@ fn main() {
     }
 
     let gray = |v: u8| Rgb(v, v, v);
-    let (tx, rx) = flume::unbounded();
+    let (tx, rx) = std::sync::mpsc::channel();
     let session = TermSession::spawn(
         SpawnOptions {
             cwd: std::env::current_dir().unwrap_or_else(|_| PathBuf::from("/")),

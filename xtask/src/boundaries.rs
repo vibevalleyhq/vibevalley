@@ -14,6 +14,7 @@ const TOPOLOGY_DOC: &str = "docs/architecture.md";
 pub enum BoundaryRule {
     SpineNoModuleImport,
     MacNoServerModuleImport,
+    MacModulesAcyclic,
     ServerLayerDag,
     ServerModulesAcyclic,
     SeaOrmBoundary,
@@ -27,6 +28,7 @@ impl BoundaryRule {
         match self {
             Self::SpineNoModuleImport => "spine-no-module-import",
             Self::MacNoServerModuleImport => "mac-no-server-module-import",
+            Self::MacModulesAcyclic => "mac-modules-acyclic",
             Self::ServerLayerDag => "server-layer-dag",
             Self::ServerModulesAcyclic => "server-modules-acyclic",
             Self::SeaOrmBoundary => "no-sea-orm-outside-service",
@@ -966,6 +968,7 @@ pub fn audit_files(files: &[SourceFile]) -> Vec<BoundaryViolation> {
 
     let mut violations = Vec::new();
     let mut graph: ModuleGraph = BTreeMap::new();
+    let mut mac_graph: ModuleGraph = BTreeMap::new();
 
     for file in &sorted {
         if file.path.starts_with("apps/mac/crates/") && file.path.ends_with("/Cargo.toml") {
@@ -1022,7 +1025,39 @@ pub fn audit_files(files: &[SourceFile]) -> Vec<BoundaryViolation> {
 
         if is_mac_source_file(&file.path) {
             let mut seen_lines = BTreeSet::new();
+            let mac_source_mod = file.path.strip_prefix("apps/mac/src/").and_then(|rel| {
+                if rel == "main.rs" || rel == "lib.rs" {
+                    return None;
+                }
+                let first = rel.split('/').next()?;
+                let name = first.strip_suffix(".rs").unwrap_or(first);
+                is_snake_case_module_name(name).then(|| name.to_owned())
+            });
+            if let Some(ref src_mod) = mac_source_mod {
+                mac_graph.entry(src_mod.clone()).or_default();
+            }
+            let mut seen_mac_edge = BTreeSet::new();
             for path_ref in &refs {
+                if let Some(ref src_mod) = mac_source_mod
+                    && path_ref.segments.first().is_some_and(|s| s == "crate")
+                    && let Some(target_mod) = path_ref.segments.get(1)
+                    && target_mod != src_mod
+                    && is_snake_case_module_name(target_mod)
+                {
+                    let line = index.line_at(path_ref.offset);
+                    if seen_mac_edge.insert((target_mod.clone(), line)) {
+                        mac_graph
+                            .entry(src_mod.clone())
+                            .or_default()
+                            .entry(target_mod.clone())
+                            .or_default()
+                            .push(EdgeOccurrence {
+                                file: file.path.clone(),
+                                line,
+                                snippet: index.snippet_at(line).to_owned(),
+                            });
+                    }
+                }
                 if path_ref.segments.first().is_none_or(|s| s != "vibevalley_server") || path_ref.segments.get(1).is_none_or(|s| !is_server_internal_module(s))
                 {
                     continue;
@@ -1212,6 +1247,41 @@ pub fn audit_files(files: &[SourceFile]) -> Vec<BoundaryViolation> {
                 fix: format!(
                     "Break the module cycle by extracting shared data/ports downward or routing writes via App / Outbox / SliceProjector so crates/server/src/ domain modules form a strict DAG. See {TOPOLOGY_DOC} Section 3.2.2."
                 ),
+                details: hops,
+            });
+        }
+    }
+
+    let mac_modules: BTreeSet<String> = mac_graph.keys().cloned().collect();
+    for edges in mac_graph.values_mut() {
+        edges.retain(|target, _| mac_modules.contains(target));
+    }
+    for scc in find_strongly_connected_components(&mac_graph) {
+        let cycles = extract_cycles_from_scc(&scc, &mac_graph);
+        for cycle in cycles {
+            let mut hops = Vec::with_capacity(cycle.len());
+            let mut primary_file = "apps/mac/src/main.rs".to_owned();
+            let mut primary_line = 1usize;
+            for i in 0..cycle.len() {
+                let from = &cycle[i];
+                let to = &cycle[(i + 1) % cycle.len()];
+                let occ = mac_graph.get(from).and_then(|m| m.get(to)).and_then(|v| v.first());
+                if i == 0
+                    && let Some(first) = occ
+                {
+                    primary_file = first.file.clone();
+                    primary_line = first.line;
+                }
+                let where_str = occ.map_or_else(|| "<unknown>".to_owned(), |o| format!("{}:{}: {}", o.file, o.line, o.snippet));
+                hops.push(format!("{from} -> {to} ({where_str})"));
+            }
+            let cycle_label = format!("{} -> {}", cycle.join(" -> "), cycle[0]);
+            violations.push(BoundaryViolation {
+                rule: BoundaryRule::MacModulesAcyclic,
+                file: primary_file,
+                line: primary_line,
+                message: format!("directed cycle in desktop host modules: {cycle_label}"),
+                fix: "Break the module cycle by extracting shared types/env/bus helpers into zero-dep leaf modules (`env`, `host_types`, `vdp_bus`) or wiring callbacks from `main.rs`/`shell` so `apps/mac/src/` forms a strict DAG.".to_owned(),
                 details: hops,
             });
         }
@@ -1631,5 +1701,25 @@ mod tests {
             dirty.violations.iter().map(|v| v.rule).collect::<Vec<_>>(),
             vec![BoundaryRule::MacNoServerModuleImport]
         );
+    }
+
+    #[test]
+    fn enforces_mac_modules_acyclic_dag() {
+        let acyclic = vec![
+            sf("apps/mac/src/env.rs", "pub fn version() -> &'static str { \"1\" }\n"),
+            sf("apps/mac/src/hosted/mod.rs", "pub fn ver() -> &'static str { crate::env::version() }\n"),
+            sf("apps/mac/src/shell/mod.rs", "pub fn run() { let _ = crate::hosted::ver(); }\n"),
+            sf("apps/mac/src/main.rs", "fn main() { crate::shell::run(); }\n"),
+        ];
+        assert!(audit_files(&acyclic).is_empty());
+
+        let cyclic = vec![
+            sf("apps/mac/src/hosted/view.rs", "pub fn f() { crate::shell::g(); }\n"),
+            sf("apps/mac/src/shell/mod.rs", "pub fn g() { crate::hosted::view::f(); }\n"),
+        ];
+        let violations = audit_files(&cyclic);
+        assert_eq!(violations.len(), 1);
+        assert_eq!(violations[0].rule, BoundaryRule::MacModulesAcyclic);
+        assert!(violations[0].message.contains("hosted -> shell -> hosted"));
     }
 }

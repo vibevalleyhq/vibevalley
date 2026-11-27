@@ -476,6 +476,7 @@ export const catalogs = {
           waiting: "正在等你答复",
           inReview: "工单待验收",
           todo: "待办工单",
+          zeroTitle: "全部处理完了",
           empty: "暂无需要立即处理的事项。",
           openIssues: "打开工单看板",
         },
@@ -494,16 +495,7 @@ export const catalogs = {
       orchestrator: "主助手",
       unreachable: "暂时连不上服务端，请等它恢复后重试。",
       query: { invalidResponse: "返回的数据格式不符，已有的有效结果已保留。" },
-      table: {
-        columns: "显示的列",
-        stale: "新页还在读取，当前显示的是上一次的结果，暂时不能操作这些行。",
-        selectPage: "选择本页",
-        selectRow: "选择行 {id}",
-        empty: "暂无数据",
-        previous: "上一页",
-        next: "下一页",
-        page: "第 {n} 页",
-      },
+      table: { empty: "暂无数据" },
       form: {
         invalid: "请检查这一项。",
         validationUnavailable: "暂时无法校验，输入已保留。",
@@ -706,8 +698,14 @@ export const catalogs = {
         settingsOf: "# {name} 的设置",
         save: "保存",
       },
-      issues: { empty: "这个频道里还没有工单。在频道里跟主助手说一件要做的事，它会派执行会话，工单就列在这里。", thread: "工单话题" },
+      issues: {
+        emptyTitle: "还没有工单",
+        empty: "这个频道里还没有工单。在频道里跟主助手说一件要做的事，它会派执行会话，工单就列在这里。",
+        openBoard: "打开工单看板",
+        thread: "工单话题",
+      },
       crons: {
+        emptyTitle: "还没有定时任务",
         empty: "还没有定时任务：跟主助手说「每天九点跑一遍测试」。",
         next: "下次 {next}",
         direct: "直接派 {agent}",
@@ -1706,24 +1704,6 @@ export const catalogs = {
         collapseDay: "收起",
       },
       deps: { blockedBy: "阻塞于", pick: "选择前置工单…", none: "无前置阻塞", clear: "清除前置依赖", blockedByChip: "被 #{n} 阻塞" },
-      triage: {
-        selected: "已选 {n} 项",
-        selectIssue: "选择工单 #{n}",
-        clear: "取消选择",
-        status: "改状态",
-        agent: "派执行会话",
-        noAgent: "清除执行会话",
-        owner: "负责人",
-        noOwner: "清除负责人",
-        repo: "仓库",
-        noRepo: "清除仓库",
-        priority: "优先级",
-        tags: "标签",
-        addTags: "追加标签",
-        replaceTags: "替换标签",
-        updated: "已批量更新 {n} 张工单",
-        partial: "已更新 {ok} 张工单，{failed} 张未能更新",
-      },
       relations: {
         title: "非阻塞关联",
         pick: "添加关联或重复工单…",
@@ -2763,13 +2743,12 @@ export const catalogs = {
       approval: { title: "待审批的工具调用", allow: "允许这次调用", deny: "拒绝这次调用", unavailable: "读不到待审批的工具调用：{why}" },
     },
     "web.provider": {
-      speechNotice:
-        "可独立选择 Flash 或 Pro，再到媒体库的「生成」里生成单人语音。完整音频生成后可播放并保存为 WAV 或 MP3，不是流式播放；保存设置不会生成音频。",
+      speechNotice: "在媒体库生成单人语音（WAV/MP3，非流式）；保存设置不触发生成。",
       title: "模型与模型策略",
       intro: "按场景指定主选模型与备选回退策略；候选仅来自已配置并拉取成功的模型商。",
       words: "模型商 DeepSeek MiniMax MOSS OpenAI Anthropic API Key 密钥 验证 拉取 能力 策略 备选 回退",
-      understandingNotice: "配置独立的视觉理解模型。在媒体库的一张图或视频上点「理解」并明确确认上传；保存配置不会上传文件或发起推理。",
-      imageNotice: "保存默认图像模型后，在「生图」页提交生成任务。保存配置不会发起生图。",
+      understandingNotice: "在媒体库选择图片或视频并确认上传后执行视觉理解；保存设置不触发推理。",
+      imageNotice: "在媒体库「生图」页提交生成任务；保存设置不触发生成。",
       add: "配置模型商",
       reload: "重新加载",
       reloadAsk: "放弃未保存的修改，读取最新设置？",
@@ -4454,6 +4433,7 @@ export const catalogs = {
           waiting: "Waiting on your reply",
           inReview: "Issues in review",
           todo: "Todo issues",
+          zeroTitle: "All caught up",
           empty: "Nothing needs your attention right now.",
           openIssues: "Open issues board",
         },
@@ -4481,16 +4461,7 @@ export const catalogs = {
       orchestrator: "Assistant",
       unreachable: "The server cannot be reached for now: try again when it is back.",
       query: { invalidResponse: "The response does not match the expected data format. The last valid result has been kept." },
-      table: {
-        columns: "Columns",
-        stale: "Showing the previous result while the requested page loads. Row actions are unavailable.",
-        selectPage: "Select this page",
-        selectRow: "Select row {id}",
-        empty: "No rows",
-        previous: "Previous page",
-        next: "Next page",
-        page: "Page {n}",
-      },
+      table: { empty: "No rows" },
       form: {
         invalid: "Check this field.",
         validationUnavailable: "Validation is unavailable. Your input has been kept.",
@@ -4700,10 +4671,13 @@ export const catalogs = {
         save: "Save",
       },
       issues: {
+        emptyTitle: "No tickets yet",
         empty: "No tickets in this channel yet. Tell the assistant something to do in a channel; it sends a helper, and the ticket is listed here.",
+        openBoard: "Open issues board",
         thread: "Ticket thread",
       },
       crons: {
+        emptyTitle: "No scheduled tasks",
         empty: 'No scheduled tasks: tell the assistant "run the tests every day at nine".',
         next: "next {next}",
         direct: "straight to {agent}",
@@ -5780,24 +5754,6 @@ export const catalogs = {
         collapseDay: "Less",
       },
       deps: { blockedBy: "Blocked by", pick: "Add blockers…", none: "No blockers", clear: "Clear blockers", blockedByChip: "Blocked by #{n}" },
-      triage: {
-        selected: "{n} selected",
-        selectIssue: "Select issue #{n}",
-        clear: "Clear",
-        status: "Status",
-        agent: "Helper",
-        noAgent: "Unassigned",
-        owner: "Assignee",
-        noOwner: "Clear assignee",
-        repo: "Repo",
-        noRepo: "No repo",
-        priority: "Priority",
-        tags: "Tags",
-        addTags: "Add tags",
-        replaceTags: "Replace tags",
-        updated: "Updated {n} issues",
-        partial: "Updated {ok} issues; {failed} could not be updated",
-      },
       relations: {
         title: "Relations",
         pick: "Link related or duplicate…",
@@ -6875,14 +6831,12 @@ export const catalogs = {
       },
     },
     "web.provider": {
-      speechNotice:
-        "Choose a separate Flash or Pro binding, then generate one speaker from Generate in the Library. The completed audio can be played and saved as WAV or MP3; this is not streaming playback. Saving settings does not generate audio.",
+      speechNotice: "Generate single-speaker audio (WAV/MP3, non-streaming) in Library; saving does not run generation.",
       title: "Models & Model Policy",
       intro: "Assign primary models and fallback chains per scene from verified providers only.",
       words: "provider DeepSeek MiniMax MOSS OpenAI Anthropic API key verify fetch capability policy fallback",
-      understandingNotice:
-        "Configure the independent vision understanding model. Choose Understand on an image or video in the Library and explicitly approve the upload. Saving this configuration does not upload or run inference.",
-      imageNotice: "Save a default image model, then submit a task on the Images page. Saving settings does not generate an image.",
+      understandingNotice: "Analyze images or videos from Library after explicit upload confirmation; saving does not run inference.",
+      imageNotice: "Submit image generation tasks from Library Images; saving does not generate an image.",
       add: "Configure provider",
       reload: "Reload",
       reloadAsk: "Discard unsaved changes and load the latest settings?",
@@ -8563,6 +8517,7 @@ export interface Messages {
   "web.base.dashboard.pending.title": undefined;
   "web.base.dashboard.pending.todo": undefined;
   "web.base.dashboard.pending.waiting": undefined;
+  "web.base.dashboard.pending.zeroTitle": undefined;
   "web.base.dashboard.profile.defaultName": undefined;
   "web.base.dashboard.profile.defaultTagline": undefined;
   "web.base.dashboard.pulse.active": { readonly n: string | number };
@@ -8764,14 +8719,7 @@ export interface Messages {
   "web.base.shortcuts.say.voice": undefined;
   "web.base.shortcuts.title": undefined;
   "web.base.stop": undefined;
-  "web.base.table.columns": undefined;
   "web.base.table.empty": undefined;
-  "web.base.table.next": undefined;
-  "web.base.table.page": { readonly n: string | number };
-  "web.base.table.previous": undefined;
-  "web.base.table.selectPage": undefined;
-  "web.base.table.selectRow": { readonly id: string | number };
-  "web.base.table.stale": undefined;
   "web.base.time.clock": { readonly am: boolean; readonly hh: string | number; readonly mm: string | number };
   "web.base.time.date": { readonly d: string | number; readonly m: string | number; readonly y: string | number };
   "web.base.time.day": { readonly d: string | number; readonly m: string | number; readonly weekday: string | number };
@@ -8875,6 +8823,7 @@ export interface Messages {
   "web.channel.crons.byOrchestrator": undefined;
   "web.channel.crons.direct": { readonly agent: string | number };
   "web.channel.crons.empty": undefined;
+  "web.channel.crons.emptyTitle": undefined;
   "web.channel.crons.label": { readonly name: string | number };
   "web.channel.crons.next": { readonly next: string | number };
   "web.channel.crons.off": undefined;
@@ -8927,6 +8876,8 @@ export interface Messages {
   "web.channel.findMessages": undefined;
   "web.channel.inChannel": undefined;
   "web.channel.issues.empty": undefined;
+  "web.channel.issues.emptyTitle": undefined;
+  "web.channel.issues.openBoard": undefined;
   "web.channel.issues.thread": undefined;
   "web.channel.lacks": { readonly why: string | number };
   "web.channel.lacksFix": undefined;
@@ -9937,22 +9888,6 @@ export interface Messages {
   "web.issue.todo.whatHint": undefined;
   "web.issue.todo.whatLabel": undefined;
   "web.issue.todo.whichRepo": undefined;
-  "web.issue.triage.addTags": undefined;
-  "web.issue.triage.agent": undefined;
-  "web.issue.triage.clear": undefined;
-  "web.issue.triage.noAgent": undefined;
-  "web.issue.triage.noOwner": undefined;
-  "web.issue.triage.noRepo": undefined;
-  "web.issue.triage.owner": undefined;
-  "web.issue.triage.partial": { readonly failed: string | number; readonly ok: string | number };
-  "web.issue.triage.priority": undefined;
-  "web.issue.triage.replaceTags": undefined;
-  "web.issue.triage.repo": undefined;
-  "web.issue.triage.selectIssue": { readonly n: string | number };
-  "web.issue.triage.selected": { readonly n: string | number };
-  "web.issue.triage.status": undefined;
-  "web.issue.triage.tags": undefined;
-  "web.issue.triage.updated": { readonly n: string | number };
   "web.issue.trigger.comment": undefined;
   "web.issue.trigger.commentNumbered": { readonly id: string | number };
   "web.issue.trigger.cron": undefined;

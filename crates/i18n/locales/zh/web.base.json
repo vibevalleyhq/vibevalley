@@ -139,6 +139,7 @@
       "waiting": "正在等你答复",
       "inReview": "工单待验收",
       "todo": "待办工单",
+      "zeroTitle": "全部处理完了",
       "empty": "暂无需要立即处理的事项。",
       "openIssues": "打开工单看板"
     },
@@ -178,14 +179,7 @@
     "invalidResponse": "返回的数据格式不符，已有的有效结果已保留。"
   },
   "table": {
-    "columns": "显示的列",
-    "stale": "新页还在读取，当前显示的是上一次的结果，暂时不能操作这些行。",
-    "selectPage": "选择本页",
-    "selectRow": "选择行 {id}",
-    "empty": "暂无数据",
-    "previous": "上一页",
-    "next": "下一页",
-    "page": "第 {n} 页"
+    "empty": "暂无数据"
   },
   "form": {
     "invalid": "请检查这一项。",

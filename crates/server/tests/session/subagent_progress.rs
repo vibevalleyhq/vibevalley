@@ -1,4 +1,5 @@
 use super::until;
+use crate::support::RouterTestExt as _;
 use serde_json::{Value, json};
 use std::{path::Path, sync::Arc};
 use vibevalley_protocol::Caller;

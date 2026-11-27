@@ -232,7 +232,7 @@ impl Shell {
     fn next_reviewable_issue_route(&self, cx: &App) -> String {
         let issues = cx
             .try_global::<BridgeHub>()
-            .and_then(|hub| serde_json::from_value::<BoardSlice>(hub.0.server().slice_snapshot(SliceKind::Board)).ok())
+            .and_then(|hub| serde_json::from_str::<BoardSlice>(&hub.0.server().slice_snapshot_json(SliceKind::Board)).ok())
             .map(|board| board.issues)
             .unwrap_or_default();
         match next_reviewable_issue_id(&issues, self.chrome.last_route.as_deref()) {

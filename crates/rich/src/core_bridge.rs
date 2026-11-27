@@ -4,7 +4,7 @@
 //! and serializes canonical protocol projections for live UI updates.
 
 use nsh_core::prelude::module;
-use vibevalley_core::{compare, schedule, trajectory};
+use vibevalley_core::{compare, note, schedule, trajectory};
 use vibevalley_protocol::{CompareSpec, EventTokens, Issue, SessionEvent, SessionEventType};
 
 /// Synchronous core computation and projection helpers exported on `"vibevalley/rich"`.
@@ -119,5 +119,11 @@ impl VvCore {
         let cap = limit.and_then(|n| (n.is_finite() && n >= 0.0).then_some(n.floor() as usize));
         let merged = trajectory::merge_steps(log, &incoming, cap, replace_same_revision);
         serde_json::to_string(&merged).unwrap_or_else(|_| "[]".to_string())
+    }
+
+    /// Converts Markdown text into a canonical `DocBlock[]` JSON array via `vibevalley_core::note::doc::markdown_to_blocks`.
+    pub fn markdown_to_blocks(markdown: String) -> String {
+        let blocks = note::doc::markdown_to_blocks(&markdown);
+        serde_json::to_string(&blocks).unwrap_or_else(|_| "[]".to_string())
     }
 }

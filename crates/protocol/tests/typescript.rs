@@ -49,6 +49,9 @@ fn every_id_field_is_branded_in_typescript() {
     let mut bare = Vec::new();
     for entry in std::fs::read_dir(&dir).unwrap() {
         let path = entry.unwrap().path();
+        if !path.is_file() {
+            continue;
+        }
         let text = std::fs::read_to_string(&path).unwrap();
         let lines: Vec<&str> = text.lines().collect();
         for (i, line) in lines.iter().enumerate() {

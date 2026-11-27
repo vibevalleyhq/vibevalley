@@ -413,22 +413,6 @@
    "name": "levelUp"
   }
  ],
- "HostSeekAudioPayload": [
-  {
-   "position": 2.5
-  }
- ],
- "HostPcmStartPayload": [
-  {
-   "sampleRate": 24000,
-   "channels": 1
-  }
- ],
- "HostPcmAppendPayload": [
-  {
-   "data": "AAAA"
-  }
- ],
  "HostReadFilePayload": [
   {
    "path": "/tmp/note.txt"
@@ -603,28 +587,6 @@
    "op": "host.playSound",
    "payload": {
     "name": "tap"
-   }
-  },
-  {
-   "op": "host.seekAudio",
-   "payload": {
-    "position": 2.5
-   }
-  },
-  {
-   "op": "host.audioState"
-  },
-  {
-   "op": "host.pcmStart",
-   "payload": {
-    "sampleRate": 24000,
-    "channels": 1
-   }
-  },
-  {
-   "op": "host.pcmAppend",
-   "payload": {
-    "data": "AAAA"
    }
   },
   {

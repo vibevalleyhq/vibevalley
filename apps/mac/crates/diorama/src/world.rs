@@ -310,7 +310,7 @@ pub fn is_cutaway_building(asset: &str) -> bool {
 pub fn building_display_info(asset: &str) -> (&'static str, &'static str) {
     match asset {
         "b_workshop" => ("水车工坊", "/runtimes"),
-        "b_library" => ("藏书阁", "/team/skills"),
+        "b_library" => ("藏书阁", "/settings/skills"),
         "b_guild_hall" => ("档案厅", "/agents"),
         "b_warehouse" => ("粮仓货栈", "panel:warehouse"),
         "b_stall" => ("市集小摊", "panel:shop"),
@@ -3400,7 +3400,7 @@ mod tests {
                     BuildingSpec {
                         id: "skills".into(),
                         label: "书屋".into(),
-                        opens: "/team/skills".into(),
+                        opens: "/settings/skills".into(),
                         asset: "b_library".into(),
                         pos: [6.0, 0.0, -2.5],
                         scale: 2.1,

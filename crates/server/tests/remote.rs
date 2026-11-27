@@ -1,6 +1,7 @@
 //! End-to-end integration tests for Tailscale / mobile remote access (`remote.*`),
 //! controlled Bearer authentication, SSE slice resume, revocation, and security walls.
 
+use crate::support::RouterTestExt as _;
 use std::io::{BufRead, BufReader};
 use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;

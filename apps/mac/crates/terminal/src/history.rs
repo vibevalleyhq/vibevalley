@@ -277,7 +277,7 @@ mod tests {
             .join("\n")
     }
 
-    fn wait_for_text(session: &TermSession, events: &flume::Receiver<TermEvent>, needle: &str) {
+    fn wait_for_text(session: &TermSession, events: &std::sync::mpsc::Receiver<TermEvent>, needle: &str) {
         let deadline = Instant::now() + Duration::from_secs(10);
         loop {
             let text = screen_text(session);
@@ -375,7 +375,7 @@ mod tests {
         };
 
         // Tab 1 runs a command, then quits via graceful shutdown.
-        let (tx1, rx1) = flume::unbounded();
+        let (tx1, rx1) = std::sync::mpsc::channel();
         let s1 = TermSession::spawn(make_opts(&tab1_hist), move |ev| {
             let _ = tx1.send(ev);
         })
@@ -389,7 +389,7 @@ mod tests {
         assert!(!s1.is_alive());
 
         // Tab 2 runs a different command after Tab 1 so global HISTFILE ends with Tab 2's command.
-        let (tx2, rx2) = flume::unbounded();
+        let (tx2, rx2) = std::sync::mpsc::channel();
         let s2 = TermSession::spawn(make_opts(&tab2_hist), move |ev| {
             let _ = tx2.send(ev);
         })
@@ -407,7 +407,7 @@ mod tests {
 
         // Reopen Tab 1: pressing Up arrow must recall Tab 1's own last command, not Tab 2's,
         // and global_hist_entry must still be present in fc -l.
-        let (tx, rx) = flume::unbounded();
+        let (tx, rx) = std::sync::mpsc::channel();
         let s1_restored = TermSession::spawn(make_opts(&tab1_hist), move |ev| {
             let _ = tx.send(ev);
         })
@@ -425,7 +425,7 @@ mod tests {
         wait_for_text(&s1_restored, &rx, "GLOBAL_OK");
         s1_restored.send_text("exit\n");
         let deadline = Instant::now() + Duration::from_secs(5);
-        while let Ok(ev) = rx.recv_deadline(deadline) {
+        while let Ok(ev) = rx.recv_timeout(deadline.saturating_duration_since(Instant::now())) {
             if matches!(ev, TermEvent::Exited { .. }) {
                 break;
             }

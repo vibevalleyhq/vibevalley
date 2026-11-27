@@ -249,7 +249,8 @@ impl IssueChat {
                             ic.ensure_session_thread_async(&session).await;
                         }
                         Ok(SessionLifecycleEvent::Left { .. }) => {}
-                        Err(broadcast::error::RecvError::Lagged(_)) => {
+                        Err(broadcast::error::RecvError::Lagged(skipped)) => {
+                            tracing::warn!(skipped, "issue.chat session lifecycle stream lagged; re-opening threads");
                             let Some(ic) = w.upgrade() else { return };
                             if ic.cancel.is_cancelled() {
                                 return;
@@ -733,24 +734,34 @@ impl IssueChat {
     }
 
     async fn replay_pending_deliveries_async(self: &Arc<Self>) {
-        if let Ok(pending) = self.channel.pending_deliveries_async(DeliveryTargetKind::Issue).await {
-            for d in pending {
-                let issue_id = d.recipient_id.clone();
-                self.enqueue_lane(issue_id, IssueWake::Issue { delivery: d, committed: None });
+        match self.channel.pending_deliveries_async(DeliveryTargetKind::Issue).await {
+            Ok(pending) => {
+                for d in pending {
+                    let issue_id = d.recipient_id.clone();
+                    self.enqueue_lane(issue_id, IssueWake::Issue { delivery: d, committed: None });
+                }
+            }
+            Err(err) => {
+                tracing::warn!(error = %err, "issue.chat failed to load pending issue deliveries on replay");
             }
         }
-        if let Ok(pending) = self.channel.pending_deliveries_async(DeliveryTargetKind::Session).await {
-            for d in pending.into_iter().filter(|d| d.wakes) {
-                if let Some(issue_id) = self.session_issue_async(&d.recipient_id).await {
-                    self.enqueue_lane(
-                        issue_id.clone(),
-                        IssueWake::Session {
-                            delivery: d,
-                            issue_id,
-                            committed: None,
-                        },
-                    );
+        match self.channel.pending_deliveries_async(DeliveryTargetKind::Session).await {
+            Ok(pending) => {
+                for d in pending.into_iter().filter(|d| d.wakes) {
+                    if let Some(issue_id) = self.session_issue_async(&d.recipient_id).await {
+                        self.enqueue_lane(
+                            issue_id.clone(),
+                            IssueWake::Session {
+                                delivery: d,
+                                issue_id,
+                                committed: None,
+                            },
+                        );
+                    }
                 }
+            }
+            Err(err) => {
+                tracing::warn!(error = %err, "issue.chat failed to load pending session deliveries on replay");
             }
         }
     }
@@ -767,7 +778,7 @@ impl IssueChat {
                         .map(|s| s.id)
                         .unwrap_or_else(|| format!("issue:{issue_id}"));
                     let mail_key = format!("issue:{issue_id}:{}", d.message_id);
-                    let _ = sessions
+                    if let Err(err) = sessions
                         .enqueue_mailbox_async(
                             &owner,
                             &mail_key,
@@ -775,7 +786,10 @@ impl IssueChat {
                             Some(&d.message_id),
                             &dispatched.committed.row.body,
                         )
-                        .await;
+                        .await
+                    {
+                        tracing::warn!(issue_id = %issue_id, message_id = %d.message_id, error = %err, "issue.chat failed to enqueue issue mailbox");
+                    }
                     self.enqueue_lane(
                         issue_id,
                         IssueWake::Issue {
@@ -788,7 +802,7 @@ impl IssueChat {
                     if let Some(issue_id) = self.session_issue_async(&d.recipient_id).await {
                         let owner = self.on_issue_async(&issue_id).await.map(|s| s.id).unwrap_or_else(|| d.recipient_id.clone());
                         let mail_key = format!("issue:{issue_id}:{}", d.message_id);
-                        let _ = sessions
+                        if let Err(err) = sessions
                             .enqueue_mailbox_async(
                                 &owner,
                                 &mail_key,
@@ -796,7 +810,10 @@ impl IssueChat {
                                 Some(&d.message_id),
                                 &dispatched.committed.row.body,
                             )
-                            .await;
+                            .await
+                        {
+                            tracing::warn!(issue_id = %issue_id, session_id = %d.recipient_id, message_id = %d.message_id, error = %err, "issue.chat failed to enqueue session mailbox");
+                        }
                         self.enqueue_lane(
                             issue_id.clone(),
                             IssueWake::Session {
@@ -847,24 +864,40 @@ impl IssueChat {
         };
 
         if !self.channel.delivery_is_pending_async(delivery.id).await.unwrap_or(false) {
-            let _ = self.board.session_engine().withdraw_mailbox_by_message_async(&delivery.message_id).await;
+            if let Err(err) = self.board.session_engine().withdraw_mailbox_by_message_async(&delivery.message_id).await {
+                tracing::warn!(delivery_id = delivery.id, message_id = %delivery.message_id, error = %err, "issue.chat failed to withdraw non-pending mailbox");
+            }
             return;
         }
         let c = match committed {
             Some(c) => Some(c),
-            None => self.channel.committed_of_async(&delivery.message_id).await.ok().flatten().map(Arc::new),
+            None => match self.channel.committed_of_async(&delivery.message_id).await {
+                Ok(found) => found.map(Arc::new),
+                Err(err) => {
+                    tracing::warn!(delivery_id = delivery.id, message_id = %delivery.message_id, error = %err, "issue.chat failed to load committed message");
+                    None
+                }
+            },
         };
         let Some(c) = c else {
-            let _ = self.board.session_engine().withdraw_mailbox_by_message_async(&delivery.message_id).await;
-            let _ = self.channel.withdraw_delivery_async(delivery.id).await;
+            if let Err(err) = self.board.session_engine().withdraw_mailbox_by_message_async(&delivery.message_id).await {
+                tracing::warn!(delivery_id = delivery.id, message_id = %delivery.message_id, error = %err, "issue.chat failed to withdraw missing-message mailbox");
+            }
+            if let Err(err) = self.channel.withdraw_delivery_async(delivery.id).await {
+                tracing::warn!(delivery_id = delivery.id, message_id = %delivery.message_id, error = %err, "issue.chat failed to withdraw missing-message delivery");
+            }
             return;
         };
         let on = self.on_issue_async(&delivery.recipient_id).await.map(|h| h.id);
         if let Some(suppressed) = self.dispatch_mentioned_collaborators_async(&delivery.recipient_id, &c, on.as_deref()).await
             && suppressed
         {
-            let _ = self.board.session_engine().withdraw_mailbox_by_message_async(&delivery.message_id).await;
-            let _ = self.channel.settle_delivery_async(delivery.id, true).await;
+            if let Err(err) = self.board.session_engine().withdraw_mailbox_by_message_async(&delivery.message_id).await {
+                tracing::warn!(delivery_id = delivery.id, message_id = %delivery.message_id, error = %err, "issue.chat failed to withdraw suppressed mailbox");
+            }
+            if let Err(err) = self.channel.settle_delivery_async(delivery.id, true).await {
+                tracing::warn!(delivery_id = delivery.id, message_id = %delivery.message_id, error = %err, "issue.chat failed to settle suppressed delivery");
+            }
             return;
         }
         let mut text = c.row.body.trim().to_string();
@@ -880,13 +913,18 @@ impl IssueChat {
                 .await
                 .unwrap_or_default();
             for d in pending {
-                match self.channel.committed_of_async(&d.message_id).await.ok().flatten() {
-                    Some(ec) => {
+                match self.channel.committed_of_async(&d.message_id).await {
+                    Ok(Some(ec)) => {
                         earlier_lines.push(line_of(&self.channel, &ec));
                         earlier_ids.push((d.id, d.message_id));
                     }
-                    None => {
-                        let _ = self.channel.withdraw_delivery_async(d.id).await;
+                    Ok(None) => {
+                        if let Err(err) = self.channel.withdraw_delivery_async(d.id).await {
+                            tracing::warn!(delivery_id = d.id, message_id = %d.message_id, error = %err, "issue.chat failed to withdraw orphaned session delivery");
+                        }
+                    }
+                    Err(err) => {
+                        tracing::warn!(delivery_id = d.id, message_id = %d.message_id, error = %err, "issue.chat failed to load earlier session delivery");
                     }
                 }
             }
@@ -901,9 +939,13 @@ impl IssueChat {
             .await;
         match tell_res {
             Ok(()) => {
-                let _ = self.channel.settle_delivery_async(delivery.id, true).await;
+                if let Err(err) = self.channel.settle_delivery_async(delivery.id, true).await {
+                    tracing::warn!(delivery_id = delivery.id, message_id = %delivery.message_id, error = %err, "issue.chat failed to settle issue delivery");
+                }
                 for (did, _) in &earlier_ids {
-                    let _ = self.channel.settle_delivery_async(*did, true).await;
+                    if let Err(err) = self.channel.settle_delivery_async(*did, true).await {
+                        tracing::warn!(delivery_id = *did, error = %err, "issue.chat failed to settle coalesced earlier delivery");
+                    }
                 }
                 if let Some(session_id) = on.as_deref() {
                     for m in std::iter::once(delivery.message_id).chain(earlier_ids.into_iter().map(|(_, mid)| mid)) {
@@ -917,7 +959,9 @@ impl IssueChat {
                 }
             }
             Err(e) => {
-                let _ = self.channel.settle_delivery_async(delivery.id, false).await;
+                if let Err(err) = self.channel.settle_delivery_async(delivery.id, false).await {
+                    tracing::warn!(delivery_id = delivery.id, message_id = %delivery.message_id, error = %err, "issue.chat failed to mark failed issue delivery");
+                }
                 self.ctx.live.publish_notice(now(), NoticeLevel::Warn, e.to_string());
             }
         }
@@ -925,7 +969,9 @@ impl IssueChat {
 
     async fn deliver_to_session_async(&self, delivery: QueuedDelivery, issue_id: &str, committed: Option<Arc<Committed>>) {
         if !self.channel.delivery_is_pending_async(delivery.id).await.unwrap_or(false) {
-            let _ = self.board.session_engine().withdraw_mailbox_by_message_async(&delivery.message_id).await;
+            if let Err(err) = self.board.session_engine().withdraw_mailbox_by_message_async(&delivery.message_id).await {
+                tracing::warn!(delivery_id = delivery.id, message_id = %delivery.message_id, error = %err, "issue.chat failed to withdraw non-pending session mailbox");
+            }
             return;
         }
         let pending = self
@@ -939,19 +985,23 @@ impl IssueChat {
         for d in pending {
             let loaded = if d.id == delivery.id {
                 match committed.clone() {
-                    Some(c) => Some(c),
-                    None => self.channel.committed_of_async(&d.message_id).await.ok().flatten().map(Arc::new),
+                    Some(c) => Ok(Some(c)),
+                    None => self.channel.committed_of_async(&d.message_id).await.map(|o| o.map(Arc::new)),
                 }
             } else {
-                self.channel.committed_of_async(&d.message_id).await.ok().flatten().map(Arc::new)
+                self.channel.committed_of_async(&d.message_id).await.map(|o| o.map(Arc::new))
             };
             match loaded {
-                Some(ec) => {
+                Ok(Some(ec)) => {
                     if let Some(suppressed) = self.dispatch_mentioned_collaborators_async(issue_id, &ec, Some(&delivery.recipient_id)).await
                         && suppressed
                     {
-                        let _ = self.board.session_engine().withdraw_mailbox_by_message_async(&d.message_id).await;
-                        let _ = self.channel.settle_delivery_async(d.id, true).await;
+                        if let Err(err) = self.board.session_engine().withdraw_mailbox_by_message_async(&d.message_id).await {
+                            tracing::warn!(delivery_id = d.id, message_id = %d.message_id, error = %err, "issue.chat failed to withdraw suppressed session mailbox");
+                        }
+                        if let Err(err) = self.channel.settle_delivery_async(d.id, true).await {
+                            tracing::warn!(delivery_id = d.id, message_id = %d.message_id, error = %err, "issue.chat failed to settle suppressed session delivery");
+                        }
                         continue;
                     }
                     if ec.row.sender_kind == "user" {
@@ -960,8 +1010,13 @@ impl IssueChat {
                     lines.push(line_of(&self.channel, &ec));
                     settled_ids.push((d.id, d.message_id));
                 }
-                None => {
-                    let _ = self.channel.withdraw_delivery_async(d.id).await;
+                Ok(None) => {
+                    if let Err(err) = self.channel.withdraw_delivery_async(d.id).await {
+                        tracing::warn!(delivery_id = d.id, message_id = %d.message_id, error = %err, "issue.chat failed to withdraw missing session delivery");
+                    }
+                }
+                Err(err) => {
+                    tracing::warn!(delivery_id = d.id, message_id = %d.message_id, error = %err, "issue.chat failed to load session delivery message");
                 }
             }
         }
@@ -973,7 +1028,9 @@ impl IssueChat {
         match tell_res {
             Ok(()) => {
                 for (did, _) in &settled_ids {
-                    let _ = self.channel.settle_delivery_async(*did, true).await;
+                    if let Err(err) = self.channel.settle_delivery_async(*did, true).await {
+                        tracing::warn!(delivery_id = *did, error = %err, "issue.chat failed to settle session delivery");
+                    }
                 }
                 for (_, mid) in settled_ids {
                     if let Err(e) = self.channel.mark_seen_async(&delivery.recipient_id, &mid).await {
@@ -985,7 +1042,9 @@ impl IssueChat {
                 }
             }
             Err(e) => {
-                let _ = self.channel.settle_delivery_async(delivery.id, false).await;
+                if let Err(err) = self.channel.settle_delivery_async(delivery.id, false).await {
+                    tracing::warn!(delivery_id = delivery.id, message_id = %delivery.message_id, error = %err, "issue.chat failed to mark failed session delivery");
+                }
                 self.ctx.live.publish_notice(now(), NoticeLevel::Warn, e.to_string());
             }
         }

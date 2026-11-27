@@ -35,6 +35,17 @@ impl Phase {
             Phase::Failed => "农场没能开起来",
         }
     }
+
+    pub fn from_host_phase(phase: vibevalley_protocol::HostOpeningPhase) -> Self {
+        use vibevalley_protocol::HostOpeningPhase;
+        match phase {
+            HostOpeningPhase::Connecting | HostOpeningPhase::Waiting => Self::Connecting,
+            HostOpeningPhase::Reading => Self::Reading,
+            HostOpeningPhase::Loading => Self::Loading,
+            HostOpeningPhase::Ready => Self::Ready,
+            HostOpeningPhase::Failed => Self::Failed,
+        }
+    }
 }
 
 pub fn scene_of_hour(hour: u32) -> &'static str {

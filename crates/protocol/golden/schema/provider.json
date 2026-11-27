@@ -333,16 +333,6 @@
    "revision": 2
   }
  ],
- "ProviderModelRequest": [
-  {
-   "connection": "s4584",
-   "revision": 4585
-  },
-  {
-   "connection": "s4586",
-   "revision": 4587
-  }
- ],
  "ProviderVoiceRequest": [
   {
    "connection": "s4588",
@@ -395,32 +385,6 @@
    "id": "s4612",
    "name": "s4613",
    "createdAtSeconds": 4614
-  }
- ],
- "ProviderModelListing": [
-  {
-   "connection": "s4615",
-   "revision": 4616,
-   "models": [
-    {
-     "id": "s4617",
-     "owner": "s4618",
-     "capabilities": [
-      "image"
-     ]
-    }
-   ]
-  },
-  {
-   "connection": "s4619",
-   "revision": 4620,
-   "models": [
-    {
-     "id": "s4621",
-     "owner": "s4622",
-     "capabilities": []
-    }
-   ]
   }
  ]
 }

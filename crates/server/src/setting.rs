@@ -306,50 +306,7 @@ impl Providers {
     }
 }
 
-/// A key or token: never printed, shown by its last four characters.
-#[derive(Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(transparent)]
-pub struct Secret(String);
-
-impl Secret {
-    pub fn new(s: impl Into<String>) -> Secret {
-        Secret(s.into())
-    }
-
-    pub fn expose(&self) -> &str {
-        &self.0
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
-    }
-
-    pub fn hint(&self) -> String {
-        let tail: String = self.0.chars().rev().take(4).collect::<Vec<_>>().into_iter().rev().collect();
-        format!("…{tail}")
-    }
-
-    pub fn status(&self, source: KeySource) -> KeyStatus {
-        if self.is_empty() {
-            KeyStatus { source: None, hint: None }
-        } else {
-            KeyStatus {
-                source: Some(source),
-                hint: Some(self.hint()),
-            }
-        }
-    }
-}
-
-impl std::fmt::Debug for Secret {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.is_empty() {
-            f.write_str("Secret(none)")
-        } else {
-            write!(f, "Secret({})", self.hint())
-        }
-    }
-}
+pub use vibevalley_protocol::Secret;
 
 /// What the server was started with: where the farm lives, and keys given
 /// outside the settings file.

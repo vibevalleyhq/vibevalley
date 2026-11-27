@@ -17,8 +17,19 @@ path = "tests/publish.rs"
 [[test]]
 name = "dual_db"
 path = "tests/dual_db.rs"
+required-features = ["postgres"]
 
 [features]
+default = ["sqlite"]
+sqlite = []
+# Test & offline verification fakes (`crate::fake::*`); never enabled in release binaries.
+fake = []
+postgres = [
+  "sea-orm/sqlx-postgres",
+  "sea-orm-migration/sqlx-postgres",
+  "sea-query/backend-postgres",
+  "vibevalley-runtime/postgres",
+]
 # Test-only model checking (`cargo xtask loom`); never enable in release binaries.
 loom = ["dep:loom"]
 
@@ -75,3 +86,4 @@ reqwest = { workspace = true, features = ["blocking"] }
 sqlx = { workspace = true, features = ["runtime-tokio"] }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["test-util"] }
+vibevalley-server = { path = ".", features = ["fake"] }

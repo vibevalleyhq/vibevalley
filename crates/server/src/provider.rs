@@ -9,8 +9,8 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use serde_json::Value;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    ApiError, BizCode, ModelCapability, ProviderBinding, ProviderConnectionAdapter, ProviderModel, ProviderModelListing, ProviderStatus, ProviderUpdate,
-    ProviderVerification, ProviderVerificationStatus, ProviderVerifyRequest, ProviderVoiceListing, ProviderVoiceListingVoices, ProviderVoiceRequest,
+    ApiError, BizCode, ModelCapability, ProviderBinding, ProviderConnectionAdapter, ProviderModel, ProviderStatus, ProviderUpdate, ProviderVerification,
+    ProviderVerificationStatus, ProviderVerifyRequest, ProviderVoiceListing, ProviderVoiceListingVoices, ProviderVoiceRequest,
 };
 
 use crate::context::http::{Fetch, FetchError, Request, read_max};
@@ -492,25 +492,6 @@ impl Provider {
             }
         }
         Ok(self.setting.provider_status())
-    }
-
-    pub async fn models_async(&self, connection: &str, revision: i64) -> Result<ProviderModelListing, ApiError> {
-        let (adapter, base_url, key) = self.target_at(connection, revision)?;
-        let models = fetch_models_for_adapter_async(&self.fetch, adapter, base_url.as_deref(), &key).await?;
-        self.still_at(revision)?;
-        let verification = ProviderVerification {
-            status: ProviderVerificationStatus::Verified,
-            checked_at: Some(now_ms()),
-            error: None,
-        };
-        let _ = self
-            .store_discovery_async(connection, revision, adapter, Some(models.clone()), verification)
-            .await;
-        Ok(ProviderModelListing {
-            connection: connection.into(),
-            revision: self.setting.providers().revision,
-            models,
-        })
     }
 
     pub async fn voices_async(&self, r: &ProviderVoiceRequest) -> Result<ProviderVoiceListing, ApiError> {

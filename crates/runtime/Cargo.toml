@@ -6,6 +6,28 @@ license.workspace = true
 description = "VibeValley agent runtimes: external CLI/ACP engines (oar) and built-in DeepSeek harness (agent)"
 
 [features]
+default = ["agent"]
+# Experimental ephemeral container sandbox adapters (Docker / Apple Containers), pending server orchestration wiring.
+sandbox = []
+agent = [
+  "dep:oxc_allocator",
+  "dep:oxc_ast",
+  "dep:oxc_ast_visit",
+  "dep:oxc_parser",
+  "dep:oxc_span",
+  "dep:rquickjs",
+  "dep:schemars",
+  "dep:sea-orm",
+  "dep:sea-orm-migration",
+  "dep:sea-query",
+]
+postgres = [
+  "agent",
+  "sea-orm/sqlx-postgres",
+  "sea-orm-migration/sqlx-postgres",
+  "sea-query/backend-postgres",
+  "sqlx/postgres",
+]
 loom = ["dep:loom"] # Test-only model checking (cargo xtask loom); never enable in release binaries.
 
 [dependencies]
@@ -19,23 +41,23 @@ ignore = "0.4.34"
 jiff = { workspace = true }
 loom = { workspace = true, optional = true }
 nix = { version = "0.32.0", features = ["signal", "process"] }
-oxc_allocator = "0.159.0"
-oxc_ast = "0.159.0"
-oxc_ast_visit = "0.159.0"
-oxc_parser = "0.159.0"
-oxc_span = "0.159.0"
+oxc_allocator = { version = "0.159.0", optional = true }
+oxc_ast = { version = "0.159.0", optional = true }
+oxc_ast_visit = { version = "0.159.0", optional = true }
+oxc_parser = { version = "0.159.0", optional = true }
+oxc_span = { version = "0.159.0", optional = true }
 parking_lot = { workspace = true }
 percent-encoding = { workspace = true }
 quick-xml = { workspace = true }
 regex = { workspace = true }
 reqwest = { workspace = true }
 rmcp = { version = "3.9.0", default-features = false, features = ["client", "transport-child-process", "transport-streamable-http-client-reqwest", "reqwest-tls-no-provider"] }
-rquickjs = { package = "quickjs-jit", version = "0.14.2" }
+rquickjs = { package = "quickjs-jit", version = "0.14.2", optional = true }
 rustls = { workspace = true }
-schemars = "1.2.3"
-sea-orm = { workspace = true }
-sea-orm-migration = { workspace = true }
-sea-query = { workspace = true }
+schemars = { version = "1.2.3", optional = true }
+sea-orm = { workspace = true, optional = true }
+sea-orm-migration = { workspace = true, optional = true }
+sea-query = { workspace = true, optional = true }
 semver = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -45,10 +67,12 @@ thiserror = { workspace = true }
 tokio = { workspace = true, features = ["process", "io-util"] }
 tokio-util = { workspace = true }
 toml_edit = { version = "0.25", default-features = false, features = ["parse", "display"] }
+tracing = { workspace = true }
 uuid = { workspace = true }
 vibevalley-git = { version = "0.1.0", path = "../git" }
 vibevalley-mcp = { path = "../mcp" }
 vibevalley-protocol = { version = "0.1.0", path = "../protocol" }
+vibevalley-rt = { workspace = true }
 which = { workspace = true }
 
 [dev-dependencies]

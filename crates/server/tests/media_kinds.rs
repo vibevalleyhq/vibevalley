@@ -1,5 +1,9 @@
 //! Several voices, a designed voice, a clone, a transcript and understanding on the job machine, against MOSS
 //! answered offline. One network is kept across restarts, so the vendor remembers what it was asked.
+#![allow(clippy::disallowed_types, reason = "synchronous test barrier for recorded fetch calls")]
+
+use crate::support::{RouterTestExt as _, ServerTestExt as _};
+
 use serde_json::{Value, json};
 use std::{
     io::Cursor,
@@ -8,7 +12,7 @@ use std::{
 };
 use vibevalley_protocol::Caller;
 use vibevalley_server::context::{Fetch, FetchError, Request, Response};
-use vibevalley_server::{App, BoxFuture, Config, Server as _, create_app_blocking};
+use vibevalley_server::{App, BoxFuture, Config, create_app_blocking};
 
 struct RecordedFetch {
     inner: Arc<dyn Fetch>,

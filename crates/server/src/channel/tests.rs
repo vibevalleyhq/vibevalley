@@ -123,3 +123,38 @@ async fn async_channel_operations_and_thread_idempotency() {
     ctx.shutdown(Duration::from_secs(2)).await;
     ctx.service.close().await;
 }
+
+#[tokio::test]
+async fn channel_follow_and_reports_emit_reset_when_history_catch_up_fails() {
+    let dir = tempfile::tempdir().unwrap();
+    let (ctx, storage) = test_context(dir.path()).await;
+    let chat = Chat::open_async(ctx.clone(), storage, false).await.unwrap();
+    let cid = chat.open_channel_async("reset-room", "reset room", "").await.unwrap().id;
+
+    // Close DB so history catch-up fails inside the spawned follow/reports tasks.
+    ctx.service.close().await;
+
+    let (follow_sink, mut follow_rx) = crate::context::Sink::with_default_capacity(tokio_util::sync::CancellationToken::new());
+    chat.follow(&cid, 0, follow_sink).unwrap();
+    let follow_ev: vibevalley_protocol::ChannelEvent = serde_json::from_value(
+        tokio::time::timeout(Duration::from_secs(2), follow_rx.recv())
+            .await
+            .expect("follow must emit Reset instead of silently closing")
+            .expect("expected Reset event on follow"),
+    )
+    .expect("valid ChannelEvent");
+    assert!(matches!(follow_ev, vibevalley_protocol::ChannelEvent::Reset {}));
+
+    let (reports_sink, mut reports_rx) = crate::context::Sink::with_default_capacity(tokio_util::sync::CancellationToken::new());
+    chat.reports(None, reports_sink).unwrap();
+    let reports_ev: vibevalley_protocol::ChannelEvent = serde_json::from_value(
+        tokio::time::timeout(Duration::from_secs(2), reports_rx.recv())
+            .await
+            .expect("reports must emit Reset instead of silently closing")
+            .expect("expected Reset event on reports"),
+    )
+    .expect("valid ChannelEvent");
+    assert!(matches!(reports_ev, vibevalley_protocol::ChannelEvent::Reset {}));
+
+    ctx.shutdown(Duration::from_secs(2)).await;
+}

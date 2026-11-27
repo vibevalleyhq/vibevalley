@@ -2,6 +2,7 @@
 //! (publish.test.ts): preview, refusals, the push and the pull request,
 //! the check, a conflict with the base, and the user-only rule.
 
+use crate::support::{RouterTestExt as _, ServerTestExt as _};
 mod support;
 
 use std::path::{Path, PathBuf};
@@ -245,7 +246,6 @@ fn pull_request_issue_mandates_records_and_completes_cleanly() {
     use vibevalley_runtime::oar::{Registry, scripted::ScriptedRuntime};
     use vibevalley_server::Config;
     use vibevalley_server::app::{Overrides, create_app_with_overrides_blocking};
-    use vibevalley_server::gateway::api::Server;
 
     vibevalley_i18n::set_locale("en");
     let dir = tempfile::tempdir().unwrap();

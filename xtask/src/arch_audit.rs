@@ -60,13 +60,13 @@ pub const RUNTIME_BLOCK_ON_CEILING: usize = 0;
 /// Initialized to 0 for full Tokio adoption; never raise this ceiling.
 pub const RUNTIME_OS_THREAD_CEILING: usize = 0;
 
-/// Shrink-only ceiling for non-test `block_on(` calls under `apps/mac/src/`.
+/// Shrink-only ceiling for non-test `block_on(` calls under `apps/mac/src/` and `apps/mac/crates/workspace/src/`.
 /// Locked at the current baseline; lower as sites migrate to async and never raise this ceiling.
-pub const MAC_BLOCK_ON_CEILING: usize = 5;
+pub const MAC_BLOCK_ON_CEILING: usize = 2;
 
-/// Shrink-only ceiling for non-test `thread::spawn` / `std::thread::Builder` sites under `apps/mac/src/`.
+/// Shrink-only ceiling for non-test `thread::spawn` / `std::thread::Builder` sites under `apps/mac/src/` and `apps/mac/crates/workspace/src/`.
 /// Locked at the current baseline; lower as sites migrate to async and never raise this ceiling.
-pub const MAC_OS_THREAD_CEILING: usize = 3;
+pub const MAC_OS_THREAD_CEILING: usize = 2;
 
 /// Shrink-only ceiling for non-test `Command::new("git")` sites across workspace production source
 /// (excluding `crates/git/src/`, `crates/runtime/src/bin/`, and `fake/`).
@@ -1757,7 +1757,7 @@ fn run_arch_audit_on_files(files: &[SourceFile], existing_legacy_dirs: &BTreeSet
             }
             continue;
         }
-        if file.path.starts_with("apps/mac/src/") {
+        if file.path.starts_with("apps/mac/src/") || file.path.starts_with("apps/mac/crates/workspace/src/") {
             collect_block_on_sites(&file.path, &tokens, &index, &mut mac_block_on_sites);
             collect_os_thread_sites(&file.path, &tokens, &index, &mut mac_os_thread_sites);
             continue;
@@ -2842,8 +2842,8 @@ mod tests {
     fn rule11_runtime_and_mac_concurrency_ceilings_enforce_all_four_buckets() {
         assert_eq!(RUNTIME_BLOCK_ON_CEILING, 0);
         assert_eq!(RUNTIME_OS_THREAD_CEILING, 0);
-        assert_eq!(MAC_BLOCK_ON_CEILING, 5);
-        assert_eq!(MAC_OS_THREAD_CEILING, 3);
+        assert_eq!(MAC_BLOCK_ON_CEILING, 2);
+        assert_eq!(MAC_OS_THREAD_CEILING, 2);
 
         let dir = TempDir::new("vv-arch-r11");
         dir.write(
@@ -2885,17 +2885,21 @@ mod tests {
             "apps/mac/src/hosted/remote.rs",
             "pub fn call() {\n    vibevalley_runtime::rt::block_on(async {});\n    let _ = std::thread::Builder::new();\n}\n",
         );
+        dir.write(
+            "apps/mac/crates/workspace/src/store/sqlite.rs",
+            "pub fn bad() {\n    vibevalley_rt::block_on(async {});\n    std::thread::spawn(|| {});\n}\n",
+        );
 
         let dirty = audit_server_architecture_with_config(&dir.0, zero_cfg).unwrap();
         assert_eq!(dirty.runtime_block_on_count, 1);
         assert_eq!(dirty.runtime_os_thread_count, 1);
-        assert_eq!(dirty.mac_block_on_count, 1);
-        assert_eq!(dirty.mac_os_thread_count, 1);
+        assert_eq!(dirty.mac_block_on_count, 2);
+        assert_eq!(dirty.mac_os_thread_count, 2);
         assert_eq!(
             tags(&dirty.violations),
             vec![
-                "runtime-and-mac-concurrency-ceilings@apps/mac/src/hosted/remote.rs:2",
-                "runtime-and-mac-concurrency-ceilings@apps/mac/src/hosted/remote.rs:3",
+                "runtime-and-mac-concurrency-ceilings@apps/mac/crates/workspace/src/store/sqlite.rs:2",
+                "runtime-and-mac-concurrency-ceilings@apps/mac/crates/workspace/src/store/sqlite.rs:3",
                 "runtime-and-mac-concurrency-ceilings@crates/runtime/src/oar/runner.rs:2",
                 "runtime-and-mac-concurrency-ceilings@crates/runtime/src/oar/runner.rs:3",
             ]

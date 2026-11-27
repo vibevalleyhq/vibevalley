@@ -3,15 +3,7 @@ use std::time::Duration;
 
 use super::releases;
 
-pub fn bundle_version() -> String {
-    let exe = std::env::current_exe().ok();
-    exe.as_deref()
-        .and_then(Path::to_str)
-        .and_then(releases::bundle_of)
-        .and_then(|b| std::fs::read_to_string(Path::new(b).join("Contents/Info.plist")).ok())
-        .and_then(|xml| releases::plist_version(&xml).map(str::to_string))
-        .unwrap_or_else(|| env!("CARGO_PKG_VERSION").to_string())
-}
+pub use crate::env::bundle_version;
 
 pub(super) fn extract_login_path(output: &str) -> Option<&str> {
     let (_, rest) = output.split_once("__VV_PATH__")?;
@@ -52,7 +44,7 @@ fn resolve_login_shell_path(timeout: Duration) -> Option<String> {
         .ok()
         .filter(|s| Path::new(s).is_file())
         .unwrap_or_else(|| "/bin/zsh".into());
-    vibevalley_runtime::rt::block_on(async move {
+    vibevalley_rt::block_on(async move {
         let mut child = tokio::process::Command::new(&shell)
             .args(["-ilc", "printf '__VV_PATH__%s__VV_END__' \"$PATH\""])
             .stdin(std::process::Stdio::null())

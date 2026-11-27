@@ -1,6 +1,7 @@
 //! The server as the bridge and HTTP door see it: envelopes, per-domain slice
 //! feeds, ordered farm effects, live events, subscriptions, and Spine hooks.
 
+use crate::support::{RouterTestExt as _, ServerTestExt as _};
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};

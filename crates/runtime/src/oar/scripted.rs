@@ -286,8 +286,8 @@ struct ScriptedDriver {
     session_cancel: CancellationToken,
     _cancel_guard: DropGuard,
     current: Mutex<Option<CancellationToken>>,
-    answers: mpsc::UnboundedSender<PermissionDecision>,
-    answers_rx: Arc<AsyncMutex<mpsc::UnboundedReceiver<PermissionDecision>>>,
+    answers: mpsc::Sender<PermissionDecision>,
+    answers_rx: Arc<AsyncMutex<mpsc::Receiver<PermissionDecision>>>,
 }
 
 enum Flow {
@@ -300,7 +300,7 @@ enum Flow {
 fn run_steps<'a>(
     core: &'a SessionCore,
     cancel: &'a CancellationToken,
-    answer: &'a mut mpsc::UnboundedReceiver<PermissionDecision>,
+    answer: &'a mut mpsc::Receiver<PermissionDecision>,
     steps: &'a [Step],
     prompt: &'a str,
 ) -> Pin<Box<dyn Future<Output = Flow> + Send + 'a>> {
@@ -453,8 +453,8 @@ impl Driver for ScriptedDriver {
     }
 
     fn respond_permission<'a>(&'a self, _request_id: &'a str, decision: &'a PermissionDecision) -> BoxFuture<'a, Result<()>> {
-        let res = self.answers.send(decision.clone()).map_err(|e| AgentError::Io(e.to_string()));
-        Box::pin(async move { res })
+        let decision = decision.clone();
+        Box::pin(async move { self.answers.send(decision).await.map_err(|e| AgentError::Io(e.to_string())) })
     }
 
     fn dispose(&self) -> BoxFuture<'_, ()> {
@@ -524,7 +524,7 @@ impl Runtime for ScriptedRuntime {
                 session_id,
                 model: opts.model.clone(),
             });
-            let (answers, answers_rx) = mpsc::unbounded_channel();
+            let (answers, answers_rx) = mpsc::channel(64);
             let session_cancel = CancellationToken::new();
             let _cancel_guard = session_cancel.clone().drop_guard();
             let driver = ScriptedDriver {
@@ -547,7 +547,7 @@ impl Runtime for ScriptedRuntime {
 mod tests {
     use super::*;
 
-    fn drain_events(rx: &mut mpsc::UnboundedReceiver<crate::oar::Event>) -> Vec<crate::oar::Event> {
+    fn drain_events(rx: &mut mpsc::Receiver<crate::oar::Event>) -> Vec<crate::oar::Event> {
         let mut out = Vec::new();
         while let Ok(ev) = rx.try_recv() {
             out.push(ev);

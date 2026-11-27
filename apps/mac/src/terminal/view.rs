@@ -290,7 +290,7 @@ impl TerminalView {
         let alive = self.is_alive();
         let has_fg = self.has_foreground_process();
         let status = self.terminal_status();
-        let fallback = crate::panes::shell_name();
+        let fallback = crate::host_types::shell_name();
         classify_busy_label(alive, has_fg, self.running_command.as_deref(), &status, self.title.as_deref(), &fallback)
     }
 
@@ -388,7 +388,7 @@ impl TerminalView {
             scrollback_lines: ui.settings.scrollback_lines,
             theme: ui.colors.term.clone(),
         };
-        let (tx, rx) = flume::unbounded::<TermEvent>();
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<TermEvent>();
         let history = self.spec.history.take();
         let spawned = cx.background_spawn(async move {
             let on_event = move |event| {
@@ -434,7 +434,7 @@ impl TerminalView {
             // Session thread -> UI thread. Drain any queued burst and coalesce
             // redundant `Dirty` frames so rapid PTY output triggers one status scan
             // and one repaint per UI wake-up.
-            while let Ok(first) = rx.recv_async().await {
+            while let Some(first) = rx.recv().await {
                 let mut raw = vec![first];
                 while let Ok(next) = rx.try_recv() {
                     raw.push(next);
@@ -479,7 +479,7 @@ impl TerminalView {
             }
             TermEvent::TitleChanged(title) => {
                 let next = Some(title).filter(|t| !t.trim().is_empty());
-                if next.as_deref().is_some_and(crate::panes::is_default_title) && self.spec.title.as_deref().is_some_and(|t| !t.trim().is_empty()) {
+                if next.as_deref().is_some_and(crate::host_types::is_default_title) && self.spec.title.as_deref().is_some_and(|t| !t.trim().is_empty()) {
                     return false;
                 }
                 self.title = next.or_else(|| self.spec.title.clone().filter(|t| !t.trim().is_empty()));

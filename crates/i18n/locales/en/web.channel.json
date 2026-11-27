@@ -59,10 +59,13 @@
     "save": "Save"
   },
   "issues": {
+    "emptyTitle": "No tickets yet",
     "empty": "No tickets in this channel yet. Tell the assistant something to do in a channel; it sends a helper, and the ticket is listed here.",
+    "openBoard": "Open issues board",
     "thread": "Ticket thread"
   },
   "crons": {
+    "emptyTitle": "No scheduled tasks",
     "empty": "No scheduled tasks: tell the assistant \"run the tests every day at nine\".",
     "next": "next {next}",
     "direct": "straight to {agent}",

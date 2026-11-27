@@ -1,5 +1,4 @@
 use std::path::{Path, PathBuf};
-use std::sync::OnceLock;
 
 use gpui::{AppContext as _, Context, Entity, Focusable as _, PathPromptOptions, Subscription, Window};
 use serde_json::{Value, json};
@@ -266,33 +265,15 @@ impl Shell {
             HostOp::UpdateCheck => return crate::update::host_call(crate::update::UpdateOp::Check, reply, cx),
             HostOp::UpdateInstall => return crate::update::host_call(crate::update::UpdateOp::Install, reply, cx),
             HostOp::Info => {
-                let settings = &Ui::get(cx).settings;
-                static MONO_FONTS: OnceLock<Vec<String>> = OnceLock::new();
-                let fonts = MONO_FONTS.get_or_init(|| {
-                    let mut fonts: Vec<String> = window
-                        .text_system()
-                        .all_font_names()
-                        .into_iter()
-                        .filter(|name| {
-                            let lower = name.to_lowercase();
-                            lower.contains("nerd")
-                                || lower.contains(" nf")
-                                || lower.contains("-nf")
-                                || lower.contains("mono")
-                                || lower.contains("menlo")
-                                || lower.contains("monaco")
-                                || lower.contains("consolas")
-                                || lower.contains("courier")
-                                || lower.contains("fira code")
-                                || lower.contains("sarasa")
-                                || lower.contains("maple")
-                        })
-                        .collect();
-                    fonts.sort();
-                    fonts.dedup();
-                    fonts
-                });
-                Envelope::ok(host_info_payload(settings, fonts))
+                let settings = Ui::get(cx).settings.clone();
+                if let Some(fonts) = crate::host::cached_mono_fonts() {
+                    Envelope::ok(host_info_payload(&settings, fonts))
+                } else {
+                    Self::bg(cx, crate::host::mono_fonts, move |_, fonts, _| {
+                        reply.send(Envelope::ok(host_info_payload(&settings, &fonts)));
+                    });
+                    return;
+                }
             }
             HostOp::CliState => return self.run_cli_op(CliOp::State, reply, cx),
             HostOp::CliInstall => return self.run_cli_op(CliOp::Install, reply, cx),
@@ -383,7 +364,7 @@ impl Shell {
             }
             HostOp::Opening(state) => {
                 if let Some(opening) = &self.overlays.launch {
-                    let phase = crate::serving::opening_phase(state.phase);
+                    let phase = crate::diorama::opening::Phase::from_host_phase(state.phase);
                     opening.update(cx, |view, _| view.set_phase(phase, (state.progress as f32).clamp(0.0, 100.0)));
                 }
                 self.overlays.opening = Some(serde_json::to_value(&state).unwrap_or(Value::Null));
@@ -634,9 +615,6 @@ impl Shell {
                 crate::audio::dispatch(reply, move || crate::audio::play_sound(name));
                 return;
             }
-            HostOp::SeekAudio(_) | HostOp::AudioState | HostOp::PcmStart(_) | HostOp::PcmAppend(_) => {
-                refusal(BizCode::Refused, "legacy audio bridge op is no longer supported")
-            }
             // A file the user dropped on a view: nsh gives views file: URLs
             // and no way to read them.
             HostOp::ReadFile(req) => {
@@ -747,8 +725,8 @@ impl Shell {
                 return;
             }
             HostOp::VdpCall(req) => {
-                vibevalley_runtime::rt::current_or_global_handle().spawn(async move {
-                    let envelope = crate::debug::call_remote_vdp(req).await;
+                vibevalley_rt::current_or_global_handle().spawn(async move {
+                    let envelope = crate::vdp_bus::call_remote_vdp(req).await;
                     reply.send(envelope);
                 });
                 return;
@@ -846,16 +824,18 @@ mod tests {
     use super::*;
     use crate::theme::{SETTINGS_KEY, Settings};
 
-    #[test]
-    fn host_info_reports_persisted_theme_choice() {
-        let store = vibevalley_workspace::Store::open_in_memory().expect("open in-memory workspace store");
+    #[tokio::test]
+    async fn host_info_reports_persisted_theme_choice() {
+        let store = vibevalley_workspace::Store::open_in_memory().await.expect("open in-memory workspace store");
         for (choice, expected) in [(ThemeChoice::Light, "light"), (ThemeChoice::Dark, "dark"), (ThemeChoice::System, "system")] {
             let settings = Settings {
                 theme: choice,
                 ..Settings::default()
             };
-            vibevalley_workspace::persist::save_setting(&store, SETTINGS_KEY, &settings).expect("persist settings");
-            let reloaded: Settings = vibevalley_workspace::persist::load_setting(&store, SETTINGS_KEY);
+            vibevalley_workspace::persist::save_setting(&store, SETTINGS_KEY, &settings)
+                .await
+                .expect("persist settings");
+            let reloaded: Settings = vibevalley_workspace::persist::load_setting(&store, SETTINGS_KEY).await;
             let info = host_info_payload(&reloaded, &["Menlo".into()]);
             assert_eq!(info["theme"], expected);
             let caps = info["capabilities"].as_array().expect("capabilities array");

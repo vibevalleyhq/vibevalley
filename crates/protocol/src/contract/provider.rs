@@ -363,16 +363,6 @@ pub struct ProviderVerifyRequest {
 #[cfg_attr(feature = "ts-gen", derive(TS))]
 #[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
-pub struct ProviderModelRequest {
-    pub connection: String,
-    pub revision: i64,
-}
-
-#[skip_serializing_none]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts-gen", derive(TS))]
-#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
-#[serde(rename_all = "camelCase")]
 pub struct ProviderVoiceRequest {
     pub connection: String,
     pub revision: i64,
@@ -408,17 +398,6 @@ pub struct ProviderVoiceListing {
     pub next_cursor: Option<String>,
 }
 
-#[skip_serializing_none]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts-gen", derive(TS))]
-#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
-#[serde(rename_all = "camelCase")]
-pub struct ProviderModelListing {
-    pub connection: String,
-    pub revision: i64,
-    pub models: Vec<ProviderModel>,
-}
-
 #[cfg(feature = "ts-gen")]
 crate::typescript::module! {
     "provider";
@@ -435,10 +414,8 @@ crate::typescript::module! {
     ProviderConnectionUpdate,
     ProviderUpdate,
     ProviderVerifyRequest,
-    ProviderModelRequest,
     ProviderVoiceRequest,
     ProviderVoiceListingVoices,
-    ProviderVoiceListing,
-    ProviderModelListing];
+    ProviderVoiceListing];
     aliases: [];
 }

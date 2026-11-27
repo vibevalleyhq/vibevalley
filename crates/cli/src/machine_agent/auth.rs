@@ -3,8 +3,7 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use url::Url;
-use vibevalley_protocol::MachinePlatform;
-use vibevalley_runtime::sandbox::Secret;
+use vibevalley_protocol::{MachinePlatform, Secret};
 
 use crate::{Failure, load_secret_json, save_secret_json};
 

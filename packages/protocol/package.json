@@ -26,6 +26,14 @@
     "./host": {
       "types": "./dist/host.d.ts",
       "default": "./src/host.ts"
+    },
+    "./store": {
+      "types": "./dist/store/index.d.ts",
+      "default": "./src/store/index.ts"
+    },
+    "./ui": {
+      "types": "./dist/ui/index.d.ts",
+      "default": "./src/ui/index.ts"
     }
   },
   "dependencies": {

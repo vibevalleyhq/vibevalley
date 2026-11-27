@@ -15,10 +15,12 @@ use vibevalley_protocol::{
     NoteLinkRef, NoteType, Suggestion,
 };
 
-use super::with_write_tx;
+use super::{batch_chunk_rows, with_write_tx};
 use crate::db::column::{db_json, read_db_json, read_db_word};
 use crate::db::entity::{attachment, issue, media_job, media_library_item, note, note_change, note_collab, note_link, note_suggestion, note_version};
 use crate::db::{Database, DbResult, Tx};
+
+const NOTE_LINK_BATCH_ROWS: usize = batch_chunk_rows(8);
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct NoteRow {
@@ -676,14 +678,14 @@ impl NoteService {
                 .filter(note_link::Column::SourceId.eq(&sid))
                 .exec(tx)
                 .await?;
-            for link in links {
+            let filtered: Vec<&NoteLinkRef> = links
+                .iter()
                 // Skip trivial self-links.
-                if link.kind == source_kind && link.id == sid {
-                    continue;
-                }
-                let id = format!("lnk_{}", uuid::Uuid::now_v7().simple());
-                note_link::ActiveModel {
-                    id: Set(id),
+                .filter(|link| !(link.kind == source_kind && link.id == sid))
+                .collect();
+            for chunk in filtered.chunks(NOTE_LINK_BATCH_ROWS) {
+                let models = chunk.iter().map(|link| note_link::ActiveModel {
+                    id: Set(format!("lnk_{}", uuid::Uuid::now_v7().simple())),
                     source_kind: Set(sk.clone()),
                     source_id: Set(sid.clone()),
                     target_kind: Set(link.kind.as_str().to_owned()),
@@ -691,9 +693,8 @@ impl NoteService {
                     relation: Set(link.relation.as_str().to_owned()),
                     title: Set(link.title.clone()),
                     created_at: Set(created_at),
-                }
-                .insert(tx)
-                .await?;
+                });
+                note_link::Entity::insert_many(models).exec_without_returning(tx).await?;
             }
             Ok(())
         })
@@ -715,31 +716,90 @@ impl NoteService {
             .all(self.db.read_conn())
             .await?;
 
-        let all_notes: HashMap<String, (String, Option<NoteType>)> = note::Entity::find()
-            .all(self.db.read_conn())
-            .await?
-            .into_iter()
-            .map(|n| (n.id, (n.title, NoteType::parse(&n.note_type))))
-            .collect();
-        let all_issues: HashMap<String, (String, i64)> = issue::Entity::find()
-            .all(self.db.read_conn())
-            .await?
-            .into_iter()
-            .map(|i| (i.id, (i.title, i.number)))
-            .collect();
-        let issue_by_num: HashMap<String, String> = all_issues
-            .iter()
-            .map(|(_id, (title, num))| (num.to_string(), format!("#{num} {title}")))
-            .collect();
+        let mut needed_note_ids: HashSet<String> = HashSet::new();
+        let mut needed_issue_ids: HashSet<String> = HashSet::new();
+        let mut needed_issue_nums: HashSet<i64> = HashSet::new();
+        for row in &outgoing_rows {
+            match parse_link_kind(&row.target_kind) {
+                LinkEntityKind::Note => {
+                    needed_note_ids.insert(row.target_id.clone());
+                }
+                LinkEntityKind::Issue => {
+                    needed_issue_ids.insert(row.target_id.clone());
+                    if let Ok(num) = row.target_id.parse::<i64>() {
+                        needed_issue_nums.insert(num);
+                    }
+                }
+            }
+        }
+        for row in &backlink_rows {
+            match parse_link_kind(&row.source_kind) {
+                LinkEntityKind::Note => {
+                    needed_note_ids.insert(row.source_id.clone());
+                }
+                LinkEntityKind::Issue => {
+                    needed_issue_ids.insert(row.source_id.clone());
+                    if let Ok(num) = row.source_id.parse::<i64>() {
+                        needed_issue_nums.insert(num);
+                    }
+                }
+            }
+        }
+
+        let mut resolved_notes: HashMap<String, (String, Option<NoteType>)> = HashMap::with_capacity(needed_note_ids.len());
+        let note_id_list: Vec<String> = needed_note_ids.into_iter().collect();
+        for chunk in note_id_list.chunks(super::MAX_SQL_BIND_PARAMS) {
+            let rows: Vec<(String, String, String)> = note::Entity::find()
+                .select_only()
+                .columns([note::Column::Id, note::Column::Title, note::Column::NoteType])
+                .filter(note::Column::Id.is_in(chunk.iter().cloned()))
+                .into_tuple()
+                .all(self.db.read_conn())
+                .await?;
+            for (id, title, note_type) in rows {
+                resolved_notes.insert(id, (title, NoteType::parse(&note_type)));
+            }
+        }
+
+        let mut resolved_issues: HashMap<String, (String, i64)> = HashMap::with_capacity(needed_issue_ids.len());
+        let mut issue_by_num: HashMap<String, String> = HashMap::with_capacity(needed_issue_nums.len());
+        let issue_id_list: Vec<String> = needed_issue_ids.into_iter().collect();
+        for chunk in issue_id_list.chunks(super::MAX_SQL_BIND_PARAMS) {
+            let rows: Vec<(String, String, i64)> = issue::Entity::find()
+                .select_only()
+                .columns([issue::Column::Id, issue::Column::Title, issue::Column::Number])
+                .filter(issue::Column::Id.is_in(chunk.iter().cloned()))
+                .into_tuple()
+                .all(self.db.read_conn())
+                .await?;
+            for (id, title, number) in rows {
+                issue_by_num.insert(number.to_string(), format!("#{number} {title}"));
+                resolved_issues.insert(id, (title, number));
+            }
+        }
+        let missing_nums: Vec<i64> = needed_issue_nums.into_iter().filter(|n| !issue_by_num.contains_key(&n.to_string())).collect();
+        for chunk in missing_nums.chunks(super::MAX_SQL_BIND_PARAMS) {
+            let rows: Vec<(String, String, i64)> = issue::Entity::find()
+                .select_only()
+                .columns([issue::Column::Id, issue::Column::Title, issue::Column::Number])
+                .filter(issue::Column::Number.is_in(chunk.iter().copied()))
+                .into_tuple()
+                .all(self.db.read_conn())
+                .await?;
+            for (id, title, number) in rows {
+                issue_by_num.insert(number.to_string(), format!("#{number} {title}"));
+                resolved_issues.insert(id, (title, number));
+            }
+        }
 
         let resolve_meta = |kind: LinkEntityKind, id: &str, stored_title: Option<String>| -> (Option<String>, Option<NoteType>) {
             match kind {
-                LinkEntityKind::Note => match all_notes.get(id) {
+                LinkEntityKind::Note => match resolved_notes.get(id) {
                     Some((t, nt)) => (Some(t.clone()), *nt),
                     None => (stored_title, None),
                 },
                 LinkEntityKind::Issue => {
-                    let resolved = all_issues
+                    let resolved = resolved_issues
                         .get(id)
                         .map(|(t, n)| format!("#{n} {t}"))
                         .or_else(|| issue_by_num.get(id).cloned())
@@ -931,10 +991,25 @@ impl NoteService {
                 }
             }
         }
+        let conn = self.db.read_conn();
+        let backend = conn.get_database_backend();
         let text = req.text.as_deref().unwrap_or("").trim().to_lowercase();
         if !text.is_empty() {
-            let pattern = format!("%{}%", super::escape_like(&text));
-            query.and_where(Expr::expr(Func::lower(Expr::col((attachment::Entity, attachment::Column::Name)))).like(LikeExpr::new(pattern).escape('\\')));
+            if backend == sea_orm::DatabaseBackend::Sqlite
+                && let Some(phrase) = super::fts5_trigram_phrase(&text)
+            {
+                let fts = Alias::new("attachment_fts");
+                query
+                    .join(
+                        sea_orm::sea_query::JoinType::InnerJoin,
+                        fts.clone(),
+                        Expr::col((fts, Alias::new("rowid"))).equals((attachment::Entity, Alias::new("rowid"))),
+                    )
+                    .and_where(Expr::cust_with_values("attachment_fts MATCH ?", [sea_orm::Value::from(phrase)]));
+            } else {
+                let pattern = format!("%{}%", super::escape_like(&text));
+                query.and_where(Expr::expr(Func::lower(Expr::col((attachment::Entity, attachment::Column::Name)))).like(LikeExpr::new(pattern).escape('\\')));
+            }
         }
         match req.sort.unwrap_or(LibrarySort::Recent) {
             LibrarySort::Name => {
@@ -950,8 +1025,15 @@ impl NoteService {
             .order_by((media_library_item::Entity, media_library_item::Column::AttachmentId), Order::Asc)
             .limit(limit);
 
-        let conn = self.db.read_conn();
-        let rows = LibraryQueryRow::find_by_statement(conn.get_database_backend().build(&query)).all(conn).await?;
+        let rows = self
+            .db
+            .query_metrics()
+            .observe(
+                "note.list_library_items",
+                "SELECT media_library_item JOIN attachment",
+                LibraryQueryRow::find_by_statement(backend.build(&query)).all(conn),
+            )
+            .await?;
         Ok(rows.into_iter().map(library_item_from_row).collect())
     }
 

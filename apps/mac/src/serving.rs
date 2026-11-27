@@ -5,28 +5,14 @@
 
 use std::path::{Path, PathBuf};
 
-pub fn work_root() -> PathBuf {
-    vibevalley_server::Config::default_work_root()
-}
+pub use crate::env::work_root;
 
 /// The server's config for the farm at `home`, sharing environment overrides
 /// and bundle version with the standalone server.
 pub fn config(home: &Path, work_root: PathBuf) -> vibevalley_server::Config {
-    let mut config = vibevalley_server::Config::from_env(home, crate::update::bundle_version());
+    let mut config = vibevalley_server::Config::from_env(home, crate::env::bundle_version());
     config.work_root = work_root;
     config
-}
-
-pub fn opening_phase(phase: vibevalley_protocol::HostOpeningPhase) -> crate::diorama::opening::Phase {
-    use crate::diorama::opening::Phase;
-    use vibevalley_protocol::HostOpeningPhase;
-    match phase {
-        HostOpeningPhase::Connecting | HostOpeningPhase::Waiting => Phase::Connecting,
-        HostOpeningPhase::Reading => Phase::Reading,
-        HostOpeningPhase::Loading => Phase::Loading,
-        HostOpeningPhase::Ready => Phase::Ready,
-        HostOpeningPhase::Failed => Phase::Failed,
-    }
 }
 
 pub struct Running {

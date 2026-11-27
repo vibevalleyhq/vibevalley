@@ -2,6 +2,7 @@
 //! run when a turn starts), temporary repositories and a board on them.
 
 #![allow(dead_code)]
+#![allow(clippy::disallowed_types, reason = "synchronous TurnGate test barrier")]
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -169,7 +170,7 @@ impl Session for HookSession {
     fn records(&self) -> Vec<vibevalley_runtime::oar::voyage::Record> {
         self.inner.records()
     }
-    fn subscribe_records(&self, after: Option<u64>) -> tokio::sync::mpsc::UnboundedReceiver<vibevalley_runtime::oar::voyage::Record> {
+    fn subscribe_records(&self, after: Option<u64>) -> tokio::sync::mpsc::Receiver<vibevalley_runtime::oar::voyage::Record> {
         self.inner.subscribe_records(after)
     }
     fn control<'a>(
@@ -200,7 +201,7 @@ impl Session for HookSession {
     fn status(&self) -> SessionStatus {
         self.inner.status()
     }
-    fn events(&self) -> tokio::sync::mpsc::UnboundedReceiver<Event> {
+    fn events(&self) -> tokio::sync::mpsc::Receiver<Event> {
         self.inner.events()
     }
     fn prompt(&self, content: Vec<ContentBlock>) -> vibevalley_runtime::BoxFuture<'_, vibevalley_runtime::oar::Result<()>> {
@@ -482,6 +483,9 @@ pub async fn try_wait_until_transition_async<T>(ctx: &Context, timeout: Duration
     let _ = *cycles.borrow_and_update();
     tokio::time::timeout(timeout, async {
         loop {
+            if ctx.feed.has_unprojected_dirty() {
+                ctx.feed.flush().await;
+            }
             if let Some(val) = pred() {
                 return Some(val);
             }
@@ -490,6 +494,9 @@ pub async fn try_wait_until_transition_async<T>(ctx: &Context, timeout: Duration
                 _ = cycles.changed() => {}
                 res = live.recv() => {
                     if matches!(res, Err(tokio::sync::broadcast::error::RecvError::Closed)) {
+                        if ctx.feed.has_unprojected_dirty() {
+                            ctx.feed.flush().await;
+                        }
                         return pred();
                     }
                 }
@@ -517,6 +524,9 @@ pub fn try_wait_until_transition<T>(ctx: &Context, timeout: Duration, mut pred: 
     let _ = *cycles.borrow_and_update();
     let deadline = Instant::now() + timeout;
     loop {
+        if ctx.feed.has_unprojected_dirty() {
+            block_on(ctx.feed.flush());
+        }
         if let Some(val) = pred() {
             return Some(val);
         }
@@ -533,7 +543,12 @@ pub fn try_wait_until_transition<T>(ctx: &Context, timeout: Duration, mut pred: 
         });
         match res {
             Ok(true) => {}
-            Ok(false) | Err(_) => return pred(),
+            Ok(false) | Err(_) => {
+                if ctx.feed.has_unprojected_dirty() {
+                    block_on(ctx.feed.flush());
+                }
+                return pred();
+            }
         }
     }
 }
@@ -658,4 +673,144 @@ pub fn wait_issue(board: &Board, id: &str, what: &str, pred: impl Fn(&Issue) -> 
 
 pub fn wait_stage(board: &Board, id: &str, state: StageKind) -> Issue {
     wait_issue(board, id, &format!("{state:?}"), |t| t.stage.state == state)
+}
+
+/// Test-only synchronous convenience wrappers over the async-first [`Server`] trait.
+pub trait ServerTestExt {
+    fn call(&self, op: &str, payload: serde_json::Value) -> vibevalley_protocol::Envelope;
+    fn call_with(&self, ctx: &vibevalley_server::gateway::api::CallerContext, op: &str, payload: serde_json::Value) -> vibevalley_protocol::Envelope;
+    #[allow(clippy::result_large_err)]
+    fn subscribe(&self, name: &str, payload: serde_json::Value)
+    -> Result<(u64, tokio::sync::mpsc::Receiver<serde_json::Value>), vibevalley_protocol::Envelope>;
+    #[allow(clippy::result_large_err)]
+    fn subscribe_with(
+        &self,
+        ctx: &vibevalley_server::gateway::api::CallerContext,
+        name: &str,
+        payload: serde_json::Value,
+    ) -> Result<(u64, tokio::sync::mpsc::Receiver<serde_json::Value>), vibevalley_protocol::Envelope>;
+    fn slice_snapshot(&self, slice: SliceKind) -> serde_json::Value;
+    fn watch_slice(
+        &self,
+        slice: SliceKind,
+        after_seq: Option<i64>,
+        stop: &tokio_util::sync::CancellationToken,
+        receive: &mut dyn FnMut(i64, &serde_json::Value),
+    );
+}
+
+impl<T: vibevalley_server::gateway::api::Server + ?Sized> ServerTestExt for Arc<T> {
+    fn call(&self, op: &str, payload: serde_json::Value) -> vibevalley_protocol::Envelope {
+        self.call_with(&vibevalley_server::gateway::api::CallerContext::local(), op, payload)
+    }
+
+    fn call_with(&self, ctx: &vibevalley_server::gateway::api::CallerContext, op: &str, payload: serde_json::Value) -> vibevalley_protocol::Envelope {
+        vibevalley_runtime::rt::block_on(self.clone().call_with_async(ctx.clone(), op.to_owned(), payload))
+    }
+
+    fn subscribe(
+        &self,
+        name: &str,
+        payload: serde_json::Value,
+    ) -> Result<(u64, tokio::sync::mpsc::Receiver<serde_json::Value>), vibevalley_protocol::Envelope> {
+        self.subscribe_with(&vibevalley_server::gateway::api::CallerContext::local(), name, payload)
+    }
+
+    fn subscribe_with(
+        &self,
+        ctx: &vibevalley_server::gateway::api::CallerContext,
+        name: &str,
+        payload: serde_json::Value,
+    ) -> Result<(u64, tokio::sync::mpsc::Receiver<serde_json::Value>), vibevalley_protocol::Envelope> {
+        vibevalley_runtime::rt::block_on(self.clone().subscribe_with_async(ctx.clone(), name.to_owned(), payload))
+    }
+
+    fn slice_snapshot(&self, slice: SliceKind) -> serde_json::Value {
+        let json = vibevalley_runtime::rt::block_on(self.clone().slice_snapshot_json_async(slice));
+        serde_json::from_str(&json).unwrap_or(serde_json::Value::Null)
+    }
+
+    fn watch_slice(
+        &self,
+        slice: SliceKind,
+        after_seq: Option<i64>,
+        stop: &tokio_util::sync::CancellationToken,
+        receive: &mut dyn FnMut(i64, &serde_json::Value),
+    ) {
+        use tokio_stream::StreamExt as _;
+        let server = self.clone();
+        vibevalley_runtime::rt::block_on(async {
+            let Some(sub) = server.clone().subscribe_slice_async(slice).await else {
+                return;
+            };
+            let topic = sub.topic();
+            let mut stream = sub.into_json_watch_stream(after_seq);
+            loop {
+                let next = tokio::select! {
+                    biased;
+                    _ = stop.cancelled() => break,
+                    item = stream.next() => item,
+                };
+                let Some((seq, json_str)) = next else { break };
+                if let Some(gate) = server.fault_gate() {
+                    if gate.should_disconnect(topic) {
+                        break;
+                    }
+                    let delay = gate.delay_ms(topic);
+                    if delay > 0 {
+                        tokio::select! {
+                            biased;
+                            _ = stop.cancelled() => break,
+                            _ = tokio::time::sleep(Duration::from_millis(delay)) => {}
+                        }
+                    }
+                }
+                if stop.is_cancelled() {
+                    break;
+                }
+                if let Ok(v) = serde_json::from_str::<serde_json::Value>(&json_str) {
+                    receive(seq, &v);
+                }
+            }
+        });
+    }
+}
+
+/// Test-only synchronous convenience wrappers on [`vibevalley_server::Router`].
+pub trait RouterTestExt {
+    fn call_as(&self, caller: vibevalley_protocol::Caller, op: &str, payload: serde_json::Value) -> vibevalley_protocol::Envelope;
+    fn invoke<O: vibevalley_protocol::Op>(
+        &self,
+        ctx: &vibevalley_server::gateway::api::CallerContext,
+        input: O::Input,
+    ) -> Result<O::Result, vibevalley_protocol::ApiError>
+    where
+        O::Result: serde::de::DeserializeOwned;
+    fn invoke_as<O: vibevalley_protocol::Op>(&self, caller: vibevalley_protocol::Caller, input: O::Input) -> Result<O::Result, vibevalley_protocol::ApiError>
+    where
+        O::Result: serde::de::DeserializeOwned;
+}
+
+impl RouterTestExt for vibevalley_server::Router {
+    fn call_as(&self, caller: vibevalley_protocol::Caller, op: &str, payload: serde_json::Value) -> vibevalley_protocol::Envelope {
+        vibevalley_runtime::rt::block_on(self.call_as_async(caller, op, payload))
+    }
+
+    fn invoke<O: vibevalley_protocol::Op>(
+        &self,
+        ctx: &vibevalley_server::gateway::api::CallerContext,
+        input: O::Input,
+    ) -> Result<O::Result, vibevalley_protocol::ApiError>
+    where
+        O::Result: serde::de::DeserializeOwned,
+    {
+        vibevalley_runtime::rt::block_on(self.invoke_async::<O>(ctx, input))
+    }
+
+    fn invoke_as<O: vibevalley_protocol::Op>(&self, caller: vibevalley_protocol::Caller, input: O::Input) -> Result<O::Result, vibevalley_protocol::ApiError>
+    where
+        O::Result: serde::de::DeserializeOwned,
+    {
+        vibevalley_runtime::rt::block_on(self.invoke_as_async::<O>(caller, input))
+    }
 }

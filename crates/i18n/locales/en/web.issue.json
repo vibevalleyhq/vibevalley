@@ -531,24 +531,6 @@
     "clear": "Clear blockers",
     "blockedByChip": "Blocked by #{n}"
   },
-  "triage": {
-    "selected": "{n} selected",
-    "selectIssue": "Select issue #{n}",
-    "clear": "Clear",
-    "status": "Status",
-    "agent": "Helper",
-    "noAgent": "Unassigned",
-    "owner": "Assignee",
-    "noOwner": "Clear assignee",
-    "repo": "Repo",
-    "noRepo": "No repo",
-    "priority": "Priority",
-    "tags": "Tags",
-    "addTags": "Add tags",
-    "replaceTags": "Replace tags",
-    "updated": "Updated {n} issues",
-    "partial": "Updated {ok} issues; {failed} could not be updated"
-  },
   "relations": {
     "title": "Relations",
     "pick": "Link related or duplicate…",

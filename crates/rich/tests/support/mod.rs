@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+#![allow(clippy::disallowed_types, reason = "synchronous test harness wakeup barrier")]
 
 use std::collections::HashMap;
 use std::sync::{Arc, Condvar, Mutex};

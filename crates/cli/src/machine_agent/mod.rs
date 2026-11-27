@@ -16,4 +16,4 @@ pub use auth::{
 pub use runner::MachineAgent;
 pub use runtime_probe::{build_runtime_registry, probe_runtime_summaries_async};
 pub use transport::TransportSlot;
-pub use vibevalley_runtime::sandbox::Secret;
+pub use vibevalley_protocol::Secret;

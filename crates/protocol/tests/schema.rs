@@ -13,6 +13,10 @@ fn every_generated_type_round_trips_its_schemas_samples() {
     let mut failures = Vec::new();
     for entry in std::fs::read_dir(&dir).unwrap() {
         let path = entry.unwrap().path();
+        #[cfg(not(feature = "host"))]
+        if path.file_name().and_then(|n| n.to_str()) == Some("host.json") {
+            continue;
+        }
         let Value::Object(by_name) = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap() else {
             panic!("{} is not an object", path.display())
         };
@@ -30,7 +34,10 @@ fn every_generated_type_round_trips_its_schemas_samples() {
         }
     }
     assert!(failures.is_empty(), "{} of {values} samples failed:\n{}", failures.len(), failures.join("\n"));
+    #[cfg(feature = "host")]
     assert!(types > 450, "only {types} types sampled");
+    #[cfg(not(feature = "host"))]
+    assert!(types > 400, "only {types} types sampled");
     eprintln!("{types} types, {values} samples");
 }
 
@@ -221,53 +228,95 @@ pub fn round_trip(name: &str, value: serde_json::Value) -> Option<Result<serde_j
         "GitHubStatus" => rt::<vibevalley_protocol::GitHubStatus>(value),
         "Head" => rt::<vibevalley_protocol::Head>(value),
         "Health" => rt::<vibevalley_protocol::Health>(value),
+        #[cfg(feature = "host")]
         "HostAction" => rt::<vibevalley_protocol::HostAction>(value),
+        #[cfg(feature = "host")]
         "HostAsrPhase" => rt::<vibevalley_protocol::HostAsrPhase>(value),
+        #[cfg(feature = "host")]
         "HostAsrState" => rt::<vibevalley_protocol::HostAsrState>(value),
+        #[cfg(feature = "host")]
         "HostFileTreeFrame" => rt::<vibevalley_protocol::HostFileTreeFrame>(value),
+        #[cfg(feature = "host")]
         "HostFontPayload" => rt::<vibevalley_protocol::HostFontPayload>(value),
+        #[cfg(feature = "host")]
         "HostGitBranch" => rt::<vibevalley_protocol::HostGitBranch>(value),
+        #[cfg(feature = "host")]
         "HostGitCommit" => rt::<vibevalley_protocol::HostGitCommit>(value),
+        #[cfg(feature = "host")]
         "HostGitFileRow" => rt::<vibevalley_protocol::HostGitFileRow>(value),
+        #[cfg(feature = "host")]
         "HostGitPanelFrame" => rt::<vibevalley_protocol::HostGitPanelFrame>(value),
+        #[cfg(feature = "host")]
         "HostGitWorktree" => rt::<vibevalley_protocol::HostGitWorktree>(value),
+        #[cfg(feature = "host")]
         "HostIdPayload" => rt::<vibevalley_protocol::HostIdPayload>(value),
+        #[cfg(feature = "host")]
         "HostLiveVoicePhase" => rt::<vibevalley_protocol::HostLiveVoicePhase>(value),
+        #[cfg(feature = "host")]
         "HostLiveVoiceState" => rt::<vibevalley_protocol::HostLiveVoiceState>(value),
+        #[cfg(feature = "host")]
         "HostMotionChoice" => rt::<vibevalley_protocol::HostMotionChoice>(value),
+        #[cfg(feature = "host")]
         "HostNotifyPayload" => rt::<vibevalley_protocol::HostNotifyPayload>(value),
+        #[cfg(feature = "host")]
         "HostOp" => rt::<vibevalley_protocol::HostOp>(value),
+        #[cfg(feature = "host")]
         "HostOpenFilePayload" => rt::<vibevalley_protocol::HostOpenFilePayload>(value),
+        #[cfg(feature = "host")]
         "HostOpenTerminalPayload" => rt::<vibevalley_protocol::HostOpenTerminalPayload>(value),
+        #[cfg(feature = "host")]
         "HostOpenUrlPayload" => rt::<vibevalley_protocol::HostOpenUrlPayload>(value),
+        #[cfg(feature = "host")]
         "HostOpeningPayload" => rt::<vibevalley_protocol::HostOpeningPayload>(value),
+        #[cfg(feature = "host")]
         "HostOpeningPhase" => rt::<vibevalley_protocol::HostOpeningPhase>(value),
+        #[cfg(feature = "host")]
         "HostPaletteCommand" => rt::<vibevalley_protocol::HostPaletteCommand>(value),
+        #[cfg(feature = "host")]
         "HostPaletteFileMatch" => rt::<vibevalley_protocol::HostPaletteFileMatch>(value),
+        #[cfg(feature = "host")]
         "HostPaletteFrame" => rt::<vibevalley_protocol::HostPaletteFrame>(value),
+        #[cfg(feature = "host")]
         "HostPaletteItem" => rt::<vibevalley_protocol::HostPaletteItem>(value),
+        #[cfg(feature = "host")]
         "HostPaletteMode" => rt::<vibevalley_protocol::HostPaletteMode>(value),
+        #[cfg(feature = "host")]
         "HostPaletteSearchHit" => rt::<vibevalley_protocol::HostPaletteSearchHit>(value),
+        #[cfg(feature = "host")]
         "HostPanel" => rt::<vibevalley_protocol::HostPanel>(value),
-        "HostPcmAppendPayload" => rt::<vibevalley_protocol::HostPcmAppendPayload>(value),
-        "HostPcmStartPayload" => rt::<vibevalley_protocol::HostPcmStartPayload>(value),
+        #[cfg(feature = "host")]
         "HostPlayAudioPayload" => rt::<vibevalley_protocol::HostPlayAudioPayload>(value),
+        #[cfg(feature = "host")]
         "HostPlaySoundPayload" => rt::<vibevalley_protocol::HostPlaySoundPayload>(value),
+        #[cfg(feature = "host")]
         "HostQrPayload" => rt::<vibevalley_protocol::HostQrPayload>(value),
+        #[cfg(feature = "host")]
         "HostRailFrame" => rt::<vibevalley_protocol::HostRailFrame>(value),
+        #[cfg(feature = "host")]
         "HostRailProject" => rt::<vibevalley_protocol::HostRailProject>(value),
+        #[cfg(feature = "host")]
         "HostRailRunningState" => rt::<vibevalley_protocol::HostRailRunningState>(value),
+        #[cfg(feature = "host")]
         "HostRailTab" => rt::<vibevalley_protocol::HostRailTab>(value),
+        #[cfg(feature = "host")]
         "HostRailWorktree" => rt::<vibevalley_protocol::HostRailWorktree>(value),
+        #[cfg(feature = "host")]
         "HostRandomBytesPayload" => rt::<vibevalley_protocol::HostRandomBytesPayload>(value),
+        #[cfg(feature = "host")]
         "HostReadFilePayload" => rt::<vibevalley_protocol::HostReadFilePayload>(value),
+        #[cfg(feature = "host")]
         "HostSaveFilePayload" => rt::<vibevalley_protocol::HostSaveFilePayload>(value),
-        "HostSeekAudioPayload" => rt::<vibevalley_protocol::HostSeekAudioPayload>(value),
+        #[cfg(feature = "host")]
         "HostSha256Payload" => rt::<vibevalley_protocol::HostSha256Payload>(value),
+        #[cfg(feature = "host")]
         "HostSoundName" => rt::<vibevalley_protocol::HostSoundName>(value),
+        #[cfg(feature = "host")]
         "HostThemeChoice" => rt::<vibevalley_protocol::HostThemeChoice>(value),
+        #[cfg(feature = "host")]
         "HostTrayPayload" => rt::<vibevalley_protocol::HostTrayPayload>(value),
+        #[cfg(feature = "host")]
         "HostTreeItem" => rt::<vibevalley_protocol::HostTreeItem>(value),
+        #[cfg(feature = "host")]
         "HostVoiceMutePayload" => rt::<vibevalley_protocol::HostVoiceMutePayload>(value),
         "Id" => rt::<vibevalley_protocol::Id>(value),
         "InboxFrom" => rt::<vibevalley_protocol::InboxFrom>(value),
@@ -530,8 +579,6 @@ pub fn round_trip(name: &str, value: serde_json::Value) -> Option<Result<serde_j
         "ProviderConnectionAdapter" => rt::<vibevalley_protocol::ProviderConnectionAdapter>(value),
         "ProviderConnectionUpdate" => rt::<vibevalley_protocol::ProviderConnectionUpdate>(value),
         "ProviderModel" => rt::<vibevalley_protocol::ProviderModel>(value),
-        "ProviderModelListing" => rt::<vibevalley_protocol::ProviderModelListing>(value),
-        "ProviderModelRequest" => rt::<vibevalley_protocol::ProviderModelRequest>(value),
         "ProviderScene" => rt::<vibevalley_protocol::ProviderScene>(value),
         "ProviderScenePolicy" => rt::<vibevalley_protocol::ProviderScenePolicy>(value),
         "ProviderStatus" => rt::<vibevalley_protocol::ProviderStatus>(value),
@@ -652,17 +699,9 @@ pub fn round_trip(name: &str, value: serde_json::Value) -> Option<Result<serde_j
         "VerifyRequest" => rt::<vibevalley_protocol::VerifyRequest>(value),
         "Via" => rt::<vibevalley_protocol::Via>(value),
         "ViewportRect" => rt::<vibevalley_protocol::ViewportRect>(value),
-        "VoiceAsrGrant" => rt::<vibevalley_protocol::VoiceAsrGrant>(value),
-        "VoiceAsrResult" => rt::<vibevalley_protocol::VoiceAsrResult>(value),
-        "VoiceAsrStopInput" => rt::<vibevalley_protocol::VoiceAsrStopInput>(value),
-        "VoiceAsrTranscribeInput" => rt::<vibevalley_protocol::VoiceAsrTranscribeInput>(value),
         "VoiceCall" => rt::<vibevalley_protocol::VoiceCall>(value),
-        "VoiceCallStart" => rt::<vibevalley_protocol::VoiceCallStart>(value),
         "VoiceGrant" => rt::<vibevalley_protocol::VoiceGrant>(value),
-        "VoiceHearInput" => rt::<vibevalley_protocol::VoiceHearInput>(value),
-        "VoiceHeard" => rt::<vibevalley_protocol::VoiceHeard>(value),
         "VoiceId" => rt::<vibevalley_protocol::VoiceId>(value),
-        "VoiceSaid" => rt::<vibevalley_protocol::VoiceSaid>(value),
         "VoiceSettings" => rt::<vibevalley_protocol::VoiceSettings>(value),
         _ => return None,
     })

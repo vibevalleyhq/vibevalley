@@ -169,6 +169,7 @@ fn slice_bundle_and_slices_round_trip() {
     round_value::<SliceBundle>(&bundle);
 }
 
+#[cfg(feature = "host")]
 #[test]
 fn host_actions_and_frames_round_trip() {
     for sample in [

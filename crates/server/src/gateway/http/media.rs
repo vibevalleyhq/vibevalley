@@ -1,6 +1,7 @@
-//! Local binary inputs: bounded streaming upload and ranged playback.
-use super::auth::{LocalOnly, LocalOnlyStatus};
+//! Media binary inputs & speech streams: bounded streaming upload and ranged playback.
+use super::auth::{Authenticated, AuthenticatedQuery};
 use super::shared::{FileRangeSpec, HttpState, is_media_input_uuid, refuse, reply, serve_file_range};
+use crate::gateway::api::{CallerContext, CallerPrincipal};
 use axum::{
     body::{Body, Bytes},
     extract::{Path, State},
@@ -10,10 +11,14 @@ use axum::{
 use futures_util::{Stream, StreamExt};
 use std::{io, time::Duration};
 use tokio_util::io::{StreamReader, SyncIoBridge};
-use vibevalley_protocol::{BizCode, Envelope};
+use vibevalley_protocol::{BizCode, Envelope, SCOPE_REMOTE_MACHINE};
 
 const MAX: u64 = 512_000_000;
 const UPLOAD_TIMEOUT: Duration = Duration::from_secs(300);
+
+fn is_remote_machine(ctx: &CallerContext) -> bool {
+    matches!(&ctx.principal, CallerPrincipal::RemoteDevice { scope, .. } if scope == SCOPE_REMOTE_MACHINE)
+}
 
 pub(super) fn bounded_upload_stream(body: Body, max_bytes: u64, timeout: Duration) -> impl Stream<Item = io::Result<Bytes>> + Send + 'static {
     let deadline = tokio::time::Instant::now() + timeout;
@@ -39,7 +44,16 @@ pub(super) fn bounded_upload_stream(body: Body, max_bytes: u64, timeout: Duratio
     })
 }
 
-pub(super) async fn upload(State(state): State<HttpState>, _local: LocalOnly, Path(id): Path<String>, headers: HeaderMap, body: Body) -> Response {
+pub(super) async fn upload(
+    State(state): State<HttpState>,
+    Authenticated(ctx): Authenticated,
+    Path(id): Path<String>,
+    headers: HeaderMap,
+    body: Body,
+) -> Response {
+    if is_remote_machine(&ctx) {
+        return refuse(BizCode::Forbidden, "forbidden");
+    }
     if !headers
         .get("content-type")
         .and_then(|v| v.to_str().ok())
@@ -69,7 +83,15 @@ pub(super) async fn upload(State(state): State<HttpState>, _local: LocalOnly, Pa
     }
 }
 
-pub(super) async fn content(State(state): State<HttpState>, _local: LocalOnlyStatus, Path(id): Path<String>, headers: HeaderMap) -> Response {
+pub(super) async fn content(
+    State(state): State<HttpState>,
+    AuthenticatedQuery(ctx): AuthenticatedQuery,
+    Path(id): Path<String>,
+    headers: HeaderMap,
+) -> Response {
+    if is_remote_machine(&ctx) {
+        return StatusCode::FORBIDDEN.into_response();
+    }
     if !is_media_input_uuid(&id) {
         return StatusCode::NOT_FOUND.into_response();
     }
@@ -101,7 +123,10 @@ impl Drop for Gone {
 }
 
 /// A streamed speech job's events as NDJSON, one line each, for the one page that claims them.
-pub(super) async fn speech(State(state): State<HttpState>, _local: LocalOnly, Path(id): Path<String>) -> Response {
+pub(super) async fn speech(State(state): State<HttpState>, AuthenticatedQuery(ctx): AuthenticatedQuery, Path(id): Path<String>) -> Response {
+    if is_remote_machine(&ctx) {
+        return refuse(BizCode::Forbidden, "forbidden");
+    }
     let Some(streams) = state.ports().speech else {
         return refuse(BizCode::ServiceUnavailable, "no speech here");
     };

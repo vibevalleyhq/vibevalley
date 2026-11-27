@@ -1,3 +1,4 @@
+use crate::support::RouterTestExt as _;
 use std::collections::VecDeque;
 use std::path::Path;
 use std::process::Command;

@@ -1,10 +1,10 @@
 {
-  "speechNotice": "Choose a separate Flash or Pro binding, then generate one speaker from Generate in the Library. The completed audio can be played and saved as WAV or MP3; this is not streaming playback. Saving settings does not generate audio.",
+  "speechNotice": "Generate single-speaker audio (WAV/MP3, non-streaming) in Library; saving does not run generation.",
   "title": "Models & Model Policy",
   "intro": "Assign primary models and fallback chains per scene from verified providers only.",
   "words": "provider DeepSeek MiniMax MOSS OpenAI Anthropic API key verify fetch capability policy fallback",
-  "understandingNotice": "Configure the independent vision understanding model. Choose Understand on an image or video in the Library and explicitly approve the upload. Saving this configuration does not upload or run inference.",
-  "imageNotice": "Save a default image model, then submit a task on the Images page. Saving settings does not generate an image.",
+  "understandingNotice": "Analyze images or videos from Library after explicit upload confirmation; saving does not run inference.",
+  "imageNotice": "Submit image generation tasks from Library Images; saving does not generate an image.",
   "add": "Configure provider",
   "reload": "Reload",
   "reloadAsk": "Discard unsaved changes and load the latest settings?",

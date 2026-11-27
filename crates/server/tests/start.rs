@@ -1,5 +1,6 @@
 //! The whole server from `start`: repos by name, and an issue on one.
 
+use crate::support::RouterTestExt as _;
 use std::sync::Arc;
 
 use serde_json::json;

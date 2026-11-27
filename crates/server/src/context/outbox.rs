@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use std::fmt::Display;
 use std::future::Future;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 use parking_lot::RwLock;
@@ -206,6 +207,30 @@ impl OutboxDelivery {
 
 type OutboxHandler = Arc<dyn Fn(OutboxDelivery) -> BoxFuture<'static, Result<(), String>> + Send + Sync>;
 
+/// Dead-lettered (`failed`) outbox row exposed for diagnostics and manual replay.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OutboxDeadLetter {
+    pub id: i64,
+    pub topic: String,
+    pub payload_json: String,
+    pub attempts: i64,
+    pub created_at: i64,
+    pub last_error: Option<String>,
+}
+
+impl From<OutboxItem> for OutboxDeadLetter {
+    fn from(item: OutboxItem) -> Self {
+        Self {
+            id: item.id,
+            topic: item.topic,
+            payload_json: item.payload_json,
+            attempts: item.attempts,
+            created_at: item.created_at,
+            last_error: item.last_error,
+        }
+    }
+}
+
 /// Transactional outbox dispatcher backed by [`Service::outbox`] and driven by [`TaskGroup`].
 pub struct Outbox {
     service: Arc<Service>,
@@ -213,6 +238,7 @@ pub struct Outbox {
     clock: SharedClock,
     handlers: RwLock<HashMap<String, OutboxHandler>>,
     notify: Notify,
+    failed_count: AtomicU64,
 }
 
 impl Outbox {
@@ -229,7 +255,48 @@ impl Outbox {
             clock: system_clock(),
             handlers: RwLock::new(HashMap::new()),
             notify: Notify::new(),
+            failed_count: AtomicU64::new(0),
         }
+    }
+
+    /// Returns the last observed dead-letter (`failed`) count without blocking on I/O.
+    pub fn cached_failed_count(&self) -> u64 {
+        self.failed_count.load(Ordering::Relaxed)
+    }
+
+    /// Queries the authoritative dead-letter (`failed`) count and refreshes the cached counter.
+    pub async fn failed_count_async(&self) -> Result<u64, ApiError> {
+        let count = self.service.outbox.count_failed().await?;
+        self.failed_count.store(count, Ordering::Relaxed);
+        Ok(count)
+    }
+
+    /// Lists up to `limit` dead-lettered (`failed`) outbox items newest-first.
+    pub async fn list_failed_async(&self, limit: u64) -> Result<Vec<OutboxDeadLetter>, ApiError> {
+        let rows = self.service.outbox.list_failed(limit).await?;
+        Ok(rows.into_iter().map(OutboxDeadLetter::from).collect())
+    }
+
+    /// Replays a single dead-lettered (`failed`) item by ID, resetting its attempts and waking the dispatcher.
+    pub async fn replay_failed_async(&self, id: i64) -> Result<bool, ApiError> {
+        let replayed = self.service.outbox.replay_failed(id, self.clock.now_ms()).await?;
+        if replayed {
+            let _ = self.failed_count_async().await;
+            tracing::info!(outbox_id = id, "outbox dead-letter item replayed");
+            self.wake();
+        }
+        Ok(replayed)
+    }
+
+    /// Replays all dead-lettered (`failed`) items, resetting their attempts and waking the dispatcher.
+    pub async fn replay_all_failed_async(&self) -> Result<u64, ApiError> {
+        let replayed = self.service.outbox.replay_all_failed(self.clock.now_ms()).await?;
+        if replayed > 0 {
+            let _ = self.failed_count_async().await;
+            tracing::info!(replayed, "outbox dead-letter items replayed");
+            self.wake();
+        }
+        Ok(replayed)
     }
 
     /// Overrides the clock used for enqueue timestamps, recovery, and retry scheduling.
@@ -324,6 +391,11 @@ impl Outbox {
             if let Err(err) = outbox.service.outbox.recover_processing(outbox.clock.now_ms()).await {
                 tracing::warn!(error = %err.message, "outbox.recover_processing failed");
             }
+            if let Ok(failed) = outbox.failed_count_async().await
+                && failed > 0
+            {
+                tracing::warn!(failed_count = failed, "outbox started with existing dead-letter items");
+            }
 
             loop {
                 if cancel.is_cancelled() {
@@ -393,17 +465,26 @@ impl Outbox {
     async fn dispatch_row(&self, row: OutboxItem, current_ms: i64) -> Result<(), ApiError> {
         if let Err(err) = serde_json::from_str::<serde_json::Value>(&row.payload_json) {
             let msg = format!("invalid outbox payload json: {err}");
+            tracing::error!(
+                outbox_id = row.id,
+                topic = %row.topic,
+                attempts = row.attempts,
+                error = %msg,
+                "outbox item dead-lettered due to invalid payload json"
+            );
             self.service.outbox.fail(row.id, &msg).await?;
+            self.failed_count.fetch_add(1, Ordering::Relaxed);
             return Ok(());
         }
 
         let handler = self.handlers.read().get(&row.topic).cloned();
         let Some(handler) = handler else {
             let msg = format!("no outbox handler registered for topic `{}`", row.topic);
-            self.handle_failure(row.id, row.attempts, current_ms, &msg).await?;
+            self.handle_failure(row.id, &row.topic, row.attempts, current_ms, &msg).await?;
             return Ok(());
         };
 
+        let topic = row.topic.clone();
         let delivery = OutboxDelivery {
             id: row.id,
             topic: row.topic,
@@ -413,13 +494,23 @@ impl Outbox {
         };
         match handler(delivery).await {
             Ok(()) => self.service.outbox.complete(row.id).await,
-            Err(err) => self.handle_failure(row.id, row.attempts, current_ms, &err).await,
+            Err(err) => self.handle_failure(row.id, &topic, row.attempts, current_ms, &err).await,
         }
     }
 
-    async fn handle_failure(&self, id: i64, attempts: i64, current_ms: i64, err: &str) -> Result<(), ApiError> {
+    async fn handle_failure(&self, id: i64, topic: &str, attempts: i64, current_ms: i64, err: &str) -> Result<(), ApiError> {
         if attempts >= self.config.max_attempts {
-            self.service.outbox.fail(id, err).await
+            tracing::error!(
+                outbox_id = id,
+                topic = %topic,
+                attempts,
+                max_attempts = self.config.max_attempts,
+                error = %err,
+                "outbox item exhausted retries and entered dead-letter (failed) state"
+            );
+            self.service.outbox.fail(id, err).await?;
+            self.failed_count.fetch_add(1, Ordering::Relaxed);
+            Ok(())
         } else {
             let delay_ms = self.backoff_delay(attempts).as_millis().min(i64::MAX as u128) as i64;
             let next_at = current_ms.saturating_add(delay_ms);
@@ -669,6 +760,89 @@ mod tests {
         assert_eq!(outbox.drain_once(42_000).await.unwrap(), 1);
         assert_eq!(first_calls.load(Ordering::SeqCst), 0);
         assert_eq!(second_calls.load(Ordering::SeqCst), 1);
+
+        service.close().await;
+    }
+
+    #[tokio::test]
+    async fn dead_letter_observability_and_replay_recovers_failed_items() {
+        use std::sync::atomic::AtomicBool;
+
+        let (_dir, service) = test_service().await;
+        let clock = Arc::new(vibevalley_core::ManualClock::new(10_000));
+        let outbox = Arc::new(
+            Outbox::with_config(
+                service.clone(),
+                OutboxConfig {
+                    batch_size: 10,
+                    max_attempts: 2,
+                    base_backoff: Duration::from_millis(100),
+                    max_backoff: Duration::from_millis(200),
+                    poll_interval: Duration::from_secs(5),
+                },
+            )
+            .with_clock(clock.clone()),
+        );
+
+        let should_fail = Arc::new(AtomicBool::new(true));
+        let delivered = Arc::new(AtomicUsize::new(0));
+        let fail_flag = should_fail.clone();
+        let delivered_c = delivered.clone();
+        outbox.register("dlq.topic", move |_delivery| {
+            let fail_flag = fail_flag.clone();
+            let delivered_c = delivered_c.clone();
+            async move {
+                if fail_flag.load(Ordering::SeqCst) {
+                    Err("downstream 503".to_owned())
+                } else {
+                    delivered_c.fetch_add(1, Ordering::SeqCst);
+                    Ok(())
+                }
+            }
+        });
+
+        let outbox_c = outbox.clone();
+        let (id1, id2) = service
+            .write_dirty(move |tx| {
+                Box::pin(async move {
+                    let a = outbox_c.enqueue_in_tx_at(tx, "dlq.topic", r#"{"n":1}"#, 10_000).await?;
+                    let b = outbox_c.enqueue_in_tx_at(tx, "dlq.topic", r#"{"n":2}"#, 10_000).await?;
+                    Ok::<_, ApiError>(((a, b), SliceMask::NONE))
+                })
+            })
+            .await
+            .unwrap()
+            .0;
+
+        assert_eq!(outbox.drain_once(10_000).await.unwrap(), 2);
+        assert_eq!(outbox.failed_count_async().await.unwrap(), 0);
+
+        // Second attempt exhausts `max_attempts = 2` -> both enter dead-letter (`failed`) state.
+        assert_eq!(outbox.drain_once(10_100).await.unwrap(), 2);
+        assert_eq!(outbox.cached_failed_count(), 2);
+        assert_eq!(outbox.failed_count_async().await.unwrap(), 2);
+
+        let failed_items = outbox.list_failed_async(10).await.unwrap();
+        assert_eq!(failed_items.len(), 2);
+        assert_eq!(failed_items[0].id, id2);
+        assert_eq!(failed_items[1].id, id1);
+        assert_eq!(failed_items[0].last_error.as_deref(), Some("downstream 503"));
+
+        // Fix downstream handler and replay a single dead-letter item by ID.
+        should_fail.store(false, Ordering::SeqCst);
+        clock.set(20_000);
+        assert!(outbox.replay_failed_async(id1).await.unwrap());
+        assert!(!outbox.replay_failed_async(id1).await.unwrap(), "replaying non-failed row returns false");
+        assert_eq!(outbox.cached_failed_count(), 1);
+        assert_eq!(outbox.drain_once(20_000).await.unwrap(), 1);
+        assert_eq!(delivered.load(Ordering::SeqCst), 1);
+
+        // Replay remaining dead-letter items in bulk.
+        assert_eq!(outbox.replay_all_failed_async().await.unwrap(), 1);
+        assert_eq!(outbox.cached_failed_count(), 0);
+        assert_eq!(outbox.drain_once(20_000).await.unwrap(), 1);
+        assert_eq!(delivered.load(Ordering::SeqCst), 2);
+        assert_eq!(outbox.failed_count_async().await.unwrap(), 0);
 
         service.close().await;
     }

@@ -1,12 +1,12 @@
 //! Structured Block Doc view projection and block-append endpoints (#38, #39).
 
-use vibevalley_core::note::doc::{DocDocument, append_block, markdown_to_blocks, parse_doc_document, project_doc_view, serialize_doc_document};
+use vibevalley_core::note::doc::{DocDocument, append_block, parse_doc_document, project_doc_view, serialize_doc_document};
 use vibevalley_protocol::{ApiError, DocView, NoteDocAppendBlockRequest, NoteFileEncoding, NoteFileWriteItem, NoteFileWriteRequest, NoteType, USER_ID};
 
 use super::{Maker, Manager, note_type_of, refused};
 
 impl Manager {
-    /// Projects `structure/doc.json` (or fallback `structure/index.md`) of a note into [`DocView`].
+    /// Projects `structure/doc.json` of a note into [`DocView`].
     pub async fn doc_view_async(&self, id: &str) -> Result<DocView, ApiError> {
         self.flush_pending_writes_async(id).await;
         let row = self.row_async(id).await?;
@@ -32,13 +32,6 @@ impl Manager {
             && let Ok(text) = std::str::from_utf8(bytes)
         {
             parse_doc_document(text).map_err(refused)?
-        } else if let Some(bytes) = raw_files.get("structure/index.md")
-            && let Ok(text) = std::str::from_utf8(bytes)
-        {
-            DocDocument {
-                version: 1,
-                blocks: markdown_to_blocks(text),
-            }
         } else {
             DocDocument::default()
         };

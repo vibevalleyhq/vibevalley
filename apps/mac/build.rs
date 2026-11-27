@@ -15,11 +15,16 @@ fn main() {
     let repo = manifest.join("../..").canonicalize().unwrap();
     let ui = manifest.join("ui");
     let out_root = PathBuf::from(std::env::var("OUT_DIR").unwrap());
+    println!("cargo::rustc-check-cfg=cfg(vv_embed_ui)");
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-env-changed=NSH_BIN");
     println!("cargo:rerun-if-env-changed=VIBEVALLEY_EMBED_UI");
 
-    let release = std::env::var_os("CARGO_CFG_DEBUG_ASSERTIONS").is_none() || std::env::var_os("VIBEVALLEY_EMBED_UI").is_some();
+    let embed_ui_env = std::env::var_os("VIBEVALLEY_EMBED_UI").is_some_and(|v| !v.is_empty() && v != "0");
+    if embed_ui_env {
+        println!("cargo:rustc-cfg=vv_embed_ui");
+    }
+    let release = std::env::var_os("CARGO_CFG_DEBUG_ASSERTIONS").is_none() || embed_ui_env;
     if release {
         watch(&ui);
     }

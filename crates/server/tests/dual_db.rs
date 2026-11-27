@@ -231,7 +231,7 @@ fn start_server(home: &Path, database_url: Option<String>, weixin_url: &str) -> 
 }
 
 fn ok(started: &vibevalley_server::App, op: &str, payload: Value) -> Value {
-    let env = started.router().call_as(Caller::User, op, payload);
+    let env = vibevalley_runtime::rt::block_on(started.router().call_as_async(Caller::User, op, payload));
     assert_eq!(env.biz_code, 0, "{op} failed (biz={}): {}", env.biz_code, env.message);
     env.data.unwrap_or(Value::Null)
 }

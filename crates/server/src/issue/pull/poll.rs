@@ -68,11 +68,14 @@ pub async fn refresh(pulls: &Pull) {
         if state == PullRequestState::Open {
             continue;
         }
-        if pulls.set_state_async(&row.id, state, now()).await.is_err() {
+        if let Err(err) = pulls.set_state_async(&row.id, state, now()).await {
+            tracing::warn!(pull_id = %row.id, state = ?state, error = %err, "pull.poll failed to persist settled PR state");
             continue;
         }
-        if let (Some(board), Some(issue_id)) = (pulls.board.as_ref(), row.issue_id.as_deref()) {
-            let _ = board.settle_pull_async(issue_id, state).await;
+        if let (Some(board), Some(issue_id)) = (pulls.board.as_ref(), row.issue_id.as_deref())
+            && let Err(err) = board.settle_pull_async(issue_id, state).await
+        {
+            tracing::warn!(pull_id = %row.id, issue_id, state = ?state, error = %err, "pull.poll failed to settle linked issue for PR");
         }
     }
 }
@@ -210,7 +213,9 @@ async fn observe_checks_async(pulls: &Pull, row: &PullRecord, remote: &str, curr
     }
     let revision = row.check_revision + 1;
     let (failed, finished) = checks_verdict(&current.checks);
-    let _ = pulls.observe_checks_async(&row.id, &fingerprint, revision, at).await;
+    if let Err(err) = pulls.observe_checks_async(&row.id, &fingerprint, revision, at).await {
+        tracing::warn!(pull_id = %row.id, revision, error = %err, "pull.poll failed to persist observed CI checks");
+    }
 
     let (Some(board), Some(issue_id)) = (&pulls.board, linked_issue_id) else {
         return;
@@ -220,7 +225,9 @@ async fn observe_checks_async(pulls: &Pull, row: &PullRecord, remote: &str, curr
     }
     let text = format_ci_report_async(&pulls.gh, pulls.publisher.github_rest(), remote, &current.checks, &failed).await;
     let key = format!("{}#{}:ci:{revision}", row.repo, row.number);
-    let _ = board.tell_message_async(issue_id, &text, &key).await;
+    if let Err(err) = board.tell_message_async(issue_id, &text, &key).await {
+        tracing::warn!(pull_id = %row.id, issue_id, key = %key, error = %err, "pull.poll failed to notify issue of CI verdict");
+    }
 }
 
 fn format_comment_text(comment: &GitHubComment) -> String {
@@ -302,7 +309,8 @@ impl KnownPollState {
         }
         let round = event.bot.then(|| self.rounds.get(&event.round_key).copied().unwrap_or(self.bot_round + 1));
         let round_key = round.map(|_| event.round_key.as_str());
-        if pulls.keep_event_async(&row.id, &event.key, round_key, round).await.is_err() {
+        if let Err(err) = pulls.keep_event_async(&row.id, &event.key, round_key, round).await {
+            tracing::warn!(pull_id = %row.id, event_key = %event.key, error = %err, "pull.poll failed to record PR event");
             return;
         }
         self.seen_keys.insert(event.key.clone());
@@ -312,8 +320,9 @@ impl KnownPollState {
         }
         if let (Some(board), Some(issue_id)) = (&pulls.board, linked_issue_id)
             && !event.text.is_empty()
+            && let Err(err) = board.tell_message_async(issue_id, &event.text, &event.key).await
         {
-            let _ = board.tell_message_async(issue_id, &event.text, &event.key).await;
+            tracing::warn!(pull_id = %row.id, issue_id, event_key = %event.key, error = %err, "pull.poll failed to deliver PR review/comment to issue");
         }
     }
 }

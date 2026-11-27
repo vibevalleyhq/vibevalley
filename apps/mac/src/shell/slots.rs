@@ -105,7 +105,7 @@ impl Shell {
                                 PaneKind::Hosted { .. } => "hosted",
                                 PaneKind::Diorama { .. } => "diorama",
                             },
-                            "title": crate::panes::tab_title(self, t, cx),
+                            "title": super::tab_title(self, t, cx),
                         })
                     })
                     .collect();
@@ -172,6 +172,23 @@ impl Shell {
         cx.spawn(async move |this, cx| {
             let result = task.await;
             let _ = this.update(cx, |shell, cx| then(shell, result, cx));
+        })
+        .detach();
+    }
+
+    /// Runs a Tokio future on the shared I/O runtime without blocking GPUI threads,
+    /// then delivers its result to `then` on the UI thread.
+    pub fn bg_tokio<R, F, T>(cx: &mut Context<Self>, fut: F, then: T)
+    where
+        R: Send + 'static,
+        F: std::future::Future<Output = R> + Send + 'static,
+        T: FnOnce(&mut Self, R, &mut Context<Self>) + 'static,
+    {
+        let task = vibevalley_rt::current_or_global_handle().spawn(fut);
+        cx.spawn(async move |this, cx| {
+            if let Ok(result) = task.await {
+                let _ = this.update(cx, |shell, cx| then(shell, result, cx));
+            }
         })
         .detach();
     }

@@ -531,24 +531,6 @@
     "clear": "清除前置依赖",
     "blockedByChip": "被 #{n} 阻塞"
   },
-  "triage": {
-    "selected": "已选 {n} 项",
-    "selectIssue": "选择工单 #{n}",
-    "clear": "取消选择",
-    "status": "改状态",
-    "agent": "派执行会话",
-    "noAgent": "清除执行会话",
-    "owner": "负责人",
-    "noOwner": "清除负责人",
-    "repo": "仓库",
-    "noRepo": "清除仓库",
-    "priority": "优先级",
-    "tags": "标签",
-    "addTags": "追加标签",
-    "replaceTags": "替换标签",
-    "updated": "已批量更新 {n} 张工单",
-    "partial": "已更新 {ok} 张工单，{failed} 张未能更新"
-  },
   "relations": {
     "title": "非阻塞关联",
     "pick": "添加关联或重复工单…",

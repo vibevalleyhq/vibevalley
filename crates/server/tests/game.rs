@@ -1,5 +1,6 @@
 //! The ledger and its fold (VibeValley `progress.test.ts`, `game.test.ts`).
 
+use crate::support::RouterTestExt as _;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -281,7 +282,7 @@ fn daily_tasks_track_quality_metrics_dedup_churn_and_auto_settle_into_ledger() {
     let issue_id = issue["id"].as_str().unwrap().to_string();
 
     let today = local_day(app.ctx().now());
-    let initial = call("game.daily.list", json!(null)).data.expect("game.daily.list");
+    let initial = call("game.shop.list", json!(null)).data.expect("game.shop.list")["daily"].clone();
     assert_eq!(initial["day"], today);
     assert_eq!(initial["tasks"].as_array().unwrap().len(), 3);
     assert_eq!(initial["settledCoinsToday"], 0);
@@ -302,7 +303,7 @@ fn daily_tasks_track_quality_metrics_dedup_churn_and_auto_settle_into_ledger() {
     game.on_issue_reviewed(&reviewed, true);
     game.on_issue_delivered(&reviewed, std::slice::from_ref(&reviewed));
 
-    let after = call("game.daily.list", json!(null)).data.expect("game.daily.list after work");
+    let after = call("game.shop.list", json!(null)).data.expect("game.shop.list after work")["daily"].clone();
     let tasks = after["tasks"].as_array().unwrap();
     let expected_reward: i64 = tasks.iter().map(|t| t["rewardCoins"].as_i64().unwrap()).sum();
     assert!(expected_reward > 0);

@@ -179,12 +179,15 @@ impl Board {
             }
             if upd.description.is_some() {
                 let links = vibevalley_core::note::links::extract_markdown_links(&updated_desc);
-                let _ = self
+                if let Err(err) = self
                     .ctx
                     .service
                     .note
                     .replace_links_for_source(vibevalley_protocol::LinkEntityKind::Issue, &updated_id, &links, at)
-                    .await;
+                    .await
+                {
+                    tracing::warn!(issue_id = %updated_id, error = %err, "issue.edit failed to sync markdown note links");
+                }
             }
             self.stored_async(&was.id).await
         })
@@ -247,7 +250,9 @@ impl Board {
                 &[("n", issue.number.into()), ("why", t("server.issue.does.cleanWorktree", &[]).into())],
             ));
         }
-        let _ = self.take_words_async(&issue.id).await;
+        if let Err(err) = self.take_words_async(&issue.id).await {
+            tracing::warn!(issue_id = %issue.id, error = %err, "issue.remove failed to clear queued words");
+        }
         let peers_to_clean: Vec<Issue> = self
             .issues_async()
             .await?

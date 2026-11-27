@@ -1,79 +1,16 @@
 //! Persistent remote CLI credentials (`$VIBEVALLEY_HOME/auth.json`), redacted token wrapper,
 //! server URL normalization, and `vibevalley://pair?...` deep-link parsing.
 
-use std::convert::Infallible;
-use std::fmt;
 use std::fs;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
-use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 use url::Url;
 use vibevalley_cli::{Failure, exit, load_secret_json, save_secret_json};
+pub use vibevalley_protocol::Secret;
 
 pub const AUTH_FILE: &str = "auth.json";
-
-/// Redacted credential token: serializes as a plain JSON string, never reveals its full value in `Debug` or `Display`.
-#[derive(Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(transparent)]
-pub struct Secret(String);
-
-impl Secret {
-    pub fn new(raw: impl Into<String>) -> Self {
-        Self(raw.into())
-    }
-
-    pub fn expose(&self) -> &str {
-        &self.0
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.0.trim().is_empty()
-    }
-
-    pub fn trimmed(&self) -> Option<Self> {
-        let trimmed = self.0.trim();
-        (!trimmed.is_empty()).then(|| Self(trimmed.to_string()))
-    }
-
-    /// Safe redacted hint (last four characters only for long tokens; never reveals short secrets).
-    pub fn hint(&self) -> String {
-        let trimmed = self.0.trim();
-        if trimmed.is_empty() {
-            return "none".into();
-        }
-        if trimmed.chars().count() <= 8 {
-            return "[redacted]".into();
-        }
-        let tail: String = trimmed.chars().rev().take(4).collect::<Vec<_>>().into_iter().rev().collect();
-        format!("…{tail}")
-    }
-}
-
-impl fmt::Debug for Secret {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.is_empty() {
-            f.write_str("Secret(none)")
-        } else {
-            write!(f, "Secret({})", self.hint())
-        }
-    }
-}
-
-impl fmt::Display for Secret {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.hint())
-    }
-}
-
-impl FromStr for Secret {
-    type Err = Infallible;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Self(s.to_string()))
-    }
-}
 
 /// Persisted remote authentication record stored at `$VIBEVALLEY_HOME/auth.json` (`0o600` on Unix).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

@@ -43,8 +43,8 @@ Commands:
   loom                                 Run loom concurrency tests (runtime & server)
   goldens [--check]                    Run vibevalley-core note golden tests
   protocol [--write]                   Check (or with --write, regenerate) TS contract & goldens
-  audit [--boundaries] [--ratchets] [--arch] [--uml] [--deps]
-                                       Run module-boundary, ratchet, arch, UML strict, and UI deps audits
+  audit [--boundaries] [--ratchets] [--arch] [--uml] [--deps] [--ssot]
+                                       Run module-boundary, ratchet, arch, UML strict, UI deps, and SSOT audits
   arch-audit [--report-locks] [--json] Run flat server architecture audit (14 rules) & lock report
   diagnose [--json] [--top <N>]        Compute architectural metrics, hotspots & prescriptive diagnostics
   trace <op|slice|orphans|query> [--layer <name>] [--json]
@@ -198,6 +198,7 @@ fn cmd_audit(root: &Path, args: &[String]) -> Result<i32, String> {
     let mut want_arch = false;
     let mut want_uml = false;
     let mut want_deps = false;
+    let mut want_ssot = false;
     for arg in args {
         match arg.as_str() {
             "--boundaries" => want_boundaries = true,
@@ -205,18 +206,19 @@ fn cmd_audit(root: &Path, args: &[String]) -> Result<i32, String> {
             "--arch" => want_arch = true,
             "--uml" => want_uml = true,
             "--deps" => want_deps = true,
+            "--ssot" => want_ssot = true,
             "--help" | "-h" => {
-                println!("Usage: cargo xtask audit [--boundaries] [--ratchets] [--arch] [--uml] [--deps]");
+                println!("Usage: cargo xtask audit [--boundaries] [--ratchets] [--arch] [--uml] [--deps] [--ssot]");
                 return Ok(0);
             }
             other => {
-                eprintln!("Usage: cargo xtask audit [--boundaries] [--ratchets] [--arch] [--uml] [--deps] (unknown option {other})");
+                eprintln!("Usage: cargo xtask audit [--boundaries] [--ratchets] [--arch] [--uml] [--deps] [--ssot] (unknown option {other})");
                 return Ok(2);
             }
         }
     }
 
-    let run_all = !want_boundaries && !want_ratchets && !want_arch && !want_uml && !want_deps;
+    let run_all = !want_boundaries && !want_ratchets && !want_arch && !want_uml && !want_deps && !want_ssot;
     let mut exit_code = 0;
 
     if run_all || want_boundaries {
@@ -245,6 +247,12 @@ fn cmd_audit(root: &Path, args: &[String]) -> Result<i32, String> {
     }
     if run_all || want_deps {
         let code = deps::run(root, &["ui".to_owned(), "--strict".to_owned()])?;
+        if code != 0 {
+            exit_code = code;
+        }
+    }
+    if run_all || want_ssot {
+        let code = ssot::run(root, &["--strict".to_owned()])?;
         if code != 0 {
             exit_code = code;
         }

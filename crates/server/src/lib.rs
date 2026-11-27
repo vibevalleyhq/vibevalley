@@ -14,6 +14,7 @@ pub mod cron;
 pub mod db;
 pub mod debug;
 mod debug_sources;
+#[cfg(any(test, feature = "fake"))]
 pub mod fake;
 pub mod game;
 pub mod gateway;

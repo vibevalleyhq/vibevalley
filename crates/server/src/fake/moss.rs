@@ -122,6 +122,7 @@ struct Frames {
 }
 
 impl Read for Frames {
+    #[allow(clippy::disallowed_methods, reason = "blocking std::io::Read fake SSE test body")]
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         loop {
             let n = self.current.read(buf)?;

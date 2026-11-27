@@ -15,7 +15,7 @@ enum TrayEvent {
 }
 
 struct TrayTargetIvars {
-    tx: flume::Sender<TrayEvent>,
+    tx: tokio::sync::mpsc::UnboundedSender<TrayEvent>,
 }
 
 objc2::define_class!(
@@ -38,7 +38,7 @@ objc2::define_class!(
 );
 
 impl TrayTarget {
-    fn new(mtm: MainThreadMarker, tx: flume::Sender<TrayEvent>) -> Retained<Self> {
+    fn new(mtm: MainThreadMarker, tx: tokio::sync::mpsc::UnboundedSender<TrayEvent>) -> Retained<Self> {
         let this = mtm.alloc::<Self>().set_ivars(TrayTargetIvars { tx });
         unsafe { objc2::msg_send![super(this), init] }
     }
@@ -106,9 +106,9 @@ fn format_tooltip(channel: ReleaseChannel, summary_title: &str) -> String {
 pub fn install(cx: &mut App) {
     let Some(mtm) = MainThreadMarker::new() else { return };
     let channel = current_channel();
-    let (tx, rx) = flume::unbounded();
+    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
     cx.spawn(async move |cx| {
-        while let Ok(event) = rx.recv_async().await {
+        while let Some(event) = rx.recv().await {
             cx.update(|cx| match event {
                 TrayEvent::Open => {
                     crate::ensure_main_window(cx);

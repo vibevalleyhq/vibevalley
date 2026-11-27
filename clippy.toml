@@ -11,16 +11,13 @@ disallowed-methods = [
   { path = "tokio::runtime::Runtime::new", reason = "Reuse `vibevalley_runtime::rt::handle()` instead of constructing ad-hoc Tokio runtimes." },
   { path = "std::process::abort", reason = "Return typed errors or propagate graceful shutdown instead of aborting the process." },
   { path = "tokio::task::block_in_place", reason = "Keep `block_in_place` restricted to `crates/runtime/src/rt.rs`." },
-
-  # --- Upcoming post-`flat-polish` bans (do NOT uncomment until xtask ceilings reach 0) ---
-  # { path = "std::thread::sleep", reason = "Use `tokio::time::sleep` in async code; remaining sites live in `crates/server/src/app/{fake/moss,slice}.rs` and `crates/files/src/watch.rs`." },
-  # { path = "flume::unbounded", reason = "Use `tokio::sync` channels (`mpsc`, `broadcast`, `watch`, `oneshot`) once `SERVER_FLUME_CEILING` and `RUNTIME_FLUME_CEILING` are cleared across `apps/mac`." },
-  # { path = "flume::bounded", reason = "Use `tokio::sync` channels (`mpsc`, `broadcast`, `watch`, `oneshot`) once `apps/mac` finishes migrating off `flume`." },
+  { path = "std::thread::sleep", reason = "Use `tokio::time::sleep` in async code; blocking OS boundaries must opt in with explicit `#[allow(clippy::disallowed_methods, reason = ...)]`." },
+  { path = "flume::unbounded", reason = "Use `tokio::sync` channels (`mpsc`, `broadcast`, `watch`, `oneshot`) or `std::sync::mpsc`; `flume` is banned workspace-wide." },
+  { path = "flume::bounded", reason = "Use `tokio::sync` channels (`mpsc`, `broadcast`, `watch`, `oneshot`) or `std::sync::mpsc`; `flume` is banned workspace-wide." },
 ]
 
 disallowed-types = [
-  # --- Upcoming post-`flat-polish` type bans (uncomment once workspace migrations complete) ---
-  # { path = "std::sync::Condvar", reason = "Use `tokio::sync::Notify` / `watch` / `mpsc` once `apps/mac/crates/terminal/src/pty.rs` migrates off blocking condvars." },
-  # { path = "flume::Sender", reason = "Use `tokio::sync` channel senders once `flume` is removed from `Cargo.toml`." },
-  # { path = "flume::Receiver", reason = "Use `tokio::sync` channel receivers once `flume` is removed from `Cargo.toml`." },
+  { path = "std::sync::Condvar", reason = "Use `tokio::sync::Notify` / `watch` / `mpsc` or `std::thread::park` instead of blocking condvars." },
+  { path = "flume::Sender", reason = "Use `tokio::sync` or `std::sync::mpsc` channel senders; `flume` is banned workspace-wide." },
+  { path = "flume::Receiver", reason = "Use `tokio::sync` or `std::sync::mpsc` channel receivers; `flume` is banned workspace-wide." },
 ]

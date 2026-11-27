@@ -117,10 +117,7 @@ pub fn build_for<'a>(release: &'a Release, arch: &str) -> Option<&'a Build> {
     release.builds.iter().find(|b| b.arch == arch)
 }
 
-pub fn bundle_of(exe: &str) -> Option<&str> {
-    let at = exe.rfind(".app/Contents/MacOS/")?;
-    Some(&exe[..at + ".app".len()])
-}
+pub use crate::env::{bundle_of, plist_version};
 
 pub fn place_problem(bundle: &str, writable: bool) -> Option<Manual> {
     if bundle.contains("/AppTranslocation/") {
@@ -141,23 +138,12 @@ pub const CHANNEL_BUNDLE_IDS: &[&str] = &[
     "dev.vibevalley.app.dev",
 ];
 
-fn plist_string<'a>(xml: &'a str, key: &str) -> Option<&'a str> {
-    let tag = format!("<key>{key}</key>");
-    let rest = &xml[xml.find(&tag)? + tag.len()..];
-    let rest = rest.trim_start().strip_prefix("<string>")?;
-    Some(rest[..rest.find('<')?].trim())
-}
-
-pub fn plist_version(xml: &str) -> Option<&str> {
-    plist_string(xml, "VibeValleyVersion").or_else(|| plist_string(xml, "CFBundleShortVersionString"))
-}
-
 pub fn plist_bundle_id(xml: &str) -> Option<&str> {
-    plist_string(xml, "CFBundleIdentifier").filter(|id| !id.is_empty())
+    crate::env::plist_string(xml, "CFBundleIdentifier").filter(|id| !id.is_empty())
 }
 
 pub fn plist_update_feed(xml: &str) -> Option<&str> {
-    plist_string(xml, "VibeValleyUpdateFeed").filter(|feed| !feed.is_empty())
+    crate::env::plist_string(xml, "VibeValleyUpdateFeed").filter(|feed| !feed.is_empty())
 }
 
 pub fn is_channel_bundle_id(id: &str) -> bool {

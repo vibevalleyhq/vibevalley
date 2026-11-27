@@ -14,7 +14,7 @@ const NAMING_DOC: &str = "docs/style/naming.md";
 
 /// Shrink-only ceiling for non-test `rt::block_on(` calls under `crates/server/src/`.
 /// This ceiling may only decrease as sync wrappers migrate to async; never raise it.
-pub const SERVER_BLOCK_ON_CEILING: usize = 5;
+pub const SERVER_BLOCK_ON_CEILING: usize = 3;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[allow(clippy::enum_variant_names)]
@@ -344,7 +344,10 @@ fn check_mac_rt_handle(file: &SourceFile, stripped_rust: &str) -> Vec<RatchetVio
     let index = LineIndex::new(&file.text);
     let mut seen_line = BTreeSet::new();
     let mut violations = Vec::new();
-    for offset in find_prefixed_call_matches(stripped_rust, "vibevalley_runtime::", "rt::handle", false) {
+    for offset in find_prefixed_call_matches(stripped_rust, "vibevalley_runtime::", "rt::handle", false)
+        .into_iter()
+        .chain(find_word_matches(stripped_rust, "vibevalley_rt::handle"))
+    {
         let line = index.line_at(offset);
         if !seen_line.insert(line) {
             continue;
@@ -731,7 +734,10 @@ fn collect_server_block_on_sites(files: &[SourceFile], excluded_targets: &BTreeS
         }
         let non_test_code = strip_rust_non_code(&file.text, &file.path);
         let index = LineIndex::new(&file.text);
-        for offset in find_prefixed_call_matches(&non_test_code, "vibevalley_runtime::", "rt::block_on", true) {
+        for offset in find_prefixed_call_matches(&non_test_code, "vibevalley_runtime::", "rt::block_on", true)
+            .into_iter()
+            .chain(find_prefixed_call_matches(&non_test_code, "", "vibevalley_rt::block_on", true))
+        {
             let line = index.line_at(offset);
             sites.push(BlockOnSite {
                 file: file.path.clone(),
@@ -1099,7 +1105,7 @@ mod tests {
 
     #[test]
     fn block_on_ceiling_excludes_cfg_test() {
-        assert_eq!(SERVER_BLOCK_ON_CEILING, 5);
+        assert_eq!(SERVER_BLOCK_ON_CEILING, 3);
 
         let files = vec![
             sf(

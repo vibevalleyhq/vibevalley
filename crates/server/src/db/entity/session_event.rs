@@ -8,6 +8,7 @@ pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub seq: i64,
     pub run_id: Option<String>,
+    pub event_type: Option<String>,
     #[sea_orm(column_type = "Text")]
     pub payload: String,
 }

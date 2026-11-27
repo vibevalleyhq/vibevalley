@@ -96,6 +96,30 @@ pub enum PermissionMode {
     Plan,
 }
 
+/// Structured remote-machine dispatch metadata attached to a session open request.
+/// Replaces the legacy `__VIBEVALLEY_REMOTE_*` environment variable smuggling so
+/// worker metadata never leaks into child process environments.
+#[derive(Clone, Default, PartialEq, Eq)]
+pub struct RemoteDispatchMeta {
+    pub session_id: Option<String>,
+    pub repo_ref: Option<String>,
+    pub branch: Option<String>,
+    pub base_ref: Option<String>,
+    pub mcp_session_token: Option<String>,
+}
+
+impl std::fmt::Debug for RemoteDispatchMeta {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RemoteDispatchMeta")
+            .field("session_id", &self.session_id)
+            .field("repo_ref", &self.repo_ref)
+            .field("branch", &self.branch)
+            .field("base_ref", &self.base_ref)
+            .field("mcp_session_token", &self.mcp_session_token.as_ref().map(|_| "[REDACTED]"))
+            .finish()
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct SessionOptions {
     pub baseline_timeout: Option<std::time::Duration>,
@@ -127,6 +151,8 @@ pub struct SessionOptions {
     /// Replaces the runtime's own system prompt (VibeValley's persona mode
     /// `replace`); `append_system_prompt` still goes after it.
     pub system_prompt: Option<String>,
+    /// Structured metadata for remote machine dispatch (`RemoteRuntime`).
+    pub remote_dispatch: Option<RemoteDispatchMeta>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]

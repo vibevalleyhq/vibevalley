@@ -2,7 +2,15 @@ import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
 import { VibeValleyApi, VibeValleyApiError } from "../client";
 import { BizCode } from "../endpoint";
-import { createHttpRemoteTransport, normalizeServerUrl, pairWithServer, parsePairUrl, type RemoteConnectionState, type RemoteEnvelope } from "./transport";
+import {
+  createHttpRemoteTransport,
+  normalizeServerUrl,
+  pairWithServer,
+  parsePairUrl,
+  type RemoteConnectionState,
+  type RemoteDecodeError,
+  type RemoteEnvelope,
+} from "./transport";
 
 const encoder = new TextEncoder();
 
@@ -682,5 +690,62 @@ describe("createHttpRemoteTransport", () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(heldRecovered.cancelled()).toBe(true);
     transport.close();
+  });
+
+  it("surfaces decode errors on malformed slice, live, and subscribe SSE frames without freezing subsequent valid frames", async () => {
+    const decodeErrors: RemoteDecodeError[] = [];
+    const boardSeqs: number[] = [];
+    const liveTexts: string[] = [];
+    const subEvents: unknown[] = [];
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    const sliceStream = streamFromChunks(['id: 1\ndata: {"seq":"not-a-number"}\n\n', 'id: 2\ndata: {"seq":2,"issues":[]}\n\n'], { holdOpen: true });
+    const liveStream = streamFromChunks(
+      ['event: lagged\ndata: {"skipped":4}\n\n', 'data: {"type":"unknown_kind"}\n\n', 'data: {"type":"notice","at":1,"level":"info","text":"recovered"}\n\n'],
+      { holdOpen: true },
+    );
+    const subStream = streamFromChunks(["data: {broken json\n\n", 'data: {"kind":"ok"}\n\n'], { holdOpen: true });
+
+    const transport = createHttpRemoteTransport({
+      baseUrl: "http://127.0.0.1:8890",
+      token: "vv_dev_tok_decode",
+      onDecodeError: (err) => decodeErrors.push(err),
+      fetch: (input) => {
+        const url = urlOf(input);
+        if (url.includes("/api/v1/slice/board")) {
+          return Promise.resolve(new Response(sliceStream.stream, { status: 200, headers: { "content-type": "text/event-stream" } }));
+        }
+        if (url.includes("/api/v1/live")) {
+          return Promise.resolve(new Response(liveStream.stream, { status: 200, headers: { "content-type": "text/event-stream" } }));
+        }
+        return Promise.resolve(new Response(subStream.stream, { status: 200, headers: { "content-type": "text/event-stream" } }));
+      },
+    });
+
+    const unsubSlice = transport.slice("board", (frame) => boardSeqs.push(frame.seq));
+    const unsubLive = transport.live((ev) => {
+      if (ev.type === "notice") liveTexts.push(ev.text);
+    });
+    const unsubSub = transport.subscribe(
+      "channel.follow",
+      { id: "c1", after: 0 },
+      (ev) => subEvents.push(ev),
+      () => undefined,
+    );
+
+    await vi.waitFor(() => {
+      expect(boardSeqs).toEqual([2]);
+      expect(liveTexts).toEqual(["recovered"]);
+      expect(subEvents).toEqual([{ kind: "ok" }]);
+    });
+
+    expect(decodeErrors.map((e) => `${e.stream}:${e.topic}`).toSorted()).toEqual(["live:live", "slice:board", "subscribe:channel.follow"]);
+    expect(warnSpy).toHaveBeenCalled();
+
+    unsubSlice();
+    unsubLive();
+    unsubSub();
+    transport.close();
+    warnSpy.mockRestore();
   });
 });

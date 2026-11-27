@@ -23,6 +23,9 @@ pub struct Model {
     pub pinned_at: Option<i64>,
     #[sea_orm(column_type = "Text", nullable)]
     pub reactions: Option<String>,
+    pub has_file: bool,
+    pub has_image: bool,
+    pub has_link: bool,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

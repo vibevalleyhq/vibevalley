@@ -641,17 +641,13 @@ fn count_words(blocks: &[DocBlock]) -> (u32, u32) {
     (words, breaks)
 }
 
-/// Projects a note directory's `structure/doc.json` (or fallback `structure/index.md`) into [`DocView`].
+/// Projects a note directory's `structure/doc.json` into [`DocView`].
 pub fn project_doc_view(note_id: &str, title: &str, files: &BTreeMap<String, Vec<u8>>) -> DocView {
     let blocks = if let Some(bytes) = files.get("structure/doc.json")
         && let Ok(raw) = std::str::from_utf8(bytes)
         && let Ok(doc) = parse_doc_document(raw)
     {
         doc.blocks
-    } else if let Some(bytes) = files.get("structure/index.md")
-        && let Ok(raw) = std::str::from_utf8(bytes)
-    {
-        markdown_to_blocks(raw)
     } else {
         Vec::new()
     };

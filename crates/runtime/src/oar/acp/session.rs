@@ -97,7 +97,7 @@ pub(super) struct Shared {
     pub(super) turn_start_step_idx: Mutex<Option<i64>>,
     pub(super) children: Mutex<HashMap<String, Vec<String>>>,
     pub(super) updates: Mutex<VecDeque<String>>,
-    pub(super) commands: mpsc::UnboundedSender<Command>,
+    pub(super) commands: mpsc::Sender<Command>,
     pub(super) cwd: PathBuf,
 }
 
@@ -1104,7 +1104,7 @@ async fn serve(
     shared: Arc<Shared>,
     opts: SessionOptions,
     probe_models: bool,
-    mut commands: mpsc::UnboundedReceiver<Command>,
+    mut commands: mpsc::Receiver<Command>,
     ready: mpsc::Sender<Result<Opened>>,
 ) -> std::result::Result<(), agent_client_protocol::Error> {
     let opened = match handshake(&cx, &shared, &opts, probe_models).await {
@@ -1168,10 +1168,10 @@ async fn serve(
 pub(super) async fn run_connection(
     shared: Arc<Shared>,
     child: Arc<LineChild>,
-    incoming: mpsc::UnboundedReceiver<Option<std::io::Result<String>>>,
+    incoming: mpsc::Receiver<Option<std::io::Result<String>>>,
     opts: SessionOptions,
     probe_models: bool,
-    commands: mpsc::UnboundedReceiver<Command>,
+    commands: mpsc::Receiver<Command>,
     ready: mpsc::Sender<Result<Opened>>,
 ) {
     let incoming = Box::pin(futures_util::stream::unfold(incoming, |mut rx| async move {

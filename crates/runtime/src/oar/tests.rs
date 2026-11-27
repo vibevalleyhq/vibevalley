@@ -24,7 +24,7 @@ fn text(s: &str) -> Vec<ContentBlock> {
 }
 
 /// Events up to and including the first one `stop` accepts.
-async fn until(rx: &mut tokio::sync::mpsc::UnboundedReceiver<Event>, stop: impl Fn(&EventKind) -> bool) -> Vec<Event> {
+async fn until(rx: &mut tokio::sync::mpsc::Receiver<Event>, stop: impl Fn(&EventKind) -> bool) -> Vec<Event> {
     let mut out = Vec::new();
     loop {
         let event = tokio::time::timeout(WAIT, rx.recv())
@@ -1048,6 +1048,7 @@ async fn trace_id_propagates_to_voyage_jsonl_and_omits_none_or_zero() {
     assert_eq!(decoded_nonzero.trace_id, Some(42));
 }
 
+#[cfg(feature = "agent")]
 #[test]
 fn builtin_runtime_specs_match_default_registry_and_exclude_dsh() {
     assert!(runtime_spec("dsh").is_none());
@@ -1269,4 +1270,47 @@ for raw in sys.stdin:
     assert!(headers.contains(&json!({ "name": HEADER_PROTOCOL_VERSION, "value": PROTOCOL_STATELESS })));
     assert_eq!(servers[0]["_meta"][META_PROTOCOL_VERSION], PROTOCOL_STATELESS);
     assert_eq!(servers[0]["_meta"][EXT_SKILLS]["scheme"], SKILL_URI_SCHEME);
+}
+
+#[tokio::test]
+async fn oar_core_evicts_slow_event_subscriber_without_blocking_fast_subscribers() {
+    let core = crate::oar::core::SessionCore::new("scripted", "sess-backpressure", None);
+    let mut slow_rx = core.subscribe_with_capacity(4);
+    let mut fast_rx = core.subscribe_with_capacity(64);
+
+    for i in 0..20usize {
+        core.emit_root(EventKind::TextDelta { text: format!("chunk-{i}") });
+    }
+
+    let mut fast_got = Vec::new();
+    while let Ok(ev) = fast_rx.try_recv() {
+        fast_got.push(ev);
+    }
+    assert_eq!(fast_got.len(), 20, "fast subscriber must receive every event");
+    assert_eq!(fast_got.first().map(|e| e.seq), Some(0));
+    assert_eq!(fast_got.last().map(|e| e.seq), Some(19));
+
+    let mut slow_got = Vec::new();
+    while let Some(ev) = slow_rx.recv().await {
+        slow_got.push(ev);
+    }
+    assert_eq!(slow_got.len(), 4, "slow subscriber must be bounded to capacity and evicted on overflow");
+    assert_eq!(slow_got.last().map(|e| e.seq), Some(3));
+}
+
+#[test]
+fn remote_dispatch_meta_debug_redacts_mcp_session_token() {
+    let meta = RemoteDispatchMeta {
+        session_id: Some("sess-1".into()),
+        repo_ref: Some("https://example.invalid/repo.git".into()),
+        branch: Some("feat/x".into()),
+        base_ref: Some("main".into()),
+        mcp_session_token: Some("super-secret-token-value".into()),
+    };
+    let rendered = format!("{meta:?}");
+    assert!(
+        !rendered.contains("super-secret-token-value"),
+        "Debug output must redact mcp_session_token: {rendered}"
+    );
+    assert!(rendered.contains("[REDACTED]"));
 }

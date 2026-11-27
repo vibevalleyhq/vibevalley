@@ -309,19 +309,6 @@ export const HostPlaySoundPayload = z.object({
   name: HostSoundName,
 }) satisfies Codec<T.HostPlaySoundPayload>;
 
-export const HostSeekAudioPayload = z.object({
-  position: z.number(),
-}) satisfies Codec<T.HostSeekAudioPayload>;
-
-export const HostPcmStartPayload = z.object({
-  sampleRate: z.number(),
-  channels: z.number(),
-}) satisfies Codec<T.HostPcmStartPayload>;
-
-export const HostPcmAppendPayload = z.object({
-  data: z.string(),
-}) satisfies Codec<T.HostPcmAppendPayload>;
-
 export const HostReadFilePayload = z.object({
   path: z.string(),
 }) satisfies Codec<T.HostReadFilePayload>;
@@ -421,10 +408,6 @@ export const HostOp = z.discriminatedUnion("op", [
   z.object({ op: z.literal("host.voiceMute"), payload: HostVoiceMutePayload }),
   z.object({ op: z.literal("host.playAudio"), payload: HostPlayAudioPayload }),
   z.object({ op: z.literal("host.playSound"), payload: HostPlaySoundPayload }),
-  z.object({ op: z.literal("host.seekAudio"), payload: HostSeekAudioPayload }),
-  z.object({ op: z.literal("host.audioState") }),
-  z.object({ op: z.literal("host.pcmStart"), payload: HostPcmStartPayload }),
-  z.object({ op: z.literal("host.pcmAppend"), payload: HostPcmAppendPayload }),
   z.object({ op: z.literal("host.stopAudio") }),
   z.object({ op: z.literal("host.readFile"), payload: HostReadFilePayload }),
   z.object({ op: z.literal("host.assetsDir") }),

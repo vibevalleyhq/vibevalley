@@ -1,6 +1,7 @@
 //! VibeValley `modules/agent/agent.test.ts` (profiles, templates, skills)
 //! and the runtime endpoints over the scripted runtime.
 
+use crate::support::RouterTestExt as _;
 use std::path::Path;
 use std::sync::Arc;
 

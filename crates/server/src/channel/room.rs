@@ -775,7 +775,11 @@ impl Chat {
         let fut = async move {
             let missed = match channels.messages_changed_after(&channel, after, CATCH_UP_MAX as i64 + 1).await {
                 Ok(rows) => rows,
-                Err(_) => return,
+                Err(err) => {
+                    tracing::error!(channel_id = %channel, after, error = %err, "channel.follow history catch-up failed; emitting reset");
+                    let _ = sink.send(&ProtocolChannelEvent::Reset {});
+                    return;
+                }
             };
             if missed.len() > CATCH_UP_MAX {
                 sink.send(&ProtocolChannelEvent::Reset {});
@@ -810,7 +814,11 @@ impl Chat {
                 };
                 match res {
                     Ok(rows) => rows,
-                    Err(_) => return,
+                    Err(err) => {
+                        tracing::error!(after = ?after, error = %err, "channel.reports history catch-up failed; emitting reset");
+                        let _ = sink.send(&ProtocolChannelEvent::Reset {});
+                        return;
+                    }
                 }
             };
             if missed.len() > CATCH_UP_MAX {
@@ -872,7 +880,8 @@ async fn relay(mut live: broadcast::Receiver<ChannelEvent>, cancel: Cancellation
                     return;
                 }
             }
-            Err(broadcast::error::RecvError::Lagged(_)) => {
+            Err(broadcast::error::RecvError::Lagged(skipped)) => {
+                tracing::warn!(skipped, "channel subscription broadcast lagged; emitting reset");
                 let _ = sink.send(&ProtocolChannelEvent::Reset {});
                 return;
             }
