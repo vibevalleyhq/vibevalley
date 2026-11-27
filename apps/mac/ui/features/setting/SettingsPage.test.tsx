@@ -176,3 +176,48 @@ test("ConnectorsPage stacks horizontal selector below xl (< 1280px) so Connector
   expect(cardBox.y).toBeGreaterThanOrEqual(listBox.y + listBox.height);
   expect(cardBox.width).toBeGreaterThan(450);
 });
+
+test("SettingsPage collapses duplicate voice readiness warnings, omits self-pointing fix link on /settings/models, and clears nav active state", async () => {
+  setLocale("zh");
+  const baseSettings = scenarios.typical.responses["setting.get"] as Record<string, unknown>;
+  const baseReadiness = baseSettings.readiness as Record<string, unknown>;
+  const fake = fakeHost(scenarios.typical, { route: "/settings/voice", locale: "zh" });
+  fake.respond("setting.get", {
+    ...baseSettings,
+    readiness: {
+      ...baseReadiness,
+      orchestrator: { ready: true },
+      live: { ready: false, missing: "mossAccount" },
+      vision: { ready: false, missing: "mossAccount" },
+      call: { ready: false, missing: "mossAccount" },
+    },
+  });
+
+  const app = await open("../../app/main.tsx", {
+    width: 1200,
+    height: 800,
+    colorScheme: "light",
+    platform: "macos",
+    clock: { time: SCENARIO_NOW },
+    host: fake.options,
+  });
+  await fake.pumpUntil(app, () => app.count("id:readiness") === 1);
+
+  // /settings/voice collapses the 3 identical MOSS account warnings into a single concise row.
+  expect(app.count("id:readiness-row-lacking")).toBe(1);
+  expect(app.count("id:readiness-fix")).toBe(1);
+  expect(app.texts()).toContain("MOSS Live、实时视觉、通话：还没有 MOSS 账号");
+
+  // Navigating to /settings/models omits the redundant self-pointing 去设置 link.
+  await app.press("id:readiness-fix");
+  await fake.pumpUntil(app, () => app.count("id:settings-models") === 1);
+  expect(app.count("id:readiness-row-ready")).toBe(1);
+  expect(app.count("id:readiness-row-lacking")).toBe(1);
+  expect(app.count("id:readiness-fix")).toBe(0);
+  expect(app.texts()).toContain("通话：还没有 MOSS 账号");
+
+  // Switching away from /settings/models keeps only the target section selected.
+  await app.press("id:settings-section-general");
+  await fake.pumpUntil(app, () => app.count("id:settings-general") === 1);
+  expect(app.count("id:settings-models")).toBe(0);
+});

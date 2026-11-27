@@ -265,5 +265,9 @@
     "ready": "{feature}: ready",
     "lacks": "{feature}: {why}",
     "fix": "Set it up"
+  },
+  "remote": {
+    "toggleLabel": "Mobile & client listener",
+    "toggleHint": "Allow paired devices to connect to this Mac over Tailscale."
   }
 }

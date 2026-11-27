@@ -2994,8 +2994,6 @@ export const catalogs = {
       noRuntimes: "读不到引擎：",
       usedBy: " · {n} 个 agent",
       reading: "读取中…",
-      bundled: "随 oar 一起装",
-      commandLine: "命令行",
       unsupportedWhy: "不支持：{why}",
       checkedAt: "检测于 {clock}",
       recheck: "重新检测",
@@ -3125,7 +3123,6 @@ export const catalogs = {
       },
       quickActions: "快捷操作",
       installation: "安装与路径",
-      source: "安装方式",
       mcpServer: {
         add: "添加",
         addTitle: "添加 MCP 服务器",
@@ -3555,6 +3552,7 @@ export const catalogs = {
         call: "通话",
       },
       readiness: { ready: "{feature}：可以用了", lacks: "{feature}：{why}", fix: "去设置" },
+      remote: { toggleLabel: "手机与客户端接入", toggleHint: "开启后允许已配对设备经 Tailscale 连接到这台 Mac。" },
     },
     "web.shell": {
       sidebar: {
@@ -3994,7 +3992,7 @@ export const catalogs = {
         reviewer: "Code Reviewer",
         tester: "QA Engineer",
         designer: "UI/UX Designer",
-        product: "Product Manager",
+        product: "Product Lead",
         scout: "Tech Scout",
         docs: "Technical Writer",
         pages: "Dashboard Builder",
@@ -7027,8 +7025,6 @@ export const catalogs = {
       noRuntimes: "The machines could not be read: ",
       usedBy: " · {n} agents",
       reading: "Reading…",
-      bundled: "installed with oar",
-      commandLine: "command line",
       unsupportedWhy: "Unsupported: {why}",
       checkedAt: "checked at {clock}",
       recheck: "Check again",
@@ -7168,7 +7164,6 @@ export const catalogs = {
       },
       quickActions: "Quick actions",
       installation: "Installation",
-      source: "Install source",
       mcpServer: {
         add: "Add",
         addTitle: "Add MCP server",
@@ -7608,6 +7603,7 @@ export const catalogs = {
         call: "Calls",
       },
       readiness: { ready: "{feature}: ready", lacks: "{feature}: {why}", fix: "Set it up" },
+      remote: { toggleLabel: "Mobile & client listener", toggleHint: "Allow paired devices to connect to this Mac over Tailscale." },
     },
     "web.shell": {
       sidebar: {
@@ -11063,7 +11059,6 @@ export interface Messages {
   "web.runtime.budget": undefined;
   "web.runtime.budgetHint": { readonly pi: boolean; readonly spent: string | number };
   "web.runtime.budgetLabel": undefined;
-  "web.runtime.bundled": undefined;
   "web.runtime.can": undefined;
   "web.runtime.capability.accountUsage": undefined;
   "web.runtime.capability.checkUpdate": undefined;
@@ -11074,7 +11069,6 @@ export interface Messages {
   "web.runtime.capability.upgrade": undefined;
   "web.runtime.checkedAt": { readonly clock: string | number };
   "web.runtime.checking": undefined;
-  "web.runtime.commandLine": undefined;
   "web.runtime.default": undefined;
   "web.runtime.defaultEffort": undefined;
   "web.runtime.defaultModel": undefined;
@@ -11202,7 +11196,6 @@ export interface Messages {
   "web.runtime.signInTerminal": undefined;
   "web.runtime.signedOut": { readonly runtime: string | number };
   "web.runtime.skills": undefined;
-  "web.runtime.source": undefined;
   "web.runtime.spentToday": { readonly spent: string | number };
   "web.runtime.spentTodayBudget": { readonly budget: string | number; readonly spent: string | number };
   "web.runtime.stats.cumulativeSpend": undefined;
@@ -11579,6 +11572,8 @@ export interface Messages {
   "web.setting.readiness.fix": undefined;
   "web.setting.readiness.lacks": { readonly feature: string | number; readonly why: string | number };
   "web.setting.readiness.ready": { readonly feature: string | number };
+  "web.setting.remote.toggleHint": undefined;
+  "web.setting.remote.toggleLabel": undefined;
   "web.setting.scope.device": undefined;
   "web.setting.scope.farm": undefined;
   "web.setting.source.address": { readonly label: string | number };

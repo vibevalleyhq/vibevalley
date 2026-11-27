@@ -265,5 +265,9 @@
     "ready": "{feature}：可以用了",
     "lacks": "{feature}：{why}",
     "fix": "去设置"
+  },
+  "remote": {
+    "toggleLabel": "手机与客户端接入",
+    "toggleHint": "开启后允许已配对设备经 Tailscale 连接到这台 Mac。"
   }
 }
