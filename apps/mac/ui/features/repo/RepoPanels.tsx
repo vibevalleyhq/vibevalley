@@ -110,20 +110,9 @@ export function Languages(props: { languages: Asked<RepoLanguages> }) {
 }
 
 function NotCounted(props: { reason: string }) {
-  const install = () => props.reason.includes("brew install tokei");
-  const code = (text: string) => <Text class="rounded-sm bg-selected px-1.5 py-px font-mono text-sm text-ink">{text}</Text>;
   return (
     <View class="gap-2 rounded-lg bg-hover p-3">
-      <Text class="text-sm text-ink">{install() ? t("web.repo.noTokei") : props.reason}</Text>
-      <If when={install()}>
-        <Text class="text-sm text-muted">
-          {t("web.repo.install")}
-          {code("brew install tokei")}
-          {t("web.repo.or")}
-          {code("cargo install tokei")}
-          {t("web.repo.thenRecount")}
-        </Text>
-      </If>
+      <Text class="text-sm text-ink">{props.reason}</Text>
     </View>
   );
 }

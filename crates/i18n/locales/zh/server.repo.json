@@ -1,7 +1,6 @@
 {
   "badName": "仓库名用字母或数字开头，只含字母、数字、-、_、.，最多 64 个字符",
   "badGithub": "请填 GitHub 仓库地址，例如 https://github.com/botiverse/raft-source",
-  "noTokei": "统计代码要用 tokei，这台机器上没找到：装一个（brew install tokei，或 cargo install tokei）再点统计",
   "noName": "无名",
   "gh": {
     "missing": "没装 gh",
@@ -24,8 +23,6 @@
   "exists": "「{name}」已经存在，请换个仓库名",
   "cloneFailedGh": "下载失败：请确认 GitHub 登录、仓库权限和网络后重试",
   "cloneFailed": "下载失败：请确认仓库公开、地址正确且网络可用；超过 3 分钟会停止，可重试",
-  "tokeiFailed": "tokei 没数完：{why}",
-  "tokeiUnread": "tokei 的输出读不懂：换个新一点的 tokei 试试",
   "github": {
     "unchecked": "尚未检测 GitHub",
     "notGithub": "不是 GitHub 仓库",
