@@ -228,7 +228,7 @@ function ProseBlockView(props: {
           <VdpAnchor testId={`doc-format-bar-${props.block.id}`} role="toolbar" />
           <View
             testID={`doc-format-bar-${props.block.id}`}
-            class="absolute -top-8 left-0 z-20 flex-row items-center gap-0.5 rounded-md border border-line bg-elevated px-1 py-0.5 shadow-raise"
+            class="mb-1.5 flex-row items-center gap-0.5 self-start rounded-md border border-line bg-elevated px-1 py-0.5 shadow-raise"
           >
             <View
               role="button"
@@ -383,14 +383,15 @@ function headingTextClass(level: number): string {
   }
 }
 
-function headingSpacingClass(level: number): string {
-  switch (level) {
+function outerBlockSpacingClass(block: DocBlock): string {
+  if (block.type !== "heading") return "";
+  switch (block.level) {
     case 1:
-      return "mt-6 mb-1";
-    case 2:
       return "mt-5 mb-0.5";
+    case 2:
+      return "mt-4 mb-0.5";
     default:
-      return "mt-3";
+      return "mt-2.5";
   }
 }
 
@@ -408,7 +409,7 @@ function HeadingBlockView(props: {
   });
 
   return (
-    <View testID={`doc-heading-${props.block.id}`} class={`flex-row items-center gap-2 ${headingSpacingClass(props.block.level)}`}>
+    <View testID={`doc-heading-${props.block.id}`} class="flex-row items-center gap-2 py-0.5">
       <Input
         ref={(el) => {
           inputRef = el;
@@ -841,7 +842,10 @@ export function BlockItem(props: BlockItemProps) {
   const nested = () => (props.depth ?? 0) > 0;
 
   return (
-    <View testID={`doc-block-${props.block.id}`} class={`group relative flex-row items-start rounded-md py-0.5 pr-1 ${nested() ? "pl-10" : "pl-14"}`}>
+    <View
+      testID={`doc-block-${props.block.id}`}
+      class={`group relative flex-row items-start rounded-md py-0.5 pr-1 ${nested() ? "pl-10" : "pl-14"} ${outerBlockSpacingClass(props.block)}`}
+    >
       <View
         class={`absolute top-1 left-0 flex-row items-center justify-end gap-0.5 pr-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 ${
           nested() ? "w-9" : "w-12"

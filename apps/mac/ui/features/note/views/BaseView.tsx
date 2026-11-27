@@ -210,11 +210,40 @@ export function BaseView(props: BaseViewProps) {
 
   const timelineData = computed(() => projectBaseTimeline(filteredRows(), columns(), timelineScale()));
 
-  const previewColumns = computed(() =>
-    columns()
-      .filter((c) => c.kind !== "media")
-      .slice(0, 4),
-  );
+  const titleColumnId = computed(() => columns().find((c) => c.kind === "text")?.id ?? columns()[0]?.id);
+
+  const previewColumns = computed(() => {
+    const tColId = titleColumnId();
+    const gColId = groupColumn()?.id;
+    return columns()
+      .filter((c) => c.kind !== "media" && c.id !== tColId && c.id !== gColId)
+      .slice(0, 3);
+  });
+
+  const formatPreviewCell = (row: BaseRow, col: BaseColumn): string => {
+    const cell = row.cells[col.id];
+    if (cell === undefined) return "—";
+    switch (cell._tag) {
+      case "noteRef":
+        return notesById().get(cell.noteId)?.title ?? cell.noteId;
+      case "issueRef": {
+        const iss = issuesById().get(cell.issueId);
+        return iss ? `#${iss.number} ${iss.title}` : cell.issueId;
+      }
+      case "agentRef":
+        return agentsById().get(cell.agentId)?.name ?? cell.agentId;
+      case "bool":
+        return cell.value ? "✓" : "—";
+      case "text": {
+        if (col.kind === "select") {
+          return findSelectOption(col, cell.value)?.label ?? cell.value;
+        }
+        return cell.value || "—";
+      }
+      default:
+        return baseCellAsText(cell) || "—";
+    }
+  };
 
   const totalTableWidth = computed(() => 40 + 64 + 16 + columns().reduce((sum, col) => sum + columnWidthPx(col), 0));
 
@@ -435,7 +464,7 @@ export function BaseView(props: BaseViewProps) {
             <If when={viewKind() === "board"}>
               <>
                 <VdpAnchor testId="base-board-view" role="region" />
-                <Scroll horizontal testID="base-board-view" class="min-h-0 flex-1" contentClass="gap-3 p-3 items-start">
+                <Scroll horizontal testID="base-board-view" class="min-h-0 flex-1" contentClass="flex-row items-start gap-3 p-3">
                   <Each of={boardGroups()} key={(g) => g.key}>
                     {(group) => {
                       const gCol = () => groupColumn();
@@ -478,9 +507,7 @@ export function BaseView(props: BaseViewProps) {
                                             {(col) => (
                                               <View class="flex-row items-center justify-between gap-2">
                                                 <Text class="w-20 shrink-0 truncate text-2xs text-faint">{col().name}</Text>
-                                                <Text class="min-w-0 flex-1 truncate text-right text-2xs text-muted">
-                                                  {baseCellAsText(r().cells[col().id]) || "—"}
-                                                </Text>
+                                                <Text class="min-w-0 flex-1 truncate text-right text-2xs text-muted">{formatPreviewCell(r(), col())}</Text>
                                               </View>
                                             )}
                                           </Each>
@@ -547,7 +574,7 @@ export function BaseView(props: BaseViewProps) {
                                   {(col) => (
                                     <View class="flex-row items-center justify-between gap-2">
                                       <Text class="w-20 shrink-0 truncate text-2xs text-faint">{col().name}</Text>
-                                      <Text class="min-w-0 flex-1 truncate text-right text-2xs text-ink">{baseCellAsText(row().cells[col().id]) || "—"}</Text>
+                                      <Text class="min-w-0 flex-1 truncate text-right text-2xs text-ink">{formatPreviewCell(row(), col())}</Text>
                                     </View>
                                   )}
                                 </Each>

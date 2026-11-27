@@ -374,7 +374,7 @@ export function BlockDocView(props: BlockDocViewProps) {
 
       <If when={showOutlineRail()}>
         <View testID="doc-outline-rail" class="hidden w-44 shrink-0 pt-12 pr-4 lg:flex">
-          <View class="gap-1 border-l border-line pl-3">
+          <View class="w-full min-w-0 gap-1 border-l border-line pl-3">
             <Text class="mb-1 text-2xs font-semibold text-faint">{t("web.note.doc.outline")}</Text>
             <Each of={outlineEntries()} key={(entry) => entry.blockId}>
               {(entry) => {
@@ -387,10 +387,10 @@ export function BlockDocView(props: BlockDocViewProps) {
                       highlightedBlockId.set(entry().blockId);
                       focusedBlockId.set(entry().blockId);
                     }}
-                    class="rounded-sm py-0.5 pr-1 hover:bg-hover"
+                    class="w-full min-w-0 rounded-sm py-0.5 pr-1 hover:bg-hover"
                     style={{ paddingLeft: Math.max(0, entry().level - 1) * 10 }}
                   >
-                    <Text class={`truncate text-2xs ${active() ? "font-semibold text-accent" : "text-faint hover:text-ink"}`}>{entry().text}</Text>
+                    <Text class={`w-full truncate text-2xs ${active() ? "font-semibold text-accent" : "text-faint hover:text-ink"}`}>{entry().text}</Text>
                   </View>
                 );
               }}

@@ -80,7 +80,7 @@ async function performSeedNoteShowcase(v: VdpScenarioContext): Promise<NoteShowc
           { id: "c_note", name: "关联笔记", kind: "noteRef", width: 170 },
           { id: "c_issue", name: "关联工单", kind: "issueRef", width: 170 },
           { id: "c_pts", name: "工作量", kind: "number", width: 90 },
-          { id: "c_score", name: "完成度公式", kind: "formula", width: 120, formula: 'if(c_status == "done", 100, c_pts * 8)' },
+          { id: "c_score", name: "完成度公式", kind: "formula", width: 120, formula: 'if({c_status} == "done", 100, {c_pts} * 8)' },
           { id: "c_verified", name: "验收", kind: "checkbox", width: 80 },
           {
             id: "c_agent",

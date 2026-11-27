@@ -285,6 +285,7 @@ function alignTextClass(align: string | undefined): string {
 }
 
 export function TableBlockView(props: { readonly block: TableBlockData; readonly onUpdate: (next: TableBlockData) => void }) {
+  const activeCell = signal<string | undefined>(undefined);
   return (
     <View testID={`doc-table-${props.block.id}`} class="overflow-hidden rounded-md border border-line bg-page">
       <View class="flex-row items-center border-b border-line bg-side px-2 py-1.5">
@@ -325,19 +326,42 @@ export function TableBlockView(props: { readonly block: TableBlockData; readonly
       </View>
       <Each of={props.block.rows} key={(_, rowIdx) => String(rowIdx)}>
         {(row, rowIdx) => (
-          <View class="flex-row items-center border-t border-line px-2 py-1 hover:bg-hover">
+          <View class="flex-row items-start border-t border-line px-2 py-1.5 hover:bg-hover">
             <Each of={row()} key={(_, colIdx) => String(colIdx)}>
-              {(cell, colIdx) => (
-                <View class="min-w-0 flex-1 px-1">
-                  <Input
-                    testID={`doc-table-cell-${props.block.id}-${rowIdx()}-${colIdx()}`}
-                    value={cell()}
-                    placeholder="…"
-                    onChange={(e) => props.onUpdate(updateTableCell(props.block, rowIdx(), colIdx(), e.value))}
-                    class={`min-w-0 flex-1 bg-transparent text-xs text-ink placeholder:text-faint ${alignTextClass(props.block.alignments?.[colIdx()])}`}
-                  />
-                </View>
-              )}
+              {(cell, colIdx) => {
+                const cellKey = () => `${rowIdx()}:${colIdx()}`;
+                const editing = () => activeCell() === cellKey();
+                return (
+                  <View class="min-w-0 flex-1 px-1">
+                    <If
+                      when={editing()}
+                      else={
+                        <View
+                          role="button"
+                          testID={`doc-table-cell-${props.block.id}-${rowIdx()}-${colIdx()}`}
+                          onPress={() => activeCell.set(cellKey())}
+                          class="min-h-5 justify-center rounded-xs px-1 py-0.5 hover:bg-hover"
+                        >
+                          <Text class={`text-xs leading-relaxed ${cell() ? "text-ink" : "text-faint"} ${alignTextClass(props.block.alignments?.[colIdx()])}`}>
+                            {cell() || "…"}
+                          </Text>
+                        </View>
+                      }
+                    >
+                      <Input
+                        autoFocus
+                        testID={`doc-table-cell-input-${props.block.id}-${rowIdx()}-${colIdx()}`}
+                        value={cell()}
+                        placeholder="…"
+                        onChange={(e) => props.onUpdate(updateTableCell(props.block, rowIdx(), colIdx(), e.value))}
+                        onSubmit={() => activeCell.set(undefined)}
+                        onBlur={() => activeCell.set(undefined)}
+                        class={`w-full min-w-0 rounded-xs border border-focus bg-page px-1 py-0.5 text-xs text-ink placeholder:text-faint ${alignTextClass(props.block.alignments?.[colIdx()])}`}
+                      />
+                    </If>
+                  </View>
+                );
+              }}
             </Each>
             <View class="w-6 shrink-0 items-center opacity-0 group-hover:opacity-100">
               <If when={props.block.rows.length > 1}>
