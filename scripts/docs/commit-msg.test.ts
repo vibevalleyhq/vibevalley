@@ -1,6 +1,6 @@
 import { expect, test } from "vite-plus/test";
 
-import { bodyProblems, branchProblems, messageProblems, subjectMax, subjectProblems } from "./commit-msg";
+import { bodyProblems, branchProblems, messageProblems, steProblems, subjectMax, subjectProblems } from "./commit-msg";
 
 test("a subject says what the code now does, in at most 100 characters", () => {
   expect(subjectProblems("The board groups issues by helper")).toEqual([]);
@@ -39,17 +39,21 @@ test("a subject is English; the interface's words and code are quoted", () => {
   expect(subjectProblems("The board's 「完成」 column keeps `已完成` issues")).toEqual([]);
 });
 
-test("a pull request's body has the template's sections, in English", () => {
-  const body = (what: string) => `## What changed\n\n${what}\n\n## Checks\n\n- \`vp check\`\n\n## Not verified\n\nNone.\n`;
+test("a pull request's body has the template's sections, in STE English", () => {
+  const body = (what: string) =>
+    `## What changed\n\n${what}\n\n## Changelog\n\n### Changed\n\n- Group board issues by helper.\n\n## Checks\n\n- \`vp check\`\n\n## Not verified\n\nNone.\n`;
   expect(bodyProblems(body("The board groups issues by helper."))).toEqual([]);
   expect(bodyProblems(body("A full gateway says 「网关满了」.\n\n```\nexpected '还在等' to be '收到'\n```"))).toEqual([]);
   expect(bodyProblems(body("<!-- 模板的注释不算 -->\nThe board groups issues."))).toEqual([]);
   expect(bodyProblems(body("工单板按帮工分组。"))[0]).toContain("write the body in English");
   expect(bodyProblems("## Changes\n\nThe board groups issues.")).toEqual([
     'the body has no "## What changed" section',
+    'the body has no "## Changelog" section',
     'the body has no "## Checks" section',
     'the body has no "## Not verified" section',
   ]);
+  expect(bodyProblems(body("The board seamlessly empowers users out of the box."))).toHaveLength(3);
+  expect(steProblems('Use `seamlessly` only inside backticks or "out of the box" in quotes.')).toEqual([]);
 });
 
 test("a branch is <kind>/<topic> in lowercase English", () => {
