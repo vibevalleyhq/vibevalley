@@ -5,6 +5,7 @@
   "repos": "代码库",
   "all": "全部",
   "allLine": "整张地图：每个仓库一座岛",
+  "selectPrompt": "从左侧选择一个仓库查看健康度、语言分布与提交历史。",
   "notGit": "还不是 git 仓库",
   "finding": "在找……",
   "none": "工作区里还没有仓库。点「新增仓库」新建一个，或从 GitHub 下载一个。",
@@ -108,13 +109,13 @@
   "unmountTip": "仅从 VibeValley 列表移除关联，不会删除磁盘上的本地文件夹",
   "health": {
     "title": "仓库健康度",
-    "open": "开着 {n}",
-    "inProgress": "进行中 {n}",
-    "inReview": "待验收 {n}",
-    "blocked": "阻塞 {n}",
-    "stuck": "卡住 {n}",
-    "asking": "待回复 {n}",
-    "failedChecks": "检查失败 {n}",
-    "overdue": "已逾期 {n}"
+    "open": "开着",
+    "inProgress": "进行中",
+    "inReview": "待验收",
+    "blocked": "阻塞",
+    "stuck": "卡住",
+    "asking": "待回复",
+    "failedChecks": "检查失败",
+    "overdue": "已逾期"
   }
 }

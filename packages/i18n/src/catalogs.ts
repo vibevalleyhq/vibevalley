@@ -2859,6 +2859,7 @@ export const catalogs = {
       repos: "代码库",
       all: "全部",
       allLine: "整张地图：每个仓库一座岛",
+      selectPrompt: "从左侧选择一个仓库查看健康度、语言分布与提交历史。",
       notGit: "还不是 git 仓库",
       finding: "在找……",
       none: "工作区里还没有仓库。点「新增仓库」新建一个，或从 GitHub 下载一个。",
@@ -2948,14 +2949,14 @@ export const catalogs = {
       unmountTip: "仅从 VibeValley 列表移除关联，不会删除磁盘上的本地文件夹",
       health: {
         title: "仓库健康度",
-        open: "开着 {n}",
-        inProgress: "进行中 {n}",
-        inReview: "待验收 {n}",
-        blocked: "阻塞 {n}",
-        stuck: "卡住 {n}",
-        asking: "待回复 {n}",
-        failedChecks: "检查失败 {n}",
-        overdue: "已逾期 {n}",
+        open: "开着",
+        inProgress: "进行中",
+        inReview: "待验收",
+        blocked: "阻塞",
+        stuck: "卡住",
+        asking: "待回复",
+        failedChecks: "检查失败",
+        overdue: "已逾期",
       },
     },
     "web.runtime": {
@@ -6873,6 +6874,7 @@ export const catalogs = {
       repos: "Code bases",
       all: "All",
       allLine: "The whole map: an island for each repo",
+      selectPrompt: "Select a repository from the list to inspect its health, languages, and commit history.",
       notGit: "Not a git repository yet",
       finding: "Looking…",
       none: "No repos in the work folder yet. Press New repo to add one, or download one from GitHub.",
@@ -6962,14 +6964,14 @@ export const catalogs = {
       unmountTip: "Stop managing this external folder in VibeValley without deleting files on disk",
       health: {
         title: "Health",
-        open: "Open {n}",
-        inProgress: "Working {n}",
-        inReview: "Review {n}",
-        blocked: "Blocked {n}",
-        stuck: "Stuck {n}",
-        asking: "Asking {n}",
-        failedChecks: "Failed checks {n}",
-        overdue: "Overdue {n}",
+        open: "Open",
+        inProgress: "Working",
+        inReview: "Review",
+        blocked: "Blocked",
+        stuck: "Stuck",
+        asking: "Asking",
+        failedChecks: "Failed checks",
+        overdue: "Overdue",
       },
     },
     "web.runtime": {
@@ -10918,14 +10920,14 @@ export interface Messages {
   "web.repo.github": undefined;
   "web.repo.githubAddress": undefined;
   "web.repo.githubHint": undefined;
-  "web.repo.health.asking": { readonly n: string | number };
-  "web.repo.health.blocked": { readonly n: string | number };
-  "web.repo.health.failedChecks": { readonly n: string | number };
-  "web.repo.health.inProgress": { readonly n: string | number };
-  "web.repo.health.inReview": { readonly n: string | number };
-  "web.repo.health.open": { readonly n: string | number };
-  "web.repo.health.overdue": { readonly n: string | number };
-  "web.repo.health.stuck": { readonly n: string | number };
+  "web.repo.health.asking": undefined;
+  "web.repo.health.blocked": undefined;
+  "web.repo.health.failedChecks": undefined;
+  "web.repo.health.inProgress": undefined;
+  "web.repo.health.inReview": undefined;
+  "web.repo.health.open": undefined;
+  "web.repo.health.overdue": undefined;
+  "web.repo.health.stuck": undefined;
   "web.repo.health.title": undefined;
   "web.repo.how": undefined;
   "web.repo.inYear": undefined;
@@ -10984,6 +10986,7 @@ export interface Messages {
   "web.repo.rows.4": undefined;
   "web.repo.rows.5": undefined;
   "web.repo.rows.6": undefined;
+  "web.repo.selectPrompt": undefined;
   "web.repo.thenRecount": undefined;
   "web.repo.times": { readonly n: string | number };
   "web.repo.uncounted": undefined;
