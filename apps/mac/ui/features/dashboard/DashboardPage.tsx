@@ -3,7 +3,6 @@ import { computed, Scroll, Text, View } from "nsh";
 import { t } from "@vibevalley/i18n";
 import { isFreeUserSession, isOrchestratorSession, sessionIssueId, sessionProfile } from "@vibevalley/protocol/rules";
 
-import { ButtonLink } from "../../design/Button";
 import { AgentFace, OrchestratorFace, UserAvatar } from "../../design/domain/Face";
 import { Icon } from "../../design/Icon";
 import type { IconName } from "../../design/icons";
@@ -14,7 +13,7 @@ import { useOrchestrators } from "../../infra/agents";
 import { useNow } from "../../infra/base/dom";
 import { ago } from "../../infra/base/format";
 import { useBoardSlice, useInboxSlice, useSessionsSlice } from "../../infra/frame";
-import { ready, useAgents, useQuery, useSettings } from "../../infra/query";
+import { ready, useAgents, useQuery } from "../../infra/query";
 import { Link as A, useRouter } from "../../infra/router";
 import { waitingOnUser } from "../inbox";
 import { allSessionsQuery, buildRunEntries, runActivityAt, type RunApprovals, type RunEntry, RunsPage, type RunStatusBadge, runStatusOf } from "../session";
@@ -105,7 +104,6 @@ function QuickLinkCard(props: { href: string; testid: string; icon: IconName; la
 }
 
 function DashboardOverview() {
-  const settings = useSettings();
   const sessionsSlice = useSessionsSlice();
   const board = useBoardSlice();
   const inbox = useInboxSlice();
@@ -114,15 +112,12 @@ function DashboardOverview() {
   const sessions = useQuery(allSessionsQuery);
   const now = useNow();
 
-  const profile = () => ready(settings, undefined)?.profile;
-  const displayName = () => profile()?.displayName?.trim() || t("web.base.dashboard.profile.defaultName");
-  const tagline = () => profile()?.tagline?.trim() || t("web.base.dashboard.profile.defaultTagline");
-
   const workingSessions = computed(() => (sessionsSlice()?.sessions ?? []).filter((s) => !isFreeUserSession(s) && s.phase._tag === "working"));
   const waitingCount = computed(() => waitingOnUser(inbox()?.items ?? []));
   const openIssueCount = computed(() => (board()?.issues ?? []).filter((i) => i.status === "todo" || i.status === "in_progress").length);
   const reviewIssueCount = computed(() => (board()?.issues ?? []).filter((i) => i.status === "in_review").length);
   const todoIssueCount = computed(() => (board()?.issues ?? []).filter((i) => i.status === "todo").length);
+  const hasPending = computed(() => waitingCount() > 0 || reviewIssueCount() > 0 || todoIssueCount() > 0);
 
   const agentById = computed(() => new Map(ready(agents, []).map((a) => [a.id, a])));
   const recentRuns = computed(() =>
@@ -136,23 +131,6 @@ function DashboardOverview() {
 
   return (
     <Scroll testID="dashboard-overview" class="min-h-0 flex-1 bg-page" contentClass="mx-auto w-full max-w-5xl gap-5 p-6">
-      <View testID="dashboard-profile-card" class="flex-row flex-wrap items-center justify-between gap-4 rounded-xl border border-line bg-elevated px-5 py-4">
-        <View class="min-w-0 flex-1 flex-row items-center gap-4">
-          <UserAvatar size={52} />
-          <View class="min-w-0 flex-1 gap-0.5">
-            <Text testID="dashboard-profile-name" class="truncate text-lg font-semibold text-ink">
-              {displayName()}
-            </Text>
-            <Text testID="dashboard-profile-tagline" class="truncate text-xs text-muted">
-              {tagline()}
-            </Text>
-          </View>
-        </View>
-        <ButtonLink href="/settings/profile" tone="plain" size="compact" icon="edit" testID="dashboard-edit-profile">
-          {t("web.base.dashboard.profile.edit")}
-        </ButtonLink>
-      </View>
-
       <View class="flex-row flex-wrap gap-3">
         <StatCard
           href="/dashboard/runs?scope=active"
@@ -245,24 +223,43 @@ function DashboardOverview() {
               {t("web.base.dashboard.pending.openIssues")}
             </A>
           </View>
-          <View class="gap-2.5 px-4 py-3">
-            <A href="/chat" class="flex-row items-center justify-between rounded-md px-2 py-1.5 hover:bg-hover">
-              <Text class="text-sm text-ink">{t("web.base.dashboard.pending.waiting", { n: waitingCount() })}</Text>
-              <CountPill count={waitingCount()} tone={waitingCount() > 0 ? "bad" : "neutral"} />
-            </A>
-            <A
-              href="/issues?status=in_review"
-              testID="dashboard-pending-review"
-              class="flex-row items-center justify-between rounded-md px-2 py-1.5 hover:bg-hover"
-            >
-              <Text class="text-sm text-ink">{t("web.base.dashboard.pending.inReview", { n: reviewIssueCount() })}</Text>
-              <CountPill count={reviewIssueCount()} />
-            </A>
-            <A href="/issues?status=todo" testID="dashboard-pending-todo" class="flex-row items-center justify-between rounded-md px-2 py-1.5 hover:bg-hover">
-              <Text class="text-sm text-ink">{t("web.base.dashboard.pending.todo", { n: todoIssueCount() })}</Text>
-              <CountPill count={todoIssueCount()} />
-            </A>
-          </View>
+          <If
+            when={hasPending()}
+            else={
+              <View testID="dashboard-pending-empty" class="px-4 py-5">
+                <Quiet>{t("web.base.dashboard.pending.empty")}</Quiet>
+              </View>
+            }
+          >
+            <View class="gap-1.5 px-4 py-3">
+              <If when={waitingCount() > 0}>
+                <A href="/chat" testID="dashboard-pending-waiting" class="flex-row items-center justify-between rounded-md px-2 py-1.5 hover:bg-hover">
+                  <Text class="text-sm text-ink">{t("web.base.dashboard.pending.waiting")}</Text>
+                  <CountPill count={waitingCount()} tone="bad" />
+                </A>
+              </If>
+              <If when={reviewIssueCount() > 0}>
+                <A
+                  href="/issues?status=in_review"
+                  testID="dashboard-pending-review"
+                  class="flex-row items-center justify-between rounded-md px-2 py-1.5 hover:bg-hover"
+                >
+                  <Text class="text-sm text-ink">{t("web.base.dashboard.pending.inReview")}</Text>
+                  <CountPill count={reviewIssueCount()} />
+                </A>
+              </If>
+              <If when={todoIssueCount() > 0}>
+                <A
+                  href="/issues?status=todo"
+                  testID="dashboard-pending-todo"
+                  class="flex-row items-center justify-between rounded-md px-2 py-1.5 hover:bg-hover"
+                >
+                  <Text class="text-sm text-ink">{t("web.base.dashboard.pending.todo")}</Text>
+                  <CountPill count={todoIssueCount()} />
+                </A>
+              </If>
+            </View>
+          </If>
         </View>
       </View>
 

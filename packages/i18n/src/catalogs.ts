@@ -695,7 +695,7 @@ export const catalogs = {
             reworkLine: "返工率：{reworkRate}（{issues} 张工单，{findings} 条问题，未解决 {unresolved} 条）",
           },
         },
-        profile: { defaultName: "工作台用户", defaultTagline: "在工作台与默认频道统筹角色与工单", edit: "编辑个人资料" },
+        profile: { defaultName: "工作台用户", defaultTagline: "在工作台与默认频道统筹角色与工单" },
         stats: { working: "运行中会话", waiting: "等你回应", issues: "待办与进行中", review: "待验收" },
         pulse: {
           title: "活跃引擎与执行脉搏",
@@ -703,7 +703,14 @@ export const catalogs = {
           active: "{n} 个会话正在干活",
           openRuns: "查看全部运行记录",
         },
-        pending: { title: "工作台待关注", waiting: "{n} 项正在等你答复", inReview: "{n} 张工单待验收", todo: "{n} 张待办工单", openIssues: "打开工单看板" },
+        pending: {
+          title: "工作台待关注",
+          waiting: "正在等你答复",
+          inReview: "工单待验收",
+          todo: "待办工单",
+          empty: "暂无需要立即处理的事项。",
+          openIssues: "打开工单看板",
+        },
         recent: { title: "最近运行记录", empty: "还没有运行记录。" },
         quick: { title: "快捷入口" },
       },
@@ -4560,7 +4567,7 @@ export const catalogs = {
             reworkLine: "Rework: {reworkRate} ({issues} issues, {findings} findings, {unresolved} unresolved)",
           },
         },
-        profile: { defaultName: "Workspace User", defaultTagline: "Coordinating roles and issues across your workspace", edit: "Edit profile" },
+        profile: { defaultName: "Workspace User", defaultTagline: "Coordinating roles and issues across your workspace" },
         stats: { working: "Active sessions", waiting: "Needs response", issues: "Open issues", review: "In review" },
         pulse: {
           title: "Live Execution Pulse",
@@ -4570,9 +4577,10 @@ export const catalogs = {
         },
         pending: {
           title: "Needs Review & Action",
-          waiting: "{n} waiting on your reply",
-          inReview: "{n} issues in review",
-          todo: "{n} todo issues",
+          waiting: "Waiting on your reply",
+          inReview: "Issues in review",
+          todo: "Todo issues",
+          empty: "Nothing needs your attention right now.",
           openIssues: "Open issues board",
         },
         recent: { title: "Recent Runs", empty: "No runs recorded yet." },
@@ -8571,14 +8579,14 @@ export interface Messages {
   "web.base.compare.uploadFailed": { readonly why: string | number };
   "web.base.compare.uploading": undefined;
   "web.base.compare.zoom": { readonly label: string | number };
-  "web.base.dashboard.pending.inReview": { readonly n: string | number };
+  "web.base.dashboard.pending.empty": undefined;
+  "web.base.dashboard.pending.inReview": undefined;
   "web.base.dashboard.pending.openIssues": undefined;
   "web.base.dashboard.pending.title": undefined;
-  "web.base.dashboard.pending.todo": { readonly n: string | number };
-  "web.base.dashboard.pending.waiting": { readonly n: string | number };
+  "web.base.dashboard.pending.todo": undefined;
+  "web.base.dashboard.pending.waiting": undefined;
   "web.base.dashboard.profile.defaultName": undefined;
   "web.base.dashboard.profile.defaultTagline": undefined;
-  "web.base.dashboard.profile.edit": undefined;
   "web.base.dashboard.pulse.active": { readonly n: string | number };
   "web.base.dashboard.pulse.empty": undefined;
   "web.base.dashboard.pulse.openRuns": undefined;

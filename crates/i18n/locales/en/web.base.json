@@ -120,8 +120,7 @@
     },
     "profile": {
       "defaultName": "Workspace User",
-      "defaultTagline": "Coordinating roles and issues across your workspace",
-      "edit": "Edit profile"
+      "defaultTagline": "Coordinating roles and issues across your workspace"
     },
     "stats": {
       "working": "Active sessions",
@@ -137,9 +136,10 @@
     },
     "pending": {
       "title": "Needs Review & Action",
-      "waiting": "{n} waiting on your reply",
-      "inReview": "{n} issues in review",
-      "todo": "{n} todo issues",
+      "waiting": "Waiting on your reply",
+      "inReview": "Issues in review",
+      "todo": "Todo issues",
+      "empty": "Nothing needs your attention right now.",
       "openIssues": "Open issues board"
     },
     "recent": {
