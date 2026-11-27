@@ -1,4 +1,13 @@
-import type { ChatMessage, IssueHistory, IssueRetroReport, RetroWindow, SessionEvent, SessionEventPage, SliceBundle } from "@vibevalley/protocol";
+import type {
+  ChatMessage,
+  IssueHistory,
+  IssueRetroReport,
+  MorningDigest,
+  RetroWindow,
+  SessionEvent,
+  SessionEventPage,
+  SliceBundle,
+} from "@vibevalley/protocol";
 import { SliceBundle as SliceBundleSchema } from "@vibevalley/protocol/schema";
 
 import workbenchResponsesJson from "../workbench/responses.json";
@@ -47,6 +56,28 @@ function emptyRetro(window: RetroWindow): IssueRetroReport {
     byRepo: [],
     byTag: [],
     byAgent: [],
+  };
+}
+
+function emptyDigest(): MorningDigest {
+  return {
+    generatedAt: SCENARIO_NOW,
+    windowStart: SCENARIO_NOW - 86_400_000,
+    windowEnd: SCENARIO_NOW,
+    progress: {
+      asking: [],
+      reviewing: [],
+      stuck: [],
+      working: [],
+      completedRecent: [],
+      runsTotal: 0,
+      runsCompleted: 0,
+      runsFailed: 0,
+      runsInterrupted: 0,
+      tokensSpent: 0,
+    },
+    repoHealth: [],
+    triage: [],
   };
 }
 
@@ -173,6 +204,8 @@ function responsesFor(density: ScenarioDensity, bundle: SliceBundle): Record<str
       "runtime.list": [],
       "issue.history.list": [],
       "issue.retro.get": emptyRetro("7d"),
+      "issue.digest.get": emptyDigest(),
+      "issue.triage.list": [],
       "issue.run.list": [],
       "issue.timeline.get": { milestones: [] },
       "issue.diff.get": { files: [], truncated: false },
@@ -200,6 +233,8 @@ function responsesFor(density: ScenarioDensity, bundle: SliceBundle): Record<str
     "orchestrator.approval.list": [],
     "issue.history.list": buildHistory(bundle),
     "issue.retro.get": emptyRetro("7d"),
+    "issue.digest.get": emptyDigest(),
+    "issue.triage.list": [],
     "issue.timeline.get": {
       milestones: [
         { at: SCENARIO_NOW - 40 * MIN_MS, kind: "opened", text: "写下这张工单" },

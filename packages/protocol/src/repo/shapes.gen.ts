@@ -36,7 +36,15 @@ export type RepoTemplates = { repo: string, stack: RepoStack, recent: Array<stri
 
 export type PullRequestCapability = { available: boolean, reason: string, };
 
-export type RepoSummary = { name: string, path: string, git: boolean, external: boolean, last?: number, maxSessions: number, pullRequest: PullRequestCapability, };
+export type RepoSummary = { name: string, path: string, git: boolean, external: boolean, last?: number, maxSessions: number, pullRequest: PullRequestCapability, health?: RepoHealth, };
+
+export const RepoHealthStatusValues = ["on_track", "at_risk", "off_track"] as const;
+export type RepoHealthStatus = (typeof RepoHealthStatusValues)[number];
+
+export const RepoHealthReasonValues = ["stuck_issues", "failed_checks", "overdue_issues", "asking_user", "blocked_issues", "no_active_progress", "stale_activity", "healthy"] as const;
+export type RepoHealthReason = (typeof RepoHealthReasonValues)[number];
+
+export type RepoHealth = { repo: string, status: RepoHealthStatus, reasons: Array<RepoHealthReason>, openIssues: number, inProgressIssues: number, inReviewIssues: number, blockedIssues: number, stuckIssues: number, askingIssues: number, failedChecks: number, overdueIssues: number, lastCommitAt?: number, evaluatedAt: number, };
 
 export type NewRepo = { name: string, github?: string, };
 

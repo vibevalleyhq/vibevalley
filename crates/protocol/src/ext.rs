@@ -200,6 +200,7 @@ impl Issue {
             start_at: None,
             due_at: None,
             owner: None,
+            relations: vec![],
         }
     }
 }

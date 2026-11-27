@@ -6,7 +6,7 @@
 //! One process holds a board at a time (a lock file next to its data); others
 //! read it with [`Board::snapshot_async`].
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Weak};
 use std::time::{Duration, Instant};
@@ -16,9 +16,9 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex as AsyncMutex;
 use vibevalley_core::{Move, status_move};
 use vibevalley_protocol::{
-    ActorRef, ApiError, AppliedIssue, Assignment, Attachment, BizCode, Deliverable, HumanPause, HumanPauseSource, Issue, IssueCanceled, IssueConstraints,
-    IssueMandate, IssueStageKind as StageKind, IssueStatus, JsNumber, Landing, Priority, ResumeCondition, Run, RunTriggerKind, Session, SliceBundle,
-    StuckReason,
+    ActorRef, ApiError, AppliedIssue, Assignment, Attachment, BacklogTriageSuggestion, BizCode, Deliverable, HumanPause, HumanPauseSource, Issue,
+    IssueCanceled, IssueConstraints, IssueMandate, IssueRelation, IssueStageKind as StageKind, IssueStatus, JsNumber, Landing, Priority, ResumeCondition, Run,
+    RunTriggerKind, Session, SliceBundle, StuckReason,
 };
 use vibevalley_runtime::oar::Registry;
 
@@ -77,6 +77,9 @@ pub struct NewIssue {
     pub due_at: Option<JsNumber>,
     #[serde(default)]
     pub owner: Option<ActorRef>,
+    /// Non-blocking links (`duplicate` / `related`), maintained bidirectionally.
+    #[serde(default)]
+    pub relations: Vec<IssueRelation>,
 }
 
 pub(super) fn resolve_blocked_by(all_issues: &[Issue], self_id: Option<&str>, refs: &[String]) -> Result<Vec<String>> {
@@ -95,6 +98,62 @@ pub(super) fn resolve_blocked_by(all_issues: &[Issue], self_id: Option<&str>, re
         }
     }
     Ok(out)
+}
+
+pub(super) fn resolve_relations(all_issues: &[Issue], self_id: Option<&str>, refs: &[IssueRelation]) -> Result<Vec<IssueRelation>> {
+    let mut out = Vec::new();
+    for raw in refs {
+        let trimmed = raw.issue.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let target = find_issue(all_issues, trimmed).ok_or_else(|| BoardError::NoIssue(trimmed.to_string()))?;
+        if self_id == Some(target.id.as_str()) {
+            return Err(BoardError::Other("an issue cannot relate to itself".into()));
+        }
+        let candidate = IssueRelation {
+            kind: raw.kind,
+            issue: target.id.clone(),
+        };
+        if !out.contains(&candidate) {
+            out.push(candidate);
+        }
+    }
+    Ok(out)
+}
+
+fn get_or_clone_peer<'a>(id: &str, all_issues: &[Issue], map: &'a mut HashMap<String, Issue>) -> Option<&'a mut Issue> {
+    if !map.contains_key(id)
+        && let Some(found) = all_issues.iter().find(|i| i.id == id)
+    {
+        map.insert(id.to_string(), found.clone());
+    }
+    map.get_mut(id)
+}
+
+pub(super) fn sync_bidirectional_relations(source_id: &str, old_rels: &[IssueRelation], new_rels: &[IssueRelation], all_issues: &[Issue]) -> Vec<Issue> {
+    let mut modified: HashMap<String, Issue> = HashMap::new();
+    for old in old_rels {
+        if !new_rels.contains(old)
+            && let Some(peer) = get_or_clone_peer(&old.issue, all_issues, &mut modified)
+        {
+            peer.relations.retain(|r| !(r.kind == old.kind && r.issue == source_id));
+        }
+    }
+    for next in new_rels {
+        if !old_rels.contains(next)
+            && let Some(peer) = get_or_clone_peer(&next.issue, all_issues, &mut modified)
+        {
+            let reverse = IssueRelation {
+                kind: next.kind,
+                issue: source_id.to_string(),
+            };
+            if !peer.relations.contains(&reverse) {
+                peer.relations.push(reverse);
+            }
+        }
+    }
+    modified.into_values().collect()
 }
 
 pub(super) fn clean_tags(tags: &[String]) -> Vec<String> {
@@ -166,12 +225,20 @@ pub enum Sent {
     Queued { blocked_by: Vec<String> },
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub(super) struct TriageStore {
+    #[serde(default)]
+    pub custom: Vec<BacklogTriageSuggestion>,
+    #[serde(default)]
+    pub dismissed: HashSet<String>,
+}
+
 /// Issue board domain service.
 pub struct Board {
     ctx: Arc<Context>,
     pub(super) state: Arc<IssueState>,
     pub(super) runtime: Arc<Runtime>,
-    repos: Option<Arc<Repo>>,
+    pub(super) repos: Option<Arc<Repo>>,
     channel: Option<Arc<Chat>>,
     storage: Option<Arc<Storage>>,
     pub(super) create_keys: AsyncRequestKeys<AppliedIssue>,
@@ -179,6 +246,8 @@ pub struct Board {
     /// Held for short workflow state checks and room reservations so slow
     /// git/worktree/dispatch I/O runs outside this coarse lock.
     pub(super) work: AsyncMutex<()>,
+    pub(super) triage_path: PathBuf,
+    pub(super) triage: AsyncMutex<TriageStore>,
     issue_locks: Mutex<HashMap<String, Weak<AsyncMutex<()>>>>,
     in_flight: Mutex<HashMap<String, Option<String>>>,
     join_lock: AsyncMutex<()>,
@@ -276,6 +345,11 @@ impl Board {
             tokio::time::sleep(Duration::from_millis(50)).await;
         }
         let state = Arc::new(IssueState::new(ctx.clone(), runtime.write_lock().clone()));
+        let triage_path = config.data_dir.join("triage.json");
+        let triage_store: TriageStore = match tokio::fs::read_to_string(&triage_path).await {
+            Ok(raw) => serde_json::from_str(&raw).unwrap_or_default(),
+            Err(_) => TriageStore::default(),
+        };
         let board = Arc::new(Board {
             ctx,
             state,
@@ -286,6 +360,8 @@ impl Board {
             create_keys: AsyncRequestKeys::default(),
             status_keys: AsyncRequestKeys::default(),
             work: AsyncMutex::new(()),
+            triage_path,
+            triage: AsyncMutex::new(triage_store),
             issue_locks: Mutex::new(HashMap::new()),
             in_flight: Mutex::new(HashMap::new()),
             join_lock: AsyncMutex::new(()),
@@ -496,6 +572,7 @@ impl Board {
                 None => None,
             };
             let blocked_by = resolve_blocked_by(&all_issues, None, &new.blocked_by)?;
+            let relations = resolve_relations(&all_issues, None, &new.relations)?;
             if let Some(p) = &parent
                 && p.status.is_closed()
             {
@@ -523,6 +600,7 @@ impl Board {
             let parent_agent = parent.as_ref().and_then(|p| p.assigned_agent()).map(String::from);
             issue.parent = parent.map(|p| p.id);
             issue.blocked_by = blocked_by;
+            issue.relations = relations.clone();
             issue.constraints = new.constraints;
             issue.cron = new.cron;
             issue.attachments = attachments;
@@ -550,7 +628,9 @@ impl Board {
                     executions: vec![],
                 }];
             }
-            self.state.put_issues_async(&[issue]).await?;
+            let mut to_put = vec![issue];
+            to_put.extend(sync_bidirectional_relations(&id, &[], &relations, &all_issues));
+            self.state.put_issues_async(&to_put).await?;
             id
         };
         self.stored_async(&id).await

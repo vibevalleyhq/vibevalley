@@ -26,6 +26,7 @@ import { createMemo, createEffect } from "../../../infra/solid";
 import { useIntents } from "../../../infra/state/intent";
 import { pendingNewIssue } from "../../../infra/state/issueDraft";
 import { rememberPick } from "../../../infra/state/prefs";
+import { BacklogTriagePanel } from "../../dashboard";
 import {
   type BoardCard,
   type BoardFilter,
@@ -503,6 +504,9 @@ export function IssuesPage(props: { rest: string }) {
               onRefresh={refreshIssues}
               onNew={() => startNew({})}
             />
+            <If when={filter().scope === "backlog"}>
+              <BacklogTriagePanel />
+            </If>
             <If
               when={look().view === "board"}
               else={

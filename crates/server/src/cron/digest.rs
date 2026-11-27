@@ -6,7 +6,10 @@ use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
 use vibevalley_i18n::locale as current_locale;
 use vibevalley_i18n::t_in;
-use vibevalley_protocol::{ConnectorID, Issue, IssueStageKind, IssueStatus, Millis, Outcome, Run, Session, StuckReason};
+use vibevalley_protocol::{
+    BacklogTriageSuggestion, ConnectorID, Issue, IssueStageKind, IssueStatus, Millis, MorningDigest, Outcome, RepoHealth, RepoHealthStatus, Run, Session,
+    StuckReason,
+};
 
 use crate::context::port::DigestTargets;
 use crate::context::text::clip_plain;
@@ -46,7 +49,7 @@ pub fn parse_digest_directive(text: &str) -> Option<DigestSpec> {
         None => (rest, None),
     };
     let head_lower = head.to_ascii_lowercase();
-    if !matches!(head_lower.as_str(), "digest" | "简报" | "日报") {
+    if !matches!(head_lower.as_str(), "digest" | "简报" | "日报" | "早报") {
         return None;
     }
     let mut connectors = Vec::new();
@@ -101,7 +104,7 @@ pub struct DigestRunStats {
     pub total_tokens: i64,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ProgressDigest {
     pub title: String,
     pub window_start: Millis,
@@ -112,16 +115,55 @@ pub struct ProgressDigest {
     pub working: Vec<DigestIssueItem>,
     pub completed_recent: Vec<DigestIssueItem>,
     pub runs: DigestRunStats,
+    pub repo_health: Vec<RepoHealth>,
+    pub triage: Vec<BacklogTriageSuggestion>,
 }
 
 impl ProgressDigest {
     pub fn is_empty(&self) -> bool {
+        let has_risky_repo = self.repo_health.iter().any(|r| r.status != RepoHealthStatus::OnTrack);
         self.asking.is_empty()
             && self.reviewing.is_empty()
             && self.stuck.is_empty()
             && self.working.is_empty()
             && self.completed_recent.is_empty()
             && self.runs.total == 0
+            && !has_risky_repo
+            && self.triage.is_empty()
+    }
+}
+
+/// Converts a [`MorningDigest`] into a renderable [`ProgressDigest`] with all three sections.
+pub fn progress_digest_from_morning(title: &str, morning: &MorningDigest) -> ProgressDigest {
+    let map_items = |items: &[vibevalley_protocol::DigestIssueRef]| -> Vec<DigestIssueItem> {
+        items
+            .iter()
+            .map(|r| DigestIssueItem {
+                number: r.number,
+                title: r.title.clone(),
+                detail: r.detail.clone(),
+                stuck: r.stuck,
+            })
+            .collect()
+    };
+    ProgressDigest {
+        title: title.to_string(),
+        window_start: morning.window_start,
+        window_end: morning.window_end,
+        asking: map_items(&morning.progress.asking),
+        reviewing: map_items(&morning.progress.reviewing),
+        stuck: map_items(&morning.progress.stuck),
+        working: map_items(&morning.progress.working),
+        completed_recent: map_items(&morning.progress.completed_recent),
+        runs: DigestRunStats {
+            total: morning.progress.runs_total as usize,
+            completed: morning.progress.runs_completed as usize,
+            failed: morning.progress.runs_failed as usize,
+            interrupted: morning.progress.runs_interrupted as usize,
+            total_tokens: morning.progress.tokens_spent,
+        },
+        repo_health: morning.repo_health.clone(),
+        triage: morning.triage.clone(),
     }
 }
 
@@ -241,6 +283,8 @@ pub fn build_progress_digest(title: &str, issues: &[Issue], sessions: &[Session]
         working,
         completed_recent,
         runs: stats,
+        repo_health: Vec::new(),
+        triage: Vec::new(),
     }
 }
 
@@ -268,21 +312,31 @@ pub fn format_progress_digest(digest: &ProgressDigest) -> String {
 /// Formats a [`ProgressDigest`] in an explicit `locale` without mutating process-wide i18n state.
 pub fn format_progress_digest_in(locale: &str, digest: &ProgressDigest) -> String {
     let mut lines = vec![t_in(locale, "server.connector.cronDigest.title", &[("title", digest.title.clone().into())])];
-    if digest.is_empty() {
+    if digest.is_empty() && digest.repo_health.is_empty() && digest.triage.is_empty() {
         lines.push(t_in(locale, "server.connector.cronDigest.quiet", &[]));
         return lines.join("\n");
     }
-    lines.push(t_in(
-        locale,
-        "server.connector.cronDigest.counts",
-        &[
-            ("asking", (digest.asking.len() as i64).into()),
-            ("reviewing", (digest.reviewing.len() as i64).into()),
-            ("stuck", (digest.stuck.len() as i64).into()),
-            ("working", (digest.working.len() as i64).into()),
-            ("done", (digest.completed_recent.len() as i64).into()),
-        ],
-    ));
+    if digest.asking.is_empty()
+        && digest.reviewing.is_empty()
+        && digest.stuck.is_empty()
+        && digest.working.is_empty()
+        && digest.completed_recent.is_empty()
+        && digest.runs.total == 0
+    {
+        lines.push(t_in(locale, "server.connector.cronDigest.quiet", &[]));
+    } else {
+        lines.push(t_in(
+            locale,
+            "server.connector.cronDigest.counts",
+            &[
+                ("asking", (digest.asking.len() as i64).into()),
+                ("reviewing", (digest.reviewing.len() as i64).into()),
+                ("stuck", (digest.stuck.len() as i64).into()),
+                ("working", (digest.working.len() as i64).into()),
+                ("done", (digest.completed_recent.len() as i64).into()),
+            ],
+        ));
+    }
     if digest.runs.total > 0 {
         lines.push(t_in(
             locale,
@@ -372,6 +426,52 @@ pub fn format_progress_digest_in(locale: &str, digest: &ProgressDigest) -> Strin
             })
             .collect();
         push_capped_lines(locale, &mut lines, done_lines);
+    }
+
+    if !digest.repo_health.is_empty() {
+        lines.push(String::new());
+        lines.push(t_in(locale, "server.connector.cronDigest.healthHeader", &[]));
+        let health_lines = digest
+            .repo_health
+            .iter()
+            .map(|h| {
+                let status_key = match h.status {
+                    RepoHealthStatus::OnTrack => "shared.repoHealth.on_track",
+                    RepoHealthStatus::AtRisk => "shared.repoHealth.at_risk",
+                    RepoHealthStatus::OffTrack => "shared.repoHealth.off_track",
+                };
+                let status_label = t_in(locale, status_key, &[]);
+                t_in(
+                    locale,
+                    "server.connector.cronDigest.itemHealth",
+                    &[
+                        ("repo", h.repo.clone().into()),
+                        ("status", status_label.into()),
+                        ("open", h.open_issues.into()),
+                        ("blocked", h.blocked_issues.into()),
+                        ("stuck", h.stuck_issues.into()),
+                    ],
+                )
+            })
+            .collect();
+        push_capped_lines(locale, &mut lines, health_lines);
+    }
+
+    if !digest.triage.is_empty() {
+        lines.push(String::new());
+        lines.push(t_in(locale, "server.connector.cronDigest.triageHeader", &[]));
+        let triage_lines = digest
+            .triage
+            .iter()
+            .map(|s| {
+                t_in(
+                    locale,
+                    "server.connector.cronDigest.itemTriage",
+                    &[("number", s.issue_number.into()), ("summary", clip_plain(&s.summary, 60).into())],
+                )
+            })
+            .collect();
+        push_capped_lines(locale, &mut lines, triage_lines);
     }
 
     lines.join("\n")
@@ -497,5 +597,53 @@ mod tests {
         assert!(rendered.contains("#1 修复登录"));
         assert!(rendered.contains("#2 微信通知"));
         assert!(!rendered.contains("#3 旧工单"));
+
+        let morning = vibevalley_protocol::MorningDigest {
+            generated_at: 2_000,
+            window_start: 1_000,
+            window_end: 2_000,
+            progress: vibevalley_protocol::DigestProgressSummary {
+                completed_recent: vec![vibevalley_protocol::DigestIssueRef {
+                    id: "i2".into(),
+                    number: 2,
+                    title: "微信通知".into(),
+                    detail: String::new(),
+                    stuck: None,
+                }],
+                ..Default::default()
+            },
+            repo_health: vec![RepoHealth {
+                repo: "alpha".into(),
+                status: RepoHealthStatus::AtRisk,
+                reasons: vec![vibevalley_protocol::RepoHealthReason::AskingUser],
+                open_issues: 2,
+                in_progress_issues: 1,
+                in_review_issues: 0,
+                blocked_issues: 0,
+                stuck_issues: 0,
+                asking_issues: 1,
+                failed_checks: 0,
+                overdue_issues: 0,
+                last_commit_at: None,
+                evaluated_at: 2_000,
+            }],
+            triage: vec![BacklogTriageSuggestion {
+                id: "auto:i4:priority".into(),
+                issue_id: "i4".into(),
+                issue_number: 4,
+                issue_title: "Fix urgent crash".into(),
+                reason: "Urgent keyword".into(),
+                summary: "Raise #4 priority to High".into(),
+                source: vibevalley_protocol::ActorKind::System,
+                patch: Default::default(),
+                created_at: 2_000,
+            }],
+        };
+        let converted = progress_digest_from_morning("早报", &morning);
+        let three_part = format_progress_digest_in("zh", &converted);
+        assert!(three_part.contains("仓库健康度："), "{three_part}");
+        assert!(three_part.contains("alpha【存在风险】"), "{three_part}");
+        assert!(three_part.contains("备选池梳理建议"), "{three_part}");
+        assert!(three_part.contains("#4：Raise #4 priority to High"), "{three_part}");
     }
 }

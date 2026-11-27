@@ -542,5 +542,30 @@
     "replaceTags": "替换标签",
     "updated": "已批量更新 {n} 张工单",
     "partial": "已更新 {ok} 张工单，{failed} 张未能更新"
+  },
+  "relations": {
+    "title": "非阻塞关联",
+    "pick": "添加关联或重复工单…",
+    "none": "暂无关联工单",
+    "clear": "清除关联",
+    "related": "相关",
+    "duplicate": "重复",
+    "relatedChip": "相关 #{n}",
+    "duplicateChip": "重复 #{n}"
+  },
+  "digest": {
+    "title": "晨间简报",
+    "subtitle": "过夜进展、仓库健康度，以及需点击确认才生效的需求池梳理建议。",
+    "refresh": "刷新",
+    "progressTitle": "一、过夜进展与待处理",
+    "healthTitle": "二、仓库健康度",
+    "triageTitle": "三、需求池梳理建议（点击确认后修改）",
+    "triageConfirm": "确认应用",
+    "triageDismiss": "忽略",
+    "triageEmpty": "当前没有待确认的需求池梳理建议。",
+    "quiet": "本时段暂无新增进展或待处理事项。",
+    "runsLine": "共 {total} 次运行（完成 {completed} · 失败 {failed} · 中断 {interrupted}）",
+    "emptyHealth": "暂无已挂载仓库。",
+    "pendingCount": "{n} 项待确认"
   }
 }

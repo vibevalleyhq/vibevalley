@@ -209,6 +209,11 @@ MOSS Live 语音通话
 | `issue.status.previewUpdate` | 试挪任务的状态：说会发生什么，不动手 | `/api/v1/issue/status/previewUpdate` | ✓ | ✓ | ✓ |   |
 | `issue.refine` | 让一个执行会话读代码，把备选的任务起草好 | `/api/v1/issue/refine` | ✓ | ✓ | ✓ |   |
 | `issue.retro.get` | 按时间窗口统计任务吞吐、阶段耗时、逾期情况、返工率与按仓库、标签、角色分布 | `/api/v1/issue/retro/get` | ✓ | ✓ | ✓ |   |
+| `issue.digest.get` | cap.op.issue.digest.get | `/api/v1/issue/digest/get` | ✓ | ✓ | ✓ |   |
+| `issue.triage.list` | cap.op.issue.triage.list | `/api/v1/issue/triage/list` | ✓ | ✓ | ✓ |   |
+| `issue.triage.suggest` | cap.op.issue.triage.suggest | `/api/v1/issue/triage/suggest` | ✓ | ✓ | ✓ |   |
+| `issue.triage.confirm` | cap.op.issue.triage.confirm | `/api/v1/issue/triage/confirm` | ✓ | ✓ |   |   |
+| `issue.triage.dismiss` | cap.op.issue.triage.dismiss | `/api/v1/issue/triage/dismiss` | ✓ | ✓ |   |   |
 
 ## session
 

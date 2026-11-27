@@ -10,6 +10,28 @@ use ts_rs::TS;
 use super::*;
 use crate::JsNumber;
 
+/// Non-blocking relation kind between issues (maintained bidirectionally).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+pub enum IssueRelationKind {
+    #[serde(rename = "duplicate")]
+    Duplicate,
+    #[serde(rename = "related")]
+    Related,
+}
+
+/// Non-blocking link from one issue to another (`duplicate` or `related`).
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct IssueRelation {
+    pub kind: IssueRelationKind,
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::IssueId"))]
+    pub issue: IssueId,
+}
+
 /// Lightweight typed owner/actor reference on issues (`user` or `agent`).
 #[skip_serializing_none]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
@@ -848,6 +870,9 @@ pub struct Issue {
     pub due_at: Option<JsNumber>,
     #[serde(default)]
     pub owner: Option<ActorRef>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "Option<Vec<IssueRelation>>", optional))]
+    pub relations: Vec<IssueRelation>,
 }
 
 /// Includes the Core fold `seq` that applied the mutation so clients can await state convergence.
@@ -908,6 +933,9 @@ pub struct AppliedIssue {
     pub due_at: Option<JsNumber>,
     #[serde(default)]
     pub owner: Option<ActorRef>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "Option<Vec<IssueRelation>>", optional))]
+    pub relations: Vec<IssueRelation>,
     pub seq: i64,
 }
 
@@ -953,6 +981,7 @@ impl AppliedIssue {
             start_at: issue.start_at,
             due_at: issue.due_at,
             owner: issue.owner,
+            relations: issue.relations,
             seq,
         }
     }
@@ -994,6 +1023,9 @@ pub struct IssueUpdate {
     /// Final owner (`user` or `agent`); empty `id` clears it.
     #[serde(default)]
     pub owner: Option<ActorRef>,
+    /// Non-blocking links (`duplicate` / `related`) maintained bidirectionally; `[]` clears all relations.
+    #[serde(default)]
+    pub relations: Option<Vec<IssueRelation>>,
 }
 
 #[skip_serializing_none]
@@ -1050,6 +1082,8 @@ pub struct IssueRequest {
     pub due_at: Option<JsNumber>,
     #[serde(default)]
     pub owner: Option<ActorRef>,
+    #[serde(default)]
+    pub relations: Option<Vec<IssueRelation>>,
     /// Idempotency key deduplicating retries after a lost response.
     pub request_key: Option<String>,
 }
@@ -1335,6 +1369,9 @@ pub struct IssueUpdateInput {
     /// Final owner (`user` or `agent`); empty `id` clears it.
     #[serde(default)]
     pub owner: Option<ActorRef>,
+    /// Non-blocking links (`duplicate` / `related`) maintained bidirectionally; `[]` clears all relations.
+    #[serde(default)]
+    pub relations: Option<Vec<IssueRelation>>,
 }
 
 #[skip_serializing_none]
@@ -1535,10 +1572,136 @@ pub struct BoardSummary {
     pub by_issue: BTreeMap<String, BoardIssueSummary>,
 }
 
+/// Partial field updates proposed for a backlog issue, applied only after explicit user confirmation.
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct TriagePatch {
+    pub priority: Option<Priority>,
+    pub repo: Option<String>,
+    pub agent: Option<String>,
+    #[serde(default)]
+    pub tags: Option<Vec<String>>,
+    pub status: Option<IssueStatus>,
+    #[serde(default)]
+    pub relations: Option<Vec<IssueRelation>>,
+    #[serde(default)]
+    pub due_at: Option<JsNumber>,
+}
+
+/// Confirmable triage recommendation for a backlog issue (never auto-overwrites issue fields).
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct BacklogTriageSuggestion {
+    pub id: String,
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::IssueId"))]
+    pub issue_id: IssueId,
+    pub issue_number: i64,
+    pub issue_title: String,
+    pub reason: String,
+    pub summary: String,
+    pub source: ActorKind,
+    pub patch: TriagePatch,
+    pub created_at: i64,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct DigestIssueRef {
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::IssueId"))]
+    pub id: IssueId,
+    pub number: i64,
+    pub title: String,
+    pub detail: String,
+    pub stuck: Option<StuckReason>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct DigestProgressSummary {
+    pub asking: Vec<DigestIssueRef>,
+    pub reviewing: Vec<DigestIssueRef>,
+    pub stuck: Vec<DigestIssueRef>,
+    pub working: Vec<DigestIssueRef>,
+    pub completed_recent: Vec<DigestIssueRef>,
+    pub runs_total: i64,
+    pub runs_completed: i64,
+    pub runs_failed: i64,
+    pub runs_interrupted: i64,
+    pub tokens_spent: i64,
+}
+
+/// Three-part morning digest: (1) overnight progress, (2) repo health, (3) confirmable backlog triage.
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct MorningDigest {
+    pub generated_at: i64,
+    pub window_start: i64,
+    pub window_end: i64,
+    pub progress: DigestProgressSummary,
+    pub repo_health: Vec<RepoHealth>,
+    pub triage: Vec<BacklogTriageSuggestion>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct IssueDigestGetInput {
+    pub window_hours: Option<i64>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct BacklogTriageSuggestInput {
+    pub issue_id: String,
+    pub reason: String,
+    pub summary: Option<String>,
+    pub patch: TriagePatch,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct BacklogTriageConfirmInput {
+    pub id: String,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct BacklogTriageDismissInput {
+    pub id: String,
+}
+
 #[cfg(feature = "ts-gen")]
 crate::typescript::module! {
     "issue";
     types: [ActorRef,
+    IssueRelationKind,
+    IssueRelation,
     Landing,
     IssueCanceled,
     Priority,
@@ -1609,6 +1772,15 @@ crate::typescript::module! {
     IssueUpdateInput,
     IssueDeleteInput,
     IssueStatusUpdateInput,
-    IssueRefineInput];
+    IssueRefineInput,
+    TriagePatch,
+    BacklogTriageSuggestion,
+    DigestIssueRef,
+    DigestProgressSummary,
+    MorningDigest,
+    IssueDigestGetInput,
+    BacklogTriageSuggestInput,
+    BacklogTriageConfirmInput,
+    BacklogTriageDismissInput];
     aliases: [];
 }

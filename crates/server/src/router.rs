@@ -155,7 +155,7 @@ impl Router {
             E::RepoPrSubmit => on!(p, RepoPrSubmit, |r| c.pull.submit_pr_async(ctx.caller, &r).await?),
             E::GithubGet => ret!(ok_json(c.repo.github_status())),
             E::GithubRefresh => ret!(ok_json(c.repo.refresh_github_async().await)),
-            E::RepoList => ret!(ok_json(c.repo.list_summaries_async().await)),
+            E::RepoList => ret!(ok_json(glue::repo_list_async(c).await)),
             E::RepoValidate => on!(p, RepoValidate, |r| c.repo.validate_repo(&r)),
             E::RepoCreate => on!(p, RepoCreate, |r| c.repo.create_repo_async(&r).await?),
             E::RepoMount => on!(p, RepoMount, |r| c.repo.mount_repo_async(&r).await?),
@@ -202,6 +202,13 @@ impl Router {
             E::IssueStatusPreviewUpdate => on!(p, IssueStatusPreviewUpdate, |r| brd.issue_status_preview_update_endpoint_async(&r).await?),
             E::IssueRefine => on!(p, IssueRefine, |r| brd.issue_refine_endpoint_async(&r).await?),
             E::IssueRetroGet => on!(p, IssueRetroGet, |r| brd.issue_retro_endpoint_async(&r, &*c.ctx.clock).await?),
+            E::IssueDigestGet => on!(p, IssueDigestGet, |r| brd.issue_digest_get_endpoint_async(&r, &*c.ctx.clock).await?),
+            E::IssueTriageList => ret!(ok_json(brd.issue_triage_list_endpoint_async(&*c.ctx.clock).await?)),
+            E::IssueTriageSuggest => on!(p, IssueTriageSuggest, |r| {
+                brd.issue_triage_suggest_endpoint_async(ctx.caller, r, &*c.ctx.clock).await?
+            }),
+            E::IssueTriageConfirm => on!(p, IssueTriageConfirm, |r| brd.issue_triage_confirm_endpoint_async(&r, &*c.ctx.clock).await?),
+            E::IssueTriageDismiss => void!(p, IssueTriageDismiss, |r| brd.issue_triage_dismiss_endpoint_async(&r).await?),
             E::CronCreate => on!(p, CronCreate, |r| c.cron.create_endpoint_async(ctx.caller, r).await?),
             E::CronList => ret!(ok_json(c.cron.list_endpoint_async().await?)),
             E::CronUpdate => void!(p, CronUpdate, |r| c.cron.update_endpoint_async(&r.id, r.enabled).await?),

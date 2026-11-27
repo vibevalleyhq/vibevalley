@@ -51,6 +51,8 @@ pub struct BoardInput {
     pub sessions: Vec<Session>,
     pub channels: Vec<Channel>,
     pub commits: Option<CommitCount>,
+    pub repos: Vec<crate::health::RepoHealthInput>,
+    pub evaluated_at: Option<i64>,
 }
 
 /// Domain inputs needed to project [`SessionsSlice`].
@@ -231,11 +233,17 @@ pub fn project_board(input: &BoardInput, live: &LiveSnapshot, seq: i64) -> Board
     let sessions = overlay_sessions(&input.sessions, &live.sessions);
     let issues = derive_issues(&input.issues, &sessions);
     let summary = board_summary(&issues, &sessions, &input.channels);
+    let repo_health = if input.repos.is_empty() {
+        Vec::new()
+    } else {
+        crate::health::assess_repos_health(&input.repos, &issues, &[], input.evaluated_at.unwrap_or(0))
+    };
     BoardSlice {
         seq,
         issues,
         board_summary: Some(summary),
         commits: input.commits.clone(),
+        repo_health,
     }
 }
 
@@ -325,6 +333,7 @@ mod tests {
             sessions: state.sessions.clone(),
             channels: state.chat.as_ref().map_or_else(Vec::new, |c| c.channels.clone()),
             commits: state.commits.clone(),
+            ..Default::default()
         };
         let session_in = SessionInput {
             sessions: state.sessions.clone(),
@@ -505,6 +514,7 @@ mod tests {
                 sessions: vec![db_session.clone()],
                 channels: vec![],
                 commits: None,
+                ..Default::default()
             },
             &live,
             42,

@@ -30,7 +30,7 @@ import { createIssueActs } from "../model/acts";
 import type { Tone } from "../model/cards";
 import { changesLine } from "../model/changes";
 import { useIssueChanges, useIssues, useIssueTimeline } from "../model/history";
-import { blockerIssuesOf } from "../model/meta";
+import { blockerIssuesOf, relationIssuesOf } from "../model/meta";
 import { issueMove, movedIssue } from "../model/moves";
 import { issueState, stageTone } from "../model/overview";
 import { issueSet, labeledIssue, sendLabel, updateIssueAttachments } from "../model/write";
@@ -38,7 +38,18 @@ import { ActLines } from "./ActLines";
 import { ChangesBody, ChangesHead, ConflictFiles } from "./CloseDialog";
 import { IssueActivity } from "./IssueActivity";
 import { IssueAttachments } from "./IssueAttachments";
-import { BlockedByChips, BlockedByPicker, DatePropertyEditor, OwnerMark, OwnerPicker, ParentPicker, SubIssuesSection, TagEditor } from "./IssueMetaControls";
+import {
+  BlockedByChips,
+  BlockedByPicker,
+  DatePropertyEditor,
+  OwnerMark,
+  OwnerPicker,
+  ParentPicker,
+  RelationChips,
+  RelationsPicker,
+  SubIssuesSection,
+  TagEditor,
+} from "./IssueMetaControls";
 import { AnswerView, Criteria, OrchestratorIssueDetail, Question, ReconcileWorktree } from "./IssueSections";
 import { AgentFaceOf, PriorityMark, StatusMark } from "./Marks";
 import { Fold, IssueSheet, IssueTrail, More, Note, Pick, Property, SheetLabel, StagePill } from "./Sheet";
@@ -125,6 +136,7 @@ export function IssueDetail(props: {
   };
   const parent = createMemo(() => (live().parent ? issues().find((item) => item.id === live().parent) : undefined));
   const blockers = createMemo(() => blockerIssuesOf(live(), issues()));
+  const relations = createMemo(() => relationIssuesOf(live(), issues()));
   const tone = computed(() => stageTone[s().stage.state]);
   const statusParts = computed(() => s().statusParts(now(), timeline()?.spent?.cny));
   const stageMeta = computed(() => statusParts().slice(1).filter(Boolean));
@@ -137,6 +149,7 @@ export function IssueDetail(props: {
       <View class="mt-2.5 flex-row flex-wrap items-center gap-2" accessibilityLabel={t("web.issue.detail.now")} testID="issue-now">
         <StagePill tone={tone()} label={statusParts()[0] ?? t(`shared.stage.${s().stage.state}`)} />
         <BlockedByChips blockers={blockers()} max={6} onOpen={openIssue} testid="detail-blocked-by" />
+        <RelationChips relations={relations()} max={6} onOpen={openIssue} testid="detail-relations" />
         <If when={stageMeta().length > 0}>
           <View class="min-w-0 flex-1 flex-row flex-wrap items-center">
             <Each of={stageMeta()} key="index">
@@ -572,6 +585,17 @@ export function IssueDetail(props: {
           state={labeled().state("blockedBy")}
           onOpen={openIssue}
           onChange={(blockedBy) => setLabel({ blockedBy })}
+        />
+      </Property>
+      <Property align="start" label={t("web.issue.relations.title")} icon={<Icon name="branch" size={13} tone="muted" />} inset>
+        <RelationsPicker
+          issueId={props.issue.id}
+          relations={live().relations ?? []}
+          allIssues={issues()}
+          disabled={busy() || !s().open}
+          state={labeled().state("relations")}
+          onOpen={openIssue}
+          onChange={(relations) => setLabel({ relations })}
         />
       </Property>
       <Property align="start" label={t("web.issue.tags.label")} icon={<Icon name="catalog" size={13} tone="muted" />} inset>

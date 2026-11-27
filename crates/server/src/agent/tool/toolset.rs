@@ -52,9 +52,14 @@ pub fn access_of(op: &str) -> Option<ToolAccess> {
 
     Some(match op {
         "issue.list" | "issue.get" => ToolAccess::new(Issue, true, true),
-        "issue.create" | "issue.update" | "issue.status.update" | "issue.comment.create" | "issue.review" | "issue.diff.get" => {
-            ToolAccess::new(Issue, true, false)
-        }
+        "issue.create"
+        | "issue.update"
+        | "issue.status.update"
+        | "issue.comment.create"
+        | "issue.review"
+        | "issue.diff.get"
+        | "issue.digest.get"
+        | "issue.triage.suggest" => ToolAccess::new(Issue, true, false),
         "issue.split" | "issue.report" | "issue.pr.submit" => ToolAccess::new(Issue, false, true),
         "session.list" => ToolAccess::new(Session, true, true),
         "session.stop" => ToolAccess::new(Session, true, false),

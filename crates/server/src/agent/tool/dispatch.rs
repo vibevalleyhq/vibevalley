@@ -203,6 +203,8 @@ fn handler(op: &str) -> Option<Run> {
         "issue.comment.create" => typed!(issue::comment),
         "issue.review" => typed!(issue::review),
         "issue.diff.get" => typed!(issue::diff),
+        "issue.digest.get" => typed!(issue::digest_get),
+        "issue.triage.suggest" => typed!(issue::triage_suggest),
         "issue.split" => typed!(issue::split),
         "issue.report" => typed!(issue::report),
         "issue.pr.submit" => typed!(issue::pr_submit),

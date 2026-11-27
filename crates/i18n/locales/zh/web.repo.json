@@ -105,5 +105,16 @@
   "unmount": "取消关联",
   "unmounting": "取消中…",
   "unmounted": "已取消关联 {name}（磁盘原目录已保留）",
-  "unmountTip": "仅从 VibeValley 列表移除关联，不会删除磁盘上的本地文件夹"
+  "unmountTip": "仅从 VibeValley 列表移除关联，不会删除磁盘上的本地文件夹",
+  "health": {
+    "title": "仓库健康度",
+    "open": "开着 {n}",
+    "inProgress": "进行中 {n}",
+    "inReview": "待验收 {n}",
+    "blocked": "阻塞 {n}",
+    "stuck": "卡住 {n}",
+    "asking": "待回复 {n}",
+    "failedChecks": "检查失败 {n}",
+    "overdue": "已逾期 {n}"
+  }
 }

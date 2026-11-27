@@ -127,6 +127,9 @@ pub struct BoardSlice {
     pub issues: Vec<Issue>,
     pub board_summary: Option<BoardSummary>,
     pub commits: Option<CommitCount>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "Option<Vec<RepoHealth>>", optional))]
+    pub repo_health: Vec<RepoHealth>,
 }
 
 #[skip_serializing_none]

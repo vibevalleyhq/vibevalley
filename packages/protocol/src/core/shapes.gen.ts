@@ -8,6 +8,7 @@ import type { CommitCount, FactProgressChanged, FarmFrame, Progress, SessionPlay
 import type { FactRuntimeInboxChanged, InboxItem } from "../inbox/shapes.gen";
 import type { BoardSummary, FactIssueChanged, FactIssueRemoved, FactSessionReported, Issue, IssueStatus } from "../issue/shapes.gen";
 import type { FactMediaChanged, MediaJob, MediaSummary } from "../media/shapes.gen";
+import type { RepoHealth } from "../repo/shapes.gen";
 import type { RuntimeInfo } from "../runtime/shapes.gen";
 import type { FactMachineChanged, FactMachineRemoved, FactSessionChanged, FactSessionLeft, FactSessionPhaseChanged, FactSessionSubagentsChanged, FactSessionToolChanged, FactSessionToolsReset, Machine, Session, SessionEvent, SessionView } from "../session/shapes.gen";
 import type { CallState, FactCallChanged } from "../voice/shapes.gen";
@@ -40,7 +41,7 @@ export type SliceKind = (typeof SliceKindValues)[number];
 export const NoticeLevelValues = ["info", "warn", "error"] as const;
 export type NoticeLevel = (typeof NoticeLevelValues)[number];
 
-export type BoardSlice = { seq: number, issues: Array<Issue>, boardSummary?: BoardSummary, commits?: CommitCount, };
+export type BoardSlice = { seq: number, issues: Array<Issue>, boardSummary?: BoardSummary, commits?: CommitCount, repoHealth?: Array<RepoHealth>, };
 
 export type SessionsSlice = { seq: number, sessions: Array<SessionView>, machines: Array<Machine>, };
 

@@ -106,5 +106,20 @@
     "aside": "{text}（{aside}）",
     "sentence": "{text}。",
     "separator": "、"
+  },
+  "repoHealth": {
+    "on_track": "正常推进",
+    "at_risk": "存在风险",
+    "off_track": "进度偏离"
+  },
+  "repoHealthReason": {
+    "stuck_issues": "存在卡住待处理的工单",
+    "failed_checks": "项目检查未通过",
+    "overdue_issues": "存在已逾期工单",
+    "asking_user": "有工单正等待你的回答",
+    "blocked_issues": "存在前置阻塞工单",
+    "no_active_progress": "有未关闭工单但暂无推进中任务",
+    "stale_activity": "近期长时间无提交",
+    "healthy": "推进正常"
   }
 }

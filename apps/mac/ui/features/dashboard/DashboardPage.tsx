@@ -18,6 +18,7 @@ import { ready, useAgents, useQuery, useSettings } from "../../infra/query";
 import { Link as A, useRouter } from "../../infra/router";
 import { waitingOnUser } from "../inbox";
 import { allSessionsQuery, buildRunEntries, runActivityAt, type RunApprovals, type RunEntry, RunsPage, type RunStatusBadge, runStatusOf } from "../session";
+import { MorningDigestPanel } from "./MorningDigestPanel";
 import { RetroView } from "./RetroView";
 
 export type DashboardTab = "overview" | "retro" | "runs";
@@ -264,6 +265,8 @@ function DashboardOverview() {
           </View>
         </View>
       </View>
+
+      <MorningDigestPanel />
 
       <View testID="dashboard-recent-runs" class="rounded-xl border border-line bg-elevated">
         <View class="flex-row items-center justify-between gap-2 border-b border-line px-4 py-2.5">

@@ -102,6 +102,10 @@ impl AppCore {
     }
 }
 
+pub(crate) async fn repo_list_async(c: &AppCore) -> Vec<vibevalley_protocol::RepoSummary> {
+    c.board.repo_summaries_with_health_async(&c.repo, c.ctx.clock.now_ms()).await
+}
+
 pub(crate) async fn repo_templates_async(c: &AppCore, id: &str) -> Result<RepoTemplates, ApiError> {
     let issues = c.board.issues_async().await.map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?;
     let mut out = c.repo.templates_async(id, &issues, |a| c.agent.profile.is_orchestrator(a)).await?;

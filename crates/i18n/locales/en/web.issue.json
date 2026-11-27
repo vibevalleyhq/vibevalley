@@ -542,5 +542,30 @@
     "replaceTags": "Replace tags",
     "updated": "Updated {n} issues",
     "partial": "Updated {ok} issues; {failed} could not be updated"
+  },
+  "relations": {
+    "title": "Relations",
+    "pick": "Link related or duplicate…",
+    "none": "No relations",
+    "clear": "Clear relations",
+    "related": "Related",
+    "duplicate": "Duplicate",
+    "relatedChip": "Related #{n}",
+    "duplicateChip": "Duplicate #{n}"
+  },
+  "digest": {
+    "title": "Morning Digest",
+    "subtitle": "Overnight progress, deterministic repo health, and backlog triage awaiting your click.",
+    "refresh": "Refresh",
+    "progressTitle": "1. Progress & Attention",
+    "healthTitle": "2. Repo Health",
+    "triageTitle": "3. Backlog Triage (Confirm to Apply)",
+    "triageConfirm": "Confirm & Apply",
+    "triageDismiss": "Dismiss",
+    "triageEmpty": "No backlog triage suggestions right now.",
+    "quiet": "No overnight progress or attention items in the selected window.",
+    "runsLine": "{total} runs ({completed} completed, {failed} failed, {interrupted} interrupted)",
+    "emptyHealth": "No mounted repositories yet.",
+    "pendingCount": "{n} pending"
   }
 }

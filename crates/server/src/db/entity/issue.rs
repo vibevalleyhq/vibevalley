@@ -60,6 +60,8 @@ pub struct Model {
     pub due_at: Option<i64>,
     #[sea_orm(column_type = "Text", nullable)]
     pub owner: Option<String>,
+    #[sea_orm(column_type = "Text")]
+    pub relations: String,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

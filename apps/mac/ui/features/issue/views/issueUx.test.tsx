@@ -4,6 +4,7 @@ import { expect, open, test } from "nsh/test";
 import { setLocale, t } from "@vibevalley/i18n";
 import "@vibevalley/i18n/catalogs";
 import type { Issue, IssueId, Session, SessionId, SliceBundle } from "@vibevalley/protocol";
+import { issueId } from "@vibevalley/protocol/schema";
 
 import { fakeHost } from "../../../fixtures/fakeHost";
 import { SCENARIO_NOW, scenarios } from "../../../fixtures/scenarios";
@@ -1123,4 +1124,61 @@ test("Keyboard j/k/Enter/e navigation, x/Shift+click multi-select, and BatchTria
   // Clear selection closes the floating BatchTriageBar.
   await app.press("id:batch-triage-clear");
   await fake.pumpUntil(app, () => app.count("id:batch-triage-bar") === 0);
+});
+
+test("Issue detail displays and updates non-blocking relations without blocking status", async () => {
+  setLocale("en");
+  const primary = makeIssueFixture({
+    id: "i-rel-1",
+    number: 601,
+    title: "Primary API endpoint",
+    status: "backlog",
+    relations: [{ kind: "related", issue: issueId("i-rel-2") }],
+    stage: { state: "draft", acts: [] },
+  });
+  const peer = makeIssueFixture({
+    id: "i-rel-2",
+    number: 602,
+    title: "Related schema update",
+    status: "backlog",
+    relations: [{ kind: "related", issue: issueId("i-rel-1") }],
+    stage: { state: "draft", acts: [] },
+  });
+  const state: SliceBundle = {
+    ...scenarios.empty.state,
+    board: { seq: 50, issues: [primary, peer] },
+  };
+  const fake = fakeHost({ state, responses: scenarios.typical.responses }, { route: `/issues/${primary.id}`, locale: "en" });
+  fake.respond("issue.history.list", [
+    { issue: primary, sessions: [], missingSessions: [] },
+    { issue: peer, sessions: [], missingSessions: [] },
+  ]);
+  fake.respond("issue.update", (payload: unknown) => ({
+    ...primary,
+    ...(payload as Record<string, unknown>),
+    seq: 51,
+  }));
+
+  const app = await open("../../../app/main.tsx", {
+    width: 1280,
+    height: 820,
+    colorScheme: "light",
+    platform: "macos",
+    locale: "en-US",
+    clock: { time: SCENARIO_NOW },
+    host: fake.options,
+  });
+
+  await fake.pumpUntil(app, () => app.count("id:issue-relations-picker") === 1 && app.count("id:detail-relations") === 1);
+  expect(app.texts()).toContain("Related #602");
+
+  // Clear relations via picker clear button and Save.
+  await app.press("id:issue-relations-picker-clear");
+  await fake.pumpUntil(app, () => app.count("id:issue-save") === 1);
+  await app.press("id:issue-save");
+  await fake.pumpUntil(app, () => fake.calls.some((c) => c.op === "issue.update"));
+  expect(fake.calls.find((c) => c.op === "issue.update")?.payload).toMatchObject({
+    id: primary.id,
+    relations: [],
+  });
 });

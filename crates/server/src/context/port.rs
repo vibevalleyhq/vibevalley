@@ -8,7 +8,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
-use vibevalley_protocol::{ApiError, ArtifactCard, ChatMessage, ConnectorID, Issue, Millis, Run, Session};
+use vibevalley_protocol::{ApiError, ArtifactCard, ChatMessage, ConnectorID, Issue, Millis, MorningDigest, Run, Session};
 
 use crate::BoxFuture;
 
@@ -94,6 +94,7 @@ pub trait CronBoardPort: Send + Sync {
     ) -> BoxFuture<'a, Result<Issue, ApiError>>;
     fn move_to_todo_async<'a>(&'a self, id: &'a str, words: Option<&'a str>) -> BoxFuture<'a, Result<(), ApiError>>;
     fn tell_async<'a>(&'a self, id: &'a str, words: &'a str) -> BoxFuture<'a, Result<(), ApiError>>;
+    fn morning_digest_async(&self, window_start: Millis, window_end: Millis) -> BoxFuture<'_, Result<MorningDigest, ApiError>>;
 }
 
 /// Executes actionable connector quote-replies against `issue::Board` without a `connector -> issue` edge.

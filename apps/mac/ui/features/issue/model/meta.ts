@@ -1,5 +1,5 @@
 import { t } from "@vibevalley/i18n";
-import type { Issue, IssueStatus } from "@vibevalley/protocol";
+import type { Issue, IssueRelation, IssueStatus } from "@vibevalley/protocol";
 import { IssueStatus as IssueStatusSchema } from "@vibevalley/protocol/schema";
 
 export function issueTagPresets(): readonly string[] {
@@ -125,6 +125,34 @@ function reachesDependency(startId: string, targetId: string, allIssues: readonl
 export function eligibleBlockerOptions(issueId: string, allIssues: readonly Issue[]): { value: string; label: string }[] {
   return allIssues
     .filter((item) => item.id !== issueId && (issueId === "" || !reachesDependency(item.id, issueId, allIssues)))
+    .toSorted((a, b) => a.number - b.number)
+    .map((item) => ({ value: item.id, label: `#${item.number} ${item.title}` }));
+}
+
+/** Resolves `issue.relations` links into known `Issue` records, preserving order without duplicates. */
+export function relationIssuesOf(
+  issue: { readonly relations?: readonly IssueRelation[] | undefined },
+  allIssues: readonly Issue[],
+): { relation: IssueRelation; issue: Issue }[] {
+  const rels = issue.relations ?? [];
+  if (rels.length === 0) return [];
+  const byId = new Map<string, Issue>(allIssues.map((item) => [item.id, item]));
+  const out: { relation: IssueRelation; issue: Issue }[] = [];
+  const seen = new Set<string>();
+  for (const relation of rels) {
+    const key = `${relation.kind}:${relation.issue}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const found = byId.get(relation.issue);
+    if (found) out.push({ relation, issue: found });
+  }
+  return out;
+}
+
+/** Eligible non-blocking relation options for `issueId`: excludes only self (relations never block execution or form cycles). */
+export function eligibleRelationOptions(issueId: string, allIssues: readonly Issue[]): { value: string; label: string }[] {
+  return allIssues
+    .filter((item) => item.id !== issueId)
     .toSorted((a, b) => a.number - b.number)
     .map((item) => ({ value: item.id, label: `#${item.number} ${item.title}` }));
 }

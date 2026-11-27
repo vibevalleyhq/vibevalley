@@ -3,8 +3,9 @@
 use serde::Deserialize;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    ActorKind, ActorRef, CriterionCheck, Deliverable, HumanPauseSource, Issue, IssueAnswer, IssueFilter, IssueMandate, IssueRefineInput, IssueReportMemory,
-    IssueRequest, IssueReviewInput, IssueStatus, IssueStatusUpdateInput, IssueTimeline, IssueUpdateInput, MandateStrength, SubmitBranch,
+    ActorKind, ActorRef, BacklogTriageSuggestInput, Caller, CriterionCheck, Deliverable, HumanPauseSource, Issue, IssueAnswer, IssueDigestGetInput,
+    IssueFilter, IssueMandate, IssueRefineInput, IssueRelation, IssueReportMemory, IssueRequest, IssueReviewInput, IssueStatus, IssueStatusUpdateInput,
+    IssueTimeline, IssueUpdateInput, MandateStrength, Priority, RepoHealthStatus, SubmitBranch, TriagePatch,
 };
 
 use super::registry::{Route, RouteSource, ToolRegistry, Who, given};
@@ -313,6 +314,7 @@ pub struct UpdateArgs {
     owner: Option<ActorRef>,
     #[serde(rename = "blockedBy")]
     blocked_by: Option<Vec<String>>,
+    relations: Option<Vec<IssueRelation>>,
     attachments: Option<Vec<String>>,
 }
 
@@ -332,6 +334,7 @@ pub async fn update(f: &ToolRegistry, who: &Who, a: UpdateArgs) -> Result<String
         attachments: a.attachments,
         owner: a.owner,
         blocked_by: a.blocked_by,
+        relations: a.relations,
         ..Default::default()
     };
     if let Some(pr) = given(&a.priority) {
@@ -419,6 +422,7 @@ pub struct CreateArgs {
     parent: Option<String>,
     #[serde(rename = "blockedBy")]
     blocked_by: Option<Vec<String>>,
+    relations: Option<Vec<IssueRelation>>,
     repo: Option<String>,
     priority: Option<String>,
     agent: Option<String>,
@@ -468,6 +472,7 @@ pub async fn create(f: &ToolRegistry, who: &Who, a: CreateArgs) -> Result<String
         deliver: a.deliver,
         parent: a.parent,
         blocked_by: a.blocked_by,
+        relations: a.relations,
         auto_submit_pr: a.auto_submit_pr,
         owner: a.owner,
         attachments: a.attachments,
@@ -716,6 +721,132 @@ async fn submit(f: &ToolRegistry, who: &Who, summary: Option<&str>) -> Result<St
     };
     let data = f.pull.publish_async(&req, Some(&issue.id)).await.map_err(|e| e.message)?;
     Ok(data.url.unwrap_or(data.branch))
+}
+
+#[derive(Deserialize)]
+pub struct DigestArgs {
+    #[serde(rename = "windowHours")]
+    window_hours: Option<i64>,
+}
+
+pub async fn digest_get(f: &ToolRegistry, _who: &Who, a: DigestArgs) -> Result<String, String> {
+    let digest = f
+        .issue
+        .issue_digest_get_endpoint_async(&IssueDigestGetInput { window_hours: a.window_hours }, f.ctx.clock.as_ref())
+        .await
+        .map_err(|e| e.message)?;
+    let mut parts = Vec::new();
+    let p = &digest.progress;
+    parts.push(format!(
+        "## 一、近期进展与待处理\n- 待回复：{} · 待验收：{} · 卡住：{} · 进行中：{} · 近期完成：{}（运行 {} 次：完成 {} / 失败 {} / 中断 {}）",
+        p.asking.len(),
+        p.reviewing.len(),
+        p.stuck.len(),
+        p.working.len(),
+        p.completed_recent.len(),
+        p.runs_total,
+        p.runs_completed,
+        p.runs_failed,
+        p.runs_interrupted,
+    ));
+    for item in p.asking.iter().chain(p.stuck.iter()).chain(p.reviewing.iter()).take(8) {
+        parts.push(format!(
+            "  - #{} {}{}",
+            item.number,
+            item.title,
+            if item.detail.is_empty() {
+                String::new()
+            } else {
+                format!(" — {}", item.detail)
+            }
+        ));
+    }
+
+    let mut health_lines = vec!["## 二、仓库健康度".to_string()];
+    if digest.repo_health.is_empty() {
+        health_lines.push("- 暂无已挂载仓库".into());
+    } else {
+        for h in &digest.repo_health {
+            let status = match h.status {
+                RepoHealthStatus::OnTrack => "on_track",
+                RepoHealthStatus::AtRisk => "at_risk",
+                RepoHealthStatus::OffTrack => "off_track",
+            };
+            health_lines.push(format!(
+                "- {} [{}]（进行中 {}，待验收 {}，阻塞 {}，卡住 {}，逾期 {}）",
+                h.repo, status, h.in_progress_issues, h.in_review_issues, h.blocked_issues, h.stuck_issues, h.overdue_issues
+            ));
+        }
+    }
+    parts.push(health_lines.join("\n"));
+
+    let mut triage_lines = vec!["## 三、备选池梳理建议（需用户在界面或明确点击确认，绝不自动覆盖）".to_string()];
+    if digest.triage.is_empty() {
+        triage_lines.push("- 暂无待确认的备选池建议".into());
+    } else {
+        for s in &digest.triage {
+            triage_lines.push(format!(
+                "- [{}] #{} {}：{}（原因：{}）",
+                s.id, s.issue_number, s.issue_title, s.summary, s.reason
+            ));
+        }
+    }
+    parts.push(triage_lines.join("\n"));
+    Ok(parts.join("\n\n"))
+}
+
+#[derive(Deserialize)]
+pub struct TriageSuggestArgs {
+    #[serde(rename = "issueId")]
+    issue_id: String,
+    reason: String,
+    summary: Option<String>,
+    priority: Option<String>,
+    repo: Option<String>,
+    agent: Option<String>,
+    tags: Option<Vec<String>>,
+    status: Option<String>,
+    relations: Option<Vec<IssueRelation>>,
+}
+
+pub async fn triage_suggest(f: &ToolRegistry, who: &Who, a: TriageSuggestArgs) -> Result<String, String> {
+    let Who::Orchestrator(_) = who else {
+        return Err("没成：只有主助手能提交备选池梳理建议。".into());
+    };
+    let priority: Option<Priority> = match given(&a.priority) {
+        Some(p) => Some(text::priority_named(p).ok_or(PRIORITIES)?),
+        None => None,
+    };
+    let status = match given(&a.status) {
+        Some(s) => Some(text::status_named(s).ok_or_else(|| format!("Expected one of: {}", text::STATUS_WORDS))?),
+        None => None,
+    };
+    let created = f
+        .issue
+        .issue_triage_suggest_endpoint_async(
+            Caller::Orchestrator,
+            BacklogTriageSuggestInput {
+                issue_id: a.issue_id,
+                reason: a.reason,
+                summary: a.summary,
+                patch: TriagePatch {
+                    priority,
+                    repo: a.repo,
+                    agent: a.agent,
+                    tags: a.tags,
+                    status,
+                    relations: a.relations,
+                    due_at: None,
+                },
+            },
+            f.ctx.clock.as_ref(),
+        )
+        .await
+        .map_err(|e| e.message)?;
+    Ok(format!(
+        "已记下备选池建议（尚未改动工单，等待用户点击确认）：[{}] #{} {} -> {}",
+        created.id, created.issue_number, created.issue_title, created.summary
+    ))
 }
 
 /// The PR title (first line, a leading `#` dropped) and body a helper wrote.

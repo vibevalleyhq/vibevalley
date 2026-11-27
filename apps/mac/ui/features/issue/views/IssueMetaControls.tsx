@@ -2,7 +2,8 @@ import { computed, signal, Text, View } from "nsh";
 import { Input } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
-import type { ActorRef, Issue, Priority } from "@vibevalley/protocol";
+import { type ActorRef, type Issue, type IssueRelation, type IssueRelationKind, IssueRelationKindValues, type Priority } from "@vibevalley/protocol";
+import { issueId } from "@vibevalley/protocol/schema";
 
 import { Combobox } from "../../../design/Combobox";
 import { EpochDatePicker } from "../../../design/DatePicker";
@@ -17,7 +18,7 @@ import { Bubble } from "../../../design/Tip";
 import { mix } from "../../../design/tone";
 import { ready, useAgents, useSettings } from "../../../infra/query";
 import { decodeActorRef, encodeActorRef, type GroupBy } from "../model/display";
-import { childIssuesOf, eligibleBlockerOptions, eligibleParentOptions, issueTagPresets, normalizeTagList } from "../model/meta";
+import { childIssuesOf, eligibleBlockerOptions, eligibleParentOptions, eligibleRelationOptions, issueTagPresets, normalizeTagList } from "../model/meta";
 import { AgentFaceOf, NoFaceMark, PriorityMark, StatusMark } from "./Marks";
 import { Pick } from "./Sheet";
 
@@ -301,6 +302,125 @@ export function BlockedByPicker(props: {
       <If when={selectedIssues().length > 0} else={<Text class="px-2 py-1 text-xs text-faint">{t("web.issue.deps.none")}</Text>}>
         <View class="px-1 py-0.5">
           <BlockedByChips blockers={selectedIssues()} max={12} onOpen={(id) => props.onOpen?.(id)} testid={`${testid()}-readonly`} />
+        </View>
+      </If>
+    </If>
+  );
+}
+
+/** Clickable non-blocking relation chips (`Related #N` / `Duplicate #N`). */
+export function RelationChips(props: {
+  relations: readonly { readonly relation: IssueRelation; readonly issue: Issue }[];
+  max?: number | undefined;
+  compact?: boolean | undefined;
+  onOpen: (id: string) => void;
+  testid?: string | undefined;
+}) {
+  const max = () => props.max ?? 6;
+  const shown = computed(() => props.relations.slice(0, max()));
+  const extra = computed(() => Math.max(0, props.relations.length - max()));
+  return (
+    <If when={props.relations.length > 0}>
+      <View testID={props.testid ?? "issue-relation-chips"} class="flex-row flex-wrap items-center gap-1">
+        <Each of={shown()} key={(r) => `${r.relation.kind}:${r.issue.id}`}>
+          {(entry) => {
+            const chipText = () =>
+              entry().relation.kind === "duplicate"
+                ? t("web.issue.relations.duplicateChip", { n: entry().issue.number })
+                : t("web.issue.relations.relatedChip", { n: entry().issue.number });
+            return (
+              <View
+                role="button"
+                testID={props.testid ? `${props.testid}-${entry().issue.id}` : `issue-relation-chip-${entry().issue.id}`}
+                accessibilityLabel={`#${entry().issue.number} ${entry().issue.title}`}
+                tooltip={<Bubble text={`#${entry().issue.number} ${entry().issue.title}`} />}
+                onPress={() => props.onOpen(entry().issue.id)}
+                class="shrink-0 flex-row items-center gap-1 rounded-sm border border-line bg-side px-1.5 py-px hover:border-line-strong hover:bg-hover"
+              >
+                <Icon name="branch" size={props.compact === true ? 9 : 10} tone="muted" />
+                <Text class="truncate font-mono text-2xs leading-3.5 text-water">{chipText()}</Text>
+              </View>
+            );
+          }}
+        </Each>
+        <If when={extra() > 0}>
+          <View class="rounded-sm border border-line bg-side px-1 py-px">
+            <Text class="text-2xs leading-3.5 text-faint tabular-nums">{`+${extra()}`}</Text>
+          </View>
+        </If>
+      </View>
+    </If>
+  );
+}
+
+/** Bidirectional non-blocking relations (`related` / `duplicate`) editor for IssueDetail & TodoDetail. */
+export function RelationsPicker(props: {
+  issueId: string;
+  relations: readonly IssueRelation[];
+  allIssues: readonly Issue[];
+  disabled?: boolean | undefined;
+  state?: "pending" | "failed" | undefined;
+  testid?: string | undefined;
+  onOpen?: ((id: string) => void) | undefined;
+  onChange: (relations: IssueRelation[]) => void;
+}) {
+  const testid = () => props.testid ?? "issue-relations-picker";
+  const activeKind = signal<IssueRelationKind>("related");
+  const kindOptions = computed(() => IssueRelationKindValues.map((k) => ({ value: k, label: t(`web.issue.relations.${k}`) })));
+  const options = computed(() => eligibleRelationOptions(props.issueId, props.allIssues));
+  const selectedForKind = computed(() => props.relations.filter((r) => r.kind === activeKind()).map((r) => r.issue));
+  const resolvedAll = computed(() => {
+    const byId = new Map<string, Issue>(props.allIssues.map((item) => [item.id, item]));
+    return props.relations.flatMap((relation) => {
+      const found = byId.get(relation.issue);
+      return found ? [{ relation, issue: found }] : [];
+    });
+  });
+  const setForKind = (ids: string[]) => {
+    const kind = activeKind();
+    const otherKinds = props.relations.filter((r) => r.kind !== kind);
+    const nextForKind: IssueRelation[] = ids.map((id) => ({ kind, issue: issueId(id) }));
+    props.onChange([...otherKinds, ...nextForKind]);
+  };
+  return (
+    <If
+      when={props.disabled === true}
+      else={
+        <View class="gap-1.5">
+          <Select
+            label={t("web.issue.relations.title")}
+            testid={`${testid()}-kind`}
+            size="control"
+            quiet
+            value={activeKind()}
+            options={kindOptions()}
+            onChange={(next) => activeKind.set(next)}
+          />
+          <Combobox
+            multiple
+            clearable
+            quiet
+            size="control"
+            label={t("web.issue.relations.title")}
+            testid={testid()}
+            value={selectedForKind()}
+            placeholder={t("web.issue.relations.pick")}
+            emptyText={t("web.issue.list.emptyFiltered")}
+            clearLabel={t("web.issue.relations.clear")}
+            state={props.state}
+            options={options()}
+            onChange={setForKind}
+            onClear={() => props.onChange([])}
+          />
+          <If when={resolvedAll().length > 0}>
+            <RelationChips relations={resolvedAll()} max={12} onOpen={(id) => props.onOpen?.(id)} testid={`${testid()}-chips`} />
+          </If>
+        </View>
+      }
+    >
+      <If when={resolvedAll().length > 0} else={<Text class="px-2 py-1 text-xs text-faint">{t("web.issue.relations.none")}</Text>}>
+        <View class="px-1 py-0.5">
+          <RelationChips relations={resolvedAll()} max={12} onOpen={(id) => props.onOpen?.(id)} testid={`${testid()}-readonly`} />
         </View>
       </If>
     </If>

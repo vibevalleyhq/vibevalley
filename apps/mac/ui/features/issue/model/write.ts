@@ -61,7 +61,7 @@ export function updateIssueAttachments(id: string, attachments: readonly string[
 // An issue's labels set by the user on its page (title, priority, what it delivers, parent, tags, schedule): an intent
 // (state/intent.ts) on issue.update, settled by the frame whose seq is the reply's. The server takes them while the issue is open.
 
-export type IssueLabels = Pick<IssueUpdate, "title" | "priority" | "deliver" | "parent" | "blockedBy" | "tags" | "startAt" | "dueAt" | "owner">;
+export type IssueLabels = Pick<IssueUpdate, "title" | "priority" | "deliver" | "parent" | "blockedBy" | "relations" | "tags" | "startAt" | "dueAt" | "owner">;
 export type IssueLabel = keyof IssueLabels;
 
 export type IssueSet = { readonly id: string } & IssueLabels;
@@ -77,7 +77,7 @@ export const issueSet = defineIntent<IssueSet, AppliedIssue, "board">({
 
 type LabelSets = readonly Intent<IssueSet, AppliedIssue>[];
 
-const allLabelKeys = ["title", "priority", "deliver", "parent", "blockedBy", "tags", "startAt", "dueAt", "owner"] as const;
+const allLabelKeys = ["title", "priority", "deliver", "parent", "blockedBy", "relations", "tags", "startAt", "dueAt", "owner"] as const;
 const labelsOf = (p: IssueSet) => allLabelKeys.filter((k) => p[k] !== undefined);
 const newestSet = (sets: LabelSets, id: string, label: IssueLabel) => sets.findLast((p) => p.input.id === id && p.input[label] !== undefined);
 
@@ -111,6 +111,10 @@ const labeled = (issue: Issue, sets: LabelSets) => {
   const nextBlockedBy = kept("blockedBy")?.blockedBy;
   if (nextBlockedBy !== undefined) {
     next.blockedBy = nextBlockedBy.map(issueId);
+  }
+  const nextRelations = kept("relations")?.relations;
+  if (nextRelations !== undefined) {
+    next.relations = nextRelations;
   }
   const nextStart = kept("startAt")?.startAt;
   if (nextStart !== undefined) {

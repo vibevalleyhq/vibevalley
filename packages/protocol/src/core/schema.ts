@@ -9,6 +9,7 @@ import { CommitCount, FarmFrame } from "../game/schema";
 import { InboxItem } from "../inbox/schema";
 import { BoardSummary, Issue, IssueStatus } from "../issue/schema";
 import { MediaJob, MediaSummary } from "../media/schema";
+import { RepoHealth } from "../repo/schema";
 import { RuntimeInfo } from "../runtime/schema";
 import { Machine, SessionEvent, SessionView } from "../session/schema";
 import { CallState } from "../voice/schema";
@@ -23,6 +24,7 @@ export const BoardSlice = z.object({
   issues: z.array(Issue),
   boardSummary: z.exactOptional(BoardSummary),
   commits: z.exactOptional(CommitCount),
+  repoHealth: z.exactOptional(z.array(RepoHealth)),
 }) satisfies Codec<T.BoardSlice>;
 
 export const SessionsSlice = z.object({

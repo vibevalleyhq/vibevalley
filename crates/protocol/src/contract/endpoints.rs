@@ -646,6 +646,51 @@ pub const ENDPOINTS: &[Endpoint] = &[
         result: Some("IssueRetroReport"),
     },
     Endpoint {
+        op: "issue.digest.get",
+        module: "issue",
+        about: &[],
+        can: &[Caller::User, Caller::Remote, Caller::Orchestrator],
+        dry_run: None,
+        input: Some("IssueDigestGetInput"),
+        result: Some("MorningDigest"),
+    },
+    Endpoint {
+        op: "issue.triage.list",
+        module: "issue",
+        about: &[],
+        can: &[Caller::User, Caller::Remote, Caller::Orchestrator],
+        dry_run: None,
+        input: None,
+        result: Some("Vec<BacklogTriageSuggestion>"),
+    },
+    Endpoint {
+        op: "issue.triage.suggest",
+        module: "issue",
+        about: &["issueId"],
+        can: &[Caller::User, Caller::Remote, Caller::Orchestrator],
+        dry_run: None,
+        input: Some("BacklogTriageSuggestInput"),
+        result: Some("BacklogTriageSuggestion"),
+    },
+    Endpoint {
+        op: "issue.triage.confirm",
+        module: "issue",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("BacklogTriageConfirmInput"),
+        result: Some("AppliedIssue"),
+    },
+    Endpoint {
+        op: "issue.triage.dismiss",
+        module: "issue",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("BacklogTriageDismissInput"),
+        result: None,
+    },
+    Endpoint {
         op: "cron.create",
         module: "cron",
         about: &[],
@@ -2255,6 +2300,41 @@ pub mod ops {
         type Input = t::IssueRetroGetInput;
         type Result = t::IssueRetroReport;
     }
+    /// Three-part morning digest combining overnight progress, repo health, and confirmable backlog triage.
+    pub struct IssueDigestGet;
+    impl Op for IssueDigestGet {
+        const NAME: &'static str = "issue.digest.get";
+        type Input = t::IssueDigestGetInput;
+        type Result = t::MorningDigest;
+    }
+    /// Pending backlog triage suggestions awaiting explicit user confirmation.
+    pub struct IssueTriageList;
+    impl Op for IssueTriageList {
+        const NAME: &'static str = "issue.triage.list";
+        type Input = ();
+        type Result = Vec<t::BacklogTriageSuggestion>;
+    }
+    /// Proposes a non-destructive triage suggestion for a backlog issue without overwriting its fields.
+    pub struct IssueTriageSuggest;
+    impl Op for IssueTriageSuggest {
+        const NAME: &'static str = "issue.triage.suggest";
+        type Input = t::BacklogTriageSuggestInput;
+        type Result = t::BacklogTriageSuggestion;
+    }
+    /// Applies a pending backlog triage suggestion after explicit user click/confirmation.
+    pub struct IssueTriageConfirm;
+    impl Op for IssueTriageConfirm {
+        const NAME: &'static str = "issue.triage.confirm";
+        type Input = t::BacklogTriageConfirmInput;
+        type Result = t::AppliedIssue;
+    }
+    /// Dismisses a pending backlog triage suggestion without modifying the issue.
+    pub struct IssueTriageDismiss;
+    impl Op for IssueTriageDismiss {
+        const NAME: &'static str = "issue.triage.dismiss";
+        type Input = t::BacklogTriageDismissInput;
+        type Result = ();
+    }
     pub struct CronCreate;
     impl Op for CronCreate {
         const NAME: &'static str = "cron.create";
@@ -3298,6 +3378,11 @@ endpoint_ids! {
     IssueStatusPreviewUpdate => "issue.status.previewUpdate",
     IssueRefine => "issue.refine",
     IssueRetroGet => "issue.retro.get",
+    IssueDigestGet => "issue.digest.get",
+    IssueTriageList => "issue.triage.list",
+    IssueTriageSuggest => "issue.triage.suggest",
+    IssueTriageConfirm => "issue.triage.confirm",
+    IssueTriageDismiss => "issue.triage.dismiss",
     // cron
     CronCreate => "cron.create",
     CronList => "cron.list",

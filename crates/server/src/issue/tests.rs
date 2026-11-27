@@ -803,3 +803,137 @@ async fn issue_blocked_by_update_validates_cycles_dedup_clear_and_parent_composi
     board.close_async().await;
     let _ = ctx.shutdown(Duration::from_secs(1)).await;
 }
+
+#[tokio::test]
+async fn issue_relations_sync_bidirectionally_and_never_block_or_cycle_and_triage_requires_confirm() {
+    use vibevalley_core::ManualClock;
+    use vibevalley_protocol::{
+        BacklogTriageConfirmInput, BacklogTriageSuggestInput, Caller, IssueDigestGetInput, IssueRelation, IssueRelationKind, Priority, TriagePatch,
+    };
+
+    let dir = tempfile::tempdir().unwrap();
+    let clock = Arc::new(ManualClock::new(1_700_000_000_000));
+    let service = Service::open(dir.path()).await.unwrap();
+    let http: Arc<dyn crate::context::Fetch> = Arc::new(Http);
+    let ctx = Arc::new(Context::new(
+        service.clone(),
+        TaskGroup::new(),
+        Arc::new(LiveState::new()),
+        Arc::new(Outbox::new(service)),
+        Arc::new(StateFeed::new()),
+        clock.clone(),
+        http.clone(),
+        http,
+    ));
+    let mut reg = Registry::new();
+    reg.register(Arc::new(vibevalley_runtime::oar::scripted::ScriptedRuntime::demo()));
+    let board = Board::open_standalone_async(ctx.clone(), Arc::new(reg), BoardConfig::under(dir.path()))
+        .await
+        .unwrap();
+
+    let a = board
+        .create_async(NewIssue {
+            title: "Urgent auth token crash".into(),
+            agent: "scripted".into(),
+            deliver: vibevalley_protocol::Deliverable::Answer,
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    let b = board
+        .create_async(NewIssue {
+            title: "Auth token refresh crash".into(),
+            agent: "scripted".into(),
+            deliver: vibevalley_protocol::Deliverable::Answer,
+            relations: vec![IssueRelation {
+                kind: IssueRelationKind::Duplicate,
+                issue: a.id.clone(),
+            }],
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+    // Bidirectional creation syncs back onto A.
+    let a_fresh = board.issue_async(&a.id).await.unwrap().unwrap();
+    assert_eq!(
+        a_fresh.relations,
+        vec![IssueRelation {
+            kind: IssueRelationKind::Duplicate,
+            issue: b.id.clone(),
+        }]
+    );
+
+    // Non-blocking: B can leave Backlog and start work even while duplicate/related to open A.
+    board.move_to_async(&b.id, vibevalley_protocol::IssueStatus::Todo, None).await.unwrap();
+    assert_ne!(
+        board.issue_async(&b.id).await.unwrap().unwrap().status,
+        vibevalley_protocol::IssueStatus::Backlog
+    );
+
+    // Updating A's relations to Related updates B bidirectionally.
+    board
+        .update_from_input_async(IssueUpdateInput {
+            id: a.id.clone(),
+            relations: Some(vec![IssueRelation {
+                kind: IssueRelationKind::Related,
+                issue: format!("#{}", b.number),
+            }]),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    let b_fresh = board.issue_async(&b.id).await.unwrap().unwrap();
+    assert_eq!(
+        b_fresh.relations,
+        vec![IssueRelation {
+            kind: IssueRelationKind::Related,
+            issue: a.id.clone(),
+        }]
+    );
+
+    // Clearing relations on A removes reverse relation from B.
+    board
+        .update_from_input_async(IssueUpdateInput {
+            id: a.id.clone(),
+            relations: Some(vec![]),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert!(board.issue_async(&b.id).await.unwrap().unwrap().relations.is_empty());
+
+    // Triage suggestion never mutates A until explicit confirm.
+    let suggestion = board
+        .issue_triage_suggest_endpoint_async(
+            Caller::Orchestrator,
+            BacklogTriageSuggestInput {
+                issue_id: a.id.clone(),
+                reason: "High urgency crash".into(),
+                summary: Some("Set priority Urgent".into()),
+                patch: TriagePatch {
+                    priority: Some(Priority::Urgent),
+                    ..Default::default()
+                },
+            },
+            clock.as_ref(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(board.issue_async(&a.id).await.unwrap().unwrap().priority, Priority::Medium);
+
+    let digest = board
+        .issue_digest_get_endpoint_async(&IssueDigestGetInput { window_hours: Some(24) }, clock.as_ref())
+        .await
+        .unwrap();
+    assert!(digest.triage.iter().any(|s| s.id == suggestion.id));
+
+    let applied = board
+        .issue_triage_confirm_endpoint_async(&BacklogTriageConfirmInput { id: suggestion.id.clone() }, clock.as_ref())
+        .await
+        .unwrap();
+    assert_eq!(applied.priority, Priority::Urgent);
+
+    board.close_async().await;
+    let _ = ctx.shutdown(Duration::from_secs(1)).await;
+}

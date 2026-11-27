@@ -114,6 +114,14 @@ impl crate::context::port::CronBoardPort for Board {
             Board::tell_async(self, id, words).await.map_err(board_err)
         })
     }
+
+    fn morning_digest_async(
+        &self,
+        window_start: vibevalley_protocol::Millis,
+        window_end: vibevalley_protocol::Millis,
+    ) -> crate::BoxFuture<'_, std::result::Result<vibevalley_protocol::MorningDigest, vibevalley_protocol::ApiError>> {
+        Box::pin(async move { Board::morning_digest_async(self, window_start, window_end).await })
+    }
 }
 
 impl crate::context::port::ConnectorIssuePort for Board {

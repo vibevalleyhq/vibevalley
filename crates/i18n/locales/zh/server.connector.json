@@ -110,6 +110,10 @@
     "itemFailed": "· [失败] #{number} {title}：{detail}",
     "itemWorking": "· [进行中] #{number} {title}",
     "itemDone": "· #{number} {title}",
+    "healthHeader": "仓库健康度：",
+    "itemHealth": "· {repo}【{status}】（待办/开着 {open} · 阻塞 {blocked} · 卡住 {stuck}）",
+    "triageHeader": "备选池梳理建议（需在工作台点确认才生效）：",
+    "itemTriage": "· #{number}：{summary}",
     "more": "……还有 {n} 项",
     "quiet": "近期暂无新增进度，当前没有待处理工单。"
   }

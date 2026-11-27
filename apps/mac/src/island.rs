@@ -243,6 +243,7 @@ mod tests {
             issues: vec![working, asking, stuck, done],
             board_summary: None,
             commits: None,
+            repo_health: Vec::new(),
         };
         let out = glance(&board);
         assert_eq!(out.working, 1);

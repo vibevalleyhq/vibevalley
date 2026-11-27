@@ -88,7 +88,12 @@ impl Board {
                 issue.attachments = self.resolve_attachments_async(ids).await?;
             }
             let touch_dag = upd.parent.is_some() || upd.blocked_by.is_some();
-            let all_issues = if touch_dag { Some(self.issues_async().await?) } else { None };
+            let touch_relations = upd.relations.is_some();
+            let all_issues = if touch_dag || touch_relations {
+                Some(self.issues_async().await?)
+            } else {
+                None
+            };
             if let Some(raw_parent) = upd.parent.as_deref().map(str::trim) {
                 if raw_parent.is_empty() {
                     issue.parent = None;
@@ -116,7 +121,16 @@ impl Board {
                 let all_issues = all_issues.as_deref().expect("loaded above");
                 issue.blocked_by = super::board::resolve_blocked_by(all_issues, Some(&was.id), raw_blockers)?;
             }
-            if let Some(all_issues) = all_issues {
+            let peer_relation_updates = if let Some(raw_relations) = &upd.relations {
+                let all_issues = all_issues.as_deref().expect("loaded above");
+                let resolved = super::board::resolve_relations(all_issues, Some(&was.id), raw_relations)?;
+                let updates = super::board::sync_bidirectional_relations(&was.id, &was.relations, &resolved, all_issues);
+                issue.relations = resolved;
+                updates
+            } else {
+                Vec::new()
+            };
+            if touch_dag && let Some(all_issues) = &all_issues {
                 let graph: Vec<(String, Option<String>, Vec<String>)> = all_issues
                     .iter()
                     .map(|t| {
@@ -145,6 +159,7 @@ impl Board {
                 issue.owner = super::board::normalize_owner_with_driver(self.runtime.driver().as_ref(), Some(owner));
             }
             let mut edited = vec![issue];
+            edited.extend(peer_relation_updates);
             if let Some(before) = &upd.before {
                 for placed in self.placed_async(&was.id, before).await? {
                     if let Some(earlier) = edited.iter_mut().find(|m| m.id == placed.id) {
@@ -222,6 +237,22 @@ impl Board {
             ));
         }
         let _ = self.take_words_async(&issue.id).await;
+        let peers_to_clean: Vec<Issue> = self
+            .issues_async()
+            .await?
+            .into_iter()
+            .filter_map(|mut peer| {
+                if peer.id == issue.id {
+                    return None;
+                }
+                let before = peer.relations.len();
+                peer.relations.retain(|r| r.issue != issue.id);
+                (peer.relations.len() != before).then_some(peer)
+            })
+            .collect();
+        if !peers_to_clean.is_empty() {
+            self.state.put_issues_async(&peers_to_clean).await?;
+        }
         self.state.remove_issue_async(&issue.id).await
     }
 

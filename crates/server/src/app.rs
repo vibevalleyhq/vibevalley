@@ -368,7 +368,7 @@ async fn create_app_inner(mut config: Config, storage_config: StorageConfig, ove
     let gw = GatewayMeta::new(ports, observer, fault_gate, config.host_debug, active_subscriptions);
     let router = Router::new(core.clone(), remote.clone(), gw);
 
-    finish_boot_and_start_feeds(&core.ctx, &core.board, &core.channel, &core.cron, &core.artifact, &core.game);
+    finish_boot_and_start_feeds(&core.ctx, &core.board, &core.channel, &core.cron, &core.artifact, &core.game, &core.repo);
     core.ctx.feed.flush().await;
     core.board.refresh_queue_async().await.map_err(|e| failed("the queue")(&e))?;
     remote.restore_if_enabled_async(router.clone()).await;

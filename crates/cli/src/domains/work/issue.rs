@@ -6,9 +6,10 @@ use std::time::Duration;
 use clap::{ArgGroup, Args, Subcommand, ValueEnum};
 use tokio_util::sync::CancellationToken;
 use vibevalley_protocol::{
-    ActWords, ActorRef, AppliedIssue, BoardSlice, Changes, Issue, IssueAction, IssueCommentCreateInput, IssueDeleteInput, IssueDiffGetInput, IssueFilter,
-    IssueGetInput, IssueRequest, IssueReviewInput, IssueStageKind, IssueStatus, IssueStatusUpdateInput, IssueTimelineGetInput, IssueUpdateInput, IssueWatch,
-    Priority, ReviewRevision, ops,
+    ActWords, ActorRef, AppliedIssue, BacklogTriageConfirmInput, BacklogTriageDismissInput, BoardSlice, Changes, Issue, IssueAction, IssueCommentCreateInput,
+    IssueDeleteInput, IssueDiffGetInput, IssueDigestGetInput, IssueFilter, IssueGetInput, IssueRelation, IssueRelationKind, IssueRequest, IssueReviewInput,
+    IssueStageKind, IssueStatus, IssueStatusUpdateInput, IssueTimelineGetInput, IssueUpdateInput, IssueWatch, MorningDigest, Priority, RepoHealthStatus,
+    ReviewRevision, ops,
 };
 
 use crate::client::{Client, Done, Failure, decode_failure, exit};
@@ -137,6 +138,12 @@ pub enum IssueActionCmd {
         /// Blocker issue number or id (repeatable)
         #[arg(long)]
         blocked_by: Vec<String>,
+        /// Related issue number or id (repeatable, non-blocking)
+        #[arg(long)]
+        related: Vec<String>,
+        /// Duplicate issue number or id (repeatable, non-blocking)
+        #[arg(long)]
+        duplicate: Vec<String>,
         /// Uploaded attachment id (repeatable)
         #[arg(long)]
         attach: Vec<String>,
@@ -176,6 +183,15 @@ pub enum IssueActionCmd {
         /// Clear all blockers
         #[arg(long, conflicts_with = "blocked_by")]
         clear_blocked_by: bool,
+        /// Replace related issue links (repeatable, non-blocking)
+        #[arg(long)]
+        related: Vec<String>,
+        /// Replace duplicate issue links (repeatable, non-blocking)
+        #[arg(long)]
+        duplicate: Vec<String>,
+        /// Clear all non-blocking relations
+        #[arg(long, conflicts_with_all = ["related", "duplicate"])]
+        clear_relations: bool,
         /// Replace attachments with uploaded attachment ids (repeatable)
         #[arg(long)]
         attach: Vec<String>,
@@ -249,6 +265,27 @@ pub enum IssueActionCmd {
         /// Issue number or id
         issue: String,
     },
+    /// Show the three-part morning digest (progress, repo health, confirmable triage)
+    Digest {
+        /// Window in hours (default 24, max 168)
+        #[arg(long)]
+        hours: Option<i64>,
+    },
+    /// Inspect or confirm/dismiss pending backlog triage suggestions
+    Triage {
+        #[command(subcommand)]
+        action: TriageCmd,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum TriageCmd {
+    /// List pending backlog triage suggestions
+    List,
+    /// Explicitly confirm and apply a pending triage suggestion
+    Confirm { id: String },
+    /// Dismiss a pending triage suggestion without modifying the issue
+    Dismiss { id: String },
 }
 
 fn summary_line(number: i64, status: IssueStatus, title: &str, agent: Option<&str>, repo: Option<&str>) -> String {
@@ -340,6 +377,20 @@ fn issue_text(issue: &Issue) -> String {
     }
     if !issue.blocked_by.is_empty() {
         lines.push(format!("blocked_by: {}", issue.blocked_by.join(", ")));
+    }
+    if !issue.relations.is_empty() {
+        let formatted: Vec<String> = issue
+            .relations
+            .iter()
+            .map(|r| {
+                let k = match r.kind {
+                    IssueRelationKind::Duplicate => "duplicate",
+                    IssueRelationKind::Related => "related",
+                };
+                format!("{k}:{}", r.issue)
+            })
+            .collect();
+        lines.push(format!("relations: {}", formatted.join(", ")));
     }
     if !issue.description.trim().is_empty() {
         lines.extend([String::new(), issue.description.trim().to_string()]);
@@ -450,11 +501,26 @@ pub async fn run(client: &Client, cmd: IssueCmd) -> Done {
             priority,
             criterion,
             blocked_by,
+            related,
+            duplicate,
             attach,
             key,
         } => {
             let owner = owner.as_deref().map(parse_actor_ref).transpose()?;
             let blocked_by = (!blocked_by.is_empty()).then(|| blocked_by.into_iter().map(|b| issue_ref(&b)).collect());
+            let mut rels = Vec::new();
+            for r in related {
+                rels.push(IssueRelation {
+                    kind: IssueRelationKind::Related,
+                    issue: issue_ref(&r),
+                });
+            }
+            for d in duplicate {
+                rels.push(IssueRelation {
+                    kind: IssueRelationKind::Duplicate,
+                    issue: issue_ref(&d),
+                });
+            }
             let request = IssueRequest {
                 title: title.join(" "),
                 description: load_description(description)?,
@@ -464,6 +530,7 @@ pub async fn run(client: &Client, cmd: IssueCmd) -> Done {
                 priority: priority.map(Into::into),
                 criteria: (!criterion.is_empty()).then_some(criterion),
                 blocked_by,
+                relations: (!rels.is_empty()).then_some(rels),
                 attachments: (!attach.is_empty()).then_some(attach),
                 request_key: key,
                 ..Default::default()
@@ -481,6 +548,9 @@ pub async fn run(client: &Client, cmd: IssueCmd) -> Done {
             criterion,
             blocked_by,
             clear_blocked_by,
+            related,
+            duplicate,
+            clear_relations,
             attach,
         } => {
             let owner = owner.as_deref().map(parse_actor_ref).transpose()?;
@@ -488,6 +558,26 @@ pub async fn run(client: &Client, cmd: IssueCmd) -> Done {
                 Some(Vec::new())
             } else if !blocked_by.is_empty() {
                 Some(blocked_by.into_iter().map(|b| issue_ref(&b)).collect())
+            } else {
+                None
+            };
+            let relations = if clear_relations {
+                Some(Vec::new())
+            } else if !related.is_empty() || !duplicate.is_empty() {
+                let mut rels = Vec::new();
+                for r in related {
+                    rels.push(IssueRelation {
+                        kind: IssueRelationKind::Related,
+                        issue: issue_ref(&r),
+                    });
+                }
+                for d in duplicate {
+                    rels.push(IssueRelation {
+                        kind: IssueRelationKind::Duplicate,
+                        issue: issue_ref(&d),
+                    });
+                }
+                Some(rels)
             } else {
                 None
             };
@@ -501,6 +591,7 @@ pub async fn run(client: &Client, cmd: IssueCmd) -> Done {
                 priority: priority.map(Into::into),
                 criteria: (!criterion.is_empty()).then_some(criterion),
                 blocked_by,
+                relations,
                 attachments: (!attach.is_empty()).then_some(attach),
                 ..Default::default()
             };
@@ -588,7 +679,72 @@ pub async fn run(client: &Client, cmd: IssueCmd) -> Done {
                 .mutate::<ops::IssueDelete>("issue delete", &IssueDeleteInput { id: id.clone() }, |_| format!("deleted #{id}"))
                 .await
         }
+        IssueActionCmd::Digest { hours } => {
+            let digest = client.ask::<ops::IssueDigestGet>(&IssueDigestGetInput { window_hours: hours }).await?;
+            client.output.show(&digest, digest_text);
+            Ok(())
+        }
+        IssueActionCmd::Triage { action } => match action {
+            TriageCmd::List => {
+                let items = client.ask::<ops::IssueTriageList>(&()).await?;
+                client.output.show(&items, |list| {
+                    if list.is_empty() {
+                        "no triage suggestions".into()
+                    } else {
+                        list.iter()
+                            .map(|s| line(&[&s.id, &format!("#{}", s.issue_number), &s.summary, &s.reason]))
+                            .collect::<Vec<_>>()
+                            .join("\n")
+                    }
+                });
+                Ok(())
+            }
+            TriageCmd::Confirm { id } => {
+                client
+                    .mutate::<ops::IssueTriageConfirm>("issue triage confirm", &BacklogTriageConfirmInput { id }, applied_line)
+                    .await
+            }
+            TriageCmd::Dismiss { id } => {
+                client
+                    .mutate::<ops::IssueTriageDismiss>("issue triage dismiss", &BacklogTriageDismissInput { id: id.clone() }, |_| {
+                        format!("dismissed {id}")
+                    })
+                    .await
+            }
+        },
     }
+}
+
+fn digest_text(digest: &MorningDigest) -> String {
+    let p = &digest.progress;
+    let mut lines = vec![
+        format!(
+            "progress: asking={} reviewing={} stuck={} working={} done={} runs={}",
+            p.asking.len(),
+            p.reviewing.len(),
+            p.stuck.len(),
+            p.working.len(),
+            p.completed_recent.len(),
+            p.runs_total
+        ),
+        "repo_health:".into(),
+    ];
+    for h in &digest.repo_health {
+        let st = match h.status {
+            RepoHealthStatus::OnTrack => "on_track",
+            RepoHealthStatus::AtRisk => "at_risk",
+            RepoHealthStatus::OffTrack => "off_track",
+        };
+        lines.push(format!(
+            "  {}  {}  open={} blocked={} stuck={}",
+            h.repo, st, h.open_issues, h.blocked_issues, h.stuck_issues
+        ));
+    }
+    lines.push(format!("triage ({}):", digest.triage.len()));
+    for s in &digest.triage {
+        lines.push(format!("  {}  #{}  {}  ({})", s.id, s.issue_number, s.summary, s.reason));
+    }
+    lines.join("\n")
 }
 
 async fn wait_for_issue(client: &Client, issue: &Issue, timeout: Option<i64>) -> Done {

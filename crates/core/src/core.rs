@@ -445,6 +445,7 @@ pub fn board_slice(state: &SpaceState, seq: i64) -> BoardSlice {
         issues: state.issues.clone(),
         board_summary: Some(board_summary(&state.issues, &state.sessions, channels)),
         commits: state.commits.clone(),
+        repo_health: Vec::new(),
     }
 }
 

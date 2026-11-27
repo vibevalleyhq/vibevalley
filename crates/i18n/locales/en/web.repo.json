@@ -105,5 +105,16 @@
   "unmount": "Unmount",
   "unmounting": "Unmounting…",
   "unmounted": "Unmounted {name} (files on disk were kept)",
-  "unmountTip": "Stop managing this external folder in VibeValley without deleting files on disk"
+  "unmountTip": "Stop managing this external folder in VibeValley without deleting files on disk",
+  "health": {
+    "title": "Health",
+    "open": "Open {n}",
+    "inProgress": "Working {n}",
+    "inReview": "Review {n}",
+    "blocked": "Blocked {n}",
+    "stuck": "Stuck {n}",
+    "asking": "Asking {n}",
+    "failedChecks": "Failed checks {n}",
+    "overdue": "Overdue {n}"
+  }
 }

@@ -8,9 +8,9 @@ use parking_lot::Mutex;
 use tokio::sync::Mutex as AsyncMutex;
 use vibevalley_core::SliceMask;
 use vibevalley_i18n::t;
-use vibevalley_protocol::{ActorKind, ApiError, BizCode, Cron, CronRequest, CronWhen, IssueStatus, NoticeLevel, Preview, Run};
+use vibevalley_protocol::{ActorKind, ApiError, BizCode, Cron, CronRequest, CronWhen, IssueStatus, NoticeLevel, Preview};
 
-use super::digest::{DigestSpec, build_progress_digest, format_digest_directive, format_progress_digest, parse_digest_directive};
+use super::digest::{DigestSpec, format_digest_directive, format_progress_digest, parse_digest_directive, progress_digest_from_morning};
 use crate::channel::{Chat, Noticing};
 use crate::context::Context;
 use crate::context::error::{LookIn, missing};
@@ -381,28 +381,10 @@ impl Scheduler {
         })
     }
 
-    async fn collect_recent_runs_async(&self, issues: &[vibevalley_protocol::Issue], window_start: i64) -> Vec<Run> {
-        let mut runs = Vec::new();
-        for issue in issues {
-            if !issue.was_sent() {
-                continue;
-            }
-            if issue.status.is_closed() && issue.closed_at.is_none_or(|c| c < window_start) {
-                continue;
-            }
-            if let Ok(found) = self.board.runs_async(&issue.id).await {
-                runs.extend(found);
-            }
-        }
-        runs
-    }
-
     async fn deliver_digest_async(&self, cron: &Cron, spec: &DigestSpec, prev_last_run: Option<i64>, at: i64) -> Result<(), ApiError> {
         let window_start = prev_last_run.unwrap_or_else(|| at.saturating_sub(DEFAULT_DIGEST_WINDOW_MS));
-        let issues = self.board.issues_async().await?;
-        let sessions = self.board.sessions_async().await?;
-        let runs = self.collect_recent_runs_async(&issues, window_start).await;
-        let digest = build_progress_digest(&cron.name, &issues, &sessions, &runs, window_start, at);
+        let morning = self.board.morning_digest_async(window_start, at).await?;
+        let digest = progress_digest_from_morning(&cron.name, &morning);
         if spec.skip_if_empty && digest.is_empty() {
             return Ok(());
         }

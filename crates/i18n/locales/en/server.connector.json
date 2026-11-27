@@ -110,6 +110,10 @@
     "itemFailed": "· [Failed] #{number} {title}: {detail}",
     "itemWorking": "· [Working] #{number} {title}",
     "itemDone": "· #{number} {title}",
+    "healthHeader": "Repo health:",
+    "itemHealth": "· {repo} [{status}] (open {open}, blocked {blocked}, stuck {stuck})",
+    "triageHeader": "Backlog triage suggestions (confirm in VibeValley before applying):",
+    "itemTriage": "· #{number}: {summary}",
     "more": "...and {n} more",
     "quiet": "No new progress recently and nothing waiting on you."
   }

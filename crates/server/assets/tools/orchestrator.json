@@ -104,6 +104,18 @@
      "description": "紧急、高、普通、低；不填是普通",
      "type": "string"
     },
+    "relations": {
+     "description": "非阻塞关联（duplicate 或 related），不阻塞执行、双向同步",
+     "items": {
+      "type": "object",
+      "properties": {
+       "kind": { "type": "string", "enum": ["duplicate", "related"] },
+       "issue": { "type": "string", "description": "关联工单编号（#41 或 41）" }
+      },
+      "required": ["kind", "issue"]
+     },
+     "type": "array"
+    },
     "owner": {
      "description": "最终负责人（{ kind: 'user' | 'agent', id }）；不填默认当前用户",
      "type": "object",
@@ -178,6 +190,18 @@
     "priority": {
      "description": "紧急、高、普通、低",
      "type": "string"
+    },
+    "relations": {
+     "description": "非阻塞关联（duplicate 或 related）；传空数组 [] 清空，会双向同步且不阻塞执行",
+     "items": {
+      "type": "object",
+      "properties": {
+       "kind": { "type": "string", "enum": ["duplicate", "related"] },
+       "issue": { "type": "string", "description": "关联工单编号（#41 或 41）" }
+      },
+      "required": ["kind", "issue"]
+     },
+     "type": "array"
     },
     "owner": {
      "description": "最终负责人（{ kind: 'user' | 'agent', id }）；id 传空字符串清除",
@@ -445,9 +469,79 @@
   }
  },
  {
+  "op": "issue.digest.get",
+  "name": "issue_digest_get",
+  "description": "获取三段式早报（Morning Digest）：（一）近期进展与待处理，（二）按服务端确定性规则计算的各仓库健康度（on_track / at_risk / off_track），（三）待用户点击确认的备选池梳理建议（triage）。用于回答早报/进度总结，绝不擅自改备选工单字段。",
+  "parameters": {
+   "additionalProperties": true,
+   "properties": {
+    "windowHours": {
+     "description": "统计窗口小时数，默认 24，范围 1..168",
+     "type": "integer"
+    }
+   },
+   "type": "object"
+  }
+ },
+ {
+  "op": "issue.triage.suggest",
+  "name": "issue_triage_suggest",
+  "description": "为备选池（backlog）工单提交一条梳理建议（改优先级、补仓库、关联重复、或建议转待办），只存入待确认列表，绝不直接覆盖工单字段；需要用户在界面或明确点击确认后才生效。",
+  "parameters": {
+   "additionalProperties": true,
+   "properties": {
+    "issueId": {
+     "description": "备选池工单编号（#41 或 41）",
+     "type": "string"
+    },
+    "reason": {
+     "description": "提出这条建议的原因",
+     "type": "string"
+    },
+    "summary": {
+     "description": "简短动作说明",
+     "type": "string"
+    },
+    "priority": {
+     "description": "建议修改的优先级：紧急、高、普通、低",
+     "type": "string"
+    },
+    "repo": {
+     "description": "建议归属的仓库",
+     "type": "string"
+    },
+    "agent": {
+     "description": "建议指派的执行会话或角色",
+     "type": "string"
+    },
+    "tags": {
+     "items": { "type": "string" },
+     "type": "array"
+    },
+    "status": {
+     "description": "建议挪到的状态，例如 待办",
+     "type": "string"
+    },
+    "relations": {
+     "items": {
+      "type": "object",
+      "properties": {
+       "kind": { "type": "string", "enum": ["duplicate", "related"] },
+       "issue": { "type": "string" }
+      },
+      "required": ["kind", "issue"]
+     },
+     "type": "array"
+    }
+   },
+   "required": ["issueId", "reason"],
+   "type": "object"
+  }
+ },
+ {
   "op": "repo.list",
   "name": "repo_list",
-  "description": "列出工作区下的仓库（每个文件夹是一个仓库），以及是不是 git 仓库。",
+  "description": "列出工作区下的仓库（每个文件夹是一个仓库）、是不是 git 仓库，以及服务端计算的健康度（on_track / at_risk / off_track）。",
   "parameters": {
    "additionalProperties": true,
    "properties": {},

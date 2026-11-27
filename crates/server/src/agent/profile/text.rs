@@ -321,6 +321,21 @@ pub fn issue_detail(issue: &Issue, who: &str, timeline: Option<&IssueTimeline>, 
     if let Some(pr) = &issue.pull_request {
         lines.push(format!("PR #{}（{}）{}", pr.number, wire(&pr.state), pr.url));
     }
+    if !issue.relations.is_empty() {
+        let rels = issue
+            .relations
+            .iter()
+            .map(|r| {
+                let label = match r.kind {
+                    vibevalley_protocol::IssueRelationKind::Duplicate => "重复",
+                    vibevalley_protocol::IssueRelationKind::Related => "相关",
+                };
+                format!("{label}:{}", r.issue)
+            })
+            .collect::<Vec<_>>()
+            .join("、");
+        lines.push(format!("非阻塞关联：{rels}"));
+    }
     for m in timeline.map(|t| t.milestones.iter().take(8).collect::<Vec<_>>()).unwrap_or_default() {
         let who = m.who.as_deref().map(|w| format!("{w} ")).unwrap_or_default();
         lines.push(format!("  · {}前 {who}{}", span_words(now - m.at), head(&m.text, 120)));

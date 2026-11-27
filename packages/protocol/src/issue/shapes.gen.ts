@@ -1,14 +1,28 @@
 // Generated from crates/protocol/src/contract (vp run protocol:ts). Do not edit.
 
 import type { Attachment } from "../attachment/shapes.gen";
-import type { IssueId, Outcome, SessionId, Spent } from "../common/shapes.gen";
-import type { Conflict, ReviewRevision } from "../repo/shapes.gen";
+import type { ActorKind, IssueId, Outcome, SessionId, Spent } from "../common/shapes.gen";
+import type { Conflict, RepoHealth, ReviewRevision } from "../repo/shapes.gen";
 import type { IssueAnswer, PhaseRestingOnly, Session, SessionEvent } from "../session/shapes.gen";
 
 /**
  * Lightweight typed owner/actor reference on issues (`user` or `agent`).
  */
 export type ActorRef = { "kind": "user", id: string, } | { "kind": "agent", id: string, };
+
+/**
+ * Non-blocking relation kind between issues (maintained bidirectionally).
+ */
+export const IssueRelationKindValues = ["duplicate", "related"] as const;
+/**
+ * Non-blocking relation kind between issues (maintained bidirectionally).
+ */
+export type IssueRelationKind = (typeof IssueRelationKindValues)[number];
+
+/**
+ * Non-blocking link from one issue to another (`duplicate` or `related`).
+ */
+export type IssueRelation = { kind: IssueRelationKind, issue: IssueId, };
 
 export const LandingValues = ["merged", "merged_into_parent", "pull_request", "submitted", "kept", "none"] as const;
 export type Landing = (typeof LandingValues)[number];
@@ -150,7 +164,7 @@ machineId?: string, assignments: Array<Assignment>, priority: Priority, rank?: n
 /**
  * Tracks runs executed without a worker session (e.g. in-process orchestrator); active while `endedAt` is absent.
  */
-lastRun?: IssueLastRun, answer?: IssueAnswer, stage: IssueStage, attachments?: Array<Attachment>, tags?: Array<string>, startAt?: number, dueAt?: number, owner?: ActorRef, };
+lastRun?: IssueLastRun, answer?: IssueAnswer, stage: IssueStage, attachments?: Array<Attachment>, tags?: Array<string>, startAt?: number, dueAt?: number, owner?: ActorRef, relations?: Array<IssueRelation>, };
 
 /**
  * Includes the Core fold `seq` that applied the mutation so clients can await state convergence.
@@ -159,7 +173,7 @@ export type AppliedIssue = { constraints?: IssueConstraints, id: IssueId, number
 /**
  * Target execution host id when pinned to a specific machine; omitted lets the control plane route.
  */
-machineId?: string, assignments: Array<Assignment>, priority: Priority, rank?: number, createdAt: number, queuedAt?: number, closedAt?: number, delivered?: Landing, canceled?: IssueCanceled, parent?: IssueId, blockedBy: Array<IssueId>, cron?: string, status: IssueStatus, moves: Array<IssueStatus>, pullRequest?: PullRequest, deliver: Deliverable, reviewedAt?: number, deliveryEvidence?: DeliveryEvidence, findings: Array<Finding>, questions: Array<Question>, criteria: Array<string>, checks: Array<CriterionCheck>, refining?: IssueRefining, lastRun?: IssueLastRun, answer?: IssueAnswer, stage: IssueStage, attachments?: Array<Attachment>, tags?: Array<string>, startAt?: number, dueAt?: number, owner?: ActorRef, seq: number, };
+machineId?: string, assignments: Array<Assignment>, priority: Priority, rank?: number, createdAt: number, queuedAt?: number, closedAt?: number, delivered?: Landing, canceled?: IssueCanceled, parent?: IssueId, blockedBy: Array<IssueId>, cron?: string, status: IssueStatus, moves: Array<IssueStatus>, pullRequest?: PullRequest, deliver: Deliverable, reviewedAt?: number, deliveryEvidence?: DeliveryEvidence, findings: Array<Finding>, questions: Array<Question>, criteria: Array<string>, checks: Array<CriterionCheck>, refining?: IssueRefining, lastRun?: IssueLastRun, answer?: IssueAnswer, stage: IssueStage, attachments?: Array<Attachment>, tags?: Array<string>, startAt?: number, dueAt?: number, owner?: ActorRef, relations?: Array<IssueRelation>, seq: number, };
 
 export type IssueUpdate = { title?: string, description?: string, repo?: string, agent?: string, machineId?: string, priority?: Priority, criteria?: Array<string>, deliver?: Deliverable,
 /**
@@ -185,7 +199,11 @@ dueAt?: number,
 /**
  * Final owner (`user` or `agent`); empty `id` clears it.
  */
-owner?: ActorRef, };
+owner?: ActorRef,
+/**
+ * Non-blocking links (`duplicate` / `related`) maintained bidirectionally; `[]` clears all relations.
+ */
+relations?: Array<IssueRelation>, };
 
 export type IssueHistory = { issue: Issue, sessions: Array<Session>, missingSessions: Array<SessionId>, };
 
@@ -195,7 +213,7 @@ export type IssueRefineRequest = { text?: string,
  */
 edit?: IssueUpdate, };
 
-export type IssueRequest = { constraints?: IssueConstraints, title: string, parent?: IssueId, blockedBy?: Array<IssueId>, description?: string, repo?: string, agent?: string, machineId?: string, priority?: Priority, deliver?: Deliverable, autoSubmitPr?: boolean, criteria?: Array<string>, attachments?: Array<string>, tags?: Array<string>, startAt?: number, dueAt?: number, owner?: ActorRef,
+export type IssueRequest = { constraints?: IssueConstraints, title: string, parent?: IssueId, blockedBy?: Array<IssueId>, description?: string, repo?: string, agent?: string, machineId?: string, priority?: Priority, deliver?: Deliverable, autoSubmitPr?: boolean, criteria?: Array<string>, attachments?: Array<string>, tags?: Array<string>, startAt?: number, dueAt?: number, owner?: ActorRef, relations?: Array<IssueRelation>,
 /**
  * Idempotency key deduplicating retries after a lost response.
  */
@@ -285,10 +303,41 @@ dueAt?: number,
 /**
  * Final owner (`user` or `agent`); empty `id` clears it.
  */
-owner?: ActorRef, };
+owner?: ActorRef,
+/**
+ * Non-blocking links (`duplicate` / `related`) maintained bidirectionally; `[]` clears all relations.
+ */
+relations?: Array<IssueRelation>, };
 
 export type IssueDeleteInput = { id: string, };
 
 export type IssueStatusUpdateInput = { revision?: ReviewRevision, id: string, status: IssueStatus, text?: string, agent?: string, edit?: IssueUpdate, requestKey?: string, };
 
 export type IssueRefineInput = { id: string, text?: string, edit?: IssueUpdate, };
+
+/**
+ * Partial field updates proposed for a backlog issue, applied only after explicit user confirmation.
+ */
+export type TriagePatch = { priority?: Priority, repo?: string, agent?: string, tags?: Array<string>, status?: IssueStatus, relations?: Array<IssueRelation>, dueAt?: number, };
+
+/**
+ * Confirmable triage recommendation for a backlog issue (never auto-overwrites issue fields).
+ */
+export type BacklogTriageSuggestion = { id: string, issueId: IssueId, issueNumber: number, issueTitle: string, reason: string, summary: string, source: ActorKind, patch: TriagePatch, createdAt: number, };
+
+export type DigestIssueRef = { id: IssueId, number: number, title: string, detail: string, stuck?: StuckReason, };
+
+export type DigestProgressSummary = { asking: Array<DigestIssueRef>, reviewing: Array<DigestIssueRef>, stuck: Array<DigestIssueRef>, working: Array<DigestIssueRef>, completedRecent: Array<DigestIssueRef>, runsTotal: number, runsCompleted: number, runsFailed: number, runsInterrupted: number, tokensSpent: number, };
+
+/**
+ * Three-part morning digest: (1) overnight progress, (2) repo health, (3) confirmable backlog triage.
+ */
+export type MorningDigest = { generatedAt: number, windowStart: number, windowEnd: number, progress: DigestProgressSummary, repoHealth: Array<RepoHealth>, triage: Array<BacklogTriageSuggestion>, };
+
+export type IssueDigestGetInput = { windowHours?: number, };
+
+export type BacklogTriageSuggestInput = { issueId: string, reason: string, summary?: string, patch: TriagePatch, };
+
+export type BacklogTriageConfirmInput = { id: string, };
+
+export type BacklogTriageDismissInput = { id: string, };

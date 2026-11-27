@@ -37,6 +37,16 @@ export interface IssueHandlers {
   readonly "issue.refine": (a: { readonly id: string } & T.IssueRefineRequest) => Promise<T.Issue>;
   /** Deterministic issue cycle-time and retro analytics for a time window. */
   readonly "issue.retro.get": (a: T.IssueRetroGetInput) => Promise<T.IssueRetroReport>;
+  /** Three-part morning digest combining overnight progress, repo health, and confirmable backlog triage. */
+  readonly "issue.digest.get": (a: T.IssueDigestGetInput) => Promise<T.MorningDigest>;
+  /** Pending backlog triage suggestions awaiting explicit user confirmation. */
+  readonly "issue.triage.list": () => Promise<T.BacklogTriageSuggestion[]>;
+  /** Proposes a non-destructive triage suggestion for a backlog issue without overwriting its fields. */
+  readonly "issue.triage.suggest": (a: T.BacklogTriageSuggestInput) => Promise<T.BacklogTriageSuggestion>;
+  /** Applies a pending backlog triage suggestion after explicit user click/confirmation. */
+  readonly "issue.triage.confirm": (a: T.BacklogTriageConfirmInput) => Promise<T.AppliedIssue>;
+  /** Dismisses a pending backlog triage suggestion without modifying the issue. */
+  readonly "issue.triage.dismiss": (a: T.BacklogTriageDismissInput) => Promise<void>;
 }
 
 export const issueEndpoints: readonly Endpoint[] = [
@@ -161,5 +171,40 @@ export const issueEndpoints: readonly Endpoint[] = [
     input: S.IssueRetroGetInput,
     result: S.IssueRetroReport,
     can: ["user", "remote", "orchestrator"],
+  },
+  {
+    op: "issue.digest.get",
+    about: [],
+    input: S.IssueDigestGetInput,
+    result: S.MorningDigest,
+    can: ["user", "remote", "orchestrator"],
+  },
+  {
+    op: "issue.triage.list",
+    about: [],
+    input: undefined,
+    result: z.array(S.BacklogTriageSuggestion),
+    can: ["user", "remote", "orchestrator"],
+  },
+  {
+    op: "issue.triage.suggest",
+    about: ["issueId"],
+    input: S.BacklogTriageSuggestInput,
+    result: S.BacklogTriageSuggestion,
+    can: ["user", "remote", "orchestrator"],
+  },
+  {
+    op: "issue.triage.confirm",
+    about: ["id"],
+    input: S.BacklogTriageConfirmInput,
+    result: S.AppliedIssue,
+    can: ["user", "remote"],
+  },
+  {
+    op: "issue.triage.dismiss",
+    about: ["id"],
+    input: S.BacklogTriageDismissInput,
+    result: undefined,
+    can: ["user", "remote"],
   },
 ];

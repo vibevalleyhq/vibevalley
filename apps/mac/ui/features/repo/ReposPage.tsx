@@ -1,7 +1,7 @@
 import { Clipboard, Scroll, signal, Text, View } from "nsh";
 
-import { t } from "@vibevalley/i18n";
-import type { RepoActivity, RepoLanguages, RepoSummary } from "@vibevalley/protocol";
+import { list, t } from "@vibevalley/i18n";
+import type { RepoActivity, RepoHealth, RepoHealthStatus, RepoLanguages, RepoSummary } from "@vibevalley/protocol";
 
 import { createAct } from "../../design/act";
 import { Button, ButtonLink } from "../../design/Button";
@@ -10,13 +10,14 @@ import { Dialog } from "../../design/Dialog";
 import { OpenTerminal } from "../../design/domain/OpenTerminal";
 import { Icon } from "../../design/Icon";
 import { IconButton } from "../../design/IconButton";
-import { Empty, ListCard, ListRow } from "../../design/layout";
+import { Empty, ListCard, ListRow, Card } from "../../design/layout";
 import { Bubble } from "../../design/Tip";
 import { toast } from "../../design/toasts";
 import { mix } from "../../design/tone";
 import { api } from "../../infra/api";
 import { Keyed, useNow } from "../../infra/base/dom";
 import { act as hostAct } from "../../infra/bridge";
+import { useBoardSlice } from "../../infra/frame";
 import { readHostParams } from "../../infra/hostParams";
 import { defineQuery, ready, retryRead, useQuery, useQueryClient, useRepos } from "../../infra/query";
 import { useRouter } from "../../infra/router";
@@ -56,6 +57,26 @@ const recencyIconTone: Record<Recency, "leaf" | "wheat" | "muted"> = {
   older: "muted",
 };
 
+function healthBadgeClasses(status: RepoHealthStatus): { box: string; ink: string } {
+  switch (status) {
+    case "on_track":
+      return { box: "bg-ok-soft", ink: "text-ok-ink" };
+    case "at_risk":
+      return { box: "bg-warn-soft", ink: "text-warn-ink" };
+    case "off_track":
+      return { box: "bg-bad-soft", ink: "text-berry" };
+  }
+}
+
+export function RepoHealthBadge(props: { status: RepoHealthStatus; testid?: string }) {
+  const style = () => healthBadgeClasses(props.status);
+  return (
+    <View testID={props.testid ?? "repo-health-badge"} class={`rounded-sm px-1.5 py-0.5 ${style().box}`}>
+      <Text class={`text-xs font-medium ${style().ink}`}>{t(`shared.repoHealth.${props.status}`)}</Text>
+    </View>
+  );
+}
+
 /** A repo's recency badge tile. */
 function Plot(props: { recency: Recency; size: number; label?: string }) {
   return (
@@ -76,7 +97,9 @@ export function ReposPage(props: { rest: string }) {
   // A minute at a time: enough for "3h ago".
   const now = useNow(60_000);
   const list = useRepos();
+  const board = useBoardSlice();
   const sorted = createMemo(() => sortRepos(ready(list, [])));
+  const healthFor = (repo: RepoSummary): RepoHealth | undefined => repo.health ?? board()?.repoHealth?.find((h) => h.repo === repo.name);
   const selected = createMemo(() => sorted().find((p) => p.name === (props.rest && decodeURIComponent(props.rest))));
   const creating = signal(false);
   const createMode = signal<"local" | "new" | "github">("github");
@@ -123,10 +146,13 @@ export function ReposPage(props: { rest: string }) {
               <Each of={sorted()} key={(p) => p.name}>
                 {(p) => {
                   const recency = () => recencyText(recencyOf(p().last, now()));
+                  const health = () => healthFor(p());
                   const line = () => {
                     const last = p().last;
                     const base = !p().git ? t("web.repo.notGit") : last !== undefined ? `${recency()} · ${since(last, now())}` : recency();
-                    return p().external ? `${t("web.repo.badgeLocal")} · ${base}` : base;
+                    const origin = p().external ? `${t("web.repo.badgeLocal")} · ${base}` : base;
+                    const h = health();
+                    return h ? `${t(`shared.repoHealth.${h.status}`)} · ${origin}` : origin;
                   };
                   return (
                     <ListRow
@@ -147,7 +173,7 @@ export function ReposPage(props: { rest: string }) {
       <Scroll class="min-h-120 min-w-0 flex-1 bg-page md:min-h-0" contentClass="p-4">
         {/* Keyed by the name, a plain value: the panel's queries ask about this one repo for its life. */}
         <If when={selected()?.name} else={<ReposOverviewEmpty onMountLocal={() => openAdd("local")} />}>
-          {(name) => <Keyed key={name()}>{() => <RepoPanel name={untrack(name)} repos={sorted} now={now()} />}</Keyed>}
+          {(name) => <Keyed key={name()}>{() => <RepoPanel name={untrack(name)} repos={sorted} healthFor={healthFor} now={now()} />}</Keyed>}
         </If>
       </Scroll>
       <Dialog
@@ -187,22 +213,46 @@ function ReposOverviewEmpty(props: { onMountLocal: () => void }) {
   );
 }
 
-function RepoPanel(props: { name: string; repos: () => RepoSummary[]; now: number }) {
+function RepoPanel(props: { name: string; repos: () => RepoSummary[]; healthFor: (r: RepoSummary) => RepoHealth | undefined; now: number }) {
   const repo = createMemo<RepoSummary | undefined>((last) => props.repos().find((p) => p.name === props.name) ?? last);
   return (
     <View testID="repo" class="max-w-4xl gap-3">
-      <If when={repo()}>{(p) => <Details repo={p()} now={props.now} />}</If>
+      <If when={repo()}>{(p) => <Details repo={p()} health={props.healthFor(p())} now={props.now} />}</If>
     </View>
   );
 }
 
-function Details(props: { repo: RepoSummary; now: number }) {
+function RepoHealthCard(props: { health: RepoHealth }) {
+  const reasonText = () => list(props.health.reasons.map((r) => t(`shared.repoHealthReason.${r}`)));
+  return (
+    <Card
+      title={t("web.repo.health.title")}
+      action={<RepoHealthBadge status={props.health.status} testid="repo-health-card-badge" />}
+      testid="repo-health-card"
+    >
+      <Text class="text-sm text-ink">{reasonText()}</Text>
+      <View class="flex-row flex-wrap gap-x-6 gap-y-2">
+        <Stat label={t("web.repo.health.open", { n: props.health.openIssues })} value={String(props.health.openIssues)} />
+        <Stat label={t("web.repo.health.inProgress", { n: props.health.inProgressIssues })} value={String(props.health.inProgressIssues)} />
+        <Stat label={t("web.repo.health.inReview", { n: props.health.inReviewIssues })} value={String(props.health.inReviewIssues)} />
+        <Stat label={t("web.repo.health.blocked", { n: props.health.blockedIssues })} value={String(props.health.blockedIssues)} />
+        <Stat label={t("web.repo.health.stuck", { n: props.health.stuckIssues })} value={String(props.health.stuckIssues)} />
+        <Stat label={t("web.repo.health.asking", { n: props.health.askingIssues })} value={String(props.health.askingIssues)} />
+        <Stat label={t("web.repo.health.failedChecks", { n: props.health.failedChecks })} value={String(props.health.failedChecks)} />
+        <Stat label={t("web.repo.health.overdue", { n: props.health.overdueIssues })} value={String(props.health.overdueIssues)} />
+      </View>
+    </Card>
+  );
+}
+
+function Details(props: { repo: RepoSummary; health: RepoHealth | undefined; now: number }) {
   // Keyed by the name: the queries ask about this one repo for the panel's life.
   const name = untrack(() => props.repo.name);
   const survey = useSurvey(() => name);
   return (
     <>
-      <Overview repo={props.repo} languages={survey.languages} activity={survey.activity} now={props.now} />
+      <Overview repo={props.repo} health={props.health} languages={survey.languages} activity={survey.activity} now={props.now} />
+      <If when={props.health}>{(h) => <RepoHealthCard health={h()} />}</If>
       <Languages languages={survey.languages} />
       <CommitCalendar activity={survey.activity} />
       <Hands activity={ready(survey.activity, undefined)} />
@@ -219,7 +269,7 @@ async function copyPath(path: string) {
   }
 }
 
-function Overview(props: { repo: RepoSummary; languages: Asked<RepoLanguages>; activity: Asked<RepoActivity>; now: number }) {
+function Overview(props: { repo: RepoSummary; health: RepoHealth | undefined; languages: Asked<RepoLanguages>; activity: Asked<RepoActivity>; now: number }) {
   const router = useRouter();
   const client = useQueryClient();
   const unmountAct = createAct();
@@ -292,6 +342,7 @@ function Overview(props: { repo: RepoSummary; languages: Asked<RepoLanguages>; a
           <View class={`rounded-sm px-1.5 py-0.5 ${badge().box}`}>
             <Text class={`text-xs font-medium ${badge().ink}`}>{recencyText(recency())}</Text>
           </View>
+          <If when={props.health}>{(h) => <RepoHealthBadge status={h().status} />}</If>
         </View>
         <View class="flex-row flex-wrap gap-x-6 gap-y-2">
           <Stat label={t("web.repo.firstCommit")} value={firstCommit()} />

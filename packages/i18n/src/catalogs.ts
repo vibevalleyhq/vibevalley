@@ -66,6 +66,17 @@ export const catalogs = {
       seconds: "{n} 秒",
       minutes: "{n} 分钟",
       join: { labeled: "{label}：{text}", aside: "{text}（{aside}）", sentence: "{text}。", separator: "、" },
+      repoHealth: { on_track: "正常推进", at_risk: "存在风险", off_track: "进度偏离" },
+      repoHealthReason: {
+        stuck_issues: "存在卡住待处理的工单",
+        failed_checks: "项目检查未通过",
+        overdue_issues: "存在已逾期工单",
+        asking_user: "有工单正等待你的回答",
+        blocked_issues: "存在前置阻塞工单",
+        no_active_progress: "有未关闭工单但暂无推进中任务",
+        stale_activity: "近期长时间无提交",
+        healthy: "推进正常",
+      },
     },
     "web.agent": {
       newName: "新的 {runtime}",
@@ -1896,6 +1907,31 @@ export const catalogs = {
         updated: "已批量更新 {n} 张工单",
         partial: "已更新 {ok} 张工单，{failed} 张未能更新",
       },
+      relations: {
+        title: "非阻塞关联",
+        pick: "添加关联或重复工单…",
+        none: "暂无关联工单",
+        clear: "清除关联",
+        related: "相关",
+        duplicate: "重复",
+        relatedChip: "相关 #{n}",
+        duplicateChip: "重复 #{n}",
+      },
+      digest: {
+        title: "晨间简报",
+        subtitle: "过夜进展、仓库健康度，以及需点击确认才生效的需求池梳理建议。",
+        refresh: "刷新",
+        progressTitle: "一、过夜进展与待处理",
+        healthTitle: "二、仓库健康度",
+        triageTitle: "三、需求池梳理建议（点击确认后修改）",
+        triageConfirm: "确认应用",
+        triageDismiss: "忽略",
+        triageEmpty: "当前没有待确认的需求池梳理建议。",
+        quiet: "本时段暂无新增进展或待处理事项。",
+        runsLine: "共 {total} 次运行（完成 {completed} · 失败 {failed} · 中断 {interrupted}）",
+        emptyHealth: "暂无已挂载仓库。",
+        pendingCount: "{n} 项待确认",
+      },
     },
     "web.library": {
       upload: "上传",
@@ -2863,6 +2899,17 @@ export const catalogs = {
       unmounting: "取消中…",
       unmounted: "已取消关联 {name}（磁盘原目录已保留）",
       unmountTip: "仅从 VibeValley 列表移除关联，不会删除磁盘上的本地文件夹",
+      health: {
+        title: "仓库健康度",
+        open: "开着 {n}",
+        inProgress: "进行中 {n}",
+        inReview: "待验收 {n}",
+        blocked: "阻塞 {n}",
+        stuck: "卡住 {n}",
+        asking: "待回复 {n}",
+        failedChecks: "检查失败 {n}",
+        overdue: "已逾期 {n}",
+      },
     },
     "web.runtime": {
       capability: {
@@ -3795,6 +3842,17 @@ export const catalogs = {
       seconds: "{n} s",
       minutes: "{n} min",
       join: { labeled: "{label}: {text}", aside: "{text} ({aside})", sentence: "{text}.", separator: ", " },
+      repoHealth: { on_track: "On track", at_risk: "At risk", off_track: "Off track" },
+      repoHealthReason: {
+        stuck_issues: "Stuck issues need attention",
+        failed_checks: "Project checks failed",
+        overdue_issues: "Overdue issues past due date",
+        asking_user: "Waiting for user response",
+        blocked_issues: "Blocked by dependencies",
+        no_active_progress: "Open backlog with no active progress",
+        stale_activity: "No recent commits",
+        healthy: "Healthy and moving smoothly",
+      },
     },
     "web.agent": {
       newName: "New {runtime}",
@@ -5735,6 +5793,31 @@ export const catalogs = {
         updated: "Updated {n} issues",
         partial: "Updated {ok} issues; {failed} could not be updated",
       },
+      relations: {
+        title: "Relations",
+        pick: "Link related or duplicate…",
+        none: "No relations",
+        clear: "Clear relations",
+        related: "Related",
+        duplicate: "Duplicate",
+        relatedChip: "Related #{n}",
+        duplicateChip: "Duplicate #{n}",
+      },
+      digest: {
+        title: "Morning Digest",
+        subtitle: "Overnight progress, deterministic repo health, and backlog triage awaiting your click.",
+        refresh: "Refresh",
+        progressTitle: "1. Progress & Attention",
+        healthTitle: "2. Repo Health",
+        triageTitle: "3. Backlog Triage (Confirm to Apply)",
+        triageConfirm: "Confirm & Apply",
+        triageDismiss: "Dismiss",
+        triageEmpty: "No backlog triage suggestions right now.",
+        quiet: "No overnight progress or attention items in the selected window.",
+        runsLine: "{total} runs ({completed} completed, {failed} failed, {interrupted} interrupted)",
+        emptyHealth: "No mounted repositories yet.",
+        pendingCount: "{n} pending",
+      },
     },
     "web.library": {
       upload: "Upload",
@@ -6748,6 +6831,17 @@ export const catalogs = {
       unmounting: "Unmounting…",
       unmounted: "Unmounted {name} (files on disk were kept)",
       unmountTip: "Stop managing this external folder in VibeValley without deleting files on disk",
+      health: {
+        title: "Health",
+        open: "Open {n}",
+        inProgress: "Working {n}",
+        inReview: "Review {n}",
+        blocked: "Blocked {n}",
+        stuck: "Stuck {n}",
+        asking: "Asking {n}",
+        failedChecks: "Failed checks {n}",
+        overdue: "Overdue {n}",
+      },
     },
     "web.runtime": {
       capability: {
@@ -7691,6 +7785,17 @@ export interface Messages {
   "shared.priority.low": undefined;
   "shared.priority.medium": undefined;
   "shared.priority.urgent": undefined;
+  "shared.repoHealth.at_risk": undefined;
+  "shared.repoHealth.off_track": undefined;
+  "shared.repoHealth.on_track": undefined;
+  "shared.repoHealthReason.asking_user": undefined;
+  "shared.repoHealthReason.blocked_issues": undefined;
+  "shared.repoHealthReason.failed_checks": undefined;
+  "shared.repoHealthReason.healthy": undefined;
+  "shared.repoHealthReason.no_active_progress": undefined;
+  "shared.repoHealthReason.overdue_issues": undefined;
+  "shared.repoHealthReason.stale_activity": undefined;
+  "shared.repoHealthReason.stuck_issues": undefined;
   "shared.seconds": { readonly n: string | number };
   "shared.serverAnswered": { readonly status: string | number };
   "shared.stage.asking": undefined;
@@ -9385,6 +9490,24 @@ export interface Messages {
   "web.issue.detail.waiting": undefined;
   "web.issue.detail.who": undefined;
   "web.issue.detail.yours": undefined;
+  "web.issue.digest.emptyHealth": undefined;
+  "web.issue.digest.healthTitle": undefined;
+  "web.issue.digest.pendingCount": { readonly n: string | number };
+  "web.issue.digest.progressTitle": undefined;
+  "web.issue.digest.quiet": undefined;
+  "web.issue.digest.refresh": undefined;
+  "web.issue.digest.runsLine": {
+    readonly completed: string | number;
+    readonly failed: string | number;
+    readonly interrupted: string | number;
+    readonly total: string | number;
+  };
+  "web.issue.digest.subtitle": undefined;
+  "web.issue.digest.title": undefined;
+  "web.issue.digest.triageConfirm": undefined;
+  "web.issue.digest.triageDismiss": undefined;
+  "web.issue.digest.triageEmpty": undefined;
+  "web.issue.digest.triageTitle": undefined;
   "web.issue.display.boardNote": undefined;
   "web.issue.display.defaultNote": undefined;
   "web.issue.display.group": undefined;
@@ -9519,6 +9642,14 @@ export interface Messages {
   "web.issue.peek.compareBadge": undefined;
   "web.issue.peek.expand": undefined;
   "web.issue.reading": undefined;
+  "web.issue.relations.clear": undefined;
+  "web.issue.relations.duplicate": undefined;
+  "web.issue.relations.duplicateChip": { readonly n: string | number };
+  "web.issue.relations.none": undefined;
+  "web.issue.relations.pick": undefined;
+  "web.issue.relations.related": undefined;
+  "web.issue.relations.relatedChip": { readonly n: string | number };
+  "web.issue.relations.title": undefined;
   "web.issue.reopen.line": { readonly issue: string | number };
   "web.issue.reopen.reopen": undefined;
   "web.issue.reopen.title": undefined;
@@ -10584,6 +10715,15 @@ export interface Messages {
   "web.repo.github": undefined;
   "web.repo.githubAddress": undefined;
   "web.repo.githubHint": undefined;
+  "web.repo.health.asking": { readonly n: string | number };
+  "web.repo.health.blocked": { readonly n: string | number };
+  "web.repo.health.failedChecks": { readonly n: string | number };
+  "web.repo.health.inProgress": { readonly n: string | number };
+  "web.repo.health.inReview": { readonly n: string | number };
+  "web.repo.health.open": { readonly n: string | number };
+  "web.repo.health.overdue": { readonly n: string | number };
+  "web.repo.health.stuck": { readonly n: string | number };
+  "web.repo.health.title": undefined;
   "web.repo.how": undefined;
   "web.repo.inYear": undefined;
   "web.repo.initGit": undefined;

@@ -13,6 +13,7 @@ pub mod core;
 pub mod cron;
 pub mod deps;
 pub mod game;
+pub mod health;
 mod inbox;
 pub mod moves;
 pub mod pr;
@@ -34,6 +35,7 @@ pub use crate::core::{
 pub use crate::deps::{
     CheckoutChecks, DagNode, DagProblem, acceptance_ancestors, blocked_issues, child_checks, dag_id_valid, dag_problems, dependency_problems,
 };
+pub use crate::health::{MorningDigestInput, RepoHealthInput, assess_repo_health, assess_repos_health, build_morning_digest, suggest_backlog_triage};
 pub use crate::moves::{Move, Refusal, status_move, status_moves};
 pub use crate::projection::{
     BoardInput, CollabInput, FarmInput, InboxInput, LiveSessionOverlay, LiveSnapshot, OpsInput, SessionInput, apply_session_telemetry, derive_issues,

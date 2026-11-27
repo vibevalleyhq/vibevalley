@@ -443,6 +443,25 @@ export class VibeValleyApi {
       get: (a: T.IssueRetroGetInput, options?: { signal?: AbortSignal }): Promise<T.IssueRetroReport> =>
         this.call<T.IssueRetroReport>("issue.retro.get", "/api/v1/issue/retro/get", a, options),
     },
+    digest: {
+      /** Three-part morning digest combining overnight progress, repo health, and confirmable backlog triage. */
+      get: (a: T.IssueDigestGetInput, options?: { signal?: AbortSignal }): Promise<T.MorningDigest> =>
+        this.call<T.MorningDigest>("issue.digest.get", "/api/v1/issue/digest/get", a, options),
+    },
+    triage: {
+      /** Pending backlog triage suggestions awaiting explicit user confirmation. */
+      list: (options?: { signal?: AbortSignal }): Promise<T.BacklogTriageSuggestion[]> =>
+        this.call<T.BacklogTriageSuggestion[]>("issue.triage.list", "/api/v1/issue/triage/list", undefined, options),
+      /** Proposes a non-destructive triage suggestion for a backlog issue without overwriting its fields. */
+      suggest: (a: T.BacklogTriageSuggestInput, options?: { signal?: AbortSignal }): Promise<T.BacklogTriageSuggestion> =>
+        this.call<T.BacklogTriageSuggestion>("issue.triage.suggest", "/api/v1/issue/triage/suggest", a, options),
+      /** Applies a pending backlog triage suggestion after explicit user click/confirmation. */
+      confirm: (a: T.BacklogTriageConfirmInput, options?: { signal?: AbortSignal }): Promise<T.AppliedIssue> =>
+        this.call<T.AppliedIssue>("issue.triage.confirm", "/api/v1/issue/triage/confirm", a, options),
+      /** Dismisses a pending backlog triage suggestion without modifying the issue. */
+      dismiss: (a: T.BacklogTriageDismissInput, options?: { signal?: AbortSignal }): Promise<void> =>
+        this.call<void>("issue.triage.dismiss", "/api/v1/issue/triage/dismiss", a, options),
+    },
   };
 
   readonly session = {

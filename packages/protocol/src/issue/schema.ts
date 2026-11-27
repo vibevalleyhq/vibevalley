@@ -2,10 +2,17 @@ import { z } from "zod";
 
 import { Attachment } from "../attachment/schema";
 import type { Codec } from "../codec";
-import { IssueId, Outcome, SessionId, Spent } from "../common/schema";
-import { Conflict, ReviewRevision } from "../repo/schema";
+import { ActorKind, IssueId, Outcome, SessionId, Spent } from "../common/schema";
+import { Conflict, RepoHealth, ReviewRevision } from "../repo/schema";
 import { IssueAnswer, Session } from "../session/schema";
 import * as T from "./shapes.gen";
+
+export const IssueRelationKind = z.enum(T.IssueRelationKindValues) satisfies Codec<T.IssueRelationKind>;
+
+export const IssueRelation = z.object({
+  kind: IssueRelationKind,
+  issue: IssueId,
+}) satisfies Codec<T.IssueRelation>;
 
 export const ActorRef = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("user"), id: z.string() }),
@@ -227,6 +234,7 @@ const issueFields = {
   startAt: z.exactOptional(z.number()),
   dueAt: z.exactOptional(z.number()),
   owner: z.exactOptional(ActorRef),
+  relations: z.exactOptional(z.array(IssueRelation)),
 };
 
 export const Issue = z.object(issueFields) satisfies Codec<T.Issue>;
@@ -250,6 +258,7 @@ export const IssueUpdate = z.object({
   startAt: z.exactOptional(z.number()),
   dueAt: z.exactOptional(z.number()),
   owner: z.exactOptional(ActorRef),
+  relations: z.exactOptional(z.array(IssueRelation)),
 }) satisfies Codec<T.IssueUpdate>;
 
 export const IssueHistory = z.object({
@@ -281,6 +290,7 @@ export const IssueRequest = z.object({
   startAt: z.exactOptional(z.number()),
   dueAt: z.exactOptional(z.number()),
   owner: z.exactOptional(ActorRef),
+  relations: z.exactOptional(z.array(IssueRelation)),
   requestKey: z.exactOptional(z.string()),
 }) satisfies Codec<T.IssueRequest>;
 
@@ -329,3 +339,74 @@ export const IssueStatusRequest = z.object({
   edit: z.exactOptional(IssueUpdate),
   requestKey: z.exactOptional(z.string()),
 }) satisfies Codec<T.IssueStatusRequest>;
+
+export const TriagePatch = z.object({
+  priority: z.exactOptional(Priority),
+  repo: z.exactOptional(z.string()),
+  agent: z.exactOptional(z.string()),
+  tags: z.exactOptional(z.array(z.string())),
+  status: z.exactOptional(IssueStatus),
+  relations: z.exactOptional(z.array(IssueRelation)),
+  dueAt: z.exactOptional(z.number()),
+}) satisfies Codec<T.TriagePatch>;
+
+export const BacklogTriageSuggestion = z.object({
+  id: z.string(),
+  issueId: IssueId,
+  issueNumber: z.number(),
+  issueTitle: z.string(),
+  reason: z.string(),
+  summary: z.string(),
+  source: ActorKind,
+  patch: TriagePatch,
+  createdAt: z.number(),
+}) satisfies Codec<T.BacklogTriageSuggestion>;
+
+export const DigestIssueRef = z.object({
+  id: IssueId,
+  number: z.number(),
+  title: z.string(),
+  detail: z.string(),
+  stuck: z.exactOptional(StuckReason),
+}) satisfies Codec<T.DigestIssueRef>;
+
+export const DigestProgressSummary = z.object({
+  asking: z.array(DigestIssueRef),
+  reviewing: z.array(DigestIssueRef),
+  stuck: z.array(DigestIssueRef),
+  working: z.array(DigestIssueRef),
+  completedRecent: z.array(DigestIssueRef),
+  runsTotal: z.number(),
+  runsCompleted: z.number(),
+  runsFailed: z.number(),
+  runsInterrupted: z.number(),
+  tokensSpent: z.number(),
+}) satisfies Codec<T.DigestProgressSummary>;
+
+export const MorningDigest = z.object({
+  generatedAt: z.number(),
+  windowStart: z.number(),
+  windowEnd: z.number(),
+  progress: DigestProgressSummary,
+  repoHealth: z.array(RepoHealth),
+  triage: z.array(BacklogTriageSuggestion),
+}) satisfies Codec<T.MorningDigest>;
+
+export const IssueDigestGetInput = z.object({
+  windowHours: z.exactOptional(z.number()),
+}) satisfies Codec<T.IssueDigestGetInput>;
+
+export const BacklogTriageSuggestInput = z.object({
+  issueId: z.string(),
+  reason: z.string(),
+  summary: z.exactOptional(z.string()),
+  patch: TriagePatch,
+}) satisfies Codec<T.BacklogTriageSuggestInput>;
+
+export const BacklogTriageConfirmInput = z.object({
+  id: z.string(),
+}) satisfies Codec<T.BacklogTriageConfirmInput>;
+
+export const BacklogTriageDismissInput = z.object({
+  id: z.string(),
+}) satisfies Codec<T.BacklogTriageDismissInput>;

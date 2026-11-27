@@ -158,6 +158,7 @@ impl MockIssueState {
             canceled: None,
             parent: req.parent,
             blocked_by: req.blocked_by.unwrap_or_default(),
+            relations: req.relations.unwrap_or_default(),
             cron: None,
             status: IssueStatus::Backlog,
             moves: vec![IssueStatus::Todo, IssueStatus::Canceled],

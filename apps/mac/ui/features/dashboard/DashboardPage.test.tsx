@@ -263,3 +263,86 @@ test("DashboardPage overview stat cards and pending rows deep-link into pre-filt
   expect(app.count("id:filter-clear")).toBe(1);
   expect(app.count("id:issue-card")).toBe(scenarios.typical.state.board.issues.filter((i) => i.status === "todo").length);
 });
+
+test("DashboardPage renders 3-part Morning Digest and applies backlog triage ONLY after explicit Confirm click", async () => {
+  setLocale("en");
+  const digest = {
+    generatedAt: SCENARIO_NOW,
+    windowStart: SCENARIO_NOW - 86_400_000,
+    windowEnd: SCENARIO_NOW,
+    progress: {
+      asking: [{ id: issueId("i1"), number: 1, title: "Clarify OAuth scope", detail: "Use PKCE?" }],
+      reviewing: [],
+      stuck: [],
+      working: [],
+      completedRecent: [{ id: issueId("i2"), number: 2, title: "Ship health check", detail: "" }],
+      runsTotal: 2,
+      runsCompleted: 1,
+      runsFailed: 1,
+      runsInterrupted: 0,
+      tokensSpent: 500,
+    },
+    repoHealth: [
+      {
+        repo: "alpha",
+        status: "at_risk",
+        reasons: ["asking_user"],
+        openIssues: 2,
+        inProgressIssues: 1,
+        inReviewIssues: 0,
+        blockedIssues: 0,
+        stuckIssues: 0,
+        askingIssues: 1,
+        failedChecks: 0,
+        overdueIssues: 0,
+        evaluatedAt: SCENARIO_NOW,
+      },
+    ],
+    triage: [
+      {
+        id: "auto:i1:priority",
+        issueId: issueId("i1"),
+        issueNumber: 1,
+        issueTitle: "Clarify OAuth scope",
+        reason: "Due within 48 hours",
+        summary: "Raise #1 priority to High",
+        source: "system",
+        patch: { priority: "high" },
+        createdAt: SCENARIO_NOW,
+      },
+    ],
+  };
+
+  let pendingTriage = [...digest.triage];
+  const fake = fakeHost(scenarios.typical, { route: "/dashboard", locale: "en" });
+  fake.respond("issue.digest.get", () => ({ ...digest, triage: pendingTriage }));
+  fake.respond("issue.triage.confirm", (payload: unknown) => {
+    const req = payload as { id: string };
+    pendingTriage = pendingTriage.filter((s) => s.id !== req.id);
+    return { ...scenarios.typical.state.board.issues[0], id: issueId("i1"), priority: "high", seq: scenarios.typical.state.seq + 1 };
+  });
+
+  const app = await open("../../app/main.tsx", {
+    width: 1200,
+    height: 820,
+    colorScheme: "light",
+    platform: "macos",
+    locale: "en-US",
+    clock: { time: SCENARIO_NOW },
+    host: fake.options,
+  });
+
+  await fake.pumpUntil(app, () => app.count("id:dashboard-morning-digest") === 1 && app.count("id:triage-confirm-auto:i1:priority") === 1);
+  expect(app.count("id:digest-part-progress")).toBe(1);
+  expect(app.count("id:digest-part-health")).toBe(1);
+  expect(app.count("id:digest-part-triage")).toBe(1);
+
+  // Confirm is NEVER auto-invoked on render.
+  expect(fake.calls.some((c) => c.op === "issue.triage.confirm")).toBe(false);
+
+  // Clicking Confirm & Apply dispatches issue.triage.confirm for that suggestion.
+  await app.press("id:triage-confirm-auto:i1:priority");
+  await fake.pumpUntil(app, () => fake.calls.some((c) => c.op === "issue.triage.confirm"));
+  expect(fake.calls.find((c) => c.op === "issue.triage.confirm")?.payload).toEqual({ id: "auto:i1:priority" });
+  await fake.pumpUntil(app, () => app.count("id:triage-confirm-auto:i1:priority") === 0);
+});

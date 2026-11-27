@@ -142,10 +142,25 @@ impl Orchestrator {
             ));
         }
         let repos = self.repo.list_async().await;
+        let healths = self.issue.repo_health_list_async(self.ctx.now()).await.unwrap_or_default();
         let folders = if repos.is_empty() {
             words::NO_REPOS.to_string()
         } else {
-            repos.iter().map(|r| r.name.as_str()).collect::<Vec<_>>().join("、")
+            repos
+                .iter()
+                .map(|r| match healths.iter().find(|h| h.repo == r.name) {
+                    Some(h) => {
+                        let status = match h.status {
+                            vibevalley_protocol::RepoHealthStatus::OnTrack => "on_track",
+                            vibevalley_protocol::RepoHealthStatus::AtRisk => "at_risk",
+                            vibevalley_protocol::RepoHealthStatus::OffTrack => "off_track",
+                        };
+                        format!("{}（{}）", r.name, status)
+                    }
+                    None => r.name.clone(),
+                })
+                .collect::<Vec<_>>()
+                .join("、")
         };
         let (direct, target) = self.chat.address_of(channel);
         words::whole(

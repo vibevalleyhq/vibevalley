@@ -86,6 +86,26 @@ const PullRequestCapability = z.object({
   reason: z.string(),
 }) satisfies Codec<T.PullRequestCapability>;
 
+export const RepoHealthStatus = z.enum(T.RepoHealthStatusValues) satisfies Codec<T.RepoHealthStatus>;
+
+export const RepoHealthReason = z.enum(T.RepoHealthReasonValues) satisfies Codec<T.RepoHealthReason>;
+
+export const RepoHealth = z.object({
+  repo: z.string(),
+  status: RepoHealthStatus,
+  reasons: z.array(RepoHealthReason),
+  openIssues: z.number(),
+  inProgressIssues: z.number(),
+  inReviewIssues: z.number(),
+  blockedIssues: z.number(),
+  stuckIssues: z.number(),
+  askingIssues: z.number(),
+  failedChecks: z.number(),
+  overdueIssues: z.number(),
+  lastCommitAt: z.exactOptional(z.number()),
+  evaluatedAt: z.number(),
+}) satisfies Codec<T.RepoHealth>;
+
 export const RepoSummary = z.object({
   name: z.string(),
   path: z.string(),
@@ -94,6 +114,7 @@ export const RepoSummary = z.object({
   last: z.exactOptional(z.number()),
   maxSessions: z.number(),
   pullRequest: PullRequestCapability,
+  health: z.exactOptional(RepoHealth),
 }) satisfies Codec<T.RepoSummary>;
 
 export const NewRepo = z.object({
