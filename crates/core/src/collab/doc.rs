@@ -228,6 +228,15 @@ pub struct DocSnapshot {
     pub lists: BTreeMap<String, Vec<Value>>,
 }
 
+/// Result of exporting an incremental version-vector sync payload (or snapshot fallback).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SyncExport {
+    pub bytes: Vec<u8>,
+    pub is_snapshot: bool,
+    pub version_vector: VersionVector,
+    pub frontiers: Frontiers,
+}
+
 /// Encodes Loro `Frontiers` into a base64 string for wire transport / SQLite.
 pub fn encode_frontiers(frontiers: &Frontiers) -> String {
     BASE64.encode(frontiers.encode())
@@ -338,6 +347,48 @@ impl CollabDoc {
         Ok(self.doc.export(ExportMode::updates(from))?)
     }
 
+    /// Exports an incremental update since `from` (or full snapshot when `from` is
+    /// absent or predates a compacted shallow snapshot root).
+    pub fn export_sync_since(&self, from: Option<&VersionVector>) -> Result<SyncExport, CollabError> {
+        match from {
+            Some(vv) => {
+                if self.is_shallow() {
+                    let shallow_vv = self.doc.shallow_since_vv();
+                    let behind_shallow = shallow_vv.iter().any(|(peer, &counter)| vv.get(peer).copied().unwrap_or(0) < counter);
+                    if behind_shallow {
+                        return Ok(SyncExport {
+                            bytes: self.export_snapshot()?,
+                            is_snapshot: true,
+                            version_vector: self.version_vector(),
+                            frontiers: self.frontiers(),
+                        });
+                    }
+                }
+                match self.doc.export(ExportMode::updates(vv)) {
+                    Ok(bytes) => Ok(SyncExport {
+                        bytes,
+                        is_snapshot: false,
+                        version_vector: self.version_vector(),
+                        frontiers: self.frontiers(),
+                    }),
+                    Err(_) if self.is_shallow() => Ok(SyncExport {
+                        bytes: self.export_snapshot()?,
+                        is_snapshot: true,
+                        version_vector: self.version_vector(),
+                        frontiers: self.frontiers(),
+                    }),
+                    Err(e) => Err(CollabError::from(e)),
+                }
+            }
+            None => Ok(SyncExport {
+                bytes: self.export_snapshot()?,
+                is_snapshot: true,
+                version_vector: self.version_vector(),
+                frontiers: self.frontiers(),
+            }),
+        }
+    }
+
     /// Imports binary snapshot or incremental update bytes from a peer.
     pub fn import_bytes(&self, bytes: &[u8]) -> Result<(), CollabError> {
         if bytes.is_empty() {
@@ -346,6 +397,37 @@ impl CollabDoc {
         self.doc.import(bytes)?;
         self.doc.get_tree(TREE_ROOT).enable_fractional_index(0);
         Ok(())
+    }
+
+    /// Imports binary snapshot or incremental update bytes and reports whether
+    /// the document's `VersionVector` advanced with newly integrated operations.
+    pub fn import_bytes_with_status(&self, bytes: &[u8]) -> Result<bool, CollabError> {
+        if bytes.is_empty() {
+            return Ok(false);
+        }
+        let before = self.version_vector();
+        self.import_bytes(bytes)?;
+        Ok(self.version_vector() != before)
+    }
+
+    /// Returns the decoded `CommitMeta` of the newest reachable commit if present.
+    pub fn latest_commit_meta(&self) -> Option<CommitMeta> {
+        let tips = self.doc.oplog_frontiers();
+        let ids: Vec<ID> = tips.iter().collect();
+        if ids.is_empty() {
+            return None;
+        }
+        let mut found = None;
+        let _ = self.doc.travel_change_ancestors(&ids, &mut |change| {
+            if change.len > 0
+                && let Some(meta) = change.message.as_deref().and_then(|raw| serde_json::from_str::<CommitMeta>(raw).ok())
+            {
+                found = Some(meta);
+                return ControlFlow::Break(());
+            }
+            ControlFlow::Continue(())
+        });
+        found
     }
 
     // ---- LoroText operations (blocks, outline, HTML, store text) -------------

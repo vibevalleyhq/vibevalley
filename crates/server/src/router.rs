@@ -275,6 +275,8 @@ impl Router {
             E::ArtifactHistoryFork => on!(p, ArtifactHistoryFork, |r| art.history_fork_async(&art.caller_meta(ctx).0, &r).await?),
             E::ArtifactHistoryUndoOrigin => on!(p, ArtifactHistoryUndoOrigin, |r| glue::artifact_undo_origin(art, ctx, &r).await?),
             E::ArtifactHistoryCompact => on!(p, ArtifactHistoryCompact, |r| art.history_compact_async(&r).await?),
+            E::ArtifactCollabExport => on!(p, ArtifactCollabExport, |r| art.collab_export_async(&r).await?),
+            E::ArtifactCollabImport => on!(p, ArtifactCollabImport, |r| glue::artifact_collab_import(art, ctx, &r).await?),
             E::ArtifactCoverSet => on!(p, ArtifactCoverSet, |r| art.set_cover_async(&r).await?),
             E::ConnectorLogin => on!(p, ConnectorLogin, |r| c.connector.handle_login(r).await?),
             E::ConnectorVerify => on!(p, ConnectorVerify, |r| c.connector.handle_verify(r).await?),

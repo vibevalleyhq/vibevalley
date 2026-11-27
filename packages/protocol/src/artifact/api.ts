@@ -54,6 +54,10 @@ export interface ArtifactHandlers {
   readonly "artifact.history.undoOrigin": (a: T.ArtifactHistoryUndoOriginRequest) => Promise<T.Artifact>;
   /** Compact old operation history into a shallow snapshot while keeping current state intact. */
   readonly "artifact.history.compact": (a: T.ArtifactHistoryCompactRequest) => Promise<T.Artifact>;
+  /** Export incremental Loro CRDT updates (or full snapshot) relative to a client VersionVector. */
+  readonly "artifact.collab.export": (a: T.ArtifactCollabExportRequest) => Promise<T.ArtifactCollabExportResult>;
+  /** Import incremental Loro CRDT updates (or snapshot) into an artifact and optionally return missing server updates. */
+  readonly "artifact.collab.import": (a: T.ArtifactCollabImportRequest) => Promise<T.ArtifactCollabImportResult>;
   /** Saves a derived auto-captured cover image outside the artifact directory and CRDT. */
   readonly "artifact.cover.set": (a: T.ArtifactCoverSetRequest) => Promise<T.ArtifactCover>;
 }
@@ -233,6 +237,20 @@ export const artifactEndpoints: readonly Endpoint[] = [
     about: ["id"],
     input: S.ArtifactHistoryCompactRequest,
     result: S.Artifact,
+    can: ["user", "remote"],
+  },
+  {
+    op: "artifact.collab.export",
+    about: ["id"],
+    input: S.ArtifactCollabExportRequest,
+    result: S.ArtifactCollabExportResult,
+    can: ["user", "remote", "orchestrator", "session"],
+  },
+  {
+    op: "artifact.collab.import",
+    about: ["id"],
+    input: S.ArtifactCollabImportRequest,
+    result: S.ArtifactCollabImportResult,
     can: ["user", "remote"],
   },
   {

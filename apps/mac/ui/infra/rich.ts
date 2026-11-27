@@ -110,6 +110,8 @@ export interface VvMarkdownProps extends ComponentHostProps {
 
 export interface VvWhiteboardBatchEvent {
   writesJson: string;
+  collabUpdateB64?: string;
+  versionVectorB64?: string;
 }
 
 export interface VvWhiteboardSelectionEvent {
@@ -149,6 +151,7 @@ export interface VvWhiteboardViewportEvent {
 export interface VvWhiteboardProps extends ComponentHostProps {
   entriesJson: string;
   presencesJson?: string;
+  collabUpdateB64?: string;
   seq?: number;
   title?: string;
   readOnly?: boolean;

@@ -784,5 +784,65 @@
    "heading": "App",
    "subtitle": "Interactive demo"
   }
+ ],
+ "ArtifactCollabExportRequest": [
+  {
+   "id": "a1",
+   "versionVector": "dmVyc2lvbg=="
+  },
+  {
+   "id": "a1"
+  }
+ ],
+ "ArtifactCollabExportResult": [
+  {
+   "artifactId": "a1",
+   "seq": 3,
+   "versionVector": "dmVyc2lvbg==",
+   "frontiers": "ZnJvbnRpZXJz",
+   "snapshot": false,
+   "update": "dXBkYXRl"
+  }
+ ],
+ "ArtifactCollabImportRequest": [
+  {
+   "id": "a1",
+   "update": "dXBkYXRl",
+   "clientVersionVector": "dmVyc2lvbg==",
+   "origin": "user",
+   "summary": "sync offline edits"
+  },
+  {
+   "id": "a1",
+   "update": "dXBkYXRl"
+  }
+ ],
+ "ArtifactCollabImportResult": [
+  {
+   "artifactId": "a1",
+   "seq": 4,
+   "versionVector": "dmVyc2lvbg==",
+   "frontiers": "ZnJvbnRpZXJz",
+   "files": [
+    {
+     "path": "structure/index.md",
+     "mime": "text/markdown",
+     "size": 42,
+     "hash": "abc123",
+     "updatedAt": 1000
+    }
+   ],
+   "deleted": [],
+   "serverUpdate": "dXBkYXRl",
+   "serverSnapshot": false
+  },
+  {
+   "artifactId": "a1",
+   "seq": 4,
+   "versionVector": "dmVyc2lvbg==",
+   "frontiers": "ZnJvbnRpZXJz",
+   "files": [],
+   "deleted": []
+  }
  ]
 }

@@ -1465,6 +1465,24 @@ pub const ENDPOINTS: &[Endpoint] = &[
         result: Some("Artifact"),
     },
     Endpoint {
+        op: "artifact.collab.export",
+        module: "artifact",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
+        dry_run: None,
+        input: Some("ArtifactCollabExportRequest"),
+        result: Some("ArtifactCollabExportResult"),
+    },
+    Endpoint {
+        op: "artifact.collab.import",
+        module: "artifact",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("ArtifactCollabImportRequest"),
+        result: Some("ArtifactCollabImportResult"),
+    },
+    Endpoint {
         op: "artifact.cover.set",
         module: "artifact",
         about: &["id"],
@@ -2799,6 +2817,20 @@ pub mod ops {
         type Input = t::ArtifactHistoryCompactRequest;
         type Result = t::Artifact;
     }
+    /// Export incremental Loro CRDT updates (or snapshot) relative to a client VersionVector.
+    pub struct ArtifactCollabExport;
+    impl Op for ArtifactCollabExport {
+        const NAME: &'static str = "artifact.collab.export";
+        type Input = t::ArtifactCollabExportRequest;
+        type Result = t::ArtifactCollabExportResult;
+    }
+    /// Import incremental Loro CRDT updates (or snapshot) into an artifact and optionally return missing server updates.
+    pub struct ArtifactCollabImport;
+    impl Op for ArtifactCollabImport {
+        const NAME: &'static str = "artifact.collab.import";
+        type Input = t::ArtifactCollabImportRequest;
+        type Result = t::ArtifactCollabImportResult;
+    }
     /// Saves a derived auto-captured cover image outside the artifact directory and CRDT.
     pub struct ArtifactCoverSet;
     impl Op for ArtifactCoverSet {
@@ -3318,6 +3350,8 @@ endpoint_ids! {
     ArtifactHistoryFork => "artifact.history.fork",
     ArtifactHistoryUndoOrigin => "artifact.history.undoOrigin",
     ArtifactHistoryCompact => "artifact.history.compact",
+    ArtifactCollabExport => "artifact.collab.export",
+    ArtifactCollabImport => "artifact.collab.import",
     ArtifactCoverSet => "artifact.cover.set",
     // provider & setting
     ProviderGet => "provider.get",

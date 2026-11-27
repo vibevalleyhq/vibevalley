@@ -11,6 +11,7 @@ name = "suite"
 path = "tests/suite.rs"
 
 [dependencies]
+base64 = { workspace = true }
 nsh-base = { version = "0.7.1", default-features = false, features = ["editor"] }
 nsh-core = { version = "0.7.1", default-features = false, features = ["svg"] }
 ratex-font = "0.1.15"
@@ -22,6 +23,7 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 ttf-parser = "0.25"
+vibevalley-core = { path = "../core", features = ["collab"] }
 vibevalley-i18n = { path = "../i18n", features = ["web"] }
 vibevalley-pele = { path = "../engines/pele" }
 vibevalley-shiki = { path = "../engines/shiki" }

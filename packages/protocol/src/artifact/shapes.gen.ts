@@ -311,3 +311,43 @@ export type ArtifactHistoryForkRequest = { id: ArtifactId, frontiers: string, ti
 export type ArtifactHistoryUndoOriginRequest = { id: ArtifactId, origin: string, };
 
 export type ArtifactHistoryCompactRequest = { id: ArtifactId, };
+
+export type ArtifactCollabExportRequest = { id: ArtifactId,
+/**
+ * Base64-encoded Loro `VersionVector` (`LoroDoc::version`); omit for full snapshot.
+ */
+versionVector?: string, };
+
+export type ArtifactCollabExportResult = { artifactId: ArtifactId, seq: number,
+/**
+ * Server's current Loro `VersionVector` encoded as base64.
+ */
+versionVector: string,
+/**
+ * Server's current Loro `Frontiers` encoded as base64.
+ */
+frontiers: string,
+/**
+ * True when `update` contains a full Loro snapshot rather than an incremental delta.
+ */
+snapshot: boolean,
+/**
+ * Base64-encoded Loro update or snapshot bytes compatible with `loro-crdt` WASM/JS.
+ */
+update: string, };
+
+export type ArtifactCollabImportRequest = { id: ArtifactId,
+/**
+ * Base64-encoded Loro update or snapshot bytes compatible with `loro-crdt` WASM/JS.
+ */
+update: string,
+/**
+ * Optional client Loro `VersionVector` (base64); when provided, returns missing `server_update`.
+ */
+clientVersionVector?: string, origin?: string, summary?: string, };
+
+export type ArtifactCollabImportResult = { artifactId: ArtifactId, seq: number, versionVector: string, frontiers: string, files: Array<ArtifactFileMeta>, deleted: Array<string>,
+/**
+ * Base64-encoded server updates missing from `client_version_vector`, when requested.
+ */
+serverUpdate?: string, serverSnapshot?: boolean, };

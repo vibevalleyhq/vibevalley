@@ -560,6 +560,14 @@ export class VibeValleyApi {
       compact: (a: T.ArtifactHistoryCompactRequest, options?: { signal?: AbortSignal }): Promise<T.Artifact> =>
         this.call<T.Artifact>("artifact.history.compact", "/api/v1/artifact/history/compact", a, options),
     },
+    collab: {
+      /** Export incremental Loro CRDT updates (or full snapshot) relative to a client VersionVector. */
+      export: (a: T.ArtifactCollabExportRequest, options?: { signal?: AbortSignal }): Promise<T.ArtifactCollabExportResult> =>
+        this.call<T.ArtifactCollabExportResult>("artifact.collab.export", "/api/v1/artifact/collab/export", a, options),
+      /** Import incremental Loro CRDT updates (or snapshot) into an artifact and optionally return missing server updates. */
+      import: (a: T.ArtifactCollabImportRequest, options?: { signal?: AbortSignal }): Promise<T.ArtifactCollabImportResult> =>
+        this.call<T.ArtifactCollabImportResult>("artifact.collab.import", "/api/v1/artifact/collab/import", a, options),
+    },
     cover: {
       /** Saves a derived auto-captured cover image outside the artifact directory and CRDT. */
       set: (a: T.ArtifactCoverSetRequest, options?: { signal?: AbortSignal }): Promise<T.ArtifactCover> =>

@@ -1190,6 +1190,71 @@ pub struct ArtifactHistoryCompactRequest {
     pub id: ArtifactId,
 }
 
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct ArtifactCollabExportRequest {
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::ArtifactId"))]
+    pub id: ArtifactId,
+    /// Base64-encoded Loro `VersionVector` (`LoroDoc::version`); omit for full snapshot.
+    pub version_vector: Option<String>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct ArtifactCollabExportResult {
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::ArtifactId"))]
+    pub artifact_id: ArtifactId,
+    pub seq: i64,
+    /// Server's current Loro `VersionVector` encoded as base64.
+    pub version_vector: String,
+    /// Server's current Loro `Frontiers` encoded as base64.
+    pub frontiers: String,
+    /// True when `update` contains a full Loro snapshot rather than an incremental delta.
+    pub snapshot: bool,
+    /// Base64-encoded Loro update or snapshot bytes compatible with `loro-crdt` WASM/JS.
+    pub update: String,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct ArtifactCollabImportRequest {
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::ArtifactId"))]
+    pub id: ArtifactId,
+    /// Base64-encoded Loro update or snapshot bytes compatible with `loro-crdt` WASM/JS.
+    pub update: String,
+    /// Optional client Loro `VersionVector` (base64); when provided, returns missing `server_update`.
+    pub client_version_vector: Option<String>,
+    pub origin: Option<String>,
+    pub summary: Option<String>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct ArtifactCollabImportResult {
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::ArtifactId"))]
+    pub artifact_id: ArtifactId,
+    pub seq: i64,
+    pub version_vector: String,
+    pub frontiers: String,
+    pub files: Vec<ArtifactFileMeta>,
+    pub deleted: Vec<String>,
+    /// Base64-encoded server updates missing from `client_version_vector`, when requested.
+    pub server_update: Option<String>,
+    pub server_snapshot: Option<bool>,
+}
+
 #[cfg(feature = "ts-gen")]
 crate::typescript::module! {
     "artifact";
@@ -1252,6 +1317,10 @@ crate::typescript::module! {
     ArtifactHistoryRestoreRequest,
     ArtifactHistoryForkRequest,
     ArtifactHistoryUndoOriginRequest,
-    ArtifactHistoryCompactRequest];
+    ArtifactHistoryCompactRequest,
+    ArtifactCollabExportRequest,
+    ArtifactCollabExportResult,
+    ArtifactCollabImportRequest,
+    ArtifactCollabImportResult];
     aliases: [];
 }

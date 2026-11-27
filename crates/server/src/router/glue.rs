@@ -6,9 +6,9 @@ use std::time::Duration;
 
 use vibevalley_core::SliceMask;
 use vibevalley_protocol::{
-    ApiError, Artifact, ArtifactFileDeleteRequest, ArtifactFileDeleteResult, ArtifactFileWriteRequest, ArtifactFileWriteResult,
-    ArtifactHistoryUndoOriginRequest, ArtifactSuggestionAcceptInput, ArtifactSuggestionCreateInput, ArtifactVersionRequest, BizCode, Caller, Health, Op,
-    RepoTemplates, SayRequest, SessionSendInput, Suggestion, ops,
+    ApiError, Artifact, ArtifactCollabImportRequest, ArtifactCollabImportResult, ArtifactFileDeleteRequest, ArtifactFileDeleteResult, ArtifactFileWriteRequest,
+    ArtifactFileWriteResult, ArtifactHistoryUndoOriginRequest, ArtifactSuggestionAcceptInput, ArtifactSuggestionCreateInput, ArtifactVersionRequest, BizCode,
+    Caller, Health, Op, RepoTemplates, SayRequest, SessionSendInput, Suggestion, ops,
 };
 use vibevalley_runtime::oar::{Registry, set_observer};
 
@@ -229,6 +229,14 @@ pub(crate) async fn artifact_reject(art: &ArtifactManager, ctx: &CallerContext, 
 
 pub(crate) async fn artifact_undo_origin(art: &ArtifactManager, ctx: &CallerContext, r: &ArtifactHistoryUndoOriginRequest) -> Result<Artifact, ApiError> {
     art.history_undo_origin_async(&art.caller_meta(ctx).0, r).await
+}
+
+pub(crate) async fn artifact_collab_import(
+    art: &ArtifactManager,
+    ctx: &CallerContext,
+    r: &ArtifactCollabImportRequest,
+) -> Result<ArtifactCollabImportResult, ApiError> {
+    art.collab_import_async(&art.caller_meta(ctx).0, r).await
 }
 
 pub(crate) async fn setting_update(c: &AppCore, r: <ops::SettingUpdate as Op>::Input) -> Result<<ops::SettingUpdate as Op>::Result, ApiError> {

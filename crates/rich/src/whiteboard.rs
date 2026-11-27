@@ -6,23 +6,26 @@
 //! inline editing, minimap, context menu, and collapsible inspector (zero `WKWebView`).
 
 use std::cell::{Cell, RefCell};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::rc::{Rc, Weak};
 use std::time::{Duration, Instant};
 
+use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use nsh_core::canvas::render::{ImageFormat, RenderOptions};
 use nsh_core::element::{ImageSrc, input};
 use nsh_core::keymap::Modifiers;
 use nsh_core::prelude::*;
+use serde_json::Value;
+use vibevalley_core::collab::{CollabDoc, CommitMeta, VersionVector, encode_version_vector};
 use vibevalley_i18n::t_in;
 
 use crate::engine::whiteboard::{
     AlignOp, ArrowCurve, BoardAction, BoardCommand, BoardDoc, DistributeAxis, ElementId, ElementKind, FramePaintInput, GridStyle, MilestoneKind,
     Modifiers as WbModifiers, Point2, PointerButton as WbPointerButton, PointerInput, Presence, PresenceColor, Rect2, STICKERS, ShapeKind, StickerCategory,
-    StrokeStyle, TemplateKind, TextAlign, TextVariant, WhiteboardController, WhiteboardEntry, WhiteboardPalette, ZOrderDir, apply_command,
-    build_export_painter, decode_board_entries, decode_presences_json, encode_element_json, export_json, export_json_canvas, export_svg, layout_card,
-    measure_text_span, merge_live_presences, paint::parse_hex_hsla, paint_board_frame_painter, paint_minimap_painter, resolve_sticker_svg, route_arrow,
-    sample_polyline,
+    StrokeStyle, TemplateKind, TextAlign, TextVariant, WhiteboardController, WhiteboardEntry, WhiteboardEntryKind, WhiteboardEntryOp, WhiteboardPalette,
+    WhiteboardWriteInput, ZOrderDir, apply_command, build_export_painter, decode_board_entries, decode_presences_json, encode_element_json, export_json,
+    export_json_canvas, export_svg, layout_card, measure_text_span, merge_live_presences, paint::parse_hex_hsla, paint_board_frame_painter,
+    paint_minimap_painter, resolve_sticker_svg, route_arrow, sample_polyline,
 };
 use crate::theme::AdaptiveUi;
 
@@ -34,6 +37,9 @@ pub struct VvWhiteboardProps {
     /// Optional serialized JSON array of extra live [`Presence`] objects (e.g. working agents).
     #[prop(default)]
     pub presences_json: Prop<SharedString>,
+    /// Optional base64-encoded Loro CRDT update or snapshot bytes for incremental replica sync.
+    #[prop(default)]
+    pub collab_update_b64: Prop<SharedString>,
     /// Monotonic artifact store sequence number reported by the server.
     #[prop(default)]
     pub seq: Prop<i64>,
@@ -48,11 +54,15 @@ pub struct VvWhiteboardProps {
     pub locale: Prop<SharedString>,
 }
 
-/// Payload emitted when local whiteboard edits need persistence via `artifact.entry.batch`.
+/// Payload emitted when local whiteboard edits need persistence via `artifact.file.write` or `artifact.collab.import`.
 #[derive(Debug, Clone, Default, PartialEq, Eq, JsObject)]
 pub struct VvWhiteboardBatchEvent {
-    /// Serialized JSON array of whiteboard write operations (preserving `ifRev` guards).
+    /// Serialized JSON array of whiteboard write operations for directory persistence.
     pub writes_json: SharedString,
+    /// Base64-encoded incremental Loro CRDT update exported from the in-process replica.
+    pub collab_update_b64: SharedString,
+    /// Base64-encoded Loro `VersionVector` after the local replica commit.
+    pub version_vector_b64: SharedString,
 }
 
 /// Payload emitted when the whiteboard selection changes.
@@ -121,7 +131,7 @@ pub struct VvWhiteboardViewportEvent {
 /// Events emitted by [`VvWhiteboard`].
 #[derive(Debug, Clone, PartialEq, Event)]
 pub enum VvWhiteboardEvent {
-    /// Local edits produced optimistic store writes for `artifact.entry.batch`.
+    /// Local edits produced store writes and an incremental Loro replica delta for persistence.
     #[args(event)]
     Batch(VvWhiteboardBatchEvent),
     /// Active selection changed on the board.
@@ -301,7 +311,13 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
     let json_draft = signal(String::new());
 
     let ui_snap = signal(WhiteboardUiSnapshot::default());
-    let last_sync = Rc::new(RefCell::new((SharedString::default(), SharedString::default(), i64::MIN)));
+    let replica = Rc::new(RefCell::new(WhiteboardLoroReplica::new()));
+    let last_sync = Rc::new(RefCell::new((
+        SharedString::default(),
+        SharedString::default(),
+        SharedString::default(),
+        i64::MIN,
+    )));
     let store_presences: Rc<RefCell<Vec<Presence>>> = Rc::new(RefCell::new(Vec::new()));
     let emit_throttle: Rc<RefCell<PresenceEmitThrottle>> = Rc::new(RefCell::new(PresenceEmitThrottle::default()));
     let anim_timer: Rc<RefCell<Option<Spawned<()>>>> = Rc::new(RefCell::new(None));
@@ -570,6 +586,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
 
     let dispatch_effects = {
         let controller = Rc::clone(&controller);
+        let replica = Rc::clone(&replica);
         let sync_ui_snapshot = sync_ui_snapshot.clone();
         let maybe_emit_viewport = maybe_emit_viewport.clone();
         let mark_navigating = mark_navigating.clone();
@@ -657,8 +674,11 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
             }
             if let Some(writes) = flush_writes {
                 let writes_json = serde_json::to_string(&writes).unwrap_or_else(|_| "[]".to_owned());
+                let (collab_update_b64, version_vector_b64) = replica.borrow_mut().apply_local_writes(&writes);
                 cx.emit(VvWhiteboardEvent::Batch(VvWhiteboardBatchEvent {
                     writes_json: SharedString::from(writes_json),
+                    collab_update_b64: SharedString::from(collab_update_b64),
+                    version_vector_b64: SharedString::from(version_vector_b64),
                 }));
             }
             if let Some(ids) = open_chat_ids {
@@ -678,9 +698,10 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
         }
     };
 
-    // Sync incoming entries JSON & live session presences without resetting camera or tool state.
+    // Sync incoming entries/Loro deltas & live presences into the in-process replica without resetting local state.
     {
         let controller = Rc::clone(&controller);
+        let replica = Rc::clone(&replica);
         let dispatch_effects = dispatch_effects.clone();
         let sync_ui_snapshot = sync_ui_snapshot.clone();
         let store_presences = Rc::clone(&store_presences);
@@ -688,22 +709,24 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
         effect(move || {
             let entries_raw = props.entries_json.get();
             let presences_raw = props.presences_json.get();
+            let collab_raw = props.collab_update_b64.get();
             let seq = props.seq.get();
             let smooth = !animations_disabled();
 
-            let (entries_changed, presences_changed) = {
+            let (entries_changed, presences_changed, collab_changed) = {
                 let mut prev = last_sync.borrow_mut();
-                let ec = prev.0 != entries_raw || prev.2 != seq;
+                let ec = prev.0 != entries_raw || prev.3 != seq;
                 let pc = prev.1 != presences_raw;
-                if !ec && !pc {
+                let cc = prev.2 != collab_raw;
+                if !ec && !pc && !cc {
                     return;
                 }
-                *prev = (entries_raw.clone(), presences_raw.clone(), seq);
-                (ec, pc)
+                *prev = (entries_raw.clone(), presences_raw.clone(), collab_raw.clone(), seq);
+                (ec, pc, cc)
             };
 
             let live_presences = decode_presences_json(presences_raw.as_str());
-            if !entries_changed && presences_changed {
+            if !entries_changed && !collab_changed && presences_changed {
                 let effs = {
                     let mut ctrl = controller.borrow_mut();
                     ctrl.smooth_animations = smooth;
@@ -719,23 +742,65 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                 return;
             }
 
-            let parsed_entries: Vec<WhiteboardEntry> = serde_json::from_str(entries_raw.as_str()).unwrap_or_default();
-            let mut next_doc = decode_board_entries(&parsed_entries, seq);
-            *store_presences.borrow_mut() = next_doc.presences.clone();
-            merge_live_presences(&mut next_doc, live_presences);
+            let (use_snapshot, next_snapshot_doc, delta_entries, deleted_paths, has_board_changes) = if collab_changed
+                && !collab_raw.as_str().trim().is_empty()
+                && let Ok(bytes) = BASE64.decode(collab_raw.as_str().trim())
+                && let Some((updated, deleted, is_initial)) = replica.borrow_mut().import_remote_bytes(&bytes, seq)
+            {
+                let has_changes = !updated.is_empty() || !deleted.is_empty();
+                if is_initial {
+                    (true, Some(decode_board_entries(&updated, seq)), Vec::new(), Vec::new(), has_changes)
+                } else {
+                    (false, None, updated, deleted, has_changes)
+                }
+            } else {
+                let parsed_entries: Vec<WhiteboardEntry> = serde_json::from_str(entries_raw.as_str()).unwrap_or_default();
+                let (updated, deleted, is_initial) = replica.borrow_mut().sync_remote_entries(&parsed_entries, seq);
+                let has_changes = !updated.is_empty() || !deleted.is_empty();
+                if is_initial {
+                    (true, Some(decode_board_entries(&parsed_entries, seq)), Vec::new(), Vec::new(), has_changes)
+                } else {
+                    (false, None, updated, deleted, has_changes)
+                }
+            };
 
-            let effs = {
+            let effs = if use_snapshot {
+                let mut next_doc = next_snapshot_doc.unwrap_or_else(|| decode_board_entries(&[], seq));
+                *store_presences.borrow_mut() = next_doc.presences.clone();
+                merge_live_presences(&mut next_doc, live_presences);
                 let mut ctrl = controller.borrow_mut();
                 ctrl.smooth_animations = smooth;
                 ctrl.apply_remote_snapshot(next_doc)
+            } else if has_board_changes {
+                let mut ctrl = controller.borrow_mut();
+                ctrl.smooth_animations = smooth;
+                let mut effs = ctrl.apply_remote_delta(&delta_entries, &deleted_paths, seq);
+                if presences_changed {
+                    effs.extend(ctrl.apply_live_presences(&store_presences.borrow(), live_presences));
+                }
+                effs
+            } else {
+                let mut ctrl = controller.borrow_mut();
+                ctrl.smooth_animations = smooth;
+                if seq > ctrl.doc.seq {
+                    ctrl.doc.seq = seq;
+                }
+                if presences_changed {
+                    ctrl.apply_live_presences(&store_presences.borrow(), live_presences)
+                } else {
+                    Vec::new()
+                }
             };
+
             if effs.is_empty() {
-                camera_tick.set(camera_tick.get_untracked().wrapping_add(1));
+                if use_snapshot {
+                    camera_tick.set(camera_tick.get_untracked().wrapping_add(1));
+                }
                 canvas_tick.set(canvas_tick.get_untracked().wrapping_add(1));
                 sync_ui_snapshot();
                 schedule_anim_frame();
             } else {
-                dispatch_effects(effs, true, false);
+                dispatch_effects(effs, has_board_changes || use_snapshot, false);
             }
         });
     }
@@ -3173,6 +3238,243 @@ fn map_mouse_btn(btn: Option<MouseButton>) -> WbPointerButton {
         Some(MouseButton::Right) => WbPointerButton::Secondary,
         Some(MouseButton::Middle) => WbPointerButton::Middle,
         _ => WbPointerButton::Primary,
+    }
+}
+
+/// In-process Loro replica backing [`VvWhiteboard`] for zero-roundtrip local redraws
+/// and incremental Version-Vector CRDT synchronization.
+struct WhiteboardLoroReplica {
+    doc: CollabDoc,
+    last_synced_vv: VersionVector,
+    initialized: bool,
+    has_elements: bool,
+    known_entries: BTreeMap<String, Value>,
+}
+
+impl WhiteboardLoroReplica {
+    fn new() -> Self {
+        let doc = CollabDoc::new();
+        let last_synced_vv = doc.version_vector();
+        Self {
+            doc,
+            last_synced_vv,
+            initialized: false,
+            has_elements: false,
+            known_entries: BTreeMap::new(),
+        }
+    }
+
+    fn is_board_entry_path(path: &str) -> bool {
+        path == "board/meta" || path.starts_with("elements/")
+    }
+
+    fn build_replace_patch(prev: Option<&Value>, next: &Value) -> Value {
+        let Some(next_obj) = next.as_object() else {
+            return next.clone();
+        };
+        let mut out = next_obj.clone();
+        if let Some(prev_obj) = prev.and_then(Value::as_object) {
+            for k in prev_obj.keys() {
+                if !out.contains_key(k) {
+                    out.insert(k.clone(), Value::Null);
+                }
+            }
+        }
+        Value::Object(out)
+    }
+
+    fn merge_patch_into_known(target: &mut Value, patch: &Value) {
+        let Some(patch_obj) = patch.as_object() else {
+            *target = patch.clone();
+            return;
+        };
+        if !target.is_object() {
+            *target = Value::Object(serde_json::Map::new());
+        }
+        if let Some(target_obj) = target.as_object_mut() {
+            for (k, v) in patch_obj {
+                if v.is_null() {
+                    target_obj.remove(k);
+                } else if v.is_object()
+                    && let Some(existing) = target_obj.get_mut(k)
+                    && existing.is_object()
+                {
+                    Self::merge_patch_into_known(existing, v);
+                } else {
+                    target_obj.insert(k.clone(), v.clone());
+                }
+            }
+        }
+    }
+
+    fn apply_local_writes(&mut self, writes: &[WhiteboardWriteInput]) -> (String, String) {
+        let mut changed = false;
+        for w in writes {
+            if w.path.starts_with("presence/") || !Self::is_board_entry_path(&w.path) {
+                continue;
+            }
+            match w.op {
+                WhiteboardEntryOp::Delete => {
+                    let _ = self.doc.entry_delete(&w.path);
+                    self.known_entries.remove(&w.path);
+                    changed = true;
+                }
+                WhiteboardEntryOp::Set => {
+                    if let Some(raw) = w.value.as_deref()
+                        && let Ok(val) = serde_json::from_str::<Value>(raw)
+                    {
+                        let patch = Self::build_replace_patch(self.known_entries.get(&w.path), &val);
+                        if self.doc.entry_patch_json(&w.path, &patch).is_ok() {
+                            self.known_entries.insert(w.path.clone(), val);
+                            if w.path.starts_with("elements/") {
+                                self.has_elements = true;
+                            }
+                            changed = true;
+                        }
+                    }
+                }
+                WhiteboardEntryOp::Patch => {
+                    if let Some(raw) = w.value.as_deref()
+                        && let Ok(patch) = serde_json::from_str::<Value>(raw)
+                        && self.doc.entry_patch_json(&w.path, &patch).is_ok()
+                    {
+                        let entry = self
+                            .known_entries
+                            .entry(w.path.clone())
+                            .or_insert_with(|| Value::Object(serde_json::Map::new()));
+                        Self::merge_patch_into_known(entry, &patch);
+                        if w.path.starts_with("elements/") {
+                            self.has_elements = true;
+                        }
+                        changed = true;
+                    }
+                }
+                WhiteboardEntryOp::Copy => {
+                    if let Some(from) = w.from.as_deref()
+                        && let Some(val) = self.known_entries.get(from).cloned()
+                        && self.doc.entry_patch_json(&w.path, &val).is_ok()
+                    {
+                        self.known_entries.insert(w.path.clone(), val);
+                        if w.path.starts_with("elements/") {
+                            self.has_elements = true;
+                        }
+                        changed = true;
+                    }
+                }
+            }
+        }
+        self.initialized = true;
+        if changed {
+            let _ = self.doc.commit(&CommitMeta::user("local", None, 0));
+        }
+        let update_b64 = if changed {
+            self.doc
+                .export_sync_since(Some(&self.last_synced_vv))
+                .map(|s| BASE64.encode(&s.bytes))
+                .unwrap_or_default()
+        } else {
+            String::new()
+        };
+        let next_vv = self.doc.version_vector();
+        let vv_b64 = encode_version_vector(&next_vv);
+        self.last_synced_vv = next_vv;
+        (update_b64, vv_b64)
+    }
+
+    fn entry_for_value(path: String, val: &Value, seq: i64) -> WhiteboardEntry {
+        let encoded = serde_json::to_string(val).unwrap_or_else(|_| "{}".to_owned());
+        WhiteboardEntry {
+            artifact_id: String::new(),
+            path,
+            kind: WhiteboardEntryKind::Json,
+            mime: "application/json".to_owned(),
+            size: encoded.len() as i64,
+            rev: seq,
+            updated_by: "remote".to_owned(),
+            updated: 0,
+            value: Some(encoded),
+            attachment_id: None,
+        }
+    }
+
+    fn import_remote_bytes(&mut self, bytes: &[u8], seq: i64) -> Option<(Vec<WhiteboardEntry>, Vec<String>, bool)> {
+        let was_init = self.initialized;
+        let had_elements = self.has_elements;
+        let _ = self.doc.import_bytes_with_status(bytes).ok()?;
+        self.initialized = true;
+        self.last_synced_vv = self.doc.version_vector();
+
+        let snap = self.doc.project_snapshot();
+        let next_entries: BTreeMap<String, Value> = snap.entries.into_iter().filter(|(k, _)| Self::is_board_entry_path(k)).collect();
+        let has_elements_now = next_entries.keys().any(|k| k.starts_with("elements/"));
+        let is_initial = !was_init || (!had_elements && has_elements_now);
+        if has_elements_now {
+            self.has_elements = true;
+        }
+
+        let mut deleted = Vec::new();
+        for old_path in self.known_entries.keys() {
+            if !next_entries.contains_key(old_path) {
+                deleted.push(old_path.clone());
+            }
+        }
+        let mut updated = Vec::new();
+        for (path, val) in &next_entries {
+            if is_initial || self.known_entries.get(path) != Some(val) {
+                updated.push(Self::entry_for_value(path.clone(), val, seq));
+            }
+        }
+        self.known_entries = next_entries;
+        Some((updated, deleted, is_initial))
+    }
+
+    fn sync_remote_entries(&mut self, entries: &[WhiteboardEntry], seq: i64) -> (Vec<WhiteboardEntry>, Vec<String>, bool) {
+        let was_init = self.initialized;
+        let had_elements = self.has_elements;
+        let mut incoming = BTreeMap::new();
+        for entry in entries {
+            if !Self::is_board_entry_path(&entry.path) {
+                continue;
+            }
+            if let Some(raw) = entry.value.as_deref()
+                && let Ok(val) = serde_json::from_str::<Value>(raw)
+            {
+                incoming.insert(entry.path.clone(), val);
+            }
+        }
+
+        let has_elements_now = incoming.keys().any(|k| k.starts_with("elements/"));
+        let is_initial = !was_init || (!had_elements && has_elements_now);
+        self.initialized = true;
+        if has_elements_now {
+            self.has_elements = true;
+        }
+
+        let mut deleted = Vec::new();
+        for old_path in self.known_entries.keys() {
+            if !incoming.contains_key(old_path) {
+                let _ = self.doc.entry_delete(old_path);
+                deleted.push(old_path.clone());
+            }
+        }
+
+        let mut updated = Vec::new();
+        for (path, val) in &incoming {
+            let prev = self.known_entries.get(path);
+            if prev != Some(val) {
+                let patch = Self::build_replace_patch(prev, val);
+                let _ = self.doc.entry_patch_json(path, &patch);
+                updated.push(Self::entry_for_value(path.clone(), val, seq));
+            }
+        }
+
+        if !updated.is_empty() || !deleted.is_empty() {
+            let _ = self.doc.commit(&CommitMeta::user("remote", None, seq));
+            self.last_synced_vv = self.doc.version_vector();
+            self.known_entries = incoming;
+        }
+
+        (updated, deleted, is_initial)
     }
 }
 

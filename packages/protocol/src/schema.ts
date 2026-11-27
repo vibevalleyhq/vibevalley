@@ -120,6 +120,10 @@ export {
 export {
   Artifact,
   ArtifactCard,
+  ArtifactCollabExportRequest,
+  ArtifactCollabExportResult,
+  ArtifactCollabImportRequest,
+  ArtifactCollabImportResult,
   ArtifactContent,
   ArtifactCover,
   ArtifactCoverSetRequest,
