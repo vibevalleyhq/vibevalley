@@ -45,17 +45,18 @@ function makeTodoCard(id: string, lane: "backlog" | "todo" = "todo"): BoardCard 
   return { id, kind: "todo", lane, issue };
 }
 
-const sampleGhost: DragGhost = { title: "Card A", dx: 10, dy: 10, w: 240, origin: { x: 0, y: 0 } };
+const sampleGhost: DragGhost = { number: "#1", title: "Card A", dx: 10, dy: 10, w: 240, h: 84, origin: { x: 0, y: 0 } };
 const sampleTargets: DragTargets = {
   laneRects: [
-    ["backlog", { x: 0, y: 0, w: 220, h: 600 }],
+    ["backlog", { x: 0, y: 0, w: 220, h: 320 }],
     ["todo", { x: 230, y: 0, w: 220, h: 600 }],
-    ["in_progress", { x: 460, y: 0, w: 220, h: 600 }],
+    ["in_progress", { x: 460, y: 0, w: 220, h: 240 }],
   ],
   cardRects: [
     ["c-1", { x: 240, y: 40, w: 200, h: 80 }],
     ["c-2", { x: 240, y: 130, w: 200, h: 80 }],
   ],
+  boardRect: { x: 0, y: 0, w: 680, h: 600 },
 };
 
 test("IssuesPage overlay FSM keeps overlays mutually exclusive and handles peek/close/reopen/new", () => {
@@ -173,4 +174,90 @@ test("boardLaneWidth fits all 6 lanes cleanly at 1680px and avoids awkward parti
   expect(width1280).toBeGreaterThanOrEqual(220);
   expect(fiveLanes1280).toBeLessThanOrEqual(avail1280);
   expect(avail1280 - fiveLanes1280).toBeLessThan(BOARD_LANE_GAP);
+});
+
+test("cross-lane drag over placeable cards in another lane drops on target lane instead of placing before", () => {
+  const cardBacklog = makeTodoCard("c-backlog", "backlog");
+  const cardTodo = makeTodoCard("c-2", "todo");
+  const placeable = (id: string) => id === "c-1" || id === "c-2";
+
+  let state = dragTransition(initialDragState(), { kind: "start", card: cardBacklog, number: "#10", title: "From backlog", at: { x: 80, y: 60 } });
+  state = dragTransition(state, { kind: "measured", epoch: state.epoch, ghost: sampleGhost, targets: sampleTargets, isPlaceable: placeable });
+  // Hover directly over placeable `c-2` in the `todo` lane -> must drop on `todo`, NEVER set `before: "c-2"`.
+  state = dragTransition(state, { kind: "move", at: { x: 280, y: 150 }, isPlaceable: placeable });
+  expect(state.phase).toBe("dragging");
+  if (state.phase === "dragging") {
+    expect(state.over).toBe("todo");
+    expect(state.before).toBeUndefined();
+  }
+  expect(dragDropOutcome(state, true)).toEqual({ kind: "drop", card: cardBacklog, lane: "todo" });
+
+  // Moving back to another card inside its own `backlog` lane keeps cross-lane vs same-lane behavior distinct.
+  expect(cardTodo.lane).toBe("todo");
+});
+
+test("drag hit-testing tolerates empty space below short lanes and 10px inter-lane gaps while rejecting outside board", () => {
+  const baseCard = makeTodoCard("c-1", "todo");
+  const cardA: BoardCard = { ...baseCard, issue: { ...baseCard.issue, moves: ["backlog", "todo", "in_progress", "done", "canceled"] } };
+  const placeable = () => false;
+
+  let state = dragTransition(initialDragState(), { kind: "start", card: cardA, title: "Card A", at: { x: 260, y: 60 } });
+  state = dragTransition(state, { kind: "measured", epoch: state.epoch, ghost: sampleGhost, targets: sampleTargets, isPlaceable: placeable });
+
+  // Empty vertical area below `in_progress` (lane rect h=240, boardRect h=600).
+  state = dragTransition(state, { kind: "move", at: { x: 520, y: 500 }, isPlaceable: placeable });
+  expect(dragDropOutcome(state, true)).toEqual({ kind: "drop", card: cardA, lane: "in_progress" });
+
+  // Inside the 10px gap between `todo` (ends 450) and `in_progress` (starts 460), closer to `in_progress`.
+  state = dragTransition(state, { kind: "move", at: { x: 458, y: 120 }, isPlaceable: placeable });
+  expect(dragDropOutcome(state, true)).toEqual({ kind: "drop", card: cardA, lane: "in_progress" });
+
+  // Outside `boardRect` bottom -> resolves to none.
+  state = dragTransition(state, { kind: "move", at: { x: 520, y: 720 }, isPlaceable: placeable });
+  expect(dragDropOutcome(state, true)).toEqual({ kind: "none" });
+});
+
+test("fast-drag release during measuring preserves drop target and resolves cleanly after measured", () => {
+  const cardA = makeTodoCard("c-1", "todo");
+  const placeable = () => false;
+
+  let state = dragTransition(initialDragState(), { kind: "start", card: cardA, title: "Fast drag", at: { x: 260, y: 60 } });
+  state = dragTransition(state, { kind: "release", at: { x: 50, y: 80 }, isPlaceable: placeable });
+  expect(state.phase).toBe("measuring");
+  if (state.phase === "measuring") {
+    expect(state.pendingDrop).toBe(true);
+    expect(state.at).toEqual({ x: 50, y: 80 });
+  }
+
+  state = dragTransition(state, { kind: "measured", epoch: state.epoch, ghost: sampleGhost, targets: sampleTargets, isPlaceable: placeable });
+  expect(dragDropOutcome(state, true)).toEqual({ kind: "drop", card: cardA, lane: "backlog" });
+});
+
+test("grouped swimlane hit-testing tracks exact hovered cell overKey and vertical bounds", () => {
+  const baseCard = makeTodoCard("c-1", "todo");
+  const cardA: BoardCard = { ...baseCard, issue: { ...baseCard.issue, moves: ["backlog", "todo", "in_progress", "done", "canceled"] } };
+  const placeable = () => false;
+  const groupedTargets: DragTargets = {
+    laneRects: [
+      ["in_progress", { x: 460, y: 40, w: 220, h: 120 }, "repoA:in_progress"],
+      ["in_progress", { x: 460, y: 220, w: 220, h: 120 }, "repoB:in_progress"],
+    ],
+    cardRects: [],
+    boardRect: { x: 0, y: 0, w: 720, h: 600 },
+    grouped: true,
+  };
+
+  let state = dragTransition(initialDragState(), { kind: "start", card: cardA, title: "Grouped drag", at: { x: 260, y: 60 } });
+  state = dragTransition(state, { kind: "measured", epoch: state.epoch, ghost: sampleGhost, targets: groupedTargets, isPlaceable: placeable });
+
+  state = dragTransition(state, { kind: "move", at: { x: 500, y: 260 }, isPlaceable: placeable });
+  expect(state.phase).toBe("dragging");
+  if (state.phase === "dragging") {
+    expect(state.over).toBe("in_progress");
+    expect(state.overKey).toBe("repoB:in_progress");
+  }
+
+  // Below all swimlane cells in grouped mode -> should NOT expand vertically across group boundaries.
+  state = dragTransition(state, { kind: "move", at: { x: 500, y: 450 }, isPlaceable: placeable });
+  expect(dragDropOutcome(state, true)).toEqual({ kind: "none" });
 });
