@@ -11858,6 +11858,7 @@ dependencies = [
  "indexmap 2.14.2",
  "toml_datetime 1.1.3+spec-1.1.0",
  "toml_parser",
+ "toml_writer",
  "winnow 1.0.5",
 ]
 
@@ -12615,6 +12616,7 @@ dependencies = [
 name = "vibevalley-rich"
 version = "0.1.0"
 dependencies = [
+ "base64 0.23.1",
  "nsh-base",
  "nsh-core",
  "nsh-js",
@@ -12630,8 +12632,10 @@ dependencies = [
  "tokio",
  "ttf-parser",
  "usvg 0.46.0",
+ "vibevalley-core",
  "vibevalley-i18n",
  "vibevalley-pele",
+ "vibevalley-protocol",
  "vibevalley-shiki",
  "zstd",
 ]
@@ -12674,6 +12678,7 @@ dependencies = [
  "thiserror 2.0.21",
  "tokio",
  "tokio-util",
+ "toml_edit 0.25.19+spec-1.1.0",
  "uuid",
  "vibevalley-git",
  "vibevalley-mcp",
@@ -12745,6 +12750,7 @@ dependencies = [
  "libghostty-vt",
  "portable-pty",
  "serde",
+ "serde_json",
  "tempfile",
  "thiserror 2.0.21",
  "unicode-segmentation",

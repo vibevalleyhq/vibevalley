@@ -139,48 +139,52 @@ pub(crate) fn shiki_rgba_to_hsla(c: vibevalley_shiki::Rgba) -> Hsla {
 /// Always uses concrete hex colors (zero CSS `var()`/`color-mix()`) so `nsh_core::svg::rasterize`
 /// renders text and shapes identically on macOS retina displays.
 pub fn vv_pele_palette(dark: bool) -> PeleThemePalette {
-    if dark {
-        PeleThemePalette {
-            bg: "#151413".to_owned(),
-            fg: "#ecebe8".to_owned(),
-            muted: "#a9a49e".to_owned(),
-            line: "#a9a49e".to_owned(),
-            surface: "#1b1a18".to_owned(),
-            surface_alt: "#262421".to_owned(),
-            border: "#5c5750".to_owned(),
-            accent: "#7fae4f".to_owned(),
-            critical: "#e47d6d".to_owned(),
-            fg_on_light: "#1c1917".to_owned(),
-            fg_on_dark: "#ecebe8".to_owned(),
-            series: ["#6aa6dc", "#e5a93c", "#8dbb5c", "#e47d6d", "#72b7b2", "#c8a46e", "#b48ef5", "#f3b07a"].map(str::to_owned),
-            radius: 6.0,
-            font_family: DIAGRAM_FONT_SANS.to_owned(),
-            font_family_mono: CODE_FONT_MONO.to_owned(),
-            title_weight: "600".to_owned(),
-            heading_weight: "600".to_owned(),
-            bold_weight: "600".to_owned(),
-        }
+    let (bg, fg, muted, surface, surface_alt, border, accent, critical, fg_on_dark, series) = if dark {
+        (
+            "#151413",
+            "#ecebe8",
+            "#a9a49e",
+            "#1b1a18",
+            "#262421",
+            "#5c5750",
+            "#7fae4f",
+            "#e47d6d",
+            "#ecebe8",
+            ["#6aa6dc", "#e5a93c", "#8dbb5c", "#e47d6d", "#72b7b2", "#c8a46e", "#b48ef5", "#f3b07a"],
+        )
     } else {
-        PeleThemePalette {
-            bg: "#fcfcfb".to_owned(),
-            fg: "#1c1917".to_owned(),
-            muted: "#5e5852".to_owned(),
-            line: "#5e5852".to_owned(),
-            surface: "#f6f5f3".to_owned(),
-            surface_alt: "#efeeeb".to_owned(),
-            border: "#8a837b".to_owned(),
-            accent: "#4d7a2a".to_owned(),
-            critical: "#a83a2c".to_owned(),
-            fg_on_light: "#1c1917".to_owned(),
-            fg_on_dark: "#fffaf0".to_owned(),
-            series: ["#2c6aa3", "#b8682a", "#4d7a2a", "#a83a2c", "#3b8a82", "#9b7550", "#7c52a8", "#74a046"].map(str::to_owned),
-            radius: 6.0,
-            font_family: DIAGRAM_FONT_SANS.to_owned(),
-            font_family_mono: CODE_FONT_MONO.to_owned(),
-            title_weight: "600".to_owned(),
-            heading_weight: "600".to_owned(),
-            bold_weight: "600".to_owned(),
-        }
+        (
+            "#fcfcfb",
+            "#1c1917",
+            "#5e5852",
+            "#f6f5f3",
+            "#efeeeb",
+            "#8a837b",
+            "#4d7a2a",
+            "#a83a2c",
+            "#fffaf0",
+            ["#2c6aa3", "#b8682a", "#4d7a2a", "#a83a2c", "#3b8a82", "#9b7550", "#7c52a8", "#74a046"],
+        )
+    };
+    PeleThemePalette {
+        bg: bg.to_owned(),
+        fg: fg.to_owned(),
+        muted: muted.to_owned(),
+        line: muted.to_owned(),
+        surface: surface.to_owned(),
+        surface_alt: surface_alt.to_owned(),
+        border: border.to_owned(),
+        accent: accent.to_owned(),
+        critical: critical.to_owned(),
+        fg_on_light: "#1c1917".to_owned(),
+        fg_on_dark: fg_on_dark.to_owned(),
+        series: series.map(str::to_owned),
+        radius: 6.0,
+        font_family: DIAGRAM_FONT_SANS.to_owned(),
+        font_family_mono: CODE_FONT_MONO.to_owned(),
+        title_weight: "600".to_owned(),
+        heading_weight: "600".to_owned(),
+        bold_weight: "600".to_owned(),
     }
 }
 
@@ -196,18 +200,42 @@ fn rule(scopes: &[&str], fg: &str, font_style: Option<&str>) -> RawThemeSetting 
     }
 }
 
-/// VibeValley warm light TextMate theme matching `apps/mac/ui/design/theme.json`.
-pub fn vv_shiki_light_theme() -> RawTheme {
+struct ShikiThemeColors {
+    name: &'static str,
+    display_name: &'static str,
+    theme_type: ThemeType,
+    editor_fg: &'static str,
+    editor_bg: &'static str,
+    comment: &'static str,
+    keyword: &'static str,
+    operator: &'static str,
+    string: &'static str,
+    escape: &'static str,
+    constant: &'static str,
+    function: &'static str,
+    ty: &'static str,
+    tag: &'static str,
+    attribute: &'static str,
+    language_var: &'static str,
+    markup_text: &'static str,
+    markup_code: &'static str,
+    markup_inserted: &'static str,
+    markup_deleted: &'static str,
+    markup_changed: &'static str,
+    invalid: &'static str,
+}
+
+fn build_shiki_theme(c: &ShikiThemeColors) -> RawTheme {
     let mut colors = BTreeMap::new();
-    colors.insert("editor.foreground".to_owned(), "#1c1917".to_owned());
-    colors.insert("editor.background".to_owned(), "#f3f1ee".to_owned());
+    colors.insert("editor.foreground".to_owned(), c.editor_fg.to_owned());
+    colors.insert("editor.background".to_owned(), c.editor_bg.to_owned());
     RawTheme {
-        name: Some(SHIKI_LIGHT_THEME.to_owned()),
-        display_name: Some("VibeValley Warm Light".to_owned()),
-        theme_type: Some(ThemeType::Light),
+        name: Some(c.name.to_owned()),
+        display_name: Some(c.display_name.to_owned()),
+        theme_type: Some(c.theme_type),
         colors,
         token_colors: Some(vec![
-            rule(&["comment", "punctuation.definition.comment"], "#716a64", Some("italic")),
+            rule(&["comment", "punctuation.definition.comment"], c.comment, Some("italic")),
             rule(
                 &[
                     "keyword",
@@ -217,20 +245,20 @@ pub fn vv_shiki_light_theme() -> RawTheme {
                     "keyword.control",
                     "keyword.operator.word",
                 ],
-                "#a83a2c",
+                c.keyword,
                 None,
             ),
-            rule(&["keyword.operator", "punctuation.accessor"], "#5e5852", None),
-            rule(&["string", "punctuation.definition.string"], "#3b6125", None),
-            rule(&["constant.character.escape", "string.regexp"], "#94531f", None),
+            rule(&["keyword.operator", "punctuation.accessor"], c.operator, None),
+            rule(&["string", "punctuation.definition.string"], c.string, None),
+            rule(&["constant.character.escape", "string.regexp"], c.escape, None),
             rule(
                 &["constant.numeric", "constant.language", "constant.other", "support.constant"],
-                "#b8682a",
+                c.constant,
                 None,
             ),
             rule(
                 &["entity.name.function", "support.function", "meta.function-call", "variable.function"],
-                "#2c6aa3",
+                c.function,
                 None,
             ),
             rule(
@@ -244,10 +272,10 @@ pub fn vv_shiki_light_theme() -> RawTheme {
                     "support.type",
                     "support.class",
                 ],
-                "#6d4c96",
+                c.ty,
                 None,
             ),
-            rule(&["entity.name.tag", "support.type.property-name"], "#4d7a2a", None),
+            rule(&["entity.name.tag", "support.type.property-name"], c.tag, None),
             rule(
                 &[
                     "entity.other.attribute-name",
@@ -256,104 +284,79 @@ pub fn vv_shiki_light_theme() -> RawTheme {
                     "variable.other.member",
                     "meta.attribute",
                 ],
-                "#7f5b3b",
+                c.attribute,
                 None,
             ),
             rule(
                 &["variable.language", "storage.modifier.lifetime", "entity.name.lifetime"],
-                "#94531f",
+                c.language_var,
                 Some("italic"),
             ),
-            rule(&["markup.heading"], "#1c1917", Some("bold")),
-            rule(&["markup.bold"], "#1c1917", Some("bold")),
-            rule(&["markup.italic"], "#1c1917", Some("italic")),
-            rule(&["markup.inline.raw", "markup.fenced_code"], "#4d7a2a", None),
-            rule(&["markup.inserted", "diff.plus"], "#3b6125", None),
-            rule(&["markup.deleted", "diff.minus"], "#a83a2c", None),
-            rule(&["markup.changed", "meta.diff.range"], "#2c6aa3", None),
-            rule(&["invalid"], "#a83a2c", Some("underline")),
+            rule(&["markup.heading"], c.markup_text, Some("bold")),
+            rule(&["markup.bold"], c.markup_text, Some("bold")),
+            rule(&["markup.italic"], c.markup_text, Some("italic")),
+            rule(&["markup.inline.raw", "markup.fenced_code"], c.markup_code, None),
+            rule(&["markup.inserted", "diff.plus"], c.markup_inserted, None),
+            rule(&["markup.deleted", "diff.minus"], c.markup_deleted, None),
+            rule(&["markup.changed", "meta.diff.range"], c.markup_changed, None),
+            rule(&["invalid"], c.invalid, Some("underline")),
         ]),
         ..RawTheme::default()
     }
 }
 
+/// VibeValley warm light TextMate theme matching `apps/mac/ui/design/theme.json`.
+pub fn vv_shiki_light_theme() -> RawTheme {
+    build_shiki_theme(&ShikiThemeColors {
+        name: SHIKI_LIGHT_THEME,
+        display_name: "VibeValley Warm Light",
+        theme_type: ThemeType::Light,
+        editor_fg: "#1c1917",
+        editor_bg: "#f3f1ee",
+        comment: "#716a64",
+        keyword: "#a83a2c",
+        operator: "#5e5852",
+        string: "#3b6125",
+        escape: "#94531f",
+        constant: "#b8682a",
+        function: "#2c6aa3",
+        ty: "#6d4c96",
+        tag: "#4d7a2a",
+        attribute: "#7f5b3b",
+        language_var: "#94531f",
+        markup_text: "#1c1917",
+        markup_code: "#4d7a2a",
+        markup_inserted: "#3b6125",
+        markup_deleted: "#a83a2c",
+        markup_changed: "#2c6aa3",
+        invalid: "#a83a2c",
+    })
+}
+
 /// VibeValley warm dark TextMate theme matching `apps/mac/ui/design/theme.json`.
 pub fn vv_shiki_dark_theme() -> RawTheme {
-    let mut colors = BTreeMap::new();
-    colors.insert("editor.foreground".to_owned(), "#ecebe8".to_owned());
-    colors.insert("editor.background".to_owned(), "#1d1c1a".to_owned());
-    RawTheme {
-        name: Some(SHIKI_DARK_THEME.to_owned()),
-        display_name: Some("VibeValley Warm Dark".to_owned()),
-        theme_type: Some(ThemeType::Dark),
-        colors,
-        token_colors: Some(vec![
-            rule(&["comment", "punctuation.definition.comment"], "#8b867f", Some("italic")),
-            rule(
-                &[
-                    "keyword",
-                    "storage",
-                    "storage.type",
-                    "storage.modifier",
-                    "keyword.control",
-                    "keyword.operator.word",
-                ],
-                "#e47d6d",
-                None,
-            ),
-            rule(&["keyword.operator", "punctuation.accessor"], "#a9a49e", None),
-            rule(&["string", "punctuation.definition.string"], "#b0d488", None),
-            rule(&["constant.character.escape", "string.regexp"], "#f3b07a", None),
-            rule(
-                &["constant.numeric", "constant.language", "constant.other", "support.constant"],
-                "#e5a93c",
-                None,
-            ),
-            rule(
-                &["entity.name.function", "support.function", "meta.function-call", "variable.function"],
-                "#6aa6dc",
-                None,
-            ),
-            rule(
-                &[
-                    "entity.name.type",
-                    "entity.name.class",
-                    "entity.name.struct",
-                    "entity.name.enum",
-                    "entity.name.trait",
-                    "entity.other.inherited-class",
-                    "support.type",
-                    "support.class",
-                ],
-                "#cbb2f0",
-                None,
-            ),
-            rule(&["entity.name.tag", "support.type.property-name"], "#8dbb5c", None),
-            rule(
-                &[
-                    "entity.other.attribute-name",
-                    "variable.parameter",
-                    "variable.other.property",
-                    "variable.other.member",
-                    "meta.attribute",
-                ],
-                "#d4b483",
-                None,
-            ),
-            rule(
-                &["variable.language", "storage.modifier.lifetime", "entity.name.lifetime"],
-                "#e0a062",
-                Some("italic"),
-            ),
-            rule(&["markup.heading"], "#ecebe8", Some("bold")),
-            rule(&["markup.bold"], "#ecebe8", Some("bold")),
-            rule(&["markup.italic"], "#ecebe8", Some("italic")),
-            rule(&["markup.inline.raw", "markup.fenced_code"], "#8dbb5c", None),
-            rule(&["markup.inserted", "diff.plus"], "#b0d488", None),
-            rule(&["markup.deleted", "diff.minus"], "#e47d6d", None),
-            rule(&["markup.changed", "meta.diff.range"], "#6aa6dc", None),
-            rule(&["invalid"], "#e47d6d", Some("underline")),
-        ]),
-        ..RawTheme::default()
-    }
+    build_shiki_theme(&ShikiThemeColors {
+        name: SHIKI_DARK_THEME,
+        display_name: "VibeValley Warm Dark",
+        theme_type: ThemeType::Dark,
+        editor_fg: "#ecebe8",
+        editor_bg: "#1d1c1a",
+        comment: "#8b867f",
+        keyword: "#e47d6d",
+        operator: "#a9a49e",
+        string: "#b0d488",
+        escape: "#f3b07a",
+        constant: "#e5a93c",
+        function: "#6aa6dc",
+        ty: "#cbb2f0",
+        tag: "#8dbb5c",
+        attribute: "#d4b483",
+        language_var: "#e0a062",
+        markup_text: "#ecebe8",
+        markup_code: "#8dbb5c",
+        markup_inserted: "#b0d488",
+        markup_deleted: "#e47d6d",
+        markup_changed: "#6aa6dc",
+        invalid: "#e47d6d",
+    })
 }

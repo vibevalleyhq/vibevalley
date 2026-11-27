@@ -1,7 +1,7 @@
 //! Single typed executor for shell inspection, input dispatch, screenshots, and commands.
 //!
-//! Both live VDP WebSocket requests (`vdp.rs`) and legacy `VIBEVALLEY_DEBUG_SCRIPT`
-//! files (`script.rs`) execute through this module so command behavior never drifts.
+//! Live VDP WebSocket requests (`vdp.rs`) and DevTools Canvas Inspector execute through
+//! this module so inspection and automation behavior share one source of truth.
 
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -12,9 +12,10 @@ use gpui::{
 use serde_json::{Value, json};
 use vibevalley_protocol::{
     HostCapturedImage, VdpAckResult, VdpCaptureScreenshotParams, VdpDispatchKeyParams, VdpDispatchMouseParams, VdpError, VdpInputResult, VdpMouseButton,
-    VdpMouseEventKind, VdpPageMetrics, VdpScreenshotTarget, VdpShellClosePaneParams, VdpShellGetTerminalGridParams, VdpShellNavigateParams,
-    VdpShellOpenPaneParams, VdpShellResizeParams, VdpShellRunCommandParams, VdpShellSendTerminalInputParams, VdpShellSetThemeParams, VdpTarget, VdpTargetKind,
-    VdpTypeTextParams,
+    VdpMouseEventKind, VdpPageMetrics, VdpScreenshotTarget, VdpShellClosePaneParams, VdpShellDispatchActionParams, VdpShellGetTerminalGridParams,
+    VdpShellNavigateParams, VdpShellOpenPaneParams, VdpShellResizeParams, VdpShellRunCommandParams, VdpShellSendTerminalInputParams,
+    VdpShellSetDioramaClockParams, VdpShellSetThemeParams, VdpTarget, VdpTargetKind, VdpTypeTextParams, VdpUiBounds, VdpUiHighlightParams,
+    VdpUiInspectAtResult, VdpUiInspectorModeParams, VdpUiNode,
 };
 use vibevalley_workspace::{DiffSpec, PaneKind, TabId};
 
@@ -58,7 +59,7 @@ pub fn grid_text(snapshot: &vibevalley_terminal::Snapshot) -> Vec<String> {
         .collect()
 }
 
-/// Captures the full shell state snapshot shared by `VIBEVALLEY_DEBUG_DUMP` and `Shell.getState`.
+/// Captures the full shell state snapshot for `Shell.getState`.
 pub fn dump(shell: &Shell, cx: &App) -> Value {
     let projects: Vec<Value> = shell
         .workspace
@@ -463,25 +464,6 @@ pub(crate) fn dispatch_mouse(params: &VdpDispatchMouseParams, window: &mut Windo
     Ok(VdpInputResult { handled: true })
 }
 
-/// Captures the GPUI Metal frame to disk for legacy `shot:<file.png>` script steps.
-#[cfg(feature = "shot")]
-pub(crate) fn save_shell_screenshot(window: &mut Window, path: &str, cx: &mut App) {
-    window.simulate_next_frame(cx);
-    window.draw(cx).clear(cx);
-    match window.render_to_image() {
-        Ok(image) => match image.save(path) {
-            Ok(()) => eprintln!("debug script: shot {path} {}x{}", image.width(), image.height()),
-            Err(e) => eprintln!("debug script: shot {path}: {e}"),
-        },
-        Err(e) => eprintln!("debug script: shot: {e}"),
-    }
-}
-
-#[cfg(not(feature = "shot"))]
-pub(crate) fn save_shell_screenshot(_window: &mut Window, path: &str, _cx: &mut App) {
-    eprintln!("debug script: shot {path}: build with --features shot");
-}
-
 /// Captures a screenshot for `Page.captureScreenshot` (shell Metal texture or active `WKWebView`).
 pub(crate) fn capture_screenshot(params: &VdpCaptureScreenshotParams, window: &mut Window, cx: &mut App) -> GpuiExecResult {
     match params.target.unwrap_or_default() {
@@ -757,7 +739,7 @@ pub(crate) fn exec_send_terminal_input(shell: &mut Shell, params: &VdpShellSendT
     Ok(json!(VdpAckResult { ok: true }))
 }
 
-/// Runs a legacy window-level command (`draw`, `shot:`, `key:`, `type:`, `mouse:`).
+/// Runs a window-level command (`draw`, `key:`, `type:`, `mouse:`) for `Shell.runCommand`.
 /// Returns `Ok(true)` if handled as a window command, `Ok(false)` for shell commands.
 pub(crate) fn run_window_command(cmd: &str, window: &mut Window, cx: &mut App) -> Result<bool, VdpError> {
     let (name, arg) = cmd.split_once(':').unwrap_or((cmd, ""));
@@ -765,53 +747,47 @@ pub(crate) fn run_window_command(cmd: &str, window: &mut Window, cx: &mut App) -
         "draw" => {
             window.draw(cx).clear(cx);
         }
-        "shot" => {
-            save_shell_screenshot(window, arg, cx);
-        }
         "key" => {
-            let res = dispatch_keys(&VdpDispatchKeyParams { keys: arg.to_string() }, window, cx)?;
-            eprintln!("debug script: key {arg} handled={}", res.handled);
+            let _ = dispatch_keys(&VdpDispatchKeyParams { keys: arg.to_string() }, window, cx)?;
         }
         "type" => {
             let _ = dispatch_text(&VdpTypeTextParams { text: arg.to_string() }, window, cx);
         }
         "mouse" => {
-            let params = parse_legacy_mouse_arg(arg)?;
-            let _ = dispatch_mouse(&params, window, cx)?;
+            let parts: Vec<&str> = arg.split(',').map(str::trim).collect();
+            let kind = match parts.first().copied().unwrap_or("") {
+                "down" => VdpMouseEventKind::Down,
+                "up" => VdpMouseEventKind::Up,
+                "move" => VdpMouseEventKind::Move,
+                "drag" => VdpMouseEventKind::Drag,
+                "click" => VdpMouseEventKind::Click,
+                other => return Err(VdpError::invalid_params(format!("unknown mouse action {other:?}"))),
+            };
+            let num = |i: usize| parts.get(i).and_then(|v| v.parse::<f32>().ok()).unwrap_or(0.0);
+            let button = match parts.get(3).copied() {
+                Some("right") => Some(VdpMouseButton::Right),
+                Some("middle") => Some(VdpMouseButton::Middle),
+                _ => Some(VdpMouseButton::Left),
+            };
+            let _ = dispatch_mouse(
+                &VdpDispatchMouseParams {
+                    kind,
+                    x: num(1),
+                    y: num(2),
+                    button,
+                    end_x: None,
+                    end_y: None,
+                },
+                window,
+                cx,
+            )?;
         }
         _ => return Ok(false),
     }
     Ok(true)
 }
 
-/// Parses `mouse:<down|up|move|drag|click>,x,y[,right|middle]` into [`VdpDispatchMouseParams`].
-pub(crate) fn parse_legacy_mouse_arg(arg: &str) -> Result<VdpDispatchMouseParams, VdpError> {
-    let parts: Vec<&str> = arg.split(',').map(str::trim).collect();
-    let kind = match parts.first().copied().unwrap_or("") {
-        "down" => VdpMouseEventKind::Down,
-        "up" => VdpMouseEventKind::Up,
-        "move" => VdpMouseEventKind::Move,
-        "drag" => VdpMouseEventKind::Drag,
-        "click" => VdpMouseEventKind::Click,
-        other => return Err(VdpError::invalid_params(format!("unknown mouse action {other:?}"))),
-    };
-    let num = |i: usize| parts.get(i).and_then(|v| v.parse::<f32>().ok()).unwrap_or(0.0);
-    let button = match parts.get(3).copied() {
-        Some("right") => Some(VdpMouseButton::Right),
-        Some("middle") => Some(VdpMouseButton::Middle),
-        _ => Some(VdpMouseButton::Left),
-    };
-    Ok(VdpDispatchMouseParams {
-        kind,
-        x: num(1),
-        y: num(2),
-        button,
-        end_x: None,
-        end_y: None,
-    })
-}
-
-/// Runs a shell-level command string shared by `Shell.runCommand` and `VIBEVALLEY_DEBUG_SCRIPT`.
+/// Runs a shell-level command string for `Shell.runCommand`.
 pub(crate) fn run_shell_command(shell: &mut Shell, cmd: &str, window: &mut Window, cx: &mut Context<Shell>) -> Result<(), VdpError> {
     let (name, arg) = cmd.split_once(':').unwrap_or((cmd, ""));
     match name {
@@ -863,12 +839,8 @@ pub(crate) fn run_shell_command(shell: &mut Shell, cmd: &str, window: &mut Windo
         }
         "diorama_clock" => {
             let parts: Vec<&str> = arg.split(',').collect();
-            if let Some(view) = active_diorama(shell) {
-                view.update(cx, |v, cx| {
-                    v.set_clock(parts[0].parse().ok());
-                    cx.notify();
-                });
-            }
+            let seconds = parts.first().and_then(|p| p.parse::<f32>().ok());
+            let _ = exec_set_diorama_clock(shell, &VdpShellSetDioramaClockParams { seconds }, cx);
         }
         "close_kind" => {
             let (kind, title) = arg.split_once('@').unwrap_or((arg, ""));
@@ -899,4 +871,291 @@ pub(crate) fn exec_run_command(shell: &Entity<Shell>, params: &VdpShellRunComman
     }
     shell.update(cx, |s, cx| run_shell_command(s, cmd, window, cx))?;
     Ok(json!(VdpAckResult { ok: true }))
+}
+
+/// Executes `Shell.dispatchAction` with a typed [`vibevalley_protocol::HostAction`].
+pub(crate) fn exec_dispatch_action(shell: &mut Shell, params: &VdpShellDispatchActionParams, window: &mut Window, cx: &mut Context<Shell>) -> Value {
+    shell.on_action(params.action.clone(), window, cx);
+    json!(VdpAckResult { ok: true })
+}
+
+/// Executes `Shell.save`.
+pub(crate) fn exec_save(shell: &mut Shell, cx: &mut Context<Shell>) -> Value {
+    shell.save_now(cx);
+    json!(VdpAckResult { ok: true })
+}
+
+/// Executes `Shell.getUpdateState`.
+pub(crate) fn exec_get_update_state() -> Value {
+    json!({
+        "ready": crate::update::ready(),
+        "state": crate::update::state(),
+    })
+}
+
+/// Executes `Shell.setDioramaClock`.
+pub(crate) fn exec_set_diorama_clock(shell: &mut Shell, params: &VdpShellSetDioramaClockParams, cx: &mut Context<Shell>) -> Value {
+    if let Some(view) = active_diorama(shell) {
+        view.update(cx, |v, cx| {
+            v.set_clock(params.seconds);
+            cx.notify();
+        });
+    }
+    json!(VdpAckResult { ok: true })
+}
+
+/// Executes `Page.draw`.
+pub(crate) fn exec_page_draw(shell: &Entity<Shell>, window: &mut Window, cx: &mut App) -> Value {
+    window.draw(cx).clear(cx);
+    shell.update(cx, |s, cx| step_unpainted_dioramas(s, cx));
+    json!(VdpAckResult { ok: true })
+}
+
+/// Executes `UI.highlight`.
+pub(crate) fn exec_ui_highlight(shell: &mut Shell, params: &VdpUiHighlightParams, cx: &mut Context<Shell>) -> Value {
+    let hit = if params.test_id.is_none() && params.bounds.is_none() {
+        None
+    } else {
+        Some(VdpUiInspectAtResult {
+            hit: true,
+            surface: params.surface.clone(),
+            test_id: params.test_id.clone(),
+            role: None,
+            text: params.label.clone(),
+            route: None,
+            source: params.source.clone(),
+            bounds: params.bounds,
+        })
+    };
+    shell.set_devtools_highlight(hit, cx);
+    json!(VdpAckResult { ok: true })
+}
+
+/// Executes `UI.setInspectorMode`.
+pub(crate) fn exec_ui_set_inspector_mode(shell: &mut Shell, params: &VdpUiInspectorModeParams, cx: &mut Context<Shell>) -> Value {
+    shell.set_devtools_inspecting(params.enabled, cx);
+    json!(VdpAckResult { ok: true })
+}
+
+fn contains_point(bounds: &VdpUiBounds, x: f32, y: f32) -> bool {
+    bounds.width > 0.0 && bounds.height > 0.0 && x >= bounds.x && x <= (bounds.x + bounds.width) && y >= bounds.y && y <= (bounds.y + bounds.height)
+}
+
+fn bounds_area(bounds: &VdpUiBounds) -> f32 {
+    (bounds.width.max(0.0)) * (bounds.height.max(0.0))
+}
+
+fn is_container_only_node(hit: &VdpUiInspectAtResult) -> bool {
+    matches!(hit.role.as_deref(), Some("root" | "route")) || hit.test_id.as_deref().is_some_and(|id| id.starts_with("view:"))
+}
+
+/// Chooses the tightest (smallest-area) inspect candidate containing `(x, y)`, preferring leaf nodes over root view wrappers.
+pub(crate) fn select_deepest_hit(x: f32, y: f32, candidates: Vec<VdpUiInspectAtResult>) -> Option<VdpUiInspectAtResult> {
+    candidates
+        .into_iter()
+        .filter(|c| c.bounds.as_ref().is_some_and(|b| contains_point(b, x, y)))
+        .min_by(|a, b| {
+            let a_container = is_container_only_node(a);
+            let b_container = is_container_only_node(b);
+            a_container.cmp(&b_container).then_with(|| {
+                let area_a = a.bounds.as_ref().map_or(f32::MAX, bounds_area);
+                let area_b = b.bounds.as_ref().map_or(f32::MAX, bounds_area);
+                area_a.total_cmp(&area_b)
+            })
+        })
+}
+
+/// Translates a `vdpProbe` UI node reported by `surface` at window origin `(ox, oy)` into shell window coordinates.
+pub(crate) fn hit_from_hosted_node(surface: &str, ox: f32, oy: f32, node: &VdpUiNode) -> Option<VdpUiInspectAtResult> {
+    let b = node.bounds?;
+    Some(VdpUiInspectAtResult {
+        hit: true,
+        surface: Some(surface.to_string()),
+        test_id: node.test_id.clone(),
+        role: node.role.clone(),
+        text: node.text.clone(),
+        route: node.route.clone(),
+        source: node.source.clone(),
+        bounds: Some(VdpUiBounds {
+            x: b.x + ox,
+            y: b.y + oy,
+            width: b.width,
+            height: b.height,
+        }),
+    })
+}
+
+/// Collects mounted [`HostedView`] entities and their shell window origins `(surface, ox, oy, view)` overlapping the window.
+pub(crate) fn hosted_view_origins(shell: &Shell, vp_w: f32, vp_h: f32, cx: &App) -> Vec<(String, f32, f32, Entity<HostedView>)> {
+    let mut views = Vec::new();
+    if let Some(palette) = shell.overlays.palette.as_ref().filter(|p| p.open) {
+        let palette_w = (vp_w - 32.0).clamp(280.0, 620.0);
+        let palette_top = if vp_h < 520.0 { 24.0 } else { 72.0 };
+        let ox = ((vp_w - palette_w) * 0.5).max(0.0);
+        views.push(("palette".to_string(), ox, palette_top, palette.view.clone()));
+    }
+    if shell.chrome.native_workspace {
+        if shell.chrome.sidebar_visible {
+            views.push(("sidebar".to_string(), shell.chrome.global_rail_width, 0.0, shell.chrome.sidebar.clone()));
+        }
+        if let Some(inspector) = &shell.chrome.inspector {
+            views.push((
+                "inspector".to_string(),
+                (vp_w - shell.chrome.inspector_width).max(0.0),
+                0.0,
+                inspector.view.clone(),
+            ));
+        }
+        if let Some(project) = shell.workspace.ws.active()
+            && let Some(tab) = project.layout.active_tab()
+            && let Some(PaneEntity::Hosted(pane_view)) = shell.workspace.panes.get(&(project.id(), tab.id)).map(|s| &s.entity)
+        {
+            let left = shell.chrome.global_rail_width
+                + if shell.chrome.sidebar_visible {
+                    shell.chrome.sidebar_width + 1.0
+                } else {
+                    0.0
+                };
+            let module = pane_view.read(cx).view_name().to_string();
+            views.push((format!("pane:{module}"), left, 0.0, pane_view.clone()));
+        }
+    }
+    views.push(("workbench".to_string(), 0.0, 0.0, shell.chrome.workbench.clone()));
+    views
+}
+
+/// Collects native GPUI shell chrome, diorama canvas, and pane elements containing `(x, y)` with `.rs` source locations.
+pub(crate) fn inspect_native_at(shell: &Shell, x: f32, y: f32, vp_w: f32, vp_h: f32, cx: &App) -> Option<VdpUiInspectAtResult> {
+    let mut candidates = Vec::new();
+    let rail_w = shell.chrome.global_rail_width;
+
+    if shell.overlays.devtools.state.enabled {
+        let cap_w = 340.0f32.min(vp_w - 16.0).max(160.0);
+        candidates.push(VdpUiInspectAtResult {
+            hit: true,
+            surface: Some("shell".into()),
+            test_id: Some("devtools-capsule".into()),
+            role: Some("button".into()),
+            text: Some(shell.overlays.devtools.state.format_capsule()),
+            route: None,
+            source: Some("apps/mac/src/shell/devtools.rs:475".into()),
+            bounds: Some(VdpUiBounds {
+                x: (vp_w - cap_w) * 0.5,
+                y: (vp_h - 36.0).max(0.0),
+                width: cap_w,
+                height: 26.0,
+            }),
+        });
+    }
+
+    if let Some(slot) = &shell.chrome.native_diorama {
+        candidates.push(VdpUiInspectAtResult {
+            hit: true,
+            surface: Some("diorama".into()),
+            test_id: Some("diorama-canvas".into()),
+            role: Some("canvas".into()),
+            text: Some(slot.view.read(cx).debug_state()["kind"].as_str().unwrap_or("diorama").to_string()),
+            route: Some("/farm".into()),
+            source: Some("apps/mac/src/diorama/view.rs:1".into()),
+            bounds: Some(VdpUiBounds {
+                x: rail_w,
+                y: 0.0,
+                width: (vp_w - rail_w).max(0.0),
+                height: vp_h,
+            }),
+        });
+    }
+
+    if shell.chrome.native_workspace {
+        if shell.chrome.sidebar_visible {
+            let div_x = rail_w + shell.chrome.sidebar_width;
+            candidates.push(VdpUiInspectAtResult {
+                hit: true,
+                surface: Some("shell".into()),
+                test_id: Some("sidebar-divider".into()),
+                role: Some("separator".into()),
+                text: None,
+                route: None,
+                source: Some("apps/mac/src/shell/render.rs:80".into()),
+                bounds: Some(VdpUiBounds {
+                    x: (div_x - 3.0).max(0.0),
+                    y: 0.0,
+                    width: 6.0,
+                    height: vp_h,
+                }),
+            });
+        }
+        if shell.chrome.inspector.is_some() {
+            let div_x = (vp_w - shell.chrome.inspector_width).max(0.0);
+            candidates.push(VdpUiInspectAtResult {
+                hit: true,
+                surface: Some("shell".into()),
+                test_id: Some("inspector-divider".into()),
+                role: Some("separator".into()),
+                text: None,
+                route: None,
+                source: Some("apps/mac/src/shell/render.rs:98".into()),
+                bounds: Some(VdpUiBounds {
+                    x: (div_x - 3.0).max(0.0),
+                    y: 0.0,
+                    width: 6.0,
+                    height: vp_h,
+                }),
+            });
+        }
+
+        let main_left = rail_w
+            + if shell.chrome.sidebar_visible {
+                shell.chrome.sidebar_width + 1.0
+            } else {
+                0.0
+            };
+        let main_right = vp_w
+            - if shell.chrome.inspector.is_some() {
+                shell.chrome.inspector_width + 1.0
+            } else {
+                0.0
+            };
+        let main_bounds = VdpUiBounds {
+            x: main_left,
+            y: 0.0,
+            width: (main_right - main_left).max(0.0),
+            height: vp_h,
+        };
+        if let Some(project) = shell.workspace.ws.active()
+            && let Some(tab) = project.layout.active_tab()
+        {
+            let (test_id, role, source) = match &tab.kind {
+                PaneKind::Terminal { terminal_id, .. } => (format!("pane:terminal:{terminal_id}"), "terminal", "apps/mac/src/panes.rs:1"),
+                PaneKind::File { path } => {
+                    let is_md = path.extension().and_then(|e| e.to_str()).is_some_and(|e| e.eq_ignore_ascii_case("md"));
+                    (
+                        format!("pane:file:{}", path.file_name().and_then(|n| n.to_str()).unwrap_or("file")),
+                        "document",
+                        if is_md {
+                            "apps/mac/src/markdown_pane.rs:1"
+                        } else {
+                            "apps/mac/src/viewer.rs:1"
+                        },
+                    )
+                }
+                PaneKind::Diff { .. } => ("pane:diff".to_string(), "diff", "apps/mac/src/diff.rs:1"),
+                PaneKind::Diorama { scene, .. } => (format!("pane:diorama:{scene}"), "canvas", "apps/mac/src/diorama/view.rs:1"),
+                PaneKind::Hosted { module, .. } => (format!("pane:hosted:{module}"), "region", "apps/mac/src/hosted/view.rs:1"),
+                PaneKind::Chat { .. } => ("pane:chat".to_string(), "region", "apps/mac/src/panes.rs:1"),
+            };
+            candidates.push(VdpUiInspectAtResult {
+                hit: true,
+                surface: Some("workspace".into()),
+                test_id: Some(test_id),
+                role: Some(role.into()),
+                text: Some(tab_title(shell, tab, cx)),
+                route: Some("/workspace".into()),
+                source: Some(source.into()),
+                bounds: Some(main_bounds),
+            });
+        }
+    }
+
+    select_deepest_hit(x, y, candidates)
 }

@@ -93,12 +93,45 @@ const farmFormParamsSchema = z.object({
 
 const emptyCalls: FarmCalls = { open: false, narrow: false, ringing: null, missed: [], log: [] };
 
+const callLogEntrySchema = z.object({
+  call: InboxItem,
+  answered: z.boolean(),
+});
+
+const resilientInboxItem = z
+  .unknown()
+  .transform((value) => {
+    const parsed = InboxItem.safeParse(value);
+    return parsed.success ? parsed.data : null;
+  })
+  .catch(null);
+
+const resilientInboxArray = z
+  .array(z.unknown())
+  .catch([])
+  .transform((items) =>
+    items.flatMap((item) => {
+      const parsed = InboxItem.safeParse(item);
+      return parsed.success ? [parsed.data] : [];
+    }),
+  );
+
+const resilientCallLogArray = z
+  .array(z.unknown())
+  .catch([])
+  .transform((items) =>
+    items.flatMap((item) => {
+      const parsed = callLogEntrySchema.safeParse(item);
+      return parsed.success ? [parsed.data] : [];
+    }),
+  );
+
 export const farmCallsSchema = z.object({
-  open: z.boolean(),
-  narrow: z.boolean(),
-  ringing: InboxItem.nullable(),
-  missed: z.array(InboxItem),
-  log: z.array(z.object({ call: InboxItem, answered: z.boolean() })),
+  open: z.boolean().catch(false),
+  narrow: z.boolean().catch(false),
+  ringing: resilientInboxItem,
+  missed: resilientInboxArray,
+  log: resilientCallLogArray,
 });
 
 const farmPhoneParamsSchema = z.object({

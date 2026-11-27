@@ -4,7 +4,35 @@
     "parent": "父工单",
     "noParent": "无父工单",
     "clearParent": "清除父工单",
-    "subProgress": "{done} / {total} 已完成"
+    "subProgress": "{done} / {total} 已完成",
+    "compactProgress": "{done}/{total}"
+  },
+  "owner": {
+    "label": "负责人",
+    "pick": "选择负责人",
+    "search": "搜索人员或专家…",
+    "self": "我（本人）",
+    "selfNamed": "{name}（本人）",
+    "unassigned": "未指定负责人",
+    "clear": "清除负责人",
+    "peopleGroup": "人员",
+    "expertsGroup": "专家角色"
+  },
+  "groupBy": {
+    "label": "分组",
+    "none": "不分组",
+    "repo": "仓库",
+    "owner": "负责人",
+    "agent": "角色",
+    "priority": "优先级",
+    "parent": "父工单",
+    "noParent": "无父工单"
+  },
+  "hierarchy": {
+    "label": "层级",
+    "all": "全部工单",
+    "top_level": "仅顶层",
+    "parents_only": "仅父工单"
   },
   "tags": {
     "label": "标签",
@@ -24,7 +52,6 @@
   "dates": {
     "startAt": "计划开始",
     "dueAt": "目标截止",
-    "datePlaceholder": "如 2026-12-01",
     "notSet": "未设置",
     "clearDate": "清除日期"
   },
@@ -102,6 +129,9 @@
     "allRepos": "所有仓库",
     "byHelper": "按角色看",
     "allHelpers": "全部角色",
+    "byStatus": "按状态看",
+    "allStatuses": "全部状态",
+    "todoAndInProgress": "待办与进行中",
     "shown": "{shown} / {of} 张",
     "clear": "清掉筛选",
     "view": "看法",
@@ -115,9 +145,7 @@
   },
   "sheet": {
     "less": "收起",
-    "more": "更多",
-    "at": "在「{stage}」",
-    "stageDone": "{stage}做完了"
+    "more": "更多"
   },
   "acts": {
     "reopened": "工单重开了",
@@ -194,10 +222,7 @@
     "changedFiles": "改了哪些文件",
     "fileCount": "{n} 个",
     "changesUnread": "读不到改动。",
-    "story": "怎么走到这一步",
-    "unread": "读不到。",
     "full": "要做的（完整说明）",
-    "steps": "执行会话的每一步",
     "openTrajectory": "完整轨迹",
     "runs": "每一轮",
     "time": "时间",
@@ -227,19 +252,6 @@
     "unsaid": "它还没说",
     "noRuns": "还没有干过活。",
     "runCount": "{n} 次",
-    "stepCount": "{n} 步",
-    "stepsAndTools": "{n} 步 · 用了 {tools} 个工具",
-    "step": {
-      "run/start": "开工",
-      "user/message": "听到",
-      "memory/recalled": "想起",
-      "assistant/thinking": "想",
-      "assistant/message": "说",
-      "tool/call": "用工具",
-      "llm/retry": "重试",
-      "run/error": "出错",
-      "run/end": "这一轮结束"
-    },
     "orchestratorStuck": "主助手这一轮没答成：在频道里看它说了什么",
     "job": "要做的",
     "from": "来自",
@@ -267,10 +279,6 @@
     "refiningLine": "它在读代码，写好了会填进下面各栏。",
     "questions": "草稿写好了，它有 {n} 个问题要问你",
     "questionsLine": "在下面回答，它照你的回答再起草一版。",
-    "drafted": "草稿写好了",
-    "draftedLine": "看一遍、改一改，没问题就开工。",
-    "what": "想做什么？",
-    "whatLine": "写一句就行：执行会话读过代码，替你写成工单。",
     "titleHint": "比如：给登录页加上记住我",
     "title": "标题",
     "descriptionHint": "说明：为什么、要做的、不做的、可能涉及哪些文件（起草会写好）",
@@ -297,23 +305,18 @@
     "inQueue": "排队中：{ago}排上的，有并发上限就按看板上的先后自动开工。",
     "unqueue": "不排了",
     "pickHelper": "先选好角色",
-    "start": "确认需求并派发",
     "save": "存下改动",
     "remove": "删掉",
     "newRepo": "新建仓库",
     "repoHint": "仓库名，也是工作区下的文件夹名",
     "repoName": "仓库名",
     "create": "新建",
-    "writeOwn": "自己写说明",
     "edit": "编辑",
     "doneEditing": "完成编辑",
     "addDescription": "添加说明…",
     "addCriteria": "添加验收标准",
     "polish": "让角色再润色",
     "markReady": "标为待开发",
-    "markDone": "标为已完成",
-    "accept": "验收通过",
-    "markCanceled": "废弃",
     "revive": "恢复到需求池",
     "criterionToggle": "切换验收标准「{criterion}」"
   },
@@ -348,11 +351,6 @@
       "in_review": "待验收",
       "done": "已完成",
       "canceled": "已废弃"
-    },
-    "stage": {
-      "talk": "聊清楚",
-      "work": "安排活",
-      "finish": "完成"
     },
     "newIssue": "新工单"
   },
@@ -413,8 +411,6 @@
     "since": "{span}了",
     "ran": "第 {n} 轮",
     "used": "共用 {span}",
-    "noSteps": "还什么都没做。",
-    "stepsGone": "轨迹只留 30 天（配置里的 session.trajectory_days），这个工单的已经清掉了。",
     "change": {
       "A": {
         "mark": "新",
@@ -455,10 +451,12 @@
     "goRuntimes": "去配置引擎"
   },
   "conversation": {
-    "title": "讨论与交付记录",
     "older": "加载更早的消息",
-    "empty": "需求讨论、执行反馈与交付会保留在这里",
     "placeholder": "写一条评论、补充说明或反馈…"
+  },
+  "activity": {
+    "title": "动态记录",
+    "empty": "需求讨论、进展节点与执行步骤会汇总在这里"
   },
   "attachments": {
     "title": "附件",
@@ -478,9 +476,6 @@
     "scheduledCount": "已排期 {n}",
     "rolledUp": "由子工单汇总",
     "overdue": "已逾期",
-    "shiftPrev": "提前 1 天",
-    "shiftNext": "延后 1 天",
-    "editDates": "调整排期",
     "scheduleToday": "排到今天",
     "emptyScheduled": "当前没有带起止日期的工单",
     "emptyScheduledHint": "在下方未排期工单中点「排到今天」，或在工单属性里设置计划开始 / 目标截止日期。",
@@ -508,8 +503,56 @@
     "nextMonth": "下一月",
     "newOnDate": "在 {date} 新建工单",
     "moreItems": "还有 {n} 项",
-    "collapseDay": "收起",
-    "scheduledBadge": "排期 {date}",
-    "clearScheduledDate": "清除预填日期"
+    "collapseDay": "收起"
+  },
+  "deps": {
+    "blockedBy": "阻塞于",
+    "pick": "选择前置工单…",
+    "none": "无前置阻塞",
+    "clear": "清除前置依赖",
+    "blockedByChip": "被 #{n} 阻塞"
+  },
+  "triage": {
+    "selected": "已选 {n} 项",
+    "selectIssue": "选择工单 #{n}",
+    "clear": "取消选择",
+    "status": "改状态",
+    "agent": "派执行会话",
+    "noAgent": "清除执行会话",
+    "owner": "负责人",
+    "noOwner": "清除负责人",
+    "repo": "仓库",
+    "noRepo": "清除仓库",
+    "priority": "优先级",
+    "tags": "标签",
+    "addTags": "追加标签",
+    "replaceTags": "替换标签",
+    "updated": "已批量更新 {n} 张工单",
+    "partial": "已更新 {ok} 张工单，{failed} 张未能更新"
+  },
+  "relations": {
+    "title": "非阻塞关联",
+    "pick": "添加关联或重复工单…",
+    "none": "暂无关联工单",
+    "clear": "清除关联",
+    "related": "相关",
+    "duplicate": "重复",
+    "relatedChip": "相关 #{n}",
+    "duplicateChip": "重复 #{n}"
+  },
+  "digest": {
+    "title": "晨间简报",
+    "subtitle": "过夜进展、仓库健康度，以及需点击确认才生效的需求池梳理建议。",
+    "refresh": "刷新",
+    "progressTitle": "一、过夜进展与待处理",
+    "healthTitle": "二、仓库健康度",
+    "triageTitle": "三、需求池梳理建议（点击确认后修改）",
+    "triageConfirm": "确认应用",
+    "triageDismiss": "忽略",
+    "triageEmpty": "当前没有待确认的需求池梳理建议。",
+    "quiet": "本时段暂无新增进展或待处理事项。",
+    "runsLine": "共 {total} 次运行（完成 {completed} · 失败 {failed} · 中断 {interrupted}）",
+    "emptyHealth": "暂无已挂载仓库。",
+    "pendingCount": "{n} 项待确认"
   }
 }

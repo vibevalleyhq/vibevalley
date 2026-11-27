@@ -5,6 +5,9 @@ use std::path::Path;
 
 use crate::store::{Project, ProjectId, Result, SavedTerminal};
 use serde_json::Value;
+use vibevalley_terminal::TerminalHooksConfig;
+
+pub const TERMINAL_HOOKS_SETTINGS_KEY: &str = "terminal.hooks";
 
 pub trait Persistence: Send + Sync {
     fn projects(&self) -> Result<Vec<Project>>;
@@ -73,4 +76,36 @@ pub fn load_setting<T: serde::de::DeserializeOwned + Default>(store: &dyn Persis
 pub fn save_setting<T: serde::Serialize>(store: &dyn Persistence, key: &str, value: &T) -> Result<()> {
     let value = serde_json::to_value(value).map_err(|e| crate::store::StoreError::Db(e.to_string()))?;
     store.set_setting(key, &value)
+}
+
+/// Loads persisted terminal hooks config; returns all-OFF defaults when unset.
+pub fn load_terminal_hooks(store: &dyn Persistence) -> TerminalHooksConfig {
+    load_setting(store, TERMINAL_HOOKS_SETTINGS_KEY)
+}
+
+pub fn save_terminal_hooks(store: &dyn Persistence, config: &TerminalHooksConfig) -> Result<()> {
+    save_setting(store, TERMINAL_HOOKS_SETTINGS_KEY, config)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use super::*;
+    use crate::testing::MemStore;
+
+    #[test]
+    fn terminal_hooks_persistence_defaults_to_all_off_and_round_trips() {
+        let store = MemStore::default();
+        let initial = load_terminal_hooks(&store);
+        assert_eq!(initial, TerminalHooksConfig::default());
+        assert!(!initial.is_workspace_hook_enabled(Some(Path::new("/work/repo")), "idegraph"));
+
+        let mut updated = initial;
+        updated.set_workspace_hook_enabled(Path::new("/work/repo"), "idegraph", true);
+        save_terminal_hooks(&store, &updated).unwrap();
+
+        let reloaded = load_terminal_hooks(&store);
+        assert!(reloaded.is_workspace_hook_enabled(Some(Path::new("/work/repo")), "idegraph"));
+    }
 }

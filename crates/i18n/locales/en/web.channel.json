@@ -11,6 +11,8 @@
   "find": "Find in this channel",
   "findMessages": "Find messages",
   "settings": "Channel settings",
+  "listenReports": "Listen to reports",
+  "listenReportsActive": "Listening to reports (click to turn off)",
   "inChannel": "In the channel",
   "empty": "Nobody has spoken in {label}: tell the assistant something to do.",
   "sendTo": "Message {label}",
@@ -152,7 +154,12 @@
     "artifactSlide": "Slide {n}",
     "artifactSelected": "{n} selected",
     "clearContext": "Remove attached context",
-    "runningHint": "Working — send a follow-up or click stop"
+    "runningHint": "Working — send a follow-up or click stop",
+    "dictateStart": "Voice dictation (MOSS ASR)",
+    "dictateStop": "Stop dictation",
+    "dictateConnecting": "Connecting audio…",
+    "dictateListening": "Listening…",
+    "dictateFinishing": "Transcribing…"
   },
   "manage": {
     "name": "Name",
@@ -189,7 +196,20 @@
     "copyLink": "Copy link",
     "copied": "Link copied",
     "markUnread": "Mark unread from here",
-    "jump": "Jump to it"
+    "jump": "Jump to it",
+    "promoteIssue": "Promote to ticket",
+    "saveArtifact": "Save as artifact"
+  },
+  "promote": {
+    "source": "From {where}",
+    "saveTitle": "Save message as artifact",
+    "artifactTitle": "Title",
+    "artifactType": "Type",
+    "artifactContent": "Content",
+    "artifactSave": "Save artifact",
+    "artifactSaved": "Saved as \"{title}\"",
+    "artifactNote": "Saved from {where}",
+    "fallbackTitle": "Message #{number}"
   },
   "switcher": {
     "open": "Jump to…",
@@ -284,7 +304,9 @@
       "remember": "Remembered",
       "stop": "Stopped",
       "imagegen": "Handed to the assistant; the image will be posted here"
-    }
+    },
+    "skillArgs": "args (optional)",
+    "skillNote": "Run skill"
   },
   "lacks": "cannot answer: {why}",
   "lacksFix": "Settings"

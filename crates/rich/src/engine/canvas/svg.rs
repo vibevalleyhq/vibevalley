@@ -395,6 +395,16 @@ pub struct ThemePalette {
 }
 
 impl ThemePalette {
+    const fn swatch(border: u32, fill_opacity: f64, label: u32) -> PresetSwatch {
+        let color = Rgba8::from_hex_u32(border);
+        PresetSwatch {
+            border: color,
+            fill: color,
+            fill_opacity,
+            label: Rgba8::from_hex_u32(label),
+        }
+    }
+
     pub fn light() -> Self {
         Self {
             background: Rgba8::from_hex_u32(0xfafafa),
@@ -411,42 +421,12 @@ impl ThemePalette {
             edge: Rgba8::from_hex_u32(0x71717a),
             edge_label_bg: Rgba8::from_hex_u32(0xffffff),
             presets: [
-                PresetSwatch {
-                    border: Rgba8::from_hex_u32(0xd9383a),
-                    fill: Rgba8::from_hex_u32(0xd9383a),
-                    fill_opacity: 0.09,
-                    label: Rgba8::from_hex_u32(0xa61f22),
-                },
-                PresetSwatch {
-                    border: Rgba8::from_hex_u32(0xe6730e),
-                    fill: Rgba8::from_hex_u32(0xe6730e),
-                    fill_opacity: 0.10,
-                    label: Rgba8::from_hex_u32(0xa84e00),
-                },
-                PresetSwatch {
-                    border: Rgba8::from_hex_u32(0xd4a017),
-                    fill: Rgba8::from_hex_u32(0xd4a017),
-                    fill_opacity: 0.12,
-                    label: Rgba8::from_hex_u32(0x8a6500),
-                },
-                PresetSwatch {
-                    border: Rgba8::from_hex_u32(0x1e8a4f),
-                    fill: Rgba8::from_hex_u32(0x1e8a4f),
-                    fill_opacity: 0.09,
-                    label: Rgba8::from_hex_u32(0x146338),
-                },
-                PresetSwatch {
-                    border: Rgba8::from_hex_u32(0x0b8576),
-                    fill: Rgba8::from_hex_u32(0x0b8576),
-                    fill_opacity: 0.09,
-                    label: Rgba8::from_hex_u32(0x075e54),
-                },
-                PresetSwatch {
-                    border: Rgba8::from_hex_u32(0x8a35d6),
-                    fill: Rgba8::from_hex_u32(0x8a35d6),
-                    fill_opacity: 0.09,
-                    label: Rgba8::from_hex_u32(0x6421a3),
-                },
+                Self::swatch(0xd9383a, 0.09, 0xa61f22),
+                Self::swatch(0xe6730e, 0.10, 0xa84e00),
+                Self::swatch(0xd4a017, 0.12, 0x8a6500),
+                Self::swatch(0x1e8a4f, 0.09, 0x146338),
+                Self::swatch(0x0b8576, 0.09, 0x075e54),
+                Self::swatch(0x8a35d6, 0.09, 0x6421a3),
             ],
         }
     }
@@ -467,42 +447,12 @@ impl ThemePalette {
             edge: Rgba8::from_hex_u32(0x8e8e98),
             edge_label_bg: Rgba8::from_hex_u32(0x1b1b1f),
             presets: [
-                PresetSwatch {
-                    border: Rgba8::from_hex_u32(0xff6b6b),
-                    fill: Rgba8::from_hex_u32(0xff6b6b),
-                    fill_opacity: 0.14,
-                    label: Rgba8::from_hex_u32(0xffa496),
-                },
-                PresetSwatch {
-                    border: Rgba8::from_hex_u32(0xf28a2e),
-                    fill: Rgba8::from_hex_u32(0xf28a2e),
-                    fill_opacity: 0.14,
-                    label: Rgba8::from_hex_u32(0xf7b06e),
-                },
-                PresetSwatch {
-                    border: Rgba8::from_hex_u32(0xe8c547),
-                    fill: Rgba8::from_hex_u32(0xe8c547),
-                    fill_opacity: 0.14,
-                    label: Rgba8::from_hex_u32(0xf2da7e),
-                },
-                PresetSwatch {
-                    border: Rgba8::from_hex_u32(0x41bd74),
-                    fill: Rgba8::from_hex_u32(0x41bd74),
-                    fill_opacity: 0.14,
-                    label: Rgba8::from_hex_u32(0x7ae0a3),
-                },
-                PresetSwatch {
-                    border: Rgba8::from_hex_u32(0x4fc3b4),
-                    fill: Rgba8::from_hex_u32(0x4fc3b4),
-                    fill_opacity: 0.14,
-                    label: Rgba8::from_hex_u32(0x85dfd3),
-                },
-                PresetSwatch {
-                    border: Rgba8::from_hex_u32(0xb48ef5),
-                    fill: Rgba8::from_hex_u32(0xb48ef5),
-                    fill_opacity: 0.15,
-                    label: Rgba8::from_hex_u32(0xd5bcf9),
-                },
+                Self::swatch(0xff6b6b, 0.14, 0xffa496),
+                Self::swatch(0xf28a2e, 0.14, 0xf7b06e),
+                Self::swatch(0xe8c547, 0.14, 0xf2da7e),
+                Self::swatch(0x41bd74, 0.14, 0x7ae0a3),
+                Self::swatch(0x4fc3b4, 0.14, 0x85dfd3),
+                Self::swatch(0xb48ef5, 0.15, 0xd5bcf9),
             ],
         }
     }
@@ -881,29 +831,54 @@ fn render_card_frame(rect: Rect, color: Option<&CanvasColor>, palette: &ThemePal
     border
 }
 
+#[allow(clippy::too_many_arguments)]
+fn begin_clipped_card(
+    node_type: &str,
+    id: &str,
+    rect: Rect,
+    color: Option<&CanvasColor>,
+    index: usize,
+    palette: &ThemePalette,
+    options: &SvgRenderOptions,
+    defs: &mut String,
+    out: &mut String,
+) -> Rgba8 {
+    let clip_id = format!("vv-clip-{index}");
+    let _ = write!(
+        defs,
+        r#"<clipPath id="{clip_id}"><rect x="{:.2}" y="{:.2}" width="{:.2}" height="{:.2}"/></clipPath>"#,
+        rect.x + 4.0,
+        rect.y + 4.0,
+        (rect.width - 8.0).max(1.0),
+        (rect.height - 8.0).max(1.0),
+    );
+    let _ = write!(out, r#"<g data-node-type="{node_type}" data-node-id="{}">"#, escape_xml(id));
+    let accent = render_card_frame(rect, color, palette, options, out);
+    let _ = write!(out, r#"<g clip-path="url(#{clip_id})">"#);
+    accent
+}
+
 fn render_text_node(node: &TextNode, index: usize, palette: &ThemePalette, options: &SvgRenderOptions, defs: &mut String, out: &mut String) {
     let x = node.x as f64;
     let y = node.y as f64;
     let w = node.width as f64;
     let h = node.height as f64;
     let pad = 14.0;
-    let clip_id = format!("vv-clip-{index}");
-    let _ = write!(
+    begin_clipped_card(
+        "text",
+        node.id.as_str(),
+        Rect::new(x, y, w, h),
+        node.color.as_ref(),
+        index,
+        palette,
+        options,
         defs,
-        r#"<clipPath id="{clip_id}"><rect x="{:.2}" y="{:.2}" width="{:.2}" height="{:.2}"/></clipPath>"#,
-        x + 4.0,
-        y + 4.0,
-        (w - 8.0).max(1.0),
-        (h - 8.0).max(1.0),
+        out,
     );
-
-    let _ = write!(out, r#"<g data-node-type="text" data-node-id="{}">"#, escape_xml(node.id.as_str()));
-    render_card_frame(Rect::new(x, y, w, h), node.color.as_ref(), palette, options, out);
 
     let inner_w = (w - pad * 2.0).max(20.0);
     let styled_lines = layout_markdown_lines(&node.text, inner_w, options.font_size);
 
-    let _ = write!(out, r#"<g clip-path="url(#{clip_id})">"#);
     let mut cursor_y = y + pad;
     let max_y = y + h - 6.0;
     for line in styled_lines {
@@ -935,20 +910,18 @@ fn render_file_node(node: &FileNode, index: usize, palette: &ThemePalette, optio
     let w = node.width as f64;
     let h = node.height as f64;
     let pad = 14.0;
-    let clip_id = format!("vv-clip-{index}");
-    let _ = write!(
+    let accent = begin_clipped_card(
+        "file",
+        node.id.as_str(),
+        Rect::new(x, y, w, h),
+        node.color.as_ref(),
+        index,
+        palette,
+        options,
         defs,
-        r#"<clipPath id="{clip_id}"><rect x="{:.2}" y="{:.2}" width="{:.2}" height="{:.2}"/></clipPath>"#,
-        x + 4.0,
-        y + 4.0,
-        (w - 8.0).max(1.0),
-        (h - 8.0).max(1.0),
+        out,
     );
 
-    let _ = write!(out, r#"<g data-node-type="file" data-node-id="{}">"#, escape_xml(node.id.as_str()));
-    let accent = render_card_frame(Rect::new(x, y, w, h), node.color.as_ref(), palette, options, out);
-
-    let _ = write!(out, r#"<g clip-path="url(#{clip_id})">"#);
     let ix = x + pad;
     let iy = y + pad;
     let _ = write!(
@@ -1030,20 +1003,18 @@ fn render_link_node(node: &LinkNode, index: usize, palette: &ThemePalette, optio
     let w = node.width as f64;
     let h = node.height as f64;
     let pad = 14.0;
-    let clip_id = format!("vv-clip-{index}");
-    let _ = write!(
+    begin_clipped_card(
+        "link",
+        node.id.as_str(),
+        Rect::new(x, y, w, h),
+        node.color.as_ref(),
+        index,
+        palette,
+        options,
         defs,
-        r#"<clipPath id="{clip_id}"><rect x="{:.2}" y="{:.2}" width="{:.2}" height="{:.2}"/></clipPath>"#,
-        x + 4.0,
-        y + 4.0,
-        (w - 8.0).max(1.0),
-        (h - 8.0).max(1.0),
+        out,
     );
 
-    let _ = write!(out, r#"<g data-node-type="link" data-node-id="{}">"#, escape_xml(node.id.as_str()));
-    render_card_frame(Rect::new(x, y, w, h), node.color.as_ref(), palette, options, out);
-
-    let _ = write!(out, r#"<g clip-path="url(#{clip_id})">"#);
     let ix = x + pad;
     let iy = y + pad;
     let _ = write!(

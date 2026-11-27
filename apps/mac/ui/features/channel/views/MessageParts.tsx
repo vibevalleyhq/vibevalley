@@ -2,11 +2,14 @@ import { Clipboard, Image, keymap, signal, Text, untracked, Video, View } from "
 import { Input } from "nsh/base";
 
 import { list, t } from "@vibevalley/i18n";
-import { type Attachment, type ChatMessage, type Embed, userId } from "@vibevalley/protocol";
+import { type Attachment, type Channel, type ChatMessage, type Embed, userId } from "@vibevalley/protocol";
 import { channelOf } from "@vibevalley/protocol/rules";
 
 import { createAct } from "../../../design/act";
+import { Button } from "../../../design/Button";
+import { Dialog } from "../../../design/Dialog";
 import { fileKind, kindIcon, sizeText } from "../../../design/domain/AttachmentTile";
+import { Field, Select, TextArea, TextInput } from "../../../design/Field";
 import { Icon } from "../../../design/Icon";
 import { IconButton } from "../../../design/IconButton";
 import type { IconName } from "../../../design/icons";
@@ -20,16 +23,20 @@ import { api, newSendKey, reasonOf } from "../../../infra/api";
 import { fileUrl, openAttachment, playAudio, useAttachmentFile } from "../../../infra/attachmentFile";
 import { hostApi } from "../../../infra/bridge";
 import { useCollabSlice } from "../../../infra/frame";
+import { useQueryClient } from "../../../infra/query";
 import { formatGenUiAction, type VvGenUiActionEvent } from "../../../infra/rich";
 import { useRouter } from "../../../infra/router";
 import { localizeRuntimeError } from "../../../infra/runtimeError";
 import { createEffect } from "../../../infra/solid";
 import { useIntents } from "../../../infra/state/intent";
+import { pendingNewIssue } from "../../../infra/state/issueDraft";
 import { transport } from "../../../infra/transport";
+import { artifactHref, artifactTypeLabel, buildOutlineFromMarkdown } from "../../artifact";
 import { drafts } from "../model/composing";
 import { useMessage } from "../model/follow";
 import { pinSet, reactionSet, sameMessage, sameReaction, setMark, markUnread, unreadMark } from "../model/marks";
 import { workbenchClock, type LinkedMessage, channelLabel, linkedMessages, messagePath } from "../model/places";
+import { buildPromotedArtifactDraft, buildPromotedIssueDraft } from "../model/promote";
 import { quickReactions, reactionOn, EmojiPopover } from "./EmojiPicker";
 
 const nameOf = (m: ChatMessage) => (m.from === userId ? t("web.channel.messages.user") : m.name);
@@ -347,7 +354,77 @@ function AddReaction(props: { m: ChatMessage; hovered: boolean }) {
   );
 }
 
-type ToolbarMenu = "closed" | "quickEmoji" | "fullEmoji" | "more" | "confirmDelete";
+type ToolbarMenu = "closed" | "quickEmoji" | "fullEmoji" | "more" | "confirmDelete" | "saveArtifact";
+
+type PromotedArtifactType = "docs" | "outline";
+
+function SaveAsArtifactDialog(props: { m: ChatMessage; channel: Channel | undefined; onClose: () => void }) {
+  const router = useRouter();
+  const queries = useQueryClient();
+  const initial = untracked(() => buildPromotedArtifactDraft(props.m, props.channel));
+  const title = signal(initial.title);
+  const artifactType = signal<PromotedArtifactType>("docs");
+  const content = signal(initial.content);
+  const act = createAct();
+
+  const typeOptions: readonly { value: PromotedArtifactType; label: string }[] = [
+    { value: "docs", label: artifactTypeLabel("docs") },
+    { value: "outline", label: artifactTypeLabel("outline") },
+  ];
+
+  const canSave = () => !act.busy() && title().trim() !== "";
+  const save = () => {
+    const cleanTitle = title().trim();
+    if (!cleanTitle || act.busy()) return;
+    const pickedType = artifactType();
+    const rawContent = content();
+    const body = pickedType === "outline" ? `${JSON.stringify(buildOutlineFromMarkdown(cleanTitle, rawContent), null, 2)}\n` : rawContent;
+    const channelId = props.m.channel;
+    void act.run(async () => {
+      const made = await api.artifact.create({
+        title: cleanTitle,
+        artifactType: pickedType,
+        content: body,
+        channel: channelId,
+        note: initial.note,
+      });
+      await queries.invalidate({ prefix: ["artifacts"] });
+      props.onClose();
+      toast(t("web.channel.promote.artifactSaved", { title: made.title }));
+      router.navigate(artifactHref(made.id));
+    });
+  };
+
+  return (
+    <Dialog open onClose={props.onClose} title={t("web.channel.promote.saveTitle")} size="md" height="auto" testid="save-artifact-dialog">
+      <View class="gap-3.5 px-5 py-4">
+        <Field label={t("web.channel.promote.artifactTitle")}>
+          <TextInput testID="save-artifact-title" value={title()} onInput={(v) => title.set(v)} autoFocus />
+        </Field>
+        <Field label={t("web.channel.promote.artifactType")}>
+          <Select
+            label={t("web.channel.promote.artifactType")}
+            testid="save-artifact-type"
+            value={artifactType()}
+            onChange={(v) => artifactType.set(v)}
+            options={typeOptions}
+          />
+        </Field>
+        <Field label={t("web.channel.promote.artifactContent")}>
+          <TextArea testID="save-artifact-content" rows={6} value={content()} onInput={(v) => content.set(v)} />
+        </Field>
+        <View class="flex-row items-center justify-end gap-2 border-t border-line pt-3">
+          <Button tone="quiet" testID="save-artifact-cancel" onPress={props.onClose}>
+            {t("web.channel.dialog.cancel")}
+          </Button>
+          <Button tone="primary" testID="save-artifact-submit" disabled={!canSave()} onPress={save}>
+            {t("web.channel.promote.artifactSave")}
+          </Button>
+        </View>
+      </View>
+    </Dialog>
+  );
+}
 
 function Tool(props: { icon: IconName; size?: 14 | 16; label: string; testid: string; onPress: () => void; pressed?: boolean; dim?: boolean; sure?: boolean }) {
   return (
@@ -397,10 +474,19 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
       toast(t("web.channel.more.copied"));
     });
   };
+  const promoteIssue = () => {
+    const channel = channelOf(collab()?.chat, props.m.channel);
+    pendingNewIssue.set(buildPromotedIssueDraft(props.m, channel));
+    menu.set("closed");
+    router.navigate("/issues/new");
+  };
   const editable = () => props.m.from === userId && props.m.kind === "chat";
   const open = () => props.shown || menu() !== "closed";
   return (
     <If when={open()}>
+      <If when={menu() === "saveArtifact"}>
+        <SaveAsArtifactDialog m={props.m} channel={channelOf(collab()?.chat, props.m.channel)} onClose={() => menu.set("closed")} />
+      </If>
       <View
         role="toolbar"
         testID="message-tools"
@@ -481,6 +567,8 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
           open={more()}
           onOpenChange={(next) => menu.set(next ? "more" : more() ? "closed" : menu())}
           items={[
+            { key: "promote-issue", label: t("web.channel.more.promoteIssue"), icon: "issues", onSelect: promoteIssue },
+            { key: "save-artifact", label: t("web.channel.more.saveArtifact"), icon: "artifacts", onSelect: () => menu.set("saveArtifact") },
             { key: "copy-link", label: t("web.channel.more.copyLink"), icon: "copy", onSelect: copyLink },
             { key: "mark-unread", label: t("web.channel.more.markUnread"), icon: "show", onSelect: unread },
           ]}

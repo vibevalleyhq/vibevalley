@@ -3,7 +3,7 @@
 
 use std::cell::Cell;
 use std::rc::Rc;
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 use std::time::{Duration, Instant};
 
 use gpui::{
@@ -109,6 +109,48 @@ impl vibevalley_server::gateway::bridge::Outlet for SliceOutlet {
 
 const DIORAMA_SLICES: &[SliceKind] = &[SliceKind::Farm, SliceKind::Board, SliceKind::Sessions, SliceKind::Inbox, SliceKind::Collab];
 
+fn attach_diorama_bridge(
+    bridge: &vibevalley_server::gateway::bridge::Bridge,
+    kind: &str,
+) -> (Arc<vibevalley_server::gateway::bridge::Client>, flume::Receiver<(String, Value)>) {
+    let (tx, rx) = flume::unbounded::<(String, Value)>();
+    let identity = crate::hosted::next_client_identity(vibevalley_server::ClientKind::GpuiPixel, kind);
+    let client = Arc::new(bridge.attach(identity, Arc::new(SliceOutlet(tx))));
+    for slice in DIORAMA_SLICES {
+        let topic = format!("slice:{}", slice.as_str());
+        if let Err(error) = client.watch(&topic) {
+            eprintln!("diorama watch {topic}: {error}");
+        }
+    }
+    (client, rx)
+}
+
+fn decode_slice_frame<'a>(event: &'a str, envelope: &Value) -> Option<(&'a str, u64, Value)> {
+    let topic = event.strip_prefix("frame:")?;
+    let rev = envelope["rev"].as_u64().unwrap_or(0);
+    let data = envelope["data"].clone();
+    Some((topic, rev, data))
+}
+
+async fn pump_diorama_slices(
+    rx: flume::Receiver<(String, Value)>,
+    ack_client: Weak<vibevalley_server::gateway::bridge::Client>,
+    mut apply: impl FnMut(&str, Value) -> bool,
+) {
+    while let Ok((event, envelope)) = rx.recv_async().await {
+        let Some((topic, rev, data)) = decode_slice_frame(&event, &envelope) else {
+            continue;
+        };
+        if !apply(topic, data) {
+            break;
+        }
+        // Only hold a Weak reference so dropping DioramaView drops Client and closes SliceOutlet.
+        if let Some(client) = ack_client.upgrade() {
+            client.applied_slice(topic, rev);
+        }
+    }
+}
+
 pub struct DioramaView {
     pub kind: String,
     props: Value,
@@ -128,8 +170,11 @@ pub struct DioramaView {
     phone: Option<(Entity<HostedView>, Subscription)>,
     sheet_request: Option<Value>,
     sheet: Option<(Entity<HostedView>, Subscription)>,
+    last_dark: Option<bool>,
     /// Only reveals the cold-load indicator after 150ms so fast loads never flash.
     show_loading: bool,
+    _theme_sub: Subscription,
+    _slice_task: gpui::Task<()>,
     _bridge: Arc<vibevalley_server::gateway::bridge::Client>,
 }
 
@@ -143,31 +188,12 @@ impl Focusable for DioramaView {
 
 impl DioramaView {
     pub fn new(kind: &str, props: Value, cx: &mut Context<Self>) -> Self {
-        let (tx, rx) = flume::unbounded::<(String, Value)>();
-        let identity = crate::hosted::next_client_identity(vibevalley_server::ClientKind::GpuiPixel, kind);
-        let client = Arc::new(cx.global::<BridgeHub>().0.attach(identity, Arc::new(SliceOutlet(tx))));
-        for slice in DIORAMA_SLICES {
-            let topic = format!("slice:{}", slice.as_str());
-            if let Err(error) = client.watch(&topic) {
-                eprintln!("diorama watch {topic}: {error}");
-            }
-        }
-        let ack_client = client.clone();
-        cx.spawn(async move |this, cx| {
-            while let Ok((event, envelope)) = rx.recv_async().await {
-                let Some(topic) = event.strip_prefix("frame:") else {
-                    continue;
-                };
-                let rev = envelope["rev"].as_u64().unwrap_or(0);
-                let data = envelope["data"].clone();
-                let alive = this.update(cx, |v, cx| v.on_slice(topic, data, cx));
-                ack_client.applied_slice(topic, rev);
-                if alive.is_err() {
-                    break;
-                }
-            }
-        })
-        .detach();
+        let (client, rx) = attach_diorama_bridge(&cx.global::<BridgeHub>().0, kind);
+        let ack_client = Arc::downgrade(&client);
+        let slice_task = cx.spawn(async move |this, cx| {
+            pump_diorama_slices(rx, ack_client, |topic, data| this.update(cx, |v, cx| v.on_slice(topic, data, cx)).is_ok()).await;
+        });
+        let theme_sub = cx.observe_global::<crate::theme::Ui>(|_, cx| cx.notify());
 
         let task = cx.background_executor().spawn(async move {
             let dir = crate::assets::diorama_dir();
@@ -216,7 +242,10 @@ impl DioramaView {
             phone: None,
             sheet_request: None,
             sheet: None,
+            last_dark: None,
             show_loading: false,
+            _theme_sub: theme_sub,
+            _slice_task: slice_task,
             _bridge: client,
         }
     }
@@ -312,7 +341,8 @@ impl DioramaView {
 
     fn overlay(&mut self, name: &'static str, request: Value, window: &mut Window, cx: &mut Context<Self>) -> (Entity<HostedView>, Subscription) {
         let params = request.as_object().cloned().unwrap_or_default();
-        let view = cx.new(|cx| HostedView::new(name, params, false, window, cx));
+        let dark = app_dark(window, cx);
+        let view = cx.new(|cx| HostedView::new(name, params, dark, window, cx));
         let sub = cx.subscribe_in(&view, window, move |this, _, event: &HostedEvent, window, cx| match event {
             HostedEvent::Action(crate::hosted::Action::DismissFarmForm) => {
                 if name == "farm-phone" {
@@ -367,6 +397,16 @@ impl DioramaView {
     }
 
     fn mount_sheet(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let dark = app_dark(window, cx);
+        if self.last_dark != Some(dark) {
+            self.last_dark = Some(dark);
+            if let Some((view, _)) = &self.phone {
+                view.update(cx, |v, cx| v.set_dark(dark, cx));
+            }
+            if let Some((view, _)) = &self.sheet {
+                view.update(cx, |v, cx| v.set_dark(dark, cx));
+            }
+        }
         if let Some(request) = self.sheet_request.take() {
             self.sheet = Some(self.overlay("farm-form", request, window, cx));
         }
@@ -487,7 +527,7 @@ impl DioramaView {
         }
     }
 
-    fn render_hud(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+    fn render_hud(&mut self, window: &Window, cx: &mut Context<Self>) -> Option<AnyElement> {
         let SceneState::Ready(d) = &mut self.scene else {
             return None;
         };
@@ -513,8 +553,13 @@ impl DioramaView {
         });
         let toast_text = d.active_toast().map(str::to_string);
         let has_missed = d.phone.ringing.is_some() || d.phone.missed(&d.frame.inbox).next().is_some();
+        let shop_coins = d.frame.progress.as_ref().map_or(0, |p| p.coins);
+        let daily_summary = d.frame.progress.as_ref().and_then(|p| p.daily.as_ref()).map(|board| {
+            let done = board.tasks.iter().filter(|task| task.completed).count() as i64;
+            (done, board.tasks.len() as i64)
+        });
 
-        let ui_dark = cx.try_global::<crate::theme::Ui>().is_some_and(|ui| ui.colors.dark);
+        let ui_dark = app_dark(window, cx);
         let palette = HudPalette::for_scene(ui_dark, active_tod);
         let hover_bg = palette.hover;
 
@@ -701,17 +746,64 @@ impl DioramaView {
                 )
         });
 
+        let shop_pill = {
+            let mut pill = div()
+                .absolute()
+                .top(px(12.0))
+                .left(px(14.0))
+                .flex()
+                .items_center()
+                .gap(px(8.0))
+                .px(px(9.0))
+                .py(px(4.0))
+                .rounded(px(9.0))
+                .bg(palette.surface)
+                .border_1()
+                .border_color(palette.border)
+                .cursor_pointer()
+                .hover(move |s| s.bg(hover_bg))
+                .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .on_mouse_down(
+                    MouseButton::Left,
+                    cx.listener(|v, _, _, cx| {
+                        cx.stop_propagation();
+                        let req = match &v.scene {
+                            SceneState::Ready(d) => json!({ "kind": "shop", "repo": d.repo }),
+                            _ => return,
+                        };
+                        v.dispatch_action(DioramaAction::OpenForm(req), cx);
+                    }),
+                )
+                .child(
+                    div()
+                        .text_size(px(11.5))
+                        .text_color(palette.ink)
+                        .child(t("web.farm.hud.coins", &[("n", shop_coins.into())])),
+                );
+            if let Some((done, total)) = daily_summary {
+                pill = pill.child(hud_divider(&palette)).child(
+                    div()
+                        .text_size(px(11.5))
+                        .text_color(palette.muted)
+                        .child(t("web.farm.hud.daily", &[("done", done.into()), ("total", total.into())])),
+                );
+            }
+            pill.child(hud_divider(&palette))
+                .child(div().text_size(px(11.5)).text_color(palette.ink).child(t("web.farm.hud.shop", &[])))
+        };
+
         let mut overlay = div()
             .absolute()
             .inset_0()
             .children(anchor_pills)
+            .child(shop_pill)
             .child(div().absolute().top(px(12.0)).right(px(12.0)).child(toolbar));
 
         if let Some(msg) = toast_text.filter(|m| !m.is_empty()) {
             overlay = overlay.child(
                 div()
                     .absolute()
-                    .top(px(12.0))
+                    .top(px(48.0))
                     .left(px(14.0))
                     .px(px(10.0))
                     .py(px(5.0))
@@ -915,6 +1007,17 @@ fn phone_notification_dot(palette: &HudPalette) -> gpui::Div {
         .child(div().w(px(5.0)).h(px(5.0)).rounded_full().bg(palette.badge_dot))
 }
 
+fn resolve_dark(ui: Option<&crate::theme::Ui>, appearance: gpui::WindowAppearance) -> bool {
+    ui.map_or_else(
+        || matches!(appearance, gpui::WindowAppearance::Dark | gpui::WindowAppearance::VibrantDark),
+        |ui| ui.colors.dark,
+    )
+}
+
+fn app_dark(window: &Window, cx: &App) -> bool {
+    resolve_dark(cx.try_global::<crate::theme::Ui>(), window.appearance())
+}
+
 fn motion_enabled(cx: &App) -> bool {
     cx.try_global::<crate::theme::Ui>()
         .is_none_or(|ui| ui.settings.effective_motion() != crate::theme::MotionChoice::Off)
@@ -980,7 +1083,7 @@ impl Render for DioramaView {
             .into_any_element()
         });
 
-        let hud = self.render_hud(cx);
+        let hud = self.render_hud(window, cx);
         let canvas_layer = div()
             .id("diorama")
             .track_focus(&self.focus)
@@ -1150,6 +1253,12 @@ impl Render for DioramaView {
             _ => None,
         });
 
+        let sheet_scrim = if app_dark(window, cx) {
+            gpui::rgba(0x00000080)
+        } else {
+            gpui::rgba(0x1c191740)
+        };
+
         div()
             .relative()
             .size_full()
@@ -1163,7 +1272,7 @@ impl Render for DioramaView {
                     .flex()
                     .items_center()
                     .justify_center()
-                    .bg(gpui::rgba(0x2f1f134d))
+                    .bg(sheet_scrim)
                     .child(div().w(px(540.0)).max_w_full().h(px(430.0)).max_h_full().child(view))
             }))
     }
@@ -1251,6 +1360,17 @@ mod tests {
     use crate::diorama::phone::Phone;
 
     #[test]
+    fn resolve_dark_uses_ui_global_then_window_appearance_fallback() {
+        let light_ui = crate::theme::Ui::new(crate::theme::Settings::default(), false);
+        let dark_ui = crate::theme::Ui::new(crate::theme::Settings::default(), true);
+        assert!(!super::resolve_dark(Some(&light_ui), gpui::WindowAppearance::Dark));
+        assert!(super::resolve_dark(Some(&dark_ui), gpui::WindowAppearance::Light));
+        assert!(!super::resolve_dark(None, gpui::WindowAppearance::Light));
+        assert!(super::resolve_dark(None, gpui::WindowAppearance::Dark));
+        assert!(super::resolve_dark(None, gpui::WindowAppearance::VibrantDark));
+    }
+
+    #[test]
     fn hud_palette_adapts_to_ui_theme_and_night_diorama() {
         for daytime in [TimeOfDay::Dawn, TimeOfDay::Noon, TimeOfDay::Dusk] {
             let light = HudPalette::for_scene(false, daytime);
@@ -1335,5 +1455,101 @@ mod tests {
         phone.game = false;
         let (nw, nh) = phone_overlay_size((500.0, 600.0), &phone);
         assert_eq!((nw, nh), (472.0, 474.0));
+    }
+
+    #[test]
+    fn regression_dropping_diorama_bridge_and_task_releases_all_slice_watches() {
+        use std::collections::BTreeSet;
+        use std::sync::Arc;
+        use std::time::Duration;
+
+        use parking_lot::Mutex;
+        use tokio::sync::Notify;
+        use vibevalley_server::gateway::bridge::Bridge;
+        use vibevalley_server::gateway::bridge::fake::{FakeServer, empty_bundle};
+
+        let fake = Arc::new(FakeServer::from_bundle(empty_bundle(1)));
+        let bridge = Bridge::new(fake.clone(), 2);
+
+        for visit in 0..3 {
+            let (client, rx) = super::attach_diorama_bridge(&bridge, "farm");
+            assert_eq!(Arc::strong_count(&client), 1, "visit {visit}: no extra strong Arc");
+
+            let weak_client = Arc::downgrade(&client);
+            let seen_topics = Arc::new(Mutex::new(BTreeSet::new()));
+            let notify = Arc::new(Notify::new());
+
+            let task_topics = seen_topics.clone();
+            let task_notify = notify.clone();
+            let task_ack = weak_client.clone();
+            let pump_handle = vibevalley_runtime::rt::current_or_global_handle().spawn(async move {
+                super::pump_diorama_slices(rx, task_ack, move |topic, _data| {
+                    task_topics.lock().insert(topic.to_string());
+                    task_notify.notify_waiters();
+                    true
+                })
+                .await;
+            });
+
+            vibevalley_runtime::rt::block_on(async {
+                tokio::time::timeout(Duration::from_secs(3), async {
+                    loop {
+                        let notified = notify.notified();
+                        tokio::pin!(notified);
+                        notified.as_mut().enable();
+                        if seen_topics.lock().len() == super::DIORAMA_SLICES.len() {
+                            return;
+                        }
+                        notified.await;
+                    }
+                })
+                .await
+            })
+            .expect("all 5 diorama slices should deliver initial frames");
+
+            assert_eq!(Arc::strong_count(&client), 1, "pump task must hold Weak<Client> only");
+            let snapshot = bridge.clients_snapshot();
+            assert_eq!(snapshot.len(), 1);
+            assert_eq!(snapshot[0].watches.len(), super::DIORAMA_SLICES.len());
+            for slice in super::DIORAMA_SLICES {
+                assert_eq!(fake.slice_watchers(*slice), 1, "expected active watcher for {slice:?}");
+            }
+
+            if visit % 2 == 0 {
+                // Drop _bridge first (like an entity drop before task cancellation): SliceOutlet must close rx so the task exits.
+                drop(client);
+                assert_eq!(weak_client.strong_count(), 0);
+                assert!(weak_client.upgrade().is_none());
+                vibevalley_runtime::rt::block_on(async {
+                    tokio::time::timeout(Duration::from_secs(3), pump_handle)
+                        .await
+                        .expect("slice pump task should exit once SliceOutlet drops")
+                        .expect("slice pump task should not panic");
+                });
+            } else {
+                // Cancel task first (matching DioramaView dropping _slice_task before _bridge), then drop _bridge.
+                pump_handle.abort();
+                drop(client);
+                assert_eq!(weak_client.strong_count(), 0);
+                assert!(weak_client.upgrade().is_none());
+            }
+
+            assert!(bridge.clients_snapshot().is_empty(), "visit {visit}: bridge client leaked");
+            vibevalley_runtime::rt::block_on(async {
+                tokio::time::timeout(Duration::from_secs(3), async {
+                    let mut yields = 0usize;
+                    while super::DIORAMA_SLICES.iter().any(|slice| fake.slice_watchers(*slice) != 0) {
+                        if yields < 64 {
+                            yields += 1;
+                            tokio::task::yield_now().await;
+                        } else {
+                            tokio::time::sleep(Duration::from_millis(1)).await;
+                        }
+                    }
+                })
+                .await
+                .expect("all 5 FakeServer slice watchers should drop to 0");
+            });
+        }
     }
 }

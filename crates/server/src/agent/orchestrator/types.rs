@@ -26,6 +26,9 @@ pub struct Input {
     pub messages: Vec<String>,
     /// The live answer waiting for this turn's words (`Orchestrator::answer_async`, `brief`).
     pub port: Option<String>,
+    /// Owning cron id when `source == Source::Cron`.
+    #[serde(default)]
+    pub cron_id: Option<String>,
 }
 
 /// Messages heard but not woken for: shown with the next input (`digest`).

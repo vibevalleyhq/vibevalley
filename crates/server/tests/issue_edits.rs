@@ -98,7 +98,23 @@ fn a_sent_issue_keeps_what_was_asked_and_its_runs_make_the_timeline() {
     assert!(runs.iter().all(|r| r.outcome == Some(Outcome::Completed) && r.summary == "Made f.txt"));
     let timeline = vibevalley_core::brief::milestones_of(&passed, &runs, |_| Some("helper".into()));
     let kinds: Vec<MilestoneKind> = timeline.milestones.iter().map(|m| m.kind).collect();
-    assert_eq!(kinds.first(), Some(&MilestoneKind::Accepted), "{kinds:?}");
-    assert_eq!(kinds.last(), Some(&MilestoneKind::Opened));
-    assert!(kinds.contains(&MilestoneKind::Told) && kinds.contains(&MilestoneKind::Rejected));
+    assert_eq!(kinds.first(), Some(&MilestoneKind::Opened), "{kinds:?}");
+    assert_eq!(kinds.last(), Some(&MilestoneKind::Accepted), "{kinds:?}");
+    assert!(kinds.contains(&MilestoneKind::Rejected));
+    assert!(timeline.milestones.windows(2).all(|w| w[0].at <= w[1].at), "{:?}", timeline.milestones);
+    let reported: Vec<_> = timeline.milestones.iter().filter(|m| m.kind == MilestoneKind::Reported).collect();
+    assert_eq!(reported.len(), 2, "{:?}", timeline.milestones);
+    assert_eq!(reported[0].run.as_deref(), Some(runs[0].id.as_str()));
+    assert_eq!(reported[1].run.as_deref(), Some(runs[1].id.as_str()));
+    assert!(
+        reported
+            .iter()
+            .all(|m| m.said.as_deref() == Some("Made f.txt") && !m.text.contains("Made f.txt"))
+    );
+    let second_start = timeline
+        .milestones
+        .iter()
+        .find(|m| m.kind == MilestoneKind::Started && m.run.as_deref() == Some(runs[1].id.as_str()))
+        .expect("comment-triggered run emits Started milestone");
+    assert_eq!(second_start.said, None);
 }

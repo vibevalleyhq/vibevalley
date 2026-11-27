@@ -1,7 +1,7 @@
 //! Orchestrator-specific prompt and situation formatting helpers.
 
 use crate::agent::profile::text::{LINE_MAX, cut_note, runtime_label, yuan};
-use crate::context::text::{format_artifact_view_context, head};
+use crate::context::text::head;
 
 /// Who woke the orchestrator: what the input's words are worth.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -149,6 +149,13 @@ pub fn picked_agent(name: &str) -> String {
 pub fn picked_repo(repo: &str) -> String {
     format!("（用户选定了仓库：{repo}，派活就派在这个仓库里）\n")
 }
+pub fn command_note(name: &str, args: &str) -> String {
+    if args.trim().is_empty() {
+        format!("（用户调用了技能 /{name}，先用 load_skill 读取该技能再照着执行）\n")
+    } else {
+        format!("（用户调用了技能 /{name}，参数：{args}；先用 load_skill 读取该技能再照着执行）\n")
+    }
+}
 pub fn user_line(text: &str) -> String {
     format!("用户说：{text}")
 }
@@ -158,41 +165,7 @@ pub fn chat_line(target: &str, lines: &str) -> String {
 pub const DICTATED: &str =
     "（这句话是用户用语音说的，语音那边已经回答了，问答都在默认频道。你只要按需派活：派了就用一句话说派给了谁；没派活就什么都不说，免得同一句话回两遍。）\n";
 
-/// `messageLine`: line breaks are marked, so no message can pass for a header.
-pub fn message_line(m: &crate::channel::AddressedMessage) -> String {
-    use vibevalley_protocol::{Actor, AgentRole};
-    let from = match &m.actor {
-        Actor::Agent { role: AgentRole::Worker, .. } => format!("{} {}", m.from, m.name),
-        _ => m.name.clone(),
-    };
-    let head = if m.number == 0 {
-        format!("[input={} from={from}]", m.id)
-    } else {
-        let reply = m.reply_to.map(|n| format!(" reply={n}")).unwrap_or_default();
-        format!("[target={} msg={}{reply} from={from}]", m.target, m.number)
-    };
-    if m.deleted == Some(true) {
-        return format!("{head} （这条已删除）");
-    }
-    let files: String = m.attachments.iter().flatten().map(|a| format!("\n  │ [附件 {}：{}]", a.name, a.path)).collect();
-    let made = m
-        .artifact
-        .as_ref()
-        .map(|a| {
-            format!(
-                "\n  │ [Artifact「{}」第 {} 稿：id={}，原文用 artifact_content_get 读]",
-                a.title, a.version, a.id
-            )
-        })
-        .unwrap_or_default();
-    let view = m
-        .view_context
-        .as_ref()
-        .map(|vc| format!("\n  │ {}", format_artifact_view_context(vc).replace('\n', "\n  │ ")))
-        .unwrap_or_default();
-    let edited = if m.edited == Some(true) { "（改过）" } else { "" };
-    format!("{head}{edited} {}{files}{made}{view}", m.text.trim().replace('\n', "\n  │ "))
-}
+pub use crate::agent::tool::message_line;
 
 /// `orchestratorEnvelopeLines`: what others said past `LINE_MAX` is cut.
 pub fn orchestrator_lines(messages: &[crate::channel::AddressedMessage]) -> String {
@@ -218,6 +191,7 @@ mod tests {
     use vibevalley_protocol::{Actor, ArtifactType, ArtifactViewContext};
 
     use super::*;
+    use crate::context::text::format_artifact_view_context;
 
     fn sample_view_context(title: &str) -> ArtifactViewContext {
         ArtifactViewContext {

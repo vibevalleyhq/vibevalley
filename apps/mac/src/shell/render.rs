@@ -47,6 +47,7 @@ impl Render for Shell {
         let launch = self.overlays.launch.clone().map(|o| div().absolute().inset_0().child(o));
         let startup_pill = self.render_slow_startup_pill(cx);
         let startup_diagnostics = self.render_startup_diagnostics(cx);
+        let inspector_overlay = self.render_inspector_overlay(window, cx);
         let devtools_overlay = self.render_devtools_overlay(cx);
         let devtools_capsule = self.render_devtools_capsule(cx);
         let show_inspector = should_mount_inspector(
@@ -139,6 +140,14 @@ impl Render for Shell {
             .capture_any_mouse_down(cx.listener(|s, e: &gpui::MouseDownEvent, window, cx| {
                 crate::host::restore_window_first_responder();
                 if e.button == MouseButton::Left
+                    && s.overlays.devtools.inspecting
+                    && !s.is_point_in_devtools_chrome(f32::from(e.position.x), f32::from(e.position.y), window)
+                {
+                    cx.stop_propagation();
+                    s.handle_inspector_click(f32::from(e.position.x), f32::from(e.position.y), window, cx);
+                    return;
+                }
+                if e.button == MouseButton::Left
                     && (s.chrome.modal_overlay
                         || (!s.chrome.native_workspace && s.chrome.native_diorama.is_none())
                         || f32::from(e.position.x) < s.chrome.global_rail_width)
@@ -148,8 +157,17 @@ impl Render for Shell {
                 }
             }))
             .capture_key_down(cx.listener(|s, e: &gpui::KeyDownEvent, _, cx| {
-                if s.workspace.chat_menu_group.is_some() && e.keystroke.key == "escape" && !e.keystroke.modifiers.modified() {
+                if s.overlays.devtools.inspecting && e.keystroke.key == "escape" && !e.keystroke.modifiers.modified() {
+                    s.set_devtools_inspecting(false, cx);
+                    cx.stop_propagation();
+                    return;
+                }
+                if (s.workspace.chat_menu_group.is_some() || s.workspace.terminal_hooks_menu_group.is_some())
+                    && e.keystroke.key == "escape"
+                    && !e.keystroke.modifiers.modified()
+                {
                     s.workspace.chat_menu_group = None;
+                    s.workspace.terminal_hooks_menu_group = None;
                     cx.stop_propagation();
                     cx.notify();
                 }
@@ -157,7 +175,11 @@ impl Render for Shell {
             .on_mouse_down(
                 MouseButton::Left,
                 cx.listener(|s, e: &gpui::MouseDownEvent, window, cx| {
-                    if s.workspace.chat_menu_group.take().is_some() {
+                    let mut dismissed = s.workspace.chat_menu_group.take().is_some();
+                    if s.workspace.terminal_hooks_menu_group.take().is_some() {
+                        dismissed = true;
+                    }
+                    if dismissed {
                         cx.notify();
                     }
                     if s.overlays.palette.as_ref().is_none_or(|p| !p.open)
@@ -289,6 +311,7 @@ impl Render for Shell {
                             .child(vibevalley_i18n::t("desktop.terminal.dismiss", &[])),
                     )
             }))
+            .children(inspector_overlay)
             .children(devtools_overlay)
             .children(devtools_capsule)
             .children(launch)

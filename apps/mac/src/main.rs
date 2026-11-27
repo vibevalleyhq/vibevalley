@@ -23,6 +23,7 @@ mod theme;
 mod tray;
 mod update;
 mod viewer;
+mod voice_asr;
 
 use gpui::{App, AppContext as _, Bounds, Focusable as _, TitlebarOptions, WindowBounds, WindowOptions, point, px, size};
 

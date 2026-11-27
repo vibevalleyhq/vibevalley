@@ -9,7 +9,7 @@ import { AgentsRoute } from "../features/agent";
 import { ArtifactsPage, PresenterPage, StandaloneArtifactPage } from "../features/artifact";
 import { ChannelSidePane, ChatPage } from "../features/channel";
 import { ContentShell } from "../features/content";
-import { DashboardPage } from "../features/dashboard";
+import { DashboardPage, type DashboardTab } from "../features/dashboard";
 import { Follow } from "../features/inbox";
 import { issueSearch } from "../features/issue/model/navigation";
 import { IssuesPage } from "../features/issue/views/IssuesPage";
@@ -135,6 +135,11 @@ function MissingPage(props: { invalid?: boolean }) {
   );
 }
 
+function dashboardTabOf(rest: string): DashboardTab {
+  const seg = rest.split("/")[0];
+  return seg === "runs" ? "runs" : seg === "retro" ? "retro" : "overview";
+}
+
 const routes: readonly RouteDefinition[] = [
   {
     path: "/",
@@ -160,7 +165,7 @@ const routes: readonly RouteDefinition[] = [
       { path: farmRoute, meta: { skin: "farm" }, component: RepoFarm },
       { path: "/workspace", meta: { place: "workspace" }, component: () => <View testID="native-workspace" class="flex-1" /> },
       page("/issues", "issues", (rest) => <IssuesPage rest={rest()} />, issueSearch),
-      page("/dashboard", "dashboard", (rest) => <DashboardPage tab={rest().split("/")[0] === "runs" ? "runs" : "overview"} approvals={PendingApprovals} />),
+      page("/dashboard", "dashboard", (rest) => <DashboardPage tab={dashboardTabOf(rest())} approvals={PendingApprovals} />),
       page("/runs", "dashboard", () => <DashboardPage tab="runs" approvals={PendingApprovals} />),
       page("/chat", "chat", () => <ChatPage />),
       page("/settings", "settings", (rest) => <SettingsPage rest={rest()} />),
@@ -208,6 +213,7 @@ function WorkbenchSurface() {
     testId: "workbench-page",
     role: "main",
     route: () => location().pathname,
+    source: "apps/mac/ui/app/Workbench.tsx:212",
     getRef: () => pageRef,
   });
   return (

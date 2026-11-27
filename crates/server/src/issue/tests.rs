@@ -267,6 +267,41 @@ async fn issue_tags_dates_cycle_safe_parent_and_manual_done_roundtrip() {
     assert_eq!(parent.tags, vec!["UX".to_string(), "架构".to_string()]);
     assert_eq!(parent.start_at, Some(JsNumber::from(1_760_000_000_000_i64)));
     assert_eq!(parent.due_at, Some(JsNumber::from(1_760_864_000_000_i64)));
+    assert_eq!(parent.owner, Some(vibevalley_protocol::ActorRef::User { id: "self".into() }));
+    assert!(parent.assignments.is_empty());
+
+    // Update owner to collaborator and then to agent, and clear via empty id.
+    let owned_collab = board
+        .update_from_input_async(IssueUpdateInput {
+            id: parent.id.clone(),
+            owner: Some(vibevalley_protocol::ActorRef::User { id: " alice ".into() }),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(owned_collab.owner, Some(vibevalley_protocol::ActorRef::User { id: "alice".into() }));
+    assert!(owned_collab.assignments.is_empty());
+
+    let owned_agent = board
+        .update_from_input_async(IssueUpdateInput {
+            id: parent.id.clone(),
+            owner: Some(vibevalley_protocol::ActorRef::Agent { id: "expert-arch".into() }),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(owned_agent.owner, Some(vibevalley_protocol::ActorRef::Agent { id: "expert-arch".into() }));
+    assert!(owned_agent.assignments.is_empty());
+
+    let cleared_owner = board
+        .update_from_input_async(IssueUpdateInput {
+            id: parent.id.clone(),
+            owner: Some(vibevalley_protocol::ActorRef::User { id: String::new() }),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(cleared_owner.owner, None);
 
     // Create child & grandchild, then update parent dynamically and verify cycle protection.
     let child = board
@@ -551,4 +586,354 @@ async fn unsent_issue_workflow_tracks_in_progress_in_review_and_criteria_persist
 
     board3.close_async().await;
     let _ = ctx3.shutdown(Duration::from_secs(1)).await;
+}
+
+#[tokio::test]
+async fn issue_retro_uses_injected_clock_and_full_persisted_issues() {
+    use vibevalley_protocol::{DAY_MS, Finding, IssueRetroGetInput, IssueStatus, JsNumber, RetroWindow};
+
+    let dir = tempfile::tempdir().unwrap();
+    let service = Service::open(dir.path()).await.unwrap();
+    let outbox = Arc::new(Outbox::new(service.clone()));
+    let http: Arc<dyn crate::context::Fetch> = Arc::new(Http);
+    let now_ms = 1_800_000_000_000_i64;
+    let clock = Arc::new(ManualClock::new(now_ms));
+    let ctx = Arc::new(Context::new(
+        service,
+        TaskGroup::new(),
+        Arc::new(LiveState::new()),
+        outbox,
+        Arc::new(StateFeed::new()),
+        clock.clone(),
+        http.clone(),
+        http,
+    ));
+    let board = Board::open_standalone_async(ctx.clone(), Arc::new(Registry::new()), BoardConfig::under(dir.path()))
+        .await
+        .unwrap();
+
+    let mut recent_done = board
+        .create_async(NewIssue {
+            title: "recent-done".into(),
+            tags: vec!["retro".into()],
+            due_at: Some(JsNumber::from(now_ms - DAY_MS)),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    recent_done.created_at = now_ms - 4 * DAY_MS;
+    recent_done.queued_at = Some(now_ms - 3 * DAY_MS);
+    recent_done.reviewed_at = Some(now_ms - 2 * DAY_MS);
+    recent_done.closed_at = Some(now_ms - 2 * DAY_MS);
+    recent_done.delivered = Some(Landing::Merged);
+    recent_done.status = IssueStatus::Done;
+    recent_done.findings.push(Finding {
+        id: "f1".into(),
+        text: "needs edge test".into(),
+        at: now_ms - 2 * DAY_MS,
+        resolved: true,
+    });
+
+    let mut older_done = board
+        .create_async(NewIssue {
+            title: "older-done".into(),
+            tags: vec!["legacy".into()],
+            due_at: Some(JsNumber::from(now_ms - 12 * DAY_MS)),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    older_done.created_at = now_ms - 15 * DAY_MS;
+    older_done.closed_at = Some(now_ms - 10 * DAY_MS);
+    older_done.delivered = Some(Landing::Merged);
+    older_done.status = IssueStatus::Done;
+
+    board.state().put_issues_async(&[recent_done, older_done]).await.unwrap();
+
+    let report_7d = board
+        .issue_retro_endpoint_async(
+            &IssueRetroGetInput {
+                window: Some(RetroWindow::Days7),
+            },
+            clock.as_ref(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(report_7d.total_issues, 1);
+    assert_eq!(report_7d.completed_count, 1);
+    assert_eq!(report_7d.on_time_count, 1);
+    assert_eq!(report_7d.rework_issue_count, 1);
+    assert_eq!(report_7d.cycle_time.median_ms, Some(2 * DAY_MS));
+    assert_eq!(report_7d.review_wait.median_ms, Some(DAY_MS));
+
+    let report_14d = board
+        .issue_retro_endpoint_async(
+            &IssueRetroGetInput {
+                window: Some(RetroWindow::Days14),
+            },
+            clock.as_ref(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(report_14d.total_issues, 2);
+    assert_eq!(report_14d.completed_count, 2);
+    assert_eq!(report_14d.on_time_count, 1);
+    assert_eq!(report_14d.overdue_count, 1);
+    assert_eq!(report_14d.overdue_items.len(), 1);
+
+    board.close_async().await;
+    let _ = ctx.shutdown(Duration::from_secs(1)).await;
+}
+
+#[tokio::test]
+async fn issue_blocked_by_update_validates_cycles_dedup_clear_and_parent_composition() {
+    use vibevalley_protocol::ActorRef;
+
+    let dir = tempfile::tempdir().unwrap();
+    let service = Service::open(dir.path()).await.unwrap();
+    let outbox = Arc::new(Outbox::new(service.clone()));
+    let http: Arc<dyn crate::context::Fetch> = Arc::new(Http);
+    let ctx = Arc::new(Context::new(
+        service,
+        TaskGroup::new(),
+        Arc::new(LiveState::new()),
+        outbox,
+        Arc::new(StateFeed::new()),
+        vibevalley_core::system_clock(),
+        http.clone(),
+        http,
+    ));
+    let board = Board::open_standalone_async(ctx.clone(), Arc::new(Registry::new()), BoardConfig::under(dir.path()))
+        .await
+        .unwrap();
+
+    let a = board
+        .create_from_request_async(&IssueRequest {
+            title: "Issue A".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    let b = board
+        .create_from_request_async(&IssueRequest {
+            title: "Issue B".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    let c = board
+        .create_from_request_async(&IssueRequest {
+            title: "Issue C".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+    // Update A.blocked_by using #number and id, deduplicating cleanly alongside owner update.
+    let a = board
+        .update_from_input_async(IssueUpdateInput {
+            id: a.id.clone(),
+            blocked_by: Some(vec![format!("#{}", b.number), b.id.clone(), String::new()]),
+            owner: Some(ActorRef::Agent { id: "laozhou".into() }),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(a.blocked_by, vec![b.id.clone()]);
+    assert_eq!(a.owner, Some(ActorRef::Agent { id: "laozhou".into() }));
+
+    // B blocked by C succeeds (chain A -> B -> C).
+    let b = board
+        .update_from_input_async(IssueUpdateInput {
+            id: b.id.clone(),
+            blocked_by: Some(vec![c.id.clone()]),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(b.blocked_by, vec![c.id.clone()]);
+
+    // Self-blocking is refused.
+    let self_err = board
+        .update_from_input_async(IssueUpdateInput {
+            id: a.id.clone(),
+            blocked_by: Some(vec![a.id.clone()]),
+            ..Default::default()
+        })
+        .await
+        .unwrap_err();
+    assert_eq!(self_err.biz_code, BizCode::IssueRefused);
+
+    // Transitive cycle C -> A (with A -> B -> C) is refused.
+    let cycle_err = board
+        .update_from_input_async(IssueUpdateInput {
+            id: c.id.clone(),
+            blocked_by: Some(vec![format!("#{}", a.number)]),
+            ..Default::default()
+        })
+        .await
+        .unwrap_err();
+    assert_eq!(cycle_err.biz_code, BizCode::IssueRefused);
+
+    // Parent + blocked_by cycle: setting C.parent = A while A -> B -> C would make A wait on child C and C transitively already reached from A -> B -> C? Wait:
+    // If C is child of A, A waits on C; if C is also blocked_by A, that's a cycle.
+    let parent_cycle_err = board
+        .update_from_input_async(IssueUpdateInput {
+            id: c.id.clone(),
+            parent: Some(a.id.clone()),
+            blocked_by: Some(vec![a.id.clone()]),
+            ..Default::default()
+        })
+        .await
+        .unwrap_err();
+    assert_eq!(parent_cycle_err.biz_code, BizCode::IssueRefused);
+
+    // Clearing blocked_by via [] persists and unblocks, preserving owner.
+    let cleared = board
+        .update_from_input_async(IssueUpdateInput {
+            id: a.id.clone(),
+            blocked_by: Some(vec![]),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert!(cleared.blocked_by.is_empty());
+    assert_eq!(cleared.owner, Some(ActorRef::Agent { id: "laozhou".into() }));
+
+    board.close_async().await;
+    let _ = ctx.shutdown(Duration::from_secs(1)).await;
+}
+
+#[tokio::test]
+async fn issue_relations_sync_bidirectionally_and_never_block_or_cycle_and_triage_requires_confirm() {
+    use vibevalley_core::ManualClock;
+    use vibevalley_protocol::{
+        BacklogTriageConfirmInput, BacklogTriageSuggestInput, Caller, IssueDigestGetInput, IssueRelation, IssueRelationKind, Priority, TriagePatch,
+    };
+
+    let dir = tempfile::tempdir().unwrap();
+    let clock = Arc::new(ManualClock::new(1_700_000_000_000));
+    let service = Service::open(dir.path()).await.unwrap();
+    let http: Arc<dyn crate::context::Fetch> = Arc::new(Http);
+    let ctx = Arc::new(Context::new(
+        service.clone(),
+        TaskGroup::new(),
+        Arc::new(LiveState::new()),
+        Arc::new(Outbox::new(service)),
+        Arc::new(StateFeed::new()),
+        clock.clone(),
+        http.clone(),
+        http,
+    ));
+    let mut reg = Registry::new();
+    reg.register(Arc::new(vibevalley_runtime::oar::scripted::ScriptedRuntime::demo()));
+    let board = Board::open_standalone_async(ctx.clone(), Arc::new(reg), BoardConfig::under(dir.path()))
+        .await
+        .unwrap();
+
+    let a = board
+        .create_async(NewIssue {
+            title: "Urgent auth token crash".into(),
+            agent: "scripted".into(),
+            deliver: vibevalley_protocol::Deliverable::Answer,
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    let b = board
+        .create_async(NewIssue {
+            title: "Auth token refresh crash".into(),
+            agent: "scripted".into(),
+            deliver: vibevalley_protocol::Deliverable::Answer,
+            relations: vec![IssueRelation {
+                kind: IssueRelationKind::Duplicate,
+                issue: a.id.clone(),
+            }],
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+    // Bidirectional creation syncs back onto A.
+    let a_fresh = board.issue_async(&a.id).await.unwrap().unwrap();
+    assert_eq!(
+        a_fresh.relations,
+        vec![IssueRelation {
+            kind: IssueRelationKind::Duplicate,
+            issue: b.id.clone(),
+        }]
+    );
+
+    // Non-blocking: B can leave Backlog and start work even while duplicate/related to open A.
+    board.move_to_async(&b.id, vibevalley_protocol::IssueStatus::Todo, None).await.unwrap();
+    assert_ne!(
+        board.issue_async(&b.id).await.unwrap().unwrap().status,
+        vibevalley_protocol::IssueStatus::Backlog
+    );
+
+    // Updating A's relations to Related updates B bidirectionally.
+    board
+        .update_from_input_async(IssueUpdateInput {
+            id: a.id.clone(),
+            relations: Some(vec![IssueRelation {
+                kind: IssueRelationKind::Related,
+                issue: format!("#{}", b.number),
+            }]),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    let b_fresh = board.issue_async(&b.id).await.unwrap().unwrap();
+    assert_eq!(
+        b_fresh.relations,
+        vec![IssueRelation {
+            kind: IssueRelationKind::Related,
+            issue: a.id.clone(),
+        }]
+    );
+
+    // Clearing relations on A removes reverse relation from B.
+    board
+        .update_from_input_async(IssueUpdateInput {
+            id: a.id.clone(),
+            relations: Some(vec![]),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert!(board.issue_async(&b.id).await.unwrap().unwrap().relations.is_empty());
+
+    // Triage suggestion never mutates A until explicit confirm.
+    let suggestion = board
+        .issue_triage_suggest_endpoint_async(
+            Caller::Orchestrator,
+            BacklogTriageSuggestInput {
+                issue_id: a.id.clone(),
+                reason: "High urgency crash".into(),
+                summary: Some("Set priority Urgent".into()),
+                patch: TriagePatch {
+                    priority: Some(Priority::Urgent),
+                    ..Default::default()
+                },
+            },
+            clock.as_ref(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(board.issue_async(&a.id).await.unwrap().unwrap().priority, Priority::Medium);
+
+    let digest = board
+        .issue_digest_get_endpoint_async(&IssueDigestGetInput { window_hours: Some(24) }, clock.as_ref())
+        .await
+        .unwrap();
+    assert!(digest.triage.iter().any(|s| s.id == suggestion.id));
+
+    let applied = board
+        .issue_triage_confirm_endpoint_async(&BacklogTriageConfirmInput { id: suggestion.id.clone() }, clock.as_ref())
+        .await
+        .unwrap();
+    assert_eq!(applied.priority, Priority::Urgent);
+
+    board.close_async().await;
+    let _ = ctx.shutdown(Duration::from_secs(1)).await;
 }

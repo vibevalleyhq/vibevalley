@@ -62,7 +62,11 @@
 - **交付物类型 `deliver` 事先声明**：分 `change`（要求合入）、`pull_request`（提交 PR/MR 即交付）、`branch`（留分支）与只读调研 `answer`；`answer` 单将结论写入 `Issue.answer`，完成后重置 worktree 并记 `delivered: none`。
 - **原生父子工单与 DAG 依赖**：通过 `parent` 与 `blockedBy` 表达归属与前置依赖。子工单从父分支 `vibevalley/issue-<父编号>` 切出 worktree，完成后合入父分支。
 - **验收子工单先判红并冻结文件**：标记 `constraints.acceptance` 的子工单应先证明检查失败，合入父分支时将其改动文件记为 `frozen`；后继子工单不得修改冻结文件，且末端须通过全部祖先验收命令。
-- **已完成只由用户点头**：单轮 `completed` 只进 `in_review`，助手 `issue_review` 通过只记 `reviewedAt`；最后一轮为 `failed` 时禁止挪到 `done`。
+- **已完成只由用户点头**：单轮 `completed` 只进 `in_review`，助手或自动审查 `issue_review` 通过只记 `reviewedAt`；最后一轮为 `failed` 时禁止挪到 `done`。
+- **多帮工只读协同与单写者交接（Hoe Handoff）**：
+  - **自动审查（`in_review`）**：非自研或非自查工单进入 `in_review`（`reviewedAt` 为空且未暂停）时，若存在已启用的 `reviewer` 档案且 `mandate.maxBotReviewRounds` 仍有额度，自动以只读模式（`RunMode::ReadOnlyReview`、`PermissionMode::Plan`、屏蔽写工具）派发审查会话；审查员仅可读取工单与改动（`issue_diff_get`）并调用 `issue_review` 通过或附 `findings` 打回，不可修改代码，不写 `assignments`；轮次状态持久化在 `durable_document("issue", id, "auto_review")`。
+  - **工单串 `@<agent>` 只读协同**：工单讨论消息解析 `@<agent>`（忽略邮箱/代码块内符号），将匹配的非主执行档案以只读协同会话（`RunMode::ReadOnlyCollaborator`）接入同一工作区检查并回贴汇报，不唤醒、不打断也不抢占主执行会话与串主权。
+  - **单写锁交接（Hoe Handoff）**：同一本地或远端 worktree（`WorktreeKey`）同一时刻只允许一个写会话持有写入租约（`HoeRegistry`）；换人或交接时先序列化提交（`HandoffCleanup::Commit`）或暂存（`HandoffCleanup::Stash`）未提交改动，再干净释放并移交写所有权。
 
 ## 怎么走
 
@@ -127,13 +131,13 @@ PR/MR 创建或更新后在串内记录真实链接；关联保存在 Issue，�
 
 ## 还没做的
 
-- 多帮工协作同一块地、逐条勾选持久化验收标准：`#50`。
+- 逐条勾选持久化验收标准。
 - 工单详情的讨论、里程碑、步骤与轮次合为一条活动流：`#49`。
 - Hub/Machine 解耦与按空间隔离：`#36`。
 
 ## 怎么验证
 
-- `crates/server/tests/issue_board.rs`：从待办到合并、失败与修、提问、中断续上、取消、排队与空位、按仓库的上限、重启接续、冲突、检查失败退回、调研单、留分支、没动静。
+- `crates/server/tests/issue_board.rs`、`crates/server/tests/multi_helper.rs`：从待办到合并、失败与修、提问、中断续上、取消、排队与空位、按仓库的上限、重启接续、冲突、检查失败退回、调研单、留分支、没动静，以及自动只读审查、讨论 `@<agent>` 只读协同与 Hoe Handoff 单写锁交接。
 - `crates/server/tests/issue_family.rs`：父子拆单、验收子工单与冻结文件、起草。
 - `crates/server/tests/issue_edits.rs`：改字段、排位与删单。
 - `crates/server/tests/issue.rs`、`crates/server/tests/cron.rs`：经端点走一张工单；定时任务的增删、拒绝与到期。

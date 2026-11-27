@@ -54,6 +54,7 @@ pub fn start(voice: SharedLiveVoice, owner: String) -> Result<State, String> {
         let mut current = call().lock();
         current.state.phase = Phase::Idle;
         current.state.muted = false;
+        current.state.mic_level = 0.0;
         current.state.problem = result.err();
         current.stop = None;
     });
@@ -78,6 +79,9 @@ pub fn mute(owner: &str, muted: bool) -> State {
         return State::default();
     }
     current.state.muted = muted;
+    if muted {
+        current.state.mic_level = 0.0;
+    }
     current.state.clone()
 }
 
@@ -157,6 +161,11 @@ async fn run(voice: SharedLiveVoice, cancel: CancellationToken) -> Result<(), St
     if cancel.is_cancelled() {
         return Ok(());
     }
+    tokio::select! {
+        biased;
+        () = cancel.cancelled() => return Ok(()),
+        () = crate::speech_audio::preempt_for_call() => {}
+    }
     let setup_voice = voice.clone();
     let setup_cancel = cancel.clone();
     let Some((audio, line, voice_call)) = tokio::task::spawn_blocking(move || -> Result<_, String> {
@@ -221,6 +230,16 @@ async fn run(voice: SharedLiveVoice, cancel: CancellationToken) -> Result<(), St
             || call().lock().state.muted,
             || {
                 call().lock().state.phase = Phase::Live;
+            },
+            |raw_level| {
+                let mut current = call().lock();
+                if current.state.muted {
+                    current.state.mic_level = 0.0;
+                } else {
+                    let prev = current.state.mic_level;
+                    let next = if raw_level <= 0.001 { prev * 0.45 } else { prev * 0.5 + raw_level * 0.5 };
+                    current.state.mic_level = if next < 0.005 { 0.0 } else { next };
+                }
             },
         )
         .await
@@ -314,6 +333,7 @@ async fn session<S, A: Audio>(
     mut heard: impl FnMut(&str, &Event) -> Result<(), WireError>,
     muted: impl Fn() -> bool,
     ready: impl Fn(),
+    mut on_mic_level: impl FnMut(f64),
 ) -> Result<(), WireError>
 where
     S: futures_util::Stream<Item = Result<Message, tokio_tungstenite::tungstenite::Error>>
@@ -436,7 +456,11 @@ where
                     send(&mut writer, &cancel, Message::text(json!({"action":"mic_state","enabled":!is_muted}).to_string())).await?;
                     was_muted = is_muted;
                 }
-                for frame in audio.microphone()?.as_chunks::<640>().0 {
+                let mic_bytes = audio.microphone()?;
+                if !mic_bytes.is_empty() {
+                    on_mic_level(if is_muted { 0.0 } else { crate::audio::pcm16_rms_level(&mic_bytes) });
+                }
+                for frame in mic_bytes.as_chunks::<640>().0 {
                     let mut tagged = vec![0u8; 641];
                     if !is_muted { tagged[1..].copy_from_slice(frame); }
                     send(&mut writer, &cancel, Message::Binary(tagged.into())).await?;
@@ -585,6 +609,7 @@ mod tests {
             |_, _| Ok(()),
             || false,
             || {},
+            |_| {},
         )
         .await
         .unwrap();
@@ -626,6 +651,7 @@ mod tests {
             |_, _| Ok(()),
             || false,
             || {},
+            |_| {},
         )
         .await;
         assert!(matches!(result, Err(WireError::Failed(error)) if error.contains("options")));
@@ -696,6 +722,7 @@ mod tests {
             |_, _| Ok(()),
             || false,
             || {},
+            |_| {},
         )
         .await
         .unwrap();
@@ -769,6 +796,7 @@ mod tests {
                 |_, _| Ok(()),
                 || false,
                 || {},
+                |_| {},
             )
             .await
         });

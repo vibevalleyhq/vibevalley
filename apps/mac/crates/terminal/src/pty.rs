@@ -7,6 +7,7 @@ use std::sync::{Arc, Condvar, Mutex};
 
 use portable_pty::{CommandBuilder, MasterPty, PtySize, SlavePty, native_pty_system};
 
+use crate::hooks::{HookRuntime, ResolvedTerminalHooks};
 use crate::session::Msg;
 use crate::{Result, SpawnOptions, TermError, TermSize};
 
@@ -70,6 +71,8 @@ pub(crate) struct Pty {
     pub writer: flume::Sender<Vec<u8>>,
     /// Closing this end stops the reader and writer threads.
     wake: Option<OwnedFd>,
+    /// Isolated per-tab temp shims / ZDOTDIR wrapper, removed on shutdown or drop.
+    hook_runtime: Option<HookRuntime>,
 }
 
 impl Pty {
@@ -95,6 +98,7 @@ impl Pty {
         self.budget.close();
         self.wake = None;
         self.slave = None;
+        self.hook_runtime = None;
     }
 }
 
@@ -127,7 +131,7 @@ fn spawn_err(e: impl std::fmt::Display) -> TermError {
     TermError::Spawn(e.to_string())
 }
 
-fn command(opts: &SpawnOptions) -> CommandBuilder {
+fn command(opts: &SpawnOptions, hooks: &ResolvedTerminalHooks) -> Result<(CommandBuilder, Option<HookRuntime>)> {
     let mut cmd = match &opts.program {
         Some(program) => {
             let mut cmd = CommandBuilder::new(program);
@@ -146,17 +150,17 @@ fn command(opts: &SpawnOptions) -> CommandBuilder {
     cmd.env("TERM", "xterm-256color");
     cmd.env("COLORTERM", "truecolor");
     cmd.env("TERM_PROGRAM", "VibeValley");
-    for (key, value) in &opts.env {
-        cmd.env(key, value);
-    }
-    cmd
+    let history_active = crate::history::apply_pty_env(&mut cmd, &opts.env);
+    let hook_runtime = crate::hooks::apply_pty_hooks(&mut cmd, &opts.env, hooks, history_active).map_err(spawn_err)?;
+    Ok((cmd, hook_runtime))
 }
 
 /// Opens the PTY, starts the child and the three helper threads. Returns the
 /// PTY plus a duplicate of the master descriptor for the session handle.
-pub(crate) fn spawn(opts: &SpawnOptions, tx: flume::Sender<Msg>) -> Result<(Pty, OwnedFd)> {
+pub(crate) fn spawn(opts: &SpawnOptions, hooks: &ResolvedTerminalHooks, tx: flume::Sender<Msg>) -> Result<(Pty, OwnedFd)> {
     let pair = native_pty_system().openpty(pty_size(opts.size)).map_err(spawn_err)?;
-    let mut child = pair.slave.spawn_command(command(opts)).map_err(spawn_err)?;
+    let (cmd, hook_runtime) = command(opts, hooks)?;
+    let mut child = pair.slave.spawn_command(cmd).map_err(spawn_err)?;
     let pid = child.process_id().map(|pid| pid as i32);
 
     let master_fd = pair.master.as_raw_fd().ok_or_else(|| spawn_err("pty master has no file descriptor"))?;
@@ -205,6 +209,7 @@ pub(crate) fn spawn(opts: &SpawnOptions, tx: flume::Sender<Msg>) -> Result<(Pty,
             budget,
             writer: writer_tx,
             wake: Some(wake_w),
+            hook_runtime,
         },
         handle_fd,
     ))

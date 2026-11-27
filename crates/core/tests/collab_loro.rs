@@ -510,3 +510,57 @@ fn property_three_peers_converge_across_all_sync_permutations_without_cycles() {
         }
     }
 }
+
+#[test]
+fn version_vector_incremental_sync_converges_after_offline_edits_and_shallow_compaction() {
+    let server = CollabDoc::with_peer_id(1).unwrap();
+    server.entry_put_text("structure/index.md", "text/markdown", "Line 1\nLine 2\n").unwrap();
+    server.entry_patch_json("elements/n1", &json!({ "id": "n1", "x": 10, "y": 20 })).unwrap();
+    server.commit(&CommitMeta::user("user", Some("seed".into()), 1_000)).unwrap();
+
+    // Client cold-starts with no VV -> receives full snapshot.
+    let cold = server.export_sync_since(None).unwrap();
+    assert!(cold.is_snapshot);
+    let client = CollabDoc::from_snapshot_with_peer(&cold.bytes, 2).unwrap();
+    let base_vv = client.version_vector();
+    assert_eq!(base_vv, cold.version_vector);
+
+    // Offline edits happen concurrently on both server and client.
+    server.text_insert("structure/index.md", 0, "[Server] ").unwrap();
+    server.entry_patch_json("elements/n1", &json!({ "x": 42 })).unwrap();
+    server
+        .commit(&CommitMeta::session("agent", "codex", "s1", 1, Some("server edit".into()), 2_000))
+        .unwrap();
+
+    client.text_insert("structure/index.md", 14, " [Client]").unwrap();
+    client.entry_patch_json("elements/n1", &json!({ "y": 99 })).unwrap();
+    client.commit(&CommitMeta::user("user", Some("offline edit".into()), 2_100)).unwrap();
+
+    // Reconnect: incremental export from server since `base_vv`, and client delta since `base_vv`.
+    let server_delta = server.export_sync_since(Some(&base_vv)).unwrap();
+    assert!(!server_delta.is_snapshot);
+    let client_delta = client.export_sync_since(Some(&base_vv)).unwrap();
+    assert!(!client_delta.is_snapshot);
+
+    assert!(server.import_bytes_with_status(&client_delta.bytes).unwrap());
+    assert!(client.import_bytes_with_status(&server_delta.bytes).unwrap());
+    // Re-importing the same bytes is idempotent.
+    assert!(!server.import_bytes_with_status(&client_delta.bytes).unwrap());
+
+    assert_eq!(server.version_vector(), client.version_vector());
+    assert_eq!(server.project_snapshot(), client.project_snapshot());
+    assert_eq!(server.text_get("structure/index.md").as_deref(), Some("[Server] Line 1\nLine 2\n [Client]"));
+    let n1 = server.entry_get_json("elements/n1").unwrap();
+    assert_eq!(n1["x"], json!(42));
+    assert_eq!(n1["y"], json!(99));
+
+    // Shallow compaction fallback: a stale VV behind the shallow root falls back to snapshot.
+    server.text_insert("structure/index.md", 0, "v3 ").unwrap();
+    server.commit(&CommitMeta::user("user", Some("extra commit".into()), 3_000)).unwrap();
+    let shallow_bytes = server.compact_shallow_snapshot().unwrap();
+    let shallow_server = CollabDoc::from_snapshot_with_peer(&shallow_bytes, 3).unwrap();
+    let fallback = shallow_server.export_sync_since(Some(&base_vv)).unwrap();
+    assert!(fallback.is_snapshot);
+    let late_client = CollabDoc::from_snapshot_with_peer(&fallback.bytes, 4).unwrap();
+    assert_eq!(late_client.project_snapshot(), shallow_server.project_snapshot());
+}

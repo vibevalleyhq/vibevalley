@@ -9,12 +9,14 @@ use sea_orm::{
     ActiveValue::Set, ColumnTrait, ConnectionTrait, EntityTrait, ExprTrait, FromQueryResult, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Update,
 };
 use serde::{Deserialize, Serialize};
-use vibevalley_protocol::{Run, Session, SessionEvent, SessionPermissionMode, SessionSubagents};
+use vibevalley_core::{apply_session_telemetry, fold_session_telemetry};
+use vibevalley_protocol::{Run, Session, SessionEvent, SessionPermissionMode, SessionSubagents, SessionTelemetry};
 use vibevalley_runtime::agent::durable::entities::durable_document;
 
+use super::with_write_tx;
 use crate::db::column::{db_json, db_word, read_db_json, read_db_word};
 use crate::db::entity::{session, session_event, session_mailbox, session_run};
-use crate::db::{Database, DbError, DbResult, Tx, begin_write_tx, commit_tx, rollback_tx};
+use crate::db::{Database, DbError, DbResult, Tx};
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct SessionConfig {
@@ -121,6 +123,7 @@ fn read_session(r: SessionQueryRow) -> DbResult<Session> {
         spent: r.spent.map(read_db_json).transpose()?,
         subagents: r.subagents.map(read_db_json).transpose()?,
         tool_connections: r.tool_connections.map(read_db_json).transpose()?,
+        telemetry: None,
         machine: r.machine,
         phase: read_db_json(r.phase)?,
     })
@@ -737,21 +740,13 @@ impl SessionService {
         if writes.is_empty() {
             return Ok(());
         }
-        let tx = begin_write_tx(self.db.write_conn()).await?;
-        let outcome: DbResult<()> = async {
+        with_write_tx(&self.db, async |tx| {
             for (session_id, events) in writes {
-                upsert_events_impl(&tx, session_id, events).await?;
+                upsert_events_impl(tx, session_id, events).await?;
             }
             Ok(())
-        }
-        .await;
-        match outcome {
-            Ok(()) => commit_tx(tx).await,
-            Err(err) => {
-                let _ = rollback_tx(tx).await;
-                Err(err)
-            }
-        }
+        })
+        .await
     }
 
     pub(crate) async fn delete_events(&self, session_id: &str) -> DbResult<()> {
@@ -806,6 +801,58 @@ impl SessionService {
             .into_iter()
             .map(read_db_json)
             .collect()
+    }
+
+    pub(crate) async fn telemetry_for_session(&self, session_id: &str) -> DbResult<Option<SessionTelemetry>> {
+        let rows = session_event::Entity::find()
+            .select_only()
+            .column(session_event::Column::Payload)
+            .filter(session_event::Column::SessionId.eq(session_id))
+            .filter(
+                Condition::any()
+                    .add(session_event::Column::Payload.contains("llm/usage"))
+                    .add(session_event::Column::Payload.contains("llm/retry"))
+                    .add(session_event::Column::Payload.contains("run/error")),
+            )
+            .order_by_asc(session_event::Column::Seq)
+            .into_tuple::<String>()
+            .all(self.db.read_conn())
+            .await?;
+        let events = rows.into_iter().map(read_db_json).collect::<DbResult<Vec<SessionEvent>>>()?;
+        Ok(fold_session_telemetry(&events))
+    }
+
+    pub(crate) async fn telemetry_by_session(&self) -> DbResult<HashMap<String, SessionTelemetry>> {
+        let active_ids = Query::select()
+            .column(session::Column::Id)
+            .from(session::Entity)
+            .and_where(Expr::col(session::Column::Departed).eq(false))
+            .to_owned();
+        let rows = session_event::Entity::find()
+            .select_only()
+            .columns([session_event::Column::SessionId, session_event::Column::Payload])
+            .filter(session_event::Column::SessionId.in_subquery(active_ids))
+            .filter(
+                Condition::any()
+                    .add(session_event::Column::Payload.contains("llm/usage"))
+                    .add(session_event::Column::Payload.contains("llm/retry"))
+                    .add(session_event::Column::Payload.contains("run/error")),
+            )
+            .order_by_asc(session_event::Column::SessionId)
+            .order_by_asc(session_event::Column::Seq)
+            .into_tuple::<(String, String)>()
+            .all(self.db.read_conn())
+            .await?;
+
+        let mut out: HashMap<String, SessionTelemetry> = HashMap::new();
+        for (session_id, payload) in rows {
+            let event: SessionEvent = read_db_json(payload)?;
+            let mut candidate = out.get(&session_id).cloned().unwrap_or_default();
+            if apply_session_telemetry(&mut candidate, &event) {
+                out.insert(session_id, candidate);
+            }
+        }
+        Ok(out)
     }
 
     #[allow(clippy::too_many_arguments)]

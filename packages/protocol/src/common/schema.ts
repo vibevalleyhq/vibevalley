@@ -94,6 +94,37 @@ export const KeyStatus = z.object({
 
 export const Locale = z.enum(T.LocaleValues) satisfies Codec<T.Locale>;
 
+export const CompareAnnotationSide = z.enum(T.CompareAnnotationSideValues) satisfies Codec<T.CompareAnnotationSide>;
+
+export const CompareAnnotationTone = z.enum(T.CompareAnnotationToneValues) satisfies Codec<T.CompareAnnotationTone>;
+
+export const CompareImage = z.object({
+  attachment: z.exactOptional(z.string()),
+  url: z.exactOptional(z.string()),
+  label: z.exactOptional(z.string()),
+}) satisfies Codec<T.CompareImage>;
+
+export const CompareAnnotation = z.object({
+  n: z.number(),
+  side: z.exactOptional(CompareAnnotationSide),
+  rect: z.tuple([z.number(), z.number(), z.number(), z.number()]),
+  tone: z.exactOptional(CompareAnnotationTone),
+  note: z.string(),
+}) satisfies Codec<T.CompareAnnotation>;
+
+export const CompareSpec = z.object({
+  title: z.exactOptional(z.string()),
+  before: z.exactOptional(CompareImage),
+  after: z.exactOptional(CompareImage),
+  image: z.exactOptional(CompareImage),
+  annotations: z.exactOptional(z.array(CompareAnnotation)),
+}) satisfies Codec<T.CompareSpec>;
+
+export const CompareMarkdownSegment = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("markdown"), text: z.string() }),
+  z.object({ kind: z.literal("compare"), raw: z.string(), spec: CompareSpec }),
+]) satisfies Codec<T.CompareMarkdownSegment>;
+
 /** A string's length counted in code points, not UTF-16 units: an emoji is one character, as a person counts it.
  * Written into the JSON Schema a tool's model reads as minLength/maxLength, which count code points too (the bag's
  * minimum/maximum are what z.toJSONSchema reads for a string; a refine alone says nothing there). */

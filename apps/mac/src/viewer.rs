@@ -9,10 +9,11 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use gpui::{
-    AnyElement, AppContext as _, ClipboardItem, Context, EventEmitter, FocusHandle, Focusable, FontWeight, HighlightStyle, Hsla, InteractiveElement as _,
-    IntoElement, KeyDownEvent, MouseButton, ObjectFit, ParentElement as _, Render, ScrollStrategy, StatefulInteractiveElement as _, Styled as _,
-    StyledImage as _, StyledText, UniformListScrollHandle, Window, div, img, px, uniform_list,
+    AnyElement, AppContext as _, ClipboardItem, Context, Entity, EventEmitter, FocusHandle, Focusable, FontWeight, HighlightStyle, Hsla,
+    InteractiveElement as _, IntoElement, KeyDownEvent, MouseButton, ObjectFit, ParentElement as _, Render, ScrollStrategy, StatefulInteractiveElement as _,
+    Styled as _, StyledImage as _, StyledText, UniformListScrollHandle, Window, div, hsla, img, px, uniform_list,
 };
+use nsh_platform_gpui::{App as NshApp, AppOptions, AppView, Appearance, Bundle};
 use vibevalley_files::{FileContent, HighlightKind, HighlightSpan, Language};
 
 use crate::host::{EditorOption, EditorTarget};
@@ -20,6 +21,45 @@ use crate::icon::{editor_popover, gpui_icon, icon_button, icon_caret_button};
 use crate::theme::{Palette, Ui};
 
 const MAX_BYTES: u64 = 8 * 1024 * 1024;
+const HTML_PREVIEW_CAPABILITIES: &str = r#"{"webview":{"hosts":[]}}"#;
+const HTML_PREVIEW_JS: &str = r#"import { host, mount, signal, WebView } from "nsh";
+import { component } from "nsh:rt";
+
+const html = signal(typeof host.params.html === "string" ? host.params.html : "");
+const covered = signal(Boolean(host.params.covered));
+host.on("html", (next) => {
+  if (typeof next === "string") html.set(next);
+});
+host.on("covered", (next) => {
+  covered.set(Boolean(next));
+});
+
+mount(() =>
+  component(WebView, {
+    get html() {
+      return html();
+    },
+    incognito: true,
+    get style() {
+      return covered()
+        ? { flexGrow: 1, flexShrink: 1, flexBasis: 0, width: "100%", height: "100%", opacity: 0 }
+        : { flexGrow: 1, flexShrink: 1, flexBasis: 0, width: "100%", height: "100%" };
+    },
+  }),
+);
+"#;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum HtmlViewMode {
+    Preview,
+    Source,
+}
+
+impl HtmlViewMode {
+    fn default_for_path(path: &Path) -> Self {
+        if is_html_path(path) { Self::Preview } else { Self::Source }
+    }
+}
 
 pub enum ViewerEvent {
     OpenInEditor(EditorTarget),
@@ -34,11 +74,85 @@ pub struct Line {
 
 enum State {
     Loading,
-    Text { lines: Arc<Vec<Line>>, language: Option<Language> },
+    Text {
+        lines: Arc<Vec<Line>>,
+        language: Option<Language>,
+        html_doc: Option<Arc<str>>,
+    },
     Image,
     Binary(u64),
     TooLarge(u64),
     Error(String),
+}
+
+pub(crate) struct EditorToolbarState {
+    pub(crate) copied: bool,
+    copy_gen: u64,
+    pub(crate) editor_menu_open: bool,
+    pub(crate) editor_options: Vec<EditorOption>,
+}
+
+impl EditorToolbarState {
+    pub(crate) fn new() -> Self {
+        Self {
+            copied: false,
+            copy_gen: 0,
+            editor_menu_open: false,
+            editor_options: crate::host::cached_editor_options(),
+        }
+    }
+
+    pub(crate) fn refresh_editors<V: 'static>(cx: &mut Context<V>, field: fn(&mut V) -> &mut Self) {
+        let task = cx.background_spawn(async { crate::host::detect_editors_blocking() });
+        cx.spawn(async move |this, cx| {
+            let options = task.await;
+            let _ = this.update(cx, |v, cx| {
+                let state = field(v);
+                if state.editor_options != options {
+                    state.editor_options = options;
+                    cx.notify();
+                }
+            });
+        })
+        .detach();
+    }
+
+    pub(crate) fn copy_path<V: 'static>(&mut self, path: &Path, cx: &mut Context<V>, field: fn(&mut V) -> &mut Self) {
+        cx.write_to_clipboard(ClipboardItem::new_string(path.to_string_lossy().into_owned()));
+        self.copied = true;
+        self.copy_gen = self.copy_gen.wrapping_add(1);
+        let generation = self.copy_gen;
+        cx.notify();
+        cx.spawn(async move |this, cx| {
+            cx.background_executor().timer(Duration::from_millis(1500)).await;
+            let _ = this.update(cx, |v, cx| {
+                let state = field(v);
+                if state.copy_gen == generation && state.copied {
+                    state.copied = false;
+                    cx.notify();
+                }
+            });
+        })
+        .detach();
+    }
+
+    pub(crate) fn toggle_editor_menu<V: 'static>(
+        &mut self,
+        was_open: bool,
+        focus: &FocusHandle,
+        window: &mut Window,
+        cx: &mut Context<V>,
+        field: fn(&mut V) -> &mut Self,
+    ) {
+        // Use render-time `was_open`: `on_mouse_down_out` already cleared
+        // `editor_menu_open` during capture when clicking the trigger to close.
+        self.editor_menu_open = !was_open;
+        if self.editor_menu_open {
+            window.focus(focus, cx);
+            Self::refresh_editors(cx, field);
+        }
+        cx.notify();
+    }
 }
 
 pub struct FileViewer {
@@ -50,10 +164,11 @@ pub struct FileViewer {
     reloads: u64,
     load_gen: u64,
     show_skeleton: bool,
-    copied: bool,
-    copy_gen: u64,
-    editor_menu_open: bool,
-    editor_options: Vec<EditorOption>,
+    toolbar: EditorToolbarState,
+    html_mode: HtmlViewMode,
+    html_preview: Option<Entity<AppView>>,
+    html_preview_dark: Option<bool>,
+    html_preview_error: Option<String>,
 }
 
 fn matches_scope(scope: &str, prefix: &str) -> bool {
@@ -177,6 +292,7 @@ pub fn clip_spans(text: &str, spans: &[HighlightSpan]) -> Vec<(Range<usize>, vib
 
 impl FileViewer {
     pub fn new(path: PathBuf, cx: &mut Context<Self>) -> Self {
+        let html_mode = HtmlViewMode::default_for_path(&path);
         let mut viewer = FileViewer {
             path,
             state: State::Loading,
@@ -186,57 +302,90 @@ impl FileViewer {
             reloads: 0,
             load_gen: 0,
             show_skeleton: false,
-            copied: false,
-            copy_gen: 0,
-            editor_menu_open: false,
-            editor_options: crate::host::cached_editor_options(),
+            toolbar: EditorToolbarState::new(),
+            html_mode,
+            html_preview: None,
+            html_preview_dark: None,
+            html_preview_error: None,
         };
-        viewer.refresh_editors(cx);
+        EditorToolbarState::refresh_editors(cx, |v: &mut Self| &mut v.toolbar);
         viewer.reload(cx);
         viewer
     }
 
-    fn refresh_editors(&mut self, cx: &mut Context<Self>) {
-        let task = cx.background_spawn(async { crate::host::detect_editors_blocking() });
-        cx.spawn(async move |this, cx| {
-            let options = task.await;
-            let _ = this.update(cx, |v, cx| {
-                if v.editor_options != options {
-                    v.editor_options = options;
-                    cx.notify();
-                }
-            });
-        })
-        .detach();
-    }
-
     fn copy_path(&mut self, cx: &mut Context<Self>) {
-        cx.write_to_clipboard(ClipboardItem::new_string(self.path.to_string_lossy().into_owned()));
-        self.copied = true;
-        self.copy_gen = self.copy_gen.wrapping_add(1);
-        let generation = self.copy_gen;
-        cx.notify();
-        cx.spawn(async move |this, cx| {
-            cx.background_executor().timer(Duration::from_millis(1500)).await;
-            let _ = this.update(cx, |v, cx| {
-                if v.copy_gen == generation && v.copied {
-                    v.copied = false;
-                    cx.notify();
-                }
-            });
-        })
-        .detach();
+        self.toolbar.copy_path(&self.path, cx, |v| &mut v.toolbar);
     }
 
     fn toggle_editor_menu(&mut self, was_open: bool, window: &mut Window, cx: &mut Context<Self>) {
-        // Use render-time `was_open`: `on_mouse_down_out` already cleared
-        // `editor_menu_open` during capture when clicking the trigger to close.
-        self.editor_menu_open = !was_open;
-        if self.editor_menu_open {
-            window.focus(&self.focus, cx);
-            self.refresh_editors(cx);
+        self.toolbar.toggle_editor_menu(was_open, &self.focus, window, cx, |v| &mut v.toolbar);
+        self.sync_html_covered(cx);
+    }
+
+    fn set_editor_menu_open(&mut self, open: bool, cx: &mut Context<Self>) {
+        if self.toolbar.editor_menu_open != open {
+            self.toolbar.editor_menu_open = open;
+            self.sync_html_covered(cx);
+            cx.notify();
         }
-        cx.notify();
+    }
+
+    fn sync_html_covered(&self, cx: &gpui::App) {
+        if let Some(app) = &self.html_preview {
+            let _ = app.read(cx).host().send("covered", serde_json::Value::Bool(self.toolbar.editor_menu_open));
+        }
+    }
+
+    fn set_html_mode(&mut self, mode: HtmlViewMode, cx: &mut Context<Self>) {
+        if self.html_mode != mode {
+            self.html_mode = mode;
+            cx.notify();
+        }
+    }
+
+    fn ensure_html_preview(&mut self, html: Arc<str>, window: &mut Window, cx: &mut Context<Self>) {
+        let dark = Ui::get(cx).colors.dark;
+        if let Some(app) = &self.html_preview {
+            if self.html_preview_dark != Some(dark) {
+                self.html_preview_dark = Some(dark);
+                app.update(cx, |app, cx| app.set_appearance(if dark { Appearance::Dark } else { Appearance::Light }, cx));
+            }
+            return;
+        }
+        if self.html_preview_error.is_some() {
+            return;
+        }
+        let bundle = match build_html_preview_bundle() {
+            Ok(b) => b,
+            Err(err) => {
+                self.html_preview_error = Some(err);
+                return;
+            }
+        };
+        crate::hosted::ensure_ui_sets();
+        let covered = self.toolbar.editor_menu_open;
+        let options = AppOptions {
+            appearance: Appearance::System,
+            data_dir: Some(crate::host::Storage::configured().views),
+            inline_root: true,
+            ..Default::default()
+        };
+        let app = cx.new(|cx| {
+            let app = AppView::new(options, window, cx);
+            app.set_appearance(if dark { Appearance::Dark } else { Appearance::Light }, cx);
+            let host = app.host();
+            let mut params = serde_json::Map::new();
+            params.insert("html".into(), serde_json::Value::String(html.to_string()));
+            params.insert("covered".into(), serde_json::Value::Bool(covered));
+            host.set_params(params);
+            app.on_error(|message| {
+                tracing::warn!(target: "vibevalley::viewer", %message, "html preview error");
+            });
+            app.load(NshApp::Js(bundle));
+            app
+        });
+        self.html_preview = Some(app);
+        self.html_preview_dark = Some(dark);
     }
 
     pub fn path(&self) -> &Path {
@@ -246,7 +395,7 @@ impl FileViewer {
     pub fn status(&self) -> String {
         match &self.state {
             State::Loading => "loading".into(),
-            State::Text { lines, language } => {
+            State::Text { lines, language, .. } => {
                 format!("text {} lines {}", lines.len(), language.as_ref().map_or("plain", |l| l.0.as_str()))
             }
             State::Image => "image".into(),
@@ -277,13 +426,16 @@ impl FileViewer {
             .detach();
         }
         let path = self.path.clone();
+        let is_html = is_html_path(&path);
         let task = cx.background_spawn(async move {
             match vibevalley_files::load_file(&path, MAX_BYTES) {
                 Ok(FileContent::Text { text, language }) => {
                     let lines = prepare(&text, language.as_ref());
+                    let html_doc = is_html.then(|| Arc::<str>::from(build_html_preview_document(&text)));
                     State::Text {
                         lines: Arc::new(lines),
                         language,
+                        html_doc,
                     }
                 }
                 Ok(FileContent::Image { .. }) => State::Image,
@@ -301,6 +453,9 @@ impl FileViewer {
                 v.state = state;
                 v.show_skeleton = false;
                 v.reloads += 1;
+                if let (State::Text { html_doc: Some(html), .. }, Some(app)) = (&v.state, &v.html_preview) {
+                    let _ = app.read(cx).host().send("html", serde_json::Value::String(html.to_string()));
+                }
                 if let Some(line) = v.pending_line.take() {
                     v.scroll_to_line(line, cx);
                 }
@@ -312,6 +467,9 @@ impl FileViewer {
 
     /// 1-based line, as search hits give it.
     pub fn scroll_to_line(&mut self, line: u32, cx: &mut Context<Self>) {
+        if self.is_html() {
+            self.html_mode = HtmlViewMode::Source;
+        }
         match self.state {
             State::Text { .. } => self.scroll.scroll_to_item(line.saturating_sub(1) as usize, ScrollStrategy::Center),
             _ => self.pending_line = Some(line),
@@ -322,6 +480,33 @@ impl FileViewer {
     fn is_markdown(&self) -> bool {
         matches!(&self.state, State::Text { language: Some(l), .. } if l.0 == "markdown") || self.path.extension().is_some_and(|e| e == "md" || e == "markdown")
     }
+
+    fn is_html(&self) -> bool {
+        is_html_path(&self.path)
+    }
+}
+
+pub(crate) fn is_html_path(path: &Path) -> bool {
+    path.extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("html") || ext.eq_ignore_ascii_case("htm"))
+}
+
+pub(crate) fn build_html_preview_document(raw_html: &str) -> String {
+    crate::applet::prototype::with_policy(raw_html)
+}
+
+fn build_html_preview_bundle() -> Result<Bundle, String> {
+    Bundle::source(HTML_PREVIEW_JS.to_owned())
+        .with_app_id(Some("dev.vibevalley.html-preview"))
+        .with_capabilities_json(Some(HTML_PREVIEW_CAPABILITIES))
+}
+
+fn html_mode_labels() -> (String, String) {
+    (
+        vibevalley_i18n::t("web.artifact.page.previewTab", &[]),
+        vibevalley_i18n::t("web.base.rich.viewSource", &[]),
+    )
 }
 
 impl EventEmitter<ViewerEvent> for FileViewer {}
@@ -489,8 +674,66 @@ fn state_card(title: &'static str, detail: String, hint: Option<&'static str>, d
         .into_any_element()
 }
 
+fn html_mode_toggle(mode: HtmlViewMode, colors: &Palette, cx: &mut Context<FileViewer>) -> AnyElement {
+    let (preview_label, source_label) = html_mode_labels();
+    let hover = colors.hover;
+    let text = colors.text;
+    let pill = |id: &'static str, label: String, active: bool, next: HtmlViewMode, cx: &mut Context<FileViewer>| {
+        let base = div()
+            .id(id)
+            .h(px(18.0))
+            .px(px(8.0))
+            .rounded(px(4.0))
+            .border_1()
+            .flex()
+            .items_center()
+            .justify_center()
+            .text_size(px(11.0))
+            .font_weight(FontWeight::MEDIUM)
+            .cursor_pointer()
+            .child(label)
+            .on_click(cx.listener(move |v, _, _, cx| v.set_html_mode(next, cx)));
+        if active {
+            base.bg(colors.elevated).border_color(colors.border).text_color(colors.text)
+        } else {
+            base.border_color(hsla(0.0, 0.0, 0.0, 0.0))
+                .text_color(colors.muted)
+                .hover(move |s| s.bg(hover).text_color(text))
+        }
+    };
+    div()
+        .id("viewer-html-mode")
+        .flex_none()
+        .h(px(24.0))
+        .p(px(2.0))
+        .mr(px(4.0))
+        .rounded(px(6.0))
+        .border_1()
+        .border_color(colors.border)
+        .bg(colors.surface)
+        .flex()
+        .flex_row()
+        .items_center()
+        .gap(px(2.0))
+        .child(pill(
+            "viewer-html-mode-preview",
+            preview_label,
+            mode == HtmlViewMode::Preview,
+            HtmlViewMode::Preview,
+            cx,
+        ))
+        .child(pill(
+            "viewer-html-mode-source",
+            source_label,
+            mode == HtmlViewMode::Source,
+            HtmlViewMode::Source,
+            cx,
+        ))
+        .into_any_element()
+}
+
 impl Render for FileViewer {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let ui = Ui::get(cx);
         let colors = ui.colors.clone();
         let mono = ui.mono();
@@ -498,7 +741,7 @@ impl Render for FileViewer {
         let line_height = (font_size * 1.65).round().max(21.0);
         let (file_name, parent_dir) = split_display_path(&self.path);
         let (lang_badge, meta_text) = match &self.state {
-            State::Text { lines, language } => {
+            State::Text { lines, language, .. } => {
                 let count = if lines.len() == 1 {
                     "1 line".to_string()
                 } else {
@@ -510,7 +753,22 @@ impl Render for FileViewer {
             State::Binary(size) | State::TooLarge(size) => (None, Some(format_bytes(*size))),
             State::Loading | State::Error(_) => (None, None),
         };
-        let menu_open = self.editor_menu_open;
+        let is_html = self.is_html();
+        let html_preview_doc = if is_html && self.html_mode == HtmlViewMode::Preview {
+            match &self.state {
+                State::Text {
+                    lines, html_doc: Some(html), ..
+                } if !lines.is_empty() => Some(html.clone()),
+                _ => None,
+            }
+        } else {
+            None
+        };
+        if let Some(html) = html_preview_doc {
+            self.ensure_html_preview(html, window, cx);
+        }
+        let show_html_toggle = is_html && !matches!(self.state, State::Binary(_) | State::TooLarge(_) | State::Error(_));
+        let menu_open = self.toolbar.editor_menu_open;
         let toolbar = div()
             .h(px(34.0))
             .flex_none()
@@ -579,14 +837,15 @@ impl Render for FileViewer {
                     .flex_row()
                     .items_center()
                     .gap(px(3.0))
+                    .children(show_html_toggle.then(|| html_mode_toggle(self.html_mode, &colors, cx)))
                     .children(self.is_markdown().then(|| {
                         icon_button("preview", "show", "Preview Markdown", false, &colors).on_click(cx.listener(|_, _, _, cx| cx.emit(ViewerEvent::Preview)))
                     }))
                     .child(
                         icon_button(
                             "copy-path",
-                            if self.copied { "check" } else { "copy" },
-                            if self.copied { "Copied" } else { "Copy path" },
+                            if self.toolbar.copied { "check" } else { "copy" },
+                            if self.toolbar.copied { "Copied" } else { "Copy path" },
                             false,
                             &colors,
                         )
@@ -609,21 +868,17 @@ impl Render for FileViewer {
             let dismiss_entity = cx.entity();
             editor_popover(
                 "viewer-editor-menu",
-                &self.editor_options,
+                &self.toolbar.editor_options,
                 &colors,
                 move |target, _, cx| {
                     select_entity.update(cx, |v, cx| {
-                        v.editor_menu_open = false;
+                        v.set_editor_menu_open(false, cx);
                         cx.emit(ViewerEvent::OpenInEditor(target));
-                        cx.notify();
                     });
                 },
                 move |_, cx| {
                     dismiss_entity.update(cx, |v, cx| {
-                        if v.editor_menu_open {
-                            v.editor_menu_open = false;
-                            cx.notify();
-                        }
+                        v.set_editor_menu_open(false, cx);
                     });
                 },
             )
@@ -676,6 +931,22 @@ impl Render for FileViewer {
                 )
                 .into_any_element(),
             State::Text { lines, .. } if lines.is_empty() => state_card("Empty file", "This file has no content yet.".into(), None, false, Vec::new(), &colors),
+            State::Text { .. } if is_html && self.html_mode == HtmlViewMode::Preview => {
+                if let Some(err) = &self.html_preview_error {
+                    state_card(
+                        "Could not render HTML preview",
+                        err.clone(),
+                        Some("Switch to Source mode to inspect the raw file."),
+                        true,
+                        Vec::new(),
+                        &colors,
+                    )
+                } else if let Some(app) = &self.html_preview {
+                    app.clone().into_any_element()
+                } else {
+                    div().size_full().into_any_element()
+                }
+            }
             State::Text { lines, .. } => {
                 let lines = lines.clone();
                 let digits = lines.len().max(1).to_string().len().max(3);
@@ -752,10 +1023,9 @@ impl Render for FileViewer {
             .track_focus(&self.focus)
             .key_context("FileViewer")
             .on_key_down(cx.listener(|v, event: &KeyDownEvent, _, cx| {
-                if v.editor_menu_open && event.keystroke.key == "escape" {
-                    v.editor_menu_open = false;
+                if v.toolbar.editor_menu_open && event.keystroke.key == "escape" {
+                    v.set_editor_menu_open(false, cx);
                     cx.stop_propagation();
-                    cx.notify();
                 }
             }))
             .size_full()
@@ -862,5 +1132,47 @@ mod tests {
         assert!(md_lines[0].spans.iter().any(|s| s.kind == HighlightKind::Heading));
         assert!(md_lines[1].spans.iter().any(|s| s.kind == HighlightKind::Emphasis));
         assert!(md_lines[1].spans.iter().any(|s| s.kind == HighlightKind::Link));
+    }
+
+    #[test]
+    fn html_paths_default_to_preview_mode_case_insensitively() {
+        for path in ["index.html", "DIR/PAGE.HTML", "widget.htm", "LEGACY.HTM"] {
+            assert!(is_html_path(Path::new(path)), "{path} should be detected as HTML");
+            assert_eq!(HtmlViewMode::default_for_path(Path::new(path)), HtmlViewMode::Preview);
+        }
+        for path in ["notes.md", "app.tsx", "styles.css", "html", "index.html.bak"] {
+            assert!(!is_html_path(Path::new(path)), "{path} should not be detected as HTML");
+            assert_eq!(HtmlViewMode::default_for_path(Path::new(path)), HtmlViewMode::Source);
+        }
+    }
+
+    #[test]
+    fn build_html_preview_document_enforces_strict_sandbox_csp() {
+        let full = "<!doctype html><html><head><title>Demo</title></head><body><h1>Hi</h1></body></html>";
+        let full_out = build_html_preview_document(full);
+        assert!(full_out.contains("default-src 'none'"));
+        assert!(full_out.contains("connect-src 'none'"));
+        assert!(full_out.contains("form-action 'none'"));
+        assert!(full_out.contains("base-uri 'none'"));
+        assert!(full_out.contains("<h1>Hi</h1>"));
+
+        let fragment = "<p>fragment</p>";
+        let frag_out = build_html_preview_document(fragment);
+        assert!(frag_out.contains("connect-src 'none'"));
+        assert!(frag_out.contains("<p>fragment</p>"));
+    }
+
+    #[test]
+    fn html_preview_bundle_denies_external_hosts_and_renders_localized_labels() {
+        let caps: serde_json::Value = serde_json::from_str(HTML_PREVIEW_CAPABILITIES).expect("valid capabilities json");
+        assert_eq!(caps["webview"]["hosts"], serde_json::json!([]));
+        assert!(build_html_preview_bundle().is_ok());
+
+        let prev = vibevalley_i18n::locale();
+        vibevalley_i18n::set_locale("zh");
+        assert_eq!(html_mode_labels(), ("预览".to_string(), "源码".to_string()));
+        vibevalley_i18n::set_locale("en");
+        assert_eq!(html_mode_labels(), ("Preview".to_string(), "Source".to_string()));
+        vibevalley_i18n::set_locale(&prev);
     }
 }

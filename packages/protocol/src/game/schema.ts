@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import type { Codec } from "../codec";
 import { SessionId } from "../common/schema";
-import { Repo } from "../repo/schema";
+import { IssueTemplate, Repo } from "../repo/schema";
 import { doingFields } from "../session/schema";
 import * as T from "./shapes.gen";
 
@@ -71,6 +71,68 @@ const ProgressTitle = z.object({
   tier: z.number(),
 }) satisfies Codec<T.ProgressTitle>;
 
+export const ShopItemKind = z.enum(T.ShopItemKindValues) satisfies Codec<T.ShopItemKind>;
+
+export const YardDecorationPlacement = z.object({
+  asset: z.string(),
+  x: z.number(),
+  z: z.number(),
+  yawDeg: z.number(),
+  scale: z.number(),
+}) satisfies Codec<T.YardDecorationPlacement>;
+
+export const YardDecoration = z.object({
+  id: z.string(),
+  asset: z.string(),
+  title: z.string(),
+  x: z.number(),
+  z: z.number(),
+  yawDeg: z.number(),
+  scale: z.number(),
+}) satisfies Codec<T.YardDecoration>;
+
+export const ShopItem = z.object({
+  id: z.string(),
+  kind: ShopItemKind,
+  title: z.string(),
+  detail: z.string(),
+  price: z.number(),
+  owned: z.boolean(),
+  decoration: z.exactOptional(YardDecorationPlacement),
+  template: z.exactOptional(IssueTemplate),
+}) satisfies Codec<T.ShopItem>;
+
+export const DailyTaskKind = z.enum(T.DailyTaskKindValues) satisfies Codec<T.DailyTaskKind>;
+
+export const DailyTask = z.object({
+  id: z.string(),
+  kind: DailyTaskKind,
+  title: z.string(),
+  detail: z.string(),
+  progress: z.number(),
+  target: z.number(),
+  rewardCoins: z.number(),
+  completed: z.boolean(),
+  settled: z.boolean(),
+  settledAt: z.exactOptional(z.number()),
+}) satisfies Codec<T.DailyTask>;
+
+export const DailyTaskBoard = z.object({
+  day: z.string(),
+  tasks: z.array(DailyTask),
+  settledCoinsToday: z.number(),
+}) satisfies Codec<T.DailyTaskBoard>;
+
+export const FarmShopView = z.object({
+  coins: z.number(),
+  items: z.array(ShopItem),
+  daily: DailyTaskBoard,
+}) satisfies Codec<T.FarmShopView>;
+
+export const ShopPurchaseRequest = z.object({
+  id: z.string(),
+}) satisfies Codec<T.ShopPurchaseRequest>;
+
 const Progress = z.object({
   coins: z.number(),
   streak: z.number(),
@@ -80,6 +142,8 @@ const Progress = z.object({
   title: z.exactOptional(ProgressTitle),
   agents: z.record(z.string(), AgentTally),
   multiplier: z.exactOptional(z.number()),
+  purchased: z.exactOptional(z.array(z.string())),
+  daily: z.exactOptional(DailyTaskBoard),
 }) satisfies Codec<T.Progress>;
 
 const FarmLevel = z.object({
@@ -106,6 +170,7 @@ export const FarmView = z.object({
   level: FarmLevel,
   plots: z.record(z.string(), PlotView),
   plays: z.record(z.string(), SessionPlayView),
+  decorations: z.exactOptional(z.array(YardDecoration)),
 }) satisfies Codec<T.FarmView>;
 
 const GameEffectReward = z.object({

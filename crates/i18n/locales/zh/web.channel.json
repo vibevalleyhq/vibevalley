@@ -11,6 +11,8 @@
   "find": "在这个频道里找",
   "findMessages": "找消息",
   "settings": "频道设置",
+  "listenReports": "听汇报",
+  "listenReportsActive": "正在听汇报（点击关闭）",
   "inChannel": "频道里的",
   "empty": "{label} 还没人说话：跟主助手说一件要做的事。",
   "sendTo": "发送消息至 {label}",
@@ -152,7 +154,12 @@
     "artifactSlide": "第 {n} 页",
     "artifactSelected": "已选 {n} 个元素",
     "clearContext": "移除本次附带的上下文",
-    "runningHint": "正在处理中，可直接补充说明或点击停止"
+    "runningHint": "正在处理中，可直接补充说明或点击停止",
+    "dictateStart": "语音输入（MOSS ASR）",
+    "dictateStop": "停止语音输入",
+    "dictateConnecting": "正在连接语音…",
+    "dictateListening": "正在听写…",
+    "dictateFinishing": "正在整理文字…"
   },
   "manage": {
     "name": "名称",
@@ -189,7 +196,20 @@
     "copyLink": "复制链接",
     "copied": "链接已复制",
     "markUnread": "从这里标成未读",
-    "jump": "跳到这条"
+    "jump": "跳到这条",
+    "promoteIssue": "转为工单",
+    "saveArtifact": "存为作品"
+  },
+  "promote": {
+    "source": "来自 {where}",
+    "saveTitle": "将消息存为作品",
+    "artifactTitle": "标题",
+    "artifactType": "类型",
+    "artifactContent": "内容",
+    "artifactSave": "保存作品",
+    "artifactSaved": "已存为「{title}」",
+    "artifactNote": "存自 {where}",
+    "fallbackTitle": "第 {number} 条消息"
   },
   "switcher": {
     "open": "跳到…",
@@ -284,7 +304,9 @@
       "remember": "记下了",
       "stop": "叫停了",
       "imagegen": "交给主助手了，画好会发到这里"
-    }
+    },
+    "skillArgs": "说明（可选）",
+    "skillNote": "用技能执行"
   },
   "lacks": "回不了话：{why}",
   "lacksFix": "去设置"

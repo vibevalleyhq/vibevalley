@@ -12,7 +12,7 @@ pub mod world;
 
 pub use asset::{AssetBundle, BoneDesc, CompressedTexture};
 pub use camera::CameraPreset;
-pub use domain::{HelperTaskSync, PlayerIntent, PlotActionOutcome, PlotTicketSync, ScreenAnchor, YardSnapshotSync};
+pub use domain::{DecorationSync, HelperTaskSync, PlayerIntent, PlotActionOutcome, PlotTicketSync, ScreenAnchor, YardSnapshotSync};
 pub use foley::{SoundKind, synthesize_wav};
 pub use metal::{DofMode, FrameOutput, FrameStats, MetalRenderer, RenderQuality, RenderSceneInput, WgpuRenderer, prepare_scene_input};
 pub use nav::{LandZone, NavGraph, PlacementStatus, is_in_canal, surface_height_at, validate_placement};

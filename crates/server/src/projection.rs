@@ -16,6 +16,7 @@ use crate::context::{Context, encode_slice};
 use crate::cron::Scheduler as CronScheduler;
 use crate::game::Game;
 use crate::issue::Board;
+use crate::repo::Repo;
 use crate::service::DbError;
 
 /// Narrow domain handles required to project the six server slices.
@@ -27,6 +28,7 @@ pub(crate) struct SliceSources {
     pub cron: Arc<CronScheduler>,
     pub artifact: Arc<ArtifactManager>,
     pub game: Arc<Game>,
+    pub repo: Arc<Repo>,
 }
 
 pub(crate) async fn project_slice_json(sources: &SliceSources, kind: SliceKind, seq: i64) -> Result<Arc<str>, String> {
@@ -44,14 +46,27 @@ pub(crate) async fn project_slice_json(sources: &SliceSources, kind: SliceKind, 
                 sessions: raw_sessions.map_err(dberr)?,
                 channels: channels.map_err(err)?,
                 commits: sources.ctx.live.commits_snapshot(),
+                repos: sources.repo.cached_health_inputs(),
+                evaluated_at: Some(sources.ctx.clock.now_ms()),
             };
             let live = sources.ctx.live.to_core_snapshot(false);
             encode_slice(&project_board(&input, &live, seq)).map_err(err)
         }
         SliceKind::Sessions => {
-            let (raw_sessions, raw_issues) = tokio::join!(sources.ctx.service.session.all(), sources.board.raw_issues_async());
+            let (raw_sessions, telemetry_map, raw_issues) = tokio::join!(
+                sources.ctx.service.session.all(),
+                sources.ctx.service.session.telemetry_by_session(),
+                sources.board.raw_issues_async(),
+            );
+            let mut sessions = raw_sessions.map_err(dberr)?;
+            let mut telemetry_map = telemetry_map.map_err(dberr)?;
+            for s in &mut sessions {
+                if let Some(tel) = telemetry_map.remove(&s.id) {
+                    s.telemetry = Some(tel);
+                }
+            }
             let input = SessionInput {
-                sessions: raw_sessions.map_err(dberr)?,
+                sessions,
                 issues: raw_issues.map_err(|e| e.to_string())?,
                 machines: sources.ctx.live.machines_snapshot(),
             };
@@ -114,6 +129,7 @@ pub(crate) fn finish_boot_and_start_feeds(
     cron: &Arc<CronScheduler>,
     artifact: &Arc<ArtifactManager>,
     game: &Arc<Game>,
+    repo: &Arc<Repo>,
 ) {
     let sources = SliceSources {
         ctx: ctx.clone(),
@@ -122,6 +138,7 @@ pub(crate) fn finish_boot_and_start_feeds(
         cron: cron.clone(),
         artifact: artifact.clone(),
         game: game.clone(),
+        repo: repo.clone(),
     };
     sources.ctx.outbox.start(&sources.ctx.task);
     sources.ctx.feed.start(&sources.ctx.task, {
@@ -132,4 +149,16 @@ pub(crate) fn finish_boot_and_start_feeds(
         }
     });
     sources.ctx.mark_dirty(SliceMask::ALL);
+    let warmup_ctx = ctx.clone();
+    let warmup_repo = repo.clone();
+    let warmup_cancel = ctx.task.child_token();
+    ctx.task.spawn_named("repo.health.warmup", async move {
+        if warmup_cancel.is_cancelled() {
+            return;
+        }
+        let summaries = warmup_repo.list_summaries_async().await;
+        if !summaries.is_empty() && !warmup_cancel.is_cancelled() {
+            warmup_ctx.mark_dirty(SliceMask::BOARD);
+        }
+    });
 }

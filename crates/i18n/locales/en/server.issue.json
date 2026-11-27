@@ -84,7 +84,6 @@
     "runtime": "The machine carried on by itself",
     "refined": "Drafted",
     "reported": "Handed back",
-    "said": ": {summary}",
     "accepted": "Accepted",
     "asked": "Asked you: {questions}",
     "rejected": "Sent back: {lines}",
@@ -102,5 +101,11 @@
   "prSubmitUnavailable": "Pull-request delivery is not enabled for this ticket's repo",
   "deliveryNeedsPr": "Deliver a valid PR/MR before accepting this issue",
   "notFound": "No issue {id}",
-  "wordsRequired": "Say something: the words cannot be empty"
+  "wordsRequired": "Say something: the words cannot be empty",
+  "triage": {
+    "onlyBacklog": "Triage suggestions only apply to Backlog tickets (ticket #{n} is not in Backlog)",
+    "emptyPatch": "A triage suggestion must propose at least one field or status change",
+    "emptyReason": "A triage suggestion must include a reason",
+    "notFound": "Triage suggestion {id} was not found or has already been resolved"
+  }
 }

@@ -26,6 +26,8 @@ import { crc32, deflateSync } from "node:zlib";
 
 import { z } from "zod";
 
+import { VdpWsClient, waitForVdpEndpoint } from "./vdp-client.ts";
+
 const Envelope = z.object({ bizCode: z.number(), message: z.string().optional(), data: z.unknown().optional() });
 const ReadyReceipt = z.object({ pid: z.number(), url: z.string() });
 const WindowView = z.object({
@@ -210,13 +212,18 @@ async function stopProcess(proc: ChildProcess): Promise<void> {
   }
 }
 
+interface NativeLaunchStep {
+  readonly method: string;
+  readonly params: Record<string, unknown>;
+}
+
 async function withLaunch<T>(
   bundle: string,
   live: string,
   evidence: string,
   stage: string,
-  steps: readonly string[],
-  run: (client: Client, dump: string) => Promise<T>,
+  steps: readonly NativeLaunchStep[],
+  run: (client: Client, vdp: VdpWsClient) => Promise<T>,
 ): Promise<T> {
   const isDir = statSync(bundle).isDirectory();
   const binaries = isDir ? join(bundle, "Contents/MacOS") : dirname(bundle);
@@ -227,9 +234,7 @@ async function withLaunch<T>(
   const user = join(live, "user");
   for (const dir of [host, home, work, user]) mkdirSync(dir, { recursive: true });
 
-  const script = join(evidence, `${stage}-steps.jsonl`);
   const dump = join(evidence, `${stage}-window.json`);
-  writeFileSync(script, steps.map((step) => JSON.stringify({ shell: step })).join("\n") + "\n");
 
   const env: Record<string, string> = {
     PATH: "/usr/bin:/bin:/usr/sbin:/sbin",
@@ -247,8 +252,7 @@ async function withLaunch<T>(
     VIBEVALLEY_TEST_RUNTIMES: "1",
     VIBEVALLEY_AGENT_STARTERS: "docs",
     VIBEVALLEY_PATROL_HEARTBEAT_MINUTES: "0",
-    VIBEVALLEY_DEBUG_SCRIPT: script,
-    VIBEVALLEY_DEBUG_DUMP: dump,
+    VIBEVALLEY_DEBUG_PORT: "0",
     GIT_CONFIG_NOSYSTEM: "1",
     GIT_CONFIG_GLOBAL: "/dev/null",
     GIT_AUTHOR_NAME: "Native compatibility",
@@ -275,6 +279,7 @@ async function withLaunch<T>(
   });
   closeSync(logFd);
 
+  let vdp: VdpWsClient | undefined;
   try {
     const readyUrl = await waitFor(stage, () => {
       if (proc.exitCode !== null || proc.signalCode !== null) {
@@ -291,35 +296,64 @@ async function withLaunch<T>(
     const client = new Client(readyUrl, join(binaries, "vibevalley"), env);
     const serviceMs = Number((process.hrtime.bigint() - startedNs) / 1_000_000n);
 
-    await waitFor("loaded native window", () => {
-      try {
-        const view = WindowView.parse(JSON.parse(readFileSync(dump, "utf8")));
-        return view.loaded && view.load_error == null;
-      } catch {
-        return false;
-      }
+    const endpoint = await waitForVdpEndpoint({
+      homeDir: home,
+      ...(proc.pid !== undefined ? { expectedPid: proc.pid } : {}),
+      timeoutMs: 30_000,
+      appExited: () => proc.exitCode,
+      logPath: join(evidence, `${stage}.log`),
     });
+    vdp = await VdpWsClient.connect(endpoint, 15_000);
+
+    const loadedDeadline = Date.now() + 30_000;
+    let loadedRaw: unknown;
+    while (Date.now() < loadedDeadline) {
+      const raw = await vdp.call("Shell.getState", {});
+      const view = WindowView.safeParse(raw);
+      if (view.success && view.data.loaded && view.data.load_error == null) {
+        loadedRaw = raw;
+        break;
+      }
+      await sleep(50);
+    }
+    if (loadedRaw === undefined) {
+      throw new Error(`${stage}: timed out waiting for loaded native window`);
+    }
+
+    for (const step of steps) {
+      await vdp.call(step.method, step.params);
+    }
+    const finalState = await vdp.call("Shell.getState", {});
+    writeFileSync(dump, JSON.stringify(finalState, null, 2) + "\n");
 
     const times = { serviceReadyMs: serviceMs, windowReadyMs: Number((process.hrtime.bigint() - startedNs) / 1_000_000n) };
     writeFileSync(join(evidence, `${stage}-startup.json`), JSON.stringify(times));
-    return await run(client, dump);
+    return await run(client, vdp);
   } finally {
+    vdp?.close();
     await stopProcess(proc);
   }
 }
 
-function windowState(dump: string): { id: string; layout: unknown } | undefined {
-  try {
-    const view = WindowView.parse(JSON.parse(readFileSync(dump, "utf8")));
-    if (!view.loaded || view.load_error != null) return undefined;
-    const project = (view.projects ?? []).find((p) => p.name === "workspace-project");
-    if (project && project.layout.root.node === "split") {
-      return { id: project.id, layout: project.layout };
+async function waitForWindowState(label: string, vdp: VdpWsClient, dumpPath: string, timeoutSec = 50): Promise<{ id: string; layout: unknown }> {
+  const until = Date.now() + timeoutSec * 1_000;
+  while (Date.now() < until) {
+    try {
+      const raw = await vdp.call("Shell.getState", {});
+      writeFileSync(dumpPath, JSON.stringify(raw, null, 2) + "\n");
+      const view = WindowView.parse(raw);
+      if (view.loaded && view.load_error == null) {
+        const project = (view.projects ?? []).find((p) => p.name === "workspace-project");
+        if (project && project.layout.root.node === "split") {
+          return { id: project.id, layout: project.layout };
+        }
+      }
+    } catch {
+      // Keep polling until the split layout finishes persisting.
     }
-  } catch {
-    return undefined;
+    await sleep(50);
   }
-  return undefined;
+  throw new Error(`timed out waiting for ${label}`);
 }
 
 interface SeedIds {
@@ -455,8 +489,9 @@ async function verifyOldContent(c: Client, ids: SeedIds): Promise<void> {
   );
   const downloaded = Buffer.from(AttachmentGet.parse(c.cli("attachment", "get", ids.attachment)).data, "base64");
   assert(createHash("sha256").update(downloaded).digest("hex") === ids.attachment, "attachment sha256 mismatch");
-  const mediaInput = MediaInput.parse(await c.call("media.input.get", { id: ids.mediaInput }));
-  assert(mediaInput.hash === ids.attachment, "mediaInput hash mismatch");
+  const mediaInputs = z.array(MediaInput).parse(c.cli("media", "input", "list"));
+  const mediaInput = mediaInputs.find((item) => item.id === ids.mediaInput);
+  assert(mediaInput !== undefined && mediaInput.hash === ids.attachment, "mediaInput hash mismatch");
   const job = MediaJob.parse(c.cli("media", "job", "show", ids.mediaJob));
   assert(job.phase === ids.mediaPhase && job.attachment?.id === ids.generatedAttachment, "mediaJob mismatch");
   const crons = z.array(IdObj).parse(c.cli("cron", "list"));
@@ -508,8 +543,8 @@ function seedConnectorFixture(dbPath: string): void {
 }
 
 async function verifyConnector(c: Client, live: string): Promise<void> {
-  const connectors = z.array(ConnectorRow).parse(await c.call("connector.list"));
-  const qq = connectors.find((x) => x.id === "qq");
+  const collab = z.object({ connectors: z.array(ConnectorRow) }).parse(c.cli("state", "--slice", "collab"));
+  const qq = collab.connectors.find((x) => x.id === "qq");
   assert(qq !== undefined && qq.state === "paused" && qq.pending === 1, JSON.stringify(qq));
   const path = join(live, "home/server.db");
   const reportRow = readDb(path, "SELECT id FROM channel_message WHERE kind='report' ORDER BY created_at LIMIT 1", (r) =>
@@ -603,15 +638,23 @@ async function verify(oldBundle: string, newBundle: string, root: string): Promi
   let oldWindow!: { id: string; layout: unknown };
   const engines: Record<string, unknown> = {};
 
-  await withLaunch(oldBundle, live, root, "old", ["activate:0", "split_right", "save", "draw"], async (c, dump) => {
+  const oldSteps: readonly NativeLaunchStep[] = [
+    { method: "Shell.dispatchAction", params: { action: { type: "activate_path", path: join(live, "work/workspace-project") } } },
+    { method: "Shell.dispatchAction", params: { action: { type: "palette_select", id: "pane.split_right" } } },
+    { method: "Shell.save", params: {} },
+    { method: "Page.draw", params: {} },
+  ];
+  const drawSteps: readonly NativeLaunchStep[] = [{ method: "Page.draw", params: {} }];
+
+  await withLaunch(oldBundle, live, root, "old", oldSteps, async (c, vdp) => {
     ids = await seedOld(c);
     engines.old = sqliteVersions(c, live, ids.agent, "old");
-    oldWindow = await waitFor("old split layout", () => windowState(dump));
+    oldWindow = await waitForWindowState("old split layout", vdp, join(root, "old-window.json"));
     await verifyOldContent(c, ids);
   });
 
   seedConnectorFixture(join(live, "home/server.db"));
-  await withLaunch(oldBundle, live, root, "old-connector", ["draw"], async (c) => {
+  await withLaunch(oldBundle, live, root, "old-connector", drawSteps, async (c) => {
     await verifyConnector(c, live);
   });
   save("old-records", ids);
@@ -624,9 +667,9 @@ async function verify(oldBundle: string, newBundle: string, root: string): Promi
   let marker!: { id: string };
   let followup = "";
 
-  await withLaunch(newBundle, live, root, "upgraded", ["draw"], async (c, dump) => {
+  await withLaunch(newBundle, live, root, "upgraded", drawSteps, async (c, vdp) => {
     engines.upgraded = sqliteVersions(c, live, ids.agent, "upgraded");
-    const upgradedLayout = await waitFor("upgraded layout", () => windowState(dump));
+    const upgradedLayout = await waitForWindowState("upgraded layout", vdp, join(root, "upgraded-window.json"));
     assertEqualJson(upgradedLayout, oldWindow, "upgraded layout");
     await verifyOldContent(c, ids);
     await verifyConnector(c, live);
@@ -649,7 +692,7 @@ async function verify(oldBundle: string, newBundle: string, root: string): Promi
   });
 
   let submitted: readonly [string, string][] = [];
-  await withLaunch(newBundle, live, root, "upgraded-reopen", ["draw"], async (c) => {
+  await withLaunch(newBundle, live, root, "upgraded-reopen", drawSteps, async (c) => {
     assert(IssueShow.parse(c.cli("issue", "show", ids.issue)).status === "done", "expected done issue");
     const completedRuns = z.array(IssueRun).parse(await c.call("issue.run.list", { id: followup }));
     const requests = readDb(
@@ -683,14 +726,14 @@ async function verify(oldBundle: string, newBundle: string, root: string): Promi
   cpSync(backup, live, { recursive: true, verbatimSymlinks: true });
   assertEqualJson(manifest(live), original, "restored backup manifest");
 
-  await withLaunch(oldBundle, live, root, "rollback", ["draw"], async (c, dump) => {
+  await withLaunch(oldBundle, live, root, "rollback", drawSteps, async (c, vdp) => {
     engines.rollback = sqliteVersions(c, live, ids.agent, "rollback");
     const issues = z.array(IdObj).parse(c.cli("issue", "list"));
     assert(
       issues.every((issue) => issue.id !== followup),
       "followup issue leaked into rollback",
     );
-    const rollbackLayout = await waitFor("rollback layout", () => windowState(dump));
+    const rollbackLayout = await waitForWindowState("rollback layout", vdp, join(root, "rollback-window.json"));
     assertEqualJson(rollbackLayout, oldWindow, "rollback layout");
     await verifyOldContent(c, ids);
     await verifyConnector(c, live);

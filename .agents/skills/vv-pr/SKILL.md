@@ -1,6 +1,6 @@
 ---
 name: vv-pr
-description: 给 VibeValley 开、改、合 PR：默认把同一批工作的改动合成一个 PR，再照规矩起分支名、写英文的标题和正文（What changed / Checks / Not verified）、附验收的证据、等 CI、squash 合并。用在：做完一件事要提交、推送、开 PR；用户说「开个 PR」「提 PR」「合进去」「拆一下 PR」；改 PR 的标题或正文；手上有好几处改动不知道该合成一个还是拆开。
+description: 给 VibeValley 开、改、合 PR：默认把同一批工作的改动合成一个 PR，再照规矩起分支名、按 STE 规范写英文的标题和正文（What changed / Changelog / Checks / Not verified）、附验收的证据、等 CI、squash 合并。用在：做完一件事要提交、推送、开 PR；用户说「开个 PR」「提 PR」「合进去」「拆一下 PR」；改 PR 的标题或正文；手上有好几处改动不知道该合成一个还是拆开。
 ---
 
 # 开 PR
@@ -28,11 +28,12 @@ description: 给 VibeValley 开、改、合 PR：默认把同一批工作的改�
 - 界面上的中文词放进「」：`The board's 「完成」 column keeps issues done today`。代码和路径用反引号。
 - 好几处小修放在一起时，说它们共同的结果，或说最重要的那处、其余在正文里：`gh answers are decoded, and a failed input ends its caller`。
 
-## 4. 正文
+## 4. 正文（STE 约束与 Changelog）
 
-照模板写三段，英文，正文就是 `main` 上那条提交的说明：
+正文按 [writing.md](docs/style/writing.md)（ASD-STE100）用主动语态、精确动词和唯一术语撰写，不用「seamlessly」「out of the box」「empower」「significantly」「appropriately」等空洞程度词或套话，分四段写（英文，正文即 `main` 上 squash 提交的说明）：
 
-- `## What changed`：现在的行为和为什么；一处问题一条，说清以前会怎样（输入、结果），现在怎样。链接相关子系统文档或 issue（如 `#NN`）。看过、决定不改的，也写一句和理由，下一个人不用再查一遍。
+- `## What changed`：现在的行为、机制和为什么；一处变化一条，说清以前会怎样（输入、结果），现在怎样。链接相关子系统文档或 issue（如 `#NN`）。看过、决定不改的，也写一句和理由，下一个人不用再查一遍。
+- `## Changelog`：按 `### Added`、`### Changed`、`### Fixed`、`### Removed` 分组列出对外/用户可见或契约变化，每条用严格 STE 句式写清实体、动作与 `#NN` 工单号，供发版说明直接复用。
 - `## Checks`：跑了的命令和它们打出的结果（`vp check`、`cargo xtask check` 的通过数）。先写测试的，写修之前它报什么（`expected 'still waiting' to contain …`）；改了接口、服务、页面，附 [vv-acceptance](.agents/skills/vv-acceptance/SKILL.md) 要的证据。
 - `## Not verified`：没验的和原因（真机、花钱的评测、真的厂商）。都验了写 `None.`。
 - `## Regression`（要的时候才有）：这个 PR 删了或改了名字以 `regression: ` 开头的测试，逐个写出测试名和为什么（行为有意改了、挪了地方）；`fix/` 没补回归测试时写为什么补不了。CI 的 `scripts/release/regression.ts` 查。

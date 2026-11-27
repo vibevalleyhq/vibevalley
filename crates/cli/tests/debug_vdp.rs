@@ -102,6 +102,8 @@ fn mock_node() -> VdpUiNode {
         test_id: Some("nav-library".into()),
         role: Some("button".into()),
         text: Some("Library".into()),
+        route: Some("/library".into()),
+        source: Some("apps/mac/ui/app/Shell.tsx:88".into()),
         bounds: Some(VdpUiBounds {
             x: 16.0,
             y: 120.0,
@@ -220,6 +222,8 @@ async fn drive_mock_vdp_ws(mut socket: WebSocket, state: MockVdpState) {
                         test_id: Some("sidebar".into()),
                         role: Some("navigation".into()),
                         text: None,
+                        route: None,
+                        source: None,
                         bounds: Some(VdpUiBounds {
                             x: 0.0,
                             y: 0.0,
@@ -263,6 +267,19 @@ async fn drive_mock_vdp_ws(mut socket: WebSocket, state: MockVdpState) {
                     };
                     send_json(&mut socket, &VdpResponse::ok(req.id, serde_json::to_value(out).unwrap(), req.session_id)).await;
                 }
+            }
+            VdpCommand::UiInspectAt(p) => {
+                let out = serde_json::json!({
+                    "hit": true,
+                    "surface": "workbench",
+                    "testId": "nav-library",
+                    "role": "button",
+                    "text": "Library",
+                    "route": "/library",
+                    "source": "apps/mac/ui/app/Shell.tsx:88",
+                    "bounds": { "x": p.x, "y": p.y, "width": 180.0, "height": 32.0 }
+                });
+                send_json(&mut socket, &VdpResponse::ok(req.id, out, req.session_id)).await;
             }
             VdpCommand::ServerSlice(p) => {
                 let res = VdpResponse::ok(req.id, json!({ "slice": p.name, "seq": 17, "issues": [] }), req.session_id);
@@ -594,6 +611,12 @@ fn debug_commands_screenshot_ui_wait_raw_call_and_watch() {
 
     let timed_out = run_cli(home, &["debug", "ui-wait", "--test-id", "never-appears", "--timeout-ms", "100"]);
     assert_eq!((timed_out.code, timed_out.tag()), (1, "Timeout"), "{:?}", timed_out.failure);
+
+    let inspect = run_cli(home, &["debug", "ui-inspect-at", "32", "130", "--json"]);
+    assert_eq!(inspect.code, 0, "{:?}", inspect.failure);
+    assert_eq!(inspect.json()["hit"], true);
+    assert_eq!(inspect.json()["testId"], "nav-library");
+    assert_eq!(inspect.json()["source"], "apps/mac/ui/app/Shell.tsx:88");
 
     // Server.slice, Server.invoke, and raw call.
     let slice = run_cli(home, &["debug", "server-slice", "board", "--json"]);

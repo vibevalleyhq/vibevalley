@@ -16,7 +16,7 @@ cargo run -p vibevalley-cli -- doctor        # 命令行，对着运行中的服
 
 - **通道、端口与目录**：端口、家目录与宿主库按发布通道隔离（`release` `8787` / `~/.vibevalley` / `VibeValley`，`beta` `8788` / `~/.vibevalley-beta` / `VibeValley-beta`，`alpha` `8789` / `~/.vibevalley-alpha` / `VibeValley-alpha`，未打包的 `dev` `8790` / `~/.vibevalley-dev` / `VibeValley-dev`），可用 `VIBEVALLEY_CHANNEL`、`VIBEVALLEY_PORT`、`VIBEVALLEY_HOME`、`VIBEVALLEY_STORE` 覆盖；原生应用与单独跑的服务端都让帮工默认在 `~/vibevalley-dev`（`VIBEVALLEY_WORK_ROOT`）下干活，仓库在 `repos/`，worktree 在 `worktrees/`（[客户端](docs/subsystems/app.md#进程和服务端)、[设置和配置](docs/subsystems/setting.md#发布通道默认端口与数据目录)）。
 - **重载**：服务端不自动重载，修改 `crates/` 需重新构建、重启。调试构建的应用从磁盘读 `apps/mac/ui/build/`（工作台 `App.tsx`）与 `apps/mac/ui/build-shell/`（轻量壳窗格 `ShellApp.tsx`）的页面包：改了 TSX 跑 `vp run mac:check` 重新打包，再重开应用，不用重新编译 Rust。
-- **不看屏幕检查应用**：`VIBEVALLEY_DEBUG_DUMP=<文件>` 每秒把外壳的状态写成 JSON，`VIBEVALLEY_DEBUG_SCRIPT=<文件>` 一行一步地驱动应用，带 `--features shot` 构建时能截图（[验收的应用分册](.agents/skills/vv-acceptance/references/app.md)）。
+- **不看屏幕检查应用**：启动应用时传 `VIBEVALLEY_DEBUG_PORT=0`（或 `--remote-debugging-port=0`）打开 VDP 回环调试门，用 `vibevalley debug`（`state`、`navigate`、`ui-tree`、`screenshot`、`server-rpc` 等）或类型化 VDP JSON-RPC 驱动并校验状态，带 `--features shot` 构建时可截取 GPUI Metal 帧（[验收的应用分册](.agents/skills/vv-acceptance/references/app.md)）。
 
 ## 发版与本地构建
 
@@ -67,7 +67,7 @@ CI 只在 Linux 上运行：PR 标题与正文、`vp check`、`docs:verify`、�
 - **分支**：`<类>/<主题>`，类别为 `feat`、`fix`、`docs`、`chore`、`refactor`、`test`，主题用英文小写连字符（如 `feat/issue-board-groups`）。
 - **提交**：英文单句陈述改后行为（如 `The board groups issues by helper`），界面中文词用「」包裹，代码与路径用反引号，不超过 100 码点、不加句号，不带 AI 署名，由 `scripts/docs/commit-msg.ts` 校验。
 - **钩子**：`vp install` 自动配置 `.vite-hooks/`，pre-commit 对暂存文件跑 `vp check --fix`（编辑器使用 tsrs，见 [scripts/tsrs](scripts/tsrs/README.md)）。
-- **PR 正文**：英文填写 `## What changed`、`## Checks`（附 [vv-acceptance](.agents/skills/vv-acceptance/SKILL.md) 证据）、`## Not verified`。
+- **PR 正文**：按 [writing.md](docs/style/writing.md)（STE）用英文填写 `## What changed`、`## Changelog`（按 `Added` / `Changed` / `Fixed` / `Removed` 分组）、`## Checks`（附 [vv-acceptance](.agents/skills/vv-acceptance/SKILL.md) 证据）与 `## Not verified`，由 `scripts/docs/commit-msg.ts --body` 校验。
 - **回归测试**：缺陷修复测试以 `regression: ` 开头；修改或删除已有回归测试、或 `fix/` 分支无新回归测试时，须在 PR 正文加 `## Regression` 说明，由 `scripts/release/regression.ts` 检查。
 - **死代码**：`vp run deadcode` 调用 knip 检查未使用的文件、导出和依赖（配置在 `knip.ts`，说明见 `scripts/audit/deadcode.ts`）。原生页面从 `App.tsx`、测试和故事入口追踪；Rust 生成的完整契约由 `cargo xtask protocol` 校验，不按 TS 调用方裁剪，手写重导出照常检查。`nsh check` 同时检查未用局部声明。
 

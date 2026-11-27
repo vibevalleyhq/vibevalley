@@ -7,9 +7,10 @@ use vibevalley_core::rules::short_title;
 use vibevalley_core::{Clock, Move};
 use vibevalley_i18n::{Params, t};
 use vibevalley_protocol::{
-    ActWords, ApiError, AppliedIssue, BizCode, Caller, ChangedFile, Changes, Commit, Issue, IssueAction, IssueFilter, IssueHistory, IssueRefineInput,
-    IssueRequest, IssueReviewInput, IssueSplitInput, IssueStageKind, IssueStatus, IssueStatusUpdateInput, IssueTimeline, IssueUpdate, IssueUpdateInput, Next,
-    Preview, Run, Session, StuckReason, UncommittedItem,
+    ActWords, ActorKind, ApiError, AppliedIssue, BacklogTriageConfirmInput, BacklogTriageDismissInput, BacklogTriageSuggestInput, BacklogTriageSuggestion,
+    BizCode, Caller, ChangedFile, Changes, Commit, Issue, IssueAction, IssueDigestGetInput, IssueFilter, IssueHistory, IssueRefineInput, IssueRequest,
+    IssueReviewInput, IssueSplitInput, IssueStageKind, IssueStatus, IssueStatusUpdateInput, IssueTimeline, IssueUpdate, IssueUpdateInput, MorningDigest, Next,
+    Preview, RepoHealth, Run, Session, StuckReason, UncommittedItem,
 };
 
 use super::board::{Board, NewIssue};
@@ -30,7 +31,7 @@ fn look_in_issues() -> Next {
 }
 
 /// Maps a [`BoardError`] into an endpoint refusal.
-fn api(e: BoardError) -> ApiError {
+pub(super) fn api(e: BoardError) -> ApiError {
     match e {
         BoardError::NoIssue(r) => ApiError::new(BizCode::IssueNotFound, t("server.issue.issueRef", &[("ref", r.into())])).with_next(vec![look_in_issues()]),
         BoardError::Refused(r) => ApiError::new(BizCode::IssueRefused, r.text()),
@@ -364,6 +365,12 @@ fn apply_preview_edit(item: &mut Issue, edit: &IssueUpdate) {
         let trimmed = p.trim();
         item.parent = (!trimmed.is_empty()).then(|| trimmed.to_string());
     }
+    if let Some(blocked_by) = &edit.blocked_by {
+        item.blocked_by = blocked_by.iter().map(|b| b.trim().to_string()).filter(|b| !b.is_empty()).collect();
+    }
+    if let Some(relations) = &edit.relations {
+        item.relations = relations.clone();
+    }
     if let Some(tags) = &edit.tags {
         item.tags = super::board::clean_tags(tags);
     }
@@ -372,6 +379,9 @@ fn apply_preview_edit(item: &mut Issue, edit: &IssueUpdate) {
     }
     if let Some(due_at) = edit.due_at {
         item.due_at = super::board::normalize_timestamp(Some(due_at));
+    }
+    if let Some(owner) = edit.owner.clone() {
+        item.owner = super::board::normalize_owner(Some(owner));
     }
 }
 
@@ -397,6 +407,15 @@ impl Board {
 
     /// Creates an issue from an [`IssueRequest`] (used by tools and `issue.create`).
     pub async fn create_from_request_async(&self, req: &IssueRequest) -> Result<Issue, ApiError> {
+        self.create_from_request_with_mandate_async(req, None).await
+    }
+
+    /// Creates an issue from an [`IssueRequest`] with an explicit/inferred caller mandate.
+    pub async fn create_from_request_with_mandate_async(
+        &self,
+        req: &IssueRequest,
+        mandate: Option<vibevalley_protocol::IssueMandate>,
+    ) -> Result<Issue, ApiError> {
         let raw_agent = req.agent.as_deref().unwrap_or("");
         let agent = resolve_agent(self, raw_agent);
         let on_duty = self.runtime().driver().profile_info(&agent).is_some_and(|p| p.is_orchestrator);
@@ -419,10 +438,13 @@ impl Board {
             constraints: req.constraints.clone(),
             cron: None,
             auto_submit_pr: req.auto_submit_pr == Some(true),
+            mandate,
             attachments: req.attachments.clone().unwrap_or_default(),
             tags: req.tags.clone().unwrap_or_default(),
             start_at: req.start_at,
             due_at: req.due_at,
+            owner: req.owner.clone(),
+            relations: req.relations.clone().unwrap_or_default(),
         };
         self.create_async(new).await.map_err(api)
     }
@@ -441,9 +463,12 @@ impl Board {
             before: input.before,
             attachments: input.attachments,
             parent: input.parent,
+            blocked_by: input.blocked_by,
             tags: input.tags,
             start_at: input.start_at,
             due_at: input.due_at,
+            owner: input.owner,
+            relations: input.relations,
         };
         let id = self.get_async(&input.id).await?.id;
         self.edit_async(&id, &upd).await.map_err(api)
@@ -491,6 +516,11 @@ impl Board {
                 }
             }
             let settled = settle(&item, input.status, input.text.as_deref().unwrap_or(""))?;
+            if input.status == IssueStatus::Todo && item.mandate.strength == vibevalley_protocol::MandateStrength::Inferred {
+                let mut upgraded = vibevalley_protocol::IssueMandate::explicit("user", item.mandate.auto_submit_pr);
+                upgraded.max_bot_review_rounds = item.mandate.max_bot_review_rounds;
+                self.set_mandate_async(&item.id, upgraded).await.map_err(api)?;
+            }
             let words = (!settled.said.is_empty()).then_some(settled.said.as_str());
             if settled.mv == Move::Round && words.is_some() && item.stage.state == IssueStageKind::Reviewing {
                 self.review_async(&item.id, false, &findings_of(&settled.said), "", None).await.map_err(api)?;
@@ -632,6 +662,252 @@ impl Board {
     pub(crate) async fn issue_list_endpoint_async(&self, filter: &IssueFilter, clock: &dyn Clock) -> Result<Vec<Issue>, ApiError> {
         let issues = self.issues_async().await.map_err(api)?;
         Ok(vibevalley_core::pick_issues(&issues, filter, clock.now_ms()))
+    }
+
+    pub(crate) async fn issue_retro_endpoint_async(
+        &self,
+        input: &vibevalley_protocol::IssueRetroGetInput,
+        clock: &dyn Clock,
+    ) -> Result<vibevalley_protocol::IssueRetroReport, ApiError> {
+        let issues = self.issues_async().await.map_err(api)?;
+        let window = input.window.unwrap_or(vibevalley_protocol::RetroWindow::Days7);
+        Ok(vibevalley_core::issue_retro(&issues, window, clock.now_ms()))
+    }
+
+    pub(crate) async fn repo_health_inputs_async(&self) -> Vec<vibevalley_core::RepoHealthInput> {
+        let Some(repos) = &self.repos else {
+            return Vec::new();
+        };
+        repos
+            .list_summaries_async()
+            .await
+            .into_iter()
+            .map(|r| vibevalley_core::RepoHealthInput {
+                name: r.name,
+                last_commit_at: r.last.map(|s| s * 1000),
+            })
+            .collect()
+    }
+
+    pub(crate) async fn repo_health_list_async(&self, evaluated_at: i64) -> Result<Vec<RepoHealth>, ApiError> {
+        let (issues, sessions, repos) = tokio::join!(self.issues_async(), self.sessions_async(), self.repo_health_inputs_async());
+        let issues = issues.map_err(api)?;
+        let sessions = sessions.map_err(api)?;
+        Ok(vibevalley_core::assess_repos_health(&repos, &issues, &sessions, evaluated_at))
+    }
+
+    pub(crate) async fn repo_summaries_with_health_async(&self, repo: &crate::repo::Repo, evaluated_at: i64) -> Vec<vibevalley_protocol::RepoSummary> {
+        let mut summaries = repo.list_summaries_async().await;
+        if summaries.is_empty() {
+            return summaries;
+        }
+        let inputs: Vec<vibevalley_core::RepoHealthInput> = summaries
+            .iter()
+            .map(|r| vibevalley_core::RepoHealthInput {
+                name: r.name.clone(),
+                last_commit_at: r.last.map(|s| s * 1000),
+            })
+            .collect();
+        if let (Ok(issues), Ok(sessions)) = tokio::join!(self.issues_async(), self.sessions_async()) {
+            let healths = vibevalley_core::assess_repos_health(&inputs, &issues, &sessions, evaluated_at);
+            for summary in &mut summaries {
+                if let Some(health) = healths.iter().find(|h| h.repo == summary.name) {
+                    summary.health = Some(health.clone());
+                }
+            }
+        }
+        summaries
+    }
+
+    async fn save_triage_store_async(&self, store: &super::board::TriageStore) -> Result<(), ApiError> {
+        let json = serde_json::to_string_pretty(store).map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?;
+        tokio::fs::write(&self.triage_path, json)
+            .await
+            .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))
+    }
+
+    pub(crate) async fn triage_list_async(&self, clock: &dyn Clock) -> Result<Vec<BacklogTriageSuggestion>, ApiError> {
+        let (issues, sessions, repos) = tokio::join!(self.issues_async(), self.sessions_async(), self.repo_health_inputs_async());
+        let issues = vibevalley_core::derive_issues(&issues.map_err(api)?, &sessions.map_err(api)?);
+        let store = self.triage.lock().await;
+        let mut out = vibevalley_core::suggest_backlog_triage(&issues, &repos, clock.now_ms(), &store.dismissed);
+        for custom in &store.custom {
+            if !store.dismissed.contains(&custom.id)
+                && !out.iter().any(|s| s.id == custom.id)
+                && issues.iter().any(|i| i.id == custom.issue_id && i.status == IssueStatus::Backlog)
+            {
+                out.push(custom.clone());
+            }
+        }
+        Ok(out)
+    }
+
+    pub(crate) async fn issue_triage_list_endpoint_async(&self, clock: &dyn Clock) -> Result<Vec<BacklogTriageSuggestion>, ApiError> {
+        self.triage_list_async(clock).await
+    }
+
+    pub(crate) async fn issue_triage_suggest_endpoint_async(
+        &self,
+        caller: Caller,
+        input: BacklogTriageSuggestInput,
+        clock: &dyn Clock,
+    ) -> Result<BacklogTriageSuggestion, ApiError> {
+        let item = self.get_async(&input.issue_id).await?;
+        if item.status != IssueStatus::Backlog {
+            return Err(ApiError::new(
+                BizCode::IssueRefused,
+                t("server.issue.triage.onlyBacklog", &[("n", item.number.into())]),
+            ));
+        }
+        let has_patch = input.patch.priority.is_some()
+            || input.patch.repo.is_some()
+            || input.patch.agent.is_some()
+            || input.patch.tags.is_some()
+            || input.patch.status.is_some()
+            || input.patch.relations.is_some()
+            || input.patch.due_at.is_some();
+        if !has_patch {
+            return Err(ApiError::new(BizCode::IssueRefused, t("server.issue.triage.emptyPatch", &[])));
+        }
+        let reason = input.reason.trim();
+        if reason.is_empty() {
+            return Err(ApiError::new(BizCode::IssueRefused, t("server.issue.triage.emptyReason", &[])));
+        }
+        let all_issues = self.issues_async().await.map_err(api)?;
+        let mut patch = input.patch;
+        if let Some(rels) = patch.relations {
+            patch.relations = Some(super::board::resolve_relations(&all_issues, Some(&item.id), &rels).map_err(api)?);
+        }
+        let summary = input
+            .summary
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(String::from)
+            .unwrap_or_else(|| reason.to_string());
+        let source = match caller {
+            Caller::User | Caller::Remote => ActorKind::User,
+            Caller::Orchestrator | Caller::Session => ActorKind::Agent,
+        };
+        let suggestion = BacklogTriageSuggestion {
+            id: format!("triage:{}", uuid::Uuid::now_v7()),
+            issue_id: item.id,
+            issue_number: item.number,
+            issue_title: item.title,
+            reason: reason.to_string(),
+            summary,
+            source,
+            patch,
+            created_at: clock.now_ms(),
+        };
+        let mut store = self.triage.lock().await;
+        store.custom.push(suggestion.clone());
+        self.save_triage_store_async(&store).await?;
+        Ok(suggestion)
+    }
+
+    pub(crate) async fn issue_triage_confirm_endpoint_async(&self, input: &BacklogTriageConfirmInput, clock: &dyn Clock) -> Result<AppliedIssue, ApiError> {
+        let suggestions = self.triage_list_async(clock).await?;
+        let suggestion = suggestions
+            .into_iter()
+            .find(|s| s.id == input.id)
+            .ok_or_else(|| ApiError::new(BizCode::IssueNotFound, t("server.issue.triage.notFound", &[("id", input.id.clone().into())])))?;
+        let current = self.get_async(&suggestion.issue_id).await?;
+        if current.status != IssueStatus::Backlog {
+            return Err(ApiError::new(
+                BizCode::IssueRefused,
+                t("server.issue.triage.onlyBacklog", &[("n", current.number.into())]),
+            ));
+        }
+        let patch = &suggestion.patch;
+        let merged_relations = patch.relations.as_ref().map(|proposed| {
+            let mut next = current.relations.clone();
+            for rel in proposed {
+                if !next.contains(rel) {
+                    next.push(rel.clone());
+                }
+            }
+            next
+        });
+        let has_field_edits = patch.priority.is_some()
+            || patch.repo.is_some()
+            || patch.agent.is_some()
+            || patch.tags.is_some()
+            || merged_relations.is_some()
+            || patch.due_at.is_some();
+        let mut updated = current;
+        if has_field_edits {
+            updated = self
+                .update_from_input_async(IssueUpdateInput {
+                    id: updated.id.clone(),
+                    priority: patch.priority,
+                    repo: patch.repo.clone(),
+                    agent: patch.agent.clone(),
+                    tags: patch.tags.clone(),
+                    relations: merged_relations,
+                    due_at: patch.due_at,
+                    ..Default::default()
+                })
+                .await?;
+        }
+        if let Some(target_status) = patch.status
+            && target_status != IssueStatus::Backlog
+        {
+            updated = self
+                .status_from_input_async(&IssueStatusUpdateInput {
+                    id: updated.id.clone(),
+                    status: target_status,
+                    text: None,
+                    agent: None,
+                    edit: None,
+                    request_key: None,
+                    revision: None,
+                })
+                .await?;
+        }
+        let mut store = self.triage.lock().await;
+        store.custom.retain(|c| c.id != input.id);
+        store.dismissed.insert(input.id.clone());
+        self.save_triage_store_async(&store).await?;
+        Ok(AppliedIssue::from_issue(updated, self.seq()))
+    }
+
+    pub(crate) async fn issue_triage_dismiss_endpoint_async(&self, input: &BacklogTriageDismissInput) -> Result<(), ApiError> {
+        let mut store = self.triage.lock().await;
+        store.custom.retain(|c| c.id != input.id);
+        store.dismissed.insert(input.id.clone());
+        self.save_triage_store_async(&store).await?;
+        Ok(())
+    }
+
+    pub(crate) async fn morning_digest_async(&self, window_start: i64, window_end: i64) -> Result<MorningDigest, ApiError> {
+        let (issues, sessions, repos) = tokio::join!(self.issues_async(), self.sessions_async(), self.repo_health_inputs_async());
+        let issues = issues.map_err(api)?;
+        let sessions = sessions.map_err(api)?;
+        let mut runs = Vec::new();
+        for issue in &issues {
+            if let Ok(issue_runs) = self.runs_async(&issue.id).await {
+                runs.extend(issue_runs);
+            }
+        }
+        let store = self.triage.lock().await;
+        Ok(vibevalley_core::build_morning_digest(&vibevalley_core::MorningDigestInput {
+            repos: &repos,
+            issues: &issues,
+            sessions: &sessions,
+            runs: &runs,
+            window_start,
+            window_end,
+            custom_triage: &store.custom,
+            dismissed_ids: &store.dismissed,
+        }))
+    }
+
+    pub(crate) async fn issue_digest_get_endpoint_async(&self, input: &IssueDigestGetInput, clock: &dyn Clock) -> Result<MorningDigest, ApiError> {
+        let hours = input.window_hours.unwrap_or(24).clamp(1, 168);
+        let window_end = clock.now_ms();
+        let window_start = window_end.saturating_sub(hours * 60 * 60_000);
+        self.morning_digest_async(window_start, window_end).await
     }
 
     pub(crate) async fn issue_get_endpoint_async(&self, id: &str) -> Result<Issue, ApiError> {

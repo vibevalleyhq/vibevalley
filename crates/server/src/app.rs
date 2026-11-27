@@ -6,9 +6,10 @@ use std::sync::{Arc, OnceLock};
 
 use crate::agent::{Agent, AgentDriver, Mcp, Memory, Orchestrator, OrchestratorParts, PendingExecution, Profile, Resource, ToolRegistry};
 use crate::artifact::Manager as ArtifactManager;
+pub use crate::boot::Overrides;
 use crate::boot::{
-    LazyCronOrchestrator, build_runtimes, open_context, register_session_reported_outbox, seat_orchestrators_and_watch, seed_starter_issues_on_boot,
-    spawn_chat_artifact_bridge, spawn_skin_event_bridge,
+    LazyCronOrchestrator, apply_env_overrides, build_runtimes, open_context, register_session_reported_outbox, seat_orchestrators_and_watch,
+    seed_starter_issues_on_boot, spawn_chat_artifact_bridge, spawn_skin_event_bridge,
 };
 use crate::channel::Chat;
 use crate::config::failed;
@@ -22,7 +23,7 @@ use crate::debug_sources::build_debug_kit;
 use crate::game::Game;
 use crate::gateway::api::{GatewayMeta, GatewayPorts, Server};
 use crate::gateway::remote::Remote;
-use crate::issue::{Board, IssueChat, Publisher, Pull, SessionChat};
+use crate::issue::{Board, IssueChat, Pull, SessionChat};
 use crate::machine::Machine;
 use crate::projection::finish_boot_and_start_feeds;
 use crate::provider::Provider;
@@ -129,18 +130,24 @@ impl App {
 /// Opens and starts the full server asynchronously, reading optional
 /// `VIBEVALLEY_STORAGE_URL` (defaulting to local filesystem at `config.home`).
 pub async fn create_app(config: Config) -> Result<App, StartError> {
+    create_app_with_overrides(config, Overrides::default()).await
+}
+
+/// Opens and starts the full server asynchronously with domain [`Overrides`].
+pub async fn create_app_with_overrides(config: Config, overrides: Overrides) -> Result<App, StartError> {
     let storage_config = StorageConfig::from_env(&config.home).map_err(|e| failed("the storage")(&e))?;
-    Box::pin(create_app_inner(config, storage_config)).await
+    Box::pin(create_app_inner(config, storage_config, overrides)).await
 }
 
 /// Opens and starts the full server asynchronously with an explicit [`StorageConfig`].
 pub async fn create_app_with_storage(config: Config, storage_config: StorageConfig) -> Result<App, StartError> {
-    Box::pin(create_app_inner(config, storage_config)).await
+    Box::pin(create_app_inner(config, storage_config, Overrides::default())).await
 }
 
-async fn create_app_inner(config: Config, storage_config: StorageConfig) -> Result<App, StartError> {
+async fn create_app_inner(mut config: Config, storage_config: StorageConfig, overrides: Overrides) -> Result<App, StartError> {
     let boot_started = std::time::Instant::now();
     install_tls();
+    apply_env_overrides(&mut config);
     let ctx = open_context(&config).await?;
     let active_subscriptions = Arc::new(AtomicUsize::new(0));
 
@@ -227,7 +234,7 @@ async fn create_app_inner(config: Config, storage_config: StorageConfig) -> Resu
     .await
     .map_err(|e| failed("the board")(&e))?;
     seed_starter_issues_on_boot(&config, &setting, &board).await;
-    let publisher = config.publisher.clone().unwrap_or_else(|| Arc::new(Publisher::default()));
+    let publisher = overrides.publisher.unwrap_or_default();
     let pull = Box::pin(Pull::open_async(ctx.clone(), publisher, Some(repo.clone()), Some(board.clone()), None, None))
         .await
         .map_err(|e| failed("the pulls")(&e.message))?;
@@ -260,7 +267,7 @@ async fn create_app_inner(config: Config, storage_config: StorageConfig) -> Resu
         storage: storage.clone(),
         repos_root: repo.root().to_path_buf(),
     });
-    let mcp = Mcp::new(tool.clone(), config.version.clone());
+    let mcp = Mcp::with_home(tool.clone(), config.version.clone(), config.home.clone());
 
     let key = setting.clone();
     let orchestrator = Box::pin(Orchestrator::open_async(OrchestratorParts {
@@ -294,11 +301,13 @@ async fn create_app_inner(config: Config, storage_config: StorageConfig) -> Resu
         setting: setting.clone(),
         chat: channel.clone(),
         orchestrator: agent.orchestrator.clone(),
-        realtime: config.voice_realtime,
+        realtime: overrides.voice_realtime,
+        transcriber: overrides.voice_transcriber,
     });
-    let connector = Connector::open_async(ctx.clone(), setting.clone(), channel.clone(), config.connector.clone())
+    let connector = Connector::open_async(ctx.clone(), setting.clone(), channel.clone(), overrides.connector.unwrap_or_default())
         .await
         .map_err(|e| failed("the connectors")(&e.message))?;
+    connector.attach_actions(board.clone(), runtime.clone());
 
     let game = Game::open_async(&config.home, ctx.clone(), repo.clone()).await;
     game.count_commits(config.git_emails.clone());
@@ -360,7 +369,7 @@ async fn create_app_inner(config: Config, storage_config: StorageConfig) -> Resu
     let gw = GatewayMeta::new(ports, observer, fault_gate, config.host_debug, active_subscriptions);
     let router = Router::new(core.clone(), remote.clone(), gw);
 
-    finish_boot_and_start_feeds(&core.ctx, &core.board, &core.channel, &core.cron, &core.artifact, &core.game);
+    finish_boot_and_start_feeds(&core.ctx, &core.board, &core.channel, &core.cron, &core.artifact, &core.game, &core.repo);
     core.ctx.feed.flush().await;
     core.board.refresh_queue_async().await.map_err(|e| failed("the queue")(&e))?;
     remote.restore_if_enabled_async(router.clone()).await;
@@ -370,5 +379,10 @@ async fn create_app_inner(config: Config, storage_config: StorageConfig) -> Resu
 
 /// Blocking wrapper around [`create_app`] for process boundaries and synchronous tests.
 pub fn create_app_blocking(config: Config) -> Result<App, StartError> {
-    vibevalley_runtime::rt::block_on(create_app(config))
+    create_app_with_overrides_blocking(config, Overrides::default())
+}
+
+/// Blocking wrapper around [`create_app_with_overrides`] for synchronous tests.
+pub fn create_app_with_overrides_blocking(config: Config, overrides: Overrides) -> Result<App, StartError> {
+    vibevalley_runtime::rt::block_on(create_app_with_overrides(config, overrides))
 }

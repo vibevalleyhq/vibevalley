@@ -15,4 +15,5 @@ unicode-segmentation = "1.13.3"
 unicode-width = "0.2.3"
 
 [dev-dependencies]
+serde_json = { workspace = true }
 tempfile = { workspace = true }

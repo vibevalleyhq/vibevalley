@@ -18,11 +18,17 @@ export type DebugTrajectorySummary = { id: string, kind: DebugTrajectoryKind, ti
 
 export type DebugTrajectoryRawEntry = { seq: number, time: number, kind: string, frameType?: string, agentPath: Array<string>, traceId?: number, summary: string, payload?: string, originalBytes: number, truncated: boolean, };
 
-export type DebugTrajectoryTurn = { index: number, prompt?: string, startedAt: number, endedAt?: number, durationMs?: number, events: Array<SessionEvent>, rawEntries: Array<DebugTrajectoryRawEntry>, tokens?: EventTokens, silentErrors: Array<string>, };
+export type DebugTrajectoryTurn = { index: number, prompt?: string, startedAt: number, endedAt?: number, durationMs?: number, events: Array<SessionEvent>, rawEntries: Array<DebugTrajectoryRawEntry>, tokens?: EventTokens, silentErrors: Array<string>, traceIds: Array<number>, };
 
-export type DebugTrajectoryDetail = { summary: DebugTrajectorySummary, systemPrompt?: string, turns: Array<DebugTrajectoryTurn>, subagentPaths: Array<string>, voyageRecordCount: number, };
+export type DebugTrajectorySubagentNode = { id: string, parentId?: string, path: string, label: string, agentName?: string, status?: string, turnCount: number, eventCount: number, rawCount: number, startedAt?: number, endedAt?: number, traceIds: Array<number>, };
+
+export type DebugTrajectoryDetail = { summary: DebugTrajectorySummary, systemPrompt?: string, turns: Array<DebugTrajectoryTurn>, subagentPaths: Array<string>, subagentNodes: Array<DebugTrajectorySubagentNode>, voyageRecordCount: number, };
 
 export type DebugTrajectoryGetRequest = { id: string, kind?: DebugTrajectoryKind, };
+
+export type DebugTrajectoryExportRequest = { id: string, kind?: DebugTrajectoryKind, outDir?: string, };
+
+export type DebugTrajectoryExportResult = { dir: string, replaySpecPath: string, conversationId: string, sourceKind: string, entriesExported: number, tasksExported: number, conversationsExported: number, inspectCmd: string, replayCmd: string, };
 
 export type DebugRuntimeSummary = { id: string, name: string, installed: boolean, ready: boolean, version?: string, };
 
@@ -36,9 +42,15 @@ export type DebugGraph = { clients: Array<DebugGraphClient>, sessions: Array<Deb
 
 export type DebugCacheStat = { name: string, entries: number, detail?: string, };
 
+export type DebugCollabClock = { peerId: string, counter: number, };
+
+export type DebugCollabPresence = { id: string, name: string, color?: string, kind: string, status?: string, nodeId?: string, path?: string, offset?: number, endOffset?: number, sessionId?: string, updatedAt: number, };
+
+export type DebugCollabArtifactState = { artifactId: string, title: string, artifactType: string, seq: number, snapshotBytes: number, frontiers: string, frontierIds: Array<DebugCollabClock>, versionVector: string, vvEntries: Array<DebugCollabClock>, ephemeralTtlMs: number, presenceCount: number, presence: Array<DebugCollabPresence>, updatedAt: number, };
+
 export type DebugStateCounts = { issues: number, sessions: number, channels: number, agents: number, repos: number, artifacts: number, inbox: number, mediaJobs: number, };
 
-export type DebugStateCache = { seq: number, sliceSeqs: { [key in string]: number }, sliceWatchers: { [key in string]: number }, counts: DebugStateCounts, caches: Array<DebugCacheStat>, };
+export type DebugStateCache = { seq: number, sliceSeqs: { [key in string]: number }, sliceWatchers: { [key in string]: number }, counts: DebugStateCounts, caches: Array<DebugCacheStat>, collab: Array<DebugCollabArtifactState>, };
 
 export type DebugOverrideConfig = { rpcDelayMs: number, sliceDelayMs: number, targetFilter?: string, disconnectTopic?: string, };
 

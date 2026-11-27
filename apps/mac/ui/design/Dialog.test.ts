@@ -13,21 +13,27 @@ describe("design/Dialog", () => {
     const viewport = { width: 1440, height: 900 };
     expect(dialogDimensions("sm", "auto", viewport)).toEqual({ width: 480, maxHeight: 560, marginTop: 80 });
     expect(dialogDimensions("md", "auto", viewport)).toEqual({ width: 640, maxHeight: 620, marginTop: 80 });
-    expect(dialogDimensions("lg", "auto", viewport)).toEqual({ width: 820, maxHeight: 680, marginTop: 80 });
-    expect(dialogDimensions("xl", "auto", viewport)).toEqual({ width: 1000, maxHeight: 720, marginTop: 80 });
+    expect(dialogDimensions("lg", "auto", viewport)).toEqual({ width: 980, maxHeight: 765, marginTop: 80 });
+    expect(dialogDimensions("xl", "auto", viewport)).toEqual({ width: 1220, maxHeight: 772, marginTop: 80 });
 
     expect(dialogDimensions("sm", "fixed", viewport)).toEqual({ width: 480, height: 440, marginTop: 80 });
     expect(dialogDimensions("md", "fixed", viewport)).toEqual({ width: 640, height: 540, marginTop: 80 });
-    expect(dialogDimensions("lg", "fixed", viewport)).toEqual({ width: 820, height: 640, marginTop: 80 });
-    expect(dialogDimensions("xl", "fixed", viewport)).toEqual({ width: 1000, height: 680, marginTop: 80 });
+    expect(dialogDimensions("lg", "fixed", viewport)).toEqual({ width: 980, height: 740, marginTop: 80 });
+    expect(dialogDimensions("xl", "fixed", viewport)).toEqual({ width: 1220, height: 772, marginTop: 80 });
   });
 
   test("caps dimensions and top anchor on large displays instead of stretching indefinitely", () => {
     const large = { width: 2560, height: 1440 };
+    const ultrawide = { width: 3840, height: 2160 };
+    expect(dialogDimensions("lg", "auto", large)).toEqual({ width: 980, maxHeight: 800, marginTop: 80 });
+    expect(dialogDimensions("lg", "fixed", large)).toEqual({ width: 980, height: 740, marginTop: 80 });
+    expect(dialogDimensions("xl", "auto", large)).toEqual({ width: 1220, maxHeight: 900, marginTop: 80 });
+    expect(dialogDimensions("xl", "fixed", large)).toEqual({ width: 1220, height: 860, marginTop: 80 });
+
     const sizes: readonly DialogSize[] = ["sm", "md", "lg", "xl"];
     for (const size of sizes) {
-      expect(dialogDimensions(size, "auto", large)).toEqual(dialogDimensions(size, "auto", { width: 1440, height: 900 }));
-      expect(dialogDimensions(size, "fixed", large)).toEqual(dialogDimensions(size, "fixed", { width: 1440, height: 900 }));
+      expect(dialogDimensions(size, "auto", ultrawide)).toEqual(dialogDimensions(size, "auto", large));
+      expect(dialogDimensions(size, "fixed", ultrawide)).toEqual(dialogDimensions(size, "fixed", large));
     }
   });
 
@@ -35,9 +41,9 @@ describe("design/Dialog", () => {
     const small = { width: 680, height: 500 };
     expect(dialogDimensions("sm", "fixed", small)).toEqual({ width: 480, height: 400, marginTop: 45 });
     expect(dialogDimensions("md", "fixed", small)).toEqual({ width: 640, height: 400, marginTop: 45 });
-    expect(dialogDimensions("lg", "fixed", small)).toEqual({ width: 648, height: 410, marginTop: 45 });
-    expect(dialogDimensions("xl", "fixed", small)).toEqual({ width: 632, height: 410, marginTop: 45 });
-    expect(dialogDimensions("xl", "auto", small)).toEqual({ width: 632, maxHeight: 410, marginTop: 45 });
+    expect(dialogDimensions("lg", "fixed", small)).toEqual({ width: 598, height: 425, marginTop: 45 });
+    expect(dialogDimensions("xl", "fixed", small)).toEqual({ width: 612, height: 425, marginTop: 45 });
+    expect(dialogDimensions("xl", "auto", small)).toEqual({ width: 612, maxHeight: 425, marginTop: 45 });
 
     const sizes: readonly DialogSize[] = ["sm", "md", "lg", "xl"];
     for (const size of sizes) {

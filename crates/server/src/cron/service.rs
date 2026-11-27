@@ -8,32 +8,19 @@ use parking_lot::Mutex;
 use tokio::sync::Mutex as AsyncMutex;
 use vibevalley_core::SliceMask;
 use vibevalley_i18n::t;
-use vibevalley_protocol::{ActorKind, ApiError, BizCode, Cron, CronRequest, CronWhen, IssueStatus, NoticeLevel, Preview, Run};
+use vibevalley_protocol::{ActorKind, ApiError, BizCode, Cron, CronRequest, CronWhen, IssueStatus, NoticeLevel, Preview};
 
+use super::digest::{DigestSpec, format_digest_directive, format_progress_digest, parse_digest_directive, progress_digest_from_morning};
 use crate::channel::{Chat, Noticing};
-use crate::connector::Connector;
-use crate::connector::digest::{DigestSpec, DigestTargets, build_progress_digest, format_digest_directive, format_progress_digest, parse_digest_directive};
 use crate::context::Context;
 use crate::context::error::{LookIn, missing};
-use crate::context::port::{CronAgentPort, CronOrchestratorPort};
+use crate::context::port::{CronAgentPort, CronBoardPort, CronOrchestratorPort, DigestDeliveryPort};
 use crate::context::task::Ticker;
-use crate::issue::{Board, BoardError, NewIssue};
 use crate::service::internal_db;
 
 pub const DEFAULT_CHANNEL: &str = "general";
 const TICK: Duration = Duration::from_secs(20);
 const DEFAULT_DIGEST_WINDOW_MS: i64 = 24 * 60 * 60_000;
-
-/// Delivers formatted scheduled progress digests to external connectors.
-pub trait DigestDeliveryPort: Send + Sync {
-    fn deliver_digest_async<'a>(&'a self, cron_id: &'a str, at: i64, targets: DigestTargets, text: &'a str) -> crate::BoxFuture<'a, Result<usize, ApiError>>;
-}
-
-impl DigestDeliveryPort for Connector {
-    fn deliver_digest_async<'a>(&'a self, cron_id: &'a str, at: i64, targets: DigestTargets, text: &'a str) -> crate::BoxFuture<'a, Result<usize, ApiError>> {
-        Box::pin(async move { Connector::deliver_digest_async(self, cron_id, at, targets, text).await })
-    }
-}
 
 /// Request payload for scheduling a progress digest cron job.
 #[derive(Debug, Clone)]
@@ -86,7 +73,7 @@ pub struct Scheduler {
     ctx: Arc<Context>,
     crons: Mutex<Vec<Cron>>,
     links: Arc<Mutex<CronLinks>>,
-    board: Arc<Board>,
+    board: Arc<dyn CronBoardPort>,
     agents: Arc<dyn CronAgentPort>,
     /// The ticker, the endpoints, and the tools all change the list.
     lock: AsyncMutex<()>,
@@ -102,7 +89,7 @@ impl Scheduler {
     /// projection lookup on `board`.
     pub async fn open_async(
         ctx: Arc<Context>,
-        board: Arc<Board>,
+        board: Arc<dyn CronBoardPort>,
         agents: Arc<dyn CronAgentPort>,
         chat: Option<Arc<Chat>>,
         orchestrator: Option<Arc<dyn CronOrchestratorPort>>,
@@ -130,7 +117,7 @@ impl Scheduler {
         }
         let lookup_links = links.clone();
         board
-            .use_cron_of_issue_async(Arc::new(move |issue_id| lookup_links.lock().cron_of_issue.get(issue_id).cloned()))
+            .set_cron_of_issue(Arc::new(move |issue_id| lookup_links.lock().cron_of_issue.get(issue_id).cloned()))
             .await;
         Ok(Arc::new(Scheduler {
             ctx,
@@ -394,32 +381,10 @@ impl Scheduler {
         })
     }
 
-    async fn collect_recent_runs_async(&self, issues: &[vibevalley_protocol::Issue], window_start: i64) -> Vec<Run> {
-        let mut runs = Vec::new();
-        for issue in issues {
-            if !issue.was_sent() {
-                continue;
-            }
-            if issue.status.is_closed() && issue.closed_at.is_none_or(|c| c < window_start) {
-                continue;
-            }
-            if let Ok(found) = self.board.runs_async(&issue.id).await {
-                runs.extend(found);
-            }
-        }
-        runs
-    }
-
     async fn deliver_digest_async(&self, cron: &Cron, spec: &DigestSpec, prev_last_run: Option<i64>, at: i64) -> Result<(), ApiError> {
-        let fail = |e: BoardError| match e {
-            BoardError::Api(e) => e,
-            e => ApiError::new(BizCode::IssueRefused, e.to_string()),
-        };
         let window_start = prev_last_run.unwrap_or_else(|| at.saturating_sub(DEFAULT_DIGEST_WINDOW_MS));
-        let issues = self.board.issues_async().await.map_err(fail)?;
-        let sessions = self.board.sessions_async().await.map_err(fail)?;
-        let runs = self.collect_recent_runs_async(&issues, window_start).await;
-        let digest = build_progress_digest(&cron.name, &issues, &sessions, &runs, window_start, at);
+        let morning = self.board.morning_digest_async(window_start, at).await?;
+        let digest = progress_digest_from_morning(&cron.name, &morning);
         if spec.skip_if_empty && digest.is_empty() {
             return Ok(());
         }
@@ -469,7 +434,7 @@ impl Scheduler {
             .await;
         }
         let agent = self.chat.as_ref().map(|chat| chat.orchestrator_in(&channel)).unwrap_or_default();
-        if o.hear_cron(&agent, &channel, words).await {
+        if o.hear_cron(&agent, &channel, &cron.id, words).await {
             Ok(())
         } else {
             Err(unserved())
@@ -486,10 +451,6 @@ impl Scheduler {
         at: i64,
     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), ApiError>> + Send + 'a>> {
         Box::pin(async move {
-            let fail = |e: BoardError| match e {
-                BoardError::Api(e) => e,
-                e => ApiError::new(BizCode::IssueRefused, e.to_string()),
-            };
             let Some(agent) = &cron.agent else {
                 if let Some(spec) = parse_digest_directive(&cron.text) {
                     return self.deliver_digest_async(cron, &spec, prev_last_run, at).await;
@@ -497,34 +458,25 @@ impl Scheduler {
                 return self.to_orchestrator_async(cron, words).await;
             };
             let found = match self.issue_of(&cron.id) {
-                Some(id) => self.board.issue_async(&id).await.map_err(fail)?,
+                Some(id) => self.board.issue_async(&id).await?,
                 None => None,
             };
             let Some(issue) = found else {
                 let made = self
                     .board
-                    .create_async(NewIssue {
-                        title: cron.name.clone(),
-                        description: cron.text.clone(),
-                        repo: cron.repo.clone().map(PathBuf::from),
-                        agent: agent.clone(),
-                        cron: Some(cron.id.clone()),
-                        ..Default::default()
-                    })
-                    .await
-                    .map_err(fail)?;
+                    .create_for_cron_async(&cron.name, &cron.text, cron.repo.clone().map(PathBuf::from), agent, &cron.id)
+                    .await?;
                 self.link_issue_async(&cron.id, Some(&made.id)).await?;
-                self.board.move_to_async(&made.id, IssueStatus::Todo, None).await.map_err(fail)?;
+                self.board.move_to_todo_async(&made.id, None).await?;
                 return Ok(());
             };
             match issue.status {
-                IssueStatus::Backlog => self.board.move_to_async(&issue.id, IssueStatus::Todo, None).await.map(|_| ()),
+                IssueStatus::Backlog => self.board.move_to_todo_async(&issue.id, None).await,
                 // Waiting for room: it starts when there is some.
                 IssueStatus::Todo => Ok(()),
-                s if s.is_closed() => self.board.move_to_async(&issue.id, IssueStatus::Todo, Some(words)).await.map(|_| ()),
+                s if s.is_closed() => self.board.move_to_todo_async(&issue.id, Some(words)).await,
                 _ => self.board.tell_async(&issue.id, words).await,
             }
-            .map_err(fail)
         })
     }
 

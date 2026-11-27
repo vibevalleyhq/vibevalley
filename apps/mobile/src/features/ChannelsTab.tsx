@@ -116,7 +116,11 @@ export function ChannelsTab(props: {
 
     const applyReloadedMessages = (data: unknown) => {
       const reloaded = ChatMessageListSchema.safeParse(data);
-      if (!reloaded.success) return;
+      if (!reloaded.success) {
+        console.error("[ChannelsTab] invalid channel.message.list reload payload", { channelId, issues: reloaded.error.issues });
+        sendError.set(reloaded.error.message);
+        return;
+      }
       const ordered = mergeMessages([], reloaded.data);
       messages.set(ordered);
       const reloadedKeys = new Set(ordered.map((m) => m.sendKey).filter((k): k is string => k !== undefined));
@@ -146,6 +150,9 @@ export function ChannelsTab(props: {
           for (const msg of ordered) {
             if (msg.revision > maxRevision) maxRevision = msg.revision;
           }
+        } else {
+          console.error("[ChannelsTab] invalid channel.message.list payload", { channelId, issues: parsed.error.issues });
+          sendError.set(parsed.error.message);
         }
       } else {
         sendError.set(env.message);
@@ -158,7 +165,10 @@ export function ChannelsTab(props: {
         (raw) => {
           if (controller.signal.aborted) return;
           const parsed = ChannelEventSchema.safeParse(raw);
-          if (!parsed.success) return;
+          if (!parsed.success) {
+            console.error("[ChannelsTab] dropped malformed channel.follow event", { channelId, issues: parsed.error.issues });
+            return;
+          }
           const ev = parsed.data;
           switch (ev._tag) {
             case "Message": {
@@ -183,11 +193,20 @@ export function ChannelsTab(props: {
               void props.session
                 .call("channel.message.list", { id: channelId, limit: 50 }, { signal: controller.signal })
                 .then((reloadEnv) => {
-                  if (!controller.signal.aborted && reloadEnv.bizCode === 0) {
+                  if (controller.signal.aborted) return;
+                  if (reloadEnv.bizCode === 0) {
                     applyReloadedMessages(reloadEnv.data);
+                  } else {
+                    console.error("[ChannelsTab] channel reset reload failed", { channelId, bizCode: reloadEnv.bizCode, message: reloadEnv.message });
+                    sendError.set(reloadEnv.message);
                   }
                 })
-                .catch(() => undefined);
+                .catch((err: unknown) => {
+                  if (controller.signal.aborted) return;
+                  const message = err instanceof Error ? err.message : String(err);
+                  console.error("[ChannelsTab] channel reset reload error", { channelId, error: message });
+                  sendError.set(message);
+                });
               break;
           }
         },

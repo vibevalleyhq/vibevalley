@@ -96,6 +96,13 @@ test("cardLook and issueState preserve full titles over 40 chars and quiet draft
   };
   const draftLook = cardLook({ kind: "todo", id: draftIssue.id, lane: "todo", issue: draftIssue }, (id) => id, [draftIssue], 2_000);
   expect(draftLook.flags).toEqual([{ text: t("web.issue.card.draft"), tone: "faint" }]);
+
+  const nonSessionReview: Issue = {
+    ...makeIssue("i-review-todo", "draft"),
+    status: "in_review",
+  };
+  const reviewTodoLook = cardLook({ kind: "todo", id: nonSessionReview.id, lane: "in_review", issue: nonSessionReview }, (id) => id, [nonSessionReview], 2_000);
+  expect(reviewTodoLook.flags).toEqual([]);
 });
 
 test("localizeIssueError maps raw English API-key failures to localized copy with settings href", () => {

@@ -23,7 +23,20 @@
     "copied": "Copied",
     "apply": "Apply",
     "reset": "Reset",
-    "disconnect": "Simulate Disconnect"
+    "disconnect": "Simulate Disconnect",
+    "inspect": "Inspect Canvas",
+    "inspectCancel": "Cancel Inspect",
+    "jumpToSource": "Jump to Source",
+    "clearHighlight": "Clear Highlight",
+    "exportTrajectory": "Export Eval Bundle",
+    "jumpToTimeline": "View in Timeline",
+    "jumpToTrajectory": "View in Trajectory"
+  },
+  "inspector": {
+    "title": "Canvas Inspector",
+    "active": "Inspector active — click any element or canvas in the main window.",
+    "surface": "Surface",
+    "noSource": "No source location recorded"
   },
   "lanes": {
     "all": "All Lanes",
@@ -82,6 +95,8 @@
     "rawPayload": "Raw Payload",
     "truncated": "Truncated ({bytes} B)",
     "subagents": "Subagents",
+    "subagentTree": "Subagent Tree",
+    "allAgents": "All Agents",
     "systemPrompt": "System Prompt",
     "turns": "Rounds",
     "turnIndex": "Round #{index}",
@@ -90,7 +105,10 @@
     "rawEntries": "Wire Entries",
     "voyageRecords": "Voyage Records",
     "emptyList": "No trajectories recorded yet.",
-    "selectPrompt": "Select a trajectory to inspect its rounds and raw frames."
+    "selectPrompt": "Select a trajectory to inspect its rounds and raw frames.",
+    "exported": "Exported eval bundle to {dir}",
+    "inspectCmd": "Inspect Command",
+    "replayCmd": "Replay Command"
   },
   "state": {
     "seq": "State Seq",
@@ -107,7 +125,13 @@
     "artifacts": "Artifacts",
     "inbox": "Inbox",
     "mediaJobs": "Media",
-    "emptyCaches": "No cache metrics reported."
+    "emptyCaches": "No cache metrics reported.",
+    "collab": "Loro Collab & EphemeralStore",
+    "emptyCollab": "No active collaborative artifacts.",
+    "frontiers": "Frontiers",
+    "presence": "EphemeralStore Peers",
+    "noPeers": "No active ephemeral peers",
+    "ttl": "TTL {ms}ms"
   },
   "lab": {
     "rpcDelayMs": "RPC Delay (ms)",

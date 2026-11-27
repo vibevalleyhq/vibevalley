@@ -1,4 +1,15 @@
-import type { ChatMessage, IssueHistory, SessionEvent, SessionEventPage, SliceBundle } from "@vibevalley/protocol";
+import type {
+  ChatMessage,
+  IssueHistory,
+  IssueRetroReport,
+  MorningDigest,
+  RetroWindow,
+  SessionEvent,
+  SessionEventPage,
+  SessionTrajectoryProjection,
+  SliceBundle,
+  TrajectoryRunView,
+} from "@vibevalley/protocol";
 import { SliceBundle as SliceBundleSchema } from "@vibevalley/protocol/schema";
 
 import workbenchResponsesJson from "../workbench/responses.json";
@@ -22,6 +33,54 @@ function buildHistory(bundle: SliceBundle): IssueHistory[] {
     const sessions = issue.assignments.flatMap((a) => a.executions.map((e) => byId.get(e.session))).filter((s): s is NonNullable<typeof s> => s !== undefined);
     return { issue, sessions, missingSessions: [] };
   });
+}
+
+function emptyRetro(window: RetroWindow): IssueRetroReport {
+  return {
+    window,
+    generatedAt: SCENARIO_NOW,
+    totalIssues: 0,
+    openCount: 0,
+    completedCount: 0,
+    canceledCount: 0,
+    cycleTime: { sampleCount: 0 },
+    reviewWait: { sampleCount: 0 },
+    withDueCount: 0,
+    withoutDueCount: 0,
+    onTimeCount: 0,
+    overdueCount: 0,
+    upcomingDueCount: 0,
+    reworkIssueCount: 0,
+    totalFindingsCount: 0,
+    unresolvedFindingsCount: 0,
+    overdueItems: [],
+    reworkItems: [],
+    byRepo: [],
+    byTag: [],
+    byAgent: [],
+  };
+}
+
+function emptyDigest(): MorningDigest {
+  return {
+    generatedAt: SCENARIO_NOW,
+    windowStart: SCENARIO_NOW - 86_400_000,
+    windowEnd: SCENARIO_NOW,
+    progress: {
+      asking: [],
+      reviewing: [],
+      stuck: [],
+      working: [],
+      completedRecent: [],
+      runsTotal: 0,
+      runsCompleted: 0,
+      runsFailed: 0,
+      runsInterrupted: 0,
+      tokensSpent: 0,
+    },
+    repoHealth: [],
+    triage: [],
+  };
 }
 
 function buildSessionEvents(now: number, working: boolean, dense: boolean): SessionEvent[] {
@@ -119,6 +178,55 @@ function buildMessages(density: ScenarioDensity, now: number): ChatMessage[] {
   return [...anchored, ...extra];
 }
 
+function scenarioTrajectory(events: SessionEvent[]): SessionTrajectoryProjection {
+  const emptyTelemetry = { inputTokens: 0, cacheReadTokens: 0, outputTokens: 0, llmRetries: 0, runErrors: 0 };
+  if (events.length === 0) {
+    return {
+      shown: [],
+      runs: [],
+      waterfall: { runs: [], spans: [] },
+      summary: { runs: 0, steps: 0, modelMs: 0, toolMs: 0, input: 0, cacheRead: 0, output: 0 },
+      stepDurations: [],
+      stepMeta: [],
+      telemetry: emptyTelemetry,
+    };
+  }
+  const results = new Map<number, SessionEvent>();
+  for (const e of events) if (e.type === "tool/result" && e.call !== undefined) results.set(e.call, e);
+  const shown = events.flatMap((e): SessionEvent[] => {
+    if (e.type === "run/start" || e.type === "run/end" || e.type === "tool/result") return [];
+    if (e.type === "tool/call") {
+      const r = results.get(e.seq);
+      if (r) return [{ ...e, ...(r.output !== undefined ? { output: r.output } : {}), ...(r.ok !== undefined ? { ok: r.ok } : {}) }];
+    }
+    return [e];
+  });
+  const runs: TrajectoryRunView[] = [];
+  for (const s of shown) {
+    let cur = runs.at(-1);
+    if (!cur || cur.run !== s.run) {
+      cur = { ...(s.run !== undefined ? { run: s.run } : {}), steps: [] };
+      runs.push(cur);
+    }
+    if (!cur.asked && cur.steps.length === 0 && s.type === "user/message") cur.asked = s;
+    else cur.steps.push(s);
+  }
+  return {
+    shown,
+    runs,
+    waterfall: { runs: runs.map((r) => [r.asked?.time ?? r.steps[0]?.time ?? 0, r.steps.at(-1)?.time ?? r.asked?.time ?? 0]), spans: [] },
+    summary: { runs: runs.length, steps: shown.length, modelMs: 0, toolMs: 0, input: 0, cacheRead: 0, output: 0 },
+    stepDurations: shown.map((s) => ({ seq: s.seq, durationMs: s.seq === 4 ? 1_000 : 0 })),
+    stepMeta: shown.map((s) => ({
+      seq: s.seq,
+      durationMs: s.seq === 4 ? 1_000 : 0,
+      ...(s.input !== undefined ? { readableInput: s.input } : {}),
+      ...(s.type === "user/message" ? { collapsedSummary: s.text } : {}),
+    })),
+    telemetry: emptyTelemetry,
+  };
+}
+
 function eventPage(events: SessionEvent[]): SessionEventPage {
   const oldestSeq = events[0]?.seq;
   const newestSeq = events.at(-1)?.seq;
@@ -127,6 +235,7 @@ function eventPage(events: SessionEvent[]): SessionEventPage {
     hasMore: false,
     ...(oldestSeq !== undefined ? { oldestSeq } : {}),
     ...(newestSeq !== undefined ? { newestSeq } : {}),
+    trajectory: scenarioTrajectory(events),
   };
 }
 
@@ -146,6 +255,9 @@ function responsesFor(density: ScenarioDensity, bundle: SliceBundle): Record<str
       "repo.list": [],
       "runtime.list": [],
       "issue.history.list": [],
+      "issue.retro.get": emptyRetro("7d"),
+      "issue.digest.get": emptyDigest(),
+      "issue.triage.list": [],
       "issue.run.list": [],
       "issue.timeline.get": { milestones: [] },
       "issue.diff.get": { files: [], truncated: false },
@@ -172,11 +284,14 @@ function responsesFor(density: ScenarioDensity, bundle: SliceBundle): Record<str
     "host.assetsDir": assetsDir,
     "orchestrator.approval.list": [],
     "issue.history.list": buildHistory(bundle),
+    "issue.retro.get": emptyRetro("7d"),
+    "issue.digest.get": emptyDigest(),
+    "issue.triage.list": [],
     "issue.timeline.get": {
       milestones: [
         { at: SCENARIO_NOW - 40 * MIN_MS, kind: "opened", text: "写下这张工单" },
-        { at: SCENARIO_NOW - 20 * MIN_MS, kind: "started", who: "老周", text: "开始处理" },
-        { at: SCENARIO_NOW - 6 * MIN_MS, kind: "reported", who: "老周", text: "已提交修改并补充测试。" },
+        { at: SCENARIO_NOW - 20 * MIN_MS, kind: "started", who: "老周", text: "开始处理", run: "run-1" },
+        { at: SCENARIO_NOW - 6 * MIN_MS, kind: "reported", who: "老周", text: "交回来了", said: "已提交修改并补充测试。", run: "run-1" },
       ],
       spent: { tokens: 182_400, cny: 0.42 },
     },

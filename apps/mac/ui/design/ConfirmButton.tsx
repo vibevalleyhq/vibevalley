@@ -1,4 +1,4 @@
-import { keymap, signal, Text, View } from "nsh";
+import { effect, keymap, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 
@@ -21,7 +21,9 @@ export function ConfirmButton(props: {
 }) {
   const armed = signal(false);
   const primary = () => props.tone === "primary";
-  keymap.bind("escape", () => armed() && armed.set(false), { passThrough: true });
+  effect(() => {
+    if (armed()) return keymap.bind("escape", () => armed.set(false));
+  });
   return (
     <If
       when={armed()}

@@ -9,21 +9,26 @@ pub mod channel;
 pub mod clock;
 #[cfg(feature = "collab")]
 pub mod collab;
+pub mod compare;
 pub mod core;
 pub mod cron;
 pub mod deps;
 pub mod game;
+pub mod health;
 mod inbox;
 pub mod moves;
 pub mod pr;
 pub mod projection;
 pub mod prompts;
 pub mod refine;
+pub mod retro;
 pub mod rules;
 #[cfg(any(test, feature = "scenarios"))]
 pub mod scenario;
+pub mod schedule;
 pub mod status;
 pub mod text;
+pub mod trajectory;
 
 pub use crate::clock::{Clock, ManualClock, SharedClock, SystemClock, system_clock};
 pub use crate::core::{
@@ -33,12 +38,15 @@ pub use crate::core::{
 pub use crate::deps::{
     CheckoutChecks, DagNode, DagProblem, acceptance_ancestors, blocked_issues, child_checks, dag_id_valid, dag_problems, dependency_problems,
 };
+pub use crate::health::{MorningDigestInput, RepoHealthInput, assess_repo_health, assess_repos_health, build_morning_digest, suggest_backlog_triage};
 pub use crate::moves::{Move, Refusal, status_move, status_moves};
 pub use crate::projection::{
-    BoardInput, CollabInput, FarmInput, InboxInput, LiveSessionOverlay, LiveSnapshot, OpsInput, SessionInput, derive_issues, overlay_sessions, project_board,
-    project_collab, project_farm, project_inbox, project_ops, project_sessions,
+    BoardInput, CollabInput, FarmInput, InboxInput, LiveSessionOverlay, LiveSnapshot, OpsInput, SessionInput, apply_session_telemetry, derive_issues,
+    fold_session_telemetry, merge_session_telemetry_usage, overlay_sessions, project_board, project_collab, project_farm, project_inbox, project_ops,
+    project_sessions,
 };
 pub use crate::prompts::work_constraints;
+pub use crate::retro::issue_retro;
 pub use crate::status::{issue_order, pick_issues};
 
 #[cfg(test)]

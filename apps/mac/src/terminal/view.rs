@@ -10,16 +10,16 @@ use gpui::{
     StatefulInteractiveElement as _, Styled as _, Window, div, point, px,
 };
 use vibevalley_terminal::{
-    LinkMatch, LinkResolveContext, LinkSpan, LinkTarget, Mods, MouseButton as TermButton, MouseInput, MouseKind, SelectionMode, Snapshot, SpawnOptions,
-    TermEvent, TermSession, TermSize, link_at_with,
+    LinkMatch, LinkResolveContext, LinkSpan, LinkTarget, Mods, MouseButton as TermButton, MouseInput, MouseKind, ResolvedTerminalHooks, SelectionMode,
+    Snapshot, SpawnOptions, TermEvent, TermSession, TermSize, link_at_with,
 };
 
 use super::element::{self, Geometry, RowCache, TerminalElement};
 use super::keys;
 use super::preview;
 use super::status::{
-    ACTIVE_OUTPUT_WINDOW, AgentTurnTracker, HoveredLink, Input, RunningState, SpawnSpec, State, TerminalEvent, TerminalStatus, classify_terminal_status,
-    coalesce_term_events, looks_like_shell_prompt,
+    ACTIVE_OUTPUT_WINDOW, AgentTurnTracker, HoveredLink, Input, RunningState, SpawnSpec, State, TerminalEvent, TerminalHookStatus, TerminalStatus,
+    classify_busy_label, classify_terminal_status, coalesce_term_events, looks_like_shell_prompt,
 };
 use super::{Clear, Copy, Paste, ScrollPageDown, ScrollPageUp, ScrollToBottom};
 use crate::theme::Ui;
@@ -28,6 +28,8 @@ pub struct TerminalView {
     state: State,
     pending_input: Vec<Input>,
     spec: SpawnSpec,
+    active_hooks: ResolvedTerminalHooks,
+    desired_hooks: ResolvedTerminalHooks,
     focus: FocusHandle,
     pub(crate) marked: Option<String>,
     pub(crate) geometry: Option<Geometry>,
@@ -116,10 +118,13 @@ impl TerminalView {
 
         let initial_title = spec.title.as_deref().map(str::trim).filter(|t| !t.is_empty()).map(str::to_string);
         let initial_status = classify_terminal_status(false, None, spec.program.as_deref(), initial_title.as_deref(), false, &[], &[], false, false);
+        let initial_hooks = spec.hooks.clone();
         TerminalView {
             state: State::Unsized,
             pending_input: Vec::new(),
             spec,
+            active_hooks: initial_hooks.clone(),
+            desired_hooks: initial_hooks,
             focus: cx.focus_handle(),
             marked: None,
             geometry: None,
@@ -271,15 +276,63 @@ impl TerminalView {
             .unwrap_or_else(|| self.spec.cwd.clone())
     }
 
+    pub fn is_alive(&self) -> bool {
+        !self.exited && !matches!(self.state, State::Failed(_)) && self.session().is_none_or(TermSession::is_alive)
+    }
+
+    pub fn has_foreground_process(&self) -> bool {
+        self.is_alive() && self.session().is_some_and(TermSession::has_foreground_process)
+    }
+
+    /// Returns a descriptive process or agent label when closing this terminal
+    /// would interrupt an active foreground command or agent, else `None`.
+    pub fn busy_label(&self) -> Option<String> {
+        let alive = self.is_alive();
+        let has_fg = self.has_foreground_process();
+        let status = self.terminal_status();
+        let fallback = crate::panes::shell_name();
+        classify_busy_label(alive, has_fg, self.running_command.as_deref(), &status, self.title.as_deref(), &fallback)
+    }
+
     pub fn can_reopen_in(&self, target: &std::path::Path) -> bool {
-        !self.exited
-            && !matches!(self.state, State::Failed(_))
-            && self.session().is_none_or(TermSession::is_alive)
-            && self.directory().canonicalize().is_ok_and(|cwd| cwd.starts_with(target))
+        self.is_alive() && self.directory().canonicalize().is_ok_and(|cwd| cwd.starts_with(target))
     }
 
     pub fn has_exited(&self) -> bool {
         self.exited
+    }
+
+    pub fn hook_status(&self) -> TerminalHookStatus {
+        TerminalHookStatus::from_resolved(&self.active_hooks, &self.desired_hooks)
+    }
+
+    pub fn desired_hooks(&self) -> &ResolvedTerminalHooks {
+        &self.desired_hooks
+    }
+
+    pub fn set_desired_hooks(&mut self, hooks: ResolvedTerminalHooks, cx: &mut Context<Self>) {
+        self.desired_hooks = hooks.clone();
+        self.spec.hooks = hooks;
+        cx.notify();
+    }
+
+    pub fn respawn_with_hooks(&mut self, hooks: ResolvedTerminalHooks, cx: &mut Context<Self>) {
+        let cwd = self.directory();
+        self.spec.cwd = cwd;
+        self.spec.hooks = hooks.clone();
+        self.desired_hooks = hooks;
+        self.active_hooks = self.desired_hooks.clone();
+        self.running_command = None;
+        self.last_output_at = None;
+        self.settle_pending = false;
+        self.exited = false;
+        self.turn_tracker.reset();
+        self.pending_input.clear();
+        self.state = State::Unsized;
+        if let Some(geometry) = self.geometry {
+            self.spawn(geometry.size, cx);
+        }
+        cx.notify();
     }
 
     fn input(&mut self, input: Input) {
@@ -318,7 +371,12 @@ impl TerminalView {
     fn spawn(&mut self, size: TermSize, cx: &mut Context<Self>) {
         self.state = State::Spawning;
         let ui = Ui::get(cx);
+        let hooks = self.desired_hooks.clone();
+        self.active_hooks = hooks.clone();
         let mut env = self.spec.env.clone();
+        if !hooks.is_empty() {
+            hooks.apply_to_spawn_env(&mut env);
+        }
         env.push(("TERM_PROGRAM".into(), "VibeValley".into()));
         env.push(("COLORTERM".into(), "truecolor".into()));
         let opts = SpawnOptions {
@@ -337,8 +395,8 @@ impl TerminalView {
                 let _ = tx.send(event);
             };
             match history {
-                Some(history) => TermSession::spawn_with_history(opts, &history, on_event),
-                None => TermSession::spawn(opts, on_event),
+                Some(history) => TermSession::spawn_with_history_and_hooks(opts, &history, hooks, on_event),
+                None => TermSession::spawn_with_hooks(opts, hooks, on_event),
             }
         });
         cx.spawn(async move |this, cx| {

@@ -1,7 +1,7 @@
 //! Repos and timers (direct calls into [`crate::repo::Repo`] and [`crate::cron::Scheduler`]).
 
 use serde::Deserialize;
-use vibevalley_protocol::{ActorKind, CronRequest, CronWhen, CronWhenDaily, CronWhenEvery, CronWhenExpr, CronWhenOnce, CronWhenWeekly};
+use vibevalley_protocol::{ActorKind, CronRequest, CronWhen, CronWhenDaily, CronWhenEvery, CronWhenExpr, CronWhenOnce, CronWhenWeekly, RepoHealthStatus};
 
 use super::registry::{ToolRegistry, Who, given};
 use crate::agent::profile::text;
@@ -14,9 +14,27 @@ pub async fn repos(f: &ToolRegistry, _who: &Who, _: Nothing) -> Result<String, S
     if all.is_empty() {
         return Ok(format!("工作目录（{}）下还没有仓库。", f.repos_root.display()));
     }
+    let healths = f.issue.repo_health_list_async(f.ctx.now()).await.unwrap_or_default();
     Ok(all
         .iter()
-        .map(|r| format!("- {}{}", r.name, if r.git { "" } else { "（还不是 git 仓库，第一次派活时会建）" }))
+        .map(|r| {
+            let git_note = if r.git { "" } else { "（还不是 git 仓库，第一次派活时会建）" };
+            let health_note = match healths.iter().find(|h| h.repo == r.name) {
+                Some(h) => {
+                    let status = match h.status {
+                        RepoHealthStatus::OnTrack => "on_track",
+                        RepoHealthStatus::AtRisk => "at_risk",
+                        RepoHealthStatus::OffTrack => "off_track",
+                    };
+                    format!(
+                        " [health={status}, open={}, blocked={}, stuck={}]",
+                        h.open_issues, h.blocked_issues, h.stuck_issues
+                    )
+                }
+                None => String::new(),
+            };
+            format!("- {}{git_note}{health_note}", r.name)
+        })
         .collect::<Vec<_>>()
         .join("\n"))
 }

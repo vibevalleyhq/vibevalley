@@ -71,43 +71,74 @@ impl Orchestrator {
         const HANDED_EMOJI: &str = "👀";
         let sessions = &self.ctx.service.session;
         let now_ms = self.ctx.now();
-        if !chat.delivery_is_pending_async(d.id).await.unwrap_or(false) {
-            let _ = sessions.withdraw_mailbox_by_message(&d.message_id, now_ms).await;
+        let is_pending = match chat.delivery_is_pending_async(d.id).await {
+            Ok(pending) => pending,
+            Err(err) => {
+                tracing::warn!(delivery_id = d.id, message_id = %d.message_id, error = %err.message, "orchestrator.chat delivery_is_pending failed");
+                false
+            }
+        };
+        if !is_pending {
+            if let Err(err) = sessions.withdraw_mailbox_by_message(&d.message_id, now_ms).await {
+                tracing::warn!(delivery_id = d.id, message_id = %d.message_id, error = %err, "orchestrator.chat withdraw_mailbox_by_message failed");
+            }
             return;
         }
         if !self.profile.is_orchestrator(&d.recipient_id) {
-            let _ = chat.settle_delivery_async(d.id, false).await;
+            if let Err(err) = chat.settle_delivery_async(d.id, false).await {
+                tracing::warn!(delivery_id = d.id, recipient = %d.recipient_id, error = %err.message, "orchestrator.chat settle_delivery failed");
+            }
             return;
         }
         let owned;
         let c = match committed {
             Some(c) => c.as_ref(),
-            None => match chat.committed_of_async(&d.message_id).await.ok().flatten() {
-                Some(c) => {
+            None => match chat.committed_of_async(&d.message_id).await {
+                Ok(Some(c)) => {
                     owned = c;
                     &owned
                 }
-                None => {
-                    let _ = sessions.withdraw_mailbox_by_message(&d.message_id, now_ms).await;
-                    let _ = chat.withdraw_delivery_async(d.id).await;
+                Ok(None) => {
+                    if let Err(err) = sessions.withdraw_mailbox_by_message(&d.message_id, now_ms).await {
+                        tracing::warn!(delivery_id = d.id, message_id = %d.message_id, error = %err, "orchestrator.chat withdraw_mailbox_by_message failed");
+                    }
+                    if let Err(err) = chat.withdraw_delivery_async(d.id).await {
+                        tracing::warn!(delivery_id = d.id, message_id = %d.message_id, error = %err.message, "orchestrator.chat withdraw_delivery failed");
+                    }
+                    return;
+                }
+                Err(err) => {
+                    tracing::warn!(delivery_id = d.id, message_id = %d.message_id, error = %err.message, "orchestrator.chat committed_of failed");
+                    if let Err(err) = sessions.withdraw_mailbox_by_message(&d.message_id, now_ms).await {
+                        tracing::warn!(delivery_id = d.id, message_id = %d.message_id, error = %err, "orchestrator.chat withdraw_mailbox_by_message failed");
+                    }
+                    if let Err(err) = chat.withdraw_delivery_async(d.id).await {
+                        tracing::warn!(delivery_id = d.id, message_id = %d.message_id, error = %err.message, "orchestrator.chat withdraw_delivery failed");
+                    }
                     return;
                 }
             },
         };
         if c.row.deleted_at.is_some() {
-            let _ = sessions.withdraw_mailbox_by_message(&d.message_id, now_ms).await;
-            let _ = chat.withdraw_delivery_async(d.id).await;
+            if let Err(err) = sessions.withdraw_mailbox_by_message(&d.message_id, now_ms).await {
+                tracing::warn!(delivery_id = d.id, message_id = %d.message_id, error = %err, "orchestrator.chat withdraw_mailbox_by_message failed");
+            }
+            if let Err(err) = chat.withdraw_delivery_async(d.id).await {
+                tracing::warn!(delivery_id = d.id, message_id = %d.message_id, error = %err.message, "orchestrator.chat withdraw_delivery failed");
+            }
             return;
         }
         let m = chat.addressed_of(&c.row);
         let line = words::orchestrator_lines(std::slice::from_ref(&m));
         if !d.wakes {
             intake.overhear(Some(&d.recipient_id), line);
-            let _ = chat.settle_delivery_async(d.id, true).await;
+            if let Err(err) = chat.settle_delivery_async(d.id, true).await {
+                tracing::warn!(delivery_id = d.id, recipient = %d.recipient_id, error = %err.message, "orchestrator.chat settle_delivery failed");
+            }
             return;
         }
         let mail_key = format!("orchestrator:{}:{}", d.recipient_id, d.message_id);
-        let mail_entry = sessions
+        let mail_entry = match sessions
             .enqueue_mailbox(
                 &d.recipient_id,
                 &mail_key,
@@ -117,8 +148,20 @@ impl Orchestrator {
                 now_ms,
             )
             .await
-            .ok();
-        let claimed = sessions.claim_mailbox_by_key(&mail_key, now_ms).await.unwrap_or(false);
+        {
+            Ok(entry) => Some(entry),
+            Err(err) => {
+                tracing::warn!(mail_key = %mail_key, error = %err, "orchestrator.chat enqueue_mailbox failed");
+                None
+            }
+        };
+        let claimed = match sessions.claim_mailbox_by_key(&mail_key, now_ms).await {
+            Ok(claimed) => claimed,
+            Err(err) => {
+                tracing::warn!(mail_key = %mail_key, error = %err, "orchestrator.chat claim_mailbox_by_key failed");
+                false
+            }
+        };
         if !claimed
             && mail_entry
                 .as_ref()
@@ -145,14 +188,20 @@ impl Orchestrator {
             .filter(|_| c.row.deleted_at.is_none())
             .map(|vc| format!("{}\n", format_artifact_view_context(vc)))
             .unwrap_or_default();
+        let command_note = meta
+            .command
+            .as_ref()
+            .filter(|cmd| !cmd.name.trim().is_empty())
+            .map(|cmd| words::command_note(cmd.name.trim(), cmd.args.trim()))
+            .unwrap_or_default();
         let text = c.row.body.trim();
         let said = match meta.voice_mode.as_deref() {
-            Some("dictated") => format!("{picked_note}{view_note}{}{}", words::DICTATED, words::user_line(text)),
-            Some("conversation") => format!("{}\n{}", text::PROMPTS.voice, words::user_line(text)),
+            Some("dictated") => format!("{picked_note}{view_note}{command_note}{}{}", words::DICTATED, words::user_line(text)),
+            Some("conversation") => format!("{}\n{command_note}{}", text::PROMPTS.voice, words::user_line(text)),
             _ if from_user && (c.channel_type == ChannelType::Direct || c.row.channel_id == chat.default_channel()) => {
-                format!("{picked_note}{view_note}{}", words::user_line(text))
+                format!("{picked_note}{view_note}{command_note}{}", words::user_line(text))
             }
-            _ => format!("{picked_note}{}", words::chat_line(&m.target, &line)),
+            _ => format!("{picked_note}{command_note}{}", words::chat_line(&m.target, &line)),
         };
         let input = Input {
             agent: Some(d.recipient_id.clone()),
@@ -163,21 +212,30 @@ impl Orchestrator {
             picked: meta.picked.clone(),
             messages: vec![c.row.id.clone()],
             port: meta.response_port.clone(),
+            cron_id: None,
         };
         let heard = intake.hear_async(input).await;
         if heard {
-            if let Some(id) = settle_id {
-                let _ = sessions.settle_mailbox(id, true, Some(&d.recipient_id), self.ctx.now()).await;
+            if let Some(id) = settle_id
+                && let Err(err) = sessions.settle_mailbox(id, true, Some(&d.recipient_id), self.ctx.now()).await
+            {
+                tracing::warn!(mailbox_id = id, recipient = %d.recipient_id, error = %err, "orchestrator.chat settle_mailbox failed");
             }
-            let _ = chat.settle_delivery_async(d.id, true).await;
+            if let Err(err) = chat.settle_delivery_async(d.id, true).await {
+                tracing::warn!(delivery_id = d.id, recipient = %d.recipient_id, error = %err.message, "orchestrator.chat settle_delivery failed");
+            }
             if let Err(e) = chat.react_async(&c.row.id, &d.recipient_id, HANDED_EMOJI, true).await {
-                eprintln!("vibevalley-server: orchestrator: 👀: {}", e.message);
+                tracing::warn!(message_id = %c.row.id, recipient = %d.recipient_id, error = %e.message, "orchestrator.chat react 👀 failed");
             }
         } else if !self.closed.load(Ordering::Acquire) {
-            if let Some(id) = settle_id {
-                let _ = sessions.settle_mailbox(id, false, Some("rejected"), self.ctx.now()).await;
+            if let Some(id) = settle_id
+                && let Err(err) = sessions.settle_mailbox(id, false, Some("rejected"), self.ctx.now()).await
+            {
+                tracing::warn!(mailbox_id = id, recipient = %d.recipient_id, error = %err, "orchestrator.chat settle_mailbox failed");
             }
-            let _ = chat.settle_delivery_async(d.id, false).await;
+            if let Err(err) = chat.settle_delivery_async(d.id, false).await {
+                tracing::warn!(delivery_id = d.id, recipient = %d.recipient_id, error = %err.message, "orchestrator.chat settle_delivery failed");
+            }
         }
     }
 }

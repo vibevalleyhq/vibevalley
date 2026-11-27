@@ -5,6 +5,7 @@
     "everos": "EverOS"
   },
   "empty": "要记的话是空的",
+  "invalidScope": "不支持的记忆范围：{scope}",
   "dbFailed": "没记下来：数据库写不进去",
   "noMemory": "{agent} 的记忆里没有 {id}",
   "forget": "从 {agent} 的记忆里忘掉：「{text}」"

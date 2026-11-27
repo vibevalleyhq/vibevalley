@@ -1,7 +1,7 @@
 //! `repo list|create|mount|unmount` and `repo pr submit`.
 
 use clap::{Args, Subcommand};
-use vibevalley_protocol::{MountRepo, NewRepo, RepoSummary, RepoUnmountInput, SubmitBranch, ops};
+use vibevalley_protocol::{MountRepo, NewRepo, RepoHealthStatus, RepoSummary, RepoUnmountInput, SubmitBranch, ops};
 
 use crate::client::{Client, Done};
 use crate::output::line;
@@ -84,12 +84,22 @@ pub enum RepoPrAction {
     },
 }
 
+fn health_status_str(status: RepoHealthStatus) -> &'static str {
+    match status {
+        RepoHealthStatus::OnTrack => "on_track",
+        RepoHealthStatus::AtRisk => "at_risk",
+        RepoHealthStatus::OffTrack => "off_track",
+    }
+}
+
 fn repo_line(repo: &RepoSummary) -> String {
+    let health = repo.health.as_ref().map(|h| health_status_str(h.status)).unwrap_or("");
     line(&[
         &repo.name,
         &repo.path,
         if repo.git { "git" } else { "" },
         if repo.pull_request.available { "pr" } else { "" },
+        health,
     ])
 }
 

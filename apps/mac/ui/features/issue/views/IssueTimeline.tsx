@@ -1,8 +1,7 @@
-import { cleanup, computed, Scroll, signal, Text, View, type ScrollRef } from "nsh";
-import { Popover } from "nsh/base";
+import { cleanup, computed, PanResponder, Scroll, signal, Text, untracked, View, type ScrollRef } from "nsh";
 
 import { t } from "@vibevalley/i18n";
-import type { Issue } from "@vibevalley/protocol";
+import type { BoardSummary, Issue } from "@vibevalley/protocol";
 
 import { Button } from "../../../design/Button";
 import { Icon } from "../../../design/Icon";
@@ -14,12 +13,13 @@ import { Bubble } from "../../../design/Tip";
 import { mix, tone } from "../../../design/tone";
 import { useNow } from "../../../infra/base/dom";
 import type { BoardCard, Tone } from "../model/cards";
-import { formatIsoDate } from "../model/meta";
+import { blockerIssuesOf, formatIsoDate } from "../model/meta";
 import {
   addUtcDays,
   buildScheduleForCards,
+  computeTimelineDrag,
   type ScheduledCardRow,
-  shiftIssueDates,
+  type TimelineDragMode,
   type TimelineScale,
   timelineScales,
   timelineScaleSpec,
@@ -27,13 +27,15 @@ import {
   utcDayStart,
 } from "../model/schedule";
 import { EmptyNote } from "./Board";
-import { DatePropertyEditor } from "./IssueMetaControls";
+import { BlockedByChips } from "./IssueMetaControls";
 import { PriorityMark, StatusMark } from "./Marks";
 import type { NewIssueAt } from "./NewIssue";
 
 const ROW_HEIGHT = 38;
 const HEADER_HEIGHT = 42;
 const LEFT_COL_WIDTH = 272;
+const MONTH_LABEL_RESERVE = 104;
+const DRAG_ACTIVATION_PX = 4;
 
 const weekdayKeys = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
 
@@ -87,11 +89,14 @@ function barBorderColor(tName: Tone, selected: boolean): string {
   }
 }
 
+function formatDateSpan(startMs: number, endMs: number): string {
+  const start = formatIsoDate(startMs);
+  const end = formatIsoDate(endMs);
+  return start === end ? start : `${start} -> ${end}`;
+}
+
 function barTooltipText(row: ScheduledCardRow): string {
-  const start = formatIsoDate(row.span.startMs);
-  const end = formatIsoDate(row.span.endMs);
-  const range = start === end ? start : `${start} → ${end}`;
-  const parts = [`#${row.issue.number} ${row.issue.title}`, `${t(`shared.status.${row.issue.status}`)} · ${range}`];
+  const parts = [`#${row.issue.number} ${row.issue.title}`, `${t(`shared.status.${row.issue.status}`)} · ${formatDateSpan(row.span.startMs, row.span.endMs)}`];
   if (row.span.overdue) parts.push(t("web.issue.timeline.overdue"));
   if (row.span.rolledUp) parts.push(t("web.issue.timeline.rolledUp"));
   return parts.join("\n");
@@ -118,14 +123,23 @@ export function createFrameQueue() {
   return { schedule, cancelAll };
 }
 
-/** Interactive Gantt / Timeline view with zoom scales, parent-child rollup, today marker, and inline date shifts. */
+interface ActiveDragState {
+  readonly issueId: string;
+  readonly mode: TimelineDragMode;
+  readonly deltaDays: number;
+}
+
+/** Interactive Gantt / Timeline view with zoom scales, parent-child rollup, today marker, sticky month labels, and direct drag/resize bars. */
 export function IssueTimeline(props: {
   cards: BoardCard[];
   allIssues: readonly Issue[];
+  summary?: BoardSummary | undefined;
   filtered?: boolean | undefined;
   loading: boolean;
   selected?: string | undefined;
+  selectedIds?: ReadonlySet<string> | undefined;
   onOpen: (id: string) => void;
+  onToggleSelect?: ((id: string, opts: { range: boolean }) => void) | undefined;
   onUpdateDates: (id: string, dates: { startAt?: number; dueAt?: number }) => Promise<void> | void;
   onNew: (at: NewIssueAt) => void;
   onClearFilter?: (() => void) | undefined;
@@ -133,12 +147,14 @@ export function IssueTimeline(props: {
   const scale = signal<TimelineScale>("month");
   const showUnscheduled = signal(false);
   const gridViewportWidth = signal(0);
+  const scrollX = signal(0);
+  const activeDrag = signal<ActiveDragState | undefined>(undefined);
   const now = useNow(60_000);
   let timelineScroll: ScrollRef | undefined;
   let disposed = false;
   const frames = createFrameQueue();
 
-  const timeline = computed(() => buildScheduleForCards(props.cards, props.allIssues, scale(), now()));
+  const timeline = computed(() => buildScheduleForCards(props.cards, props.allIssues, scale(), now(), props.summary));
   const dayWidth = computed(() => timelineScaleSpec[scale()].dayWidth);
   const totalGridWidth = computed(() => timeline().totalDays * dayWidth());
   const todayIndex = computed(() => utcDayDiff(timeline().rangeStartMs, timeline().todayDayMs));
@@ -148,7 +164,9 @@ export function IssueTimeline(props: {
     if (disposed || !timelineScroll) return;
     const w = gridViewportWidth();
     const vw = w > 0 ? w : 720;
-    const x = Math.max(0, todayX() - Math.round(vw * 0.32));
+    const maxScroll = Math.max(0, totalGridWidth() - vw);
+    const x = Math.min(maxScroll, Math.max(0, todayX() - Math.round(vw * 0.32)));
+    scrollX.set(x);
     timelineScroll.scrollTo({ x, animated });
   };
 
@@ -246,14 +264,21 @@ export function IssueTimeline(props: {
                     </View>
                     <Each of={timeline().rows} key={(r) => r.card.id}>
                       {(r) => {
-                        const selected = () => props.selected === r().card.id;
+                        const selected = () => props.selected === r().card.id || props.selectedIds?.has(r().card.id) === true;
+                        const blockers = computed(() => blockerIssuesOf(r().issue, props.allIssues));
                         return (
                           <View
                             role="button"
                             testID="timeline-row"
                             accessibilityLabel={`#${r().issue.number} ${r().issue.title}`}
                             accessibilityState={{ selected: selected() }}
-                            onPress={() => props.onOpen(r().card.id)}
+                            onPress={(e) => {
+                              if (e.modifiers.shift && props.onToggleSelect) {
+                                props.onToggleSelect(r().card.id, { range: true });
+                                return;
+                              }
+                              props.onOpen(r().card.id);
+                            }}
                             class={`flex-row items-center gap-1.5 border-b pr-2.5 ${selected() ? "bg-selected" : "hover:bg-hover"}`}
                             style={{
                               height: ROW_HEIGHT,
@@ -267,6 +292,7 @@ export function IssueTimeline(props: {
                             <StatusMark status={r().issue.status} size={13} />
                             <Text class="shrink-0 font-mono text-2xs text-faint tabular-nums">{`#${r().issue.number}`}</Text>
                             <Text class="min-w-0 flex-1 truncate text-xs font-medium text-ink">{r().issue.title}</Text>
+                            <BlockedByChips blockers={blockers()} max={1} compact onOpen={props.onOpen} testid="timeline-blocked-by" />
                             <If when={r().span.overdue}>
                               <View class="size-1.5 shrink-0 rounded-full bg-berry" />
                             </If>
@@ -282,7 +308,9 @@ export function IssueTimeline(props: {
                   {/* Horizontally scrollable time header + Gantt bars */}
                   <Scroll
                     horizontal
+                    testID="timeline-grid-scroll"
                     class="min-w-0 flex-1"
+                    onScroll={(e) => scrollX.set(Math.max(0, e.offset.x))}
                     onLayout={(e) => {
                       const w = e.bounds.size.width;
                       if (w > 0 && gridViewportWidth() === 0) {
@@ -299,23 +327,34 @@ export function IssueTimeline(props: {
                     <View class="relative" style={{ width: totalGridWidth() }}>
                       {/* Time axis header */}
                       <View class="border-b border-line bg-side" style={{ height: HEADER_HEIGHT, width: totalGridWidth() }}>
-                        {/* Top month band */}
+                        {/* Top month band with sticky-clamped labels */}
                         <View class="relative h-5 flex-row items-center border-b" style={{ borderColor: mix("line", 0.5) }}>
                           <Each of={timeline().months} key={(m) => m.key}>
-                            {(m) => (
-                              <View
-                                class="absolute top-0 bottom-0 flex-row items-center border-r px-2"
-                                style={{
-                                  left: m().startIndex * dayWidth(),
-                                  width: m().spanDays * dayWidth(),
-                                  borderColor: mix("line", 0.65),
-                                }}
-                              >
-                                <Text class="truncate text-2xs font-semibold text-muted tabular-nums">
-                                  {t("web.issue.calendar.monthTitle", { year: m().year, month: m().month })}
-                                </Text>
-                              </View>
-                            )}
+                            {(m) => {
+                              const bandLeft = () => m().startIndex * dayWidth();
+                              const bandWidth = () => m().spanDays * dayWidth();
+                              const stickyOffset = () => {
+                                const w = bandWidth();
+                                const reserve = Math.min(w, MONTH_LABEL_RESERVE);
+                                return Math.max(0, Math.min(scrollX() - bandLeft(), w - reserve));
+                              };
+                              return (
+                                <View
+                                  class="absolute top-0 bottom-0 flex-row items-center overflow-hidden border-r"
+                                  style={{
+                                    left: bandLeft(),
+                                    width: bandWidth(),
+                                    borderColor: mix("line", 0.65),
+                                  }}
+                                >
+                                  <View class="h-full flex-row items-center px-2" style={{ marginLeft: stickyOffset() }}>
+                                    <Text testID="timeline-month-label" class="truncate text-2xs font-semibold text-muted tabular-nums">
+                                      {t("web.issue.calendar.monthTitle", { year: m().year, month: m().month })}
+                                    </Text>
+                                  </View>
+                                </View>
+                              );
+                            }}
                           </Each>
                         </View>
                         {/* Bottom day / week ticks */}
@@ -387,16 +426,80 @@ export function IssueTimeline(props: {
                         {/* Schedule rows */}
                         <Each of={timeline().rows} key={(r) => r.card.id}>
                           {(r, rowIdx) => {
-                            const barStartIdx = () => utcDayDiff(timeline().rangeStartMs, r().span.startMs);
+                            let suppressNextPress = false;
+                            let dragOrigin: ScheduledCardRow | undefined;
+                            const beginDrag = (mode: TimelineDragMode) => {
+                              suppressNextPress = true;
+                              dragOrigin = untracked(r);
+                              activeDrag.set({ issueId: dragOrigin.issue.id, mode, deltaDays: 0 });
+                            };
+                            const updateDrag = (mode: TimelineDragMode, dx: number) => {
+                              if (!dragOrigin) return;
+                              const deltaDays = Math.round(dx / untracked(dayWidth));
+                              const current = untracked(activeDrag);
+                              if (current?.issueId === dragOrigin.issue.id && current.mode === mode && current.deltaDays === deltaDays) return;
+                              activeDrag.set({ issueId: dragOrigin.issue.id, mode, deltaDays });
+                            };
+                            const endDrag = (mode: TimelineDragMode, dx: number, commit: boolean) => {
+                              const origin = dragOrigin;
+                              dragOrigin = undefined;
+                              frames.schedule(() => {
+                                suppressNextPress = false;
+                              });
+                              activeDrag.set(undefined);
+                              if (!commit || !origin) return;
+                              const deltaDays = Math.round(dx / untracked(dayWidth));
+                              const next = computeTimelineDrag(origin.issue, origin.span, mode, deltaDays);
+                              if (next.startMs !== origin.span.startMs || next.endMs !== origin.span.endMs) {
+                                void props.onUpdateDates(origin.issue.id, next.dates);
+                              }
+                            };
+
+                            const bodyPan = PanResponder.create({
+                              onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dx) >= DRAG_ACTIVATION_PX,
+                              onPanResponderTerminationRequest: () => false,
+                              onPanResponderGrant: () => beginDrag("move"),
+                              onPanResponderMove: (_e, g) => updateDrag("move", g.dx),
+                              onPanResponderRelease: (_e, g) => endDrag("move", g.dx, true),
+                              onPanResponderTerminate: (_e, g) => endDrag("move", g.dx, false),
+                            });
+
+                            const makeResizePan = (mode: "resize-start" | "resize-end") =>
+                              PanResponder.create({
+                                onStartShouldSetPanResponder: () => true,
+                                onMoveShouldSetPanResponder: () => true,
+                                onPanResponderTerminationRequest: () => false,
+                                onPanResponderGrant: () => beginDrag(mode),
+                                onPanResponderMove: (_e, g) => updateDrag(mode, g.dx),
+                                onPanResponderRelease: (_e, g) => endDrag(mode, g.dx, true),
+                                onPanResponderTerminate: (_e, g) => endDrag(mode, g.dx, false),
+                              });
+
+                            const startResizePan = makeResizePan("resize-start");
+                            const endResizePan = makeResizePan("resize-end");
+
+                            const draggingThis = () => {
+                              const d = activeDrag();
+                              return d !== undefined && d.issueId === r().issue.id ? d : undefined;
+                            };
+                            const preview = computed(() => {
+                              const d = draggingThis();
+                              return d ? computeTimelineDrag(r().issue, r().span, d.mode, d.deltaDays) : undefined;
+                            });
+                            const shownStartMs = () => preview()?.startMs ?? r().span.startMs;
+                            const shownDurationDays = () => preview()?.durationDays ?? r().span.durationDays;
+                            const barStartIdx = () => utcDayDiff(timeline().rangeStartMs, shownStartMs());
                             const barLeft = () => barStartIdx() * dayWidth() + 2;
-                            const barWidth = () => Math.max(Math.max(18, dayWidth() - 4), r().span.durationDays * dayWidth() - 4);
+                            const barWidth = () => Math.max(Math.max(18, dayWidth() - 4), shownDurationDays() * dayWidth() - 4);
                             const barTone = () => barToneOf(r());
-                            const selected = () => props.selected === r().card.id;
-                            const showBarLabel = () => barWidth() >= 92;
+                            const selected = () => props.selected === r().card.id || preview() !== undefined;
+                            const showCompactNumber = () => barWidth() >= 36;
+                            const showFullTitle = () => barWidth() >= 92;
+
                             return (
                               <View
                                 testID={`timeline-lane-${r().issue.id}`}
-                                class="group absolute right-0 left-0 flex-row items-center border-b"
+                                class="absolute right-0 left-0 flex-row items-center border-b"
                                 style={{
                                   top: rowIdx() * ROW_HEIGHT,
                                   height: ROW_HEIGHT,
@@ -404,14 +507,21 @@ export function IssueTimeline(props: {
                                 }}
                               >
                                 <View
+                                  {...bodyPan.panHandlers}
                                   role="button"
                                   testID="timeline-bar"
                                   accessibilityLabel={`#${r().issue.number} ${r().issue.title}`}
                                   tooltip={<Bubble text={barTooltipText(r())} />}
-                                  onPress={() => props.onOpen(r().card.id)}
-                                  class={`absolute flex-row items-center gap-1.5 rounded-md border px-2 ${
+                                  onPress={() => {
+                                    if (suppressNextPress || untracked(activeDrag) !== undefined) {
+                                      suppressNextPress = false;
+                                      return;
+                                    }
+                                    props.onOpen(r().card.id);
+                                  }}
+                                  class={`group absolute flex-row items-center rounded-md border ${showFullTitle() ? "gap-1.5 px-2" : "px-1.5"} ${
                                     r().span.rolledUp && !r().span.hasExplicitStart && !r().span.hasExplicitDue ? "border-dashed" : ""
-                                  } ${motionClass("transition-transform duration-120 ease-out")} active:translate-y-px focus-visible:outline-2 focus-visible:outline-focus`}
+                                  } ${motionClass("transition-transform duration-120 ease-out")} focus-visible:outline-2 focus-visible:outline-focus`}
                                   style={{
                                     left: barLeft(),
                                     width: barWidth(),
@@ -420,57 +530,49 @@ export function IssueTimeline(props: {
                                     borderColor: barBorderColor(barTone(), selected()),
                                   }}
                                 >
-                                  <If when={showBarLabel()}>
+                                  <View
+                                    {...startResizePan.panHandlers}
+                                    testID="timeline-resize-start"
+                                    class="absolute top-0 bottom-0 left-0 z-10 w-1.5 cursor-col-resize items-center justify-center rounded-l-md"
+                                  >
+                                    <View
+                                      class={`h-3 w-0.5 rounded-full ${
+                                        draggingThis()?.mode === "resize-start" ? "bg-accent" : "bg-transparent group-hover:bg-line-strong"
+                                      }`}
+                                    />
+                                  </View>
+
+                                  <If when={showCompactNumber()}>
                                     <Text class="shrink-0 font-mono text-2xs font-medium text-ink tabular-nums">{`#${r().issue.number}`}</Text>
-                                    <Text class="min-w-0 flex-1 truncate text-2xs font-medium text-ink">{r().issue.title}</Text>
+                                    <If when={showFullTitle()}>
+                                      <Text class="min-w-0 flex-1 truncate text-2xs font-medium text-ink">{r().issue.title}</Text>
+                                    </If>
                                   </If>
+
+                                  <View
+                                    {...endResizePan.panHandlers}
+                                    testID="timeline-resize-end"
+                                    class="absolute top-0 right-0 bottom-0 z-10 w-1.5 cursor-col-resize items-center justify-center rounded-r-md"
+                                  >
+                                    <View
+                                      class={`h-3 w-0.5 rounded-full ${
+                                        draggingThis()?.mode === "resize-end" ? "bg-accent" : "bg-transparent group-hover:bg-line-strong"
+                                      }`}
+                                    />
+                                  </View>
                                 </View>
 
-                                {/* Quick inline shift (-1d / +1d) and date editor */}
-                                <View
-                                  class="absolute flex-row items-center gap-0.5 rounded-md border border-line bg-elevated px-0.5 py-0.5 opacity-70 shadow-raise group-hover:opacity-100 focus-within:opacity-100"
-                                  style={{ left: barLeft() + barWidth() + 6 }}
-                                >
-                                  <View
-                                    role="button"
-                                    testID="timeline-shift-prev"
-                                    accessibilityLabel={t("web.issue.timeline.shiftPrev")}
-                                    tooltip={<Bubble text={t("web.issue.timeline.shiftPrev")} />}
-                                    onPress={() => void props.onUpdateDates(r().issue.id, shiftIssueDates(r().issue, -1, r().span))}
-                                    class="size-5 items-center justify-center rounded-sm hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
-                                  >
-                                    <Icon name="previous" size={11} tone="muted" />
-                                  </View>
-                                  <View
-                                    role="button"
-                                    testID="timeline-shift-next"
-                                    accessibilityLabel={t("web.issue.timeline.shiftNext")}
-                                    tooltip={<Bubble text={t("web.issue.timeline.shiftNext")} />}
-                                    onPress={() => void props.onUpdateDates(r().issue.id, shiftIssueDates(r().issue, 1, r().span))}
-                                    class="size-5 items-center justify-center rounded-sm hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
-                                  >
-                                    <Icon name="next" size={11} tone="muted" />
-                                  </View>
-                                  <Popover
-                                    placement="bottom"
-                                    align="start"
-                                    offset={4}
-                                    popupClass="w-60 rounded-lg border border-line bg-elevated p-3 shadow-float"
-                                    trigger={
-                                      <View
-                                        role="button"
-                                        testID="timeline-edit-dates"
-                                        accessibilityLabel={t("web.issue.timeline.editDates")}
-                                        tooltip={<Bubble text={t("web.issue.timeline.editDates")} />}
-                                        class="size-5 items-center justify-center rounded-sm hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
-                                      >
-                                        <Icon name="calendar" size={11} tone="muted" />
-                                      </View>
-                                    }
-                                  >
-                                    <TimelineDateEditor issue={r().issue} onUpdate={(dates) => void props.onUpdateDates(r().issue.id, dates)} />
-                                  </Popover>
-                                </View>
+                                <If when={preview()}>
+                                  {(p) => (
+                                    <View
+                                      testID="timeline-drag-pill"
+                                      class="pointer-events-none absolute z-20 rounded-md border border-accent bg-elevated px-1.5 py-0.5 shadow-float"
+                                      style={{ left: barLeft() + barWidth() + 6 }}
+                                    >
+                                      <Text class="font-mono text-2xs font-medium text-ink tabular-nums">{formatDateSpan(p().startMs, p().endMs)}</Text>
+                                    </View>
+                                  )}
+                                </If>
                               </View>
                             );
                           }}
@@ -530,31 +632,5 @@ export function IssueTimeline(props: {
         </If>
       </View>
     </If>
-  );
-}
-
-function TimelineDateEditor(props: { issue: Issue; onUpdate: (dates: { startAt?: number; dueAt?: number }) => void }) {
-  return (
-    <View testID="timeline-date-popover" class="gap-2.5">
-      <Text class="truncate text-xs font-semibold text-ink">{`#${props.issue.number} ${props.issue.title}`}</Text>
-      <View class="gap-1">
-        <Text class="text-2xs font-medium text-muted">{t("web.issue.dates.startAt")}</Text>
-        <DatePropertyEditor
-          label={t("web.issue.dates.startAt")}
-          value={props.issue.startAt}
-          testid="timeline-popover-start-at"
-          onCommit={(startAt) => props.onUpdate({ startAt })}
-        />
-      </View>
-      <View class="gap-1">
-        <Text class="text-2xs font-medium text-muted">{t("web.issue.dates.dueAt")}</Text>
-        <DatePropertyEditor
-          label={t("web.issue.dates.dueAt")}
-          value={props.issue.dueAt}
-          testid="timeline-popover-due-at"
-          onCommit={(dueAt) => props.onUpdate({ dueAt })}
-        />
-      </View>
-    </View>
   );
 }

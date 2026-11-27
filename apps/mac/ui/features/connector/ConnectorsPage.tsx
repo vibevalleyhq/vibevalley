@@ -1,4 +1,4 @@
-import { Image, signal, Text, View, type JSX } from "nsh";
+import { Image, signal, Text, View, windowSize, type JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import { type ConnectorID, ConnectorIDValues, type ConnectorLogin, type ConnectorState, type ConnectorStatus } from "@vibevalley/protocol";
@@ -19,6 +19,7 @@ import { Keyed } from "../../infra/base/dom";
 import { momentText, wallClockText } from "../../infra/base/format";
 import { channelLabel, topsOf } from "../../infra/channelMeta";
 import { useCollabSlice } from "../../infra/frame";
+import { Link as A } from "../../infra/router";
 
 const connectorLabel: Record<ConnectorID, string> = {
   weixin: t("web.connector.connectors.label.weixin"),
@@ -98,8 +99,38 @@ function MarkStandIn(props: { id: ConnectorID; size: number }) {
   );
 }
 
+function ConnectorDetail(props: { selected: ConnectorID; list: readonly ConnectorStatus[] | undefined; status: ConnectorStatus }) {
+  return (
+    <View class="max-w-3xl gap-3">
+      <If
+        when={props.list}
+        else={
+          <Card title={connectorLabel[props.selected]}>
+            <Quiet>{t("web.base.form.asking")}</Quiet>
+          </Card>
+        }
+      >
+        <Keyed key={props.selected}>{() => <ConnectorCard id={props.selected} status={props.status} />}</Keyed>
+      </If>
+      <Card title={t("web.connector.connectors.know")}>
+        <View class="gap-2">
+          <Each of={[...connectorNotes[props.selected], connectorsAlways]}>
+            {(n) => (
+              <View class="flex-row items-start gap-2.5">
+                <View class="mt-2 size-1 shrink-0 rounded-full bg-faint" />
+                <Text class="min-w-0 flex-1 text-sm leading-relaxed text-ink">{n()}</Text>
+              </View>
+            )}
+          </Each>
+        </View>
+      </Card>
+    </View>
+  );
+}
+
 export function ConnectorsPage(props: { id?: string | undefined; basePath?: string | undefined }) {
   const collab = useCollabSlice();
+  const xl = () => windowSize().width >= 1280;
   const selected = () => ConnectorIDValues.find((c) => c === props.id) ?? "weixin";
   const list = () => collab()?.connectors;
   const of = (c: ConnectorID) => list()?.find((s) => s.id === c);
@@ -108,79 +139,112 @@ export function ConnectorsPage(props: { id?: string | undefined; basePath?: stri
     const state = of(c)?.state;
     return state && state !== "off" ? stateLabel[state] : connectorHow[c];
   };
+  const activeStatus = () => of(selected()) ?? { id: selected(), state: "off", pending: 0, error: "", qr: "", pairCode: "" };
   return (
-    <Split
-      edge
-      list={
-        <ListCard
-          bare
-          title={t("web.connector.connectors.section.label")}
-          label={t("web.connector.connectors.list")}
-          testid="connectors"
-          action={<CountPill count={`${connectedCount()}/${ConnectorIDValues.length}`} />}
-        >
-          <View class="px-2 pt-0.5 pb-2">
-            <Text class="text-xs leading-relaxed text-muted">{t("web.connector.connectors.intro")}</Text>
-          </View>
-          <Each of={ConnectorIDValues}>
-            {(c) => {
-              const st = () => of(c());
-              const state = () => st()?.state ?? "off";
-              const pending = () => Math.round(st()?.pending ?? 0);
-              return (
-                <ListRow
-                  to={`${props.basePath ?? "/settings/chat"}/${c()}`}
-                  item={c()}
-                  active={c() === selected()}
-                  title={connectorLabel[c()]}
-                  line={lineOf(c())}
-                  leading={<ConnectorMark id={c()} size={36} />}
-                  trailing={
-                    <View class="shrink-0 flex-row items-center gap-1.5">
-                      <If when={pending() > 0}>
-                        <View class="rounded-full bg-warn-soft px-1.5 py-px">
-                          <Text class="font-mono text-2xs font-medium text-warn-ink tabular-nums">{String(pending())}</Text>
-                        </View>
-                      </If>
-                      <View tooltip={<Bubble text={stateLabel[state()]} />} class="size-4 items-center justify-center">
+    <If
+      when={xl()}
+      else={
+        <View class="max-w-3xl gap-4">
+          <View accessibilityLabel={t("web.connector.connectors.list")} testID="connectors" class="gap-3 rounded-xl border border-line bg-side p-3">
+            <View class="flex-row items-center justify-between gap-2">
+              <View class="min-w-0 flex-1 gap-0.5">
+                <View class="flex-row items-center gap-2">
+                  <Text role="header" class="text-sm font-semibold text-ink">
+                    {t("web.connector.connectors.section.label")}
+                  </Text>
+                  <CountPill count={`${connectedCount()}/${ConnectorIDValues.length}`} />
+                </View>
+                <Text class="text-xs leading-relaxed text-muted">{t("web.connector.connectors.intro")}</Text>
+              </View>
+            </View>
+            <View class="flex-row flex-wrap gap-2">
+              <Each of={ConnectorIDValues}>
+                {(c) => {
+                  const st = () => of(c());
+                  const state = () => st()?.state ?? "off";
+                  const pending = () => Math.round(st()?.pending ?? 0);
+                  const active = () => c() === selected();
+                  return (
+                    <A
+                      href={`${props.basePath ?? "/settings/chat"}/${c()}`}
+                      testID={`list-row-${c()}`}
+                      accessibilityLabel={connectorLabel[c()]}
+                      accessibilityState={{ selected: active() }}
+                      class={`min-w-36 flex-1 flex-row items-center gap-2 rounded-lg border px-2.5 py-2 focus-visible:outline-2 focus-visible:outline-focus ${
+                        active() ? "border-line bg-selected" : "border-transparent bg-page hover:bg-hover"
+                      }`}
+                    >
+                      <ConnectorMark id={c()} size={24} />
+                      <View class="min-w-0 flex-1">
+                        <Text class="truncate text-sm font-medium text-ink">{connectorLabel[c()]}</Text>
+                        <Text class="truncate text-2xs text-muted">{stateLabel[state()]}</Text>
+                      </View>
+                      <View class="shrink-0 flex-row items-center gap-1">
+                        <If when={pending() > 0}>
+                          <View class="rounded-full bg-warn-soft px-1.5 py-px">
+                            <Text class="font-mono text-2xs font-medium text-warn-ink tabular-nums">{String(pending())}</Text>
+                          </View>
+                        </If>
                         <View class={`size-2 shrink-0 rounded-full ${stateDot[stateKind(state())]}`} />
                       </View>
-                    </View>
-                  }
-                />
-              );
-            }}
-          </Each>
-        </ListCard>
+                    </A>
+                  );
+                }}
+              </Each>
+            </View>
+          </View>
+          <ConnectorDetail selected={selected()} list={list()} status={activeStatus()} />
+        </View>
       }
     >
-      <View class="max-w-3xl gap-3">
-        <If
-          when={list()}
-          else={
-            <Card title={connectorLabel[selected()]}>
-              <Quiet>{t("web.base.form.asking")}</Quiet>
-            </Card>
-          }
-        >
-          <Keyed key={selected()}>
-            {() => <ConnectorCard id={selected()} status={of(selected()) ?? { id: selected(), state: "off", pending: 0, error: "", qr: "", pairCode: "" }} />}
-          </Keyed>
-        </If>
-        <Card title={t("web.connector.connectors.know")}>
-          <View class="gap-2">
-            <Each of={[...connectorNotes[selected()], connectorsAlways]}>
-              {(n) => (
-                <View class="flex-row items-start gap-2.5">
-                  <View class="mt-2 size-1 shrink-0 rounded-full bg-faint" />
-                  <Text class="min-w-0 flex-1 text-sm leading-relaxed text-ink">{n()}</Text>
-                </View>
-              )}
+      <Split
+        edge
+        list={
+          <ListCard
+            bare
+            title={t("web.connector.connectors.section.label")}
+            label={t("web.connector.connectors.list")}
+            testid="connectors"
+            action={<CountPill count={`${connectedCount()}/${ConnectorIDValues.length}`} />}
+          >
+            <View class="px-2 pt-0.5 pb-2">
+              <Text class="text-xs leading-relaxed text-muted">{t("web.connector.connectors.intro")}</Text>
+            </View>
+            <Each of={ConnectorIDValues}>
+              {(c) => {
+                const st = () => of(c());
+                const state = () => st()?.state ?? "off";
+                const pending = () => Math.round(st()?.pending ?? 0);
+                return (
+                  <ListRow
+                    to={`${props.basePath ?? "/settings/chat"}/${c()}`}
+                    item={c()}
+                    active={c() === selected()}
+                    title={connectorLabel[c()]}
+                    line={lineOf(c())}
+                    leading={<ConnectorMark id={c()} size={36} />}
+                    trailing={
+                      <View class="shrink-0 flex-row items-center gap-1.5">
+                        <If when={pending() > 0}>
+                          <View class="rounded-full bg-warn-soft px-1.5 py-px">
+                            <Text class="font-mono text-2xs font-medium text-warn-ink tabular-nums">{String(pending())}</Text>
+                          </View>
+                        </If>
+                        <View tooltip={<Bubble text={stateLabel[state()]} />} class="size-4 items-center justify-center">
+                          <View class={`size-2 shrink-0 rounded-full ${stateDot[stateKind(state())]}`} />
+                        </View>
+                      </View>
+                    }
+                  />
+                );
+              }}
             </Each>
-          </View>
-        </Card>
-      </View>
-    </Split>
+          </ListCard>
+        }
+      >
+        <ConnectorDetail selected={selected()} list={list()} status={activeStatus()} />
+      </Split>
+    </If>
   );
 }
 

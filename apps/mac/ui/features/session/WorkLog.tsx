@@ -1,7 +1,7 @@
 import { Clipboard, computed, Scroll, signal, Text, View, type JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";
-import type { SessionEvent } from "@vibevalley/protocol";
+import type { SessionEvent, SessionTrajectoryProjection } from "@vibevalley/protocol";
 
 import { Icon } from "../../design/Icon";
 import { actionIcon, type IconName } from "../../design/icons";
@@ -16,19 +16,18 @@ import { ago, tookText } from "../../infra/base/format";
 import { useTimeout } from "../../infra/base/timer";
 import { localizeRuntimeError } from "../../infra/runtimeError";
 import { createEffect } from "../../infra/solid";
-import { createRunEvents } from "./events";
+import { createSessionProjection } from "./events";
 import {
   answerOf,
   farmToolText,
   isLongText,
   lastTime,
+  projectTrajectory,
   readableInput,
   runLabel,
   runMs,
-  runsOf,
   runTitle,
   type RunView,
-  shownEvents,
   spanLabel,
   spansOf,
   spanTone,
@@ -52,9 +51,9 @@ function usageLineText(step: SessionEvent): string {
   });
 }
 
-function RunClockLog(props: { steps: SessionEvent[] }) {
+function RunClockLog(props: { steps: SessionEvent[]; trajectory?: SessionTrajectoryProjection | undefined }) {
   const now = useNow();
-  return <WorkLog steps={props.steps} now={now()} asked={t("web.session.log.heard")} class="mt-1.5" />;
+  return <WorkLog steps={props.steps} trajectory={props.trajectory} now={now()} asked={t("web.session.log.heard")} class="mt-1.5" />;
 }
 
 /** Under a report or the orchestrator's answer: the run behind it, folded to one line until opened. */
@@ -65,11 +64,24 @@ export function RunSteps(props: { session: string; run: string | undefined; orch
     () => open.set(false),
     { defer: true },
   );
-  const steps = createRunEvents(
+  const proj = createSessionProjection(
     () => props.session,
-    () => props.run,
     () => !!props.run,
   );
+  const steps = () => (props.run ? proj().steps.filter((s) => s.run === props.run) : []);
+  const runTrajectory = (): SessionTrajectoryProjection | undefined => {
+    const t0 = proj().trajectory;
+    if (!t0 || !props.run) return undefined;
+    const runs = t0.runs.filter((r) => r.run === props.run);
+    const shown = t0.shown.filter((s) => s.run === props.run);
+    const seqs = new Set(shown.map((s) => s.seq));
+    return {
+      ...t0,
+      shown,
+      runs,
+      stepMeta: t0.stepMeta.filter((m) => seqs.has(m.seq)),
+    };
+  };
   const label = () => (props.run ? runLabel(steps(), props.orchestrator ?? false) : undefined);
   return (
     <If when={label()}>
@@ -94,7 +106,7 @@ export function RunSteps(props: { session: string; run: string | undefined; orch
             <Text class="text-xs font-medium text-muted tabular-nums">{text()}</Text>
           </View>
           <If when={open()}>
-            <RunClockLog steps={steps()} />
+            <RunClockLog steps={steps()} trajectory={runTrajectory()} />
           </If>
         </View>
       )}
@@ -103,10 +115,20 @@ export function RunSteps(props: { session: string; run: string | undefined; orch
 }
 
 /** A session's steps by run, each run folded to its answer but the last. Its height stops at 22rem, or at `height`. */
-export function WorkLog(props: { steps: SessionEvent[]; now: number; asked?: string; working?: boolean; class?: string | undefined; height?: number }) {
-  const shown = computed(() => shownEvents(props.steps));
-  const runs = computed(() => runsOf(shown()));
-  const firstAsked = computed(() => shown().find((s) => s.type === "user/message" && s.under === undefined)?.seq);
+export function WorkLog(props: {
+  steps: SessionEvent[];
+  trajectory?: SessionTrajectoryProjection | undefined;
+  now: number;
+  asked?: string;
+  working?: boolean;
+  class?: string | undefined;
+  height?: number;
+}) {
+  const activeProj = () => props.trajectory ?? projectTrajectory(props.steps, props.now);
+  const shown = () => activeProj()?.shown ?? [];
+  const runs = () => activeProj()?.runs ?? [];
+  const firstAsked = () => shown().find((s) => s.type === "user/message" && s.under === undefined)?.seq;
+  const readableMap = () => new Map((activeProj()?.stepMeta ?? []).flatMap((m) => (m.readableInput !== undefined ? [[m.seq, m.readableInput] as const] : [])));
   return (
     <Scroll testID="work-log" class={props.class ?? ""} style={{ maxHeight: props.height ?? 352 }} accessibilityLabel={t("web.session.log.process")}>
       <Each of={runs()} key={(r) => r.run ?? (r.asked ?? r.steps[0])?.seq ?? -1}>
@@ -117,6 +139,7 @@ export function WorkLog(props: { steps: SessionEvent[]; now: number; asked?: str
             live={props.working === true && i() === runs().length - 1}
             now={props.now}
             label={runTitle(r(), firstAsked(), props.asked)}
+            readableInputOf={(seq) => readableMap().get(seq)}
           />
         )}
       </Each>
@@ -124,7 +147,14 @@ export function WorkLog(props: { steps: SessionEvent[]; now: number; asked?: str
   );
 }
 
-function RunFold(props: { run: RunView; last: boolean; live: boolean; now: number; label: string }) {
+function RunFold(props: {
+  run: RunView;
+  last: boolean;
+  live: boolean;
+  now: number;
+  label: string;
+  readableInputOf?: ((seq: number) => string | undefined) | undefined;
+}) {
   const toggled = signal<boolean>();
   const open = computed(() => toggled() ?? props.last);
   const end = () => (props.live ? props.now : (lastTime(props.run) ?? props.now));
@@ -196,7 +226,7 @@ function RunFold(props: { run: RunView; last: boolean; live: boolean; now: numbe
                     : undefined
               }
             >
-              <WorkLogStep step={s()} now={props.now} />
+              <WorkLogStep step={s()} now={props.now} readableInput={props.readableInputOf?.(s().seq)} />
             </View>
           );
         }}
@@ -290,7 +320,7 @@ function Line(props: { mark: IconName; step: SessionEvent; now: number; kind: Li
   );
 }
 
-export function WorkLogStep(props: { step: SessionEvent; now: number }) {
+export function WorkLogStep(props: { step: SessionEvent; now: number; readableInput?: string | undefined }) {
   const sub = () => props.step.under !== undefined;
   const type = () => props.step.type;
   // Not rows: a run's bounds (each step carries its run), a result is shown in its call (shownEvents).
@@ -317,7 +347,7 @@ export function WorkLogStep(props: { step: SessionEvent; now: number }) {
         </Box>
       </If>
       <If when={type() === "tool/call"}>
-        <ToolStep step={props.step} now={props.now} />
+        <ToolStep step={props.step} now={props.now} readableInput={props.readableInput} />
       </If>
       <If when={type() === "llm/retry"}>
         <Line mark="retry" step={props.step} now={props.now} kind="retry" />
@@ -350,7 +380,7 @@ function WorkLogCopyButton(props: { testID: string; copied: boolean; onCopy: () 
   );
 }
 
-function ToolStep(props: { step: SessionEvent; now: number }) {
+function ToolStep(props: { step: SessionEvent; now: number; readableInput?: string | undefined }) {
   const open = signal(false);
   const copiedSlot = signal<"input" | "output" | undefined>(undefined);
   const resetCopy = useTimeout();
@@ -374,7 +404,7 @@ function ToolStep(props: { step: SessionEvent; now: number }) {
   };
   const farm = computed(() => farmToolText(props.step.text));
   const kind = () => (farm() ? t("web.session.log.farm") : (props.step.actionText ?? ""));
-  const input = computed(() => readableInput(props.step));
+  const input = computed(() => props.readableInput ?? readableInput(props.step));
   const running = () => props.step.ok === undefined;
   const failed = () => props.step.ok === false;
   const state = () => (running() ? t("web.session.log.running") : props.step.ok === true ? t("web.session.log.ok") : t("web.session.log.failed"));

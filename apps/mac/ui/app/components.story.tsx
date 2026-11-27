@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
 import "@vibevalley/i18n/catalogs";
-import type { SessionEvent } from "@vibevalley/protocol";
+import type { SessionEvent, SessionTrajectoryProjection } from "@vibevalley/protocol";
 
 import { Button } from "../design/Button";
 import { Checkbox } from "../design/Checkbox";
@@ -116,6 +116,64 @@ const failedOnlySteps: SessionEvent[] = [
   { seq: 20, revision: 1, time: SCENARIO_NOW - 50_000, type: "run/start", run: "r-fail", text: "" },
   { seq: 21, revision: 1, time: SCENARIO_NOW - 45_000, type: "run/error", run: "r-fail", text: "模型钥匙未配置" },
 ];
+
+const emptyStoryTelemetry = { inputTokens: 0, cacheReadTokens: 0, outputTokens: 0, llmRetries: 0, runErrors: 0 };
+
+const liveOnlyTrajectory: SessionTrajectoryProjection = {
+  shown: [liveOnlySteps[1], liveOnlySteps[2]],
+  runs: [{ run: "r-live", asked: liveOnlySteps[1], steps: [liveOnlySteps[2]] }],
+  waterfall: { runs: [[SCENARIO_NOW - 9_000, SCENARIO_NOW - 8_000]], spans: [] },
+  summary: { runs: 1, steps: 2, modelMs: 0, toolMs: 0, input: 0, cacheRead: 0, output: 0 },
+  stepDurations: [
+    { seq: 11, durationMs: 1_000 },
+    { seq: 12, durationMs: 0 },
+  ],
+  stepMeta: [
+    { seq: 11, durationMs: 1_000, collapsedSummary: "运行单测" },
+    { seq: 12, durationMs: 0, readableInput: "vp test run" },
+  ],
+  telemetry: emptyStoryTelemetry,
+};
+
+const failedOnlyTrajectory: SessionTrajectoryProjection = {
+  shown: [failedOnlySteps[1]],
+  runs: [{ run: "r-fail", steps: [failedOnlySteps[1]] }],
+  waterfall: { runs: [], spans: [] },
+  summary: { runs: 1, steps: 1, modelMs: 0, toolMs: 0, input: 0, cacheRead: 0, output: 0 },
+  stepDurations: [],
+  stepMeta: [{ seq: 21, durationMs: 0 }],
+  telemetry: { ...emptyStoryTelemetry, runErrors: 1 },
+};
+
+const finishedAndLiveMerged3: SessionEvent = { ...finishedAndLiveSteps[2], output: "ok", ok: true };
+const finishedAndLiveTrajectory: SessionTrajectoryProjection = {
+  shown: [finishedAndLiveSteps[1], finishedAndLiveMerged3, finishedAndLiveSteps[4], finishedAndLiveSteps[7]],
+  runs: [
+    { run: "r1", asked: finishedAndLiveSteps[1], steps: [finishedAndLiveMerged3, finishedAndLiveSteps[4]] },
+    { run: "r2", steps: [finishedAndLiveSteps[7]] },
+  ],
+  waterfall: {
+    runs: [
+      [SCENARIO_NOW - 119_000, SCENARIO_NOW - 100_000],
+      [SCENARIO_NOW - 9_000, SCENARIO_NOW - 9_000],
+    ],
+    spans: [],
+  },
+  summary: { runs: 2, steps: 4, modelMs: 19_000, toolMs: 1_000, input: 0, cacheRead: 0, output: 0 },
+  stepDurations: [
+    { seq: 2, durationMs: 4_000 },
+    { seq: 3, durationMs: 1_000 },
+    { seq: 5, durationMs: 0 },
+    { seq: 8, durationMs: 0 },
+  ],
+  stepMeta: [
+    { seq: 2, durationMs: 4_000, collapsedSummary: "检查登录过期处理" },
+    { seq: 3, durationMs: 1_000, readableInput: "auth.ts" },
+    { seq: 5, durationMs: 0 },
+    { seq: 8, durationMs: 0, readableInput: "cargo test" },
+  ],
+  telemetry: emptyStoryTelemetry,
+};
 
 function ComponentBench() {
   const clicks = signal(0);
@@ -318,16 +376,16 @@ function ComponentBench() {
           </Button>
         </View>
         <View testID="domain-worklog-live">
-          <WorkLog steps={liveOnlySteps} now={now()} working asked={t("web.session.log.heard")} />
+          <WorkLog steps={liveOnlySteps} trajectory={liveOnlyTrajectory} now={now()} working asked={t("web.session.log.heard")} />
         </View>
         <View testID="domain-worklog-failed">
-          <WorkLog steps={failedOnlySteps} now={SCENARIO_NOW} />
+          <WorkLog steps={failedOnlySteps} trajectory={failedOnlyTrajectory} now={SCENARIO_NOW} />
         </View>
         <View testID="domain-worklog-empty">
           <WorkLog steps={[]} now={SCENARIO_NOW} />
         </View>
         <View testID="domain-trajectory">
-          <Trajectory steps={finishedAndLiveSteps} now={SCENARIO_NOW} working />
+          <Trajectory steps={finishedAndLiveSteps} trajectory={finishedAndLiveTrajectory} now={SCENARIO_NOW} working />
         </View>
         {subagentData ? <SubagentProgress session="w1" progress={subagentData} now={SCENARIO_NOW} /> : null}
       </View>

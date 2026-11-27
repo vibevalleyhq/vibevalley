@@ -10,7 +10,7 @@ import { Bubble } from "../../design/Tip";
 import { mix } from "../../design/tone";
 import { ago } from "../../infra/base/format";
 import { createMemo } from "../../infra/solid";
-import { createSessionEvents } from "./events";
+import { createSessionProjection } from "./events";
 import { shownEvents } from "./runs";
 import { describeSubagents, type SubagentSummary } from "./subagents";
 import { WorkLogStep } from "./WorkLog";
@@ -196,11 +196,14 @@ export function SubagentProgress(props: { session: string; progress: SubagentSum
 }
 
 function ThreadLog(props: { session: string; run: string; thread: string; now: number }) {
-  const steps = createSessionEvents(
+  const proj = createSessionProjection(
     () => props.session,
     () => true,
   );
-  const log = createMemo(() => shownEvents(steps().filter((step) => step.run === props.run && step.threadId === props.thread)));
+  const log = createMemo(() => {
+    const shown = proj().trajectory?.shown ?? shownEvents(proj().steps);
+    return shown.filter((step) => step.run === props.run && step.threadId === props.thread);
+  });
   return (
     <View testID="subagent-log">
       <If when={log().length > 0} else={<Text class="text-xs text-faint">{t("web.session.subagents.noLog")}</Text>}>

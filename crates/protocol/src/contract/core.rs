@@ -127,6 +127,9 @@ pub struct BoardSlice {
     pub issues: Vec<Issue>,
     pub board_summary: Option<BoardSummary>,
     pub commits: Option<CommitCount>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "Option<Vec<RepoHealth>>", optional))]
+    pub repo_health: Vec<RepoHealth>,
 }
 
 #[skip_serializing_none]
@@ -341,6 +344,137 @@ pub struct ArtifactSuggestionFollowPayload {
     pub id: String,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+pub enum RetroWindow {
+    #[serde(rename = "7d")]
+    Days7,
+    #[serde(rename = "14d")]
+    Days14,
+    #[serde(rename = "30d")]
+    Days30,
+    #[serde(rename = "all")]
+    All,
+}
+
+impl RetroWindow {
+    pub const ALL: [RetroWindow; 4] = [RetroWindow::Days7, RetroWindow::Days14, RetroWindow::Days30, RetroWindow::All];
+
+    /// The string on the wire.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            RetroWindow::Days7 => "7d",
+            RetroWindow::Days14 => "14d",
+            RetroWindow::Days30 => "30d",
+            RetroWindow::All => "all",
+        }
+    }
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct IssueRetroGetInput {
+    pub window: Option<RetroWindow>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct RetroDurationStats {
+    pub sample_count: i64,
+    pub median_ms: Option<i64>,
+    pub p90_ms: Option<i64>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct RetroOverdueItem {
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::IssueId"))]
+    pub id: IssueId,
+    pub number: i64,
+    pub title: String,
+    pub status: IssueStatus,
+    pub repo: Option<String>,
+    pub agent: Option<String>,
+    pub due_at: i64,
+    pub closed_at: Option<i64>,
+    pub overdue_ms: i64,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct RetroReworkItem {
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::IssueId"))]
+    pub id: IssueId,
+    pub number: i64,
+    pub title: String,
+    pub status: IssueStatus,
+    pub repo: Option<String>,
+    pub agent: Option<String>,
+    pub findings_count: i64,
+    pub unresolved_count: i64,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct RetroBreakdownBucket {
+    pub key: String,
+    pub total_count: i64,
+    pub completed_count: i64,
+    pub canceled_count: i64,
+    pub overdue_count: i64,
+    pub rework_count: i64,
+    pub median_cycle_ms: Option<i64>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct IssueRetroReport {
+    pub window: RetroWindow,
+    pub generated_at: i64,
+    pub window_start_at: Option<i64>,
+    pub total_issues: i64,
+    pub open_count: i64,
+    pub completed_count: i64,
+    pub canceled_count: i64,
+    pub completion_rate_pct: Option<crate::JsNumber>,
+    pub cycle_time: RetroDurationStats,
+    pub review_wait: RetroDurationStats,
+    pub with_due_count: i64,
+    pub without_due_count: i64,
+    pub on_time_count: i64,
+    pub overdue_count: i64,
+    pub upcoming_due_count: i64,
+    pub on_time_rate_pct: Option<crate::JsNumber>,
+    pub overdue_rate_pct: Option<crate::JsNumber>,
+    pub rework_issue_count: i64,
+    pub total_findings_count: i64,
+    pub unresolved_findings_count: i64,
+    pub rework_rate_pct: Option<crate::JsNumber>,
+    pub overdue_items: Vec<RetroOverdueItem>,
+    pub rework_items: Vec<RetroReworkItem>,
+    pub by_repo: Vec<RetroBreakdownBucket>,
+    pub by_tag: Vec<RetroBreakdownBucket>,
+    pub by_agent: Vec<RetroBreakdownBucket>,
+}
+
 #[cfg(feature = "ts-gen")]
 crate::typescript::module! {
     "core";
@@ -362,6 +496,13 @@ crate::typescript::module! {
     ChannelFollowPayload,
     ChannelReportsPayload,
     ArtifactFollowPayload,
-    ArtifactSuggestionFollowPayload];
+    ArtifactSuggestionFollowPayload,
+    RetroWindow,
+    IssueRetroGetInput,
+    RetroDurationStats,
+    RetroOverdueItem,
+    RetroReworkItem,
+    RetroBreakdownBucket,
+    IssueRetroReport];
     aliases: [];
 }

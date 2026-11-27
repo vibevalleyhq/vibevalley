@@ -10,6 +10,15 @@ export type AgentProblem = { field: string, level: AgentProblemLevel, text: stri
 export const PersonaModeValues = ["append", "replace", "prompt"] as const;
 export type PersonaMode = (typeof PersonaModeValues)[number];
 
+/**
+ * Capability groups controlling which built-in farm tools an agent profile can call.
+ */
+export const ToolsetValues = ["issue", "session", "channel", "repo", "cron", "resource", "memory", "media", "library", "artifact"] as const;
+/**
+ * Capability groups controlling which built-in farm tools an agent profile can call.
+ */
+export type Toolset = (typeof ToolsetValues)[number];
+
 export type MCPServerStdio = { "type": "stdio", name: string, command: string, args: Array<string>, env: { [key in string]: string }, };
 
 export type MCPServerHTTP = { "type": "http", name: string, url: string, headers: { [key in string]: string }, };
@@ -61,7 +70,11 @@ duty: string, enabled: boolean, runtime: string,
 /**
  * Target execution host id when pinned to a specific machine; omitted lets the control plane route.
  */
-machineId?: string, model: string, effort: string, persona: string, personaMode: PersonaMode, skills: Array<string>, mcpServers: Array<MCPServer>, disallowedTools: Array<string>, env: { [key in string]: string }, workdir: string, worktree: boolean, tags: Array<string>, look: Look,
+machineId?: string, model: string, effort: string, persona: string, personaMode: PersonaMode, skills: Array<string>, toolsets: Array<Toolset>, mcpServers: Array<MCPServer>, disallowedTools: Array<string>, env: { [key in string]: string }, workdir: string, worktree: boolean, tags: Array<string>, look: Look,
+/**
+ * Optional MOSS voice ID paired with serialized channel report playback.
+ */
+voice?: string,
 /**
  * The template it was installed from, at that template's version; none for one made by hand.
  */

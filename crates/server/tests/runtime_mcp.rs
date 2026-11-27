@@ -69,3 +69,130 @@ fn runtime_mcp_list_returns_all_four_oar_hosts_and_snippets() {
 
     started.close_blocking();
 }
+
+#[test]
+fn runtime_mcp_server_crud_and_probe_populate_inventory_for_hosts() {
+    struct HomeGuard(Option<std::ffi::OsString>);
+    impl Drop for HomeGuard {
+        fn drop(&mut self) {
+            unsafe {
+                match &self.0 {
+                    Some(prev) => std::env::set_var("HOME", prev),
+                    None => std::env::remove_var("HOME"),
+                }
+            }
+        }
+    }
+
+    let prev_home = std::env::var_os("HOME");
+    let _guard = HomeGuard(prev_home);
+    let fake_home = tempfile::tempdir().unwrap();
+    unsafe {
+        std::env::set_var("HOME", fake_home.path());
+    }
+
+    // Seed Antigravity (~/.gemini/config/mcp_config.json) before server boot.
+    let agy_cfg = fake_home.path().join(".gemini/config/mcp_config.json");
+    std::fs::create_dir_all(agy_cfg.parent().unwrap()).unwrap();
+    std::fs::write(
+        &agy_cfg,
+        r#"{
+  "mcpServers": {
+    "github": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-github"] },
+    "linear": { "serverUrl": "https://mcp.linear.app/mcp", "disabled": true }
+  }
+}"#,
+    )
+    .unwrap();
+
+    let dir = tempfile::tempdir().unwrap();
+    let started = app(dir.path());
+
+    // 1. runtime.mcpServer.list reads the real Antigravity config via OAR.
+    let listed = serde_json::to_value(started.router().call("runtime.mcpServer.list", json!({ "host": "antigravity" }))).unwrap();
+    assert_eq!(listed["bizCode"], 0, "{listed}");
+    let servers = listed["data"]["servers"].as_array().unwrap();
+    assert_eq!(servers.len(), 2);
+    assert_eq!(servers[0]["name"], "github");
+    assert_eq!(servers[0]["transport"], "stdio");
+    assert_eq!(servers[0]["enabled"], true);
+    assert_eq!(servers[1]["name"], "linear");
+    assert_eq!(servers[1]["transport"], "streamableHttp");
+    assert_eq!(servers[1]["url"], "https://mcp.linear.app/mcp");
+    assert_eq!(servers[1]["enabled"], false);
+
+    // 2. runtime.mcpServer.save adds a Codex server and preserves TOML formatting.
+    let saved = serde_json::to_value(started.router().call(
+        "runtime.mcpServer.save",
+        json!({
+            "host": "codex",
+            "name": "context7",
+            "transport": "stdio",
+            "command": "npx",
+            "args": ["-y", "@upstash/context7-mcp"],
+            "env": { "API_KEY": "secret" },
+            "headers": {},
+            "enabled": true
+        }),
+    ))
+    .unwrap();
+    assert_eq!(saved["bizCode"], 0, "{saved}");
+    assert_eq!(saved["data"]["servers"].as_array().unwrap().len(), 1);
+    assert_eq!(saved["data"]["servers"][0]["name"], "context7");
+
+    // 3. runtime.mcpServer.toggle disables and re-enables the server in place.
+    let toggled = serde_json::to_value(
+        started
+            .router()
+            .call("runtime.mcpServer.toggle", json!({ "host": "codex", "name": "context7", "enabled": false })),
+    )
+    .unwrap();
+    assert_eq!(toggled["bizCode"], 0, "{toggled}");
+    assert_eq!(toggled["data"]["servers"][0]["enabled"], false);
+
+    // 4. Remote caller can list, but cannot save, toggle, or remove.
+    let remote_list = serde_json::to_value(started.router().call_as(Caller::Remote, "runtime.mcpServer.list", json!({ "host": "codex" }))).unwrap();
+    assert_eq!(remote_list["bizCode"], 0);
+    let remote_save = serde_json::to_value(started.router().call_as(
+        Caller::Remote,
+        "runtime.mcpServer.save",
+        json!({
+            "host": "codex",
+            "name": "x",
+            "transport": "stdio",
+            "command": "npx",
+            "args": [],
+            "env": {},
+            "headers": {},
+            "enabled": true
+        }),
+    ))
+    .unwrap();
+    assert_eq!(remote_save["bizCode"], 200002);
+    let remote_toggle = serde_json::to_value(started.router().call_as(
+        Caller::Remote,
+        "runtime.mcpServer.toggle",
+        json!({ "host": "codex", "name": "context7", "enabled": true }),
+    ))
+    .unwrap();
+    assert_eq!(remote_toggle["bizCode"], 200002);
+    let remote_remove = serde_json::to_value(started.router().call_as(
+        Caller::Remote,
+        "runtime.mcpServer.remove",
+        json!({ "host": "codex", "name": "context7" }),
+    ))
+    .unwrap();
+    assert_eq!(remote_remove["bizCode"], 200002);
+
+    // 5. runtime.mcpServer.remove deletes the server cleanly.
+    let removed = serde_json::to_value(
+        started
+            .router()
+            .call("runtime.mcpServer.remove", json!({ "host": "codex", "name": "context7" })),
+    )
+    .unwrap();
+    assert_eq!(removed["bizCode"], 0, "{removed}");
+    assert!(removed["data"]["servers"].as_array().unwrap().is_empty());
+
+    started.close_blocking();
+}

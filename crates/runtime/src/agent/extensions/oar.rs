@@ -1,6 +1,8 @@
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+
+use parking_lot::Mutex;
 
 use crate::oar::{
     Capabilities, ContentBlock, EventKind, Installation, PermissionDecision, PermissionMode, Registry, Session, SessionOptions, StopReason, ToolAction,
@@ -71,7 +73,7 @@ struct OarInner {
 
 impl OarInner {
     async fn prune_terminal_active(&self) {
-        let entries: Vec<(String, Store)> = self.active.lock().unwrap().iter().map(|(id, rec)| (id.clone(), rec.store.clone())).collect();
+        let entries: Vec<(String, Store)> = self.active.lock().iter().map(|(id, rec)| (id.clone(), rec.store.clone())).collect();
         if entries.is_empty() {
             return;
         }
@@ -92,7 +94,7 @@ impl OarInner {
         }
         let mut removed = Vec::with_capacity(stale_ids.len());
         {
-            let mut guard = self.active.lock().unwrap();
+            let mut guard = self.active.lock();
             for id in stale_ids {
                 if let Some(rec) = guard.remove(&id) {
                     removed.push(rec.entry);
@@ -132,7 +134,7 @@ impl OarExtension {
 
     pub async fn active_sessions(&self) -> Vec<ActiveOarSession> {
         self.inner.prune_terminal_active().await;
-        self.inner.active.lock().unwrap().values().map(|r| r.entry.clone()).collect()
+        self.inner.active.lock().values().map(|r| r.entry.clone()).collect()
     }
 }
 
@@ -206,7 +208,6 @@ impl TypedTool for OarList {
                 .inner
                 .active
                 .lock()
-                .unwrap()
                 .values()
                 .map(|r| &r.entry)
                 .map(|s| OarActiveSummary {
@@ -432,7 +433,7 @@ impl Extension for OarExtension {
     fn on_task_aborted(&self, task_ids: &[String]) {
         let mut removed = Vec::new();
         {
-            let mut guard = self.inner.active.lock().unwrap();
+            let mut guard = self.inner.active.lock();
             for id in task_ids {
                 if let Some(rec) = guard.remove(id) {
                     removed.push(rec.entry);
@@ -578,7 +579,7 @@ impl OarExtension {
 
         self.inner.prune_terminal_active().await;
         {
-            let active = self.inner.active.lock().unwrap();
+            let active = self.inner.active.lock();
             if active.len() >= self.inner.policy.max_concurrent {
                 return Err(format!("max concurrent OAR sessions ({}) reached", self.inner.policy.max_concurrent));
             }
@@ -625,7 +626,7 @@ impl OarExtension {
 
         self.inner.prune_terminal_active().await;
         {
-            let active = self.inner.active.lock().unwrap();
+            let active = self.inner.active.lock();
             if active.len() >= self.inner.policy.max_concurrent {
                 return Err(Error::Invalid(format!(
                     "max concurrent OAR sessions ({}) reached",
@@ -680,7 +681,7 @@ impl OarExtension {
             return Ok(Transition::Fail("aborted".into()));
         }
 
-        self.inner.active.lock().unwrap().insert(
+        self.inner.active.lock().insert(
             tc.task.id.clone(),
             ActiveRecord {
                 store: engine.store().clone(),
@@ -728,7 +729,7 @@ impl OarExtension {
 
     async fn phase_run(&self, tc: &TaskContext, engine: &Engine) -> durable::Result<Transition> {
         if let Some(saved) = tc.task.memo.get("turnResult") {
-            self.inner.active.lock().unwrap().remove(&tc.task.id);
+            self.inner.active.lock().remove(&tc.task.id);
             return Ok(Transition::Complete(saved.clone()));
         }
 
@@ -746,7 +747,7 @@ impl OarExtension {
         let child_conv_label = format!("oar:{}", doc.vendor_session_id);
 
         if tc.task.memo.get("turnStarted").and_then(Value::as_bool) == Some(true) {
-            let removed = self.inner.active.lock().unwrap().remove(&tc.task.id);
+            let removed = self.inner.active.lock().remove(&tc.task.id);
             if let Some(removed) = removed {
                 removed.entry.session.dispose().await;
             }
@@ -786,11 +787,11 @@ impl OarExtension {
         }
 
         if tc.is_cancelled() {
-            self.inner.active.lock().unwrap().remove(&tc.task.id);
+            self.inner.active.lock().remove(&tc.task.id);
             return Ok(Transition::Fail("aborted".into()));
         }
 
-        let active_session = self.inner.active.lock().unwrap().get(&tc.task.id).map(|r| r.entry.clone());
+        let active_session = self.inner.active.lock().get(&tc.task.id).map(|r| r.entry.clone());
         let session = match active_session {
             Some(entry) => entry.session,
             None => {
@@ -816,7 +817,7 @@ impl OarExtension {
                         })
                         .await?;
                 }
-                self.inner.active.lock().unwrap().insert(
+                self.inner.active.lock().insert(
                     tc.task.id.clone(),
                     ActiveRecord {
                         store: engine.store().clone(),
@@ -1049,12 +1050,12 @@ struct ActiveSessionGuard {
 
 impl Drop for ActiveSessionGuard {
     fn drop(&mut self) {
-        self.active.lock().unwrap().remove(&self.task_id);
+        self.active.lock().remove(&self.task_id);
     }
 }
 
 fn find_active_session(active: &Arc<Mutex<HashMap<String, ActiveRecord>>>, target: &str) -> Option<ActiveOarSession> {
-    let guard = active.lock().unwrap();
+    let guard = active.lock();
     guard
         .get(target)
         .or_else(|| guard.values().find(|r| r.entry.vendor_session_id == target))
@@ -1062,7 +1063,7 @@ fn find_active_session(active: &Arc<Mutex<HashMap<String, ActiveRecord>>>, targe
 }
 
 fn remove_active_session(active: &Arc<Mutex<HashMap<String, ActiveRecord>>>, target: &str) -> Option<ActiveOarSession> {
-    let mut guard = active.lock().unwrap();
+    let mut guard = active.lock();
     if let Some(found) = guard.remove(target) {
         return Some(found.entry);
     }
@@ -1219,7 +1220,7 @@ mod tests {
 
     impl ModelClient for QueueClient {
         fn complete<'a>(&'a self, _req: &'a ChatRequest, on: &'a mut (dyn FnMut(Delta) + Send)) -> BoxFuture<'a, AiResult<Completion>> {
-            let reply = self.replies.lock().unwrap().pop_front().expect("unexpected model call");
+            let reply = self.replies.lock().pop_front().expect("unexpected model call");
             if let Some(t) = &reply.message.content {
                 on(Delta::Text(t.clone()));
             }
@@ -1436,7 +1437,7 @@ mod tests {
             "scripted",
             Script::computed(Arc::new(move |_: &TurnAsk| {
                 let _ = entered_tx.send(());
-                let _ = release_rx.lock().unwrap().recv_timeout(Duration::from_secs(3));
+                let _ = release_rx.lock().recv_timeout(Duration::from_secs(3));
                 Ok(vec![Step::text("done"), Step::finish(StopReason::Completed)])
             })),
         )));
@@ -1584,7 +1585,7 @@ mod tests {
                 })
             })
             .await?;
-        ext.inner.active.lock().unwrap().insert(
+        ext.inner.active.lock().insert(
             task.id.clone(),
             ActiveRecord {
                 store: store.clone(),

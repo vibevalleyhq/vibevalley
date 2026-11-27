@@ -1,4 +1,4 @@
-import { signal, Text, untracked, View, windowSize, type JSX } from "nsh";
+import { computed, signal, Text, untracked, View, windowSize, type JSX } from "nsh";
 import { Popover } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
@@ -17,6 +17,7 @@ import { createMemo } from "../../../infra/solid";
 import { ArtifactCanvas } from "../../artifact";
 import { useMarkedChat } from "../model/marks";
 import { channelLabel, channelName, chatPath, pointedAt, topOf, topsOf } from "../model/places";
+import { listenToReports, setListenToReports, useChannelReportPlayback } from "../model/reportPlayback";
 import { FarmSearch, Members, Pins, ThreadList, ThreadPane } from "./ChannelPanels";
 import { BarButton, ChannelAvatar, Sidebar } from "./ChannelSidebar";
 import { Composer, FileDrop } from "./Composer";
@@ -156,6 +157,13 @@ function HeadPopover(props: {
   );
 }
 
+/** Fold secondary channel tabs into the h-11 header on wide viewports (>= 960px) when the main pane has room without truncation. */
+export function isWideChannelHead(viewportWidth: number, mainPaneWidth: number, searchOpen: boolean): boolean {
+  if (viewportWidth < 960) return false;
+  if (mainPaneWidth <= 0) return true;
+  return mainPaneWidth >= (searchOpen ? 760 : 560);
+}
+
 /** Built again for each channel (Keyed): its tab and search start over in another one. */
 function ChannelMain(props: { channel: Channel | undefined; point: number | undefined; onDrawer: () => void }) {
   const router = useRouter();
@@ -166,11 +174,29 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
   const search = signal<string | undefined>(undefined);
   const settings = signal(false);
   const membersOpen = signal(false);
+  const mainWidth = signal(0);
+  const wideHead = computed(() => isWideChannelHead(windowSize().width, mainWidth(), search() !== undefined));
+  const tabItems = createMemo(() =>
+    (props.channel?.type === "direct" ? tabs.filter((entry) => entry.tab === "chat") : tabs).map((e) => ({
+      value: e.tab,
+      label: e.label,
+      icon: e.icon,
+    })),
+  );
   const name = () => channelName(props.channel);
+  useChannelReportPlayback(() => props.channel?.id);
   const about = () =>
     [props.channel?.description, props.channel?.repo ? t("web.channel.defaultRepo", { repo: props.channel.repo }) : ""].filter(Boolean).join(" · ");
   return (
-    <View accessibilityLabel={channelLabel(props.channel)} testID="channel-main" class="min-w-0 flex-1">
+    <View
+      accessibilityLabel={channelLabel(props.channel)}
+      testID="channel-main"
+      onLayout={(e) => {
+        const w = Math.floor(e.bounds.size.width);
+        if (w > 0 && w !== untracked(mainWidth)) mainWidth.set(w);
+      }}
+      class="min-w-0 flex-1"
+    >
       <View testID="channel-head" desktop={{ windowDrag: true }} class="h-11 shrink-0 flex-row items-center gap-2 border-b border-line px-3.5">
         <If when={!md()}>
           <BarButton icon="chat" size={16} label={t("web.channel.channels")} testid="channels-drawer" onPress={() => props.onDrawer()} />
@@ -178,7 +204,7 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
         <ChannelAvatar channel={props.channel} size={24} />
         <View class="min-w-0 flex-1 flex-row items-center gap-2 overflow-hidden">
           <View
-            class="shrink-0"
+            class="min-w-0 shrink"
             tooltip={
               <If when={props.channel?.default === true}>
                 <Bubble text={t("web.channel.defaultHint")} />
@@ -193,6 +219,13 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
             <Text class="min-w-0 flex-1 truncate text-xs text-muted">{about()}</Text>
           </If>
         </View>
+        <If when={wideHead()}>
+          <View testID="channel-head-tabs" class="shrink-0 flex-row items-center gap-2">
+            <View class="h-4 w-px shrink-0 bg-line" />
+            <Tabs look="pills" label={t("web.channel.inChannel")} value={tab()} onChange={(v) => tab.set(v)} items={tabItems()} />
+            <View class="h-4 w-px shrink-0 bg-line" />
+          </View>
+        </If>
         <View class="shrink-0 flex-row items-center gap-1">
           <If when={search() !== undefined}>
             <View class="mr-1 w-44">
@@ -259,6 +292,15 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
             />
           </If>
           <BarButton
+            icon="audio"
+            size={16}
+            testid="listen-reports-toggle"
+            label={listenToReports() ? t("web.channel.listenReportsActive") : t("web.channel.listenReports")}
+            pressed={listenToReports()}
+            disabled={!props.channel}
+            onPress={() => setListenToReports(!listenToReports())}
+          />
+          <BarButton
             icon="settings"
             size={16}
             testid="channel-settings-open"
@@ -268,18 +310,11 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
           />
         </View>
       </View>
-      <Tabs
-        look="line"
-        label={t("web.channel.inChannel")}
-        value={tab()}
-        onChange={(v) => tab.set(v)}
-        items={(props.channel?.type === "direct" ? tabs.filter((entry) => entry.tab === "chat") : tabs).map((e) => ({
-          value: e.tab,
-          label: e.label,
-          icon: e.icon,
-        }))}
-        class="shrink-0 border-b border-line px-4"
-      />
+      <If when={!wideHead()}>
+        <View testID="channel-subbar-tabs" class="shrink-0 border-b border-line px-4">
+          <Tabs look="line" label={t("web.channel.inChannel")} value={tab()} onChange={(v) => tab.set(v)} items={tabItems()} />
+        </View>
+      </If>
       <If when={tab() === "chat"}>
         <View class="min-h-0 flex-1 flex-row">
           <FileDrop channel={props.channel}>

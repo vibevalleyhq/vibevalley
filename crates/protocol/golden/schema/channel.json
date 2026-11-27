@@ -636,6 +636,12 @@
    "_tag": "Reset"
   }
  ],
+ "ChannelCommand": [
+  {
+   "name": "s1957",
+   "args": "s1958"
+  }
+ ],
  "SayRequest": [
   {
    "id": "s1959",
@@ -648,7 +654,11 @@
    "agent": "s1967",
    "repo": "s1968",
    "sendKey": "s1969",
-   "to": "s1970"
+   "to": "s1970",
+   "command": {
+    "name": "s1973",
+    "args": "s1974"
+   }
   },
   {
    "id": "s1971",

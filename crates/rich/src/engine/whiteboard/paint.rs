@@ -1,7 +1,7 @@
 use std::collections::{BTreeSet, HashMap};
 
 use nsh_core::canvas::{CanvasGradient, CanvasNode, CanvasTextAlign, CanvasTextBaseline, Drawing, LineCap, LineJoin};
-use nsh_core::prelude::{AccessibilityRole, Bounds, Hsla, Painter, Percentage, Size, point, px, radians, rgb, rgba, size};
+use nsh_core::prelude::{AccessibilityRole, Bounds, Hsla, Painter, Percentage, Points, Size, point, px, radians, rgb, rgba, size};
 use nsh_core::{Color, PaintStyle};
 
 use crate::engine::whiteboard::geometry::{
@@ -459,6 +459,106 @@ fn fast_shadow_color(pal: &WhiteboardPalette) -> Hsla {
     Hsla { a: 0.08, ..pal.card_shadow }
 }
 
+fn fill_and_stroke_round_rect(painter: Painter, bounds: Bounds<Points>, radius: f32, fill: Hsla, stroke: Hsla, stroke_width: f32) -> Painter {
+    painter
+        .begin_path()
+        .fill_color(fill)
+        .round_rect(bounds, px(radius))
+        .fill()
+        .stroke_color(stroke)
+        .line_width(stroke_width)
+        .begin_path()
+        .round_rect(bounds, px(radius))
+        .stroke()
+}
+
+fn fill_and_stroke_rect(painter: Painter, bounds: Bounds<Points>, fill: Hsla, stroke: Hsla, stroke_width: f32) -> Painter {
+    painter
+        .begin_path()
+        .fill_color(fill)
+        .rect(bounds)
+        .fill()
+        .stroke_color(stroke)
+        .line_width(stroke_width)
+        .begin_path()
+        .rect(bounds)
+        .stroke()
+}
+
+fn fill_and_stroke_circle(painter: Painter, cx: f32, cy: f32, r: f32, fill: Hsla, stroke: Hsla, stroke_width: f32) -> Painter {
+    let center = point(px(cx), px(cy));
+    let radii = size(px(r), px(r));
+    painter
+        .begin_path()
+        .fill_color(fill)
+        .ellipse(center, radii, radians(0.0), radians(0.0), radians(std::f32::consts::TAU), false)
+        .fill()
+        .stroke_color(stroke)
+        .line_width(stroke_width)
+        .begin_path()
+        .ellipse(center, radii, radians(0.0), radians(0.0), radians(std::f32::consts::TAU), false)
+        .stroke()
+}
+
+#[allow(clippy::too_many_arguments)]
+fn fill_round_rect_shadowed(
+    painter: Painter,
+    bounds: Bounds<Points>,
+    radius: f32,
+    fill: Hsla,
+    pal: &WhiteboardPalette,
+    fast_shadows: bool,
+    blur: f32,
+    dy: f32,
+) -> Painter {
+    if fast_shadows {
+        let shadow_bounds = Bounds::new(point(bounds.origin.x, px(f32::from(bounds.origin.y) + dy)), bounds.size);
+        painter
+            .begin_path()
+            .fill_color(fast_shadow_color(pal))
+            .round_rect(shadow_bounds, px(radius))
+            .fill()
+            .begin_path()
+            .fill_color(fill)
+            .round_rect(bounds, px(radius))
+            .fill()
+    } else {
+        painter
+            .save()
+            .shadow(pal.card_shadow, px(blur), point(px(0.0), px(dy)))
+            .begin_path()
+            .fill_color(fill)
+            .round_rect(bounds, px(radius))
+            .fill()
+            .restore()
+    }
+}
+
+fn paint_world_backdrop(
+    doc: &BoardDoc,
+    index: &SpatialIndex,
+    lookup: &HashMap<ElementId, Rect2>,
+    camera: Camera,
+    viewport_size: (f32, f32),
+    pal: &WhiteboardPalette,
+) -> (Painter, BTreeSet<usize>) {
+    let vw = viewport_size.0.max(1.0);
+    let vh = viewport_size.1.max(1.0);
+    let bg = doc.meta.background.as_deref().and_then(parse_hex_hsla).unwrap_or(pal.page);
+    let painter = Painter::new()
+        .begin_path()
+        .fill_color(bg)
+        .rect(Bounds::new(point(px(0.0), px(0.0)), size(px(vw), px(vh))))
+        .fill();
+    let painter = paint_grid(painter, doc.meta.grid, camera, vw, vh, pal);
+    let visible = collect_visible_indices(doc, index, lookup, camera, vw, vh);
+    let painter = painter
+        .save()
+        .translate(camera.pan_x as f32, camera.pan_y as f32)
+        .scale(camera.zoom as f32, camera.zoom as f32);
+    (painter, visible)
+}
+
 fn collect_visible_indices(doc: &BoardDoc, index: &SpatialIndex, lookup: &HashMap<ElementId, Rect2>, camera: Camera, vw: f32, vh: f32) -> BTreeSet<usize> {
     let world_view = camera.visible_world_rect(f64::from(vw), f64::from(vh));
     let mut visible: BTreeSet<usize> = index.query_rect(world_view.expand(120.0)).into_iter().collect();
@@ -514,24 +614,7 @@ pub fn paint_board_frame_painter(input: &FramePaintInput<'_>) -> Painter {
     let ctrl = input.controller;
     let camera = ctrl.camera;
     let pal = WhiteboardPalette::for_mode(input.dark);
-    let vw = input.viewport_size.0.max(1.0);
-    let vh = input.viewport_size.1.max(1.0);
-
-    let bg = ctrl.doc.meta.background.as_deref().and_then(parse_hex_hsla).unwrap_or(pal.page);
-    let mut painter = Painter::new()
-        .begin_path()
-        .fill_color(bg)
-        .rect(Bounds::new(point(px(0.0), px(0.0)), size(px(vw), px(vh))))
-        .fill();
-
-    painter = paint_grid(painter, ctrl.doc.meta.grid, camera, vw, vh, &pal);
-
-    let visible = collect_visible_indices(&ctrl.doc, &ctrl.spatial, &ctrl.lookup, camera, vw, vh);
-
-    painter = painter
-        .save()
-        .translate(camera.pan_x as f32, camera.pan_y as f32)
-        .scale(camera.zoom as f32, camera.zoom as f32);
+    let (mut painter, visible) = paint_world_backdrop(&ctrl.doc, &ctrl.spatial, &ctrl.lookup, camera, input.viewport_size, &pal);
 
     painter = paint_board_into_painter_ex(
         painter,
@@ -556,25 +639,7 @@ pub fn paint_static_layer(input: &LayerPaintInput<'_>) -> Drawing {
 
 pub fn paint_static_layer_painter(input: &LayerPaintInput<'_>) -> Painter {
     let pal = WhiteboardPalette::for_mode(input.dark);
-    let vw = input.viewport_size.0.max(1.0);
-    let vh = input.viewport_size.1.max(1.0);
-
-    let bg = input.doc.meta.background.as_deref().and_then(parse_hex_hsla).unwrap_or(pal.page);
-
-    let mut painter = Painter::new()
-        .begin_path()
-        .fill_color(bg)
-        .rect(Bounds::new(point(px(0.0), px(0.0)), size(px(vw), px(vh))))
-        .fill();
-
-    painter = paint_grid(painter, input.doc.meta.grid, input.camera, vw, vh, &pal);
-
-    let visible = collect_visible_indices(input.doc, input.index, input.lookup, input.camera, vw, vh);
-
-    painter = painter
-        .save()
-        .translate(input.camera.pan_x as f32, input.camera.pan_y as f32)
-        .scale(input.camera.zoom as f32, input.camera.zoom as f32);
+    let (mut painter, visible) = paint_world_backdrop(input.doc, input.index, input.lookup, input.camera, input.viewport_size, &pal);
 
     painter = paint_board_into_painter(painter, input.doc, input.lookup, &pal, Some(&visible), input.editing_id, input.anim_hidden_ids);
 
@@ -1106,16 +1171,7 @@ fn paint_arrow_geom(
             point(px((geom.label_pos.x - lw * 0.5) as f32), px((geom.label_pos.y - 11.0) as f32)),
             size(px(lw as f32), px(22.0)),
         );
-        painter = painter
-            .begin_path()
-            .fill_color(pal.arrow_label_bg)
-            .round_rect(lb, px(6.0))
-            .fill()
-            .stroke_color(pal.line)
-            .line_width(1.0)
-            .begin_path()
-            .round_rect(lb, px(6.0))
-            .stroke()
+        painter = fill_and_stroke_round_rect(painter, lb, 6.0, pal.arrow_label_bg, pal.line, 1.0)
             .fill_color(pal.ink)
             .font("600 11px 'PingFang SC', system-ui, sans-serif")
             .text_align(CanvasTextAlign::Center)
@@ -1248,31 +1304,7 @@ fn paint_timeline(
 
         match m.kind {
             MilestoneKind::Minor => {
-                let r = 10.5_f32;
-                painter = painter
-                    .begin_path()
-                    .fill_color(pal.minor_node_bg)
-                    .ellipse(
-                        point(px(pt.x as f32), px(pt.y as f32)),
-                        size(px(r), px(r)),
-                        radians(0.0),
-                        radians(0.0),
-                        radians(std::f32::consts::TAU),
-                        false,
-                    )
-                    .fill()
-                    .stroke_color(pal.minor_node_border)
-                    .line_width(1.6)
-                    .begin_path()
-                    .ellipse(
-                        point(px(pt.x as f32), px(pt.y as f32)),
-                        size(px(r), px(r)),
-                        radians(0.0),
-                        radians(0.0),
-                        radians(std::f32::consts::TAU),
-                        false,
-                    )
-                    .stroke();
+                painter = fill_and_stroke_circle(painter, pt.x as f32, pt.y as f32, 10.5, pal.minor_node_bg, pal.minor_node_border, 1.6);
 
                 if !hide_this && !m.label.is_empty() {
                     painter = painter
@@ -1292,30 +1324,7 @@ fn paint_timeline(
                     size(px(pw as f32), px(ph as f32)),
                 );
                 let fill_color = m.tone.as_deref().and_then(parse_hex_hsla).unwrap_or(pal.pill_bg);
-                if fast_shadows {
-                    let shadow_pill = Bounds::new(
-                        point(px((pt.x - pw * 0.5) as f32), px((pt.y - ph * 0.5 + 2.0) as f32)),
-                        size(px(pw as f32), px(ph as f32)),
-                    );
-                    painter = painter
-                        .begin_path()
-                        .fill_color(fast_shadow_color(pal))
-                        .round_rect(shadow_pill, px(13.0))
-                        .fill()
-                        .begin_path()
-                        .fill_color(fill_color)
-                        .round_rect(pill, px(13.0))
-                        .fill();
-                } else {
-                    painter = painter
-                        .save()
-                        .shadow(pal.card_shadow, px(6.0), point(px(0.0), px(2.0)))
-                        .begin_path()
-                        .fill_color(fill_color)
-                        .round_rect(pill, px(13.0))
-                        .fill()
-                        .restore();
-                }
+                painter = fill_round_rect_shadowed(painter, pill, 13.0, fill_color, pal, fast_shadows, 6.0, 2.0);
 
                 if !hide_this && !m.label.is_empty() {
                     painter = painter
@@ -1565,16 +1574,7 @@ fn paint_text(
     if let Some(bg_fill) = fill {
         let tone = pal.tone(bg_fill);
         let b = Bounds::new(point(px(rect.x as f32), px(rect.y as f32)), size(px(rect.w as f32), px(rect.h as f32)));
-        painter = painter
-            .begin_path()
-            .fill_color(tone.fill)
-            .round_rect(b, px(8.0))
-            .fill()
-            .stroke_color(tone.border)
-            .line_width(1.0)
-            .begin_path()
-            .round_rect(b, px(8.0))
-            .stroke();
+        painter = fill_and_stroke_round_rect(painter, b, 8.0, tone.fill, tone.border, 1.0);
     }
 
     let ink = color.and_then(parse_hex_hsla).unwrap_or(match variant {
@@ -1731,27 +1731,7 @@ fn paint_table(
     let layout = layout_table(rect, headers, rows);
     let table_bounds = Bounds::new(point(px(rect.x as f32), px(rect.y as f32)), size(px(rect.w as f32), px(rect.h as f32)));
 
-    if fast_shadows {
-        let shadow_bounds = Bounds::new(point(px(rect.x as f32), px((rect.y + 2.0) as f32)), size(px(rect.w as f32), px(rect.h as f32)));
-        painter = painter
-            .begin_path()
-            .fill_color(fast_shadow_color(pal))
-            .round_rect(shadow_bounds, px(8.0))
-            .fill()
-            .begin_path()
-            .fill_color(tone.fill)
-            .round_rect(table_bounds, px(8.0))
-            .fill();
-    } else {
-        painter = painter
-            .save()
-            .shadow(pal.card_shadow, px(8.0), point(px(0.0), px(2.0)))
-            .begin_path()
-            .fill_color(tone.fill)
-            .round_rect(table_bounds, px(8.0))
-            .fill()
-            .restore();
-    }
+    painter = fill_round_rect_shadowed(painter, table_bounds, 8.0, tone.fill, pal, fast_shadows, 8.0, 2.0);
 
     if layout.header_height > 0.0 {
         let hb = Bounds::new(
@@ -1838,16 +1818,7 @@ fn paint_table(
 
 fn paint_image_card(mut painter: Painter, rect: Rect2, alt: Option<&str>, uri: &str, pal: &WhiteboardPalette) -> Painter {
     let bounds = Bounds::new(point(px(rect.x as f32), px(rect.y as f32)), size(px(rect.w as f32), px(rect.h as f32)));
-    painter = painter
-        .begin_path()
-        .fill_color(pal.tone_side.fill)
-        .round_rect(bounds, px(10.0))
-        .fill()
-        .stroke_color(pal.tone_side.border)
-        .line_width(1.25)
-        .begin_path()
-        .round_rect(bounds, px(10.0))
-        .stroke();
+    painter = fill_and_stroke_round_rect(painter, bounds, 10.0, pal.tone_side.fill, pal.tone_side.border, 1.25);
 
     // Landscape mountain glyph in center when bitmap is async/external.
     let cx = rect.center().x as f32;
@@ -1877,16 +1848,7 @@ fn paint_image_card(mut painter: Painter, rect: Rect2, alt: Option<&str>, uri: &
 
 fn paint_html_card(mut painter: Painter, rect: Rect2, title: Option<&str>, pal: &WhiteboardPalette) -> Painter {
     let bounds = Bounds::new(point(px(rect.x as f32), px(rect.y as f32)), size(px(rect.w as f32), px(rect.h as f32)));
-    painter = painter
-        .begin_path()
-        .fill_color(pal.tone_default.fill)
-        .round_rect(bounds, px(10.0))
-        .fill()
-        .stroke_color(pal.tone_default.border)
-        .line_width(1.25)
-        .begin_path()
-        .round_rect(bounds, px(10.0))
-        .stroke();
+    painter = fill_and_stroke_round_rect(painter, bounds, 10.0, pal.tone_default.fill, pal.tone_default.border, 1.25);
 
     let bar = Bounds::new(point(px(rect.x as f32), px(rect.y as f32)), size(px(rect.w as f32), px(26.0)));
     painter = painter
@@ -2019,16 +1981,7 @@ fn paint_overlay_world_contents(
         InteractionMode::DrawingBox { start_world, cur_world } => {
             let r = Rect2::from_corners(*start_world, *cur_world);
             let b = Bounds::new(point(px(r.x as f32), px(r.y as f32)), size(px(r.w as f32), px(r.h as f32)));
-            painter = painter
-                .begin_path()
-                .fill_color(pal.selection_soft)
-                .round_rect(b, px(8.0))
-                .fill()
-                .stroke_color(pal.selection)
-                .line_width(1.6 / zoom as f32)
-                .begin_path()
-                .round_rect(b, px(8.0))
-                .stroke();
+            painter = fill_and_stroke_round_rect(painter, b, 8.0, pal.selection_soft, pal.selection, 1.6 / zoom as f32);
         }
         InteractionMode::DrawingInk { points, mode } => {
             let width = if *mode == InkMode::Highlighter {
@@ -2133,30 +2086,7 @@ fn paint_overlay_world_contents(
         let port_r = (4.2 / zoom) as f32;
         for side in crate::engine::whiteboard::model::AnchorSide::ALL {
             let p = crate::engine::whiteboard::geometry::rotate_point(anchor_port_pos(rect, side, port_offset), rect.center(), el.rotation_deg);
-            painter = painter
-                .begin_path()
-                .fill_color(pal.page)
-                .ellipse(
-                    point(px(p.x as f32), px(p.y as f32)),
-                    size(px(port_r), px(port_r)),
-                    radians(0.0),
-                    radians(0.0),
-                    radians(std::f32::consts::TAU),
-                    false,
-                )
-                .fill()
-                .stroke_color(pal.selection)
-                .line_width(1.4 / zoom as f32)
-                .begin_path()
-                .ellipse(
-                    point(px(p.x as f32), px(p.y as f32)),
-                    size(px(port_r), px(port_r)),
-                    radians(0.0),
-                    radians(0.0),
-                    radians(std::f32::consts::TAU),
-                    false,
-                )
-                .stroke();
+            painter = fill_and_stroke_circle(painter, p.x as f32, p.y as f32, port_r, pal.page, pal.selection, 1.4 / zoom as f32);
         }
     }
 
@@ -2169,30 +2099,7 @@ fn paint_overlay_world_contents(
             if let Some(geom) = route_arrow(from, to, bends, *curve, &controller.lookup) {
                 let hr = (5.0 / zoom) as f32;
                 for pt in [geom.start, geom.end].into_iter().chain(bends.iter().copied()) {
-                    painter = painter
-                        .begin_path()
-                        .fill_color(pal.page)
-                        .ellipse(
-                            point(px(pt.x as f32), px(pt.y as f32)),
-                            size(px(hr), px(hr)),
-                            radians(0.0),
-                            radians(0.0),
-                            radians(std::f32::consts::TAU),
-                            false,
-                        )
-                        .fill()
-                        .stroke_color(pal.selection)
-                        .line_width(1.6 / zoom as f32)
-                        .begin_path()
-                        .ellipse(
-                            point(px(pt.x as f32), px(pt.y as f32)),
-                            size(px(hr), px(hr)),
-                            radians(0.0),
-                            radians(0.0),
-                            radians(std::f32::consts::TAU),
-                            false,
-                        )
-                        .stroke();
+                    painter = fill_and_stroke_circle(painter, pt.x as f32, pt.y as f32, hr, pal.page, pal.selection, 1.6 / zoom as f32);
                 }
             }
         } else if let Some(&rect) = controller.lookup.get(id) {
@@ -2212,16 +2119,7 @@ fn paint_overlay_world_contents(
             for h in ResizeHandle8::ALL {
                 let hp = h.position_on(rect);
                 let hb = Bounds::new(point(px(hp.x as f32 - hs * 0.5), px(hp.y as f32 - hs * 0.5)), size(px(hs), px(hs)));
-                painter = painter
-                    .begin_path()
-                    .fill_color(pal.page)
-                    .rect(hb)
-                    .fill()
-                    .stroke_color(pal.selection)
-                    .line_width(1.4 / zoom as f32)
-                    .begin_path()
-                    .rect(hb)
-                    .stroke();
+                painter = fill_and_stroke_rect(painter, hb, pal.page, pal.selection, 1.4 / zoom as f32);
             }
 
             let top_mid = Point2::new(rect.x + rect.w * 0.5, rect.y);
@@ -2233,29 +2131,8 @@ fn paint_overlay_world_contents(
                 .line_width(1.3 / zoom as f32)
                 .move_to(top_mid.x as f32, top_mid.y as f32)
                 .line_to(rot_pt.x as f32, rot_pt.y as f32)
-                .stroke()
-                .begin_path()
-                .fill_color(pal.page)
-                .ellipse(
-                    point(px(rot_pt.x as f32), px(rot_pt.y as f32)),
-                    size(px(rr), px(rr)),
-                    radians(0.0),
-                    radians(0.0),
-                    radians(std::f32::consts::TAU),
-                    false,
-                )
-                .fill()
-                .begin_path()
-                .ellipse(
-                    point(px(rot_pt.x as f32), px(rot_pt.y as f32)),
-                    size(px(rr), px(rr)),
-                    radians(0.0),
-                    radians(0.0),
-                    radians(std::f32::consts::TAU),
-                    false,
-                )
-                .stroke()
-                .restore();
+                .stroke();
+            painter = fill_and_stroke_circle(painter, rot_pt.x as f32, rot_pt.y as f32, rr, pal.page, pal.selection, 1.3 / zoom as f32).restore();
         }
     } else if controller.selection.len() > 1
         && let Some(group_rect) = controller.selection_bbox(&controller.selection)
@@ -2398,27 +2275,7 @@ fn paint_presence_region(mut painter: Painter, rect: Rect2, p: &Presence, color:
     let bh = 22.0_f32;
     let chip = Bounds::new(point(px(10.0), px(-bh * 0.5)), size(px(bw), px(bh)));
     painter = painter.save().translate(rect.x as f32, rect.y as f32).scale(inv, inv);
-    if fast_shadows {
-        let shadow_chip = Bounds::new(point(px(10.0), px(-bh * 0.5 + 1.5)), size(px(bw), px(bh)));
-        painter = painter
-            .begin_path()
-            .fill_color(fast_shadow_color(pal))
-            .round_rect(shadow_chip, px(11.0))
-            .fill()
-            .begin_path()
-            .fill_color(color)
-            .round_rect(chip, px(11.0))
-            .fill();
-    } else {
-        painter = painter
-            .save()
-            .shadow(pal.card_shadow, px(4.0), point(px(0.0), px(1.5)))
-            .begin_path()
-            .fill_color(color)
-            .round_rect(chip, px(11.0))
-            .fill()
-            .restore();
-    }
+    painter = fill_round_rect_shadowed(painter, chip, 11.0, color, pal, fast_shadows, 4.0, 1.5);
     painter
         .fill_color(pal.pill_ink)
         .font("600 11px 'PingFang SC', system-ui, sans-serif")
@@ -2518,27 +2375,7 @@ fn paint_presence_cursor(
         let pb = Bounds::new(point(px(10.0), px(10.0)), size(px(pill_w), px(pill_h)));
         let close_cx = 10.0 + pill_w - 17.0;
         let close_cy = 10.0 + pill_h * 0.5;
-        if fast_shadows {
-            let shadow_pb = Bounds::new(point(px(10.0), px(12.0)), size(px(pill_w), px(pill_h)));
-            painter = painter
-                .begin_path()
-                .fill_color(fast_shadow_color(pal))
-                .round_rect(shadow_pb, px(10.0))
-                .fill()
-                .begin_path()
-                .fill_color(color)
-                .round_rect(pb, px(10.0))
-                .fill();
-        } else {
-            painter = painter
-                .save()
-                .shadow(pal.card_shadow, px(7.0), point(px(0.0), px(2.0)))
-                .begin_path()
-                .fill_color(color)
-                .round_rect(pb, px(10.0))
-                .fill()
-                .restore();
-        }
+        painter = fill_round_rect_shadowed(painter, pb, 10.0, color, pal, fast_shadows, 7.0, 2.0);
         painter = painter
             .fill_color(pal.pill_ink)
             .font("500 12.5px 'PingFang SC', system-ui, sans-serif")
@@ -2562,27 +2399,7 @@ fn paint_presence_cursor(
         let pill_w = (measure_text_span(&label, 11.5, true) + 18.0).max(40.0) as f32;
         let pill_h = 22.0_f32;
         let pb = Bounds::new(point(px(10.0), px(10.0)), size(px(pill_w), px(pill_h)));
-        if fast_shadows {
-            let shadow_pb = Bounds::new(point(px(10.0), px(12.0)), size(px(pill_w), px(pill_h)));
-            painter = painter
-                .begin_path()
-                .fill_color(fast_shadow_color(pal))
-                .round_rect(shadow_pb, px(11.0))
-                .fill()
-                .begin_path()
-                .fill_color(color)
-                .round_rect(pb, px(11.0))
-                .fill();
-        } else {
-            painter = painter
-                .save()
-                .shadow(pal.card_shadow, px(5.0), point(px(0.0), px(2.0)))
-                .begin_path()
-                .fill_color(color)
-                .round_rect(pb, px(11.0))
-                .fill()
-                .restore();
-        }
+        painter = fill_round_rect_shadowed(painter, pb, 11.0, color, pal, fast_shadows, 5.0, 2.0);
         painter = painter
             .fill_color(pal.pill_ink)
             .font("600 11.5px 'PingFang SC', system-ui, sans-serif")
@@ -2617,16 +2434,14 @@ pub fn paint_minimap_painter(
     let mw = minimap_size.0.max(60.0);
     let mh = minimap_size.1.max(40.0);
 
-    let mut painter = Painter::new()
-        .begin_path()
-        .fill_color(pal.side)
-        .round_rect(Bounds::new(point(px(0.0), px(0.0)), size(px(mw), px(mh))), px(8.0))
-        .fill()
-        .stroke_color(pal.line)
-        .line_width(1.0)
-        .begin_path()
-        .round_rect(Bounds::new(point(px(0.0), px(0.0)), size(px(mw), px(mh))), px(8.0))
-        .stroke();
+    let mut painter = fill_and_stroke_round_rect(
+        Painter::new(),
+        Bounds::new(point(px(0.0), px(0.0)), size(px(mw), px(mh))),
+        8.0,
+        pal.side,
+        pal.line,
+        1.0,
+    );
 
     let world_view = camera.visible_world_rect(f64::from(viewport_size.0.max(1.0)), f64::from(viewport_size.1.max(1.0)));
     let world_bounds = doc.content_bounds().map_or(world_view, |c| c.union(world_view)).expand(60.0);
@@ -2661,14 +2476,5 @@ pub fn paint_minimap_painter(
     let vh = (world_view.h * s).clamp(8.0, f64::from(mh) - f64::from(vy) - 2.0) as f32;
     let vb = Bounds::new(point(px(vx), px(vy)), size(px(vw), px(vh)));
 
-    painter
-        .begin_path()
-        .fill_color(pal.selection_soft)
-        .rect(vb)
-        .fill()
-        .stroke_color(pal.selection)
-        .line_width(1.2)
-        .begin_path()
-        .rect(vb)
-        .stroke()
+    fill_and_stroke_rect(painter, vb, pal.selection_soft, pal.selection, 1.2)
 }

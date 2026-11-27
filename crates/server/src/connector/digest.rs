@@ -2,48 +2,21 @@
 //! saying who speaks, cut to what each app takes, and a digest of what
 //! waited.
 
-use std::collections::HashSet;
 use std::sync::LazyLock;
 
-use regex::{Captures, Regex};
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
 use vibevalley_core::rules::actor_role_of;
 use vibevalley_i18n::{locale as current_locale, t, t_in};
-use vibevalley_protocol::{
-    AgentRole, Channel, ChannelType, ChatMessage, ConnectorID, Issue, IssueStageKind, IssueStatus, MessageKind, Millis, Outcome, Run, Session, Spent,
-    StuckReason,
-};
+use vibevalley_protocol::{AgentRole, Channel, ChannelType, ChatMessage, Issue, IssueStageKind, MessageKind, Millis, Outcome, Session, Spent, StuckReason};
+
+use crate::context::text::{clip_plain, plain_text, within};
 
 /// More than this many waiting go out as one digest.
 pub const DIGEST_OVER: usize = 3;
 
-fn re(pattern: &str) -> Regex {
-    Regex::new(pattern).expect("a pattern")
-}
-
-static FENCE: LazyLock<Regex> = LazyLock::new(|| re(r"```[^\n]*\n([\s\S]*?)```"));
-static CODE: LazyLock<Regex> = LazyLock::new(|| re(r"`([^`\n]+)`"));
-static IMAGE: LazyLock<Regex> = LazyLock::new(|| re(r"!\[([^\]]*)\]\(([^)]+)\)"));
-static LINK: LazyLock<Regex> = LazyLock::new(|| re(r"\[([^\]]+)\]\(([^)]+)\)"));
-static HEADING: LazyLock<Regex> = LazyLock::new(|| re(r"(?m)^#{1,6}\s+"));
-static BOLD: LazyLock<Regex> = LazyLock::new(|| re(r"\*\*(.+?)\*\*|__(.+?)__"));
-static ITALIC: LazyLock<Regex> = LazyLock::new(|| re(r"(^|[^*])\*([^*\s][^*\n]*?)\*"));
-static BULLET: LazyLock<Regex> = LazyLock::new(|| re(r"(?m)^\s*[-*+]\s+"));
-static GAPS: LazyLock<Regex> = LazyLock::new(|| re(r"\n{3,}"));
-static PAIR_WORD: LazyLock<Regex> = LazyLock::new(|| re(r"^(?i:配对|pair)"));
-
-fn plain_text(markdown: &str) -> String {
-    let s = FENCE.replace_all(markdown, |c: &Captures| c[1].trim_end().to_string());
-    let s = CODE.replace_all(&s, "$1");
-    let s = IMAGE.replace_all(&s, "[$1] $2");
-    let s = LINK.replace_all(&s, "$1 ($2)");
-    let s = HEADING.replace_all(&s, "");
-    let s = BOLD.replace_all(&s, |c: &Captures| c.get(1).or(c.get(2)).map_or("", |m| m.as_str()).to_string());
-    let s = ITALIC.replace_all(&s, "$1$2");
-    let s = BULLET.replace_all(&s, "· ");
-    GAPS.replace_all(&s, "\n\n").trim().to_string()
-}
+static PAIR_WORD: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^(?i:配对|pair)").expect("a pattern"));
 
 /// The user sees one chat, the farm has many threads: each line says who speaks and where.
 pub fn user_line(m: &ChatMessage, place: &Channel) -> String {
@@ -64,18 +37,6 @@ pub fn user_line(m: &ChatMessage, place: &Channel) -> String {
         t("server.connector.line.headWhat", &[("who", who.into()), ("what", what.into())])
     };
     format!("{head}\n{}", plain_text(&m.text))
-}
-
-/// The byte index after at most `max` UTF-16 units of `s`.
-fn within(s: &str, max: usize) -> usize {
-    let mut units = 0;
-    for (at, ch) in s.char_indices() {
-        units += ch.len_utf16();
-        if units > max {
-            return at;
-        }
-    }
-    s.len()
 }
 
 /// `text` in pieces of at most `max` UTF-16 units, cut at a line's end when one is past the middle.
@@ -129,17 +90,6 @@ pub fn short_id(id: &str) -> String {
     format!("{head}…{tail}")
 }
 
-fn clip_plain(text: &str, max_units: usize) -> String {
-    let cleaned = plain_text(text).replace('\n', " ");
-    let collapsed = cleaned.split_whitespace().collect::<Vec<_>>().join(" ");
-    let cut = within(&collapsed, max_units);
-    if cut < collapsed.len() {
-        format!("{}…", collapsed[..cut].trim_end())
-    } else {
-        collapsed
-    }
-}
-
 fn short_hash(value: &str) -> String {
     Sha256::digest(value.as_bytes()).iter().take(6).map(|b| format!("{b:02x}")).collect()
 }
@@ -175,6 +125,13 @@ pub enum PersonalEventKind {
         session_name: String,
         summary: String,
     },
+    PermissionRequest {
+        request_id: String,
+        session_name: String,
+        tool: String,
+        summary: String,
+        input: Option<String>,
+    },
 }
 
 impl PersonalEventKind {
@@ -187,13 +144,19 @@ impl PersonalEventKind {
             Self::IssueFailed { .. } => "failed",
             Self::RunCompleted { .. } => "run_completed",
             Self::RunFailed { .. } => "run_failed",
+            Self::PermissionRequest { .. } => "perm",
         }
     }
 
     pub fn is_urgent(&self) -> bool {
         matches!(
             self,
-            Self::IssueAsking { .. } | Self::IssueConflict { .. } | Self::IssueInterrupted { .. } | Self::IssueFailed { .. } | Self::RunFailed { .. }
+            Self::IssueAsking { .. }
+                | Self::IssueConflict { .. }
+                | Self::IssueInterrupted { .. }
+                | Self::IssueFailed { .. }
+                | Self::RunFailed { .. }
+                | Self::PermissionRequest { .. }
         )
     }
 }
@@ -219,9 +182,12 @@ impl PersonalEvent {
 
     /// Stable `connector_outbox.message_id` used for deduplication and workbench-settled withdrawal.
     pub fn outbox_message_id(&self) -> String {
-        match self.issue_id.as_deref() {
-            Some(issue_id) => format!("push:issue:{issue_id}:{}:{}", self.kind.category(), short_hash(&self.dedupe_key)),
-            None => format!("push:run:{}:{}", self.kind.category(), short_hash(&self.dedupe_key)),
+        match (&self.kind, self.issue_id.as_deref(), self.session_id.as_deref()) {
+            (PersonalEventKind::PermissionRequest { request_id, .. }, _, Some(session_id)) => {
+                format!("push:perm:{session_id}:{request_id}")
+            }
+            (_, Some(issue_id), _) => format!("push:issue:{issue_id}:{}:{}", self.kind.category(), short_hash(&self.dedupe_key)),
+            _ => format!("push:run:{}:{}", self.kind.category(), short_hash(&self.dedupe_key)),
         }
     }
 }
@@ -233,6 +199,150 @@ pub fn parse_push_issue_message_id(message_id: &str) -> Option<(&str, &str)> {
     let issue_id = parts.next().filter(|s| !s.is_empty())?;
     let category = parts.next().filter(|s| !s.is_empty())?;
     Some((issue_id, category))
+}
+
+/// Parses a `push:perm:<session_id>:<request_id>` outbox message id.
+pub fn parse_push_perm_message_id(message_id: &str) -> Option<(&str, &str)> {
+    let rest = message_id.strip_prefix("push:perm:")?;
+    let (session_id, request_id) = rest.split_once(':')?;
+    if session_id.is_empty() || request_id.is_empty() {
+        return None;
+    }
+    Some((session_id, request_id))
+}
+
+/// Actionable push message reference resolved from an inbound quote.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PushTarget<'a> {
+    Issue { issue_id: &'a str, category: &'a str },
+    Permission { session_id: &'a str, request_id: &'a str },
+}
+
+/// Parses an actionable `push:issue:...` or `push:perm:...` outbox message id.
+pub fn parse_push_message_id(message_id: &str) -> Option<PushTarget<'_>> {
+    if let Some((issue_id, category)) = parse_push_issue_message_id(message_id) {
+        return Some(PushTarget::Issue { issue_id, category });
+    }
+    if let Some((session_id, request_id)) = parse_push_perm_message_id(message_id) {
+        return Some(PushTarget::Permission { session_id, request_id });
+    }
+    None
+}
+
+/// Structured command parsed from a quote-reply to a `push:issue:...` message.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum IssueReplyAction {
+    Answer { text: String },
+    Accept,
+    Reject { reason: String },
+    Retry { words: Option<String> },
+}
+
+/// Structured command parsed from a quote-reply to a `push:perm:...` message.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PermissionReplyAction {
+    AllowOnce,
+    AllowAlways,
+    Deny { reason: Option<String> },
+}
+
+/// Reason a quote-reply could not be mapped to an actionable command.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReplyParseError {
+    EmptyAnswer,
+    ReviewUnrecognized,
+    RejectNeedsReason,
+    StuckUnrecognized,
+    ConflictNeedsWorkbench,
+    PermissionUnrecognized,
+    UnsupportedCategory,
+}
+
+fn strip_command_prefix<'a>(input: &'a str, keyword: &str) -> Option<&'a str> {
+    let prefix = input.get(..keyword.len())?;
+    if !prefix.eq_ignore_ascii_case(keyword) {
+        return None;
+    }
+    let rest = &input[keyword.len()..];
+    if rest.is_empty() {
+        return Some("");
+    }
+    let first = rest.chars().next()?;
+    if first.is_whitespace() || matches!(first, ':' | '：' | '.' | '。' | '!' | '！') {
+        Some(rest.trim_start_matches(|c: char| c.is_whitespace() || matches!(c, ':' | '：')))
+    } else {
+        None
+    }
+}
+
+fn strip_trailing_punct(s: &str) -> &str {
+    s.trim_end_matches(['.', '。', '!', '！'])
+}
+
+/// Parses a user quote-reply to an issue push notification (`asking` / `reviewing` / `failed` / `interrupted` / `conflict`).
+pub fn parse_issue_reply(category: &str, text: &str) -> Result<IssueReplyAction, ReplyParseError> {
+    let trimmed = text.trim();
+    match category {
+        "asking" => {
+            if trimmed.is_empty() {
+                Err(ReplyParseError::EmptyAnswer)
+            } else {
+                Ok(IssueReplyAction::Answer { text: trimmed.to_string() })
+            }
+        }
+        "reviewing" => {
+            let bare = strip_trailing_punct(trimmed).trim();
+            let lower = bare.to_ascii_lowercase();
+            if matches!(lower.as_str(), "accept" | "ok" | "approve" | "approved" | "lgtm" | "pass" | "yes")
+                || matches!(bare, "通过" | "同意" | "确认" | "确认通过" | "通过验收" | "验收通过")
+            {
+                return Ok(IssueReplyAction::Accept);
+            }
+            for kw in ["reject", "changes", "rework", "打回", "拒绝", "退回"] {
+                if let Some(rest) = strip_command_prefix(trimmed, kw) {
+                    let reason = rest.trim();
+                    if reason.is_empty() || strip_trailing_punct(reason).trim().is_empty() {
+                        return Err(ReplyParseError::RejectNeedsReason);
+                    }
+                    return Ok(IssueReplyAction::Reject { reason: reason.to_string() });
+                }
+            }
+            Err(ReplyParseError::ReviewUnrecognized)
+        }
+        "failed" | "interrupted" => {
+            for kw in ["retry", "resume", "rerun", "重试", "恢复", "继续", "接着做", "接着修"] {
+                if let Some(rest) = strip_command_prefix(trimmed, kw) {
+                    let clean = strip_trailing_punct(rest).trim();
+                    let words = (!clean.is_empty()).then(|| rest.trim().to_string());
+                    return Ok(IssueReplyAction::Retry { words });
+                }
+            }
+            Err(ReplyParseError::StuckUnrecognized)
+        }
+        "conflict" => Err(ReplyParseError::ConflictNeedsWorkbench),
+        _ => Err(ReplyParseError::UnsupportedCategory),
+    }
+}
+
+/// Parses a user quote-reply to a permission request push notification (`push:perm:<session_id>:<request_id>`).
+pub fn parse_permission_reply(text: &str) -> Result<PermissionReplyAction, ReplyParseError> {
+    let trimmed = text.trim();
+    let bare = strip_trailing_punct(trimmed).trim();
+    let lower = bare.to_ascii_lowercase();
+    if matches!(lower.as_str(), "allow always" | "always" | "always allow") || matches!(bare, "始终允许" | "总是允许") {
+        return Ok(PermissionReplyAction::AllowAlways);
+    }
+    if matches!(lower.as_str(), "allow" | "allow once" | "approve" | "ok" | "yes") || matches!(bare, "允许" | "同意" | "批准" | "一次允许") {
+        return Ok(PermissionReplyAction::AllowOnce);
+    }
+    for kw in ["deny", "reject", "no", "拒绝", "禁止", "不允许", "不同意"] {
+        if let Some(rest) = strip_command_prefix(trimmed, kw) {
+            let clean = strip_trailing_punct(rest).trim();
+            let reason = (!clean.is_empty()).then(|| rest.trim().to_string());
+            return Ok(PermissionReplyAction::Deny { reason });
+        }
+    }
+    Err(ReplyParseError::PermissionUnrecognized)
 }
 
 fn issue_stage_stamp(issue: &Issue, fallback_at: Millis, extra: &str) -> String {
@@ -344,7 +454,7 @@ pub fn personal_event_for_run(
     })
 }
 
-fn issue_target_label(number: Option<i64>, title: Option<&str>) -> String {
+pub(super) fn issue_target_label(number: Option<i64>, title: Option<&str>) -> String {
     let clean_title = title.map(|t| clip_plain(t, 48)).unwrap_or_default();
     match (number, clean_title.is_empty()) {
         (Some(n), false) => format!("#{n} {clean_title}"),
@@ -424,385 +534,38 @@ pub fn format_personal_event_in(locale: &str, event: &PersonalEvent) -> String {
             let s = clip_plain(summary, 240);
             t_in(locale, "server.connector.push.runFailed", &[("name", name.into()), ("summary", s.into())])
         }
-    }
-}
-
-/// Where a scheduled digest cron delivers its summary.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-pub enum DigestTargets {
-    /// Configured default targets (linked WeChat when connected).
-    #[default]
-    Default,
-    /// Explicit connector list (e.g. `Weixin`, `Feishu`).
-    Connectors(Vec<ConnectorID>),
-    /// Every currently connected and paired connector.
-    AllConnected,
-}
-
-/// Parsed configuration of a scheduled digest cron job.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-pub struct DigestSpec {
-    pub targets: DigestTargets,
-    pub skip_if_empty: bool,
-}
-
-/// Formats a canonical `[digest...]` directive prefix stored inside `Cron.text`.
-pub fn format_digest_directive(spec: &DigestSpec, note: &str) -> String {
-    let mut tags: Vec<String> = match &spec.targets {
-        DigestTargets::Default => Vec::new(),
-        DigestTargets::AllConnected => vec!["all".into()],
-        DigestTargets::Connectors(ids) => ids.iter().map(|id| id.as_str().to_string()).collect(),
-    };
-    if spec.skip_if_empty {
-        tags.push("skip-empty".into());
-    }
-    let header = if tags.is_empty() {
-        "[digest]".to_string()
-    } else {
-        format!("[digest:{}]", tags.join(","))
-    };
-    let trimmed = note.trim();
-    if trimmed.is_empty() { header } else { format!("{header} {trimmed}") }
-}
-
-/// Recognizes `[digest]`, `[digest:weixin]`, `[digest:all]`, `[简报]`, `[日报]` prefixes in `cron.text`.
-pub fn parse_digest_directive(text: &str) -> Option<DigestSpec> {
-    let trimmed = text.trim_start();
-    let rest = trimmed.strip_prefix('[').and_then(|s| s.split_once(']').map(|(inner, _)| inner.trim()))?;
-    let (head, tail) = match rest.split_once(':') {
-        Some((h, t)) => (h.trim(), Some(t)),
-        None => (rest, None),
-    };
-    let head_lower = head.to_ascii_lowercase();
-    if !matches!(head_lower.as_str(), "digest" | "简报" | "日报") {
-        return None;
-    }
-    let mut connectors = Vec::new();
-    let mut all = false;
-    let mut skip_if_empty = false;
-    if let Some(params) = tail {
-        for raw in params.split([',', '|', ' ']).map(str::trim).filter(|p| !p.is_empty()) {
-            match raw.to_ascii_lowercase().as_str() {
-                "all" | "全部" => all = true,
-                "skip-empty" | "quiet" | "skip_empty" => skip_if_empty = true,
-                "weixin" | "wechat" | "微信" => {
-                    if !connectors.contains(&ConnectorID::Weixin) {
-                        connectors.push(ConnectorID::Weixin);
-                    }
+        PersonalEventKind::PermissionRequest {
+            session_name,
+            tool,
+            summary,
+            input,
+            ..
+        } => {
+            let session = clip_plain(session_name, 40);
+            let tool = clip_plain(tool, 40);
+            let summary = clip_plain(summary, 180);
+            match input.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+                Some(raw_input) => {
+                    let clipped = clip_plain(raw_input, 160);
+                    t_in(
+                        locale,
+                        "server.connector.push.permissionInput",
+                        &[
+                            ("session", session.into()),
+                            ("tool", tool.into()),
+                            ("summary", summary.into()),
+                            ("input", clipped.into()),
+                        ],
+                    )
                 }
-                "feishu" | "lark" | "飞书" => {
-                    if !connectors.contains(&ConnectorID::Feishu) {
-                        connectors.push(ConnectorID::Feishu);
-                    }
-                }
-                "qq" if !connectors.contains(&ConnectorID::Qq) => {
-                    connectors.push(ConnectorID::Qq);
-                }
-                _ => {}
-            }
-        }
-    }
-    let targets = if all {
-        DigestTargets::AllConnected
-    } else if connectors.is_empty() {
-        DigestTargets::Default
-    } else {
-        DigestTargets::Connectors(connectors)
-    };
-    Some(DigestSpec { targets, skip_if_empty })
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DigestIssueItem {
-    pub number: i64,
-    pub title: String,
-    pub detail: String,
-    pub stuck: Option<StuckReason>,
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct DigestRunStats {
-    pub total: usize,
-    pub completed: usize,
-    pub failed: usize,
-    pub interrupted: usize,
-    pub total_tokens: i64,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ProgressDigest {
-    pub title: String,
-    pub window_start: Millis,
-    pub window_end: Millis,
-    pub asking: Vec<DigestIssueItem>,
-    pub reviewing: Vec<DigestIssueItem>,
-    pub stuck: Vec<DigestIssueItem>,
-    pub working: Vec<DigestIssueItem>,
-    pub completed_recent: Vec<DigestIssueItem>,
-    pub runs: DigestRunStats,
-}
-
-impl ProgressDigest {
-    pub fn is_empty(&self) -> bool {
-        self.asking.is_empty()
-            && self.reviewing.is_empty()
-            && self.stuck.is_empty()
-            && self.working.is_empty()
-            && self.completed_recent.is_empty()
-            && self.runs.total == 0
-    }
-}
-
-/// Summarizes recent Issues and Runs progress over `[window_start, window_end]`.
-pub fn build_progress_digest(title: &str, issues: &[Issue], sessions: &[Session], runs: &[Run], window_start: Millis, window_end: Millis) -> ProgressDigest {
-    let mut asking = Vec::new();
-    let mut reviewing = Vec::new();
-    let mut stuck = Vec::new();
-    let mut working = Vec::new();
-    let mut completed_recent = Vec::new();
-
-    let session_summary_for = |issue: &Issue| -> Option<&str> {
-        let sid = issue.latest_session_id()?;
-        sessions
-            .iter()
-            .find(|s| &s.id == sid)
-            .and_then(|s| s.last_run.as_ref())
-            .map(|r| r.summary.as_str())
-            .filter(|s| !s.is_empty())
-    };
-
-    for issue in issues {
-        match issue.stage.state {
-            IssueStageKind::Asking => asking.push(DigestIssueItem {
-                number: issue.number,
-                title: clip_plain(&issue.title, 40),
-                detail: clip_plain(issue.questions.first().map_or("", |q| q.question.as_str()), 60),
-                stuck: None,
-            }),
-            IssueStageKind::Reviewing if issue.parent.is_none() => reviewing.push(DigestIssueItem {
-                number: issue.number,
-                title: clip_plain(&issue.title, 40),
-                detail: clip_plain(session_summary_for(issue).unwrap_or(""), 60),
-                stuck: None,
-            }),
-            IssueStageKind::Stuck => {
-                let detail = if issue.stage.stuck == Some(StuckReason::Conflict)
-                    && let Some(c) = &issue.conflict
-                {
-                    c.files.iter().take(3).cloned().collect::<Vec<_>>().join(", ")
-                } else {
-                    session_summary_for(issue)
-                        .or_else(|| issue.questions.first().map(|q| q.question.as_str()))
-                        .unwrap_or("")
-                        .to_string()
-                };
-                stuck.push(DigestIssueItem {
-                    number: issue.number,
-                    title: clip_plain(&issue.title, 40),
-                    detail: clip_plain(&detail, 60),
-                    stuck: issue.stage.stuck,
-                });
-            }
-            IssueStageKind::Working if issue.status == IssueStatus::InProgress => working.push(DigestIssueItem {
-                number: issue.number,
-                title: clip_plain(&issue.title, 40),
-                detail: String::new(),
-                stuck: None,
-            }),
-            IssueStageKind::Done if issue.closed_at.is_some_and(|at| at >= window_start && at <= window_end) => {
-                completed_recent.push(DigestIssueItem {
-                    number: issue.number,
-                    title: clip_plain(&issue.title, 44),
-                    detail: String::new(),
-                    stuck: None,
-                });
-            }
-            _ => {}
-        }
-    }
-
-    let mut stats = DigestRunStats::default();
-    let mut seen_runs = HashSet::new();
-    for run in runs {
-        let in_window =
-            (run.started_at >= window_start && run.started_at <= window_end) || run.ended_at.is_some_and(|at| at >= window_start && at <= window_end);
-        if !in_window || !seen_runs.insert(run.id.clone()) {
-            continue;
-        }
-        stats.total += 1;
-        if let Some(spent) = &run.spent {
-            stats.total_tokens = stats.total_tokens.saturating_add(spent.tokens);
-        }
-        match run.outcome {
-            Some(Outcome::Completed) => stats.completed += 1,
-            Some(Outcome::Failed) => stats.failed += 1,
-            Some(Outcome::Interrupted) => stats.interrupted += 1,
-            None => {}
-        }
-    }
-
-    // Fallback when only `Issue.last_run` is present (e.g. unit snapshots without `Run` rows).
-    if stats.total == 0 {
-        for issue in issues {
-            if let Some(lr) = &issue.last_run {
-                let at = lr.ended_at.unwrap_or(lr.started_at);
-                if at >= window_start && at <= window_end {
-                    stats.total += 1;
-                    match lr.outcome {
-                        Some(Outcome::Completed) => stats.completed += 1,
-                        Some(Outcome::Failed) => stats.failed += 1,
-                        Some(Outcome::Interrupted) => stats.interrupted += 1,
-                        None => {}
-                    }
-                }
-            }
-        }
-    }
-
-    ProgressDigest {
-        title: title.to_string(),
-        window_start,
-        window_end,
-        asking,
-        reviewing,
-        stuck,
-        working,
-        completed_recent,
-        runs: stats,
-    }
-}
-
-const MAX_DIGEST_SECTION_ITEMS: usize = 5;
-
-fn push_capped_lines(locale: &str, out: &mut Vec<String>, items: Vec<String>) {
-    let total = items.len();
-    for line in items.into_iter().take(MAX_DIGEST_SECTION_ITEMS) {
-        out.push(line);
-    }
-    if total > MAX_DIGEST_SECTION_ITEMS {
-        out.push(t_in(
-            locale,
-            "server.connector.cronDigest.more",
-            &[("n", ((total - MAX_DIGEST_SECTION_ITEMS) as i64).into())],
-        ));
-    }
-}
-
-/// Formats a [`ProgressDigest`] into concise i18n plain text for WeChat / connectors.
-pub fn format_progress_digest(digest: &ProgressDigest) -> String {
-    format_progress_digest_in(&current_locale(), digest)
-}
-
-/// Formats a [`ProgressDigest`] in an explicit `locale` without mutating process-wide i18n state.
-pub fn format_progress_digest_in(locale: &str, digest: &ProgressDigest) -> String {
-    let mut lines = vec![t_in(locale, "server.connector.cronDigest.title", &[("title", digest.title.clone().into())])];
-    if digest.is_empty() {
-        lines.push(t_in(locale, "server.connector.cronDigest.quiet", &[]));
-        return lines.join("\n");
-    }
-    lines.push(t_in(
-        locale,
-        "server.connector.cronDigest.counts",
-        &[
-            ("asking", (digest.asking.len() as i64).into()),
-            ("reviewing", (digest.reviewing.len() as i64).into()),
-            ("stuck", (digest.stuck.len() as i64).into()),
-            ("working", (digest.working.len() as i64).into()),
-            ("done", (digest.completed_recent.len() as i64).into()),
-        ],
-    ));
-    if digest.runs.total > 0 {
-        lines.push(t_in(
-            locale,
-            "server.connector.cronDigest.runs",
-            &[
-                ("completed", (digest.runs.completed as i64).into()),
-                ("failed", (digest.runs.failed as i64).into()),
-                ("interrupted", (digest.runs.interrupted as i64).into()),
-            ],
-        ));
-    }
-
-    let mut attention = Vec::new();
-    for item in &digest.asking {
-        attention.push(t_in(
-            locale,
-            "server.connector.cronDigest.itemAsk",
-            &[
-                ("number", item.number.into()),
-                ("title", item.title.clone().into()),
-                ("detail", item.detail.clone().into()),
-            ],
-        ));
-    }
-    for item in &digest.stuck {
-        let key = match item.stuck {
-            Some(StuckReason::Conflict) => "server.connector.cronDigest.itemConflict",
-            Some(StuckReason::Interrupted) => "server.connector.cronDigest.itemInterrupted",
-            _ => "server.connector.cronDigest.itemFailed",
-        };
-        attention.push(t_in(
-            locale,
-            key,
-            &[
-                ("number", item.number.into()),
-                ("title", item.title.clone().into()),
-                ("detail", item.detail.clone().into()),
-            ],
-        ));
-    }
-    for item in &digest.reviewing {
-        attention.push(t_in(
-            locale,
-            "server.connector.cronDigest.itemReview",
-            &[
-                ("number", item.number.into()),
-                ("title", item.title.clone().into()),
-                ("detail", item.detail.clone().into()),
-            ],
-        ));
-    }
-    if !attention.is_empty() {
-        lines.push(String::new());
-        lines.push(t_in(locale, "server.connector.cronDigest.attentionHeader", &[]));
-        push_capped_lines(locale, &mut lines, attention);
-    }
-
-    if !digest.working.is_empty() {
-        lines.push(String::new());
-        lines.push(t_in(locale, "server.connector.cronDigest.workingHeader", &[]));
-        let working_lines = digest
-            .working
-            .iter()
-            .map(|item| {
-                t_in(
+                None => t_in(
                     locale,
-                    "server.connector.cronDigest.itemWorking",
-                    &[("number", item.number.into()), ("title", item.title.clone().into())],
-                )
-            })
-            .collect();
-        push_capped_lines(locale, &mut lines, working_lines);
+                    "server.connector.push.permission",
+                    &[("session", session.into()), ("tool", tool.into()), ("summary", summary.into())],
+                ),
+            }
+        }
     }
-
-    if !digest.completed_recent.is_empty() {
-        lines.push(String::new());
-        lines.push(t_in(locale, "server.connector.cronDigest.completedHeader", &[]));
-        let done_lines = digest
-            .completed_recent
-            .iter()
-            .map(|item| {
-                t_in(
-                    locale,
-                    "server.connector.cronDigest.itemDone",
-                    &[("number", item.number.into()), ("title", item.title.clone().into())],
-                )
-            })
-            .collect();
-        push_capped_lines(locale, &mut lines, done_lines);
-    }
-
-    lines.join("\n")
 }
 
 #[cfg(test)]
@@ -916,120 +679,95 @@ mod tests {
     }
 
     #[test]
-    fn digest_directives_and_progress_summary_format_cleanly() {
-        use vibevalley_protocol::{RunTrigger, RunTriggerKind};
-
-        assert_eq!(parse_digest_directive("写早报"), None);
-        assert_eq!(
-            parse_digest_directive("[digest] daily"),
-            Some(DigestSpec {
-                targets: DigestTargets::Default,
-                skip_if_empty: false,
-            })
-        );
-        assert_eq!(
-            parse_digest_directive("[简报:weixin,skip-empty]"),
-            Some(DigestSpec {
-                targets: DigestTargets::Connectors(vec![ConnectorID::Weixin]),
-                skip_if_empty: true,
-            })
-        );
-        assert_eq!(
-            parse_digest_directive("[digest:all]"),
-            Some(DigestSpec {
-                targets: DigestTargets::AllConnected,
-                skip_if_empty: false,
-            })
-        );
-        let roundtrip = format_digest_directive(
-            &DigestSpec {
-                targets: DigestTargets::Connectors(vec![ConnectorID::Weixin, ConnectorID::Feishu]),
-                skip_if_empty: true,
+    fn permission_push_formats_parses_and_reply_commands_parse_cleanly() {
+        let perm_ev = PersonalEvent {
+            dedupe_key: "perm:s1:req-9".into(),
+            issue_id: None,
+            issue_number: None,
+            issue_title: None,
+            session_id: Some("s1".into()),
+            channel_id: None,
+            is_child_review: false,
+            at: 10_000,
+            kind: PersonalEventKind::PermissionRequest {
+                request_id: "req-9".into(),
+                session_name: "Workspace".into(),
+                tool: "shell".into(),
+                summary: "Run cargo test".into(),
+                input: Some("cargo test -p vibevalley-server".into()),
             },
-            "每日播报",
-        );
-        assert_eq!(roundtrip, "[digest:weixin,feishu,skip-empty] 每日播报");
-        assert_eq!(
-            parse_digest_directive(&roundtrip),
-            Some(DigestSpec {
-                targets: DigestTargets::Connectors(vec![ConnectorID::Weixin, ConnectorID::Feishu]),
-                skip_if_empty: true,
-            })
-        );
-
-        let empty = build_progress_digest("日报", &[], &[], &[], 1_000, 2_000);
-        assert!(empty.is_empty());
-        assert!(format_progress_digest_in("zh", &empty).contains("近期暂无新增进度"));
-
-        let mut i1 = Issue::new("i1", 1, "修复登录", 1_000);
-        i1.stage.state = IssueStageKind::Asking;
-        i1.questions.push(vibevalley_protocol::Question {
-            question: "用 OAuth 吗？".into(),
-            options: vec![],
-        });
-
-        let mut i2 = Issue::new("i2", 2, "微信通知", 1_000);
-        i2.status = IssueStatus::Done;
-        i2.stage.state = IssueStageKind::Done;
-        i2.closed_at = Some(1_500);
-
-        let mut i3 = Issue::new("i3", 3, "旧工单", 500);
-        i3.status = IssueStatus::Done;
-        i3.stage.state = IssueStageKind::Done;
-        i3.closed_at = Some(800);
-
-        let trigger = || RunTrigger {
-            kind: RunTriggerKind::Issue,
-            message: None,
-            channel: None,
-            cron: None,
-            missed: None,
         };
-        let runs = vec![
-            Run {
-                needs_reconciliation: false,
-                id: "r1".into(),
-                issue: Some("i2".into()),
-                session: "s1".into(),
-                subagents: None,
-                triggered_by: trigger(),
-                heard: vec![],
-                started_at: 1_100,
-                ended_at: Some(1_400),
-                outcome: Some(Outcome::Completed),
-                summary: "ok".into(),
-                spent: Some(Spent { tokens: 120, cny: None }),
-            },
-            Run {
-                needs_reconciliation: false,
-                id: "r2".into(),
-                issue: Some("i1".into()),
-                session: "s2".into(),
-                subagents: None,
-                triggered_by: trigger(),
-                heard: vec![],
-                started_at: 1_200,
-                ended_at: Some(1_300),
-                outcome: Some(Outcome::Failed),
-                summary: "err".into(),
-                spent: None,
-            },
-        ];
-
-        let summary = build_progress_digest("每日进展", &[i1, i2, i3], &[], &runs, 1_000, 2_000);
-        assert_eq!(summary.asking.len(), 1);
-        assert_eq!(summary.completed_recent.len(), 1);
+        assert!(perm_ev.is_urgent());
+        let perm_msg_id = perm_ev.outbox_message_id();
+        assert_eq!(perm_msg_id, "push:perm:s1:req-9");
         assert_eq!(
-            (summary.runs.total, summary.runs.completed, summary.runs.failed, summary.runs.total_tokens),
-            (2, 1, 1, 120)
+            parse_push_message_id(&perm_msg_id),
+            Some(PushTarget::Permission {
+                session_id: "s1",
+                request_id: "req-9"
+            })
         );
-        let rendered = format_progress_digest_in("zh", &summary);
-        assert!(rendered.contains("【进展简报 · 每日进展】"));
-        assert!(rendered.contains("待回复 1"));
-        assert!(rendered.contains("近期完成 1"));
-        assert!(rendered.contains("完成 1 · 失败 1"));
-        assert!(rendered.contains("#1 修复登录"));
-        assert!(rendered.contains("#2 微信通知"));
-        assert!(!rendered.contains("#3 旧工单"));
+        let zh_perm = format_personal_event_in("zh", &perm_ev);
+        assert!(zh_perm.contains("【请求授权 · Workspace】"));
+        assert!(zh_perm.contains("cargo test -p vibevalley-server"));
+        let en_perm = format_personal_event_in("en", &perm_ev);
+        assert!(en_perm.contains("[Permission Request · Workspace]"));
+        assert!(en_perm.contains("Reply allow to approve or deny to reject."));
+
+        // Asking reply parsing
+        assert_eq!(
+            parse_issue_reply("asking", "  Yes, enable quiet hours  "),
+            Ok(IssueReplyAction::Answer {
+                text: "Yes, enable quiet hours".into()
+            })
+        );
+        assert_eq!(parse_issue_reply("asking", "   "), Err(ReplyParseError::EmptyAnswer));
+
+        // Reviewing reply parsing
+        assert_eq!(parse_issue_reply("reviewing", "accept"), Ok(IssueReplyAction::Accept));
+        assert_eq!(parse_issue_reply("reviewing", " OK! "), Ok(IssueReplyAction::Accept));
+        assert_eq!(parse_issue_reply("reviewing", "通过。"), Ok(IssueReplyAction::Accept));
+        assert_eq!(
+            parse_issue_reply("reviewing", "reject: missing edge case tests"),
+            Ok(IssueReplyAction::Reject {
+                reason: "missing edge case tests".into()
+            })
+        );
+        assert_eq!(
+            parse_issue_reply("reviewing", "打回 缺少边界测试"),
+            Ok(IssueReplyAction::Reject {
+                reason: "缺少边界测试".into()
+            })
+        );
+        assert_eq!(parse_issue_reply("reviewing", "reject"), Err(ReplyParseError::RejectNeedsReason));
+        assert_eq!(parse_issue_reply("reviewing", "reject:   "), Err(ReplyParseError::RejectNeedsReason));
+        assert_eq!(parse_issue_reply("reviewing", "maybe later"), Err(ReplyParseError::ReviewUnrecognized));
+        assert_eq!(parse_issue_reply("reviewing", "retry"), Err(ReplyParseError::ReviewUnrecognized));
+
+        // Failed / Interrupted reply parsing
+        assert_eq!(parse_issue_reply("failed", "retry"), Ok(IssueReplyAction::Retry { words: None }));
+        assert_eq!(
+            parse_issue_reply("interrupted", "resume check git log first"),
+            Ok(IssueReplyAction::Retry {
+                words: Some("check git log first".into())
+            })
+        );
+        assert_eq!(parse_issue_reply("failed", "重试"), Ok(IssueReplyAction::Retry { words: None }));
+        assert_eq!(parse_issue_reply("interrupted", "accept"), Err(ReplyParseError::StuckUnrecognized));
+        assert_eq!(parse_issue_reply("conflict", "retry"), Err(ReplyParseError::ConflictNeedsWorkbench));
+
+        // Permission reply parsing
+        assert_eq!(parse_permission_reply("allow"), Ok(PermissionReplyAction::AllowOnce));
+        assert_eq!(parse_permission_reply("允许。"), Ok(PermissionReplyAction::AllowOnce));
+        assert_eq!(parse_permission_reply("allow always"), Ok(PermissionReplyAction::AllowAlways));
+        assert_eq!(parse_permission_reply("始终允许"), Ok(PermissionReplyAction::AllowAlways));
+        assert_eq!(parse_permission_reply("deny"), Ok(PermissionReplyAction::Deny { reason: None }));
+        assert_eq!(
+            parse_permission_reply("deny: too risky"),
+            Ok(PermissionReplyAction::Deny {
+                reason: Some("too risky".into())
+            })
+        );
+        assert_eq!(parse_permission_reply("maybe"), Err(ReplyParseError::PermissionUnrecognized));
     }
 }

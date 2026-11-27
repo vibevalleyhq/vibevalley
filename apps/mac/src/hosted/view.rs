@@ -85,7 +85,7 @@ impl HostedView {
             params.entry("motion").or_insert_with(|| json!(motion.as_str()));
             params.entry("connectionMode").or_insert_with(|| json!(active_connection.as_str()));
             params.entry("randomSeed").or_insert_with(|| json!(crate::host::random_seed_hex()));
-            if crate::debug::vdp_enabled() {
+            if crate::debug::vdp_enabled() || crate::shell::devtools_enabled() {
                 params.entry("vdpEnabled").or_insert_with(|| json!(true));
             }
             let assets_dir = crate::assets::assets_dir();

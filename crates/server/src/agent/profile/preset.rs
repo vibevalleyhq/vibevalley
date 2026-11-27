@@ -606,6 +606,7 @@ mod tests {
             persona: String::new(),
             persona_mode: PersonaMode::Prompt,
             skills: vec![],
+            toolsets: vibevalley_protocol::Toolset::defaults_for(AgentRole::Worker),
             mcp_servers: vec![],
             disallowed_tools: vec![],
             env: BTreeMap::new(),
@@ -624,6 +625,7 @@ mod tests {
                 eye: String::new(),
                 avatar: None,
             },
+            voice: None,
             from: None,
         };
 
@@ -730,6 +732,7 @@ mod tests {
             persona: String::new(),
             persona_mode: PersonaMode::Prompt,
             skills: vec![],
+            toolsets: vibevalley_protocol::Toolset::defaults_for(AgentRole::Worker),
             mcp_servers: vec![],
             disallowed_tools: vec![],
             env: BTreeMap::new(),
@@ -748,6 +751,7 @@ mod tests {
                 eye: String::new(),
                 avatar: None,
             },
+            voice: None,
             from: None,
         };
 

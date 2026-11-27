@@ -1,6 +1,6 @@
 use crate::asset::{AssetBundle, BoneDesc, LightPreset, SceneSpec};
 use crate::camera::CameraRig;
-use crate::domain::{PlayerIntent, PlotActionOutcome, ScreenAnchor, YardSnapshotSync};
+use crate::domain::{DecorationSync, PlayerIntent, PlotActionOutcome, ScreenAnchor, YardSnapshotSync};
 use crate::foley::SoundKind;
 use crate::math::{Mat4, Vec3};
 use crate::nav::{NavEdgeSummary, NavGraph, PlacementStatus, is_in_canal, surface_height_at, validate_placement};
@@ -797,8 +797,45 @@ impl DioramaWorld {
         if let Some(tod) = sync.time_of_day {
             self.set_time_of_day(tod, false);
         }
+        self.apply_decorations_sync(sync.decorations);
         for slot in urgent_plots {
             self.recall_helper_to_plot(slot);
+        }
+    }
+
+    fn apply_decorations_sync(&mut self, decorations: Vec<DecorationSync>) {
+        let mut wanted = std::collections::HashSet::with_capacity(decorations.len());
+        for deco in &decorations {
+            wanted.insert(format!("shop_deco_{}", deco.id));
+        }
+        self.props.retain(|p| !p.id.starts_with("shop_deco_") || wanted.contains(&p.id));
+        for deco in decorations {
+            let prop_id = format!("shop_deco_{}", deco.id);
+            let is_lamp = deco.asset.contains("lantern") || deco.asset.contains("lamp");
+            let yaw_rad = deco.yaw_deg.to_radians();
+            let scale = if deco.scale > 0.1 { deco.scale } else { 1.0 };
+            let pos = Vec3::new(deco.x, 0.0, deco.z);
+            if let Some(existing) = self.props.iter_mut().find(|p| p.id == prop_id) {
+                existing.asset = deco.asset;
+                existing.pos = pos;
+                existing.scale = scale;
+                existing.yaw_rad = yaw_rad;
+                existing.is_lamp = is_lamp;
+                continue;
+            }
+            let sway = if is_lamp { 0.0 } else { 0.035 };
+            let mut spring = FlapSpring::new(0.0, 0.4, sway);
+            spring.fold_down_and_rise(0.0);
+            self.props.push(PropState {
+                id: prop_id,
+                asset: deco.asset,
+                pos,
+                scale,
+                yaw_rad,
+                is_lamp,
+                spring,
+                is_dynamic: false,
+            });
         }
     }
 
@@ -3703,7 +3740,7 @@ mod tests {
 
     #[test]
     fn phase_a_interact_plot_domain_sync_focus_and_dynamic_repath() {
-        use crate::domain::{PlotTicketSync, YardSnapshotSync};
+        use crate::domain::{DecorationSync, PlotTicketSync, YardSnapshotSync};
 
         let mut w = sample_world();
         // 1. Plot 0 starts Reviewing -> interact_plot harvests +1, plays HarvestChime, home helper celebrates
@@ -3715,7 +3752,7 @@ mod tests {
         assert_eq!(outcome.sound, SoundKind::HarvestChime);
         assert_eq!(w.helpers[0].rig.state, PuppetAnimState::Celebrate);
 
-        // 2. Idempotent domain sync pushes plot 1 to Asking and updates title
+        // 2. Idempotent domain sync pushes plot 1 to Asking, updates title, and renders unlocked decorations
         w.apply_domain_sync(YardSnapshotSync {
             plots: vec![PlotTicketSync {
                 index: 1,
@@ -3724,11 +3761,33 @@ mod tests {
                 locked: Some(false),
             }],
             helpers: vec![],
+            decorations: vec![DecorationSync {
+                id: "deco_stone_lantern".into(),
+                asset: "p_lantern".into(),
+                x: 2.15,
+                z: -1.85,
+                yaw_deg: 12.0,
+                scale: 1.15,
+            }],
             time_of_day: Some(TimeOfDay::Dusk),
         });
         assert_eq!(w.plots[1].stage, PlotStage::Asking);
         assert_eq!(w.plots[1].title, "#200 Sync Ticket");
         assert_eq!(w.time_of_day, TimeOfDay::Dusk);
+        assert_eq!(w.props.iter().filter(|p| p.id == "shop_deco_deco_stone_lantern").count(), 1);
+        // Re-applying the exact same decoration stays idempotent without duplicating props
+        w.apply_domain_sync(YardSnapshotSync {
+            decorations: vec![DecorationSync {
+                id: "deco_stone_lantern".into(),
+                asset: "p_lantern".into(),
+                x: 2.15,
+                z: -1.85,
+                yaw_deg: 12.0,
+                scale: 1.15,
+            }],
+            ..Default::default()
+        });
+        assert_eq!(w.props.iter().filter(|p| p.id == "shop_deco_deco_stone_lantern").count(), 1);
 
         // 3. Screen-space anchor projection includes urgent plot 1
         let anchors = w.project_screen_anchors(16.0 / 10.0);

@@ -72,7 +72,29 @@
     "failed": "【执行失败 · {target}】\n{summary}\n\n可在工作台查看详情或回复重试。",
     "runCompleted": "【一轮完成 · {name}】\n{summary}",
     "runCompletedTokens": "【一轮完成 · {name}】\n{summary}\n（消耗 {tokens} tokens）",
-    "runFailed": "【一轮失败 · {name}】\n{summary}"
+    "runFailed": "【一轮失败 · {name}】\n{summary}",
+    "permission": "【请求授权 · {session}】\n工具：{tool}\n{summary}\n\n回复 allow 允许，或 deny 拒绝。",
+    "permissionInput": "【请求授权 · {session}】\n工具：{tool}\n{summary}\n参数：{input}\n\n回复 allow 允许，或 deny 拒绝。"
+  },
+  "reply": {
+    "answered": "【已回复 · {target}】\n已将你的回答发给执行会话继续处理。",
+    "accepted": "【已完成 · {target}】\n验收通过，工单已完成。",
+    "rejected": "【已打回 · {target}】\n已将反馈发回修改：{reason}",
+    "retried": "【已重试 · {target}】\n已重新启动新一轮处理。",
+    "permAllowed": "【已授权 · {session}】\n已允许本次权限请求。",
+    "permAllowedAlways": "【已授权 · {session}】\n已始终允许该权限请求。",
+    "permDenied": "【已拒绝 · {session}】\n已拒绝该权限请求。",
+    "alreadyHandled": "【无需重复处理 · {target}】\n该提醒已处理或已过期。",
+    "permAlreadyHandled": "【无需重复处理 · {session}】\n该权限请求已处理或已过期。",
+    "emptyAnswer": "【无法回复 · {target}】\n回复内容不能为空，请直接回复你的答案。",
+    "reviewHint": "【无法识别指令 · {target}】\n请回复 accept / ok 完成验收，或回复 reject <原因> 打回修改。",
+    "rejectNeedsReason": "【缺少打回原因 · {target}】\n请在 reject 后填写具体原因，例如：reject 请补充单元测试。",
+    "stuckHint": "【无法识别指令 · {target}】\n请回复 retry 或 resume 重新启动该工单。",
+    "conflictHint": "【合并冲突 · {target}】\n合并冲突需在工作台处理后再重试。",
+    "permHint": "【无法识别指令 · {session}】\n请回复 allow 允许，或回复 deny 拒绝。",
+    "actionFailed": "【操作未完成 · {target}】\n{why}",
+    "permFailed": "【授权未完成 · {session}】\n{why}",
+    "noActionPort": "当前未挂载工单操作通道，请在工作台操作。"
   },
   "cronDigest": {
     "title": "【进展简报 · {title}】",
@@ -88,6 +110,10 @@
     "itemFailed": "· [失败] #{number} {title}：{detail}",
     "itemWorking": "· [进行中] #{number} {title}",
     "itemDone": "· #{number} {title}",
+    "healthHeader": "仓库健康度：",
+    "itemHealth": "· {repo}【{status}】（待办/开着 {open} · 阻塞 {blocked} · 卡住 {stuck}）",
+    "triageHeader": "备选池梳理建议（需在工作台点确认才生效）：",
+    "itemTriage": "· #{number}：{summary}",
     "more": "……还有 {n} 项",
     "quiet": "近期暂无新增进度，当前没有待处理工单。"
   }

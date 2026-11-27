@@ -443,8 +443,9 @@ pub fn board_slice(state: &SpaceState, seq: i64) -> BoardSlice {
     BoardSlice {
         seq,
         issues: state.issues.clone(),
-        board_summary: Some(board_summary(&state.issues, &state.sessions, channels)),
+        board_summary: Some(board_summary(&state.issues, &state.sessions, channels, None)),
         commits: state.commits.clone(),
+        repo_health: Vec::new(),
     }
 }
 
@@ -551,6 +552,7 @@ pub(crate) fn session_view(h: &Session, conflict: Option<&Conflict>) -> SessionV
         spent: h.spent.clone(),
         subagents: h.subagents.clone(),
         tool_connections: h.tool_connections.clone(),
+        telemetry: h.telemetry.clone(),
         machine: h.machine.clone(),
         phase_text: phase_words(h, conflict),
     }

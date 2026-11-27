@@ -20,5 +20,15 @@
     "emptyMessage": "消息内容不能为空",
     "notLive": "执行会话当前未运行",
     "interactionDecisionRequired": "需要选择选项、填写回复或取消"
+  },
+  "writeLockHeld": "工作区 {worktree} 当前正由执行会话 {holder} 独占写入，请先交接或让其收工",
+  "compact": {
+    "empty": "该会话还没有可压缩的持久化对话记录",
+    "notEnoughEntries": "当前未压缩条目还不够多，暂不需要手动压缩",
+    "closed": "已结束的会话不能触发压缩或运行 CodeMode"
+  },
+  "codemode": {
+    "emptyScript": "脚本内容不能为空",
+    "unsupportedRuntime": "引擎 `{runtime}` 不支持持久化 CodeMode 脚本执行"
   }
 }

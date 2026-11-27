@@ -18,6 +18,7 @@ import { useQueryClient } from "../../infra/query";
 import { Link as A, useRouter } from "../../infra/router";
 import { untrack } from "../../infra/solid";
 import { runsHref } from "../session";
+import { defaultToolsets } from "./AgentConfig";
 import { FromTemplate } from "./FromTemplate";
 
 /** features/orchestrator/OrchestratorPage.tsx's, which comes with phase 2. */
@@ -37,6 +38,7 @@ export function newOrchestrator(): Agent {
     persona: "",
     personaMode: "append",
     skills: [],
+    toolsets: defaultToolsets("orchestrator"),
     mcpServers: [],
     disallowedTools: [],
     env: {},

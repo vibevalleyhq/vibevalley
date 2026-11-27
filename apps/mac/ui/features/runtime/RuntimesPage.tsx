@@ -1,7 +1,17 @@
-import { computed, keymap, Scroll, signal, Text, View, windowSize } from "nsh";
+import { cleanup, computed, keymap, Scroll, signal, Text, View, windowSize } from "nsh";
 
 import { t } from "@vibevalley/i18n";
-import { type Agent, type MachinePlatform, type MachineStatus, RuntimeCapabilityValues, type RuntimeInfo, type SessionView } from "@vibevalley/protocol";
+import {
+  type Agent,
+  type InventoryEntry,
+  type MachinePlatform,
+  type MachineStatus,
+  type McpHostId,
+  type McpServerEntry,
+  RuntimeCapabilityValues,
+  type RuntimeInfo,
+  type SessionView,
+} from "@vibevalley/protocol";
 
 import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
@@ -35,7 +45,17 @@ import {
   type SelectedMachineRuntime,
   useMergedMachines,
 } from "./machines";
-import { capabilityLabel, InventoryCard, ModelsCard, SettingsCard, SupportCard, Usage } from "./RuntimeCards";
+import {
+  capabilityLabel,
+  InventoryCard,
+  mcpEntryDescription,
+  mcpHostOf,
+  ModelsCard,
+  RuntimeRunStatsCard,
+  SettingsCard,
+  SupportCard,
+  Usage,
+} from "./RuntimeCards";
 
 function compactVersion(raw: string): string {
   const cleaned = raw.replace(/\s*\([^)]*\)\s*$/u, "").trim();
@@ -166,12 +186,13 @@ export function RuntimesPage(props: { rest: string }) {
   const machines = useMergedMachines();
 
   const sidebarOpen = signal(true);
-  const inspectorOpen = signal(true);
+  const inspectorOverride = signal<boolean | undefined>(undefined);
+  const inspectorOpen = () => inspectorOverride() ?? lg();
   const inspectorWidth = usePaneWidth("runtime-inspector", 304, 248, 420);
   const refreshingAll = createAct();
   const refreshingOne = createAct();
 
-  keymap.bind("mod+\\", () => sidebarOpen.set(!sidebarOpen()), { when: "always" });
+  cleanup(keymap.bind("mod+\\", () => sidebarOpen.set(!sidebarOpen()), { when: "always" }));
 
   const groups = computed(() => buildMachineRuntimeGroups(machines(), ready(runtimes, []), t("web.runtime.machines.kind.local")));
   const totalInstalled = computed(() => groups().reduce((sum, g) => sum + g.runtimes.length, 0));
@@ -200,6 +221,18 @@ export function RuntimesPage(props: { rest: string }) {
 
   const keepRuntime = (got: RuntimeInfo) =>
     client.setData(runtimesQuery(), (all) => (all ? { value: all.value.map((r) => (r.id === got.id ? got : r)) } : undefined));
+
+  const syncMcpServers = (host: McpHostId, servers: readonly McpServerEntry[]) => {
+    const entries: InventoryEntry[] = servers.map((s) => ({
+      name: s.name,
+      description: mcpEntryDescription(s),
+      source: s.configPath,
+      enabled: s.enabled,
+    }));
+    client.setData(runtimesQuery(), (all) =>
+      all ? { value: all.value.map((r) => (mcpHostOf(r.id) === host ? { ...r, mcpServers: entries } : r)) } : undefined,
+    );
+  };
 
   const refreshAll = () =>
     refreshingAll.run(async () => {
@@ -326,7 +359,7 @@ export function RuntimesPage(props: { rest: string }) {
                 label={inspectorOpen() ? t("web.runtime.inspectorHide") : t("web.runtime.inspectorShow")}
                 testid="runtimes-inspector-toggle"
                 pressed={inspectorOpen()}
-                onClick={() => inspectorOpen.set(!inspectorOpen())}
+                onClick={() => inspectorOverride.set(!inspectorOpen())}
               />
             </View>
           </View>
@@ -380,7 +413,7 @@ export function RuntimesPage(props: { rest: string }) {
                 size={14}
                 label={t("web.runtime.inspectorHide")}
                 testid="runtimes-inspector-close"
-                onClick={() => inspectorOpen.set(false)}
+                onClick={() => inspectorOverride.set(false)}
               />
             </View>
             <Scroll class="min-h-0 flex-1" contentClass="gap-4 p-3.5 pb-6">
@@ -395,6 +428,7 @@ export function RuntimesPage(props: { rest: string }) {
                       if (info) void recheckOne(info.id);
                       else void refreshAll();
                     }}
+                    onMcpServersSynced={syncMcpServers}
                   />
                 )}
               </If>
@@ -762,6 +796,8 @@ function RuntimeWorkspace(props: {
         </If>
       </SettingsGroup>
 
+      <RuntimeRunStatsCard sessions={props.sessions} />
+
       <SettingsGroup title={t("web.runtime.sessions")} note={props.sessions.length > 0 ? String(props.sessions.length) : undefined}>
         <If
           when={props.sessions.length > 0}
@@ -774,7 +810,7 @@ function RuntimeWorkspace(props: {
           <Each of={props.sessions.slice(0, 6)} key={(s) => s.id}>
             {(s, i) => (
               <A
-                href="/runs"
+                href={`/runs?session=${encodeURIComponent(s().id)}`}
                 testID={`runtime-session-${s().id}`}
                 class={`min-h-11 flex-row items-center gap-2.5 px-4 py-2.5 hover:bg-hover ${
                   i() === Math.min(props.sessions.length, 6) - 1 ? "" : "border-b border-line"
@@ -802,7 +838,13 @@ function InspectorRow(props: { label: string; value: string; mono?: boolean; las
   );
 }
 
-function RuntimeInspector(props: { selected: SelectedMachineRuntime; groupCount: number; recheckBusy: boolean; onRecheck: () => void }) {
+function RuntimeInspector(props: {
+  selected: SelectedMachineRuntime;
+  groupCount: number;
+  recheckBusy: boolean;
+  onRecheck: () => void;
+  onMcpServersSynced: (host: McpHostId, servers: readonly McpServerEntry[]) => void;
+}) {
   const machine = () => props.selected.machine;
   const entry = () => props.selected.entry;
   const kind = () => machineKindMeta(machineKindOf(machine()));
@@ -867,7 +909,12 @@ function RuntimeInspector(props: { selected: SelectedMachineRuntime; groupCount:
         {(info) => (
           <>
             <SupportCard info={info()} />
-            <InventoryCard title={t("web.runtime.mcp")} entries={info().mcpServers} />
+            <InventoryCard
+              title={t("web.runtime.mcp")}
+              entries={info().mcpServers}
+              mcpHost={machine().here ? mcpHostOf(info().id) : undefined}
+              onMcpServersSynced={props.onMcpServersSynced}
+            />
             <InventoryCard title={t("web.runtime.skills")} entries={info().skills} />
             <InventoryCard title={t("web.runtime.tools")} entries={info().tools} />
           </>

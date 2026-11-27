@@ -733,3 +733,96 @@ fn a_queued_issue_waits_for_the_issue_it_is_blocked_by() {
     circle.blocked_by = vec!["2".into()];
     assert!(block_on(w.board.create_async(circle)).is_err());
 }
+
+#[test]
+fn regression_slow_delivery_check_does_not_block_unrelated_board_operations() {
+    let rt = HookRuntime::new("t", quick(), |turn| {
+        turn.commit(&format!("f{}.txt", turn.prompt.len()), "ok\n");
+        turn.done("ok");
+    });
+    let w = world(vec![rt], |_| {});
+    let main = repo(w.dir.path(), "app");
+    let other = repo(w.dir.path(), "other");
+    let started_flag = w.dir.path().join("check-started");
+    let proceed_flag = w.dir.path().join("check-proceed");
+
+    std::fs::create_dir_all(main.join(".vibevalley")).unwrap();
+    std::fs::write(
+        main.join(".vibevalley/check"),
+        format!(
+            "#!/bin/sh\ntouch '{}'\nwhile [ ! -f '{}' ]; do sleep 0.02; done\n",
+            started_flag.display(),
+            proceed_flag.display()
+        ),
+    )
+    .unwrap();
+    git(&main, &["add", "."]);
+    git(&main, &["commit", "-qm", "slow check"]);
+
+    block_on(w.board.create_async(new("Slow land", Some(&main)))).unwrap();
+    block_on(w.board.create_async(new("Unrelated", Some(&other)))).unwrap();
+    block_on(w.board.move_to_async("1", IssueStatus::Todo, None)).unwrap();
+    wait_stage(&w.board, "1", StageKind::Reviewing);
+
+    let board_for_land = w.board.clone();
+    let land_handle = vibevalley_runtime::rt::spawn(async move { board_for_land.move_to_async("1", IssueStatus::Done, None).await });
+
+    // While issue #1 is blocked inside slow `land_async` I/O, creating and dispatching
+    // unrelated issues must proceed without waiting on the coarse `Board::work` lock.
+    block_on(async {
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+        while !started_flag.exists() {
+            assert!(tokio::time::Instant::now() < deadline, "slow check never started");
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        tokio::time::timeout(Duration::from_secs(2), async {
+            let created = w.board.create_async(new("Created during land", Some(&other))).await.unwrap();
+            assert_eq!(created.number, 3);
+            assert_eq!(w.board.move_to_async("2", IssueStatus::Todo, None).await.unwrap(), Move::Start);
+        })
+        .await
+        .expect("board operations blocked behind slow delivery I/O");
+    });
+    wait_stage(&w.board, "2", StageKind::Reviewing);
+
+    std::fs::write(&proceed_flag, "go\n").unwrap();
+    assert_eq!(block_on(land_handle).unwrap().unwrap(), Move::Complete);
+    assert_eq!(board_issue(&w.board, "1").unwrap().delivered, Some(Landing::Merged));
+}
+
+#[test]
+fn regression_concurrent_dispatch_enforces_space_limit() {
+    let gate = TurnGate::new();
+    let rt = HookRuntime::new("t", gate.script("done"), |turn| turn.done("ok"));
+    let w = world(vec![rt], |c| c.space_limit = 1);
+    let a = repo(w.dir.path(), "a");
+    let b = repo(w.dir.path(), "b");
+    block_on(w.board.create_async(new("First", Some(&a)))).unwrap();
+    block_on(w.board.create_async(new("Second", Some(&b)))).unwrap();
+
+    let (r1, r2) = block_on(async {
+        tokio::join!(
+            w.board.move_to_async("1", IssueStatus::Todo, None),
+            w.board.move_to_async("2", IssueStatus::Todo, None)
+        )
+    });
+    assert_eq!(r1.unwrap(), Move::Start);
+    assert_eq!(r2.unwrap(), Move::Start);
+
+    let s1 = board_issue(&w.board, "1").unwrap().stage.state;
+    let s2 = board_issue(&w.board, "2").unwrap().stage.state;
+    assert_eq!(
+        [s1, s2].into_iter().filter(|&s| s == StageKind::Working).count(),
+        1,
+        "space_limit=1 must allow at most one working issue: ({s1:?}, {s2:?})"
+    );
+    assert_eq!(
+        [s1, s2].into_iter().filter(|&s| s == StageKind::Queued).count(),
+        1,
+        "second concurrent dispatch must queue: ({s1:?}, {s2:?})"
+    );
+
+    gate.release_n(2);
+    wait_stage(&w.board, "1", StageKind::Reviewing);
+    wait_stage(&w.board, "2", StageKind::Reviewing);
+}

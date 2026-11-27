@@ -274,8 +274,8 @@ function Shown(props: { artifact: Artifact; chat: ArtifactChat }) {
     activeArtifactType.set(props.artifact.artifactType);
   });
   cleanup(() => activeArtifactType.set(undefined));
-  // Wide visual canvases start with the right rail collapsed so the canvas gets the full width.
-  const rightPanel = signal<ArtifactRightPanel>(untracked(isWideCanvas) ? "none" : "chat");
+  // Wide visual canvases and narrower viewports (< lg) start with the right rail collapsed so the editor keeps full width.
+  const rightPanel = signal<ArtifactRightPanel>(untracked(() => !isWideCanvas() && lg()) ? "chat" : "none");
   const setRightPanel = (next: ArtifactRightPanel) => {
     rightPanel.set(next);
     if (next !== "history") historyPreview.set(undefined);
@@ -323,7 +323,9 @@ function Shown(props: { artifact: Artifact; chat: ArtifactChat }) {
     const { id, title } = props.artifact;
     const description = `${kindLabel(props.artifact)} · ${artifactHref(id)}`;
     return creatingIssue.run(async () => {
-      await api.issue.create({ title, description, requestKey: newSendKey() });
+      const made = await api.issue.create({ title, description, requestKey: newSendKey() });
+      await api.artifact.update({ id, issue: made.id });
+      void queries.invalidate({ prefix: ["artifacts"] });
       toast(t("web.library.content.issueCreated"));
     });
   };

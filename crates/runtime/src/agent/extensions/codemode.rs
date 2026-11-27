@@ -181,8 +181,9 @@ fn deterministic_seed(task_id: &str) -> u64 {
 
 #[cfg(test)]
 mod tests {
+    use parking_lot::Mutex;
     use std::collections::{BTreeMap, VecDeque};
-    use std::sync::{Arc, Mutex};
+    use std::sync::Arc;
     use std::time::Duration;
 
     use serde_json::{Value, json};
@@ -211,7 +212,7 @@ mod tests {
 
     impl ModelClient for QueueClient {
         fn complete<'a>(&'a self, _req: &'a ChatRequest, on: &'a mut (dyn FnMut(Delta) + Send)) -> BoxFuture<'a, AiResult<Completion>> {
-            let reply = self.replies.lock().unwrap().pop_front().expect("unexpected model call");
+            let reply = self.replies.lock().pop_front().expect("unexpected model call");
             if let Some(t) = &reply.message.content {
                 on(Delta::Text(t.clone()));
             }

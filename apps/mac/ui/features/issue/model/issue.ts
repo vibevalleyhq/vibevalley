@@ -18,16 +18,6 @@ export function issueSession(sessions: readonly SessionView[] | undefined, issue
 
 export const isRefined = (issue: Issue) => issue.description !== "" || issue.criteria.length > 0;
 
-export type Stage = "talk" | "work" | "finish";
-
-export const stages: Stage[] = ["talk", "work", "finish"];
-
-export const stageLabel: Record<Stage, string> = {
-  talk: t("web.issue.boardLabels.stage.talk"),
-  work: t("web.issue.boardLabels.stage.work"),
-  finish: t("web.issue.boardLabels.stage.finish"),
-};
-
 export type IssueTag = "queued" | "working" | "waiting" | "closed";
 
 export function issueTag(issue: Issue): IssueTag {

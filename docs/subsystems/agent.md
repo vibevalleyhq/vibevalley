@@ -35,7 +35,7 @@
 - **损坏配置自动备份，绝不覆盖**：启动时若 `config.json` 损坏或不符合 Schema，改名为 `config.json.unreadable-<毫秒>` 保留并按新农场初始化；改名失败则拒绝开机。
 - **角色固定为 `orchestrator` 与 `worker`**：默认助手 `orchestrator` 不可删除或改为帮工；所有助手档案必须用 `vibevalley` 农机，派工候选只含 `worker` 档案。
 - **跨层统一用 `Actor` 表示说话和操作的人**：`kind` 固定为 `user`、`agent`、`system`，仅 `kind: "agent"` 携带 `role`（`orchestrator` 或 `worker`）与 `forUser`。
-- **`duty` 供阅读，`tags` 供匹配**：`duty` 是一句话职责说明；`tags` 是关键词数组。
+- **`duty` 供阅读，`tags` 供匹配，`voice` 配听汇报**：`duty` 是一句话职责说明；`tags` 是关键词数组；可选的 `voice` 存 MOSS 音色 id（可在档案「身份」页配置，严格配对频道「听汇报」串行播报队列，未配置时静默跳过）。
 - **挑档案顺序（`presets.rs`）**：依次匹配：点名的档案名或 ID → 点名的农机上首个可用档案 → 用户界面选定的档案 → 工单文字命中 `Agent.tags` 最多的可用档案。建单和起草都用它。
 - **自带的技能只读，按 id 引用**：技能列表先列自带的（`builtIn: true`），再列用户自己写的；`skill.update`、`skill.delete` 碰到自带的一律拒绝，新建技能不占它们的 id。档案只存技能的 id，所以 VibeValley 一更新，勾了它的档案都拿到新版本。模板在 `agent.json` 的 `skills` 里写自带技能的 id，安装时勾上；按模板更新时再勾上，用户另勾的留着。任何档案都能勾自带的技能。
 - **从模板按需安装与更新**：新农场默认只装 `orchestrator` 及 `agent.starters` 指定的模板；用户在工作台一键采用时由服务端优先匹配本机已安装且启用的农机并按需调整 `personaMode`；`agent.template.update` 仅覆盖 `duty`、`tags`、人设和 `worktree`，保留用户改过的名称、外观、农机与模型（旧档案尚未带头像时顺带继承模板头像）。
@@ -95,7 +95,7 @@
 
 ## 还没做的
 
-- `opencode`、`grok`、`kimi`、`codebuddy`、`qwen`、`qoder` 的真实厂商 CLI 实机验证（计费、配额、插话、取消与跨版本恢复）：`#55`。
+- 已在本机对 `opencode`（`1.19.5`）、`grok`（`1.0.92`）、`kimi`（`2.3.2`）完成非付费真实二进制与 ACP 握手能力实测（`claude 2.1.322`、`codex-cli 0.170.0` 同在宿主机可用）；`codebuddy`、`qwen`、`qoder` 本机未安装，且已安装外部 CLI 的付费轮次计费与长程跨版本恢复验收尚未消费真实 API 额度验证（详表见 [session.md](docs/subsystems/session.md#一次农机执行怎样复核)）。
 - 档案配置 `toolsets`，技能库改用 Agent Skills 文件夹按需加载：`#52`。
 
 ## 怎么验证

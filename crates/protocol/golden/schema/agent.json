@@ -146,6 +146,9 @@
    "skills": [
     "s78"
    ],
+   "toolsets": [
+    "issue"
+   ],
    "mcpServers": [
     {
      "type": "stdio",
@@ -200,6 +203,7 @@
    "skills": [
     "s104"
    ],
+   "toolsets": [],
    "mcpServers": [
     {
      "type": "stdio",
@@ -328,6 +332,9 @@
      "skills": [
       "s160"
      ],
+     "toolsets": [
+      "issue"
+     ],
      "mcpServers": [
       {
        "type": "stdio",
@@ -382,6 +389,7 @@
      "skills": [
       "s183"
      ],
+     "toolsets": [],
      "mcpServers": [
       {
        "type": "stdio",
@@ -493,5 +501,17 @@
   {
    "id": "s6929"
   }
+ ],
+ "Toolset": [
+  "issue",
+  "session",
+  "channel",
+  "repo",
+  "cron",
+  "resource",
+  "memory",
+  "media",
+  "library",
+  "artifact"
  ]
 }

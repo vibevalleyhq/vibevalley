@@ -113,6 +113,7 @@ impl IssueMandate {
             strength: MandateStrength::Explicit,
             max_bot_review_rounds: DEFAULT_BOT_REVIEW_ROUNDS,
             auto_submit_pr,
+            pause: None,
         }
     }
 
@@ -122,6 +123,11 @@ impl IssueMandate {
             strength: MandateStrength::Inferred,
             ..IssueMandate::explicit(origin_trigger_id, false)
         }
+    }
+
+    /// True when an explicit human pause blocks automated/background resumption.
+    pub fn is_paused(&self) -> bool {
+        self.pause.is_some()
     }
 }
 
@@ -134,6 +140,19 @@ impl IssueStage {
             stuck: None,
             lead: None,
             acts: vec![],
+        }
+    }
+}
+
+impl ActorRef {
+    /// The local interactive user (`self`).
+    pub fn self_user() -> Self {
+        Self::User { id: "self".into() }
+    }
+
+    pub fn id(&self) -> &str {
+        match self {
+            Self::User { id } | Self::Agent { id } => id,
         }
     }
 }
@@ -180,6 +199,8 @@ impl Issue {
             tags: vec![],
             start_at: None,
             due_at: None,
+            owner: None,
+            relations: vec![],
         }
     }
 }
@@ -249,8 +270,21 @@ macro_rules! impl_session_readers {
                 self.profile.as_deref()
             }
 
+            pub fn is_readonly_issue_helper(&self) -> bool {
+                self.controller == SessionController::IssueBoard
+                    && self.issue_id().is_some()
+                    && matches!(
+                        self.policy,
+                        ExecutionPolicy::DirectCwd {
+                            permission_mode: SessionPermissionMode::ReadOnly,
+                            ..
+                        }
+                    )
+            }
+
             pub fn is_board_worker(&self) -> bool {
-                self.controller == SessionController::IssueBoard || self.issue_id().is_some()
+                (self.controller == SessionController::IssueBoard && !self.is_readonly_issue_helper())
+                    || (self.controller != SessionController::Orchestrator && self.controller != SessionController::IssueBoard && self.issue_id().is_some())
             }
 
             pub fn is_direct_talker(&self) -> bool {
@@ -302,6 +336,7 @@ impl Session {
             spent: None,
             subagents: None,
             tool_connections: None,
+            telemetry: None,
             machine: None,
             phase: Phase::resting(),
         }

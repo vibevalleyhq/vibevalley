@@ -5,7 +5,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use serde_json::json;
-use vibevalley_protocol::{Agent, AgentRole, BizCode, Build, DEFAULT_ORCHESTRATOR, Head, Look, ORCHESTRATOR_RUNTIME, PersonaMode, Skill, Species};
+use vibevalley_protocol::{Agent, AgentRole, BizCode, Build, DEFAULT_ORCHESTRATOR, Head, Look, ORCHESTRATOR_RUNTIME, PersonaMode, Skill, Species, Toolset};
 use vibevalley_server::agent::profile::{Profile, ProfileStore, profile};
 use vibevalley_server::context::{Context, Http, LiveState, Outbox, PublicDownload, StateFeed, TaskGroup};
 use vibevalley_server::service::Service;
@@ -38,6 +38,7 @@ fn draft() -> Agent {
         persona: String::new(),
         persona_mode: PersonaMode::Append,
         skills: vec![],
+        toolsets: Toolset::defaults_for(AgentRole::Worker),
         mcp_servers: vec![],
         disallowed_tools: vec![],
         env: Default::default(),
@@ -56,6 +57,7 @@ fn draft() -> Agent {
             eye: String::new(),
             avatar: None,
         },
+        voice: None,
         from: None,
     }
 }
@@ -593,5 +595,86 @@ fn usage_is_read_again_and_told() {
         assert!(tokio::time::timeout(std::time::Duration::from_millis(200), live.recv()).await.is_err());
         let _ = ctx.shutdown(std::time::Duration::from_secs(1)).await;
         service.close().await;
+    });
+}
+
+#[test]
+fn user_skills_migrate_to_skills_directory_and_roundtrip_on_disk() {
+    let home = tempfile::tempdir().unwrap();
+    let legacy_agent = json!({
+        "id": "legacy-worker",
+        "name": "旧帮工",
+        "role": "worker",
+        "duty": "",
+        "enabled": true,
+        "runtime": "pi",
+        "model": "",
+        "effort": "",
+        "persona": "",
+        "personaMode": "append",
+        "skills": ["migrated-skill"],
+        "mcpServers": [],
+        "disallowedTools": [],
+        "env": {},
+        "workdir": "",
+        "worktree": false,
+        "tags": [],
+        "look": { "species": "cat", "outfit": "farmer", "orchestrator": null, "body": "", "trim": "", "hat": "", "eye": "" }
+    });
+    let raw = json!({
+        "agents": [legacy_agent],
+        "skills": [{ "id": "migrated-skill", "name": "Migrated Skill", "description": "from config", "body": "Follow the migrated checklist." }],
+        "settings": {}
+    });
+    std::fs::write(home.path().join("config.json"), raw.to_string()).unwrap();
+
+    let s = open(home.path());
+    let skill_md = home.path().join("skills").join("migrated-skill").join("SKILL.md");
+    assert!(skill_md.is_file(), "expected migrated SKILL.md at {}", skill_md.display());
+    let disk_content = std::fs::read_to_string(&skill_md).unwrap();
+    assert!(
+        disk_content.contains("Migrated Skill") && disk_content.contains("Follow the migrated checklist."),
+        "{disk_content}"
+    );
+
+    let cfg: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(home.path().join("config.json")).unwrap()).unwrap();
+    assert!(cfg.get("skills").is_none(), "config.json should no longer persist skills: {cfg}");
+    assert_eq!(s.agent("legacy-worker").unwrap().toolsets, Toolset::defaults_for(AgentRole::Worker));
+
+    vibevalley_runtime::rt::block_on(async {
+        let created = s
+            .create_skill_async(Skill {
+                id: String::new(),
+                name: "Lint Check".into(),
+                description: "Run checks".into(),
+                body: "Run cargo clippy".into(),
+                built_in: None,
+            })
+            .await
+            .unwrap();
+        assert_eq!(created.id, "lint-check");
+        assert!(home.path().join("skills/lint-check/SKILL.md").is_file());
+
+        s.remove_skill_async("migrated-skill").await.unwrap();
+        assert!(!skill_md.exists());
+    });
+}
+
+#[test]
+fn agent_optional_voice_persists_through_config_without_migration() {
+    let home = tempfile::tempdir().unwrap();
+    vibevalley_runtime::rt::block_on(async {
+        let s = open(home.path());
+        let created = s
+            .create_async(Agent {
+                name: "VoiceWorker".into(),
+                voice: Some("voice-one".into()),
+                ..draft()
+            })
+            .await
+            .unwrap();
+        assert_eq!(created.voice.as_deref(), Some("voice-one"));
+        let reopened = open(home.path());
+        assert_eq!(reopened.agent(&created.id).unwrap().voice.as_deref(), Some("voice-one"));
     });
 }

@@ -202,3 +202,50 @@ export const McpInstallInput = z.object({
 export const McpUninstallInput = z.object({
   host: McpHostId,
 }) satisfies Codec<T.McpUninstallInput>;
+
+export const McpServerEntry = z.object({
+  host: McpHostId,
+  name: z.string(),
+  transport: McpTransportKind,
+  command: z.exactOptional(z.string()),
+  args: z.array(z.string()),
+  env: z.record(z.string(), z.string()),
+  url: z.exactOptional(z.string()),
+  headers: z.record(z.string(), z.string()),
+  enabled: z.boolean(),
+  configPath: z.string(),
+}) satisfies Codec<T.McpServerEntry>;
+
+export const McpServerListInput = z.object({
+  host: McpHostId,
+}) satisfies Codec<T.McpServerListInput>;
+
+export const McpServerListResult = z.object({
+  host: McpHostId,
+  configPath: z.exactOptional(z.string()),
+  servers: z.array(McpServerEntry),
+}) satisfies Codec<T.McpServerListResult>;
+
+export const McpServerSaveInput = z.object({
+  host: McpHostId,
+  previousName: z.exactOptional(z.string()),
+  name: z.string(),
+  transport: McpTransportKind,
+  command: z.exactOptional(z.string()),
+  args: z.array(z.string()),
+  env: z.record(z.string(), z.string()),
+  url: z.exactOptional(z.string()),
+  headers: z.record(z.string(), z.string()),
+  enabled: z.boolean(),
+}) satisfies Codec<T.McpServerSaveInput>;
+
+export const McpServerToggleInput = z.object({
+  host: McpHostId,
+  name: z.string(),
+  enabled: z.boolean(),
+}) satisfies Codec<T.McpServerToggleInput>;
+
+export const McpServerRemoveInput = z.object({
+  host: McpHostId,
+  name: z.string(),
+}) satisfies Codec<T.McpServerRemoveInput>;

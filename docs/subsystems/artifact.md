@@ -39,6 +39,9 @@ Artifact（`Artifact`）是用户、主助手和执行会话共同创作与交�
 ### 统一多人 + 多 Agent 实时协同层（不可妥协，覆盖全部 12 类）
 
 - **全类型一致协同**：全部 12 种 `ArtifactType` 运行在同一套实时协同层之上，支持多人类与多 Agent 并发编辑同一作品目录；协同变更经 CRDT 无冲突合并后物化同步至 `storage/` 下的 `manifest.json` 与 `structure/` 文件。
+- **按版本向量增量双向同步（`artifact.collab.export` / `artifact.collab.import`）**：支持基于 Loro `VersionVector` 的增量更新导出/导入（二进制格式与 `loro-crdt` WASM/JS 兼容），离线客户端重连后可交换缺失增量并在单次或两次往返内收敛；若浅快照压缩导致客户端版本向量落后于压缩根，自动回退全量快照。
+- **按 `origin` 分桶的流式微批合并（`OriginWriteBatcher`）**：短时间窗口内的流式写入严格按 `(artifact_id, origin)` 分桶合并为单次 CRDT 提交与持久化事务，既减少落盘与快照写放大，又确保不同来源永不跨 `origin` 混合，保证 `artifact.history.undoOrigin` 与游标折叠归因清晰。
+- **原生白板本地 Loro 副本（`VvWhiteboard`）**：`crates/rich/src/whiteboard.rs` 内嵌进程内 `CollabDoc` 副本，本地绘制与属性修改零往返即时重绘并按版本向量增量导出 Loro delta，远端更新按增量差值合入画布而保留本地摄像机、选区与未落盘并发改动。
 - **纯内存实时在场（`PresenceHub`）**：按 `artifact_id` 维护驻留内存的 `PresenceHub`（带 TTL 过期淘汰），通过 `artifact.presence.update` 与订阅流 `artifact.presence.follow` 实时同步人与 Agent 的光标、选区、聚焦区域与视口，零数据库写入。
 - **按 `origin` 归因的变更日志与时间旅行（`artifact_change`、`artifact.history.*`）**：每次协同提交附带 `CommitMeta` 归因（人类用户、具体执行会话或撤销操作），支持历史列表、只读预览、一键恢复、分叉为新作品、浅快照压缩与按 `origin` 选择性撤销（仅撤指定执行会话轮次，保留人类与其他并发会话改动）。
 - **人机评审建议（`artifact_suggestion`、`artifact.suggestion.*`）**：Agent 改动人类正在或已经编辑的内容时，通过持久化建议分流（`create` / `accept` / `reject`）并经 `artifact.suggestion.follow` 推送，绝不盲目覆盖并发人类改动。
@@ -94,7 +97,6 @@ Artifact（`Artifact`）是用户、主助手和执行会话共同创作与交�
 ## 还没做的
 
 - 作品类型向高内聚原语（`3+1` / Block Rich Doc 与多维数据表 `Base`）及协同交互体验收敛：`#31`、`#32`、`#38`–`#40`。
-- Loro 远端浏览器 WASM/JS 双向同步与流式微批合并：`#58`。
 
 ## 怎么验证
 

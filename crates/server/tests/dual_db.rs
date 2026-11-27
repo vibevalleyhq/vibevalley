@@ -206,22 +206,27 @@ fn start_server(home: &Path, database_url: Option<String>, weixin_url: &str) -> 
         ..Vendors::default()
     };
 
-    vibevalley_server::create_app_blocking(vibevalley_server::Config {
-        version: "0.1.0-dual-db-test".into(),
-        registry: Some(Arc::new(registry)),
-        probe_runtimes: false,
-        orchestrator_listens: false,
-        link_previews: false,
-        tick_crons: false,
-        debug_enabled: false,
-        database_url,
-        connector: ConnectorOptions {
-            vendors,
-            moment: Duration::from_secs(2),
-            ..ConnectorOptions::default()
+    vibevalley_server::app::create_app_with_overrides_blocking(
+        vibevalley_server::Config {
+            version: "0.1.0-dual-db-test".into(),
+            registry: Some(Arc::new(registry)),
+            probe_runtimes: false,
+            orchestrator_listens: false,
+            link_previews: false,
+            tick_crons: false,
+            debug_enabled: false,
+            database_url,
+            ..vibevalley_server::Config::under(home)
         },
-        ..vibevalley_server::Config::under(home)
-    })
+        vibevalley_server::app::Overrides {
+            connector: Some(ConnectorOptions {
+                vendors,
+                moment: Duration::from_secs(2),
+                ..ConnectorOptions::default()
+            }),
+            ..Default::default()
+        },
+    )
     .unwrap()
 }
 
@@ -353,11 +358,16 @@ fn run_full_stack_e2e(home: &Path, database_url: Option<String>) {
     );
     let deadline = std::time::Instant::now() + Duration::from_secs(5);
     loop {
-        let connectors = ok(&started, "connector.list", json!({})).as_array().unwrap().clone();
-        if connectors.iter().any(|c| c["id"] == "weixin" && c["state"] == "connected") {
+        vibevalley_runtime::rt::block_on(started.ctx().feed.flush());
+        let collab: vibevalley_protocol::CollabSlice = serde_json::from_str(&started.ctx().feed.snapshot_json(SliceKind::Collab)).unwrap();
+        if collab.connectors.iter().any(|c| c.id.as_str() == "weixin" && c.state.as_str() == "connected") {
             break;
         }
-        assert!(std::time::Instant::now() < deadline, "connector weixin did not reach connected: {connectors:?}");
+        assert!(
+            std::time::Instant::now() < deadline,
+            "connector weixin did not reach connected: {:?}",
+            collab.connectors
+        );
         vibevalley_runtime::rt::block_on(async { tokio::time::sleep(Duration::from_millis(25)).await });
     }
     ok(&started, "connector.channel.set", json!({ "id": "weixin", "channel": "#dual-eng" }));
@@ -382,8 +392,8 @@ fn run_full_stack_e2e(home: &Path, database_url: Option<String>) {
             .upload_async(&media_id, Box::new(std::io::Cursor::new(media_bytes.to_vec()))),
     )
     .unwrap();
-    let media_got = ok(&started, "media.input.get", json!({ "id": media_id }));
-    assert_eq!(media_got["phase"], "ready");
+    let media_listed = ok(&started, "media.input.list", Value::Null);
+    assert!(media_listed.as_array().unwrap().iter().any(|m| m["id"] == media_id && m["phase"] == "ready"));
 
     // 10. content/artifact (docs + slides directory files)
     let md_art = ok(
@@ -501,8 +511,14 @@ fn run_full_stack_e2e(home: &Path, database_url: Option<String>) {
     let pins = ok(&reopened, "channel.pin.list", json!({ "id": eng_id }));
     assert!(pins.as_array().unwrap().iter().any(|p| p["id"] == msg_id));
 
-    let connectors = ok(&reopened, "connector.list", json!({}));
-    assert!(connectors.as_array().unwrap().iter().any(|c| c["id"] == "weixin" && c["channel"] == "dual-eng"));
+    vibevalley_runtime::rt::block_on(reopened.ctx().feed.flush());
+    let collab: vibevalley_protocol::CollabSlice = serde_json::from_str(&reopened.ctx().feed.snapshot_json(SliceKind::Collab)).unwrap();
+    assert!(
+        collab
+            .connectors
+            .iter()
+            .any(|c| c.id.as_str() == "weixin" && c.channel.as_deref() == Some("dual-eng"))
+    );
 
     let lib_items = ok(&reopened, "library.item.list", json!({}));
     assert!(lib_items.as_array().unwrap().iter().any(|i| i["attachment"]["id"] == att_id));

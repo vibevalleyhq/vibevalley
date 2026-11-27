@@ -12,10 +12,12 @@ use std::time::{Duration, Instant};
 use serde_json::{Value, json};
 use vibevalley_core::SliceMask;
 use vibevalley_protocol::{
-    BizCode, Caller, ContextRef, DebugBundleResult, DebugGraph, DebugOverrideConfig, DebugSnapshot, DebugTimelineEvent, DebugTimelineLane, DebugTimelinePage,
-    DebugTrajectoryDetail, DebugTrajectoryKind, DebugTrajectorySummary, EventTokens, Execution, ExecutionPolicy, Issue, Phase, Session, SessionAction,
-    SessionController, SliceKind,
+    BizCode, Caller, ContextRef, DebugBundleResult, DebugOverrideConfig, DebugSnapshot, DebugTimelineEvent, DebugTimelineLane, DebugTimelinePage,
+    DebugTrajectoryDetail, DebugTrajectoryExportResult, DebugTrajectoryKind, DebugTrajectorySummary, EventTokens, Execution, ExecutionPolicy, Issue, Phase,
+    Session, SessionAction, SessionController, SliceKind,
 };
+use vibevalley_runtime::agent::durable::Store;
+use vibevalley_runtime::agent::eval::{ReplaySpec, analyze_store};
 use vibevalley_runtime::oar::voyage::{Header as VoyageHeader, Kind as VoyageKind, Record as VoyageRecord, Writer as VoyageWriter};
 use vibevalley_runtime::oar::{Event as OarEvent, EventKind as OarEventKind, OarObserver, Registry, StopReason, Usage as OarUsage};
 use vibevalley_server::Server as _;
@@ -125,14 +127,12 @@ fn disabled_by_default_refuses_all_nine_endpoints_and_leaves_hub_unobserved() {
     assert!(!started.router().has_fault_gate(), "disabled server must not attach fault gate");
     assert!(!vibevalley_runtime::oar::has_observer(), "disabled server must not attach global oar observer");
 
-    let cases: [(&str, Value); 9] = [
+    let cases: [(&str, Value); 7] = [
         ("debug.snapshot", json!({})),
         ("debug.timeline.list", json!({})),
         ("debug.timeline.clear", json!({})),
         ("debug.trajectory.list", json!({})),
         ("debug.trajectory.get", json!({ "id": "orchestrator" })),
-        ("debug.graph", json!({})),
-        ("debug.override.get", json!({})),
         ("debug.override.set", json!({ "rpcDelayMs": 0, "sliceDelayMs": 0 })),
         ("debug.bundle.export", json!({})),
     ];
@@ -448,12 +448,12 @@ fn fault_gate_delays_normal_ops_without_delaying_or_recording_debug_ops() {
     assert_eq!(cfg.disconnect_topic.as_deref(), Some("slice:board"));
 
     let t_debug = Instant::now();
-    let get_env = started.router().call_as(Caller::User, "debug.override.get", json!({}));
+    let get_env = started.router().call_as(Caller::User, "debug.snapshot", json!({}));
     let debug_elapsed = t_debug.elapsed();
     assert_eq!(get_env.biz_code, 0);
     assert!(
         debug_elapsed < Duration::from_millis(30),
-        "debug.override.get must not be delayed (took {debug_elapsed:?})"
+        "debug.snapshot must not be delayed (took {debug_elapsed:?})"
     );
 
     let t_normal = Instant::now();
@@ -485,8 +485,8 @@ fn fault_gate_delays_normal_ops_without_delaying_or_recording_debug_ops() {
     assert_eq!(gate.delay_ms("debug.snapshot"), 0);
     assert!(gate.should_disconnect("slice:board"));
     assert!(!gate.should_disconnect("slice:board"), "disconnect_topic must be one-shot");
-    let after_cfg: DebugOverrideConfig = serde_json::from_value(started.router().call_as(Caller::User, "debug.override.get", json!({})).data.unwrap()).unwrap();
-    assert_eq!(after_cfg.disconnect_topic, None);
+    let snap_after: DebugSnapshot = serde_json::from_value(started.router().call_as(Caller::User, "debug.snapshot", json!({})).data.unwrap()).unwrap();
+    assert_eq!(snap_after.overrides.disconnect_topic, None);
 
     started.router().call_as(
         Caller::User,
@@ -675,6 +675,11 @@ fn trajectory_inspector_covers_issue_workspace_and_orchestrator_with_voyage_toke
     .unwrap();
     assert_eq!(issue_detail.voyage_record_count, 1);
     assert_eq!(issue_detail.subagent_paths, vec!["sub-1"]);
+    assert!(
+        issue_detail.subagent_nodes.iter().any(|n| n.path == "sub-1"),
+        "expected structured subagent node for sub-1: {:?}",
+        issue_detail.subagent_nodes
+    );
     assert_eq!(issue_detail.turns.len(), 1);
     let t0 = &issue_detail.turns[0];
     assert_eq!(t0.prompt.as_deref(), Some("Fix the silent failure"));
@@ -721,13 +726,12 @@ fn trajectory_inspector_covers_issue_workspace_and_orchestrator_with_voyage_toke
 
     let base_board_watchers = started.router().slice_watcher_counts().get("board").copied().unwrap_or(0);
     let _board_watch = started.ctx().feed.subscribe(SliceKind::Board);
-    let graph: DebugGraph = serde_json::from_value(started.router().call_as(Caller::User, "debug.graph", json!({})).data.unwrap()).unwrap();
-    let g_issue = graph.sessions.iter().find(|s| s.session_id == "sess-issue-1").unwrap();
+
+    let snap: DebugSnapshot = serde_json::from_value(started.router().call_as(Caller::User, "debug.snapshot", json!({})).data.unwrap()).unwrap();
+    let g_issue = snap.graph.sessions.iter().find(|s| s.session_id == "sess-issue-1").unwrap();
     assert_eq!(g_issue.issue_id, Some(7));
     assert_eq!(g_issue.kind, DebugTrajectoryKind::IssueSession);
     assert_eq!(g_issue.status, "working");
-
-    let snap: DebugSnapshot = serde_json::from_value(started.router().call_as(Caller::User, "debug.snapshot", json!({})).data.unwrap()).unwrap();
     assert_eq!(snap.state_cache.slice_seqs.len(), 6);
     assert_eq!(snap.state_cache.slice_watchers.get("board"), Some(&(base_board_watchers + 1)));
     assert_eq!(snap.state_cache.counts.issues, 1);
@@ -736,6 +740,91 @@ fn trajectory_inspector_covers_issue_workspace_and_orchestrator_with_voyage_toke
     assert!(snap.overview.latest_seq > 0);
     assert!(started.router().slice_seqs().len() == 6);
     assert_eq!(started.router().slice_watcher_counts().get("board"), Some(&(base_board_watchers + 1)));
+
+    // Verify one-click trajectory eval bundle export produces a Store + ReplaySpec readable by vibevalley-eval.
+    let export_out = dir.path().join("exported-eval-bundle");
+    let export_env = started.router().call_as(
+        Caller::User,
+        "debug.trajectory.export",
+        json!({
+            "id": "sess-issue-1",
+            "outDir": export_out.to_string_lossy().to_string(),
+        }),
+    );
+    assert_eq!(export_env.biz_code, 0, "{}", export_env.message);
+    let exported: DebugTrajectoryExportResult = serde_json::from_value(export_env.data.unwrap()).unwrap();
+    assert_eq!(exported.dir, export_out.to_string_lossy());
+    assert!(exported.entries_exported >= 1);
+    assert!(exported.inspect_cmd.contains("vibevalley-eval inspect"));
+    assert!(exported.replay_cmd.contains("vibevalley-eval replay"));
+    let replay_raw = std::fs::read_to_string(&exported.replay_spec_path).unwrap();
+    let replay_spec: ReplaySpec = serde_json::from_str(&replay_raw).unwrap();
+    assert_eq!(replay_spec.source_path, export_out);
+    assert_eq!(replay_spec.conversation_id.as_deref(), Some(exported.conversation_id.as_str()));
+    vibevalley_runtime::rt::block_on(async {
+        let store = Store::open_any_read_only(Path::new(&exported.dir)).await.unwrap();
+        let metrics = analyze_store(&store, &exported.conversation_id, &[]).await.unwrap();
+        assert!(metrics.entry_count >= 1);
+        let _ = store.close().await;
+    });
+
+    started.close_blocking();
+}
+
+#[test]
+fn state_cache_inspects_live_loro_frontiers_and_ephemeral_presence() {
+    let _guard = DEBUG_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let dir = tempfile::tempdir().unwrap();
+    let started = start_server(dir.path(), true, "sk-collab-secret-token");
+
+    let created = started.router().call_as(
+        Caller::User,
+        "artifact.create",
+        json!({ "title": "Collab Inspector Doc", "artifactType": "docs", "announce": false }),
+    );
+    assert_eq!(created.biz_code, 0, "{}", created.message);
+    let art_id = created.data.unwrap()["id"].as_str().unwrap().to_string();
+
+    let presence = started.router().call_as(
+        Caller::User,
+        "artifact.presence.update",
+        json!({
+            "id": art_id,
+            "presence": {
+                "id": "peer-alice",
+                "name": "Alice",
+                "color": "#3b82f6",
+                "kind": "cursor",
+                "path": "structure/doc.md",
+                "nodeId": "sec-1",
+                "status": "editing sk-collab-secret-token",
+                "updatedAt": 0
+            }
+        }),
+    );
+    assert_eq!(presence.biz_code, 0, "{}", presence.message);
+
+    let snap_env = started.router().call_as(Caller::User, "debug.snapshot", json!({}));
+    assert_eq!(snap_env.biz_code, 0, "{}", snap_env.message);
+    let snap: DebugSnapshot = serde_json::from_value(snap_env.data.unwrap()).unwrap();
+    let entry = snap
+        .state_cache
+        .collab
+        .iter()
+        .find(|c| c.artifact_id == art_id)
+        .unwrap_or_else(|| panic!("missing collab state for {art_id} in {:?}", snap.state_cache.collab));
+    assert_eq!(entry.title, "Collab Inspector Doc");
+    assert_eq!(entry.artifact_type, "docs");
+    assert!(entry.snapshot_bytes > 0);
+    assert!(entry.ephemeral_ttl_ms > 0);
+    assert_eq!(entry.presence_count, 1);
+    assert_eq!(entry.presence.len(), 1);
+    assert_eq!(entry.presence[0].id, "peer-alice");
+    assert_eq!(entry.presence[0].name, "Alice");
+    assert_eq!(entry.presence[0].node_id.as_deref(), Some("sec-1"));
+    assert_eq!(entry.presence[0].path.as_deref(), Some("structure/doc.md"));
+    let serialized = serde_json::to_string(&snap.state_cache.collab).unwrap();
+    assert!(!serialized.contains("sk-collab-secret-token"), "leaked secret in collab snapshot: {serialized}");
 
     started.close_blocking();
 }

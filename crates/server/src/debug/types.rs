@@ -1,13 +1,22 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Instant;
 
 use serde_json::Value;
-use vibevalley_protocol::{DebugRuntimeSummary, DebugTrajectoryKind, Issue, Session, SessionEvent};
+use vibevalley_protocol::{ApiError, DebugCollabArtifactState, DebugRuntimeSummary, DebugTrajectoryKind, Issue, Session, SessionEvent};
 
 use crate::context::Context;
 use crate::context::api::{BoxFuture, SharedHostDebug};
 use crate::setting::Setting;
+
+/// Result of exporting a matching durable conversation directly via `Store::export_conversation_jsonl`.
+#[derive(Debug, Clone, Default)]
+pub struct DurableExportSummary {
+    pub conversation_id: String,
+    pub entries_exported: u32,
+    pub tasks_exported: u32,
+    pub conversations_exported: u32,
+}
 
 /// Snapshot of runtime probe status and profile counts injected from `app.rs`
 /// so `debug` stays free of upward business-domain imports.
@@ -29,6 +38,7 @@ pub struct DebugStateSnapshot {
     pub media_job_count: u32,
     pub inbox_count: u32,
     pub state_cache_json: Value,
+    pub collab: Vec<DebugCollabArtifactState>,
 }
 
 /// Narrow read-only data provider implemented in `app.rs` bridging
@@ -39,6 +49,13 @@ pub trait DebugDataSource: Send + Sync {
     fn system_prompt_async<'a>(&'a self, session_id: &'a str, kind: DebugTrajectoryKind) -> BoxFuture<'a, Option<String>>;
     fn runtime_probe(&self) -> RuntimeProbeSnapshot;
     fn state_snapshot_async(&self) -> BoxFuture<'_, DebugStateSnapshot>;
+    fn export_durable_conversation_async<'a>(
+        &'a self,
+        _session_id: &'a str,
+        _dest_dir: &'a Path,
+    ) -> BoxFuture<'a, Result<Option<DurableExportSummary>, ApiError>> {
+        Box::pin(async { Ok(None) })
+    }
 }
 
 /// Empty source used in unit tests when no domain modules are attached.

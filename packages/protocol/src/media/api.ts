@@ -19,7 +19,6 @@ export interface MediaHandlers {
   readonly "media.input.create": (a: T.MediaInputRequest) => Promise<T.MediaInput>;
   /** A kept attachment (a library item) taken as an input, checked as an upload is. */
   readonly "media.input.adopt": (a: { readonly attachment: string }) => Promise<T.MediaInput>;
-  readonly "media.input.get": (a: T.MediaJobRequest) => Promise<T.MediaInput>;
   readonly "media.input.list": () => Promise<T.MediaInput[]>;
   readonly "media.input.previewDelete": (a: T.MediaJobRequest) => Promise<T.Preview>;
   readonly "media.input.delete": (a: T.MediaJobRequest) => Promise<void>;
@@ -29,7 +28,6 @@ export interface MediaHandlers {
   readonly "media.understanding.start": (a: T.MediaJobRequest) => Promise<T.MediaUnderstandingJob>;
   readonly "media.speech.create": (a: T.MediaSpeechRequest) => Promise<T.MediaSpeechJob>;
   readonly "media.speech.resume": (a: T.MediaJobRequest) => Promise<T.MediaSpeechJob>;
-  readonly "media.understanding.previewCleanup": (a: T.MediaJobRequest) => Promise<T.Preview>;
   readonly "media.understanding.cleanup": (a: T.MediaJobRequest) => Promise<T.MediaUnderstandingJob>;
   readonly "media.job.get": (a: T.MediaJobRequest) => Promise<T.MediaJob>;
   readonly "media.job.cancel": (a: T.MediaJobRequest) => Promise<T.MediaJob>;
@@ -55,7 +53,6 @@ export const mediaEndpoints: readonly Endpoint[] = [
   { op: "media.audio.cleanup", about: ["id"], input: S.MediaJobRequest, result: A.MediaAudioJob, can: ["user"], dryRun: "media.audio.previewCleanup" },
   { op: "media.input.create", about: [], input: S.MediaInputRequest, result: S.MediaInput, can: ["user"] },
   { op: "media.input.adopt", about: [], input: input({ attachment: z.string() }), result: S.MediaInput, can: ["user"] },
-  { op: "media.input.get", about: ["id"], input: S.MediaJobRequest, result: S.MediaInput, can: ["user"] },
   { op: "media.input.list", about: [], input: undefined, result: z.array(S.MediaInput), can: ["user"] },
   { op: "media.input.delete", about: ["id"], input: S.MediaJobRequest, result: undefined, can: ["user"], dryRun: "media.input.previewDelete" },
   { op: "media.input.previewDelete", about: ["id"], input: S.MediaJobRequest, result: Preview, can: ["user"] },
@@ -65,14 +62,12 @@ export const mediaEndpoints: readonly Endpoint[] = [
   { op: "media.understanding.start", about: ["id"], input: S.MediaJobRequest, result: S.MediaUnderstandingJob, can: ["orchestrator"] },
   { op: "media.speech.create", about: [], input: S.MediaSpeechRequest, result: S.MediaSpeechJob, can: ["user", "orchestrator"] },
   { op: "media.speech.resume", about: ["id"], input: S.MediaJobRequest, result: S.MediaSpeechJob, can: ["user"] },
-  { op: "media.understanding.previewCleanup", about: ["id"], input: S.MediaJobRequest, result: Preview, can: ["user"] },
   {
     op: "media.understanding.cleanup",
     about: ["id"],
     input: S.MediaJobRequest,
     result: S.MediaUnderstandingJob,
     can: ["user"],
-    dryRun: "media.understanding.previewCleanup",
   },
   { op: "media.job.get", about: ["id"], input: S.MediaJobRequest, result: S.MediaJob, can: ["user", "orchestrator"] },
   { op: "media.job.cancel", about: ["id"], input: S.MediaJobRequest, result: S.MediaJob, can: ["user", "orchestrator"] },

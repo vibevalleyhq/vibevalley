@@ -12,8 +12,8 @@ use vibevalley_runtime::agent::harness::worker_conversation;
 use vibevalley_runtime::agent::runtime::{VibeValleyRuntime, default_registry};
 use vibevalley_runtime::agent::{ChatRequest, Completion, Delta, FinishReason, Message, ModelClient, Role, ToolCall};
 use vibevalley_runtime::oar::{
-    AgentError, ContentBlock, Event, EventKind, FileChangeKind, Installation, PermissionDecision, PermissionMode, Runtime, SessionOptions, SessionStatus,
-    StopReason, SubagentStatus,
+    AgentError, ContentBlock, ControlAction, ControlStatus, Event, EventKind, FileChangeKind, Installation, PermissionDecision, PermissionMode, Runtime,
+    SessionOptions, SessionStatus, StopReason, SubagentStatus,
 };
 
 const WAIT: Duration = Duration::from_secs(10);
@@ -493,4 +493,37 @@ async fn subagent_events_forward_through_oar_session() {
         }
     )));
     assert_eq!(texts(&events), "parent complete");
+}
+
+#[tokio::test]
+async fn vibevalley_runtime_supports_manual_compact_and_codemode_tool() {
+    let dir = tempfile::tempdir().unwrap();
+    let work = tempfile::tempdir().unwrap();
+    let runtime = VibeValleyRuntime::new(Arc::new(|| None), dir.path().to_path_buf()).with_client(answers(vec![
+        msg(Some("turn one"), vec![]),
+        msg(Some("turn two"), vec![]),
+        msg(Some("turn three"), vec![]),
+        msg(Some("## Goal\ncompacted summary"), vec![]),
+        msg(Some("turn four"), vec![]),
+    ]));
+    let session = runtime
+        .open(SessionOptions {
+            cwd: work.path().to_path_buf(),
+            permission_mode: PermissionMode::Bypass,
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    let mut rx = session.events();
+    for prompt in ["p1", "p2", "p3"] {
+        session.prompt(text(prompt)).await.unwrap();
+        until(&mut rx, turn_finished).await;
+    }
+
+    let compact = session.control(ControlAction::Compact, "", "c1", "c1").await.unwrap();
+    assert_eq!(compact.status, ControlStatus::Accepted);
+
+    session.prompt(text("p4")).await.unwrap();
+    let events = until(&mut rx, turn_finished).await;
+    assert_eq!(texts(&events), "turn four");
 }

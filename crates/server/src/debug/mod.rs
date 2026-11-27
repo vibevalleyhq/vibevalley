@@ -14,4 +14,4 @@ pub mod trajectory;
 mod types;
 
 pub use service::DebugKit;
-pub use types::{DebugDataSource, DebugParts, DebugStateSnapshot, EmptyDebugDataSource, RuntimeProbeSnapshot};
+pub use types::{DebugDataSource, DebugParts, DebugStateSnapshot, DurableExportSummary, EmptyDebugDataSource, RuntimeProbeSnapshot};

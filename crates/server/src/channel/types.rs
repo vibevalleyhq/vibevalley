@@ -5,8 +5,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    Actor, AgentRole, ApiError, ArtifactCard, ArtifactViewContext, Attachment, BizCode, ChannelType, ChatMessage, Embed, MessageKind, Notify, Outcome,
-    Reaction, Spent, SubjectKind, USER_ID,
+    Actor, AgentRole, ApiError, ArtifactCard, ArtifactViewContext, Attachment, BizCode, ChannelCommand, ChannelType, ChatMessage, Embed, MessageKind, Notify,
+    Outcome, Reaction, Spent, SubjectKind, USER_ID,
 };
 
 use crate::context::{LookIn, missing, refused as refuse};
@@ -297,6 +297,8 @@ pub struct Meta {
     pub response_port: Option<String>,
     #[serde(default, skip_serializing_if = "is_empty_opt_str")]
     pub voice_mode: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub command: Option<ChannelCommand>,
 }
 
 /// `metaOf`: one that does not read is none.
@@ -552,6 +554,8 @@ pub struct Saying {
     pub view_context: Option<ArtifactViewContext>,
     /// Delivers only to this orchestrator.
     pub to: Option<String>,
+    /// Optional slash skill invocation parsed by the channel composer.
+    pub command: Option<ChannelCommand>,
 }
 
 /// What was made, shown on the message that says so.

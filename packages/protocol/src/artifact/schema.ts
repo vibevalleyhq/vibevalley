@@ -302,6 +302,7 @@ export const ArtifactUpdateRequest = z.object({
   id: ArtifactId,
   title: z.exactOptional(z.string()),
   isDefault: z.exactOptional(z.boolean()),
+  issue: z.exactOptional(z.string()),
 }) satisfies Codec<T.ArtifactUpdateRequest>;
 
 export const ArtifactListRequest = z.object({
@@ -474,3 +475,36 @@ export const ArtifactHistoryUndoOriginRequest = z.object({
 export const ArtifactHistoryCompactRequest = z.object({
   id: ArtifactId,
 }) satisfies Codec<T.ArtifactHistoryCompactRequest>;
+
+export const ArtifactCollabExportRequest = z.object({
+  id: ArtifactId,
+  versionVector: z.exactOptional(z.string()),
+}) satisfies Codec<T.ArtifactCollabExportRequest>;
+
+export const ArtifactCollabExportResult = z.object({
+  artifactId: ArtifactId,
+  seq: z.number(),
+  versionVector: z.string(),
+  frontiers: z.string(),
+  snapshot: z.boolean(),
+  update: z.string(),
+}) satisfies Codec<T.ArtifactCollabExportResult>;
+
+export const ArtifactCollabImportRequest = z.object({
+  id: ArtifactId,
+  update: z.string(),
+  clientVersionVector: z.exactOptional(z.string()),
+  origin: z.exactOptional(z.string()),
+  summary: z.exactOptional(z.string()),
+}) satisfies Codec<T.ArtifactCollabImportRequest>;
+
+export const ArtifactCollabImportResult = z.object({
+  artifactId: ArtifactId,
+  seq: z.number(),
+  versionVector: z.string(),
+  frontiers: z.string(),
+  files: z.array(ArtifactFileMeta),
+  deleted: z.array(z.string()),
+  serverUpdate: z.exactOptional(z.string()),
+  serverSnapshot: z.exactOptional(z.boolean()),
+}) satisfies Codec<T.ArtifactCollabImportResult>;

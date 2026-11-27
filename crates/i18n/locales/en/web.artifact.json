@@ -98,7 +98,20 @@
     "htmlPreviewMode": "Preview"
   },
   "issue": {
-    "title": "Artifacts"
+    "title": "Artifacts",
+    "empty": "No linked artifacts yet",
+    "linkExisting": "Link existing artifact…",
+    "linkPlaceholder": "Search artifacts…",
+    "linkEmpty": "No matching unlinked artifacts",
+    "new": "New artifact",
+    "newDialogTitle": "New linked artifact",
+    "newTitle": "Title",
+    "newTitlePlaceholder": "Give this artifact a title…",
+    "newType": "Type",
+    "newCreate": "Create",
+    "unlink": "Unlink \"{title}\"",
+    "linkedToast": "Linked \"{title}\"",
+    "unlinkedToast": "Unlinked \"{title}\""
   },
   "blocks": {
     "saved": "All saved",

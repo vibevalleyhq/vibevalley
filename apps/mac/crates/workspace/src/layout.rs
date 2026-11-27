@@ -3,6 +3,7 @@
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
+pub use vibevalley_terminal::TabHookOverrides;
 
 pub type GroupId = u64;
 pub type TabId = u64;
@@ -47,6 +48,8 @@ pub enum PaneKind {
         terminal_id: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         link: Option<TerminalLink>,
+        #[serde(default, skip_serializing_if = "TabHookOverrides::is_empty")]
+        hooks: TabHookOverrides,
     },
     /// Direct OAR/ACP coding chat session bound to a project or worktree directory.
     Chat {
@@ -237,6 +240,35 @@ impl Layout {
                 _ => None,
             })
             .collect()
+    }
+
+    pub fn terminal_hook_overrides(&self, terminal_id: &str) -> Option<&TabHookOverrides> {
+        self.tabs().find_map(|t| match &t.kind {
+            PaneKind::Terminal { terminal_id: id, hooks, .. } if id == terminal_id => Some(hooks),
+            _ => None,
+        })
+    }
+
+    pub fn set_terminal_hook_overrides(&mut self, terminal_id: &str, overrides: TabHookOverrides) -> bool {
+        let tab_id = self.tabs().find_map(|t| match &t.kind {
+            PaneKind::Terminal { terminal_id: id, .. } if id == terminal_id => Some(t.id),
+            _ => None,
+        });
+        let Some(tab_id) = tab_id else {
+            return false;
+        };
+        let Some(Tab {
+            kind: PaneKind::Terminal { hooks, .. },
+            ..
+        }) = self.tab_mut(tab_id)
+        else {
+            return false;
+        };
+        if *hooks == overrides {
+            return false;
+        }
+        *hooks = overrides;
+        true
     }
 
     /// Opens `kind` in an adjacent group (or splits horizontally to the right when only one group
@@ -549,15 +581,35 @@ mod tests {
             restored.tab(tab).unwrap().kind,
             PaneKind::Terminal {
                 terminal_id: "worker".into(),
-                link: Some(target)
+                link: Some(target),
+                hooks: TabHookOverrides::default(),
             }
         );
+    }
+
+    #[test]
+    fn terminal_hook_overrides_round_trip_and_omit_when_empty() {
+        let mut layout = Layout::default();
+        let t_default = layout.add_tab(None, term("default-tab"));
+        let json = layout.to_json();
+        let tab_json = &json["root"]["tabs"][0];
+        assert!(tab_json.get("hooks").is_none(), "empty hooks must not bloat layout JSON");
+
+        let mut overrides = TabHookOverrides::default();
+        overrides.set_enabled("idegraph", false, true);
+        assert!(layout.set_terminal_hook_overrides("default-tab", overrides.clone()));
+        assert_eq!(layout.terminal_hook_overrides("default-tab"), Some(&overrides));
+
+        let restored = Layout::from_json(&layout.to_json()).unwrap();
+        assert_eq!(restored.terminal_hook_overrides("default-tab"), Some(&overrides));
+        assert!(restored.tab(t_default).is_some());
     }
 
     fn term(id: &str) -> PaneKind {
         PaneKind::Terminal {
             terminal_id: id.into(),
             link: None,
+            hooks: TabHookOverrides::default(),
         }
     }
 

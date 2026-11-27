@@ -2,6 +2,7 @@ mod support;
 
 mod agent;
 mod artifact;
+mod auth_hard_gate;
 mod channel;
 mod connector;
 mod contract;
@@ -22,6 +23,7 @@ mod media_jobs;
 mod media_kinds;
 mod memory;
 mod module_boundaries;
+mod multi_helper;
 mod orchestrator;
 mod provider;
 mod remote;

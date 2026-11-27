@@ -6,13 +6,13 @@ use std::time::Duration;
 
 use vibevalley_core::SliceMask;
 use vibevalley_protocol::{
-    ApiError, Artifact, ArtifactFileDeleteRequest, ArtifactFileDeleteResult, ArtifactFileWriteRequest, ArtifactFileWriteResult,
-    ArtifactHistoryUndoOriginRequest, ArtifactSuggestionAcceptInput, ArtifactSuggestionCreateInput, ArtifactVersionRequest, BizCode, Caller, Health, Op,
-    RepoTemplates, SayRequest, SessionSendInput, Suggestion, ops,
+    ApiError, Artifact, ArtifactCollabImportRequest, ArtifactCollabImportResult, ArtifactFileDeleteRequest, ArtifactFileDeleteResult, ArtifactFileWriteRequest,
+    ArtifactFileWriteResult, ArtifactHistoryUndoOriginRequest, ArtifactSuggestionAcceptInput, ArtifactSuggestionCreateInput, ArtifactVersionRequest, BizCode,
+    Caller, Health, Op, RepoTemplates, SayRequest, SessionSendInput, Suggestion, ops,
 };
 use vibevalley_runtime::oar::{Registry, set_observer};
 
-use crate::agent::{Agent, Orchestrator, Profile};
+use crate::agent::{Agent, Profile};
 use crate::artifact::Manager as ArtifactManager;
 use crate::channel::Chat;
 use crate::connector::Connector;
@@ -102,9 +102,28 @@ impl AppCore {
     }
 }
 
+pub(crate) async fn repo_list_async(c: &AppCore) -> Vec<vibevalley_protocol::RepoSummary> {
+    c.board.repo_summaries_with_health_async(&c.repo, c.ctx.clock.now_ms()).await
+}
+
 pub(crate) async fn repo_templates_async(c: &AppCore, id: &str) -> Result<RepoTemplates, ApiError> {
     let issues = c.board.issues_async().await.map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?;
-    c.repo.templates_async(id, &issues, |a| c.agent.profile.is_orchestrator(a)).await
+    let mut out = c.repo.templates_async(id, &issues, |a| c.agent.profile.is_orchestrator(a)).await?;
+    c.game.append_purchased_templates(&mut out);
+    Ok(out)
+}
+
+pub(crate) async fn issue_review(c: &AppCore, r: <ops::IssueReview as Op>::Input) -> Result<<ops::IssueReview as Op>::Result, ApiError> {
+    let pass = r.pass;
+    let i = c.board.issue_review_endpoint_async(r).await?;
+    c.game.record_issue_review_async(&i, pass).await;
+    Ok(i)
+}
+
+pub(crate) async fn issue_status_update(c: &AppCore, r: &<ops::IssueStatusUpdate as Op>::Input) -> Result<<ops::IssueStatusUpdate as Op>::Result, ApiError> {
+    let a = c.board.issue_status_update_endpoint_async(r).await?;
+    c.game.on_issue_status_updated_async(&a.id, a.status).await;
+    Ok(a)
 }
 
 pub(crate) async fn issue_split_async(c: &AppCore, req: &vibevalley_protocol::IssueSplitInput) -> Result<String, ApiError> {
@@ -176,26 +195,6 @@ pub(crate) async fn session_send(c: &AppCore, ctx: &CallerContext, r: SessionSen
         .await
 }
 
-pub(crate) async fn media_speakers(
-    c: &AppCore,
-    caller: Caller,
-    r: <ops::MediaDialogueCreate as Op>::Input,
-) -> Result<<ops::MediaDialogueCreate as Op>::Result, ApiError> {
-    c.artifact.media.create_speakers_for_caller_async(caller, r).await
-}
-
-pub(crate) async fn media_voice_design(
-    c: &AppCore,
-    caller: Caller,
-    r: <ops::MediaVoiceDesignCreate as Op>::Input,
-) -> Result<<ops::MediaVoiceDesignCreate as Op>::Result, ApiError> {
-    c.artifact.media.create_voice_design_for_caller_async(caller, r).await
-}
-
-pub(crate) async fn media_start_u(c: &AppCore, caller: Caller, id: &str) -> Result<<ops::MediaUnderstandingStart as Op>::Result, ApiError> {
-    c.artifact.media.start_understanding_for_caller_async(caller, id).await
-}
-
 pub(crate) async fn artifact_version(art: &ArtifactManager, ctx: &CallerContext, r: &ArtifactVersionRequest) -> Result<Artifact, ApiError> {
     let (m, _, t) = art.caller_meta(ctx);
     art.version_with_meta_async(&m, r, &t).await
@@ -231,6 +230,14 @@ pub(crate) async fn artifact_undo_origin(art: &ArtifactManager, ctx: &CallerCont
     art.history_undo_origin_async(&art.caller_meta(ctx).0, r).await
 }
 
+pub(crate) async fn artifact_collab_import(
+    art: &ArtifactManager,
+    ctx: &CallerContext,
+    r: &ArtifactCollabImportRequest,
+) -> Result<ArtifactCollabImportResult, ApiError> {
+    art.collab_import_async(&art.caller_meta(ctx).0, r).await
+}
+
 pub(crate) async fn setting_update(c: &AppCore, r: <ops::SettingUpdate as Op>::Input) -> Result<<ops::SettingUpdate as Op>::Result, ApiError> {
     let locale_changed = r.locale.is_some();
     let status = c.setting.save_async(r).await?;
@@ -240,12 +247,28 @@ pub(crate) async fn setting_update(c: &AppCore, r: <ops::SettingUpdate as Op>::I
     Ok(status)
 }
 
-pub(crate) async fn orch_open(orch: &Orchestrator) -> Result<(), ApiError> {
-    orch.open_endpoint_async().await
+pub(crate) async fn mcp_server_save(c: &AppCore, r: <ops::RuntimeMcpServerSave as Op>::Input) -> Result<<ops::RuntimeMcpServerSave as Op>::Result, ApiError> {
+    let res = c.runtime.save_host_mcp_server_endpoint_async(r).await?;
+    c.agent.profile.fleet.sync_host_mcp_servers(res.host, &res.servers);
+    Ok(res)
 }
 
-pub(crate) fn debug_clear(dbg: &DebugKit) -> Result<(), ApiError> {
-    dbg.timeline_clear()
+pub(crate) async fn mcp_server_toggle(
+    c: &AppCore,
+    r: <ops::RuntimeMcpServerToggle as Op>::Input,
+) -> Result<<ops::RuntimeMcpServerToggle as Op>::Result, ApiError> {
+    let res = c.runtime.toggle_host_mcp_server_endpoint_async(r).await?;
+    c.agent.profile.fleet.sync_host_mcp_servers(res.host, &res.servers);
+    Ok(res)
+}
+
+pub(crate) async fn mcp_server_remove(
+    c: &AppCore,
+    r: <ops::RuntimeMcpServerRemove as Op>::Input,
+) -> Result<<ops::RuntimeMcpServerRemove as Op>::Result, ApiError> {
+    let res = c.runtime.remove_host_mcp_server_endpoint_async(r).await?;
+    c.agent.profile.fleet.sync_host_mcp_servers(res.host, &res.servers);
+    Ok(res)
 }
 
 pub(crate) fn health(c: &AppCore) -> Health {

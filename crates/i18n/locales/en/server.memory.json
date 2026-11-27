@@ -5,6 +5,7 @@
     "everos": "EverOS"
   },
   "empty": "There is nothing to remember",
+  "invalidScope": "Unsupported memory scope: {scope}",
   "dbFailed": "Not remembered: the database could not be written",
   "noMemory": "{agent}'s memory has no {id}",
   "forget": "Forget from {agent}'s memory: \"{text}\""

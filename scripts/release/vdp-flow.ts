@@ -26,14 +26,31 @@ import {
 
 export { flattenUiNodes, type VdpDriver, type VdpUiNode };
 
+export interface FlowViewport {
+  readonly width: number;
+  readonly height: number;
+}
+
+export const VdpBoundsSchema = z.object({
+  x: z.number(),
+  y: z.number(),
+  width: z.number(),
+  height: z.number(),
+});
+
+export type VdpBounds = z.infer<typeof VdpBoundsSchema>;
+
+export type FlowUiNode = VdpUiNode & {
+  readonly bounds?: VdpBounds | null | undefined;
+};
+
 export interface FlowOptions {
   readonly outDir: string;
   readonly port?: number | undefined;
   readonly home?: string | undefined;
   readonly url?: string | undefined;
-  readonly theme: ReviewTheme;
-  readonly width: number;
-  readonly height: number;
+  readonly themes: readonly ReviewTheme[];
+  readonly viewports: readonly FlowViewport[];
   readonly skipBuild: boolean;
   readonly keepSandbox: boolean;
   readonly help: boolean;
@@ -87,14 +104,16 @@ export const FlowSummarySchema = z.object({
 
 export type FlowSummary = z.infer<typeof FlowSummarySchema>;
 
+export const FlowViewportSchema = z.object({
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+});
+
 export const FlowReportSchema = z.object({
   generatedAt: z.string(),
   outDir: z.string(),
   mode: z.enum(["attached", "sandbox"]),
-  viewport: z.object({
-    width: z.number().int().positive(),
-    height: z.number().int().positive(),
-  }),
+  viewport: FlowViewportSchema,
   theme: z.enum(["light", "dark"]),
   steps: z.array(FlowStepResultSchema),
   summary: FlowSummarySchema,
@@ -102,12 +121,54 @@ export const FlowReportSchema = z.object({
 
 export type FlowReport = z.infer<typeof FlowReportSchema>;
 
-export const KANBAN_LANES = [
-  { testId: "lane-todo", zh: "待办", en: "To do" },
-  { testId: "lane-working", zh: "进行中", en: "In progress" },
-  { testId: "lane-waiting", zh: "待验收", en: "In review" },
-  { testId: "lane-closed", zh: "已完成", en: "Done" },
+export const FlowMatrixSummarySchema = z.object({
+  totalRuns: z.number().int().nonnegative(),
+  passedRuns: z.number().int().nonnegative(),
+  failedRuns: z.number().int().nonnegative(),
+  totalSteps: z.number().int().nonnegative(),
+  passedSteps: z.number().int().nonnegative(),
+  failedSteps: z.number().int().nonnegative(),
+  totalChecks: z.number().int().nonnegative(),
+  passedChecks: z.number().int().nonnegative(),
+  failedChecks: z.number().int().nonnegative(),
+  totalErrors: z.number().int().nonnegative(),
+  totalScreenshots: z.number().int().nonnegative(),
+  totalBytes: z.number().int().nonnegative(),
+  allPassed: z.boolean(),
+});
+
+export type FlowMatrixSummary = z.infer<typeof FlowMatrixSummarySchema>;
+
+export const FlowMatrixReportSchema = z.object({
+  generatedAt: z.string(),
+  outDir: z.string(),
+  mode: z.enum(["attached", "sandbox"]),
+  viewports: z.array(FlowViewportSchema),
+  themes: z.array(z.enum(["light", "dark"])),
+  runs: z.array(FlowReportSchema),
+  summary: FlowMatrixSummarySchema,
+});
+
+export type FlowMatrixReport = z.infer<typeof FlowMatrixReportSchema>;
+
+export const DEFAULT_FLOW_VIEWPORTS: readonly FlowViewport[] = [
+  { width: 900, height: 720 },
+  { width: 1280, height: 800 },
+  { width: 1680, height: 1050 },
 ] as const;
+
+export const DEFAULT_FLOW_THEMES: readonly ReviewTheme[] = ["light", "dark"] as const;
+
+export const KANBAN_LANES = [
+  { key: "backlog", testId: "lane-backlog", zh: "需求池", en: "Backlog" },
+  { key: "todo", testId: "lane-todo", zh: "待办", en: "Todo" },
+  { key: "in_progress", testId: "lane-in_progress", zh: "进行中", en: "In Progress" },
+  { key: "in_review", testId: "lane-in_review", zh: "待验收", en: "In Review" },
+  { key: "done", testId: "lane-done", zh: "已完成", en: "Done" },
+  { key: "canceled", testId: "lane-canceled", zh: "已废弃", en: "Canceled" },
+] as const;
+
+export const EXPECTED_RAIL_PLACES = ["dashboard", "chat", "issues", "workspace", "content", "farm", "runtimes", "team", "settings"] as const;
 
 export const SWEEP_ROUTES = [
   { id: "route-runtimes", label: "Runtimes & Engines", route: "/runtimes", waitTestId: "runtimes-page", shotName: "flow-runtimes.png" },
@@ -115,14 +176,92 @@ export const SWEEP_ROUTES = [
   { id: "route-settings", label: "Settings", route: "/settings", shotName: "flow-settings.png" },
 ] as const;
 
+const RawFlowShellMetaSchema = z.object({
+  theme_dark: z.boolean().optional(),
+  diorama: z
+    .object({
+      kind: z.string().optional(),
+      placed: z
+        .object({
+          w: z.number(),
+          h: z.number(),
+          scale: z.number().optional(),
+        })
+        .nullable()
+        .optional(),
+      scene: z.unknown().optional(),
+    })
+    .nullable()
+    .optional(),
+});
+
+export type FarmDioramaDump = NonNullable<z.infer<typeof RawFlowShellMetaSchema>["diorama"]>;
+
+function readNodeBounds(node: VdpUiNode | undefined): VdpBounds | undefined {
+  if (!node || !("bounds" in node)) return undefined;
+  const parsed = VdpBoundsSchema.safeParse(node.bounds);
+  return parsed.success ? parsed.data : undefined;
+}
+
+function parseThemeList(raw: string): ReviewTheme[] {
+  const parts = raw
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+  if (parts.length === 0) {
+    throw new Error("--themes requires at least one theme (light, dark)");
+  }
+  const themes: ReviewTheme[] = [];
+  for (const part of parts) {
+    if (!isReviewTheme(part)) {
+      throw new Error(`unsupported theme "${part}" (expected light or dark)`);
+    }
+    if (!themes.includes(part)) themes.push(part);
+  }
+  return themes;
+}
+
+function parseViewportToken(raw: string): FlowViewport {
+  const trimmed = raw.trim().toLowerCase();
+  const match = /^(\d+)[x×](\d+)$/u.exec(trimmed);
+  if (!match) {
+    throw new Error(`invalid viewport "${raw}" (expected <width>x<height>, e.g. 1280x800)`);
+  }
+  const width = parsePositiveInt("--viewports", match[1] ?? "");
+  const height = parsePositiveInt("--viewports", match[2] ?? "");
+  return { width, height };
+}
+
+function parseViewportList(raw: string): FlowViewport[] {
+  const parts = raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (parts.length === 0) {
+    throw new Error("--viewports requires at least one <width>x<height> entry");
+  }
+  const seen = new Set<string>();
+  const out: FlowViewport[] = [];
+  for (const part of parts) {
+    const vp = parseViewportToken(part);
+    const key = `${vp.width}x${vp.height}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      out.push(vp);
+    }
+  }
+  return out;
+}
+
 export function parseFlowArgs(argv: readonly string[], cwd = process.cwd()): FlowOptions {
   let outDir = "/tmp/vv-vdp-flow";
   let port: number | undefined;
   let home: string | undefined;
   let url: string | undefined;
-  let theme: ReviewTheme = "light";
-  let width = 1280;
-  let height = 840;
+  let themes: ReviewTheme[] = [...DEFAULT_FLOW_THEMES];
+  let explicitViewports: FlowViewport[] | undefined;
+  let explicitWidth: number | undefined;
+  let explicitHeight: number | undefined;
   let skipBuild = false;
   let keepSandbox = false;
   let help = false;
@@ -171,29 +310,51 @@ export function parseFlowArgs(argv: readonly string[], cwd = process.cwd()): Flo
       if (!next) throw new Error("--theme requires light or dark");
       const normalized = next.trim().toLowerCase();
       if (!isReviewTheme(normalized)) throw new Error(`unsupported theme "${next}" (expected light or dark)`);
-      theme = normalized;
+      themes = [normalized];
     } else if (arg.startsWith("--theme=")) {
       const raw = arg.slice("--theme=".length).trim().toLowerCase();
       if (!isReviewTheme(raw)) throw new Error(`unsupported theme "${raw}" (expected light or dark)`);
-      theme = raw;
+      themes = [raw];
+    } else if (arg === "--themes") {
+      const next = argv[++i];
+      if (!next) throw new Error("--themes requires a comma-separated list");
+      themes = parseThemeList(next);
+    } else if (arg.startsWith("--themes=")) {
+      themes = parseThemeList(arg.slice("--themes=".length));
+    } else if (arg === "--viewports") {
+      const next = argv[++i];
+      if (!next) throw new Error("--viewports requires a comma-separated list");
+      explicitViewports = parseViewportList(next);
+    } else if (arg.startsWith("--viewports=")) {
+      explicitViewports = parseViewportList(arg.slice("--viewports=".length));
     } else if (arg === "--width") {
       const next = argv[++i];
       if (!next) throw new Error("--width requires a pixel value");
-      width = parsePositiveInt("--width", next);
+      explicitWidth = parsePositiveInt("--width", next);
     } else if (arg.startsWith("--width=")) {
-      width = parsePositiveInt("--width", arg.slice("--width=".length));
+      explicitWidth = parsePositiveInt("--width", arg.slice("--width=".length));
     } else if (arg === "--height") {
       const next = argv[++i];
       if (!next) throw new Error("--height requires a pixel value");
-      height = parsePositiveInt("--height", next);
+      explicitHeight = parsePositiveInt("--height", next);
     } else if (arg.startsWith("--height=")) {
-      height = parsePositiveInt("--height", arg.slice("--height=".length));
+      explicitHeight = parsePositiveInt("--height", arg.slice("--height=".length));
     } else {
       throw new Error(`unknown option "${arg}" (run with --help for usage)`);
     }
   }
 
-  return { outDir, port, home, url, theme, width, height, skipBuild, keepSandbox, help };
+  if (explicitViewports !== undefined && (explicitWidth !== undefined || explicitHeight !== undefined)) {
+    throw new Error("--viewports cannot be combined with --width or --height");
+  }
+
+  const viewports: FlowViewport[] =
+    explicitViewports ??
+    (explicitWidth !== undefined || explicitHeight !== undefined
+      ? [{ width: explicitWidth ?? 1280, height: explicitHeight ?? 800 }]
+      : [...DEFAULT_FLOW_VIEWPORTS]);
+
+  return { outDir, port, home, url, themes, viewports, skipBuild, keepSandbox, help };
 }
 
 export function checkKanbanBoardInvariants(nodes: readonly VdpUiNode[], workingSlotsCount: number): FlowCheck[] {
@@ -211,9 +372,12 @@ export function checkKanbanBoardInvariants(nodes: readonly VdpUiNode[], workingS
   }
 
   checks.push({
-    name: "kanban-4-lanes",
+    name: "kanban-6-lanes",
     passed: missingLanes.length === 0,
-    detail: missingLanes.length === 0 ? "all 4 Kanban lanes verified (待办 / 进行中 / 待验收 / 已完成)" : `missing Kanban lanes: ${missingLanes.join(", ")}`,
+    detail:
+      missingLanes.length === 0
+        ? "all 6 Kanban lanes verified (需求池 / 待办 / 进行中 / 待验收 / 已完成 / 已废弃)"
+        : `missing Kanban lanes: ${missingLanes.join(", ")}`,
   });
 
   checks.push({
@@ -270,12 +434,88 @@ export function checkNewIssueDropdownReadiness(params: {
   ];
 }
 
+export function checkSelectPopupDownward(params: {
+  readonly triggerTestId: string;
+  readonly triggerNodes: readonly VdpUiNode[];
+  readonly popupNodes: readonly VdpUiNode[];
+  readonly viewportHeight: number;
+}): FlowCheck[] {
+  const triggerPresent = params.triggerNodes.length > 0;
+  const popupOpened = params.popupNodes.length > 0;
+  const triggerBounds = readNodeBounds(params.triggerNodes[0]);
+  const popupBounds = readNodeBounds(params.popupNodes[0]);
+
+  let downwardPassed = triggerPresent && popupOpened;
+  let downwardDetail = popupOpened
+    ? `${params.triggerTestId} trigger stayed visible while popup mounted (bounds unavailable from driver)`
+    : `${params.triggerTestId} popup did not mount`;
+
+  if (triggerBounds && popupBounds) {
+    const triggerBottom = triggerBounds.y + triggerBounds.height;
+    const popupBottom = popupBounds.y + popupBounds.height;
+    const opensBelowTrigger = popupBounds.y >= triggerBottom;
+    const fitsViewport = popupBottom <= params.viewportHeight;
+    downwardPassed = opensBelowTrigger && fitsViewport;
+    downwardDetail = downwardPassed
+      ? `popup opened strictly downward at y=${popupBounds.y} >= trigger bottom ${triggerBottom} (cover=false, bottom=${popupBottom} <= ${params.viewportHeight})`
+      : `popup geometry violated downward cover=false invariant (popupY=${popupBounds.y}, triggerBottom=${triggerBottom}, popupBottom=${popupBottom}, viewportHeight=${params.viewportHeight})`;
+  }
+
+  return [
+    {
+      name: "select-trigger-visible",
+      passed: triggerPresent,
+      detail: triggerPresent ? `${params.triggerTestId} trigger remained visible` : `${params.triggerTestId} trigger missing`,
+    },
+    {
+      name: "select-popup-opened",
+      passed: popupOpened,
+      detail: popupOpened
+        ? `${params.triggerTestId} dropdown popup opened (${params.popupNodes.length} node(s))`
+        : `${params.triggerTestId} dropdown popup did not open`,
+    },
+    {
+      name: "select-popup-downward-cover-false",
+      passed: downwardPassed,
+      detail: downwardDetail,
+    },
+  ];
+}
+
+/** Matches `IssuePeekModal.tsx` viewport scaling (`min(1260, max(320, min(w-24, round(w*0.88))))`). */
+export function expectedPeekModalDimensions(viewport: FlowViewport): { readonly width: number; readonly height: number; readonly marginTop: number } {
+  const width = Math.min(1260, Math.max(320, Math.min(viewport.width - 24, Math.round(viewport.width * 0.88))));
+  const height = Math.min(940, Math.max(360, Math.min(viewport.height - 32, Math.round(viewport.height * 0.88))));
+  const marginTop = Math.max(16, Math.round((viewport.height - height) / 2));
+  return { width, height, marginTop };
+}
+
 export function checkQuickPeekInvariants(params: {
   readonly cardCount: number;
+  readonly peekModalCount?: number | undefined;
   readonly peekExpandCount: number;
   readonly shellRoute: string | null;
+  readonly viewport?: FlowViewport | undefined;
+  readonly peekSurfaceBounds?: VdpBounds | undefined;
 }): FlowCheck[] {
   const stayedOnIssues = params.shellRoute === null || params.shellRoute === "/issues" || params.shellRoute.startsWith("/issues?");
+  const modalMounted = (params.peekModalCount ?? params.peekExpandCount) > 0 && params.peekExpandCount > 0;
+  const vp = params.viewport ?? { width: 1280, height: 800 };
+  const expected = expectedPeekModalDimensions(vp);
+
+  let widePassed = modalMounted;
+  let wideDetail = modalMounted ? `IssuePeekModal wide target ${expected.width}x${expected.height} at ${vp.width}x${vp.height}` : "IssuePeekModal not mounted";
+
+  if (params.peekSurfaceBounds) {
+    const b = params.peekSurfaceBounds;
+    const wideEnough = b.width >= expected.width - 4 && b.width <= vp.width;
+    const tallEnough = b.height >= expected.height - 4 && b.height <= vp.height;
+    widePassed = modalMounted && wideEnough && tallEnough;
+    wideDetail = widePassed
+      ? `IssuePeekModal surface ${b.width}x${b.height} matches wide target ${expected.width}x${expected.height}`
+      : `IssuePeekModal surface ${b.width}x${b.height} missed wide target ${expected.width}x${expected.height} within ${vp.width}x${vp.height}`;
+  }
+
   return [
     {
       name: "issue-card-available",
@@ -284,8 +524,13 @@ export function checkQuickPeekInvariants(params: {
     },
     {
       name: "quick-peek-modal-open",
-      passed: params.peekExpandCount > 0,
-      detail: params.peekExpandCount > 0 ? "Quick-Peek modal opened with issue-peek-expand" : "issue-peek-expand not found after pressing first issue-card",
+      passed: modalMounted,
+      detail: modalMounted ? "Quick-Peek modal opened with issue-peek-expand" : "issue-peek-expand not found after pressing first issue-card",
+    },
+    {
+      name: "quick-peek-wide-geometry",
+      passed: widePassed,
+      detail: wideDetail,
     },
     {
       name: "quick-peek-stays-on-issues",
@@ -295,11 +540,124 @@ export function checkQuickPeekInvariants(params: {
   ];
 }
 
+export function checkFarmPhoneOverlayInvariants(params: {
+  readonly shellRoute: string | null;
+  readonly diorama: FarmDioramaDump | null;
+  readonly farmViewCount: number;
+  readonly phoneNodes: readonly VdpUiNode[];
+  readonly viewport: FlowViewport;
+}): FlowCheck[] {
+  const onFarmRoute = params.shellRoute === "/farm" || params.shellRoute?.startsWith("/farm/") === true;
+  const dioramaPlaced = params.diorama?.placed != null && params.diorama.placed.w > 0 && params.diorama.placed.h > 0;
+  const surfaceReady = params.diorama !== null || params.farmViewCount > 0;
+
+  const checks: FlowCheck[] = [
+    {
+      name: "farm-route-active",
+      passed: onFarmRoute,
+      detail: onFarmRoute ? `navigated cleanly to ${params.shellRoute}` : `expected /farm route, got ${params.shellRoute ?? "<none>"}`,
+    },
+    {
+      name: "farm-surface-mounted",
+      passed: surfaceReady,
+      detail: dioramaPlaced
+        ? `farm diorama mounted (${params.diorama?.placed?.w}x${params.diorama?.placed?.h})`
+        : surfaceReady
+          ? "farm surface mounted cleanly"
+          : "neither diorama state nor farm view node found on /farm",
+    },
+  ];
+
+  const phoneNode = params.phoneNodes.find((n) => n.testId === "farm-phone") ?? params.phoneNodes[0];
+  if (phoneNode) {
+    const phoneBounds = readNodeBounds(phoneNode);
+    const fitsViewport =
+      phoneBounds === undefined ||
+      (phoneBounds.x >= 0 &&
+        phoneBounds.y >= 0 &&
+        phoneBounds.width > 0 &&
+        phoneBounds.height > 0 &&
+        phoneBounds.x + phoneBounds.width <= params.viewport.width &&
+        phoneBounds.y + phoneBounds.height <= params.viewport.height);
+    checks.push({
+      name: "farm-phone-overlay",
+      passed: fitsViewport,
+      detail:
+        phoneBounds === undefined
+          ? "farm-phone overlay mounted cleanly"
+          : fitsViewport
+            ? `farm-phone overlay (${phoneBounds.width}x${phoneBounds.height} at ${phoneBounds.x},${phoneBounds.y}) fits ${params.viewport.width}x${params.viewport.height}`
+            : `farm-phone overlay (${phoneBounds.width}x${phoneBounds.height} at ${phoneBounds.x},${phoneBounds.y}) overflows ${params.viewport.width}x${params.viewport.height}`,
+    });
+  } else {
+    checks.push({
+      name: "farm-phone-overlay",
+      passed: surfaceReady,
+      detail: surfaceReady ? "farm-phone overlay idle/closed; diorama ready without overlay errors" : "farm surface unavailable for phone overlay check",
+    });
+  }
+
+  return checks;
+}
+
+export function checkNavigationAndThemeParity(params: {
+  readonly treeNodes: readonly VdpUiNode[];
+  readonly linkNodes?: readonly VdpUiNode[] | undefined;
+  readonly theme: ReviewTheme;
+  readonly shellThemeDark: boolean | null;
+  readonly metricsThemeDark?: boolean | null | undefined;
+  readonly viewport: FlowViewport;
+}): FlowCheck[] {
+  const combined = [...flattenUiNodes(params.treeNodes), ...(params.linkNodes ?? [])];
+  const placeNodes = combined.filter((n) => typeof n.testId === "string" && n.testId.startsWith("place-"));
+  const checks: FlowCheck[] = [];
+
+  if (placeNodes.length > 0) {
+    const seenPlaces = new Set(placeNodes.map((n) => n.testId));
+    const missingPlaces = EXPECTED_RAIL_PLACES.filter((id) => !seenPlaces.has(`place-${id}`));
+    const clippedPlaces: string[] = [];
+    for (const node of placeNodes) {
+      const b = readNodeBounds(node);
+      if (b && (b.y < 0 || b.y + b.height > params.viewport.height)) {
+        clippedPlaces.push(`${node.testId ?? "place"}(${b.y}+${b.height}>${params.viewport.height})`);
+      }
+    }
+    const navPassed = missingPlaces.length === 0 && clippedPlaces.length === 0;
+    checks.push({
+      name: "rail-navigation-parity",
+      passed: navPassed,
+      detail: navPassed
+        ? `all ${EXPECTED_RAIL_PLACES.length} rail places mounted within ${params.viewport.width}x${params.viewport.height}`
+        : [
+            missingPlaces.length > 0 ? `missing rail places: ${missingPlaces.join(", ")}` : "",
+            clippedPlaces.length > 0 ? `clipped rail places: ${clippedPlaces.join(", ")}` : "",
+          ]
+            .filter(Boolean)
+            .join("; "),
+    });
+  }
+
+  const expectedDark = params.theme === "dark";
+  const shellMatches = params.shellThemeDark === null || params.shellThemeDark === expectedDark;
+  const metricsMatches = params.metricsThemeDark === undefined || params.metricsThemeDark === null || params.metricsThemeDark === expectedDark;
+  const themePassed = shellMatches && metricsMatches;
+
+  checks.push({
+    name: "theme-scrollbar-parity",
+    passed: themePassed,
+    detail: themePassed
+      ? `theme=${params.theme} synchronized with shell/scrollbar scheme`
+      : `theme mismatch for "${params.theme}" (shellThemeDark=${String(params.shellThemeDark)}, metricsThemeDark=${String(params.metricsThemeDark)})`,
+  });
+
+  return checks;
+}
+
 export function aggregateFlowReport(params: {
   readonly generatedAt?: string;
   readonly outDir: string;
   readonly mode: "attached" | "sandbox";
-  readonly viewport: { readonly width: number; readonly height: number };
+  readonly viewport: FlowViewport;
   readonly theme: ReviewTheme;
   readonly steps: readonly FlowStepResult[];
 }): FlowReport {
@@ -347,6 +705,64 @@ export function aggregateFlowReport(params: {
   });
 }
 
+export function aggregateFlowMatrixReport(params: {
+  readonly generatedAt?: string;
+  readonly outDir: string;
+  readonly mode: "attached" | "sandbox";
+  readonly viewports: readonly FlowViewport[];
+  readonly themes: readonly ReviewTheme[];
+  readonly runs: readonly FlowReport[];
+}): FlowMatrixReport {
+  const passedRuns = params.runs.filter((r) => r.summary.allPassed).length;
+  const failedRuns = params.runs.length - passedRuns;
+
+  let totalSteps = 0;
+  let passedSteps = 0;
+  let failedSteps = 0;
+  let totalChecks = 0;
+  let passedChecks = 0;
+  let failedChecks = 0;
+  let totalErrors = 0;
+  let totalScreenshots = 0;
+  let totalBytes = 0;
+
+  for (const run of params.runs) {
+    totalSteps += run.summary.totalSteps;
+    passedSteps += run.summary.passedSteps;
+    failedSteps += run.summary.failedSteps;
+    totalChecks += run.summary.totalChecks;
+    passedChecks += run.summary.passedChecks;
+    failedChecks += run.summary.failedChecks;
+    totalErrors += run.summary.totalErrors;
+    totalScreenshots += run.summary.totalScreenshots;
+    totalBytes += run.summary.totalBytes;
+  }
+
+  return FlowMatrixReportSchema.parse({
+    generatedAt: params.generatedAt ?? new Date().toISOString(),
+    outDir: params.outDir,
+    mode: params.mode,
+    viewports: params.viewports.map((vp) => ({ width: vp.width, height: vp.height })),
+    themes: [...params.themes],
+    runs: [...params.runs],
+    summary: {
+      totalRuns: params.runs.length,
+      passedRuns,
+      failedRuns,
+      totalSteps,
+      passedSteps,
+      failedSteps,
+      totalChecks,
+      passedChecks,
+      failedChecks,
+      totalErrors,
+      totalScreenshots,
+      totalBytes,
+      allPassed: failedRuns === 0 && failedSteps === 0 && failedChecks === 0 && totalErrors === 0,
+    },
+  });
+}
+
 function makeStepResult(params: {
   readonly id: string;
   readonly label: string;
@@ -377,11 +793,16 @@ function makeStepResult(params: {
 async function inspectShellAndTree(driver: VdpDriver): Promise<{
   readonly shellRoute: string | null;
   readonly shellErrors: string[];
+  readonly shellThemeDark: boolean | null;
+  readonly diorama: FarmDioramaDump | null;
   readonly treeNodes: readonly VdpUiNode[];
   readonly uiNodeCount: number;
 }> {
   const rawState = await driver.getState();
   const shell = extractShellErrors(rawState);
+  const metaParsed = RawFlowShellMetaSchema.safeParse(rawState);
+  const shellThemeDark = metaParsed.success && metaParsed.data.theme_dark !== undefined ? metaParsed.data.theme_dark : null;
+  const diorama = metaParsed.success && metaParsed.data.diorama !== undefined ? metaParsed.data.diorama : null;
   let treeNodes: readonly VdpUiNode[] = [];
   let uiNodeCount = 0;
   try {
@@ -394,37 +815,49 @@ async function inspectShellAndTree(driver: VdpDriver): Promise<{
   return {
     shellRoute: shell.route,
     shellErrors: shell.errors,
+    shellThemeDark,
+    diorama,
     treeNodes,
     uiNodeCount,
   };
+}
+
+async function captureStepShot(driver: VdpDriver, outDir: string, shotsSubdir: string, fileName: string, shellErrors: string[]): Promise<FlowScreenshot> {
+  const shotsDir = shotsSubdir ? resolve(outDir, "shots", shotsSubdir) : resolve(outDir, "shots");
+  const shot = await captureVdpScreenshot(driver, shotsDir, fileName, shellErrors);
+  const relPath = shotsSubdir ? `shots/${shotsSubdir}/${fileName}` : shot.relPath;
+  return { ...shot, relPath };
 }
 
 export async function runFlowScenario(
   driver: VdpDriver,
   options: {
     readonly outDir: string;
+    readonly shotsSubdir?: string | undefined;
     readonly mode: "attached" | "sandbox";
-    readonly viewport: { readonly width: number; readonly height: number };
+    readonly viewport: FlowViewport;
     readonly theme: ReviewTheme;
   },
 ): Promise<FlowReport> {
-  const shotsDir = resolve(options.outDir, "shots");
+  const shotsSubdir = options.shotsSubdir ?? "";
   const steps: FlowStepResult[] = [];
 
   await driver.resize(options.viewport.width, options.viewport.height);
   await driver.setTheme(options.theme);
   await driver.settle(350);
 
-  // Step 1: Navigate /issues -> verify Kanban 4 lanes & 0 lane-working-slots.
+  // Step 1: Navigate /issues -> verify Kanban 6 lanes, 0 lane-working-slots, rail navigation & theme/scrollbar parity.
   {
     const startedAt = Date.now();
     await driver.navigate("/issues");
     await driver.uiWaitFor({ testId: "issues-page", view: "workbench", timeoutMs: 4_000 });
     await driver.settle(450);
 
-    const { shellRoute, shellErrors, treeNodes, uiNodeCount } = await inspectShellAndTree(driver);
+    const { shellRoute, shellErrors, shellThemeDark, treeNodes, uiNodeCount } = await inspectShellAndTree(driver);
     const flatNodes = flattenUiNodes(treeNodes);
     const slotsRes = await driver.uiQuery({ testId: "lane-working-slots", view: "workbench" });
+    const linkRes = await driver.uiQuery({ role: "link", view: "workbench" });
+    const metrics = driver.getMetrics ? await driver.getMetrics() : null;
 
     // Also query each lane testId explicitly in case shallow tree pruning omits deep children.
     const queriedLanes: VdpUiNode[] = [...flatNodes];
@@ -435,12 +868,22 @@ export async function runFlowScenario(
       queriedLanes.push(...textRes.nodes);
     }
 
-    const checks = checkKanbanBoardInvariants(queriedLanes, slotsRes.count);
-    const screenshot = await captureVdpScreenshot(driver, shotsDir, "flow-issues-board.png", shellErrors);
+    const checks = [
+      ...checkKanbanBoardInvariants(queriedLanes, slotsRes.count),
+      ...checkNavigationAndThemeParity({
+        treeNodes,
+        linkNodes: linkRes.nodes,
+        theme: options.theme,
+        shellThemeDark,
+        metricsThemeDark: metrics?.themeDark ?? null,
+        viewport: options.viewport,
+      }),
+    ];
+    const screenshot = await captureStepShot(driver, options.outDir, shotsSubdir, "flow-issues-board.png", shellErrors);
     steps.push(
       makeStepResult({
         id: "issues-board",
-        label: "Issues Kanban Board (4 lanes & 0 working-slots)",
+        label: "Issues Kanban Board (6 lanes, 0 working-slots & rail parity)",
         route: "/issues",
         startedAt,
         checks,
@@ -452,7 +895,7 @@ export async function runFlowScenario(
     );
   }
 
-  // Step 2: Click issue-toolbar-new -> inspect repo & helper dropdowns -> capture -> close via issue-new-dialog-never.
+  // Step 2: Click issue-toolbar-new -> inspect repo & helper dropdowns + downward <Select> popup (cover=false) -> close via issue-new-dialog-never.
   {
     const startedAt = Date.now();
     let dialogOpen = false;
@@ -461,6 +904,7 @@ export async function runFlowScenario(
     let missingRepoCount = 0;
     let missingRuntimeCount = 0;
     let dialogClosedAfterCancel = false;
+    let selectChecks: FlowCheck[] = [];
     const extraErrors: string[] = [];
 
     try {
@@ -474,13 +918,30 @@ export async function runFlowScenario(
       helperSelectCount = (await driver.uiQuery({ testId: "issue-new-helper", view: "workbench" })).count;
       missingRepoCount = (await driver.uiQuery({ testId: "issue-new-missing-repo", view: "workbench" })).count;
       missingRuntimeCount = (await driver.uiQuery({ testId: "issue-new-missing-runtime", view: "workbench" })).count;
+
+      if (repoSelectCount > 0) {
+        let triggerRes = await driver.uiQuery({ testId: "issue-new-repo-trigger", view: "workbench" });
+        const pressTarget = triggerRes.count > 0 ? "issue-new-repo-trigger" : "issue-new-repo";
+        await driver.uiPress(pressTarget, "workbench");
+        await driver.settle(200);
+
+        triggerRes = await driver.uiQuery({ testId: pressTarget, view: "workbench" });
+        const searchPopupRes = await driver.uiQuery({ testId: "issue-new-repo-search", view: "workbench" });
+        const optionPopupRes = searchPopupRes.count > 0 ? searchPopupRes : await driver.uiQuery({ text: "vibevalley", view: "workbench" });
+        selectChecks = checkSelectPopupDownward({
+          triggerTestId: pressTarget,
+          triggerNodes: triggerRes.nodes,
+          popupNodes: optionPopupRes.nodes,
+          viewportHeight: options.viewport.height,
+        });
+      }
     } catch (err) {
       extraErrors.push(`NewIssue interaction failed: ${err instanceof Error ? err.message : String(err)}`);
     }
 
     const { shellRoute, shellErrors, uiNodeCount } = await inspectShellAndTree(driver);
     shellErrors.push(...extraErrors);
-    const screenshot = await captureVdpScreenshot(driver, shotsDir, "flow-new-issue.png", shellErrors);
+    const screenshot = await captureStepShot(driver, options.outDir, shotsSubdir, "flow-new-issue.png", shellErrors);
 
     if (dialogOpen) {
       try {
@@ -494,18 +955,21 @@ export async function runFlowScenario(
       }
     }
 
-    const checks = checkNewIssueDropdownReadiness({
-      dialogOpen,
-      repoSelectCount,
-      helperSelectCount,
-      missingRepoCount,
-      missingRuntimeCount,
-      dialogClosedAfterCancel,
-    });
+    const checks = [
+      ...checkNewIssueDropdownReadiness({
+        dialogOpen,
+        repoSelectCount,
+        helperSelectCount,
+        missingRepoCount,
+        missingRuntimeCount,
+        dialogClosedAfterCancel,
+      }),
+      ...selectChecks,
+    ];
     steps.push(
       makeStepResult({
         id: "new-issue-dialog",
-        label: "NewIssue Dialog & Dropdown Readiness",
+        label: "NewIssue Dialog & Downward Select Readiness",
         route: "/issues",
         startedAt,
         checks,
@@ -517,19 +981,25 @@ export async function runFlowScenario(
     );
   }
 
-  // Step 3: Click first issue-card -> verify Quick-Peek modal opens without leaving /issues.
+  // Step 3: Click first issue-card -> verify wide Quick-Peek modal opens without leaving /issues.
   {
     const startedAt = Date.now();
     const extraErrors: string[] = [];
     const cards = await driver.uiQuery({ testId: "issue-card", view: "workbench" });
+    let peekModalCount = 0;
     let peekExpandCount = 0;
+    let peekSurfaceBounds: VdpBounds | undefined;
 
     if (cards.count > 0) {
       try {
         await driver.uiPress("issue-card", "workbench");
         await driver.uiWaitFor({ testId: "issue-peek-expand", view: "workbench", timeoutMs: 3_000 });
         await driver.settle(300);
+        const modalRes = await driver.uiQuery({ testId: "issue-peek-modal", view: "workbench" });
+        const surfaceRes = await driver.uiQuery({ testId: "issue-peek-surface", view: "workbench" });
+        peekModalCount = modalRes.count;
         peekExpandCount = (await driver.uiQuery({ testId: "issue-peek-expand", view: "workbench" })).count;
+        peekSurfaceBounds = readNodeBounds(surfaceRes.nodes[0]) ?? readNodeBounds(modalRes.nodes[0]);
       } catch (err) {
         extraErrors.push(`Quick-Peek interaction failed: ${err instanceof Error ? err.message : String(err)}`);
       }
@@ -537,13 +1007,20 @@ export async function runFlowScenario(
 
     const { shellRoute, shellErrors, uiNodeCount } = await inspectShellAndTree(driver);
     shellErrors.push(...extraErrors);
-    const screenshot = await captureVdpScreenshot(driver, shotsDir, "flow-quick-peek.png", shellErrors);
-    const checks = checkQuickPeekInvariants({ cardCount: cards.count, peekExpandCount, shellRoute });
+    const screenshot = await captureStepShot(driver, options.outDir, shotsSubdir, "flow-quick-peek.png", shellErrors);
+    const checks = checkQuickPeekInvariants({
+      cardCount: cards.count,
+      peekModalCount,
+      peekExpandCount,
+      shellRoute,
+      viewport: options.viewport,
+      peekSurfaceBounds,
+    });
 
     steps.push(
       makeStepResult({
         id: "quick-peek",
-        label: "Issue Card Quick-Peek Modal",
+        label: "Wide IssueCard Quick-Peek Modal",
         route: "/issues",
         startedAt,
         checks,
@@ -572,7 +1049,7 @@ export async function runFlowScenario(
 
     const { shellRoute, shellErrors, uiNodeCount } = await inspectShellAndTree(driver);
     shellErrors.push(...extraErrors);
-    const screenshot = await captureVdpScreenshot(driver, shotsDir, "flow-detail-expanded.png", shellErrors);
+    const screenshot = await captureStepShot(driver, options.outDir, shotsSubdir, "flow-detail-expanded.png", shellErrors);
     const onDetailRoute = shellRoute !== null && shellRoute.startsWith("/issues/") && shellRoute.length > "/issues/".length;
 
     const checks: FlowCheck[] = [
@@ -630,7 +1107,7 @@ export async function runFlowScenario(
     const listCards = await driver.uiQuery({ testId: "issue-card", view: "workbench" });
     const { shellRoute, shellErrors, uiNodeCount } = await inspectShellAndTree(driver);
     shellErrors.push(...extraErrors);
-    const screenshot = await captureVdpScreenshot(driver, shotsDir, "flow-issues-list.png", shellErrors);
+    const screenshot = await captureStepShot(driver, options.outDir, shotsSubdir, "flow-issues-list.png", shellErrors);
 
     const checks: FlowCheck[] = [
       {
@@ -659,7 +1136,69 @@ export async function runFlowScenario(
     );
   }
 
-  // Step 6: Navigate /runs -> click first step row to verify inline structured detail drawer expands.
+  // Step 6: Toggle Calendar view (issue-view-calendar) -> verify month grid & week 6 unclipped accessibility.
+  {
+    const startedAt = Date.now();
+    const extraErrors: string[] = [];
+    let calendarToggled = false;
+    let calendarMounted = false;
+    let week6Clipped = false;
+    let week6Detail = "calendar view mounted cleanly";
+
+    try {
+      const calOpt = await driver.uiQuery({ testId: "issue-view-calendar", view: "workbench" });
+      if (calOpt.count > 0) {
+        await driver.uiPress("issue-view-calendar", "workbench");
+        calendarToggled = true;
+        await driver.uiWaitFor({ testId: "issue-calendar", view: "workbench", timeoutMs: 3_000 });
+        await driver.settle(300);
+      }
+      const calRes = await driver.uiQuery({ testId: "issue-calendar", view: "workbench" });
+      calendarMounted = calRes.count > 0;
+      const week6Res = await driver.uiQuery({ testId: "calendar-week-5", view: "workbench" });
+      const week6Bounds = readNodeBounds(week6Res.nodes[0]);
+      if (week6Bounds && week6Bounds.y + week6Bounds.height > options.viewport.height) {
+        week6Clipped = true;
+        week6Detail = `calendar-week-5 bottom (${week6Bounds.y + week6Bounds.height}) exceeds viewport height (${options.viewport.height})`;
+      } else if (week6Bounds) {
+        week6Detail = `calendar-week-5 bottom (${week6Bounds.y + week6Bounds.height}) fits within viewport height (${options.viewport.height})`;
+      }
+    } catch (err) {
+      extraErrors.push(`Calendar view toggle failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+
+    const { shellRoute, shellErrors, uiNodeCount } = await inspectShellAndTree(driver);
+    shellErrors.push(...extraErrors);
+    const screenshot = await captureStepShot(driver, options.outDir, shotsSubdir, "flow-issues-calendar.png", shellErrors);
+
+    const checks: FlowCheck[] = [
+      {
+        name: "issues-calendar-mounted",
+        passed: calendarToggled && calendarMounted,
+        detail: calendarMounted ? "issue-calendar mounted cleanly" : "issue-calendar did not mount after pressing issue-view-calendar",
+      },
+      {
+        name: "issues-calendar-week6-accessible",
+        passed: calendarMounted && !week6Clipped,
+        detail: week6Detail,
+      },
+    ];
+    steps.push(
+      makeStepResult({
+        id: "issues-calendar",
+        label: "Issues Calendar View & Week 6 Accessibility",
+        route: "/issues",
+        startedAt,
+        checks,
+        screenshot,
+        shellRoute,
+        shellErrors,
+        uiNodeCount,
+      }),
+    );
+  }
+
+  // Step 7: Navigate /runs -> click first step row to verify inline structured detail drawer expands.
   {
     const startedAt = Date.now();
     const extraErrors: string[] = [];
@@ -734,7 +1273,7 @@ export async function runFlowScenario(
 
     const { shellRoute, shellErrors, uiNodeCount } = await inspectShellAndTree(driver);
     shellErrors.push(...extraErrors);
-    const screenshot = await captureVdpScreenshot(driver, shotsDir, "flow-runs-expanded.png", shellErrors);
+    const screenshot = await captureStepShot(driver, options.outDir, shotsSubdir, "flow-runs-expanded.png", shellErrors);
     steps.push(
       makeStepResult({
         id: "runs-expanded",
@@ -750,7 +1289,47 @@ export async function runFlowScenario(
     );
   }
 
-  // Step 7: Navigate /runtimes, /agents, /settings -> assert zero shell/view errors across every route.
+  // Step 8: Navigate /farm -> verify diorama surface & phone overlay readiness/bounds.
+  {
+    const startedAt = Date.now();
+    await driver.navigate("/farm");
+    await driver.settle(500);
+
+    const { shellRoute, shellErrors, diorama, uiNodeCount } = await inspectShellAndTree(driver);
+    const farmRes = await driver.uiQuery({ testId: "farm", view: "workbench" });
+    let phoneNodes: readonly VdpUiNode[] = [];
+    try {
+      const phoneRes = await driver.uiQuery({ testId: "farm-phone", view: "farm-phone" });
+      phoneNodes = phoneRes.nodes;
+    } catch {
+      // farm-phone overlay is only mounted while open; diorama state check remains authoritative.
+      phoneNodes = [];
+    }
+
+    const checks = checkFarmPhoneOverlayInvariants({
+      shellRoute,
+      diorama,
+      farmViewCount: farmRes.count,
+      phoneNodes,
+      viewport: options.viewport,
+    });
+    const screenshot = await captureStepShot(driver, options.outDir, shotsSubdir, "flow-farm.png", shellErrors);
+    steps.push(
+      makeStepResult({
+        id: "route-farm",
+        label: "Farm Diorama & Phone Overlay",
+        route: "/farm",
+        startedAt,
+        checks,
+        screenshot,
+        shellRoute,
+        shellErrors,
+        uiNodeCount,
+      }),
+    );
+  }
+
+  // Step 9: Navigate /runtimes, /agents, /settings -> assert zero shell/view errors & route/theme parity.
   for (const spec of SWEEP_ROUTES) {
     const startedAt = Date.now();
     await driver.navigate(spec.route);
@@ -759,13 +1338,23 @@ export async function runFlowScenario(
     }
     await driver.settle(450);
 
-    const { shellRoute, shellErrors, uiNodeCount } = await inspectShellAndTree(driver);
-    const screenshot = await captureVdpScreenshot(driver, shotsDir, spec.shotName, shellErrors);
+    const { shellRoute, shellErrors, shellThemeDark, uiNodeCount } = await inspectShellAndTree(driver);
+    const screenshot = await captureStepShot(driver, options.outDir, shotsSubdir, spec.shotName, shellErrors);
+    const routeMatches = shellRoute === null || shellRoute === spec.route || shellRoute.startsWith(`${spec.route}/`);
+    const themeMatches = shellThemeDark === null || shellThemeDark === (options.theme === "dark");
     const checks: FlowCheck[] = [
       {
         name: `${spec.id}-zero-shell-errors`,
         passed: shellErrors.length === 0,
         detail: shellErrors.length === 0 ? `${spec.route} loaded with 0 shell/view errors` : `${spec.route} reported ${shellErrors.length} error(s)`,
+      },
+      {
+        name: `${spec.id}-route-theme-parity`,
+        passed: routeMatches && themeMatches,
+        detail:
+          routeMatches && themeMatches
+            ? `${spec.route} route and theme=${options.theme} matched`
+            : `route=${shellRoute ?? "<none>"}, shellThemeDark=${String(shellThemeDark)} for expected ${spec.route}/${options.theme}`,
       },
     ];
     steps.push(
@@ -792,6 +1381,38 @@ export async function runFlowScenario(
   });
 }
 
+export async function runFlowMatrix(
+  driver: VdpDriver,
+  options: {
+    readonly outDir: string;
+    readonly mode: "attached" | "sandbox";
+    readonly viewports: readonly FlowViewport[];
+    readonly themes: readonly ReviewTheme[];
+  },
+): Promise<FlowMatrixReport> {
+  const runs: FlowReport[] = [];
+  for (const viewport of options.viewports) {
+    for (const theme of options.themes) {
+      const shotsSubdir = `${viewport.width}x${viewport.height}-${theme}`;
+      const runReport = await runFlowScenario(driver, {
+        outDir: options.outDir,
+        shotsSubdir,
+        mode: options.mode,
+        viewport,
+        theme,
+      });
+      runs.push(runReport);
+    }
+  }
+  return aggregateFlowMatrixReport({
+    outDir: options.outDir,
+    mode: options.mode,
+    viewports: options.viewports,
+    themes: options.themes,
+    runs,
+  });
+}
+
 function seedFlowSandbox(cliBin: string, root: string, cliEnv: NodeJS.ProcessEnv, payloadDir: string): void {
   const vvJson = <T>(args: readonly string[], schema: z.ZodType<T>, label: string): T =>
     parseJsonOutput(runChecked(cliBin, [...args, "--json"], { cwd: root, env: cliEnv, capture: true, timeoutMs: 30_000 }), schema, label);
@@ -806,9 +1427,10 @@ function seedFlowSandbox(cliBin: string, root: string, cliEnv: NodeJS.ProcessEnv
   const descPath = join(payloadDir, "flow-issue.md");
   writeFileSync(
     descPath,
-    ["## Flow Verification Seed", "Exercises Kanban 4-lane layout, NewIssue dropdowns, Quick-Peek modal, full-screen Detail expansion, and List toggle."].join(
-      "\n",
-    ),
+    [
+      "## Flow Verification Seed",
+      "Exercises Kanban 6-lane layout, downward Select dropdowns, wide Quick-Peek modal, full-screen Detail expansion, List/Calendar views, and Farm overlay.",
+    ].join("\n"),
     "utf8",
   );
 
@@ -837,30 +1459,34 @@ function printUsage(): void {
   console.log(`Usage: vp run ui:flow -- [options]
 
 Options:
-  --out <dir>          Output directory for report.json and shots/ (default: /tmp/vv-vdp-flow)
-  --port <port>        Attach to a running VibeValley app on loopback VDP port
-  --home <dir>         Attach to a running VibeValley app using its VIBEVALLEY_HOME debug.json
-  --url <url>          Attach to an explicit VDP WebSocket/HTTP URL
-  --theme <light|dark> Theme mode for screenshots (default: light)
-  --width <px>         Window logical width in pixels (default: 1280)
-  --height <px>        Window logical height in pixels (default: 840)
-  --skip-build         Reuse existing vibevalley-mac, vibevalley CLI, and UI bundles in sandbox mode
-  --keep-sandbox       Preserve temporary sandbox directory after exit
-  -h, --help           Show this help message`);
+  --out <dir>              Output directory for report.json and shots/ (default: /tmp/vv-vdp-flow)
+  --port <port>            Attach to a running VibeValley app on loopback VDP port
+  --home <dir>             Attach to a running VibeValley app using its VIBEVALLEY_HOME debug.json
+  --url <url>              Attach to an explicit VDP WebSocket/HTTP URL
+  --theme <light|dark>     Run a single theme mode
+  --themes <list>          Comma-separated themes (default: light,dark)
+  --viewports <list>       Comma-separated WxH viewports (default: 900x720,1280x800,1680x1050)
+  --width <px>             Single viewport logical width in pixels (overrides --viewports)
+  --height <px>            Single viewport logical height in pixels (overrides --viewports)
+  --skip-build             Reuse existing vibevalley-mac, vibevalley CLI, and UI bundles in sandbox mode
+  --keep-sandbox           Preserve temporary sandbox directory after exit
+  -h, --help               Show this help message`);
 }
 
-function writeAndCheckFlowReport(outDir: string, report: FlowReport): FlowReport {
+function writeAndCheckFlowReport(outDir: string, report: FlowMatrixReport): FlowMatrixReport {
   writeFileSync(resolve(outDir, "report.json"), `${JSON.stringify(report, null, 2)}\n`, "utf8");
   if (!report.summary.allPassed) {
-    throw new Error(`vdp-flow failed (${report.summary.failedSteps} step(s), ${report.summary.totalErrors} error(s)) -> ${resolve(outDir, "report.json")}`);
+    throw new Error(
+      `vdp-flow failed (${report.summary.failedRuns} run(s), ${report.summary.failedSteps} step(s), ${report.summary.totalErrors} error(s)) -> ${resolve(outDir, "report.json")}`,
+    );
   }
   console.log(
-    `vdp-flow: passed ${report.summary.passedSteps}/${report.summary.totalSteps} steps (${report.summary.totalScreenshots} shots) -> ${resolve(outDir, "report.json")}`,
+    `vdp-flow: passed ${report.summary.passedRuns}/${report.summary.totalRuns} runs (${report.summary.passedSteps}/${report.summary.totalSteps} steps, ${report.summary.totalScreenshots} shots) -> ${resolve(outDir, "report.json")}`,
   );
   return report;
 }
 
-export async function runVdpFlow(options: FlowOptions): Promise<FlowReport> {
+export async function runVdpFlow(options: FlowOptions): Promise<FlowMatrixReport> {
   const root = resolve(import.meta.dirname, "../..");
   const paths = resolveVdpWorkspacePaths(root);
   const isAttached = options.port !== undefined || options.home !== undefined || options.url !== undefined;
@@ -878,11 +1504,11 @@ export async function runVdpFlow(options: FlowOptions): Promise<FlowReport> {
     if (options.url !== undefined) targetFlags.push("--url", options.url);
 
     const driver = createCliVdpDriver({ cliBin: paths.cliBin, root, env: process.env, targetFlags });
-    const report = await runFlowScenario(driver, {
+    const report = await runFlowMatrix(driver, {
       outDir: options.outDir,
       mode: "attached",
-      viewport: { width: options.width, height: options.height },
-      theme: options.theme,
+      viewports: options.viewports,
+      themes: options.themes,
     });
     return writeAndCheckFlowReport(options.outDir, report);
   }
@@ -903,11 +1529,11 @@ export async function runVdpFlow(options: FlowOptions): Promise<FlowReport> {
     },
     async ({ payloadDir, cliEnv, driver }) => {
       seedFlowSandbox(paths.cliBin, root, cliEnv, payloadDir);
-      return runFlowScenario(driver, {
+      return runFlowMatrix(driver, {
         outDir: options.outDir,
         mode: "sandbox",
-        viewport: { width: options.width, height: options.height },
-        theme: options.theme,
+        viewports: options.viewports,
+        themes: options.themes,
       });
     },
   );

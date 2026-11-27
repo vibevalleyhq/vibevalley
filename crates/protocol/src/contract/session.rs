@@ -448,6 +448,7 @@ pub struct Session {
     pub spent: Option<Spent>,
     pub subagents: Option<SessionSubagents>,
     pub tool_connections: Option<Vec<ToolConnection>>,
+    pub telemetry: Option<SessionTelemetry>,
     /// The machine it works on; none for an agent hosted in the server's process.
     pub machine: Option<String>,
     pub phase: Phase,
@@ -477,6 +478,7 @@ pub struct SessionView {
     pub spent: Option<Spent>,
     pub subagents: Option<SessionSubagents>,
     pub tool_connections: Option<Vec<ToolConnection>>,
+    pub telemetry: Option<SessionTelemetry>,
     pub machine: Option<String>,
     pub phase: PhaseView,
     pub phase_text: String,
@@ -619,6 +621,24 @@ pub struct EventTokens {
     pub reasoning: Option<i64>,
     pub context_used: Option<i64>,
     pub context_window: Option<i64>,
+}
+
+/// Aggregated token usage, context saturation, and retry/error counts for a session.
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct SessionTelemetry {
+    pub input_tokens: i64,
+    pub cache_read_tokens: i64,
+    pub output_tokens: i64,
+    pub cache_write_tokens: Option<i64>,
+    pub reasoning_tokens: Option<i64>,
+    pub context_used: Option<i64>,
+    pub context_window: Option<i64>,
+    pub llm_retries: i64,
+    pub run_errors: i64,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
@@ -996,6 +1016,362 @@ pub struct SessionEventListInput {
 }
 
 #[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct TrajectoryRunView {
+    pub run: Option<String>,
+    pub asked: Option<SessionEvent>,
+    pub steps: Vec<SessionEvent>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+pub enum TrajectoryWaterfallLane {
+    #[serde(rename = "asked")]
+    Asked,
+    #[serde(rename = "model")]
+    Model,
+    #[serde(rename = "tool")]
+    Tool,
+}
+
+impl TrajectoryWaterfallLane {
+    pub const ALL: [TrajectoryWaterfallLane; 3] = [TrajectoryWaterfallLane::Asked, TrajectoryWaterfallLane::Model, TrajectoryWaterfallLane::Tool];
+
+    /// The string on the wire.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            TrajectoryWaterfallLane::Asked => "asked",
+            TrajectoryWaterfallLane::Model => "model",
+            TrajectoryWaterfallLane::Tool => "tool",
+        }
+    }
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct TrajectoryLaneSpan {
+    pub lane: TrajectoryWaterfallLane,
+    pub start: i64,
+    pub end: i64,
+    pub seq: i64,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct TrajectoryWaterfall {
+    pub runs: Vec<[i64; 2]>,
+    pub spans: Vec<TrajectoryLaneSpan>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct TrajectorySummary {
+    pub runs: i64,
+    pub steps: i64,
+    pub model_ms: i64,
+    pub tool_ms: i64,
+    pub input: i64,
+    pub cache_read: i64,
+    pub output: i64,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct TrajectoryStepDuration {
+    pub seq: i64,
+    pub duration_ms: i64,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct TrajectoryStepMeta {
+    pub seq: i64,
+    pub duration_ms: i64,
+    pub readable_input: Option<String>,
+    pub collapsed_summary: Option<String>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct SessionTrajectoryProjection {
+    pub shown: Vec<SessionEvent>,
+    pub runs: Vec<TrajectoryRunView>,
+    pub waterfall: TrajectoryWaterfall,
+    pub summary: TrajectorySummary,
+    pub step_durations: Vec<TrajectoryStepDuration>,
+    pub step_meta: Vec<TrajectoryStepMeta>,
+    pub telemetry: SessionTelemetry,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct ActivityStep {
+    pub step: SessionEvent,
+    pub duration_ms: Option<i64>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct ActivityEditedFile {
+    pub path: String,
+    pub line: Option<i64>,
+    pub can_diff: bool,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct ActivityCommandPreview {
+    pub seq: i64,
+    pub command: String,
+    pub running: bool,
+    pub failed: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+pub enum TodoStepStatus {
+    #[serde(rename = "pending")]
+    Pending,
+    #[serde(rename = "in_progress")]
+    InProgress,
+    #[serde(rename = "done")]
+    Done,
+    #[serde(rename = "skipped")]
+    Skipped,
+    #[serde(rename = "failed")]
+    Failed,
+}
+
+impl TodoStepStatus {
+    pub const ALL: [TodoStepStatus; 5] = [
+        TodoStepStatus::Pending,
+        TodoStepStatus::InProgress,
+        TodoStepStatus::Done,
+        TodoStepStatus::Skipped,
+        TodoStepStatus::Failed,
+    ];
+
+    /// The string on the wire.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            TodoStepStatus::Pending => "pending",
+            TodoStepStatus::InProgress => "in_progress",
+            TodoStepStatus::Done => "done",
+            TodoStepStatus::Skipped => "skipped",
+            TodoStepStatus::Failed => "failed",
+        }
+    }
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct TodoStep {
+    pub title: String,
+    pub status: TodoStepStatus,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct TodoChecklist {
+    pub seq: i64,
+    pub steps: Vec<TodoStep>,
+    pub done_count: i64,
+    pub in_progress_count: i64,
+    pub failed_count: i64,
+    pub total_count: i64,
+    pub active_step: Option<TodoStep>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct ActivitySummary {
+    pub total_steps: i64,
+    pub thinking_count: i64,
+    pub read_count: i64,
+    pub search_count: i64,
+    pub edit_count: i64,
+    pub command_count: i64,
+    pub other_tool_count: i64,
+    pub total_tools: i64,
+    pub running_count: i64,
+    pub failed_count: i64,
+    pub started_at: i64,
+    pub duration_ms: i64,
+    pub edited_files: Vec<ActivityEditedFile>,
+    pub latest_command: Option<ActivityCommandPreview>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum ChatFeedItem {
+    #[serde(rename_all = "camelCase")]
+    Step {
+        key: String,
+        step: SessionEvent,
+        duration_ms: Option<i64>,
+        trailing: bool,
+    },
+    #[serde(rename_all = "camelCase")]
+    Activity {
+        key: String,
+        steps: Vec<ActivityStep>,
+        summary: ActivitySummary,
+        trailing: bool,
+    },
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct ToolTarget {
+    pub path: String,
+    pub line: Option<i64>,
+    pub can_diff: bool,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct ToolDetails {
+    pub headline: String,
+    pub formatted_input: String,
+    pub output_lines: i64,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct ChatTelemetry {
+    pub cached_read: i64,
+    pub uncached_input: i64,
+    pub total_input: i64,
+    pub output: i64,
+    pub reasoning: i64,
+    pub context_used: i64,
+    pub context_window: i64,
+    pub context_pct: i64,
+    pub cache_hit_pct: i64,
+    pub turns: i64,
+    pub tool_count: i64,
+    pub has_data: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+pub enum BoardTextTokenKind {
+    #[serde(rename = "text")]
+    Text,
+    #[serde(rename = "mention")]
+    Mention,
+    #[serde(rename = "seq")]
+    Seq,
+    #[serde(rename = "tag")]
+    Tag,
+}
+
+impl BoardTextTokenKind {
+    pub const ALL: [BoardTextTokenKind; 4] = [
+        BoardTextTokenKind::Text,
+        BoardTextTokenKind::Mention,
+        BoardTextTokenKind::Seq,
+        BoardTextTokenKind::Tag,
+    ];
+
+    /// The string on the wire.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            BoardTextTokenKind::Text => "text",
+            BoardTextTokenKind::Mention => "mention",
+            BoardTextTokenKind::Seq => "seq",
+            BoardTextTokenKind::Tag => "tag",
+        }
+    }
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct BoardTextToken {
+    pub kind: BoardTextTokenKind,
+    pub value: String,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct ChatToolStepProjection {
+    pub seq: i64,
+    pub target: Option<ToolTarget>,
+    pub details: ToolDetails,
+    pub todo: Option<TodoChecklist>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct ChatSessionProjection {
+    pub visible_steps: Vec<SessionEvent>,
+    pub feed_items: Vec<ChatFeedItem>,
+    pub latest_todos: Option<TodoChecklist>,
+    pub telemetry: ChatTelemetry,
+    pub tool_entries: Vec<ChatToolStepProjection>,
+}
+
+#[skip_serializing_none]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts-gen", derive(TS))]
 #[cfg_attr(feature = "ts-gen", ts(optional_fields))]
@@ -1005,6 +1381,7 @@ pub struct SessionEventPage {
     pub has_more: bool,
     pub oldest_seq: Option<i64>,
     pub newest_seq: Option<i64>,
+    pub trajectory: Option<SessionTrajectoryProjection>,
 }
 
 #[skip_serializing_none]
@@ -1286,6 +1663,59 @@ pub struct SessionChildTranscript {
     pub steps: Vec<SessionChildStep>,
 }
 
+/// Request to manually compact conversation context for a session.
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct SessionCompactInput {
+    pub id: String,
+}
+
+/// Result of manually compacting conversation context for a session.
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct SessionCompactResult {
+    pub id: String,
+    pub compacted: bool,
+    pub summary: Option<String>,
+    pub reason: Option<String>,
+}
+
+/// Request to execute a durable CodeMode JavaScript task within a session's context.
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct SessionRunCodeInput {
+    pub id: String,
+    pub script: String,
+    pub seed: Option<crate::JsNumber>,
+    pub timeout_ms: Option<i64>,
+    pub max_steps: Option<i64>,
+}
+
+/// Result of a durable CodeMode script execution.
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct SessionRunCodeResult {
+    pub id: String,
+    pub task_id: String,
+    pub output_json: String,
+    pub executed_steps: i64,
+    pub replayed_calls: i64,
+    pub replayed_sleeps: i64,
+    pub virtual_now_ms: i64,
+}
+
 #[skip_serializing_none]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts-gen", derive(TS))]
@@ -1319,12 +1749,14 @@ pub enum SessionWatchEvent {
         #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::SessionId"))]
         session: SessionId,
         events: Vec<SessionEvent>,
+        projection: Option<ChatSessionProjection>,
     },
     #[serde(rename_all = "camelCase")]
     Event {
         #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::SessionId"))]
         session: SessionId,
         event: SessionEvent,
+        projection: Option<ChatSessionProjection>,
     },
     #[serde(rename_all = "camelCase")]
     Missing {
@@ -1367,6 +1799,7 @@ crate::typescript::module! {
     SessionEventType,
     ToolAction,
     EventTokens,
+    SessionTelemetry,
     SessionPermissionMode,
     SessionPermissionDecision,
     SessionPermissionRequest,
@@ -1390,6 +1823,29 @@ crate::typescript::module! {
     SessionListInput,
     SessionGetInput,
     SessionEventListInput,
+    TrajectoryRunView,
+    TrajectoryWaterfallLane,
+    TrajectoryLaneSpan,
+    TrajectoryWaterfall,
+    TrajectorySummary,
+    TrajectoryStepDuration,
+    TrajectoryStepMeta,
+    SessionTrajectoryProjection,
+    ActivityStep,
+    ActivityEditedFile,
+    ActivityCommandPreview,
+    TodoStepStatus,
+    TodoStep,
+    TodoChecklist,
+    ActivitySummary,
+    ChatFeedItem,
+    ToolTarget,
+    ToolDetails,
+    ChatToolStepProjection,
+    ChatTelemetry,
+    BoardTextTokenKind,
+    BoardTextToken,
+    ChatSessionProjection,
     SessionEventPage,
     SessionBindingInput,
     SessionContextFile,
@@ -1411,6 +1867,10 @@ crate::typescript::module! {
     SessionChildStep,
     SessionChildTranscriptInput,
     SessionChildTranscript,
+    SessionCompactInput,
+    SessionCompactResult,
+    SessionRunCodeInput,
+    SessionRunCodeResult,
     SessionWatchPayload,
     SessionWatchEvent];
     aliases: [];

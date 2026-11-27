@@ -18,6 +18,7 @@ pub mod cache;
 pub mod canvas;
 pub mod chart;
 pub mod code_block;
+pub mod core_bridge;
 pub mod diagram;
 pub mod engine;
 pub mod genui;
@@ -47,6 +48,7 @@ pub use code_block::{
     ASYNC_HIGHLIGHT_BYTE_THRESHOLD, ASYNC_HIGHLIGHT_LINE_THRESHOLD, CODE_LINE_HEIGHT, DEFAULT_FOLD_LINES, VvCodeBlock, VvCodeBlockElement, VvCodeBlockEvent,
     VvCodeBlockProps, VvCodeCopyEvent, count_code_lines, should_offload_highlight, vv_code_block,
 };
+pub use core_bridge::VvCore;
 pub use diagram::{
     DiagramError, RenderedDiagram, VvDiagram, VvDiagramElement, VvDiagramEvent, VvDiagramPressEvent, VvDiagramProps, cached_render_diagram_with_max_width,
     clear_diagram_cache, diagram_cache_stats, render_diagram, render_diagram_with_max_width, vv_diagram,
@@ -93,6 +95,7 @@ pub fn registry() -> Registry {
         .register::<VvIcon>()
         .register::<VvWhiteboard>()
         .module::<VvI18n>()
-        .module::<VvPinyin>();
+        .module::<VvPinyin>()
+        .module::<VvCore>();
     set
 }

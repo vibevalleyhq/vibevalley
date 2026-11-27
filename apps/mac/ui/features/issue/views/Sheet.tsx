@@ -1,6 +1,7 @@
 import { Clipboard, context, effect, Scroll, signal, Text, untracked, View, type JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";
+import type { Issue } from "@vibevalley/protocol";
 
 import { Select } from "../../../design/Field";
 import { Icon } from "../../../design/Icon";
@@ -12,7 +13,6 @@ import { mix } from "../../../design/tone";
 import { useTimeout } from "../../../infra/base/timer";
 import { createEffect } from "../../../infra/solid";
 import type { Tone } from "../model/cards";
-import { type Stage, stageLabel, stages } from "../model/issue";
 
 export interface IssueChrome {
   readonly hasSheet: () => boolean;
@@ -91,15 +91,15 @@ export function IssueSheet(props: { heading: JSX.Element; main: JSX.Element; sid
   return (
     <View onLayout={box.onLayout} class="relative min-h-0 flex-1 flex-row">
       <Scroll testID="issue-scroll" class="min-h-0 min-w-0 flex-1">
-        <View class={`w-full max-w-[780px] self-center ${wide() ? "px-8 pt-6 pb-14" : "px-4 pt-4 pb-10"}`}>
+        <View class={`w-full max-w-4xl self-center ${wide() ? "px-8 pt-6 pb-14" : "px-4 pt-4 pb-10"}`}>
           {props.heading}
           <View class="mt-6">{props.main}</View>
         </View>
       </Scroll>
       <If when={wide() && desktopOpen()}>
-        <View testID="issue-inspector" class="min-h-0 w-76 shrink-0 border-l border-line bg-side">
-          <Scroll class="min-h-0 flex-1">
-            <View class="px-4 pt-4 pb-8">{props.side}</View>
+        <View testID="issue-inspector" class="h-full min-h-0 w-76 shrink-0 border-l border-line bg-side">
+          <Scroll testID="issue-inspector-scroll" class="min-h-0 flex-1" contentClass="px-4 pt-4 pb-10">
+            {props.side}
           </Scroll>
         </View>
       </If>
@@ -110,8 +110,8 @@ export function IssueSheet(props: { heading: JSX.Element; main: JSX.Element; sid
             <Text class="text-xs font-semibold text-muted">{t("web.issue.detail.properties")}</Text>
             <IconButton icon="close" size={14} label={t("web.issue.sheet.less")} onClick={() => chrome?.closeDrawer()} />
           </View>
-          <Scroll class="min-h-0 flex-1">
-            <View class="px-4 pt-3 pb-8">{props.side}</View>
+          <Scroll testID="issue-inspector-scroll" class="min-h-0 flex-1" contentClass="px-4 pt-3 pb-10">
+            {props.side}
           </Scroll>
         </View>
       </If>
@@ -124,7 +124,7 @@ export function Property(props: { label: string; icon?: JSX.Element; align?: "ce
   const start = () => props.align === "start";
   return (
     <View class={`min-h-8 flex-row gap-2 py-0.5 ${start() ? "items-start" : "items-center"}`}>
-      <Text class={`w-16 shrink-0 text-xs text-muted ${start() ? "pt-1.5" : ""}`}>{props.label}</Text>
+      <Text class={`w-18 shrink-0 text-xs text-muted ${start() ? "pt-1.5" : ""}`}>{props.label}</Text>
       <View class={`min-w-0 flex-1 flex-row gap-1 ${start() ? "items-start" : "items-center"}`}>
         <If when={props.icon}>
           <View class={`w-4 shrink-0 items-center justify-center ${start() ? "pt-1.5" : ""}`}>{props.icon}</View>
@@ -258,30 +258,6 @@ export function Note(props: { tone?: Tone | undefined; children: JSX.Element; cl
   );
 }
 
-/** Draft -> Active -> Done, the one it is at marked. */
-export function Stages(props: { at: Stage }) {
-  const ati = () => stages.indexOf(props.at);
-  return (
-    <View class="flex-row items-center" accessibilityLabel={t("web.issue.sheet.at", { stage: stageLabel[props.at] })}>
-      <Each of={stages} key={(s) => s}>
-        {(s, i) => (
-          <View class={`flex-row items-center ${i() > 0 ? "flex-1" : ""}`}>
-            <If when={i() > 0}>
-              <View class={`mx-2 h-px flex-1 ${i() <= ati() ? "bg-leaf" : "bg-line"}`} />
-            </If>
-            <View class="flex-row items-center gap-1.5">
-              <If when={i() < ati()} else={<View class={`h-2 w-2 rounded-full ${s() === props.at ? "bg-wheat" : "bg-line"}`} />}>
-                <Icon name="check" size={12} label={t("web.issue.sheet.stageDone", { stage: stageLabel[s()] })} />
-              </If>
-              <Text class={`text-sm ${s() === props.at ? "font-semibold text-ink" : i() < ati() ? "text-accent" : "text-faint"}`}>{stageLabel[s()]}</Text>
-            </View>
-          </View>
-        )}
-      </Each>
-    </View>
-  );
-}
-
 export function Pick<V extends string>(props: {
   label: string;
   value: V;
@@ -291,6 +267,9 @@ export function Pick<V extends string>(props: {
   disabled?: boolean;
   testid?: string;
   state?: "pending" | "failed" | undefined;
+  searchable?: boolean | undefined;
+  searchPlaceholder?: string | undefined;
+  emptyText?: string | undefined;
 }) {
   const shown = () => props.options.find((o) => o.value === props.value)?.label ?? props.placeholder ?? "";
   return (
@@ -307,6 +286,9 @@ export function Pick<V extends string>(props: {
           onChange={props.onChange}
           testid={props.testid}
           state={props.state}
+          searchable={props.searchable}
+          searchPlaceholder={props.searchPlaceholder}
+          emptyText={props.emptyText}
         />
       }
     >
@@ -348,5 +330,32 @@ export function IssueNumberPill(props: { number: number }) {
       <Text class={`font-mono text-xs tabular-nums ${copied() ? "text-leaf" : "text-muted"}`}>{`#${props.number}`}</Text>
       <Icon name={copied() ? "check" : "copy"} size={12} tone={copied() ? "leaf" : "muted"} />
     </View>
+  );
+}
+
+/** Parent issue link shown above the issue title when nested under a parent issue. */
+export function IssueTrail(props: {
+  parentId?: string | undefined;
+  parent?: Pick<Issue, "number" | "title"> | undefined;
+  onOpenParent?: ((id: string) => void) | undefined;
+}) {
+  return (
+    <If when={props.parentId}>
+      {(parentId) => (
+        <View accessibilityLabel={t("web.issue.detail.trail")} testID="issue-trail" class="mb-2.5 min-w-0 flex-row flex-wrap items-center gap-1.5">
+          <View
+            role="button"
+            testID="parent-issue"
+            onPress={() => props.onOpenParent?.(parentId())}
+            class="min-w-0 max-w-64 shrink flex-row items-center gap-1 overflow-hidden rounded-md border border-line bg-side px-1.5 py-0.5 hover:border-line-strong hover:bg-hover"
+          >
+            <Icon name="indent" size={12} tone="water" />
+            <Text class="min-w-0 truncate text-xs text-water">
+              {props.parent ? `#${props.parent.number} ${props.parent.title}` : t("web.issue.family.parent")}
+            </Text>
+          </View>
+        </View>
+      )}
+    </If>
   );
 }

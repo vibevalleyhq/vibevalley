@@ -1,4 +1,4 @@
-import { computed, Scroll, signal, Text, View } from "nsh";
+import { computed, Scroll, signal, Text, View, windowSize } from "nsh";
 
 import { list as listed, t } from "@vibevalley/i18n";
 import type { Agent, RuntimeInfo, Skill } from "@vibevalley/protocol";
@@ -54,7 +54,8 @@ export function SkillsPage(props: { id?: string | undefined }) {
   });
   const shownBuiltIn = computed(() => {
     const id = props.id;
-    return creating() || shownInstalled() !== undefined ? undefined : builtIns().find((s) => s.id === id);
+    if (creating() || shownInstalled() !== undefined) return undefined;
+    return builtIns().find((s) => s.id === id) ?? (installed().length === 0 && own().length === 0 ? builtIns()[0] : undefined);
   });
   const selected = computed(() =>
     creating() || shownInstalled() || shownBuiltIn() !== undefined
@@ -73,105 +74,128 @@ export function SkillsPage(props: { id?: string | undefined }) {
   });
   const count = (shown: number, total: number) => (q() ? `${shown} / ${total}` : `${total}`);
   const open = computed(() => shownInstalled() ?? first());
+  const lg = () => windowSize().width >= 1024;
 
-  return (
-    <View class="h-full min-h-0 flex-1 gap-3 lg:flex-row">
-      <Scroll
-        accessibilityLabel={t("web.runtime.library.book")}
-        testID="skills-book"
-        class="max-h-80 shrink-0 rounded-lg border border-line bg-side lg:max-h-none lg:w-72"
-        contentClass="gap-2 p-2.5"
-      >
-        <Text role="header" class="px-1.5 pt-1 text-base font-semibold text-ink">
-          {t("web.runtime.library.book")}
+  const bookBody = () => (
+    <>
+      <Text role="header" class="px-1.5 pt-1 text-base font-semibold text-ink">
+        {t("web.runtime.library.book")}
+      </Text>
+      <SearchField
+        testid="skills-search"
+        value={query()}
+        onInput={(v) => query.set(v)}
+        placeholder={t("web.runtime.library.searchHint")}
+        label={t("web.runtime.library.search")}
+      />
+      <If when={runtimes.error()}>
+        <Text class="px-1.5 text-xs text-berry">
+          {t("web.runtime.library.noRuntimes")}
+          {reasonOf(runtimes.error())}
         </Text>
-        <SearchField
-          testid="skills-search"
-          value={query()}
-          onInput={(v) => query.set(v)}
-          placeholder={t("web.runtime.library.searchHint")}
-          label={t("web.runtime.library.search")}
-        />
-        <If when={runtimes.error()}>
-          <Text class="px-1.5 text-xs text-berry">
-            {t("web.runtime.library.noRuntimes")}
-            {reasonOf(runtimes.error())}
-          </Text>
+      </If>
+      <SidebarSection
+        class="pt-2"
+        title={t("web.runtime.library.installed", { count: count(list().length, installed().length) })}
+        open={installedOpen() || q() !== ""}
+        onToggle={() => installedOpen.set(!installedOpen())}
+      >
+        <If when={installed().length === 0}>
+          <Text class="px-2 text-xs text-muted">{t("web.runtime.library.noneReported")}</Text>
         </If>
-        <SidebarSection
-          class="pt-2"
-          title={t("web.runtime.library.installed", { count: count(list().length, installed().length) })}
-          open={installedOpen() || q() !== ""}
-          onToggle={() => installedOpen.set(!installedOpen())}
-        >
-          <If when={installed().length === 0}>
-            <Text class="px-2 text-xs text-muted">{t("web.runtime.library.noneReported")}</Text>
-          </If>
-          <If when={installed().length > 0 && list().length === 0}>
-            <Text class="px-2 text-xs text-muted">{t("web.runtime.library.noMatch")}</Text>
-          </If>
-          <Each of={list()} key={(s) => s.name}>
-            {(s) => (
-              <Entry
-                to={skillPath(installedPrefix + s().name)}
-                on={open()?.name === s().name}
-                title={s().name}
-                detail={listed(s().runtimes.map((x) => runtimeName(catalog(), x.runtime)))}
-              />
-            )}
+        <If when={installed().length > 0 && list().length === 0}>
+          <Text class="px-2 text-xs text-muted">{t("web.runtime.library.noMatch")}</Text>
+        </If>
+        <Each of={list()} key={(s) => s.name}>
+          {(s) => (
+            <Entry
+              to={skillPath(installedPrefix + s().name)}
+              on={open()?.name === s().name}
+              title={s().name}
+              detail={listed(s().runtimes.map((x) => runtimeName(catalog(), x.runtime)))}
+            />
+          )}
+        </Each>
+      </SidebarSection>
+      <SidebarSection
+        class="pt-2"
+        title={t("web.runtime.library.builtIn", { count: count(builtInShown().length, builtIns().length) })}
+        open={builtInOpen() || q() !== ""}
+        onToggle={() => builtInOpen.set(!builtInOpen())}
+      >
+        <View class="gap-0.5" testID="built-in-skills">
+          <Each of={builtInShown()} key={(s) => s.id}>
+            {(s) => <Entry to={skillPath(s().id)} on={shownBuiltIn()?.id === s().id} title={s().name} detail={s().description} />}
           </Each>
-        </SidebarSection>
-        <SidebarSection
-          class="pt-2"
-          title={t("web.runtime.library.builtIn", { count: count(builtInShown().length, builtIns().length) })}
-          open={builtInOpen() || q() !== ""}
-          onToggle={() => builtInOpen.set(!builtInOpen())}
-        >
-          <View class="gap-0.5" testID="built-in-skills">
-            <Each of={builtInShown()} key={(s) => s.id}>
-              {(s) => <Entry to={skillPath(s().id)} on={shownBuiltIn()?.id === s().id} title={s().name} detail={s().description} />}
-            </Each>
-          </View>
-        </SidebarSection>
-        <SidebarSection
-          class="pt-2"
-          title={t("web.runtime.library.own", { count: count(ownShown().length, own().length) })}
-          open={ownOpen() || q() !== ""}
-          onToggle={() => ownOpen.set(!ownOpen())}
+        </View>
+      </SidebarSection>
+      <SidebarSection
+        class="pt-2"
+        title={t("web.runtime.library.own", { count: count(ownShown().length, own().length) })}
+        open={ownOpen() || q() !== ""}
+        onToggle={() => ownOpen.set(!ownOpen())}
+        action={
+          <ButtonLink href={skillPath("new")} tone="primary" size="compact" icon="add" testID="new-skill">
+            {t("web.runtime.library.newSkill")}
+          </ButtonLink>
+        }
+      >
+        <Each of={ownShown()} key={(s) => s.id}>
+          {(s) => <Entry to={skillPath(s().id)} on={!creating() && selected()?.id === s().id} title={s().name} detail={s().description} />}
+        </Each>
+      </SidebarSection>
+    </>
+  );
+
+  const detailBody = () => (
+    <>
+      <If when={creating()}>
+        <Keyed key="new">{() => <SkillEditor />}</Keyed>
+      </If>
+      <If when={!creating() ? shownBuiltIn() : undefined}>{(s) => <BuiltInCard skill={s()} />}</If>
+      <If when={!creating() && !shownBuiltIn() ? open() : undefined}>{(s) => <InstalledCard skill={s()} catalog={catalog()} />}</If>
+      <If when={!creating() && !shownBuiltIn() && !open() ? selected() : undefined}>
+        {(s) => <Keyed key={s().id}>{() => <SkillEditor skill={s()} />}</Keyed>}
+      </If>
+      <If when={!creating() && !shownBuiltIn() && !open() && !selected()}>
+        <Empty
+          icon="skill"
           action={
-            <ButtonLink href={skillPath("new")} tone="primary" size="compact" icon="add" testID="new-skill">
+            <Button tone="primary" icon="add" onPress={() => router.navigate(skillPath("new"))}>
               {t("web.runtime.library.newSkill")}
-            </ButtonLink>
+            </Button>
           }
         >
-          <Each of={ownShown()} key={(s) => s.id}>
-            {(s) => <Entry to={skillPath(s().id)} on={!creating() && selected()?.id === s().id} title={s().name} detail={s().description} />}
-          </Each>
-        </SidebarSection>
-      </Scroll>
-      <Scroll class="min-h-0 min-w-0 flex-1">
-        <If when={creating()}>
-          <Keyed key="new">{() => <SkillEditor />}</Keyed>
-        </If>
-        <If when={!creating() ? shownBuiltIn() : undefined}>{(s) => <BuiltInCard skill={s()} />}</If>
-        <If when={!creating() && !shownBuiltIn() ? open() : undefined}>{(s) => <InstalledCard skill={s()} catalog={catalog()} />}</If>
-        <If when={!creating() && !shownBuiltIn() && !open() ? selected() : undefined}>
-          {(s) => <Keyed key={s().id}>{() => <SkillEditor skill={s()} />}</Keyed>}
-        </If>
-        <If when={!creating() && !shownBuiltIn() && !open() && !selected()}>
-          <Empty
-            icon="skill"
-            action={
-              <Button tone="primary" icon="add" onPress={() => router.navigate(skillPath("new"))}>
-                {t("web.runtime.library.newSkill")}
-              </Button>
-            }
-          >
-            {t("web.runtime.library.noSkills")}
-          </Empty>
-        </If>
-      </Scroll>
-    </View>
+          {t("web.runtime.library.noSkills")}
+        </Empty>
+      </If>
+    </>
+  );
+
+  return (
+    <If
+      when={lg()}
+      else={
+        <Scroll class="h-full min-h-0 flex-1" contentClass="gap-3 pb-4">
+          <View accessibilityLabel={t("web.runtime.library.book")} testID="skills-book" class="shrink-0 gap-2 rounded-lg border border-line bg-side p-2.5">
+            {bookBody()}
+          </View>
+          <View class="min-w-0">{detailBody()}</View>
+        </Scroll>
+      }
+    >
+      <View class="h-full min-h-0 flex-1 flex-row gap-3">
+        <Scroll
+          accessibilityLabel={t("web.runtime.library.book")}
+          testID="skills-book"
+          class="h-full min-h-0 w-72 shrink-0 rounded-lg border border-line bg-side"
+          contentClass="gap-2 p-2.5"
+        >
+          {bookBody()}
+        </Scroll>
+        <Scroll class="min-h-0 min-w-0 flex-1">{detailBody()}</Scroll>
+      </View>
+    </If>
   );
 }
 
@@ -181,14 +205,14 @@ function Entry(props: { to: string; on: boolean; title: string; detail: string }
       href={props.to}
       testID="skill-entry"
       accessibilityState={{ selected: props.on }}
-      class={`relative rounded-md px-2 py-1.5 focus-visible:outline-2 focus-visible:outline-focus ${props.on ? "bg-selected" : "hover:bg-hover"}`}
+      class={`relative min-w-0 shrink-0 rounded-md px-2 py-1.5 focus-visible:outline-2 focus-visible:outline-focus ${props.on ? "bg-selected" : "hover:bg-hover"}`}
     >
       <If when={props.on}>
         <ActiveBar tall />
       </If>
-      <Text class="truncate text-sm font-medium text-ink">{props.title}</Text>
+      <Text class="min-w-0 truncate text-sm font-medium text-ink">{props.title}</Text>
       <If when={props.detail}>
-        <Text class="truncate text-xs text-muted">{props.detail}</Text>
+        <Text class="min-w-0 truncate text-xs text-muted">{props.detail}</Text>
       </If>
     </A>
   );

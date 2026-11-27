@@ -139,7 +139,7 @@ test("TodoDetail defaults to preview-first Markdown, Compare, visual criteria ch
     criteria: ["Markdown headings and Compare slider render by default", "Editing controls toggle inline cleanly"],
   });
 
-  // Preview-first state: wrapping text title, Markdown + Compare preview, visual criteria rows, and calm action bar hiding issue-talk.
+  // Preview-first state: wrapping text title, Markdown + Compare preview, visual criteria rows, and calm layout without duplicate banners/compare/trail clutter.
   expect(app.texts()).toContain(longTitle);
   expect(app.count("id:issue-title-input")).toBe(0);
   expect(app.count("id:issue-description-preview")).toBe(1);
@@ -148,7 +148,12 @@ test("TodoDetail defaults to preview-first Markdown, Compare, visual criteria ch
   expect(app.count("id:issue-criteria-preview")).toBe(1);
   expect(app.count("id:todo-criterion")).toBe(2);
   expect(app.count("id:issue-criteria-input")).toBe(0);
+  expect(app.count("id:issue-talk-card")).toBe(0);
   expect(app.count("id:issue-talk")).toBe(0);
+  expect(app.count("id:issue-start")).toBe(0);
+  expect(app.count("id:issue-add-compare")).toBe(0);
+  expect(app.count("id:issue-trail")).toBe(0);
+  expect(app.count("id:issue-copy-id")).toBe(1);
   expect(app.count("id:issue-draft-toggle")).toBe(1);
 
   const titleBox = app.layout("id:issue-title");
@@ -214,4 +219,103 @@ test("TodoDetail displays agent.validate readiness diagnostics and can mount a l
   await app.press("id:mount-local-repo");
   await fake.pump(app);
   expect(fake.calls.some((c) => c.op === "repo.mount")).toBe(true);
+});
+
+test("TodoDetail inspector scrolls smoothly at 900x720 so bottom delete button is never clipped", async () => {
+  const baseTodo =
+    scenarios.typical.state.board.issues.find((i) => i.status === "backlog") ?? scenarios.typical.state.board.issues.find((i) => i.status === "todo");
+  if (!baseTodo) throw new Error("typical scenario must include a backlog or todo issue");
+  const tallTodo = {
+    ...baseTodo,
+    queuedAt: SCENARIO_NOW - 120_000,
+    tags: ["UX", "架构", "MCP", "ACP", "存储", "语音", "白板", "Bug", "custom-long-tag-one", "custom-long-tag-two"],
+  };
+  const state = {
+    ...scenarios.typical.state,
+    board: {
+      ...scenarios.typical.state.board,
+      issues: scenarios.typical.state.board.issues.map((i) => (i.id === tallTodo.id ? tallTodo : i)),
+    },
+  };
+  const fake = fakeHost({ state, responses: scenarios.typical.responses }, { route: `/issues/${tallTodo.id}` });
+  const app = await open("../../../app/main.tsx", {
+    width: 900,
+    height: 720,
+    colorScheme: "light",
+    platform: "macos",
+    clock: { time: SCENARIO_NOW },
+    host: fake.options,
+  });
+  await fake.pumpUntil(app, () => app.count("id:issue-title") === 1);
+
+  // At 900x720 with sidebar open, inspector toggles as a drawer; open it if collapsed.
+  if (app.count("id:issue-inspector-scroll") === 0 && app.count("id:issue-inspector-toggle") === 1) {
+    await app.press("id:issue-inspector-toggle");
+    await fake.pumpUntil(app, () => app.count("id:issue-inspector-scroll") === 1);
+  }
+  await fake.pumpUntil(app, () => app.count("id:issue-remove") === 1);
+  await app.press("id:sheet-more");
+  await fake.pump(app);
+  await app.scroll("id:issue-inspector-scroll", 600);
+  await fake.pump(app);
+  const removeBox = app.layout("id:issue-remove");
+  expect(removeBox).toBeDefined();
+  expect(removeBox!.clipped).toBe(false);
+  expect(removeBox!.y + removeBox!.height).toBeLessThanOrEqual(720);
+});
+
+test("TodoDetail truncates long parent trail pill without colliding with #N and omits duplicate calendar icon in DatePropertyEditor", async () => {
+  const baseTodo =
+    scenarios.typical.state.board.issues.find((i) => i.status === "backlog") ?? scenarios.typical.state.board.issues.find((i) => i.status === "todo");
+  if (!baseTodo) throw new Error("typical scenario must include a backlog or todo issue");
+
+  const longParent = {
+    ...baseTodo,
+    id: "i-long-parent" as typeof baseTodo.id,
+    number: 42,
+    title: "Extremely long parent issue title designed to overflow breadcrumb pills if min-w-0 and max-w-64 are missing from IssueTrail",
+    parent: undefined,
+  };
+  const childTodo = {
+    ...baseTodo,
+    id: "i-long-child" as typeof baseTodo.id,
+    number: 63,
+    title: "Child draft verifying trail layout and date icons",
+    parent: longParent.id,
+    status: "backlog" as const,
+    stage: { state: "draft" as const, acts: [] },
+  };
+  const state = {
+    ...scenarios.typical.state,
+    board: {
+      ...scenarios.typical.state.board,
+      issues: [longParent, childTodo, ...scenarios.typical.state.board.issues.filter((i) => i.id !== longParent.id && i.id !== childTodo.id)],
+    },
+  };
+  const fake = fakeHost({ state, responses: scenarios.typical.responses }, { route: `/issues/${childTodo.id}` });
+  const app = await open("../../../app/main.tsx", {
+    width: 1200,
+    height: 800,
+    colorScheme: "light",
+    platform: "macos",
+    clock: { time: SCENARIO_NOW },
+    host: fake.options,
+  });
+  await fake.pumpUntil(app, () => app.count("id:parent-issue") === 1 && app.count("id:issue-copy-id") === 1);
+
+  const parentBox = app.layout("id:parent-issue");
+  const copyBox = app.layout("id:issue-copy-id");
+  expect(parentBox).toBeDefined();
+  expect(copyBox).toBeDefined();
+  expect(parentBox!.width).toBeLessThanOrEqual(256);
+  const sameRow = Math.abs(parentBox!.y - copyBox!.y) < Math.min(parentBox!.height, copyBox!.height);
+  if (sameRow) {
+    expect(parentBox!.x + parentBox!.width).toBeLessThanOrEqual(copyBox!.x);
+  }
+
+  // Property rows provide the single leading calendar icon; EpochDatePicker omits its own duplicate icon.
+  expect(app.count("id:issue-start-at")).toBe(1);
+  expect(app.count("id:issue-due-at")).toBe(1);
+  expect(app.count("id:issue-start-at-icon")).toBe(0);
+  expect(app.count("id:issue-due-at-icon")).toBe(0);
 });

@@ -14,13 +14,25 @@ use crate::context::error::LookIn;
 use crate::context::port::MemoryRecallPort;
 use crate::runtime::{AgentProfileInfo, Drive, HelperPlace, Persona, RuntimeError, SessionDriver};
 
-/// `instructions`: the persona, then each of its skills.
+/// `instructions`: the persona, followed by an on-demand index of its skills.
 pub fn instructions(agent: &Agent, library: &[Skill]) -> String {
     let mut parts = vec![agent.persona.trim().to_string()];
+    let mut index = Vec::new();
     for id in &agent.skills {
         if let Some(skill) = library.iter().find(|s| &s.id == id) {
-            parts.push(format!("## {}\n{}", skill.name, skill.body.trim()));
+            let desc = skill.description.trim();
+            if desc.is_empty() {
+                index.push(format!("- {} ({})", skill.name, skill.id));
+            } else {
+                index.push(format!("- {} ({})：{desc}", skill.name, skill.id));
+            }
         }
+    }
+    if !index.is_empty() {
+        parts.push(format!(
+            "## 技能\n需要时通过 `load_skill` 或 MCP `skills/get` / `resources/read`（`skill://`）按需读取以下技能全文：\n{}",
+            index.join("\n")
+        ));
     }
     parts.retain(|p| !p.is_empty());
     parts.join("\n\n")
@@ -106,6 +118,26 @@ impl AgentDriver {
     }
 }
 
+fn format_workplace_template(template: &str, place: &HelperPlace) -> String {
+    let house_head = "\n\n## 这台机器上所有仓库的约定\n{house}";
+    let template = if place.house.trim().is_empty() {
+        template.replace(house_head, "")
+    } else {
+        template.to_string()
+    };
+    let mut rules = template
+        .replace("{repo}", &place.repo)
+        .replace("{branch}", place.branch.as_deref().unwrap_or(""))
+        .replace("{cwd}", &place.cwd)
+        .replace("{id}", &place.id)
+        .replace("{house}", place.house.trim());
+    let language = users_language();
+    if language != "中文" {
+        rules = rules.replace("中文", &language);
+    }
+    rules
+}
+
 impl SessionDriver for AgentDriver {
     fn recall<'a>(&'a self, agent: &'a str, session: &'a str, repo: &'a str, input: &'a str) -> BoxFuture<'a, String> {
         Box::pin(async move {
@@ -133,33 +165,65 @@ impl SessionDriver for AgentDriver {
         })
     }
 
+    fn reviewer_profile(&self) -> Option<AgentProfileInfo> {
+        let agents = self.profile.agents();
+        let to_info = |a: Agent| AgentProfileInfo {
+            id: a.id,
+            name: a.name,
+            enabled: a.enabled,
+            is_orchestrator: false,
+        };
+        agents
+            .iter()
+            .find(|a| a.enabled && a.role == AgentRole::Worker && a.id == "reviewer")
+            .cloned()
+            .or_else(|| {
+                agents
+                    .into_iter()
+                    .find(|a| a.enabled && a.role == AgentRole::Worker && a.from.as_ref().is_some_and(|f| f.template == "reviewer"))
+            })
+            .map(to_info)
+    }
+
+    fn resolve_mention_agent(&self, token: &str) -> Option<AgentProfileInfo> {
+        let needle = token.trim();
+        if needle.is_empty() {
+            return None;
+        }
+        let workers: Vec<Agent> = self.profile.agents().into_iter().filter(|a| a.enabled && a.role == AgentRole::Worker).collect();
+        let found = workers
+            .iter()
+            .find(|a| a.id == needle)
+            .or_else(|| workers.iter().find(|a| a.name == needle))
+            .or_else(|| {
+                workers
+                    .iter()
+                    .find(|a| a.id.eq_ignore_ascii_case(needle) || a.name.eq_ignore_ascii_case(needle))
+            })?;
+        Some(AgentProfileInfo {
+            id: found.id.clone(),
+            name: found.name.clone(),
+            enabled: found.enabled,
+            is_orchestrator: false,
+        })
+    }
+
     fn rules(&self, place: &HelperPlace, deliver: Deliverable) -> String {
         let words = &PROMPTS.workplace;
+        if deliver == Deliverable::Answer {
+            let answer = format_workplace_template(&words.answer, place);
+            return format!("{ANSWER_ONLY}\n\n{answer}");
+        }
         let template = match (&place.branch, place.pull_request) {
             (Some(_), true) => &words.pull_request,
             (Some(_), false) => &words.branch,
             (None, _) => &words.folder,
         };
-        let house_head = "\n\n## 这台机器上所有仓库的约定\n{house}";
-        let template = if place.house.trim().is_empty() {
-            template.replace(house_head, "")
-        } else {
-            template.clone()
-        };
-        let mut rules = template
-            .replace("{repo}", &place.repo)
-            .replace("{branch}", place.branch.as_deref().unwrap_or(""))
-            .replace("{cwd}", &place.cwd)
-            .replace("{id}", &place.id)
-            .replace("{house}", place.house.trim());
-        let language = users_language();
-        if language != "中文" {
-            rules = rules.replace("中文", &language);
-        }
-        if deliver == Deliverable::Answer {
-            rules = format!("{ANSWER_ONLY}\n\n{rules}");
-        }
-        rules
+        format_workplace_template(template, place)
+    }
+
+    fn draft_rules(&self, place: &HelperPlace) -> String {
+        format_workplace_template(&PROMPTS.workplace.draft, place)
     }
 
     fn talk_rules(&self, cwd: &str, channel: &str, id: &str) -> String {

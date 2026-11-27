@@ -10,12 +10,18 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
+pub mod history;
+pub mod hooks;
 mod input;
 mod links;
 mod pty;
 mod screen;
 mod session;
 
+pub use hooks::{
+    ActiveHookInfo, BuiltinHookPreset, HookSource, PathShimSpec, ResolvedTerminalHooks, TabHookOverrides, TerminalHookTemplate, TerminalHooksConfig,
+    WorkspaceHookConfig,
+};
 pub use links::{LinkMatch, LinkResolveContext, LinkSpan, LinkTarget, link_at, link_at_rows, link_at_rows_with, link_at_with};
 
 use session::{Msg, Shared};
@@ -258,34 +264,31 @@ impl TermSession {
     /// Starts the PTY and the session thread. `on_event` is called on the
     /// session thread; it must be cheap and must not block.
     pub fn spawn(opts: SpawnOptions, on_event: impl Fn(TermEvent) + Send + 'static) -> Result<TermSession> {
-        let (tx, rx) = flume::unbounded();
-        let (done_tx, done) = flume::bounded(1);
-        let (pty, master_fd) = pty::spawn(&opts, tx.clone())?;
-        let shared = Arc::new(Shared::new(opts.size, master_fd, pty.pid));
-        let (ready_tx, ready_rx) = flume::bounded(1);
-        let thread_shared = shared.clone();
-        std::thread::Builder::new()
-            .name("vibevalley-terminal".to_string())
-            .spawn(move || {
-                let _done = done_tx;
-                session::run(opts, pty, thread_shared, rx, Box::new(on_event), ready_tx);
-            })
-            .map_err(|e| TermError::Spawn(e.to_string()))?;
-        ready_rx
-            .recv()
-            .map_err(|_| TermError::Backend("session thread stopped during startup".into()))??;
-        Ok(TermSession {
-            inner: Arc::new(Inner { tx, done, shared }),
-        })
+        Self::spawn_with_hooks(opts, ResolvedTerminalHooks::default(), on_event)
+    }
+
+    /// Starts the PTY and the session thread with optional scoped hooks.
+    pub fn spawn_with_hooks(opts: SpawnOptions, hooks: ResolvedTerminalHooks, on_event: impl Fn(TermEvent) + Send + 'static) -> Result<TermSession> {
+        Self::spawn_with_history_and_hooks(opts, "", hooks, on_event)
     }
 
     /// Like `spawn`, but first writes `history` (plain text, `\n` line
     /// ends) into the terminal, so a restored session shows its earlier
     /// output above the new shell's prompt.
     pub fn spawn_with_history(opts: SpawnOptions, history: &str, on_event: impl Fn(TermEvent) + Send + 'static) -> Result<TermSession> {
+        Self::spawn_with_history_and_hooks(opts, history, ResolvedTerminalHooks::default(), on_event)
+    }
+
+    /// Like `spawn_with_history`, additionally injecting scoped terminal hooks when non-empty.
+    pub fn spawn_with_history_and_hooks(
+        opts: SpawnOptions,
+        history: &str,
+        hooks: ResolvedTerminalHooks,
+        on_event: impl Fn(TermEvent) + Send + 'static,
+    ) -> Result<TermSession> {
         let (tx, rx) = flume::unbounded();
         let (done_tx, done) = flume::bounded(1);
-        let (pty, master_fd) = pty::spawn(&opts, tx.clone())?;
+        let (pty, master_fd) = pty::spawn(&opts, &hooks, tx.clone())?;
         let shared = Arc::new(Shared::new(opts.size, master_fd, pty.pid));
         let (ready_tx, ready_rx) = flume::bounded(1);
         let thread_shared = shared.clone();
@@ -428,11 +431,21 @@ impl TermSession {
         self.post(Msg::Kill);
     }
 
+    /// Initiates graceful session shutdown without waiting for exit.
+    pub fn begin_shutdown(&self) {
+        self.post(Msg::Shutdown);
+    }
+
+    /// Waits up to `timeout` for a previously initiated shutdown to finish.
+    pub fn wait_shutdown(&self, timeout: std::time::Duration) -> bool {
+        self.inner.done.recv_timeout(timeout).is_ok()
+    }
+
     /// Stops the session thread, reaps its PTY child, and waits up to `timeout`
     /// for teardown to finish.
     pub fn shutdown_and_wait(&self, timeout: std::time::Duration) {
-        self.post(Msg::Shutdown);
-        let _ = self.inner.done.recv_timeout(timeout);
+        self.begin_shutdown();
+        let _ = self.wait_shutdown(timeout);
     }
 }
 

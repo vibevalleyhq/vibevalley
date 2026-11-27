@@ -1,6 +1,10 @@
 import { z } from "zod";
 
 import type {
+  ActivitySummary,
+  BoardTextToken,
+  ChatFeedItem,
+  ChatSessionProjection,
   EventTokens,
   Priority,
   RuntimeInfo as ProtocolRuntimeInfo,
@@ -18,24 +22,34 @@ import type {
   SessionSwarmThread,
   SessionWatchEvent,
   SessionWorkspace,
+  TodoChecklist,
+  TodoStep,
+  ToolDetails,
 } from "@vibevalley/protocol";
 import { PriorityValues } from "@vibevalley/protocol";
 import {
-  jsonString,
+  BoardTextToken as BoardTextTokenSchema,
+  ChatSessionProjection as ChatSessionProjectionSchema,
   RuntimeInfo as RuntimeInfoSchema,
   SessionChildTranscript as SessionChildTranscriptSchema,
-  SessionEvent as SessionEventSchema,
   SessionWatchEvent as SessionWatchEventSchema,
   SessionWorkspace as SessionWorkspaceSchema,
+  TodoChecklist as TodoChecklistSchema,
+  ToolDetails as ToolDetailsSchema,
 } from "@vibevalley/protocol/schema";
 
-import { computeTelemetry, extractToolTarget, formatTokens, mergeSteps, shownEvents, type ToolTarget } from "../infra/sessionRuns";
+import { coreBridge } from "../infra/rich";
+import { computeTelemetry, extractToolTarget, formatTokens, mergeSteps } from "../infra/sessionRuns";
 import { transport } from "../infra/transport";
 
 export {
   computeTelemetry,
   extractToolTarget,
   formatTokens,
+  type ActivitySummary,
+  type BoardTextToken,
+  type ChatFeedItem,
+  type ChatSessionProjection,
   type EventTokens,
   type SessionChildStep,
   type SessionEvent,
@@ -51,17 +65,15 @@ export {
   type SessionSwarmThread,
   type SessionWatchEvent,
   type SessionWorkspace,
+  type TodoChecklist,
+  type TodoStep,
+  type ToolDetails,
 };
 
 export interface ComposerFile {
   readonly path: string;
   readonly name: string;
   readonly mime: string;
-}
-
-export interface BoardTextToken {
-  readonly kind: "text" | "mention" | "seq" | "tag";
-  readonly value: string;
 }
 
 export type ThoughtLevel = "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
@@ -88,6 +100,7 @@ export interface WorkspaceRuntimeOption {
 }
 
 const DEFAULT_EFFORTS: readonly ThoughtLevel[] = PriorityValues.filter((p): p is Exclude<Priority, "urgent"> => p !== "urgent").toReversed();
+const BoardTokenArraySchema = z.array(BoardTextTokenSchema);
 
 export function asThoughtLevel(value: string | undefined): ThoughtLevel | undefined {
   switch (value) {
@@ -166,394 +179,32 @@ export async function fetchWorkspaceRuntimes(): Promise<readonly WorkspaceRuntim
   return parsed.success ? parsed.data.map(toWorkspaceRuntime) : [];
 }
 
-const CHAT_STEP_VISIBILITY: Record<SessionEvent["type"], boolean> = {
-  "run/start": false,
-  "user/message": true,
-  "memory/recalled": true,
-  "assistant/thinking": true,
-  "assistant/message": true,
-  "tool/call": true,
-  "tool/result": false,
-  "permission/request": false,
-  "permission/resolved": false,
-  "interaction/request": false,
-  "interaction/resolved": true,
-  "llm/retry": true,
-  "llm/usage": false,
-  "run/error": true,
-  "run/end": false,
-};
-
-const chatHiddenStepTypes: ReadonlySet<SessionEvent["type"]> = new Set(SessionEventSchema.shape.type.options.filter((type) => !CHAT_STEP_VISIBILITY[type]));
-
+/** Merges chat transcript events uncapped via Rust `VvCore`, replacing equal revisions. */
 export function mergeChatSteps(existing: readonly SessionEvent[], incoming: readonly SessionEvent[]): SessionEvent[] {
   return mergeSteps([...existing], incoming, { limit: null, replaceSameRevision: true });
 }
 
-/** Joins `tool/call` steps with their matching `tool/result` (`call === seq`) and drops run/usage bounds. */
-export function visibleChatSteps(steps: readonly SessionEvent[]): SessionEvent[] {
-  return shownEvents(steps, chatHiddenStepTypes);
+/** Projects the full workspace chat state (`visibleSteps`, `feedItems`, `latestTodos`, `telemetry`, `toolEntries`) via Rust `VvCore`. */
+export function projectChatSession(steps: readonly SessionEvent[], latestTokens?: EventTokens, defaultWindow = 200_000): ChatSessionProjection | undefined {
+  const json = coreBridge()?.projectChatSession?.(JSON.stringify(steps), latestTokens !== undefined ? JSON.stringify(latestTokens) : null, defaultWindow);
+  if (!json) return undefined;
+  const parsed = ChatSessionProjectionSchema.safeParse(JSON.parse(json));
+  return parsed.success ? parsed.data : undefined;
 }
 
-export interface ActivityStep {
-  readonly step: SessionEvent;
-  readonly durationMs?: number | undefined;
-}
-
-export interface ActivityEditedFile {
-  readonly path: string;
-  readonly line?: number | undefined;
-  readonly canDiff: boolean;
-}
-
-export interface ActivityCommandPreview {
-  readonly seq: number;
-  readonly command: string;
-  readonly running: boolean;
-  readonly failed: boolean;
-}
-
-export type TodoStepStatus = "pending" | "in_progress" | "done" | "skipped" | "failed";
-
-export interface TodoStep {
-  readonly title: string;
-  readonly status: TodoStepStatus;
-}
-
-export interface TodoChecklist {
-  readonly seq: number;
-  readonly steps: readonly TodoStep[];
-  readonly doneCount: number;
-  readonly inProgressCount: number;
-  readonly failedCount: number;
-  readonly totalCount: number;
-  readonly activeStep?: TodoStep | undefined;
-}
-
-export interface ActivitySummary {
-  readonly totalSteps: number;
-  readonly thinkingCount: number;
-  readonly readCount: number;
-  readonly searchCount: number;
-  readonly editCount: number;
-  readonly commandCount: number;
-  readonly otherToolCount: number;
-  readonly totalTools: number;
-  readonly runningCount: number;
-  readonly failedCount: number;
-  readonly startedAt: number;
-  readonly durationMs: number;
-  readonly editedFiles: readonly ActivityEditedFile[];
-  readonly latestCommand?: ActivityCommandPreview | undefined;
-}
-
-export type ChatFeedItem =
-  | {
-      readonly kind: "step";
-      readonly key: string;
-      readonly step: SessionEvent;
-      readonly durationMs?: number | undefined;
-      readonly trailing: boolean;
-    }
-  | {
-      readonly kind: "activity";
-      readonly key: string;
-      readonly steps: readonly ActivityStep[];
-      readonly summary: ActivitySummary;
-      readonly trailing: boolean;
-    };
-
-export interface ToolDetails {
-  readonly headline: string;
-  readonly formattedInput: string;
-  readonly outputLines: number;
-}
-
-const JsonObjectInput = jsonString(z.record(z.string(), z.unknown()));
-
-function isIntermediateStep(step: SessionEvent): boolean {
-  return step.type === "assistant/thinking" || step.type === "tool/call" || step.type === "memory/recalled";
-}
-
-function isPlainRecord(val: unknown): val is Readonly<Record<string, unknown>> {
-  return typeof val === "object" && val !== null && !Array.isArray(val);
-}
-
-function firstStringField(obj: Readonly<Record<string, unknown>>, keys: readonly string[]): string | undefined {
-  for (const key of keys) {
-    const val = obj[key];
-    if (typeof val === "string") {
-      const trimmed = val.trim();
-      if (trimmed.length > 0) return trimmed;
-    }
-  }
-  return undefined;
-}
-
-function firstPositiveInt(obj: Readonly<Record<string, unknown>>, keys: readonly string[]): number | undefined {
-  for (const key of keys) {
-    const val = obj[key];
-    if (typeof val === "number" && Number.isFinite(val) && val > 0) return Math.floor(val);
-  }
-  return undefined;
-}
-
-function normalizeTodoStatus(raw: unknown): TodoStepStatus | undefined {
-  if (typeof raw !== "string") return undefined;
-  switch (raw.trim().toLowerCase()) {
-    case "done":
-    case "completed":
-    case "complete":
-      return "done";
-    case "in_progress":
-    case "in-progress":
-    case "working":
-    case "running":
-      return "in_progress";
-    case "pending":
-    case "todo":
-    case "not_started":
-      return "pending";
-    case "skipped":
-    case "cancelled":
-    case "canceled":
-      return "skipped";
-    case "failed":
-    case "error":
-      return "failed";
-    default:
-      return undefined;
-  }
-}
-
-/** Parses `update_steps` (Antigravity/AMP), `TodoWrite`, or `update_plan` payloads into a structured checklist. */
+/** Parses `update_steps` / `TodoWrite` / `update_plan` payloads into a structured checklist via Rust `VvCore`. */
 export function parseTodoChecklist(step: Pick<SessionEvent, "seq" | "type" | "tool" | "input">): TodoChecklist | undefined {
-  if (step.type !== "tool/call") return undefined;
-  const raw = step.input?.trim() ?? "";
-  if (raw === "") return undefined;
-  const parsed = JsonObjectInput.safeParse(raw);
-  if (!parsed.success) return undefined;
-  const obj = parsed.data;
-  const toolLower = (step.tool ?? "").toLowerCase();
-
-  let candidates: unknown;
-  if (Array.isArray(obj.steps)) {
-    candidates = obj.steps;
-  } else if ((toolLower.includes("todo") || toolLower.includes("plan") || toolLower.includes("steps")) && Array.isArray(obj.todos)) {
-    candidates = obj.todos;
-  } else if ((toolLower.includes("todo") || toolLower.includes("plan") || toolLower.includes("steps")) && Array.isArray(obj.plan)) {
-    candidates = obj.plan;
-  }
-  if (!Array.isArray(candidates) || candidates.length === 0) return undefined;
-
-  const steps: TodoStep[] = [];
-  for (const item of candidates) {
-    if (!isPlainRecord(item)) continue;
-    const title = firstStringField(item, ["title", "content", "step", "label"]);
-    const status = normalizeTodoStatus(item.status) ?? "pending";
-    if (title !== undefined) steps.push({ title, status });
-  }
-  if (steps.length === 0) return undefined;
-
-  let doneCount = 0;
-  let inProgressCount = 0;
-  let failedCount = 0;
-  for (const item of steps) {
-    if (item.status === "done") doneCount += 1;
-    else if (item.status === "in_progress") inProgressCount += 1;
-    else if (item.status === "failed") failedCount += 1;
-  }
-  const activeStep = steps.find((s) => s.status === "in_progress") ?? steps.find((s) => s.status === "pending");
-
-  return {
-    seq: step.seq,
-    steps,
-    doneCount,
-    inProgressCount,
-    failedCount,
-    totalCount: steps.length,
-    ...(activeStep !== undefined ? { activeStep } : {}),
-  };
-}
-
-/** Returns the latest `update_steps` / todo checklist from a session transcript, if any. */
-export function latestSessionTodos(steps: readonly SessionEvent[]): TodoChecklist | undefined {
-  for (let i = steps.length - 1; i >= 0; i--) {
-    const step = steps[i];
-    if (step === undefined) continue;
-    const parsed = parseTodoChecklist(step);
-    if (parsed !== undefined) return parsed;
-  }
-  return undefined;
-}
-
-function extractCommandText(step: SessionEvent): string | undefined {
-  if (step.type !== "tool/call" || step.action !== "run_command") return undefined;
-  const raw = step.input?.trim() ?? "";
-  if (raw !== "") {
-    const parsed = JsonObjectInput.safeParse(raw);
-    if (parsed.success) {
-      const cmd = firstStringField(parsed.data, ["command", "CommandLine", "cmd"]);
-      if (cmd !== undefined) return cmd.replaceAll(/\s+/gu, " ").trim();
-    }
-  }
-  const fallback = step.text
-    .replaceAll(/\s+/gu, " ")
-    .trim()
-    .replace(/^\$\s+/u, "");
-  return fallback.length > 0 ? fallback : undefined;
-}
-
-function summarizeActivity(run: readonly ActivityStep[], endTime: number): ActivitySummary {
-  let thinkingCount = 0;
-  let readCount = 0;
-  let searchCount = 0;
-  let editCount = 0;
-  let commandCount = 0;
-  let otherToolCount = 0;
-  let runningCount = 0;
-  let failedCount = 0;
-  const editedByPath = new Map<string, ActivityEditedFile>();
-  let latestRunningCommand: ActivityCommandPreview | undefined;
-  let latestAnyCommand: ActivityCommandPreview | undefined;
-
-  for (const { step } of run) {
-    if (step.type === "assistant/thinking") {
-      thinkingCount += 1;
-      continue;
-    }
-    if (step.type !== "tool/call") continue;
-    if (step.ok === undefined) runningCount += 1;
-    else if (step.ok === false) failedCount += 1;
-
-    switch (step.action) {
-      case "read_file":
-        readCount += 1;
-        break;
-      case "search":
-      case "web":
-        searchCount += 1;
-        break;
-      case "edit_file":
-        editCount += 1;
-        break;
-      case "run_command": {
-        commandCount += 1;
-        const cmdText = extractCommandText(step);
-        if (cmdText !== undefined) {
-          const preview: ActivityCommandPreview = {
-            seq: step.seq,
-            command: cmdText,
-            running: step.ok === undefined,
-            failed: step.ok === false,
-          };
-          latestAnyCommand = preview;
-          if (preview.running) latestRunningCommand = preview;
-        }
-        break;
-      }
-      default:
-        otherToolCount += 1;
-        break;
-    }
-
-    const target: ToolTarget | undefined = extractToolTarget(step);
-    if (target !== undefined && target.canDiff) {
-      const existing = editedByPath.get(target.path);
-      editedByPath.set(target.path, {
-        path: target.path,
-        line: target.line ?? existing?.line,
-        canDiff: true,
-      });
-    }
-  }
-
-  const first = run[0];
-  const last = run[run.length - 1];
-  const startedAt = first?.step.time ?? endTime;
-  const durationMs = first !== undefined && last !== undefined ? Math.max(0, endTime - startedAt) : 0;
-  const latestCommand = latestRunningCommand ?? latestAnyCommand;
-
-  return {
-    totalSteps: run.length,
-    thinkingCount,
-    readCount,
-    searchCount,
-    editCount,
-    commandCount,
-    otherToolCount,
-    totalTools: readCount + searchCount + editCount + commandCount + otherToolCount,
-    runningCount,
-    failedCount,
-    startedAt,
-    durationMs,
-    editedFiles: [...editedByPath.values()],
-    ...(latestCommand !== undefined ? { latestCommand } : {}),
-  };
-}
-
-/**
- * Groups consecutive intermediate steps (`assistant/thinking`, `tool/call`, `memory/recalled`)
- * into a collapsible activity cluster when 2+ appear back-to-back, while keeping single steps bare.
- */
-export function groupChatSteps(steps: readonly SessionEvent[]): ChatFeedItem[] {
-  const items: ChatFeedItem[] = [];
-  let buffer: ActivityStep[] = [];
-  let bufferEndIdx = -1;
-
-  const flush = () => {
-    const first = buffer[0];
-    const last = buffer[buffer.length - 1];
-    if (first === undefined || last === undefined) {
-      buffer = [];
-      bufferEndIdx = -1;
-      return;
-    }
-    const isTrailing = bufferEndIdx === steps.length - 1;
-    if (buffer.length === 1) {
-      items.push({
-        kind: "step",
-        key: `s:${first.step.seq}`,
-        step: first.step,
-        ...(first.durationMs !== undefined ? { durationMs: first.durationMs } : {}),
-        trailing: isTrailing,
-      });
-    } else {
-      const after = steps[bufferEndIdx + 1];
-      const endTime = after !== undefined ? after.time : last.step.time;
-      items.push({
-        kind: "activity",
-        key: `g:${first.step.seq}`,
-        steps: buffer,
-        summary: summarizeActivity(buffer, endTime),
-        trailing: isTrailing,
-      });
-    }
-    buffer = [];
-    bufferEndIdx = -1;
-  };
-
-  for (let i = 0; i < steps.length; i++) {
-    const step = steps[i];
-    if (step === undefined) continue;
-    const next = steps[i + 1];
-    const durationMs = next !== undefined ? Math.max(0, next.time - step.time) : undefined;
-    if (isIntermediateStep(step)) {
-      buffer.push(durationMs !== undefined ? { step, durationMs } : { step });
-      bufferEndIdx = i;
-    } else {
-      flush();
-      items.push({
-        kind: "step",
-        key: `s:${step.seq}`,
-        step,
-        ...(durationMs !== undefined ? { durationMs } : {}),
-        trailing: i === steps.length - 1,
-      });
-    }
-  }
-  flush();
-  return items;
+  const json = coreBridge()?.parseTodoChecklist?.(
+    JSON.stringify({
+      revision: 0,
+      time: 0,
+      text: "",
+      ...step,
+    }),
+  );
+  if (!json) return undefined;
+  const parsed = TodoChecklistSchema.safeParse(JSON.parse(json));
+  return parsed.success ? parsed.data : undefined;
 }
 
 /** Compact wall-clock duration label (`320ms`, `4.2s`, `1m 12s`). */
@@ -575,56 +226,18 @@ export function thinkingPreview(text: string, maxChars = 96): string {
   return `${collapsed.slice(0, Math.max(1, maxChars - 1)).trimEnd()}…`;
 }
 
-/** Extracts a scannable headline, formatted input, and output line count for a tool step. */
+/** Extracts a scannable headline, formatted input, and output line count for a tool step via Rust `VvCore`. */
 export function formatToolDetails(step: SessionEvent): ToolDetails {
-  const raw = step.input?.trim() ?? "";
-  const parsed = raw !== "" ? JsonObjectInput.safeParse(raw) : undefined;
-  const obj = parsed !== undefined && parsed.success ? parsed.data : undefined;
-  const target = extractToolTarget(step);
+  const json = coreBridge()?.formatToolDetails?.(JSON.stringify(step));
+  if (json !== undefined) {
+    const parsed = ToolDetailsSchema.safeParse(JSON.parse(json));
+    if (parsed.success) return parsed.data;
+  }
   const output = step.output ?? "";
-  const outputLines = output.length > 0 ? output.split(/\r?\n/u).length : 0;
-
-  let formattedInput = raw;
-  if (obj !== undefined) {
-    formattedInput = JSON.stringify(obj, null, 2);
-  }
-
-  let headline = target?.path ?? (step.text || step.tool || "");
-  const todo = parseTodoChecklist(step);
-  if (todo !== undefined) {
-    headline = todo.activeStep !== undefined ? `${todo.doneCount}/${todo.totalCount} · ${todo.activeStep.title}` : `${todo.doneCount}/${todo.totalCount}`;
-  } else if (step.action === "run_command" && obj !== undefined) {
-    const cmd = firstStringField(obj, ["command", "CommandLine", "cmd"]);
-    if (cmd !== undefined) {
-      headline = `$ ${cmd}`;
-      const cwd = firstStringField(obj, ["cwd", "Cwd", "workdir", "WorkDir"]);
-      formattedInput = cwd !== undefined ? `$ ${cmd}\ncwd: ${cwd}` : `$ ${cmd}`;
-    }
-  } else if (step.action === "search" && obj !== undefined) {
-    const query = firstStringField(obj, ["query", "Query", "pattern", "Pattern"]);
-    const inPath = firstStringField(obj, ["path", "SearchPath", "directory", "dir", "Directory"]);
-    if (query !== undefined) {
-      headline = inPath !== undefined ? `${query} in ${inPath}` : query;
-    }
-  } else if ((step.action === "read_file" || step.action === "edit_file") && target !== undefined) {
-    const startLine = target.line ?? (obj !== undefined ? firstPositiveInt(obj, ["StartLine", "start_line", "line"]) : undefined);
-    const endLine = obj !== undefined ? firstPositiveInt(obj, ["EndLine", "end_line"]) : undefined;
-    if (startLine !== undefined && endLine !== undefined && endLine > startLine) {
-      headline = `${target.path}:${startLine}-${endLine}`;
-    } else if (startLine !== undefined) {
-      headline = `${target.path}:${startLine}`;
-    } else {
-      headline = target.path;
-    }
-  } else if (step.action === "web" && obj !== undefined) {
-    const webTarget = firstStringField(obj, ["url", "Url", "query", "Query"]);
-    if (webTarget !== undefined) headline = webTarget;
-  }
-
   return {
-    headline,
-    formattedInput,
-    outputLines,
+    headline: step.text || step.tool || "",
+    formattedInput: step.input?.trim() ?? "",
+    outputLines: output.length > 0 ? output.split(/\r?\n/u).length : 0,
   };
 }
 
@@ -695,22 +308,14 @@ export async function fetchChildTranscript(
   return { ok: true, steps: parsed.data.steps };
 }
 
-const BOARD_TOKEN_RE = /(@[a-zA-Z0-9_-]+|#[0-9]+|\[(?:done|stall)\])/gu;
-
+/** Splits swarm board message tokens (`@mention`, `#seq`, `[done]`/`[stall]`) via Rust `VvCore`. */
 export function parseBoardTokens(text: string): BoardTextToken[] {
-  const tokens: BoardTextToken[] = [];
-  let cursor = 0;
-  for (const match of text.matchAll(BOARD_TOKEN_RE)) {
-    const idx = match.index;
-    const hit = match[0];
-    if (idx > cursor) tokens.push({ kind: "text", value: text.slice(cursor, idx) });
-    if (hit.startsWith("@")) tokens.push({ kind: "mention", value: hit });
-    else if (hit.startsWith("#")) tokens.push({ kind: "seq", value: hit });
-    else tokens.push({ kind: "tag", value: hit });
-    cursor = idx + hit.length;
+  const json = coreBridge()?.parseBoardTokens?.(text);
+  if (json !== undefined) {
+    const parsed = BoardTokenArraySchema.safeParse(JSON.parse(json));
+    if (parsed.success && parsed.data.length > 0) return parsed.data;
   }
-  if (cursor < text.length) tokens.push({ kind: "text", value: text.slice(cursor) });
-  return tokens.length > 0 ? tokens : [{ kind: "text", value: text }];
+  return [{ kind: "text", value: text }];
 }
 
 export async function stopWorkspaceSession(id: string): Promise<{ ok: true } | { ok: false; reason: string }> {
@@ -729,7 +334,11 @@ export async function setWorkspaceConfig(
   const env = await transport().call("session.setConfig", payload);
   if (env.bizCode !== 0) return { ok: false, reason: env.message };
   const parsed = SessionWorkspaceSchema.safeParse(env.data);
-  return parsed.success ? { ok: true, workspace: parsed.data } : { ok: true };
+  if (!parsed.success) {
+    console.error("[chatSession] malformed session.setConfig response", { id, issues: parsed.error.issues });
+    return { ok: false, reason: parsed.error.message };
+  }
+  return { ok: true, workspace: parsed.data };
 }
 
 export async function respondWorkspaceInteraction(
@@ -774,7 +383,11 @@ export function watchWorkspaceSession(id: string, onEvent: (event: SessionWatchE
     payload,
     (raw) => {
       const parsed = SessionWatchEventSchema.safeParse(raw);
-      if (parsed.success) onEvent(parsed.data);
+      if (!parsed.success) {
+        console.error("[chatSession] dropped malformed session.watch event", { id, issues: parsed.error.issues });
+        return;
+      }
+      onEvent(parsed.data);
     },
     () => onEnd?.(),
   );

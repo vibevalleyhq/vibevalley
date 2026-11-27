@@ -8,6 +8,7 @@ mod chart_chart_kinds;
 mod chart_ticks_and_layout;
 mod chart_validation_and_security;
 mod code_block;
+mod core_bridge;
 mod diagram_and_canvas;
 mod genui_compound_interest_tests;
 mod genui_dashboard_tests;

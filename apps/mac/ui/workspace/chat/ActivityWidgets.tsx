@@ -2,6 +2,7 @@ import { Clipboard, computed, Scroll, signal, Text, untracked, View } from "nsh"
 import { TextView } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
+import type { ChatToolStepProjection } from "@vibevalley/protocol";
 
 import { Button } from "../../design/Button";
 import { CodeBlock } from "../../design/code/CodeBlock";
@@ -324,12 +325,17 @@ export function ThinkingBlock(props: { step: SessionEvent; durationMs?: number |
   );
 }
 
-export function ToolCallCard(props: { step: SessionEvent; durationMs?: number | undefined; embedded?: boolean | undefined }) {
+export function ToolCallCard(props: {
+  step: SessionEvent;
+  durationMs?: number | undefined;
+  embedded?: boolean | undefined;
+  projected?: ChatToolStepProjection | undefined;
+}) {
   const toggled = signal<boolean>();
   const open = computed(() => toggled() ?? props.step.ok === false);
-  const target = computed(() => extractToolTarget(props.step));
-  const details = computed(() => formatToolDetails(props.step));
-  const todo = computed(() => parseTodoChecklist(props.step));
+  const target = computed(() => (props.projected ? props.projected.target : extractToolTarget(props.step)));
+  const details = computed(() => props.projected?.details ?? formatToolDetails(props.step));
+  const todo = computed(() => (props.projected ? props.projected.todo : parseTodoChecklist(props.step)));
   const embedded = () => props.embedded === true;
   const running = () => props.step.ok === undefined;
   const failed = () => props.step.ok === false;
@@ -470,7 +476,11 @@ export function MemoryRecalledRow(props: { step: SessionEvent; embedded?: boolea
   );
 }
 
-export function ActivityGroup(props: { item: Extract<ChatFeedItem, { kind: "activity" }>; working: boolean }) {
+export function ActivityGroup(props: {
+  item: Extract<ChatFeedItem, { kind: "activity" }>;
+  working: boolean;
+  toolEntries?: ReadonlyMap<number, ChatToolStepProjection> | undefined;
+}) {
   const toggled = signal<boolean>();
   const autoOpen = computed(() => props.item.summary.runningCount > 0 || props.item.summary.failedCount > 0 || (props.item.trailing && props.working));
   const open = computed(() => toggled() ?? autoOpen());
@@ -587,7 +597,7 @@ export function ActivityGroup(props: { item: Extract<ChatFeedItem, { kind: "acti
                   <ThinkingBlock step={entry().step} durationMs={entry().durationMs} running={running() && index() === props.item.steps.length - 1} embedded />
                 </If>
                 <If when={entry().step.type === "tool/call"}>
-                  <ToolCallCard step={entry().step} durationMs={entry().durationMs} embedded />
+                  <ToolCallCard step={entry().step} durationMs={entry().durationMs} embedded projected={props.toolEntries?.get(entry().step.seq)} />
                 </If>
                 <If when={entry().step.type === "memory/recalled"}>
                   <MemoryRecalledRow step={entry().step} embedded />

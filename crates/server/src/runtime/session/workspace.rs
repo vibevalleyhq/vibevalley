@@ -20,7 +20,7 @@ use vibevalley_runtime::oar::{
     SwarmMemberState, TurnOptions, Usage,
 };
 
-use super::engine::SessionEngine;
+use super::engine::{PermissionEvent, SessionEngine};
 use super::mailbox::MailboxSource;
 use crate::context::error::{LookIn, missing};
 use crate::context::now;
@@ -524,7 +524,7 @@ impl SessionEngine {
             mcp_servers,
             ..Default::default()
         };
-        let agent = drive.runtime.open(opts).await?;
+        let agent = self.open_runtime_for_session_async(drive.runtime.as_ref(), &session, opts).await?;
         self.go_live_async(agent, session.clone(), None).await?;
         self.set_workspace_meta_async(&id, meta).await;
         self.notify_workspace(&id);
@@ -604,7 +604,7 @@ impl SessionEngine {
             mcp_servers,
             ..Default::default()
         };
-        let agent = drive.runtime.open(opts).await?;
+        let agent = self.open_runtime_for_session_async(drive.runtime.as_ref(), &session, opts).await?;
         session.phase = Phase::Resting(PhaseResting {});
         self.go_live_async(agent, session.clone(), None).await?;
         self.set_workspace_meta_async(&session.id, meta).await;
@@ -842,7 +842,8 @@ impl SessionEngine {
     /// Handles `EventKind::PermissionRequested` for a workspace session: auto-approves
     /// only when the workspace session's `permission_mode == Bypass`; otherwise records
     /// a pending permission card and wakes `session.watch` subscribers.
-    pub(super) fn on_workspace_permission_requested(&self, session_id: &str, request_id: String, tool: String, input: serde_json::Value, summary: String) {
+    pub(super) fn on_workspace_permission_requested(&self, session: &Session, request_id: String, tool: String, input: serde_json::Value, summary: String) {
+        let session_id = session.id.as_str();
         let mode = self.workspace_snapshot(session_id).permission_mode;
         if mode == SessionPermissionMode::Bypass {
             if let Some(agent) = self.live_agent(session_id) {
@@ -862,8 +863,15 @@ impl SessionEngine {
             let mut map = self.0.workspaces.lock();
             let ws = self.ensure_workspace_entry(&mut map, session_id);
             ws.pending_permissions.retain(|p| p.request_id != request_id);
-            ws.pending_permissions.push(req);
+            ws.pending_permissions.push(req.clone());
         }
+        self.emit_permission(PermissionEvent::Requested {
+            session_id: session.id.clone(),
+            session_name: session.name.clone(),
+            channel_id: session.channel_id().map(str::to_owned),
+            request: req,
+            at: self.0.ctx.now(),
+        });
         self.notify_workspace(session_id);
     }
 
@@ -879,6 +887,10 @@ impl SessionEngine {
             }
         };
         if changed {
+            self.emit_permission(PermissionEvent::Resolved {
+                session_id: session_id.to_owned(),
+                request_id: request_id.to_owned(),
+            });
             self.notify_workspace(session_id);
         }
     }
@@ -926,14 +938,21 @@ impl SessionEngine {
 
     pub(super) fn on_workspace_turn_finished(&self, session_id: &str, usage: &Usage) {
         let tokens = super::journal::event_tokens_of(usage);
-        {
+        let cleared_perms = {
             let mut map = self.0.workspaces.lock();
             let ws = self.ensure_workspace_entry(&mut map, session_id);
+            let had_perms = !ws.pending_permissions.is_empty();
             ws.pending_permissions.clear();
             ws.pending_interactions.clear();
             if let Some(tokens) = tokens {
                 ws.tokens = Some(tokens);
             }
+            had_perms
+        };
+        if cleared_perms {
+            self.emit_permission(PermissionEvent::ClearedSession {
+                session_id: session_id.to_owned(),
+            });
         }
         self.notify_workspace(session_id);
     }
@@ -967,17 +986,23 @@ impl SessionEngine {
         let Some(session) = self.session_async(session_id).await.filter(|s| s.controller == SessionController::User) else {
             return;
         };
-        let had_pending = {
+        let (had_pending, had_perms) = {
             let mut map = self.0.workspaces.lock();
             if let Some(ws) = map.get_mut(session_id) {
                 let any = !ws.pending_permissions.is_empty() || !ws.pending_interactions.is_empty();
+                let perms = !ws.pending_permissions.is_empty();
                 ws.pending_permissions.clear();
                 ws.pending_interactions.clear();
-                any
+                (any, perms)
             } else {
-                false
+                (false, false)
             }
         };
+        if had_perms {
+            self.emit_permission(PermissionEvent::ClearedSession {
+                session_id: session_id.to_owned(),
+            });
+        }
         if session.phase.is_working() {
             let _ = self.persist_phase_change_async(session_id, Phase::Resting(PhaseResting {}), None, None).await;
             self.notify_workspace(session_id);

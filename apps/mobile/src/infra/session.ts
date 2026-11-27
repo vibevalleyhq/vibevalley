@@ -360,6 +360,8 @@ export function createRemoteSession(options?: RemoteSessionOptions): RemoteSessi
           if (parsed.success) {
             updateWatchState(sessionId, (prev) => applySessionWatchEvent(prev, parsed.data));
             processWatchNotifications(sessionId, parsed.data);
+          } else {
+            console.warn("[mobile/session] dropped malformed session.watch event", sessionId, parsed.error.issues);
           }
         },
         () => {
@@ -524,6 +526,7 @@ export function createRemoteSession(options?: RemoteSessionOptions): RemoteSessi
       await saveCredentials(stored, tokenStore);
       if (disposed || controller.signal.aborted) return false;
       credentials.set(stored);
+      ready.set(true);
       connectWith(stored);
       void trackTask(requestNotificationPermissionSafe());
       hapticNotification("success");

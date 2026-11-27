@@ -5,7 +5,8 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 use vibevalley_core::{Refusal, SliceMask, derive_issues};
 use vibevalley_protocol::{
-    ApiError, Assignment, Conflict, CriterionCheck, Execution, Finding, Issue, IssueAnswer, IssueCanceled, Landing, Millis, Outcome, Question, Session,
+    ApiError, Assignment, Conflict, CriterionCheck, Execution, Finding, HumanPause, Issue, IssueAnswer, IssueCanceled, IssueMandate, Landing, Millis, Outcome,
+    Question, Session,
 };
 use vibevalley_runtime::oar::PermissionMode;
 
@@ -198,6 +199,9 @@ pub enum IssueChange {
         session: String,
         worker: bool,
     },
+    Paused(HumanPause),
+    Resumed,
+    Mandate(IssueMandate),
 }
 
 impl IssueChange {
@@ -221,7 +225,10 @@ impl IssueChange {
             | IssueChange::Failed { .. }
             | IssueChange::Drafted { .. }
             | IssueChange::Reported { .. }
-            | IssueChange::Assigned(_) => base,
+            | IssueChange::Assigned(_)
+            | IssueChange::Paused(_)
+            | IssueChange::Resumed
+            | IssueChange::Mandate(_) => base,
         }
     }
 
@@ -237,11 +244,13 @@ impl IssueChange {
                 t.conflict = None;
                 t.reviewed_at = None;
                 t.queued_at = Some(at);
+                t.mandate.pause = None;
             }
             IssueChange::Revived => {
                 t.closed_at = None;
                 t.canceled = None;
                 t.queued_at = None;
+                t.mandate.pause = None;
             }
             IssueChange::Answered => {
                 t.questions.clear();
@@ -257,11 +266,13 @@ impl IssueChange {
                 t.conflict = None;
                 t.queued_at = None;
                 t.questions.clear();
+                t.mandate.pause = None;
             }
             IssueChange::Canceled(why) => {
                 t.canceled = Some(why);
                 t.closed_at = Some(at);
                 t.queued_at = None;
+                t.mandate.pause = None;
             }
             IssueChange::Conflicted(conflict) => t.conflict = Some(conflict),
             IssueChange::Stuck { why, conflict } => {
@@ -341,12 +352,23 @@ impl IssueChange {
                 if worker {
                     t.questions.clear();
                     t.reviewed_at = None;
+                    t.mandate.pause = None;
                     if t.latest_session_id() != Some(&session)
                         && let Some(a) = t.assignments.iter_mut().rev().find(|a| a.ended_at.is_none())
                     {
                         a.executions.push(Execution::Worker { session, started_at: at });
                     }
                 }
+            }
+            IssueChange::Paused(pause) => {
+                t.mandate.pause = Some(pause);
+                t.queued_at = None;
+            }
+            IssueChange::Resumed => {
+                t.mandate.pause = None;
+            }
+            IssueChange::Mandate(mandate) => {
+                t.mandate = mandate;
             }
         }
     }

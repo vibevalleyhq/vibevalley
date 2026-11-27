@@ -120,6 +120,18 @@ export const ContextRef = z.discriminatedUnion("kind", [
   }),
 ]) satisfies Codec<T.ContextRef>;
 
+export const SessionTelemetry = z.object({
+  inputTokens: z.number(),
+  cacheReadTokens: z.number(),
+  outputTokens: z.number(),
+  cacheWriteTokens: z.exactOptional(z.number()),
+  reasoningTokens: z.exactOptional(z.number()),
+  contextUsed: z.exactOptional(z.number()),
+  contextWindow: z.exactOptional(z.number()),
+  llmRetries: z.number(),
+  runErrors: z.number(),
+}) satisfies Codec<T.SessionTelemetry>;
+
 const sessionFields = {
   id: SessionId,
   controller: SessionController,
@@ -137,6 +149,7 @@ const sessionFields = {
   spent: z.exactOptional(Spent),
   subagents: z.exactOptional(SessionSubagents),
   toolConnections: z.exactOptional(z.array(ToolConnection)),
+  telemetry: z.exactOptional(SessionTelemetry),
   machine: z.exactOptional(z.string()),
 };
 
@@ -214,11 +227,182 @@ export const SessionEvent = z.object({
   interactionResolution: z.exactOptional(SessionInteractionResolution),
 }) satisfies Codec<T.SessionEvent>;
 
+export const TrajectoryRunView = z.object({
+  run: z.exactOptional(z.string()),
+  asked: z.exactOptional(SessionEvent),
+  steps: z.array(SessionEvent),
+}) satisfies Codec<T.TrajectoryRunView>;
+
+export const TrajectoryWaterfallLane = z.enum(T.TrajectoryWaterfallLaneValues) satisfies Codec<T.TrajectoryWaterfallLane>;
+
+export const TrajectoryLaneSpan = z.object({
+  lane: TrajectoryWaterfallLane,
+  start: z.number(),
+  end: z.number(),
+  seq: z.number(),
+}) satisfies Codec<T.TrajectoryLaneSpan>;
+
+export const TrajectoryWaterfall = z.object({
+  runs: z.array(z.tuple([z.number(), z.number()])),
+  spans: z.array(TrajectoryLaneSpan),
+}) satisfies Codec<T.TrajectoryWaterfall>;
+
+export const TrajectorySummary = z.object({
+  runs: z.number(),
+  steps: z.number(),
+  modelMs: z.number(),
+  toolMs: z.number(),
+  input: z.number(),
+  cacheRead: z.number(),
+  output: z.number(),
+}) satisfies Codec<T.TrajectorySummary>;
+
+export const TrajectoryStepDuration = z.object({
+  seq: z.number(),
+  durationMs: z.number(),
+}) satisfies Codec<T.TrajectoryStepDuration>;
+
+export const TrajectoryStepMeta = z.object({
+  seq: z.number(),
+  durationMs: z.number(),
+  readableInput: z.exactOptional(z.string()),
+  collapsedSummary: z.exactOptional(z.string()),
+}) satisfies Codec<T.TrajectoryStepMeta>;
+
+export const SessionTrajectoryProjection = z.object({
+  shown: z.array(SessionEvent),
+  runs: z.array(TrajectoryRunView),
+  waterfall: TrajectoryWaterfall,
+  summary: TrajectorySummary,
+  stepDurations: z.array(TrajectoryStepDuration),
+  stepMeta: z.array(TrajectoryStepMeta),
+  telemetry: SessionTelemetry,
+}) satisfies Codec<T.SessionTrajectoryProjection>;
+
+export const ActivityStep = z.object({
+  step: SessionEvent,
+  durationMs: z.exactOptional(z.number()),
+}) satisfies Codec<T.ActivityStep>;
+
+export const ActivityEditedFile = z.object({
+  path: z.string(),
+  line: z.exactOptional(z.number()),
+  canDiff: z.boolean(),
+}) satisfies Codec<T.ActivityEditedFile>;
+
+export const ActivityCommandPreview = z.object({
+  seq: z.number(),
+  command: z.string(),
+  running: z.boolean(),
+  failed: z.boolean(),
+}) satisfies Codec<T.ActivityCommandPreview>;
+
+export const TodoStepStatus = z.enum(T.TodoStepStatusValues) satisfies Codec<T.TodoStepStatus>;
+
+export const TodoStep = z.object({
+  title: z.string(),
+  status: TodoStepStatus,
+}) satisfies Codec<T.TodoStep>;
+
+export const TodoChecklist = z.object({
+  seq: z.number(),
+  steps: z.array(TodoStep),
+  doneCount: z.number(),
+  inProgressCount: z.number(),
+  failedCount: z.number(),
+  totalCount: z.number(),
+  activeStep: z.exactOptional(TodoStep),
+}) satisfies Codec<T.TodoChecklist>;
+
+export const ActivitySummary = z.object({
+  totalSteps: z.number(),
+  thinkingCount: z.number(),
+  readCount: z.number(),
+  searchCount: z.number(),
+  editCount: z.number(),
+  commandCount: z.number(),
+  otherToolCount: z.number(),
+  totalTools: z.number(),
+  runningCount: z.number(),
+  failedCount: z.number(),
+  startedAt: z.number(),
+  durationMs: z.number(),
+  editedFiles: z.array(ActivityEditedFile),
+  latestCommand: z.exactOptional(ActivityCommandPreview),
+}) satisfies Codec<T.ActivitySummary>;
+
+export const ChatFeedItem = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("step"),
+    key: z.string(),
+    step: SessionEvent,
+    durationMs: z.exactOptional(z.number()),
+    trailing: z.boolean(),
+  }),
+  z.object({
+    kind: z.literal("activity"),
+    key: z.string(),
+    steps: z.array(ActivityStep),
+    summary: ActivitySummary,
+    trailing: z.boolean(),
+  }),
+]) satisfies Codec<T.ChatFeedItem>;
+
+export const ToolTarget = z.object({
+  path: z.string(),
+  line: z.exactOptional(z.number()),
+  canDiff: z.boolean(),
+}) satisfies Codec<T.ToolTarget>;
+
+export const ToolDetails = z.object({
+  headline: z.string(),
+  formattedInput: z.string(),
+  outputLines: z.number(),
+}) satisfies Codec<T.ToolDetails>;
+
+export const ChatTelemetry = z.object({
+  cachedRead: z.number(),
+  uncachedInput: z.number(),
+  totalInput: z.number(),
+  output: z.number(),
+  reasoning: z.number(),
+  contextUsed: z.number(),
+  contextWindow: z.number(),
+  contextPct: z.number(),
+  cacheHitPct: z.number(),
+  turns: z.number(),
+  toolCount: z.number(),
+  hasData: z.boolean(),
+}) satisfies Codec<T.ChatTelemetry>;
+
+export const BoardTextTokenKind = z.enum(T.BoardTextTokenKindValues) satisfies Codec<T.BoardTextTokenKind>;
+
+export const BoardTextToken = z.object({
+  kind: BoardTextTokenKind,
+  value: z.string(),
+}) satisfies Codec<T.BoardTextToken>;
+
+export const ChatToolStepProjection = z.object({
+  seq: z.number(),
+  target: z.exactOptional(ToolTarget),
+  details: ToolDetails,
+  todo: z.exactOptional(TodoChecklist),
+}) satisfies Codec<T.ChatToolStepProjection>;
+
+export const ChatSessionProjection = z.object({
+  visibleSteps: z.array(SessionEvent),
+  feedItems: z.array(ChatFeedItem),
+  latestTodos: z.exactOptional(TodoChecklist),
+  telemetry: ChatTelemetry,
+  toolEntries: z.array(ChatToolStepProjection),
+}) satisfies Codec<T.ChatSessionProjection>;
+
 export const SessionEventPage = z.object({
   events: z.array(SessionEvent),
   hasMore: z.boolean(),
   oldestSeq: z.exactOptional(z.number()),
   newestSeq: z.exactOptional(z.number()),
+  trajectory: z.exactOptional(SessionTrajectoryProjection),
 }) satisfies Codec<T.SessionEventPage>;
 
 export const SessionBindingInput = z.object({
@@ -316,6 +500,23 @@ export const SessionChildTranscript = z.object({
   steps: z.array(SessionChildStep),
 }) satisfies Codec<T.SessionChildTranscript>;
 
+export const SessionCompactResult = z.object({
+  id: z.string(),
+  compacted: z.boolean(),
+  summary: z.exactOptional(z.string()),
+  reason: z.exactOptional(z.string()),
+}) satisfies Codec<T.SessionCompactResult>;
+
+export const SessionRunCodeResult = z.object({
+  id: z.string(),
+  taskId: z.string(),
+  outputJson: z.string(),
+  executedSteps: z.number(),
+  replayedCalls: z.number(),
+  replayedSleeps: z.number(),
+  virtualNowMs: z.number(),
+}) satisfies Codec<T.SessionRunCodeResult>;
+
 export const SessionWatchEvent = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("state"),
@@ -333,11 +534,13 @@ export const SessionWatchEvent = z.discriminatedUnion("kind", [
     kind: z.literal("history"),
     session: SessionId,
     events: z.array(SessionEvent),
+    projection: z.exactOptional(ChatSessionProjection),
   }),
   z.object({
     kind: z.literal("event"),
     session: SessionId,
     event: SessionEvent,
+    projection: z.exactOptional(ChatSessionProjection),
   }),
   z.object({
     kind: z.literal("missing"),

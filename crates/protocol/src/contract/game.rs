@@ -194,6 +194,152 @@ pub struct ProgressTitle {
     pub tier: i64,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+pub enum ShopItemKind {
+    #[serde(rename = "decoration")]
+    Decoration,
+    #[serde(rename = "template")]
+    Template,
+}
+
+impl ShopItemKind {
+    pub const ALL: [ShopItemKind; 2] = [ShopItemKind::Decoration, ShopItemKind::Template];
+
+    /// The string on the wire.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ShopItemKind::Decoration => "decoration",
+            ShopItemKind::Template => "template",
+        }
+    }
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct YardDecorationPlacement {
+    pub asset: String,
+    pub x: JsNumber,
+    pub z: JsNumber,
+    pub yaw_deg: JsNumber,
+    pub scale: JsNumber,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct YardDecoration {
+    pub id: String,
+    pub asset: String,
+    pub title: String,
+    pub x: JsNumber,
+    pub z: JsNumber,
+    pub yaw_deg: JsNumber,
+    pub scale: JsNumber,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct ShopItem {
+    pub id: String,
+    pub kind: ShopItemKind,
+    pub title: String,
+    pub detail: String,
+    pub price: i64,
+    pub owned: bool,
+    pub decoration: Option<YardDecorationPlacement>,
+    pub template: Option<IssueTemplate>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+pub enum DailyTaskKind {
+    #[serde(rename = "tests_passed")]
+    TestsPassed,
+    #[serde(rename = "reviews_completed")]
+    ReviewsCompleted,
+    #[serde(rename = "clean_harvest")]
+    CleanHarvest,
+    #[serde(rename = "milestone_done")]
+    MilestoneDone,
+}
+
+impl DailyTaskKind {
+    pub const ALL: [DailyTaskKind; 4] = [
+        DailyTaskKind::TestsPassed,
+        DailyTaskKind::ReviewsCompleted,
+        DailyTaskKind::CleanHarvest,
+        DailyTaskKind::MilestoneDone,
+    ];
+
+    /// The string on the wire.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            DailyTaskKind::TestsPassed => "tests_passed",
+            DailyTaskKind::ReviewsCompleted => "reviews_completed",
+            DailyTaskKind::CleanHarvest => "clean_harvest",
+            DailyTaskKind::MilestoneDone => "milestone_done",
+        }
+    }
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct DailyTask {
+    pub id: String,
+    pub kind: DailyTaskKind,
+    pub title: String,
+    pub detail: String,
+    pub progress: i64,
+    pub target: i64,
+    pub reward_coins: i64,
+    pub completed: bool,
+    pub settled: bool,
+    pub settled_at: Option<i64>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct DailyTaskBoard {
+    pub day: String,
+    pub tasks: Vec<DailyTask>,
+    pub settled_coins_today: i64,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct FarmShopView {
+    pub coins: i64,
+    pub items: Vec<ShopItem>,
+    pub daily: DailyTaskBoard,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct ShopPurchaseRequest {
+    pub id: String,
+}
+
 #[skip_serializing_none]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts-gen", derive(TS))]
@@ -208,6 +354,10 @@ pub struct Progress {
     pub title: Option<ProgressTitle>,
     pub agents: BTreeMap<String, AgentTally>,
     pub multiplier: Option<JsNumber>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "Option<Vec<String>>"))]
+    pub purchased: Vec<String>,
+    pub daily: Option<DailyTaskBoard>,
 }
 
 #[skip_serializing_none]
@@ -358,6 +508,10 @@ pub struct FarmView {
     pub plots: BTreeMap<String, PlotView>,
     /// Each session's station and step history, by the session's id; the farm reads only this.
     pub plays: BTreeMap<String, SessionPlayView>,
+    /// Unlocked yard decorations rendered in the 3D diorama scene.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "Option<Vec<YardDecoration>>"))]
+    pub decorations: Vec<YardDecoration>,
 }
 
 #[skip_serializing_none]
@@ -608,6 +762,64 @@ pub struct LedgerEntryTitled {
     pub tier: Option<i64>,
 }
 
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct LedgerEntryPurchased {
+    pub at: i64,
+    pub item_id: String,
+    pub item_kind: ShopItemKind,
+    pub price: i64,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct LedgerEntryDailySettled {
+    pub at: i64,
+    pub day: String,
+    pub task_id: String,
+    pub task_kind: DailyTaskKind,
+    pub coins: i64,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct LedgerEntryCheckPassed {
+    pub at: i64,
+    pub key: String,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct LedgerEntryReviewCompleted {
+    pub at: i64,
+    pub key: String,
+    pub passed: bool,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct LedgerEntryDelivered {
+    pub at: i64,
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::IssueId"))]
+    pub issue: IssueId,
+    pub clean: bool,
+}
+
 /// Told apart by `kind`.
 #[skip_serializing_none]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -645,6 +857,16 @@ pub enum LedgerEntry {
     Level(LedgerEntryLevel),
     #[serde(rename = "titled")]
     Titled(LedgerEntryTitled),
+    #[serde(rename = "purchased")]
+    Purchased(LedgerEntryPurchased),
+    #[serde(rename = "dailySettled")]
+    DailySettled(LedgerEntryDailySettled),
+    #[serde(rename = "checkPassed")]
+    CheckPassed(LedgerEntryCheckPassed),
+    #[serde(rename = "reviewCompleted")]
+    ReviewCompleted(LedgerEntryReviewCompleted),
+    #[serde(rename = "delivered")]
+    Delivered(LedgerEntryDelivered),
 }
 
 impl LedgerEntry {
@@ -662,6 +884,11 @@ impl LedgerEntry {
             LedgerEntry::Opened(e) | LedgerEntry::Split(e) | LedgerEntry::Voice(e) | LedgerEntry::Busy6(e) => e.at,
             LedgerEntry::Level(e) => e.at,
             LedgerEntry::Titled(e) => e.at,
+            LedgerEntry::Purchased(e) => e.at,
+            LedgerEntry::DailySettled(e) => e.at,
+            LedgerEntry::CheckPassed(e) => e.at,
+            LedgerEntry::ReviewCompleted(e) => e.at,
+            LedgerEntry::Delivered(e) => e.at,
         }
     }
 
@@ -679,6 +906,11 @@ impl LedgerEntry {
             LedgerEntry::Opened(e) | LedgerEntry::Split(e) | LedgerEntry::Voice(e) | LedgerEntry::Busy6(e) => e.at = at,
             LedgerEntry::Level(e) => e.at = at,
             LedgerEntry::Titled(e) => e.at = at,
+            LedgerEntry::Purchased(e) => e.at = at,
+            LedgerEntry::DailySettled(e) => e.at = at,
+            LedgerEntry::CheckPassed(e) => e.at = at,
+            LedgerEntry::ReviewCompleted(e) => e.at = at,
+            LedgerEntry::Delivered(e) => e.at = at,
         }
         self
     }
@@ -734,6 +966,15 @@ crate::typescript::module! {
     Unlock,
     AgentTally,
     ProgressTitle,
+    ShopItemKind,
+    YardDecorationPlacement,
+    YardDecoration,
+    ShopItem,
+    DailyTaskKind,
+    DailyTask,
+    DailyTaskBoard,
+    FarmShopView,
+    ShopPurchaseRequest,
     Progress,
     ProgressNews,
     FarmLevel,
@@ -761,6 +1002,11 @@ crate::typescript::module! {
     LedgerEntryMoment,
     LedgerEntryLevel,
     LedgerEntryTitled,
+    LedgerEntryPurchased,
+    LedgerEntryDailySettled,
+    LedgerEntryCheckPassed,
+    LedgerEntryReviewCompleted,
+    LedgerEntryDelivered,
     LedgerEntry,
     ChooseTitleRequest,
     FactProgressChangedStation,

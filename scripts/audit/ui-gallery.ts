@@ -1,8 +1,11 @@
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { setTimeout as sleep } from "node:timers/promises";
 
 import { z } from "zod";
+
+import { captureVdpPngFile, ShellStateSchema, VdpWsClient, waitForVdpEndpoint } from "../release/vdp-client.ts";
 
 export const DEFAULT_SCENARIOS = ["typical", "edge"] as const;
 export type GalleryScenario = (typeof DEFAULT_SCENARIOS)[number];
@@ -87,84 +90,89 @@ function parseScenarioList(raw: string): GalleryScenario[] {
   return out;
 }
 
+export type GalleryStep =
+  | { readonly kind: "rpc"; readonly method: string; readonly params: Record<string, unknown> }
+  | { readonly kind: "wait"; readonly ms: number }
+  | { readonly kind: "shot"; readonly path: string };
+
 export interface GalleryStepPlan {
-  readonly steps: readonly string[];
+  readonly steps: readonly GalleryStep[];
   readonly expectedShots: readonly string[];
 }
 
-function shotLine(shotsDir: string, name: string, expected: string[]): string {
+function shotStep(shotsDir: string, name: string, expected: string[]): GalleryStep {
   const file = resolve(shotsDir, `${name}.png`);
   expected.push(file);
-  return JSON.stringify({ shell: `shot:${file}` });
+  return { kind: "shot", path: file };
 }
 
-function routeStep(path: string): string {
-  return JSON.stringify({ type: "open_route", path });
+function routeStep(path: string): GalleryStep {
+  return { kind: "rpc", method: "Shell.dispatchAction", params: { action: { type: "open_route", path } } };
 }
 
 export function buildStepPlan(scenario: GalleryScenario, shotsDir: string): GalleryStepPlan {
   const expected: string[] = [];
-  const wait = (ms: number) => JSON.stringify({ shell: `wait:${ms}` });
-  const resize = (w: number, h: number) => JSON.stringify({ shell: `resize:${w},${h}` });
-  const toggleTheme = JSON.stringify({ shell: "toggle_theme" });
-  const draw = JSON.stringify({ shell: "draw" });
-  const quit = JSON.stringify({ shell: "quit" });
+  const wait = (ms: number): GalleryStep => ({ kind: "wait", ms });
+  const resize = (width: number, height: number): GalleryStep => ({ kind: "rpc", method: "Shell.resize", params: { width, height } });
+  const toggleTheme: GalleryStep = { kind: "rpc", method: "Shell.setTheme", params: {} };
+  const draw: GalleryStep = { kind: "rpc", method: "Page.draw", params: {} };
+  const quit: GalleryStep = { kind: "rpc", method: "Shell.quit", params: {} };
 
   if (scenario === "typical") {
-    const steps = [
+    const steps: GalleryStep[] = [
       resize(1280, 820),
       routeStep("/issues"),
       wait(900),
       draw,
-      shotLine(shotsDir, "typical-issues-light", expected),
+      shotStep(shotsDir, "typical-issues-light", expected),
       toggleTheme,
       wait(400),
       draw,
-      shotLine(shotsDir, "typical-issues-dark", expected),
+      shotStep(shotsDir, "typical-issues-dark", expected),
       toggleTheme,
       resize(560, 820),
       wait(500),
       draw,
-      shotLine(shotsDir, "typical-issues-narrow-light", expected),
+      shotStep(shotsDir, "typical-issues-narrow-light", expected),
       resize(1280, 820),
       routeStep("/chat"),
       wait(800),
       draw,
-      shotLine(shotsDir, "typical-chat-light", expected),
+      shotStep(shotsDir, "typical-chat-light", expected),
       routeStep("/runs"),
       wait(700),
       draw,
-      shotLine(shotsDir, "typical-runs-light", expected),
+      shotStep(shotsDir, "typical-runs-light", expected),
       routeStep("/agents"),
       wait(700),
       draw,
-      shotLine(shotsDir, "typical-agents-light", expected),
+      shotStep(shotsDir, "typical-agents-light", expected),
       routeStep("/artifacts/art-launch-board"),
       wait(1100),
       draw,
-      shotLine(shotsDir, "typical-whiteboard-light", expected),
+      shotStep(shotsDir, "typical-whiteboard-light", expected),
       toggleTheme,
       wait(500),
       draw,
-      shotLine(shotsDir, "typical-whiteboard-dark", expected),
+      shotStep(shotsDir, "typical-whiteboard-dark", expected),
       toggleTheme,
       routeStep("/settings/general"),
       wait(700),
       draw,
-      shotLine(shotsDir, "typical-settings-light", expected),
+      shotStep(shotsDir, "typical-settings-light", expected),
       routeStep("/workspace"),
       wait(900),
       draw,
-      shotLine(shotsDir, "typical-workspace-light", expected),
+      shotStep(shotsDir, "typical-workspace-light", expected),
       toggleTheme,
       wait(400),
       draw,
-      shotLine(shotsDir, "typical-workspace-dark", expected),
+      shotStep(shotsDir, "typical-workspace-dark", expected),
       toggleTheme,
       routeStep("/farm"),
       wait(900),
       draw,
-      shotLine(shotsDir, "typical-farm", expected),
+      shotStep(shotsDir, "typical-farm", expected),
       routeStep("/issues"),
       wait(1200),
       quit,
@@ -172,21 +180,21 @@ export function buildStepPlan(scenario: GalleryScenario, shotsDir: string): Gall
     return { steps, expectedShots: expected };
   }
 
-  const steps = [
+  const steps: GalleryStep[] = [
     resize(1280, 820),
     routeStep("/issues"),
     wait(900),
     draw,
-    shotLine(shotsDir, "edge-issues-light", expected),
+    shotStep(shotsDir, "edge-issues-light", expected),
     toggleTheme,
     wait(400),
     draw,
-    shotLine(shotsDir, "edge-issues-dark", expected),
+    shotStep(shotsDir, "edge-issues-dark", expected),
     toggleTheme,
     routeStep("/library"),
     wait(800),
     draw,
-    shotLine(shotsDir, "edge-library-light", expected),
+    shotStep(shotsDir, "edge-library-light", expected),
     wait(1200),
     quit,
   ];
@@ -269,7 +277,7 @@ function writeScenarioResponses(root: string, scenario: GalleryScenario, outPath
   writeFileSync(outPath, `${JSON.stringify(parsed, null, 2)}\n`, "utf8");
 }
 
-function runGallery(): void {
+async function runGallery(): Promise<void> {
   const root = resolve(import.meta.dirname, "../..");
   const options = parseGalleryArgs(process.argv.slice(2));
   const shotsDir = resolve(options.outDir, "shots");
@@ -308,7 +316,6 @@ function runGallery(): void {
     const workDir = resolve(options.outDir, "runtime", scenario, "work");
     const storeDb = resolve(options.outDir, "runtime", scenario, "state.db");
     const dumpPath = resolve(options.outDir, `${scenario}-dump.json`);
-    const stepsPath = resolve(options.outDir, `${scenario}-steps.txt`);
     const appLogPath = resolve(options.outDir, `${scenario}-app.log`);
 
     mkdirSync(fakeDir, { recursive: true });
@@ -321,7 +328,6 @@ function runGallery(): void {
     writeScenarioResponses(root, scenario, resolve(fakeDir, "responses.json"));
 
     const plan = buildStepPlan(scenario, shotsDir);
-    writeFileSync(stepsPath, `${plan.steps.join("\n")}\n`, "utf8");
 
     const env: NodeJS.ProcessEnv = {
       ...process.env,
@@ -331,27 +337,79 @@ function runGallery(): void {
       VIBEVALLEY_NO_OPENING: "1",
       VIBEVALLEY_NO_ANIMATION: "1",
       VIBEVALLEY_FAKE_SERVER: fakeDir,
-      VIBEVALLEY_DEBUG_DUMP: dumpPath,
-      VIBEVALLEY_DEBUG_SCRIPT: stepsPath,
+      VIBEVALLEY_DEBUG_PORT: "0",
     };
 
-    const run = spawnSync(macBin, [], {
+    const proc = spawn(macBin, [], {
       cwd: root,
       env,
-      encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"],
-      timeout: 120_000,
     });
-    writeFileSync(appLogPath, `${run.stdout ?? ""}\n${run.stderr ?? ""}`, "utf8");
-    if (run.status !== 0) {
-      allProblems.push(`${scenario}: vibevalley-mac exited with ${String(run.status)} (see ${appLogPath})`);
+    let appOutput = "";
+    proc.stdout?.on("data", (chunk: Buffer) => {
+      appOutput += chunk.toString("utf8");
+    });
+    proc.stderr?.on("data", (chunk: Buffer) => {
+      appOutput += chunk.toString("utf8");
+    });
+    const exited = new Promise<number>((done) => {
+      proc.once("exit", (code, sig) => done(code ?? (sig ? 1 : 0)));
+      proc.once("error", () => done(1));
+    });
+    const timer = setTimeout(() => {
+      proc.kill("SIGKILL");
+    }, 120_000);
+
+    let rawDump: unknown = null;
+    try {
+      const endpoint = await waitForVdpEndpoint({
+        homeDir,
+        ...(proc.pid !== undefined ? { expectedPid: proc.pid } : {}),
+        timeoutMs: 25_000,
+        appExited: () => proc.exitCode,
+      });
+      const vdp = await VdpWsClient.connect(endpoint, 15_000);
+      try {
+        const loadDeadline = Date.now() + 20_000;
+        while (Date.now() < loadDeadline) {
+          const state = await vdp.callDecoded("Shell.getState", {}, ShellStateSchema);
+          if (state.loaded) break;
+          await sleep(100);
+        }
+        for (const step of plan.steps) {
+          if (step.kind === "wait") {
+            await sleep(step.ms);
+          } else if (step.kind === "shot") {
+            await captureVdpPngFile(vdp, step.path);
+          } else if (step.method === "Shell.quit") {
+            rawDump = await vdp.call("Shell.getState", {});
+            writeFileSync(dumpPath, JSON.stringify(rawDump, null, 2), "utf8");
+            await vdp.call(step.method, step.params);
+          } else {
+            await vdp.call(step.method, step.params);
+          }
+        }
+      } finally {
+        vdp.close();
+      }
+    } finally {
+      clearTimeout(timer);
+      if (proc.exitCode === null) {
+        await Promise.race([exited, sleep(5_000)]);
+        if (proc.exitCode === null) proc.kill("SIGKILL");
+      }
+    }
+
+    const status = await exited;
+    writeFileSync(appLogPath, appOutput, "utf8");
+    if (status !== 0) {
+      allProblems.push(`${scenario}: vibevalley-mac exited with ${String(status)} (see ${appLogPath})`);
       continue;
     }
-    if (!existsSync(dumpPath)) {
+    if (!existsSync(dumpPath) || rawDump === null) {
       allProblems.push(`${scenario}: missing dump file ${dumpPath} (see ${appLogPath})`);
       continue;
     }
-    const rawDump: unknown = JSON.parse(readFileSync(dumpPath, "utf8"));
     allProblems.push(...validateDumpAndShots(scenario, rawDump, plan.expectedShots));
   }
 
@@ -364,5 +422,5 @@ function runGallery(): void {
 }
 
 if (import.meta.main) {
-  runGallery();
+  await runGallery();
 }

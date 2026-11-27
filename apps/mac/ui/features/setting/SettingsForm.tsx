@@ -75,12 +75,6 @@ const draftsOf = (status: SettingsStatus) =>
     ),
   );
 
-/** Where the settings are kept, said on hover: a card's header puts it beside its title. */
-export function SettingsFile() {
-  const settings = useSettings();
-  return <If when={ready(settings, undefined)}>{(s) => <Hint icon="file" text={t("web.base.form.storedIn", { file: s().file })} />}</If>;
-}
-
 /** Built again for each part (Keyed by the page): a saved form starts over from what the server answered. */
 export function SettingsForm(props: { part: SettingsPart }) {
   const settings = useSettings();

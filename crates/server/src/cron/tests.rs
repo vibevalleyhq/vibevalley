@@ -7,9 +7,9 @@ use vibevalley_core::{Clock, ManualClock};
 use vibevalley_protocol::{ActorKind, BizCode, ConnectorID, CronRequest, CronWhen, CronWhenEvery, CronWhenOnce, IssueStatus};
 use vibevalley_runtime::oar::Registry;
 
+use super::digest::DigestSpec;
 use super::{DigestCronRequest, DigestDeliveryPort, Scheduler};
-use crate::connector::digest::{DigestSpec, DigestTargets};
-use crate::context::port::{CronAgentPort, CronOrchestratorPort};
+use crate::context::port::{CronAgentPort, CronOrchestratorPort, DigestTargets};
 use crate::context::{Context, Http, LiveState, Outbox, PublicDownload, StateFeed, TaskGroup};
 use crate::issue::{Board, NewIssue};
 use crate::runtime::{Runtime, RuntimeConfig, RuntimeDriver};
@@ -20,7 +20,7 @@ struct CountingOrchestrator {
 }
 
 impl CronOrchestratorPort for CountingOrchestrator {
-    fn hear_cron<'a>(&'a self, _agent: &'a str, _channel: &'a str, _words: &'a str) -> crate::BoxFuture<'a, bool> {
+    fn hear_cron<'a>(&'a self, _agent: &'a str, _channel: &'a str, _cron_id: &'a str, _words: &'a str) -> crate::BoxFuture<'a, bool> {
         self.heard.fetch_add(1, Ordering::SeqCst);
         Box::pin(std::future::ready(true))
     }

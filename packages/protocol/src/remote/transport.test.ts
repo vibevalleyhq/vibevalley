@@ -591,4 +591,96 @@ describe("createHttpRemoteTransport", () => {
 
     transport.close();
   });
+
+  it("automatically reconnects subscribe() with bounded exponential backoff on unexpected SSE/stream drops and resets on recovery", async () => {
+    vi.useFakeTimers();
+    const events: unknown[] = [];
+    const endedCalls: (RemoteEnvelope | null)[] = [];
+    const lastIds: (string | undefined)[] = [];
+    let attempt = 0;
+
+    const heldRecovered = streamFromChunks(['id: 2\ndata: {"kind":"event","seq":2}\n\n'], { holdOpen: true });
+
+    const transport = createHttpRemoteTransport({
+      baseUrl: "http://127.0.0.1:8890",
+      token: "vv_dev_tok_sub_backoff",
+      fetch: (_input, init) => {
+        attempt++;
+        lastIds.push(headerOf(init, "last-event-id"));
+        // Attempt 1: initial SSE stream delivers event id:1 then drops unexpectedly mid-stream.
+        if (attempt === 1) {
+          let step = 0;
+          const dropStream = new ReadableStream<Uint8Array>({
+            pull(controller) {
+              if (step === 0) {
+                step++;
+                controller.enqueue(encoder.encode('id: 1\ndata: {"kind":"event","seq":1}\n\n'));
+              } else {
+                controller.error(new TypeError("stream reset"));
+              }
+            },
+          });
+          return Promise.resolve(new Response(dropStream, { status: 200, headers: { "content-type": "text/event-stream" } }));
+        }
+        // Attempts 2..6: network failures + 503 verify bounded exponential backoff (1s, 2s, 4s, 8s, 8s).
+        if (attempt === 2 || attempt === 3 || attempt === 4 || attempt === 5) {
+          return Promise.reject(new TypeError("network down"));
+        }
+        if (attempt === 6) {
+          return Promise.resolve(new Response("temporarily unavailable", { status: 503, headers: { "content-type": "text/plain" } }));
+        }
+        // Attempt 7: recovers and streams new event while carrying Last-Event-ID.
+        return Promise.resolve(new Response(heldRecovered.stream, { status: 200, headers: { "content-type": "text/event-stream" } }));
+      },
+    });
+
+    const unsub = transport.subscribe(
+      "session.watch",
+      { id: "sess-1" },
+      (ev) => events.push(ev),
+      (why) => endedCalls.push(why),
+    );
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(attempt).toBe(1);
+    expect(events).toEqual([{ kind: "event", seq: 1 }]);
+    expect(endedCalls).toEqual([]);
+
+    // 1000ms -> attempt 2
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(attempt).toBe(2);
+
+    // 2000ms -> attempt 3
+    await vi.advanceTimersByTimeAsync(1999);
+    expect(attempt).toBe(2);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(attempt).toBe(3);
+
+    // 4000ms -> attempt 4
+    await vi.advanceTimersByTimeAsync(4000);
+    expect(attempt).toBe(4);
+
+    // 8000ms -> attempt 5
+    await vi.advanceTimersByTimeAsync(8000);
+    expect(attempt).toBe(5);
+
+    // Bounded cap at 8000ms -> attempt 6 (503)
+    await vi.advanceTimersByTimeAsync(8000);
+    expect(attempt).toBe(6);
+
+    // Bounded cap at 8000ms -> attempt 7 (recovers)
+    await vi.advanceTimersByTimeAsync(8000);
+    expect(attempt).toBe(7);
+    expect(events).toEqual([
+      { kind: "event", seq: 1 },
+      { kind: "event", seq: 2 },
+    ]);
+    expect(lastIds.slice(1)).toEqual(["1", "1", "1", "1", "1", "1"]);
+    expect(endedCalls).toEqual([]);
+
+    unsub();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(heldRecovered.cancelled()).toBe(true);
+    transport.close();
+  });
 });

@@ -49,8 +49,7 @@ fn protocol_adopts_a_kept_attachment_and_delete_preserves_its_bytes() {
     assert_eq!(r["phase"], "ready");
     assert_eq!(r["hash"], file.id);
     let id = r["id"].as_str().unwrap();
-    assert_eq!(ok(router, "media.input.get", json!({"id":id})), r);
-    assert_eq!(ok(router, "media.input.list", Value::Null).as_array().unwrap().len(), 1);
+    assert_eq!(ok(router, "media.input.list", Value::Null), json!([r]));
     assert_eq!(ok(router, "media.input.previewDelete", json!({"id":id}))["does"].as_array().unwrap().len(), 1);
     assert_eq!(
         std::fs::read(vibevalley_runtime::rt::block_on(inputs.content_async(id)).unwrap().path).unwrap(),

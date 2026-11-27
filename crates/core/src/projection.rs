@@ -8,8 +8,9 @@
 use std::collections::{BTreeMap, HashMap};
 
 use vibevalley_protocol::{
-    BoardSlice, CallState, Channel, Chat, CollabSlice, CommitCount, Conflict, ConnectorStatus, ContextRef, Cron, FarmFrame, GameEffect, InboxItem, InboxSlice,
-    Issue, Machine, MediaJob, OpsSlice, Phase, Progress, Session, SessionId, SessionPlay, SessionSubagents, SessionsSlice, Spent, ToolConnection, UserMention,
+    BoardSlice, CallState, Channel, Chat, CollabSlice, CommitCount, Conflict, ConnectorStatus, ContextRef, Cron, EventTokens, FarmFrame, GameEffect, InboxItem,
+    InboxSlice, Issue, Machine, MediaJob, OpsSlice, Phase, Progress, Session, SessionEvent, SessionEventType, SessionId, SessionPlay, SessionSubagents,
+    SessionTelemetry, SessionsSlice, Spent, ToolConnection, UserMention,
 };
 
 use crate::channel::trim_and_sort_channels;
@@ -31,6 +32,8 @@ pub struct LiveSessionOverlay {
     pub subagents: Option<Option<SessionSubagents>>,
     /// `None` keeps DB tool connections; `Some(v)` overrides `session.tool_connections = Some(v)`.
     pub tool_connections: Option<Vec<ToolConnection>>,
+    /// `None` keeps DB-folded telemetry; `Some(v)` overrides `session.telemetry = Some(v)`.
+    pub telemetry: Option<SessionTelemetry>,
 }
 
 /// Ephemeral `LiveOverlay` snapshot combined with DB snapshots during slice projection.
@@ -48,6 +51,8 @@ pub struct BoardInput {
     pub sessions: Vec<Session>,
     pub channels: Vec<Channel>,
     pub commits: Option<CommitCount>,
+    pub repos: Vec<crate::health::RepoHealthInput>,
+    pub evaluated_at: Option<i64>,
 }
 
 /// Domain inputs needed to project [`SessionsSlice`].
@@ -134,7 +139,70 @@ fn overlay_session(session: &Session, overlay: &LiveSessionOverlay) -> Session {
     if let Some(connections) = &overlay.tool_connections {
         next.tool_connections = Some(connections.clone());
     }
+    if let Some(telemetry) = &overlay.telemetry {
+        next.telemetry = Some(telemetry.clone());
+    }
     next
+}
+
+/// Folds token usage and context window metrics from a single [`EventTokens`] record into [`SessionTelemetry`].
+pub fn merge_session_telemetry_usage(dst: &mut SessionTelemetry, tok: &EventTokens) {
+    let input = tok.input.max(0);
+    let cache_read = tok.cache_read.max(0);
+    let output = tok.output.max(0);
+    dst.input_tokens += input;
+    dst.cache_read_tokens += cache_read;
+    dst.output_tokens += output;
+    if let Some(cw) = tok.cache_write.filter(|&v| v > 0) {
+        dst.cache_write_tokens = Some(dst.cache_write_tokens.unwrap_or(0) + cw);
+    }
+    if let Some(r) = tok.reasoning.filter(|&v| v > 0) {
+        dst.reasoning_tokens = Some(dst.reasoning_tokens.unwrap_or(0) + r);
+    }
+    if let Some(used) = tok.context_used.filter(|&v| v > 0) {
+        dst.context_used = Some(used);
+    } else {
+        let fallback = input.max(cache_read);
+        if fallback > 0 {
+            dst.context_used = Some(fallback);
+        }
+    }
+    if let Some(win) = tok.context_window.filter(|&v| v > 0) {
+        dst.context_window = Some(win);
+    }
+}
+
+/// Applies one trajectory [`SessionEvent`] onto a [`SessionTelemetry`] accumulator.
+pub fn apply_session_telemetry(dst: &mut SessionTelemetry, event: &SessionEvent) -> bool {
+    let mut touched = false;
+    match event.r#type {
+        SessionEventType::LlmRetry => {
+            dst.llm_retries += 1;
+            touched = true;
+        }
+        SessionEventType::RunError => {
+            dst.run_errors += 1;
+            touched = true;
+        }
+        _ => {}
+    }
+    if let Some(tok) = &event.tokens {
+        merge_session_telemetry_usage(dst, tok);
+        touched = true;
+    }
+    touched
+}
+
+/// Aggregates token usage, context saturation, retries, and errors across ordered session events.
+pub fn fold_session_telemetry(events: &[SessionEvent]) -> Option<SessionTelemetry> {
+    let mut dst = SessionTelemetry::default();
+    let mut any = false;
+    for event in events {
+        if apply_session_telemetry(&mut dst, event) {
+            any = true;
+        }
+    }
+    any.then_some(dst)
 }
 
 /// Overlays ephemeral [`LiveSessionOverlay`] entries onto DB-backed sessions.
@@ -164,12 +232,18 @@ pub fn derive_issues(issues: &[Issue], sessions: &[Session]) -> Vec<Issue> {
 pub fn project_board(input: &BoardInput, live: &LiveSnapshot, seq: i64) -> BoardSlice {
     let sessions = overlay_sessions(&input.sessions, &live.sessions);
     let issues = derive_issues(&input.issues, &sessions);
-    let summary = board_summary(&issues, &sessions, &input.channels);
+    let summary = board_summary(&issues, &sessions, &input.channels, input.evaluated_at);
+    let repo_health = if input.repos.is_empty() {
+        Vec::new()
+    } else {
+        crate::health::assess_repos_health(&input.repos, &issues, &[], input.evaluated_at.unwrap_or(0))
+    };
     BoardSlice {
         seq,
         issues,
         board_summary: Some(summary),
         commits: input.commits.clone(),
+        repo_health,
     }
 }
 
@@ -233,7 +307,7 @@ pub fn project_ops(input: &OpsInput, seq: i64) -> OpsSlice {
 pub fn project_farm(input: &FarmInput, live: &LiveSnapshot, seq: i64) -> FarmFrame {
     let sessions = overlay_sessions(&input.sessions, &live.sessions);
     let issues = derive_issues(&input.issues, &sessions);
-    let view = farm_view(&issues, &sessions, Some(&live.plays), input.commits.as_ref());
+    let view = farm_view(&issues, &sessions, Some(&live.plays), input.commits.as_ref(), input.progress.as_ref());
     FarmFrame {
         seq,
         view,
@@ -259,6 +333,7 @@ mod tests {
             sessions: state.sessions.clone(),
             channels: state.chat.as_ref().map_or_else(Vec::new, |c| c.channels.clone()),
             commits: state.commits.clone(),
+            ..Default::default()
         };
         let session_in = SessionInput {
             sessions: state.sessions.clone(),
@@ -429,6 +504,7 @@ mod tests {
                 spent: Some(spent),
                 subagents: Some(Some(subagents)),
                 tool_connections: Some(vec![tool]),
+                telemetry: None,
             },
         );
 
@@ -438,6 +514,7 @@ mod tests {
                 sessions: vec![db_session.clone()],
                 channels: vec![],
                 commits: None,
+                ..Default::default()
             },
             &live,
             42,
@@ -531,5 +608,67 @@ mod tests {
         }
 
         assert_state_parity(&state, vec![], 99);
+    }
+
+    #[test]
+    fn fold_session_telemetry_aggregates_usage_context_retries_and_errors() {
+        let base_event = |seq: i64, r#type: SessionEventType| SessionEvent {
+            seq,
+            revision: 1,
+            time: seq * 1000,
+            r#type,
+            run: Some("r1".into()),
+            call: None,
+            under: None,
+            thread_id: None,
+            text: String::new(),
+            action: None,
+            action_text: None,
+            tool: None,
+            input: None,
+            output: None,
+            ok: None,
+            tokens: None,
+            connection: None,
+            permission: None,
+            interaction: None,
+            interaction_resolution: None,
+        };
+
+        assert_eq!(fold_session_telemetry(&[base_event(1, SessionEventType::UserMessage)]), None);
+
+        let mut u1 = base_event(2, SessionEventType::LlmUsage);
+        u1.tokens = Some(EventTokens {
+            input: 10_000,
+            cache_read: 4_000,
+            output: 1_200,
+            cache_write: Some(500),
+            reasoning: Some(300),
+            context_used: Some(14_000),
+            context_window: Some(200_000),
+        });
+        let retry = base_event(3, SessionEventType::LlmRetry);
+        let err = base_event(4, SessionEventType::RunError);
+        let mut u2 = base_event(5, SessionEventType::LlmUsage);
+        u2.tokens = Some(EventTokens {
+            input: 20_000,
+            cache_read: 12_000,
+            output: 800,
+            cache_write: None,
+            reasoning: Some(200),
+            context_used: Some(32_000),
+            context_window: Some(200_000),
+        });
+
+        let got = fold_session_telemetry(&[u1, retry, err, u2]).expect("telemetry");
+        assert_eq!(got.input_tokens, 30_000);
+        assert_eq!(got.cache_read_tokens, 16_000);
+        assert_eq!(got.output_tokens, 2_000);
+        assert_eq!(got.cache_write_tokens, Some(500));
+        assert_eq!(got.reasoning_tokens, Some(500));
+        assert_eq!(got.context_used, Some(32_000));
+        assert_eq!(got.context_window, Some(200_000));
+        assert_eq!(got.llm_retries, 1);
+        assert_eq!(got.run_errors, 1);
     }
 }

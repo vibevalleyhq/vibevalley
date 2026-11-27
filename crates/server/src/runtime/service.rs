@@ -5,13 +5,15 @@ use std::sync::Arc;
 use tokio::sync::{Mutex as AsyncMutex, broadcast};
 use vibevalley_core::SliceMask;
 use vibevalley_protocol::{
-    ApiError, ExecutionPolicy, Issue, IssueGetInput, LastRun, Millis, Outcome, Phase, Run, Session, SessionBindingInput, SessionChildTranscript,
-    SessionChildTranscriptInput, SessionController, SessionEventListInput, SessionEventPage, SessionOpenWorkspaceInput, SessionRespondInteractionInput,
-    SessionRespondPermissionInput, SessionSendInput, SessionSetConfigInput, SessionWatchPayload, SessionWorkspace,
+    ApiError, ExecutionPolicy, Issue, IssueGetInput, LastRun, Millis, Outcome, Phase, Run, Session, SessionChildTranscript, SessionChildTranscriptInput,
+    SessionController, SessionEventListInput, SessionEventPage, SessionOpenWorkspaceInput, SessionRespondInteractionInput, SessionRespondPermissionInput,
+    SessionSendInput, SessionSetConfigInput, SessionWatchPayload, SessionWorkspace,
 };
 use vibevalley_runtime::oar::Registry;
 
-use super::session::{self, MailboxEntry, MailboxSource, Report, RuntimeDriver, SessionDriver, SessionEngine, SessionLifecycleEvent, Trajectory};
+use super::session::{
+    self, MailboxEntry, MailboxSource, PermissionEvent, Report, RuntimeDriver, SessionDriver, SessionEngine, SessionLifecycleEvent, Trajectory,
+};
 use super::types::{Opened, Result, RuntimeConfig, io};
 use super::worktree::Worktree;
 use crate::context::{Context, now};
@@ -23,11 +25,14 @@ use crate::storage::Storage;
 pub async fn reopen_sessions_async(ctx: &Arc<Context>) -> Result<Opened> {
     let durable = ctx.service.durable().await?;
     let stored = ctx.service.session.all().await?;
+    let issues = ctx.service.issue.all().await?;
+    let paused_issues: HashSet<String> = issues.into_iter().filter(|i| i.mandate.is_paused()).map(|i| i.id).collect();
     let all_extras = ctx.service.session.extras().await?;
     let mut recoverable_ids = HashSet::new();
     for s in &stored {
         if s.phase.is_working()
             && !s.is_refining()
+            && s.issue_id().is_none_or(|id| !paused_issues.contains(id))
             && s.runtime == vibevalley_runtime::agent::runtime::ID
             && let Some(extra) = all_extras.get(&s.id)
             && let (Some(run_id), Some(vendor)) = (extra.run.as_deref(), extra.agent_session.as_deref())
@@ -214,8 +219,24 @@ impl Runtime {
         self.session.subscribe_doing()
     }
 
+    pub fn subscribe_permissions(&self) -> broadcast::Receiver<PermissionEvent> {
+        self.session.subscribe_permissions()
+    }
+
+    pub fn has_pending_permission(&self, session_id: &str, request_id: &str) -> bool {
+        self.session
+            .workspace_snapshot(session_id)
+            .pending_permissions
+            .iter()
+            .any(|p| p.request_id == request_id)
+    }
+
     pub fn who(&self, token: &str) -> Option<String> {
         self.session.who(token)
+    }
+
+    pub fn opening_session(&self, id: &str) -> Option<Session> {
+        self.session.opening_session(id)
     }
 
     pub fn base_branch(&self, session: &str) -> Option<String> {
@@ -248,6 +269,10 @@ impl Runtime {
 
     pub async fn stop_async(&self, id: &str) -> std::result::Result<(), ApiError> {
         self.session.stop_async(id).await
+    }
+
+    pub async fn stop_with_pause_async(&self, id: &str, source: Option<vibevalley_protocol::HumanPauseSource>) -> std::result::Result<(), ApiError> {
+        self.session.stop_with_pause_async(id, source).await
     }
 
     pub async fn report_async(&self, session: &str, report: &Report) -> Result<()> {
@@ -354,12 +379,16 @@ impl Runtime {
         self.session.child_transcript_endpoint_async(input).await
     }
 
-    pub(crate) async fn attach_binding_endpoint_async(&self, input: SessionBindingInput) -> std::result::Result<Session, ApiError> {
-        self.session.attach_binding_endpoint_async(input).await
+    pub(crate) async fn compact_live_async(&self, id: &str) -> std::result::Result<(), ApiError> {
+        self.session.compact_live_async(id).await
     }
 
-    pub(crate) async fn detach_binding_endpoint_async(&self, input: SessionBindingInput) -> std::result::Result<Session, ApiError> {
-        self.session.detach_binding_endpoint_async(input).await
+    pub(crate) fn worker_conversation(&self, id: &str) -> Option<String> {
+        self.session.worker_conversation(id)
+    }
+
+    pub(crate) fn is_live_session(&self, id: &str) -> bool {
+        self.session.is_live(id)
     }
 
     pub(crate) async fn watch_session_async(&self, input: SessionWatchPayload, sink: crate::context::Sink) -> std::result::Result<(), ApiError> {

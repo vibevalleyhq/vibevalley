@@ -8,8 +8,9 @@ use sea_orm::sea_query::{Expr, OnConflict};
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Update};
 use vibevalley_protocol::ConnectorID;
 
+use super::with_write_tx;
 use crate::db::entity::{connector_account, connector_inbound, connector_outbox};
-use crate::db::{Database, DbResult, begin_write_tx, commit_tx, rollback_tx};
+use crate::db::{Database, DbResult};
 
 #[derive(Clone, PartialEq, Eq)]
 pub(crate) struct ConnectorAccountRow {
@@ -103,8 +104,7 @@ impl ConnectorService {
 
     /// Replacing an account retires its queued work before reopening the bridge.
     pub(crate) async fn connect(&self, id: ConnectorID, secrets: &str, user: &str, pair_code: Option<&str>, at: i64, retired: &str) -> DbResult<()> {
-        let tx = begin_write_tx(self.db.write_conn()).await?;
-        let outcome: DbResult<()> = async {
+        with_write_tx(&self.db, async |tx| {
             let model = connector_account::ActiveModel {
                 connector: Set(id.as_str().to_owned()),
                 secrets: Set(secrets.to_owned()),
@@ -131,36 +131,21 @@ impl ConnectorService {
                 .to_owned();
             connector_account::Entity::insert(model)
                 .on_conflict(on_conflict)
-                .exec_without_returning(&tx)
+                .exec_without_returning(tx)
                 .await?;
-            forget_impl(&tx, id, retired).await?;
+            forget_impl(tx, id, retired).await?;
             Ok(())
-        }
-        .await;
-        match outcome {
-            Ok(()) => commit_tx(tx).await,
-            Err(err) => {
-                let _ = rollback_tx(tx).await;
-                Err(err)
-            }
-        }
+        })
+        .await
     }
 
     pub(crate) async fn disconnect(&self, id: ConnectorID, retired: &str) -> DbResult<()> {
-        let tx = begin_write_tx(self.db.write_conn()).await?;
-        let outcome: DbResult<()> = async {
-            connector_account::Entity::delete_by_id(id.as_str().to_owned()).exec(&tx).await?;
-            forget_impl(&tx, id, retired).await?;
+        with_write_tx(&self.db, async |tx| {
+            connector_account::Entity::delete_by_id(id.as_str().to_owned()).exec(tx).await?;
+            forget_impl(tx, id, retired).await?;
             Ok(())
-        }
-        .await;
-        match outcome {
-            Ok(()) => commit_tx(tx).await,
-            Err(err) => {
-                let _ = rollback_tx(tx).await;
-                Err(err)
-            }
-        }
+        })
+        .await
     }
 
     pub(crate) async fn pause(&self, id: ConnectorID, until: Option<i64>) -> DbResult<()> {
@@ -173,33 +158,25 @@ impl ConnectorService {
     }
 
     pub(crate) async fn paired(&self, id: ConnectorID, from: &str, ext_id: &str, reply: &str, at: i64) -> DbResult<()> {
-        let tx = begin_write_tx(self.db.write_conn()).await?;
-        let outcome: DbResult<()> = async {
+        with_write_tx(&self.db, async |tx| {
             Update::many(connector_account::Entity)
                 .col_expr(connector_account::Column::UserId, Expr::value(Some(from.to_owned())))
                 .col_expr(connector_account::Column::PairCode, Expr::value(Option::<String>::None))
                 .col_expr(connector_account::Column::ReplyContext, Expr::value(nonempty(reply)))
                 .col_expr(connector_account::Column::LastInbound, Expr::value(Some(at)))
                 .filter(connector_account::Column::Connector.eq(id.as_str()))
-                .exec(&tx)
+                .exec(tx)
                 .await?;
             Update::many(connector_inbound::Entity)
                 .col_expr(connector_inbound::Column::Delivered, Expr::value(true))
                 .col_expr(connector_inbound::Column::Body, Expr::value(String::new()))
                 .filter(connector_inbound::Column::Connector.eq(id.as_str()))
                 .filter(connector_inbound::Column::ExtId.eq(ext_id))
-                .exec(&tx)
+                .exec(tx)
                 .await?;
             Ok(())
-        }
-        .await;
-        match outcome {
-            Ok(()) => commit_tx(tx).await,
-            Err(err) => {
-                let _ = rollback_tx(tx).await;
-                Err(err)
-            }
-        }
+        })
+        .await
     }
 
     pub(crate) async fn replied(&self, id: ConnectorID, reply: &str, at: i64) -> DbResult<()> {
@@ -231,11 +208,10 @@ impl ConnectorService {
 
     /// Only advances the cursor after the whole batch of inbound messages is durable.
     pub(crate) async fn accept(&self, id: ConnectorID, messages: &[ConnectorInboundRow], cursor: &str, at: i64) -> DbResult<bool> {
-        let tx = begin_write_tx(self.db.write_conn()).await?;
-        let outcome: DbResult<bool> = async {
+        with_write_tx(&self.db, async |tx| {
             let count = connector_account::Entity::find()
                 .filter(connector_account::Column::Connector.eq(id.as_str()))
-                .count(&tx)
+                .count(tx)
                 .await?;
             if count == 0 {
                 return Ok(false);
@@ -259,33 +235,19 @@ impl ConnectorService {
                             .do_nothing()
                             .to_owned(),
                     )
-                    .exec_without_returning(&tx)
+                    .exec_without_returning(tx)
                     .await?;
             }
             if !cursor.is_empty() {
                 Update::many(connector_account::Entity)
                     .col_expr(connector_account::Column::Cursor, Expr::value(cursor.to_owned()))
                     .filter(connector_account::Column::Connector.eq(id.as_str()))
-                    .exec(&tx)
+                    .exec(tx)
                     .await?;
             }
             Ok(true)
-        }
-        .await;
-        match outcome {
-            Ok(true) => {
-                commit_tx(tx).await?;
-                Ok(true)
-            }
-            Ok(false) => {
-                let _ = rollback_tx(tx).await;
-                Ok(false)
-            }
-            Err(err) => {
-                let _ = rollback_tx(tx).await;
-                Err(err)
-            }
-        }
+        })
+        .await
     }
 
     pub(crate) async fn pending_inbound(&self, id: ConnectorID) -> DbResult<Vec<ConnectorInboundRow>> {
@@ -319,9 +281,22 @@ impl ConnectorService {
         Ok(())
     }
 
-    pub(crate) async fn add_outgoing(&self, id: ConnectorID, message: &str, pieces: &[String], at: i64) -> DbResult<()> {
-        let tx = begin_write_tx(self.db.write_conn()).await?;
-        let outcome: DbResult<()> = async {
+    async fn enqueue_outgoing(&self, id: ConnectorID, message: &str, pieces: &[String], at: i64, only_if_absent: bool) -> DbResult<bool> {
+        if pieces.is_empty() {
+            return Ok(false);
+        }
+        with_write_tx(&self.db, async |tx| {
+            if only_if_absent {
+                let existing = connector_outbox::Entity::find()
+                    .filter(connector_outbox::Column::Connector.eq(id.as_str()))
+                    .filter(connector_outbox::Column::MessageId.eq(message))
+                    .filter(connector_outbox::Column::State.ne("dropped"))
+                    .count(tx)
+                    .await?;
+                if existing > 0 {
+                    return Ok(false);
+                }
+            }
             for piece in pieces {
                 connector_outbox::ActiveModel {
                     connector: Set(id.as_str().to_owned()),
@@ -334,65 +309,22 @@ impl ConnectorService {
                     sent_at: Set(None),
                     ..Default::default()
                 }
-                .insert(&tx)
+                .insert(tx)
                 .await?;
             }
-            Ok(())
-        }
-        .await;
-        match outcome {
-            Ok(()) => commit_tx(tx).await,
-            Err(err) => {
-                let _ = rollback_tx(tx).await;
-                Err(err)
-            }
-        }
+            Ok(true)
+        })
+        .await
+    }
+
+    pub(crate) async fn add_outgoing(&self, id: ConnectorID, message: &str, pieces: &[String], at: i64) -> DbResult<()> {
+        self.enqueue_outgoing(id, message, pieces, at, false).await?;
+        Ok(())
     }
 
     /// Enqueues outgoing pieces only if `(connector, message_id)` has no non-dropped row yet.
     pub(crate) async fn add_outgoing_once(&self, id: ConnectorID, message: &str, pieces: &[String], at: i64) -> DbResult<bool> {
-        if pieces.is_empty() {
-            return Ok(false);
-        }
-        let tx = begin_write_tx(self.db.write_conn()).await?;
-        let outcome: DbResult<bool> = async {
-            let existing = connector_outbox::Entity::find()
-                .filter(connector_outbox::Column::Connector.eq(id.as_str()))
-                .filter(connector_outbox::Column::MessageId.eq(message))
-                .filter(connector_outbox::Column::State.ne("dropped"))
-                .count(&tx)
-                .await?;
-            if existing > 0 {
-                return Ok(false);
-            }
-            for piece in pieces {
-                connector_outbox::ActiveModel {
-                    connector: Set(id.as_str().to_owned()),
-                    message_id: Set(message.to_owned()),
-                    body: Set(piece.clone()),
-                    state: Set("pending".to_owned()),
-                    ext_id: Set(None),
-                    error: Set(None),
-                    created_at: Set(at),
-                    sent_at: Set(None),
-                    ..Default::default()
-                }
-                .insert(&tx)
-                .await?;
-            }
-            Ok(true)
-        }
-        .await;
-        match outcome {
-            Ok(inserted) => {
-                commit_tx(tx).await?;
-                Ok(inserted)
-            }
-            Err(err) => {
-                let _ = rollback_tx(tx).await;
-                Err(err)
-            }
-        }
+        self.enqueue_outgoing(id, message, pieces, at, true).await
     }
 
     pub(crate) async fn pending_outgoing(&self, id: ConnectorID) -> DbResult<Vec<ConnectorOutgoingRow>> {
@@ -436,26 +368,18 @@ impl ConnectorService {
         if rows.is_empty() {
             return Ok(());
         }
-        let tx = begin_write_tx(self.db.write_conn()).await?;
-        let outcome: DbResult<()> = async {
+        with_write_tx(&self.db, async |tx| {
             Update::many(connector_outbox::Entity)
                 .col_expr(connector_outbox::Column::State, Expr::value("sent"))
                 .col_expr(connector_outbox::Column::SentAt, Expr::value(Some(at)))
                 .col_expr(connector_outbox::Column::ExtId, Expr::value(nonempty(ext)))
                 .col_expr(connector_outbox::Column::Error, Expr::value(Option::<String>::None))
                 .filter(connector_outbox::Column::Seq.is_in(rows.iter().copied()))
-                .exec(&tx)
+                .exec(tx)
                 .await?;
             Ok(())
-        }
-        .await;
-        match outcome {
-            Ok(()) => commit_tx(tx).await,
-            Err(err) => {
-                let _ = rollback_tx(tx).await;
-                Err(err)
-            }
-        }
+        })
+        .await
     }
 
     pub(crate) async fn not_sent(&self, rows: &[i64], error: &str) -> DbResult<()> {

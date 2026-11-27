@@ -11,9 +11,10 @@ use sea_orm::{
 };
 use vibevalley_protocol::{Attachment, LibraryFileKind, LibraryItem, LibraryListRequest, LibraryOrigin, LibrarySort, Suggestion};
 
+use super::with_write_tx;
 use crate::db::column::{db_json, read_db_json, read_db_word};
 use crate::db::entity::{artifact, artifact_change, artifact_collab, artifact_suggestion, artifact_version, attachment, media_job, media_library_item};
-use crate::db::{Database, DbResult, Tx, begin_write_tx, commit_tx, rollback_tx};
+use crate::db::{Database, DbResult, Tx};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct ArtifactRow {
@@ -400,6 +401,29 @@ async fn collab_snapshot_impl<C: ConnectionTrait>(db: &C, artifact_id: &str) -> 
     Ok(artifact_collab::Entity::find_by_id(artifact_id.to_owned()).one(db).await?.map(|m| m.snapshot))
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct CollabSnapshotRow {
+    pub(crate) artifact_id: String,
+    pub(crate) snapshot: Vec<u8>,
+    pub(crate) updated_at: i64,
+}
+
+async fn list_collab_snapshots_impl<C: ConnectionTrait>(db: &C, limit: i64) -> DbResult<Vec<CollabSnapshotRow>> {
+    Ok(artifact_collab::Entity::find()
+        .order_by_desc(artifact_collab::Column::UpdatedAt)
+        .order_by_asc(artifact_collab::Column::ArtifactId)
+        .limit(u64::try_from(limit.clamp(1, i64::MAX)).unwrap_or(64))
+        .all(db)
+        .await?
+        .into_iter()
+        .map(|m| CollabSnapshotRow {
+            artifact_id: m.artifact_id,
+            snapshot: m.snapshot,
+            updated_at: m.updated_at,
+        })
+        .collect())
+}
+
 async fn upsert_collab_snapshot_impl<C: ConnectionTrait>(db: &C, artifact_id: &str, snapshot: &[u8], updated_at: i64) -> DbResult<()> {
     let model = artifact_collab::ActiveModel {
         artifact_id: Set(artifact_id.into()),
@@ -564,6 +588,10 @@ impl ArtifactService {
         update_artifact_field_impl(tx, id, artifact::Column::Title, title, at).await
     }
 
+    pub(crate) async fn set_issue_in_tx(&self, tx: &Tx, id: &str, issue: Option<&str>, at: i64) -> DbResult<()> {
+        update_artifact_field_impl(tx, id, artifact::Column::Issue, issue.map(str::to_owned), at).await
+    }
+
     pub(crate) async fn delete(&self, id: &str) -> DbResult<()> {
         super::delete_by_id::<artifact::Entity, _>(self.db.write_conn(), id).await
     }
@@ -602,6 +630,10 @@ impl ArtifactService {
 
     pub(crate) async fn collab_snapshot(&self, artifact_id: &str) -> DbResult<Option<Vec<u8>>> {
         collab_snapshot_impl(self.db.read_conn(), artifact_id).await
+    }
+
+    pub(crate) async fn list_collab_snapshots(&self, limit: i64) -> DbResult<Vec<CollabSnapshotRow>> {
+        list_collab_snapshots_impl(self.db.read_conn(), limit).await
     }
 
     pub(crate) async fn upsert_collab_snapshot(&self, artifact_id: &str, snapshot: &[u8], updated_at: i64) -> DbResult<()> {
@@ -746,29 +778,21 @@ impl ArtifactService {
     /// Soft-removes generated items (`source_job_id IS NOT NULL`) so they are not re-recorded,
     /// and hard-deletes uploaded/fetched items.
     pub(crate) async fn remove_library_item(&self, attachment_id: &str, at: i64) -> DbResult<()> {
-        let tx = begin_write_tx(self.db.write_conn()).await?;
-        let outcome: DbResult<()> = async {
+        with_write_tx(&self.db, async |tx| {
             Update::many(media_library_item::Entity)
                 .col_expr(media_library_item::Column::RemovedAt, Expr::value(Some(at)))
                 .filter(media_library_item::Column::AttachmentId.eq(attachment_id))
                 .filter(media_library_item::Column::SourceJobId.is_not_null())
-                .exec(&tx)
+                .exec(tx)
                 .await?;
             media_library_item::Entity::delete_many()
                 .filter(media_library_item::Column::AttachmentId.eq(attachment_id))
                 .filter(media_library_item::Column::SourceJobId.is_null())
-                .exec(&tx)
+                .exec(tx)
                 .await?;
             Ok(())
-        }
-        .await;
-        match outcome {
-            Ok(()) => commit_tx(tx).await,
-            Err(err) => {
-                let _ = rollback_tx(tx).await;
-                Err(err)
-            }
-        }
+        })
+        .await
     }
 
     // --- Media jobs ---

@@ -393,7 +393,7 @@ pub(crate) fn is_default_title(title: &str) -> bool {
     })
 }
 
-fn shell_name() -> String {
+pub(crate) fn shell_name() -> String {
     std::env::var("SHELL")
         .ok()
         .and_then(|s| s.rsplit('/').next().map(String::from))
@@ -401,7 +401,7 @@ fn shell_name() -> String {
         .unwrap_or_else(|| "shell".into())
 }
 
-fn chat_runtime_label(runtime: &str) -> &str {
+pub(crate) fn chat_runtime_label(runtime: &str) -> &str {
     match runtime {
         "antigravity" => "Antigravity",
         "claude" => "Claude",
@@ -533,6 +533,14 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
         } else {
             None
         };
+        let tab_hook_icon = match &tab.kind {
+            PaneKind::Terminal { .. } => {
+                let hook_status = shell.terminal_hook_status_for_tab(tab, cx);
+                crate::terminal::hook_badge_label(&hook_status)
+                    .map(|_| gpui_icon("plug", 11.0, if hook_status.pending_restart { colors.warning } else { colors.accent }))
+            }
+            _ => None,
+        };
         let focused_bar = if active && focused && multi_group {
             Some(
                 div()
@@ -567,9 +575,9 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .on_mouse_down(
                     MouseButton::Middle,
-                    cx.listener(move |shell, _, window, cx| {
+                    cx.listener(move |shell, event: &gpui::MouseDownEvent, window, cx| {
                         cx.stop_propagation();
-                        shell.close_tab(tab_id, window, cx);
+                        shell.close_tab_with_force(tab_id, event.modifiers.shift, window, cx);
                     }),
                 )
                 .on_click(cx.listener(move |shell, _, window, cx| {
@@ -583,6 +591,7 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
                 }))
                 .children(focused_bar)
                 .children(indicator)
+                .children(tab_hook_icon)
                 .child(div().overflow_hidden().text_ellipsis().whitespace_nowrap().child(title))
                 .child(
                     div()
@@ -599,9 +608,9 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
                         .tooltip_show_delay(TOOLTIP_SHOW_DELAY)
                         .child(gpui_icon("close", 11.0, if active { colors.muted } else { colors.faint }))
                         .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                        .on_click(cx.listener(move |shell, _, window, cx| {
+                        .on_click(cx.listener(move |shell, event: &gpui::ClickEvent, window, cx| {
                             cx.stop_propagation();
-                            shell.close_tab(tab_id, window, cx);
+                            shell.close_tab_with_force(tab_id, event.modifiers().shift, window, cx);
                         })),
                 ),
         );
@@ -778,6 +787,273 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
         .child(tabs_row)
         .child(new_btn_slot);
 
+    let hook_badge_slot = g.active_tab().and_then(|active_tab| {
+        let PaneKind::Terminal { .. } = &active_tab.kind else {
+            return None;
+        };
+        let active_tab_id = active_tab.id;
+        let model = shell.terminal_hook_menu_model(pid, active_tab, cx)?;
+        let badge_label = crate::terminal::hook_badge_label(&model.status);
+        let badge_tooltip = crate::terminal::hook_badge_tooltip(&model.status);
+        let hooks_open = shell.workspace.terminal_hooks_menu_group == Some(group_id);
+        let has_active = badge_label.is_some();
+        let pending = model.status.pending_restart;
+        let mut trigger = div()
+            .id(("terminal-hooks-btn", group_id as usize))
+            .h(px(24.0))
+            .flex_none()
+            .flex()
+            .flex_row()
+            .items_center()
+            .justify_center()
+            .gap(px(4.0))
+            .rounded(px(5.0))
+            .border_1()
+            .cursor_pointer()
+            .tooltip(gpui_tooltip(badge_tooltip, &colors))
+            .tooltip_show_delay(TOOLTIP_SHOW_DELAY)
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(move |shell, _, _, cx| {
+                    cx.stop_propagation();
+                    shell.workspace.chat_menu_group = None;
+                    shell.workspace.terminal_hooks_menu_group = if hooks_open { None } else { Some(group_id) };
+                    cx.notify();
+                }),
+            );
+        trigger = if let Some(label) = badge_label {
+            trigger
+                .px(px(7.0))
+                .bg(if hooks_open { colors.elevated } else { colors.selected })
+                .border_color(if pending { colors.warning } else { colors.border })
+                .child(gpui_icon("plug", 12.0, if pending { colors.warning } else { colors.accent }))
+                .child(div().text_size(px(11.0)).text_color(colors.text).child(label))
+                .children(pending.then(|| div().size(px(5.0)).rounded_full().bg(colors.warning)))
+        } else {
+            trigger
+                .w(px(24.0))
+                .bg(if hooks_open { colors.elevated } else { transparent() })
+                .border_color(if hooks_open { colors.border } else { transparent() })
+                .hover(move |s| s.bg(hover_bg))
+                .child(gpui_icon("plug", 13.0, if hooks_open { colors.text } else { colors.muted }))
+        };
+
+        let popover = hooks_open.then(|| {
+            let mut panel = div()
+                .id(("terminal-hooks-popover", group_id as usize))
+                .w(px(284.0))
+                .p(px(8.0))
+                .rounded(px(8.0))
+                .border_1()
+                .border_color(colors.border)
+                .bg(colors.elevated)
+                .shadow_md()
+                .flex()
+                .flex_col()
+                .gap(px(4.0))
+                .occlude()
+                .on_mouse_down_out(cx.listener(|shell, _, _, cx| {
+                    if shell.workspace.terminal_hooks_menu_group.take().is_some() {
+                        cx.notify();
+                    }
+                }))
+                .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .on_mouse_down(MouseButton::Right, |_, _, cx| cx.stop_propagation())
+                .child(
+                    div()
+                        .px(px(4.0))
+                        .pb(px(4.0))
+                        .flex()
+                        .flex_col()
+                        .gap(px(2.0))
+                        .child(
+                            div()
+                                .text_size(px(12.5))
+                                .text_color(colors.text)
+                                .child(vibevalley_i18n::t("desktop.terminal.hooks.title", &[])),
+                        )
+                        .child(
+                            div()
+                                .text_size(px(11.0))
+                                .text_color(colors.muted)
+                                .child(vibevalley_i18n::t("desktop.terminal.hooks.subtitle", &[])),
+                        ),
+                )
+                .child(div().h(px(1.0)).bg(colors.border))
+                .child(
+                    div()
+                        .px(px(4.0))
+                        .pt(px(2.0))
+                        .text_size(px(11.0))
+                        .text_color(colors.faint)
+                        .child(vibevalley_i18n::t("desktop.terminal.hooks.tabSection", &[])),
+                );
+
+            for (idx, entry) in model.entries.iter().enumerate() {
+                let hook_id = entry.id.clone();
+                let source_label = match entry.source {
+                    Some(vibevalley_terminal::HookSource::Workspace) => vibevalley_i18n::t("desktop.terminal.hooks.sourceWorkspace", &[]),
+                    Some(vibevalley_terminal::HookSource::Tab) => vibevalley_i18n::t("desktop.terminal.hooks.sourceTab", &[]),
+                    None => vibevalley_i18n::t("desktop.terminal.hooks.sourceOff", &[]),
+                };
+                let row = div()
+                    .id(("terminal-hook-tab-toggle", (group_id as usize) * 32 + idx))
+                    .h(px(28.0))
+                    .px(px(6.0))
+                    .rounded(px(6.0))
+                    .flex()
+                    .flex_row()
+                    .items_center()
+                    .justify_between()
+                    .gap(px(8.0))
+                    .cursor_pointer()
+                    .hover(move |s| s.bg(hover_bg))
+                    .child(
+                        div()
+                            .flex()
+                            .flex_row()
+                            .items_center()
+                            .gap(px(6.0))
+                            .child(gpui_icon(
+                                if entry.tab_enabled { "ticked" } else { "plug" },
+                                13.0,
+                                if entry.tab_enabled { colors.accent } else { colors.faint },
+                            ))
+                            .child(div().text_size(px(12.5)).text_color(colors.text).child(entry.label.clone())),
+                    )
+                    .child(
+                        div()
+                            .px(px(5.0))
+                            .py(px(1.0))
+                            .rounded(px(4.0))
+                            .bg(if entry.tab_enabled { colors.selected } else { colors.surface })
+                            .text_size(px(10.5))
+                            .text_color(if entry.tab_enabled { colors.accent } else { colors.faint })
+                            .child(source_label),
+                    )
+                    .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                    .on_click(cx.listener(move |shell, _, _, cx| {
+                        shell.toggle_terminal_tab_hook(pid, active_tab_id, &hook_id, cx);
+                    }));
+                panel = panel.child(row);
+            }
+
+            panel = panel.child(div().my(px(2.0)).h(px(1.0)).bg(colors.border)).child(
+                div()
+                    .px(px(4.0))
+                    .pt(px(2.0))
+                    .text_size(px(11.0))
+                    .text_color(colors.faint)
+                    .child(vibevalley_i18n::t("desktop.terminal.hooks.workspaceSection", &[])),
+            );
+
+            for (idx, entry) in model.entries.iter().enumerate() {
+                let hook_id = entry.id.clone();
+                let label = vibevalley_i18n::t(
+                    "desktop.terminal.hooks.workspaceToggle",
+                    &[("hook", entry.label.clone().into()), ("repo", model.repo_name.clone().into())],
+                );
+                panel = panel.child(
+                    div()
+                        .id(("terminal-hook-ws-toggle", (group_id as usize) * 32 + idx))
+                        .min_h(px(28.0))
+                        .px(px(6.0))
+                        .py(px(4.0))
+                        .rounded(px(6.0))
+                        .flex()
+                        .flex_row()
+                        .items_center()
+                        .gap(px(6.0))
+                        .cursor_pointer()
+                        .hover(move |s| s.bg(hover_bg))
+                        .child(gpui_icon(
+                            if entry.workspace_enabled { "ticked" } else { "folder" },
+                            13.0,
+                            if entry.workspace_enabled { colors.accent } else { colors.muted },
+                        ))
+                        .child(div().flex_1().text_size(px(11.5)).text_color(colors.text).child(label))
+                        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                        .on_click(cx.listener(move |shell, _, _, cx| {
+                            shell.toggle_workspace_terminal_hook(pid, &hook_id, cx);
+                        })),
+                );
+            }
+
+            let summary = if has_active {
+                let names = crate::terminal::hook_names_csv(&model.status.active_hooks);
+                vibevalley_i18n::t("desktop.terminal.hooks.activeSummary", &[("hooks", names.into())])
+            } else {
+                vibevalley_i18n::t("desktop.terminal.hooks.disabledSummary", &[])
+            };
+            panel = panel.child(div().my(px(2.0)).h(px(1.0)).bg(colors.border)).child(
+                div()
+                    .px(px(4.0))
+                    .py(px(2.0))
+                    .text_size(px(11.0))
+                    .text_color(if has_active { colors.muted } else { colors.faint })
+                    .child(summary),
+            );
+
+            if pending {
+                panel = panel.child(
+                    div()
+                        .mt(px(2.0))
+                        .p(px(6.0))
+                        .rounded(px(6.0))
+                        .bg(colors.surface)
+                        .border_1()
+                        .border_color(colors.warning)
+                        .flex()
+                        .flex_row()
+                        .items_center()
+                        .justify_between()
+                        .gap(px(8.0))
+                        .child(
+                            div()
+                                .flex_1()
+                                .text_size(px(11.0))
+                                .text_color(colors.warning)
+                                .child(vibevalley_i18n::t("desktop.terminal.hooks.pendingRestart", &[])),
+                        )
+                        .child(
+                            div()
+                                .id(("terminal-hook-restart", group_id as usize))
+                                .px(px(8.0))
+                                .py(px(3.0))
+                                .rounded(px(5.0))
+                                .bg(colors.accent)
+                                .text_size(px(11.0))
+                                .text_color(colors.on_accent)
+                                .cursor_pointer()
+                                .child(vibevalley_i18n::t("desktop.terminal.hooks.restartAction", &[]))
+                                .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                                .on_click(cx.listener(move |shell, _, _, cx| {
+                                    shell.restart_terminal_tab(pid, active_tab_id, cx);
+                                })),
+                        ),
+                );
+            }
+
+            gpui::deferred(
+                gpui::anchored()
+                    .anchor(gpui::Anchor::TopRight)
+                    .offset(gpui::point(px(0.0), px(30.0)))
+                    .snap_to_window_with_margin(gpui::Edges::all(px(8.0)))
+                    .child(panel),
+            )
+            .with_priority(1)
+        });
+
+        Some(
+            div()
+                .relative()
+                .mr(px(if is_last_group { 2.0 } else { 6.0 }))
+                .flex_none()
+                .child(trigger)
+                .children(popover),
+        )
+    });
+
     let mut bar = div()
         .h(px(36.0))
         .flex_none()
@@ -787,7 +1063,8 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
         .bg(colors.surface)
         .border_b_1()
         .border_color(colors.border)
-        .child(tabs_wrap);
+        .child(tabs_wrap)
+        .children(hook_badge_slot);
 
     if is_last_group {
         let inspector_btn = div()
@@ -850,6 +1127,9 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
             MouseButton::Left,
             cx.listener(move |shell, _, _, cx| {
                 let mut changed = shell.workspace.chat_menu_group.take().is_some();
+                if shell.workspace.terminal_hooks_menu_group.take().is_some() {
+                    changed = true;
+                }
                 if let Some(p) = shell.workspace.ws.active_mut()
                     && p.layout.focused != group_id
                 {

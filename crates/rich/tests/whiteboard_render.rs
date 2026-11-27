@@ -392,19 +392,24 @@ thread_local! {
     static WB_EVENTS: RefCell<RecordedWbEvents> = RefCell::new(RecordedWbEvents::default());
     static WB_SEED_JSON: RefCell<String> = const { RefCell::new(String::new()) };
     static WB_PRESENCES_JSON: RefCell<String> = const { RefCell::new(String::new()) };
+    static WB_COLLAB_UPDATES: RefCell<Vec<(String, String)>> = const { RefCell::new(Vec::new()) };
+    static WB_REMOTE_COLLAB_B64: RefCell<String> = const { RefCell::new(String::new()) };
 }
 
 #[component]
 fn WhiteboardTestRoot() -> impl IntoElement {
     let entries_json = WB_SEED_JSON.with(|s| s.borrow().clone());
     let presences_json = WB_PRESENCES_JSON.with(|s| s.borrow().clone());
+    let collab_update_b64 = WB_REMOTE_COLLAB_B64.with(|s| s.borrow().clone());
     vv_whiteboard()
         .entries_json(entries_json)
         .presences_json(presences_json)
+        .collab_update_b64(collab_update_b64)
         .title("产品发布时间线")
         .locale("zh")
         .on_batch(|ev: &VvWhiteboardBatchEvent| {
             WB_EVENTS.with(|r| r.borrow_mut().batches.push(ev.writes_json.to_string()));
+            WB_COLLAB_UPDATES.with(|c| c.borrow_mut().push((ev.collab_update_b64.to_string(), ev.version_vector_b64.to_string())));
         })
         .on_export(|ev: &VvWhiteboardExportEvent| {
             WB_EVENTS.with(|r| r.borrow_mut().exports.push(ev.clone()));
@@ -1080,4 +1085,59 @@ fn vv_whiteboard_hud_anchors_zoom_and_minimap_bottom_right_without_overlap() {
         !rects_overlap(narrow_zoom, inspector) && !rects_overlap(narrow_minimap, inspector),
         "zoom HUD and minimap must not overlap inspector drawer"
     );
+}
+
+#[test]
+fn vv_whiteboard_local_loro_replica_emits_incremental_delta_and_converges_with_remote_updates() {
+    use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+    use vibevalley_core::collab::{CollabDoc, CommitMeta, decode_version_vector};
+
+    // Remote peer creates an initial element in Loro and exports a snapshot.
+    let remote = CollabDoc::with_peer_id(77).unwrap();
+    remote
+        .entry_patch_json(
+            "elements/remote-card",
+            &serde_json::json!({
+                "id": "remote-card",
+                "type": "card",
+                "x": 120.0,
+                "y": 140.0,
+                "w": 200.0,
+                "h": 110.0,
+                "title": "Remote Card",
+                "fill": "sun"
+            }),
+        )
+        .unwrap();
+    remote.commit(&CommitMeta::user("remote", Some("seed".into()), 1_000)).unwrap();
+    let seed_b64 = BASE64.encode(remote.export_snapshot().unwrap());
+
+    WB_EVENTS.with(|r| *r.borrow_mut() = RecordedWbEvents::default());
+    WB_COLLAB_UPDATES.with(|c| c.borrow_mut().clear());
+    WB_SEED_JSON.with(|s| *s.borrow_mut() = "[]".to_owned());
+    WB_PRESENCES_JSON.with(|s| s.borrow_mut().clear());
+    WB_REMOTE_COLLAB_B64.with(|c| *c.borrow_mut() = seed_b64);
+
+    let mut harness = TestHarness::mount(Root::of::<WhiteboardTestRoot>());
+    assert!(harness.contains_text("1 个元素") || harness.find_test_id("wb-count").is_some());
+
+    // Local edit via grid toggle updates immediately and emits incremental Loro bytes + VV.
+    let grid_btn = harness.find_test_id("wb-grid-toggle").expect("wb-grid-toggle present");
+    assert!(harness.press(grid_btn));
+
+    let (delta_b64, vv_b64) = WB_COLLAB_UPDATES.with(|c| {
+        let updates = c.borrow();
+        assert!(!updates.is_empty(), "local whiteboard edit should emit Loro delta");
+        updates.last().unwrap().clone()
+    });
+    assert!(!delta_b64.is_empty(), "collab_update_b64 must be non-empty");
+    let local_vv = decode_version_vector(&vv_b64).expect("valid encoded VersionVector");
+    let delta_bytes = BASE64.decode(&delta_b64).expect("valid base64 Loro update");
+
+    // Importing the local delta into the remote CollabDoc converges board/meta state cleanly.
+    assert!(remote.import_bytes_with_status(&delta_bytes).unwrap());
+    assert_eq!(remote.version_vector(), local_vv);
+    assert!(remote.entry_get_json("board/meta").is_some());
+
+    WB_REMOTE_COLLAB_B64.with(|c| c.borrow_mut().clear());
 }

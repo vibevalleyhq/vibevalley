@@ -22,6 +22,9 @@ use crate::service::memory::NewMemory;
 /// Fading marks the ones that would go if this many more were kept.
 const FADING_SOON: usize = 10;
 pub const LOCAL: &str = "local";
+const SCOPE_AGENT: &str = "agent";
+const SCOPE_REPO: &str = "repo";
+const SCOPE_FARM: &str = "farm";
 
 fn db_failed(e: DbError) -> ApiError {
     ApiError::new(BizCode::MemoryRefused, format!("{}: {e}", t("server.memory.dbFailed", &[])))
@@ -48,6 +51,19 @@ pub struct Note {
     pub by: By,
 }
 
+/// A structured memory write supporting `note`, `profile`, and `episode` entries.
+#[derive(Debug, Clone)]
+pub struct WriteMemory {
+    pub agent: String,
+    pub kind: MemoryKind,
+    pub scope: Option<String>,
+    pub title: Option<String>,
+    pub text: String,
+    pub repo: String,
+    pub by: By,
+    pub importance: i64,
+}
+
 /// One finished run, as the memory keeps it.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FinishedRun {
@@ -67,14 +83,29 @@ pub struct Memory {
     create_keys: AsyncRequestKeys<MemoryItem>,
 }
 
-fn to_rules(x: MemoryItem) -> m::Memory {
+fn to_rules_kind(kind: MemoryKind) -> m::MemoryKind {
+    match kind {
+        MemoryKind::Note => m::MemoryKind::Note,
+        MemoryKind::Issue => m::MemoryKind::Issue,
+        MemoryKind::Profile => m::MemoryKind::Profile,
+        MemoryKind::Episode => m::MemoryKind::Episode,
+    }
+}
+
+fn to_wire_kind(kind: m::MemoryKind) -> MemoryKind {
+    match kind {
+        m::MemoryKind::Note => MemoryKind::Note,
+        m::MemoryKind::Issue => MemoryKind::Issue,
+        m::MemoryKind::Profile => MemoryKind::Profile,
+        m::MemoryKind::Episode => MemoryKind::Episode,
+    }
+}
+
+pub(super) fn to_rules(x: MemoryItem) -> m::Memory {
     m::Memory {
         id: x.id,
         agent: x.agent,
-        kind: match x.kind {
-            MemoryKind::Note => m::MemoryKind::Note,
-            MemoryKind::Issue => m::MemoryKind::Issue,
-        },
+        kind: to_rules_kind(x.kind),
         text: x.text,
         author: match x.author {
             ActorKind::User => m::ActorKind::User,
@@ -88,6 +119,10 @@ fn to_rules(x: MemoryItem) -> m::Memory {
         recalled_at: x.recalled_at,
         fading: x.fading,
         source: x.source,
+        scope: x.scope,
+        title: x.title,
+        importance: x.importance,
+        replaced_by: x.replaced_by,
     }
 }
 
@@ -95,10 +130,7 @@ fn to_wire(x: m::Memory) -> MemoryItem {
     MemoryItem {
         id: x.id,
         agent: x.agent,
-        kind: match x.kind {
-            m::MemoryKind::Note => MemoryKind::Note,
-            m::MemoryKind::Issue => MemoryKind::Issue,
-        },
+        kind: to_wire_kind(x.kind),
         text: x.text,
         author: match x.author {
             m::ActorKind::User => ActorKind::User,
@@ -112,16 +144,49 @@ fn to_wire(x: m::Memory) -> MemoryItem {
         recalled_at: x.recalled_at,
         fading: x.fading,
         source: x.source,
+        scope: x.scope,
+        title: x.title,
+        importance: x.importance,
+        replaced_by: x.replaced_by,
     }
 }
 
-fn build_note_entry(n: &Note, at: i64) -> Result<(NewMemory, MemoryItem), ApiError> {
-    let body = m::clip(&n.text, m::NOTE_MAX_CHARS);
+fn max_chars_for(kind: MemoryKind) -> usize {
+    match kind {
+        MemoryKind::Note | MemoryKind::Issue => m::NOTE_MAX_CHARS,
+        MemoryKind::Profile => m::PROFILE_MAX_CHARS,
+        MemoryKind::Episode => m::EPISODE_MAX_CHARS,
+    }
+}
+
+fn resolve_scope(kind: MemoryKind, repo: Option<&str>, raw_scope: Option<&str>) -> Result<String, ApiError> {
+    if let Some(s) = raw_scope.map(str::trim).filter(|s| !s.is_empty()) {
+        return match s {
+            SCOPE_AGENT | SCOPE_REPO | SCOPE_FARM => Ok(s.to_string()),
+            other => Err(refused(t("server.memory.invalidScope", &[("scope", other.into())]))),
+        };
+    }
+    Ok(match kind {
+        MemoryKind::Profile => SCOPE_FARM.to_string(),
+        MemoryKind::Note | MemoryKind::Issue | MemoryKind::Episode => {
+            if repo.is_some() {
+                SCOPE_REPO.to_string()
+            } else {
+                SCOPE_AGENT.to_string()
+            }
+        }
+    })
+}
+
+fn build_memory_entry(w: &WriteMemory, at: i64) -> Result<(NewMemory, MemoryItem), ApiError> {
+    let body = m::clip(&w.text, max_chars_for(w.kind));
     if body.is_empty() {
         return Err(refused(t("server.memory.empty", &[])));
     }
-    let repo = Some(n.repo.trim().to_string()).filter(|r| !r.is_empty());
-    let (author, session) = match &n.by {
+    let repo = Some(w.repo.trim().to_string()).filter(|r| !r.is_empty());
+    let scope = resolve_scope(w.kind, repo.as_deref(), w.scope.as_deref())?;
+    let title = w.title.as_deref().map(str::trim).filter(|s| !s.is_empty()).map(str::to_string);
+    let (author, session) = match &w.by {
         By::User => (ActorKind::User, None),
         By::Orchestrator => (ActorKind::Agent, None),
         By::Session(s) => (ActorKind::Agent, Some(s.clone()).filter(|s| !s.is_empty())),
@@ -129,18 +194,21 @@ fn build_note_entry(n: &Note, at: i64) -> Result<(NewMemory, MemoryItem), ApiErr
     let id = uuid::Uuid::now_v7().to_string();
     let entry = NewMemory {
         id: id.clone(),
-        agent: n.agent.clone(),
-        kind: MemoryKind::Note,
+        agent: w.agent.clone(),
+        kind: w.kind,
+        scope: scope.clone(),
+        title: title.clone(),
         body: body.clone(),
         repo: repo.clone(),
         session: session.clone(),
         author,
+        importance: w.importance,
         created_at: at,
     };
     let wire = MemoryItem {
         id,
-        agent: n.agent.clone(),
-        kind: MemoryKind::Note,
+        agent: w.agent.clone(),
+        kind: w.kind,
         text: body,
         author,
         repo,
@@ -150,6 +218,10 @@ fn build_note_entry(n: &Note, at: i64) -> Result<(NewMemory, MemoryItem), ApiErr
         recalled_at: None,
         fading: false,
         source: None,
+        scope: Some(scope),
+        title,
+        importance: Some(w.importance),
+        replaced_by: None,
     };
     Ok((entry, wire))
 }
@@ -163,8 +235,25 @@ impl Memory {
         })
     }
 
+    pub async fn get_async(&self, id: &str) -> Result<Option<m::Memory>, ApiError> {
+        let row = self.ctx.service.memory.get(id).await.map_err(db_failed)?;
+        Ok(row.map(to_rules))
+    }
+
     pub async fn list_async(&self, agent: &str) -> Result<Vec<m::Memory>, ApiError> {
         let rows = self.ctx.service.memory.list(agent).await.map_err(db_failed)?;
+        Ok(rows.into_iter().map(to_rules).collect())
+    }
+
+    /// Lists all rows for `agent` including entries superseded via `replaced_by`.
+    pub async fn list_all_async(&self, agent: &str) -> Result<Vec<m::Memory>, ApiError> {
+        let rows = self.ctx.service.memory.list_all(agent).await.map_err(db_failed)?;
+        Ok(rows.into_iter().map(to_rules).collect())
+    }
+
+    /// Lists active farm-wide `profile` memories ordered by descending `importance`.
+    pub async fn list_farm_profiles_async(&self) -> Result<Vec<m::Memory>, ApiError> {
+        let rows = self.ctx.service.memory.list_farm_profiles().await.map_err(db_failed)?;
         Ok(rows.into_iter().map(to_rules).collect())
     }
 
@@ -189,28 +278,147 @@ impl Memory {
         memories
             .iter()
             .filter_map(|x| {
-                let shared = m::terms_of(&x.text).intersection(&words).count();
+                let mut doc_terms = m::terms_of(&x.text);
+                if let Some(title) = &x.title {
+                    doc_terms.extend(m::terms_of(title));
+                }
+                let shared = doc_terms.intersection(&words).count();
                 (shared > 0).then(|| (x.id.clone(), 0.1 * shared as f64 / words.len() as f64))
             })
             .collect()
     }
 
-    pub async fn write_async(&self, n: &Note) -> Result<MemoryItem, ApiError> {
-        let (entry, wire) = build_note_entry(n, self.ctx.now())?;
-        self.ctx.service.memory.insert(&entry).await.map_err(db_failed)?;
+    pub async fn write_entry_async(&self, w: &WriteMemory) -> Result<MemoryItem, ApiError> {
+        let (entry, wire) = build_memory_entry(w, self.ctx.now())?;
+        let candidate_body = entry.body.clone();
+        self.ctx
+            .service
+            .memory
+            .insert_superseding(&entry, |existing| m::is_similar(&existing.text, &candidate_body))
+            .await
+            .map_err(db_failed)?;
         Ok(wire)
+    }
+
+    pub async fn write_async(&self, n: &Note) -> Result<MemoryItem, ApiError> {
+        self.write_entry_async(&WriteMemory {
+            agent: n.agent.clone(),
+            kind: MemoryKind::Note,
+            scope: None,
+            title: None,
+            text: n.text.clone(),
+            repo: n.repo.clone(),
+            by: n.by.clone(),
+            importance: 0,
+        })
+        .await
+    }
+
+    pub async fn write_profile_async(&self, title: Option<&str>, text: &str, importance: i64, by: By) -> Result<MemoryItem, ApiError> {
+        let agent = match &by {
+            By::User => String::new(),
+            By::Orchestrator => vibevalley_protocol::DEFAULT_ORCHESTRATOR.to_string(),
+            By::Session(s) => s.clone(),
+        };
+        self.write_entry_async(&WriteMemory {
+            agent,
+            kind: MemoryKind::Profile,
+            scope: Some(SCOPE_FARM.into()),
+            title: title.map(str::to_string),
+            text: text.to_string(),
+            repo: String::new(),
+            by,
+            importance,
+        })
+        .await
+    }
+
+    pub async fn record_episode_async(
+        &self,
+        agent: &str,
+        title: Option<&str>,
+        text: &str,
+        repo: Option<&str>,
+        session: Option<&str>,
+        author: ActorKind,
+    ) -> Result<Option<MemoryItem>, ApiError> {
+        let body = m::clip(text, m::EPISODE_MAX_CHARS);
+        if body.is_empty() {
+            return Ok(None);
+        }
+        let repo = repo.map(str::trim).filter(|r| !r.is_empty()).map(str::to_string);
+        let scope = if repo.is_some() { SCOPE_REPO } else { SCOPE_AGENT }.to_string();
+        let title = title.map(str::trim).filter(|s| !s.is_empty()).map(str::to_string);
+        let session = session.map(str::trim).filter(|s| !s.is_empty()).map(str::to_string);
+        let at = self.ctx.now();
+        let id = uuid::Uuid::now_v7().to_string();
+        let entry = NewMemory {
+            id: id.clone(),
+            agent: agent.to_string(),
+            kind: MemoryKind::Episode,
+            scope: scope.clone(),
+            title: title.clone(),
+            body: body.clone(),
+            repo: repo.clone(),
+            session: session.clone(),
+            author,
+            importance: 0,
+            created_at: at,
+        };
+        let candidate_body = entry.body.clone();
+        self.ctx
+            .service
+            .memory
+            .insert_superseding(&entry, |existing| m::is_similar(&existing.text, &candidate_body))
+            .await
+            .map_err(db_failed)?;
+        Ok(Some(MemoryItem {
+            id,
+            agent: agent.to_string(),
+            kind: MemoryKind::Episode,
+            text: body,
+            author,
+            repo,
+            session,
+            at,
+            recalled: 0,
+            recalled_at: None,
+            fading: false,
+            source: None,
+            scope: Some(scope),
+            title,
+            importance: Some(0),
+            replaced_by: None,
+        }))
+    }
+
+    pub async fn record_compaction_episode_async(&self, agent: &str, session_or_run: &str, level: &str, summary: &str, repo: Option<&str>) {
+        if summary.trim().is_empty() {
+            return;
+        }
+        let title = format!("对话压缩（{level}）");
+        if let Err(error) = self
+            .record_episode_async(agent, Some(&title), summary, repo, Some(session_or_run), ActorKind::System)
+            .await
+        {
+            eprintln!("could not record compaction episode for {agent}/{session_or_run}: {}", error.message);
+        }
     }
 
     /// `rewrite_async`: the agent's own notes replaced atomically; the user's stay.
     pub async fn rewrite_async(&self, agent: &str, texts: &[String], by: By) -> Result<usize, ApiError> {
         let mut entries = Vec::with_capacity(texts.len());
         for text in texts {
-            let (entry, _) = build_note_entry(
-                &Note {
+            let (entry, _) = build_memory_entry(
+                &WriteMemory {
                     agent: agent.into(),
+                    kind: MemoryKind::Note,
+                    scope: None,
+                    title: None,
                     text: text.clone(),
                     repo: String::new(),
                     by: by.clone(),
+                    importance: 0,
                 },
                 self.ctx.now(),
             )?;
@@ -245,13 +453,18 @@ impl Memory {
         })
     }
 
-    /// What a run on `agent` recalls (`recallable`); with `peek` nothing is
-    /// counted and a cue with no repo recalls nothing.
+    /// What a run on `agent` recalls (`recallable`) plus farm-wide `profile` memories
+    /// ordered by `importance`; with `peek` nothing is counted and a cue with no repo recalls nothing.
     pub async fn recall_async(&self, agent: &str, session: Option<&str>, repo: &str, text: &str, peek: bool) -> Vec<(String, String)> {
         if peek && repo.is_empty() {
             return vec![];
         }
-        let all = self.list_async(agent).await.unwrap_or_default();
+        let profiles = self.list_farm_profiles_async().await.unwrap_or_default();
+        let all = if agent.is_empty() {
+            vec![]
+        } else {
+            self.list_async(agent).await.unwrap_or_default()
+        };
         let cue = m::Cue {
             session: if peek { None } else { session },
             repo,
@@ -261,12 +474,26 @@ impl Memory {
             matches: self.matches(&all, text),
         };
         let picked = m::pick(&all, &cue);
-        if !peek && !picked.is_empty() {
+        let mut out = Vec::with_capacity(profiles.len() + picked.len());
+        let mut seen = HashSet::new();
+        for p in profiles {
+            if seen.insert(p.id.clone()) {
+                let line = m::line_of(&p, repo);
+                out.push((p.id, line));
+            }
+        }
+        for x in picked {
+            if seen.insert(x.id.clone()) {
+                let line = m::line_of(&x, repo);
+                out.push((x.id, line));
+            }
+        }
+        if !peek && !out.is_empty() {
             let at = self.ctx.now();
-            let ids: Vec<String> = picked.iter().map(|x| x.id.clone()).collect();
+            let ids: Vec<String> = out.iter().map(|(id, _)| id.clone()).collect();
             let _ = self.ctx.service.memory.record_recalled(&ids, at).await;
         }
-        picked.iter().map(|x| (x.id.clone(), m::line_of(x, repo))).collect()
+        out
     }
 
     /// The lines a run is told; "" when none.
@@ -284,15 +511,21 @@ impl Memory {
         if run.outcome == Outcome::Interrupted {
             return;
         }
-        let issue_entry = run.issue.as_ref().map(|_| NewMemory {
-            id: uuid::Uuid::now_v7().to_string(),
-            agent: run.agent.clone(),
-            kind: MemoryKind::Issue,
-            body: m::issue_memory_text(&run.brief, &run.summary, run.outcome == Outcome::Failed),
-            repo: Some(run.repo.clone()),
-            session: Some(run.session.clone()),
-            author: ActorKind::System,
-            created_at: self.ctx.now(),
+        let issue_entry = run.issue.as_ref().map(|_| {
+            let repo = Some(run.repo.clone()).filter(|r| !r.trim().is_empty());
+            NewMemory {
+                id: uuid::Uuid::now_v7().to_string(),
+                agent: run.agent.clone(),
+                kind: MemoryKind::Issue,
+                scope: if repo.is_some() { SCOPE_REPO } else { SCOPE_AGENT }.to_string(),
+                title: None,
+                body: m::issue_memory_text(&run.brief, &run.summary, run.outcome == Outcome::Failed),
+                repo,
+                session: Some(run.session.clone()),
+                author: ActorKind::System,
+                importance: 0,
+                created_at: self.ctx.now(),
+            }
         });
         let agent = run.agent.clone();
         let service = self.ctx.service.clone();
@@ -318,24 +551,39 @@ impl Memory {
         }
     }
 
-    /// `search_async`: one agent's, or every profile's when none is named.
+    /// `search_async`: one agent's (plus farm-wide profiles), or every active memory when none is named.
     pub async fn search_async(&self, agent: &str, repo: &str, text: &str, limit: usize) -> MemorySearch {
-        let agents: Vec<String> = if agent.is_empty() {
-            self.profile.agents().into_iter().map(|a| a.id).collect()
+        let all: Vec<m::Memory> = if agent.is_empty() {
+            self.ctx
+                .service
+                .memory
+                .list_all_active()
+                .await
+                .unwrap_or_default()
+                .into_iter()
+                .map(to_rules)
+                .collect()
         } else {
-            vec![agent.into()]
+            let mut combined = self.list_async(agent).await.unwrap_or_default();
+            let mut seen: HashSet<String> = combined.iter().map(|m| m.id.clone()).collect();
+            for p in self.list_farm_profiles_async().await.unwrap_or_default() {
+                if seen.insert(p.id.clone()) {
+                    combined.push(p);
+                }
+            }
+            combined
         };
-        let mut all = vec![];
-        for a in &agents {
-            all.extend(self.list_async(a).await.unwrap_or_default());
-        }
         let matches = self.matches(&all, text);
         let found = m::search(&all, repo, text, None, limit, &matches)
             .into_iter()
             .map(|(x, score)| {
-                let scope = match &x.repo {
-                    None => MemoryScope::Global {},
-                    Some(r) => MemoryScope::Repo { repo: r.clone() },
+                let scope = if x.scope.as_deref() == Some(SCOPE_FARM) {
+                    MemoryScope::Farm {}
+                } else {
+                    match &x.repo {
+                        None => MemoryScope::Global {},
+                        Some(r) => MemoryScope::Repo { repo: r.clone() },
+                    }
                 };
                 let w = to_wire(x);
                 MemoryFound {
@@ -353,6 +601,9 @@ impl Memory {
                     source: LOCAL.into(),
                     score: score.into(),
                     scope,
+                    title: w.title,
+                    importance: w.importance,
+                    replaced_by: w.replaced_by,
                 }
             })
             .collect();
@@ -390,8 +641,7 @@ impl Memory {
         .await;
     }
 
-    /// Registers `memory.session_remember` on the durable [`crate::context::Outbox`] so committed
-    /// session reports can persist round learnings asynchronously without a `Runtime` hook.
+    /// Registers `memory.session_remember` and `memory.issue_episode` on the durable [`crate::context::Outbox`].
     pub(crate) fn register_outbox(self: &Arc<Self>) {
         let store = Arc::downgrade(self);
         self.ctx.outbox.register(crate::context::outbox::OUTBOX_SESSION_REMEMBER, move |delivery| {
@@ -409,6 +659,29 @@ impl Memory {
                             repo: repo.unwrap_or_default(),
                             by: By::Session(String::new()),
                         })
+                        .await
+                {
+                    return Err(e.message);
+                }
+                Ok(())
+            }
+        });
+        let store = Arc::downgrade(self);
+        self.ctx.outbox.register(crate::context::outbox::OUTBOX_ISSUE_EPISODE, move |delivery| {
+            let store = store.clone();
+            async move {
+                let Some(store) = store.upgrade() else {
+                    return Ok::<(), String>(());
+                };
+                if let crate::context::OutboxEvent::IssueEpisode {
+                    agent,
+                    title,
+                    text,
+                    repo,
+                    session,
+                } = delivery.decode_event().map_err(|e| format!("invalid issue episode outbox event: {e}"))?
+                    && let Err(e) = store
+                        .record_episode_async(&agent, title.as_deref(), &text, repo.as_deref(), session.as_deref(), ActorKind::System)
                         .await
                 {
                     return Err(e.message);
@@ -454,11 +727,15 @@ impl Memory {
         };
         self.create_keys
             .once(input.request_key.as_deref(), async move {
-                self.write_async(&Note {
+                self.write_entry_async(&WriteMemory {
                     agent: input.agent.clone(),
+                    kind: input.kind.unwrap_or(MemoryKind::Note),
+                    scope: input.scope.clone(),
+                    title: input.title.clone(),
                     text: input.text.clone(),
                     repo: input.repo.clone().unwrap_or_default(),
                     by,
+                    importance: input.importance.unwrap_or(0),
                 })
                 .await
             })

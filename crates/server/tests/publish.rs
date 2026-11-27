@@ -216,14 +216,19 @@ fn the_repos_check_runs_before_the_push() {
 #[test]
 fn only_the_user_publishes() {
     let dir = tempfile::tempdir().unwrap();
-    let app = vibevalley_server::create_app_blocking(vibevalley_server::Config {
-        publisher: Some(Arc::new(farm().publisher)),
-        probe_runtimes: false,
-        tick_crons: false,
-        link_previews: false,
-        orchestrator_listens: false,
-        ..vibevalley_server::Config::under(dir.path())
-    })
+    let app = vibevalley_server::app::create_app_with_overrides_blocking(
+        vibevalley_server::Config {
+            probe_runtimes: false,
+            tick_crons: false,
+            link_previews: false,
+            orchestrator_listens: false,
+            ..vibevalley_server::Config::under(dir.path())
+        },
+        vibevalley_server::app::Overrides {
+            publisher: Some(Arc::new(farm().publisher)),
+            ..Default::default()
+        },
+    )
     .unwrap();
     let asked = json!({ "cwd": "/tmp", "branch": "fix", "sha": "0", "base": "main", "title": "t", "body": "" });
     let e = app.router().call_as(Caller::Remote, "repo.pr.submit", asked);
@@ -238,8 +243,9 @@ fn pull_request_issue_mandates_records_and_completes_cleanly() {
     use std::time::Duration;
     use vibevalley_protocol::{Landing, PullRequest, PullRequestState};
     use vibevalley_runtime::oar::{Registry, scripted::ScriptedRuntime};
+    use vibevalley_server::Config;
+    use vibevalley_server::app::{Overrides, create_app_with_overrides_blocking};
     use vibevalley_server::gateway::api::Server;
-    use vibevalley_server::{Config, create_app_blocking};
 
     vibevalley_i18n::set_locale("en");
     let dir = tempfile::tempdir().unwrap();
@@ -266,16 +272,21 @@ fn pull_request_issue_mandates_records_and_completes_cleanly() {
     let mut registry = Registry::new();
     registry.register(Arc::new(ScriptedRuntime::demo()));
 
-    let started = create_app_blocking(Config {
-        registry: Some(Arc::new(registry)),
-        publisher: Some(publisher),
-        probe_runtimes: false,
-        tick_crons: false,
-        link_previews: false,
-        offline_media: true,
-        orchestrator_listens: false,
-        ..Config::under(&root)
-    })
+    let started = create_app_with_overrides_blocking(
+        Config {
+            registry: Some(Arc::new(registry)),
+            probe_runtimes: false,
+            tick_crons: false,
+            link_previews: false,
+            offline_media: true,
+            orchestrator_listens: false,
+            ..Config::under(&root)
+        },
+        Overrides {
+            publisher: Some(publisher),
+            ..Default::default()
+        },
+    )
     .unwrap();
 
     let repo_dir = root.join("repos/farm");

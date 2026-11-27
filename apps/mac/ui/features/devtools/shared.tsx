@@ -2,11 +2,12 @@ import { Clipboard, Scroll, signal, Text, View, type JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 
+import { Button } from "../../design/Button";
 import { IconButton } from "../../design/IconButton";
 import { CountPill } from "../../design/Tag";
 import { useTimeout } from "../../infra/base/timer";
 
-export function CopyButton(props: { text: string; testID?: string | undefined }) {
+export function CopyButton(props: { text: string; label?: string | undefined; testID?: string | undefined }) {
   const copied = signal(false);
   const schedule = useTimeout();
   const copy = () => {
@@ -19,13 +20,22 @@ export function CopyButton(props: { text: string; testID?: string | undefined })
     );
   };
   return (
-    <IconButton
-      icon={copied() ? "check" : "copy"}
-      size={14}
-      label={copied() ? t("web.devtools.actions.copied") : t("web.devtools.actions.copy")}
-      testid={props.testID}
-      onClick={copy}
-    />
+    <If
+      when={props.label !== undefined}
+      else={
+        <IconButton
+          icon={copied() ? "check" : "copy"}
+          size={14}
+          label={copied() ? t("web.devtools.actions.copied") : t("web.devtools.actions.copy")}
+          testid={props.testID}
+          onClick={copy}
+        />
+      }
+    >
+      <Button size="compact" tone="quiet" icon={copied() ? "check" : "copy"} testID={props.testID} onPress={copy}>
+        {copied() ? t("web.devtools.actions.copied") : (props.label ?? "")}
+      </Button>
+    </If>
   );
 }
 

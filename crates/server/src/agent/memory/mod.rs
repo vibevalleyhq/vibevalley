@@ -12,4 +12,4 @@ mod store;
 mod tests;
 
 pub use prompt::found_text;
-pub use store::{By, FinishedRun, LOCAL, Memory, Note};
+pub use store::{By, FinishedRun, LOCAL, Memory, Note, WriteMemory};

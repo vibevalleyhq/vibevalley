@@ -1,9 +1,11 @@
 //! Shared pub/sub and commit stats hub for non-SQLite backends.
 
 use std::sync::{
-    Arc, Mutex,
+    Arc,
     atomic::{AtomicBool, Ordering},
 };
+
+use parking_lot::Mutex;
 
 use tokio::sync::mpsc;
 
@@ -47,13 +49,13 @@ impl LiveHub {
 
     pub fn mark_closed(&self) {
         self.closed.store(true, Ordering::Release);
-        let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+        let mut inner = self.inner.lock();
         inner.docs.clear();
         inner.tasks.clear();
     }
 
     pub fn subscribe_documents(&self) -> Result<mpsc::UnboundedReceiver<DocumentEvent>> {
-        let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+        let mut inner = self.inner.lock();
         if self.is_closed() {
             return Err(Error::Closed);
         }
@@ -63,7 +65,7 @@ impl LiveHub {
     }
 
     pub fn subscribe_tasks(&self) -> Result<mpsc::Receiver<()>> {
-        let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+        let mut inner = self.inner.lock();
         if self.is_closed() {
             return Err(Error::Closed);
         }
@@ -73,17 +75,17 @@ impl LiveHub {
     }
 
     pub fn record_request(&self) {
-        let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+        let mut inner = self.inner.lock();
         inner.stats.requests += 1;
     }
 
     pub fn record_failure(&self) {
-        let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+        let mut inner = self.inner.lock();
         inner.stats.failed_ops += 1;
     }
 
     pub fn record_commit_and_publish(&self, events: Vec<DocumentEvent>, tasks_changed: bool) {
-        let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+        let mut inner = self.inner.lock();
         inner.stats.batches += 1;
         inner.stats.committed_ops += 1;
         for event in events {
@@ -95,6 +97,6 @@ impl LiveHub {
     }
 
     pub fn stats(&self) -> CommitStats {
-        self.inner.lock().unwrap_or_else(|e| e.into_inner()).stats
+        self.inner.lock().stats
     }
 }

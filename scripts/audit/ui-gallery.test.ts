@@ -24,7 +24,7 @@ describe("ui-gallery", () => {
     expect(plan.expectedShots).toContain("/tmp/out/shots/typical-whiteboard-dark.png");
     expect(plan.expectedShots).toContain("/tmp/out/shots/typical-workspace-dark.png");
     expect(plan.expectedShots).toContain("/tmp/out/shots/typical-farm.png");
-    expect(plan.steps.at(-1)).toBe('{"shell":"quit"}');
+    expect(plan.steps.at(-1)).toEqual({ kind: "rpc", method: "Shell.quit", params: {} });
 
     const edgePlan = buildStepPlan("edge", "/tmp/out/shots");
     expect(edgePlan.expectedShots).toEqual([

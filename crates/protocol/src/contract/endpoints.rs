@@ -101,18 +101,9 @@ pub const ENDPOINTS: &[Endpoint] = &[
         module: "agent",
         about: &["id"],
         can: &[Caller::User],
-        dry_run: Some("agent.template.previewDelete"),
-        input: Some("AgentDeleteInput"),
-        result: None,
-    },
-    Endpoint {
-        op: "agent.template.previewDelete",
-        module: "agent",
-        about: &["id"],
-        can: &[Caller::User],
         dry_run: None,
         input: Some("AgentDeleteInput"),
-        result: Some("Preview"),
+        result: None,
     },
     Endpoint {
         op: "skill.list",
@@ -146,18 +137,9 @@ pub const ENDPOINTS: &[Endpoint] = &[
         module: "agent",
         about: &["id"],
         can: &[Caller::User],
-        dry_run: Some("skill.previewDelete"),
-        input: Some("SkillDeleteInput"),
-        result: None,
-    },
-    Endpoint {
-        op: "skill.previewDelete",
-        module: "agent",
-        about: &["id"],
-        can: &[Caller::User],
         dry_run: None,
         input: Some("SkillDeleteInput"),
-        result: Some("Preview"),
+        result: None,
     },
     Endpoint {
         op: "runtime.list",
@@ -212,6 +194,42 @@ pub const ENDPOINTS: &[Endpoint] = &[
         dry_run: None,
         input: Some("McpUninstallInput"),
         result: Some("McpHostInfo"),
+    },
+    Endpoint {
+        op: "runtime.mcpServer.list",
+        module: "runtime",
+        about: &["host"],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("McpServerListInput"),
+        result: Some("McpServerListResult"),
+    },
+    Endpoint {
+        op: "runtime.mcpServer.save",
+        module: "runtime",
+        about: &["host"],
+        can: &[Caller::User],
+        dry_run: None,
+        input: Some("McpServerSaveInput"),
+        result: Some("McpServerListResult"),
+    },
+    Endpoint {
+        op: "runtime.mcpServer.toggle",
+        module: "runtime",
+        about: &["host"],
+        can: &[Caller::User],
+        dry_run: None,
+        input: Some("McpServerToggleInput"),
+        result: Some("McpServerListResult"),
+    },
+    Endpoint {
+        op: "runtime.mcpServer.remove",
+        module: "runtime",
+        about: &["host"],
+        can: &[Caller::User],
+        dry_run: None,
+        input: Some("McpServerRemoveInput"),
+        result: Some("McpServerListResult"),
     },
     Endpoint {
         op: "memory.list",
@@ -466,22 +484,22 @@ pub const ENDPOINTS: &[Endpoint] = &[
         result: Some("SessionChildTranscript"),
     },
     Endpoint {
-        op: "session.binding.attach",
+        op: "session.compact",
         module: "session",
         about: &["id"],
-        can: &[Caller::User, Caller::Orchestrator, Caller::Remote],
+        can: &[Caller::User, Caller::Remote],
         dry_run: None,
-        input: Some("SessionBindingInput"),
-        result: Some("Session"),
+        input: Some("SessionCompactInput"),
+        result: Some("SessionCompactResult"),
     },
     Endpoint {
-        op: "session.binding.detach",
+        op: "session.runCode",
         module: "session",
         about: &["id"],
-        can: &[Caller::User, Caller::Orchestrator, Caller::Remote],
+        can: &[Caller::User, Caller::Remote],
         dry_run: None,
-        input: Some("SessionBindingInput"),
-        result: Some("Session"),
+        input: Some("SessionRunCodeInput"),
+        result: Some("SessionRunCodeResult"),
     },
     Endpoint {
         op: "issue.conversation.get",
@@ -637,6 +655,60 @@ pub const ENDPOINTS: &[Endpoint] = &[
         result: Some("Issue"),
     },
     Endpoint {
+        op: "issue.retro.get",
+        module: "issue",
+        about: &[],
+        can: &[Caller::User, Caller::Remote, Caller::Orchestrator],
+        dry_run: None,
+        input: Some("IssueRetroGetInput"),
+        result: Some("IssueRetroReport"),
+    },
+    Endpoint {
+        op: "issue.digest.get",
+        module: "issue",
+        about: &[],
+        can: &[Caller::User, Caller::Remote, Caller::Orchestrator],
+        dry_run: None,
+        input: Some("IssueDigestGetInput"),
+        result: Some("MorningDigest"),
+    },
+    Endpoint {
+        op: "issue.triage.list",
+        module: "issue",
+        about: &[],
+        can: &[Caller::User, Caller::Remote, Caller::Orchestrator],
+        dry_run: None,
+        input: None,
+        result: Some("Vec<BacklogTriageSuggestion>"),
+    },
+    Endpoint {
+        op: "issue.triage.suggest",
+        module: "issue",
+        about: &["issueId"],
+        can: &[Caller::User, Caller::Remote, Caller::Orchestrator],
+        dry_run: None,
+        input: Some("BacklogTriageSuggestInput"),
+        result: Some("BacklogTriageSuggestion"),
+    },
+    Endpoint {
+        op: "issue.triage.confirm",
+        module: "issue",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("BacklogTriageConfirmInput"),
+        result: Some("AppliedIssue"),
+    },
+    Endpoint {
+        op: "issue.triage.dismiss",
+        module: "issue",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("BacklogTriageDismissInput"),
+        result: None,
+    },
+    Endpoint {
         op: "cron.create",
         module: "cron",
         about: &[],
@@ -706,15 +778,6 @@ pub const ENDPOINTS: &[Endpoint] = &[
         can: &[Caller::User, Caller::Remote, Caller::Orchestrator],
         dry_run: None,
         input: Some("ChannelUpdateInput"),
-        result: None,
-    },
-    Endpoint {
-        op: "channel.default.set",
-        module: "channel",
-        about: &["id"],
-        can: &[Caller::User, Caller::Remote],
-        dry_run: None,
-        input: Some("ChannelDefaultSetInput"),
         result: None,
     },
     Endpoint {
@@ -880,15 +943,6 @@ pub const ENDPOINTS: &[Endpoint] = &[
         result: Some("Vec<ChannelUnread>"),
     },
     Endpoint {
-        op: "connector.list",
-        module: "connector",
-        about: &[],
-        can: &[Caller::User, Caller::Remote],
-        dry_run: None,
-        input: None,
-        result: Some("Vec<ConnectorStatus>"),
-    },
-    Endpoint {
         op: "connector.login",
         module: "connector",
         about: &["id"],
@@ -923,24 +977,6 @@ pub const ENDPOINTS: &[Endpoint] = &[
         dry_run: None,
         input: Some("ConnectorChannelSetInput"),
         result: Some("ConnectorStatus"),
-    },
-    Endpoint {
-        op: "game.achievement.list",
-        module: "game",
-        about: &[],
-        can: &[Caller::User, Caller::Remote],
-        dry_run: None,
-        input: None,
-        result: Some("AchievementList"),
-    },
-    Endpoint {
-        op: "game.title.set",
-        module: "game",
-        about: &[],
-        can: &[Caller::User, Caller::Remote],
-        dry_run: None,
-        input: Some("ChooseTitleRequest"),
-        result: None,
     },
     Endpoint {
         op: "media.dialogue.create",
@@ -1021,15 +1057,6 @@ pub const ENDPOINTS: &[Endpoint] = &[
         can: &[Caller::User],
         dry_run: None,
         input: Some("MediaInputAdoptInput"),
-        result: Some("MediaInput"),
-    },
-    Endpoint {
-        op: "media.input.get",
-        module: "media",
-        about: &["id"],
-        can: &[Caller::User],
-        dry_run: None,
-        input: Some("MediaJobRequest"),
         result: Some("MediaInput"),
     },
     Endpoint {
@@ -1114,20 +1141,11 @@ pub const ENDPOINTS: &[Endpoint] = &[
         result: Some("MediaSpeechJob"),
     },
     Endpoint {
-        op: "media.understanding.previewCleanup",
-        module: "media",
-        about: &["id"],
-        can: &[Caller::User],
-        dry_run: None,
-        input: Some("MediaJobRequest"),
-        result: Some("Preview"),
-    },
-    Endpoint {
         op: "media.understanding.cleanup",
         module: "media",
         about: &["id"],
         can: &[Caller::User],
-        dry_run: Some("media.understanding.previewCleanup"),
+        dry_run: None,
         input: Some("MediaJobRequest"),
         result: Some("MediaUnderstandingJob"),
     },
@@ -1283,6 +1301,33 @@ pub const ENDPOINTS: &[Endpoint] = &[
         dry_run: None,
         input: Some("VoiceSaid"),
         result: None,
+    },
+    Endpoint {
+        op: "voice.asr.start",
+        module: "voice",
+        about: &[],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: None,
+        result: Some("VoiceAsrGrant"),
+    },
+    Endpoint {
+        op: "voice.asr.stop",
+        module: "voice",
+        about: &[],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("VoiceAsrStopInput"),
+        result: None,
+    },
+    Endpoint {
+        op: "voice.asr.transcribe",
+        module: "voice",
+        about: &[],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("VoiceAsrTranscribeInput"),
+        result: Some("VoiceAsrResult"),
     },
     Endpoint {
         op: "artifact.list",
@@ -1510,6 +1555,24 @@ pub const ENDPOINTS: &[Endpoint] = &[
         result: Some("Artifact"),
     },
     Endpoint {
+        op: "artifact.collab.export",
+        module: "artifact",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
+        dry_run: None,
+        input: Some("ArtifactCollabExportRequest"),
+        result: Some("ArtifactCollabExportResult"),
+    },
+    Endpoint {
+        op: "artifact.collab.import",
+        module: "artifact",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("ArtifactCollabImportRequest"),
+        result: Some("ArtifactCollabImportResult"),
+    },
+    Endpoint {
         op: "artifact.cover.set",
         module: "artifact",
         about: &["id"],
@@ -1699,22 +1762,13 @@ pub const ENDPOINTS: &[Endpoint] = &[
         result: Some("DebugTrajectoryDetail"),
     },
     Endpoint {
-        op: "debug.graph",
+        op: "debug.trajectory.export",
         module: "debug",
-        about: &[],
+        about: &["id"],
         can: &[Caller::User],
         dry_run: None,
-        input: None,
-        result: Some("DebugGraph"),
-    },
-    Endpoint {
-        op: "debug.override.get",
-        module: "debug",
-        about: &[],
-        can: &[Caller::User],
-        dry_run: None,
-        input: None,
-        result: Some("DebugOverrideConfig"),
+        input: Some("DebugTrajectoryExportRequest"),
+        result: Some("DebugTrajectoryExportResult"),
     },
     Endpoint {
         op: "debug.override.set",
@@ -1806,6 +1860,33 @@ pub const ENDPOINTS: &[Endpoint] = &[
         input: None,
         result: Some("Vec<MachineInfo>"),
     },
+    Endpoint {
+        op: "game.shop.list",
+        module: "game",
+        about: &[],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: None,
+        result: Some("FarmShopView"),
+    },
+    Endpoint {
+        op: "game.shop.buy",
+        module: "game",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("ShopPurchaseRequest"),
+        result: Some("FarmShopView"),
+    },
+    Endpoint {
+        op: "game.daily.list",
+        module: "game",
+        about: &[],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: None,
+        result: Some("DailyTaskBoard"),
+    },
 ];
 
 /// Each endpoint as a type: its name, input and result.
@@ -1887,13 +1968,6 @@ pub mod ops {
         type Input = t::AgentDeleteInput;
         type Result = ();
     }
-    /// What deleting the template would do, refused as it would be; nothing changes.
-    pub struct AgentTemplatePreviewDelete;
-    impl Op for AgentTemplatePreviewDelete {
-        const NAME: &'static str = "agent.template.previewDelete";
-        type Input = t::AgentDeleteInput;
-        type Result = t::Preview;
-    }
     pub struct SkillList;
     impl Op for SkillList {
         const NAME: &'static str = "skill.list";
@@ -1918,13 +1992,6 @@ pub mod ops {
         const NAME: &'static str = "skill.delete";
         type Input = t::SkillDeleteInput;
         type Result = ();
-    }
-    /// What delete would do, refused as it would be; nothing changes.
-    pub struct SkillPreviewDelete;
-    impl Op for SkillPreviewDelete {
-        const NAME: &'static str = "skill.previewDelete";
-        type Input = t::SkillDeleteInput;
-        type Result = t::Preview;
     }
     pub struct RuntimeList;
     impl Op for RuntimeList {
@@ -1961,6 +2028,30 @@ pub mod ops {
         const NAME: &'static str = "runtime.mcp.uninstall";
         type Input = t::McpUninstallInput;
         type Result = t::McpHostInfo;
+    }
+    pub struct RuntimeMcpServerList;
+    impl Op for RuntimeMcpServerList {
+        const NAME: &'static str = "runtime.mcpServer.list";
+        type Input = t::McpServerListInput;
+        type Result = t::McpServerListResult;
+    }
+    pub struct RuntimeMcpServerSave;
+    impl Op for RuntimeMcpServerSave {
+        const NAME: &'static str = "runtime.mcpServer.save";
+        type Input = t::McpServerSaveInput;
+        type Result = t::McpServerListResult;
+    }
+    pub struct RuntimeMcpServerToggle;
+    impl Op for RuntimeMcpServerToggle {
+        const NAME: &'static str = "runtime.mcpServer.toggle";
+        type Input = t::McpServerToggleInput;
+        type Result = t::McpServerListResult;
+    }
+    pub struct RuntimeMcpServerRemove;
+    impl Op for RuntimeMcpServerRemove {
+        const NAME: &'static str = "runtime.mcpServer.remove";
+        type Input = t::McpServerRemoveInput;
+        type Result = t::McpServerListResult;
     }
     /// An agent's memories from the database and its configured sources.
     pub struct MemoryList;
@@ -2144,19 +2235,19 @@ pub mod ops {
         type Input = t::SessionChildTranscriptInput;
         type Result = t::SessionChildTranscript;
     }
-    /// Attaches a context reference to an existing session.
-    pub struct SessionBindingAttach;
-    impl Op for SessionBindingAttach {
-        const NAME: &'static str = "session.binding.attach";
-        type Input = t::SessionBindingInput;
-        type Result = t::Session;
+    /// Manually triggers context compaction for a durable or runtime session.
+    pub struct SessionCompact;
+    impl Op for SessionCompact {
+        const NAME: &'static str = "session.compact";
+        type Input = t::SessionCompactInput;
+        type Result = t::SessionCompactResult;
     }
-    /// Detaches a context reference from an existing session.
-    pub struct SessionBindingDetach;
-    impl Op for SessionBindingDetach {
-        const NAME: &'static str = "session.binding.detach";
-        type Input = t::SessionBindingInput;
-        type Result = t::Session;
+    /// Executes a durable CodeMode JavaScript script in the session's tool context.
+    pub struct SessionRunCode;
+    impl Op for SessionRunCode {
+        const NAME: &'static str = "session.runCode";
+        type Input = t::SessionRunCodeInput;
+        type Result = t::SessionRunCodeResult;
     }
     pub struct IssueConversationGet;
     impl Op for IssueConversationGet {
@@ -2270,6 +2361,48 @@ pub mod ops {
         type Input = t::IssueRefineInput;
         type Result = t::Issue;
     }
+    /// Deterministic issue cycle-time and retro analytics for a time window.
+    pub struct IssueRetroGet;
+    impl Op for IssueRetroGet {
+        const NAME: &'static str = "issue.retro.get";
+        type Input = t::IssueRetroGetInput;
+        type Result = t::IssueRetroReport;
+    }
+    /// Three-part morning digest combining overnight progress, repo health, and confirmable backlog triage.
+    pub struct IssueDigestGet;
+    impl Op for IssueDigestGet {
+        const NAME: &'static str = "issue.digest.get";
+        type Input = t::IssueDigestGetInput;
+        type Result = t::MorningDigest;
+    }
+    /// Pending backlog triage suggestions awaiting explicit user confirmation.
+    pub struct IssueTriageList;
+    impl Op for IssueTriageList {
+        const NAME: &'static str = "issue.triage.list";
+        type Input = ();
+        type Result = Vec<t::BacklogTriageSuggestion>;
+    }
+    /// Proposes a non-destructive triage suggestion for a backlog issue without overwriting its fields.
+    pub struct IssueTriageSuggest;
+    impl Op for IssueTriageSuggest {
+        const NAME: &'static str = "issue.triage.suggest";
+        type Input = t::BacklogTriageSuggestInput;
+        type Result = t::BacklogTriageSuggestion;
+    }
+    /// Applies a pending backlog triage suggestion after explicit user click/confirmation.
+    pub struct IssueTriageConfirm;
+    impl Op for IssueTriageConfirm {
+        const NAME: &'static str = "issue.triage.confirm";
+        type Input = t::BacklogTriageConfirmInput;
+        type Result = t::AppliedIssue;
+    }
+    /// Dismisses a pending backlog triage suggestion without modifying the issue.
+    pub struct IssueTriageDismiss;
+    impl Op for IssueTriageDismiss {
+        const NAME: &'static str = "issue.triage.dismiss";
+        type Input = t::BacklogTriageDismissInput;
+        type Result = ();
+    }
     pub struct CronCreate;
     impl Op for CronCreate {
         const NAME: &'static str = "cron.create";
@@ -2318,13 +2451,6 @@ pub mod ops {
     impl Op for ChannelUpdate {
         const NAME: &'static str = "channel.update";
         type Input = t::ChannelUpdateInput;
-        type Result = ();
-    }
-    /// The channel what names none goes to from now on: a connector's, a call's.
-    pub struct ChannelDefaultSet;
-    impl Op for ChannelDefaultSet {
-        const NAME: &'static str = "channel.default.set";
-        type Input = t::ChannelDefaultSetInput;
         type Result = ();
     }
     /// What deleteTask would do, refused as it would be; nothing changes.
@@ -2450,12 +2576,6 @@ pub mod ops {
         type Input = ();
         type Result = Vec<t::ChannelUnread>;
     }
-    pub struct ConnectorList;
-    impl Op for ConnectorList {
-        const NAME: &'static str = "connector.list";
-        type Input = ();
-        type Result = Vec<t::ConnectorStatus>;
-    }
     pub struct ConnectorLogin;
     impl Op for ConnectorLogin {
         const NAME: &'static str = "connector.login";
@@ -2479,19 +2599,6 @@ pub mod ops {
         const NAME: &'static str = "connector.channel.set";
         type Input = t::ConnectorChannelSetInput;
         type Result = t::ConnectorStatus;
-    }
-    /// Every achievement and its current standing.
-    pub struct GameAchievementList;
-    impl Op for GameAchievementList {
-        const NAME: &'static str = "game.achievement.list";
-        type Input = ();
-        type Result = t::AchievementList;
-    }
-    pub struct GameTitleSet;
-    impl Op for GameTitleSet {
-        const NAME: &'static str = "game.title.set";
-        type Input = t::ChooseTitleRequest;
-        type Result = ();
     }
     pub struct MediaDialogueCreate;
     impl Op for MediaDialogueCreate {
@@ -2548,12 +2655,6 @@ pub mod ops {
         type Input = t::MediaInputAdoptInput;
         type Result = t::MediaInput;
     }
-    pub struct MediaInputGet;
-    impl Op for MediaInputGet {
-        const NAME: &'static str = "media.input.get";
-        type Input = t::MediaJobRequest;
-        type Result = t::MediaInput;
-    }
     pub struct MediaInputList;
     impl Op for MediaInputList {
         const NAME: &'static str = "media.input.list";
@@ -2607,12 +2708,6 @@ pub mod ops {
         const NAME: &'static str = "media.speech.resume";
         type Input = t::MediaJobRequest;
         type Result = t::MediaSpeechJob;
-    }
-    pub struct MediaUnderstandingPreviewCleanup;
-    impl Op for MediaUnderstandingPreviewCleanup {
-        const NAME: &'static str = "media.understanding.previewCleanup";
-        type Input = t::MediaJobRequest;
-        type Result = t::Preview;
     }
     pub struct MediaUnderstandingCleanup;
     impl Op for MediaUnderstandingCleanup {
@@ -2725,6 +2820,24 @@ pub mod ops {
         const NAME: &'static str = "voice.call.say";
         type Input = t::VoiceSaid;
         type Result = ();
+    }
+    pub struct VoiceAsrStart;
+    impl Op for VoiceAsrStart {
+        const NAME: &'static str = "voice.asr.start";
+        type Input = ();
+        type Result = t::VoiceAsrGrant;
+    }
+    pub struct VoiceAsrStop;
+    impl Op for VoiceAsrStop {
+        const NAME: &'static str = "voice.asr.stop";
+        type Input = t::VoiceAsrStopInput;
+        type Result = ();
+    }
+    pub struct VoiceAsrTranscribe;
+    impl Op for VoiceAsrTranscribe {
+        const NAME: &'static str = "voice.asr.transcribe";
+        type Input = t::VoiceAsrTranscribeInput;
+        type Result = t::VoiceAsrResult;
     }
     /// The artifacts announced in a channel or made for an issue, newest change first; every one the farm has when neither is given.
     pub struct ArtifactList;
@@ -2897,6 +3010,20 @@ pub mod ops {
         type Input = t::ArtifactHistoryCompactRequest;
         type Result = t::Artifact;
     }
+    /// Export incremental Loro CRDT updates (or snapshot) relative to a client VersionVector.
+    pub struct ArtifactCollabExport;
+    impl Op for ArtifactCollabExport {
+        const NAME: &'static str = "artifact.collab.export";
+        type Input = t::ArtifactCollabExportRequest;
+        type Result = t::ArtifactCollabExportResult;
+    }
+    /// Import incremental Loro CRDT updates (or snapshot) into an artifact and optionally return missing server updates.
+    pub struct ArtifactCollabImport;
+    impl Op for ArtifactCollabImport {
+        const NAME: &'static str = "artifact.collab.import";
+        type Input = t::ArtifactCollabImportRequest;
+        type Result = t::ArtifactCollabImportResult;
+    }
     /// Saves a derived auto-captured cover image outside the artifact directory and CRDT.
     pub struct ArtifactCoverSet;
     impl Op for ArtifactCoverSet {
@@ -3035,17 +3162,11 @@ pub mod ops {
         type Input = t::DebugTrajectoryGetRequest;
         type Result = t::DebugTrajectoryDetail;
     }
-    pub struct DebugGraph;
-    impl Op for DebugGraph {
-        const NAME: &'static str = "debug.graph";
-        type Input = ();
-        type Result = t::DebugGraph;
-    }
-    pub struct DebugOverrideGet;
-    impl Op for DebugOverrideGet {
-        const NAME: &'static str = "debug.override.get";
-        type Input = ();
-        type Result = t::DebugOverrideConfig;
+    pub struct DebugTrajectoryExport;
+    impl Op for DebugTrajectoryExport {
+        const NAME: &'static str = "debug.trajectory.export";
+        type Input = t::DebugTrajectoryExportRequest;
+        type Result = t::DebugTrajectoryExportResult;
     }
     pub struct DebugOverrideSet;
     impl Op for DebugOverrideSet {
@@ -3106,6 +3227,24 @@ pub mod ops {
         const NAME: &'static str = "machine.list";
         type Input = ();
         type Result = Vec<t::MachineInfo>;
+    }
+    pub struct GameShopList;
+    impl Op for GameShopList {
+        const NAME: &'static str = "game.shop.list";
+        type Input = ();
+        type Result = t::FarmShopView;
+    }
+    pub struct GameShopBuy;
+    impl Op for GameShopBuy {
+        const NAME: &'static str = "game.shop.buy";
+        type Input = t::ShopPurchaseRequest;
+        type Result = t::FarmShopView;
+    }
+    pub struct GameDailyList;
+    impl Op for GameDailyList {
+        const NAME: &'static str = "game.daily.list";
+        type Input = ();
+        type Result = t::DailyTaskBoard;
     }
 }
 
@@ -3266,12 +3405,10 @@ endpoint_ids! {
     AgentTemplateUpdate => "agent.template.update",
     AgentTemplateAdd => "agent.template.add",
     AgentTemplateDelete => "agent.template.delete",
-    AgentTemplatePreviewDelete => "agent.template.previewDelete",
     SkillList => "skill.list",
     SkillCreate => "skill.create",
     SkillUpdate => "skill.update",
     SkillDelete => "skill.delete",
-    SkillPreviewDelete => "skill.previewDelete",
     // runtime
     RuntimeList => "runtime.list",
     RuntimeRefresh => "runtime.refresh",
@@ -3279,6 +3416,10 @@ endpoint_ids! {
     RuntimeMcpList => "runtime.mcp.list",
     RuntimeMcpInstall => "runtime.mcp.install",
     RuntimeMcpUninstall => "runtime.mcp.uninstall",
+    RuntimeMcpServerList => "runtime.mcpServer.list",
+    RuntimeMcpServerSave => "runtime.mcpServer.save",
+    RuntimeMcpServerToggle => "runtime.mcpServer.toggle",
+    RuntimeMcpServerRemove => "runtime.mcpServer.remove",
     // memory
     MemoryList => "memory.list",
     MemoryRecall => "memory.recall",
@@ -3310,8 +3451,8 @@ endpoint_ids! {
     SessionRespondInteraction => "session.respondInteraction",
     SessionSetConfig => "session.setConfig",
     SessionChildTranscript => "session.childTranscript",
-    SessionBindingAttach => "session.binding.attach",
-    SessionBindingDetach => "session.binding.detach",
+    SessionCompact => "session.compact",
+    SessionRunCode => "session.runCode",
     // issue
     IssueConversationGet => "issue.conversation.get",
     IssueCommentCreate => "issue.comment.create",
@@ -3330,6 +3471,12 @@ endpoint_ids! {
     IssueStatusUpdate => "issue.status.update",
     IssueStatusPreviewUpdate => "issue.status.previewUpdate",
     IssueRefine => "issue.refine",
+    IssueRetroGet => "issue.retro.get",
+    IssueDigestGet => "issue.digest.get",
+    IssueTriageList => "issue.triage.list",
+    IssueTriageSuggest => "issue.triage.suggest",
+    IssueTriageConfirm => "issue.triage.confirm",
+    IssueTriageDismiss => "issue.triage.dismiss",
     // cron
     CronCreate => "cron.create",
     CronList => "cron.list",
@@ -3340,7 +3487,6 @@ endpoint_ids! {
     ChannelMessageSend => "channel.message.send",
     ChannelCreate => "channel.create",
     ChannelUpdate => "channel.update",
-    ChannelDefaultSet => "channel.default.set",
     ChannelMessageList => "channel.message.list",
     ChannelMarkRead => "channel.markRead",
     ChannelMessageUpdate => "channel.message.update",
@@ -3360,14 +3506,10 @@ endpoint_ids! {
     ChannelList => "channel.list",
     ChannelUnreadList => "channel.unread.list",
     // connector
-    ConnectorList => "connector.list",
     ConnectorLogin => "connector.login",
     ConnectorVerify => "connector.verify",
     ConnectorLogout => "connector.logout",
     ConnectorChannelSet => "connector.channel.set",
-    // game
-    GameAchievementList => "game.achievement.list",
-    GameTitleSet => "game.title.set",
     // media & library
     MediaDialogueCreate => "media.dialogue.create",
     MediaVoiceDesignCreate => "media.voiceDesign.create",
@@ -3378,7 +3520,6 @@ endpoint_ids! {
     MediaAudioCleanup => "media.audio.cleanup",
     MediaInputCreate => "media.input.create",
     MediaInputAdopt => "media.input.adopt",
-    MediaInputGet => "media.input.get",
     MediaInputList => "media.input.list",
     MediaInputDelete => "media.input.delete",
     MediaInputPreviewDelete => "media.input.previewDelete",
@@ -3388,7 +3529,6 @@ endpoint_ids! {
     MediaUnderstandingStart => "media.understanding.start",
     MediaSpeechCreate => "media.speech.create",
     MediaSpeechResume => "media.speech.resume",
-    MediaUnderstandingPreviewCleanup => "media.understanding.previewCleanup",
     MediaUnderstandingCleanup => "media.understanding.cleanup",
     MediaJobGet => "media.job.get",
     MediaJobCancel => "media.job.cancel",
@@ -3408,6 +3548,9 @@ endpoint_ids! {
     VoiceCallStop => "voice.call.stop",
     VoiceCallHear => "voice.call.hear",
     VoiceCallSay => "voice.call.say",
+    VoiceAsrStart => "voice.asr.start",
+    VoiceAsrStop => "voice.asr.stop",
+    VoiceAsrTranscribe => "voice.asr.transcribe",
     // artifact
     ArtifactList => "artifact.list",
     ArtifactGet => "artifact.get",
@@ -3434,6 +3577,8 @@ endpoint_ids! {
     ArtifactHistoryFork => "artifact.history.fork",
     ArtifactHistoryUndoOrigin => "artifact.history.undoOrigin",
     ArtifactHistoryCompact => "artifact.history.compact",
+    ArtifactCollabExport => "artifact.collab.export",
+    ArtifactCollabImport => "artifact.collab.import",
     ArtifactCoverSet => "artifact.cover.set",
     // provider & setting
     ProviderGet => "provider.get",
@@ -3459,8 +3604,7 @@ endpoint_ids! {
     DebugTimelineClear => "debug.timeline.clear",
     DebugTrajectoryList => "debug.trajectory.list",
     DebugTrajectoryGet => "debug.trajectory.get",
-    DebugGraph => "debug.graph",
-    DebugOverrideGet => "debug.override.get",
+    DebugTrajectoryExport => "debug.trajectory.export",
     DebugOverrideSet => "debug.override.set",
     DebugBundleExport => "debug.bundle.export",
     // remote & machine
@@ -3472,6 +3616,10 @@ endpoint_ids! {
     RemoteDeviceRevoke => "remote.device.revoke",
     RemoteWhoami => "remote.whoami",
     MachineList => "machine.list",
+    // game
+    GameShopList => "game.shop.list",
+    GameShopBuy => "game.shop.buy",
+    GameDailyList => "game.daily.list",
 }
 
 #[cfg(test)]

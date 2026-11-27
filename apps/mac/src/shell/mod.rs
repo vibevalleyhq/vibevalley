@@ -59,6 +59,8 @@ pub struct WorkspaceProjects {
     pub chat_statuses: HashMap<(ProjectId, TabId), ChatTabStatus>,
     pub(super) chat_watches: HashMap<String, (u64, gpui::Task<()>)>,
     pub chat_menu_group: Option<vibevalley_workspace::GroupId>,
+    pub terminal_hooks: vibevalley_terminal::TerminalHooksConfig,
+    pub terminal_hooks_menu_group: Option<vibevalley_workspace::GroupId>,
     pub(super) save_pending: bool,
     pub(super) fs_tx: flume::Sender<(ProjectId, Vec<FsChange>)>,
     pub(super) dir_refresh_pending: BTreeSet<ProjectId>,

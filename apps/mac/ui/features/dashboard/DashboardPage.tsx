@@ -18,8 +18,21 @@ import { ready, useAgents, useQuery, useSettings } from "../../infra/query";
 import { Link as A, useRouter } from "../../infra/router";
 import { waitingOnUser } from "../inbox";
 import { allSessionsQuery, buildRunEntries, runActivityAt, type RunApprovals, type RunEntry, RunsPage, type RunStatusBadge, runStatusOf } from "../session";
+import { MorningDigestPanel } from "./MorningDigestPanel";
+import { RetroView } from "./RetroView";
 
-export type DashboardTab = "overview" | "runs";
+export type DashboardTab = "overview" | "retro" | "runs";
+
+function tabPath(tab: DashboardTab): string {
+  switch (tab) {
+    case "overview":
+      return "/dashboard";
+    case "retro":
+      return "/dashboard/retro";
+    case "runs":
+      return "/dashboard/runs";
+  }
+}
 
 function statusDot(badge: RunStatusBadge): DotTone {
   switch (badge) {
@@ -78,14 +91,14 @@ function QuickLinkCard(props: { href: string; testid: string; icon: IconName; la
     <A
       href={props.href}
       testID={props.testid}
-      class="min-w-44 flex-1 flex-row items-center gap-3 rounded-xl border border-line bg-elevated px-3.5 py-3 hover:border-faint hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
+      class="min-w-0 flex-row items-center gap-3 rounded-xl border border-line bg-elevated px-3.5 py-3 hover:border-faint hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
     >
       <View class="size-8 shrink-0 items-center justify-center rounded-md bg-side">
         <Icon name={props.icon} size={16} tone="ink" />
       </View>
       <View class="min-w-0 flex-1 gap-0.5">
         <Text class="truncate text-sm font-medium text-ink">{props.label}</Text>
-        <Text class="truncate text-xs text-muted">{props.hint}</Text>
+        <Text class="text-xs leading-snug text-muted">{props.hint}</Text>
       </View>
     </A>
   );
@@ -157,8 +170,20 @@ function DashboardOverview() {
           count={waitingCount()}
           tone={waitingCount() > 0 ? "bad" : "default"}
         />
-        <StatCard href="/issues" testid="dashboard-stat-issues" icon="issues" label={t("web.base.dashboard.stats.issues")} count={openIssueCount()} />
-        <StatCard href="/issues" testid="dashboard-stat-review" icon="check" label={t("web.base.dashboard.stats.review")} count={reviewIssueCount()} />
+        <StatCard
+          href="/issues?status=todo,in_progress"
+          testid="dashboard-stat-issues"
+          icon="issues"
+          label={t("web.base.dashboard.stats.issues")}
+          count={openIssueCount()}
+        />
+        <StatCard
+          href="/issues?status=in_review"
+          testid="dashboard-stat-review"
+          icon="check"
+          label={t("web.base.dashboard.stats.review")}
+          count={reviewIssueCount()}
+        />
       </View>
 
       <View class="flex-row flex-wrap items-start gap-4">
@@ -225,17 +250,23 @@ function DashboardOverview() {
               <Text class="text-sm text-ink">{t("web.base.dashboard.pending.waiting", { n: waitingCount() })}</Text>
               <CountPill count={waitingCount()} tone={waitingCount() > 0 ? "bad" : "neutral"} />
             </A>
-            <A href="/issues" class="flex-row items-center justify-between rounded-md px-2 py-1.5 hover:bg-hover">
+            <A
+              href="/issues?status=in_review"
+              testID="dashboard-pending-review"
+              class="flex-row items-center justify-between rounded-md px-2 py-1.5 hover:bg-hover"
+            >
               <Text class="text-sm text-ink">{t("web.base.dashboard.pending.inReview", { n: reviewIssueCount() })}</Text>
               <CountPill count={reviewIssueCount()} />
             </A>
-            <A href="/issues" class="flex-row items-center justify-between rounded-md px-2 py-1.5 hover:bg-hover">
+            <A href="/issues?status=todo" testID="dashboard-pending-todo" class="flex-row items-center justify-between rounded-md px-2 py-1.5 hover:bg-hover">
               <Text class="text-sm text-ink">{t("web.base.dashboard.pending.todo", { n: todoIssueCount() })}</Text>
               <CountPill count={todoIssueCount()} />
             </A>
           </View>
         </View>
       </View>
+
+      <MorningDigestPanel />
 
       <View testID="dashboard-recent-runs" class="rounded-xl border border-line bg-elevated">
         <View class="flex-row items-center justify-between gap-2 border-b border-line px-4 py-2.5">
@@ -280,7 +311,7 @@ function DashboardOverview() {
 
       <View class="gap-2">
         <Text class="px-0.5 text-xs font-semibold text-muted">{t("web.base.dashboard.quick.title")}</Text>
-        <View class="flex-row flex-wrap gap-3">
+        <View class="grid gap-3 md:grid-cols-2">
           <QuickLinkCard
             href="/issues"
             testid="dashboard-quick-issues"
@@ -321,6 +352,7 @@ export function DashboardPage(props: { tab?: DashboardTab | undefined; approvals
           value={tab()}
           options={[
             { value: "overview", label: t("web.base.dashboard.tab.overview") },
+            { value: "retro", label: t("web.base.dashboard.tab.retro") },
             {
               value: "runs",
               label: t("web.base.dashboard.tab.runs"),
@@ -328,10 +360,16 @@ export function DashboardPage(props: { tab?: DashboardTab | undefined; approvals
               countTone: "water",
             },
           ]}
-          onChange={(next) => router.navigate(next === "runs" ? "/dashboard/runs" : "/dashboard")}
+          onChange={(next) => router.navigate(tabPath(next))}
         />
       </View>
-      <If when={tab() === "runs"} else={<DashboardOverview />}>
+      <If when={tab() === "overview"}>
+        <DashboardOverview />
+      </If>
+      <If when={tab() === "retro"}>
+        <RetroView />
+      </If>
+      <If when={tab() === "runs"}>
         <View class="min-h-0 flex-1">
           <RunsPage approvals={props.approvals} />
         </View>

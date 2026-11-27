@@ -1,9 +1,28 @@
 // Generated from crates/protocol/src/contract (vp run protocol:ts). Do not edit.
 
 import type { Attachment } from "../attachment/shapes.gen";
-import type { IssueId, Outcome, SessionId, Spent } from "../common/shapes.gen";
-import type { Conflict, ReviewRevision } from "../repo/shapes.gen";
+import type { ActorKind, IssueId, Outcome, SessionId, Spent } from "../common/shapes.gen";
+import type { Conflict, RepoHealth, ReviewRevision } from "../repo/shapes.gen";
 import type { IssueAnswer, PhaseRestingOnly, Session, SessionEvent } from "../session/shapes.gen";
+
+/**
+ * Lightweight typed owner/actor reference on issues (`user` or `agent`).
+ */
+export type ActorRef = { "kind": "user", id: string, } | { "kind": "agent", id: string, };
+
+/**
+ * Non-blocking relation kind between issues (maintained bidirectionally).
+ */
+export const IssueRelationKindValues = ["duplicate", "related"] as const;
+/**
+ * Non-blocking relation kind between issues (maintained bidirectionally).
+ */
+export type IssueRelationKind = (typeof IssueRelationKindValues)[number];
+
+/**
+ * Non-blocking link from one issue to another (`duplicate` or `related`).
+ */
+export type IssueRelation = { kind: IssueRelationKind, issue: IssueId, };
 
 export const LandingValues = ["merged", "merged_into_parent", "pull_request", "submitted", "kept", "none"] as const;
 export type Landing = (typeof LandingValues)[number];
@@ -28,9 +47,17 @@ export type IssuePromptKind = (typeof IssuePromptKindValues)[number];
 
 export type BoardLaneCounts = { backlog: number, todo: number, inProgress: number, inReview: number, done: number, canceled: number, };
 
-export type BoardIssueSummary = { lane: IssueLane, cardKind: IssueCardKind, familyDone: number, familyTotal: number, needsWorktreeCheck: boolean, prompt?: IssuePromptKind, };
+export type BoardCardPreview = { attachmentId?: string, url?: string, isCompare: boolean, };
 
-export type BoardSummary = { laneCounts: BoardLaneCounts, runningSlots: number, maxRunning: number, byIssue: { [key in string]: BoardIssueSummary }, };
+export type IssueScheduleSpan = { startMs: number, endMs: number, durationDays: number, hasExplicitStart: boolean, hasExplicitDue: boolean, rolledUp: boolean, overdue: boolean, };
+
+export type BoardScheduleEntry = { issueId: IssueId, span: IssueScheduleSpan, depth: number, isParent: boolean, childCount: number, };
+
+export type BoardSchedule = { todayDayMs: number, scheduled: Array<BoardScheduleEntry>, unscheduledIds: Array<IssueId>, };
+
+export type BoardIssueSummary = { lane: IssueLane, cardKind: IssueCardKind, familyDone: number, familyTotal: number, needsWorktreeCheck: boolean, prompt?: IssuePromptKind, preview?: BoardCardPreview, schedule?: IssueScheduleSpan, };
+
+export type BoardSummary = { laneCounts: BoardLaneCounts, runningSlots: number, maxRunning: number, byIssue: { [key in string]: BoardIssueSummary }, schedule?: BoardSchedule, };
 
 export const PullRequestStateValues = ["open", "merged", "closed"] as const;
 export type PullRequestState = (typeof PullRequestStateValues)[number];
@@ -75,14 +102,22 @@ export type IssueStage = { state: IssueStageKind, since?: number, stuck?: StuckR
  */
 lead?: IssueAct, acts: Array<IssueAction>, };
 
-export const MilestoneKindValues = ["opened", "refined", "started", "reported", "asked", "told", "failed", "stopped", "rejected", "accepted", "closed"] as const;
+export const MilestoneKindValues = ["opened", "refined", "started", "reported", "asked", "failed", "stopped", "rejected", "accepted", "closed"] as const;
 export type MilestoneKind = (typeof MilestoneKindValues)[number];
 
 export type Milestone = { at: number, kind: MilestoneKind,
 /**
  * Session name; absent for user or system milestones.
  */
-who?: string, text: string, };
+who?: string, text: string,
+/**
+ * Plain-text summary from the run that produced this milestone, if any.
+ */
+said?: string,
+/**
+ * Run id that produced this milestone, if any.
+ */
+run?: string, };
 
 export type IssueTimeline = { milestones: Array<Milestone>, spent?: Spent, };
 
@@ -108,7 +143,15 @@ export type ProjectCheckReceipt = { targetBranch: string, targetCommit: string, 
 
 export type DeliveryEvidence = { reviews: Array<CodeReview>, check?: ProjectCheckReceipt, mergedCommit?: string, };
 
-export type IssueMandate = { originTriggerId?: string, strength: MandateStrength, maxBotReviewRounds: number, autoSubmitPr: boolean, };
+export const HumanPauseSourceValues = ["user_stop", "user_chat"] as const;
+export type HumanPauseSource = (typeof HumanPauseSourceValues)[number];
+
+export const ResumeConditionValues = ["explicit_user_resume"] as const;
+export type ResumeCondition = (typeof ResumeConditionValues)[number];
+
+export type HumanPause = { source: HumanPauseSource, clearCondition: ResumeCondition, pausedAt: number, sessionId?: string, note?: string, };
+
+export type IssueMandate = { originTriggerId?: string, strength: MandateStrength, maxBotReviewRounds: number, autoSubmitPr: boolean, pause?: HumanPause, };
 
 export const IssueReportMemoryScopeValues = ["repo", "all"] as const;
 export type IssueReportMemoryScope = (typeof IssueReportMemoryScopeValues)[number];
@@ -129,7 +172,7 @@ machineId?: string, assignments: Array<Assignment>, priority: Priority, rank?: n
 /**
  * Tracks runs executed without a worker session (e.g. in-process orchestrator); active while `endedAt` is absent.
  */
-lastRun?: IssueLastRun, answer?: IssueAnswer, stage: IssueStage, attachments?: Array<Attachment>, tags?: Array<string>, startAt?: number, dueAt?: number, };
+lastRun?: IssueLastRun, answer?: IssueAnswer, stage: IssueStage, attachments?: Array<Attachment>, tags?: Array<string>, startAt?: number, dueAt?: number, owner?: ActorRef, relations?: Array<IssueRelation>, };
 
 /**
  * Includes the Core fold `seq` that applied the mutation so clients can await state convergence.
@@ -138,7 +181,7 @@ export type AppliedIssue = { constraints?: IssueConstraints, id: IssueId, number
 /**
  * Target execution host id when pinned to a specific machine; omitted lets the control plane route.
  */
-machineId?: string, assignments: Array<Assignment>, priority: Priority, rank?: number, createdAt: number, queuedAt?: number, closedAt?: number, delivered?: Landing, canceled?: IssueCanceled, parent?: IssueId, blockedBy: Array<IssueId>, cron?: string, status: IssueStatus, moves: Array<IssueStatus>, pullRequest?: PullRequest, deliver: Deliverable, reviewedAt?: number, deliveryEvidence?: DeliveryEvidence, findings: Array<Finding>, questions: Array<Question>, criteria: Array<string>, checks: Array<CriterionCheck>, refining?: IssueRefining, lastRun?: IssueLastRun, answer?: IssueAnswer, stage: IssueStage, attachments?: Array<Attachment>, tags?: Array<string>, startAt?: number, dueAt?: number, seq: number, };
+machineId?: string, assignments: Array<Assignment>, priority: Priority, rank?: number, createdAt: number, queuedAt?: number, closedAt?: number, delivered?: Landing, canceled?: IssueCanceled, parent?: IssueId, blockedBy: Array<IssueId>, cron?: string, status: IssueStatus, moves: Array<IssueStatus>, pullRequest?: PullRequest, deliver: Deliverable, reviewedAt?: number, deliveryEvidence?: DeliveryEvidence, findings: Array<Finding>, questions: Array<Question>, criteria: Array<string>, checks: Array<CriterionCheck>, refining?: IssueRefining, lastRun?: IssueLastRun, answer?: IssueAnswer, stage: IssueStage, attachments?: Array<Attachment>, tags?: Array<string>, startAt?: number, dueAt?: number, owner?: ActorRef, relations?: Array<IssueRelation>, seq: number, };
 
 export type IssueUpdate = { title?: string, description?: string, repo?: string, agent?: string, machineId?: string, priority?: Priority, criteria?: Array<string>, deliver?: Deliverable,
 /**
@@ -148,7 +191,11 @@ before?: string, attachments?: Array<string>,
 /**
  * Parent issue id or number; "" clears the parent.
  */
-parent?: string, tags?: Array<string>,
+parent?: string,
+/**
+ * Blocker issue ids or numbers; `[]` clears all blockers.
+ */
+blockedBy?: Array<string>, tags?: Array<string>,
 /**
  * Start date timestamp (ms); 0 or negative clears it.
  */
@@ -156,7 +203,15 @@ startAt?: number,
 /**
  * Target due timestamp (ms); 0 or negative clears it.
  */
-dueAt?: number, };
+dueAt?: number,
+/**
+ * Final owner (`user` or `agent`); empty `id` clears it.
+ */
+owner?: ActorRef,
+/**
+ * Non-blocking links (`duplicate` / `related`) maintained bidirectionally; `[]` clears all relations.
+ */
+relations?: Array<IssueRelation>, };
 
 export type IssueHistory = { issue: Issue, sessions: Array<Session>, missingSessions: Array<SessionId>, };
 
@@ -166,7 +221,7 @@ export type IssueRefineRequest = { text?: string,
  */
 edit?: IssueUpdate, };
 
-export type IssueRequest = { constraints?: IssueConstraints, title: string, parent?: IssueId, blockedBy?: Array<IssueId>, description?: string, repo?: string, agent?: string, machineId?: string, priority?: Priority, deliver?: Deliverable, autoSubmitPr?: boolean, criteria?: Array<string>, attachments?: Array<string>, tags?: Array<string>, startAt?: number, dueAt?: number,
+export type IssueRequest = { constraints?: IssueConstraints, title: string, parent?: IssueId, blockedBy?: Array<IssueId>, description?: string, repo?: string, agent?: string, machineId?: string, priority?: Priority, deliver?: Deliverable, autoSubmitPr?: boolean, criteria?: Array<string>, attachments?: Array<string>, tags?: Array<string>, startAt?: number, dueAt?: number, owner?: ActorRef, relations?: Array<IssueRelation>,
 /**
  * Idempotency key deduplicating retries after a lost response.
  */
@@ -240,7 +295,11 @@ export type IssueUpdateInput = { id: string, title?: string, description?: strin
 /**
  * Parent issue id or number; "" clears the parent.
  */
-parent?: string, tags?: Array<string>,
+parent?: string,
+/**
+ * Blocker issue ids or numbers; `[]` clears all blockers.
+ */
+blockedBy?: Array<string>, tags?: Array<string>,
 /**
  * Start date timestamp (ms); 0 or negative clears it.
  */
@@ -248,10 +307,45 @@ startAt?: number,
 /**
  * Target due timestamp (ms); 0 or negative clears it.
  */
-dueAt?: number, };
+dueAt?: number,
+/**
+ * Final owner (`user` or `agent`); empty `id` clears it.
+ */
+owner?: ActorRef,
+/**
+ * Non-blocking links (`duplicate` / `related`) maintained bidirectionally; `[]` clears all relations.
+ */
+relations?: Array<IssueRelation>, };
 
 export type IssueDeleteInput = { id: string, };
 
 export type IssueStatusUpdateInput = { revision?: ReviewRevision, id: string, status: IssueStatus, text?: string, agent?: string, edit?: IssueUpdate, requestKey?: string, };
 
 export type IssueRefineInput = { id: string, text?: string, edit?: IssueUpdate, };
+
+/**
+ * Partial field updates proposed for a backlog issue, applied only after explicit user confirmation.
+ */
+export type TriagePatch = { priority?: Priority, repo?: string, agent?: string, tags?: Array<string>, status?: IssueStatus, relations?: Array<IssueRelation>, dueAt?: number, };
+
+/**
+ * Confirmable triage recommendation for a backlog issue (never auto-overwrites issue fields).
+ */
+export type BacklogTriageSuggestion = { id: string, issueId: IssueId, issueNumber: number, issueTitle: string, reason: string, summary: string, source: ActorKind, patch: TriagePatch, createdAt: number, };
+
+export type DigestIssueRef = { id: IssueId, number: number, title: string, detail: string, stuck?: StuckReason, };
+
+export type DigestProgressSummary = { asking: Array<DigestIssueRef>, reviewing: Array<DigestIssueRef>, stuck: Array<DigestIssueRef>, working: Array<DigestIssueRef>, completedRecent: Array<DigestIssueRef>, runsTotal: number, runsCompleted: number, runsFailed: number, runsInterrupted: number, tokensSpent: number, };
+
+/**
+ * Three-part morning digest: (1) overnight progress, (2) repo health, (3) confirmable backlog triage.
+ */
+export type MorningDigest = { generatedAt: number, windowStart: number, windowEnd: number, progress: DigestProgressSummary, repoHealth: Array<RepoHealth>, triage: Array<BacklogTriageSuggestion>, };
+
+export type IssueDigestGetInput = { windowHours?: number, };
+
+export type BacklogTriageSuggestInput = { issueId: string, reason: string, summary?: string, patch: TriagePatch, };
+
+export type BacklogTriageConfirmInput = { id: string, };
+
+export type BacklogTriageDismissInput = { id: string, };

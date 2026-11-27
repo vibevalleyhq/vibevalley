@@ -13,10 +13,13 @@ pub mod worktree;
 pub use service::{Runtime, reopen_sessions_async};
 pub(crate) use session::delivery::IssueReportDoc;
 pub use session::{
-    ANSWER_ONLY, AgentProfileInfo, DraftEnd, Drive, HelperPlace, Hire, Journal, MailboxEntry, MailboxSource, MailboxStatus, News, Persona, Report,
-    ReportQuestion, ReportStatus, Rounds, RuntimeDriver, SessionDriver, SessionEngine, SessionLifecycleEvent, Trajectory, WorkspaceSnapshot, trigger_of,
+    ANSWER_ONLY, AgentProfileInfo, DraftEnd, Drive, HelperPlace, Hire, Journal, MailboxEntry, MailboxSource, MailboxStatus, News, PermissionEvent, Persona,
+    Report, ReportQuestion, ReportStatus, Rounds, RunMode, RuntimeDriver, SessionDriver, SessionEngine, SessionLifecycleEvent, Trajectory, WorkspaceSnapshot,
+    trigger_of,
 };
 pub(crate) use session::{OUTBOX_SESSION_REPORTED, OutboxSessionReported};
 pub use types::{BoardConfig, BoardError, IssueChange, Opened, Result, RuntimeConfig, RuntimeError, Step, Undelivered};
 pub(crate) use types::{derive_all_issues, find_issue, io};
-pub use worktree::{Changes, Delivery, Joined, Landed, Leave, Leaving, OnDisk, Worktree, issue_branch};
+pub use worktree::{
+    Changes, Delivery, HandoffCleanup, HandoffRecord, HoeRegistry, Joined, Landed, Leave, Leaving, OnDisk, Worktree, WorktreeKey, WriteLease, issue_branch,
+};

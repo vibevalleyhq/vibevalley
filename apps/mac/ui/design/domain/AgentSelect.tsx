@@ -62,8 +62,10 @@ export function AgentSelect(props: {
   const triggerSurface = () => {
     const status = selectedInfo()?.status;
     if (status === "error") return "border-berry bg-bad-soft";
-    if (props.quiet === true) return disabled() ? "border-transparent bg-transparent" : "border-transparent bg-transparent hover:border-line hover:bg-page";
-    return disabled() ? "border-line bg-page" : "border-line bg-page hover:border-faint hover:bg-hover";
+    if (props.quiet === true) {
+      return disabled() ? "border-transparent bg-transparent" : "border-transparent bg-transparent hover:border-line hover:bg-page aria-expanded:bg-page";
+    }
+    return disabled() ? "border-line bg-page" : "border-line bg-page hover:border-faint hover:bg-hover aria-expanded:bg-page";
   };
 
   return (
@@ -73,19 +75,31 @@ export function AgentSelect(props: {
       value={props.value}
       disabled={props.disabled}
       items={allItems()}
+      searchable
+      searchPlaceholder={t("web.agent.list.search")}
+      searchAccessibilityLabel={t("web.agent.list.search")}
+      searchTestID={props.testid ? `${props.testid}-search` : undefined}
+      searchClass="mb-1 h-7 rounded-md border border-line bg-page px-2 text-xs text-ink placeholder:text-faint hover:border-faint focus:border-focus"
+      empty={
+        <View class="items-center px-2 py-3">
+          <Text class="text-xs text-muted">{t("web.agent.list.emptySearch")}</Text>
+        </View>
+      }
       onChange={(e) => {
         const next = e.value ?? "";
         if (next === "" ? props.placeholder !== undefined : agentById().has(next)) {
           props.onChange(next);
         }
       }}
+      cover={false}
+      placement="bottom"
       offset={4}
       align="start"
-      popupClass={`max-h-80 min-w-64 rounded-lg border border-line bg-elevated p-1 shadow-float ${motionClass("transition-opacity duration-120 ease-out")}`}
+      popupClass={`max-h-80 min-w-64 rounded-lg border border-line-strong bg-elevated p-1 shadow-float ${motionClass("transition-opacity duration-120 ease-out")}`}
       popupStartingClass={popupTransition("opacity-0")}
       popupEndingClass={popupTransition("opacity-0")}
-      listClass="gap-0.5"
-      itemClass="group min-h-8 flex-row items-center gap-2 rounded-md px-2 py-1 focus:bg-hover selected:bg-selected disabled:opacity-50"
+      listClass="max-h-64 gap-0.5"
+      itemClass="group min-h-8 flex-row items-center gap-2 rounded-md px-2 py-1 focus:bg-hover hover:bg-hover selected:bg-selected disabled:opacity-50"
       renderItem={(entry) => {
         const agent = () => agentById().get(entry.value);
         const info = () => (entry.value ? props.readiness()[entry.value] : undefined);

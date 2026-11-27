@@ -33,8 +33,9 @@ const RULES: readonly Rule[] = [
     pattern:
       /\bowner_?[iI]d\b|(?:\b(?:for|wants|by|on|from|needs|stopped|hands|source|conflict)|For|Wants|By|On|From|Needs|Stopped|Hands|Source|Conflict)Owner|\bowner(?:Mentions?|Required|Read|Last|Line|Late|Spoke|Said|Seen|Event|Only|AgentWord|sLanguage)|Owner(?:Mention|Face|Unread|Read|Did|Required|Only|Ask)|["']owner["']/u,
     says: "the one person a farm has is the user in code, tables and values: userId, actsForUser, stageWantsUser, the actor kind \"user\" (docs/subsystems/user.md); a thread's, a block's or a trigger's owner (ownerOf, threadOwnerOf) is another word and stays",
-    // oar's acquired-session key, and the EverOS sender id that memories already stored outside are filed under.
-    except: /^apps\/server\/src\/modules\/(session\/executor\.test|memory\/everos|memory\/outside\.test)\.ts$/u,
+    // oar's acquired-session key, EverOS sender id, and Issue #84's explicit Issue.owner / GroupBy "owner" dimension.
+    except:
+      /^(?:apps\/server\/src\/modules\/(session\/executor\.test|memory\/everos|memory\/outside\.test)\.ts|apps\/mac\/ui\/features\/issue\/(model\/(display|write|schedule\.test)|views\/(FamilyDetail|IssueDetail|IssueList|IssueMetaControls|issueUx\.test))\.tsx?)$/u,
   },
   {
     name: "a delivery name the one-door plan retired",

@@ -9,9 +9,10 @@ use sea_orm::sea_query::{Alias, Expr, Func, OnConflict};
 use sea_orm::{ActiveValue::Set, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Update};
 use vibevalley_protocol::{Issue, JsNumber, PublishPlatform, PullRequestState};
 
+use super::with_write_tx;
 use crate::db::column::{db_json, db_word, read_db_json, read_db_word};
 use crate::db::entity::{issue, pull, pull_event};
-use crate::db::{Database, DbError, DbResult, Tx, begin_write_tx, commit_tx, rollback_tx};
+use crate::db::{Database, DbError, DbResult, Tx};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PullRecord {
@@ -76,6 +77,8 @@ fn read_issue(r: issue::Model) -> DbResult<Issue> {
     item.tags = read_db_json(r.tags_json)?;
     item.start_at = r.start_at.map(JsNumber::from);
     item.due_at = r.due_at.map(JsNumber::from);
+    item.owner = r.owner.map(read_db_json).transpose()?;
+    item.relations = read_db_json(r.relations)?;
     item.constraints = r.constraints.map(read_db_json).transpose()?;
     item.conflict = r.conflict.map(read_db_json).transpose()?;
     item.last_run = r.last_run.map(read_db_json).transpose()?;
@@ -152,6 +155,8 @@ async fn put_issue_impl<C: ConnectionTrait>(db: &C, t: &Issue) -> DbResult<()> {
         tags_json: Set(db_json(&t.tags)?),
         start_at: Set(t.start_at.map(|v| v.get().round() as i64)),
         due_at: Set(t.due_at.map(|v| v.get().round() as i64)),
+        owner: Set(t.owner.as_ref().map(db_json).transpose()?),
+        relations: Set(db_json(&t.relations)?),
     };
     let on_conflict = OnConflict::column(issue::Column::Id)
         .update_columns([
@@ -187,6 +192,8 @@ async fn put_issue_impl<C: ConnectionTrait>(db: &C, t: &Issue) -> DbResult<()> {
             issue::Column::TagsJson,
             issue::Column::StartAt,
             issue::Column::DueAt,
+            issue::Column::Owner,
+            issue::Column::Relations,
         ])
         .to_owned();
     issue::Entity::insert(model).on_conflict(on_conflict).exec(db).await?;
@@ -299,21 +306,13 @@ impl IssueService {
         if issues.is_empty() {
             return Ok(());
         }
-        let tx = begin_write_tx(self.db.write_conn()).await?;
-        let outcome: DbResult<()> = async {
+        with_write_tx(&self.db, async |tx| {
             for item in issues {
-                put_issue_impl(&tx, item).await?;
+                put_issue_impl(tx, item).await?;
             }
             Ok(())
-        }
-        .await;
-        match outcome {
-            Ok(()) => commit_tx(tx).await,
-            Err(err) => {
-                let _ = rollback_tx(tx).await;
-                Err(err)
-            }
-        }
+        })
+        .await
     }
 
     pub(crate) async fn remove(&self, id: &str) -> DbResult<()> {
@@ -321,13 +320,12 @@ impl IssueService {
     }
 
     pub(crate) async fn keep_words(&self, issue_id: &str, words: &str) -> DbResult<()> {
-        let tx = begin_write_tx(self.db.write_conn()).await?;
-        let outcome: DbResult<()> = async {
+        with_write_tx(&self.db, async |tx| {
             let Some(raw) = issue::Entity::find_by_id(issue_id.to_owned())
                 .select_only()
                 .column(issue::Column::QueuedWords)
                 .into_tuple::<String>()
-                .one(&tx)
+                .one(tx)
                 .await?
             else {
                 return Ok(());
@@ -337,28 +335,20 @@ impl IssueService {
             Update::many(issue::Entity)
                 .col_expr(issue::Column::QueuedWords, Expr::value(db_json(&kept)?))
                 .filter(issue::Column::Id.eq(issue_id))
-                .exec(&tx)
+                .exec(tx)
                 .await?;
             Ok(())
-        }
-        .await;
-        match outcome {
-            Ok(()) => commit_tx(tx).await,
-            Err(err) => {
-                let _ = rollback_tx(tx).await;
-                Err(err)
-            }
-        }
+        })
+        .await
     }
 
     pub(crate) async fn take_words(&self, issue_id: &str) -> DbResult<Vec<String>> {
-        let tx = begin_write_tx(self.db.write_conn()).await?;
-        let outcome: DbResult<Vec<String>> = async {
+        with_write_tx(&self.db, async |tx| {
             let Some(raw) = issue::Entity::find_by_id(issue_id.to_owned())
                 .select_only()
                 .column(issue::Column::QueuedWords)
                 .into_tuple::<String>()
-                .one(&tx)
+                .one(tx)
                 .await?
             else {
                 return Ok(Vec::new());
@@ -368,22 +358,12 @@ impl IssueService {
                 Update::many(issue::Entity)
                     .col_expr(issue::Column::QueuedWords, Expr::value("[]"))
                     .filter(issue::Column::Id.eq(issue_id))
-                    .exec(&tx)
+                    .exec(tx)
                     .await?;
             }
             Ok(kept)
-        }
-        .await;
-        match outcome {
-            Ok(kept) => {
-                commit_tx(tx).await?;
-                Ok(kept)
-            }
-            Err(err) => {
-                let _ = rollback_tx(tx).await;
-                Err(err)
-            }
-        }
+        })
+        .await
     }
 
     pub(crate) async fn list_pulls(&self) -> DbResult<Vec<PullRecord>> {

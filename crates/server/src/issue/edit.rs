@@ -10,7 +10,7 @@ use vibevalley_protocol::{Assignment, Deliverable, Finding, Issue, IssueStatus, 
 use super::board::Board;
 use super::store::{BoardError, IssueChange, Result};
 use crate::context::now;
-use crate::runtime::Leave;
+use crate::runtime::{HandoffCleanup, HandoffRecord, Leave, WriteLease};
 
 const RANK_STEP: i64 = 1024;
 const RANK_BOUND: i64 = 2_000_000_000;
@@ -87,12 +87,19 @@ impl Board {
             if let Some(ids) = &upd.attachments {
                 issue.attachments = self.resolve_attachments_async(ids).await?;
             }
+            let touch_dag = upd.parent.is_some() || upd.blocked_by.is_some();
+            let touch_relations = upd.relations.is_some();
+            let all_issues = if touch_dag || touch_relations {
+                Some(self.issues_async().await?)
+            } else {
+                None
+            };
             if let Some(raw_parent) = upd.parent.as_deref().map(str::trim) {
                 if raw_parent.is_empty() {
                     issue.parent = None;
                 } else {
-                    let all_issues = self.issues_async().await?;
-                    let target = crate::runtime::find_issue(&all_issues, raw_parent).ok_or_else(|| BoardError::NoIssue(raw_parent.to_string()))?;
+                    let all_issues = all_issues.as_deref().expect("loaded above");
+                    let target = crate::runtime::find_issue(all_issues, raw_parent).ok_or_else(|| BoardError::NoIssue(raw_parent.to_string()))?;
                     if target.id == was.id {
                         return Err(BoardError::Other("an issue cannot be its own parent".into()));
                     }
@@ -107,18 +114,36 @@ impl Board {
                         }
                         cursor = all_issues.iter().find(|i| i.id == curr).and_then(|i| i.parent.as_deref());
                     }
-                    let graph: Vec<(String, Option<String>, Vec<String>)> = all_issues
-                        .iter()
-                        .map(|t| {
-                            let parent = if t.id == was.id { Some(target.id.clone()) } else { t.parent.clone() };
-                            (t.id.clone(), parent, t.blocked_by.clone())
-                        })
-                        .collect();
-                    let problems = vibevalley_core::dependency_problems(&graph);
-                    if !problems.is_empty() {
-                        return Err(BoardError::Other(format!("the dependencies do not form a DAG: {problems:?}")));
-                    }
                     issue.parent = Some(target.id.clone());
+                }
+            }
+            if let Some(raw_blockers) = &upd.blocked_by {
+                let all_issues = all_issues.as_deref().expect("loaded above");
+                issue.blocked_by = super::board::resolve_blocked_by(all_issues, Some(&was.id), raw_blockers)?;
+            }
+            let peer_relation_updates = if let Some(raw_relations) = &upd.relations {
+                let all_issues = all_issues.as_deref().expect("loaded above");
+                let resolved = super::board::resolve_relations(all_issues, Some(&was.id), raw_relations)?;
+                let updates = super::board::sync_bidirectional_relations(&was.id, &was.relations, &resolved, all_issues);
+                issue.relations = resolved;
+                updates
+            } else {
+                Vec::new()
+            };
+            if touch_dag && let Some(all_issues) = &all_issues {
+                let graph: Vec<(String, Option<String>, Vec<String>)> = all_issues
+                    .iter()
+                    .map(|t| {
+                        if t.id == was.id {
+                            (t.id.clone(), issue.parent.clone(), issue.blocked_by.clone())
+                        } else {
+                            (t.id.clone(), t.parent.clone(), t.blocked_by.clone())
+                        }
+                    })
+                    .collect();
+                let problems = vibevalley_core::dependency_problems(&graph);
+                if !problems.is_empty() {
+                    return Err(BoardError::Other(format!("the dependencies do not form a DAG: {problems:?}")));
                 }
             }
             if let Some(tags) = &upd.tags {
@@ -130,7 +155,11 @@ impl Board {
             if let Some(due_at) = upd.due_at {
                 issue.due_at = super::board::normalize_timestamp(Some(due_at));
             }
+            if let Some(owner) = upd.owner.clone() {
+                issue.owner = super::board::normalize_owner_with_driver(self.runtime.driver().as_ref(), Some(owner));
+            }
             let mut edited = vec![issue];
+            edited.extend(peer_relation_updates);
             if let Some(before) = &upd.before {
                 for placed in self.placed_async(&was.id, before).await? {
                     if let Some(earlier) = edited.iter_mut().find(|m| m.id == placed.id) {
@@ -141,6 +170,11 @@ impl Board {
                 }
             }
             self.state.put_issues_async(&edited).await?;
+            let should_refresh_queue = upd.blocked_by.is_some() && was.status == IssueStatus::Todo && was.queued_at.is_some();
+            drop(_work);
+            if should_refresh_queue {
+                self.refresh_queue_unlocked_async().await;
+            }
             self.stored_async(&was.id).await
         })
     }
@@ -203,6 +237,22 @@ impl Board {
             ));
         }
         let _ = self.take_words_async(&issue.id).await;
+        let peers_to_clean: Vec<Issue> = self
+            .issues_async()
+            .await?
+            .into_iter()
+            .filter_map(|mut peer| {
+                if peer.id == issue.id {
+                    return None;
+                }
+                let before = peer.relations.len();
+                peer.relations.retain(|r| r.issue != issue.id);
+                (peer.relations.len() != before).then_some(peer)
+            })
+            .collect();
+        if !peers_to_clean.is_empty() {
+            self.state.put_issues_async(&peers_to_clean).await?;
+        }
         self.state.remove_issue_async(&issue.id).await
     }
 
@@ -338,10 +388,29 @@ impl Board {
                 send_words = Some(failed_text(&all, if findings.is_empty() { text } else { "" }));
                 self.change_async(&issue.id, IssueChange::Failed { findings: all }).await?;
             }
+            let mut handoff_note = None;
             if let Some(s) = self.on_board_async(&issue).await {
+                if let Some(key) = self.session_engine().worktree_key_for_async(&s).await {
+                    let cleanup = HandoffCleanup::Commit {
+                        message: format!("{}: uncommitted work handed over", s.name),
+                    };
+                    let rec = self.session_engine().handoff_worktree_async(Some(&s.id), &key, None, cleanup).await?;
+                    if let Some(commit) = rec.cleanup_commit {
+                        handoff_note = Some(format!("Handed over uncommitted worktree state in commit {commit}."));
+                    }
+                }
                 self.session_engine().dismiss_async(&s.id, Leave::KeepBranch).await?;
             }
+            if let Some(note) = handoff_note {
+                send_words = Some(match send_words {
+                    Some(w) if !w.trim().is_empty() => format!("{w}\n\n{note}"),
+                    _ => note,
+                });
+            }
             self.change_async(&issue.id, IssueChange::Assigned(agent.to_string())).await?;
+            if issue.mandate.is_paused() {
+                self.change_async(&issue.id, IssueChange::Resumed).await?;
+            }
             let kind = if mv == vibevalley_core::Move::Start {
                 self.change_async(&issue.id, IssueChange::Queued).await?;
                 vibevalley_protocol::RunTriggerKind::Issue
@@ -353,6 +422,78 @@ impl Board {
             self.refresh_queue_locked_async().await;
             Ok(mv)
         })
+    }
+
+    /// Upgrades an issue's mandate (e.g. from `Inferred` to `Explicit` when a user explicitly starts it).
+    pub async fn set_mandate_async(&self, id: &str, mandate: vibevalley_protocol::IssueMandate) -> Result<Issue> {
+        let _work = self.work.lock().await;
+        self.change_async(id, IssueChange::Mandate(mandate)).await
+    }
+
+    /// Cleanly commits or stashes any uncommitted changes on `reference`'s active worktree,
+    /// transfers single-writer ownership ("Hoe Handoff") to `agent`, and dispatches `agent`.
+    pub async fn handoff_async(&self, reference: &str, agent: &str, text: &str, cleanup: HandoffCleanup) -> Result<HandoffRecord> {
+        let initial = self.stored_async(reference).await?;
+        let _issue_guard = self.issue_lock(&initial.id).await;
+        let issue = self.stored_async(&initial.id).await?;
+        let next_agent = self.runtime.driver().resolve_agent_key(agent);
+        if next_agent.is_empty() {
+            return Err(refused("server.issue.noAssignee", &[]));
+        }
+        self.runtime.driver().check(&next_agent)?;
+
+        let prev = self.on_board_async(&issue).await;
+        let mut record = HandoffRecord {
+            previous_owner: prev
+                .as_ref()
+                .map(|s| WriteLease::new(&s.id, s.profile.clone(), s.machine.clone(), s.worktree_branch().map(String::from))),
+            new_owner: None,
+            cleanup_commit: None,
+            cleanup_stash: None,
+        };
+        if let Some(s) = prev.as_ref() {
+            if let Some(key) = self.session_engine().worktree_key_for_async(s).await {
+                record = self.session_engine().handoff_worktree_async(Some(&s.id), &key, None, cleanup).await?;
+            }
+            self.session_engine().dismiss_async(&s.id, Leave::KeepBranch).await?;
+        }
+        self.change_async(&issue.id, IssueChange::Assigned(next_agent.clone())).await?;
+        if issue.mandate.is_paused() {
+            self.change_async(&issue.id, IssueChange::Resumed).await?;
+        }
+        let mut words = text.trim().to_string();
+        if let Some(commit) = record.cleanup_commit.as_deref() {
+            words = if words.is_empty() {
+                format!("Previous helper work was committed at {commit}.")
+            } else {
+                format!("{words}\n\nPrevious helper work was committed at {commit}.")
+            };
+        } else if let Some(stash) = record.cleanup_stash.as_deref() {
+            words = if words.is_empty() {
+                format!("Previous helper uncommitted edits were stashed at {stash}.")
+            } else {
+                format!("{words}\n\nPrevious helper uncommitted edits were stashed at {stash}.")
+            };
+        }
+        if issue.status.is_closed() {
+            self.change_async(&issue.id, IssueChange::Reopened).await?;
+        } else if issue.status == IssueStatus::Backlog {
+            self.change_async(&issue.id, IssueChange::Queued).await?;
+        }
+        let sent = self
+            .send_for_issue_async(&issue.id, (!words.is_empty()).then_some(words), vibevalley_protocol::RunTriggerKind::Comment)
+            .await?;
+        if let super::board::Sent::Working { session } = sent
+            && let Some(new_sess) = self.session_async(&session).await
+        {
+            record.new_owner = Some(WriteLease::new(
+                &new_sess.id,
+                new_sess.profile.clone(),
+                new_sess.machine.clone(),
+                new_sess.worktree_branch().map(String::from),
+            ));
+        }
+        Ok(record)
     }
 
     /// Why one more session cannot start on `issue` now (`noRoom`), or ""

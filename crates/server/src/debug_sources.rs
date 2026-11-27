@@ -1,13 +1,19 @@
 //! DevTools state and trajectory data source ([`ServerDebugSources`], [`build_debug_kit`]).
 
-use std::path::PathBuf;
+use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Instant;
 
 use serde_json::json;
+use vibevalley_core::collab::{CollabDoc, DEFAULT_PRESENCE_TTL_MS, encode_frontiers, encode_version_vector};
 use vibevalley_core::projection::{InboxInput, derive_issues, overlay_sessions, project_inbox};
-use vibevalley_protocol::{ArtifactListRequest, DebugRuntimeSummary, DebugTrajectoryKind, SessionEvent};
+use vibevalley_protocol::{
+    ApiError, ArtifactListRequest, ArtifactPresenceUpdateRequest, BizCode, DebugCollabArtifactState, DebugCollabClock, DebugCollabPresence,
+    DebugRuntimeSummary, DebugTrajectoryKind, SessionEvent,
+};
+use vibevalley_runtime::agent::durable::ExportOptions;
 use vibevalley_runtime::oar::set_observer;
 
 use crate::agent::Agent;
@@ -16,7 +22,7 @@ use crate::channel::Chat;
 use crate::context::Context;
 use crate::context::api::{BoxFuture, SharedHostDebug};
 use crate::cron::Scheduler as CronScheduler;
-use crate::debug::{DebugDataSource, DebugKit, DebugParts, DebugStateSnapshot, RuntimeProbeSnapshot};
+use crate::debug::{DebugDataSource, DebugKit, DebugParts, DebugStateSnapshot, DurableExportSummary, RuntimeProbeSnapshot};
 use crate::issue::Board;
 use crate::repo::Repo;
 use crate::runtime::Runtime;
@@ -142,6 +148,8 @@ impl DebugDataSource for ServerDebugSources {
             let channels = self.channel.channels_snapshot_async().await.unwrap_or_default();
             let user_mentions = self.channel.user_mentions_snapshot_async().await.unwrap_or_default();
             let artifacts = self.artifact.list_async(&ArtifactListRequest::default()).await.unwrap_or_default();
+            let collab_rows = self.ctx.service.artifact.list_collab_snapshots(64).await.unwrap_or_default();
+            let collab = self.inspect_collab_states_async(&artifacts, collab_rows).await;
             let media_jobs = self.artifact.media.list_async().await.unwrap_or_default();
             let crons = self.cron.list();
             let (call, call_reason) = self.ctx.live.call_snapshot();
@@ -172,7 +180,169 @@ impl DebugDataSource for ServerDebugSources {
                     "sliceSeqs": self.ctx.feed.slice_seqs(),
                     "watchers": self.ctx.feed.watcher_counts(),
                 }),
+                collab,
             }
         })
+    }
+
+    fn export_durable_conversation_async<'a>(
+        &'a self,
+        session_id: &'a str,
+        dest_dir: &'a Path,
+    ) -> BoxFuture<'a, Result<Option<DurableExportSummary>, ApiError>> {
+        Box::pin(async move {
+            let store = self.runtime.durable_store();
+            let extras = self.ctx.service.session.extras().await.unwrap_or_default();
+            let mut candidates = vec![
+                session_id.to_string(),
+                vibevalley_runtime::agent::harness::worker_conversation(session_id),
+                format!("issue:{session_id}"),
+            ];
+            if let Some(vendor) = extras.get(session_id).and_then(|e| e.agent_session.as_deref()) {
+                candidates.push(vibevalley_runtime::agent::harness::worker_conversation(vendor));
+                candidates.push(vendor.to_string());
+            }
+
+            let found = store
+                .read_async(move |r| {
+                    Box::pin(async move {
+                        for id in candidates {
+                            if r.conversation_async(&id).await.is_ok() {
+                                return Ok(Some(id));
+                            }
+                        }
+                        Ok(None)
+                    })
+                })
+                .await
+                .map_err(|e| ApiError::new(BizCode::InternalError, format!("lookup durable conversation: {e}")))?;
+
+            let Some(conv_id) = found else {
+                return Ok(None);
+            };
+            let manifest = store
+                .export_conversation_jsonl(
+                    &conv_id,
+                    dest_dir,
+                    ExportOptions {
+                        at_seq: None,
+                        include_children: true,
+                        fsync: true,
+                    },
+                )
+                .await
+                .map_err(|e| ApiError::new(BizCode::InternalError, format!("export durable conversation: {e}")))?;
+
+            Ok(Some(DurableExportSummary {
+                conversation_id: manifest.root_conversation_id,
+                entries_exported: manifest.entries_exported as u32,
+                tasks_exported: manifest.tasks_exported as u32,
+                conversations_exported: manifest.conversations_exported as u32,
+            }))
+        })
+    }
+}
+
+impl ServerDebugSources {
+    async fn inspect_collab_states_async(
+        &self,
+        artifacts: &[vibevalley_protocol::Artifact],
+        collab_rows: Vec<crate::service::artifact::CollabSnapshotRow>,
+    ) -> Vec<DebugCollabArtifactState> {
+        let mut by_id: BTreeMap<String, (Option<crate::service::artifact::CollabSnapshotRow>, Option<&vibevalley_protocol::Artifact>)> = BTreeMap::new();
+        for art in artifacts.iter().take(64) {
+            by_id.insert(art.id.clone(), (None, Some(art)));
+        }
+        for row in collab_rows {
+            let artifact_id = row.artifact_id.clone();
+            by_id.entry(artifact_id).or_insert((None, None)).0 = Some(row);
+        }
+
+        let mut out = Vec::new();
+        for (artifact_id, (row_opt, art_opt)) in by_id {
+            let live_presence = self
+                .artifact
+                .update_presence_async(&ArtifactPresenceUpdateRequest {
+                    id: artifact_id.clone(),
+                    presence: None,
+                    peer_id: None,
+                })
+                .await
+                .unwrap_or_default();
+
+            if row_opt.is_none() && live_presence.is_empty() {
+                continue;
+            }
+
+            let (snapshot_bytes, frontiers, frontier_ids, version_vector, vv_entries, doc_updated_at) = if let Some(row) = row_opt {
+                let bytes_len = row.snapshot.len() as u32;
+                match CollabDoc::from_snapshot(&row.snapshot) {
+                    Ok(doc) => {
+                        let f = doc.frontiers();
+                        let vv = doc.version_vector();
+                        let frontier_ids = f
+                            .iter()
+                            .map(|id| DebugCollabClock {
+                                peer_id: id.peer.to_string(),
+                                counter: id.counter,
+                            })
+                            .collect();
+                        let vv_entries = vv
+                            .iter()
+                            .map(|(&peer, &counter)| DebugCollabClock {
+                                peer_id: peer.to_string(),
+                                counter,
+                            })
+                            .collect();
+                        (
+                            bytes_len,
+                            encode_frontiers(&f),
+                            frontier_ids,
+                            encode_version_vector(&vv),
+                            vv_entries,
+                            row.updated_at,
+                        )
+                    }
+                    Err(_) => (bytes_len, String::new(), Vec::new(), String::new(), Vec::new(), row.updated_at),
+                }
+            } else {
+                (0, String::new(), Vec::new(), String::new(), Vec::new(), 0)
+            };
+
+            let presence: Vec<DebugCollabPresence> = live_presence
+                .into_iter()
+                .map(|p| DebugCollabPresence {
+                    id: p.id,
+                    name: p.name,
+                    color: p.color,
+                    kind: p.kind.as_str().to_string(),
+                    status: p.status,
+                    node_id: p.node_id,
+                    path: p.path,
+                    offset: p.offset,
+                    end_offset: p.end_offset,
+                    session_id: p.session_id,
+                    updated_at: p.updated_at,
+                })
+                .collect();
+            let updated_at = doc_updated_at.max(art_opt.map_or(0, |a| a.updated));
+            out.push(DebugCollabArtifactState {
+                artifact_id,
+                title: art_opt.map_or_else(String::new, |a| a.title.clone()),
+                artifact_type: art_opt.map_or_else(|| "unknown".to_string(), |a| a.artifact_type.as_str().to_string()),
+                seq: art_opt.map_or(0, |a| a.seq),
+                snapshot_bytes,
+                frontiers,
+                frontier_ids,
+                version_vector,
+                vv_entries,
+                ephemeral_ttl_ms: DEFAULT_PRESENCE_TTL_MS,
+                presence_count: presence.len() as u32,
+                presence,
+                updated_at,
+            });
+        }
+        out.sort_by(|a, b| b.updated_at.cmp(&a.updated_at).then_with(|| a.artifact_id.cmp(&b.artifact_id)));
+        out
     }
 }

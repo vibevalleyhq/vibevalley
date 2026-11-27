@@ -1,7 +1,7 @@
 //! `agent list|create|update|delete`.
 
 use clap::{ArgAction, Args, Subcommand, ValueEnum};
-use vibevalley_protocol::{Agent, AgentDeleteInput, AgentRole, Build, Head, Look, OrchestratorLook, Outfit, PersonaMode, Species, ops};
+use vibevalley_protocol::{Agent, AgentDeleteInput, AgentRole, Build, Head, Look, OrchestratorLook, Outfit, PersonaMode, Species, Toolset, ops};
 
 use crate::client::{Client, Done, Failure, exit};
 use crate::output::line;
@@ -140,6 +140,7 @@ pub async fn run(client: &Client, cmd: AgentCmd) -> Done {
                 persona: String::new(),
                 persona_mode: PersonaMode::Append,
                 skills: vec![],
+                toolsets: Toolset::defaults_for(role),
                 mcp_servers: vec![],
                 disallowed_tools: vec![],
                 env: Default::default(),
@@ -147,6 +148,7 @@ pub async fn run(client: &Client, cmd: AgentCmd) -> Done {
                 worktree: true,
                 tags: vec![],
                 look: default_look(role),
+                voice: None,
                 from: None,
             };
             client.mutate::<ops::AgentCreate>("agent create", &profile, agent_line).await

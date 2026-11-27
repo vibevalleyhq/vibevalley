@@ -1,9 +1,30 @@
 import "../../infra/polyfill";
 import { expect, test } from "nsh/test";
 
-import { defaultOrchestrator, type Agent, type Issue, type IssueId, type Session, type SessionId, type SessionView } from "@vibevalley/protocol";
+import {
+  defaultOrchestrator,
+  type Agent,
+  type Issue,
+  type IssueId,
+  type Session,
+  type SessionId,
+  type SessionTelemetry,
+  type SessionView,
+} from "@vibevalley/protocol";
 
-import { buildRunEntries, filterRunEntries, parseRunsSearch, resolveSelectedRun, runActivityAt, runsHref, runStatusOf } from "./runsView";
+import {
+  buildRunEntries,
+  filterRunEntries,
+  isRecoverableRun,
+  parseRunsSearch,
+  resolveSelectedRun,
+  runActivityAt,
+  runsHref,
+  runStatusOf,
+  runTelemetryOf,
+  supportsCodeMode,
+  supportsManualCompaction,
+} from "./runsView";
 
 const sid = (id: string) => id as SessionId;
 const iid = (id: string) => id as IssueId;
@@ -33,6 +54,7 @@ function makeAgent(id: string, role: Agent["role"], name: string, duty = ""): Ag
     persona: "",
     personaMode: "append",
     skills: [],
+    toolsets: ["issue", "session", "channel", "resource", "memory", "library", "artifact"],
     mcpServers: [],
     disallowedTools: [],
     env: {},
@@ -276,4 +298,172 @@ test("filterRunEntries and resolveSelectedRun handle scope, agentId, issueId, qu
   expect(resolveSelectedRun(entries, "orch-live")?.id).toBe(defaultOrchestrator);
   expect(resolveSelectedRun(entries, "missing")?.id).toBe("w1");
   expect(resolveSelectedRun([], "w1")).toBeUndefined();
+});
+
+test("runTelemetryOf folds session telemetry and step events and isRecoverableRun gates worker recovery", () => {
+  const withTel = makeSession({
+    id: "w-tel",
+    name: "老周",
+    spent: { tokens: 12_000, cny: 0.25 },
+    telemetry: {
+      inputTokens: 6_000,
+      cacheReadTokens: 4_000,
+      outputTokens: 2_000,
+      contextUsed: 64_000,
+      contextWindow: 128_000,
+      llmRetries: 2,
+      runErrors: 1,
+    },
+    phase: { _tag: "failed" },
+  });
+  const entryWithTel: ReturnType<typeof buildRunEntries>[number] = {
+    kind: "worker",
+    id: "w-tel",
+    session: withTel,
+    live: undefined,
+    active: false,
+  };
+  const rollupTel = runTelemetryOf(entryWithTel);
+  expect(rollupTel.spent?.tokens).toBe(12_000);
+  expect(rollupTel.spent?.cny).toBe(0.25);
+  expect(rollupTel.llmRetries).toBe(2);
+  expect(rollupTel.runErrors).toBe(1);
+  expect(rollupTel.contextUsed).toBe(64_000);
+  expect(rollupTel.contextWindow).toBe(128_000);
+  expect(rollupTel.contextPct).toBe(50);
+  expect(rollupTel.hasContext).toBe(true);
+  expect(isRecoverableRun(entryWithTel)).toBe(true);
+
+  const bareSession = makeSession({
+    id: "w-steps",
+    name: "小林",
+    phase: { _tag: "resting" },
+  });
+  const projectedTelemetry: SessionTelemetry = {
+    inputTokens: 2_000,
+    cacheReadTokens: 1_000,
+    outputTokens: 500,
+    contextUsed: 45_000,
+    contextWindow: 100_000,
+    llmRetries: 1,
+    runErrors: 1,
+  };
+  const entryFromSteps: ReturnType<typeof buildRunEntries>[number] = {
+    kind: "worker",
+    id: "w-steps",
+    session: bareSession,
+    live: undefined,
+    active: false,
+  };
+  const rollupSteps = runTelemetryOf(entryFromSteps, projectedTelemetry);
+  expect(rollupSteps.spent?.tokens).toBe(3_500);
+  expect(rollupSteps.llmRetries).toBe(1);
+  expect(rollupSteps.runErrors).toBe(1);
+  expect(rollupSteps.contextPct).toBe(45);
+  expect(isRecoverableRun(entryFromSteps)).toBe(true);
+
+  expect(
+    isRecoverableRun({
+      kind: "worker",
+      id: "w-int",
+      session: makeSession({
+        id: "w-int",
+        name: "小林",
+        phase: { _tag: "resting" },
+        lastRun: { outcome: "interrupted", summary: "", at: 12 },
+      }),
+      live: undefined,
+      active: false,
+    }),
+  ).toBe(true);
+  expect(
+    isRecoverableRun({
+      kind: "worker",
+      id: "w-done",
+      session: makeSession({ id: "w-done", name: "小林", phase: { _tag: "done" } }),
+      live: undefined,
+      active: false,
+    }),
+  ).toBe(false);
+  expect(
+    isRecoverableRun({
+      kind: "worker",
+      id: "w-work",
+      session: makeSession({ id: "w-work", name: "小林", phase: { _tag: "working", since: 1, doing: { action: "run_command", label: "test" } } }),
+      live: undefined,
+      active: true,
+    }),
+  ).toBe(false);
+  expect(
+    isRecoverableRun({
+      kind: "worker",
+      id: "w-closed",
+      session: makeSession({ id: "w-closed", name: "小林", phase: { _tag: "closed", at: 12, closed: "merged" } }),
+      live: undefined,
+      active: false,
+    }),
+  ).toBe(false);
+});
+
+test("supportsManualCompaction and supportsCodeMode gate run actions by runtime and phase", () => {
+  const orchAgent = makeAgent(defaultOrchestrator, "orchestrator", "Orch");
+  const orchIdle: ReturnType<typeof buildRunEntries>[number] = {
+    kind: "orchestrator",
+    id: defaultOrchestrator,
+    agent: orchAgent,
+    live: undefined,
+    active: false,
+  };
+  expect(supportsManualCompaction(orchIdle)).toBe(true);
+  expect(supportsCodeMode(orchIdle)).toBe(true);
+
+  const orchBusy: ReturnType<typeof buildRunEntries>[number] = {
+    kind: "orchestrator",
+    id: defaultOrchestrator,
+    agent: orchAgent,
+    live: undefined,
+    active: true,
+  };
+  expect(supportsManualCompaction(orchBusy)).toBe(false);
+  expect(supportsCodeMode(orchBusy)).toBe(true);
+
+  const vvIdle: ReturnType<typeof buildRunEntries>[number] = {
+    kind: "worker",
+    id: "w-vv",
+    session: { ...makeSession({ id: "w-vv", name: "vv", phase: { _tag: "resting" } }), runtime: "vibevalley" },
+    live: undefined,
+    active: false,
+  };
+  expect(supportsManualCompaction(vvIdle)).toBe(true);
+  expect(supportsCodeMode(vvIdle)).toBe(true);
+
+  const claudeIdle: ReturnType<typeof buildRunEntries>[number] = {
+    kind: "worker",
+    id: "w-cc",
+    session: { ...makeSession({ id: "w-cc", name: "cc", phase: { _tag: "resting" } }), runtime: "claude" },
+    live: undefined,
+    active: false,
+  };
+  expect(supportsManualCompaction(claudeIdle)).toBe(true);
+  expect(supportsCodeMode(claudeIdle)).toBe(false);
+
+  const opencodeIdle: ReturnType<typeof buildRunEntries>[number] = {
+    kind: "worker",
+    id: "w-oc",
+    session: { ...makeSession({ id: "w-oc", name: "oc", phase: { _tag: "resting" } }), runtime: "opencode" },
+    live: undefined,
+    active: false,
+  };
+  expect(supportsManualCompaction(opencodeIdle)).toBe(false);
+  expect(supportsCodeMode(opencodeIdle)).toBe(false);
+
+  const vvClosed: ReturnType<typeof buildRunEntries>[number] = {
+    kind: "worker",
+    id: "w-vv-closed",
+    session: { ...makeSession({ id: "w-vv-closed", name: "vv", phase: { _tag: "closed", at: 12, closed: "completed" } }), runtime: "vibevalley" },
+    live: undefined,
+    active: false,
+  };
+  expect(supportsManualCompaction(vvClosed)).toBe(false);
+  expect(supportsCodeMode(vvClosed)).toBe(false);
 });

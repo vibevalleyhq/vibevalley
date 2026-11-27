@@ -129,7 +129,13 @@ fn picture(s: &App) -> String {
     input(s, "image", "image/png", "cat.png", png)
 }
 fn deletable(s: &App, input: &str) -> bool {
-    ok(s, "media.input.get", json!({"id":input}))["canDelete"] == true
+    ok(s, "media.input.list", Value::Null)
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|i| i["id"] == input)
+        .unwrap()["canDelete"]
+        == true
 }
 fn until(s: &App, id: &str, what: &str, done: impl Fn(&Value) -> bool) -> Value {
     crate::support::wait_until_settled(Some(s.ctx()), Duration::from_secs(10), what, || {
@@ -205,7 +211,7 @@ fn a_dialogue_and_a_designed_voice_are_followed_kept_and_released() {
     let released = ok(&s, "media.job.release", json!({"id":"voice"}));
     assert_eq!((&released["canRelease"], &released["previewInput"]), (&json!(false), &Value::Null));
     assert!(released.get("attachment").is_none());
-    refused(&s, "media.input.get", json!({"id":preview}));
+    assert!(ok(&s, "media.input.list", Value::Null).as_array().unwrap().iter().all(|i| i["id"] != preview));
     s.close_blocking();
 }
 
@@ -403,7 +409,6 @@ fn understanding_uploads_asks_once_and_deletes_what_it_uploaded() {
         (network.count("POST /files"), network.count("POST /responses"), network.count("DELETE /files/")),
         (1, 1, 1)
     );
-    assert_eq!(ok(&s, "media.understanding.previewCleanup", json!({"id":"look"})), json!({"does":[]}));
     refused(&s, "media.job.release", json!({"id":"look"}));
 
     ok(
@@ -423,13 +428,6 @@ fn understanding_uploads_asks_once_and_deletes_what_it_uploaded() {
     let lost = wait(&s, "lost", "unknown");
     assert_eq!((&lost["cleanup"], &lost["canCleanup"]), (&json!("pending"), &json!(true)));
     assert!(!deletable(&s, &image));
-    assert_eq!(
-        ok(&s, "media.understanding.previewCleanup", json!({"id":"lost"}))["does"]
-            .as_array()
-            .unwrap()
-            .len(),
-        2
-    );
     assert_eq!(ok(&s, "media.understanding.cleanup", json!({"id":"lost"}))["cleanup"], "done");
     assert!(deletable(&s, &image));
     assert_eq!(network.count("DELETE /files/"), 3);

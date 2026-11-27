@@ -515,9 +515,34 @@ mod tests {
         assert!(issue_cols.contains("start_at"), "issue table must include start_at column");
         assert!(issue_cols.contains("due_at"), "issue table must include due_at column");
         assert!(issue_cols.contains("status"), "issue table must include status column");
+        assert!(issue_cols.contains("owner"), "issue table must include owner column");
+        assert!(issue_cols.contains("relations"), "issue table must include relations column");
+
+        let memory_cols: BTreeSet<&str> = actual_columns
+            .get("memory")
+            .expect("memory table must exist")
+            .iter()
+            .map(|c| c.name.as_str())
+            .collect();
+        for col in ["scope", "title", "importance", "replaced_by"] {
+            assert!(memory_cols.contains(col), "memory table must include {col} column");
+        }
+        let memory_row = db
+            .read_conn()
+            .query_one_raw(Statement::from_string(
+                DatabaseBackend::Sqlite,
+                "SELECT scope, title, importance, replaced_by FROM memory WHERE id = 'm1'",
+            ))
+            .await
+            .unwrap()
+            .expect("legacy memory row preserved");
+        assert_eq!(memory_row.try_get_by_index::<String>(0).unwrap(), "agent");
+        assert_eq!(memory_row.try_get_by_index::<Option<String>>(1).unwrap(), None);
+        assert_eq!(memory_row.try_get_by_index::<i64>(2).unwrap(), 0);
+        assert_eq!(memory_row.try_get_by_index::<Option<String>>(3).unwrap(), None);
 
         let migrations = list_applied_migrations(db.read_conn(), DatabaseBackend::Sqlite, &existing).await.unwrap();
-        assert_eq!(migrations.len(), 6);
+        assert_eq!(migrations.len(), 9);
         db.close().await;
     }
 

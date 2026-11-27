@@ -2,13 +2,14 @@ import { z } from "zod";
 
 import { ChannelSummary, Chat } from "../channel/schema";
 import type { Codec } from "../codec";
-import { SessionId } from "../common/schema";
+import { IssueId, SessionId } from "../common/schema";
 import { ConnectorStatus } from "../connector/schema";
 import { CronView } from "../cron/schema";
 import { CommitCount, FarmFrame } from "../game/schema";
 import { InboxItem } from "../inbox/schema";
-import { BoardSummary, Issue } from "../issue/schema";
+import { BoardSummary, Issue, IssueStatus } from "../issue/schema";
 import { MediaJob, MediaSummary } from "../media/schema";
+import { RepoHealth } from "../repo/schema";
 import { RuntimeInfo } from "../runtime/schema";
 import { Machine, SessionEvent, SessionView } from "../session/schema";
 import { CallState } from "../voice/schema";
@@ -23,6 +24,7 @@ export const BoardSlice = z.object({
   issues: z.array(Issue),
   boardSummary: z.exactOptional(BoardSummary),
   commits: z.exactOptional(CommitCount),
+  repoHealth: z.exactOptional(z.array(RepoHealth)),
 }) satisfies Codec<T.BoardSlice>;
 
 export const SessionsSlice = z.object({
@@ -99,3 +101,77 @@ const LiveEventRuntime = z.object({
 }) satisfies Codec<T.LiveEventRuntime>;
 
 export const LiveEvent = z.discriminatedUnion("type", [LiveEventSession, LiveEventNotice, LiveEventRuntime]) satisfies Codec<T.LiveEvent>;
+
+export const RetroWindow = z.enum(T.RetroWindowValues) satisfies Codec<T.RetroWindow>;
+
+export const IssueRetroGetInput = z.object({
+  window: z.exactOptional(RetroWindow),
+}) satisfies Codec<T.IssueRetroGetInput>;
+
+export const RetroDurationStats = z.object({
+  sampleCount: z.number(),
+  medianMs: z.exactOptional(z.number()),
+  p90Ms: z.exactOptional(z.number()),
+}) satisfies Codec<T.RetroDurationStats>;
+
+export const RetroOverdueItem = z.object({
+  id: IssueId,
+  number: z.number(),
+  title: z.string(),
+  status: IssueStatus,
+  repo: z.exactOptional(z.string()),
+  agent: z.exactOptional(z.string()),
+  dueAt: z.number(),
+  closedAt: z.exactOptional(z.number()),
+  overdueMs: z.number(),
+}) satisfies Codec<T.RetroOverdueItem>;
+
+export const RetroReworkItem = z.object({
+  id: IssueId,
+  number: z.number(),
+  title: z.string(),
+  status: IssueStatus,
+  repo: z.exactOptional(z.string()),
+  agent: z.exactOptional(z.string()),
+  findingsCount: z.number(),
+  unresolvedCount: z.number(),
+}) satisfies Codec<T.RetroReworkItem>;
+
+export const RetroBreakdownBucket = z.object({
+  key: z.string(),
+  totalCount: z.number(),
+  completedCount: z.number(),
+  canceledCount: z.number(),
+  overdueCount: z.number(),
+  reworkCount: z.number(),
+  medianCycleMs: z.exactOptional(z.number()),
+}) satisfies Codec<T.RetroBreakdownBucket>;
+
+export const IssueRetroReport = z.object({
+  window: RetroWindow,
+  generatedAt: z.number(),
+  windowStartAt: z.exactOptional(z.number()),
+  totalIssues: z.number(),
+  openCount: z.number(),
+  completedCount: z.number(),
+  canceledCount: z.number(),
+  completionRatePct: z.exactOptional(z.number()),
+  cycleTime: RetroDurationStats,
+  reviewWait: RetroDurationStats,
+  withDueCount: z.number(),
+  withoutDueCount: z.number(),
+  onTimeCount: z.number(),
+  overdueCount: z.number(),
+  upcomingDueCount: z.number(),
+  onTimeRatePct: z.exactOptional(z.number()),
+  overdueRatePct: z.exactOptional(z.number()),
+  reworkIssueCount: z.number(),
+  totalFindingsCount: z.number(),
+  unresolvedFindingsCount: z.number(),
+  reworkRatePct: z.exactOptional(z.number()),
+  overdueItems: z.array(RetroOverdueItem),
+  reworkItems: z.array(RetroReworkItem),
+  byRepo: z.array(RetroBreakdownBucket),
+  byTag: z.array(RetroBreakdownBucket),
+  byAgent: z.array(RetroBreakdownBucket),
+}) satisfies Codec<T.IssueRetroReport>;

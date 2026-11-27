@@ -23,14 +23,26 @@ impl Memory {
     }
 
     async fn render_prompt(&self, agent: &str) -> String {
+        let profiles = self.list_farm_profiles_async().await.unwrap_or_default();
         let notes = self.list_async(agent).await.unwrap_or_default();
-        let lines: Vec<String> = notes
+        let note_lines: Vec<String> = notes
             .iter()
             .rev()
             .filter(|n| n.kind == m::MemoryKind::Note)
             .map(|n| format!("{}{}", if n.author == m::ActorKind::User { m::FROM_USER } else { "" }, n.text))
             .collect();
-        m::carried_memory(&lines)
+        let profile_block = profiles
+            .iter()
+            .map(|p| format!("- {}", m::profile_prompt_line(p)))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let notes_block = m::carried_memory(&note_lines);
+        match (profile_block.is_empty(), notes_block.is_empty()) {
+            (true, true) => String::new(),
+            (false, true) => profile_block,
+            (true, false) => notes_block,
+            (false, false) => format!("{profile_block}\n{notes_block}"),
+        }
     }
 }
 
@@ -102,6 +114,8 @@ pub fn found_text(result: &MemorySearch, agent: &str, repo: &str, text: &str) ->
             kind: match f.kind {
                 MemoryKind::Issue => m::MemoryKind::Issue,
                 MemoryKind::Note => m::MemoryKind::Note,
+                MemoryKind::Profile => m::MemoryKind::Profile,
+                MemoryKind::Episode => m::MemoryKind::Episode,
             },
             text: f.text.clone(),
             author: m::ActorKind::System,
@@ -112,6 +126,10 @@ pub fn found_text(result: &MemorySearch, agent: &str, repo: &str, text: &str) ->
             recalled_at: f.recalled_at,
             fading: f.fading,
             source: None,
+            scope: None,
+            title: f.title.clone(),
+            importance: f.importance,
+            replaced_by: f.replaced_by.clone(),
         };
         let mut line = m::line_of(&x, repo);
         if agent.is_empty() && !f.agent.is_empty() {

@@ -8,7 +8,8 @@ use crate::agent::profile::text;
 use crate::channel::{AddressedMessage, ReadOptions, Speaking, Spoken};
 use crate::context::text::format_artifact_view_context;
 
-fn message_line(m: &AddressedMessage) -> String {
+/// `messageLine`: line breaks are marked, so no message can pass for a header.
+pub fn message_line(m: &AddressedMessage) -> String {
     let from = match &m.actor {
         Actor::Agent { role: AgentRole::Worker, .. } => format!("{} {}", m.from, m.name),
         _ => m.name.clone(),

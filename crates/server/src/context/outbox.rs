@@ -28,6 +28,7 @@ const DEFAULT_POLL_INTERVAL: Duration = Duration::from_secs(5);
 
 pub const OUTBOX_SESSION_REPORTED: &str = "work.session.reported";
 pub const OUTBOX_SESSION_REMEMBER: &str = "memory.session_remember";
+pub const OUTBOX_ISSUE_EPISODE: &str = "memory.issue_episode";
 pub const OUTBOX_CONNECTOR_NOTIFY: &str = "connector.notify";
 
 /// Durable report payload persisted via `Outbox` when a session round finishes.
@@ -62,23 +63,45 @@ pub enum OutboxEvent {
     SessionReported(OutboxSessionReported),
     #[serde(rename = "memory.session_remember")]
     SessionRemember { agent: String, text: String, repo: Option<String> },
+    #[serde(rename = "memory.issue_episode")]
+    IssueEpisode {
+        agent: String,
+        title: Option<String>,
+        text: String,
+        repo: Option<String>,
+        session: Option<String>,
+    },
     #[serde(rename = "connector.notify")]
     ConnectorNotify(OutboxConnectorNotify),
 }
 
 impl OutboxEvent {
-    pub const fn topic(&self) -> &'static str {
+    const fn topic(&self) -> &'static str {
         match self {
             Self::SessionReported(_) => OUTBOX_SESSION_REPORTED,
             Self::SessionRemember { .. } => OUTBOX_SESSION_REMEMBER,
+            Self::IssueEpisode { .. } => OUTBOX_ISSUE_EPISODE,
             Self::ConnectorNotify(_) => OUTBOX_CONNECTOR_NOTIFY,
         }
     }
 
-    pub fn serialize_payload_json(&self) -> Result<String, ApiError> {
+    fn serialize_payload_json(&self) -> Result<String, ApiError> {
         let res = match self {
             Self::SessionReported(report) => serde_json::to_string(report),
             Self::SessionRemember { agent, text, repo } => serde_json::to_string(&RememberPayload { agent, text, repo }),
+            Self::IssueEpisode {
+                agent,
+                title,
+                text,
+                repo,
+                session,
+            } => serde_json::to_string(&IssueEpisodePayload {
+                agent,
+                title,
+                text,
+                repo,
+                session,
+            }),
             Self::ConnectorNotify(notify) => serde_json::to_string(notify),
         };
         res.map_err(|e| ApiError::new(BizCode::InternalError, format!("outbox payload serialize failed: {e}")))
@@ -92,14 +115,23 @@ struct RememberPayload<'a> {
     repo: &'a Option<String>,
 }
 
+#[derive(Serialize)]
+struct IssueEpisodePayload<'a> {
+    agent: &'a str,
+    title: &'a Option<String>,
+    text: &'a str,
+    repo: &'a Option<String>,
+    session: &'a Option<String>,
+}
+
 /// Configuration governing outbox batch size, retry budget, and backoff timings.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OutboxConfig {
-    pub batch_size: u64,
-    pub max_attempts: i64,
-    pub base_backoff: Duration,
-    pub max_backoff: Duration,
-    pub poll_interval: Duration,
+struct OutboxConfig {
+    batch_size: u64,
+    max_attempts: i64,
+    base_backoff: Duration,
+    max_backoff: Duration,
+    poll_interval: Duration,
 }
 
 impl Default for OutboxConfig {
@@ -148,6 +180,24 @@ impl OutboxDelivery {
                     repo: p.repo,
                 })
             }
+            OUTBOX_ISSUE_EPISODE => {
+                #[derive(Deserialize)]
+                struct OwnedEpisode {
+                    agent: String,
+                    title: Option<String>,
+                    text: String,
+                    repo: Option<String>,
+                    session: Option<String>,
+                }
+                let p: OwnedEpisode = serde_json::from_str(&self.payload_json)?;
+                Ok(OutboxEvent::IssueEpisode {
+                    agent: p.agent,
+                    title: p.title,
+                    text: p.text,
+                    repo: p.repo,
+                    session: p.session,
+                })
+            }
             OUTBOX_CONNECTOR_NOTIFY => Ok(OutboxEvent::ConnectorNotify(serde_json::from_str(&self.payload_json)?)),
             _ => Err(serde::de::Error::custom(format!("unknown outbox topic `{}`", self.topic))),
         }
@@ -172,7 +222,7 @@ impl Outbox {
     }
 
     /// Creates an [`Outbox`] dispatcher with explicit retry and poll configuration.
-    pub fn with_config(service: Arc<Service>, config: OutboxConfig) -> Self {
+    fn with_config(service: Arc<Service>, config: OutboxConfig) -> Self {
         Self {
             service,
             config,
@@ -209,18 +259,20 @@ impl Outbox {
     }
 
     /// Enqueues a typed [`OutboxEvent`] inside an open write transaction with an explicit timestamp (ms).
-    pub async fn enqueue_event_in_tx_at(&self, tx: &Tx, event: &OutboxEvent, now_ms: i64) -> Result<i64, ApiError> {
+    async fn enqueue_event_in_tx_at(&self, tx: &Tx, event: &OutboxEvent, now_ms: i64) -> Result<i64, ApiError> {
         let payload_json = event.serialize_payload_json()?;
         self.service.outbox.enqueue_in_tx(tx, event.topic(), &payload_json, now_ms).await
     }
 
     /// Enqueues a raw JSON payload inside an open write transaction using the configured clock.
-    pub async fn enqueue_in_tx(&self, tx: &Tx, topic: &str, payload_json: &str) -> Result<i64, ApiError> {
+    #[cfg(test)]
+    async fn enqueue_in_tx(&self, tx: &Tx, topic: &str, payload_json: &str) -> Result<i64, ApiError> {
         self.enqueue_in_tx_at(tx, topic, payload_json, self.clock.now_ms()).await
     }
 
     /// Enqueues a raw JSON payload inside an open write transaction with an explicit timestamp (ms).
-    pub async fn enqueue_in_tx_at(&self, tx: &Tx, topic: &str, payload_json: &str, now_ms: i64) -> Result<i64, ApiError> {
+    #[cfg(test)]
+    async fn enqueue_in_tx_at(&self, tx: &Tx, topic: &str, payload_json: &str, now_ms: i64) -> Result<i64, ApiError> {
         self.service.outbox.enqueue_in_tx(tx, topic, payload_json, now_ms).await
     }
 
@@ -252,7 +304,7 @@ impl Outbox {
     }
 
     /// Computes exponential backoff delay for the given attempt count (`attempts >= 1`).
-    pub fn backoff_delay(&self, attempts: i64) -> Duration {
+    fn backoff_delay(&self, attempts: i64) -> Duration {
         let shift = attempts.saturating_sub(1).clamp(0, 20) as u32;
         let factor = 1u32.checked_shl(shift).unwrap_or(u32::MAX);
         self.config.base_backoff.saturating_mul(factor).min(self.config.max_backoff)
@@ -272,7 +324,7 @@ impl Outbox {
                     return;
                 }
 
-                let drained = match outbox.drain_once(outbox.clock.now_ms()).await {
+                let drained = match outbox.drain_once_inner(outbox.clock.now_ms()).await {
                     Ok(count) => count,
                     Err(err) => {
                         tracing::warn!(error = %err.message, "outbox.drain_once failed");
@@ -318,13 +370,18 @@ impl Outbox {
     }
 
     /// Claims and dispatches up to `config.batch_size` due rows at `current_ms`.
-    pub async fn drain_once(&self, current_ms: i64) -> Result<usize, ApiError> {
+    async fn drain_once_inner(&self, current_ms: i64) -> Result<usize, ApiError> {
         let rows = self.service.outbox.claim_pending(current_ms, self.config.batch_size).await?;
         let count = rows.len();
         for row in rows {
             self.dispatch_row(row, current_ms).await?;
         }
         Ok(count)
+    }
+
+    #[cfg(test)]
+    pub(crate) async fn drain_once(&self, current_ms: i64) -> Result<usize, ApiError> {
+        self.drain_once_inner(current_ms).await
     }
 
     async fn dispatch_row(&self, row: OutboxItem, current_ms: i64) -> Result<(), ApiError> {

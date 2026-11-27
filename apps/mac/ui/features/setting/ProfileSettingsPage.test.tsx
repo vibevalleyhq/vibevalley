@@ -63,3 +63,31 @@ test("ProfileSettingsPage edits name, tagline, preset, uploads custom avatar via
     avatarPreset: "monogram",
   });
 });
+
+test("ProfileSettingsPage wraps avatar presets cleanly within container at 900x720 without half-clipping", async () => {
+  setLocale("en");
+  const fake = fakeHost(scenarios.typical, { route: "/settings/profile", locale: "en", connectionMode: "embedded" });
+  const app = await open("../../app/main.tsx", {
+    width: 900,
+    height: 720,
+    colorScheme: "light",
+    platform: "macos",
+    locale: "en-US",
+    clock: { time: SCENARIO_NOW },
+    host: fake.options,
+  });
+  await fake.pumpUntil(app, () => app.count("id:profile-settings-page") === 1);
+
+  const pageBox = app.layout("id:profile-settings-page")!;
+  const monogram = app.layout("id:profile-preset-monogram")!;
+  expect(monogram.x).toBeGreaterThanOrEqual(pageBox.x);
+  expect(monogram.x + monogram.width).toBeLessThanOrEqual(pageBox.x + pageBox.width);
+
+  for (const preset of ["user", "avatar-architect", "avatar-builder", "avatar-reviewer", "avatar-tester", "avatar-designer"]) {
+    const box = app.layout(`id:profile-preset-${preset}`);
+    if (box) {
+      expect(box.x).toBeGreaterThanOrEqual(pageBox.x);
+      expect(box.x + box.width).toBeLessThanOrEqual(pageBox.x + pageBox.width);
+    }
+  }
+});

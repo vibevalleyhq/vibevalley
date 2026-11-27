@@ -73,6 +73,8 @@ export function InboxTab(props: {
 }) {
   const busyKey = signal<string | undefined>(undefined);
   const answerDrafts = signal<Readonly<Record<string, string>>>({});
+  const rejectOpenId = signal<string | undefined>(undefined);
+  const rejectDrafts = signal<Readonly<Record<string, string>>>({});
   const actionError = signal<string | undefined>(undefined);
   let userPicked = false;
 
@@ -117,6 +119,104 @@ export function InboxTab(props: {
   const setDraft = (key: string, value: string) => {
     if ((untracked(answerDrafts)[key] ?? "") === value) return;
     answerDrafts.update((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const setRejectDraft = (itemId: string, value: string) => {
+    if ((untracked(rejectDrafts)[itemId] ?? "") === value) return;
+    rejectDrafts.update((prev) => ({ ...prev, [itemId]: value }));
+  };
+
+  const issueIdOf = (item: InboxItem): string | undefined => {
+    switch (item.target.kind) {
+      case "issue":
+        return item.target.id;
+      case "session": {
+        const sessId = item.target.id;
+        const fromBinding = (props.session.sessions()?.sessions ?? []).find((s) => s.id === sessId)?.bindings.find((b) => b.kind === "issue")?.id;
+        if (fromBinding !== undefined) return fromBinding;
+        return (props.session.board()?.issues ?? []).find((issue) => issue.assignments.some((a) => a.executions.some((e) => e.session === sessId)))?.id;
+      }
+      case "chat":
+      case "runtime":
+        return undefined;
+    }
+  };
+
+  const acceptReview = async (itemId: string, issueId: string) => {
+    const key = `review:${itemId}`;
+    if (untracked(busyKey) === key) return;
+    busyKey.set(key);
+    actionError.set(undefined);
+    try {
+      const res = await props.session.call("issue.status.update", {
+        id: issueId,
+        status: "done",
+      });
+      if (res.bizCode !== 0) {
+        actionError.set(res.message);
+        hapticNotification("error");
+      } else {
+        if (untracked(rejectOpenId) === itemId) rejectOpenId.set(undefined);
+        hapticNotification("success");
+      }
+    } catch (err: unknown) {
+      actionError.set(err instanceof Error ? err.message : String(err));
+      hapticNotification("error");
+    } finally {
+      busyKey.set(undefined);
+    }
+  };
+
+  const submitRejectReview = async (itemId: string, issueId: string) => {
+    const text = (untracked(rejectDrafts)[itemId] ?? "").trim();
+    const key = `review:${itemId}`;
+    if (text === "" || untracked(busyKey) === key) return;
+    busyKey.set(key);
+    actionError.set(undefined);
+    try {
+      const res = await props.session.call("issue.review", {
+        id: issueId,
+        pass: false,
+        text,
+      });
+      if (res.bizCode !== 0) {
+        actionError.set(res.message);
+        hapticNotification("error");
+      } else {
+        setRejectDraft(itemId, "");
+        rejectOpenId.set(undefined);
+        hapticNotification("warning");
+      }
+    } catch (err: unknown) {
+      actionError.set(err instanceof Error ? err.message : String(err));
+      hapticNotification("error");
+    } finally {
+      busyKey.set(undefined);
+    }
+  };
+
+  const retryOrResumeIssue = async (itemId: string, issueId: string) => {
+    const key = `retry:${itemId}`;
+    if (untracked(busyKey) === key) return;
+    busyKey.set(key);
+    actionError.set(undefined);
+    try {
+      const res = await props.session.call("issue.status.update", {
+        id: issueId,
+        status: "todo",
+      });
+      if (res.bizCode !== 0) {
+        actionError.set(res.message);
+        hapticNotification("error");
+      } else {
+        hapticImpact("light");
+      }
+    } catch (err: unknown) {
+      actionError.set(err instanceof Error ? err.message : String(err));
+      hapticNotification("error");
+    } finally {
+      busyKey.set(undefined);
+    }
   };
 
   const respondPermission = async (sessionId: string, requestId: string, decision: SessionPermissionDecision) => {
@@ -273,6 +373,121 @@ export function InboxTab(props: {
     );
   };
 
+  const renderInboxQuickActions = (item: () => InboxItem) => {
+    const issueId = computed(() => issueIdOf(item()));
+    const isReview = computed(() => item().kind === "review" && issueId() !== undefined);
+    const isFix = computed(() => item().kind === "fix" && issueId() !== undefined);
+    const isInterrupted = computed(() => item().kind === "interrupted" && issueId() !== undefined);
+    const hasQuickActions = computed(() => isReview() || isFix() || isInterrupted());
+    const isRejectOpen = computed(() => rejectOpenId() === item().id);
+    const rejectDraft = computed(() => rejectDrafts()[item().id] ?? "");
+    const isReviewBusy = computed(() => busyKey() === `review:${item().id}`);
+    const isRetryBusy = computed(() => busyKey() === `retry:${item().id}`);
+    const canSubmitReject = computed(() => !isReviewBusy() && rejectDraft().trim() !== "");
+    return (
+      <If when={hasQuickActions()}>
+        <View class="gap-2 pt-1">
+          <If when={isReview()}>
+            <View class="gap-2">
+              <View class="flex-row items-center gap-2">
+                <PillButton
+                  testID={`inbox-accept-${item().id}`}
+                  tone="ok"
+                  size="sm"
+                  icon="check"
+                  label={t("web.remote.inbox.accept")}
+                  disabled={isReviewBusy()}
+                  onPress={() => {
+                    const targetIssue = issueId();
+                    if (targetIssue !== undefined) void acceptReview(item().id, targetIssue);
+                  }}
+                  class="flex-1"
+                />
+                <PillButton
+                  testID={`inbox-reject-${item().id}`}
+                  tone="danger"
+                  size="sm"
+                  icon="cross"
+                  label={t("web.remote.inbox.reject")}
+                  disabled={isReviewBusy()}
+                  onPress={() => {
+                    hapticImpact("light");
+                    rejectOpenId.set(untracked(rejectOpenId) === item().id ? undefined : item().id);
+                  }}
+                  class="flex-1"
+                />
+              </View>
+              <If when={isRejectOpen()}>
+                <View class="flex-row items-center gap-2">
+                  <FieldInput
+                    testID={`inbox-reject-input-${item().id}`}
+                    placeholder={t("web.remote.inbox.rejectReasonPlaceholder")}
+                    value={rejectDraft()}
+                    onInput={(v) => setRejectDraft(item().id, v)}
+                    onSubmit={() => {
+                      const targetIssue = issueId();
+                      if (targetIssue !== undefined) void submitRejectReview(item().id, targetIssue);
+                    }}
+                    disabled={isReviewBusy()}
+                    class="min-w-0 flex-1"
+                  />
+                  <PillButton
+                    testID={`inbox-reject-submit-${item().id}`}
+                    tone="danger"
+                    size="sm"
+                    icon="send"
+                    label={t("web.remote.inbox.reject")}
+                    disabled={!canSubmitReject()}
+                    onPress={() => {
+                      const targetIssue = issueId();
+                      if (targetIssue !== undefined) void submitRejectReview(item().id, targetIssue);
+                    }}
+                  />
+                  <PillButton
+                    testID={`inbox-reject-cancel-${item().id}`}
+                    tone="plain"
+                    size="sm"
+                    label={t("web.remote.controlPlane.cancel")}
+                    disabled={isReviewBusy()}
+                    onPress={() => rejectOpenId.set(undefined)}
+                  />
+                </View>
+              </If>
+            </View>
+          </If>
+          <If when={isFix()}>
+            <PillButton
+              testID={`inbox-retry-${item().id}`}
+              tone="primary"
+              size="sm"
+              icon="retry"
+              label={t("web.remote.inbox.retry")}
+              disabled={isRetryBusy()}
+              onPress={() => {
+                const targetIssue = issueId();
+                if (targetIssue !== undefined) void retryOrResumeIssue(item().id, targetIssue);
+              }}
+            />
+          </If>
+          <If when={isInterrupted()}>
+            <PillButton
+              testID={`inbox-resume-${item().id}`}
+              tone="primary"
+              size="sm"
+              icon="play"
+              label={t("web.remote.inbox.resume")}
+              disabled={isRetryBusy()}
+              onPress={() => {
+                const targetIssue = issueId();
+                if (targetIssue !== undefined) void retryOrResumeIssue(item().id, targetIssue);
+              }}
+            />
+          </If>
+        </View>
+      </If>
+    );
+  };
+
   const renderMaster = () => (
     <View class="min-h-0 flex-1">
       <If when={actionError()}>
@@ -314,6 +529,7 @@ export function InboxTab(props: {
                           <StatusTag label={item().words.label || item().kind} tone={inboxKindTone(item().kind)} />
                         </View>
                         <Text class="text-xs text-muted">{item().words.body || item().text}</Text>
+                        {renderInboxQuickActions(item)}
                       </SectionCard>
                     )}
                   </If>
@@ -398,6 +614,7 @@ export function InboxTab(props: {
                       <StatusTag label={item().words.label || item().kind} tone={inboxKindTone(item().kind)} />
                     </View>
                     <MarkdownText testID={`inbox-detail-body-${item().id}`} text={item().words.body || item().text} size="sm" />
+                    {renderInboxQuickActions(item)}
                     <PillButton
                       testID={`inbox-jump-${item().id}`}
                       tone="primary"

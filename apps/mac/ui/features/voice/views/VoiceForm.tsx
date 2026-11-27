@@ -1,39 +1,315 @@
-import { signal, Text, untracked, View, type JSX } from "nsh";
+import { computed, signal, Text, untracked, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
-import type { SettingsStatus, SettingsUpdate, VoiceSettings } from "@vibevalley/protocol";
+import type { ProviderConnectionUpdate, ProviderStatus, ProviderUpdate, SettingsStatus, SettingsUpdate, VoiceSettings } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 
 import { createAct } from "../../../design/act";
 import { Button } from "../../../design/Button";
-import { TextArea, TextInput } from "../../../design/Field";
+import { KeyRow, SettingRow, SettingsGroup } from "../../../design/domain/settings";
+import { Select, TextArea, TextInput } from "../../../design/Field";
 import { Icon } from "../../../design/Icon";
 import { SaveBar } from "../../../design/KeyField";
-import { Card, Quiet } from "../../../design/layout";
+import { Quiet } from "../../../design/layout";
 import { TextLink } from "../../../design/TextLink";
-import { Hint } from "../../../design/Tip";
 import { toast } from "../../../design/toasts";
 import { api, reasonOf } from "../../../infra/api";
 import { createSettled, Keyed } from "../../../infra/base/dom";
-import { defineQuery, ready, useQuery, useSettings } from "../../../infra/query";
+import { defineQuery, providerQuery, providerVoicesQuery, ready, settingsQuery, useQuery, useQueryClient, useSettings } from "../../../infra/query";
 import { Link as A } from "../../../infra/router";
 import { useSaveSettings } from "../../../infra/settings";
-import { MossVerify } from "./MossVerify";
 import { NativeCall } from "./NativeCall";
 
 type VoicePart = "line" | "agent";
+type VoiceUse = "live" | "speech" | "transcription";
 
 const sameVoice = (a: VoiceSettings, b: VoiceSettings) => same(a, b);
 
+const editableProviders = (status: ProviderStatus): ProviderUpdate => ({
+  revision: status.revision,
+  connections: status.connections.map(({ key: _key, ...connection }) => connection),
+  image: status.image,
+  understanding: status.understanding,
+  speech: status.speech,
+  live: status.live,
+  speakers: status.speakers,
+  voiceDesign: status.voiceDesign,
+  transcription: status.transcription,
+  vision: status.vision,
+});
+
 export function VoiceForm(props: { part: VoicePart }) {
+  if (props.part === "line") {
+    return (
+      <View testID="voice-moss" class="min-h-0 gap-6">
+        <NativeCall />
+        <VoiceConfigSection />
+      </View>
+    );
+  }
   const settings = useSettings();
   return (
     <If
       when={ready(settings, undefined)}
       else={<Quiet>{settings.error() ? t("web.voice.voice.noSettings", { why: reasonOf(settings.error()) }) : t("web.base.form.asking")}</Quiet>}
     >
-      {(status) => <Keyed key={status().file}>{() => <Form status={untracked(status)} part={props.part} />}</Keyed>}
+      {(status) => <Keyed key={status().file}>{() => <AgentVoiceForm status={untracked(status)} />}</Keyed>}
     </If>
+  );
+}
+
+function VoiceConfigSection() {
+  const providers = useQuery(providerQuery);
+  return (
+    <If when={ready(providers, undefined)} else={<Quiet>{providers.error() ? reasonOf(providers.error()) : t("web.base.form.asking")}</Quiet>}>
+      {(status) => <VoiceConfigForm initial={untracked(status)} />}
+    </If>
+  );
+}
+
+function VoiceConfigForm(props: { initial: ProviderStatus }) {
+  const client = useQueryClient();
+  const base = signal(props.initial);
+  const draft = signal(editableProviders(props.initial));
+  const selectedId = signal<string | undefined>(undefined);
+  const error = signal<string | undefined>(undefined);
+  const act = createAct((why) => error.set(why));
+
+  const dirty = computed(() => !same(draft(), editableProviders(base())));
+  const activeConnectionId = computed(() => {
+    const list = draft().connections;
+    if (list.length === 0) return undefined;
+    const picked = selectedId();
+    if (picked && list.some((c) => c.id === picked)) return picked;
+    const liveConn = draft().live?.connection ?? draft().speech?.connection ?? draft().transcription?.connection;
+    if (liveConn && list.some((c) => c.id === liveConn)) return liveConn;
+    return list[0]?.id;
+  });
+  const activeDraftConnection = computed(() => {
+    const id = activeConnectionId();
+    return id ? draft().connections.find((c) => c.id === id) : undefined;
+  });
+  const activeBaseConnection = computed(() => {
+    const id = activeConnectionId();
+    return id ? base().connections.find((c) => c.id === id) : undefined;
+  });
+
+  const savedSpeech = computed(() => base().speech);
+  const voices = useQuery(
+    () => {
+      const s = savedSpeech();
+      return providerVoicesQuery({ connection: s?.connection ?? "", revision: base().revision, limit: 24 });
+    },
+    { enabled: () => Boolean(savedSpeech()?.connection) },
+  );
+
+  const accept = (status: ProviderStatus) => {
+    base.set(status);
+    draft.set(editableProviders(status));
+    error.set(undefined);
+    client.setData(providerQuery(), () => ({ value: status }));
+  };
+
+  const changeConnection = (id: string, patch: Partial<ProviderConnectionUpdate>) => {
+    draft.set({
+      ...draft(),
+      connections: draft().connections.map((c) => {
+        if (c.id !== id) return c;
+        const { key, ...rest } = { ...c, ...patch };
+        return key === undefined ? rest : { ...rest, key };
+      }),
+    });
+    error.set(undefined);
+  };
+
+  const keepKey = (id: string) => {
+    draft.set({
+      ...draft(),
+      connections: draft().connections.map((c) => {
+        if (c.id !== id) return c;
+        const { key: _key, ...rest } = c;
+        return rest;
+      }),
+    });
+  };
+
+  const addConnection = () => {
+    const id = crypto.randomUUID();
+    const firstModel = base().liveModels[0] ?? "moss-live-1.0";
+    const speechModel = base().speechModels[0] ?? "moss-tts-1.5-flash";
+    const txModel = base().transcriptionModels[0] ?? "moss-transcribe-1.0";
+    const next = draft();
+    draft.set({
+      ...next,
+      connections: [...next.connections, { id, name: "MOSS", adapter: "moss", enabled: true }],
+      live: next.live ?? { connection: id, model: firstModel },
+      speech: next.speech ?? { connection: id, model: speechModel },
+      transcription: next.transcription ?? { connection: id, model: txModel },
+    });
+    selectedId.set(id);
+  };
+
+  const setUseModel = (use: VoiceUse, model: string) => {
+    const current = draft();
+    if (!model) {
+      draft.set({ ...current, [use]: null });
+      return;
+    }
+    const conn = current[use]?.connection ?? activeConnectionId();
+    if (!conn) return;
+    draft.set({ ...current, [use]: { connection: conn, model } });
+  };
+
+  const save = () =>
+    act.run(async () => {
+      const next = await api.provider.update(draft());
+      accept(next);
+      await client.invalidate({ key: settingsQuery().key });
+      toast(t("web.voice.moss.saved"));
+    });
+
+  const connectionOptions = computed(() => draft().connections.map((c) => ({ value: c.id, label: c.name || "MOSS" })));
+  const modelOptions = (models: readonly string[], currentModel: string | undefined) => {
+    const items = [{ value: "", label: t("web.voice.moss.unbound") }, ...models.map((m) => ({ value: m, label: m }))];
+    if (currentModel && !models.includes(currentModel)) {
+      items.push({ value: currentModel, label: currentModel });
+    }
+    return items;
+  };
+  const voiceList = computed(() => ready(voices, undefined)?.voices ?? []);
+
+  return (
+    <View testID="voice-config" class="gap-5">
+      <SettingsGroup
+        title={t("web.voice.moss.configTitle")}
+        note={t("web.voice.moss.configNote")}
+        action={<TextLink href="/settings/models">{t("web.voice.moss.manageAll")}</TextLink>}
+        testid="voice-config-group"
+      >
+        <SettingRow icon="plug" label={t("web.voice.moss.accountLabel")} hint={t("web.voice.moss.accountHint")} testid="voice-connection-row">
+          <If
+            when={draft().connections.length > 0}
+            else={
+              <Button testID="voice-add-connection" icon="add" onPress={addConnection}>
+                {t("web.voice.moss.addConnection")}
+              </Button>
+            }
+          >
+            <View class="w-48">
+              <Select
+                testid="voice-connection-select"
+                label={t("web.voice.moss.accountLabel")}
+                value={activeConnectionId() ?? ""}
+                options={connectionOptions()}
+                onChange={(id) => selectedId.set(id)}
+              />
+            </View>
+          </If>
+        </SettingRow>
+
+        <If when={activeDraftConnection()}>
+          {(conn) => (
+            <KeyRow
+              testid="voice-key-row"
+              label={t("web.voice.moss.keyLabel")}
+              hint={t("web.voice.moss.keyHint")}
+              status={activeBaseConnection()?.key ?? { source: null }}
+              value={conn().key ?? ""}
+              removing={conn().key === null}
+              onInput={(v) => (v ? changeConnection(conn().id, { key: v }) : keepKey(conn().id))}
+              onRemove={(removing) => (removing ? changeConnection(conn().id, { key: null }) : keepKey(conn().id))}
+              link={{ href: "https://platform.moss.cn/", label: t("web.provider.console") }}
+            />
+          )}
+        </If>
+
+        <SettingRow icon="realtime" label={t("web.voice.moss.liveModel")} hint={t("web.voice.moss.liveModelHint")} testid="voice-live-model-row">
+          <View class="w-60">
+            <Select
+              testid="voice-live-model"
+              label={t("web.voice.moss.liveModel")}
+              disabled={draft().connections.length === 0}
+              value={draft().live?.model ?? ""}
+              options={modelOptions(base().liveModels, draft().live?.model)}
+              onChange={(m) => setUseModel("live", m)}
+            />
+          </View>
+        </SettingRow>
+
+        <SettingRow icon="audio" label={t("web.voice.moss.speechModel")} hint={t("web.voice.moss.speechModelHint")} testid="voice-speech-model-row">
+          <View class="w-60">
+            <Select
+              testid="voice-speech-model"
+              label={t("web.voice.moss.speechModel")}
+              disabled={draft().connections.length === 0}
+              value={draft().speech?.model ?? ""}
+              options={modelOptions(base().speechModels, draft().speech?.model)}
+              onChange={(m) => setUseModel("speech", m)}
+            />
+          </View>
+        </SettingRow>
+
+        <SettingRow
+          icon="record"
+          label={t("web.voice.moss.transcriptionModel")}
+          hint={t("web.voice.moss.transcriptionModelHint")}
+          testid="voice-transcription-model-row"
+          last={savedSpeech() === null}
+        >
+          <View class="w-60">
+            <Select
+              testid="voice-transcription-model"
+              label={t("web.voice.moss.transcriptionModel")}
+              disabled={draft().connections.length === 0}
+              value={draft().transcription?.model ?? ""}
+              options={modelOptions(base().transcriptionModels, draft().transcription?.model)}
+              onChange={(m) => setUseModel("transcription", m)}
+            />
+          </View>
+        </SettingRow>
+
+        <If when={savedSpeech()}>
+          <SettingRow icon="agents" label={t("web.voice.moss.voicesTitle")} hint={t("web.voice.moss.voicesHint")} testid="voice-catalog-row" wide last>
+            <If when={!voices.fetching()} else={<Text class="text-xs text-muted">{t("web.base.form.asking")}</Text>}>
+              <If when={voiceList().length > 0} else={<Text class="text-xs text-faint">{t("web.voice.moss.voicesEmpty")}</Text>}>
+                <View class="flex-row flex-wrap items-center gap-1.5">
+                  <Each of={voiceList().slice(0, 8)} key={(v) => v.id}>
+                    {(v) => (
+                      <View class="rounded-md border border-line bg-side px-2 py-0.5">
+                        <Text class="text-xs text-ink">{v().name || v().id}</Text>
+                      </View>
+                    )}
+                  </Each>
+                  <Text class="text-xs text-muted tabular-nums">{t("web.voice.moss.voicesCount", { n: voiceList().length })}</Text>
+                </View>
+              </If>
+            </If>
+          </SettingRow>
+        </If>
+      </SettingsGroup>
+
+      <SaveBar
+        dirty={dirty()}
+        busy={act.busy()}
+        onSave={() => void save()}
+        onUndo={() => {
+          draft.set(editableProviders(base()));
+          error.set(undefined);
+        }}
+        left={
+          <If when={error()}>
+            {(why) => (
+              <View class="flex-row items-center gap-1.5 self-start rounded-md bg-bad-soft px-2.5 py-1">
+                <Icon name="cross" size={12} />
+                <Text testID="voice-config-problem" role="alert" class="min-w-0 text-xs font-medium text-berry">
+                  {why()}
+                </Text>
+              </View>
+            )}
+          </If>
+        }
+      />
+    </View>
   );
 }
 
@@ -48,36 +324,6 @@ function useProblem(update: () => SettingsUpdate) {
   const asked = createSettled(update);
   const check = useQuery(() => problemQuery({ input: asked(), token: crypto.randomUUID() }));
   return () => ready(check, undefined)?.problem;
-}
-
-function Labeled(props: { label: string; hint?: string; children: JSX.Element }) {
-  return (
-    <View class="gap-1.5">
-      <View class="min-h-4 flex-row items-center gap-1.5">
-        <Text class="text-xs font-medium text-muted">{props.label}</Text>
-        <If when={props.hint}>{(h) => <Hint text={h()} />}</If>
-      </View>
-      <View>{props.children}</View>
-    </View>
-  );
-}
-
-function Form(props: { status: SettingsStatus; part: VoicePart }) {
-  if (props.part === "line") {
-    return (
-      <View testID="voice-moss" class="min-h-0 gap-3">
-        <View class="max-w-4xl flex-row flex-wrap items-center justify-between gap-3 rounded-lg border border-line bg-page px-4 py-3">
-          <View class="min-w-0 flex-1 flex-row items-center gap-2">
-            <Icon name="plug" size={14} tone="muted" />
-            <TextLink href="/settings/models">{t("web.provider.manage")}</TextLink>
-          </View>
-          <MossVerify />
-        </View>
-        <NativeCall />
-      </View>
-    );
-  }
-  return <AgentVoiceForm status={props.status} />;
 }
 
 function AgentVoiceForm(props: { status: SettingsStatus }) {
@@ -109,8 +355,8 @@ function AgentVoiceForm(props: { status: SettingsStatus }) {
   };
 
   return (
-    <View testID="voice-agent" class="max-w-4xl gap-3">
-      <View class="flex-row flex-wrap items-center gap-x-1 rounded-lg bg-side px-3.5 py-2">
+    <View testID="voice-agent" class="max-w-180 gap-4">
+      <View class="flex-row flex-wrap items-center gap-x-1 rounded-lg border border-line bg-side px-3.5 py-2">
         <View class="mr-0.5 shrink-0">
           <Icon name="info" size={12} tone="faint" />
         </View>
@@ -120,32 +366,25 @@ function AgentVoiceForm(props: { status: SettingsStatus }) {
         </A>
         <Text class="text-xs leading-relaxed text-muted">{t("web.voice.voice.persona.page")}</Text>
       </View>
-      <Card
-        title={t("web.voice.voice.persona.open")}
-        action={
-          <View class="rounded-sm bg-side px-2 py-0.5">
-            <Text class="text-xs font-medium text-muted">{t("web.voice.voice.persona.openParts")}</Text>
-          </View>
-        }
-      >
-        <Labeled label={t("web.voice.voice.persona.persona")} hint={t("web.voice.voice.persona.personaHint")}>
+      <SettingsGroup title={t("web.voice.voice.persona.open")} note={t("web.voice.voice.persona.openParts")}>
+        <SettingRow label={t("web.voice.voice.persona.persona")} hint={t("web.voice.voice.persona.personaHint")} wide>
           <TextArea
             testID="persona"
             accessibilityLabel={t("web.voice.voice.persona.persona")}
-            rows={8}
+            rows={7}
             value={draft().persona}
             onInput={(persona) => draft.set({ ...draft(), persona })}
           />
-        </Labeled>
-        <Labeled label={t("web.voice.voice.persona.greeting")} hint={t("web.voice.voice.persona.greetingHint")}>
+        </SettingRow>
+        <SettingRow label={t("web.voice.voice.persona.greeting")} hint={t("web.voice.voice.persona.greetingHint")} wide last>
           <TextInput
             testID="greeting"
             accessibilityLabel={t("web.voice.voice.persona.greeting")}
             value={draft().greeting}
             onInput={(greeting) => draft.set({ ...draft(), greeting })}
           />
-        </Labeled>
-      </Card>
+        </SettingRow>
+      </SettingsGroup>
       <SaveBar
         dirty={dirty()}
         busy={busy() || !!problem()}

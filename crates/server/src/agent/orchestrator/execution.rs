@@ -12,6 +12,7 @@ use vibevalley_runtime::agent::core::engine::{BrainProvider, Request};
 use vibevalley_runtime::agent::core::pipeline::Transcript;
 use vibevalley_runtime::agent::durable::{Error, Result, Scheduler, Store, SubmissionStatus, Task, TaskStatus};
 use vibevalley_runtime::agent::extensions::budget::BudgetExtension;
+use vibevalley_runtime::agent::extensions::codemode::CodeModeExtension;
 use vibevalley_runtime::agent::extensions::governance::{self, GovernanceExtension, Permissions};
 use vibevalley_runtime::agent::extensions::grader::{GraderExtension, OutcomeReview, ReviewProvider, ReviewRequest, Rubric};
 use vibevalley_runtime::agent::extensions::subagent::SubagentExtension;
@@ -32,6 +33,7 @@ pub(super) trait OrchestratorHost: Send + Sync {
     fn issue(&self) -> &Board;
     fn artifact(&self) -> &ArtifactManager;
     fn brain_at_async<'a>(&'a self, id: &'a str, route: &'a Arc<Mutex<Route>>, model: &'a str) -> BoxFuture<'a, Brain>;
+    fn record_worker_compaction_episode(&self, session_id: &str, level: &str, summary: &str);
 }
 
 pub(super) trait RunSink: Send + Sync {
@@ -77,6 +79,12 @@ impl BrainProvider for Bound {
     }
 
     fn observe(&self, conv: &str, _task: &str, event: AgentEvent) {
+        if let Some(session_id) = conv.strip_prefix("worker:")
+            && let AgentEvent::Compacted { level, summary } = &event
+            && let Some(o) = self.orchestrator.get().and_then(Weak::upgrade)
+        {
+            o.record_worker_compaction_episode(session_id, level, summary);
+        }
         if let Some(s) = self.listeners.lock().get(conv) {
             let _ = s.send(event);
         }
@@ -201,6 +209,7 @@ impl PendingExecution {
         harness.register_extension(Arc::new(GraderExtension::new(bound.clone())));
         harness.register_extension(Arc::new(TodoExtension::default().without_global_tools()));
         harness.register_extension(Arc::new(SubagentExtension::new("VibeValley").without_global_tools()));
+        harness.register_extension(Arc::new(CodeModeExtension::new()));
         let shared = SharedExecution::new(harness.clone());
         Self { harness, bound, shared }
     }
@@ -602,6 +611,21 @@ impl Execution {
                         }
                     }
                     Ok(out)
+                })
+            })
+            .await
+    }
+
+    pub(super) async fn latest_compaction_async(&self, conv: &str) -> Result<Option<(i64, String)>> {
+        let conv = conv.to_owned();
+        self.store()
+            .read_with_async(conv, |tx, conv| {
+                Box::pin(async move {
+                    let found = tx.visible_entries_async(conv).await?.into_iter().rev().find(|e| e.kind == "pi.compaction");
+                    Ok(found.map(|e| {
+                        let payload = serde_json::from_value::<CompactionEntryPayload>(e.payload).unwrap_or_default();
+                        (e.seq, payload.summary)
+                    }))
                 })
             })
             .await

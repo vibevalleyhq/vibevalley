@@ -7,7 +7,7 @@ use serde::{Deserialize, Deserializer};
 use serde_json::{Value, json};
 use vibevalley_mcp::{ToolCallResult, ToolDef};
 use vibevalley_protocol::{
-    AppliedIssue, AttachmentUpload, Issue, IssueCommentCreateInput, IssueConversationGetInput, IssueFilter, IssueGetInput, IssueRequest, IssueStatus,
+    ActorRef, AppliedIssue, AttachmentUpload, Issue, IssueCommentCreateInput, IssueConversationGetInput, IssueFilter, IssueGetInput, IssueRequest, IssueStatus,
     IssueStatusUpdateInput, IssueUpdate, IssueUpdateInput, JsNumber, Priority, SayRequest, ops,
 };
 
@@ -55,6 +55,33 @@ where
     }
 }
 
+fn deserialize_optional_issue_id_list<'de, D>(deserializer: D) -> Result<Option<Vec<String>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum StringOrInt {
+        Str(String),
+        Int(i64),
+        Uint(u64),
+    }
+
+    match Option::<Vec<StringOrInt>>::deserialize(deserializer)? {
+        None => Ok(None),
+        Some(items) => Ok(Some(
+            items
+                .into_iter()
+                .map(|item| match item {
+                    StringOrInt::Str(s) => s,
+                    StringOrInt::Int(n) => n.to_string(),
+                    StringOrInt::Uint(n) => n.to_string(),
+                })
+                .collect(),
+        )),
+    }
+}
+
 #[derive(Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct IssueListArgs {
@@ -95,6 +122,8 @@ pub(super) struct IssueCreateArgs {
     pub(super) agent: Option<String>,
     #[serde(default, deserialize_with = "deserialize_optional_issue_id")]
     pub(super) parent: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_optional_issue_id_list")]
+    pub(super) blocked_by: Option<Vec<String>>,
     #[serde(default)]
     pub(super) tags: Option<Vec<String>>,
     #[serde(default)]
@@ -105,6 +134,8 @@ pub(super) struct IssueCreateArgs {
     pub(super) criteria: Option<Vec<String>>,
     #[serde(default)]
     pub(super) attachments: Option<Vec<String>>,
+    #[serde(default)]
+    pub(super) owner: Option<ActorRef>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -126,6 +157,8 @@ pub(super) struct IssueUpdateArgs {
     pub(super) agent: Option<String>,
     #[serde(default, deserialize_with = "deserialize_optional_issue_id")]
     pub(super) parent: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_optional_issue_id_list")]
+    pub(super) blocked_by: Option<Vec<String>>,
     #[serde(default)]
     pub(super) tags: Option<Vec<String>>,
     #[serde(default)]
@@ -136,6 +169,8 @@ pub(super) struct IssueUpdateArgs {
     pub(super) criteria: Option<Vec<String>>,
     #[serde(default)]
     pub(super) attachments: Option<Vec<String>>,
+    #[serde(default)]
+    pub(super) owner: Option<ActorRef>,
     #[serde(default)]
     pub(super) comment: Option<String>,
 }
@@ -201,18 +236,29 @@ pub(super) fn tool_definitions() -> Vec<ToolDef> {
                     "repo": { "type": "string", "description": "Optional repository name." },
                     "agent": { "type": "string", "description": "Optional assigned agent profile id." },
                     "parent": { "type": "string", "description": "Optional parent issue number (e.g. '10' or '#10') or issue id." },
+                    "blockedBy": { "type": "array", "items": { "type": "string" }, "description": "Optional blocker issue numbers or ids." },
                     "tags": { "type": "array", "items": { "type": "string" }, "description": "Optional issue tags (e.g. ['UX', 'MCP'])." },
                     "startAt": { "type": "number", "description": "Optional planned start timestamp in Unix milliseconds." },
                     "dueAt": { "type": "number", "description": "Optional target due timestamp in Unix milliseconds." },
                     "criteria": { "type": "array", "items": { "type": "string" }, "description": "Optional acceptance criteria list." },
-                    "attachments": { "type": "array", "items": { "type": "string" }, "description": "Optional uploaded attachment ids." }
+                    "attachments": { "type": "array", "items": { "type": "string" }, "description": "Optional uploaded attachment ids." },
+                    "owner": {
+                        "type": "object",
+                        "properties": {
+                            "kind": { "type": "string", "enum": ["user", "agent"] },
+                            "id": { "type": "string" }
+                        },
+                        "required": ["kind", "id"],
+                        "additionalProperties": false,
+                        "description": "Optional final owner reference ({ kind: 'user' | 'agent', id }); defaults to local user 'self'."
+                    }
                 },
                 "required": ["title"]
             }),
         ),
         tool_def(
             "vv_issue_update",
-            "Update an existing VibeValley issue's title, description, priority, repo, agent, parent, tags, startAt, dueAt, criteria, attachments, or transition its status.",
+            "Update an existing VibeValley issue's title, description, priority, repo, agent, owner, parent, tags, startAt, dueAt, criteria, attachments, or transition its status.",
             json!({
                 "type": "object",
                 "properties": {
@@ -223,7 +269,18 @@ pub(super) fn tool_definitions() -> Vec<ToolDef> {
                     "priority": { "type": "string", "enum": ["urgent", "high", "medium", "low"], "description": "Updated priority." },
                     "repo": { "type": "string", "description": "Updated repository name." },
                     "agent": { "type": "string", "description": "Updated assigned agent profile id." },
+                    "owner": {
+                        "type": "object",
+                        "properties": {
+                            "kind": { "type": "string", "enum": ["user", "agent"] },
+                            "id": { "type": "string" }
+                        },
+                        "required": ["kind", "id"],
+                        "additionalProperties": false,
+                        "description": "Updated final owner reference ({ kind: 'user' | 'agent', id }), or empty id '' to clear owner."
+                    },
                     "parent": { "type": "string", "description": "Updated parent issue number/id, or empty string '' to clear parent." },
+                    "blockedBy": { "type": "array", "items": { "type": "string" }, "description": "Replacement blocker issue numbers or ids, or empty array [] to clear blockers." },
                     "tags": { "type": "array", "items": { "type": "string" }, "description": "Replacement issue tags list." },
                     "startAt": { "type": "number", "description": "Updated planned start timestamp in Unix milliseconds (0 clears it)." },
                     "dueAt": { "type": "number", "description": "Updated target due timestamp in Unix milliseconds (0 clears it)." },
@@ -343,12 +400,16 @@ impl McpServer {
             repo: non_empty_trimmed(args.repo),
             agent: non_empty_trimmed(args.agent),
             parent: non_empty_trimmed(args.parent).map(|p| issue_ref(&p)),
+            blocked_by: args
+                .blocked_by
+                .map(|items| items.into_iter().map(|item| issue_ref(item.trim())).filter(|item| !item.is_empty()).collect()),
             tags: args.tags.filter(|t| !t.is_empty()),
             start_at: args.start_at,
             due_at: args.due_at,
             priority: args.priority,
             criteria: args.criteria.filter(|c| !c.is_empty()),
             attachments: args.attachments.filter(|a| !a.is_empty()),
+            owner: args.owner,
             ..Default::default()
         };
 
@@ -409,19 +470,29 @@ impl McpServer {
             let trimmed = p.trim();
             if trimmed.is_empty() { String::new() } else { issue_ref(trimmed) }
         });
+        let blocked_by = args.blocked_by.map(|items| {
+            items
+                .into_iter()
+                .map(|item| issue_ref(item.trim()))
+                .filter(|item| !item.is_empty())
+                .collect::<Vec<_>>()
+        });
         let tags = args.tags;
         let start_at = args.start_at;
         let due_at = args.due_at;
         let priority = args.priority;
         let criteria = args.criteria;
         let attachments = args.attachments;
+        let owner = args.owner;
         let comment = non_empty_trimmed(args.comment);
 
         let has_field_edits = title.is_some()
             || description.is_some()
             || repo.is_some()
             || agent.is_some()
+            || owner.is_some()
             || parent.is_some()
+            || blocked_by.is_some()
             || tags.is_some()
             || start_at.is_some()
             || due_at.is_some()
@@ -437,7 +508,9 @@ impl McpServer {
                 description,
                 repo,
                 agent,
+                owner,
                 parent,
+                blocked_by,
                 tags,
                 start_at,
                 due_at,
@@ -462,7 +535,7 @@ impl McpServer {
         } else {
             if !has_field_edits {
                 return ToolCallResult::error(
-                    "vv_issue_update requires at least one field to update (title, description, status, priority, repo, agent, parent, tags, startAt, dueAt, criteria, or attachments)",
+                    "vv_issue_update requires at least one field to update (title, description, status, priority, repo, agent, owner, parent, blockedBy, tags, startAt, dueAt, criteria, or attachments)",
                 );
             }
             let req = IssueUpdateInput {
@@ -471,7 +544,9 @@ impl McpServer {
                 description,
                 repo,
                 agent,
+                owner,
                 parent,
+                blocked_by,
                 tags,
                 start_at,
                 due_at,

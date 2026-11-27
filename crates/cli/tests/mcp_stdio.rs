@@ -143,6 +143,7 @@ impl MockIssueState {
                 strength: MandateStrength::Explicit,
                 max_bot_review_rounds: 0,
                 auto_submit_pr: false,
+                pause: None,
             },
             conflict: None,
             repo: req.repo,
@@ -157,6 +158,7 @@ impl MockIssueState {
             canceled: None,
             parent: req.parent,
             blocked_by: req.blocked_by.unwrap_or_default(),
+            relations: req.relations.unwrap_or_default(),
             cron: None,
             status: IssueStatus::Backlog,
             moves: vec![IssueStatus::Todo, IssueStatus::Canceled],
@@ -182,6 +184,7 @@ impl MockIssueState {
             tags: req.tags.unwrap_or_default(),
             start_at: req.start_at,
             due_at: req.due_at,
+            owner: req.owner.or_else(|| Some(vibevalley_protocol::ActorRef::self_user())),
         }
     }
 }
@@ -262,6 +265,9 @@ async fn handle_issue_update(State(state): State<MockIssueState>, axum::Json(inp
     if let Some(criteria) = input.criteria {
         issue.criteria = criteria;
     }
+    if let Some(owner) = input.owner {
+        issue.owner = if owner.id().trim().is_empty() { None } else { Some(owner) };
+    }
     ok_envelope(AppliedIssue::from_issue(issue.clone(), 2)).into_response()
 }
 
@@ -280,6 +286,9 @@ async fn handle_issue_status_update(State(state): State<MockIssueState>, axum::J
         }
         if let Some(priority) = edit.priority {
             issue.priority = priority;
+        }
+        if let Some(owner) = edit.owner {
+            issue.owner = if owner.id().trim().is_empty() { None } else { Some(owner) };
         }
     }
     issue.status = input.status;
@@ -883,7 +892,7 @@ async fn drive_mock_vdp(mut socket: WebSocket, state: MockVdpState) {
                             height: 36.0,
                         }),
                         pressable: Some(true),
-                        children: None,
+                        ..Default::default()
                     }],
                 };
                 send_ws_json(&mut socket, &VdpResponse::ok(req.id, serde_json::to_value(out).unwrap(), req.session_id)).await;
@@ -1144,6 +1153,7 @@ fn mcp_stdio_end_to_end_issues_vdp_screenshot_and_security() {
             "status": "todo",
             "repo": "vibevalley",
             "agent": "frontend",
+            "owner": { "kind": "agent", "id": "frontend" },
             "criteria": ["Left indicator bar matches rail geometry"]
         }),
     );
@@ -1152,6 +1162,7 @@ fn mcp_stdio_end_to_end_issues_vdp_screenshot_and_security() {
     assert_eq!(created_json["number"], 1);
     assert_eq!(created_json["status"], "todo");
     assert_eq!(created_json["priority"], "high");
+    assert_eq!(created_json["owner"], json!({ "kind": "agent", "id": "frontend" }));
 
     let _second = mcp.call_tool(
         11,
@@ -1181,13 +1192,15 @@ fn mcp_stdio_end_to_end_issues_vdp_screenshot_and_security() {
             "id": "1",
             "title": "Fix rail active highlight (verified)",
             "status": "done",
-            "priority": "medium"
+            "priority": "medium",
+            "owner": { "kind": "user", "id": "alice" }
         }),
     );
     assert_ne!(updated["isError"], true, "{updated}");
     let updated_json: Value = serde_json::from_str(updated["content"][0]["text"].as_str().unwrap()).unwrap();
     assert_eq!(updated_json["status"], "done");
     assert_eq!(updated_json["title"], "Fix rail active highlight (verified)");
+    assert_eq!(updated_json["owner"], json!({ "kind": "user", "id": "alice" }));
 
     let commented = mcp.call_tool(15, "vv_issue_comment", json!({ "issueId": "1", "text": "Verified on round 2 screenshot" }));
     assert_ne!(commented["isError"], true, "{commented}");

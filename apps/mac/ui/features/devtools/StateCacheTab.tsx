@@ -1,15 +1,16 @@
 import { computed, Scroll, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
-import type { DebugStateCache } from "@vibevalley/protocol";
+import type { DebugCollabArtifactState, DebugStateCache } from "@vibevalley/protocol";
 
 import { Tag } from "../../design/Tag";
-import { formatJson, SLICE_NAMES } from "./format";
-import { JsonPreview, MetricTile, SectionHeader } from "./shared";
+import { formatBytes, formatJson, SLICE_NAMES } from "./format";
+import { CopyButton, JsonPreview, MetricTile, SectionHeader } from "./shared";
 
 export function StateCacheTab(props: { stateCache: () => DebugStateCache }) {
   const sc = () => props.stateCache();
   const selectedSlice = signal<string>(SLICE_NAMES[0]);
+  const selectedCollabId = signal<string | undefined>(undefined);
 
   const sliceRows = computed(() => {
     const current = sc();
@@ -48,6 +49,31 @@ export function StateCacheTab(props: { stateCache: () => DebugStateCache }) {
       seq: current.sliceSeqs[name] ?? 0,
       watchers: current.sliceWatchers[name] ?? 0,
       counts: current.counts,
+    });
+  });
+
+  const selectedCollab = computed<DebugCollabArtifactState | undefined>(() => {
+    const items = sc().collab;
+    if (items.length === 0) return undefined;
+    const id = selectedCollabId();
+    return items.find((item) => item.artifactId === id) ?? items[0];
+  });
+
+  const collabPreviewJson = computed(() => {
+    const c = selectedCollab();
+    if (!c) return "";
+    return formatJson({
+      artifactId: c.artifactId,
+      title: c.title,
+      artifactType: c.artifactType,
+      seq: c.seq,
+      snapshotBytes: c.snapshotBytes,
+      frontiers: c.frontiers,
+      frontierIds: c.frontierIds,
+      versionVector: c.versionVector,
+      vvEntries: c.vvEntries,
+      ephemeralTtlMs: c.ephemeralTtlMs,
+      presence: c.presence,
     });
   });
 
@@ -121,6 +147,111 @@ export function StateCacheTab(props: { stateCache: () => DebugStateCache }) {
               )}
             </Each>
           </View>
+        </If>
+      </View>
+
+      <View testID="state-collab-section" class="gap-2">
+        <SectionHeader title={t("web.devtools.state.collab")} count={sc().collab.length} />
+        <If
+          when={sc().collab.length > 0}
+          else={
+            <View testID="state-collab-empty" class="rounded-md border border-line bg-side px-3 py-2.5">
+              <Text class="text-xs text-muted">{t("web.devtools.state.emptyCollab")}</Text>
+            </View>
+          }
+        >
+          <View class="overflow-hidden rounded-md border border-line bg-page">
+            <Each of={sc().collab} key={(c) => c.artifactId}>
+              {(item, idx) => {
+                const active = () => selectedCollab()?.artifactId === item().artifactId;
+                return (
+                  <View
+                    role="button"
+                    testID={`state-collab-${item().artifactId}`}
+                    accessibilityState={{ selected: active() }}
+                    onPress={() => selectedCollabId.set(item().artifactId)}
+                    class={`gap-1.5 px-3 py-2.5 ${idx() > 0 ? "border-t border-line" : ""} ${active() ? "bg-selected" : "hover:bg-hover"}`}
+                  >
+                    <View class="flex-row flex-wrap items-center justify-between gap-2">
+                      <View class="min-w-0 flex-1 flex-row items-center gap-1.5">
+                        <Text class="truncate text-xs font-medium text-ink">{item().title || item().artifactId}</Text>
+                        <Tag tone="neutral" label={item().artifactType} />
+                      </View>
+                      <View class="flex-row items-center gap-1.5">
+                        <Tag tone="info" label={`seq ${item().seq}`} />
+                        <Tag tone="neutral" label={formatBytes(item().snapshotBytes)} />
+                        <Tag tone={item().presenceCount > 0 ? "ok" : "neutral"} label={`${item().presenceCount} peers`} />
+                      </View>
+                    </View>
+                    <View class="flex-row flex-wrap items-center gap-2">
+                      <Text class="font-mono text-2xs text-muted">
+                        {t("web.devtools.state.frontiers")}:{" "}
+                        {item()
+                          .frontierIds.map((id) => `${id.peerId}:${id.counter}`)
+                          .join(", ") ||
+                          item().frontiers ||
+                          "∅"}
+                      </Text>
+                      <Text class="font-mono text-2xs text-faint">
+                        VV:{" "}
+                        {item()
+                          .vvEntries.map((vv) => `${vv.peerId}=${vv.counter}`)
+                          .join(" ") ||
+                          item().versionVector ||
+                          "∅"}
+                      </Text>
+                      <Tag tone="neutral" label={t("web.devtools.state.ttl", { ms: item().ephemeralTtlMs })} />
+                    </View>
+                  </View>
+                );
+              }}
+            </Each>
+          </View>
+
+          <If when={selectedCollab() !== undefined}>
+            <View testID="state-collab-detail" class="gap-2 rounded-md border border-line bg-side p-3">
+              <View class="flex-row flex-wrap items-center justify-between gap-2">
+                <Text class="text-xs font-semibold text-ink">{t("web.devtools.state.presence")}</Text>
+                <View class="flex-row items-center gap-1.5">
+                  <If when={Boolean(selectedCollab()!.frontiers)}>
+                    <CopyButton text={selectedCollab()!.frontiers} label={t("web.devtools.state.frontiers")} testID="state-collab-copy-frontiers" />
+                  </If>
+                  <If when={Boolean(selectedCollab()!.versionVector)}>
+                    <CopyButton text={selectedCollab()!.versionVector} label="VV" testID="state-collab-copy-vv" />
+                  </If>
+                </View>
+              </View>
+              <If when={selectedCollab()!.presence.length > 0} else={<Text class="text-xs text-muted">{t("web.devtools.state.noPeers")}</Text>}>
+                <View class="gap-1">
+                  <Each of={selectedCollab()!.presence} key={(peer) => peer.id}>
+                    {(peer) => (
+                      <View
+                        testID={`state-collab-peer-${peer().id}`}
+                        class="flex-row flex-wrap items-center gap-2 rounded-sm border border-line bg-page px-2.5 py-1.5"
+                      >
+                        <Tag tone="ok" label={peer().kind} />
+                        <Text class="text-xs font-medium text-ink">{peer().name}</Text>
+                        <Text class="font-mono text-2xs text-muted">{peer().id}</Text>
+                        <If when={Boolean(peer().path)}>
+                          <Text class="font-mono text-2xs text-water">{peer().path}</Text>
+                        </If>
+                        <If when={Boolean(peer().nodeId)}>
+                          <Text class="font-mono text-2xs text-muted">#{peer().nodeId}</Text>
+                        </If>
+                        <If when={peer().offset !== undefined}>
+                          <Text class="font-mono text-2xs text-faint">
+                            @{peer().offset}
+                            {peer().endOffset !== undefined ? `..${peer().endOffset}` : ""}
+                          </Text>
+                        </If>
+                      </View>
+                    )}
+                  </Each>
+                </View>
+              </If>
+              <JsonPreview content={collabPreviewJson()} testID="state-collab-json" copyTestID="state-collab-copy" />
+            </View>
+          </If>
         </If>
       </View>
     </Scroll>

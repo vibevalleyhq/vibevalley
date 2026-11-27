@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use vibevalley_terminal::{LinkMatch, LinkTarget, Row, TermEvent, TermSession};
+use vibevalley_terminal::{ActiveHookInfo, HookSource, LinkMatch, LinkTarget, ResolvedTerminalHooks, Row, TermEvent, TermSession};
 
 #[derive(Debug, Clone)]
 pub struct SpawnSpec {
@@ -15,6 +15,8 @@ pub struct SpawnSpec {
     pub env: Vec<(String, String)>,
     /// Saved output shown above the new shell's prompt (a restored terminal).
     pub history: Option<String>,
+    /// Resolved scoped hooks to inject into this terminal's PTY (empty = zero overhead).
+    pub hooks: ResolvedTerminalHooks,
 }
 
 impl SpawnSpec {
@@ -27,6 +29,7 @@ impl SpawnSpec {
             args: Vec::new(),
             env: Vec::new(),
             history: None,
+            hooks: ResolvedTerminalHooks::default(),
         }
     }
 }
@@ -109,6 +112,94 @@ impl TerminalStatus {
 
     pub fn is_coding_agent(&self) -> bool {
         self.agent.as_deref().is_some_and(|agent| agent != "cmd")
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HookBadgeItem {
+    pub id: String,
+    pub label: String,
+    pub source: HookSource,
+}
+
+impl From<&ActiveHookInfo> for HookBadgeItem {
+    fn from(info: &ActiveHookInfo) -> Self {
+        Self {
+            id: info.id.clone(),
+            label: info.label.clone(),
+            source: info.source,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct TerminalHookStatus {
+    pub active_hooks: Vec<HookBadgeItem>,
+    pub desired_hooks: Vec<HookBadgeItem>,
+    pub pending_restart: bool,
+}
+
+impl TerminalHookStatus {
+    pub fn from_resolved(active: &ResolvedTerminalHooks, desired: &ResolvedTerminalHooks) -> Self {
+        let active_hooks: Vec<HookBadgeItem> = active.active.iter().map(HookBadgeItem::from).collect();
+        let desired_hooks: Vec<HookBadgeItem> = desired.active.iter().map(HookBadgeItem::from).collect();
+        let pending_restart = active.templates != desired.templates || active.workspace_root != desired.workspace_root;
+        Self {
+            active_hooks,
+            desired_hooks,
+            pending_restart,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HookToggleAction {
+    RespawnNow,
+    PendingRestart,
+}
+
+pub fn classify_hook_toggle_action(alive: bool, has_foreground_process: bool) -> HookToggleAction {
+    if alive && has_foreground_process {
+        HookToggleAction::PendingRestart
+    } else {
+        HookToggleAction::RespawnNow
+    }
+}
+
+pub fn hook_badge_label(status: &TerminalHookStatus) -> Option<String> {
+    let items = if !status.active_hooks.is_empty() {
+        &status.active_hooks
+    } else if status.pending_restart && !status.desired_hooks.is_empty() {
+        &status.desired_hooks
+    } else {
+        return None;
+    };
+    let first = items.first()?;
+    if items.len() == 1 {
+        Some(first.label.clone())
+    } else {
+        Some(format!("{} +{}", first.label, items.len() - 1))
+    }
+}
+
+pub fn hook_names_csv(items: &[HookBadgeItem]) -> String {
+    items.iter().map(|i| i.label.as_str()).collect::<Vec<_>>().join(", ")
+}
+
+pub fn hook_badge_tooltip(status: &TerminalHookStatus) -> String {
+    if status.pending_restart {
+        let names = if status.desired_hooks.is_empty() {
+            vibevalley_i18n::t("desktop.terminal.hooks.sourceOff", &[])
+        } else {
+            hook_names_csv(&status.desired_hooks)
+        };
+        return vibevalley_i18n::t("desktop.terminal.hooks.tooltipPending", &[("hooks", names.into())]);
+    }
+    if status.active_hooks.is_empty() {
+        vibevalley_i18n::t("desktop.terminal.hooks.tooltipOff", &[])
+    } else {
+        let names = hook_names_csv(&status.active_hooks);
+        vibevalley_i18n::t("desktop.terminal.hooks.tooltipActive", &[("hooks", names.into())])
     }
 }
 
@@ -405,4 +496,38 @@ pub(super) fn classify_terminal_status(
     }
 
     TerminalStatus::idle()
+}
+
+pub(crate) fn classify_busy_label(
+    alive: bool,
+    has_foreground_process: bool,
+    running_command: Option<&str>,
+    status: &TerminalStatus,
+    osc_title: Option<&str>,
+    fallback_label: &str,
+) -> Option<String> {
+    if !alive {
+        return None;
+    }
+    let trimmed_command = running_command.map(str::trim).filter(|c| !c.is_empty());
+    let active_status = status.state != RunningState::Idle;
+    if !has_foreground_process && trimmed_command.is_none() && !active_status {
+        return None;
+    }
+    if status.is_coding_agent()
+        && let Some(agent) = status.agent.as_deref()
+    {
+        return Some(agent_display_name(agent, status.label.as_deref().unwrap_or(agent)));
+    }
+    if let Some(cmd) = trimmed_command {
+        return Some(cmd.to_string());
+    }
+    if let Some(title) = osc_title.map(str::trim).filter(|t| !t.is_empty() && !crate::panes::is_default_title(t)) {
+        return Some(title.to_string());
+    }
+    if let Some(label) = status.label.as_deref().map(str::trim).filter(|l| !l.is_empty() && *l != "运行中") {
+        return Some(label.to_string());
+    }
+    let fallback = fallback_label.trim();
+    Some(if fallback.is_empty() { "shell".to_string() } else { fallback.to_string() })
 }

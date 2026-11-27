@@ -85,6 +85,99 @@ enum IssueWake {
 
 type DeliveryWaiter = (u64, oneshot::Sender<()>);
 
+/// Per-key serialized async work queue drained on `TaskTracker` until each key goes idle or is cancelled.
+pub(super) struct KeyedLaneQueue<T> {
+    cancel: CancellationToken,
+    lanes: Arc<Mutex<HashMap<String, tokio::sync::mpsc::UnboundedSender<T>>>>,
+    tasks: TaskTracker,
+}
+
+impl<T: Send + 'static> KeyedLaneQueue<T> {
+    pub(super) fn new(cancel: CancellationToken) -> Self {
+        Self {
+            cancel,
+            lanes: Arc::new(Mutex::new(HashMap::new())),
+            tasks: TaskTracker::new(),
+        }
+    }
+
+    pub(super) fn enqueue<F, Fut>(&self, key: String, item: T, mut handle_item: F)
+    where
+        F: FnMut(T) -> Fut + Send + 'static,
+        Fut: std::future::Future<Output = ()> + Send + 'static,
+    {
+        if self.cancel.is_cancelled() {
+            return;
+        }
+        let mut lanes = self.lanes.lock();
+        let item = match lanes.get(&key) {
+            Some(tx) => match tx.send(item) {
+                Ok(()) => return,
+                Err(tokio::sync::mpsc::error::SendError(returned)) => returned,
+            },
+            None => item,
+        };
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<T>();
+        let _ = tx.send(item);
+        lanes.insert(key.clone(), tx);
+        let lanes_ref = Arc::downgrade(&self.lanes);
+        let cancel = self.cancel.clone();
+        let handle = vibevalley_runtime::rt::current_or_global_handle();
+        self.tasks.spawn_on(
+            async move {
+                loop {
+                    if cancel.is_cancelled() {
+                        return;
+                    }
+                    let next = match rx.try_recv() {
+                        Ok(item) => item,
+                        Err(tokio::sync::mpsc::error::TryRecvError::Empty) => {
+                            let Some(lanes_arc) = lanes_ref.upgrade() else { return };
+                            let mut lanes = lanes_arc.lock();
+                            match rx.try_recv() {
+                                Ok(item) => item,
+                                Err(_) => {
+                                    lanes.remove(&key);
+                                    return;
+                                }
+                            }
+                        }
+                        Err(tokio::sync::mpsc::error::TryRecvError::Disconnected) => return,
+                    };
+                    if cancel.is_cancelled() {
+                        return;
+                    }
+                    handle_item(next).await;
+                }
+            },
+            &handle,
+        );
+    }
+
+    pub(super) async fn close_async(&self, coordinator: &Mutex<Option<TaskHandle<()>>>, label: &str) {
+        self.cancel.cancel();
+        self.lanes.lock().clear();
+        let coordinator = coordinator.lock().take();
+        let timed_out = tokio::time::timeout(CHAT_CLOSE_GRACE, async {
+            if let Some(handle) = coordinator {
+                let _ = handle.await;
+            }
+            self.lanes.lock().clear();
+            self.tasks.close();
+            self.tasks.wait().await;
+        })
+        .await
+        .is_err();
+        if timed_out {
+            tracing::warn!(
+                remaining = self.tasks.len(),
+                timeout_secs = CHAT_CLOSE_GRACE.as_secs(),
+                "{label} close timed out waiting for lane tasks"
+            );
+        }
+    }
+}
+
 /// Bridges session lifecycle events, durable outbox reports, and `Chat` deliveries onto
 /// issue threads and [`Board::tell_message_async`] asynchronously per issue.
 pub struct IssueChat {
@@ -94,8 +187,7 @@ pub struct IssueChat {
     opening: tokio::sync::Mutex<()>,
     cancel: CancellationToken,
     coordinator: Mutex<Option<TaskHandle<()>>>,
-    lanes: Mutex<HashMap<String, tokio::sync::mpsc::UnboundedSender<IssueWake>>>,
-    lane_tasks: TaskTracker,
+    lanes: KeyedLaneQueue<IssueWake>,
     next_waiter_id: AtomicU64,
     delivery_waiters: Mutex<HashMap<String, Vec<DeliveryWaiter>>>,
 }
@@ -111,8 +203,7 @@ impl IssueChat {
             opening: tokio::sync::Mutex::new(()),
             cancel: cancel.clone(),
             coordinator: Mutex::new(None),
-            lanes: Mutex::new(HashMap::new()),
-            lane_tasks: TaskTracker::new(),
+            lanes: KeyedLaneQueue::new(cancel.clone()),
             next_waiter_id: AtomicU64::new(1),
             delivery_waiters: Mutex::new(HashMap::new()),
         });
@@ -178,25 +269,7 @@ impl IssueChat {
     pub async fn close_async(&self) {
         self.cancel.cancel();
         self.delivery_waiters.lock().clear();
-        self.lanes.lock().clear();
-        let coordinator = self.coordinator.lock().take();
-        let timed_out = tokio::time::timeout(CHAT_CLOSE_GRACE, async {
-            if let Some(handle) = coordinator {
-                let _ = handle.await;
-            }
-            self.lanes.lock().clear();
-            self.lane_tasks.close();
-            self.lane_tasks.wait().await;
-        })
-        .await
-        .is_err();
-        if timed_out {
-            tracing::warn!(
-                remaining = self.lane_tasks.len(),
-                timeout_secs = CHAT_CLOSE_GRACE.as_secs(),
-                "issue-chat close timed out waiting for lane tasks"
-            );
-        }
+        self.lanes.close_async(&self.coordinator, "issue-chat").await;
     }
 
     /// `issue.comment.create`: router handler returning the current sequence number.
@@ -339,13 +412,61 @@ impl IssueChat {
                 None => return Ok(()),
             },
         };
-        if !s.is_board_worker() || s.issue_id().is_none() {
+        if !(s.is_board_worker() || s.is_readonly_issue_helper()) || s.issue_id().is_none() {
             return Ok(());
         }
         if let Err(e) = self.post_report_async(&s, report).await {
             warn("the report", &e);
         }
         Ok(())
+    }
+
+    /// Parses `@<agent>` discussion mentions and dispatches readonly collaborator sessions.
+    /// Returns `None` if no collaborators matched, `Some(true)` if handled without waking
+    /// the primary worker, or `Some(false)` if collaborators were dispatched alongside primary delivery.
+    async fn dispatch_mentioned_collaborators_async(&self, issue_id: &str, c: &Committed, primary_session_id: Option<&str>) -> Option<bool> {
+        if matches!(c.row.kind.as_str(), "report" | "dispatch" | "notice") {
+            return None;
+        }
+        let tokens = crate::channel::words::extract_at_tokens(&c.row.body);
+        if tokens.is_empty() {
+            return None;
+        }
+        let issue = self.board.issue_async(issue_id).await.ok().flatten();
+        let primary_agent = issue.as_ref().and_then(|i| i.assigned_agent()).map(str::to_string);
+        let driver = self.board.runtime().driver();
+        let mut collaborators = Vec::new();
+        let mut explicit_primary_wake = false;
+        for tok in &tokens {
+            if let Some(primary_id) = primary_session_id
+                && tok == primary_id
+            {
+                explicit_primary_wake = true;
+                continue;
+            }
+            if matches!(tok.as_str(), "everyone" | "所有人") {
+                explicit_primary_wake = true;
+                continue;
+            }
+            if let Some(agent) = driver.resolve_mention_agent(tok) {
+                if primary_session_id.is_some() && primary_agent.as_deref() == Some(agent.id.as_str()) {
+                    explicit_primary_wake = true;
+                } else if !collaborators.iter().any(|existing: &String| existing == &agent.id) {
+                    collaborators.push(agent.id);
+                }
+            }
+        }
+        if collaborators.is_empty() {
+            return None;
+        }
+        let mut all_ok = true;
+        for agent_id in &collaborators {
+            if let Err(e) = self.board.dispatch_collaborator_async(issue_id, agent_id, &c.row.body, &c.row.id).await {
+                all_ok = false;
+                self.ctx.live.publish_notice(now(), NoticeLevel::Warn, e.to_string());
+            }
+        }
+        Some(all_ok && !explicit_primary_wake)
     }
 
     async fn issue_sessions_async(&self) -> Vec<Session> {
@@ -359,10 +480,17 @@ impl IssueChat {
     }
 
     async fn on_issue_async(&self, issue: &str) -> Option<Session> {
+        if let Ok(Some(item)) = self.board.issue_async(issue).await
+            && let Some(id) = item.latest_session_id()
+            && let Some(session) = self.board.session_async(id).await
+            && !session.is_readonly_issue_helper()
+        {
+            return Some(session);
+        }
         self.issue_sessions_async()
             .await
             .into_iter()
-            .filter(|h| h.issue_id() == Some(issue))
+            .filter(|h| h.issue_id() == Some(issue) && !h.is_readonly_issue_helper())
             .max_by_key(|h| h.hired_at)
     }
 
@@ -572,6 +700,16 @@ impl IssueChat {
         else {
             return Ok(());
         };
+        if h.is_readonly_issue_helper() && self.channel.home_of(&h.id).is_none() {
+            self.channel
+                .seat_async(&Seat {
+                    id: h.id.clone(),
+                    name: h.name.clone(),
+                    agent: h.profile.clone(),
+                    home: None,
+                })
+                .await?;
+        }
         self.deliver_report_async(
             Note {
                 channel: thread,
@@ -675,52 +813,15 @@ impl IssueChat {
     }
 
     fn enqueue_lane(self: &Arc<Self>, issue_id: String, wake: IssueWake) {
-        if self.cancel.is_cancelled() {
-            return;
-        }
-        let mut lanes = self.lanes.lock();
-        if let Some(tx) = lanes.get(&issue_id)
-            && tx.send(wake.clone()).is_ok()
-        {
-            return;
-        }
-        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<IssueWake>();
-        let _ = tx.send(wake);
-        lanes.insert(issue_id.clone(), tx);
         let ic = Arc::downgrade(self);
-        let id_for_task = issue_id;
-        let cancel = self.cancel.clone();
-        let handle = vibevalley_runtime::rt::current_or_global_handle();
-        self.lane_tasks.spawn_on(
+        self.lanes.enqueue(issue_id, wake, move |item| {
+            let ic = ic.clone();
             async move {
-                loop {
-                    if cancel.is_cancelled() {
-                        return;
-                    }
-                    let item = match rx.try_recv() {
-                        Ok(item) => item,
-                        Err(tokio::sync::mpsc::error::TryRecvError::Empty) => {
-                            let Some(ic) = ic.upgrade() else { return };
-                            let mut lanes = ic.lanes.lock();
-                            match rx.try_recv() {
-                                Ok(item) => item,
-                                Err(_) => {
-                                    lanes.remove(&id_for_task);
-                                    return;
-                                }
-                            }
-                        }
-                        Err(tokio::sync::mpsc::error::TryRecvError::Disconnected) => return,
-                    };
-                    let Some(ic) = ic.upgrade() else { return };
-                    if ic.cancel.is_cancelled() {
-                        return;
-                    }
+                if let Some(ic) = ic.upgrade() {
                     ic.handle_wake_async(item).await;
                 }
-            },
-            &handle,
-        );
+            }
+        });
     }
 
     async fn handle_wake_async(&self, wake: IssueWake) {
@@ -759,6 +860,13 @@ impl IssueChat {
             return;
         };
         let on = self.on_issue_async(&delivery.recipient_id).await.map(|h| h.id);
+        if let Some(suppressed) = self.dispatch_mentioned_collaborators_async(&delivery.recipient_id, &c, on.as_deref()).await
+            && suppressed
+        {
+            let _ = self.board.session_engine().withdraw_mailbox_by_message_async(&delivery.message_id).await;
+            let _ = self.channel.settle_delivery_async(delivery.id, true).await;
+            return;
+        }
         let mut text = c.row.body.trim().to_string();
         if let Some(vc) = view_context_of(&c) {
             text = format!("{}\n{text}", format_artifact_view_context(&vc));
@@ -786,7 +894,11 @@ impl IssueChat {
         if !earlier_lines.is_empty() {
             text = format!("{text}\n\n{}", wake_input(&earlier_lines));
         }
-        let tell_res = self.board.tell_message_async(&delivery.recipient_id, &text, &delivery.message_id).await;
+        let from_user = c.row.sender_kind == "user";
+        let tell_res = self
+            .board
+            .tell_message_from_async(&delivery.recipient_id, &text, &delivery.message_id, from_user)
+            .await;
         match tell_res {
             Ok(()) => {
                 let _ = self.channel.settle_delivery_async(delivery.id, true).await;
@@ -823,6 +935,7 @@ impl IssueChat {
             .unwrap_or_default();
         let mut settled_ids: Vec<(i64, String)> = Vec::new();
         let mut lines: Vec<String> = Vec::new();
+        let mut from_user = false;
         for d in pending {
             let loaded = if d.id == delivery.id {
                 match committed.clone() {
@@ -834,6 +947,16 @@ impl IssueChat {
             };
             match loaded {
                 Some(ec) => {
+                    if let Some(suppressed) = self.dispatch_mentioned_collaborators_async(issue_id, &ec, Some(&delivery.recipient_id)).await
+                        && suppressed
+                    {
+                        let _ = self.board.session_engine().withdraw_mailbox_by_message_async(&d.message_id).await;
+                        let _ = self.channel.settle_delivery_async(d.id, true).await;
+                        continue;
+                    }
+                    if ec.row.sender_kind == "user" {
+                        from_user = true;
+                    }
                     lines.push(line_of(&self.channel, &ec));
                     settled_ids.push((d.id, d.message_id));
                 }
@@ -846,7 +969,7 @@ impl IssueChat {
             return;
         }
         let body = wake_input(&lines);
-        let tell_res = self.board.tell_message_async(issue_id, &body, &delivery.message_id).await;
+        let tell_res = self.board.tell_message_from_async(issue_id, &body, &delivery.message_id, from_user).await;
         match tell_res {
             Ok(()) => {
                 for (did, _) in &settled_ids {
@@ -898,15 +1021,15 @@ mod tests {
         let board = Board::open_standalone_async(ctx.clone(), Arc::new(vibevalley_runtime::oar::Registry::new()), BoardConfig::under(dir))
             .await
             .unwrap();
+        let cancel = ctx.task.child_token();
         let ic = Arc::new(IssueChat {
             ctx: ctx.clone(),
             board: board.clone(),
             channel: channel.clone(),
             opening: tokio::sync::Mutex::new(()),
-            cancel: ctx.task.child_token(),
+            cancel: cancel.clone(),
             coordinator: Mutex::new(None),
-            lanes: Mutex::new(HashMap::new()),
-            lane_tasks: TaskTracker::new(),
+            lanes: KeyedLaneQueue::new(cancel),
             next_waiter_id: AtomicU64::new(1),
             delivery_waiters: Mutex::new(HashMap::new()),
         });

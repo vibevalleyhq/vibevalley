@@ -36,14 +36,42 @@
     "newChatWith": "新建 {runtime} 对话",
     "chooseRuntime": "选择对话引擎"
   },
+  "tab": {
+    "closeBusy": {
+      "title": "关闭“{title}”？",
+      "detail": "此标签页中仍有“{process}”正在运行，关闭将中止当前运行。",
+      "cancel": "取消",
+      "confirm": "关闭标签页"
+    }
+  },
   "terminal": {
     "noProject": "请先打开项目，再启动终端。",
     "missingFolder": "工作区已不存在，无法在此打开终端。",
     "dismiss": "知道了",
-    "agentTurnDone": "{agent} 本轮已完成"
+    "agentTurnDone": "{agent} 本轮已完成",
+    "hooks": {
+      "title": "终端 Hook",
+      "subtitle": "仅作用于当前终端，不修改全局配置文件与 PATH",
+      "tooltipOff": "终端 Hook：未启用（点击配置）",
+      "tooltipActive": "已启用 Hook：{hooks}",
+      "tooltipPending": "Hook 已变更（{hooks}），重启终端后生效",
+      "tabSection": "当前标签页",
+      "workspaceSection": "工作区默认",
+      "workspaceToggle": "在 {repo} 新建终端时默认启用 {hook}",
+      "sourceWorkspace": "工作区",
+      "sourceTab": "标签页",
+      "sourceOff": "关闭",
+      "pendingRestart": "Hook 配置已变更，需要重启当前终端以生效",
+      "restartAction": "重启终端",
+      "activeSummary": "已注入：{hooks}（隔离环境变量 / PATH / ZDOTDIR）",
+      "disabledSummary": "未启用 · 零额外环境变量与 PATH 注入"
+    }
   },
   "files": {
     "missingInWorktree": "此工单的工作区中无法打开 {path}"
+  },
+  "devtools": {
+    "inspectingHint": "点击页面或画布元素以检视 · 按 Esc 取消"
   },
   "startup": {
     "titleSchema": "数据库结构不匹配",

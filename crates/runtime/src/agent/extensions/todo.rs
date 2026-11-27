@@ -1,5 +1,7 @@
 use std::collections::HashSet;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+
+use parking_lot::Mutex;
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -246,7 +248,7 @@ async fn read_todos(fallback: &Mutex<Vec<Todo>>, ctx: &ToolContext) -> Result<Ve
             .map(|doc| doc.items)
             .map_err(|e| e.to_string());
     }
-    Ok(fallback.lock().unwrap_or_else(|p| p.into_inner()).clone())
+    Ok(fallback.lock().clone())
 }
 
 async fn mutate_todos<R: Send + 'static>(
@@ -270,7 +272,7 @@ async fn mutate_todos<R: Send + 'static>(
             .await
             .map_err(|e| e.to_string());
     }
-    let mut g = fallback.lock().unwrap_or_else(|p| p.into_inner());
+    let mut g = fallback.lock();
     f(&mut g)
 }
 

@@ -677,4 +677,169 @@ fn regression_a_stale_approval_cannot_grant_the_next_call_over_http() {
     reopened.close_blocking();
 }
 
+#[test]
+fn channel_command_invokes_user_skill_on_demand_and_orchestrator_toolsets_narrow_tools() {
+    vibevalley_i18n::set_locale("zh");
+    let dir = tempfile::tempdir().unwrap();
+    let clock = Arc::new(ManualClock::new(1_700_000_000_000));
+    let model = SignaledScripted::new([
+        call("c1", "load_skill", json!({ "name": "release-check" })),
+        say("已按 release-check 核对完成。"),
+    ]);
+    let mut registry = vibevalley_runtime::oar::Registry::new();
+    registry.register(Arc::new(vibevalley_runtime::oar::scripted::ScriptedRuntime::demo()));
+    let started = vibevalley_server::create_app_blocking(vibevalley_server::Config {
+        registry: Some(Arc::new(registry)),
+        probe_runtimes: false,
+        link_previews: false,
+        tick_crons: false,
+        model_client: Some(model.clone()),
+        clock,
+        ..vibevalley_server::Config::under(dir.path())
+    })
+    .unwrap();
+    let hub = started.router().clone();
+    let user = |op: &str, p: Value| {
+        let e = hub.call_as(Caller::User, op, p);
+        assert_eq!(e.biz_code, 0, "{op}: {}", e.message);
+        e.data.unwrap_or(Value::Null)
+    };
+
+    user(
+        "skill.create",
+        json!({
+            "id": "",
+            "name": "release-check",
+            "description": "Pre-release checklist",
+            "body": "Run tests before shipping."
+        }),
+    );
+
+    let agents: Vec<vibevalley_protocol::Agent> = serde_json::from_value(user("agent.list", json!({}))).unwrap();
+    let mut orch = agents.into_iter().find(|a| a.id == "orchestrator").unwrap();
+    orch.toolsets = vec![vibevalley_protocol::Toolset::Issue];
+    user("agent.update", serde_json::to_value(orch).unwrap());
+
+    let general = started.test_internals().channel.default_channel();
+    user(
+        "channel.message.send",
+        json!({
+            "id": general,
+            "text": "/release-check v1.2",
+            "command": { "name": "release-check", "args": "v1.2" },
+            "sendKey": "slash-cmd"
+        }),
+    );
+
+    crate::support::wait_until_channel_event(started.test_internals().channel, Duration::from_secs(30), "skill command reply", || {
+        let said = user("channel.message.list", json!({ "id": general }));
+        said.as_array()?
+            .iter()
+            .find(|m| m["from"] == "orchestrator" && m["text"] == "已按 release-check 核对完成。")
+            .cloned()
+    });
+
+    let seen = model.seen.lock().unwrap().clone();
+    let tool_names: Vec<&str> = seen[0].tools.iter().map(|t| t.name.as_str()).collect();
+    assert!(tool_names.contains(&"issue_list"), "{tool_names:?}");
+    assert!(tool_names.contains(&"load_skill"), "{tool_names:?}");
+    assert!(!tool_names.contains(&"cron_list"), "cron should be filtered out by toolsets: {tool_names:?}");
+    let prompt_input = seen[0].messages.last().unwrap().content.clone().unwrap_or_default();
+    assert!(prompt_input.contains("/release-check"), "{prompt_input}");
+    assert!(prompt_input.contains("v1.2"), "{prompt_input}");
+    let skill_result = seen[1]
+        .messages
+        .iter()
+        .find(|m| m.role == Role::Tool)
+        .and_then(|m| m.content.clone())
+        .unwrap_or_default();
+    assert!(skill_result.contains("Run tests before shipping."), "{skill_result}");
+    started.close_blocking();
+}
+
+#[test]
+fn orchestrator_manual_compact_and_run_code_work_end_to_end() {
+    vibevalley_i18n::set_locale("en");
+    let dir = tempfile::tempdir().unwrap();
+    let clock = Arc::new(ManualClock::new(1_700_000_000_000));
+    let model = SignaledScripted::new([
+        say("first ack"),
+        say("second ack"),
+        say("third ack"),
+        say("## Goal\nManual orchestrator summary"),
+    ]);
+    let mut registry = vibevalley_runtime::oar::Registry::new();
+    registry.register(Arc::new(vibevalley_runtime::oar::scripted::ScriptedRuntime::demo()));
+    let started = vibevalley_server::create_app_blocking(vibevalley_server::Config {
+        registry: Some(Arc::new(registry)),
+        probe_runtimes: false,
+        link_previews: false,
+        tick_crons: false,
+        model_client: Some(model),
+        clock,
+        ..vibevalley_server::Config::under(dir.path())
+    })
+    .unwrap();
+    let hub = started.router().clone();
+    let user = |op: &str, p: Value| hub.call_as(Caller::User, op, p);
+
+    assert_eq!(user("repo.create", json!({ "name": "demo" })).biz_code, 0);
+    assert_eq!(user("issue.create", json!({ "title": "Track #55", "repo": "demo" })).biz_code, 0);
+
+    // Run CodeMode directly on the orchestrator conversation composing a farm tool call.
+    let run_code = user(
+        "session.runCode",
+        json!({
+            "id": "orchestrator",
+            "script": r#"const text = call("issue_list", {}); return { text };"#,
+            "seed": 42,
+            "timeoutMs": 5000,
+            "maxSteps": 2000
+        }),
+    );
+    assert_eq!(run_code.biz_code, 0, "{}", run_code.message);
+    let cm_data = run_code.data.unwrap();
+    assert_eq!(cm_data["id"], "orchestrator");
+    assert_eq!(cm_data["replayedCalls"], 1);
+    let parsed_out: Value = serde_json::from_str(cm_data["outputJson"].as_str().unwrap()).unwrap();
+    assert!(parsed_out["text"].as_str().unwrap().contains("Track #55"), "{parsed_out}");
+
+    // Empty CodeMode script is rejected with InvalidInput.
+    let empty_code = user("session.runCode", json!({ "id": "orchestrator", "script": "   " }));
+    assert_eq!(empty_code.biz_code, vibevalley_protocol::BizCode::InvalidInput.code());
+
+    // Drive three turns on orchestrator so there are enough entries outside keep_recent (4) to compact.
+    let general = started.test_internals().channel.default_channel();
+    for idx in 1..=3 {
+        let key = format!("k{idx}");
+        user("channel.message.send", json!({ "id": general, "text": format!("turn {idx}"), "sendKey": key }));
+        let expected = match idx {
+            1 => "first ack",
+            2 => "second ack",
+            _ => "third ack",
+        };
+        crate::support::wait_until_channel_event(started.test_internals().channel, Duration::from_secs(30), expected, || {
+            let said = user("channel.message.list", json!({ "id": general })).data?;
+            said.as_array()?.iter().find(|m| m["from"] == "orchestrator" && m["text"] == expected).cloned()
+        });
+    }
+
+    let compacted = user("session.compact", json!({ "id": "orchestrator" }));
+    assert_eq!(compacted.biz_code, 0, "{}", compacted.message);
+    let compact_data = compacted.data.unwrap();
+    assert_eq!(compact_data["id"], "orchestrator");
+    assert_eq!(compact_data["compacted"], true);
+    assert!(
+        compact_data["summary"].as_str().unwrap_or_default().contains("Manual orchestrator summary"),
+        "{compact_data}"
+    );
+
+    // Repeating manual compact immediately reports nothing new to compact yet (`compacted: false`).
+    let second_compact = user("session.compact", json!({ "id": "orchestrator" }));
+    assert_eq!(second_compact.biz_code, 0, "{}", second_compact.message);
+    assert_eq!(second_compact.data.unwrap()["compacted"], false);
+
+    started.close_blocking();
+}
+
 mod grading;

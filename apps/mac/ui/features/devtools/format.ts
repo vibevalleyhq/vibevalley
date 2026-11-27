@@ -18,6 +18,20 @@ export type DevToolsTab = "overview" | "routes" | "timeline" | "trajectory" | "s
 
 export type TimelineLaneFilter = "all" | DebugTimelineLane;
 
+export interface TimelineJumpFocus {
+  readonly traceId?: number | undefined;
+  readonly timestampMs?: number | undefined;
+  readonly search?: string | undefined;
+  readonly key: number;
+}
+
+export interface TrajectoryJumpFocus {
+  readonly sessionId?: string | undefined;
+  readonly traceId?: number | undefined;
+  readonly timestampMs?: number | undefined;
+  readonly key: number;
+}
+
 export const DEVTOOLS_TABS: readonly DevToolsTab[] = ["overview", "routes", "timeline", "trajectory", "state", "lab", "remote"];
 
 export const TIMELINE_LANES: readonly TimelineLaneFilter[] = ["all", ...DebugTimelineLaneSchema.options];

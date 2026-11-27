@@ -5,7 +5,7 @@
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
-use vibevalley_protocol::{Assignment, Deliverable, Issue, IssueConstraints, IssueStageKind as StageKind};
+use vibevalley_protocol::{ActorRef, Assignment, Deliverable, Issue, IssueConstraints, IssueStageKind as StageKind};
 
 use super::board::Board;
 use super::store::{BoardError, IssueChange, Result};
@@ -100,6 +100,7 @@ impl Board {
             child.repo = Some(repo.clone());
             child.parent = Some(parent.id.clone());
             child.priority = parent.priority;
+            child.owner = parent.owner.clone().or_else(|| Some(ActorRef::self_user()));
             child.deliver = Deliverable::Change;
             child.blocked_by = d.needs.iter().filter_map(|n| ids.get(n).cloned()).collect();
             child.constraints = Some(IssueConstraints {
@@ -156,9 +157,15 @@ impl Board {
             return Ok(());
         };
         let Some(session) = self.on_board_async(child).await else { return Ok(()) };
-        // The parent's session is busy in the parent's worktree: wait.
+        // The parent's session is busy or still holds a write lock on the parent's worktree: wait.
         let parent_session = self.on_board_async(&parent).await;
         if parent_session.as_ref().is_some_and(|s| s.phase.is_working()) {
+            return Ok(());
+        }
+        if let Some(ps) = parent_session.as_ref()
+            && let Some(key) = self.session_engine().worktree_key_for_async(ps).await
+            && self.worktree().hoe().owner(&key).is_some_and(|l| l.session_id != ps.id)
+        {
             return Ok(());
         }
         let checks = vibevalley_core::child_checks(child, all_issues);

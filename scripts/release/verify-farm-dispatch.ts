@@ -11,6 +11,8 @@ import { parseArgs } from "node:util";
 
 import { z } from "zod";
 
+import { captureVdpPngFile, ShellStateSchema, VdpWsClient, waitForVdpEndpoint } from "./vdp-client.ts";
+
 const UTTERANCE = "create a field issue";
 const TITLE = "Native assistant from field";
 const CHANNEL_TEXT = "Native CLI receipt";
@@ -162,29 +164,11 @@ async function verify(app: string, cli: string, root: string): Promise<void> {
     VIBEVALLEY_AGENT_STARTERS: "docs",
     VIBEVALLEY_UPDATE_FEED: "off",
     VIBEVALLEY_PATROL_HEARTBEAT_MINUTES: "0",
-    VIBEVALLEY_DEBUG_DUMP: join(root, "dump.json"),
-    VIBEVALLEY_DEBUG_SCRIPT: join(root, "steps.jsonl"),
+    VIBEVALLEY_DEBUG_PORT: "0",
   };
 
   const [cx, cy] = [WINDOW[0] / 2, WINDOW[1] / 2];
   const [ix, iy] = midpoint(CHAT_INPUT);
-  const steps = [
-    `resize:${WINDOW[0]},${WINDOW[1]}`,
-    'hosted:vv {"route":"/farm"}',
-    "draw",
-    "draw",
-    `mouse:click,${cx},${cy}`,
-    "key:p",
-    "draw",
-    "draw",
-    `shot:${root}/chat.png`,
-    `mouse:click,${ix},${iy}`,
-    `type:${UTTERANCE}`,
-    `shot:${root}/typed.png`,
-    "key:enter",
-    `shot:${root}/sent.png`,
-  ];
-  writeFileSync(join(root, "steps.jsonl"), steps.map((s) => JSON.stringify({ shell: s })).join("\n") + "\n");
 
   const policy = '(version 1)(allow default)(deny network-outbound)(allow network-outbound (remote ip "localhost:*"))';
   const logFd = openSync(join(root, "app.log"), "w");
@@ -213,27 +197,78 @@ async function verify(app: string, cli: string, root: string): Promise<void> {
     }
   };
 
-  const fieldOpen = () => {
+  const tryCaptureShot = async (vdp: VdpWsClient, outPath: string): Promise<void> => {
     try {
-      const state = DumpState.parse(JSON.parse(readFileSync(join(root, "dump.json"), "utf8")));
-      const farm = state.diorama;
-      if (farm === null || farm === undefined || farm.kind !== "farm" || (farm.frames_seen ?? 0) === 0) {
-        return undefined;
+      await captureVdpPngFile(vdp, outPath);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!msg.includes("--features shot")) {
+        throw err;
       }
+    }
+  };
+
+  const driveFieldChat = async () => {
+    const endpoint = await waitForVdpEndpoint({
+      homeDir: home,
+      ...(proc.pid !== undefined ? { expectedPid: proc.pid } : {}),
+      timeoutMs: 30_000,
+      appExited: () => proc.exitCode,
+      logPath: join(root, "app.log"),
+    });
+    const vdp = await VdpWsClient.connect(endpoint, 15_000);
+    try {
+      const loadedDeadline = Date.now() + 25_000;
+      let loaded = false;
+      while (Date.now() < loadedDeadline) {
+        const state = await vdp.callDecoded("Shell.getState", {}, ShellStateSchema);
+        if (state.loaded) {
+          loaded = true;
+          break;
+        }
+        await sleep(100);
+      }
+      assert(loaded, "timed out waiting for shell loaded state");
+
+      await vdp.call("Shell.resize", { width: WINDOW[0], height: WINDOW[1] });
+      await vdp.call("Shell.openPane", { kind: "hosted", params: { module: "vv", props: { route: "/farm" } } });
+
+      let farmPlaced: unknown;
+      const farmDeadline = Date.now() + 25_000;
+      while (Date.now() < farmDeadline) {
+        await vdp.call("Page.draw", {});
+        const state = DumpState.parse(await vdp.call("Shell.getState", {}));
+        const farm = state.diorama;
+        if (farm !== null && farm !== undefined && farm.kind === "farm" && (farm.frames_seen ?? 0) > 0) {
+          farmPlaced = farm.placed;
+          break;
+        }
+        await sleep(100);
+      }
+      assert(farmPlaced !== undefined, "timed out waiting for farm diorama frame");
+
+      await vdp.call("Input.dispatchMouse", { kind: "click", x: cx, y: cy, button: "left" });
+      await vdp.call("Input.dispatchKey", { keys: "p" });
+      await vdp.call("Page.draw", {});
+      await vdp.call("Page.draw", {});
+      await tryCaptureShot(vdp, join(root, "chat.png"));
+      await vdp.call("Input.dispatchMouse", { kind: "click", x: ix, y: iy, button: "left" });
+      await vdp.call("Input.typeText", { text: UTTERANCE });
+      await tryCaptureShot(vdp, join(root, "typed.png"));
+      await vdp.call("Input.dispatchKey", { keys: "enter" });
+      await tryCaptureShot(vdp, join(root, "sent.png"));
+
       return {
         viewport: WINDOW,
         focusTap: [cx, cy],
         firstAction: "key:p",
-        farmViewport: farm.placed,
+        farmViewport: farmPlaced,
         inputBounds: CHAT_INPUT,
         inputTap: [ix, iy],
         submit: "enter",
       };
-    } catch (error) {
-      if (error instanceof SyntaxError || (error instanceof Error && "code" in error && error.code === "ENOENT")) {
-        return undefined;
-      }
-      throw error;
+    } finally {
+      vdp.close();
     }
   };
 
@@ -294,7 +329,7 @@ async function verify(app: string, cli: string, root: string): Promise<void> {
     );
     save(join(root, "doctor.json"), doctor);
 
-    const interaction = await until("farm manager opened the field chat", fieldOpen);
+    const interaction = await driveFieldChat();
     save(join(root, "interaction.json"), interaction);
 
     const userMessage = await until("field textarea submitted the message", () => {

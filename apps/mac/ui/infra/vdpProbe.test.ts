@@ -127,12 +127,14 @@ describe("infra/vdpProbe", () => {
       testId: "workbench-page",
       role: "main",
       route: "/issues",
+      source: "apps/mac/ui/app/Workbench.tsx",
     });
     const offPlace = registerVdpNode({
       testId: "place-library",
       role: "link",
       text: "Library",
       route: "/library",
+      source: "apps/mac/ui/app/Shell.tsx",
       parentId: "workbench-page",
       getRef: () => fakeRef,
       onPress: () => {
@@ -143,17 +145,26 @@ describe("infra/vdpProbe", () => {
     await fake.emit("vdp_ui_req", { type: "vdp_ui_req", reqId: "tree-1", method: "UI.getTree", params: { maxDepth: 4 } });
     const treeRes = fake.responses().find((r) => r.reqId === "tree-1");
     expect(treeRes?.error).toBeUndefined();
-    const treeData = treeRes?.result as { view: string; nodes: { testId: string; children?: { testId: string; children?: { testId: string }[] }[] }[] };
+    const treeData = treeRes?.result as {
+      view: string;
+      nodes: { testId: string; source?: string; children?: { testId: string; source?: string; children?: { testId: string; source?: string }[] }[] }[];
+    };
     expect(treeData.view).toBe("vibevalley");
     expect(treeData.nodes[0]?.testId).toBe("view:vibevalley");
     const pageNode = treeData.nodes[0]?.children?.find((c) => c.testId === "workbench-page");
+    expect(pageNode?.source).toBe("apps/mac/ui/app/Workbench.tsx");
     expect(pageNode?.children?.map((c) => c.testId)).toContain("place-library");
+    expect(pageNode?.children?.find((c) => c.testId === "place-library")?.source).toBe("apps/mac/ui/app/Shell.tsx");
 
     await fake.emit("vdp_ui_req", { type: "vdp_ui_req", reqId: "q-1", method: "UI.query", params: { text: "lib" } });
     const queryRes = fake.responses().find((r) => r.reqId === "q-1");
-    const queryData = queryRes?.result as { count: number; nodes: { testId: string; bounds?: { x: number; y: number; width: number; height: number } }[] };
+    const queryData = queryRes?.result as {
+      count: number;
+      nodes: { testId: string; source?: string; bounds?: { x: number; y: number; width: number; height: number } }[];
+    };
     expect(queryData.count).toBe(1);
     expect(queryData.nodes[0]?.testId).toBe("place-library");
+    expect(queryData.nodes[0]?.source).toBe("apps/mac/ui/app/Shell.tsx");
     expect(queryData.nodes[0]?.bounds).toEqual({ x: 8, y: 120, width: 64, height: 48 });
 
     await fake.emit("vdp_ui_req", { type: "vdp_ui_req", reqId: "p-1", method: "UI.press", params: { testId: "place-library" } });

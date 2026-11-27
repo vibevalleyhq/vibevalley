@@ -1,23 +1,43 @@
+use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use parking_lot::Mutex;
 use vibevalley_runtime::agent::extensions::memory::{MemoryPort, Remember, RewriteMemory};
-use vibevalley_runtime::agent::resources::skills::{LoadSkill, scan_skills, skill_index};
+use vibevalley_runtime::agent::resources::skills::{LoadSkill, SkillInfo, scan_skills, skill_index};
 use vibevalley_runtime::agent::{Brain, Tool, TypedToolAdapter};
 
 use super::state::Orchestrator;
 use super::types::{Input, Instance};
 use super::words;
 use crate::agent::memory::By;
-use crate::agent::profile::text;
-use crate::agent::tool::{Route, held};
+use crate::agent::profile::{Profile, text};
+use crate::agent::tool::{Route, held_for};
 
 /// `quotaLow`: a runtime with less left than this is nearly used up.
 const QUOTA_LOW: f64 = 15.0;
 
+fn collect_orchestrator_skills(agent_skills_dir: &std::path::Path, user_skills_dir: &std::path::Path, profile: &Profile) -> Vec<SkillInfo> {
+    let mut skills = scan_skills(&[agent_skills_dir.to_path_buf(), user_skills_dir.to_path_buf()]);
+    let mut seen_ids: HashSet<String> = skills.iter().map(|s| s.id.clone()).collect();
+    let mut seen_names: HashSet<String> = skills.iter().map(|s| s.name.clone()).collect();
+    for k in profile.skills() {
+        if seen_ids.contains(&k.id) || seen_names.contains(&k.name) {
+            continue;
+        }
+        seen_ids.insert(k.id.clone());
+        seen_names.insert(k.name.clone());
+        let prefix = if k.built_in == Some(true) { "skill://built-in/" } else { "skill://local/" };
+        let path = format!("{prefix}{}", k.id);
+        let markdown = format!("---\nname: {}\ndescription: {}\n---\n\n{}", k.name, k.description, k.body.trim());
+        skills.push(SkillInfo::inline(k.id, k.name, k.description, path, markdown));
+    }
+    skills.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()).then(a.name.cmp(&b.name)));
+    skills
+}
+
 impl Orchestrator {
-    pub(crate) async fn system_prompt_snapshot_async(&self, id: &str) -> String {
+    pub async fn system_prompt_snapshot_async(&self, id: &str) -> String {
         let home = self.home.join("agent").join(id);
         let memory = self.memory.port_async(id, By::Orchestrator).await;
         self.system_prompt(id, &home, memory.as_ref())
@@ -35,7 +55,7 @@ impl Orchestrator {
         s = s.trim().to_string();
         s += "\n\n";
         s += &p.env.replace("{cwd}", &self.repo.root().display().to_string());
-        let skills = scan_skills(&[home.join("skills")]);
+        let skills = collect_orchestrator_skills(&home.join("skills"), &self.home.join("skills"), &self.profile);
         if !skills.is_empty() {
             s += "\n\n";
             s += &p.skills.replace("{skills}", &skill_index(&skills, 160));
@@ -50,13 +70,15 @@ impl Orchestrator {
 
     /// Everything it can call: the farm's tools for where it is, its skills and its memory.
     pub(super) async fn tools_for_async(&self, id: &str, route: &Arc<Mutex<Route>>, skills_dir: PathBuf, memory: Arc<dyn MemoryPort>) -> Vec<Box<dyn Tool>> {
-        let mut tools = held(&self.tool, route);
-        if let Some(profile) = self.profile.agent(id) {
+        let profile = self.profile.agent(id);
+        let mut tools = held_for(&self.tool, route, profile.as_ref());
+        if let Some(profile) = profile {
             tools.extend(self.mcp.tools(&profile).await);
         }
-        let dirs = vec![skills_dir];
+        let user_skills_dir = self.home.join("skills");
+        let profile_ref = self.profile.clone();
         tools.push(Box::new(LoadSkill {
-            skills: Box::new(move || scan_skills(&dirs)),
+            skills: Box::new(move || collect_orchestrator_skills(&skills_dir, &user_skills_dir, &profile_ref)),
         }));
         tools.push(Box::new(TypedToolAdapter(Remember(memory.clone()))));
         tools.push(Box::new(TypedToolAdapter(RewriteMemory(memory))));
@@ -120,10 +142,25 @@ impl Orchestrator {
             ));
         }
         let repos = self.repo.list_async().await;
+        let healths = self.issue.repo_health_list_async(self.ctx.now()).await.unwrap_or_default();
         let folders = if repos.is_empty() {
             words::NO_REPOS.to_string()
         } else {
-            repos.iter().map(|r| r.name.as_str()).collect::<Vec<_>>().join("、")
+            repos
+                .iter()
+                .map(|r| match healths.iter().find(|h| h.repo == r.name) {
+                    Some(h) => {
+                        let status = match h.status {
+                            vibevalley_protocol::RepoHealthStatus::OnTrack => "on_track",
+                            vibevalley_protocol::RepoHealthStatus::AtRisk => "at_risk",
+                            vibevalley_protocol::RepoHealthStatus::OffTrack => "off_track",
+                        };
+                        format!("{}（{}）", r.name, status)
+                    }
+                    None => r.name.clone(),
+                })
+                .collect::<Vec<_>>()
+                .join("、")
         };
         let (direct, target) = self.chat.address_of(channel);
         words::whole(

@@ -2,11 +2,12 @@ use super::{
     CodeModeResult, CodeModeSpec, Outcome, Tool, ToolRecord,
     instrument::{Guards, compile},
 };
+use parking_lot::Mutex;
 use rquickjs::{CatchResultExt, Context, Ctx, Exception, Function, Runtime, Value as JsValue};
 use serde_json::{Value, json};
 use std::{
     collections::{HashMap, HashSet},
-    sync::{Arc, Mutex},
+    sync::Arc,
     time::{Duration, Instant},
 };
 use tokio_util::sync::CancellationToken;
@@ -122,7 +123,7 @@ pub(super) fn execute(
     let interrupt = state.clone();
     let started = Instant::now();
     rt.set_interrupt_handler(Some(Box::new(move || {
-        let mut s = interrupt.lock().unwrap();
+        let mut s = interrupt.lock();
         if cancel.is_cancelled() {
             s.fatal.get_or_insert_with(|| "execution cancelled".into());
         }
@@ -136,15 +137,15 @@ pub(super) fn execute(
         let eval = || -> rquickjs::Result<Value> {
             let s = state.clone();
             let host = Function::new(ctx.clone(), move |ctx: Ctx<'_>, op: String, name: String, args: String| {
-                s.lock().unwrap().request(&op, name, &args).map_err(|e| Exception::throw_message(&ctx, &e))
+                s.lock().request(&op, name, &args).map_err(|e| Exception::throw_message(&ctx, &e))
             })?;
             let s = state.clone();
-            let clock = Function::new(ctx.clone(), move || s.lock().unwrap().now as f64)?;
+            let clock = Function::new(ctx.clone(), move || s.lock().now as f64)?;
             let s = state.clone();
-            let rand = Function::new(ctx.clone(), move || s.lock().unwrap().random())?;
+            let rand = Function::new(ctx.clone(), move || s.lock().random())?;
             let s = state.clone();
             let count = Function::new(ctx.clone(), move |ctx: Ctx<'_>| {
-                let mut s = s.lock().unwrap();
+                let mut s = s.lock();
                 s.steps += 1;
                 if s.steps > max_steps as u64 {
                     s.fatal.get_or_insert_with(|| "step quota exceeded".into());
@@ -159,7 +160,7 @@ pub(super) fn execute(
             })?;
             let s = state.clone();
             let fail = Function::new(ctx.clone(), move |ctx: Ctx<'_>, msg: String| -> rquickjs::Result<()> {
-                s.lock().unwrap().fatal.get_or_insert_with(|| msg.clone());
+                s.lock().fatal.get_or_insert_with(|| msg.clone());
                 Err(Exception::throw_message(&ctx, &msg))
             })?;
             let names = guards.clone();
@@ -193,7 +194,7 @@ pub(super) fn execute(
         })
     });
     rt.set_interrupt_handler(None);
-    let mut s = state.lock().unwrap();
+    let mut s = state.lock();
     if let Some(pending) = s.pending.take() {
         return Ok(pending);
     }

@@ -129,6 +129,46 @@
       "failed": "失败",
       "interrupted": "已中断",
       "closed": "已结束"
+    },
+    "telemetry": {
+      "tokenBreakdown": "输入 {input} · 缓存 {cached} · 输出 {output}",
+      "context": "上下文 {pct}%（{used}/{window}）",
+      "contextCompact": "上下文 {pct}%",
+      "retries": "重试 {n} 次",
+      "errors": "错误 {n} 次"
+    },
+    "recovery": {
+      "resumeSame": "按原配置继续",
+      "retrySame": "按原配置重试",
+      "rerunOther": "换个角色/引擎重跑",
+      "openWorktree": "打开 Worktree 终端",
+      "resumedToast": "已按原配置重新发起运行",
+      "rerunTitle": "换个角色或引擎重新运行",
+      "rerunTarget": "选择角色或引擎",
+      "rerunTargetPlaceholder": "选择一个角色或引擎",
+      "rerunNote": "补充说明（可选）",
+      "rerunNotePlaceholder": "可补充指引，留空则沿用当前任务继续重跑…",
+      "rerunConfirm": "开始重跑",
+      "rerunStartedToast": "已交由 {target} 重新运行",
+      "resumePrompt": "从上一步继续执行并完成任务。",
+      "groupExperts": "角色",
+      "groupEngines": "引擎",
+      "noWorktree": "该会话未记录工作区目录"
+    },
+    "compact": {
+      "button": "压缩上下文",
+      "compacted": "已压缩上下文",
+      "skipped": "当前暂无需压缩的新内容"
+    },
+    "codemode": {
+      "button": "运行 CodeMode",
+      "title": "运行 CodeMode 脚本",
+      "description": "在当前持久化会话沙箱中执行确定性 JavaScript，可通过 `call(tool, args)` 调用工具。",
+      "scriptLabel": "JavaScript 脚本",
+      "scriptPlaceholder": "// 示例：调用工具并返回结果\nconst issues = call(\"issue_list\", {}); return { count: issues.length };",
+      "run": "运行脚本",
+      "outputLabel": "输出 JSON",
+      "stats": "{steps} 步 · {calls} 次工具调用 · {sleeps} 次休眠"
     }
   },
   "subagents": {

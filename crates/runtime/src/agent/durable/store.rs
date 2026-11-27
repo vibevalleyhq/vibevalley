@@ -2,7 +2,9 @@
 
 use std::ops::Deref;
 use std::path::Path;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
+
+use parking_lot::RwLock;
 
 use serde_json::{Value, json};
 use tokio::sync::mpsc;
@@ -114,11 +116,11 @@ impl Store {
     }
 
     pub fn set_telemetry(&self, sink: Arc<dyn TelemetrySink>) {
-        *self.telemetry.write().unwrap_or_else(|e| e.into_inner()) = sink;
+        *self.telemetry.write() = sink;
     }
 
     pub(crate) fn emit_telemetry(&self, event: TelemetryEvent) {
-        let sink = self.telemetry.read().unwrap_or_else(|e| e.into_inner()).clone();
+        let sink = self.telemetry.read().clone();
         sink.record(&event);
     }
 

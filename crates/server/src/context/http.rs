@@ -73,7 +73,7 @@ impl<F: Fn(Request) -> Result<Response, FetchError> + Send + Sync + 'static> Fet
 pub struct Http;
 
 impl Http {
-    pub async fn fetch_async(r: Request, cancel: Option<CancellationToken>) -> Result<Response, FetchError> {
+    async fn fetch_async(r: Request, cancel: Option<CancellationToken>) -> Result<Response, FetchError> {
         let client = no_redirect_client().map_err(FetchError::Network)?.clone();
         execute_request_async(client, r, cancel).await
     }
@@ -173,7 +173,7 @@ impl PublicDownload {
         Ok(PublicBytes { bytes, media_type, url })
     }
 
-    pub async fn fetch_async(r: Request, cancel: Option<CancellationToken>) -> Result<Response, FetchError> {
+    async fn fetch_async(r: Request, cancel: Option<CancellationToken>) -> Result<Response, FetchError> {
         if cancel.as_ref().is_some_and(CancellationToken::is_cancelled) {
             return Err(FetchError::Network("cancelled".into()));
         }
@@ -210,7 +210,7 @@ impl Fetch for PublicDownload {
 
 /// Executes `r` asynchronously on `client`, awaiting response headers directly
 /// and bridging body chunks into [`Response::body`] via `SyncIoBridge(StreamReader)`.
-pub async fn execute_request_async(client: reqwest::Client, r: Request, cancel: Option<CancellationToken>) -> Result<Response, FetchError> {
+async fn execute_request_async(client: reqwest::Client, r: Request, cancel: Option<CancellationToken>) -> Result<Response, FetchError> {
     if cancel.as_ref().is_some_and(CancellationToken::is_cancelled) {
         return Err(FetchError::Network("cancelled".into()));
     }
@@ -365,7 +365,7 @@ impl<R: AsyncRead + Unpin> AsyncRead for CancelRead<R> {
 }
 
 /// Returns `true` when `ip` is globally routable (not loopback, private, link-local, CGNAT, or reserved).
-pub fn public_v4(ip: Ipv4Addr) -> bool {
+fn public_v4(ip: Ipv4Addr) -> bool {
     let [a, b, c, _] = ip.octets();
     !(a == 0
         || a == 10

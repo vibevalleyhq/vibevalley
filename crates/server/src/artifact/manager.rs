@@ -2,7 +2,8 @@
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
+use std::time::Duration;
 
 use parking_lot::Mutex;
 use tokio::sync::broadcast;
@@ -18,8 +19,8 @@ use vibevalley_protocol::{
 };
 
 use super::collab::{
-    PresenceRoom, commit_meta_for_maker, export_doc_snapshot, guess_mime, ingest_files_into_doc, sha256_hex_bytes, sync_manifest_title_raw,
-    upsert_file_for_write,
+    BatchKey, OriginWriteBatcher, PresenceRoom, commit_meta_for_maker, export_doc_snapshot, guess_mime, ingest_files_into_doc, sha256_hex_bytes,
+    sync_manifest_title_raw, upsert_file_for_write,
 };
 use super::library::{AddedBy, Library};
 use super::media::Media;
@@ -74,6 +75,7 @@ pub struct Maker {
 
 /// Owns directory-backed artifacts, collaborative editing state, media library, and media jobs.
 pub struct Manager {
+    me: Weak<Self>,
     pub(crate) ctx: Arc<Context>,
     pub(crate) storage: Arc<Storage>,
     pub library: Arc<Library>,
@@ -83,6 +85,7 @@ pub struct Manager {
     pub(super) suggestion_events: broadcast::Sender<(String, SuggestionEvent)>,
     pub(super) presence_events: broadcast::Sender<(String, ArtifactPresenceEvent)>,
     pub(super) presence_rooms: Mutex<HashMap<String, Arc<PresenceRoom>>>,
+    pub(super) write_batcher: OriginWriteBatcher,
     doc_locks: Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>,
 }
 
@@ -99,7 +102,8 @@ impl Manager {
         let (changes, _) = broadcast::channel(512);
         let (suggestion_events, _) = broadcast::channel(512);
         let (presence_events, _) = broadcast::channel(512);
-        Ok(Arc::new(Self {
+        Ok(Arc::new_cyclic(|me| Self {
+            me: me.clone(),
             ctx,
             storage,
             library,
@@ -109,8 +113,13 @@ impl Manager {
             suggestion_events,
             presence_events,
             presence_rooms: Mutex::new(HashMap::new()),
+            write_batcher: OriginWriteBatcher::default(),
             doc_locks: Mutex::new(HashMap::new()),
         }))
+    }
+
+    pub fn set_stream_batch_window(&self, window: Duration) {
+        self.write_batcher.set_window(window);
     }
 
     pub fn close(&self) {
@@ -265,6 +274,9 @@ impl Manager {
     }
 
     pub async fn content_async(&self, id: &str, version: Option<i64>) -> Result<ArtifactContent, ApiError> {
+        if version.is_none() {
+            self.flush_pending_writes_async(id).await;
+        }
         let row = self.row_async(id).await?;
         let ty = artifact_type_of(&row.artifact_type)?;
         let spec = type_spec(ty);
@@ -421,8 +433,12 @@ impl Manager {
                 .await
         {
             let num_str = said.number.to_string();
-            let _ = self.ctx.service.artifact.set_message_id(&id, &num_str).await;
-            let _ = self.ctx.service.artifact.set_version_message_id(&id, 1, &num_str).await;
+            if let Err(err) = self.ctx.service.artifact.set_message_id(&id, &num_str).await {
+                tracing::warn!(artifact_id = %id, message_id = %num_str, error = %err, "artifact.set_message_id backlink failed");
+            }
+            if let Err(err) = self.ctx.service.artifact.set_version_message_id(&id, 1, &num_str).await {
+                tracing::warn!(artifact_id = %id, version = 1, message_id = %num_str, error = %err, "artifact.set_version_message_id backlink failed");
+            }
         }
 
         self.get_async(&id).await
@@ -434,6 +450,7 @@ impl Manager {
     }
 
     pub async fn version_with_meta_async(&self, maker: &Maker, req: &ArtifactVersionRequest, meta: &CommitMeta) -> Result<Wire, ApiError> {
+        self.flush_pending_writes_async(&req.id).await;
         let row = self.row_async(&req.id).await?;
         let ty = artifact_type_of(&row.artifact_type)?;
         if let Some(content) = &req.content {
@@ -501,12 +518,21 @@ impl Manager {
             .await
         {
             let num_str = said.number.to_string();
-            let _ = self.ctx.service.artifact.set_version_message_id(&fresh.id, next_ver, &num_str).await;
+            if let Err(err) = self.ctx.service.artifact.set_version_message_id(&fresh.id, next_ver, &num_str).await {
+                tracing::warn!(
+                    artifact_id = %fresh.id,
+                    version = next_ver,
+                    message_id = %num_str,
+                    error = %err,
+                    "artifact.set_version_message_id backlink failed"
+                );
+            }
         }
         self.get_async(&fresh.id).await
     }
 
     pub async fn update_async(&self, req: &ArtifactUpdateRequest) -> Result<Wire, ApiError> {
+        self.flush_pending_writes_async(&req.id).await;
         let lock = self.artifact_lock(&req.id);
         let _guard = lock.lock().await;
 
@@ -523,6 +549,11 @@ impl Manager {
         {
             return Err(refused(t("server.artifact.defaultDesignSystemOnly", &[])));
         }
+        let new_issue = match req.issue.as_deref().map(str::trim) {
+            Some("") => Some(None),
+            Some(iss) => Some(Some(self.issue_id_for_ref_async(iss).await?)),
+            None => None,
+        };
         let target_title = new_title.as_deref().unwrap_or(&row.title);
         if new_title.is_some() {
             self.storage.artifact.sync_manifest_title_async(&row.id, ty, target_title).await?;
@@ -532,6 +563,7 @@ impl Manager {
         let svc_tx = svc.clone();
         let id_tx = row.id.clone();
         let new_title_tx = new_title.clone();
+        let new_issue_tx = new_issue;
         let is_default = req.is_default;
         svc.transaction::<_, DbError>(move |tx| {
             Box::pin(async move {
@@ -543,6 +575,9 @@ impl Manager {
                         svc_tx.artifact.clear_default_design_system_in_tx(tx, at).await?;
                     }
                     svc_tx.artifact.set_default_in_tx(tx, &id_tx, flag, at).await?;
+                }
+                if let Some(issue_opt) = new_issue_tx {
+                    svc_tx.artifact.set_issue_in_tx(tx, &id_tx, issue_opt.as_deref(), at).await?;
                 }
                 Ok(())
             })
@@ -568,6 +603,7 @@ impl Manager {
     }
 
     pub async fn remove_async(&self, id: &str) -> Result<(), ApiError> {
+        self.flush_pending_writes_async(id).await;
         let lock = self.artifact_lock(id);
         let _guard = lock.lock().await;
         let _ = self.row_async(id).await?;
@@ -589,6 +625,7 @@ impl Manager {
     }
 
     pub async fn list_files_async(&self, req: &ArtifactFileListRequest) -> Result<ArtifactFileListResult, ApiError> {
+        self.flush_pending_writes_async(&req.id).await;
         let row = self.row_async(&req.id).await?;
         let files = self.storage.artifact.list_files_async(&row.id, req.prefix.as_deref()).await?;
         Ok(ArtifactFileListResult {
@@ -599,6 +636,9 @@ impl Manager {
     }
 
     pub async fn get_file_async(&self, req: &ArtifactFileGetRequest) -> Result<ArtifactFileContent, ApiError> {
+        if req.version.is_none() {
+            self.flush_pending_writes_async(&req.id).await;
+        }
         let row = self.row_async(&req.id).await?;
         let storage_id = match req.version {
             Some(ver) => {
@@ -622,6 +662,65 @@ impl Manager {
     }
 
     pub async fn write_files_with_meta_async(
+        &self,
+        maker: &Maker,
+        req: &ArtifactFileWriteRequest,
+        meta: &CommitMeta,
+    ) -> Result<ArtifactFileWriteResult, ApiError> {
+        if req.files.is_empty() {
+            return Err(refused("No files supplied"));
+        }
+
+        let mut normalized_items = Vec::with_capacity(req.files.len());
+        for item in &req.files {
+            validate_artifact_path(&item.path).map_err(refused)?;
+            let mut normalized = item.clone();
+            normalized.path = item.path.trim().to_string();
+            normalized_items.push(normalized);
+        }
+
+        let mut effective_meta = meta.clone();
+        if let Some(origin) = req.origin.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+            effective_meta.origin = origin.to_string();
+        }
+        if req.summary.is_some() {
+            effective_meta.summary = req.summary.clone();
+        }
+
+        let batchable = req.files.iter().all(|f| f.expected_hash.is_none()) && !req.announce.unwrap_or(false);
+        let window = self.write_batcher.window();
+        let key = BatchKey {
+            artifact_id: req.id.clone(),
+            origin: effective_meta.origin.clone(),
+        };
+
+        if batchable
+            && !window.is_zero()
+            && let Some(this) = self.me.upgrade()
+        {
+            let (rx, is_new, hit_cap) = self.write_batcher.enqueue(key.clone(), maker.clone(), effective_meta, normalized_items);
+            if hit_cap {
+                this.flush_batch_bucket_async(&key).await;
+            } else if is_new {
+                this.spawn_batch_flush_timer(key, window);
+            }
+            return rx
+                .await
+                .unwrap_or_else(|_| Err(ApiError::new(BizCode::ServiceUnavailable, "artifact batch cancelled")));
+        }
+
+        self.flush_batch_bucket_async(&key).await;
+        let normalized_req = ArtifactFileWriteRequest {
+            id: req.id.clone(),
+            files: normalized_items,
+            origin: Some(effective_meta.origin.clone()),
+            summary: effective_meta.summary.clone(),
+            announce: req.announce,
+        };
+        self.execute_write_files_now_async(maker, &normalized_req, &effective_meta).await
+    }
+
+    pub(super) async fn execute_write_files_now_async(
         &self,
         maker: &Maker,
         req: &ArtifactFileWriteRequest,
@@ -821,6 +920,7 @@ impl Manager {
         req: &ArtifactFileDeleteRequest,
         meta: &CommitMeta,
     ) -> Result<ArtifactFileDeleteResult, ApiError> {
+        self.flush_pending_writes_async(&req.id).await;
         let lock = self.artifact_lock(&req.id);
         let _guard = lock.lock().await;
 

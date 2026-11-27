@@ -110,6 +110,8 @@ export interface VvMarkdownProps extends ComponentHostProps {
 
 export interface VvWhiteboardBatchEvent {
   writesJson: string;
+  collabUpdateB64?: string;
+  versionVectorB64?: string;
 }
 
 export interface VvWhiteboardSelectionEvent {
@@ -149,6 +151,7 @@ export interface VvWhiteboardViewportEvent {
 export interface VvWhiteboardProps extends ComponentHostProps {
   entriesJson: string;
   presencesJson?: string;
+  collabUpdateB64?: string;
   seq?: number;
   title?: string;
   readOnly?: boolean;
@@ -161,7 +164,24 @@ export interface VvWhiteboardProps extends ComponentHostProps {
   onViewportChange?: (event: VvWhiteboardViewportEvent) => void;
 }
 
-export interface VvRichModule {
+export interface VvCoreBridge {
+  parseCompareSpec?: (raw: string) => string | null;
+  splitCompareBlocks?: (text: string) => string;
+  formatCompareBlock?: (specJson: string) => string | null;
+  computeSchedule?: (issuesJson: string, nowMs: number) => string;
+  projectTrajectory?: (eventsJson: string, endMs: number) => string;
+  waterfallWidths?: (durationsJson: string, room: number) => string;
+  projectChatSession?: (eventsJson: string, tokensJson: string | null | undefined, defaultWindow: number) => string;
+  parseBoardTokens?: (text: string) => string;
+  extractToolTarget?: (stepJson: string) => string | null;
+  formatToolDetails?: (stepJson: string) => string;
+  parseTodoChecklist?: (stepJson: string) => string | null;
+  collapsedStepSummary?: (stepType: string, body: string) => string;
+  readableInput?: (stepJson: string) => string;
+  mergeSteps?: (logJson: string, incomingJson: string, limit: number | null | undefined, replaceSameRevision: boolean) => string;
+}
+
+export interface VvRichModule extends VvCoreBridge {
   VvCanvas: (props: VvCanvasProps) => JSX.Element;
   VvChart: (props: VvChartProps) => JSX.Element;
   VvCodeBlock: (props: VvCodeBlockProps) => JSX.Element;
@@ -175,6 +195,7 @@ export interface VvRichModule {
 }
 
 let cached: VvRichModule | null | undefined;
+let testCoreBridge: Partial<VvCoreBridge> | undefined;
 
 export function richNative(): VvRichModule | undefined {
   if (cached !== undefined) return cached ?? undefined;
@@ -184,6 +205,20 @@ export function richNative(): VvRichModule | undefined {
     cached = null;
   }
   return cached ?? undefined;
+}
+
+/** Returns the synchronous Rust `VvCore` native bridge (or test override in headless tests). */
+export function coreBridge(): VvCoreBridge | undefined {
+  return testCoreBridge ?? richNative();
+}
+
+/** Installs a synchronous `VvCore` stub for headless `nsh test` runs; returns a cleanup callback. */
+export function setCoreBridgeForTest(override: Partial<VvCoreBridge> | undefined): () => void {
+  const prev = testCoreBridge;
+  testCoreBridge = override;
+  return () => {
+    testCoreBridge = prev;
+  };
 }
 
 /** Routes `@vibevalley/i18n` through native Rust `VvI18n` when the host registers it. */

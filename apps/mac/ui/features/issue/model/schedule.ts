@@ -1,6 +1,8 @@
-import type { Issue, Priority } from "@vibevalley/protocol";
+import type { BoardSchedule, BoardSummary, Issue, IssueScheduleSpan } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
+import { BoardSchedule as BoardScheduleSchema } from "@vibevalley/protocol/schema";
 
+import { coreBridge } from "../../../infra/rich";
 import type { BoardCard } from "./cards";
 import { formatIsoDate } from "./meta";
 
@@ -56,25 +58,8 @@ function monSunDayIndex(dayMs: number): number {
 }
 
 const isPositiveTimestamp = (v: number | undefined): v is number => v !== undefined && Number.isFinite(v) && v > 0;
-const isClosedIssue = (issue: Pick<Issue, "status">) => issue.status === "done" || issue.status === "canceled";
 
-export interface ScheduledSpan {
-  readonly startMs: number;
-  readonly endMs: number;
-  readonly durationDays: number;
-  readonly hasExplicitStart: boolean;
-  readonly hasExplicitDue: boolean;
-  readonly rolledUp: boolean;
-  readonly overdue: boolean;
-}
-
-export interface ScheduledIssueEntry {
-  readonly issue: Issue;
-  readonly span: ScheduledSpan;
-  readonly depth: number;
-  readonly isParent: boolean;
-  readonly childCount: number;
-}
+export type ScheduledSpan = IssueScheduleSpan;
 
 export interface ScheduledCardRow {
   readonly card: BoardCard;
@@ -137,234 +122,107 @@ export interface MonthGrid {
   readonly weeks: MonthCell[][];
 }
 
-const priorityWeight: Record<Priority, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
-
-interface RawBounds {
-  readonly startMs: number | undefined;
-  readonly endMs: number | undefined;
-  readonly hasExplicitStart: boolean;
-  readonly hasExplicitDue: boolean;
-  readonly rolledUp: boolean;
+function projectScheduleViaNative(issues: readonly Issue[], now: number): BoardSchedule | undefined {
+  const json = coreBridge()?.computeSchedule?.(JSON.stringify(issues), now);
+  if (!json) return undefined;
+  const parsed = BoardScheduleSchema.safeParse(JSON.parse(json));
+  return parsed.success ? parsed.data : undefined;
 }
 
-/**
- * Computes schedule bounds for every issue in `issues`, rolling up earliest child start
- * and latest child due onto any parent that lacks its own start/due dates.
- */
-function computeIssueSpans(issues: readonly Issue[], now = Date.now()): Map<string, ScheduledSpan> {
-  const byId = new Map<string, Issue>();
-  const childrenByParent = new Map<string, Issue[]>();
-  for (const issue of issues) {
-    byId.set(issue.id, issue);
-    if (!issue.parent) continue;
-    const list = childrenByParent.get(issue.parent) ?? [];
-    list.push(issue);
-    childrenByParent.set(issue.parent, list);
-  }
-
-  const todayDayMs = utcDayStart(now);
-  const resolved = new Map<string, RawBounds>();
-  const visiting = new Set<string>();
-
-  const resolveBounds = (issue: Issue): RawBounds => {
-    const cached = resolved.get(issue.id);
-    if (cached) return cached;
-    if (visiting.has(issue.id)) {
-      return { startMs: undefined, endMs: undefined, hasExplicitStart: false, hasExplicitDue: false, rolledUp: false };
-    }
-    visiting.add(issue.id);
-
-    const hasExplicitStart = isPositiveTimestamp(issue.startAt);
-    const hasExplicitDue = isPositiveTimestamp(issue.dueAt);
-    let startMs = hasExplicitStart ? utcDayStart(issue.startAt!) : undefined;
-    let endMs = hasExplicitDue ? utcDayStart(issue.dueAt!) : undefined;
-    let rolledUp = false;
-
-    const children = childrenByParent.get(issue.id) ?? [];
-    if (children.length > 0 && (startMs === undefined || endMs === undefined)) {
-      let minChildStart: number | undefined;
-      let maxChildDue: number | undefined;
-      for (const child of children) {
-        const cb = resolveBounds(child);
-        const cStart = cb.startMs ?? cb.endMs;
-        const cEnd = cb.endMs ?? cb.startMs;
-        if (cStart !== undefined && (minChildStart === undefined || cStart < minChildStart)) minChildStart = cStart;
-        if (cEnd !== undefined && (maxChildDue === undefined || cEnd > maxChildDue)) maxChildDue = cEnd;
-      }
-      if (startMs === undefined && minChildStart !== undefined) {
-        startMs = minChildStart;
-        rolledUp = true;
-      }
-      if (endMs === undefined && maxChildDue !== undefined) {
-        endMs = maxChildDue;
-        rolledUp = true;
-      }
-    }
-
-    visiting.delete(issue.id);
-    const out: RawBounds = { startMs, endMs, hasExplicitStart, hasExplicitDue, rolledUp };
-    resolved.set(issue.id, out);
-    return out;
-  };
-
-  for (const issue of issues) resolveBounds(issue);
-
-  const spans = new Map<string, ScheduledSpan>();
-  for (const issue of issues) {
-    const b = resolved.get(issue.id);
-    if (!b || (b.startMs === undefined && b.endMs === undefined)) continue;
-
-    let startMs: number;
-    let endMs: number;
-    if (b.startMs !== undefined && b.endMs !== undefined) {
-      startMs = b.startMs;
-      endMs = Math.max(b.startMs, b.endMs);
-    } else if (b.startMs !== undefined) {
-      startMs = b.startMs;
-      const closedDay = isPositiveTimestamp(issue.closedAt) ? utcDayStart(issue.closedAt) : undefined;
-      endMs = closedDay !== undefined && closedDay >= startMs ? closedDay : startMs;
-    } else {
-      // Due-only issues appear as a single-day milestone on their target due date.
-      startMs = b.endMs!;
-      endMs = b.endMs!;
-    }
-
-    const durationDays = Math.max(1, utcDayDiff(startMs, endMs) + 1);
-    const dueBasis = b.endMs ?? (b.hasExplicitDue ? endMs : undefined);
-    const overdue = !isClosedIssue(issue) && dueBasis !== undefined && dueBasis < todayDayMs;
-
-    spans.set(issue.id, {
-      startMs,
-      endMs,
-      durationDays,
-      hasExplicitStart: b.hasExplicitStart,
-      hasExplicitDue: b.hasExplicitDue,
-      rolledUp: b.rolledUp,
-      overdue,
-    });
-  }
-
-  return spans;
-}
-
-function compareScheduledEntries(a: { issue: Issue; span: ScheduledSpan }, b: { issue: Issue; span: ScheduledSpan }): number {
-  if (a.span.startMs !== b.span.startMs) return a.span.startMs - b.span.startMs;
-  if (a.span.endMs !== b.span.endMs) return a.span.endMs - b.span.endMs;
-  const pa = priorityWeight[a.issue.priority];
-  const pb = priorityWeight[b.issue.priority];
-  if (pa !== pb) return pa - pb;
-  return a.issue.number - b.issue.number;
-}
-
-function orderHierarchically<T extends { issue: Issue; span: ScheduledSpan }>(
-  items: readonly T[],
-  childCountOf: (issueId: string) => number,
-): (T & { depth: number; isParent: boolean; childCount: number })[] {
-  const presentIds = new Set(items.map((x) => x.issue.id));
-  const childrenMap = new Map<string, T[]>();
-  const roots: T[] = [];
-
-  for (const item of items) {
-    const parentId = item.issue.parent;
-    if (parentId && presentIds.has(parentId) && parentId !== item.issue.id) {
-      const list = childrenMap.get(parentId) ?? [];
-      list.push(item);
-      childrenMap.set(parentId, list);
-    } else {
-      roots.push(item);
-    }
-  }
-
-  roots.sort(compareScheduledEntries);
-  for (const list of childrenMap.values()) list.sort(compareScheduledEntries);
-
-  const ordered: (T & { depth: number; isParent: boolean; childCount: number })[] = [];
-  const emitted = new Set<string>();
-
-  const emit = (item: T, depth: number) => {
-    if (emitted.has(item.issue.id)) return;
-    emitted.add(item.issue.id);
-    const children = childrenMap.get(item.issue.id) ?? [];
-    const totalChildren = Math.max(children.length, childCountOf(item.issue.id));
-    ordered.push({ ...item, depth, isParent: totalChildren > 0, childCount: totalChildren });
-    for (const child of children) emit(child, Math.min(depth + 1, 3));
-  };
-
-  for (const root of roots) emit(root, 0);
-  // Safety net for any disconnected parent-cycle fragment.
-  for (const item of items) {
-    if (!emitted.has(item.issue.id)) emit(item, 0);
-  }
-  return ordered;
-}
-
-/** Pure schedule computation on raw `Issue[]`: returns hierarchically ordered scheduled entries and unscheduled issues. */
-export function computeSchedule(
-  issues: readonly Issue[],
+/** Builds timeline rows from Rust-projected `BoardSummary.schedule` (or `VvCore`) plus pure UTC axis ticks and month bands. */
+export function buildScheduleForCards(
+  cards: readonly BoardCard[],
+  allIssues: readonly Issue[],
+  scale: TimelineScale,
   now = Date.now(),
-): {
-  readonly scheduled: ScheduledIssueEntry[];
-  readonly unscheduled: Issue[];
-  readonly todayDayMs: number;
-} {
-  const todayDayMs = utcDayStart(now);
-  const spans = computeIssueSpans(issues, now);
-  const childCounts = new Map<string, number>();
-  for (const issue of issues) {
-    if (issue.parent) childCounts.set(issue.parent, (childCounts.get(issue.parent) ?? 0) + 1);
-  }
-
-  const withSpan: { issue: Issue; span: ScheduledSpan }[] = [];
-  const unscheduled: Issue[] = [];
-  for (const issue of issues) {
-    const span = spans.get(issue.id);
-    if (span) withSpan.push({ issue, span });
-    else unscheduled.push(issue);
-  }
-
-  const scheduled = orderHierarchically(withSpan, (id) => childCounts.get(id) ?? 0);
-  unscheduled.sort((a, b) => {
-    const pa = priorityWeight[a.priority];
-    const pb = priorityWeight[b.priority];
-    if (pa !== pb) return pa - pb;
-    return a.number - b.number;
-  });
-
-  return { scheduled, unscheduled, todayDayMs };
-}
-
-/** Builds timeline rows, axis ticks, month bands, and unscheduled cards for `IssueTimeline`. */
-export function buildScheduleForCards(cards: readonly BoardCard[], allIssues: readonly Issue[], scale: TimelineScale, now = Date.now()): TimelineGrid {
+  summary?: BoardSummary,
+): TimelineGrid {
   const todayDayMs = utcDayStart(now);
   const spec = timelineScaleSpec[scale];
 
-  // Combine all known issues plus any card issues not already in `allIssues` so rollup always has full context.
-  const mergedIssuesMap = new Map<string, Issue>();
-  for (const issue of allIssues) mergedIssuesMap.set(issue.id, issue);
-  for (const card of cards) mergedIssuesMap.set(card.issue.id, card.issue);
-  const mergedIssues = [...mergedIssuesMap.values()];
-
-  const spans = computeIssueSpans(mergedIssues, now);
-  const childCounts = new Map<string, number>();
-  for (const issue of mergedIssues) {
-    if (issue.parent) childCounts.set(issue.parent, (childCounts.get(issue.parent) ?? 0) + 1);
+  let boardSchedule = summary?.schedule;
+  if (!boardSchedule) {
+    const mergedIssuesMap = new Map<string, Issue>();
+    for (const issue of allIssues) mergedIssuesMap.set(issue.id, issue);
+    for (const card of cards) mergedIssuesMap.set(card.issue.id, card.issue);
+    boardSchedule = projectScheduleViaNative([...mergedIssuesMap.values()], now);
   }
 
-  const withSpan: { card: BoardCard; issue: Issue; span: ScheduledSpan }[] = [];
+  const cardById = new Map(cards.map((c) => [c.issue.id, c]));
+  const rows: ScheduledCardRow[] = [];
   const unscheduled: BoardCard[] = [];
-  for (const card of cards) {
-    const span = spans.get(card.issue.id);
-    if (span) withSpan.push({ card, issue: card.issue, span });
-    else unscheduled.push(card);
-  }
+  const seen = new Set<string>();
 
-  const rows = orderHierarchically(withSpan, (id) => childCounts.get(id) ?? 0);
-  unscheduled.sort((a, b) => {
-    const pa = priorityWeight[a.issue.priority];
-    const pb = priorityWeight[b.issue.priority];
-    if (pa !== pb) return pa - pb;
-    return a.issue.number - b.issue.number;
-  });
+  if (boardSchedule) {
+    for (const entry of boardSchedule.scheduled) {
+      const card = cardById.get(entry.issueId);
+      if (!card) continue;
+      seen.add(card.issue.id);
+      let span = entry.span;
+      // Preserve optimistic local date edits (e.g. Gantt drag / schedule-today) before the server pushes the updated BoardSlice.
+      if (!span.rolledUp) {
+        const startRaw = isPositiveTimestamp(card.issue.startAt) ? utcDayStart(card.issue.startAt) : undefined;
+        const dueRaw = isPositiveTimestamp(card.issue.dueAt) ? utcDayStart(card.issue.dueAt) : undefined;
+        const nextStart = startRaw ?? dueRaw;
+        const nextEnd = dueRaw ?? startRaw;
+        if (nextStart !== undefined && nextEnd !== undefined) {
+          const clampedEnd = Math.max(nextStart, nextEnd);
+          if (clampedEnd !== span.endMs || nextStart !== span.startMs) {
+            span = {
+              ...span,
+              startMs: nextStart,
+              endMs: clampedEnd,
+              durationDays: utcDayDiff(nextStart, clampedEnd) + 1,
+              hasExplicitStart: startRaw !== undefined,
+              hasExplicitDue: dueRaw !== undefined,
+            };
+          }
+        }
+      }
+      rows.push({
+        card,
+        issue: card.issue,
+        span,
+        depth: entry.depth,
+        isParent: entry.isParent,
+        childCount: entry.childCount,
+      });
+    }
+    for (const id of boardSchedule.unscheduledIds) {
+      const card = cardById.get(id);
+      if (!card) continue;
+      seen.add(id);
+      const startRaw = isPositiveTimestamp(card.issue.startAt) ? utcDayStart(card.issue.startAt) : undefined;
+      const dueRaw = isPositiveTimestamp(card.issue.dueAt) ? utcDayStart(card.issue.dueAt) : undefined;
+      const nextStart = startRaw ?? dueRaw;
+      const nextEnd = dueRaw ?? startRaw;
+      if (nextStart !== undefined && nextEnd !== undefined) {
+        const clampedEnd = Math.max(nextStart, nextEnd);
+        const closed = card.issue.status === "done" || card.issue.status === "canceled";
+        rows.push({
+          card,
+          issue: card.issue,
+          span: {
+            startMs: nextStart,
+            endMs: clampedEnd,
+            durationDays: utcDayDiff(nextStart, clampedEnd) + 1,
+            hasExplicitStart: startRaw !== undefined,
+            hasExplicitDue: dueRaw !== undefined,
+            rolledUp: false,
+            overdue: !closed && clampedEnd < todayDayMs,
+          },
+          depth: 0,
+          isParent: false,
+          childCount: 0,
+        });
+      } else {
+        unscheduled.push(card);
+      }
+    }
+  }
+  for (const card of cards) {
+    if (!seen.has(card.issue.id)) unscheduled.push(card);
+  }
 
   let minDay = todayDayMs;
   let maxDay = todayDayMs;
@@ -513,4 +371,62 @@ export function shiftIssueDates(
     startAt: hasStart ? addUtcDays(utcDayStart(issue.startAt!), deltaDays) : undefined,
     dueAt: hasDue ? addUtcDays(utcDayStart(issue.dueAt!), deltaDays) : undefined,
   });
+}
+
+export type TimelineDragMode = "move" | "resize-start" | "resize-end";
+
+export interface TimelineDragResult {
+  readonly startMs: number;
+  readonly endMs: number;
+  readonly durationDays: number;
+  readonly dates: { startAt?: number; dueAt?: number };
+}
+
+/** Computes snapped `[startMs, endMs]` and API date patch for bar drag (`move`) or edge resize (`resize-start` / `resize-end`), clamping `startAt <= dueAt`. */
+export function computeTimelineDrag(
+  issue: Pick<Issue, "startAt" | "dueAt">,
+  span: Pick<ScheduledSpan, "startMs" | "endMs">,
+  mode: TimelineDragMode,
+  deltaDays: number,
+): TimelineDragResult {
+  const baseStart = utcDayStart(span.startMs);
+  const baseEnd = utcDayStart(span.endMs);
+  switch (mode) {
+    case "move": {
+      const startMs = addUtcDays(baseStart, deltaDays);
+      const endMs = addUtcDays(baseEnd, deltaDays);
+      return {
+        startMs,
+        endMs,
+        durationDays: Math.max(1, utcDayDiff(startMs, endMs) + 1),
+        dates: shiftIssueDates(issue, deltaDays, { startMs: baseStart, endMs: baseEnd }),
+      };
+    }
+    case "resize-start": {
+      const startMs = Math.min(baseEnd, addUtcDays(baseStart, deltaDays));
+      const endMs = baseEnd;
+      return {
+        startMs,
+        endMs,
+        durationDays: Math.max(1, utcDayDiff(startMs, endMs) + 1),
+        dates: omitUndefined({
+          startAt: startMs,
+          dueAt: isPositiveTimestamp(issue.dueAt) ? utcDayStart(issue.dueAt) : baseEnd !== startMs ? baseEnd : undefined,
+        }),
+      };
+    }
+    case "resize-end": {
+      const startMs = baseStart;
+      const endMs = Math.max(baseStart, addUtcDays(baseEnd, deltaDays));
+      return {
+        startMs,
+        endMs,
+        durationDays: Math.max(1, utcDayDiff(startMs, endMs) + 1),
+        dates: omitUndefined({
+          startAt: isPositiveTimestamp(issue.startAt) ? utcDayStart(issue.startAt) : endMs !== baseStart ? baseStart : undefined,
+          dueAt: endMs,
+        }),
+      };
+    }
+  }
 }

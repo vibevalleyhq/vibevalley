@@ -198,6 +198,40 @@ impl Shell {
             }
             Action::DetachDevtools => self.detach_devtools(window, cx),
             Action::CloseDevtools => self.close_devtools(cx),
+            Action::DevtoolsInspectorMode { enabled } => self.set_devtools_inspecting(enabled, cx),
+            Action::DevtoolsHighlight {
+                test_id,
+                x,
+                y,
+                width,
+                height,
+                label,
+                source,
+                surface,
+            } => {
+                let bounds = match (x, y, width, height) {
+                    (Some(x), Some(y), Some(width), Some(height)) => Some(vibevalley_protocol::VdpUiBounds { x, y, width, height }),
+                    _ => None,
+                };
+                if test_id.is_none() && bounds.is_none() {
+                    self.set_devtools_highlight(None, cx);
+                } else {
+                    self.set_devtools_highlight(
+                        Some(vibevalley_protocol::VdpUiInspectAtResult {
+                            hit: true,
+                            surface,
+                            test_id,
+                            role: None,
+                            text: label,
+                            route: None,
+                            source,
+                            bounds,
+                        }),
+                        cx,
+                    );
+                }
+            }
+            Action::DevtoolsJumpSource { path, line } => self.jump_to_devtools_source(&path, line, window, cx),
         }
     }
 
@@ -548,6 +582,26 @@ impl Shell {
                 return;
             }
             HostOp::SpeechStop(req) => Envelope::ok(json!(crate::speech_audio::stop(Some(req.id.as_deref().unwrap_or_default())))),
+            HostOp::AsrState(req) => Envelope::ok(json!(crate::voice_asr::state(req.id.as_deref().unwrap_or_default()))),
+            HostOp::AsrStart(req) => {
+                let id = req.id.unwrap_or_default();
+                let server = cx.try_global::<crate::hosted::BridgeHub>().map(|b| b.0.server().clone());
+                Self::bg(
+                    cx,
+                    move || {
+                        let voice = server.and_then(|s| s.voice()).ok_or_else(|| "the voice service is not ready".to_string())?;
+                        crate::voice_asr::start(voice, id)
+                    },
+                    move |_, result, _| {
+                        reply.send(match result {
+                            Ok(state) => Envelope::ok(json!(state)),
+                            Err(error) => refusal(BizCode::Refused, error),
+                        });
+                    },
+                );
+                return;
+            }
+            HostOp::AsrStop(req) => Envelope::ok(json!(crate::voice_asr::stop(Some(req.id.as_deref().unwrap_or_default())))),
             HostOp::VoiceState(req) => Envelope::ok(json!(crate::live_voice::state(req.id.as_deref().unwrap_or_default()))),
             HostOp::VoiceStart(req) => {
                 let id = req.id.unwrap_or_default();

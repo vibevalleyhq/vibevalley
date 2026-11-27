@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
-import type { Issue, Priority } from "@vibevalley/protocol";
+import type { ActorRef, Issue, Priority } from "@vibevalley/protocol";
 import { assignedAgentOf, omitUndefined } from "@vibevalley/protocol/rules";
 
 import { compareText, or } from "../../../infra/base/search";
@@ -28,6 +28,27 @@ export const groupingLabel: Record<Grouping, string> = {
   none: t("web.issue.boardLabels.grouping.none"),
 };
 
+/** Multi-dimensional toolbar grouping across Kanban and List views. */
+export type GroupBy = "none" | "repo" | "owner" | "agent" | "priority" | "parent";
+export const groupBys = ["none", "repo", "owner", "agent", "priority", "parent"] as const satisfies readonly GroupBy[];
+export const groupByLabel: Record<GroupBy, string> = {
+  none: t("web.issue.groupBy.none"),
+  repo: t("web.issue.groupBy.repo"),
+  owner: t("web.issue.groupBy.owner"),
+  agent: t("web.issue.groupBy.agent"),
+  priority: t("web.issue.groupBy.priority"),
+  parent: t("web.issue.groupBy.parent"),
+};
+
+/** Hierarchy visibility mode across Kanban and List views. */
+export type HierarchyMode = "all" | "top_level" | "parents_only";
+export const hierarchyModes = ["all", "top_level", "parents_only"] as const satisfies readonly HierarchyMode[];
+export const hierarchyLabel: Record<HierarchyMode, string> = {
+  all: t("web.issue.hierarchy.all"),
+  top_level: t("web.issue.hierarchy.top_level"),
+  parents_only: t("web.issue.hierarchy.parents_only"),
+};
+
 /** `manual` keeps the order the rows came in: the history's, which for todo is the user's own order. */
 export type Ordering = "manual" | "priority" | "updated" | "created";
 export const orderings = ["manual", "priority", "updated", "created"] as const satisfies readonly Ordering[];
@@ -42,9 +63,11 @@ export interface BoardLook {
   view: BoardView;
   grouping: Grouping;
   ordering: Ordering;
+  groupBy: GroupBy;
+  hierarchy: HierarchyMode;
 }
 
-export const defaultLook: BoardLook = { view: "board", grouping: "status", ordering: "manual" };
+export const defaultLook: BoardLook = { view: "board", grouping: "status", ordering: "manual", groupBy: "none", hierarchy: "all" };
 
 // How the board looks on this machine: kept across reloads (state/stored.ts), each part falling back on its own.
 export const boardLook = defineStored(
@@ -53,9 +76,122 @@ export const boardLook = defineStored(
     view: orFallback(z.literal(boardViews), defaultLook.view),
     grouping: orFallback(z.literal(groupings), defaultLook.grouping),
     ordering: orFallback(z.literal(orderings), defaultLook.ordering),
+    groupBy: orFallback(z.literal(groupBys), "none"),
+    hierarchy: orFallback(z.literal(hierarchyModes), "all"),
   }),
   defaultLook,
 );
+
+export function encodeActorRef(owner: ActorRef | undefined): string {
+  if (!owner) return "";
+  return `${owner.kind}:${owner.id}`;
+}
+
+export function decodeActorRef(raw: string): ActorRef | undefined {
+  if (raw === "") return undefined;
+  const idx = raw.indexOf(":");
+  if (idx <= 0) return undefined;
+  const kind = raw.slice(0, idx);
+  const id = raw.slice(idx + 1);
+  if (kind === "user") return { kind: "user", id };
+  if (kind === "agent") return { kind: "agent", id };
+  return undefined;
+}
+
+export function hierarchyShows(mode: HierarchyMode, card: BoardCard, allIssues: readonly Issue[]): boolean {
+  switch (mode) {
+    case "all":
+      return true;
+    case "top_level":
+      return !card.issue.parent;
+    case "parents_only":
+      return !card.issue.parent && (card.kind === "family" || allIssues.some((item) => item.parent === card.issue.id));
+  }
+}
+
+export interface CardGroup {
+  readonly key: string;
+  readonly owner?: ActorRef | undefined;
+  readonly priority?: Priority | undefined;
+  readonly parent?: Issue | undefined;
+  readonly cards: BoardCard[];
+}
+
+function ownerGroupSortRank(key: string): number {
+  if (key === "") return 3;
+  if (key === "user:self") return 0;
+  if (key.startsWith("user:")) return 1;
+  return 2;
+}
+
+function asPriority(key: string): Priority | undefined {
+  switch (key) {
+    case "urgent":
+    case "high":
+    case "medium":
+    case "low":
+      return key;
+    default:
+      return undefined;
+  }
+}
+
+/** Shared multi-dimensional grouping across Kanban and List views. */
+export function groupCards(cards: readonly BoardCard[], groupBy: GroupBy, allIssues: readonly Issue[]): CardGroup[] {
+  if (groupBy === "none") return [{ key: "", cards: [...cards] }];
+  const byKey = new Map<string, BoardCard[]>();
+  for (const c of cards) {
+    const k =
+      groupBy === "repo"
+        ? (c.issue.repo ?? "")
+        : groupBy === "owner"
+          ? encodeActorRef(c.issue.owner)
+          : groupBy === "agent"
+            ? (assignedAgentOf(c.issue) ?? "")
+            : groupBy === "priority"
+              ? c.issue.priority
+              : (c.issue.parent ?? "");
+    const existing = byKey.get(k);
+    if (existing) existing.push(c);
+    else byKey.set(k, [c]);
+  }
+  const parentMap = groupBy === "parent" ? new Map<string, Issue>(allIssues.map((i) => [i.id, i])) : undefined;
+  return [...byKey]
+    .toSorted(([a], [b]) => {
+      switch (groupBy) {
+        case "priority":
+          return priorityRank(asPriority(a)) - priorityRank(asPriority(b));
+        case "owner":
+          return or(ownerGroupSortRank(a) - ownerGroupSortRank(b), compareText(a, b));
+        case "parent": {
+          const emptyDiff = Number(a === "") - Number(b === "");
+          if (emptyDiff !== 0) return emptyDiff;
+          const pa = parentMap?.get(a);
+          const pb = parentMap?.get(b);
+          if (pa && pb) return pa.number - pb.number;
+          return compareText(a, b);
+        }
+        case "repo":
+        case "agent":
+          return or(Number(a === "") - Number(b === ""), compareText(a, b));
+      }
+    })
+    .map(([key, groupCards]) => {
+      if (groupBy === "owner") {
+        const owner = decodeActorRef(key);
+        return owner ? { key, owner, cards: groupCards } : { key, cards: groupCards };
+      }
+      if (groupBy === "priority") {
+        const priority = asPriority(key);
+        return priority ? { key, priority, cards: groupCards } : { key, cards: groupCards };
+      }
+      if (groupBy === "parent") {
+        const parent = parentMap?.get(key);
+        return parent ? { key, parent, cards: groupCards } : { key, cards: groupCards };
+      }
+      return { key, cards: groupCards };
+    });
+}
 
 /** What grouping and ordering read from a row. A task has no priority of its own: undefined sorts after low. */
 export interface RowKeys {

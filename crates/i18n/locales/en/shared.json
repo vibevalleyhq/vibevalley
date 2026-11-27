@@ -106,5 +106,20 @@
     "aside": "{text} ({aside})",
     "sentence": "{text}.",
     "separator": ", "
+  },
+  "repoHealth": {
+    "on_track": "On track",
+    "at_risk": "At risk",
+    "off_track": "Off track"
+  },
+  "repoHealthReason": {
+    "stuck_issues": "Stuck issues need attention",
+    "failed_checks": "Project checks failed",
+    "overdue_issues": "Overdue issues past due date",
+    "asking_user": "Waiting for user response",
+    "blocked_issues": "Blocked by dependencies",
+    "no_active_progress": "Open backlog with no active progress",
+    "stale_activity": "No recent commits",
+    "healthy": "Healthy and moving smoothly"
   }
 }

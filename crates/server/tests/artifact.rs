@@ -7,8 +7,8 @@ use std::time::Duration;
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use serde_json::{Value, json};
 use vibevalley_core::artifact::type_spec;
-use vibevalley_core::collab::CommitMeta;
-use vibevalley_protocol::{ArtifactType, BizCode, Caller, Envelope};
+use vibevalley_core::collab::{CollabDoc, CommitMeta, decode_version_vector, encode_version_vector};
+use vibevalley_protocol::{ArtifactFileWriteItem, ArtifactFileWriteRequest, ArtifactType, BizCode, Caller, Envelope};
 use vibevalley_server::artifact::Maker;
 use vibevalley_server::gateway::api::Server;
 
@@ -872,4 +872,263 @@ fn regression_symlinked_home_canonicalizes_cover_and_frame_paths() {
     );
 
     restarted.close_blocking();
+}
+
+#[test]
+fn artifact_issue_link_and_unlink_roundtrip() {
+    let dir = tempfile::tempdir().unwrap();
+    let started = start(dir.path());
+    let hub = started.router().clone();
+    let call = |op: &str, p: Value| hub.call_as(Caller::User, op, p);
+
+    let issue_one = ok(call("issue.create", json!({ "title": "First linked issue" })));
+    let issue_two = ok(call("issue.create", json!({ "title": "Second linked issue" })));
+    let issue_one_id = issue_one["id"].as_str().unwrap().to_string();
+    let issue_two_id = issue_two["id"].as_str().unwrap().to_string();
+    let issue_two_num = issue_two["number"].as_i64().unwrap();
+
+    let created = ok(call(
+        "artifact.create",
+        json!({ "title": "Spec Draft", "artifactType": "docs", "announce": false }),
+    ));
+    let art_id = created["id"].as_str().unwrap().to_string();
+    assert!(created.get("issue").is_none());
+
+    // Link by issue id.
+    let linked_one = ok(call("artifact.update", json!({ "id": art_id, "issue": issue_one_id })));
+    assert_eq!(linked_one["issue"].as_str(), Some(issue_one_id.as_str()));
+    let listed_one = ok(call("artifact.list", json!({ "issue": issue_one_id })));
+    assert_eq!(listed_one.as_array().unwrap().len(), 1);
+    assert_eq!(listed_one[0]["id"], art_id);
+
+    // Re-link by `#number` reference.
+    let linked_two = ok(call("artifact.update", json!({ "id": art_id, "issue": format!("#{issue_two_num}") })));
+    assert_eq!(linked_two["issue"].as_str(), Some(issue_two_id.as_str()));
+    assert!(ok(call("artifact.list", json!({ "issue": issue_one_id }))).as_array().unwrap().is_empty());
+    let listed_two = ok(call("artifact.list", json!({ "issue": issue_two_id })));
+    assert_eq!(listed_two.as_array().unwrap().len(), 1);
+    assert_eq!(listed_two[0]["id"], art_id);
+
+    // Unknown issue reference must be refused and leave the existing link intact.
+    assert_eq!(
+        code(call("artifact.update", json!({ "id": art_id, "issue": "i-does-not-exist" }))),
+        BizCode::IssueNotFound.code()
+    );
+    assert_eq!(ok(call("artifact.get", json!({ "id": art_id })))["issue"].as_str(), Some(issue_two_id.as_str()));
+
+    // Clear link with empty string.
+    let unlinked = ok(call("artifact.update", json!({ "id": art_id, "issue": "" })));
+    assert!(unlinked.get("issue").is_none());
+    assert!(ok(call("artifact.get", json!({ "id": art_id }))).get("issue").is_none());
+    assert!(ok(call("artifact.list", json!({ "issue": issue_two_id }))).as_array().unwrap().is_empty());
+
+    started.close_blocking();
+}
+
+#[test]
+fn collab_vv_export_import_converges_after_offline_edits() {
+    let dir = tempfile::tempdir().unwrap();
+    let started = start(dir.path());
+    let hub = started.router().clone();
+    let call = |op: &str, p: Value| hub.call_as(Caller::User, op, p);
+
+    let created = ok(call(
+        "artifact.create",
+        json!({
+            "title": "Offline Sync PRD",
+            "artifactType": "docs",
+            "content": "Line A\nLine B\n",
+            "announce": false
+        }),
+    ));
+    let id = created["id"].as_str().unwrap().to_string();
+
+    // Cold-start export without versionVector returns a full Loro snapshot.
+    let cold = ok(call("artifact.collab.export", json!({ "id": id })));
+    assert_eq!(cold["snapshot"], true);
+    let cold_bytes = BASE64.decode(cold["update"].as_str().unwrap()).unwrap();
+    let client = CollabDoc::from_snapshot_with_peer(&cold_bytes, 4242).unwrap();
+    let base_vv = decode_version_vector(cold["versionVector"].as_str().unwrap()).unwrap();
+    assert_eq!(client.version_vector(), base_vv);
+
+    // Offline client edits `structure/index.md` locally while disconnected.
+    client.text_insert("structure/index.md", 14, "Offline tail.\n").unwrap();
+    client
+        .entry_put_text("structure/index.md", "text/markdown", &client.text_get("structure/index.md").unwrap())
+        .unwrap();
+    client.commit(&CommitMeta::user("user", Some("offline client append".into()), 2_000)).unwrap();
+
+    // Concurrently on the server, an upstream edit prepends text to `structure/index.md`.
+    ok(call(
+        "artifact.file.write",
+        json!({
+            "id": id,
+            "summary": "server prefix",
+            "files": [{ "path": "structure/index.md", "content": "[Server] Line A\nLine B\n" }]
+        }),
+    ));
+
+    // Reconnect: export incremental client delta since `base_vv` and push via `artifact.collab.import`.
+    let client_delta = client.export_sync_since(Some(&base_vv)).unwrap();
+    assert!(!client_delta.is_snapshot);
+    let imported = ok(call(
+        "artifact.collab.import",
+        json!({
+            "id": id,
+            "update": BASE64.encode(&client_delta.bytes),
+            "clientVersionVector": encode_version_vector(&base_vv),
+            "origin": "user",
+            "summary": "reconnect sync"
+        }),
+    ));
+    assert_eq!(imported["serverSnapshot"], false);
+    let server_delta_bytes = BASE64.decode(imported["serverUpdate"].as_str().unwrap()).unwrap();
+    client.import_bytes(&server_delta_bytes).unwrap();
+
+    // Re-exporting from the converged client VV produces no divergence and matching VV.
+    let after_export = ok(call(
+        "artifact.collab.export",
+        json!({ "id": id, "versionVector": encode_version_vector(&client.version_vector()) }),
+    ));
+    assert_eq!(
+        decode_version_vector(after_export["versionVector"].as_str().unwrap()).unwrap(),
+        client.version_vector()
+    );
+
+    // Both client replica and server directory converged to the exact merged content!
+    let server_file = ok(call("artifact.file.get", json!({ "id": id, "path": "structure/index.md" })));
+    let converged_text = server_file["content"].as_str().unwrap();
+    assert_eq!(converged_text, "[Server] Line A\nLine B\nOffline tail.\n");
+    assert_eq!(client.text_get("structure/index.md").as_deref(), Some(converged_text));
+
+    // Idempotent re-import must not bump `seq`, and malformed VV/update bytes are refused.
+    let seq_before = ok(call("artifact.get", json!({ "id": id })))["seq"].as_i64().unwrap();
+    let idempotent = ok(call(
+        "artifact.collab.import",
+        json!({ "id": id, "update": BASE64.encode(&client_delta.bytes) }),
+    ));
+    assert_eq!(idempotent["seq"], seq_before);
+    assert_eq!(
+        code(call("artifact.collab.export", json!({ "id": id, "versionVector": "%%%not-base64%%%" }))),
+        BizCode::ArtifactRefused.code()
+    );
+    assert_eq!(
+        code(call("artifact.collab.import", json!({ "id": id, "update": "%%%not-base64%%%" }))),
+        BizCode::ArtifactRefused.code()
+    );
+
+    started.close_blocking();
+}
+
+#[test]
+fn per_origin_streaming_micro_batching_coalesces_same_origin_without_merging_across_origins() {
+    let dir = tempfile::tempdir().unwrap();
+    let started = start(dir.path());
+    let hub = started.router().clone();
+    let manager = started.test_internals().artifact.clone();
+    let call = |op: &str, p: Value| hub.call_as(Caller::User, op, p);
+
+    let created = ok(call(
+        "artifact.create",
+        json!({
+            "title": "Streaming Coalesce",
+            "artifactType": "docs",
+            "content": "Seed.\n",
+            "announce": false
+        }),
+    ));
+    let id = created["id"].as_str().unwrap().to_string();
+
+    manager.set_stream_batch_window(Duration::from_millis(60));
+
+    let m_a = Maker {
+        from: "sess-a".into(),
+        by: "writer-a".into(),
+        run: None,
+    };
+    let m_b = Maker {
+        from: "sess-b".into(),
+        by: "writer-b".into(),
+        run: None,
+    };
+    let m_user = Maker {
+        from: "user".into(),
+        by: "user".into(),
+        run: None,
+    };
+
+    let meta_a = CommitMeta::session("writer-a", "writer-a", "sess-a", 1, Some("stream A".into()), 10_000);
+    let meta_b = CommitMeta::session("writer-b", "writer-b", "sess-b", 1, Some("stream B".into()), 10_000);
+    let meta_user = CommitMeta::user("user", Some("human stream".into()), 10_000);
+
+    let req = |path: &str, content: &str, origin: &str| ArtifactFileWriteRequest {
+        id: id.clone(),
+        files: vec![ArtifactFileWriteItem {
+            path: path.into(),
+            content: content.into(),
+            encoding: None,
+            mime: None,
+            expected_hash: None,
+        }],
+        origin: Some(origin.into()),
+        summary: None,
+        announce: Some(false),
+    };
+
+    let req1 = req("structure/a.md", "chunk 1", "session:sess-a:turn:1");
+    let req2 = req("structure/a.md", "chunk 1 + 2", "session:sess-a:turn:1");
+    let req3 = req("structure/a.md", "chunk 1 + 2 + 3", "session:sess-a:turn:1");
+    let req4 = req("structure/b.md", "agent B v1", "session:sess-b:turn:1");
+    let req5 = req("structure/b.md", "agent B final", "session:sess-b:turn:1");
+    let req6 = req("structure/human.md", "human edit", "user");
+
+    vibevalley_runtime::rt::block_on(async {
+        let (r1, r2, r3, r4, r5, r6) = tokio::join!(
+            manager.write_files_with_meta_async(&m_a, &req1, &meta_a),
+            manager.write_files_with_meta_async(&m_a, &req2, &meta_a),
+            manager.write_files_with_meta_async(&m_a, &req3, &meta_a),
+            manager.write_files_with_meta_async(&m_b, &req4, &meta_b),
+            manager.write_files_with_meta_async(&m_b, &req5, &meta_b),
+            manager.write_files_with_meta_async(&m_user, &req6, &meta_user),
+        );
+        assert!(r1.is_ok() && r2.is_ok() && r3.is_ok());
+        assert!(r4.is_ok() && r5.is_ok() && r6.is_ok());
+    });
+
+    // 1 initial create + 3 coalesced origin commits (NOT 1 + 6 = 7).
+    let history = ok(call("artifact.history.list", json!({ "id": id })));
+    let entries = history.as_array().unwrap();
+    assert_eq!(entries.len(), 4, "expected 1 create + 3 per-origin batched commits, got {history}");
+    assert_eq!(entries.iter().filter(|e| e["origin"] == "session:sess-a:turn:1").count(), 1);
+    assert_eq!(entries.iter().filter(|e| e["origin"] == "session:sess-b:turn:1").count(), 1);
+
+    assert_eq!(
+        ok(call("artifact.file.get", json!({ "id": id, "path": "structure/a.md" })))["content"],
+        "chunk 1 + 2 + 3"
+    );
+    assert_eq!(
+        ok(call("artifact.file.get", json!({ "id": id, "path": "structure/b.md" })))["content"],
+        "agent B final"
+    );
+    assert_eq!(
+        ok(call("artifact.file.get", json!({ "id": id, "path": "structure/human.md" })))["content"],
+        "human edit"
+    );
+
+    // Selective undo of session A removes only structure/a.md while keeping session B and human intact.
+    ok(call("artifact.history.undoOrigin", json!({ "id": id, "origin": "session:sess-a:turn:1" })));
+    assert_eq!(
+        code(call("artifact.file.get", json!({ "id": id, "path": "structure/a.md" }))),
+        BizCode::ArtifactNotFound.code()
+    );
+    assert_eq!(
+        ok(call("artifact.file.get", json!({ "id": id, "path": "structure/b.md" })))["content"],
+        "agent B final"
+    );
+    assert_eq!(
+        ok(call("artifact.file.get", json!({ "id": id, "path": "structure/human.md" })))["content"],
+        "human edit"
+    );
+
+    started.close_blocking();
 }

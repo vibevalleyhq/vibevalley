@@ -319,7 +319,13 @@ pub fn effects_of(before: &SpaceState, fact: &Fact) -> Vec<GameEffect> {
 /// `viewOf`: a plot per issue (the later hired session when two are on
 /// it), each session's play, and the level.
 pub(crate) fn view_of(state: &SpaceState) -> FarmView {
-    farm_view(&state.issues, &state.sessions, state.plays.as_ref(), state.commits.as_ref())
+    farm_view(
+        &state.issues,
+        &state.sessions,
+        state.plays.as_ref(),
+        state.commits.as_ref(),
+        state.progress.as_ref(),
+    )
 }
 
 /// Pure farm view projection from derived issues, overlaid sessions, plays, and commit counts.
@@ -328,6 +334,7 @@ pub(crate) fn farm_view(
     sessions: &[Session],
     plays: Option<&BTreeMap<String, SessionPlay>>,
     commits: Option<&CommitCount>,
+    progress: Option<&Progress>,
 ) -> FarmView {
     let mut latest: HashMap<&str, &Session> = HashMap::new();
     for h in sessions {
@@ -374,10 +381,12 @@ pub(crate) fn farm_view(
             (h.id.clone(), view)
         })
         .collect();
+    let decorations = progress.map(|p| super::shop::yard_decorations_for(&p.purchased)).unwrap_or_default();
     FarmView {
         level: farm_level_of(commits),
         plots,
         plays: played,
+        decorations,
     }
 }
 

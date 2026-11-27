@@ -109,3 +109,70 @@ test("SettingsPage general and appearance render separate sections with split IA
   await en.fake.pumpUntil(en.app, () => en.app.count("id:theme-dark") === 1);
   expect(en.app.count("id:motion-off")).toBe(1);
 });
+
+test("SettingsPage omits unlabelled lone file icon on /settings/models and /settings/memory", async () => {
+  for (const route of ["/settings/models", "/settings/memory"]) {
+    const { app, fake } = await mountSettings(route, "en");
+    await fake.pump(app);
+    const texts = app.texts();
+    expect(texts.some((line) => line.includes("Stored in"))).toBe(false);
+    expect(app.count("label:Stored in")).toBe(0);
+  }
+});
+
+test("SkillsPage auto-selects first built-in skill when no installed/own skills exist and avoids mid-text clipping at 900x720", async () => {
+  setLocale("en");
+  const fake = fakeHost(scenarios.typical, { route: "/settings/skills", locale: "en" });
+  const runtimes = (scenarios.typical.responses["runtime.list"] as readonly Record<string, unknown>[]).map((r) => ({
+    ...r,
+    skills: [],
+  }));
+  fake.respond("runtime.list", () => runtimes);
+  fake.respond("skill.list", () => [
+    { id: "review", name: "Code Review", description: "Review changes carefully", body: "# Review", builtIn: true },
+    { id: "tdd", name: "Test First", description: "Write failing tests first", body: "# TDD", builtIn: true },
+    { id: "docs", name: "Update Docs", description: "Keep subsystem docs synced", body: "# Docs", builtIn: true },
+  ]);
+
+  const app = await open("../../app/main.tsx", {
+    width: 900,
+    height: 720,
+    colorScheme: "light",
+    platform: "macos",
+    clock: { time: SCENARIO_NOW },
+    host: fake.options,
+  });
+  await fake.pumpUntil(app, () => app.count("id:built-in-skill") === 1);
+
+  expect(app.texts()).not.toContain("No skills yet: write one of VibeValley's own, or install some on a runtime and come back.");
+  const book = app.layout("id:skills-book")!;
+  const builtInBox = app.layout("id:built-in-skills")!;
+  expect(app.count("id:skill-entry")).toBe(3);
+  expect(builtInBox.y).toBeGreaterThanOrEqual(book.y);
+  expect(builtInBox.y + builtInBox.height).toBeLessThanOrEqual(book.y + book.height);
+  for (const title of ["Code Review", "Test First", "Update Docs"]) {
+    const row = app.layout(`id:skill-entry >> text:${title}`);
+    expect(row).not.toBeNull();
+    expect(row!.y).toBeGreaterThanOrEqual(book.y);
+    expect(row!.y + row!.height).toBeLessThanOrEqual(book.y + book.height);
+  }
+});
+
+test("ConnectorsPage stacks horizontal selector below xl (< 1280px) so ConnectorCard is not squeezed at 900x720", async () => {
+  setLocale("en");
+  const fake = fakeHost(scenarios.typical, { route: "/settings/chat/weixin", locale: "en" });
+  const app = await open("../../app/main.tsx", {
+    width: 900,
+    height: 720,
+    colorScheme: "light",
+    platform: "macos",
+    clock: { time: SCENARIO_NOW },
+    host: fake.options,
+  });
+  await fake.pumpUntil(app, () => app.count("id:connector-weixin") === 1);
+
+  const listBox = app.layout("id:connectors")!;
+  const cardBox = app.layout("id:connector-weixin")!;
+  expect(cardBox.y).toBeGreaterThanOrEqual(listBox.y + listBox.height);
+  expect(cardBox.width).toBeGreaterThan(450);
+});

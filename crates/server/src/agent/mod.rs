@@ -9,11 +9,11 @@ pub mod tool;
 
 use std::sync::Arc;
 
-pub use mcp::{Mcp, Resource, ResourceReadArgs, ToolDispatchPort, ToolSpecWire};
+pub use mcp::{HelperRunMode, Mcp, Resource, ResourceReadArgs, ToolDispatchPort, ToolSpecWire, tool_allowed_in_mode};
 pub use memory::{By, FinishedRun, Memory, Note};
-pub use orchestrator::{Execution, Input, Orchestrator, Parts as OrchestratorParts, PendingExecution, Reply, RuntimeInboxObserver};
+pub use orchestrator::{Execution, Input, Orchestrator, Parts as OrchestratorParts, PendingExecution, Reply, RuntimeInboxObserver, Source};
 pub use profile::{AgentDriver, Profile, ProfileStore, RuntimeFleet, instructions};
-pub use tool::{Held, Route, Tool, ToolRegistry, Who, held, helper, orchestrator as orchestrator_tools, unrun};
+pub use tool::{Held, Route, RouteSource, Tool, ToolRegistry, Who, held, helper, orchestrator as orchestrator_tools, unrun};
 
 /// Unified facade grouping all agent-domain sub-services.
 pub struct Agent {

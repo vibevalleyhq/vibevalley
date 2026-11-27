@@ -1,18 +1,20 @@
 # 语音
 
-实时通话的凭据、MOSS Live 线路与主助手语音旁白（`Voice::speak`）在 Rust 服务端的 `crates/server/src/voice/`，接口是 `voice.*` 七个（`voice.hear`、`voice.moss.verify`、`voice.grant.create`、`voice.call.{start,stop,hear,say}`）。服务端不碰音频：连 MOSS Live 的 WebSocket、采集麦克风和播放回答，都是宿主（原生应用 `apps/mac`，和服务端同一个进程）的事。
+实时通话与语音听写（ASR）的凭据、MOSS Live 线路与主助手语音旁白（`Voice::speak`）在 Rust 服务端的 `crates/server/src/voice/`，接口是 `voice.*`（`voice.hear`、`voice.moss.verify`、`voice.grant.create`、`voice.call.{start,stop,hear,say}`、`voice.asr.{start,stop,transcribe}`）。服务端不碰音频设备：连 MOSS Live 的 WebSocket、采集麦克风和播放回答，都是宿主（原生应用 `apps/mac`，和服务端同一个进程）的事。
 
 ## 在哪
 
 | 位置 | 是什么 |
 |---|---|
-| `crates/server/src/gateway/api/mod.rs` | `LiveVoicePort`、`LiveVoiceLine` 与 `SharedLiveVoice` 窄端口 trait：隔离开服务端具体 `Voice` 实现与桌面宿主 |
-| `crates/server/src/voice/mod.rs` | `Voice`（实现 `LiveVoicePort`）：凭据（`grant`，返回 `VoiceGrant { channel, uid }`）、通话（`start`、`stop`、`heard`、`said`、`speak`）、验 MOSS 的 Key（`verify_moss`），以及给宿主的 `moss_line`（实现 `LiveVoiceLine`） |
-| `crates/server/src/voice/moss.rs` | MOSS Live 的文字帧：`ask_orchestrator` 这个工具、会话设置、旁白（`commentary`）、验 Key |
-| `crates/server/src/voice/prompt.rs` | 通话里对模型说的话 |
+| `crates/server/src/context/api.rs` | `LiveVoicePort`、`LiveVoiceLine` 与 `SharedLiveVoice` 窄端口 trait：隔离开服务端具体 `Voice` 实现与桌面宿主（含 `asr_line`、`can_transcribe`、`transcribe_wav_async`） |
+| `crates/server/src/voice/` | `Voice`（实现 `LiveVoicePort`）：通话凭据与会话（`grant`、`start`、`stop`、`heard`、`said`、`speak`）、ASR 听写会话与转写（`asr_start`、`asr_stop`、`asr_transcribe_async`、`asr_line`）、验 MOSS 的 Key（`verify_moss_async`） |
+| `crates/server/src/voice/moss.rs` | MOSS Live 文字帧（`ask_orchestrator` 工具、通话与听写 `session_update`、旁白、验 Key）与批量 WAV 转写（`HttpTranscriber`） |
+| `crates/server/src/voice/prompt.rs` | 通话与听写里对模型说的话 |
 | `crates/server/src/agent/orchestrator/mod.rs` 的 `answer`、`brief` | 助手这一轮的话除了写进群聊，也通过窄端口交给等着它的那通电话（`Reply`） |
 | `crates/server/src/setting.rs` | `settings.json` 里的语音人设与开场白（`VoiceSettings { persona, greeting }`） |
-| `apps/mac/src/live_voice.rs`、`apps/mac/src/audio.m` | 经 `Server::voice() -> Option<SharedLiveVoice>` 消费 `LiveVoicePort` 的原生 MOSS Live WebSocket 驱动与 AVAudioEngine 采集/播放（不导入 `vibevalley_server::<domain>::*`） |
+| `apps/mac/src/live_voice.rs`、`apps/mac/src/voice_asr.rs`、`apps/mac/src/audio.{rs,m}` | 经 `Server::voice() -> Option<SharedLiveVoice>` 消费 `LiveVoicePort` 的原生 MOSS Live 通话与 Composer ASR 听写驱动、独立麦克风采集/扬声器输出租约与实时电平归一化 |
+| `apps/mac/ui/features/voice/` | 「语音与通话」设置页（`NativeCall`、`VoiceOrb`、`MicWaveform` 与内联 MOSS 密钥/模型配置） |
+| `apps/mac/ui/features/channel/views/Composer.tsx` | 频道与工单评论共用的输入框一键听写按钮（`host.asrStart`/`asrState`/`asrStop`） |
 
 接口清单见 [capabilities.md](docs/reference/capabilities.md)（`voice.*`）。
 
@@ -24,7 +26,9 @@
 
 - 启动与发包都有超时，挂断打断等待和正在发送的包；音频资源随连接退出释放。麦克风队列和播放队列各最多五秒，溢出结束本次通话，不自动重连或重试收费请求。
 - 播放按 run、turn、chunk 对账，播完才回 `chunk.completed` 和 `playback.completed`。只接受一个在播放的 run；被打断的 run 留下墓碑，迟到音频和完成事件不会再次播放。打断时停掉未播部分，partial `played_audio_ms` 保守报 0，不估算仍在设备缓冲里的采样。
-- 文件播放、Flash 与通话独占同一个输出租约；通话中其他播放请求明确拒绝。Flash 直接拉取服务端 `SpeechClaim`，满五秒时等待容量，停止可打断等待，末包播完才释放设备。
+- 文件播放、Flash 语音播放独占输出租约（`reserve_output`），Composer ASR 听写独占采集租约（`reserve_capture`），MOSS Live 通话同时持有采集与输出租约（`reserve_for_call`）。因此语音播报不会打断听写，通话中其他播放或听写请求明确拒绝，互不抢占设备。
+- 设置页「语音与通话」（`/settings/voice`）提供呼吸灯 `VoiceOrb` 与实时 `MicWaveform` 波形（跟随 Light/Dark 语义令牌并遵守 `reduceMotion`），并内置 Live/Speech/Transcription 模型选择与 API Key 配置。
+- 频道对话与工单评论共用的 `Composer` 提供一键语音输入按钮，优先直连 MOSS Live 实时返回 `input.transcript.delta`/`done`（无 Live 绑定时回退到 `Use::Transcription` 批量 WAV 转写）。
 - 离线 WebSocket 与合成音频测试验证握手、标签帧、回执、打断和退出；真实 MOSS、麦克风权限与声学效果仍需在线验收。
 
 ## 一通电话

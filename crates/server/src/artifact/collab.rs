@@ -11,15 +11,16 @@ use tokio::sync::broadcast;
 use vibevalley_core::artifact::{apply_json_merge_patch, infer_mime, is_text_mime, parse_manifest, serialize_manifest, validate_artifact_path};
 use vibevalley_core::collab::{
     CollabDoc, CommitMeta, DocSnapshot, HistoryEntry, PresenceHub, PresenceKind, PresencePayload, PresenceViewport, TextRangeAnchor, decode_frontiers,
-    encode_frontiers,
+    decode_version_vector, encode_frontiers, encode_version_vector,
 };
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    ApiError, Artifact as Wire, ArtifactEvent, ArtifactFileContent, ArtifactFileEncoding, ArtifactFileMeta, ArtifactHistoryCompactRequest,
-    ArtifactHistoryEntry, ArtifactHistoryForkRequest, ArtifactHistoryListRequest, ArtifactHistoryPreviewRequest, ArtifactHistoryPreviewResult,
-    ArtifactHistoryRestoreRequest, ArtifactHistoryUndoOriginRequest, ArtifactPresence, ArtifactPresenceEvent, ArtifactPresenceKind,
-    ArtifactPresenceUpdateRequest, ArtifactSuggestionAcceptInput, ArtifactSuggestionCreateInput, ArtifactType, BizCode, JsNumber, Suggestion, SuggestionEvent,
-    SuggestionEventKind, SuggestionStatus, USER_ID, ViewportRect,
+    ApiError, Artifact as Wire, ArtifactCollabExportRequest, ArtifactCollabExportResult, ArtifactCollabImportRequest, ArtifactCollabImportResult,
+    ArtifactEvent, ArtifactFileContent, ArtifactFileEncoding, ArtifactFileMeta, ArtifactFileWriteItem, ArtifactFileWriteRequest, ArtifactFileWriteResult,
+    ArtifactHistoryCompactRequest, ArtifactHistoryEntry, ArtifactHistoryForkRequest, ArtifactHistoryListRequest, ArtifactHistoryPreviewRequest,
+    ArtifactHistoryPreviewResult, ArtifactHistoryRestoreRequest, ArtifactHistoryUndoOriginRequest, ArtifactPresence, ArtifactPresenceEvent,
+    ArtifactPresenceKind, ArtifactPresenceUpdateRequest, ArtifactSuggestionAcceptInput, ArtifactSuggestionCreateInput, ArtifactType, BizCode, JsNumber,
+    Suggestion, SuggestionEvent, SuggestionEventKind, SuggestionStatus, USER_ID, ViewportRect,
 };
 
 use super::{Maker, Manager, artifact_type_of, encode_manifest_title_if_needed, new_id, q, refused};
@@ -32,6 +33,96 @@ const PRESENCE_EVICT_INTERVAL: Duration = Duration::from_secs(2);
 const ASSET_SENTINEL_PREFIX: &str = "__vvAssetSha256:";
 const CHANGE_EVENT_HISTORY_LIMIT: i64 = 256;
 const SUGGESTIONS_LIMIT: i64 = 1000;
+const DEFAULT_STREAM_BATCH_WINDOW: Duration = Duration::from_millis(25);
+const MAX_STREAM_BATCH_ITEMS: usize = 64;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub(super) struct BatchKey {
+    pub(super) artifact_id: String,
+    pub(super) origin: String,
+}
+
+pub(super) struct PendingWriteBatch {
+    pub(super) maker: Maker,
+    pub(super) meta: CommitMeta,
+    pub(super) items: Vec<ArtifactFileWriteItem>,
+    pub(super) waiters: Vec<tokio::sync::oneshot::Sender<Result<ArtifactFileWriteResult, ApiError>>>,
+    op_count: usize,
+}
+
+pub(super) struct OriginWriteBatcher {
+    window: parking_lot::Mutex<Duration>,
+    buckets: parking_lot::Mutex<HashMap<BatchKey, PendingWriteBatch>>,
+}
+
+impl Default for OriginWriteBatcher {
+    fn default() -> Self {
+        Self {
+            window: parking_lot::Mutex::new(DEFAULT_STREAM_BATCH_WINDOW),
+            buckets: parking_lot::Mutex::new(HashMap::new()),
+        }
+    }
+}
+
+impl OriginWriteBatcher {
+    pub(super) fn window(&self) -> Duration {
+        *self.window.lock()
+    }
+
+    pub(super) fn set_window(&self, window: Duration) {
+        *self.window.lock() = window;
+    }
+
+    pub(super) fn enqueue(
+        &self,
+        key: BatchKey,
+        maker: Maker,
+        meta: CommitMeta,
+        items: Vec<ArtifactFileWriteItem>,
+    ) -> (tokio::sync::oneshot::Receiver<Result<ArtifactFileWriteResult, ApiError>>, bool, bool) {
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        let mut buckets = self.buckets.lock();
+        let is_new = !buckets.contains_key(&key);
+        let batch = buckets.entry(key).or_insert_with(|| PendingWriteBatch {
+            maker: maker.clone(),
+            meta: meta.clone(),
+            items: Vec::new(),
+            waiters: Vec::new(),
+            op_count: 0,
+        });
+        // Keep the earliest maker/origin intact; only update summary when the latest write provides one.
+        if meta.summary.is_some() {
+            batch.meta.summary = meta.summary;
+        }
+        for item in items {
+            if let Some(existing) = batch.items.iter_mut().find(|cur| cur.path == item.path) {
+                *existing = item;
+            } else {
+                batch.items.push(item);
+            }
+        }
+        batch.waiters.push(tx);
+        batch.op_count += 1;
+        let hit_cap = batch.op_count >= MAX_STREAM_BATCH_ITEMS;
+        (rx, is_new, hit_cap)
+    }
+
+    pub(super) fn take_bucket(&self, key: &BatchKey) -> Option<PendingWriteBatch> {
+        self.buckets.lock().remove(key)
+    }
+
+    pub(super) fn take_artifact_buckets(&self, artifact_id: &str) -> Vec<(BatchKey, PendingWriteBatch)> {
+        let mut buckets = self.buckets.lock();
+        let keys: Vec<BatchKey> = buckets.keys().filter(|k| k.artifact_id == artifact_id).cloned().collect();
+        let mut out = Vec::with_capacity(keys.len());
+        for key in keys {
+            if let Some(batch) = buckets.remove(&key) {
+                out.push((key, batch));
+            }
+        }
+        out
+    }
+}
 
 type PresenceExtraMap = HashMap<String, (Option<String>, Option<String>)>;
 
@@ -232,6 +323,12 @@ fn snapshot_to_raw_files(snap: &DocSnapshot, disk_fallback: &BTreeMap<String, Ve
         let content = snap.texts.get(&entry.path).map(String::as_str).unwrap_or(entry.content.as_str());
         out.insert(entry.path.clone(), content.as_bytes().to_vec());
     }
+    // Also materialize `structure/*` text containers created directly by external `loro-crdt` peers.
+    for (path, text) in &snap.texts {
+        if !out.contains_key(path) && path.starts_with("structure/") && validate_artifact_path(path).is_ok() {
+            out.insert(path.clone(), text.as_bytes().to_vec());
+        }
+    }
     out
 }
 
@@ -330,6 +427,47 @@ impl Manager {
         Ok(touched)
     }
 
+    pub(super) async fn flush_batch_bucket_async(&self, key: &BatchKey) {
+        let Some(batch) = self.write_batcher.take_bucket(key) else {
+            return;
+        };
+        self.run_pending_batch_async(key.artifact_id.clone(), batch).await;
+    }
+
+    pub async fn flush_pending_writes_async(&self, artifact_id: &str) {
+        let pending = self.write_batcher.take_artifact_buckets(artifact_id);
+        for (key, batch) in pending {
+            self.run_pending_batch_async(key.artifact_id, batch).await;
+        }
+    }
+
+    async fn run_pending_batch_async(&self, artifact_id: String, batch: PendingWriteBatch) {
+        let req = ArtifactFileWriteRequest {
+            id: artifact_id,
+            files: batch.items,
+            origin: Some(batch.meta.origin.clone()),
+            summary: batch.meta.summary.clone(),
+            announce: Some(false),
+        };
+        let res = self.execute_write_files_now_async(&batch.maker, &req, &batch.meta).await;
+        for tx in batch.waiters {
+            let _ = tx.send(res.clone());
+        }
+    }
+
+    pub(super) fn spawn_batch_flush_timer(self: &Arc<Self>, key: BatchKey, window: Duration) {
+        let this = Arc::clone(self);
+        let cancel = self.ctx.token();
+        self.ctx.spawn("artifact.collab.batch", async move {
+            tokio::select! {
+                biased;
+                _ = cancel.cancelled() => {},
+                _ = tokio::time::sleep(window) => {},
+            }
+            this.flush_batch_bucket_async(&key).await;
+        });
+    }
+
     pub async fn suggestions_async(&self, id: &str) -> Result<Vec<Suggestion>, ApiError> {
         let _ = self.row_async(id).await?;
         let stored = self.ctx.service.artifact.stored_suggestions(id, SUGGESTIONS_LIMIT).await.map_err(q)?;
@@ -337,6 +475,7 @@ impl Manager {
     }
 
     pub async fn create_suggestion_async(&self, actor: &str, req: &ArtifactSuggestionCreateInput) -> Result<Suggestion, ApiError> {
+        self.flush_pending_writes_async(&req.id).await;
         let lock = self.artifact_lock(&req.id);
         let _guard = lock.lock().await;
 
@@ -436,6 +575,7 @@ impl Manager {
     }
 
     pub async fn accept_suggestion_async(&self, resolver: &str, req: &ArtifactSuggestionAcceptInput) -> Result<Suggestion, ApiError> {
+        self.flush_pending_writes_async(&req.id).await;
         let lock = self.artifact_lock(&req.id);
         let _guard = lock.lock().await;
 
@@ -720,6 +860,9 @@ impl Manager {
     }
 
     pub async fn history_list_async(&self, req: &ArtifactHistoryListRequest) -> Result<Vec<ArtifactHistoryEntry>, ApiError> {
+        self.flush_pending_writes_async(&req.id).await;
+        let lock = self.artifact_lock(&req.id);
+        let _guard = lock.lock().await;
         let row = self.row_async(&req.id).await?;
         let disk_files = self.storage.artifact.read_all_raw_async(&row.id, None).await?;
         let (doc, _) = self.load_or_bootstrap_doc_async(&row, &disk_files).await?;
@@ -736,6 +879,9 @@ impl Manager {
     }
 
     pub async fn history_preview_async(&self, req: &ArtifactHistoryPreviewRequest) -> Result<ArtifactHistoryPreviewResult, ApiError> {
+        self.flush_pending_writes_async(&req.id).await;
+        let lock = self.artifact_lock(&req.id);
+        let _guard = lock.lock().await;
         let row = self.row_async(&req.id).await?;
         let ty = artifact_type_of(&row.artifact_type)?;
         let disk_files = self.storage.artifact.read_all_raw_async(&row.id, None).await?;
@@ -761,6 +907,7 @@ impl Manager {
     }
 
     pub async fn history_restore_async(&self, maker: &Maker, req: &ArtifactHistoryRestoreRequest) -> Result<Wire, ApiError> {
+        self.flush_pending_writes_async(&req.id).await;
         let lock = self.artifact_lock(&req.id);
         let _guard = lock.lock().await;
 
@@ -851,6 +998,7 @@ impl Manager {
     }
 
     pub async fn history_fork_async(&self, maker: &Maker, req: &ArtifactHistoryForkRequest) -> Result<Wire, ApiError> {
+        self.flush_pending_writes_async(&req.id).await;
         let row = self.row_async(&req.id).await?;
         let ty = artifact_type_of(&row.artifact_type)?;
         let disk_files = self.storage.artifact.read_all_raw_async(&row.id, None).await?;
@@ -943,6 +1091,7 @@ impl Manager {
     }
 
     pub async fn history_undo_origin_async(&self, maker: &Maker, req: &ArtifactHistoryUndoOriginRequest) -> Result<Wire, ApiError> {
+        self.flush_pending_writes_async(&req.id).await;
         let lock = self.artifact_lock(&req.id);
         let _guard = lock.lock().await;
 
@@ -1016,6 +1165,7 @@ impl Manager {
     }
 
     pub async fn history_compact_async(&self, req: &ArtifactHistoryCompactRequest) -> Result<Wire, ApiError> {
+        self.flush_pending_writes_async(&req.id).await;
         let lock = self.artifact_lock(&req.id);
         let _guard = lock.lock().await;
 
@@ -1028,6 +1178,171 @@ impl Manager {
         let at = self.ctx.now();
         self.ctx.service.artifact.upsert_collab_snapshot(&row.id, &compacted, at).await.map_err(q)?;
         self.get_async(&row.id).await
+    }
+
+    pub async fn collab_export_async(&self, req: &ArtifactCollabExportRequest) -> Result<ArtifactCollabExportResult, ApiError> {
+        self.flush_pending_writes_async(&req.id).await;
+        let lock = self.artifact_lock(&req.id);
+        let _guard = lock.lock().await;
+
+        let row = self.row_async(&req.id).await?;
+        let disk_files = self.storage.artifact.read_all_raw_async(&row.id, None).await?;
+        let (doc, bootstrapped) = self.load_or_bootstrap_doc_async(&row, &disk_files).await?;
+        if bootstrapped {
+            let doc_bytes = export_doc_snapshot(&doc)?;
+            let now = self.ctx.now();
+            self.ctx.service.artifact.upsert_collab_snapshot(&row.id, &doc_bytes, now).await.map_err(q)?;
+        }
+
+        let from_vv = match req.version_vector.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+            Some(encoded) => Some(decode_version_vector(encoded).map_err(|e| refused(format!("invalid versionVector: {e}")))?),
+            None => None,
+        };
+        let exported = doc
+            .export_sync_since(from_vv.as_ref())
+            .map_err(|e| ApiError::new(BizCode::InternalError, format!("collab export: {e}")))?;
+
+        Ok(ArtifactCollabExportResult {
+            artifact_id: row.id,
+            seq: row.seq,
+            version_vector: encode_version_vector(&exported.version_vector),
+            frontiers: encode_frontiers(&exported.frontiers),
+            snapshot: exported.is_snapshot,
+            update: BASE64.encode(&exported.bytes),
+        })
+    }
+
+    pub async fn collab_import_async(&self, maker: &Maker, req: &ArtifactCollabImportRequest) -> Result<ArtifactCollabImportResult, ApiError> {
+        self.flush_pending_writes_async(&req.id).await;
+        let lock = self.artifact_lock(&req.id);
+        let _guard = lock.lock().await;
+
+        let row = self.row_async(&req.id).await?;
+        let ty = artifact_type_of(&row.artifact_type)?;
+        let update_bytes = BASE64.decode(req.update.trim()).map_err(|e| refused(format!("invalid base64 update: {e}")))?;
+        let client_vv = match req.client_version_vector.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+            Some(encoded) => Some(decode_version_vector(encoded).map_err(|e| refused(format!("invalid clientVersionVector: {e}")))?),
+            None => None,
+        };
+
+        let disk_files = self.storage.artifact.read_all_raw_async(&row.id, None).await?;
+        let (doc, bootstrapped) = self.load_or_bootstrap_doc_async(&row, &disk_files).await?;
+        let imported_new_ops = doc
+            .import_bytes_with_status(&update_bytes)
+            .map_err(|e| refused(format!("invalid collab update: {e}")))?;
+
+        let snap = doc.project_snapshot();
+        let mut merged_files = snapshot_to_raw_files(&snap, &disk_files);
+
+        let mut changed_paths = HashSet::new();
+        for (path, bytes) in &merged_files {
+            if path != "manifest.json" && disk_files.get(path) != Some(bytes) {
+                changed_paths.insert(path.clone());
+            }
+        }
+        let mut removed_paths = Vec::new();
+        for path in disk_files.keys() {
+            if path != "manifest.json" && !merged_files.contains_key(path) {
+                removed_paths.push(path.clone());
+            }
+        }
+
+        let mut new_seq = row.seq;
+        let mut changed_metas = Vec::new();
+        let mut deleted_paths = Vec::new();
+        let frontiers_b64 = encode_frontiers(&doc.frontiers());
+        let at = self.ctx.now();
+
+        if !changed_paths.is_empty() || !removed_paths.is_empty() {
+            encode_manifest_title_if_needed(&mut merged_files, ty, &row.title)?;
+            let (all_metas, materialized_deleted) = self
+                .storage
+                .artifact
+                .materialize_directory_async(&row.id, ty, &row.title, &merged_files)
+                .await?;
+            changed_metas = all_metas.into_iter().filter(|m| changed_paths.contains(&m.path)).collect();
+            deleted_paths = materialized_deleted;
+            new_seq = row.seq + 1;
+
+            let doc_bytes = export_doc_snapshot(&doc)?;
+            let latest_meta = doc.latest_commit_meta();
+            let effective_origin = req
+                .origin
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .map(str::to_string)
+                .or_else(|| latest_meta.as_ref().map(|m| m.origin.clone()).filter(|s| !s.is_empty()))
+                .unwrap_or_else(|| commit_meta_for_maker(maker, req.summary.clone(), at).origin);
+            let effective_actor = latest_meta
+                .as_ref()
+                .map(|m| m.author.clone())
+                .filter(|s| !s.is_empty())
+                .unwrap_or_else(|| maker.by.clone());
+            let changed_paths_vec: Vec<String> = changed_metas.iter().map(|m| m.path.clone()).collect();
+
+            let svc = self.ctx.service.clone();
+            let svc_tx = svc.clone();
+            let id_tx = row.id.clone();
+            let frontiers_b64_tx = frontiers_b64.clone();
+            let deleted_paths_tx = deleted_paths.clone();
+            svc.transaction::<_, DbError>(move |tx| {
+                Box::pin(async move {
+                    svc_tx.artifact.upsert_collab_snapshot_in_tx(tx, &id_tx, &doc_bytes, at).await?;
+                    svc_tx.artifact.set_seq_in_tx(tx, &id_tx, new_seq, at).await?;
+                    svc_tx
+                        .artifact
+                        .add_file_change_in_tx(
+                            tx,
+                            &id_tx,
+                            new_seq,
+                            &effective_actor,
+                            Some(&frontiers_b64_tx),
+                            &changed_paths_vec,
+                            &deleted_paths_tx,
+                            at,
+                        )
+                        .await
+                })
+            })
+            .await
+            .map_err(q)?;
+
+            self.emit_change(
+                &row.id,
+                ArtifactEvent::Files {
+                    seq: new_seq,
+                    files: changed_metas.clone(),
+                    deleted: deleted_paths.clone(),
+                    origin: Some(effective_origin),
+                    frontiers: Some(frontiers_b64.clone()),
+                },
+            );
+        } else if imported_new_ops || bootstrapped {
+            let doc_bytes = export_doc_snapshot(&doc)?;
+            self.ctx.service.artifact.upsert_collab_snapshot(&row.id, &doc_bytes, at).await.map_err(q)?;
+        }
+
+        let (server_update, server_snapshot) = match client_vv {
+            Some(ref cvv) => {
+                let sync = doc
+                    .export_sync_since(Some(cvv))
+                    .map_err(|e| ApiError::new(BizCode::InternalError, format!("collab export delta: {e}")))?;
+                (Some(BASE64.encode(&sync.bytes)), Some(sync.is_snapshot))
+            }
+            None => (None, None),
+        };
+
+        Ok(ArtifactCollabImportResult {
+            artifact_id: row.id,
+            seq: new_seq,
+            version_vector: encode_version_vector(&doc.version_vector()),
+            frontiers: frontiers_b64,
+            files: changed_metas,
+            deleted: deleted_paths,
+            server_update,
+            server_snapshot,
+        })
     }
 
     pub async fn follow_files_async(self: &Arc<Self>, id: &str, after: i64, sink: Sink) -> Result<(), ApiError> {

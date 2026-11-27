@@ -237,6 +237,7 @@ fn build_typical(b: &mut ScenarioBuilder) {
                 },
             )]),
             multiplier: Some(JsNumber::from(1.2)),
+            ..Progress::default()
         }),
         news: None,
         commits: Some(CommitCount { total: 42, repos: vec![] }),

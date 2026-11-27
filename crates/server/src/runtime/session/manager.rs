@@ -6,16 +6,19 @@ use tokio_util::sync::CancellationToken;
 use vibevalley_core::rules::session_ids_of;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    ApiError, Issue, IssueGetInput, IssueStageKind, IssueWatch, LiveEvent, Session, SessionBindingInput, SessionChildTranscript, SessionChildTranscriptInput,
-    SessionController, SessionEventListInput, SessionEventPage, SessionId, SessionOpenWorkspaceInput, SessionRespondInteractionInput,
-    SessionRespondPermissionInput, SessionSendInput, SessionSetConfigInput, SessionWatchEvent, SessionWatchPayload, SessionWorkspace, SliceKind,
+    ApiError, BizCode, HumanPause, HumanPauseSource, Issue, IssueGetInput, IssueStageKind, IssueWatch, LiveEvent, ResumeCondition, Session,
+    SessionChildTranscript, SessionChildTranscriptInput, SessionController, SessionEventListInput, SessionEventPage, SessionId, SessionOpenWorkspaceInput,
+    SessionRespondInteractionInput, SessionRespondPermissionInput, SessionSendInput, SessionSetConfigInput, SessionWatchEvent, SessionWatchPayload,
+    SessionWorkspace, SliceKind,
 };
+use vibevalley_runtime::oar::{ControlAction, ControlStatus};
 
 use super::engine::SessionEngine;
 use super::types::{helper_ref, session_error};
 use crate::context::error::{LookIn, missing};
 use crate::context::feed::SliceSubscription;
-use crate::runtime::derive_all_issues;
+use crate::context::now;
+use crate::runtime::{IssueChange, derive_all_issues};
 use crate::storage::Storage;
 
 fn send_watch_event<T: serde::Serialize>(sink: &crate::context::Sink, event: &T) -> bool {
@@ -29,7 +32,7 @@ fn watch_stopped(sink: &crate::context::Sink) -> bool {
 impl SessionEngine {
     pub(crate) async fn list_endpoint_async(&self, profile: Option<String>, controller: Option<SessionController>) -> Result<Vec<Session>, ApiError> {
         let profile = profile.unwrap_or_default();
-        let all = self.sessions_async().await.map_err(session_error)?;
+        let all = self.sessions_with_telemetry_async().await.map_err(session_error)?;
         let mut out: Vec<_> = all
             .into_iter()
             .filter(|x| (profile.is_empty() || x.profile_id() == Some(profile.as_str())) && controller.is_none_or(|c| x.controller == c))
@@ -39,7 +42,7 @@ impl SessionEngine {
     }
 
     pub(crate) async fn get_endpoint_async(&self, id: &str) -> Result<Session, ApiError> {
-        self.session_async(id).await.ok_or_else(|| helper_ref(id))
+        self.session_with_telemetry_async(id).await.ok_or_else(|| helper_ref(id))
     }
 
     pub(crate) async fn event_list_endpoint_async(&self, input: &SessionEventListInput) -> Result<SessionEventPage, ApiError> {
@@ -50,9 +53,29 @@ impl SessionEngine {
     }
 
     pub async fn stop_async(&self, id: &str) -> Result<(), ApiError> {
+        self.stop_with_pause_async(id, None).await
+    }
+
+    /// Stops a live session and, when invoked by a human (`source`), persists
+    /// an explicit human pause on its bound issue across restarts.
+    pub async fn stop_with_pause_async(&self, id: &str, source: Option<HumanPauseSource>) -> Result<(), ApiError> {
         let Some(session) = self.session_async(id).await.filter(|s| self.is_live(&s.id)) else {
             return Err(helper_ref(id));
         };
+        if let Some(src) = source
+            && let Some(issue_id) = session.issue_id()
+        {
+            let pause = HumanPause {
+                source: src,
+                clear_condition: ResumeCondition::ExplicitUserResume,
+                paused_at: now(),
+                session_id: Some(session.id.clone()),
+                note: None,
+            };
+            self.apply_issue_change_async(issue_id, IssueChange::Paused(pause))
+                .await
+                .map_err(session_error)?;
+        }
         if session.phase.is_working() {
             let _ = self.abort_turn_async(&session.id).await;
         }
@@ -60,7 +83,7 @@ impl SessionEngine {
     }
 
     pub(crate) async fn stop_endpoint_async(&self, id: &str) -> Result<(), ApiError> {
-        self.stop_async(id).await
+        self.stop_with_pause_async(id, Some(HumanPauseSource::UserStop)).await
     }
 
     pub(crate) async fn open_workspace_endpoint_async(&self, input: SessionOpenWorkspaceInput) -> Result<SessionWorkspace, ApiError> {
@@ -97,12 +120,27 @@ impl SessionEngine {
         self.read_child_transcript_async(input).await.map_err(session_error)
     }
 
-    pub(crate) async fn attach_binding_endpoint_async(&self, input: SessionBindingInput) -> Result<Session, ApiError> {
-        self.attach_binding_async(input).await.map_err(session_error)
+    pub(crate) async fn compact_live_async(&self, id: &str) -> Result<(), ApiError> {
+        let Some(agent) = self.live_agent(id) else {
+            return Err(ApiError::new(BizCode::SessionRefused, t("server.session.workspace.notLive", &[])));
+        };
+        let key = format!("compact-{}", uuid::Uuid::now_v7());
+        let outcome = agent
+            .control(ControlAction::Compact, "", &key, &key)
+            .await
+            .map_err(|e| session_error(e.into()))?;
+        match outcome.status {
+            ControlStatus::Accepted => Ok(()),
+            ControlStatus::Unsupported => Err(ApiError::new(BizCode::RuntimeRefused, outcome.reason)),
+            ControlStatus::Rejected | ControlStatus::NotRunning => Err(ApiError::new(BizCode::SessionRefused, outcome.reason)),
+        }
     }
 
-    pub(crate) async fn detach_binding_endpoint_async(&self, input: SessionBindingInput) -> Result<Session, ApiError> {
-        self.detach_binding_async(input).await.map_err(session_error)
+    pub(crate) fn worker_conversation(&self, id: &str) -> Option<String> {
+        self.extra(id)
+            .agent_session
+            .filter(|vendor| !vendor.trim().is_empty())
+            .map(|vendor| vibevalley_runtime::agent::harness::worker_conversation(&vendor))
     }
 
     pub(crate) async fn watch_session_async(&self, input: SessionWatchPayload, sink: crate::context::Sink) -> Result<(), ApiError> {
@@ -176,11 +214,14 @@ async fn watch_session(
             .collect(),
         None => Vec::new(),
     };
+    let snap_tokens = sessions.workspace_snapshot(&id).tokens;
+    let projection = Some(vibevalley_core::trajectory::project_chat_session(&history, snap_tokens.as_ref(), 200_000));
     if !send_watch_event(
         &sink,
         &SessionWatchEvent::History {
             session: id.clone(),
             events: history,
+            projection,
         },
     ) {
         return;
@@ -227,6 +268,7 @@ async fn watch_session(
                         &SessionWatchEvent::Event {
                             session: e.id.clone(),
                             event: e.activity,
+                            projection: None,
                         },
                     )
                 {

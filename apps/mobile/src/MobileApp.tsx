@@ -1,4 +1,4 @@
-import { cleanup, computed, effect, locale, platform, signal, Text, View } from "nsh";
+import { cleanup, computed, effect, ErrorBoundary, locale, platform, signal, Text, View } from "nsh";
 import { BackHandler, isAvailable as mobileAvailable, TabBar, type TabBarItem } from "nsh/mobile";
 
 import { t } from "@vibevalley/i18n";
@@ -8,7 +8,7 @@ import type { RemoteConnectionState } from "@vibevalley/protocol/remote";
 import type { IconName } from "../design/icons";
 import { Icon } from "./design/Icon";
 import { NAV_RAIL_WIDTH, useMobileLayout } from "./design/layout";
-import { PillButton, SafeScreen, StatusTag, type TagTone } from "./design/ui";
+import { PillButton, SafeScreen, SectionCard, StatusTag, type TagTone } from "./design/ui";
 import { ChannelsTab } from "./features/ChannelsTab";
 import { InboxTab } from "./features/InboxTab";
 import { IssuesTab } from "./features/IssuesTab";
@@ -16,7 +16,7 @@ import { PairScreen } from "./features/PairScreen";
 import { SessionsTab } from "./features/SessionsTab";
 import { syncMobileLocale } from "./infra/i18nBoot";
 import { subscribeNotificationPress, type NotificationRoute } from "./infra/notifications";
-import { createRemoteSession, hapticSelection } from "./infra/session";
+import { createRemoteSession, hapticSelection, type RemoteSessionOptions } from "./infra/session";
 
 type MobileTabId = "inbox" | "channels" | "sessions" | "issues";
 
@@ -59,11 +59,51 @@ function connectionTag(state: RemoteConnectionState): { readonly label: string; 
 
 export interface MobileAppProps {
   readonly fetchImpl?: typeof fetch;
+  readonly tokenStore?: RemoteSessionOptions["tokenStore"];
   readonly subscribeNotificationPress?: (onRoute: (route: NotificationRoute) => void) => () => void;
 }
 
-export function MobileApp(props: MobileAppProps = {}) {
-  const session = createRemoteSession(props.fetchImpl ? { fetch: props.fetchImpl } : undefined);
+function MobileSplash() {
+  return (
+    <SafeScreen testID="mobile-splash">
+      <View class="flex-1 items-center justify-center px-6">
+        <View class="items-center gap-3">
+          <View class="size-14 items-center justify-center rounded-xl border border-line bg-elevated shadow-raise">
+            <Icon name="farm" size={26} tone="accent" />
+          </View>
+          <View class="items-center gap-1">
+            <Text class="text-lg font-bold text-ink">VibeValley</Text>
+            <Text class="text-xs text-muted">{t("web.farm.native.loading")}</Text>
+          </View>
+        </View>
+      </View>
+    </SafeScreen>
+  );
+}
+
+function MobileErrorFallback(props: { readonly error: unknown; readonly reset: () => void }) {
+  const detail = () => (props.error instanceof Error ? props.error.message : String(props.error));
+  return (
+    <SafeScreen testID="mobile-error-fallback">
+      <View class="flex-1 items-center justify-center px-6">
+        <SectionCard class="w-full max-w-[360px] items-center gap-3 p-5">
+          <View class="size-12 items-center justify-center rounded-full border border-berry bg-bad-soft">
+            <Icon name="warn" size={20} tone="berry" />
+          </View>
+          <Text class="text-center text-base font-semibold text-ink">{t("web.base.unreachable")}</Text>
+          <Text class="text-center text-xs text-muted">{detail()}</Text>
+          <PillButton testID="mobile-error-retry" tone="primary" icon="refresh" label={t("web.devtools.actions.refresh")} onPress={() => props.reset()} />
+        </SectionCard>
+      </View>
+    </SafeScreen>
+  );
+}
+
+function MobileShell(props: MobileAppProps) {
+  const session = createRemoteSession({
+    ...(props.fetchImpl ? { fetch: props.fetchImpl } : {}),
+    ...(props.tokenStore ? { tokenStore: props.tokenStore } : {}),
+  });
   cleanup(() => session.dispose());
 
   effect(() => {
@@ -254,7 +294,27 @@ export function MobileApp(props: MobileAppProps = {}) {
     <If
       when={session.connectionState() === "reconnecting"}
       else={
-        <If when={session.connectionState() === "unauthorized"}>
+        <If
+          when={session.connectionState() === "unauthorized"}
+          else={
+            <If when={session.connectionState() === "offline"}>
+              <View testID="connection-banner" class="flex-row items-center justify-between gap-2.5 border-b border-line bg-side px-4 py-2">
+                <View class="min-w-0 flex-1 flex-row items-center gap-2">
+                  <Icon name="warn" size={14} tone="muted" />
+                  <Text class="min-w-0 flex-1 text-xs font-medium text-muted">{t("web.remote.state.offline")}</Text>
+                </View>
+                <PillButton
+                  testID="connection-retry-button"
+                  size="sm"
+                  tone="plain"
+                  icon="refresh"
+                  label={t("web.devtools.actions.refresh")}
+                  onPress={() => session.reconnect()}
+                />
+              </View>
+            </If>
+          }
+        >
           <View testID="connection-banner" class="flex-row items-center justify-between gap-2.5 border-b border-berry bg-bad-soft px-4 py-2">
             <View class="min-w-0 flex-1 flex-row items-center gap-2">
               <Icon name="warn" size={14} tone="berry" />
@@ -290,162 +350,172 @@ export function MobileApp(props: MobileAppProps = {}) {
   );
 
   return (
-    <If when={session.credentials()} else={<PairScreen session={session} layout={layout} />}>
-      {(creds) => {
-        const status = computed(() => connectionTag(session.connectionState()));
-        return (
-          <If
-            when={isDualPane()}
-            else={
-              <SafeScreen testID="mobile-home" bottomInset={!mobileAvailable}>
-                {renderHeader(creds().serverName, status, false)}
+    <If when={session.ready()} else={<MobileSplash />}>
+      <If when={session.credentials()} else={<PairScreen session={session} layout={layout} />}>
+        {(creds) => {
+          const status = computed(() => connectionTag(session.connectionState()));
+          return (
+            <If
+              when={isDualPane()}
+              else={
+                <SafeScreen testID="mobile-home" bottomInset={!mobileAvailable}>
+                  {renderHeader(creds().serverName, status, false)}
 
-                {renderConnectionBanner()}
+                  {renderConnectionBanner()}
 
-                {renderActiveTab()}
+                  {renderActiveTab()}
 
-                <If
-                  when={mobileAvailable}
-                  else={
-                    <View
-                      testID="mobile-tabbar"
-                      class="flex-row items-center border-t border-line bg-side px-2 py-1.5"
-                      style={{ paddingBottom: Math.max(6, layout().safe.bottom) }}
-                    >
-                      <Each of={TAB_ORDER} key={(id) => id}>
-                        {(id) => {
-                          const active = computed(() => activeTab() === id());
-                          const count = computed(() => badgeForTab(id()));
-                          return (
-                            <View
-                              role="button"
-                              testID={`tab-${id()}`}
-                              accessibilityLabel={tabTitle(id())}
-                              onPress={() => {
-                                hapticSelection();
-                                activeTab.set(id());
-                              }}
-                              class={`flex-1 items-center justify-center gap-1 rounded-lg py-1.5 ${active() ? "bg-selected" : "active:bg-hover"}`}
-                            >
+                  <If
+                    when={mobileAvailable}
+                    else={
+                      <View
+                        testID="mobile-tabbar"
+                        class="flex-row items-center border-t border-line bg-side px-2 py-1.5"
+                        style={{ paddingBottom: Math.max(6, layout().safe.bottom) }}
+                      >
+                        <Each of={TAB_ORDER} key={(id) => id}>
+                          {(id) => {
+                            const active = computed(() => activeTab() === id());
+                            const count = computed(() => badgeForTab(id()));
+                            return (
+                              <View
+                                role="button"
+                                testID={`tab-${id()}`}
+                                accessibilityLabel={tabTitle(id())}
+                                onPress={() => {
+                                  hapticSelection();
+                                  activeTab.set(id());
+                                }}
+                                class={`flex-1 items-center justify-center gap-1 rounded-lg py-1.5 ${active() ? "bg-selected" : "active:bg-hover"}`}
+                              >
+                                <View class="flex-row items-center gap-1">
+                                  <Icon name={TAB_ICONS[id()].reicon} size={18} tone={active() ? "accent" : "muted"} />
+                                  <If when={count() > 0}>
+                                    <View testID={`tab-badge-${id()}`} class="min-w-4 items-center justify-center rounded-full bg-accent px-1">
+                                      <Text class="font-mono text-2xs font-semibold text-page">{String(count())}</Text>
+                                    </View>
+                                  </If>
+                                </View>
+                                <Text class={`text-2xs ${active() ? "font-semibold text-accent" : "text-muted"}`}>{tabTitle(id())}</Text>
+                              </View>
+                            );
+                          }}
+                        </Each>
+                      </View>
+                    }
+                  >
+                    <TabBar
+                      testID="native-tabbar"
+                      class="w-full"
+                      items={tabBarItems()}
+                      selectedIndex={selectedTabIndex()}
+                      onChange={(e) => {
+                        const next = TAB_ORDER[e.index];
+                        if (next !== undefined) {
+                          hapticSelection();
+                          activeTab.set(next);
+                        }
+                      }}
+                    />
+                  </If>
+                </SafeScreen>
+              }
+            >
+              <View testID="mobile-home" class="flex-1 flex-row bg-page">
+                <View
+                  testID="mobile-nav-rail"
+                  class="shrink-0 items-center justify-between border-r border-line bg-rail"
+                  style={{
+                    width: NAV_RAIL_WIDTH + layout().safe.left,
+                    paddingLeft: layout().safe.left,
+                    paddingTop: Math.max(12, layout().safe.top),
+                    paddingBottom: Math.max(12, layout().safe.bottom),
+                  }}
+                >
+                  <View class="w-full items-center gap-1.5 px-1">
+                    <Each of={TAB_ORDER} key={(id) => id}>
+                      {(id) => {
+                        const active = computed(() => activeTab() === id());
+                        const count = computed(() => badgeForTab(id()));
+                        return (
+                          <View
+                            role="button"
+                            testID={`tab-${id()}`}
+                            accessibilityLabel={tabTitle(id())}
+                            onPress={() => {
+                              hapticSelection();
+                              activeTab.set(id());
+                            }}
+                            class={`w-full flex-row items-center rounded-lg px-1 py-2 ${active() ? "bg-selected" : "active:bg-hover"}`}
+                          >
+                            <View class={`h-5 w-1 shrink-0 rounded-full ${active() ? "bg-accent" : "bg-transparent"}`} />
+                            <View class="min-w-0 flex-1 items-center gap-1">
                               <View class="flex-row items-center gap-1">
-                                <Icon name={TAB_ICONS[id()].reicon} size={18} tone={active() ? "accent" : "muted"} />
+                                <Icon name={TAB_ICONS[id()].reicon} size={18} tone={active() ? "accent" : "on-rail"} />
                                 <If when={count() > 0}>
                                   <View testID={`tab-badge-${id()}`} class="min-w-4 items-center justify-center rounded-full bg-accent px-1">
                                     <Text class="font-mono text-2xs font-semibold text-page">{String(count())}</Text>
                                   </View>
                                 </If>
                               </View>
-                              <Text class={`text-2xs ${active() ? "font-semibold text-accent" : "text-muted"}`}>{tabTitle(id())}</Text>
+                              <Text class={`max-w-full truncate text-2xs ${active() ? "font-semibold text-accent" : "text-muted"}`}>{tabTitle(id())}</Text>
                             </View>
-                          );
-                        }}
-                      </Each>
-                    </View>
-                  }
-                >
-                  <TabBar
-                    testID="native-tabbar"
-                    class="w-full"
-                    items={tabBarItems()}
-                    selectedIndex={selectedTabIndex()}
-                    onChange={(e) => {
-                      const next = TAB_ORDER[e.index];
-                      if (next !== undefined) {
-                        hapticSelection();
-                        activeTab.set(next);
-                      }
-                    }}
-                  />
-                </If>
-              </SafeScreen>
-            }
-          >
-            <View testID="mobile-home" class="flex-1 flex-row bg-page">
-              <View
-                testID="mobile-nav-rail"
-                class="shrink-0 items-center justify-between border-r border-line bg-rail"
-                style={{
-                  width: NAV_RAIL_WIDTH + layout().safe.left,
-                  paddingLeft: layout().safe.left,
-                  paddingTop: Math.max(12, layout().safe.top),
-                  paddingBottom: Math.max(12, layout().safe.bottom),
-                }}
-              >
-                <View class="w-full items-center gap-1.5 px-1">
-                  <Each of={TAB_ORDER} key={(id) => id}>
-                    {(id) => {
-                      const active = computed(() => activeTab() === id());
-                      const count = computed(() => badgeForTab(id()));
-                      return (
-                        <View
-                          role="button"
-                          testID={`tab-${id()}`}
-                          accessibilityLabel={tabTitle(id())}
-                          onPress={() => {
-                            hapticSelection();
-                            activeTab.set(id());
-                          }}
-                          class={`w-full flex-row items-center rounded-lg px-1 py-2 ${active() ? "bg-selected" : "active:bg-hover"}`}
-                        >
-                          <View class={`h-5 w-1 shrink-0 rounded-full ${active() ? "bg-accent" : "bg-transparent"}`} />
-                          <View class="min-w-0 flex-1 items-center gap-1">
-                            <View class="flex-row items-center gap-1">
-                              <Icon name={TAB_ICONS[id()].reicon} size={18} tone={active() ? "accent" : "on-rail"} />
-                              <If when={count() > 0}>
-                                <View testID={`tab-badge-${id()}`} class="min-w-4 items-center justify-center rounded-full bg-accent px-1">
-                                  <Text class="font-mono text-2xs font-semibold text-page">{String(count())}</Text>
-                                </View>
-                              </If>
-                            </View>
-                            <Text class={`max-w-full truncate text-2xs ${active() ? "font-semibold text-accent" : "text-muted"}`}>{tabTitle(id())}</Text>
                           </View>
-                        </View>
-                      );
-                    }}
-                  </Each>
+                        );
+                      }}
+                    </Each>
+                  </View>
+
+                  <View class="items-center gap-2.5 px-2">
+                    <View testID="rail-connection-dot" class={`size-2.5 rounded-full ${status().dotClass}`} />
+                    <View
+                      role="button"
+                      testID="rail-refresh-button"
+                      accessibilityLabel={t("web.devtools.actions.refresh")}
+                      onPress={() => session.reconnect()}
+                      class="size-9 items-center justify-center rounded-lg border border-line bg-page active:bg-hover"
+                    >
+                      <Icon name="refresh" size={16} tone="muted" />
+                    </View>
+                    <View
+                      role="button"
+                      testID="rail-disconnect-button"
+                      accessibilityLabel={t("web.remote.state.disconnect")}
+                      onPress={() => handleDisconnect()}
+                      class="size-9 items-center justify-center rounded-lg border border-line bg-page active:bg-hover"
+                    >
+                      <Icon name="close" size={16} tone="muted" />
+                    </View>
+                  </View>
                 </View>
 
-                <View class="items-center gap-2.5 px-2">
-                  <View testID="rail-connection-dot" class={`size-2.5 rounded-full ${status().dotClass}`} />
-                  <View
-                    role="button"
-                    testID="rail-refresh-button"
-                    accessibilityLabel={t("web.devtools.actions.refresh")}
-                    onPress={() => session.reconnect()}
-                    class="size-9 items-center justify-center rounded-lg border border-line bg-page active:bg-hover"
-                  >
-                    <Icon name="refresh" size={16} tone="muted" />
-                  </View>
-                  <View
-                    role="button"
-                    testID="rail-disconnect-button"
-                    accessibilityLabel={t("web.remote.state.disconnect")}
-                    onPress={() => handleDisconnect()}
-                    class="size-9 items-center justify-center rounded-lg border border-line bg-page active:bg-hover"
-                  >
-                    <Icon name="close" size={16} tone="muted" />
-                  </View>
+                <View
+                  class="min-h-0 min-w-0 flex-1 bg-page"
+                  style={{
+                    paddingTop: layout().safe.top,
+                    paddingRight: layout().safe.right,
+                    paddingBottom: layout().safe.bottom,
+                  }}
+                >
+                  {renderHeader(creds().serverName, status, true)}
+
+                  {renderConnectionBanner()}
+
+                  {renderActiveTab()}
                 </View>
               </View>
-
-              <View
-                class="min-h-0 min-w-0 flex-1 bg-page"
-                style={{
-                  paddingTop: layout().safe.top,
-                  paddingRight: layout().safe.right,
-                  paddingBottom: layout().safe.bottom,
-                }}
-              >
-                {renderHeader(creds().serverName, status, true)}
-
-                {renderConnectionBanner()}
-
-                {renderActiveTab()}
-              </View>
-            </View>
-          </If>
-        );
-      }}
+            </If>
+          );
+        }}
+      </If>
     </If>
+  );
+}
+
+export function MobileApp(props: MobileAppProps = {}) {
+  return (
+    <ErrorBoundary fallback={(error, reset) => <MobileErrorFallback error={error} reset={reset} />}>
+      <MobileShell fetchImpl={props.fetchImpl} tokenStore={props.tokenStore} subscribeNotificationPress={props.subscribeNotificationPress} />
+    </ErrorBoundary>
   );
 }

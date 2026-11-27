@@ -24,23 +24,31 @@ fn worker() -> &'static flume::Sender<AudioWork> {
     })
 }
 
-static CALL_RESERVED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static CAPTURE_RESERVED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static OUTPUT_RESERVED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
-pub struct CallAudio;
-impl Drop for CallAudio {
+pub struct CaptureAudio;
+impl Drop for CaptureAudio {
     fn drop(&mut self) {
         capture_stop();
-        stop();
-        CALL_RESERVED.store(false, std::sync::atomic::Ordering::Release);
+        CAPTURE_RESERVED.store(false, std::sync::atomic::Ordering::Release);
     }
 }
 
-pub fn reserve_for_call() -> Result<CallAudio, String> {
-    use std::sync::atomic::Ordering;
-    if CALL_RESERVED.swap(true, Ordering::AcqRel) {
-        return Err("audio is already reserved by a call".into());
+pub struct OutputAudio;
+impl Drop for OutputAudio {
+    fn drop(&mut self) {
+        stop();
+        OUTPUT_RESERVED.store(false, std::sync::atomic::Ordering::Release);
     }
-    let lease = CallAudio;
+}
+
+pub struct CallAudio {
+    _capture: CaptureAudio,
+    _output: OutputAudio,
+}
+
+fn flush_worker() -> Result<(), String> {
     let (sent, received) = flume::bounded(1);
     worker()
         .send(Box::new(move || {
@@ -48,7 +56,51 @@ pub fn reserve_for_call() -> Result<CallAudio, String> {
         }))
         .map_err(|_| "audio worker stopped")?;
     received.recv().map_err(|_| "audio worker stopped")?;
+    Ok(())
+}
+
+pub fn reserve_capture() -> Result<CaptureAudio, String> {
+    use std::sync::atomic::Ordering;
+    if CAPTURE_RESERVED.swap(true, Ordering::AcqRel) {
+        return Err("microphone capture is already active".into());
+    }
+    Ok(CaptureAudio)
+}
+
+pub fn reserve_output() -> Result<OutputAudio, String> {
+    use std::sync::atomic::Ordering;
+    if OUTPUT_RESERVED.swap(true, Ordering::AcqRel) {
+        return Err("audio is already reserved by a call".into());
+    }
+    let lease = OutputAudio;
+    flush_worker()?;
     Ok(lease)
+}
+
+pub fn reserve_for_call() -> Result<CallAudio, String> {
+    let _output = reserve_output()?;
+    let _capture = reserve_capture()?;
+    Ok(CallAudio { _capture, _output })
+}
+
+pub fn output_reserved() -> bool {
+    OUTPUT_RESERVED.load(std::sync::atomic::Ordering::Acquire)
+}
+
+/// Computes normalized RMS amplitude in `0.0..=1.0` from signed 16-bit little-endian PCM bytes.
+pub fn pcm16_rms_level(bytes: &[u8]) -> f64 {
+    let samples = bytes.len() / 2;
+    if samples == 0 {
+        return 0.0;
+    }
+    let mut sum_sq = 0.0_f64;
+    for chunk in bytes.as_chunks::<2>().0 {
+        let s = f64::from(i16::from_le_bytes(*chunk)) / 32_768.0;
+        sum_sq += s * s;
+    }
+    let rms = (sum_sq / samples as f64).sqrt();
+    // Gain of ~4x keeps typical speech levels readable on compact meters while clamping peaks cleanly.
+    (rms * 4.0).clamp(0.0, 1.0)
 }
 
 pub fn dispatch<T: Serialize + 'static>(reply: crate::hosted::Replier, run: impl FnOnce() -> Result<T, String> + Send + 'static) {
@@ -57,7 +109,7 @@ pub fn dispatch<T: Serialize + 'static>(reply: crate::hosted::Replier, run: impl
     if worker()
         .try_send(Box::new(move || {
             answer.send(
-                match if CALL_RESERVED.load(std::sync::atomic::Ordering::Acquire) {
+                match if OUTPUT_RESERVED.load(std::sync::atomic::Ordering::Acquire) {
                     Err("audio is reserved by the voice call".into())
                 } else {
                     run()
@@ -846,5 +898,30 @@ mod tests {
             let again = cached_sound_wav(name);
             assert!(Arc::ptr_eq(&wav, &again), "{raw} should reuse cached buffer");
         }
+    }
+
+    #[test]
+    fn pcm16_rms_level_measures_silence_speech_and_clipping() {
+        assert_eq!(pcm16_rms_level(&[]), 0.0);
+        assert_eq!(pcm16_rms_level(&[0, 0, 0, 0]), 0.0);
+        let mid = 4_096_i16.to_le_bytes();
+        let level = pcm16_rms_level(&[mid[0], mid[1], mid[0], mid[1]]);
+        assert!((level - 0.5).abs() < 1e-6, "got {level}");
+        let peak = i16::MAX.to_le_bytes();
+        assert_eq!(pcm16_rms_level(&[peak[0], peak[1]]), 1.0);
+    }
+
+    #[test]
+    fn capture_and_output_leases_only_conflict_when_call_holds_both() {
+        let cap = reserve_capture().unwrap();
+        assert!(reserve_capture().is_err());
+        let out = reserve_output().unwrap();
+        assert!(reserve_for_call().is_err());
+        drop(out);
+        drop(cap);
+        let call = reserve_for_call().unwrap();
+        assert!(reserve_capture().is_err());
+        assert!(reserve_output().is_err());
+        drop(call);
     }
 }

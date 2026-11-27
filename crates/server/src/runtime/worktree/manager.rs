@@ -95,6 +95,7 @@ pub struct Worktree {
     repos_dir: Option<PathBuf>,
     data_dir: PathBuf,
     repo: Option<std::sync::Arc<crate::repo::Repo>>,
+    hoe: std::sync::Arc<super::handoff::HoeRegistry>,
 }
 
 impl Worktree {
@@ -108,7 +109,13 @@ impl Worktree {
             repos_dir,
             data_dir,
             repo,
+            hoe: std::sync::Arc::new(super::handoff::HoeRegistry::new()),
         }
+    }
+
+    /// Single-writer ("Hoe Handoff") lock registry shared by this worktree manager.
+    pub fn hoe(&self) -> &super::handoff::HoeRegistry {
+        &self.hoe
     }
 
     /// Where an issue's `repo` is: a mounted external repo by name, a bare

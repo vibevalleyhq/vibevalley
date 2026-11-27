@@ -142,8 +142,8 @@ pub enum ArtifactAction {
         #[arg(long)]
         note: Option<String>,
     },
-    /// Update an artifact's title or default flag
-    #[command(after_help = "Examples:\n  vibevalley artifact update a1 --title 'Renamed'")]
+    /// Update an artifact's title, default flag, or linked issue
+    #[command(after_help = "Examples:\n  vibevalley artifact update a1 --title 'Renamed'\n  vibevalley artifact update a1 --issue 42")]
     Update {
         /// Artifact id
         artifact: String,
@@ -153,6 +153,9 @@ pub enum ArtifactAction {
         /// Set or clear default design-system flag (true or false)
         #[arg(long, action = ArgAction::Set)]
         default: Option<bool>,
+        /// Link to an issue number/id, or empty string '' to unlink
+        #[arg(long)]
+        issue: Option<String>,
     },
     /// Delete an artifact
     #[command(after_help = "Examples:\n  vibevalley artifact delete a1 --dry-run")]
@@ -493,14 +496,20 @@ pub async fn run(client: &Client, cmd: ArtifactCmd) -> Done {
             let request = ArtifactVersionRequest { id: artifact, content, note };
             client.mutate::<ops::ArtifactVersionCreate>("artifact version", &request, artifact_line).await
         }
-        ArtifactAction::Update { artifact, title, default } => {
-            if title.is_none() && default.is_none() {
+        ArtifactAction::Update {
+            artifact,
+            title,
+            default,
+            issue,
+        } => {
+            if title.is_none() && default.is_none() && issue.is_none() {
                 return Err(Failure::usage("MissingArgument", "provide at least one field to update"));
             }
             let request = ArtifactUpdateRequest {
                 id: artifact,
                 title,
                 is_default: default,
+                issue: issue.map(|i| if i.is_empty() { i } else { issue_ref(&i) }),
             };
             client.mutate::<ops::ArtifactUpdate>("artifact update", &request, artifact_line).await
         }

@@ -20,8 +20,10 @@ export interface SessionHandlers {
   readonly "session.respondInteraction": (a: T.SessionRespondInteractionInput) => Promise<void>;
   readonly "session.setConfig": (a: T.SessionSetConfigInput) => Promise<T.SessionWorkspace>;
   readonly "session.childTranscript": (a: T.SessionChildTranscriptInput) => Promise<T.SessionChildTranscript>;
-  readonly "session.binding.attach": (a: T.SessionBindingInput) => Promise<T.Session>;
-  readonly "session.binding.detach": (a: T.SessionBindingInput) => Promise<T.Session>;
+  /** Manually triggers context compaction for a durable or runtime session. */
+  readonly "session.compact": (a: { readonly id: string }) => Promise<T.SessionCompactResult>;
+  /** Executes a durable CodeMode JavaScript script in the session's tool context. */
+  readonly "session.runCode": (a: T.SessionRunCodeInput) => Promise<T.SessionRunCodeResult>;
 }
 
 export const sessionEndpoints: readonly Endpoint[] = [
@@ -146,23 +148,25 @@ export const sessionEndpoints: readonly Endpoint[] = [
     can: ["user", "remote"],
   },
   {
-    op: "session.binding.attach",
+    op: "session.compact",
     about: ["id"],
     input: input({
       id: z.string(),
-      binding: S.ContextRef,
     }),
-    result: S.Session,
-    can: ["user", "orchestrator", "remote"],
+    result: S.SessionCompactResult,
+    can: ["user", "remote"],
   },
   {
-    op: "session.binding.detach",
+    op: "session.runCode",
     about: ["id"],
     input: input({
       id: z.string(),
-      binding: S.ContextRef,
+      script: z.string(),
+      seed: z.exactOptional(z.number()),
+      timeoutMs: z.exactOptional(z.number()),
+      maxSteps: z.exactOptional(z.number()),
     }),
-    result: S.Session,
-    can: ["user", "orchestrator", "remote"],
+    result: S.SessionRunCodeResult,
+    can: ["user", "remote"],
   },
 ];

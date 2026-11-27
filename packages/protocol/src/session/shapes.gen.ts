@@ -74,7 +74,7 @@ export type SessionSubagents = { run: string, rootThreadId: string, disconnected
 
 export type FactSessionSubagentsChanged = { "type": "sessionSubagentsChanged", at: number, id: SessionId, subagents?: SessionSubagents, };
 
-export type Session = { id: SessionId, controller: SessionController, role?: AgentRole, name: string, profile?: string, runtime: string, brief: string, cwd?: string, policy: ExecutionPolicy, bindings: Array<ContextRef>, hiredAt: number, runs: number, lastRun?: LastRun, spent?: Spent, subagents?: SessionSubagents, toolConnections?: Array<ToolConnection>,
+export type Session = { id: SessionId, controller: SessionController, role?: AgentRole, name: string, profile?: string, runtime: string, brief: string, cwd?: string, policy: ExecutionPolicy, bindings: Array<ContextRef>, hiredAt: number, runs: number, lastRun?: LastRun, spent?: Spent, subagents?: SessionSubagents, toolConnections?: Array<ToolConnection>, telemetry?: SessionTelemetry,
 /**
  * The machine it works on; none for an agent hosted in the server's process.
  */
@@ -83,7 +83,7 @@ machine?: string, phase: Phase, };
 /**
  * reduce never sees these: the words are the frame's (projection/frame.ts).
  */
-export type SessionView = { id: SessionId, controller: SessionController, role?: AgentRole, name: string, profile?: string, runtime: string, brief: string, cwd?: string, policy: ExecutionPolicy, bindings: Array<ContextRef>, hiredAt: number, runs: number, lastRun?: LastRun, spent?: Spent, subagents?: SessionSubagents, toolConnections?: Array<ToolConnection>, machine?: string, phase: PhaseView, phaseText: string, };
+export type SessionView = { id: SessionId, controller: SessionController, role?: AgentRole, name: string, profile?: string, runtime: string, brief: string, cwd?: string, policy: ExecutionPolicy, bindings: Array<ContextRef>, hiredAt: number, runs: number, lastRun?: LastRun, spent?: Spent, subagents?: SessionSubagents, toolConnections?: Array<ToolConnection>, telemetry?: SessionTelemetry, machine?: string, phase: PhaseView, phaseText: string, };
 
 export const SessionEventTypeValues = ["run/start", "user/message", "memory/recalled", "assistant/thinking", "assistant/message", "tool/call", "tool/result", "permission/request", "permission/resolved", "interaction/request", "interaction/resolved", "llm/retry", "llm/usage", "run/error", "run/end"] as const;
 export type SessionEventType = (typeof SessionEventTypeValues)[number];
@@ -92,6 +92,11 @@ export const ToolActionValues = ["run_command", "read_file", "edit_file", "searc
 export type ToolAction = (typeof ToolActionValues)[number];
 
 export type EventTokens = { input: number, cacheRead: number, output: number, cacheWrite?: number, reasoning?: number, contextUsed?: number, contextWindow?: number, };
+
+/**
+ * Aggregated token usage, context saturation, and retry/error counts for a session.
+ */
+export type SessionTelemetry = { inputTokens: number, cacheReadTokens: number, outputTokens: number, cacheWriteTokens?: number, reasoningTokens?: number, contextUsed?: number, contextWindow?: number, llmRetries: number, runErrors: number, };
 
 export const SessionPermissionModeValues = ["ask", "acceptEdits", "bypass", "readOnly"] as const;
 export type SessionPermissionMode = (typeof SessionPermissionModeValues)[number];
@@ -168,7 +173,56 @@ export type SessionGetInput = { id: string, };
 
 export type SessionEventListInput = { id: string, run?: string, beforeSeq?: number, afterSeq?: number, limit?: number, };
 
-export type SessionEventPage = { events: Array<SessionEvent>, hasMore: boolean, oldestSeq?: number, newestSeq?: number, };
+export type TrajectoryRunView = { run?: string, asked?: SessionEvent, steps: Array<SessionEvent>, };
+
+export const TrajectoryWaterfallLaneValues = ["asked", "model", "tool"] as const;
+export type TrajectoryWaterfallLane = (typeof TrajectoryWaterfallLaneValues)[number];
+
+export type TrajectoryLaneSpan = { lane: TrajectoryWaterfallLane, start: number, end: number, seq: number, };
+
+export type TrajectoryWaterfall = { runs: Array<[number, number]>, spans: Array<TrajectoryLaneSpan>, };
+
+export type TrajectorySummary = { runs: number, steps: number, modelMs: number, toolMs: number, input: number, cacheRead: number, output: number, };
+
+export type TrajectoryStepDuration = { seq: number, durationMs: number, };
+
+export type TrajectoryStepMeta = { seq: number, durationMs: number, readableInput?: string, collapsedSummary?: string, };
+
+export type SessionTrajectoryProjection = { shown: Array<SessionEvent>, runs: Array<TrajectoryRunView>, waterfall: TrajectoryWaterfall, summary: TrajectorySummary, stepDurations: Array<TrajectoryStepDuration>, stepMeta: Array<TrajectoryStepMeta>, telemetry: SessionTelemetry, };
+
+export type ActivityStep = { step: SessionEvent, durationMs?: number, };
+
+export type ActivityEditedFile = { path: string, line?: number, canDiff: boolean, };
+
+export type ActivityCommandPreview = { seq: number, command: string, running: boolean, failed: boolean, };
+
+export const TodoStepStatusValues = ["pending", "in_progress", "done", "skipped", "failed"] as const;
+export type TodoStepStatus = (typeof TodoStepStatusValues)[number];
+
+export type TodoStep = { title: string, status: TodoStepStatus, };
+
+export type TodoChecklist = { seq: number, steps: Array<TodoStep>, doneCount: number, inProgressCount: number, failedCount: number, totalCount: number, activeStep?: TodoStep, };
+
+export type ActivitySummary = { totalSteps: number, thinkingCount: number, readCount: number, searchCount: number, editCount: number, commandCount: number, otherToolCount: number, totalTools: number, runningCount: number, failedCount: number, startedAt: number, durationMs: number, editedFiles: Array<ActivityEditedFile>, latestCommand?: ActivityCommandPreview, };
+
+export type ChatFeedItem = { "kind": "step", key: string, step: SessionEvent, durationMs?: number, trailing: boolean, } | { "kind": "activity", key: string, steps: Array<ActivityStep>, summary: ActivitySummary, trailing: boolean, };
+
+export type ToolTarget = { path: string, line?: number, canDiff: boolean, };
+
+export type ToolDetails = { headline: string, formattedInput: string, outputLines: number, };
+
+export type ChatToolStepProjection = { seq: number, target?: ToolTarget, details: ToolDetails, todo?: TodoChecklist, };
+
+export type ChatTelemetry = { cachedRead: number, uncachedInput: number, totalInput: number, output: number, reasoning: number, contextUsed: number, contextWindow: number, contextPct: number, cacheHitPct: number, turns: number, toolCount: number, hasData: boolean, };
+
+export const BoardTextTokenKindValues = ["text", "mention", "seq", "tag"] as const;
+export type BoardTextTokenKind = (typeof BoardTextTokenKindValues)[number];
+
+export type BoardTextToken = { kind: BoardTextTokenKind, value: string, };
+
+export type ChatSessionProjection = { visibleSteps: Array<SessionEvent>, feedItems: Array<ChatFeedItem>, latestTodos?: TodoChecklist, telemetry: ChatTelemetry, toolEntries: Array<ChatToolStepProjection>, };
+
+export type SessionEventPage = { events: Array<SessionEvent>, hasMore: boolean, oldestSeq?: number, newestSeq?: number, trajectory?: SessionTrajectoryProjection, };
 
 export type SessionBindingInput = { id: string, binding: ContextRef, };
 
@@ -212,6 +266,26 @@ export type SessionChildTranscriptInput = { id: string, conversationId: string, 
 
 export type SessionChildTranscript = { conversationId: string, steps: Array<SessionChildStep>, };
 
+/**
+ * Request to manually compact conversation context for a session.
+ */
+export type SessionCompactInput = { id: string, };
+
+/**
+ * Result of manually compacting conversation context for a session.
+ */
+export type SessionCompactResult = { id: string, compacted: boolean, summary?: string, reason?: string, };
+
+/**
+ * Request to execute a durable CodeMode JavaScript task within a session's context.
+ */
+export type SessionRunCodeInput = { id: string, script: string, seed?: number, timeoutMs?: number, maxSteps?: number, };
+
+/**
+ * Result of a durable CodeMode script execution.
+ */
+export type SessionRunCodeResult = { id: string, taskId: string, outputJson: string, executedSteps: number, replayedCalls: number, replayedSleeps: number, virtualNowMs: number, };
+
 export type SessionWatchPayload = { id: string, afterSeq?: number, };
 
-export type SessionWatchEvent = { "kind": "state", session: Session, title?: string, model?: string, effort?: string, permissionMode: SessionPermissionMode, pendingPermissions: Array<SessionPermissionRequest>, pendingInteractions: Array<SessionInteractionRequest>, tokens?: EventTokens, swarm?: SessionSwarmState, } | { "kind": "history", session: SessionId, events: Array<SessionEvent>, } | { "kind": "event", session: SessionId, event: SessionEvent, } | { "kind": "missing", session: SessionId, };
+export type SessionWatchEvent = { "kind": "state", session: Session, title?: string, model?: string, effort?: string, permissionMode: SessionPermissionMode, pendingPermissions: Array<SessionPermissionRequest>, pendingInteractions: Array<SessionInteractionRequest>, tokens?: EventTokens, swarm?: SessionSwarmState, } | { "kind": "history", session: SessionId, events: Array<SessionEvent>, projection?: ChatSessionProjection, } | { "kind": "event", session: SessionId, event: SessionEvent, projection?: ChatSessionProjection, } | { "kind": "missing", session: SessionId, };

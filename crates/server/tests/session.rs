@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use serde_json::json;
-use vibevalley_protocol::{Caller, SessionEvent, ToolAction};
+use vibevalley_protocol::{Caller, EventTokens, SessionEvent, SessionEventType, ToolAction};
 use vibevalley_server::context::{Context, Http, LiveState, Outbox, PublicDownload, StateFeed, TaskGroup};
 use vibevalley_server::gateway::api::Server;
 use vibevalley_server::runtime::{Journal, Trajectory};
@@ -247,6 +247,141 @@ fn a_sent_issue_is_logged_listed_and_watched() {
     router.unsubscribe(sub);
     let missing = router.subscribe("issue.watch", json!({ "id": "i999" }));
     assert_eq!(missing.err().unwrap().biz_code, vibevalley_protocol::BizCode::IssueNotFound.code());
+    app.close_blocking();
+}
+
+#[test]
+fn session_telemetry_rolls_up_without_migrations() {
+    vibevalley_i18n::set_locale("en");
+    let dir = tempfile::tempdir().unwrap();
+    let mut registry = vibevalley_runtime::oar::Registry::new();
+    registry.register(Arc::new(vibevalley_runtime::oar::scripted::ScriptedRuntime::demo()));
+    let app: App = create_app_blocking(Config {
+        registry: Some(Arc::new(registry)),
+        probe_runtimes: false,
+        ..Config::under(dir.path())
+    })
+    .unwrap();
+    let router = app.router().clone();
+    let call = |op: &str, p| router.call_as(Caller::User, op, p);
+    let mut helper = vibevalley_runtime::rt::block_on(app.test_internals().agent.profile.store.install_template_async("reviewer")).unwrap();
+    helper.runtime = "scripted".into();
+    let helper = vibevalley_runtime::rt::block_on(app.test_internals().agent.profile.store.save_async(helper)).unwrap();
+    call("repo.create", json!({ "name": "farm" })).data.unwrap();
+    let issue = call("issue.create", json!({ "title": "collect telemetry", "repo": "farm", "agent": helper.id }))
+        .data
+        .unwrap();
+    let id = issue["id"].as_str().unwrap().to_string();
+    call("issue.status.update", json!({ "id": id, "status": "todo" })).data.unwrap();
+
+    let session = crate::support::wait_until_live(app.ctx(), Duration::from_secs(20), "the session to rest with its run ended", || {
+        let s = crate::support::board_sessions(app.test_internals().board)
+            .into_iter()
+            .find(|x| x.issue_id() == Some(id.as_str()))?;
+        let page = call("session.event.list", json!({ "id": s.id })).data?;
+        page["events"].as_array()?.iter().any(|e| e["type"] == "run/end").then_some(s)
+    });
+
+    // First verify live telemetry from ScriptedRuntime::demo() before restart.
+    let live_listed = call("session.list", json!({ "profile": helper.id })).data.unwrap();
+    assert_eq!(live_listed[0]["telemetry"]["inputTokens"], 1200);
+    assert_eq!(live_listed[0]["telemetry"]["outputTokens"], 85);
+
+    // Append additional LlmUsage + LlmRetry + RunError events, then restart App to verify DB rollup with zero migrations.
+    let tr = Trajectory::open(app.ctx().clone());
+    vibevalley_runtime::rt::block_on(async {
+        tr.prepare_async(&session.id).await;
+        tr.with_log(&session.id, |j| {
+            j.usage(
+                EventTokens {
+                    input: 1200,
+                    output: 300,
+                    cache_read: 800,
+                    cache_write: Some(200),
+                    reasoning: Some(100),
+                    context_used: Some(42_000),
+                    context_window: Some(128_000),
+                },
+                &[],
+            );
+            j.note(SessionEventType::LlmRetry, "retrying 429", &[]);
+            j.note(SessionEventType::RunError, "tool timeout", &[]);
+        });
+        tr.close_async().await;
+    });
+    app.close_blocking();
+
+    let mut registry2 = vibevalley_runtime::oar::Registry::new();
+    registry2.register(Arc::new(vibevalley_runtime::oar::scripted::ScriptedRuntime::demo()));
+    let app2: App = create_app_blocking(Config {
+        registry: Some(Arc::new(registry2)),
+        probe_runtimes: false,
+        ..Config::under(dir.path())
+    })
+    .unwrap();
+    let router2 = app2.router().clone();
+    let listed = router2.call_as(Caller::User, "session.list", json!({ "profile": helper.id })).data.unwrap();
+    assert_eq!(listed[0]["telemetry"]["inputTokens"], 2400);
+    assert_eq!(listed[0]["telemetry"]["cacheReadTokens"], 800);
+    assert_eq!(listed[0]["telemetry"]["cacheWriteTokens"], 200);
+    assert_eq!(listed[0]["telemetry"]["outputTokens"], 385);
+    assert_eq!(listed[0]["telemetry"]["reasoningTokens"], 100);
+    assert_eq!(listed[0]["telemetry"]["contextUsed"], 42_000);
+    assert_eq!(listed[0]["telemetry"]["contextWindow"], 128_000);
+    assert_eq!(listed[0]["telemetry"]["llmRetries"], 1);
+    assert_eq!(listed[0]["telemetry"]["runErrors"], 1);
+
+    let got = router2.call_as(Caller::User, "session.get", json!({ "id": session.id })).data.unwrap();
+    assert_eq!(got["telemetry"], listed[0]["telemetry"]);
+    app2.close_blocking();
+}
+
+#[test]
+fn session_compact_and_run_code_respect_runtime_capabilities() {
+    vibevalley_i18n::set_locale("en");
+    let dir = tempfile::tempdir().unwrap();
+    let mut registry = vibevalley_runtime::oar::Registry::new();
+    registry.register(Arc::new(vibevalley_runtime::oar::scripted::ScriptedRuntime::demo()));
+    let app: App = create_app_blocking(Config {
+        registry: Some(Arc::new(registry)),
+        probe_runtimes: false,
+        ..Config::under(dir.path())
+    })
+    .unwrap();
+    let router = app.router().clone();
+    let call = |op: &str, p| router.call_as(Caller::User, op, p);
+
+    let mut helper = vibevalley_runtime::rt::block_on(app.test_internals().agent.profile.store.install_template_async("reviewer")).unwrap();
+    helper.runtime = "scripted".into();
+    let helper = vibevalley_runtime::rt::block_on(app.test_internals().agent.profile.store.save_async(helper)).unwrap();
+    call("repo.create", json!({ "name": "farm" })).data.unwrap();
+    let issue = call(
+        "issue.create",
+        json!({ "title": "check compact capability", "repo": "farm", "agent": helper.id }),
+    )
+    .data
+    .unwrap();
+    let id = issue["id"].as_str().unwrap().to_string();
+    call("issue.status.update", json!({ "id": id, "status": "todo" })).data.unwrap();
+
+    let session = crate::support::wait_until_live(app.ctx(), Duration::from_secs(20), "scripted helper to finish", || {
+        let s = crate::support::board_sessions(app.test_internals().board)
+            .into_iter()
+            .find(|x| x.issue_id() == Some(id.as_str()))?;
+        let page = call("session.event.list", json!({ "id": s.id })).data?;
+        page["events"].as_array()?.iter().any(|e| e["type"] == "run/end").then_some(s)
+    });
+
+    // External non-compacting / non-durable OAR runtime (`scripted`) returns RuntimeRefused on both.
+    let compact_refused = call("session.compact", json!({ "id": session.id }));
+    assert_eq!(compact_refused.biz_code, vibevalley_protocol::BizCode::RuntimeRefused.code());
+    let code_refused = call("session.runCode", json!({ "id": session.id, "script": "return 1;" }));
+    assert_eq!(code_refused.biz_code, vibevalley_protocol::BizCode::RuntimeRefused.code());
+
+    // Missing session returns SessionNotFound.
+    let missing = call("session.compact", json!({ "id": "w404" }));
+    assert_eq!(missing.biz_code, vibevalley_protocol::BizCode::SessionNotFound.code());
+
     app.close_blocking();
 }
 

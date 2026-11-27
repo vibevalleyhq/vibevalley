@@ -27,15 +27,11 @@ export interface AgentHandlers {
   readonly "agent.template.add": (a: { readonly path: string }) => Promise<T.AgentTemplate>;
   /** An added template gone; the profiles installed from it stay. */
   readonly "agent.template.delete": (a: { readonly id: string }) => Promise<void>;
-  /** What deleting the template would do, refused as it would be; nothing changes. */
-  readonly "agent.template.previewDelete": (a: { readonly id: string }) => Promise<T.Preview>;
   readonly "skill.list": () => Promise<T.Skill[]>;
   /** Create allocates an identity; callers with an existing identity use save. */
   readonly "skill.create": (a: T.Skill) => Promise<T.Skill>;
   readonly "skill.update": (a: T.Skill) => Promise<T.Skill>;
   readonly "skill.delete": (a: { readonly id: string }) => Promise<void>;
-  /** What delete would do, refused as it would be; nothing changes. */
-  readonly "skill.previewDelete": (a: { readonly id: string }) => Promise<T.Preview>;
 }
 
 export const agentEndpoints: readonly Endpoint[] = [
@@ -116,14 +112,6 @@ export const agentEndpoints: readonly Endpoint[] = [
     input: agentDeleteInput,
     result: undefined,
     can: ["user"],
-    dryRun: "agent.template.previewDelete",
-  },
-  {
-    op: "agent.template.previewDelete",
-    about: ["id"],
-    input: agentDeleteInput,
-    result: S.Preview,
-    can: ["user"],
   },
   {
     op: "skill.list",
@@ -151,14 +139,6 @@ export const agentEndpoints: readonly Endpoint[] = [
     about: ["id"],
     input: skillDeleteInput,
     result: undefined,
-    can: ["user"],
-    dryRun: "skill.previewDelete",
-  },
-  {
-    op: "skill.previewDelete",
-    about: ["id"],
-    input: skillDeleteInput,
-    result: S.Preview,
     can: ["user"],
   },
 ];

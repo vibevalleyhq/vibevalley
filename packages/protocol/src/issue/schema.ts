@@ -2,10 +2,22 @@ import { z } from "zod";
 
 import { Attachment } from "../attachment/schema";
 import type { Codec } from "../codec";
-import { IssueId, Outcome, SessionId, Spent } from "../common/schema";
-import { Conflict, ReviewRevision } from "../repo/schema";
+import { ActorKind, IssueId, Outcome, SessionId, Spent } from "../common/schema";
+import { Conflict, RepoHealth, ReviewRevision } from "../repo/schema";
 import { IssueAnswer, Session } from "../session/schema";
 import * as T from "./shapes.gen";
+
+export const IssueRelationKind = z.enum(T.IssueRelationKindValues) satisfies Codec<T.IssueRelationKind>;
+
+export const IssueRelation = z.object({
+  kind: IssueRelationKind,
+  issue: IssueId,
+}) satisfies Codec<T.IssueRelation>;
+
+export const ActorRef = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("user"), id: z.string() }),
+  z.object({ kind: z.literal("agent"), id: z.string() }),
+]) satisfies Codec<T.ActorRef>;
 
 const Landing = z.enum(T.LandingValues) satisfies Codec<T.Landing>;
 const IssueCanceled = z.enum(T.IssueCanceledValues) satisfies Codec<T.IssueCanceled>;
@@ -29,6 +41,36 @@ export const BoardLaneCounts = z.object({
   canceled: z.number(),
 }) satisfies Codec<T.BoardLaneCounts>;
 
+export const BoardCardPreview = z.object({
+  attachmentId: z.exactOptional(z.string()),
+  url: z.exactOptional(z.string()),
+  isCompare: z.boolean(),
+}) satisfies Codec<T.BoardCardPreview>;
+
+export const IssueScheduleSpan = z.object({
+  startMs: z.number(),
+  endMs: z.number(),
+  durationDays: z.number(),
+  hasExplicitStart: z.boolean(),
+  hasExplicitDue: z.boolean(),
+  rolledUp: z.boolean(),
+  overdue: z.boolean(),
+}) satisfies Codec<T.IssueScheduleSpan>;
+
+export const BoardScheduleEntry = z.object({
+  issueId: IssueId,
+  span: IssueScheduleSpan,
+  depth: z.number(),
+  isParent: z.boolean(),
+  childCount: z.number(),
+}) satisfies Codec<T.BoardScheduleEntry>;
+
+export const BoardSchedule = z.object({
+  todayDayMs: z.number(),
+  scheduled: z.array(BoardScheduleEntry),
+  unscheduledIds: z.array(IssueId),
+}) satisfies Codec<T.BoardSchedule>;
+
 export const BoardIssueSummary = z.object({
   lane: IssueLane,
   cardKind: IssueCardKind,
@@ -36,6 +78,8 @@ export const BoardIssueSummary = z.object({
   familyTotal: z.number(),
   needsWorktreeCheck: z.boolean(),
   prompt: z.exactOptional(IssuePromptKind),
+  preview: z.exactOptional(BoardCardPreview),
+  schedule: z.exactOptional(IssueScheduleSpan),
 }) satisfies Codec<T.BoardIssueSummary>;
 
 export const BoardSummary = z.object({
@@ -43,6 +87,7 @@ export const BoardSummary = z.object({
   runningSlots: z.number(),
   maxRunning: z.number(),
   byIssue: z.record(z.string(), BoardIssueSummary),
+  schedule: z.exactOptional(BoardSchedule),
 }) satisfies Codec<T.BoardSummary>;
 
 const PullRequestState = z.enum(T.PullRequestStateValues) satisfies Codec<T.PullRequestState>;
@@ -105,6 +150,8 @@ const Milestone = z.object({
   kind: MilestoneKind,
   who: z.exactOptional(z.string()),
   text: z.string(),
+  said: z.exactOptional(z.string()),
+  run: z.exactOptional(z.string()),
 }) satisfies Codec<T.Milestone>;
 
 export const IssueTimeline = z.object({
@@ -130,11 +177,24 @@ const Assignment = z.object({
 
 const MandateStrength = z.enum(T.MandateStrengthValues) satisfies Codec<T.MandateStrength>;
 
+const HumanPauseSource = z.enum(T.HumanPauseSourceValues) satisfies Codec<T.HumanPauseSource>;
+
+const ResumeCondition = z.enum(T.ResumeConditionValues) satisfies Codec<T.ResumeCondition>;
+
+const HumanPause = z.object({
+  source: HumanPauseSource,
+  clearCondition: ResumeCondition,
+  pausedAt: z.number(),
+  sessionId: z.exactOptional(z.string()),
+  note: z.exactOptional(z.string()),
+}) satisfies Codec<T.HumanPause>;
+
 const IssueMandate = z.object({
   originTriggerId: z.exactOptional(z.string()),
   strength: MandateStrength,
   maxBotReviewRounds: z.number().int(),
   autoSubmitPr: z.boolean(),
+  pause: z.exactOptional(HumanPause),
 }) satisfies Codec<T.IssueMandate>;
 
 export const IssueConstraints = z.object({
@@ -206,6 +266,8 @@ const issueFields = {
   tags: z.exactOptional(z.array(z.string())),
   startAt: z.exactOptional(z.number()),
   dueAt: z.exactOptional(z.number()),
+  owner: z.exactOptional(ActorRef),
+  relations: z.exactOptional(z.array(IssueRelation)),
 };
 
 export const Issue = z.object(issueFields) satisfies Codec<T.Issue>;
@@ -224,9 +286,12 @@ export const IssueUpdate = z.object({
   before: z.exactOptional(z.string()),
   attachments: z.exactOptional(z.array(z.string())),
   parent: z.exactOptional(z.string()),
+  blockedBy: z.exactOptional(z.array(z.string())),
   tags: z.exactOptional(z.array(z.string())),
   startAt: z.exactOptional(z.number()),
   dueAt: z.exactOptional(z.number()),
+  owner: z.exactOptional(ActorRef),
+  relations: z.exactOptional(z.array(IssueRelation)),
 }) satisfies Codec<T.IssueUpdate>;
 
 export const IssueHistory = z.object({
@@ -257,6 +322,8 @@ export const IssueRequest = z.object({
   tags: z.exactOptional(z.array(z.string())),
   startAt: z.exactOptional(z.number()),
   dueAt: z.exactOptional(z.number()),
+  owner: z.exactOptional(ActorRef),
+  relations: z.exactOptional(z.array(IssueRelation)),
   requestKey: z.exactOptional(z.string()),
 }) satisfies Codec<T.IssueRequest>;
 
@@ -305,3 +372,74 @@ export const IssueStatusRequest = z.object({
   edit: z.exactOptional(IssueUpdate),
   requestKey: z.exactOptional(z.string()),
 }) satisfies Codec<T.IssueStatusRequest>;
+
+export const TriagePatch = z.object({
+  priority: z.exactOptional(Priority),
+  repo: z.exactOptional(z.string()),
+  agent: z.exactOptional(z.string()),
+  tags: z.exactOptional(z.array(z.string())),
+  status: z.exactOptional(IssueStatus),
+  relations: z.exactOptional(z.array(IssueRelation)),
+  dueAt: z.exactOptional(z.number()),
+}) satisfies Codec<T.TriagePatch>;
+
+export const BacklogTriageSuggestion = z.object({
+  id: z.string(),
+  issueId: IssueId,
+  issueNumber: z.number(),
+  issueTitle: z.string(),
+  reason: z.string(),
+  summary: z.string(),
+  source: ActorKind,
+  patch: TriagePatch,
+  createdAt: z.number(),
+}) satisfies Codec<T.BacklogTriageSuggestion>;
+
+export const DigestIssueRef = z.object({
+  id: IssueId,
+  number: z.number(),
+  title: z.string(),
+  detail: z.string(),
+  stuck: z.exactOptional(StuckReason),
+}) satisfies Codec<T.DigestIssueRef>;
+
+export const DigestProgressSummary = z.object({
+  asking: z.array(DigestIssueRef),
+  reviewing: z.array(DigestIssueRef),
+  stuck: z.array(DigestIssueRef),
+  working: z.array(DigestIssueRef),
+  completedRecent: z.array(DigestIssueRef),
+  runsTotal: z.number(),
+  runsCompleted: z.number(),
+  runsFailed: z.number(),
+  runsInterrupted: z.number(),
+  tokensSpent: z.number(),
+}) satisfies Codec<T.DigestProgressSummary>;
+
+export const MorningDigest = z.object({
+  generatedAt: z.number(),
+  windowStart: z.number(),
+  windowEnd: z.number(),
+  progress: DigestProgressSummary,
+  repoHealth: z.array(RepoHealth),
+  triage: z.array(BacklogTriageSuggestion),
+}) satisfies Codec<T.MorningDigest>;
+
+export const IssueDigestGetInput = z.object({
+  windowHours: z.exactOptional(z.number()),
+}) satisfies Codec<T.IssueDigestGetInput>;
+
+export const BacklogTriageSuggestInput = z.object({
+  issueId: z.string(),
+  reason: z.string(),
+  summary: z.exactOptional(z.string()),
+  patch: TriagePatch,
+}) satisfies Codec<T.BacklogTriageSuggestInput>;
+
+export const BacklogTriageConfirmInput = z.object({
+  id: z.string(),
+}) satisfies Codec<T.BacklogTriageConfirmInput>;
+
+export const BacklogTriageDismissInput = z.object({
+  id: z.string(),
+}) satisfies Codec<T.BacklogTriageDismissInput>;

@@ -13,7 +13,7 @@ use tokio_util::sync::CancellationToken;
 use vibevalley_core::LiveSessionOverlay;
 use vibevalley_protocol::{
     CallState, CommitCount, ConnectorStatus, GameEffect, InboxItem, LiveEvent, LiveEventNotice, LiveEventRuntime, LiveEventSession, Machine, Millis,
-    NoticeLevel, Phase, Progress, RuntimeInfo, SessionEvent, SessionId, SessionSubagents, Spent, ToolConnection,
+    NoticeLevel, Phase, Progress, RuntimeInfo, SessionEvent, SessionId, SessionSubagents, SessionTelemetry, Spent, ToolConnection,
 };
 
 const DEFAULT_LIVE_CAPACITY: usize = 512;
@@ -51,11 +51,12 @@ pub struct LiveSessionSnapshot {
     pub spent: Option<Spent>,
     pub tool_connections: Option<Vec<ToolConnection>>,
     pub subagents: Option<SessionSubagents>,
+    pub telemetry: Option<SessionTelemetry>,
     pub last_event_at: Option<Millis>,
 }
 
 impl LiveSessionSnapshot {
-    pub fn to_core_overlay(&self) -> LiveSessionOverlay {
+    fn to_core_overlay(&self) -> LiveSessionOverlay {
         LiveSessionOverlay {
             phase: self.phase.clone(),
             channel: self.channel.clone(),
@@ -63,15 +64,16 @@ impl LiveSessionSnapshot {
             spent: self.spent.clone(),
             subagents: self.subagents.as_ref().map(|s| Some(s.clone())),
             tool_connections: self.tool_connections.clone(),
+            telemetry: self.telemetry.clone(),
         }
     }
 }
 
 /// Sequenced farm effect stored inside [`LiveState`]'s bounded burst ring.
 #[derive(Debug, Clone, PartialEq)]
-pub struct FarmEffectEntry {
-    pub seq: u64,
-    pub effect: FarmEffect,
+struct FarmEffectEntry {
+    seq: u64,
+    effect: FarmEffect,
 }
 
 struct EffectRing {
@@ -132,7 +134,7 @@ impl LiveState {
     }
 
     /// Creates a [`LiveState`] with explicit broadcast and farm-effect ring capacities.
-    pub fn with_capacities(live_capacity: usize, farm_effect_capacity: usize) -> Self {
+    fn with_capacities(live_capacity: usize, farm_effect_capacity: usize) -> Self {
         let (live_tx, _) = broadcast::channel(live_capacity.max(1));
         Self {
             sessions: RwLock::new(BTreeMap::new()),
@@ -175,7 +177,8 @@ impl LiveState {
     }
 
     /// Returns a consistent clone of all active live session snapshots.
-    pub fn sessions_snapshot(&self) -> BTreeMap<SessionId, LiveSessionSnapshot> {
+    #[cfg(test)]
+    fn sessions_snapshot(&self) -> BTreeMap<SessionId, LiveSessionSnapshot> {
         self.sessions.read().clone()
     }
 
@@ -185,7 +188,8 @@ impl LiveState {
     }
 
     /// Number of active sessions tracked in live state.
-    pub fn session_count(&self) -> usize {
+    #[cfg(test)]
+    fn session_count(&self) -> usize {
         self.sessions.read().len()
     }
 
@@ -193,7 +197,7 @@ impl LiveState {
     /// Farm plays live in `crate::game::Game` and are attached when projecting `SliceKind::Farm`.
     pub fn to_core_snapshot(&self, drain_effects: bool) -> vibevalley_core::LiveSnapshot {
         let effects = if drain_effects {
-            self.drain_farm_effects(0).into_iter().map(|e| e.effect).collect()
+            self.drain_effects_since(0).into_iter().map(|e| e.effect).collect()
         } else {
             Vec::new()
         };
@@ -278,7 +282,7 @@ impl LiveState {
     }
 
     /// Broadcasts one [`LiveEvent`], silently dropping when there are no active listeners.
-    pub fn publish_live(&self, event: LiveEvent) {
+    fn publish_live(&self, event: LiveEvent) {
         let _ = self.live_tx.send(event);
     }
 
@@ -298,7 +302,8 @@ impl LiveState {
     }
 
     /// Current number of active [`LiveEvent`] broadcast subscribers.
-    pub fn live_subscriber_count(&self) -> usize {
+    #[cfg(test)]
+    fn live_subscriber_count(&self) -> usize {
         self.live_tx.receiver_count()
     }
 
@@ -317,19 +322,25 @@ impl LiveState {
         last
     }
 
-    /// Drains all buffered `FarmEffect` entries with `seq > since` in ascending sequence order,
-    /// discarding any entries with `seq <= since`.
-    pub fn drain_farm_effects(&self, since: u64) -> Vec<FarmEffectEntry> {
+    fn drain_effects_since(&self, since: u64) -> Vec<FarmEffectEntry> {
         self.effects.lock().drain_since(since)
     }
 
+    /// Drains buffered `FarmEffect`s with `seq > since` in ascending sequence order.
+    #[cfg(test)]
+    pub(crate) fn drain_farm_effects(&self, since: u64) -> Vec<FarmEffect> {
+        self.drain_effects_since(since).into_iter().map(|entry| entry.effect).collect()
+    }
+
     /// Latest monotonic farm effect sequence assigned by this state.
-    pub fn farm_effect_seq(&self) -> u64 {
+    #[cfg(test)]
+    pub(crate) fn farm_effect_seq(&self) -> u64 {
         self.effects.lock().next_seq
     }
 
     /// Number of currently buffered, un-drained farm effects.
-    pub fn pending_farm_effect_count(&self) -> usize {
+    #[cfg(test)]
+    fn pending_farm_effect_count(&self) -> usize {
         self.effects.lock().items.len()
     }
 }
@@ -479,10 +490,10 @@ mod tests {
         assert_eq!(live.farm_effect_seq(), 4);
         assert_eq!(live.pending_farm_effect_count(), 3);
 
-        let drained = live.drain_farm_effects(2);
+        let drained = live.drain_effects_since(2);
         assert_eq!(drained, vec![FarmEffectEntry { seq: 3, effect: e3 }, FarmEffectEntry { seq: 4, effect: e4 }]);
         assert_eq!(live.pending_farm_effect_count(), 0);
-        assert!(live.drain_farm_effects(0).is_empty());
+        assert!(live.drain_effects_since(0).is_empty());
 
         let tail_seq = live.push_farm_effects([e2]);
         assert_eq!(tail_seq, 5);

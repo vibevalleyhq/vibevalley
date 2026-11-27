@@ -1,4 +1,4 @@
-import { type Agent, defaultOrchestrator, type Issue, type Session, type SessionView } from "@vibevalley/protocol";
+import { type Agent, defaultOrchestrator, type Issue, type Session, type SessionTelemetry, type SessionView, type Spent } from "@vibevalley/protocol";
 import { isOrchestratorSession, sessionIssueId, sessionProfile, sessionRepo } from "@vibevalley/protocol/rules";
 
 export type RunsScope = "all" | "active" | "orchestrator" | "worker";
@@ -308,4 +308,92 @@ export function resolveSelectedRun(entries: readonly RunEntry[], sessionId: stri
     if (exact) return exact;
   }
   return entries[0];
+}
+
+export interface RunTelemetryRollup {
+  readonly inputTokens: number;
+  readonly cacheReadTokens: number;
+  readonly outputTokens: number;
+  readonly totalTokens: number;
+  readonly spent?: Spent | undefined;
+  readonly contextUsed: number;
+  readonly contextWindow: number;
+  readonly contextPct: number;
+  readonly hasContext: boolean;
+  readonly llmRetries: number;
+  readonly runErrors: number;
+}
+
+/** Projects aggregated token usage, Spent cost, context saturation, and retry/error counts from Rust session/trajectory telemetry. */
+export function runTelemetryOf(entry: RunEntry, projectedTelemetry?: SessionTelemetry): RunTelemetryRollup {
+  const session = entry.kind === "worker" ? (entry.live ?? entry.session) : entry.live;
+  const baseTel = session?.telemetry;
+  const spent =
+    entry.kind === "worker"
+      ? (entry.live?.spent ?? entry.session.spent ?? entry.live?.lastRun?.spent ?? entry.session.lastRun?.spent)
+      : (entry.live?.spent ?? entry.live?.lastRun?.spent);
+  const phase = session?.phase;
+  const lastOutcome = session?.lastRun?.outcome;
+
+  const inputTokens = Math.max(baseTel?.inputTokens ?? 0, projectedTelemetry?.inputTokens ?? 0);
+  const cacheReadTokens = Math.max(baseTel?.cacheReadTokens ?? 0, projectedTelemetry?.cacheReadTokens ?? 0);
+  const outputTokens = Math.max(baseTel?.outputTokens ?? 0, projectedTelemetry?.outputTokens ?? 0);
+  const telemetryTokens = inputTokens + cacheReadTokens + outputTokens;
+  const totalTokens = Math.max(spent?.tokens ?? 0, telemetryTokens);
+
+  const effectiveSpent: Spent | undefined =
+    spent !== undefined
+      ? { tokens: Math.max(spent.tokens, totalTokens), ...(spent.cny !== undefined ? { cny: spent.cny } : {}) }
+      : totalTokens > 0
+        ? { tokens: totalTokens }
+        : undefined;
+
+  const stepCtxUsed = projectedTelemetry?.contextUsed ?? 0;
+  const stepCtxWindow = projectedTelemetry?.contextWindow ?? 0;
+  const contextUsed = stepCtxUsed > 0 ? stepCtxUsed : (baseTel?.contextUsed ?? 0);
+  const contextWindow = stepCtxWindow > 0 ? stepCtxWindow : (baseTel?.contextWindow ?? 0);
+  const hasContext = contextUsed > 0 && contextWindow > 0;
+  const contextPct = hasContext ? Math.min(100, Math.round((contextUsed / contextWindow) * 100)) : 0;
+
+  const liveRetry = phase?._tag === "working" && phase.retry !== undefined ? Math.max(1, phase.retry.attempt) : 0;
+  const llmRetries = Math.max(baseTel?.llmRetries ?? 0, projectedTelemetry?.llmRetries ?? 0, liveRetry);
+  const failedFlag = phase?._tag === "failed" || lastOutcome === "failed" ? 1 : 0;
+  const runErrors = Math.max(baseTel?.runErrors ?? 0, projectedTelemetry?.runErrors ?? 0, failedFlag);
+
+  return {
+    inputTokens,
+    cacheReadTokens,
+    outputTokens,
+    totalTokens,
+    ...(effectiveSpent !== undefined ? { spent: effectiveSpent } : {}),
+    contextUsed,
+    contextWindow,
+    contextPct,
+    hasContext,
+    llmRetries,
+    runErrors,
+  };
+}
+
+/** Whether a run entry is in a recoverable stopped state (`failed`, `interrupted`, or `resting`). */
+export function isRecoverableRun(entry: RunEntry): boolean {
+  if (entry.kind !== "worker") return false;
+  const status = runStatusOf(entry);
+  return status === "failed" || status === "interrupted" || status === "resting";
+}
+
+/** Whether manual context compaction (`session.compact`) is supported in the current state. */
+export function supportsManualCompaction(entry: RunEntry): boolean {
+  if (entry.kind === "orchestrator") return !entry.active;
+  const status = runStatusOf(entry);
+  if (status === "closed" || status === "working") return false;
+  const runtime = (entry.live ?? entry.session).runtime;
+  return runtime === "vibevalley" || runtime === "claude" || runtime === "codex" || runtime === "qoder";
+}
+
+/** Whether durable CodeMode script execution (`session.runCode`) is supported for this entry. */
+export function supportsCodeMode(entry: RunEntry): boolean {
+  if (entry.kind === "orchestrator") return true;
+  if (runStatusOf(entry) === "closed") return false;
+  return (entry.live ?? entry.session).runtime === "vibevalley";
 }

@@ -256,6 +256,17 @@ pub enum ChannelEvent {
     Reset {},
 }
 
+/// Structured slash-command invocation sent with a channel message.
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct ChannelCommand {
+    pub name: String,
+    pub args: String,
+}
+
 #[skip_serializing_none]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts-gen", derive(TS))]
@@ -273,6 +284,8 @@ pub struct SayRequest {
     pub send_key: Option<String>,
     /// Orchestrator profile id that alone receives this message (e.g. `/imagegen`).
     pub to: Option<String>,
+    /// Optional slash skill invocation parsed by the channel composer.
+    pub command: Option<ChannelCommand>,
 }
 
 #[skip_serializing_none]
@@ -566,6 +579,7 @@ crate::typescript::module! {
     UserMention,
     Chat,
     ChannelEvent,
+    ChannelCommand,
     SayRequest,
     ChannelUpdate,
     ChannelRequest,

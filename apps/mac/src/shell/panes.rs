@@ -15,7 +15,7 @@ use crate::theme::Ui;
 use crate::viewer::FileViewer;
 
 use super::projects::SidebarTopics;
-use super::{DioramaSlot, PaneSlot, Shell, TerminalSlot};
+use super::{ChatTabStatus, DioramaSlot, PaneSlot, Shell, TerminalSlot};
 
 impl Shell {
     pub(crate) fn navigate_workbench(&mut self, route: &str, cx: &mut Context<Self>) {
@@ -541,6 +541,7 @@ impl Shell {
                 let PaneKind::Terminal {
                     terminal_id,
                     link: Some(origin),
+                    ..
                 } = &tab.kind
                 else {
                     return None;
@@ -563,7 +564,7 @@ impl Shell {
             }
         }
         let unused = project.layout.active_tab().and_then(|tab| {
-            let PaneKind::Terminal { terminal_id, link: None } = &tab.kind else {
+            let PaneKind::Terminal { terminal_id, link: None, .. } = &tab.kind else {
                 return None;
             };
             (project.saved_terminal(terminal_id).is_none() && !self.workspace.terminals.contains_key(terminal_id)).then(|| (terminal_id.clone(), tab.id))
@@ -595,6 +596,7 @@ impl Shell {
             env: Vec::new(),
             history: None,
             title: None,
+            hooks: Default::default(),
         };
         self.new_terminal(Some(spec), window, cx);
     }
@@ -642,6 +644,7 @@ impl Shell {
                 PaneKind::Terminal {
                     terminal_id: id.clone(),
                     link: None,
+                    hooks: Default::default(),
                 },
             )
             .is_none()
@@ -654,30 +657,81 @@ impl Shell {
     }
 
     pub(super) fn close_active_tab(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(project) = self.workspace.ws.active_mut() else { return };
+        let Some(project) = self.workspace.ws.active() else { return };
         let Some(tab) = project.layout.active_tab().map(|t| t.id) else { return };
         self.close_tab(tab, window, cx);
     }
 
     pub fn close_tab(&mut self, tab: TabId, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(project) = self.workspace.ws.active_mut() else { return };
+        self.close_tab_with_force(tab, false, window, cx);
+    }
+
+    pub fn close_tab_with_force(&mut self, tab: TabId, force: bool, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(project) = self.workspace.ws.active() else { return };
         let pid = project.id();
-        let closed = project.close_tab(tab);
-        if let Some(PaneKind::Terminal { terminal_id, .. }) = &closed {
-            self.workspace.terminals.remove(terminal_id);
+        let Some(tab_ref) = project.layout.tabs().find(|t| t.id == tab) else { return };
+        let busy = if force { None } else { self.busy_tab_label(pid, tab_ref, cx) };
+        match tab_close_action(busy, force) {
+            TabCloseAction::CloseNow => self.force_close_tab(pid, tab, window, cx),
+            TabCloseAction::ConfirmBusy { label } => {
+                let title_text = crate::panes::tab_title(self, tab_ref, cx);
+                let title = vibevalley_i18n::t("desktop.tab.closeBusy.title", &[("title", title_text.into())]);
+                let detail = vibevalley_i18n::t("desktop.tab.closeBusy.detail", &[("process", label.into())]);
+                let cancel = vibevalley_i18n::t("desktop.tab.closeBusy.cancel", &[]);
+                let confirm = vibevalley_i18n::t("desktop.tab.closeBusy.confirm", &[]);
+                let rx = window.prompt(
+                    gpui::PromptLevel::Warning,
+                    &title,
+                    Some(&detail),
+                    &[gpui::PromptButton::cancel(cancel), gpui::PromptButton::new(confirm)],
+                    cx,
+                );
+                let shell = cx.weak_entity();
+                window
+                    .spawn(cx, async move |cx| {
+                        if rx.await == Ok(1) {
+                            let _ = cx.update(|window, cx| {
+                                let _ = shell.update(cx, |shell, cx| shell.force_close_tab(pid, tab, window, cx));
+                            });
+                        }
+                    })
+                    .detach();
+            }
         }
-        if let Some(session_id) = closed_chat_session_id(closed.as_ref())
+    }
+
+    fn busy_tab_label(&self, pid: ProjectId, tab: &vibevalley_workspace::Tab, cx: &gpui::App) -> Option<String> {
+        match &tab.kind {
+            PaneKind::Terminal { terminal_id, .. } => self.workspace.terminals.get(terminal_id).and_then(|slot| slot.view.read(cx).busy_label()),
+            kind => non_terminal_tab_busy_label(kind, self.workspace.chat_statuses.get(&(pid, tab.id))),
+        }
+    }
+
+    fn force_close_tab(&mut self, pid: ProjectId, tab: TabId, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(project) = self.workspace.ws.project_mut(pid) else { return };
+        let Some(closed) = project.close_tab(tab) else { return };
+        if let PaneKind::Terminal { terminal_id, .. } = &closed {
+            self.workspace.terminals.remove(terminal_id);
+            vibevalley_terminal::history::remove_history_file(&terminal_history_path(terminal_id));
+        }
+        if let Some(session_id) = closed_chat_session_id(Some(&closed))
             && let Some(bridge) = cx.try_global::<crate::hosted::BridgeHub>()
         {
             bridge.0.call("session.closeWorkspace".into(), json!({ "id": session_id }), |_| {});
         }
         self.workspace.panes.remove(&(pid, tab));
         self.workspace.chat_statuses.remove(&(pid, tab));
-        if self.workspace.ws.active().is_some_and(|p| p.layout.tabs().next().is_none()) {
-            self.new_terminal(None, window, cx);
-            return;
+        if self.workspace.ws.active_id() == Some(pid) {
+            if self.workspace.ws.active().is_some_and(|p| p.layout.tabs().next().is_none()) {
+                self.new_terminal(None, window, cx);
+                return;
+            }
+            self.layout_changed(window, cx);
+        } else {
+            self.schedule_save(cx);
+            self.push_sidebar(cx);
+            cx.notify();
         }
-        self.layout_changed(window, cx);
     }
 
     pub fn layout_changed(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -728,6 +782,7 @@ impl Shell {
                             env: Vec::new(),
                             history: Some(saved.scrollback).filter(|s| !s.trim().is_empty()),
                             title: saved.title.clone(),
+                            hooks: Default::default(),
                         },
                         None => SpawnSpec {
                             project_root: Some(root.clone()),
@@ -752,6 +807,22 @@ impl Shell {
         if spec.project_root.is_none() {
             spec.project_root = self.workspace.ws.active().map(|p| p.root().to_path_buf());
         }
+        let owner_project = self
+            .workspace
+            .ws
+            .projects()
+            .iter()
+            .find(|p| p.layout.terminal_ids().iter().any(|tid| tid == id))
+            .or_else(|| self.workspace.ws.active());
+        let workspace_root = spec.project_root.as_deref().or_else(|| owner_project.map(|p| p.root()));
+        let tab_overrides = owner_project.and_then(|p| p.layout.terminal_hook_overrides(id)).cloned().unwrap_or_default();
+        let resolved_hooks = self.workspace.terminal_hooks.resolve_for_tab(workspace_root, &tab_overrides);
+        if !resolved_hooks.is_empty() {
+            resolved_hooks.apply_to_spawn_env(&mut spec.env);
+        }
+        spec.hooks = resolved_hooks;
+        let history_dir = terminal_history_dir();
+        vibevalley_terminal::history::configure_env(&mut spec.env, &history_dir.join("zdotdir"), &terminal_history_path_in(&history_dir, id));
         let cwd = spec.cwd.clone();
         let initial_title = spec.title.clone();
         let view = cx.new(|cx| TerminalView::new(spec, cx));
@@ -1014,6 +1085,166 @@ impl Shell {
             PaneKind::Terminal { .. } => unreachable!("terminals are kept in Shell::workspace.terminals"),
         }
     }
+
+    pub(crate) fn terminal_hook_status_for_tab(&self, tab: &vibevalley_workspace::Tab, cx: &gpui::App) -> crate::terminal::TerminalHookStatus {
+        let PaneKind::Terminal { terminal_id, hooks, .. } = &tab.kind else {
+            return crate::terminal::TerminalHookStatus::default();
+        };
+        if let Some(slot) = self.workspace.terminals.get(terminal_id) {
+            return slot.view.read(cx).hook_status();
+        }
+        let workspace_root = self.workspace.ws.projects().iter().find(|p| p.layout.tab(tab.id).is_some()).map(|p| p.root());
+        let resolved = self.workspace.terminal_hooks.resolve_for_tab(workspace_root, hooks);
+        crate::terminal::TerminalHookStatus::from_resolved(&resolved, &resolved)
+    }
+
+    pub(crate) fn terminal_hook_menu_model(&self, pid: ProjectId, tab: &vibevalley_workspace::Tab, cx: &gpui::App) -> Option<TerminalHookMenuModel> {
+        let PaneKind::Terminal { hooks, .. } = &tab.kind else {
+            return None;
+        };
+        let project = self.workspace.ws.project(pid)?;
+        let root = project.root();
+        let repo_name = root
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| project.info.name.clone());
+        let resolved = self.workspace.terminal_hooks.resolve_for_tab(Some(root), hooks);
+        let status = self.terminal_hook_status_for_tab(tab, cx);
+        let entries = self
+            .workspace
+            .terminal_hooks
+            .catalog()
+            .into_iter()
+            .map(|tmpl| {
+                let workspace_enabled = self.workspace.terminal_hooks.is_workspace_hook_enabled(Some(root), &tmpl.id);
+                let active_entry = resolved.active.iter().find(|a| a.id == tmpl.id);
+                let tab_enabled = active_entry.is_some();
+                let source = active_entry.map(|a| a.source);
+                TerminalHookMenuEntry {
+                    id: tmpl.id,
+                    label: tmpl.label,
+                    description: tmpl.description,
+                    tab_enabled,
+                    workspace_enabled,
+                    source,
+                }
+            })
+            .collect();
+        Some(TerminalHookMenuModel { repo_name, status, entries })
+    }
+
+    pub(crate) fn toggle_terminal_tab_hook(&mut self, pid: ProjectId, tab_id: TabId, hook_id: &str, cx: &mut Context<Self>) {
+        let Some(project) = self.workspace.ws.project_mut(pid) else { return };
+        let root = project.root().to_path_buf();
+        let workspace_default = self.workspace.terminal_hooks.is_workspace_hook_enabled(Some(&root), hook_id);
+        let Some(vibevalley_workspace::Tab {
+            kind: PaneKind::Terminal { terminal_id, hooks, .. },
+            ..
+        }) = project.layout.tab_mut(tab_id)
+        else {
+            return;
+        };
+        let tid = terminal_id.clone();
+        let resolved_before = self.workspace.terminal_hooks.resolve_for_tab(Some(&root), hooks);
+        let norm_id = vibevalley_terminal::hooks::normalize_hook_id(hook_id).unwrap_or_else(|| hook_id.to_string());
+        let currently_enabled = resolved_before.active.iter().any(|h| h.id == norm_id);
+        hooks.set_enabled(&norm_id, workspace_default, !currently_enabled);
+        self.schedule_save(cx);
+        self.apply_terminal_hook_change(pid, &tid, cx);
+        cx.notify();
+    }
+
+    pub(crate) fn toggle_workspace_terminal_hook(&mut self, pid: ProjectId, hook_id: &str, cx: &mut Context<Self>) {
+        let Some(root) = self.workspace.ws.project(pid).map(|p| p.root().to_path_buf()) else {
+            return;
+        };
+        let currently_enabled = self.workspace.terminal_hooks.is_workspace_hook_enabled(Some(&root), hook_id);
+        self.workspace.terminal_hooks.set_workspace_hook_enabled(&root, hook_id, !currently_enabled);
+        self.save_terminal_hooks_async(cx);
+        let terminal_ids = self.workspace.ws.project(pid).map(|p| p.layout.terminal_ids()).unwrap_or_default();
+        for tid in terminal_ids {
+            self.apply_terminal_hook_change(pid, &tid, cx);
+        }
+        cx.notify();
+    }
+
+    pub(crate) fn restart_terminal_tab(&mut self, pid: ProjectId, tab_id: TabId, cx: &mut Context<Self>) {
+        let Some(project) = self.workspace.ws.project(pid) else { return };
+        let root = project.root().to_path_buf();
+        let Some(vibevalley_workspace::Tab {
+            kind: PaneKind::Terminal { terminal_id, hooks, .. },
+            ..
+        }) = project.layout.tab(tab_id)
+        else {
+            return;
+        };
+        let tid = terminal_id.clone();
+        let resolved = self.workspace.terminal_hooks.resolve_for_tab(Some(&root), hooks);
+        if let Some(slot) = self.workspace.terminals.get(&tid) {
+            slot.view.update(cx, |view, cx| view.respawn_with_hooks(resolved, cx));
+        }
+        self.workspace.terminal_hooks_menu_group = None;
+        cx.notify();
+    }
+
+    fn apply_terminal_hook_change(&mut self, pid: ProjectId, terminal_id: &str, cx: &mut Context<Self>) {
+        let Some(project) = self.workspace.ws.project(pid) else { return };
+        let root = project.root().to_path_buf();
+        let overrides = project.layout.terminal_hook_overrides(terminal_id).cloned().unwrap_or_default();
+        let resolved = self.workspace.terminal_hooks.resolve_for_tab(Some(&root), &overrides);
+        let Some(slot) = self.workspace.terminals.get(terminal_id) else {
+            return;
+        };
+        let (unchanged, action) = {
+            let view = slot.view.read(cx);
+            let unchanged = *view.desired_hooks() == resolved;
+            let action = crate::terminal::classify_hook_toggle_action(view.is_alive(), view.has_foreground_process());
+            (unchanged, action)
+        };
+        if unchanged {
+            return;
+        }
+        match action {
+            crate::terminal::HookToggleAction::RespawnNow => {
+                slot.view.update(cx, |view, cx| view.respawn_with_hooks(resolved, cx));
+            }
+            crate::terminal::HookToggleAction::PendingRestart => {
+                slot.view.update(cx, |view, cx| view.set_desired_hooks(resolved, cx));
+            }
+        }
+    }
+
+    fn save_terminal_hooks_async(&self, cx: &mut Context<Self>) {
+        let Some(store) = self.workspace.store.clone() else { return };
+        let config = self.workspace.terminal_hooks.clone();
+        Self::bg(
+            cx,
+            move || vibevalley_workspace::save_terminal_hooks(&*store, &config),
+            |_, r, _| {
+                if let Err(e) = r {
+                    eprintln!("save terminal hooks: {e}");
+                }
+            },
+        );
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct TerminalHookMenuEntry {
+    pub id: String,
+    pub label: String,
+    pub description: Option<String>,
+    pub tab_enabled: bool,
+    pub workspace_enabled: bool,
+    pub source: Option<vibevalley_terminal::HookSource>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct TerminalHookMenuModel {
+    pub repo_name: String,
+    pub status: crate::terminal::TerminalHookStatus,
+    pub entries: Vec<TerminalHookMenuEntry>,
 }
 
 fn resolve_project_directory(cwd: PathBuf, known_roots: Vec<PathBuf>) -> Result<(PathBuf, PathBuf), String> {
@@ -1131,6 +1362,53 @@ fn classify_terminal_file_action(path: PathBuf, line: Option<u32>, project_root:
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum TabCloseAction {
+    CloseNow,
+    ConfirmBusy { label: String },
+}
+
+pub(crate) fn tab_close_action(busy_label: Option<String>, force: bool) -> TabCloseAction {
+    if force {
+        return TabCloseAction::CloseNow;
+    }
+    match busy_label {
+        Some(label) => TabCloseAction::ConfirmBusy { label },
+        None => TabCloseAction::CloseNow,
+    }
+}
+
+pub(crate) fn non_terminal_tab_busy_label(kind: &PaneKind, chat_status: Option<&ChatTabStatus>) -> Option<String> {
+    match kind {
+        PaneKind::Chat { runtime, title, .. } => {
+            if !chat_status.is_some_and(|s| s.status == "working") {
+                return None;
+            }
+            let label = title
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .unwrap_or_else(|| crate::panes::chat_runtime_label(runtime));
+            Some(label.to_string())
+        }
+        PaneKind::Terminal { .. } | PaneKind::File { .. } | PaneKind::Diff { .. } | PaneKind::Hosted { .. } | PaneKind::Diorama { .. } => None,
+    }
+}
+
+fn terminal_history_dir() -> PathBuf {
+    let db = crate::host::Storage::configured().database;
+    let data_dir = db.parent().unwrap_or_else(|| Path::new("."));
+    vibevalley_terminal::history::history_dir_for(data_dir)
+}
+
+fn terminal_history_path_in(history_dir: &Path, id: &str) -> PathBuf {
+    vibevalley_terminal::history::history_file_for(history_dir, id)
+}
+
+pub(crate) fn terminal_history_path(id: &str) -> PathBuf {
+    terminal_history_path_in(&terminal_history_dir(), id)
+}
+
 #[cfg(test)]
 mod url_tests {
     #[test]
@@ -1238,6 +1516,7 @@ mod url_tests {
             super::closed_chat_session_id(Some(&PaneKind::Terminal {
                 terminal_id: "t1".into(),
                 link: None,
+                hooks: Default::default(),
             })),
             None
         );
@@ -1257,5 +1536,98 @@ mod url_tests {
 
         let missing = dir.path().join("does-not-exist");
         assert!(super::resolve_project_directory(missing, vec![]).is_err());
+    }
+
+    #[test]
+    fn tab_close_decision_guards_busy_tabs_and_honors_force_bypass() {
+        assert_eq!(super::tab_close_action(None, false), super::TabCloseAction::CloseNow);
+        assert_eq!(
+            super::tab_close_action(Some("cargo test".into()), false),
+            super::TabCloseAction::ConfirmBusy { label: "cargo test".into() }
+        );
+        assert_eq!(super::tab_close_action(Some("cargo test".into()), true), super::TabCloseAction::CloseNow);
+        assert_eq!(super::tab_close_action(None, true), super::TabCloseAction::CloseNow);
+    }
+
+    #[test]
+    fn non_terminal_tab_busy_label_guards_working_chats_and_never_flags_viewers() {
+        use std::path::PathBuf;
+        use vibevalley_workspace::{DiffSpec, PaneKind};
+
+        let chat = PaneKind::Chat {
+            session_id: "s1".into(),
+            runtime: "antigravity".into(),
+            cwd: PathBuf::from("/tmp"),
+            title: None,
+        };
+        let working = super::ChatTabStatus {
+            status: "working".into(),
+            attention: false,
+        };
+        let ready = super::ChatTabStatus {
+            status: "ready".into(),
+            attention: true,
+        };
+        assert_eq!(super::non_terminal_tab_busy_label(&chat, Some(&working)), Some("Antigravity".into()));
+        assert_eq!(super::non_terminal_tab_busy_label(&chat, Some(&ready)), None);
+        assert_eq!(super::non_terminal_tab_busy_label(&chat, None), None);
+
+        let titled_chat = PaneKind::Chat {
+            session_id: "s2".into(),
+            runtime: "claude".into(),
+            cwd: PathBuf::from("/tmp"),
+            title: Some("  Refactor panes  ".into()),
+        };
+        assert_eq!(super::non_terminal_tab_busy_label(&titled_chat, Some(&working)), Some("Refactor panes".into()));
+
+        let file = PaneKind::File {
+            path: PathBuf::from("/tmp/main.rs"),
+        };
+        let diff = PaneKind::Diff {
+            spec: DiffSpec::Unstaged,
+            path: None,
+            repo: None,
+        };
+        assert_eq!(super::non_terminal_tab_busy_label(&file, Some(&working)), None);
+        assert_eq!(super::non_terminal_tab_busy_label(&diff, Some(&working)), None);
+    }
+
+    #[test]
+    fn terminal_history_path_in_uses_per_tab_file_and_cleanup_removes_only_target_tab() {
+        let dir = tempfile::tempdir().unwrap();
+        let hist_dir = vibevalley_terminal::history::history_dir_for(dir.path());
+        std::fs::create_dir_all(&hist_dir).unwrap();
+
+        let tab_a = super::terminal_history_path_in(&hist_dir, "tab-a");
+        let tab_b = super::terminal_history_path_in(&hist_dir, "tab-b");
+        std::fs::write(&tab_a, ": 1:0;ls\n").unwrap();
+        std::fs::write(&tab_b, ": 2:0;pwd\n").unwrap();
+
+        vibevalley_terminal::history::remove_history_file(&tab_a);
+        assert!(!tab_a.exists());
+        assert!(tab_b.exists());
+    }
+
+    #[test]
+    fn terminal_hooks_resolution_stays_empty_by_default_and_respects_workspace_and_tab_toggles() {
+        let dir = tempfile::tempdir().unwrap();
+        let repo = dir.path().join("repo");
+        std::fs::create_dir_all(&repo).unwrap();
+
+        let mut cfg = vibevalley_terminal::TerminalHooksConfig::default();
+        let default_resolved = cfg.resolve_for_tab(Some(&repo), &Default::default());
+        assert!(default_resolved.is_empty());
+
+        let mut tab_overrides = vibevalley_terminal::TabHookOverrides::default();
+        tab_overrides.set_enabled("idegraph", false, true);
+        let tab_enabled = cfg.resolve_for_tab(Some(&repo), &tab_overrides);
+        assert_eq!(tab_enabled.active_ids(), vec!["idegraph"]);
+
+        // Enabling at workspace level while tab disables keeps it off on that tab.
+        cfg.set_workspace_hook_enabled(&repo, "idegraph", true);
+        let mut tab_disabled = vibevalley_terminal::TabHookOverrides::default();
+        tab_disabled.set_enabled("idegraph", true, false);
+        assert!(cfg.resolve_for_tab(Some(&repo), &tab_disabled).is_empty());
+        assert_eq!(cfg.resolve_for_tab(Some(&repo), &Default::default()).active_ids(), vec!["idegraph"]);
     }
 }

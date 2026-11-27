@@ -1,8 +1,7 @@
-import { computed, Scroll, signal, Text, View } from "nsh";
+import { computed, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
-import type { Attachment, Issue, IssueAction, IssueAnswer, Milestone, Question as QuestionItem, SessionEvent } from "@vibevalley/protocol";
-import { plainText } from "@vibevalley/protocol/rules";
+import type { Attachment, Issue, IssueAction, IssueAnswer, Question as QuestionItem } from "@vibevalley/protocol";
 
 import { createAct } from "../../../design/act";
 import { Button } from "../../../design/Button";
@@ -10,11 +9,10 @@ import { Checkbox } from "../../../design/Checkbox";
 import { Icon } from "../../../design/Icon";
 import type { IconName } from "../../../design/icons";
 import { Markdown } from "../../../design/Markdown";
-import { Dot } from "../../../design/Tag";
 import { TextLink } from "../../../design/TextLink";
 import { mix } from "../../../design/tone";
 import { useNow } from "../../../infra/base/dom";
-import { shortMomentText, tookText, wallClockText } from "../../../infra/base/format";
+import { shortMomentText, tookText } from "../../../infra/base/format";
 import { ready } from "../../../infra/query";
 import { useIntents } from "../../../infra/state/intent";
 import { SubagentProgress } from "../../session";
@@ -28,7 +26,7 @@ import { updateIssueAttachments } from "../model/write";
 import { ActLines } from "./ActLines";
 import { IssueAttachments } from "./IssueAttachments";
 import { StatusMark } from "./Marks";
-import { IssueNumberPill, IssueSheet, Note, Property, SheetLabel, StagePill } from "./Sheet";
+import { IssueSheet, Note, Property, SheetLabel, StagePill } from "./Sheet";
 
 /** A question of the helper's: its options are replies as they are, one click each. */
 export function Question(props: { ask: QuestionItem; busy: boolean; onPick: (words: string) => void }) {
@@ -113,49 +111,6 @@ export function Criteria(props: { rows: CriterionRow[]; checking: boolean }) {
   );
 }
 
-const milestoneTone = (kind: Milestone["kind"]) =>
-  kind === "failed" || kind === "rejected" ? "berry" : kind === "asked" ? "wheat" : kind === "closed" || kind === "accepted" ? "leaf" : "muted";
-
-/** The milestones, newest first: vertical dot-and-rail timeline. */
-export function Story(props: { milestones: Milestone[] }) {
-  const now = useNow();
-  return (
-    <View>
-      <Each of={props.milestones} key={(m) => `${m.at}:${m.kind}:${m.text}`}>
-        {(m, i) => (
-          <View testID="milestone" class="flex-row items-stretch gap-3">
-            <View class="w-3 shrink-0 items-center">
-              <View class="mt-1.5">
-                <Dot tone={milestoneTone(m().kind)} size={6} ring={false} />
-              </View>
-              <If when={i() < props.milestones.length - 1}>
-                <View class="mt-1 w-px flex-1 bg-line" />
-              </If>
-            </View>
-            <View class={`min-w-0 flex-1 ${i() < props.milestones.length - 1 ? "pb-3" : "pb-0.5"}`}>
-              <View class="flex-row items-baseline gap-2">
-                <Text class="shrink-0 text-xs text-faint tabular-nums">{shortMomentText(m().at, now())}</Text>
-                <If when={m().who}>
-                  <Text class="min-w-0 truncate text-xs font-medium text-muted">{m().who}</Text>
-                </If>
-              </View>
-              <Text
-                class={[
-                  "mt-0.5 text-sm leading-snug",
-                  m().kind === "failed" || m().kind === "rejected" ? "text-berry" : "text-ink",
-                  m().kind === "asked" ? "font-semibold" : "",
-                ].join(" ")}
-              >
-                {localizeIssueError(plainText(m().text)).text}
-              </Text>
-            </View>
-          </View>
-        )}
-      </Each>
-    </View>
-  );
-}
-
 export function ReconcileWorktree(props: { onChanges?: (() => void) | undefined }) {
   return (
     <View testID="run-reconcile" class="my-1.5 flex-row flex-wrap items-center gap-2">
@@ -172,7 +127,7 @@ export function ReconcileWorktree(props: { onChanges?: (() => void) | undefined 
   );
 }
 
-export function Runs(props: { issue: string; version: string; onChanges?: (() => void) | undefined }) {
+function Runs(props: { issue: string; version: string; onChanges?: (() => void) | undefined }) {
   const query = useIssueRuns(
     () => props.issue,
     () => props.version,
@@ -217,45 +172,6 @@ export function Runs(props: { issue: string; version: string; onChanges?: (() =>
   );
 }
 
-export const stepsLine = (steps: SessionEvent[]) => {
-  const tools = steps.filter((e) => e.type === "tool/call").length;
-  return tools === 0 ? t("web.issue.detail.stepCount", { n: steps.length }) : t("web.issue.detail.stepsAndTools", { n: steps.length, tools });
-};
-
-const stepWord: Partial<Record<SessionEvent["type"], string>> = {
-  "run/start": t("web.issue.detail.step.run/start"),
-  "user/message": t("web.issue.detail.step.user/message"),
-  "memory/recalled": t("web.issue.detail.step.memory/recalled"),
-  "assistant/thinking": t("web.issue.detail.step.assistant/thinking"),
-  "assistant/message": t("web.issue.detail.step.assistant/message"),
-  "tool/call": t("web.issue.detail.step.tool/call"),
-  "llm/retry": t("web.issue.detail.step.llm/retry"),
-  "run/error": t("web.issue.detail.step.run/error"),
-  "run/end": t("web.issue.detail.step.run/end"),
-};
-
-/** The session's steps, newest last; tool results and usage are left to the farm's fuller log. */
-export function WorkLog(props: { steps: SessionEvent[] }) {
-  const shown = computed(() => props.steps.filter((e) => stepWord[e.type] !== undefined).slice(-240));
-  return (
-    <Scroll testID="issue-steps" class="max-h-[420px]">
-      <Each of={shown()} key={(e) => e.seq}>
-        {(e, i) => (
-          <View class={`flex-row gap-2.5 py-1 ${i() < shown().length - 1 ? "border-b" : ""}`} style={{ borderColor: mix("line", 0.6) }}>
-            <Text class="w-14 shrink-0 font-mono text-xs text-faint tabular-nums">{wallClockText(e().time)}</Text>
-            <Text class={`w-12 shrink-0 font-mono text-xs ${e().type === "run/error" ? "text-berry" : e().type === "tool/call" ? "text-water" : "text-muted"}`}>
-              {stepWord[e().type] ?? ""}
-            </Text>
-            <Text class="line-clamp-3 min-w-0 flex-1 text-sm text-ink">
-              {e().type === "tool/call" ? (e().actionText ?? e().text) : e().type === "run/error" ? localizeIssueError(e().text).text : e().text}
-            </Text>
-          </View>
-        )}
-      </Each>
-    </Scroll>
-  );
-}
-
 /** An issue for the orchestrator: what it was asked, and its runs; the answers are in its channel. */
 export function OrchestratorIssueDetail(props: { issue: Issue }) {
   const tag = computed(() => issueTag(props.issue));
@@ -291,8 +207,6 @@ export function OrchestratorIssueDetail(props: { issue: Issue }) {
           <Icon name="agents" size={12} tone="muted" />
           <Text class="text-xs font-medium text-muted">{t("web.issue.orchestrator")}</Text>
         </View>
-        <Icon name="next" size={12} tone="faint" />
-        <IssueNumberPill number={props.issue.number} />
       </View>
       <Text role="header" class="text-2xl leading-snug font-semibold text-ink">
         {props.issue.title}

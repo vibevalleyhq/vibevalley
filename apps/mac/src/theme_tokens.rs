@@ -2,22 +2,22 @@
 
 const DEFAULT_MONO_FONT: &str = "Maple Mono NF CN";
 
-const DARK_SURFACE: u32 = 0x1b1a18;
-const DARK_ELEVATED: u32 = 0x21201d;
-const DARK_BORDER: u32 = 0x2d2b27;
-const DARK_MUTED: u32 = 0xa9a49e;
-const DARK_FAINT: u32 = 0x8b867f;
+const DARK_SURFACE: u32 = 0x151412;
+const DARK_ELEVATED: u32 = 0x22201d;
+const DARK_BORDER: u32 = 0x34312d;
+const DARK_MUTED: u32 = 0xb0aba4;
+const DARK_FAINT: u32 = 0x928c85;
 const DARK_ACCENT: u32 = 0x7fae4f;
-const DARK_ON_ACCENT: u32 = 0x151413;
+const DARK_ON_ACCENT: u32 = 0x191816;
 const DARK_HOVER_BASE: u32 = 0xecebe8;
-const DARK_DANGER: u32 = 0xe47d6d;
+const DARK_DANGER: u32 = 0xe88272;
 const DARK_WARNING: u32 = 0xe5a93c;
 const DARK_SUCCESS: u32 = 0x7fae4f;
 const DARK_INFO: u32 = 0x6aa6dc;
 const DARK_MATCH_BASE: u32 = 0xe5a93c;
 
 const TERM_DARK_FOREGROUND: u32 = 0xecebe8;
-const TERM_DARK_BACKGROUND: u32 = 0x151413;
+const TERM_DARK_BACKGROUND: u32 = 0x191816;
 const TERM_DARK_CURSOR: u32 = 0xecebe8;
 const TERM_DARK_SELECTION: u32 = 0x2d3746;
 const TERM_DARK_ANSI: [u32; 16] = [

@@ -203,6 +203,19 @@ export const HostAction = z.discriminatedUnion("type", [
   z.object({ type: z.literal("toggle_devtools") }),
   z.object({ type: z.literal("detach_devtools") }),
   z.object({ type: z.literal("close_devtools") }),
+  z.object({ type: z.literal("devtools_inspector_mode"), enabled: z.boolean() }),
+  z.object({
+    type: z.literal("devtools_highlight"),
+    test_id: z.exactOptional(z.string()),
+    x: z.exactOptional(z.number()),
+    y: z.exactOptional(z.number()),
+    width: z.exactOptional(z.number()),
+    height: z.exactOptional(z.number()),
+    label: z.exactOptional(z.string()),
+    source: z.exactOptional(z.string()),
+    surface: z.exactOptional(z.string()),
+  }),
+  z.object({ type: z.literal("devtools_jump_source"), path: z.string(), line: z.exactOptional(z.number()) }),
 ]) satisfies Codec<T.HostAction>;
 
 export const HostThemeChoice = z.enum(T.HostThemeChoiceValues) satisfies Codec<T.HostThemeChoice>;
@@ -352,6 +365,27 @@ const HostCaptureWebViewPayload = z.object({
   height: z.exactOptional(z.number()),
 }) satisfies Codec<T.HostCaptureWebViewPayload>;
 
+export const HostLiveVoicePhase = z.enum(T.HostLiveVoicePhaseValues) satisfies Codec<T.HostLiveVoicePhase>;
+
+export const HostLiveVoiceState = z.object({
+  phase: HostLiveVoicePhase,
+  muted: z.boolean(),
+  micLevel: z.number(),
+  problem: z.string().nullable(),
+  heard: z.string(),
+  said: z.string(),
+}) satisfies Codec<T.HostLiveVoiceState>;
+
+export const HostAsrPhase = z.enum(T.HostAsrPhaseValues) satisfies Codec<T.HostAsrPhase>;
+
+export const HostAsrState = z.object({
+  phase: HostAsrPhase,
+  micLevel: z.number(),
+  text: z.string(),
+  partial: z.string(),
+  problem: z.string().nullable(),
+}) satisfies Codec<T.HostAsrState>;
+
 export const HostOp = z.discriminatedUnion("op", [
   z.object({ op: z.literal("host.info") }),
   z.object({ op: z.literal("host.updateState") }),
@@ -377,6 +411,9 @@ export const HostOp = z.discriminatedUnion("op", [
   z.object({ op: z.literal("host.speechState"), payload: HostIdPayload }),
   z.object({ op: z.literal("host.speechStart"), payload: HostIdPayload }),
   z.object({ op: z.literal("host.speechStop"), payload: HostIdPayload }),
+  z.object({ op: z.literal("host.asrState"), payload: HostIdPayload }),
+  z.object({ op: z.literal("host.asrStart"), payload: HostIdPayload }),
+  z.object({ op: z.literal("host.asrStop"), payload: HostIdPayload }),
   z.object({ op: z.literal("host.voiceState"), payload: HostIdPayload }),
   z.object({ op: z.literal("host.voiceStart"), payload: HostIdPayload }),
   z.object({ op: z.literal("host.voiceStop"), payload: HostIdPayload }),

@@ -2,7 +2,7 @@ import { computed, effect, host, keymap, Scroll, signal, Text, untracked, View, 
 import { Input, Menu, MenuItem, MenuSeparator, Popover } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
-import type { PhaseView } from "@vibevalley/protocol";
+import type { ChatFeedItem, ChatSessionProjection, ChatToolStepProjection, PhaseView } from "@vibevalley/protocol";
 
 import { Icon } from "../design/Icon";
 import { motionClass, popupTransition } from "../design/motion";
@@ -33,18 +33,16 @@ import {
   defaultThoughtLevelFor,
   fetchWorkspaceRuntimes,
   formatTokens,
-  groupChatSteps,
-  latestSessionTodos,
   mergeChatSteps,
   openWorkspaceSession,
   pickWorkspaceFile,
   preferredModelFor,
+  projectChatSession,
   respondWorkspaceInteraction,
   respondWorkspacePermission,
   sendWorkspaceMessage,
   setWorkspaceConfig,
   stopWorkspaceSession,
-  visibleChatSteps,
   watchWorkspaceSession,
   type ChatPhase,
   type ComposerFile,
@@ -83,6 +81,7 @@ export function WorkspaceChatPane() {
   const thoughtLevel = signal<ThoughtLevel | undefined>(undefined);
   const phase = signal<ChatPhase>(initialSessionId ? "starting" : "ready");
   const steps = signal<SessionEvent[]>([]);
+  const serverProjection = signal<ChatSessionProjection | undefined>(undefined);
   const steeredSeqs = signal<ReadonlySet<number>>(new Set());
   const latestTokens = signal<EventTokens | undefined>(undefined);
   const pendingInteractions = signal<SessionInteractionRequest[]>([]);
@@ -111,10 +110,28 @@ export function WorkspaceChatPane() {
   const effectiveThoughtLevel = computed((): ThoughtLevel | undefined => clampThoughtLevel(currentModelInfo(), thoughtLevel()));
   const hasAttention = computed(() => pendingInteractions().length > 0 || pendingPermissions().length > 0);
   const effectivePhase = computed((): ChatPhase => (hasAttention() ? "waiting" : phase()));
-  const shownSteps = computed(() => visibleChatSteps(steps()));
-  const feedItems = computed(() => groupChatSteps(shownSteps()));
-  const latestTodos = computed(() => latestSessionTodos(shownSteps()));
-  const telemetry = computed(() => computeTelemetry(steps(), latestTokens()));
+  const activeProjection = computed(() => serverProjection() ?? projectChatSession(steps(), latestTokens()));
+  const shownSteps = computed(() => activeProjection()?.visibleSteps ?? []);
+  const feedItems = computed((): readonly ChatFeedItem[] => {
+    const base = activeProjection()?.feedItems;
+    if (base !== undefined) {
+      if (serverProjection() !== undefined) {
+        const localOnly = steps().filter((s) => s.seq < 0);
+        if (localOnly.length > 0) {
+          return [
+            ...base.map((item) => ({ ...item, trailing: false })),
+            ...localOnly.map((step, idx): ChatFeedItem => ({ kind: "step", key: `s:${step.seq}`, step, trailing: idx === localOnly.length - 1 })),
+          ];
+        }
+      }
+      return base;
+    }
+    const localOnly = steps().filter((s) => s.seq < 0);
+    return localOnly.map((step, idx): ChatFeedItem => ({ kind: "step", key: `s:${step.seq}`, step, trailing: idx === localOnly.length - 1 }));
+  });
+  const latestTodos = computed(() => activeProjection()?.latestTodos);
+  const telemetry = computed(() => activeProjection()?.telemetry ?? computeTelemetry(steps(), latestTokens()));
+  const toolEntriesBySeq = computed((): ReadonlyMap<number, ChatToolStepProjection> => new Map((activeProjection()?.toolEntries ?? []).map((e) => [e.seq, e])));
 
   if (host.available()) {
     void fetchWorkspaceRuntimes().then((list) => {
@@ -167,7 +184,8 @@ export function WorkspaceChatPane() {
             if (!inFlightOptimistic.has(s.seq)) return false;
             return !incomingUserTexts.has(s.text);
           });
-          steps.set(mergeChatSteps(preserved, ev.events));
+          serverProjection.set(preserved.length === 0 ? ev.projection : undefined);
+          steps.set(preserved.length === 0 && ev.projection !== undefined ? ev.events : mergeChatSteps(preserved, ev.events));
           break;
         }
         case "event": {
@@ -179,6 +197,7 @@ export function WorkspaceChatPane() {
             }
             return true;
           });
+          serverProjection.set(ev.projection);
           steps.set(mergeChatSteps(prev, [step]));
           switch (step.type) {
             case "run/start":
@@ -491,7 +510,7 @@ export function WorkspaceChatPane() {
                       </If>
 
                       <If when={single().step.type === "tool/call"}>
-                        <ToolCallCard step={single().step} durationMs={single().durationMs} />
+                        <ToolCallCard step={single().step} durationMs={single().durationMs} projected={toolEntriesBySeq().get(single().step.seq)} />
                       </If>
 
                       <If when={single().step.type === "memory/recalled"}>
@@ -556,7 +575,7 @@ export function WorkspaceChatPane() {
                 </If>
               }
             >
-              {(activity) => <ActivityGroup item={activity()} working={effectivePhase() === "working"} />}
+              {(activity) => <ActivityGroup item={activity()} working={effectivePhase() === "working"} toolEntries={toolEntriesBySeq()} />}
             </If>
           )}
         </Each>

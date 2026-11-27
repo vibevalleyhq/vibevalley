@@ -1,6 +1,7 @@
+use parking_lot::Mutex;
 use std::collections::VecDeque;
 use std::io::Cursor;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
 
 use serde_json::{Value, json};
@@ -42,8 +43,8 @@ impl Scripted {
 impl ModelClient for Scripted {
     fn complete<'a>(&'a self, request: &'a ChatRequest, on: &'a mut (dyn FnMut(Delta) + Send)) -> crate::BoxFuture<'a, Result<Completion>> {
         Box::pin(async move {
-            self.seen.lock().unwrap().push(request.clone());
-            let answer = self.answers.lock().unwrap().pop_front().expect("an answer left")?;
+            self.seen.lock().push(request.clone());
+            let answer = self.answers.lock().pop_front().expect("an answer left")?;
             if let Some(t) = &answer.message.content {
                 on(Delta::Text(t.clone()));
             }
@@ -111,7 +112,7 @@ impl Tool for Counter {
     }
     fn execute<'a>(&'a self, _: &'a Value) -> crate::BoxFuture<'a, ToolOutput> {
         Box::pin(async move {
-            *self.runs.lock().unwrap() += 1;
+            *self.runs.lock() += 1;
             ToolOutput::ok("counted")
         })
     }
@@ -156,15 +157,12 @@ async fn submit_prompt(
 async fn run_worker_turn(harness: &Harness, conv: &str, b: Arc<Brain>, prompt: &str) -> (Vec<AgentEvent>, Task) {
     let events = Arc::new(Mutex::new(Vec::new()));
     let ev_sink = events.clone();
-    harness
-        .attach_worker(conv, b, Arc::new(move |e| ev_sink.lock().unwrap().push(e)))
-        .await
-        .unwrap();
+    harness.attach_worker(conv, b, Arc::new(move |e| ev_sink.lock().push(e))).await.unwrap();
     let (_, task, _) = submit_prompt(harness, conv, "deepseek-flash", "req-1", prompt, "You are a test.")
         .await
         .unwrap();
     let done = harness.scheduler().wait(&task.id, Duration::from_secs(10)).await.unwrap();
-    let captured = events.lock().unwrap().clone();
+    let captured = events.lock().clone();
     harness.workers().detach(conv);
     (captured, done)
 }
@@ -190,9 +188,9 @@ async fn a_turn_with_a_tool_call_runs_the_tool_and_answers() {
     )
     .await;
     assert_eq!(task.terminal_reason, "completed");
-    assert_eq!(*runs.lock().unwrap(), 1);
+    assert_eq!(*runs.lock(), 1);
     {
-        let seen = client.seen.lock().unwrap();
+        let seen = client.seen.lock();
         let second: Vec<Value> = seen[1].messages.iter().map(Message::to_wire).collect();
         assert_eq!(second[0]["role"], "system");
         assert_eq!(second[1]["content"], "please count");
@@ -235,7 +233,7 @@ async fn the_transcript_survives_a_reopen_and_feeds_the_next_turn() {
         h2.scheduler().wait(&t2.id, Duration::from_secs(10)).await.unwrap();
         h2.close().await;
     }
-    let seen = client.seen.lock().unwrap();
+    let seen = client.seen.lock();
     let texts: Vec<Option<String>> = seen[1].messages.iter().map(|m| m.content.clone()).collect();
     assert_eq!(
         texts,
@@ -343,9 +341,9 @@ async fn an_unfinished_turn_resumes_and_does_not_rerun_a_tool_that_changes_thing
         .unwrap();
     let done = harness.scheduler().wait(&gen_id, Duration::from_secs(10)).await.unwrap();
     assert_eq!(done.terminal_reason, "completed");
-    assert_eq!(*runs.lock().unwrap(), 0, "unsafe tool must not be replayed");
+    assert_eq!(*runs.lock(), 0, "unsafe tool must not be replayed");
     {
-        let seen = client.seen.lock().unwrap();
+        let seen = client.seen.lock();
         let last = seen[0].messages.last().unwrap();
         assert_eq!(last.role, Role::Tool);
         assert!(last.content.as_ref().unwrap().contains("interrupted"));
@@ -379,7 +377,7 @@ async fn a_read_only_tool_cut_off_mid_run_is_run_again() {
         .unwrap();
     let done = harness.scheduler().wait(&gen_id, Duration::from_secs(10)).await.unwrap();
     assert_eq!(done.terminal_reason, "completed");
-    assert_eq!(*runs.lock().unwrap(), 1);
+    assert_eq!(*runs.lock(), 1);
     harness.close().await;
 }
 
@@ -417,7 +415,7 @@ async fn abort_stops_before_the_next_step() {
     let (_, task, _) = submit_prompt(&harness, &conv, "deepseek-flash", "r1", "go", "You are a test.").await.unwrap();
     let done = harness.scheduler().wait(&task.id, Duration::from_secs(10)).await.unwrap();
     assert_eq!(done.terminal_reason, "aborted");
-    assert_eq!(client.seen.lock().unwrap().len(), 1);
+    assert_eq!(client.seen.lock().len(), 1);
     harness.close().await;
 }
 
@@ -507,7 +505,7 @@ async fn governance_extension_allows_readonly_tools_and_parks_on_unsafe_tool() {
     let (parked_task, call_id, tool_name) = tokio::time::timeout(Duration::from_secs(10), perm_rx.recv()).await.unwrap().unwrap();
     assert_eq!(call_id, "c1");
     assert_eq!(tool_name, "count");
-    assert_eq!(*runs.lock().unwrap(), 0);
+    assert_eq!(*runs.lock(), 0);
 
     let conv_read = conv.clone();
     let gov = store
@@ -532,7 +530,7 @@ async fn governance_extension_allows_readonly_tools_and_parks_on_unsafe_tool() {
 
     let done = harness.scheduler().wait(&task.id, Duration::from_secs(10)).await.unwrap();
     assert_eq!(done.terminal_reason, "completed");
-    assert_eq!(*runs.lock().unwrap(), 1);
+    assert_eq!(*runs.lock(), 1);
     harness.close().await;
 }
 
@@ -581,7 +579,7 @@ async fn grader_extension_uses_json_object_and_strips_fenced_verdict() {
     assert_eq!(done.result["rubricVerdict"]["iteration"], 2);
 
     {
-        let seen = client.seen.lock().unwrap();
+        let seen = client.seen.lock();
         // Request 1 and Request 3 are grader calls.
         assert_eq!(seen[1].response_format, Some(ResponseFormat::JsonObject));
         assert_eq!(seen[3].response_format, Some(ResponseFormat::JsonObject));
@@ -614,7 +612,7 @@ async fn subagent_extension_spawns_once_and_does_not_duplicate_on_replay() {
     let events = Arc::new(Mutex::new(Vec::new()));
     let ev_sink = events.clone();
     harness
-        .attach_worker(&conv, brain(client.clone(), vec![]), Arc::new(move |e| ev_sink.lock().unwrap().push(e)))
+        .attach_worker(&conv, brain(client.clone(), vec![]), Arc::new(move |e| ev_sink.lock().push(e)))
         .await
         .unwrap();
     let (_, task, _) = submit_prompt(&harness, &conv, "deepseek-flash", "r1", "find clock", "You are parent.")
@@ -623,7 +621,7 @@ async fn subagent_extension_spawns_once_and_does_not_duplicate_on_replay() {
     let done = harness.scheduler().wait(&task.id, Duration::from_secs(10)).await.unwrap();
     assert_eq!(done.terminal_reason, "completed");
 
-    let captured = events.lock().unwrap().clone();
+    let captured = events.lock().clone();
     assert!(
         captured
             .iter()
@@ -641,7 +639,7 @@ async fn subagent_extension_spawns_once_and_does_not_duplicate_on_replay() {
     );
 
     {
-        let seen = client.seen.lock().unwrap();
+        let seen = client.seen.lock();
         assert_eq!(seen.len(), 3);
         // Child helper received the helper system prompt with "阿狐".
         assert!(seen[1].messages[0].content.as_ref().unwrap().contains("「阿狐」派出去的帮手"));
@@ -686,7 +684,7 @@ async fn todo_extension_persists_graph_to_todo_doc_across_reopen() {
         h2.scheduler().wait(&t2.id, Duration::from_secs(10)).await.unwrap();
         h2.close().await;
     }
-    let seen = client.seen.lock().unwrap();
+    let seen = client.seen.lock();
     let listed_msg = seen[3].messages.last().unwrap().content.as_ref().unwrap();
     assert!(listed_msg.contains("step1"), "{listed_msg}");
 }
@@ -848,7 +846,8 @@ async fn deepseek_live_tool_turn() {
 }
 
 mod kit_tests {
-    use std::sync::{Arc, Mutex};
+    use parking_lot::Mutex;
+    use std::sync::Arc;
 
     use serde_json::json;
 
@@ -861,13 +860,13 @@ mod kit_tests {
 
     impl MemoryPort for InMemoryPort {
         fn prompt(&self) -> String {
-            self.0.lock().unwrap().trim().to_owned()
+            self.0.lock().trim().to_owned()
         }
 
         fn remember<'a>(&'a self, note: &'a str) -> crate::BoxFuture<'a, std::result::Result<(), String>> {
             Box::pin(async move {
                 let line = format!("- {}", note.split_whitespace().collect::<Vec<_>>().join(" "));
-                let mut body = self.0.lock().unwrap();
+                let mut body = self.0.lock();
                 if !body.is_empty() {
                     body.push('\n');
                 }
@@ -879,7 +878,7 @@ mod kit_tests {
         fn rewrite<'a>(&'a self, content: &'a str) -> crate::BoxFuture<'a, std::result::Result<usize, String>> {
             Box::pin(async move {
                 let trimmed = content.trim();
-                *self.0.lock().unwrap() = trimmed.to_owned();
+                *self.0.lock() = trimmed.to_owned();
                 Ok(trimmed.lines().filter(|l| !l.trim().is_empty()).count())
             })
         }
@@ -943,7 +942,7 @@ mod kit_tests {
             ]}))
             .await;
         assert!(bad.is_error && bad.text.contains("成了一个圈"), "{}", bad.text);
-        assert!(g.lock().unwrap().is_empty());
+        assert!(g.lock().is_empty());
         let ok = add
             .execute(&json!({"tasks": [
                 {"id": "read", "brief": "read the code"}, {"id": "fix", "brief": "fix it", "after": ["read"]}
@@ -957,7 +956,7 @@ mod kit_tests {
         assert!(back.is_error && back.text.contains("做完了，不能改成没做成"), "{}", back.text);
         let done = update.execute(&json!({"id": "fix", "state": "done"})).await;
         assert!(done.text.ends_with("都做完了，这张图收起来了。"));
-        assert!(g.lock().unwrap().is_empty());
+        assert!(g.lock().is_empty());
         assert_eq!(tools[2].execute(&json!({})).await.text, "现在没有任务。");
         assert!(add.execute(&json!({"tasks": [{"id": "坏", "brief": "x"}]})).await.text.contains("不能当 id"));
     }

@@ -330,6 +330,7 @@ pub struct Repo {
     /// Mounted external git repositories stored in `<work_root>/repos/.mounts.json`.
     mounts: Mutex<Vec<MountedRepo>>,
     mount_lock: tokio::sync::Mutex<()>,
+    health_inputs: Mutex<std::collections::BTreeMap<String, Option<i64>>>,
     cancel: CancellationToken,
     probe: Mutex<Option<tokio::task::JoinHandle<()>>>,
 }
@@ -409,6 +410,7 @@ impl Repo {
             pending: Mutex::default(),
             mounts: Mutex::new(mounts),
             mount_lock: tokio::sync::Mutex::new(()),
+            health_inputs: Mutex::default(),
             cancel: CancellationToken::new(),
             probe: Mutex::default(),
         }))
@@ -517,10 +519,22 @@ impl Repo {
         }
     }
 
+    /// Zero-I/O snapshot of known repo health inputs populated on repo create/mount/summary scans.
+    pub fn cached_health_inputs(&self) -> Vec<vibevalley_core::RepoHealthInput> {
+        self.health_inputs
+            .lock()
+            .iter()
+            .map(|(name, last_commit_at)| vibevalley_core::RepoHealthInput {
+                name: name.clone(),
+                last_commit_at: *last_commit_at,
+            })
+            .collect()
+    }
+
     pub async fn summary_async(&self, p: RepoFolder) -> RepoSummary {
         let max_sessions = self.max_sessions();
         let pull_request = self.capability(&p.name);
-        crate::log::spawn_blocking_traced(move || summary_of(p, max_sessions, pull_request))
+        let summary = crate::log::spawn_blocking_traced(move || summary_of(p, max_sessions, pull_request))
             .await
             .unwrap_or_else(|_| RepoSummary {
                 name: String::new(),
@@ -533,7 +547,12 @@ impl Repo {
                     available: false,
                     reason: t("server.repo.notChecked", &[]),
                 },
-            })
+                health: None,
+            });
+        if !summary.name.is_empty() {
+            self.health_inputs.lock().insert(summary.name.clone(), summary.last.map(|s| s * 1000));
+        }
+        summary
     }
 
     pub async fn summaries_async(&self) -> Vec<RepoSummary> {
@@ -543,6 +562,12 @@ impl Repo {
             for p in folders {
                 out.push(self.summary_async(p).await);
             }
+            let next: std::collections::BTreeMap<String, Option<i64>> = out
+                .iter()
+                .filter(|s| !s.name.is_empty())
+                .map(|s| (s.name.clone(), s.last.map(|sec| sec * 1000)))
+                .collect();
+            *self.health_inputs.lock() = next;
             return out;
         }
         let max_sessions = self.max_sessions();
@@ -577,7 +602,14 @@ impl Repo {
             }
         }
         out.sort_by_key(|(idx, _)| *idx);
-        out.into_iter().map(|(_, s)| s).collect()
+        let summaries: Vec<RepoSummary> = out.into_iter().map(|(_, s)| s).collect();
+        let next: std::collections::BTreeMap<String, Option<i64>> = summaries
+            .iter()
+            .filter(|s| !s.name.is_empty())
+            .map(|s| (s.name.clone(), s.last.map(|sec| sec * 1000)))
+            .collect();
+        *self.health_inputs.lock() = next;
+        summaries
     }
 
     /// Creates a new repository by name, either empty or cloned from GitHub.
@@ -902,6 +934,7 @@ impl Repo {
             write_mounts_async(&self.root.join(MOUNTS_FILE), &next).await?;
             *self.mounts.lock() = next;
             self.capabilities.lock().remove(id);
+            self.health_inputs.lock().remove(id);
             return Ok(());
         }
         if self.find_async(id).await.is_some() {
@@ -1090,6 +1123,7 @@ fn summary_of(p: RepoFolder, max_sessions: i64, pull_request: PullRequestCapabil
         last: (last > 0).then_some(last),
         max_sessions,
         pull_request,
+        health: None,
     }
 }
 

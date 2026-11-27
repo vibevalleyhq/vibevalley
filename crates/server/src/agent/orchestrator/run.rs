@@ -203,13 +203,18 @@ impl<'a> Run<'a> {
                 self.phase(Some(SessionAction::Thinking));
             }
             AgentEvent::Error { message } => self.agent(K::Error { message }),
+            AgentEvent::Compacted { level, summary } => {
+                self.o
+                    .memory
+                    .record_compaction_episode_async(&self.me.id, &self.run, &level, &summary, None)
+                    .await;
+            }
             AgentEvent::AgentStart
             | AgentEvent::TurnStart { .. }
             | AgentEvent::ToolUpdate { .. }
             | AgentEvent::PermissionRequested { .. }
             | AgentEvent::SubagentSpawned { .. }
             | AgentEvent::SubagentStatusChanged { .. }
-            | AgentEvent::Compacted { .. }
             | AgentEvent::TurnEnd { .. }
             | AgentEvent::AgentEnd { .. } => {}
         }

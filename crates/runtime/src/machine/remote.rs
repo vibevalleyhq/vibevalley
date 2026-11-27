@@ -704,6 +704,10 @@ impl Runtime for RemoteRuntime {
         })
     }
 
+    fn list_mcp_servers(&self) -> BoxFuture<'_, OarResult<Option<Vec<crate::oar::HostMcpServer>>>> {
+        Box::pin(async { Ok(None) })
+    }
+
     fn open(&self, opts: SessionOptions) -> BoxFuture<'_, OarResult<Arc<dyn Session>>> {
         Box::pin(async move {
             if self.machine.status() != MachineStatus::Online {

@@ -58,6 +58,10 @@ pub struct Model {
     pub tags_json: String,
     pub start_at: Option<i64>,
     pub due_at: Option<i64>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub owner: Option<String>,
+    #[sea_orm(column_type = "Text")]
+    pub relations: String,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

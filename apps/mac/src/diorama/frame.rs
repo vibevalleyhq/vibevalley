@@ -62,6 +62,7 @@ impl Default for Frame {
                 level: FarmLevel { level: 1, xp: 0, need: 10 },
                 plots: BTreeMap::new(),
                 plays: BTreeMap::new(),
+                decorations: Vec::new(),
             },
         }
     }
@@ -152,6 +153,7 @@ mod tests {
                 runs: 1,
                 last_run: None,
                 spent: None,
+                telemetry: None,
                 subagents: None,
                 tool_connections: None,
                 machine: None,
@@ -191,6 +193,7 @@ mod tests {
                 level: FarmLevel { level: 3, xp: 4, need: 30 },
                 plots,
                 plays,
+                decorations: Vec::new(),
             },
             progress: None,
             effects: vec![],

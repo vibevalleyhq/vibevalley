@@ -1,10 +1,9 @@
 //! Shared API refusal helpers (`LookIn`, `missing`, `refused`, `internal`) and
-//! idempotent request keys (`RequestKeys`, `AsyncRequestKeys`).
+//! idempotent request keys (`AsyncRequestKeys`).
 
 use std::collections::HashMap;
 use std::future::Future;
 
-use parking_lot::Mutex;
 use tokio::sync::Mutex as AsyncMutex;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{ApiError, BizCode, Next};
@@ -72,25 +71,14 @@ const REQUEST_KEY_MAX: usize = 64;
 const REQUEST_KEYS_KEPT: usize = 500;
 const REQUEST_KEY_TTL_MS: i64 = 5 * 60_000;
 
-/// Synchronous idempotency gate: a retry with the same key receives the first answer
+/// Async idempotency gate: a retry with the same key receives the first answer
 /// for five minutes; failures are not cached.
-pub struct RequestKeys<T> {
-    seen: Mutex<Answered<T>>,
-}
-
-/// Async idempotency gate matching [`RequestKeys`] without holding a sync mutex across `.await`.
 pub struct AsyncRequestKeys<T> {
     seen: AsyncMutex<Answered<T>>,
 }
 
 /// The keys oldest first, and each key's expiry and cached answer.
 type Answered<T> = (Vec<String>, HashMap<String, (i64, T)>);
-
-impl<T> Default for RequestKeys<T> {
-    fn default() -> Self {
-        RequestKeys { seen: Mutex::default() }
-    }
-}
 
 impl<T> Default for AsyncRequestKeys<T> {
     fn default() -> Self {
@@ -119,21 +107,6 @@ fn record_answer<T: Clone>(seen: &mut Answered<T>, key: &str, done: &T) {
     while seen.0.len() > REQUEST_KEYS_KEPT {
         let old = seen.0.remove(0);
         seen.1.remove(&old);
-    }
-}
-
-impl<T: Clone> RequestKeys<T> {
-    pub fn once(&self, key: Option<&str>, work: impl FnOnce() -> Result<T, ApiError>) -> Result<T, ApiError> {
-        let Some(key) = key.filter(|k| !k.is_empty()) else { return work() };
-        validate_key(key)?;
-        // Held while working: a duplicate waits for the first answer.
-        let mut seen = self.seen.lock();
-        if let Some(done) = cached_answer(&seen, key) {
-            return Ok(done);
-        }
-        let done = work()?;
-        record_answer(&mut seen, key, &done);
-        Ok(done)
     }
 }
 

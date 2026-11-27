@@ -12,7 +12,6 @@ import { Icon } from "../../../design/Icon";
 import { IconButton } from "../../../design/IconButton";
 import type { IconName } from "../../../design/icons";
 import { Markdown } from "../../../design/Markdown";
-import { motionClass } from "../../../design/motion";
 import { TextLink } from "../../../design/TextLink";
 import { Bubble } from "../../../design/Tip";
 import { toast } from "../../../design/toasts";
@@ -23,26 +22,37 @@ import { shortMomentText } from "../../../infra/base/format";
 import { hostApi } from "../../../infra/bridge";
 import { useBoardSlice } from "../../../infra/frame";
 import { ready } from "../../../infra/query";
-import { Link as A } from "../../../infra/router";
 import { createMemo } from "../../../infra/solid";
 import { useIntents } from "../../../infra/state/intent";
 import { IssueArtifacts } from "../../artifact";
-import { createSessionEvents, runsHref, SubagentProgress } from "../../session";
+import { SubagentProgress } from "../../session";
 import { createIssueActs } from "../model/acts";
 import type { Tone } from "../model/cards";
 import { changesLine } from "../model/changes";
 import { useIssueChanges, useIssues, useIssueTimeline } from "../model/history";
+import { blockerIssuesOf, relationIssuesOf } from "../model/meta";
 import { issueMove, movedIssue } from "../model/moves";
-import { issueState, noStepsText, stageTone } from "../model/overview";
+import { issueState, stageTone } from "../model/overview";
 import { issueSet, labeledIssue, sendLabel, updateIssueAttachments } from "../model/write";
 import { ActLines } from "./ActLines";
 import { ChangesBody, ChangesHead, ConflictFiles } from "./CloseDialog";
+import { IssueActivity } from "./IssueActivity";
 import { IssueAttachments } from "./IssueAttachments";
-import { DatePropertyEditor, ParentPicker, SubIssuesSection, TagEditor } from "./IssueMetaControls";
-import { AnswerView, Criteria, OrchestratorIssueDetail, Question, ReconcileWorktree, Runs, stepsLine, Story, WorkLog } from "./IssueSections";
-import { IssueThread } from "./IssueThread";
+import {
+  BlockedByChips,
+  BlockedByPicker,
+  DatePropertyEditor,
+  OwnerMark,
+  OwnerPicker,
+  ParentPicker,
+  RelationChips,
+  RelationsPicker,
+  SubIssuesSection,
+  TagEditor,
+} from "./IssueMetaControls";
+import { AnswerView, Criteria, OrchestratorIssueDetail, Question, ReconcileWorktree } from "./IssueSections";
 import { AgentFaceOf, PriorityMark, StatusMark } from "./Marks";
-import { Fold, IssueNumberPill, IssueSheet, More, Note, Pick, Property, SheetLabel, StagePill } from "./Sheet";
+import { Fold, IssueSheet, IssueTrail, More, Note, Pick, Property, SheetLabel, StagePill } from "./Sheet";
 
 export { OrchestratorIssueDetail };
 
@@ -85,8 +95,6 @@ export function IssueDetail(props: {
   const doAct = acts.send;
   const sayAct = acts.say;
   const agent = useAgent(() => sessionProfile(head()));
-  const showSteps = signal(false);
-  const steps = createSessionEvents(() => head().id, showSteps);
   const changesQuery = useIssueChanges(
     () => props.issue.id,
     () => s().showsChanges,
@@ -127,45 +135,21 @@ export function IssueDetail(props: {
     else props.onParent?.();
   };
   const parent = createMemo(() => (live().parent ? issues().find((item) => item.id === live().parent) : undefined));
+  const blockers = createMemo(() => blockerIssuesOf(live(), issues()));
+  const relations = createMemo(() => relationIssuesOf(live(), issues()));
   const tone = computed(() => stageTone[s().stage.state]);
   const statusParts = computed(() => s().statusParts(now(), timeline()?.spent?.cny));
   const stageMeta = computed(() => statusParts().slice(1).filter(Boolean));
   const heading = (
     <View>
-      <View accessibilityLabel={t("web.issue.detail.trail")} testID="issue-trail" class="mb-2 flex-row flex-wrap items-center gap-1.5">
-        <If when={s().repo}>
-          {(repo) => (
-            <>
-              <View class="flex-row items-center gap-1 rounded-md bg-side px-1.5 py-0.5">
-                <Icon name="folder" size={12} tone="muted" />
-                <Text class="text-xs font-medium text-muted">{repo()}</Text>
-              </View>
-              <Icon name="next" size={12} tone="faint" />
-            </>
-          )}
-        </If>
-        <If when={live().parent}>
-          {(parentId) => (
-            <>
-              <View
-                role="button"
-                testID="parent-issue"
-                onPress={() => openIssue(parentId())}
-                class="flex-row items-center gap-1 rounded-md border border-line bg-side px-1.5 py-0.5 hover:bg-hover"
-              >
-                <Text class="text-xs text-water">{parent() ? `#${parent()!.number} ${parent()!.title}` : t("web.issue.family.parent")}</Text>
-              </View>
-              <Icon name="next" size={12} tone="faint" />
-            </>
-          )}
-        </If>
-        <IssueNumberPill number={props.issue.number} />
-      </View>
+      <IssueTrail parentId={live().parent} parent={parent()} onOpenParent={openIssue} />
       <View class="flex-row flex-wrap items-baseline gap-x-2">
         <IssueTitle shown={s().title} full={live().title} editable={s().open} state={labeled().state("title")} onSave={(title) => setLabel({ title })} />
       </View>
       <View class="mt-2.5 flex-row flex-wrap items-center gap-2" accessibilityLabel={t("web.issue.detail.now")} testID="issue-now">
         <StagePill tone={tone()} label={statusParts()[0] ?? t(`shared.stage.${s().stage.state}`)} />
+        <BlockedByChips blockers={blockers()} max={6} onOpen={openIssue} testid="detail-blocked-by" />
+        <RelationChips relations={relations()} max={6} onOpen={openIssue} testid="detail-relations" />
         <If when={stageMeta().length > 0}>
           <View class="min-w-0 flex-1 flex-row flex-wrap items-center">
             <Each of={stageMeta()} key="index">
@@ -470,7 +454,6 @@ export function IssueDetail(props: {
         </If>
       </View>
 
-      <IssueThread issue={props.issue.id} />
       <IssueArtifacts
         issue={props.issue.id}
         heading={
@@ -480,44 +463,14 @@ export function IssueDetail(props: {
         }
       />
 
-      <View accessibilityLabel={t("web.issue.detail.story")} testID="issue-story" class="mt-7 border-t border-line pt-5">
-        <SheetLabel first>{t("web.issue.detail.story")}</SheetLabel>
-        <If
-          when={timeline()}
-          else={<Text class="text-xs text-faint">{timelineQuery.status() === "pending" ? t("web.issue.reading") : t("web.issue.detail.unread")}</Text>}
-        >
-          {(line) => <Story milestones={line().milestones} />}
-        </If>
-        <View class="mt-4 overflow-hidden rounded-lg border border-line bg-page px-3.5">
-          <Fold
-            testID="issue-steps-fold"
-            label={t("web.issue.detail.steps")}
-            summary={steps().length > 0 ? stepsLine(steps()) : undefined}
-            aside={
-              <A
-                href={runsHref({ session: head().id, issue: props.issue.id })}
-                testID="issue-open-trajectory"
-                class={`h-6 shrink-0 flex-row items-center gap-1 rounded-md px-2 ${motionClass("transition-transform duration-120 ease-out")} hover:bg-hover active:translate-y-px`}
-              >
-                <Icon name="log" size={12} tone="muted" />
-                <Text class="text-xs font-medium text-muted">{t("web.issue.detail.openTrajectory")}</Text>
-              </A>
-            }
-            onToggle={(v) => showSteps.set(v)}
-          >
-            <If when={steps().length > 0 ? steps() : undefined} else={<Text class="text-xs text-faint">{noStepsText(head())}</Text>}>
-              {(st) => <WorkLog steps={st()} />}
-            </If>
-          </Fold>
-          <Fold bordered={false} label={t("web.issue.detail.runs")} summary={s().historyLine} testID="issue-runs-fold">
-            <Runs
-              issue={props.issue.id}
-              version={`${props.issue.stage.state}:${props.session?.runs}:${props.session?.phase._tag}`}
-              onChanges={changesAction()}
-            />
-          </Fold>
-        </View>
-      </View>
+      <IssueActivity
+        issue={props.issue}
+        headSessionId={head().id}
+        timeline={timeline()}
+        timelinePending={timelineQuery.status() === "pending"}
+        runsVersion={`${props.issue.stage.state}:${props.session?.runs}:${props.session?.phase._tag}:${props.issue.findings.length}:${props.issue.closedAt ?? ""}`}
+        onChanges={changesAction()}
+      />
     </>
   );
 
@@ -596,6 +549,16 @@ export function IssueDetail(props: {
       >
         {s().whoLine}
       </Property>
+      <Property label={t("web.issue.owner.label")} icon={<OwnerMark owner={live().owner} size={15} />} inset>
+        <OwnerPicker
+          owner={live().owner}
+          allIssues={issues()}
+          disabled={busy() || !s().open}
+          state={labeled().state("owner")}
+          testid="issue-owner"
+          onChange={(owner) => setLabel({ owner: owner ?? { kind: "user", id: "" } })}
+        />
+      </Property>
       <If when={agent()?.model}>
         {(model) => (
           <Property label={t("web.issue.detail.model")} icon={<Icon name="bolt" size={13} tone="muted" />}>
@@ -613,6 +576,28 @@ export function IssueDetail(props: {
           onChange={(parent) => setLabel({ parent })}
         />
       </Property>
+      <Property align="start" label={t("web.issue.deps.blockedBy")} icon={<Icon name="lock" size={13} tone="muted" />} inset>
+        <BlockedByPicker
+          issueId={props.issue.id}
+          blockedBy={live().blockedBy}
+          allIssues={issues()}
+          disabled={busy() || !s().open}
+          state={labeled().state("blockedBy")}
+          onOpen={openIssue}
+          onChange={(blockedBy) => setLabel({ blockedBy })}
+        />
+      </Property>
+      <Property align="start" label={t("web.issue.relations.title")} icon={<Icon name="branch" size={13} tone="muted" />} inset>
+        <RelationsPicker
+          issueId={props.issue.id}
+          relations={live().relations ?? []}
+          allIssues={issues()}
+          disabled={busy() || !s().open}
+          state={labeled().state("relations")}
+          onOpen={openIssue}
+          onChange={(relations) => setLabel({ relations })}
+        />
+      </Property>
       <Property align="start" label={t("web.issue.tags.label")} icon={<Icon name="catalog" size={13} tone="muted" />} inset>
         <TagEditor tags={live().tags ?? []} disabled={busy() || !s().open} onChange={(tags) => setLabel({ tags })} />
       </Property>
@@ -623,6 +608,7 @@ export function IssueDetail(props: {
           value={live().startAt}
           disabled={busy() || !s().open}
           testid="issue-start-at"
+          maxMs={live().dueAt}
           onCommit={(startAt) => setLabel({ startAt })}
         />
       </Property>
@@ -632,6 +618,7 @@ export function IssueDetail(props: {
           value={live().dueAt}
           disabled={busy() || !s().open}
           testid="issue-due-at"
+          minMs={live().startAt}
           onCommit={(dueAt) => setLabel({ dueAt })}
         />
       </Property>
@@ -716,7 +703,7 @@ export function IssueDetail(props: {
           )}
         </If>
         <Property label={t("web.issue.detail.took")}>
-          <Text class="text-sm text-ink tabular-nums">{s().usedLine(steps(), now())}</Text>
+          <Text class="text-sm text-ink tabular-nums">{s().usedLine([], now())}</Text>
         </Property>
         <If when={s().resolvedFindings.length > 0}>
           <Property align="start" label={t("web.issue.detail.resolved")}>

@@ -101,6 +101,7 @@ async fn async_channel_operations_and_thread_idempotency() {
             attachments: None,
             to: None,
             view_context: None,
+            command: None,
         },
         None,
         None,

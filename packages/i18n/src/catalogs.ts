@@ -66,6 +66,17 @@ export const catalogs = {
       seconds: "{n} 秒",
       minutes: "{n} 分钟",
       join: { labeled: "{label}：{text}", aside: "{text}（{aside}）", sentence: "{text}。", separator: "、" },
+      repoHealth: { on_track: "正常推进", at_risk: "存在风险", off_track: "进度偏离" },
+      repoHealthReason: {
+        stuck_issues: "存在卡住待处理的工单",
+        failed_checks: "项目检查未通过",
+        overdue_issues: "存在已逾期工单",
+        asking_user: "有工单正等待你的回答",
+        blocked_issues: "存在前置阻塞工单",
+        no_active_progress: "有未关闭工单但暂无推进中任务",
+        stale_activity: "近期长时间无提交",
+        healthy: "推进正常",
+      },
     },
     "web.agent": {
       newName: "新的 {runtime}",
@@ -112,6 +123,12 @@ export const catalogs = {
       tagsHint: "前端、测试、文档…",
       enabled: "启用",
       enabledHint: "停用后主助手不会派它，名字点到也会拒绝。",
+      voice: "播报音色",
+      voiceTip: "在频道开启「听汇报」时，按此音色顺序朗读这个执行会话的汇报；留空则静默跳过。",
+      voiceNone: "不使用音色",
+      voiceNoSpeech: "还没有配置语音合成（Speech）连接，去",
+      voiceSettingsLink: "语音与通话",
+      voiceSettingsAfter: "配好后再选音色。",
       workdir: "默认仓库",
       workdirTip: "工作区（VIBEVALLEY_WORK_ROOT）下的一个文件夹。主助手派活没说仓库时用它；留空时派活必须说在哪个仓库。",
       workdirHint: "比如 clock-in",
@@ -165,6 +182,20 @@ export const catalogs = {
       disallowedExample: "比如 WebSearch",
       ownMcp: "{runtime} 自己连的 MCP",
       ownMcpTip: "引擎自己报告的，和上面加的叠在一起。",
+      toolsets: "能力集",
+      toolsetsTip: "控制这个角色能调用哪些农场内建工具（服务端也会按角色权限兜底校验）。",
+      toolset: {
+        issue: "工单",
+        session: "执行会话",
+        channel: "频道消息",
+        repo: "仓库",
+        cron: "定时任务",
+        resource: "资源读取",
+        memory: "记忆",
+        media: "媒体",
+        library: "资料库",
+        artifact: "作品",
+      },
       unreported: "这个引擎不报告这一项。",
       none: "没有。",
       role: { orchestrator: "主助手", worker: "执行角色" },
@@ -311,7 +342,22 @@ export const catalogs = {
       },
       prototype: { viewportLabel: "视口尺寸", viewportFull: "铺满", viewportTablet: "平板", viewportMobile: "手机", reload: "重新载入" },
       files: { codeMode: "源码", htmlPreviewMode: "网页预览" },
-      issue: { title: "作品" },
+      issue: {
+        title: "作品",
+        empty: "还没有关联作品",
+        linkExisting: "关联已有作品…",
+        linkPlaceholder: "搜索作品…",
+        linkEmpty: "没有可关联的作品",
+        new: "新建作品",
+        newDialogTitle: "新建关联作品",
+        newTitle: "标题",
+        newTitlePlaceholder: "给作品起个标题…",
+        newType: "类型",
+        newCreate: "创建",
+        unlink: "取消关联「{title}」",
+        linkedToast: "已关联「{title}」",
+        unlinkedToast: "已取消关联「{title}」",
+      },
       blocks: { saved: "都存好了", user: "你", start: "从这里开始写……" },
       canvas: { label: "打开的作品", close: "关掉", openPage: "在作品页打开" },
       suggestions: { title: "建议（{n}）", by: "{name} 提的", accept: "接受", reject: "不要", delete: "删掉这一块" },
@@ -586,13 +632,69 @@ export const catalogs = {
         content: { label: "作品", hint: "作品、大纲笔记与素材" },
         farm: { label: "农场", hint: "3D 纸雕农场与院落现场" },
         runtimes: { label: "引擎", hint: "本机与远端已安装的编码引擎" },
-        team: { label: "团队", hint: "角色与团队模板" },
+        team: { label: "专家", hint: "专家角色与能力模板" },
         settings: { label: "设置", hint: "个人资料、通用与外观、模型与引擎、MCP 接入、语音与连接、数据与关于" },
       },
       dashboard: {
         title: "总览仪表盘",
         tabsLabel: "仪表盘视图",
-        tab: { overview: "概览", runs: "运行记录" },
+        tab: { overview: "概览", retro: "复盘", runs: "运行记录" },
+        retro: {
+          title: "工单周期与复盘",
+          subtitle: "当前窗口共 {n} 张工单",
+          windowLabel: "复盘时间窗口",
+          window: { "7d": "7 天", "14d": "14 天", "30d": "30 天", all: "全部" },
+          copyReport: "复制复盘 Markdown 报告",
+          copiedReport: "已复制复盘报告",
+          copiedToast: "复盘 Markdown 报告已复制到剪贴板",
+          copyFailed: "未能复制复盘报告到剪贴板",
+          retry: "重试",
+          empty: "这个时间窗口内暂无工单记录。",
+          kpi: {
+            throughput: "完成与取消",
+            throughputSub: "完成 {done} · 取消 {canceled} · 进行中 {open}",
+            completionRate: "完成率 {pct}%",
+            cycleTime: "总周期（创建 → 关闭）",
+            reviewWait: "等待验收（排队 → 验收）",
+            medianP90: "中位 {median} · P90 {p90}",
+            samples: "{n} 条样本",
+            dueSla: "按期交付",
+            dueSub: "按期 {onTime} · 逾期 {overdue} · 未设截止 {noDue}",
+            rework: "打回返工",
+            reworkSub: "{issues} 张工单 · {findings} 条问题（未解决 {unresolved}）",
+          },
+          breakdown: {
+            byRepo: "按仓库分布",
+            byTag: "按标签分布",
+            byAgent: "按角色分布",
+            empty: "当前窗口内暂无分布数据。",
+            bucketMeta: "{done} 完成 · {rework} 返工 · {overdue} 逾期",
+            medianShort: "中位 {median}",
+            noRepo: "未关联仓库",
+            untagged: "无标签",
+            unassigned: "未指派",
+          },
+          overdue: { title: "逾期工单", empty: "当前窗口内没有逾期工单。", issue: "工单", status: "状态", owner: "仓库 / 角色", delay: "逾期时长" },
+          rework: {
+            title: "返工与验收问题",
+            empty: "当前窗口内没有打回返工记录。",
+            issue: "工单",
+            status: "状态",
+            owner: "仓库 / 角色",
+            findings: "问题数",
+            unresolved: "{n} 未解决",
+            allResolved: "已全部解决",
+          },
+          markdown: {
+            heading: "工单复盘报告（{window}）",
+            summary: "核心指标",
+            throughputLine: "吞吐：完成 {done}，取消 {canceled}，进行中 {open}（共 {total} 张）",
+            cycleLine: "总周期（创建 → 关闭）：中位 {median}，P90 {p90}（{n} 条样本）",
+            reviewLine: "等待验收（排队 → 验收）：中位 {median}，P90 {p90}（{n} 条样本）",
+            dueLine: "按期率：{onTimeRate}（按期 {onTime}，逾期 {overdue}，未设截止 {noDue}）",
+            reworkLine: "返工率：{reworkRate}（{issues} 张工单，{findings} 条问题，未解决 {unresolved} 条）",
+          },
+        },
         profile: { defaultName: "工作台用户", defaultTagline: "在工作台与默认频道统筹角色与工单", edit: "编辑个人资料" },
         stats: { working: "运行中会话", waiting: "等你回应", issues: "待办与进行中", review: "待验收" },
         pulse: {
@@ -639,7 +741,6 @@ export const catalogs = {
         removeKey: "移除 {label}",
         keepKey: "不移除 {label}",
         undo: "撤销",
-        storedIn: "存在 {file}",
         keepEmpty: "不改就空着",
         save: "保存",
         reset: "恢复默认",
@@ -793,6 +894,8 @@ export const catalogs = {
       find: "在这个频道里找",
       findMessages: "找消息",
       settings: "频道设置",
+      listenReports: "听汇报",
+      listenReportsActive: "正在听汇报（点击关闭）",
       inChannel: "频道里的",
       empty: "{label} 还没人说话：跟主助手说一件要做的事。",
       sendTo: "发送消息至 {label}",
@@ -911,6 +1014,11 @@ export const catalogs = {
         artifactSelected: "已选 {n} 个元素",
         clearContext: "移除本次附带的上下文",
         runningHint: "正在处理中，可直接补充说明或点击停止",
+        dictateStart: "语音输入（MOSS ASR）",
+        dictateStop: "停止语音输入",
+        dictateConnecting: "正在连接语音…",
+        dictateListening: "正在听写…",
+        dictateFinishing: "正在整理文字…",
       },
       manage: {
         name: "名称",
@@ -942,7 +1050,26 @@ export const catalogs = {
         unarchive: "取消归档「{title}」",
         notify: "话题的提醒",
       },
-      more: { label: "更多", copyLink: "复制链接", copied: "链接已复制", markUnread: "从这里标成未读", jump: "跳到这条" },
+      more: {
+        label: "更多",
+        copyLink: "复制链接",
+        copied: "链接已复制",
+        markUnread: "从这里标成未读",
+        jump: "跳到这条",
+        promoteIssue: "转为工单",
+        saveArtifact: "存为作品",
+      },
+      promote: {
+        source: "来自 {where}",
+        saveTitle: "将消息存为作品",
+        artifactTitle: "标题",
+        artifactType: "类型",
+        artifactContent: "内容",
+        artifactSave: "保存作品",
+        artifactSaved: "已存为「{title}」",
+        artifactNote: "存自 {where}",
+        fallbackTitle: "第 {number} 条消息",
+      },
       switcher: {
         open: "跳到…",
         title: "跳到频道、话题或私聊",
@@ -993,6 +1120,8 @@ export const catalogs = {
           notReady: "生图还没设置好：{why}，回车去设置",
         },
         done: { issue: "记下了 #{n}", remember: "记下了", stop: "叫停了", imagegen: "交给主助手了，画好会发到这里" },
+        skillArgs: "说明（可选）",
+        skillNote: "用技能执行",
       },
       lacks: "回不了话：{why}",
       lacksFix: "去设置",
@@ -1082,7 +1211,15 @@ export const catalogs = {
         apply: "应用",
         reset: "重置",
         disconnect: "模拟断开",
+        inspect: "检视画布元素",
+        inspectCancel: "取消检视",
+        jumpToSource: "跳转到源码",
+        clearHighlight: "清除高亮",
+        exportTrajectory: "导出评测包",
+        jumpToTimeline: "跳至时间线",
+        jumpToTrajectory: "跳至轨迹",
       },
+      inspector: { title: "画布与界面检视", active: "检视模式已开启 — 点击主窗口任意元素或画布即可定位。", surface: "所在层", noSource: "未记录源码位置" },
       lanes: { all: "全部通道", coreApply: "Core::apply", bridgeRpc: "桥接 RPC", oarWire: "OAR 协议流", gpuiFrame: "GPUI 渲染帧" },
       overview: {
         channel: "发布通道",
@@ -1127,6 +1264,8 @@ export const catalogs = {
         rawPayload: "原始载荷",
         truncated: "已截断（原 {bytes} B）",
         subagents: "子代理",
+        subagentTree: "子代理调用树",
+        allAgents: "全部代理",
         systemPrompt: "系统提示词",
         turns: "轮次",
         turnIndex: "第 {index} 轮",
@@ -1136,6 +1275,9 @@ export const catalogs = {
         voyageRecords: "原始记录",
         emptyList: "暂无轨迹记录。",
         selectPrompt: "选择一条轨迹以查看各轮详情和原始帧。",
+        exported: "已导出评测包至 {dir}",
+        inspectCmd: "检视命令",
+        replayCmd: "回放命令",
       },
       state: {
         seq: "状态序号",
@@ -1153,6 +1295,12 @@ export const catalogs = {
         inbox: "收件箱",
         mediaJobs: "媒体",
         emptyCaches: "暂无缓存统计。",
+        collab: "Loro 协同与瞬态在场",
+        emptyCollab: "暂无活跃协同作品。",
+        frontiers: "Frontiers 前沿",
+        presence: "EphemeralStore 在场节点",
+        noPeers: "暂无活跃在场节点",
+        ttl: "有效 {ms}ms",
       },
       lab: {
         rpcDelayMs: "RPC 延迟 (ms)",
@@ -1222,7 +1370,7 @@ export const catalogs = {
       status: { loading: "加载中…", error: "加载开发者工具数据失败：{reason}", disabled: "服务端未启用开发者工具。", empty: "暂无数据。" },
     },
     "web.farm": {
-      panel: { harvest: "收获{name}的地", sow: "播种 · 第 {plot} 块地", water: "给{name}浇水" },
+      panel: { harvest: "收获{name}的地", sow: "播种 · 第 {plot} 块地", water: "给{name}浇水", shop: "田头小摊" },
       menu: { issues: "工单", repos: "仓库" },
       native: { close: "关闭", loading: "载入中…" },
       chat: {
@@ -1245,7 +1393,25 @@ export const catalogs = {
         phone: "手机",
         enter: "进入",
         backToYard: "返回庭院",
+        shop: "小摊",
+        coins: "{n} 金币",
+        daily: "今日 {done}/{total}",
       },
+      shop: {
+        coins: "当前金币 {n}",
+        todayTasks: "今日轻量任务",
+        settledToday: "今日已自动结算 {n} 金币，直接记入账本。",
+        decorations: "庭院摆件",
+        decorationsNote: "仅装饰纸雕庭院，不加并发位也不提速。",
+        templates: "工单模板",
+        templatesNote: "买下后直接进播种「常见的活」，方便派发同类任务。",
+        price: "{n} 金币",
+        buy: "买下",
+        owned: "已拥有",
+        useNow: "去播种",
+        retry: "重新看看小摊",
+      },
+      daily: { settled: "已自动结算 +{n}", progress: "{progress}/{target} · +{reward} 金币" },
       sow: {
         homeless: "这座农场不是哪个仓库的",
         toMap: "种地要先进一个仓库的农场：去「仓库」里挑一个仓库。",
@@ -1353,7 +1519,27 @@ export const catalogs = {
     },
     "web.inbox": { tray: { working: "{n} 个执行会话在干活", idle: "开工了，没有在干的活", off: "还没开工", unread: "频道 {n} 条没读" } },
     "web.issue": {
-      family: { children: "子工单", parent: "父工单", noParent: "无父工单", clearParent: "清除父工单", subProgress: "{done} / {total} 已完成" },
+      family: {
+        children: "子工单",
+        parent: "父工单",
+        noParent: "无父工单",
+        clearParent: "清除父工单",
+        subProgress: "{done} / {total} 已完成",
+        compactProgress: "{done}/{total}",
+      },
+      owner: {
+        label: "负责人",
+        pick: "选择负责人",
+        search: "搜索人员或专家…",
+        self: "我（本人）",
+        selfNamed: "{name}（本人）",
+        unassigned: "未指定负责人",
+        clear: "清除负责人",
+        peopleGroup: "人员",
+        expertsGroup: "专家角色",
+      },
+      groupBy: { label: "分组", none: "不分组", repo: "仓库", owner: "负责人", agent: "角色", priority: "优先级", parent: "父工单", noParent: "无父工单" },
+      hierarchy: { label: "层级", all: "全部工单", top_level: "仅顶层", parents_only: "仅父工单" },
       tags: {
         label: "标签",
         placeholder: "输入自定义标签并回车…",
@@ -1364,7 +1550,7 @@ export const catalogs = {
         allTags: "全部标签",
         preset: { arch: "架构", storage: "存储", voice: "语音", whiteboard: "白板" },
       },
-      dates: { startAt: "计划开始", dueAt: "目标截止", datePlaceholder: "如 2026-12-01", notSet: "未设置", clearDate: "清除日期" },
+      dates: { startAt: "计划开始", dueAt: "目标截止", notSet: "未设置", clearDate: "清除日期" },
       scope: { label: "工单范围", all: "全部", active: "活跃", backlog: "需求池", canceled: "已废弃" },
       reading: "在读……",
       never: "算了",
@@ -1433,6 +1619,9 @@ export const catalogs = {
         allRepos: "所有仓库",
         byHelper: "按角色看",
         allHelpers: "全部角色",
+        byStatus: "按状态看",
+        allStatuses: "全部状态",
+        todoAndInProgress: "待办与进行中",
         shown: "{shown} / {of} 张",
         clear: "清掉筛选",
         view: "看法",
@@ -1442,7 +1631,7 @@ export const catalogs = {
         refreshing: "正在同步…",
       },
       marks: { priority: "优先级：{word}" },
-      sheet: { less: "收起", more: "更多", at: "在「{stage}」", stageDone: "{stage}做完了" },
+      sheet: { less: "收起", more: "更多" },
       acts: {
         reopened: "工单重开了",
         goesOn: "{helper} 接着做。",
@@ -1514,10 +1703,7 @@ export const catalogs = {
         changedFiles: "改了哪些文件",
         fileCount: "{n} 个",
         changesUnread: "读不到改动。",
-        story: "怎么走到这一步",
-        unread: "读不到。",
         full: "要做的（完整说明）",
-        steps: "执行会话的每一步",
         openTrajectory: "完整轨迹",
         runs: "每一轮",
         time: "时间",
@@ -1543,19 +1729,6 @@ export const catalogs = {
         unsaid: "它还没说",
         noRuns: "还没有干过活。",
         runCount: "{n} 次",
-        stepCount: "{n} 步",
-        stepsAndTools: "{n} 步 · 用了 {tools} 个工具",
-        step: {
-          "run/start": "开工",
-          "user/message": "听到",
-          "memory/recalled": "想起",
-          "assistant/thinking": "想",
-          "assistant/message": "说",
-          "tool/call": "用工具",
-          "llm/retry": "重试",
-          "run/error": "出错",
-          "run/end": "这一轮结束",
-        },
         orchestratorStuck: "主助手这一轮没答成：在频道里看它说了什么",
         job: "要做的",
         from: "来自",
@@ -1580,10 +1753,6 @@ export const catalogs = {
         refiningLine: "它在读代码，写好了会填进下面各栏。",
         questions: "草稿写好了，它有 {n} 个问题要问你",
         questionsLine: "在下面回答，它照你的回答再起草一版。",
-        drafted: "草稿写好了",
-        draftedLine: "看一遍、改一改，没问题就开工。",
-        what: "想做什么？",
-        whatLine: "写一句就行：执行会话读过代码，替你写成工单。",
         titleHint: "比如：给登录页加上记住我",
         title: "标题",
         descriptionHint: "说明：为什么、要做的、不做的、可能涉及哪些文件（起草会写好）",
@@ -1610,23 +1779,18 @@ export const catalogs = {
         inQueue: "排队中：{ago}排上的，有并发上限就按看板上的先后自动开工。",
         unqueue: "不排了",
         pickHelper: "先选好角色",
-        start: "确认需求并派发",
         save: "存下改动",
         remove: "删掉",
         newRepo: "新建仓库",
         repoHint: "仓库名，也是工作区下的文件夹名",
         repoName: "仓库名",
         create: "新建",
-        writeOwn: "自己写说明",
         edit: "编辑",
         doneEditing: "完成编辑",
         addDescription: "添加说明…",
         addCriteria: "添加验收标准",
         polish: "让角色再润色",
         markReady: "标为待开发",
-        markDone: "标为已完成",
-        accept: "验收通过",
-        markCanceled: "废弃",
         revive: "恢复到需求池",
         criterionToggle: "切换验收标准「{criterion}」",
       },
@@ -1636,7 +1800,6 @@ export const catalogs = {
         grouping: { status: "状态", repo: "仓库", agent: "角色", none: "不分组" },
         ordering: { manual: "默认", priority: "优先级", updated: "最近更新", created: "创建时间" },
         lane: { backlog: "需求池", todo: "待办", in_progress: "进行中", in_review: "待验收", done: "已完成", canceled: "已废弃" },
-        stage: { talk: "聊清楚", work: "安排活", finish: "完成" },
         newIssue: "新工单",
       },
       trigger: {
@@ -1691,8 +1854,6 @@ export const catalogs = {
         since: "{span}了",
         ran: "第 {n} 轮",
         used: "共用 {span}",
-        noSteps: "还什么都没做。",
-        stepsGone: "轨迹只留 30 天（配置里的 session.trajectory_days），这个工单的已经清掉了。",
         change: { A: { mark: "新", label: "新增" }, M: { mark: "改", label: "修改" }, D: { mark: "删", label: "删除" } },
         and: "、",
         doing: "正在{action}",
@@ -1719,12 +1880,8 @@ export const catalogs = {
         missingRuntime: "尚未启用可用引擎，配置好编码引擎后就能自动起草和开工。",
         goRuntimes: "去配置引擎",
       },
-      conversation: {
-        title: "讨论与交付记录",
-        older: "加载更早的消息",
-        empty: "需求讨论、执行反馈与交付会保留在这里",
-        placeholder: "写一条评论、补充说明或反馈…",
-      },
+      conversation: { older: "加载更早的消息", placeholder: "写一条评论、补充说明或反馈…" },
+      activity: { title: "动态记录", empty: "需求讨论、进展节点与执行步骤会汇总在这里" },
       attachments: {
         title: "附件",
         attachFile: "添加附件",
@@ -1740,9 +1897,6 @@ export const catalogs = {
         scheduledCount: "已排期 {n}",
         rolledUp: "由子工单汇总",
         overdue: "已逾期",
-        shiftPrev: "提前 1 天",
-        shiftNext: "延后 1 天",
-        editDates: "调整排期",
         scheduleToday: "排到今天",
         emptyScheduled: "当前没有带起止日期的工单",
         emptyScheduledHint: "在下方未排期工单中点「排到今天」，或在工单属性里设置计划开始 / 目标截止日期。",
@@ -1758,8 +1912,50 @@ export const catalogs = {
         newOnDate: "在 {date} 新建工单",
         moreItems: "还有 {n} 项",
         collapseDay: "收起",
-        scheduledBadge: "排期 {date}",
-        clearScheduledDate: "清除预填日期",
+      },
+      deps: { blockedBy: "阻塞于", pick: "选择前置工单…", none: "无前置阻塞", clear: "清除前置依赖", blockedByChip: "被 #{n} 阻塞" },
+      triage: {
+        selected: "已选 {n} 项",
+        selectIssue: "选择工单 #{n}",
+        clear: "取消选择",
+        status: "改状态",
+        agent: "派执行会话",
+        noAgent: "清除执行会话",
+        owner: "负责人",
+        noOwner: "清除负责人",
+        repo: "仓库",
+        noRepo: "清除仓库",
+        priority: "优先级",
+        tags: "标签",
+        addTags: "追加标签",
+        replaceTags: "替换标签",
+        updated: "已批量更新 {n} 张工单",
+        partial: "已更新 {ok} 张工单，{failed} 张未能更新",
+      },
+      relations: {
+        title: "非阻塞关联",
+        pick: "添加关联或重复工单…",
+        none: "暂无关联工单",
+        clear: "清除关联",
+        related: "相关",
+        duplicate: "重复",
+        relatedChip: "相关 #{n}",
+        duplicateChip: "重复 #{n}",
+      },
+      digest: {
+        title: "晨间简报",
+        subtitle: "过夜进展、仓库健康度，以及需点击确认才生效的需求池梳理建议。",
+        refresh: "刷新",
+        progressTitle: "一、过夜进展与待处理",
+        healthTitle: "二、仓库健康度",
+        triageTitle: "三、需求池梳理建议（点击确认后修改）",
+        triageConfirm: "确认应用",
+        triageDismiss: "忽略",
+        triageEmpty: "当前没有待确认的需求池梳理建议。",
+        quiet: "本时段暂无新增进展或待处理事项。",
+        runsLine: "共 {total} 次运行（完成 {completed} · 失败 {failed} · 中断 {interrupted}）",
+        emptyHealth: "暂无已挂载仓库。",
+        pendingCount: "{n} 项待确认",
       },
     },
     "web.library": {
@@ -2587,7 +2783,17 @@ export const catalogs = {
         disconnect: "断开连接",
       },
       tabs: { inbox: "收件箱", channels: "频道", sessions: "会话", issues: "工单" },
-      inbox: { approve: "同意", deny: "拒绝", answer: "回复", empty: "收件箱为空，暂时没有待处理项。" },
+      inbox: {
+        approve: "同意",
+        deny: "拒绝",
+        answer: "回复",
+        accept: "通过验收",
+        reject: "打回",
+        rejectReasonPlaceholder: "输入打回原因…",
+        retry: "重试",
+        resume: "继续",
+        empty: "收件箱为空，暂时没有待处理项。",
+      },
       channel: { replyPlaceholder: "输入消息回复…", send: "发送", empty: "这个频道还没有消息。" },
       session: { promptPlaceholder: "给执行会话发一条指令…", send: "发送", stop: "停止", events: "轨迹", empty: "当前没有运行中的执行会话。" },
       issue: {
@@ -2718,6 +2924,17 @@ export const catalogs = {
       unmounting: "取消中…",
       unmounted: "已取消关联 {name}（磁盘原目录已保留）",
       unmountTip: "仅从 VibeValley 列表移除关联，不会删除磁盘上的本地文件夹",
+      health: {
+        title: "仓库健康度",
+        open: "开着 {n}",
+        inProgress: "进行中 {n}",
+        inReview: "待验收 {n}",
+        blocked: "阻塞 {n}",
+        stuck: "卡住 {n}",
+        asking: "待回复 {n}",
+        failedChecks: "检查失败 {n}",
+        overdue: "已逾期 {n}",
+      },
     },
     "web.runtime": {
       capability: {
@@ -2794,8 +3011,8 @@ export const catalogs = {
       modelCount: "{n} 个",
       noModels: "这个引擎不报告模型列表。",
       effort: "推理强度",
-      unreported: "不报告。",
-      none: "没有。",
+      unreported: "当前引擎未上报这一项。",
+      none: "暂无。",
       library: {
         book: "技能书",
         search: "搜索技能",
@@ -2854,9 +3071,45 @@ export const catalogs = {
       remoteSummary: "运行在 {machine} 上，由该执行主机托管。",
       sessions: "相关会话",
       noSessions: "暂无活跃或最近的会话。",
+      stats: {
+        title: "近期运行统计",
+        runs: "近期轮次",
+        sessions: "{n} 个会话",
+        failureRate: "失败率",
+        retryRate: "重试率",
+        failuresDetail: "{failed} 失败 · {errors} 次错误",
+        retriesDetail: "{retried} 个会话 · {retries} 次重试",
+        cumulativeSpend: "累计用量与花费",
+        empty: "该引擎暂无近期运行记录。",
+      },
       quickActions: "快捷操作",
       installation: "安装与路径",
       source: "安装方式",
+      mcpServer: {
+        add: "添加",
+        addTitle: "添加 MCP 服务器",
+        editTitle: "编辑 MCP 服务器",
+        edit: "编辑 {name}",
+        remove: "移除 {name}",
+        toggle: "开关 {name}",
+        name: "名称",
+        nameHint: "写进宿主配置里的服务器键名，比如 github 或 context7。",
+        transport: "传输方式",
+        command: "命令",
+        args: "参数",
+        argsHint: "传给命令的空格分隔参数。",
+        env: "环境变量",
+        url: "服务地址",
+        headers: "请求头",
+        enabled: "启用",
+        disabledTag: "已停用",
+        enabledTag: "已启用",
+        cancel: "取消",
+        save: "保存",
+        savedToast: "已保存 MCP 服务器 {name}",
+        removedToast: "已移除 MCP 服务器 {name}",
+        toggledToast: "{enabled, select, true {已启用 MCP 服务器 {name}} other {已停用 MCP 服务器 {name}}}",
+      },
     },
     "web.session": {
       log: {
@@ -2957,6 +3210,42 @@ export const catalogs = {
         openProfile: "看角色",
         orchestratorRole: "主助手",
         status: { working: "进行中", listening: "在听", resting: "待命", done: "已完成", failed: "失败", interrupted: "已中断", closed: "已结束" },
+        telemetry: {
+          tokenBreakdown: "输入 {input} · 缓存 {cached} · 输出 {output}",
+          context: "上下文 {pct}%（{used}/{window}）",
+          contextCompact: "上下文 {pct}%",
+          retries: "重试 {n} 次",
+          errors: "错误 {n} 次",
+        },
+        recovery: {
+          resumeSame: "按原配置继续",
+          retrySame: "按原配置重试",
+          rerunOther: "换个角色/引擎重跑",
+          openWorktree: "打开 Worktree 终端",
+          resumedToast: "已按原配置重新发起运行",
+          rerunTitle: "换个角色或引擎重新运行",
+          rerunTarget: "选择角色或引擎",
+          rerunTargetPlaceholder: "选择一个角色或引擎",
+          rerunNote: "补充说明（可选）",
+          rerunNotePlaceholder: "可补充指引，留空则沿用当前任务继续重跑…",
+          rerunConfirm: "开始重跑",
+          rerunStartedToast: "已交由 {target} 重新运行",
+          resumePrompt: "从上一步继续执行并完成任务。",
+          groupExperts: "角色",
+          groupEngines: "引擎",
+          noWorktree: "该会话未记录工作区目录",
+        },
+        compact: { button: "压缩上下文", compacted: "已压缩上下文", skipped: "当前暂无需压缩的新内容" },
+        codemode: {
+          button: "运行 CodeMode",
+          title: "运行 CodeMode 脚本",
+          description: "在当前持久化会话沙箱中执行确定性 JavaScript，可通过 `call(tool, args)` 调用工具。",
+          scriptLabel: "JavaScript 脚本",
+          scriptPlaceholder: '// 示例：调用工具并返回结果\nconst issues = call("issue_list", {}); return { count: issues.length };',
+          run: "运行脚本",
+          outputLabel: "输出 JSON",
+          stats: "{steps} 步 · {calls} 次工具调用 · {sleeps} 次休眠",
+        },
       },
       subagents: {
         heading: "子代理任务",
@@ -3079,8 +3368,20 @@ export const catalogs = {
         monoFont: "终端与代码字体",
         monoFontRow: "终端与代码字体（支持 Nerd Font）",
         monoFontHint: "用于终端、Diff 与文件预览的等宽字体，内置 Nerd Font 图标回退链",
+        fontGroupInstalled: "已安装字体",
+        fontGroupFallback: "回退字体（未检测到）",
+        fontSearch: "搜索字体…",
+        fontEmpty: "没有匹配的字体",
+        fontFallbackBadge: "未安装",
         terminalFontSize: "终端字号",
         terminalFontSizeHint: "也可在工作区随时按 ⌘+ / ⌘- / ⌘0 调整",
+        previewTitle: "实时排版预览",
+        previewNote: "随界面缩放、等宽字体与终端字号即时更新",
+        previewUiHeading: "界面正文",
+        previewUiBody: "中英文混排清晰对齐 · 响应 120ms · 3 个会话运行中",
+        previewCodeHeading: "代码与终端",
+        fontLoadFailed: "读取本机字体与外观设置失败",
+        fontApplyFailed: "应用字体设置失败",
       },
       profile: {
         intro: "设置你在工作台顶部导航和总览仪表盘中的显示名称、简介与头像。",
@@ -3331,8 +3632,9 @@ export const catalogs = {
       },
       section: { collapse: "折叠 {title}", expand: "展开 {title}" },
       palette: {
-        placeholder: { commands: "输入命令或跳转到任意页面…", files: "跳转到文件…", search: "在项目中搜索文本…" },
+        placeholder: { commands: "输入命令，或搜索 #工单、作品、运行轨迹…", files: "跳转到文件…", search: "在项目中搜索文本…" },
         mode: { commands: "命令", files: "文件", search: "搜索" },
+        groups: { issues: "工单", artifacts: "作品", runs: "运行轨迹" },
         a11y: { commands: "命令", files: "文件", search: "搜索结果" },
         searching: "搜索中…",
         empty: { commands: "没有匹配的命令。", files: "没有匹配的文件。", search: "没有匹配结果。" },
@@ -3487,14 +3789,39 @@ export const catalogs = {
         moss: { verify: "测一下能不能接通", checking: "在接…", ok: "接通了" },
       },
       moss: {
-        intro: "直接和 MOSS Live 说话，听它怎么答；连线经本机服务端，key 不出这台电脑。说的话不进默认频道。",
-        talk: "开始说话",
+        intro: "直接和 MOSS Live 说话，或者配置语音通话、合成与听写所用的 MOSS 账号与模型；连线经本机服务端，key 不出这台电脑。",
+        talk: "开始通话",
         connecting: "在接通…",
         hangUp: "挂断",
         mute: "静音",
         unmute: "取消静音",
-        nativeCall: "MOSS Live 通话",
+        mutedLabel: "麦克风已静音",
+        readyPrompt: "点击「开始通话」开启与主助手的实时语音",
+        listeningPrompt: "正在聆听，直接开口即可对话",
+        youLabel: "你",
+        orchestratorLabel: "主助手",
+        nativeCall: "MOSS Live 实时通话",
         nativeNotice: "开始后采集麦克风，音频发送到已配置的 MOSS 账号，可能产生费用；双方最终字幕记进默认频道。离开本页会挂断。",
+        configTitle: "模型与密钥配置",
+        configNote: "实时语音与播报",
+        accountLabel: "MOSS 连接",
+        accountHint: "用于实时通话、语音合成与听写的账号",
+        addConnection: "新建 MOSS 连接",
+        keyLabel: "API 密钥",
+        keyHint: "密钥仅存于本机设置，保存后生效",
+        liveModel: "实时通话模型（Live）",
+        liveModelHint: "用于 MOSS Live 对话与实时流式听写",
+        speechModel: "语音合成模型（Speech）",
+        speechModelHint: "用于角色音色与「听汇报」语音播报",
+        transcriptionModel: "语音转写模型（ASR）",
+        transcriptionModelHint: "无 Live 连接时作为输入框语音听写后备",
+        unbound: "不使用",
+        voicesTitle: "可用音色预览",
+        voicesHint: "保存语音合成连接后自动拉取可用音色",
+        voicesCount: "{n} 个可用音色",
+        voicesEmpty: "当前连接下暂无可用音色",
+        manageAll: "在「模型与引擎」中管理全部连接",
+        saved: "语音设置已保存",
       },
     },
   },
@@ -3576,6 +3903,17 @@ export const catalogs = {
       seconds: "{n} s",
       minutes: "{n} min",
       join: { labeled: "{label}: {text}", aside: "{text} ({aside})", sentence: "{text}.", separator: ", " },
+      repoHealth: { on_track: "On track", at_risk: "At risk", off_track: "Off track" },
+      repoHealthReason: {
+        stuck_issues: "Stuck issues need attention",
+        failed_checks: "Project checks failed",
+        overdue_issues: "Overdue issues past due date",
+        asking_user: "Waiting for user response",
+        blocked_issues: "Blocked by dependencies",
+        no_active_progress: "Open backlog with no active progress",
+        stale_activity: "No recent commits",
+        healthy: "Healthy and moving smoothly",
+      },
     },
     "web.agent": {
       newName: "New {runtime}",
@@ -3622,6 +3960,12 @@ export const catalogs = {
       tagsHint: "frontend, tests, docs…",
       enabled: "Enabled",
       enabledHint: "Disabled, the assistant does not send it, and refuses when it is named.",
+      voice: "Report voice",
+      voiceTip: "Voice used to read this helper's reports aloud sequentially when Listen to reports is on; empty skips playback.",
+      voiceNone: "No voice assigned",
+      voiceNoSpeech: "Configure a Speech connection in",
+      voiceSettingsLink: "Voice & Calls",
+      voiceSettingsAfter: "to pick voices.",
       workdir: "Default repo",
       workdirTip:
         "A folder under the work folder (VIBEVALLEY_WORK_ROOT). Used when the assistant sends work without naming a repo; when empty, the repo must be named.",
@@ -3680,6 +4024,20 @@ export const catalogs = {
       disallowedExample: "such as WebSearch",
       ownMcp: "MCP servers {runtime} connects itself",
       ownMcpTip: "Reported by the runtime, together with those added above.",
+      toolsets: "Toolsets",
+      toolsetsTip: "Controls which built-in farm toolsets this profile can call (the server also enforces role permissions).",
+      toolset: {
+        issue: "Issues",
+        session: "Sessions",
+        channel: "Channels",
+        repo: "Repositories",
+        cron: "Crons",
+        resource: "Resources",
+        memory: "Memory",
+        media: "Media",
+        library: "Library",
+        artifact: "Artifacts",
+      },
       unreported: "This runtime does not report this.",
       none: "None.",
       role: { orchestrator: "Assistant", worker: "Helper" },
@@ -3826,7 +4184,22 @@ export const catalogs = {
       },
       prototype: { viewportLabel: "Viewport", viewportFull: "Full", viewportTablet: "Tablet", viewportMobile: "Mobile", reload: "Reload" },
       files: { codeMode: "Code", htmlPreviewMode: "Preview" },
-      issue: { title: "Artifacts" },
+      issue: {
+        title: "Artifacts",
+        empty: "No linked artifacts yet",
+        linkExisting: "Link existing artifact…",
+        linkPlaceholder: "Search artifacts…",
+        linkEmpty: "No matching unlinked artifacts",
+        new: "New artifact",
+        newDialogTitle: "New linked artifact",
+        newTitle: "Title",
+        newTitlePlaceholder: "Give this artifact a title…",
+        newType: "Type",
+        newCreate: "Create",
+        unlink: 'Unlink "{title}"',
+        linkedToast: 'Linked "{title}"',
+        unlinkedToast: 'Unlinked "{title}"',
+      },
       blocks: { saved: "All saved", user: "You", start: "Start writing here…" },
       canvas: { label: "Open artifact", close: "Close", openPage: "Open its page" },
       suggestions: { title: "Suggestions ({n})", by: "From {name}", accept: "Accept", reject: "Dismiss", delete: "Delete this block" },
@@ -4102,13 +4475,76 @@ export const catalogs = {
         content: { label: "Artifacts", hint: "Artifacts, notes, and media" },
         farm: { label: "Farm", hint: "3D papercraft farm courtyard" },
         runtimes: { label: "Engines", hint: "Installed coding engines across machines" },
-        team: { label: "Team", hint: "Roles and team templates" },
+        team: { label: "Experts", hint: "Experts and templates" },
         settings: { label: "Settings", hint: "Profile, general & appearance, models & engines, MCP, connections, data & about" },
       },
       dashboard: {
         title: "Dashboard",
         tabsLabel: "Dashboard views",
-        tab: { overview: "Overview", runs: "Runs" },
+        tab: { overview: "Overview", retro: "Retro", runs: "Runs" },
+        retro: {
+          title: "Cycle Time & Retro",
+          subtitle: "{n} issues in window",
+          windowLabel: "Retro time window",
+          window: { "7d": "7d", "14d": "14d", "30d": "30d", all: "All" },
+          copyReport: "Copy Retro Markdown Report",
+          copiedReport: "Copied Retro Report",
+          copiedToast: "Retro Markdown report copied to clipboard",
+          copyFailed: "Could not copy retro report to clipboard",
+          retry: "Retry",
+          empty: "No issues recorded in this time window.",
+          kpi: {
+            throughput: "Throughput",
+            throughputSub: "{done} done · {canceled} canceled · {open} open",
+            completionRate: "{pct}% completion",
+            cycleTime: "Cycle Time (Created → Closed)",
+            reviewWait: "Review Wait (Queued → Reviewed)",
+            medianP90: "P50 {median} · P90 {p90}",
+            samples: "{n} samples",
+            dueSla: "Due Date SLA",
+            dueSub: "{onTime} on time · {overdue} overdue · {noDue} no due date",
+            rework: "Findings Rework",
+            reworkSub: "{issues} issues · {findings} findings ({unresolved} open)",
+          },
+          breakdown: {
+            byRepo: "By Repository",
+            byTag: "By Tag",
+            byAgent: "By Agent",
+            empty: "No breakdown entries in this window.",
+            bucketMeta: "{done} done · {rework} rework · {overdue} overdue",
+            medianShort: "P50 {median}",
+            noRepo: "No repository",
+            untagged: "Untagged",
+            unassigned: "Unassigned",
+          },
+          overdue: {
+            title: "Overdue Items",
+            empty: "No overdue items in this window.",
+            issue: "Issue",
+            status: "Status",
+            owner: "Repo / Agent",
+            delay: "Overdue",
+          },
+          rework: {
+            title: "Rework & Findings Items",
+            empty: "No rework findings recorded in this window.",
+            issue: "Issue",
+            status: "Status",
+            owner: "Repo / Agent",
+            findings: "Findings",
+            unresolved: "{n} open",
+            allResolved: "All resolved",
+          },
+          markdown: {
+            heading: "Issue Retro Report ({window})",
+            summary: "Summary",
+            throughputLine: "Throughput: {done} done, {canceled} canceled, {open} open (total {total})",
+            cycleLine: "Cycle time (Created -> Closed): median {median}, P90 {p90} ({n} samples)",
+            reviewLine: "Review wait (Queued -> Reviewed): median {median}, P90 {p90} ({n} samples)",
+            dueLine: "Due SLA: {onTimeRate} on-time ({onTime} on time, {overdue} overdue, {noDue} without due date)",
+            reworkLine: "Rework: {reworkRate} ({issues} issues, {findings} findings, {unresolved} unresolved)",
+          },
+        },
         profile: { defaultName: "Workspace User", defaultTagline: "Coordinating roles and issues across your workspace", edit: "Edit profile" },
         stats: { working: "Active sessions", waiting: "Needs response", issues: "Open issues", review: "In review" },
         pulse: {
@@ -4171,7 +4607,6 @@ export const catalogs = {
         removeKey: "Remove {label}",
         keepKey: "Keep {label}",
         undo: "Undo",
-        storedIn: "Saved in {file}",
         keepEmpty: "Leave empty to keep",
         save: "Save",
         reset: "Reset",
@@ -4330,6 +4765,8 @@ export const catalogs = {
       find: "Find in this channel",
       findMessages: "Find messages",
       settings: "Channel settings",
+      listenReports: "Listen to reports",
+      listenReportsActive: "Listening to reports (click to turn off)",
       inChannel: "In the channel",
       empty: "Nobody has spoken in {label}: tell the assistant something to do.",
       sendTo: "Message {label}",
@@ -4451,6 +4888,11 @@ export const catalogs = {
         artifactSelected: "{n} selected",
         clearContext: "Remove attached context",
         runningHint: "Working — send a follow-up or click stop",
+        dictateStart: "Voice dictation (MOSS ASR)",
+        dictateStop: "Stop dictation",
+        dictateConnecting: "Connecting audio…",
+        dictateListening: "Listening…",
+        dictateFinishing: "Transcribing…",
       },
       manage: {
         name: "Name",
@@ -4482,7 +4924,26 @@ export const catalogs = {
         unarchive: 'Unarchive "{title}"',
         notify: "Thread notifications",
       },
-      more: { label: "More", copyLink: "Copy link", copied: "Link copied", markUnread: "Mark unread from here", jump: "Jump to it" },
+      more: {
+        label: "More",
+        copyLink: "Copy link",
+        copied: "Link copied",
+        markUnread: "Mark unread from here",
+        jump: "Jump to it",
+        promoteIssue: "Promote to ticket",
+        saveArtifact: "Save as artifact",
+      },
+      promote: {
+        source: "From {where}",
+        saveTitle: "Save message as artifact",
+        artifactTitle: "Title",
+        artifactType: "Type",
+        artifactContent: "Content",
+        artifactSave: "Save artifact",
+        artifactSaved: 'Saved as "{title}"',
+        artifactNote: "Saved from {where}",
+        fallbackTitle: "Message #{number}",
+      },
       switcher: {
         open: "Jump to…",
         title: "Jump to a channel, thread or direct message",
@@ -4542,6 +5003,8 @@ export const catalogs = {
           notReady: "Images aren't set up: {why}. Press Enter to set it up",
         },
         done: { issue: "Written down as #{n}", remember: "Remembered", stop: "Stopped", imagegen: "Handed to the assistant; the image will be posted here" },
+        skillArgs: "args (optional)",
+        skillNote: "Run skill",
       },
       lacks: "cannot answer: {why}",
       lacksFix: "Settings",
@@ -4641,6 +5104,19 @@ export const catalogs = {
         apply: "Apply",
         reset: "Reset",
         disconnect: "Simulate Disconnect",
+        inspect: "Inspect Canvas",
+        inspectCancel: "Cancel Inspect",
+        jumpToSource: "Jump to Source",
+        clearHighlight: "Clear Highlight",
+        exportTrajectory: "Export Eval Bundle",
+        jumpToTimeline: "View in Timeline",
+        jumpToTrajectory: "View in Trajectory",
+      },
+      inspector: {
+        title: "Canvas Inspector",
+        active: "Inspector active — click any element or canvas in the main window.",
+        surface: "Surface",
+        noSource: "No source location recorded",
       },
       lanes: { all: "All Lanes", coreApply: "Core::apply", bridgeRpc: "Bridge RPC", oarWire: "OAR Wire", gpuiFrame: "GPUI Frame" },
       overview: {
@@ -4686,6 +5162,8 @@ export const catalogs = {
         rawPayload: "Raw Payload",
         truncated: "Truncated ({bytes} B)",
         subagents: "Subagents",
+        subagentTree: "Subagent Tree",
+        allAgents: "All Agents",
         systemPrompt: "System Prompt",
         turns: "Rounds",
         turnIndex: "Round #{index}",
@@ -4695,6 +5173,9 @@ export const catalogs = {
         voyageRecords: "Voyage Records",
         emptyList: "No trajectories recorded yet.",
         selectPrompt: "Select a trajectory to inspect its rounds and raw frames.",
+        exported: "Exported eval bundle to {dir}",
+        inspectCmd: "Inspect Command",
+        replayCmd: "Replay Command",
       },
       state: {
         seq: "State Seq",
@@ -4712,6 +5193,12 @@ export const catalogs = {
         inbox: "Inbox",
         mediaJobs: "Media",
         emptyCaches: "No cache metrics reported.",
+        collab: "Loro Collab & EphemeralStore",
+        emptyCollab: "No active collaborative artifacts.",
+        frontiers: "Frontiers",
+        presence: "EphemeralStore Peers",
+        noPeers: "No active ephemeral peers",
+        ttl: "TTL {ms}ms",
       },
       lab: {
         rpcDelayMs: "RPC Delay (ms)",
@@ -4786,7 +5273,7 @@ export const catalogs = {
       },
     },
     "web.farm": {
-      panel: { harvest: "Harvest {name}'s plot", sow: "Sow · plot {plot}", water: "Water {name}" },
+      panel: { harvest: "Harvest {name}'s plot", sow: "Sow · plot {plot}", water: "Water {name}", shop: "Farm Shop" },
       menu: { issues: "Tickets", repos: "Repos" },
       native: { close: "Close", loading: "Loading…" },
       chat: {
@@ -4809,7 +5296,25 @@ export const catalogs = {
         phone: "Phone",
         enter: "Enter",
         backToYard: "Back to yard",
+        shop: "Shop",
+        coins: "{n} coins",
+        daily: "Today {done}/{total}",
       },
+      shop: {
+        coins: "{n} coins available",
+        todayTasks: "Today's lightweight tasks",
+        settledToday: "Auto-settled {n} coins today directly into your ledger.",
+        decorations: "Yard decorations",
+        decorationsNote: "Purely decorative yard pieces — no extra slots or speed boosts.",
+        templates: "Ticket templates",
+        templatesNote: "Unlocked templates appear right inside Sow → Common jobs.",
+        price: "{n} coins",
+        buy: "Buy",
+        owned: "Owned",
+        useNow: "Sow with this",
+        retry: "Reload shop",
+      },
+      daily: { settled: "Auto-settled +{n}", progress: "{progress}/{target} · +{reward} coins" },
       sow: {
         homeless: "This farm belongs to no repo",
         toMap: "To plant, enter a repo's farm first: open Repos and pick a repository.",
@@ -4950,7 +5455,36 @@ export const catalogs = {
       },
     },
     "web.issue": {
-      family: { children: "Child issues", parent: "Parent issue", noParent: "No parent", clearParent: "Clear parent", subProgress: "{done} / {total} done" },
+      family: {
+        children: "Child issues",
+        parent: "Parent issue",
+        noParent: "No parent",
+        clearParent: "Clear parent",
+        subProgress: "{done} / {total} done",
+        compactProgress: "{done}/{total}",
+      },
+      owner: {
+        label: "Assignee",
+        pick: "Set assignee",
+        search: "Search people or experts…",
+        self: "Me (Self)",
+        selfNamed: "{name} (Me)",
+        unassigned: "Unassigned",
+        clear: "Clear assignee",
+        peopleGroup: "People",
+        expertsGroup: "Experts",
+      },
+      groupBy: {
+        label: "Group by",
+        none: "No grouping",
+        repo: "Repo",
+        owner: "Assignee",
+        agent: "Helper",
+        priority: "Priority",
+        parent: "Parent",
+        noParent: "No parent",
+      },
+      hierarchy: { label: "Hierarchy", all: "All issues", top_level: "Top-level", parents_only: "Parents only" },
       tags: {
         label: "Tags",
         placeholder: "Add custom tag and press Enter…",
@@ -4961,7 +5495,7 @@ export const catalogs = {
         allTags: "All tags",
         preset: { arch: "Architecture", storage: "Storage", voice: "Voice", whiteboard: "Whiteboard" },
       },
-      dates: { startAt: "Start date", dueAt: "Due date", datePlaceholder: "YYYY-MM-DD", notSet: "Not set", clearDate: "Clear date" },
+      dates: { startAt: "Start date", dueAt: "Due date", notSet: "Not set", clearDate: "Clear date" },
       scope: { label: "Scope", all: "All", active: "Active", backlog: "Backlog", canceled: "Canceled" },
       reading: "Reading…",
       never: "Never mind",
@@ -5030,6 +5564,9 @@ export const catalogs = {
         allRepos: "All repos",
         byHelper: "By helper",
         allHelpers: "All helpers",
+        byStatus: "By status",
+        allStatuses: "All statuses",
+        todoAndInProgress: "Todo & In Progress",
         shown: "{shown} / {of}",
         clear: "Clear the filter",
         view: "View",
@@ -5039,7 +5576,7 @@ export const catalogs = {
         refreshing: "Syncing…",
       },
       marks: { priority: "Priority: {word}" },
-      sheet: { less: "Less", more: "More", at: 'At "{stage}"', stageDone: "{stage}: done" },
+      sheet: { less: "Less", more: "More" },
       acts: {
         reopened: "Ticket reopened",
         goesOn: "{helper} carries on.",
@@ -5113,10 +5650,7 @@ export const catalogs = {
         changedFiles: "Changed files",
         fileCount: "{n}",
         changesUnread: "The changes cannot be read.",
-        story: "How it got here",
-        unread: "Cannot be read.",
         full: "What to do (in full)",
-        steps: "The helper's every step",
         openTrajectory: "Full trajectory",
         runs: "Every round of work",
         time: "Time",
@@ -5142,19 +5676,6 @@ export const catalogs = {
         unsaid: "It has not said yet",
         noRuns: "No work yet.",
         runCount: "{n, plural, one {# round} other {# rounds}}",
-        stepCount: "{n, plural, one {# step} other {# steps}}",
-        stepsAndTools: "{n} steps · used {tools} tools",
-        step: {
-          "run/start": "Started",
-          "user/message": "Heard",
-          "memory/recalled": "Recalled",
-          "assistant/thinking": "Thought",
-          "assistant/message": "Said",
-          "tool/call": "Used a tool",
-          "llm/retry": "Retried",
-          "run/error": "Error",
-          "run/end": "Round over",
-        },
         orchestratorStuck: "The assistant did not finish answering this round: see what it said in its channel",
         job: "To do",
         from: "From",
@@ -5179,10 +5700,6 @@ export const catalogs = {
         refiningLine: "It is reading the code, and will fill in the fields below.",
         questions: "{n, plural, one {The draft is written, and it has a question for you} other {The draft is written, and it has # questions for you}}",
         questionsLine: "Answer below, and it drafts again by your answers.",
-        drafted: "The draft is written",
-        draftedLine: "Look it over, change what you like, and start it.",
-        what: "What should be done?",
-        whatLine: "A line is enough: a helper reads the code and writes it up as a ticket.",
         titleHint: "Such as: add Remember me to the sign-in page",
         title: "Title",
         descriptionHint: "Description: why, what to do, what not to do, which files it may touch (drafting writes it)",
@@ -5209,23 +5726,18 @@ export const catalogs = {
         inQueue: "Queued {ago}: it starts by itself in the board's order when a spot frees up.",
         unqueue: "Unqueue",
         pickHelper: "Pick a helper first",
-        start: "Confirm and dispatch",
         save: "Save",
         remove: "Delete",
         newRepo: "New repo",
         repoHint: "The repo's name, which is also its folder under the work folder",
         repoName: "Repo name",
         create: "Create",
-        writeOwn: "Write it yourself",
         edit: "Edit",
         doneEditing: "Done",
         addDescription: "Add description…",
         addCriteria: "Add acceptance criteria",
         polish: "Refine with helper",
         markReady: "Mark as Todo",
-        markDone: "Mark as Done",
-        accept: "Accept",
-        markCanceled: "Discard",
         revive: "Restore to Backlog",
         criterionToggle: 'Toggle criterion "{criterion}"',
       },
@@ -5235,7 +5747,6 @@ export const catalogs = {
         grouping: { status: "Status", repo: "Repo", agent: "Helper", none: "No grouping" },
         ordering: { manual: "Default", priority: "Priority", updated: "Last updated", created: "Created" },
         lane: { backlog: "Backlog", todo: "Todo", in_progress: "In Progress", in_review: "In Review", done: "Done", canceled: "Canceled" },
-        stage: { talk: "Talk it through", work: "Get it worked", finish: "Finish" },
         newIssue: "New ticket",
       },
       trigger: {
@@ -5295,8 +5806,6 @@ export const catalogs = {
         since: "for {span}",
         ran: "round {n}",
         used: "{span} in all",
-        noSteps: "No steps yet.",
-        stepsGone: "Work steps are kept for 30 days (session.trajectory_days in the configuration); this ticket's are cleared.",
         change: { A: { mark: "A", label: "Added" }, M: { mark: "M", label: "Modified" }, D: { mark: "D", label: "Deleted" } },
         and: ", ",
         doing: "{action}",
@@ -5323,12 +5832,8 @@ export const catalogs = {
         missingRuntime: "No ready engine configured yet. Set up an engine to draft and run tickets.",
         goRuntimes: "Configure engines",
       },
-      conversation: {
-        title: "Discussion and delivery",
-        older: "Load earlier messages",
-        empty: "Requirements, execution feedback and deliveries stay here",
-        placeholder: "Write a comment, note, or feedback…",
-      },
+      conversation: { older: "Load earlier messages", placeholder: "Write a comment, note, or feedback…" },
+      activity: { title: "Activity", empty: "Discussion, milestones, and run steps appear here" },
       attachments: {
         title: "Attachments",
         attachFile: "Attach file",
@@ -5344,9 +5849,6 @@ export const catalogs = {
         scheduledCount: "{n} scheduled",
         rolledUp: "Rolled up from sub-tickets",
         overdue: "Overdue",
-        shiftPrev: "Shift 1 day earlier",
-        shiftNext: "Shift 1 day later",
-        editDates: "Edit dates",
         scheduleToday: "Schedule today",
         emptyScheduled: "No scheduled tickets yet",
         emptyScheduledHint: "Schedule an unscheduled ticket below, or set start and due dates in ticket properties.",
@@ -5362,8 +5864,50 @@ export const catalogs = {
         newOnDate: "New ticket on {date}",
         moreItems: "{n} more",
         collapseDay: "Less",
-        scheduledBadge: "Scheduled {date}",
-        clearScheduledDate: "Clear prefilled date",
+      },
+      deps: { blockedBy: "Blocked by", pick: "Add blockers…", none: "No blockers", clear: "Clear blockers", blockedByChip: "Blocked by #{n}" },
+      triage: {
+        selected: "{n} selected",
+        selectIssue: "Select issue #{n}",
+        clear: "Clear",
+        status: "Status",
+        agent: "Helper",
+        noAgent: "Unassigned",
+        owner: "Assignee",
+        noOwner: "Clear assignee",
+        repo: "Repo",
+        noRepo: "No repo",
+        priority: "Priority",
+        tags: "Tags",
+        addTags: "Add tags",
+        replaceTags: "Replace tags",
+        updated: "Updated {n} issues",
+        partial: "Updated {ok} issues; {failed} could not be updated",
+      },
+      relations: {
+        title: "Relations",
+        pick: "Link related or duplicate…",
+        none: "No relations",
+        clear: "Clear relations",
+        related: "Related",
+        duplicate: "Duplicate",
+        relatedChip: "Related #{n}",
+        duplicateChip: "Duplicate #{n}",
+      },
+      digest: {
+        title: "Morning Digest",
+        subtitle: "Overnight progress, deterministic repo health, and backlog triage awaiting your click.",
+        refresh: "Refresh",
+        progressTitle: "1. Progress & Attention",
+        healthTitle: "2. Repo Health",
+        triageTitle: "3. Backlog Triage (Confirm to Apply)",
+        triageConfirm: "Confirm & Apply",
+        triageDismiss: "Dismiss",
+        triageEmpty: "No backlog triage suggestions right now.",
+        quiet: "No overnight progress or attention items in the selected window.",
+        runsLine: "{total} runs ({completed} completed, {failed} failed, {interrupted} interrupted)",
+        emptyHealth: "No mounted repositories yet.",
+        pendingCount: "{n} pending",
       },
     },
     "web.library": {
@@ -6231,7 +6775,17 @@ export const catalogs = {
         disconnect: "Disconnect",
       },
       tabs: { inbox: "Inbox", channels: "Channels", sessions: "Sessions", issues: "Issues" },
-      inbox: { approve: "Approve", deny: "Deny", answer: "Answer", empty: "Inbox is clear. Nothing needs your attention." },
+      inbox: {
+        approve: "Approve",
+        deny: "Deny",
+        answer: "Answer",
+        accept: "Accept",
+        reject: "Reject",
+        rejectReasonPlaceholder: "Reason for changes…",
+        retry: "Retry",
+        resume: "Resume",
+        empty: "Inbox is clear. Nothing needs your attention.",
+      },
       channel: { replyPlaceholder: "Write a reply…", send: "Send", empty: "No messages in this channel yet." },
       session: {
         promptPlaceholder: "Send instructions to this helper…",
@@ -6368,6 +6922,17 @@ export const catalogs = {
       unmounting: "Unmounting…",
       unmounted: "Unmounted {name} (files on disk were kept)",
       unmountTip: "Stop managing this external folder in VibeValley without deleting files on disk",
+      health: {
+        title: "Health",
+        open: "Open {n}",
+        inProgress: "Working {n}",
+        inReview: "Review {n}",
+        blocked: "Blocked {n}",
+        stuck: "Stuck {n}",
+        asking: "Asking {n}",
+        failedChecks: "Failed checks {n}",
+        overdue: "Overdue {n}",
+      },
     },
     "web.runtime": {
       capability: {
@@ -6446,7 +7011,7 @@ export const catalogs = {
       modelCount: "{n}",
       noModels: "This runtime does not report its models.",
       effort: "Effort",
-      unreported: "Not reported.",
+      unreported: "Not reported by this engine.",
       none: "None.",
       library: {
         book: "Skill book",
@@ -6514,9 +7079,45 @@ export const catalogs = {
       remoteSummary: "Hosted on {machine} and dispatched remotely.",
       sessions: "Related sessions",
       noSessions: "No active or recent sessions.",
+      stats: {
+        title: "Recent run summary",
+        runs: "Recent runs",
+        sessions: "{n, plural, one {# session} other {# sessions}}",
+        failureRate: "Failure rate",
+        retryRate: "Retry rate",
+        failuresDetail: "{failed} failed · {errors} errors",
+        retriesDetail: "{retried} sessions · {retries} retries",
+        cumulativeSpend: "Cumulative usage",
+        empty: "No recent runs recorded for this engine.",
+      },
       quickActions: "Quick actions",
       installation: "Installation",
       source: "Install source",
+      mcpServer: {
+        add: "Add",
+        addTitle: "Add MCP server",
+        editTitle: "Edit MCP server",
+        edit: "Edit {name}",
+        remove: "Remove {name}",
+        toggle: "Toggle {name}",
+        name: "Name",
+        nameHint: "Unique server key in the host config, such as github or context7.",
+        transport: "Transport",
+        command: "Command",
+        args: "Arguments",
+        argsHint: "Space-separated arguments passed to the command.",
+        env: "Environment variables",
+        url: "Endpoint URL",
+        headers: "HTTP headers",
+        enabled: "Enabled",
+        disabledTag: "disabled",
+        enabledTag: "enabled",
+        cancel: "Cancel",
+        save: "Save",
+        savedToast: "Saved MCP server {name}",
+        removedToast: "Removed MCP server {name}",
+        toggledToast: "{enabled, select, true {Enabled MCP server {name}} other {Disabled MCP server {name}}}",
+      },
     },
     "web.session": {
       log: {
@@ -6627,6 +7228,42 @@ export const catalogs = {
         openProfile: "Open profile",
         orchestratorRole: "Assistant",
         status: { working: "Working", listening: "Listening", resting: "Idle", done: "Done", failed: "Failed", interrupted: "Interrupted", closed: "Closed" },
+        telemetry: {
+          tokenBreakdown: "in {input} · cached {cached} · out {output}",
+          context: "Context {pct}% ({used}/{window})",
+          contextCompact: "Ctx {pct}%",
+          retries: "{n, plural, one {# retry} other {# retries}}",
+          errors: "{n, plural, one {# error} other {# errors}}",
+        },
+        recovery: {
+          resumeSame: "Resume with same config",
+          retrySame: "Retry with same config",
+          rerunOther: "Rerun with another expert/engine",
+          openWorktree: "Open Worktree Terminal",
+          resumedToast: "Resumed run with current configuration",
+          rerunTitle: "Rerun with another expert or engine",
+          rerunTarget: "Expert or engine",
+          rerunTargetPlaceholder: "Choose an expert or engine",
+          rerunNote: "Guidance for this run (optional)",
+          rerunNotePlaceholder: "Add extra context or leave blank to rerun from the current task…",
+          rerunConfirm: "Start rerun",
+          rerunStartedToast: "Started rerun with {target}",
+          resumePrompt: "Resume from the previous step and finish the task.",
+          groupExperts: "Experts",
+          groupEngines: "Engines",
+          noWorktree: "No worktree directory recorded for this session",
+        },
+        compact: { button: "Compact context", compacted: "Context compacted", skipped: "Nothing new to compact yet" },
+        codemode: {
+          button: "Run Code",
+          title: "Run CodeMode script",
+          description: "Execute deterministic JavaScript inside this durable session sandbox with `call(tool, args)`.",
+          scriptLabel: "JavaScript body",
+          scriptPlaceholder: 'const issues = call("issue_list", {}); return { count: issues.length };',
+          run: "Run script",
+          outputLabel: "Output JSON",
+          stats: "{steps} steps · {calls} tool calls · {sleeps} sleeps",
+        },
       },
       subagents: {
         heading: "Subtasks",
@@ -6749,8 +7386,20 @@ export const catalogs = {
         monoFont: "Terminal & code font",
         monoFontRow: "Terminal & code font (Nerd Font)",
         monoFontHint: "Monospace font for terminals, diffs, and file previews, with built-in Nerd Font icon fallback",
+        fontGroupInstalled: "Installed",
+        fontGroupFallback: "Fallback fonts",
+        fontSearch: "Search fonts…",
+        fontEmpty: "No matching fonts",
+        fontFallbackBadge: "Fallback",
         terminalFontSize: "Terminal font size",
         terminalFontSizeHint: "Also adjustable anytime in the terminal view with ⌘+ / ⌘- / ⌘0",
+        previewTitle: "Live Specimen",
+        previewNote: "Updates live with scale, font, and terminal size",
+        previewUiHeading: "Workbench UI",
+        previewUiBody: "Bilingual clarity · 120ms latency · 3 active sessions",
+        previewCodeHeading: "Code & Terminal",
+        fontLoadFailed: "Could not load host font and appearance settings",
+        fontApplyFailed: "Could not apply font settings",
       },
       profile: {
         intro: "Customize your display name, tagline, and avatar shown in the rail and dashboard.",
@@ -7001,8 +7650,9 @@ export const catalogs = {
       },
       section: { collapse: "Collapse {title}", expand: "Expand {title}" },
       palette: {
-        placeholder: { commands: "Type a command or jump to any page…", files: "Jump to a file…", search: "Search text in project…" },
+        placeholder: { commands: "Type a command, #issue, artifact, or run…", files: "Jump to a file…", search: "Search text in project…" },
         mode: { commands: "Commands", files: "Files", search: "Search" },
+        groups: { issues: "Issues", artifacts: "Artifacts", runs: "Trajectory Runs" },
         a11y: { commands: "Commands", files: "Files", search: "Search results" },
         searching: "Searching…",
         empty: { commands: "No matching commands.", files: "No matching files.", search: "No matching results." },
@@ -7159,15 +7809,40 @@ export const catalogs = {
       },
       moss: {
         intro:
-          "Talk to MOSS Live directly and hear how it answers; the line goes through this machine's server, and the key never leaves it. Nothing goes to the chat.",
-        talk: "Start talking",
+          "Talk live with MOSS Live or configure the MOSS key and models used for calls, speech, and dictation; audio runs through this machine's server and the key never leaves it.",
+        talk: "Start call",
         connecting: "Connecting…",
         hangUp: "Hang up",
         mute: "Mute",
         unmute: "Unmute",
+        mutedLabel: "Microphone muted",
+        readyPrompt: "Click Start call to begin a live voice session",
+        listeningPrompt: "Listening — speak naturally",
+        youLabel: "You",
+        orchestratorLabel: "Assistant",
         nativeCall: "MOSS Live call",
         nativeNotice:
-          "Starting captures your microphone and sends audio to the configured MOSS account; charges may apply. Final transcripts are recorded in the chat. Leaving this page hangs up.",
+          "Starting captures your microphone and sends audio to the configured MOSS account; charges may apply. Final transcripts are recorded in chat. Leaving this page hangs up.",
+        configTitle: "Models & API Key",
+        configNote: "Voice & Call",
+        accountLabel: "MOSS connection",
+        accountHint: "Connection backing live calls, speech, and dictation",
+        addConnection: "Add MOSS connection",
+        keyLabel: "API Key",
+        keyHint: "Stored locally in settings; takes effect when saved",
+        liveModel: "Live Call Model",
+        liveModelHint: "Used for MOSS Live calls and streaming dictation",
+        speechModel: "Speech Synthesis Model",
+        speechModelHint: "Used for agent voices and channel report playback",
+        transcriptionModel: "Transcription Model (ASR)",
+        transcriptionModelHint: "Fallback batch model for composer dictation",
+        unbound: "Not in use",
+        voicesTitle: "Available voices",
+        voicesHint: "Loaded from the saved Speech connection",
+        voicesCount: "{n} voices available",
+        voicesEmpty: "No voices returned by this connection",
+        manageAll: "Manage all connections in Models & Engines",
+        saved: "Voice settings saved",
       },
     },
   },
@@ -7237,6 +7912,17 @@ export interface Messages {
   "shared.priority.low": undefined;
   "shared.priority.medium": undefined;
   "shared.priority.urgent": undefined;
+  "shared.repoHealth.at_risk": undefined;
+  "shared.repoHealth.off_track": undefined;
+  "shared.repoHealth.on_track": undefined;
+  "shared.repoHealthReason.asking_user": undefined;
+  "shared.repoHealthReason.blocked_issues": undefined;
+  "shared.repoHealthReason.failed_checks": undefined;
+  "shared.repoHealthReason.healthy": undefined;
+  "shared.repoHealthReason.no_active_progress": undefined;
+  "shared.repoHealthReason.overdue_issues": undefined;
+  "shared.repoHealthReason.stale_activity": undefined;
+  "shared.repoHealthReason.stuck_issues": undefined;
   "shared.seconds": { readonly n: string | number };
   "shared.serverAnswered": { readonly status: string | number };
   "shared.stage.asking": undefined;
@@ -7430,10 +8116,28 @@ export interface Messages {
   "web.agent.templates.updateHint": undefined;
   "web.agent.templates.updated": undefined;
   "web.agent.templates.willUse": { readonly runtime: string | number };
+  "web.agent.toolset.artifact": undefined;
+  "web.agent.toolset.channel": undefined;
+  "web.agent.toolset.cron": undefined;
+  "web.agent.toolset.issue": undefined;
+  "web.agent.toolset.library": undefined;
+  "web.agent.toolset.media": undefined;
+  "web.agent.toolset.memory": undefined;
+  "web.agent.toolset.repo": undefined;
+  "web.agent.toolset.resource": undefined;
+  "web.agent.toolset.session": undefined;
+  "web.agent.toolsets": undefined;
+  "web.agent.toolsetsTip": undefined;
   "web.agent.unnamed": undefined;
   "web.agent.unnamedAgent": undefined;
   "web.agent.unreported": undefined;
   "web.agent.unsaved": undefined;
+  "web.agent.voice": undefined;
+  "web.agent.voiceNoSpeech": undefined;
+  "web.agent.voiceNone": undefined;
+  "web.agent.voiceSettingsAfter": undefined;
+  "web.agent.voiceSettingsLink": undefined;
+  "web.agent.voiceTip": undefined;
   "web.agent.wears": undefined;
   "web.agent.workdir": undefined;
   "web.agent.workdirHint": undefined;
@@ -7499,7 +8203,20 @@ export interface Messages {
   "web.artifact.edit.saved": { readonly version: string | number };
   "web.artifact.files.codeMode": undefined;
   "web.artifact.files.htmlPreviewMode": undefined;
+  "web.artifact.issue.empty": undefined;
+  "web.artifact.issue.linkEmpty": undefined;
+  "web.artifact.issue.linkExisting": undefined;
+  "web.artifact.issue.linkPlaceholder": undefined;
+  "web.artifact.issue.linkedToast": { readonly title: string | number };
+  "web.artifact.issue.new": undefined;
+  "web.artifact.issue.newCreate": undefined;
+  "web.artifact.issue.newDialogTitle": undefined;
+  "web.artifact.issue.newTitle": undefined;
+  "web.artifact.issue.newTitlePlaceholder": undefined;
+  "web.artifact.issue.newType": undefined;
   "web.artifact.issue.title": undefined;
+  "web.artifact.issue.unlink": { readonly title: string | number };
+  "web.artifact.issue.unlinkedToast": { readonly title: string | number };
   "web.artifact.motion.chapters": undefined;
   "web.artifact.motion.layers": { readonly n: string | number };
   "web.artifact.motion.loop": undefined;
@@ -7839,11 +8556,81 @@ export interface Messages {
   "web.base.dashboard.quick.title": undefined;
   "web.base.dashboard.recent.empty": undefined;
   "web.base.dashboard.recent.title": undefined;
+  "web.base.dashboard.retro.breakdown.bucketMeta": { readonly done: string | number; readonly overdue: string | number; readonly rework: string | number };
+  "web.base.dashboard.retro.breakdown.byAgent": undefined;
+  "web.base.dashboard.retro.breakdown.byRepo": undefined;
+  "web.base.dashboard.retro.breakdown.byTag": undefined;
+  "web.base.dashboard.retro.breakdown.empty": undefined;
+  "web.base.dashboard.retro.breakdown.medianShort": { readonly median: string | number };
+  "web.base.dashboard.retro.breakdown.noRepo": undefined;
+  "web.base.dashboard.retro.breakdown.unassigned": undefined;
+  "web.base.dashboard.retro.breakdown.untagged": undefined;
+  "web.base.dashboard.retro.copiedReport": undefined;
+  "web.base.dashboard.retro.copiedToast": undefined;
+  "web.base.dashboard.retro.copyFailed": undefined;
+  "web.base.dashboard.retro.copyReport": undefined;
+  "web.base.dashboard.retro.empty": undefined;
+  "web.base.dashboard.retro.kpi.completionRate": { readonly pct: string | number };
+  "web.base.dashboard.retro.kpi.cycleTime": undefined;
+  "web.base.dashboard.retro.kpi.dueSla": undefined;
+  "web.base.dashboard.retro.kpi.dueSub": { readonly noDue: string | number; readonly onTime: string | number; readonly overdue: string | number };
+  "web.base.dashboard.retro.kpi.medianP90": { readonly median: string | number; readonly p90: string | number };
+  "web.base.dashboard.retro.kpi.reviewWait": undefined;
+  "web.base.dashboard.retro.kpi.rework": undefined;
+  "web.base.dashboard.retro.kpi.reworkSub": { readonly findings: string | number; readonly issues: string | number; readonly unresolved: string | number };
+  "web.base.dashboard.retro.kpi.samples": { readonly n: string | number };
+  "web.base.dashboard.retro.kpi.throughput": undefined;
+  "web.base.dashboard.retro.kpi.throughputSub": { readonly canceled: string | number; readonly done: string | number; readonly open: string | number };
+  "web.base.dashboard.retro.markdown.cycleLine": { readonly median: string | number; readonly n: string | number; readonly p90: string | number };
+  "web.base.dashboard.retro.markdown.dueLine": {
+    readonly noDue: string | number;
+    readonly onTime: string | number;
+    readonly onTimeRate: string | number;
+    readonly overdue: string | number;
+  };
+  "web.base.dashboard.retro.markdown.heading": { readonly window: string | number };
+  "web.base.dashboard.retro.markdown.reviewLine": { readonly median: string | number; readonly n: string | number; readonly p90: string | number };
+  "web.base.dashboard.retro.markdown.reworkLine": {
+    readonly findings: string | number;
+    readonly issues: string | number;
+    readonly reworkRate: string | number;
+    readonly unresolved: string | number;
+  };
+  "web.base.dashboard.retro.markdown.summary": undefined;
+  "web.base.dashboard.retro.markdown.throughputLine": {
+    readonly canceled: string | number;
+    readonly done: string | number;
+    readonly open: string | number;
+    readonly total: string | number;
+  };
+  "web.base.dashboard.retro.overdue.delay": undefined;
+  "web.base.dashboard.retro.overdue.empty": undefined;
+  "web.base.dashboard.retro.overdue.issue": undefined;
+  "web.base.dashboard.retro.overdue.owner": undefined;
+  "web.base.dashboard.retro.overdue.status": undefined;
+  "web.base.dashboard.retro.overdue.title": undefined;
+  "web.base.dashboard.retro.retry": undefined;
+  "web.base.dashboard.retro.rework.allResolved": undefined;
+  "web.base.dashboard.retro.rework.empty": undefined;
+  "web.base.dashboard.retro.rework.findings": undefined;
+  "web.base.dashboard.retro.rework.issue": undefined;
+  "web.base.dashboard.retro.rework.owner": undefined;
+  "web.base.dashboard.retro.rework.status": undefined;
+  "web.base.dashboard.retro.rework.title": undefined;
+  "web.base.dashboard.retro.rework.unresolved": { readonly n: string | number };
+  "web.base.dashboard.retro.subtitle": { readonly n: string | number };
+  "web.base.dashboard.retro.title": undefined;
+  "web.base.dashboard.retro.window.14d": undefined;
+  "web.base.dashboard.retro.window.30d": undefined;
+  "web.base.dashboard.retro.window.7d": undefined;
+  "web.base.dashboard.retro.window.all": undefined;
+  "web.base.dashboard.retro.windowLabel": undefined;
   "web.base.dashboard.stats.issues": undefined;
   "web.base.dashboard.stats.review": undefined;
   "web.base.dashboard.stats.waiting": undefined;
   "web.base.dashboard.stats.working": undefined;
   "web.base.dashboard.tab.overview": undefined;
+  "web.base.dashboard.tab.retro": undefined;
   "web.base.dashboard.tab.runs": undefined;
   "web.base.dashboard.tabsLabel": undefined;
   "web.base.dashboard.title": undefined;
@@ -7867,7 +8654,6 @@ export interface Messages {
   "web.base.form.removeOnSave": undefined;
   "web.base.form.reset": undefined;
   "web.base.form.save": undefined;
-  "web.base.form.storedIn": { readonly file: string | number };
   "web.base.form.undo": undefined;
   "web.base.form.unreachable": { readonly why: string | number };
   "web.base.form.unset": undefined;
@@ -8039,6 +8825,8 @@ export interface Messages {
   "web.channel.commands.remember.name": undefined;
   "web.channel.commands.remember.needs": undefined;
   "web.channel.commands.remember.note": undefined;
+  "web.channel.commands.skillArgs": undefined;
+  "web.channel.commands.skillNote": undefined;
   "web.channel.commands.stop.args": undefined;
   "web.channel.commands.stop.name": undefined;
   "web.channel.commands.stop.needs": undefined;
@@ -8050,6 +8838,11 @@ export interface Messages {
   "web.channel.composer.cancelReply": undefined;
   "web.channel.composer.clearContext": undefined;
   "web.channel.composer.command": undefined;
+  "web.channel.composer.dictateConnecting": undefined;
+  "web.channel.composer.dictateFinishing": undefined;
+  "web.channel.composer.dictateListening": undefined;
+  "web.channel.composer.dictateStart": undefined;
+  "web.channel.composer.dictateStop": undefined;
   "web.channel.composer.mention": undefined;
   "web.channel.composer.notSent": { readonly why: string | number };
   "web.channel.composer.replying": { readonly name: string | number };
@@ -8119,6 +8912,8 @@ export interface Messages {
   "web.channel.issues.thread": undefined;
   "web.channel.lacks": { readonly why: string | number };
   "web.channel.lacksFix": undefined;
+  "web.channel.listenReports": undefined;
+  "web.channel.listenReportsActive": undefined;
   "web.channel.manage.archive": undefined;
   "web.channel.manage.archiveHint": undefined;
   "web.channel.manage.archivedTitle": undefined;
@@ -8191,6 +8986,8 @@ export interface Messages {
   "web.channel.more.jump": undefined;
   "web.channel.more.label": undefined;
   "web.channel.more.markUnread": undefined;
+  "web.channel.more.promoteIssue": undefined;
+  "web.channel.more.saveArtifact": undefined;
   "web.channel.names.everyone": undefined;
   "web.channel.names.everyoneNote": undefined;
   "web.channel.names.issueThread": undefined;
@@ -8208,6 +9005,15 @@ export interface Messages {
   "web.channel.pins.none": undefined;
   "web.channel.pins.open": undefined;
   "web.channel.pins.title": undefined;
+  "web.channel.promote.artifactContent": undefined;
+  "web.channel.promote.artifactNote": { readonly where: string | number };
+  "web.channel.promote.artifactSave": undefined;
+  "web.channel.promote.artifactSaved": { readonly title: string | number };
+  "web.channel.promote.artifactTitle": undefined;
+  "web.channel.promote.artifactType": undefined;
+  "web.channel.promote.fallbackTitle": { readonly number: string | number };
+  "web.channel.promote.saveTitle": undefined;
+  "web.channel.promote.source": { readonly where: string | number };
   "web.channel.replies": { readonly n: number };
   "web.channel.reply": undefined;
   "web.channel.runsEntry": undefined;
@@ -8304,17 +9110,28 @@ export interface Messages {
   "web.devtools.actions.apply": undefined;
   "web.devtools.actions.autoRefresh": undefined;
   "web.devtools.actions.clear": undefined;
+  "web.devtools.actions.clearHighlight": undefined;
   "web.devtools.actions.close": undefined;
   "web.devtools.actions.copied": undefined;
   "web.devtools.actions.copy": undefined;
   "web.devtools.actions.detach": undefined;
   "web.devtools.actions.disconnect": undefined;
   "web.devtools.actions.exportBundle": undefined;
+  "web.devtools.actions.exportTrajectory": undefined;
   "web.devtools.actions.exporting": undefined;
+  "web.devtools.actions.inspect": undefined;
+  "web.devtools.actions.inspectCancel": undefined;
+  "web.devtools.actions.jumpToSource": undefined;
+  "web.devtools.actions.jumpToTimeline": undefined;
+  "web.devtools.actions.jumpToTrajectory": undefined;
   "web.devtools.actions.pause": undefined;
   "web.devtools.actions.refresh": undefined;
   "web.devtools.actions.reset": undefined;
   "web.devtools.actions.resume": undefined;
+  "web.devtools.inspector.active": undefined;
+  "web.devtools.inspector.noSource": undefined;
+  "web.devtools.inspector.surface": undefined;
+  "web.devtools.inspector.title": undefined;
   "web.devtools.lab.applied": undefined;
   "web.devtools.lab.disconnectTopic": undefined;
   "web.devtools.lab.disconnectTopicPlaceholder": undefined;
@@ -8411,16 +9228,22 @@ export interface Messages {
   "web.devtools.state.artifacts": undefined;
   "web.devtools.state.caches": undefined;
   "web.devtools.state.channels": undefined;
+  "web.devtools.state.collab": undefined;
   "web.devtools.state.counts": undefined;
   "web.devtools.state.emptyCaches": undefined;
+  "web.devtools.state.emptyCollab": undefined;
   "web.devtools.state.entries": { readonly count: string | number };
+  "web.devtools.state.frontiers": undefined;
   "web.devtools.state.inbox": undefined;
   "web.devtools.state.issues": undefined;
   "web.devtools.state.mediaJobs": undefined;
+  "web.devtools.state.noPeers": undefined;
+  "web.devtools.state.presence": undefined;
   "web.devtools.state.repos": undefined;
   "web.devtools.state.seq": undefined;
   "web.devtools.state.sessions": undefined;
   "web.devtools.state.slices": undefined;
+  "web.devtools.state.ttl": { readonly ms: string | number };
   "web.devtools.state.watchers": { readonly count: string | number };
   "web.devtools.status.disabled": undefined;
   "web.devtools.status.empty": undefined;
@@ -8441,16 +9264,21 @@ export interface Messages {
   "web.devtools.timeline.slow": undefined;
   "web.devtools.timeline.slowOnly": undefined;
   "web.devtools.title": undefined;
+  "web.devtools.trajectory.allAgents": undefined;
   "web.devtools.trajectory.emptyList": undefined;
   "web.devtools.trajectory.events": undefined;
+  "web.devtools.trajectory.exported": { readonly dir: string | number };
+  "web.devtools.trajectory.inspectCmd": undefined;
   "web.devtools.trajectory.kind.issueSession": undefined;
   "web.devtools.trajectory.kind.orchestrator": undefined;
   "web.devtools.trajectory.kind.workspaceChat": undefined;
   "web.devtools.trajectory.prompt": undefined;
   "web.devtools.trajectory.rawEntries": undefined;
   "web.devtools.trajectory.rawPayload": undefined;
+  "web.devtools.trajectory.replayCmd": undefined;
   "web.devtools.trajectory.selectPrompt": undefined;
   "web.devtools.trajectory.silentError": undefined;
+  "web.devtools.trajectory.subagentTree": undefined;
   "web.devtools.trajectory.subagents": undefined;
   "web.devtools.trajectory.systemPrompt": undefined;
   "web.devtools.trajectory.tokens": undefined;
@@ -8463,6 +9291,8 @@ export interface Messages {
   "web.farm.chat.fold": undefined;
   "web.farm.chat.greeting": undefined;
   "web.farm.chat.send": undefined;
+  "web.farm.daily.progress": { readonly progress: string | number; readonly reward: string | number; readonly target: string | number };
+  "web.farm.daily.settled": { readonly n: string | number };
   "web.farm.harvest.counts": { readonly commits: string | number; readonly files: string | number };
   "web.farm.harvest.letGo": undefined;
   "web.farm.harvest.repo": { readonly repo: string | number };
@@ -8470,6 +9300,8 @@ export interface Messages {
   "web.farm.harvest.take": { readonly base: string | number };
   "web.farm.hud.backToYard": undefined;
   "web.farm.hud.closeRoof": undefined;
+  "web.farm.hud.coins": { readonly n: string | number };
+  "web.farm.hud.daily": { readonly done: string | number; readonly total: string | number };
   "web.farm.hud.dawn": undefined;
   "web.farm.hud.dusk": undefined;
   "web.farm.hud.enter": undefined;
@@ -8478,12 +9310,14 @@ export interface Messages {
   "web.farm.hud.noon": undefined;
   "web.farm.hud.phone": undefined;
   "web.farm.hud.resetCamera": undefined;
+  "web.farm.hud.shop": undefined;
   "web.farm.hud.workbench": undefined;
   "web.farm.menu.issues": undefined;
   "web.farm.menu.repos": undefined;
   "web.farm.native.close": undefined;
   "web.farm.native.loading": undefined;
   "web.farm.panel.harvest": { readonly name: string | number };
+  "web.farm.panel.shop": undefined;
   "web.farm.panel.sow": { readonly plot: string | number };
   "web.farm.panel.water": { readonly name: string | number };
   "web.farm.phone.again": undefined;
@@ -8582,6 +9416,18 @@ export interface Messages {
   "web.farm.phone.sokoban.undo": undefined;
   "web.farm.phone.start": undefined;
   "web.farm.plotOf": { readonly name: string | number };
+  "web.farm.shop.buy": undefined;
+  "web.farm.shop.coins": { readonly n: string | number };
+  "web.farm.shop.decorations": undefined;
+  "web.farm.shop.decorationsNote": undefined;
+  "web.farm.shop.owned": undefined;
+  "web.farm.shop.price": { readonly n: string | number };
+  "web.farm.shop.retry": undefined;
+  "web.farm.shop.settledToday": { readonly n: string | number };
+  "web.farm.shop.templates": undefined;
+  "web.farm.shop.templatesNote": undefined;
+  "web.farm.shop.todayTasks": undefined;
+  "web.farm.shop.useNow": undefined;
   "web.farm.sow.draft": undefined;
   "web.farm.sow.homeless": undefined;
   "web.farm.sow.how": { readonly repo: string | number };
@@ -8611,6 +9457,8 @@ export interface Messages {
   "web.inbox.tray.off": undefined;
   "web.inbox.tray.unread": { readonly n: string | number };
   "web.inbox.tray.working": { readonly n: number };
+  "web.issue.activity.empty": undefined;
+  "web.issue.activity.title": undefined;
   "web.issue.acts.carry": undefined;
   "web.issue.acts.goesOn": { readonly helper: string | number };
   "web.issue.acts.moving": undefined;
@@ -8666,21 +9514,16 @@ export interface Messages {
   "web.issue.boardLabels.ordering.manual": undefined;
   "web.issue.boardLabels.ordering.priority": undefined;
   "web.issue.boardLabels.ordering.updated": undefined;
-  "web.issue.boardLabels.stage.finish": undefined;
-  "web.issue.boardLabels.stage.talk": undefined;
-  "web.issue.boardLabels.stage.work": undefined;
   "web.issue.boardLabels.view.board": undefined;
   "web.issue.boardLabels.view.calendar": undefined;
   "web.issue.boardLabels.view.list": undefined;
   "web.issue.boardLabels.view.timeline": undefined;
-  "web.issue.calendar.clearScheduledDate": undefined;
   "web.issue.calendar.collapseDay": undefined;
   "web.issue.calendar.monthTitle": { readonly month: string | number; readonly year: string | number };
   "web.issue.calendar.moreItems": { readonly n: string | number };
   "web.issue.calendar.newOnDate": { readonly date: string | number };
   "web.issue.calendar.nextMonth": undefined;
   "web.issue.calendar.prevMonth": undefined;
-  "web.issue.calendar.scheduledBadge": { readonly date: string | number };
   "web.issue.card.assignHelper": undefined;
   "web.issue.card.cron": undefined;
   "web.issue.card.draft": undefined;
@@ -8730,15 +9573,17 @@ export interface Messages {
   "web.issue.close.stopAndCancel": undefined;
   "web.issue.close.title": { readonly issue: string | number };
   "web.issue.close.working": { readonly who: string | number };
-  "web.issue.conversation.empty": undefined;
   "web.issue.conversation.older": undefined;
   "web.issue.conversation.placeholder": undefined;
-  "web.issue.conversation.title": undefined;
   "web.issue.dates.clearDate": undefined;
-  "web.issue.dates.datePlaceholder": undefined;
   "web.issue.dates.dueAt": undefined;
   "web.issue.dates.notSet": undefined;
   "web.issue.dates.startAt": undefined;
+  "web.issue.deps.blockedBy": undefined;
+  "web.issue.deps.blockedByChip": { readonly n: string | number };
+  "web.issue.deps.clear": undefined;
+  "web.issue.deps.none": undefined;
+  "web.issue.deps.pick": undefined;
   "web.issue.detail.answer": undefined;
   "web.issue.detail.answerTo": { readonly question: string | number };
   "web.issue.detail.answered": undefined;
@@ -8791,19 +9636,6 @@ export interface Messages {
   "web.issue.detail.since": { readonly clock: string | number };
   "web.issue.detail.started": undefined;
   "web.issue.detail.status": undefined;
-  "web.issue.detail.step.assistant/message": undefined;
-  "web.issue.detail.step.assistant/thinking": undefined;
-  "web.issue.detail.step.llm/retry": undefined;
-  "web.issue.detail.step.memory/recalled": undefined;
-  "web.issue.detail.step.run/end": undefined;
-  "web.issue.detail.step.run/error": undefined;
-  "web.issue.detail.step.run/start": undefined;
-  "web.issue.detail.step.tool/call": undefined;
-  "web.issue.detail.step.user/message": undefined;
-  "web.issue.detail.stepCount": { readonly n: number };
-  "web.issue.detail.steps": undefined;
-  "web.issue.detail.stepsAndTools": { readonly n: string | number; readonly tools: string | number };
-  "web.issue.detail.story": undefined;
   "web.issue.detail.tell": { readonly who: string | number };
   "web.issue.detail.tellIdle": undefined;
   "web.issue.detail.tellSection": undefined;
@@ -8812,12 +9644,29 @@ export interface Messages {
   "web.issue.detail.time": undefined;
   "web.issue.detail.took": undefined;
   "web.issue.detail.trail": undefined;
-  "web.issue.detail.unread": undefined;
   "web.issue.detail.unsaid": undefined;
   "web.issue.detail.unsure": undefined;
   "web.issue.detail.waiting": undefined;
   "web.issue.detail.who": undefined;
   "web.issue.detail.yours": undefined;
+  "web.issue.digest.emptyHealth": undefined;
+  "web.issue.digest.healthTitle": undefined;
+  "web.issue.digest.pendingCount": { readonly n: string | number };
+  "web.issue.digest.progressTitle": undefined;
+  "web.issue.digest.quiet": undefined;
+  "web.issue.digest.refresh": undefined;
+  "web.issue.digest.runsLine": {
+    readonly completed: string | number;
+    readonly failed: string | number;
+    readonly interrupted: string | number;
+    readonly total: string | number;
+  };
+  "web.issue.digest.subtitle": undefined;
+  "web.issue.digest.title": undefined;
+  "web.issue.digest.triageConfirm": undefined;
+  "web.issue.digest.triageDismiss": undefined;
+  "web.issue.digest.triageEmpty": undefined;
+  "web.issue.digest.triageTitle": undefined;
   "web.issue.display.boardNote": undefined;
   "web.issue.display.defaultNote": undefined;
   "web.issue.display.group": undefined;
@@ -8829,9 +9678,22 @@ export interface Messages {
   "web.issue.error.missingApiKey": undefined;
   "web.issue.family.children": undefined;
   "web.issue.family.clearParent": undefined;
+  "web.issue.family.compactProgress": { readonly done: string | number; readonly total: string | number };
   "web.issue.family.noParent": undefined;
   "web.issue.family.parent": undefined;
   "web.issue.family.subProgress": { readonly done: string | number; readonly total: string | number };
+  "web.issue.groupBy.agent": undefined;
+  "web.issue.groupBy.label": undefined;
+  "web.issue.groupBy.noParent": undefined;
+  "web.issue.groupBy.none": undefined;
+  "web.issue.groupBy.owner": undefined;
+  "web.issue.groupBy.parent": undefined;
+  "web.issue.groupBy.priority": undefined;
+  "web.issue.groupBy.repo": undefined;
+  "web.issue.hierarchy.all": undefined;
+  "web.issue.hierarchy.label": undefined;
+  "web.issue.hierarchy.parents_only": undefined;
+  "web.issue.hierarchy.top_level": undefined;
   "web.issue.issue.and": undefined;
   "web.issue.issue.asking": { readonly n: number; readonly who: string | number };
   "web.issue.issue.askingLine": undefined;
@@ -8868,7 +9730,6 @@ export interface Messages {
   "web.issue.issue.interrupted": undefined;
   "web.issue.issue.justNow": undefined;
   "web.issue.issue.main": undefined;
-  "web.issue.issue.noSteps": undefined;
   "web.issue.issue.quiet": { readonly who: string | number };
   "web.issue.issue.quietLine": undefined;
   "web.issue.issue.ran": { readonly n: string | number };
@@ -8876,7 +9737,6 @@ export interface Messages {
   "web.issue.issue.reviewAfterFailedCheck": undefined;
   "web.issue.issue.reviewed": undefined;
   "web.issue.issue.since": { readonly span: string | number };
-  "web.issue.issue.stepsGone": undefined;
   "web.issue.issue.stuck": undefined;
   "web.issue.issue.used": { readonly span: string | number };
   "web.issue.issue.who": { readonly name: string | number };
@@ -8906,11 +9766,22 @@ export interface Messages {
   "web.issue.new.words": undefined;
   "web.issue.noHelper": undefined;
   "web.issue.orchestrator": undefined;
+  "web.issue.owner.clear": undefined;
+  "web.issue.owner.expertsGroup": undefined;
+  "web.issue.owner.label": undefined;
+  "web.issue.owner.peopleGroup": undefined;
+  "web.issue.owner.pick": undefined;
+  "web.issue.owner.search": undefined;
+  "web.issue.owner.self": undefined;
+  "web.issue.owner.selfNamed": { readonly name: string | number };
+  "web.issue.owner.unassigned": undefined;
   "web.issue.page.allHelpers": undefined;
   "web.issue.page.allRepos": undefined;
+  "web.issue.page.allStatuses": undefined;
   "web.issue.page.backToBoard": undefined;
   "web.issue.page.byHelper": undefined;
   "web.issue.page.byRepo": undefined;
+  "web.issue.page.byStatus": undefined;
   "web.issue.page.clear": undefined;
   "web.issue.page.filter": undefined;
   "web.issue.page.find": undefined;
@@ -8924,11 +9795,20 @@ export interface Messages {
   "web.issue.page.refresh": undefined;
   "web.issue.page.refreshing": undefined;
   "web.issue.page.shown": { readonly of: string | number; readonly shown: string | number };
+  "web.issue.page.todoAndInProgress": undefined;
   "web.issue.page.view": undefined;
   "web.issue.peek.close": undefined;
   "web.issue.peek.compareBadge": undefined;
   "web.issue.peek.expand": undefined;
   "web.issue.reading": undefined;
+  "web.issue.relations.clear": undefined;
+  "web.issue.relations.duplicate": undefined;
+  "web.issue.relations.duplicateChip": { readonly n: string | number };
+  "web.issue.relations.none": undefined;
+  "web.issue.relations.pick": undefined;
+  "web.issue.relations.related": undefined;
+  "web.issue.relations.relatedChip": { readonly n: string | number };
+  "web.issue.relations.title": undefined;
   "web.issue.reopen.line": { readonly issue: string | number };
   "web.issue.reopen.reopen": undefined;
   "web.issue.reopen.title": undefined;
@@ -8943,10 +9823,8 @@ export interface Messages {
   "web.issue.scope.backlog": undefined;
   "web.issue.scope.canceled": undefined;
   "web.issue.scope.label": undefined;
-  "web.issue.sheet.at": { readonly stage: string | number };
   "web.issue.sheet.less": undefined;
   "web.issue.sheet.more": undefined;
-  "web.issue.sheet.stageDone": { readonly stage: string | number };
   "web.issue.tags.add": undefined;
   "web.issue.tags.allTags": undefined;
   "web.issue.tags.byTag": undefined;
@@ -8960,7 +9838,6 @@ export interface Messages {
   "web.issue.tags.remove": { readonly tag: string | number };
   "web.issue.task.repo": undefined;
   "web.issue.task.written": undefined;
-  "web.issue.timeline.editDates": undefined;
   "web.issue.timeline.emptyScheduled": undefined;
   "web.issue.timeline.emptyScheduledHint": undefined;
   "web.issue.timeline.issuesColumn": undefined;
@@ -8972,8 +9849,6 @@ export interface Messages {
   "web.issue.timeline.scale.week": undefined;
   "web.issue.timeline.scheduleToday": undefined;
   "web.issue.timeline.scheduledCount": { readonly n: string | number };
-  "web.issue.timeline.shiftNext": undefined;
-  "web.issue.timeline.shiftPrev": undefined;
   "web.issue.timeline.today": undefined;
   "web.issue.timeline.unscheduled": { readonly n: string | number };
   "web.issue.timeline.unscheduledTitle": undefined;
@@ -8984,7 +9859,6 @@ export interface Messages {
   "web.issue.timeline.weekday.thu": undefined;
   "web.issue.timeline.weekday.tue": undefined;
   "web.issue.timeline.weekday.wed": undefined;
-  "web.issue.todo.accept": undefined;
   "web.issue.todo.addCriteria": undefined;
   "web.issue.todo.addDescription": undefined;
   "web.issue.todo.againHint": undefined;
@@ -8999,13 +9873,9 @@ export interface Messages {
   "web.issue.todo.doneEditing": undefined;
   "web.issue.todo.draft": undefined;
   "web.issue.todo.draftStatus": undefined;
-  "web.issue.todo.drafted": undefined;
-  "web.issue.todo.draftedLine": undefined;
   "web.issue.todo.edit": undefined;
   "web.issue.todo.firstRepo": undefined;
   "web.issue.todo.inQueue": { readonly ago: string | number };
-  "web.issue.todo.markCanceled": undefined;
-  "web.issue.todo.markDone": undefined;
   "web.issue.todo.markReady": undefined;
   "web.issue.todo.mountLocalLink": undefined;
   "web.issue.todo.newRepo": undefined;
@@ -9025,19 +9895,31 @@ export interface Messages {
   "web.issue.todo.repoName": undefined;
   "web.issue.todo.revive": undefined;
   "web.issue.todo.save": undefined;
-  "web.issue.todo.start": undefined;
   "web.issue.todo.status": undefined;
   "web.issue.todo.talk": undefined;
   "web.issue.todo.title": undefined;
   "web.issue.todo.titleHint": undefined;
   "web.issue.todo.todoStatus": undefined;
   "web.issue.todo.unqueue": undefined;
-  "web.issue.todo.what": undefined;
   "web.issue.todo.whatHint": undefined;
   "web.issue.todo.whatLabel": undefined;
-  "web.issue.todo.whatLine": undefined;
   "web.issue.todo.whichRepo": undefined;
-  "web.issue.todo.writeOwn": undefined;
+  "web.issue.triage.addTags": undefined;
+  "web.issue.triage.agent": undefined;
+  "web.issue.triage.clear": undefined;
+  "web.issue.triage.noAgent": undefined;
+  "web.issue.triage.noOwner": undefined;
+  "web.issue.triage.noRepo": undefined;
+  "web.issue.triage.owner": undefined;
+  "web.issue.triage.partial": { readonly failed: string | number; readonly ok: string | number };
+  "web.issue.triage.priority": undefined;
+  "web.issue.triage.replaceTags": undefined;
+  "web.issue.triage.repo": undefined;
+  "web.issue.triage.selectIssue": { readonly n: string | number };
+  "web.issue.triage.selected": { readonly n: string | number };
+  "web.issue.triage.status": undefined;
+  "web.issue.triage.tags": undefined;
+  "web.issue.triage.updated": { readonly n: string | number };
   "web.issue.trigger.comment": undefined;
   "web.issue.trigger.commentNumbered": { readonly id: string | number };
   "web.issue.trigger.cron": undefined;
@@ -9895,10 +10777,15 @@ export interface Messages {
   "web.remote.devices.platform.sandbox": undefined;
   "web.remote.devices.revoke": undefined;
   "web.remote.devices.title": undefined;
+  "web.remote.inbox.accept": undefined;
   "web.remote.inbox.answer": undefined;
   "web.remote.inbox.approve": undefined;
   "web.remote.inbox.deny": undefined;
   "web.remote.inbox.empty": undefined;
+  "web.remote.inbox.reject": undefined;
+  "web.remote.inbox.rejectReasonPlaceholder": undefined;
+  "web.remote.inbox.resume": undefined;
+  "web.remote.inbox.retry": undefined;
   "web.remote.issue.approve": undefined;
   "web.remote.issue.changes": undefined;
   "web.remote.issue.comment": undefined;
@@ -9979,6 +10866,15 @@ export interface Messages {
   "web.repo.github": undefined;
   "web.repo.githubAddress": undefined;
   "web.repo.githubHint": undefined;
+  "web.repo.health.asking": { readonly n: string | number };
+  "web.repo.health.blocked": { readonly n: string | number };
+  "web.repo.health.failedChecks": { readonly n: string | number };
+  "web.repo.health.inProgress": { readonly n: string | number };
+  "web.repo.health.inReview": { readonly n: string | number };
+  "web.repo.health.open": { readonly n: string | number };
+  "web.repo.health.overdue": { readonly n: string | number };
+  "web.repo.health.stuck": { readonly n: string | number };
+  "web.repo.health.title": undefined;
   "web.repo.how": undefined;
   "web.repo.inYear": undefined;
   "web.repo.initGit": undefined;
@@ -10139,6 +11035,29 @@ export interface Messages {
   "web.runtime.maxWorking": undefined;
   "web.runtime.maxWorkingHint": undefined;
   "web.runtime.mcp": undefined;
+  "web.runtime.mcpServer.add": undefined;
+  "web.runtime.mcpServer.addTitle": undefined;
+  "web.runtime.mcpServer.args": undefined;
+  "web.runtime.mcpServer.argsHint": undefined;
+  "web.runtime.mcpServer.cancel": undefined;
+  "web.runtime.mcpServer.command": undefined;
+  "web.runtime.mcpServer.disabledTag": undefined;
+  "web.runtime.mcpServer.edit": { readonly name: string | number };
+  "web.runtime.mcpServer.editTitle": undefined;
+  "web.runtime.mcpServer.enabled": undefined;
+  "web.runtime.mcpServer.enabledTag": undefined;
+  "web.runtime.mcpServer.env": undefined;
+  "web.runtime.mcpServer.headers": undefined;
+  "web.runtime.mcpServer.name": undefined;
+  "web.runtime.mcpServer.nameHint": undefined;
+  "web.runtime.mcpServer.remove": { readonly name: string | number };
+  "web.runtime.mcpServer.removedToast": { readonly name: string | number };
+  "web.runtime.mcpServer.save": undefined;
+  "web.runtime.mcpServer.savedToast": { readonly name: string | number };
+  "web.runtime.mcpServer.toggle": { readonly name: string | number };
+  "web.runtime.mcpServer.toggledToast": { readonly enabled: boolean; readonly name: string | number };
+  "web.runtime.mcpServer.transport": undefined;
+  "web.runtime.mcpServer.url": undefined;
   "web.runtime.modelCount": { readonly n: string | number };
   "web.runtime.models": undefined;
   "web.runtime.noEffort": undefined;
@@ -10179,6 +11098,15 @@ export interface Messages {
   "web.runtime.source": undefined;
   "web.runtime.spentToday": { readonly spent: string | number };
   "web.runtime.spentTodayBudget": { readonly budget: string | number; readonly spent: string | number };
+  "web.runtime.stats.cumulativeSpend": undefined;
+  "web.runtime.stats.empty": undefined;
+  "web.runtime.stats.failureRate": undefined;
+  "web.runtime.stats.failuresDetail": { readonly errors: string | number; readonly failed: string | number };
+  "web.runtime.stats.retriesDetail": { readonly retried: string | number; readonly retries: string | number };
+  "web.runtime.stats.retryRate": undefined;
+  "web.runtime.stats.runs": undefined;
+  "web.runtime.stats.sessions": { readonly n: number };
+  "web.runtime.stats.title": undefined;
   "web.runtime.steer": undefined;
   "web.runtime.subscription": { readonly tier: string | number };
   "web.runtime.tools": undefined;
@@ -10192,6 +11120,17 @@ export interface Messages {
   "web.session.hub.back": undefined;
   "web.session.hub.clear": undefined;
   "web.session.hub.clearFilter": undefined;
+  "web.session.hub.codemode.button": undefined;
+  "web.session.hub.codemode.description": undefined;
+  "web.session.hub.codemode.outputLabel": undefined;
+  "web.session.hub.codemode.run": undefined;
+  "web.session.hub.codemode.scriptLabel": undefined;
+  "web.session.hub.codemode.scriptPlaceholder": undefined;
+  "web.session.hub.codemode.stats": { readonly calls: string | number; readonly sleeps: string | number; readonly steps: string | number };
+  "web.session.hub.codemode.title": undefined;
+  "web.session.hub.compact.button": undefined;
+  "web.session.hub.compact.compacted": undefined;
+  "web.session.hub.compact.skipped": undefined;
   "web.session.hub.empty": undefined;
   "web.session.hub.emptyFiltered": undefined;
   "web.session.hub.filterAgent": { readonly name: string | number };
@@ -10201,6 +11140,22 @@ export interface Messages {
   "web.session.hub.openProfile": undefined;
   "web.session.hub.orchestratorRole": undefined;
   "web.session.hub.pick": undefined;
+  "web.session.hub.recovery.groupEngines": undefined;
+  "web.session.hub.recovery.groupExperts": undefined;
+  "web.session.hub.recovery.noWorktree": undefined;
+  "web.session.hub.recovery.openWorktree": undefined;
+  "web.session.hub.recovery.rerunConfirm": undefined;
+  "web.session.hub.recovery.rerunNote": undefined;
+  "web.session.hub.recovery.rerunNotePlaceholder": undefined;
+  "web.session.hub.recovery.rerunOther": undefined;
+  "web.session.hub.recovery.rerunStartedToast": { readonly target: string | number };
+  "web.session.hub.recovery.rerunTarget": undefined;
+  "web.session.hub.recovery.rerunTargetPlaceholder": undefined;
+  "web.session.hub.recovery.rerunTitle": undefined;
+  "web.session.hub.recovery.resumePrompt": undefined;
+  "web.session.hub.recovery.resumeSame": undefined;
+  "web.session.hub.recovery.resumedToast": undefined;
+  "web.session.hub.recovery.retrySame": undefined;
   "web.session.hub.scope.active": undefined;
   "web.session.hub.scope.all": undefined;
   "web.session.hub.scope.orchestrator": undefined;
@@ -10215,6 +11170,11 @@ export interface Messages {
   "web.session.hub.status.listening": undefined;
   "web.session.hub.status.resting": undefined;
   "web.session.hub.status.working": undefined;
+  "web.session.hub.telemetry.context": { readonly pct: string | number; readonly used: string | number; readonly window: string | number };
+  "web.session.hub.telemetry.contextCompact": { readonly pct: string | number };
+  "web.session.hub.telemetry.errors": { readonly n: number };
+  "web.session.hub.telemetry.retries": { readonly n: number };
+  "web.session.hub.telemetry.tokenBreakdown": { readonly cached: string | number; readonly input: string | number; readonly output: string | number };
   "web.session.log.all": undefined;
   "web.session.log.failed": undefined;
   "web.session.log.farm": undefined;
@@ -10377,6 +11337,13 @@ export interface Messages {
   "web.setting.about.workingQuestion": { readonly n: string | number };
   "web.setting.about.worktrees": undefined;
   "web.setting.about.worktreesHint": undefined;
+  "web.setting.appearance.fontApplyFailed": undefined;
+  "web.setting.appearance.fontEmpty": undefined;
+  "web.setting.appearance.fontFallbackBadge": undefined;
+  "web.setting.appearance.fontGroupFallback": undefined;
+  "web.setting.appearance.fontGroupInstalled": undefined;
+  "web.setting.appearance.fontLoadFailed": undefined;
+  "web.setting.appearance.fontSearch": undefined;
   "web.setting.appearance.intro": undefined;
   "web.setting.appearance.monoFont": undefined;
   "web.setting.appearance.monoFontHint": undefined;
@@ -10386,6 +11353,11 @@ export interface Messages {
   "web.setting.appearance.motionOption.off": undefined;
   "web.setting.appearance.motionOption.on": undefined;
   "web.setting.appearance.motionOption.system": undefined;
+  "web.setting.appearance.previewCodeHeading": undefined;
+  "web.setting.appearance.previewNote": undefined;
+  "web.setting.appearance.previewTitle": undefined;
+  "web.setting.appearance.previewUiBody": undefined;
+  "web.setting.appearance.previewUiHeading": undefined;
   "web.setting.appearance.scale": undefined;
   "web.setting.appearance.scaleHint": undefined;
   "web.setting.appearance.terminalFontSize": undefined;
@@ -10682,6 +11654,9 @@ export interface Messages {
   "web.shell.palette.footer.close": undefined;
   "web.shell.palette.footer.run": undefined;
   "web.shell.palette.footer.select": undefined;
+  "web.shell.palette.groups.artifacts": undefined;
+  "web.shell.palette.groups.issues": undefined;
+  "web.shell.palette.groups.runs": undefined;
   "web.shell.palette.mode.commands": undefined;
   "web.shell.palette.mode.files": undefined;
   "web.shell.palette.mode.search": undefined;
@@ -10786,14 +11761,39 @@ export interface Messages {
   "web.shell.swarm.transcriptRefresh": undefined;
   "web.shell.swarm.transcriptThinking": undefined;
   "web.shell.swarm.transcriptTitle": undefined;
+  "web.voice.moss.accountHint": undefined;
+  "web.voice.moss.accountLabel": undefined;
+  "web.voice.moss.addConnection": undefined;
+  "web.voice.moss.configNote": undefined;
+  "web.voice.moss.configTitle": undefined;
   "web.voice.moss.connecting": undefined;
   "web.voice.moss.hangUp": undefined;
   "web.voice.moss.intro": undefined;
+  "web.voice.moss.keyHint": undefined;
+  "web.voice.moss.keyLabel": undefined;
+  "web.voice.moss.listeningPrompt": undefined;
+  "web.voice.moss.liveModel": undefined;
+  "web.voice.moss.liveModelHint": undefined;
+  "web.voice.moss.manageAll": undefined;
   "web.voice.moss.mute": undefined;
+  "web.voice.moss.mutedLabel": undefined;
   "web.voice.moss.nativeCall": undefined;
   "web.voice.moss.nativeNotice": undefined;
+  "web.voice.moss.orchestratorLabel": undefined;
+  "web.voice.moss.readyPrompt": undefined;
+  "web.voice.moss.saved": undefined;
+  "web.voice.moss.speechModel": undefined;
+  "web.voice.moss.speechModelHint": undefined;
   "web.voice.moss.talk": undefined;
+  "web.voice.moss.transcriptionModel": undefined;
+  "web.voice.moss.transcriptionModelHint": undefined;
+  "web.voice.moss.unbound": undefined;
   "web.voice.moss.unmute": undefined;
+  "web.voice.moss.voicesCount": { readonly n: string | number };
+  "web.voice.moss.voicesEmpty": undefined;
+  "web.voice.moss.voicesHint": undefined;
+  "web.voice.moss.voicesTitle": undefined;
+  "web.voice.moss.youLabel": undefined;
   "web.voice.voice.moss.checking": undefined;
   "web.voice.voice.moss.ok": undefined;
   "web.voice.voice.moss.verify": undefined;

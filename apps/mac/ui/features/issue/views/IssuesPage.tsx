@@ -1,8 +1,10 @@
-import { cleanup, keymap, Scroll, signal, Text, View, type JSX } from "nsh";
+import { cleanup, keymap, Scroll, signal, Text, untracked, View, windowSize, type JSX } from "nsh";
+import { Popover } from "nsh/base";
 
 import { list, t } from "@vibevalley/i18n";
 import type { Issue, Session } from "@vibevalley/protocol";
 import { assignedAgentOf, omitUndefined } from "@vibevalley/protocol/rules";
+import { IssueStatus as IssueStatusSchema } from "@vibevalley/protocol/schema";
 
 import { createAct } from "../../../design/act";
 import { Button } from "../../../design/Button";
@@ -11,6 +13,7 @@ import { Icon } from "../../../design/Icon";
 import { IconButton } from "../../../design/IconButton";
 import { motionClass, motionDuration } from "../../../design/motion";
 import { Segmented } from "../../../design/Segmented";
+import { CountPill } from "../../../design/Tag";
 import { Bubble } from "../../../design/Tip";
 import { toast } from "../../../design/toasts";
 import { useOrchestrators } from "../../../infra/agents";
@@ -19,9 +22,11 @@ import { variant } from "../../../infra/base/dom";
 import { useBoardSlice, useRefreshSlice, useSessionsSlice } from "../../../infra/frame";
 import { useQueryClient } from "../../../infra/query";
 import { useRouter, useSearchValues } from "../../../infra/router";
-import { createMemo } from "../../../infra/solid";
+import { createMemo, createEffect } from "../../../infra/solid";
 import { useIntents } from "../../../infra/state/intent";
+import { pendingNewIssue } from "../../../infra/state/issueDraft";
 import { rememberPick } from "../../../infra/state/prefs";
+import { BacklogTriagePanel } from "../../dashboard";
 import {
   type BoardCard,
   type BoardFilter,
@@ -35,13 +40,27 @@ import {
   type Lane,
   noFilter,
 } from "../model/cards";
-import { type BoardLook, boardLook, boardViews, viewLabel } from "../model/display";
+import {
+  type BoardLook,
+  boardLook,
+  boardViews,
+  type GroupBy,
+  groupByLabel,
+  groupBys,
+  type HierarchyMode,
+  hierarchyLabel,
+  hierarchyModes,
+  hierarchyShows,
+  viewLabel,
+} from "../model/display";
 import { useIssueHistory, useNameOf } from "../model/history";
 import { issueIs } from "../model/issue";
 import { type IssueScope, issueScopes, issueTagPresets } from "../model/meta";
 import { issueMove, movedCards, sendMove } from "../model/moves";
 import { issueSearch } from "../model/navigation";
+import { orderedVisibleCardIds, selectRange, stepFocusId, toggleSelection } from "../model/triage";
 import { issueSet, labeledIssue, sendLabel, writeIssue } from "../model/write";
+import { BatchTriageBar } from "./BatchTriageBar";
 import { IssueBoard } from "./Board";
 import { CloseIssueDialog, ReopenDialog } from "./CloseDialog";
 import { DisplayMenu } from "./DisplayMenu";
@@ -52,10 +71,81 @@ import { IssueList, type ListAdd } from "./IssueList";
 import { IssuePeekModal } from "./IssuePeekModal";
 import { IssueTimeline } from "./IssueTimeline";
 import { NewIssue, type NewIssueAt } from "./NewIssue";
-import { createIssueChrome, IssueChromeContext } from "./Sheet";
+import { createIssueChrome, IssueChromeContext, IssueNumberPill } from "./Sheet";
 import { dispatchedNotice, TodoDetail } from "./TodoDetail";
 
-type Closing = { issue: Issue; session: Session | undefined; review: boolean; lane?: Lane };
+export type IssueOverlay =
+  | { readonly kind: "none" }
+  | { readonly kind: "peeking"; readonly id: string }
+  | { readonly kind: "new"; readonly at: NewIssueAt }
+  | {
+      readonly kind: "closing";
+      readonly issue: Issue;
+      readonly session: Session | undefined;
+      readonly review: boolean;
+      readonly lane?: Lane;
+      readonly returnPeekId?: string;
+    }
+  | { readonly kind: "reopening"; readonly issue: Issue; readonly lane: Lane };
+
+export type IssueOverlayEvent =
+  | { readonly kind: "peek"; readonly id: string }
+  | { readonly kind: "openNew"; readonly at: NewIssueAt }
+  | { readonly kind: "openClose"; readonly issue: Issue; readonly session: Session | undefined; readonly review: boolean; readonly lane?: Lane }
+  | { readonly kind: "openReopen"; readonly issue: Issue; readonly lane: Lane }
+  | { readonly kind: "dismiss" }
+  | { readonly kind: "clear" };
+
+export function initialIssueOverlay(): IssueOverlay {
+  return { kind: "none" };
+}
+
+export function issueOverlayTransition(state: IssueOverlay, event: IssueOverlayEvent): IssueOverlay {
+  switch (event.kind) {
+    case "peek":
+      return { kind: "peeking", id: event.id };
+    case "openNew":
+      return { kind: "new", at: event.at };
+    case "openClose": {
+      const returnPeekId = state.kind === "peeking" ? state.id : state.kind === "closing" ? state.returnPeekId : undefined;
+      return {
+        kind: "closing",
+        issue: event.issue,
+        session: event.session,
+        review: event.review,
+        ...(event.lane !== undefined ? { lane: event.lane } : {}),
+        ...(returnPeekId !== undefined ? { returnPeekId } : {}),
+      };
+    }
+    case "openReopen":
+      return { kind: "reopening", issue: event.issue, lane: event.lane };
+    case "dismiss":
+      if (state.kind === "closing" && state.returnPeekId !== undefined) {
+        return { kind: "peeking", id: state.returnPeekId };
+      }
+      return { kind: "none" };
+    case "clear":
+      return { kind: "none" };
+  }
+}
+
+export function effectiveIssueOverlay(state: IssueOverlay, rest: string, routeDefaults: NewIssueAt, openId: string | undefined): IssueOverlay {
+  if (rest === "new") return { kind: "new", at: routeDefaults };
+  if (openId !== undefined && state.kind === "peeking") return { kind: "none" };
+  return state;
+}
+
+export function isIssueOverlayBlocking(state: IssueOverlay): boolean {
+  switch (state.kind) {
+    case "none":
+      return false;
+    case "peeking":
+    case "new":
+    case "closing":
+    case "reopening":
+      return true;
+  }
+}
 
 /** `rest` is the path after /issues/. */
 export function IssuesPage(props: { rest: string }) {
@@ -110,8 +200,9 @@ export function IssuesPage(props: { rest: string }) {
   const agent = () => searchValues().agent ?? "";
   const tag = () => searchValues().tag ?? "";
   const scope = (): IssueScope => searchValues().scope ?? "all";
+  const status = () => searchValues().status ?? "";
   const query = signal("");
-  const filter = (): BoardFilter => ({ query: query(), repo: repo(), agent: agent(), tag: tag(), scope: scope() });
+  const filter = (): BoardFilter => ({ query: query(), repo: repo(), agent: agent(), tag: tag(), scope: scope(), status: status() });
   const setFilter = (f: BoardFilter) => {
     query.set(f.query);
     setSearchValues(
@@ -120,13 +211,16 @@ export function IssuesPage(props: { rest: string }) {
         agent: f.agent || undefined,
         tag: f.tag || undefined,
         scope: f.scope === "all" ? undefined : f.scope,
+        status: f.status || undefined,
       }),
       { replace: true },
     );
   };
   const older = signal(false);
-  const closing = signal<Closing>();
-  const reopening = signal<{ issue: Issue; lane: Lane }>();
+  const overlay = signal<IssueOverlay>(initialIssueOverlay());
+  const dispatchOverlay = (event: IssueOverlayEvent) => {
+    overlay.set(issueOverlayTransition(untracked(overlay), event));
+  };
   const history = useIssueHistory(older);
 
   const look = boardLook.get;
@@ -134,7 +228,7 @@ export function IssuesPage(props: { rest: string }) {
   // The filter's part of the address goes along, so closing an issue comes back to the board as filtered.
   const kept = () => {
     const search = new URLSearchParams(
-      Object.entries({ repo: repo(), agent: agent(), tag: tag(), scope: scope() === "all" ? "" : scope() }).filter(([, v]) => v !== ""),
+      Object.entries({ repo: repo(), agent: agent(), tag: tag(), scope: scope() === "all" ? "" : scope(), status: status() }).filter(([, v]) => v !== ""),
     ).toString();
     return search ? `?${search}` : "";
   };
@@ -144,9 +238,8 @@ export function IssuesPage(props: { rest: string }) {
     if (path === "/farm" || path?.startsWith("/farm/") === true) return t("web.base.farm");
   };
   const returnTo = signal<string>();
-  const peeking = signal<string>();
   const open = (to: string | undefined) => {
-    if (to !== undefined) peeking.set(undefined);
+    if (to !== undefined) dispatchOverlay({ kind: "clear" });
     if (!to && fromScene()) {
       router.history.back();
       return;
@@ -157,11 +250,11 @@ export function IssuesPage(props: { rest: string }) {
   };
   const peek = (to: string) => {
     returnTo.set(to);
-    peeking.set(to);
+    dispatchOverlay({ kind: "peek", id: to });
   };
-  const closePeek = () => peeking.set(undefined);
+  const closePeek = () => dispatchOverlay({ kind: "clear" });
   const expandPeek = (to: string) => {
-    peeking.set(undefined);
+    dispatchOverlay({ kind: "clear" });
     open(to);
   };
   const notice = dispatchedNotice(open);
@@ -179,13 +272,87 @@ export function IssuesPage(props: { rest: string }) {
   });
   const allIssues = createMemo(() => all().map((c) => c.issue));
   const shown = createMemo(() => all().filter((c) => filterShows(filter(), c)));
+  const effectiveGroupBy = (): GroupBy => look().groupBy ?? "none";
+  const effectiveHierarchy = (): HierarchyMode => look().hierarchy ?? "all";
+  const visibleCards = createMemo(() => shown().filter((c) => hierarchyShows(effectiveHierarchy(), c, allIssues())));
+  const orderedIds = createMemo(() => orderedVisibleCardIds(visibleCards(), look(), allIssues(), older(), Date.now(), board()?.boardSummary));
+  const focusedId = signal<string | undefined>(undefined);
+  const selectedIds = signal<ReadonlySet<string>>(new Set());
+  const selectionAnchor = signal<string | undefined>(undefined);
+  const clearSelection = () => {
+    selectedIds.set(new Set());
+    selectionAnchor.set(undefined);
+  };
+  createEffect(
+    () =>
+      allIssues()
+        .map((i) => i.id)
+        .join("\0"),
+    () => {
+      const known = new Set<string>(allIssues().map((i) => i.id));
+      const cur = untracked(selectedIds);
+      if (cur.size > 0 && [...cur].some((item) => !known.has(item))) {
+        selectedIds.set(new Set([...cur].filter((item) => known.has(item))));
+      }
+      const focus = untracked(focusedId);
+      if (focus !== undefined && !known.has(focus)) {
+        focusedId.set(undefined);
+      }
+    },
+    { defer: true },
+  );
+  const activeFocusId = () => {
+    const cur = focusedId();
+    if (cur !== undefined && orderedIds().includes(cur)) return cur;
+    return returnTo();
+  };
+  const selectedIssues = createMemo(() => {
+    const ids = selectedIds();
+    if (ids.size === 0) return [];
+    return allIssues().filter((item) => ids.has(item.id));
+  });
+  const handleToggleSelect = (targetId: string, opts: { range: boolean }) => {
+    if (opts.range) {
+      const next = selectRange(untracked(selectedIds), orderedIds(), untracked(selectionAnchor) ?? untracked(focusedId), targetId);
+      selectedIds.set(next);
+      if (untracked(selectionAnchor) === undefined) selectionAnchor.set(targetId);
+    } else {
+      const next = toggleSelection(untracked(selectedIds), targetId);
+      selectedIds.set(next);
+      selectionAnchor.set(next.has(targetId) ? targetId : undefined);
+    }
+    focusedId.set(targetId);
+  };
   const card = createMemo(() => {
     const at = id();
     return at === undefined ? undefined : all().find((c) => c.id === at || (c.kind === "issue" && issueIs(c.issue, at)));
   });
+  const activeOverlay = createMemo(() => {
+    const promoted = props.rest === "new" ? pendingNewIssue.get() : undefined;
+    const effectiveRepo = promoted?.repo ?? (repo() || undefined);
+    const routeDefaults: NewIssueAt = {
+      ...(promoted ? { text: promoted.text, attachmentFiles: promoted.attachmentFiles } : {}),
+      ...(effectiveRepo ? { repo: effectiveRepo } : {}),
+      ...(agent() ? { agent: agent() } : {}),
+    };
+    return effectiveIssueOverlay(overlay(), props.rest, routeDefaults, id());
+  });
   const peekCard = createMemo(() => {
-    const at = id() === undefined ? peeking() : undefined;
-    return at === undefined ? undefined : all().find((c) => c.id === at || (c.kind === "issue" && issueIs(c.issue, at)));
+    const cur = activeOverlay();
+    if (cur.kind !== "peeking") return undefined;
+    return all().find((c) => c.id === cur.id || (c.kind === "issue" && issueIs(c.issue, cur.id)));
+  });
+  const newDraftAt = createMemo(() => {
+    const cur = activeOverlay();
+    return cur.kind === "new" ? cur.at : undefined;
+  });
+  const closingOverlay = createMemo(() => {
+    const cur = activeOverlay();
+    return cur.kind === "closing" ? cur : undefined;
+  });
+  const reopeningOverlay = createMemo(() => {
+    const cur = activeOverlay();
+    return cur.kind === "reopening" ? cur : undefined;
   });
 
   const place = async (c: BoardCard, before: string | undefined) => {
@@ -210,15 +377,18 @@ export function IssuesPage(props: { rest: string }) {
       await sendMove(moves, { id: c.id, status: to, lane: to }).done;
     } else if (move === "revive") {
       await sendMove(moves, { id: c.id, status: "backlog", lane: to }).done;
-    } else if (move === "close" && c.kind === "issue" && c.session) closing.set({ issue: c.issue, session: c.session, review: false, lane: to });
-    else if (move === "close" && c.kind === "family") closing.set({ issue: c.issue, session: undefined, review: false, lane: to });
-    else if (move === "reopen" && (c.kind === "issue" || c.kind === "family")) reopening.set({ issue: c.issue, lane: to });
+    } else if (move === "close" && c.kind === "issue" && c.session) {
+      dispatchOverlay({ kind: "openClose", issue: c.issue, session: c.session, review: false, lane: to });
+    } else if (move === "close" && c.kind === "family") {
+      dispatchOverlay({ kind: "openClose", issue: c.issue, session: undefined, review: false, lane: to });
+    } else if (move === "reopen" && (c.kind === "issue" || c.kind === "family")) {
+      dispatchOverlay({ kind: "openReopen", issue: c.issue, lane: to });
+    }
   };
 
-  const newAt = signal<NewIssueAt>();
-  const draftAt = () => (props.rest === "new" ? { ...(repo() ? { repo: repo() } : {}), ...(agent() ? { agent: agent() } : {}) } : newAt());
   const closeDraft = () => {
-    newAt.set(undefined);
+    pendingNewIssue.set(undefined);
+    dispatchOverlay({ kind: "clear" });
     if (props.rest === "new") open(undefined);
   };
   const startNew = (where: NewIssueAt) => {
@@ -227,33 +397,75 @@ export function IssuesPage(props: { rest: string }) {
     const agent = where.agent || f.agent;
     const text = where.text;
     const machineId = where.machineId;
-    newAt.set({
-      ...(repo ? { repo } : {}),
-      ...(agent ? { agent } : {}),
-      ...(text ? { text } : {}),
-      ...(machineId ? { machineId } : {}),
-      ...(where.startAt !== undefined ? { startAt: where.startAt } : {}),
-      ...(where.dueAt !== undefined ? { dueAt: where.dueAt } : {}),
+    dispatchOverlay({
+      kind: "openNew",
+      at: {
+        ...(repo ? { repo } : {}),
+        ...(agent ? { agent } : {}),
+        ...(text ? { text } : {}),
+        ...(machineId ? { machineId } : {}),
+        ...(where.parent ? { parent: where.parent } : {}),
+        ...(where.startAt !== undefined ? { startAt: where.startAt } : {}),
+        ...(where.dueAt !== undefined ? { dueAt: where.dueAt } : {}),
+      },
     });
   };
   const updateScheduleDates = async (issueId: string, dates: { startAt?: number; dueAt?: number }) => {
     await sendLabel(labelSets, omitUndefined({ id: issueId, startAt: dates.startAt, dueAt: dates.dueAt })).done;
   };
   const addInList: ListAdd = (where) => startNew(where);
-  const overlayDialogUp = () => draftAt() !== undefined || closing() !== undefined || reopening() !== undefined;
-  const dialogUp = () => overlayDialogUp() || peekCard() !== undefined;
-  // C, unless a field has focus, a dialog is up or an issue is open.
-  keymap.bind(
-    "c",
-    () => {
-      if (id() !== undefined || dialogUp()) return;
-      startNew({});
-    },
-    { when: "notEditing" },
-  );
+  const dialogUp = () => {
+    const cur = activeOverlay();
+    return cur.kind === "peeking" ? peekCard() !== undefined : isIssueOverlayBlocking(cur);
+  };
+  // Board navigation shortcuts: active only when on the board surface with no modal or detail open.
+  const canNavigateBoard = () => id() === undefined && !dialogUp();
+  createEffect(() => {
+    if (!canNavigateBoard()) return;
+    return keymap.bind(
+      {
+        c: () => startNew({}),
+        j: () => {
+          const next = stepFocusId(orderedIds(), untracked(focusedId), 1);
+          if (next !== undefined) focusedId.set(next);
+        },
+        down: () => {
+          const next = stepFocusId(orderedIds(), untracked(focusedId), 1);
+          if (next !== undefined) focusedId.set(next);
+        },
+        k: () => {
+          const next = stepFocusId(orderedIds(), untracked(focusedId), -1);
+          if (next !== undefined) focusedId.set(next);
+        },
+        up: () => {
+          const next = stepFocusId(orderedIds(), untracked(focusedId), -1);
+          if (next !== undefined) focusedId.set(next);
+        },
+        enter: () => {
+          const target = untracked(focusedId);
+          if (target !== undefined && orderedIds().includes(target)) peek(target);
+        },
+        e: () => {
+          const target = untracked(focusedId);
+          if (target !== undefined && orderedIds().includes(target)) open(target);
+        },
+        x: () => {
+          const target = untracked(focusedId);
+          if (target !== undefined && orderedIds().includes(target)) handleToggleSelect(target, { range: false });
+        },
+      },
+      { when: "notEditing" },
+    );
+  });
+  createEffect(() => {
+    if (selectedIds().size === 0 || !canNavigateBoard()) return;
+    return keymap.bind("escape", clearSelection, { when: "notEditing" });
+  });
   const keepNew = async (words: string, where: NewIssueAt, requestKey: string) => {
     const made = await act.run(() =>
       writeIssue(words, where.agent ?? "", where.repo ?? "", requestKey, where.machineId ?? "", where.attachments, where.tags, {
+        parent: where.parent,
+        owner: where.owner,
         startAt: where.startAt,
         dueAt: where.dueAt,
       }),
@@ -284,7 +496,7 @@ export function IssuesPage(props: { rest: string }) {
             <Toolbar
               filter={filter()}
               cards={all()}
-              shown={shown().length}
+              shown={visibleCards().length}
               onFilter={setFilter}
               look={look()}
               onLook={setLook}
@@ -292,6 +504,9 @@ export function IssuesPage(props: { rest: string }) {
               onRefresh={refreshIssues}
               onNew={() => startNew({})}
             />
+            <If when={filter().scope === "backlog"}>
+              <BacklogTriagePanel />
+            </If>
             <If
               when={look().view === "board"}
               else={
@@ -302,9 +517,10 @@ export function IssuesPage(props: { rest: string }) {
                       when={look().view === "timeline"}
                       else={
                         <IssueCalendar
-                          cards={shown()}
+                          cards={visibleCards()}
                           allIssues={allIssues()}
-                          filtered={filterAny(filter())}
+                          summary={board()?.boardSummary}
+                          filtered={filterAny(filter()) || effectiveHierarchy() !== "all"}
                           loading={history.loading()}
                           selected={returnTo()}
                           onOpen={peek}
@@ -314,12 +530,15 @@ export function IssuesPage(props: { rest: string }) {
                       }
                     >
                       <IssueTimeline
-                        cards={shown()}
+                        cards={visibleCards()}
                         allIssues={allIssues()}
-                        filtered={filterAny(filter())}
+                        summary={board()?.boardSummary}
+                        filtered={filterAny(filter()) || effectiveHierarchy() !== "all"}
                         loading={history.loading()}
-                        selected={returnTo()}
+                        selected={activeFocusId()}
+                        selectedIds={selectedIds()}
                         onOpen={peek}
+                        onToggleSelect={handleToggleSelect}
                         onUpdateDates={updateScheduleDates}
                         onNew={startNew}
                         onClearFilter={() => setFilter(noFilter)}
@@ -328,15 +547,20 @@ export function IssuesPage(props: { rest: string }) {
                   }
                 >
                   <IssueList
-                    cards={shown()}
-                    filtered={filterAny(filter())}
+                    cards={visibleCards()}
+                    allIssues={allIssues()}
+                    filtered={filterAny(filter()) || effectiveHierarchy() !== "all"}
                     loading={history.loading()}
-                    selected={returnTo()}
+                    selected={activeFocusId()}
+                    selectedIds={selectedIds()}
                     older={older()}
                     grouping={look().grouping}
+                    groupBy={effectiveGroupBy()}
+                    hierarchy={effectiveHierarchy()}
                     ordering={look().ordering}
                     onOlder={() => older.set(!older())}
                     onOpen={peek}
+                    onToggleSelect={handleToggleSelect}
                     onAdd={addInList}
                     onClearFilter={() => setFilter(noFilter)}
                   />
@@ -344,15 +568,20 @@ export function IssuesPage(props: { rest: string }) {
               }
             >
               <IssueBoard
-                cards={shown()}
+                cards={visibleCards()}
+                allIssues={allIssues()}
                 summary={board()?.boardSummary}
-                filtered={filterAny(filter())}
+                filtered={filterAny(filter()) || effectiveHierarchy() !== "all"}
                 loading={history.loading()}
-                selected={returnTo()}
+                selected={activeFocusId()}
+                selectedIds={selectedIds()}
                 older={older()}
                 ordering={look().ordering}
+                groupBy={effectiveGroupBy()}
+                hierarchy={effectiveHierarchy()}
                 onOlder={() => older.set(!older())}
                 onOpen={peek}
+                onToggleSelect={handleToggleSelect}
                 onDrop={(c, to) => void drop(c, to)}
                 onRetry={(c) => void retry(c)}
                 onPutBack={(c) => c.move && moves.drop(c.move.key)}
@@ -360,6 +589,9 @@ export function IssuesPage(props: { rest: string }) {
                 onNew={() => startNew({})}
                 onClearFilter={() => setFilter(noFilter)}
               />
+            </If>
+            <If when={selectedIssues().length > 0}>
+              <BatchTriageBar selectedIssues={selectedIssues()} allIssues={allIssues()} onClear={clearSelection} />
             </If>
           </>
         }
@@ -372,42 +604,53 @@ export function IssuesPage(props: { rest: string }) {
           })()}
           key={(cur) => cur}
         >
-          {(at) => (
-            <IssueView onBack={() => open(undefined)} backLabel={fromScene() ?? t("web.issue.page.backToBoard")} blocked={dialogUp}>
-              <Detail
-                id={at()}
-                cards={all}
-                known={!history.loading() && history.rows() !== undefined}
-                open={open}
-                onClose={(issue, session, review) => closing.set({ issue, session, review })}
-              />
-            </IssueView>
-          )}
+          {(at) => {
+            const cur = () => all().find((c) => c.id === at() || issueIs(c.issue, at()) || String(c.issue.number) === at());
+            return (
+              <IssueView
+                onBack={() => open(undefined)}
+                backLabel={fromScene() ?? t("web.issue.page.backToBoard")}
+                issueNumber={cur()?.issue.number}
+                repo={cur() ? cardRepo(cur()!) : undefined}
+                blocked={dialogUp}
+              >
+                <Detail
+                  id={at()}
+                  cards={all}
+                  known={!history.loading() && history.rows() !== undefined}
+                  open={open}
+                  onClose={(issue, session, review) => dispatchOverlay({ kind: "openClose", issue, session, review })}
+                />
+              </IssueView>
+            );
+          }}
         </Each>
       </If>
       <If when={peekCard()}>
         {(c) => (
-          <IssuePeekModal card={c()} blocked={overlayDialogUp} onExpand={expandPeek} onClose={closePeek}>
+          <IssuePeekModal card={c()} blocked={() => activeOverlay().kind !== "peeking"} onExpand={expandPeek} onClose={closePeek}>
             <Each of={[c().id]} key={(cur) => cur}>
               {(at) => (
                 <Detail
                   id={at()}
                   cards={all}
                   known={!history.loading() && history.rows() !== undefined}
-                  open={(to) => (to === undefined ? closePeek() : peeking.set(to))}
-                  onClose={(issue, session, review) => closing.set({ issue, session, review })}
+                  open={(to) => (to === undefined ? closePeek() : dispatchOverlay({ kind: "peek", id: to }))}
+                  onClose={(issue, session, review) => dispatchOverlay({ kind: "openClose", issue, session, review })}
                 />
               )}
             </Each>
           </IssuePeekModal>
         )}
       </If>
-      <If when={draftAt()}>{(at) => <NewIssue at={at()} onKeep={keepNew} onClose={closeDraft} />}</If>
-      <If when={closing()}>
-        {(c) => <CloseIssueDialog issue={c().issue} session={c().session} review={c().review} lane={c().lane} onClose={() => closing.set(undefined)} />}
+      <If when={newDraftAt()}>{(at) => <NewIssue at={at()} onKeep={keepNew} onClose={closeDraft} />}</If>
+      <If when={closingOverlay()}>
+        {(c) => (
+          <CloseIssueDialog issue={c().issue} session={c().session} review={c().review} lane={c().lane} onClose={() => dispatchOverlay({ kind: "dismiss" })} />
+        )}
       </If>
-      <If when={reopening()}>
-        {(r) => <ReopenDialog issue={r().issue} lane={r().lane} onClose={() => reopening.set(undefined)} onReopened={() => open(r().issue.id)} />}
+      <If when={reopeningOverlay()}>
+        {(r) => <ReopenDialog issue={r().issue} lane={r().lane} onClose={() => dispatchOverlay({ kind: "dismiss" })} onReopened={() => open(r().issue.id)} />}
       </If>
     </View>
   );
@@ -501,7 +744,14 @@ function Detail(props: {
 }
 
 /** An issue's own page, at its URL: Issues or Escape goes back to the board as it was left. */
-function IssueView(props: { onBack: () => void; backLabel: string; blocked: () => boolean; children: JSX.Element }) {
+function IssueView(props: {
+  onBack: () => void;
+  backLabel: string;
+  issueNumber?: number | undefined;
+  repo?: string | undefined;
+  blocked: () => boolean;
+  children: JSX.Element;
+}) {
   const chrome = createIssueChrome();
   // A dialog over the issue takes Escape first (blocked); on narrow screens the drawer closes before the page goes back.
   keymap.bind(
@@ -519,15 +769,30 @@ function IssueView(props: { onBack: () => void; backLabel: string; blocked: () =
   return (
     <IssueChromeContext.Provider value={chrome}>
       <View testID="issue" class="min-h-0 flex-1">
-        <View desktop={{ windowDrag: true }} class="h-11 shrink-0 flex-row items-center justify-between gap-2 border-b border-line bg-page px-4">
-          <View
-            role="button"
-            testID="issue-close"
-            onPress={() => props.onBack()}
-            class={`-ml-2 h-7 flex-row items-center gap-1 rounded-md px-2 ${motionClass("transition-transform duration-120 ease-out")} hover:bg-hover active:translate-y-px`}
-          >
-            <Icon name="back" size={14} tone="muted" />
-            <Text class="text-sm font-medium text-muted">{props.backLabel}</Text>
+        <View
+          testID="issue-topbar"
+          desktop={{ windowDrag: true }}
+          class="h-11 shrink-0 flex-row items-center justify-between gap-2 border-b border-line bg-page px-4"
+        >
+          <View class="min-w-0 flex-1 flex-row items-center gap-2">
+            <View
+              role="button"
+              testID="issue-close"
+              onPress={() => props.onBack()}
+              class={`-ml-2 h-7 shrink-0 flex-row items-center gap-1 rounded-md px-2 ${motionClass("transition-transform duration-120 ease-out")} hover:bg-hover active:translate-y-px`}
+            >
+              <Icon name="back" size={14} tone="muted" />
+              <Text class="text-sm font-medium text-muted">{props.backLabel}</Text>
+            </View>
+            <If when={props.issueNumber !== undefined}>{() => <IssueNumberPill number={props.issueNumber!} />}</If>
+            <If when={props.repo}>
+              {(r) => (
+                <View class="min-w-0 shrink flex-row items-center gap-1 rounded-md border border-line bg-side px-1.5 py-0.5">
+                  <Icon name="folder" size={12} tone="muted" />
+                  <Text class="min-w-0 truncate text-xs font-medium text-muted">{r()}</Text>
+                </View>
+              )}
+            </If>
           </View>
           <If when={chrome.hasSheet()}>
             <IconButton
@@ -569,24 +834,48 @@ function Toolbar(props: {
   const repoOptions = createMemo(() => repos().map((p) => ({ value: p, label: p })));
   const agentOptions = createMemo(() => agents().map((a) => ({ value: a, label: nameOf()(a) })));
   const tagOptions = createMemo(() => tags().map((tag) => ({ value: tag, label: tag })));
+  const statusOptions = createMemo(() => {
+    const base: { value: string; label: string }[] = IssueStatusSchema.options.map((s) => ({ value: s, label: t(`shared.status.${s}`) }));
+    if (props.filter.status === "todo,in_progress") {
+      return [{ value: "todo,in_progress", label: t("web.issue.page.todoAndInProgress") }, ...base];
+    }
+    return base;
+  });
   const scopeOptions = createMemo(() =>
     issueScopes.map((s) => ({
       value: s,
       label: t(`web.issue.scope.${s}`),
     })),
   );
+  const groupByOptions = createMemo(() => groupBys.map((g) => ({ value: g, label: groupByLabel[g] })));
+  const hierarchyOptions = createMemo(() => hierarchyModes.map((m) => ({ value: m, label: hierarchyLabel[m] })));
+  const currentGroupBy = (): GroupBy => props.look.groupBy ?? "none";
+  const currentHierarchy = (): HierarchyMode => props.look.hierarchy ?? "all";
   const isFiltered = createMemo(() => filterAny(props.filter));
-  const hasFacetFilter = createMemo(() => props.filter.repo !== "" || props.filter.agent !== "" || props.filter.tag !== "");
+  const hasFacetFilter = createMemo(() => props.filter.repo !== "" || props.filter.agent !== "" || props.filter.tag !== "" || props.filter.status !== "");
+  const compactToolbar = () => windowSize().width < 1100;
+  const popoverFilterCount = createMemo(
+    () =>
+      Number(props.filter.scope !== "all") +
+      Number(props.filter.repo !== "") +
+      Number(props.filter.agent !== "") +
+      Number(props.filter.tag !== "") +
+      Number(props.filter.status !== "") +
+      Number(currentGroupBy() !== "none") +
+      Number(currentHierarchy() !== "all"),
+  );
   return (
-    <View desktop={{ windowDrag: true }} class="h-11 shrink-0 flex-row items-center gap-2 border-b border-line bg-page px-4">
+    <View testID="issues-toolbar" desktop={{ windowDrag: true }} class="h-11 shrink-0 flex-row items-center gap-2 border-b border-line bg-page px-4">
       <View class="min-w-0 flex-1 flex-row items-center gap-2">
-        <Segmented
-          label={t("web.issue.scope.label")}
-          testid="issue-scope"
-          value={props.filter.scope}
-          onChange={(scope) => props.onFilter({ ...props.filter, scope })}
-          options={scopeOptions()}
-        />
+        <If when={!compactToolbar()}>
+          <Segmented
+            label={t("web.issue.scope.label")}
+            testid="issue-scope"
+            value={props.filter.scope}
+            onChange={(scope) => props.onFilter({ ...props.filter, scope })}
+            options={scopeOptions()}
+          />
+        </If>
         <SearchField
           testid="issue-search"
           clearTestid="issue-search-clear"
@@ -594,66 +883,238 @@ function Toolbar(props: {
           onInput={(query) => props.onFilter({ ...props.filter, query })}
           placeholder={t("web.issue.page.find")}
           label={t("web.issue.page.findLabel")}
-          class="w-40 shrink"
+          class={compactToolbar() ? "w-36 min-w-20 shrink" : "w-32 min-w-16 shrink"}
         />
-        <View
-          testID="issue-filter-bar"
-          accessibilityLabel={t("web.issue.page.filter")}
-          class="flex-row items-center rounded-md border border-line bg-side pl-2"
+        <If
+          when={!compactToolbar()}
+          else={
+            <Popover
+              placement="bottom"
+              align="start"
+              offset={6}
+              popupClass="w-72 gap-2.5 rounded-lg border border-line bg-elevated p-3 shadow-float"
+              popupStyle={{ maxWidth: Math.max(240, windowSize().width - 24) }}
+              trigger={
+                <View
+                  testID="issue-filter-popover"
+                  role="button"
+                  accessibilityLabel={t("web.issue.page.filter")}
+                  tooltip={<Bubble text={t("web.issue.page.filter")} />}
+                  class={`h-7 shrink-0 flex-row items-center gap-1.5 rounded-md border border-line px-2.5 ${
+                    popoverFilterCount() > 0 ? "bg-selected" : "bg-page hover:bg-hover"
+                  } ${motionClass("transition-transform duration-120 ease-out")} active:translate-y-px`}
+                >
+                  <Icon name="filter" size={14} tone={popoverFilterCount() > 0 ? "accent" : "muted"} />
+                  <Text class="text-sm text-ink">{t("web.issue.page.filter")}</Text>
+                  <If when={popoverFilterCount() > 0}>
+                    <CountPill count={popoverFilterCount()} active />
+                  </If>
+                </View>
+              }
+            >
+              <View testID="issue-filter-popover-menu" accessibilityLabel={t("web.issue.page.filter")} class="gap-2.5">
+                <View class="gap-1">
+                  <Text class="text-xs font-medium text-muted">{t("web.issue.scope.label")}</Text>
+                  <Segmented
+                    label={t("web.issue.scope.label")}
+                    testid="issue-scope"
+                    block
+                    value={props.filter.scope}
+                    onChange={(scope) => props.onFilter({ ...props.filter, scope })}
+                    options={scopeOptions()}
+                  />
+                </View>
+                <View class="gap-1">
+                  <Text class="text-xs font-medium text-muted">{t("web.issue.page.byRepo")}</Text>
+                  <Select
+                    size="control"
+                    class="w-full"
+                    label={t("web.issue.page.byRepo")}
+                    testid="filter-repo"
+                    filter
+                    value={props.filter.repo}
+                    placeholder={t("web.issue.page.allRepos")}
+                    options={repoOptions()}
+                    onChange={(repo) => props.onFilter({ ...props.filter, repo })}
+                  />
+                </View>
+                <View class="gap-1">
+                  <Text class="text-xs font-medium text-muted">{t("web.issue.page.byHelper")}</Text>
+                  <Select
+                    size="control"
+                    class="w-full"
+                    label={t("web.issue.page.byHelper")}
+                    testid="filter-agent"
+                    filter
+                    value={props.filter.agent}
+                    placeholder={t("web.issue.page.allHelpers")}
+                    options={agentOptions()}
+                    onChange={(agent) => props.onFilter({ ...props.filter, agent })}
+                  />
+                </View>
+                <View class="gap-1">
+                  <Text class="text-xs font-medium text-muted">{t("web.issue.tags.byTag")}</Text>
+                  <Select
+                    size="control"
+                    class="w-full"
+                    label={t("web.issue.tags.byTag")}
+                    testid="filter-tag"
+                    filter
+                    value={props.filter.tag}
+                    placeholder={t("web.issue.tags.allTags")}
+                    options={tagOptions()}
+                    onChange={(tag) => props.onFilter({ ...props.filter, tag })}
+                  />
+                </View>
+                <View class="gap-1">
+                  <Text class="text-xs font-medium text-muted">{t("web.issue.page.byStatus")}</Text>
+                  <Select
+                    size="control"
+                    class="w-full"
+                    label={t("web.issue.page.byStatus")}
+                    testid="filter-status"
+                    filter
+                    value={props.filter.status}
+                    placeholder={t("web.issue.page.allStatuses")}
+                    options={statusOptions()}
+                    onChange={(status) => props.onFilter({ ...props.filter, status })}
+                  />
+                </View>
+                <View class="gap-1">
+                  <Text class="text-xs font-medium text-muted">{t("web.issue.groupBy.label")}</Text>
+                  <Select
+                    size="control"
+                    class="w-full"
+                    label={t("web.issue.groupBy.label")}
+                    testid="group-by"
+                    value={currentGroupBy()}
+                    options={groupByOptions()}
+                    onChange={(groupBy) => props.onLook({ ...props.look, groupBy })}
+                  />
+                </View>
+                <View class="gap-1">
+                  <Text class="text-xs font-medium text-muted">{t("web.issue.hierarchy.label")}</Text>
+                  <Select
+                    size="control"
+                    class="w-full"
+                    label={t("web.issue.hierarchy.label")}
+                    testid="hierarchy-mode"
+                    value={currentHierarchy()}
+                    options={hierarchyOptions()}
+                    onChange={(hierarchy) => props.onLook({ ...props.look, hierarchy })}
+                  />
+                </View>
+                <If when={isFiltered()}>
+                  <View class="flex-row items-center justify-between gap-2 border-t border-line pt-2">
+                    <Text class="text-xs text-muted tabular-nums">{t("web.issue.page.shown", { shown: props.shown, of: props.cards.length })}</Text>
+                    <Button size="compact" tone="quiet" testID="filter-clear" onPress={() => props.onFilter(noFilter)}>
+                      {t("web.issue.page.clear")}
+                    </Button>
+                  </View>
+                </If>
+              </View>
+            </Popover>
+          }
         >
-          <Icon name="filter" size={14} tone={hasFacetFilter() ? "accent" : "faint"} />
-          <View class="mx-1.5 h-3.5 w-px bg-line" />
-          <Select
-            quiet
-            size="control"
-            class="max-w-32"
-            label={t("web.issue.page.byRepo")}
-            testid="filter-repo"
-            filter
-            value={props.filter.repo}
-            placeholder={t("web.issue.page.allRepos")}
-            options={repoOptions()}
-            onChange={(repo) => props.onFilter({ ...props.filter, repo })}
-          />
-          <View class="h-3.5 w-px bg-line" />
-          <Select
-            quiet
-            size="control"
-            class="max-w-32"
-            label={t("web.issue.page.byHelper")}
-            testid="filter-agent"
-            filter
-            value={props.filter.agent}
-            placeholder={t("web.issue.page.allHelpers")}
-            options={agentOptions()}
-            onChange={(agent) => props.onFilter({ ...props.filter, agent })}
-          />
-          <View class="h-3.5 w-px bg-line" />
-          <Select
-            quiet
-            size="control"
-            class="max-w-28"
-            label={t("web.issue.tags.byTag")}
-            testid="filter-tag"
-            filter
-            value={props.filter.tag}
-            placeholder={t("web.issue.tags.allTags")}
-            options={tagOptions()}
-            onChange={(tag) => props.onFilter({ ...props.filter, tag })}
-          />
-        </View>
-        <If when={isFiltered()}>
-          <Text class="shrink-0 text-xs text-muted" style={{ fontVariant: ["tabular-nums"] }}>
-            {t("web.issue.page.shown", { shown: props.shown, of: props.cards.length })}
-          </Text>
           <View
-            role="button"
-            testID="filter-clear"
-            onPress={() => props.onFilter(noFilter)}
-            class={`h-7 shrink-0 flex-row items-center rounded-md px-2 ${motionClass("transition-transform duration-120 ease-out")} hover:bg-hover active:translate-y-px`}
+            testID="issue-filter-bar"
+            accessibilityLabel={t("web.issue.page.filter")}
+            class="flex-row items-center rounded-md border border-line bg-side pl-2"
           >
-            <Text class="text-xs font-medium text-water">{t("web.issue.page.clear")}</Text>
+            <Icon name="filter" size={14} tone={hasFacetFilter() ? "accent" : "faint"} />
+            <View class="mx-1.5 h-3.5 w-px bg-line" />
+            <Select
+              quiet
+              size="control"
+              class="max-w-24"
+              label={t("web.issue.page.byRepo")}
+              testid="filter-repo"
+              filter
+              value={props.filter.repo}
+              placeholder={t("web.issue.page.allRepos")}
+              options={repoOptions()}
+              onChange={(repo) => props.onFilter({ ...props.filter, repo })}
+            />
+            <View class="h-3.5 w-px bg-line" />
+            <Select
+              quiet
+              size="control"
+              class="max-w-24"
+              label={t("web.issue.page.byHelper")}
+              testid="filter-agent"
+              filter
+              value={props.filter.agent}
+              placeholder={t("web.issue.page.allHelpers")}
+              options={agentOptions()}
+              onChange={(agent) => props.onFilter({ ...props.filter, agent })}
+            />
+            <View class="h-3.5 w-px bg-line" />
+            <Select
+              quiet
+              size="control"
+              class="max-w-22"
+              label={t("web.issue.tags.byTag")}
+              testid="filter-tag"
+              filter
+              value={props.filter.tag}
+              placeholder={t("web.issue.tags.allTags")}
+              options={tagOptions()}
+              onChange={(tag) => props.onFilter({ ...props.filter, tag })}
+            />
+            <View class="h-3.5 w-px bg-line" />
+            <Select
+              quiet
+              size="control"
+              class="max-w-24"
+              label={t("web.issue.page.byStatus")}
+              testid="filter-status"
+              filter
+              value={props.filter.status}
+              placeholder={t("web.issue.page.allStatuses")}
+              options={statusOptions()}
+              onChange={(status) => props.onFilter({ ...props.filter, status })}
+            />
           </View>
+          <View testID="issue-layout-bar" class="shrink-0 flex-row items-center rounded-md border border-line bg-side pl-1.5">
+            <Icon name="choose" size={14} tone={currentGroupBy() !== "none" || currentHierarchy() !== "all" ? "accent" : "faint"} />
+            <View class="mx-1 h-3.5 w-px bg-line" />
+            <Select
+              quiet
+              size="control"
+              text="xs"
+              class="max-w-24"
+              label={t("web.issue.groupBy.label")}
+              testid="group-by"
+              value={currentGroupBy()}
+              options={groupByOptions()}
+              onChange={(groupBy) => props.onLook({ ...props.look, groupBy })}
+            />
+            <View class="h-3.5 w-px bg-line" />
+            <Select
+              quiet
+              size="control"
+              text="xs"
+              class="max-w-24"
+              label={t("web.issue.hierarchy.label")}
+              testid="hierarchy-mode"
+              value={currentHierarchy()}
+              options={hierarchyOptions()}
+              onChange={(hierarchy) => props.onLook({ ...props.look, hierarchy })}
+            />
+          </View>
+          <If when={isFiltered()}>
+            <Text class="shrink-0 text-xs text-muted" style={{ fontVariant: ["tabular-nums"] }}>
+              {t("web.issue.page.shown", { shown: props.shown, of: props.cards.length })}
+            </Text>
+            <View
+              role="button"
+              testID="filter-clear"
+              onPress={() => props.onFilter(noFilter)}
+              class={`h-7 shrink-0 flex-row items-center rounded-md px-2 ${motionClass("transition-transform duration-120 ease-out")} hover:bg-hover active:translate-y-px`}
+            >
+              <Text class="text-xs font-medium text-water">{t("web.issue.page.clear")}</Text>
+            </View>
+          </If>
         </If>
       </View>
       <View class="ml-auto shrink-0 flex-row items-center gap-1.5">

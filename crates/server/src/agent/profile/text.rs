@@ -14,8 +14,7 @@ use vibevalley_protocol::{
 use crate::context::text::head;
 
 /// Prompt clause prepended to read-only answer issues.
-pub const ANSWER_ONLY: &str = "This issue asks for an answer, not a change: investigate read-only (read code, run read-only \
-     commands) and do not modify or commit files; anything you change is thrown away.";
+pub const ANSWER_ONLY: &str = "这项任务只要结论，不改代码：只读调研（读代码、跑只读命令），严禁修改或提交文件；任何改动交回来都会被丢弃。";
 
 /// `prompts.json`, written by `gen/orchestrator.ts` from VibeValley.
 #[derive(Deserialize)]
@@ -39,6 +38,8 @@ pub struct Workplaces {
     #[serde(rename = "pullRequest")]
     pub pull_request: String,
     pub folder: String,
+    pub draft: String,
+    pub answer: String,
 }
 
 pub static PROMPTS: LazyLock<Prompts> =
@@ -320,6 +321,21 @@ pub fn issue_detail(issue: &Issue, who: &str, timeline: Option<&IssueTimeline>, 
     if let Some(pr) = &issue.pull_request {
         lines.push(format!("PR #{}（{}）{}", pr.number, wire(&pr.state), pr.url));
     }
+    if !issue.relations.is_empty() {
+        let rels = issue
+            .relations
+            .iter()
+            .map(|r| {
+                let label = match r.kind {
+                    vibevalley_protocol::IssueRelationKind::Duplicate => "重复",
+                    vibevalley_protocol::IssueRelationKind::Related => "相关",
+                };
+                format!("{label}:{}", r.issue)
+            })
+            .collect::<Vec<_>>()
+            .join("、");
+        lines.push(format!("非阻塞关联：{rels}"));
+    }
     for m in timeline.map(|t| t.milestones.iter().take(8).collect::<Vec<_>>()).unwrap_or_default() {
         let who = m.who.as_deref().map(|w| format!("{w} ")).unwrap_or_default();
         lines.push(format!("  · {}前 {who}{}", span_words(now - m.at), head(&m.text, 120)));
@@ -484,6 +500,14 @@ pub fn memory_found_text(result: &vibevalley_protocol::MemorySearch, agent: &str
         let mut line = match f.kind {
             MemoryKind::Issue => format!("- 做过（{where_words}）：{}", f.text),
             MemoryKind::Note => format!("- （{where_words}）{}", f.text),
+            MemoryKind::Profile => match f.title.as_deref().map(str::trim).filter(|t| !t.is_empty()) {
+                Some(title) => format!("- [全局] {title}：{}", f.text),
+                None => format!("- [全局] {}", f.text),
+            },
+            MemoryKind::Episode => match f.title.as_deref().map(str::trim).filter(|t| !t.is_empty()) {
+                Some(title) => format!("- 经历（{where_words}）{title}：{}", f.text),
+                None => format!("- 经历（{where_words}）：{}", f.text),
+            },
         };
         if agent.is_empty() && !f.agent.is_empty() {
             line = format!("- {}：{}", f.agent, line.trim_start_matches("- "));

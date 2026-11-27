@@ -26,16 +26,22 @@ pub enum MemoryKind {
     Note,
     #[serde(rename = "issue")]
     Issue,
+    #[serde(rename = "profile")]
+    Profile,
+    #[serde(rename = "episode")]
+    Episode,
 }
 
 impl MemoryKind {
-    pub const ALL: [MemoryKind; 2] = [MemoryKind::Note, MemoryKind::Issue];
+    pub const ALL: [MemoryKind; 4] = [MemoryKind::Note, MemoryKind::Issue, MemoryKind::Profile, MemoryKind::Episode];
 
     /// The string on the wire.
     pub fn as_str(self) -> &'static str {
         match self {
             MemoryKind::Note => "note",
             MemoryKind::Issue => "issue",
+            MemoryKind::Profile => "profile",
+            MemoryKind::Episode => "episode",
         }
     }
 }
@@ -59,6 +65,14 @@ pub struct Memory {
     pub recalled_at: Option<i64>,
     pub fading: bool,
     pub source: Option<String>,
+    #[serde(default)]
+    pub scope: Option<String>,
+    #[serde(default)]
+    pub title: Option<String>,
+    #[serde(default)]
+    pub importance: Option<i64>,
+    #[serde(default)]
+    pub replaced_by: Option<String>,
 }
 
 #[skip_serializing_none]
@@ -71,6 +85,14 @@ pub struct MemoryRequest {
     pub repo: Option<String>,
     /// The client's key for this request: the same key again within a while returns the first one's result and does it once (a retry after a lost reply).
     pub request_key: Option<String>,
+    #[serde(default)]
+    pub kind: Option<MemoryKind>,
+    #[serde(default)]
+    pub scope: Option<String>,
+    #[serde(default)]
+    pub title: Option<String>,
+    #[serde(default)]
+    pub importance: Option<i64>,
 }
 
 /// "unknown": the source did not declare a scope.
@@ -84,6 +106,8 @@ pub enum MemoryScope {
     Global {},
     #[serde(rename = "repo", rename_all = "camelCase")]
     Repo { repo: String },
+    #[serde(rename = "farm")]
+    Farm {},
     #[serde(rename = "unknown")]
     Unknown {},
 }
@@ -110,6 +134,12 @@ pub struct MemoryFound {
     pub source: String,
     pub score: JsNumber,
     pub scope: MemoryScope,
+    #[serde(default)]
+    pub title: Option<String>,
+    #[serde(default)]
+    pub importance: Option<i64>,
+    #[serde(default)]
+    pub replaced_by: Option<String>,
 }
 
 #[skip_serializing_none]
@@ -163,6 +193,14 @@ pub struct MemoryCreateInput {
     pub text: String,
     pub repo: Option<String>,
     pub request_key: Option<String>,
+    #[serde(default)]
+    pub kind: Option<MemoryKind>,
+    #[serde(default)]
+    pub scope: Option<String>,
+    #[serde(default)]
+    pub title: Option<String>,
+    #[serde(default)]
+    pub importance: Option<i64>,
 }
 
 #[skip_serializing_none]

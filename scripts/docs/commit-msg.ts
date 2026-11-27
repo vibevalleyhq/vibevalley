@@ -13,13 +13,36 @@ const byline =
 export const branchKinds = ["feat", "fix", "docs", "chore", "refactor", "test"] as const;
 
 /** The pull request template's sections, in its order. */
-export const bodySections = ["## What changed", "## Checks", "## Not verified"] as const;
+export const bodySections = ["## What changed", "## Changelog", "## Checks", "## Not verified"] as const;
+
+// ASD-STE100 prose gate on non-quoted PR body text: reject vague buzzwords and filler phrases.
+const steRules: readonly { pattern: RegExp; term: string; hint: string }[] = [
+  { pattern: /\bseamlessly\b/iu, term: "seamlessly", hint: "state the exact mechanism" },
+  { pattern: /\bout of the box\b/iu, term: "out of the box", hint: "use 'by default' or name the config" },
+  { pattern: /\bempower(?:s|ed|ing)?\b/iu, term: "empower", hint: "use 'let' or 'allow' with concrete capability" },
+  { pattern: /\bappropriately\b/iu, term: "appropriately", hint: "state the exact condition or value" },
+  { pattern: /\bsignificantly\b/iu, term: "significantly", hint: "give the measured number or drop the adverb" },
+  { pattern: /\bsubstantially\b/iu, term: "substantially", hint: "give the measured number or drop the adverb" },
+  { pattern: /\beffortlessly\b/iu, term: "effortlessly", hint: "state the step removed" },
+  { pattern: /\brobustly\b/iu, term: "robustly", hint: "name the retry, bound, or fallback" },
+  { pattern: /\bit is worth noting\b/iu, term: "it is worth noting", hint: "state the fact directly" },
+];
 
 // Chinese is quoted, not written: the interface's own words in 「」, “” or "", and code, logs and paths in backticks.
 const quoted = /```[\s\S]*?```|`[^`\n]*`|「[^」]*」|“[^”]*”|"[^"\n]*"|<!--[\s\S]*?-->/gu;
 /** The first run of Chinese written outside quotes and code, or undefined. */
 function chineseIn(text: string): string | undefined {
   return /\p{Script=Han}[\p{Script=Han}\u3000-\u303f\uff00-\uffef]*/u.exec(text.replace(quoted, " "))?.[0];
+}
+
+/** Non-STE buzzwords or filler phrases outside quoted strings and code spans. */
+export function steProblems(text: string): string[] {
+  const plain = text.replace(quoted, " ");
+  const problems: string[] = [];
+  for (const rule of steRules) {
+    if (rule.pattern.test(plain)) problems.push(`follow STE rules: avoid "${rule.term}" (${rule.hint})`);
+  }
+  return problems;
 }
 
 /** The message as git keeps it: comment lines and everything under the scissors line dropped. */
@@ -57,13 +80,14 @@ export function subjectProblems(subject: string): string[] {
   return problems;
 }
 
-/** What is wrong with a pull request's body: the template's sections, written in English. */
+/** What is wrong with a pull request's body: the template's sections, written in STE English. */
 export function bodyProblems(body: string): string[] {
   const problems: string[] = [];
   const headings = new Set(body.split(/\r?\n/u).map((line) => line.trim()));
   for (const section of bodySections) if (!headings.has(section)) problems.push(`the body has no "${section}" section`);
   const chinese = chineseIn(body);
   if (chinese !== undefined) problems.push(`write the body in English, quoting the interface's words in 「」 and logs in backticks: "${chinese}"`);
+  problems.push(...steProblems(body));
   return problems;
 }
 

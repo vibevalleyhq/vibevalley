@@ -3,14 +3,18 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Weak};
 use std::time::Duration;
 
+use base64::Engine as _;
 use parking_lot::Mutex;
 use vibevalley_i18n::t;
-use vibevalley_protocol::{ApiError, ApiErrorDetail, BizCode, DEFAULT_ORCHESTRATOR, Millis, NoticeLevel, Op, Validation, VoiceCall, VoiceFix, VoiceGrant, ops};
+use vibevalley_protocol::{
+    ApiError, ApiErrorDetail, BizCode, DEFAULT_ORCHESTRATOR, Millis, NoticeLevel, Op, Validation, VoiceAsrGrant, VoiceAsrResult, VoiceCall, VoiceFix,
+    VoiceGrant, ops,
+};
 
-use super::moss::{self, Realtime, Verdict};
+use super::moss::{self, HttpTranscriber, Realtime, Transcriber, Verdict};
 use super::prompt;
 use crate::channel::{Chat, Picked, Posting, Saying};
-use crate::context::api::{LiveVoiceLine, LiveVoicePort};
+use crate::context::api::{BoxFuture, LiveVoiceLine, LiveVoicePort};
 use crate::context::port::VoiceOrchestratorPort;
 use crate::context::{Context, now};
 use crate::setting::{Account, Secret, Setting, Use};
@@ -46,6 +50,8 @@ pub struct Parts {
     pub orchestrator: Arc<dyn VoiceOrchestratorPort>,
     /// Optional MOSS Live key probe override (tests).
     pub realtime: Option<Arc<dyn Realtime>>,
+    /// Optional MOSS transcription client override (tests).
+    pub transcriber: Option<Arc<dyn Transcriber>>,
 }
 
 #[derive(Clone, PartialEq)]
@@ -98,6 +104,7 @@ type GrantKey = (String, String);
 struct State {
     grants: HashMap<GrantKey, Grant>,
     calls: HashMap<String, Arc<Call>>,
+    asr_sessions: HashSet<String>,
     moss: Option<Arc<MossShared>>,
     live_line: bool,
     stopped: bool,
@@ -110,6 +117,7 @@ pub struct Voice {
     chat: Arc<Chat>,
     orchestrator: Arc<dyn VoiceOrchestratorPort>,
     realtime: Arc<dyn Realtime>,
+    transcriber: Arc<dyn Transcriber>,
     state: Mutex<State>,
     commentary: AtomicU64,
 }
@@ -132,6 +140,7 @@ fn new_uid() -> String {
 impl Voice {
     pub fn open(p: Parts) -> Arc<Voice> {
         let realtime = p.realtime.unwrap_or_else(|| Arc::new(moss::HttpProbe(p.ctx.http.clone())));
+        let transcriber = p.transcriber.unwrap_or_else(|| Arc::new(HttpTranscriber(p.ctx.http.clone())));
         Arc::new_cyclic(|me| Voice {
             me: me.clone(),
             ctx: p.ctx,
@@ -139,6 +148,7 @@ impl Voice {
             chat: p.chat,
             orchestrator: p.orchestrator,
             realtime,
+            transcriber,
             state: Mutex::default(),
             commentary: AtomicU64::new(0),
         })
@@ -527,6 +537,109 @@ impl Voice {
     pub(crate) async fn handle_call_say(&self, req: <ops::VoiceCallSay as Op>::Input) -> Result<(), ApiError> {
         self.said_async(&req.agent_id, &req.text).await
     }
+
+    /// `voice.asr.start`: allocates an active ASR dictation session using the bound MOSS Live or Transcription key.
+    pub fn asr_start(&self) -> Result<VoiceAsrGrant, ApiError> {
+        let providers = self.setting.providers();
+        let account = providers
+            .account(Use::Live)
+            .or_else(|| providers.account(Use::Transcription))
+            .ok_or_else(|| unavailable(t("server.voice.moss.noAsrKey", &[]), Some(VoiceFix::Moss)))?;
+        let mut state = self.state.lock();
+        if state.stopped {
+            return Err(Self::stopped());
+        }
+        if state.asr_sessions.len() >= 64 {
+            state.asr_sessions.clear();
+        }
+        let session_id = format!("asr-{}", uuid::Uuid::new_v4().simple());
+        state.asr_sessions.insert(session_id.clone());
+        Ok(VoiceAsrGrant {
+            session_id,
+            model: account.model,
+        })
+    }
+
+    /// `voice.asr.stop`: ends an ASR dictation session cleanly.
+    pub fn asr_stop(&self, session_id: &str) -> Result<(), ApiError> {
+        self.state.lock().asr_sessions.remove(session_id);
+        Ok(())
+    }
+
+    /// `voice.asr.transcribe`: transcribes a base64-encoded WAV clip via MOSS Transcription.
+    pub async fn asr_transcribe_async(&self, req: <ops::VoiceAsrTranscribe as Op>::Input) -> Result<VoiceAsrResult, ApiError> {
+        let wav = base64::engine::general_purpose::STANDARD
+            .decode(req.wav_base64.trim())
+            .map_err(|_| ApiError::new(BizCode::InvalidInput, t("server.voice.asr.badAudio", &[])))?;
+        let text = self.transcribe_wav_async(wav).await?;
+        Ok(VoiceAsrResult { text })
+    }
+
+    /// Transcribes raw WAV bytes via MOSS Transcription (`Use::Transcription`).
+    pub async fn transcribe_wav_async(&self, wav: Vec<u8>) -> Result<String, ApiError> {
+        if self.state.lock().stopped {
+            return Err(Self::stopped());
+        }
+        if wav.len() <= 44 || wav.len() > (16 << 20) || !wav.starts_with(b"RIFF") || &wav[8..12] != b"WAVE" {
+            return Err(ApiError::new(BizCode::InvalidInput, t("server.voice.asr.badAudio", &[])));
+        }
+        let account = self
+            .setting
+            .providers()
+            .account(Use::Transcription)
+            .ok_or_else(|| unavailable(t("server.voice.moss.noTranscribeKey", &[]), Some(VoiceFix::Moss)))?;
+        self.transcriber.transcribe_wav_async(&account.key, &account.model, wav).await.map_err(failed)
+    }
+
+    /// Lightweight dictation-only MOSS Live WebSocket credentials (no tools or commentary).
+    pub fn asr_line(&self) -> Result<MossAsrLine, ApiError> {
+        let account = self.live_account()?;
+        if self.state.lock().stopped {
+            return Err(Self::stopped());
+        }
+        Ok(MossAsrLine {
+            url: format!("wss://api.mosi.cn/v1/realtime?model={}", account.model),
+            key: account.key,
+        })
+    }
+
+    pub(crate) fn handle_asr_start(&self) -> Result<VoiceAsrGrant, ApiError> {
+        self.asr_start()
+    }
+
+    pub(crate) fn handle_asr_stop(&self, req: <ops::VoiceAsrStop as Op>::Input) -> Result<(), ApiError> {
+        self.asr_stop(&req.session_id)
+    }
+
+    pub(crate) async fn handle_asr_transcribe(&self, req: <ops::VoiceAsrTranscribe as Op>::Input) -> Result<VoiceAsrResult, ApiError> {
+        self.asr_transcribe_async(req).await
+    }
+}
+
+/// Minimal MOSS Live handle used strictly for streaming composer speech dictation.
+pub struct MossAsrLine {
+    pub url: String,
+    pub key: Secret,
+}
+
+impl LiveVoiceLine for MossAsrLine {
+    fn url(&self) -> &str {
+        &self.url
+    }
+
+    fn bearer_token(&self) -> &str {
+        self.key.expose()
+    }
+
+    fn session_update(&self) -> String {
+        moss::asr_session_update()
+    }
+
+    fn take_outgoing(&self) -> Option<tokio::sync::mpsc::UnboundedReceiver<String>> {
+        None
+    }
+
+    fn heard(&self, _raw: &str) {}
 }
 
 #[derive(Default)]
@@ -675,6 +788,22 @@ impl LiveVoicePort for Voice {
     fn moss_line(&self) -> Result<Box<dyn LiveVoiceLine>, ApiError> {
         let me = self.me.upgrade().ok_or_else(Voice::stopped)?;
         Ok(Box::new(Voice::moss_line(&me)?))
+    }
+
+    fn asr_line(&self) -> Result<Box<dyn LiveVoiceLine>, ApiError> {
+        Voice::asr_line(self).map(|line| Box::new(line) as Box<dyn LiveVoiceLine>)
+    }
+
+    fn can_transcribe(&self) -> bool {
+        self.setting.providers().account(Use::Transcription).is_some()
+    }
+
+    fn transcribe_wav_async(&self, wav: Vec<u8>) -> BoxFuture<'static, Result<String, ApiError>> {
+        let voice = self.me.upgrade();
+        Box::pin(async move {
+            let voice = voice.ok_or_else(Voice::stopped)?;
+            voice.transcribe_wav_async(wav).await
+        })
     }
 
     fn start(&self, channel: &str, uid: &str) -> Result<VoiceCall, ApiError> {

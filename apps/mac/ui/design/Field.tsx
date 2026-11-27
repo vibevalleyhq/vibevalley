@@ -155,7 +155,7 @@ export function Field(props: { label: string; hint?: string | undefined; childre
 export function Select<V extends string>(props: {
   value: V;
   onChange: (v: V) => void;
-  options: readonly { value: V; label: string; disabled?: boolean | undefined }[];
+  options: readonly { value: V; label: string; disabled?: boolean | undefined; group?: string | undefined }[];
   placeholder?: ("" extends V ? string : never) | undefined;
   label: string;
   /** Placement only: width, margins. */
@@ -171,19 +171,40 @@ export function Select<V extends string>(props: {
   disabled?: boolean | undefined;
   /** A choice on its way to the server (shown already) or refused (the value is the server's again). */
   state?: "pending" | "failed" | undefined;
+  searchable?: boolean | undefined;
+  searchPlaceholder?: string | undefined;
+  emptyText?: string | undefined;
+  popupClass?: string | undefined;
+  itemClass?: string | undefined;
+  renderOption?:
+    | ((entry: { readonly value: string; readonly title: string; readonly disabled: boolean; readonly group?: string | undefined }) => JSX.Element)
+    | undefined;
+  renderValue?: ((item: { readonly value: () => V; readonly label: () => string }) => JSX.Element) | undefined;
 }) {
-  const all = computed(() => [...(props.placeholder !== undefined ? [{ value: "", label: props.placeholder, disabled: false }] : []), ...props.options]);
+  const all = computed(() => [
+    ...(props.placeholder !== undefined ? [{ value: "", label: props.placeholder, disabled: false, group: undefined }] : []),
+    ...props.options,
+  ]);
   const offered = (v: string): v is V => all().some((o) => o.value === v);
   const shown = computed(() => all().find((o) => o.value === props.value)?.label ?? props.placeholder ?? "");
   const tinted = computed(() => props.filter === true && props.value !== "");
-  const selectItems = computed(() => all().map((o) => ({ value: o.value, title: o.label, disabled: o.disabled === true })));
+  const selectItems = computed(() =>
+    all().map((o) => ({
+      value: o.value,
+      title: o.label,
+      disabled: o.disabled === true,
+      ...(o.group !== undefined ? { group: o.group } : {}),
+    })),
+  );
   const disabled = () => props.disabled === true;
   const textClass = () => (props.text === "xs" ? "text-xs" : "text-sm");
   const triggerSurface = () => {
     if (props.state === "failed") return "border-berry bg-bad-soft";
     if (props.state === "pending" || tinted()) return "";
-    if (props.quiet === true) return disabled() ? "border-transparent bg-transparent" : "border-transparent bg-transparent hover:border-line hover:bg-page";
-    return disabled() ? "border-line bg-page" : "border-line bg-page hover:border-faint hover:bg-hover";
+    if (props.quiet === true) {
+      return disabled() ? "border-transparent bg-transparent" : "border-transparent bg-transparent hover:border-line hover:bg-page aria-expanded:bg-page";
+    }
+    return disabled() ? "border-line bg-page" : "border-line bg-page hover:border-faint hover:bg-hover aria-expanded:bg-page";
   };
   const triggerStyle = () => {
     if (props.state === "pending") return { borderColor: mix("wheat", 0.55), backgroundColor: mix("wheat", 0.1) };
@@ -204,20 +225,47 @@ export function Select<V extends string>(props: {
       value={props.value}
       disabled={props.disabled}
       items={selectItems()}
+      searchable={props.searchable}
+      searchPlaceholder={props.searchPlaceholder ?? (props.searchable === true ? t("web.shell.palette.mode.search") : undefined)}
+      searchAccessibilityLabel={props.searchPlaceholder ?? props.label}
+      searchTestID={props.testid ? `${props.testid}-search` : undefined}
+      searchClass="mb-1 h-7 rounded-md border border-line bg-page px-2 text-xs text-ink placeholder:text-faint hover:border-faint focus:border-focus"
+      groupClass="px-2 pt-1.5 pb-0.5 text-2xs font-semibold text-faint"
+      empty={
+        <If when={props.emptyText ?? (props.searchable === true ? t("web.base.table.empty") : undefined)}>
+          {(msg) => (
+            <View class="items-center px-2 py-3">
+              <Text class="text-xs text-muted">{msg()}</Text>
+            </View>
+          )}
+        </If>
+      }
       onChange={(e) => {
         const v = e.value ?? "";
         if (offered(v)) props.onChange(v);
       }}
+      cover={false}
+      placement="bottom"
       offset={4}
       align="start"
-      popupClass={`max-h-72 rounded-lg border border-line bg-elevated p-1 shadow-float ${motionClass("transition-opacity duration-120 ease-out")}`}
+      popupClass={`min-w-40 max-h-72 rounded-lg border border-line-strong bg-elevated p-1 shadow-float ${motionClass("transition-opacity duration-120 ease-out")} ${props.popupClass ?? ""}`}
       popupStartingClass={popupTransition("opacity-0")}
       popupEndingClass={popupTransition("opacity-0")}
       listClass="gap-0.5"
-      itemClass="group h-7 flex-row items-center gap-2 rounded-md px-2 focus:bg-hover selected:bg-selected disabled:opacity-50"
+      itemClass={
+        props.itemClass ??
+        "group min-h-7 flex-row items-center gap-2 rounded-md px-2 py-1 focus:bg-hover hover:bg-hover selected:bg-selected disabled:opacity-50"
+      }
       renderItem={(entry) => (
         <View class="min-w-0 flex-1 flex-row items-center gap-2">
-          <Text class={`min-w-0 flex-1 truncate ${textClass()} text-ink group-selected:font-medium group-disabled:text-faint`}>{entry.title}</Text>
+          <If
+            when={props.renderOption !== undefined}
+            else={<Text class={`min-w-0 flex-1 truncate ${textClass()} text-ink group-selected:font-medium group-disabled:text-faint`}>{entry.title}</Text>}
+          >
+            <View class="min-w-0 flex-1">
+              {props.renderOption?.({ value: entry.value, title: entry.title, disabled: entry.disabled, group: entry.group ?? undefined })}
+            </View>
+          </If>
           <View class="size-3.5 shrink-0 items-center justify-center opacity-0 group-selected:opacity-100">
             <Icon name="ticked" size={12} tone="accent" />
           </View>
@@ -236,7 +284,9 @@ export function Select<V extends string>(props: {
           ].join(" ")}
           style={triggerStyle()}
         >
-          <Text class={`min-w-0 flex-1 truncate ${textClass()} ${labelColor()}`}>{shown()}</Text>
+          <If when={props.renderValue !== undefined} else={<Text class={`min-w-0 flex-1 truncate ${textClass()} ${labelColor()}`}>{shown()}</Text>}>
+            <View class="min-w-0 flex-1">{props.renderValue?.({ value: () => props.value, label: shown })}</View>
+          </If>
           <If when={props.state === "pending"}>
             <Icon name="wait" size={12} tone="warn-ink" />
           </If>

@@ -19,6 +19,7 @@ export interface VdpUiNode {
   readonly role: string;
   readonly text?: string | undefined;
   readonly route?: string | undefined;
+  readonly source?: string | undefined;
   readonly bounds?: VdpUiBounds | undefined;
   readonly pressable: boolean;
   readonly children?: readonly VdpUiNode[] | undefined;
@@ -29,6 +30,7 @@ export interface VdpNodeRegistration {
   readonly role?: string | undefined;
   readonly text?: string | (() => string | undefined) | undefined;
   readonly route?: string | (() => string | undefined) | undefined;
+  readonly source?: string | undefined;
   readonly parentId?: string | undefined;
   readonly getRef?: (() => ViewRef | undefined) | undefined;
   readonly onPress?: (() => void | Promise<void>) | undefined;
@@ -192,6 +194,7 @@ async function snapshotNode(reg: VdpNodeRegistration): Promise<VdpUiNode> {
     role: reg.role ?? "view",
     ...(text !== undefined ? { text } : {}),
     ...(route !== undefined ? { route } : {}),
+    ...(reg.source !== undefined ? { source: reg.source } : {}),
     ...(bounds !== undefined ? { bounds } : {}),
     pressable: typeof reg.onPress === "function",
   };

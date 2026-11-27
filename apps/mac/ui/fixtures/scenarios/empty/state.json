@@ -14,7 +14,12 @@
       },
       "runningSlots": 0,
       "maxRunning": 6,
-      "byIssue": {}
+      "byIssue": {},
+      "schedule": {
+        "todayDayMs": 0,
+        "scheduled": [],
+        "unscheduledIds": []
+      }
     }
   },
   "sessions": {

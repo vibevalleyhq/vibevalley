@@ -84,7 +84,6 @@
     "runtime": "引擎自己接着做",
     "refined": "起草好了",
     "reported": "交回来了",
-    "said": "：{summary}",
     "accepted": "验收通过",
     "asked": "问你：{questions}",
     "rejected": "打回：{lines}",
@@ -99,6 +98,12 @@
   },
   "prSubmitNotAllowed": "这个工单没有用户明确授予的自行提交 PR 权限",
   "prSubmitNotCurrent": "只有当前处理这个工单的执行会话能提交 PR",
+  "triage": {
+    "onlyBacklog": "备选池梳理建议只适用于需求池工单（#{n} 当前不在备选池）",
+    "emptyPatch": "梳理建议至少要包含一项字段或状态修改建议",
+    "emptyReason": "提交梳理建议需要填写原因",
+    "notFound": "未找到备选池建议 {id} 或已处理"
+  },
   "prSubmitUnavailable": "这个工单的仓库没有启用 PR 交付",
   "deliveryNeedsPr": "请先交付一个有效的 PR/MR，再验收完成",
   "notFound": "没有工单 {id}",

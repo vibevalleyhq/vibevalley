@@ -214,6 +214,103 @@ impl Locale {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+pub enum CompareAnnotationSide {
+    #[serde(rename = "before")]
+    Before,
+    #[serde(rename = "after")]
+    After,
+    #[serde(rename = "both")]
+    Both,
+}
+
+impl CompareAnnotationSide {
+    pub const ALL: [CompareAnnotationSide; 3] = [CompareAnnotationSide::Before, CompareAnnotationSide::After, CompareAnnotationSide::Both];
+
+    /// The string on the wire.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            CompareAnnotationSide::Before => "before",
+            CompareAnnotationSide::After => "after",
+            CompareAnnotationSide::Both => "both",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+pub enum CompareAnnotationTone {
+    #[serde(rename = "issue")]
+    Issue,
+    #[serde(rename = "fixed")]
+    Fixed,
+    #[serde(rename = "note")]
+    Note,
+}
+
+impl CompareAnnotationTone {
+    pub const ALL: [CompareAnnotationTone; 3] = [CompareAnnotationTone::Issue, CompareAnnotationTone::Fixed, CompareAnnotationTone::Note];
+
+    /// The string on the wire.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            CompareAnnotationTone::Issue => "issue",
+            CompareAnnotationTone::Fixed => "fixed",
+            CompareAnnotationTone::Note => "note",
+        }
+    }
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct CompareImage {
+    pub attachment: Option<String>,
+    pub url: Option<String>,
+    pub label: Option<String>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct CompareAnnotation {
+    pub n: i64,
+    pub side: Option<CompareAnnotationSide>,
+    pub rect: [f64; 4],
+    pub tone: Option<CompareAnnotationTone>,
+    pub note: String,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct CompareSpec {
+    pub title: Option<String>,
+    pub before: Option<CompareImage>,
+    pub after: Option<CompareImage>,
+    pub image: Option<CompareImage>,
+    pub annotations: Option<Vec<CompareAnnotation>>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum CompareMarkdownSegment {
+    #[serde(rename_all = "camelCase")]
+    Markdown { text: String },
+    #[serde(rename_all = "camelCase")]
+    Compare { raw: String, spec: CompareSpec },
+}
+
 #[cfg(feature = "ts-gen")]
 crate::typescript::module! {
     "common";
@@ -228,6 +325,12 @@ crate::typescript::module! {
     Applied,
     KeySource,
     KeyStatus,
-    Locale];
+    Locale,
+    CompareAnnotationSide,
+    CompareAnnotationTone,
+    CompareImage,
+    CompareAnnotation,
+    CompareSpec,
+    CompareMarkdownSegment];
     aliases: [];
 }

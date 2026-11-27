@@ -34,8 +34,8 @@
       "hint": "Installed coding engines across machines"
     },
     "team": {
-      "label": "Team",
-      "hint": "Roles and team templates"
+      "label": "Experts",
+      "hint": "Experts and templates"
     },
     "settings": {
       "label": "Settings",
@@ -47,7 +47,76 @@
     "tabsLabel": "Dashboard views",
     "tab": {
       "overview": "Overview",
+      "retro": "Retro",
       "runs": "Runs"
+    },
+    "retro": {
+      "title": "Cycle Time & Retro",
+      "subtitle": "{n} issues in window",
+      "windowLabel": "Retro time window",
+      "window": {
+        "7d": "7d",
+        "14d": "14d",
+        "30d": "30d",
+        "all": "All"
+      },
+      "copyReport": "Copy Retro Markdown Report",
+      "copiedReport": "Copied Retro Report",
+      "copiedToast": "Retro Markdown report copied to clipboard",
+      "copyFailed": "Could not copy retro report to clipboard",
+      "retry": "Retry",
+      "empty": "No issues recorded in this time window.",
+      "kpi": {
+        "throughput": "Throughput",
+        "throughputSub": "{done} done · {canceled} canceled · {open} open",
+        "completionRate": "{pct}% completion",
+        "cycleTime": "Cycle Time (Created → Closed)",
+        "reviewWait": "Review Wait (Queued → Reviewed)",
+        "medianP90": "P50 {median} · P90 {p90}",
+        "samples": "{n} samples",
+        "dueSla": "Due Date SLA",
+        "dueSub": "{onTime} on time · {overdue} overdue · {noDue} no due date",
+        "rework": "Findings Rework",
+        "reworkSub": "{issues} issues · {findings} findings ({unresolved} open)"
+      },
+      "breakdown": {
+        "byRepo": "By Repository",
+        "byTag": "By Tag",
+        "byAgent": "By Agent",
+        "empty": "No breakdown entries in this window.",
+        "bucketMeta": "{done} done · {rework} rework · {overdue} overdue",
+        "medianShort": "P50 {median}",
+        "noRepo": "No repository",
+        "untagged": "Untagged",
+        "unassigned": "Unassigned"
+      },
+      "overdue": {
+        "title": "Overdue Items",
+        "empty": "No overdue items in this window.",
+        "issue": "Issue",
+        "status": "Status",
+        "owner": "Repo / Agent",
+        "delay": "Overdue"
+      },
+      "rework": {
+        "title": "Rework & Findings Items",
+        "empty": "No rework findings recorded in this window.",
+        "issue": "Issue",
+        "status": "Status",
+        "owner": "Repo / Agent",
+        "findings": "Findings",
+        "unresolved": "{n} open",
+        "allResolved": "All resolved"
+      },
+      "markdown": {
+        "heading": "Issue Retro Report ({window})",
+        "summary": "Summary",
+        "throughputLine": "Throughput: {done} done, {canceled} canceled, {open} open (total {total})",
+        "cycleLine": "Cycle time (Created -> Closed): median {median}, P90 {p90} ({n} samples)",
+        "reviewLine": "Review wait (Queued -> Reviewed): median {median}, P90 {p90} ({n} samples)",
+        "dueLine": "Due SLA: {onTimeRate} on-time ({onTime} on time, {overdue} overdue, {noDue} without due date)",
+        "reworkLine": "Rework: {reworkRate} ({issues} issues, {findings} findings, {unresolved} unresolved)"
+      }
     },
     "profile": {
       "defaultName": "Workspace User",
@@ -130,7 +199,6 @@
     "removeKey": "Remove {label}",
     "keepKey": "Keep {label}",
     "undo": "Undo",
-    "storedIn": "Saved in {file}",
     "keepEmpty": "Leave empty to keep",
     "save": "Save",
     "reset": "Reset",

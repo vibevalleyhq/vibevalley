@@ -1,11 +1,16 @@
 import { t } from "@vibevalley/i18n";
-import type { Channel, Feature, Readiness } from "@vibevalley/protocol";
+import type { Channel, Feature, Readiness, Skill } from "@vibevalley/protocol";
 
 import { api, createRequestKey } from "../../../infra/api";
 import { fixOf } from "../../../infra/readiness";
 import type { Nameable } from "./mentions";
 const CommandNames = ["issue", "remember", "stop", "dm", "imagegen"] as const;
 type CommandName = (typeof CommandNames)[number];
+
+/** Parsed slash invocation: built-in farm action or a skill from `$VIBEVALLEY_HOME/skills` / library. */
+export type ParsedCommand =
+  | { readonly kind: "builtin"; readonly name: CommandName; readonly text: string }
+  | { readonly kind: "skill"; readonly skill: Skill; readonly args: string };
 
 /** Where a command runs: the place the box writes to, and the orchestrator that looks after it. */
 interface CommandPlace {
@@ -60,9 +65,9 @@ const run: Record<CommandName, (text: string, at: CommandPlace) => Promise<Comma
   },
 };
 
-/** The commands as the menu offers them, like names: /issue, /stop… */
-export const commandNameables = (readiness: Record<Feature, Readiness> | undefined): Nameable[] =>
-  CommandNames.map((name) => {
+/** The commands as the menu offers them, like names: /issue, /stop, plus user/built-in skills. */
+export const commandNameables = (readiness: Record<Feature, Readiness> | undefined, skills: readonly Skill[] = []): Nameable[] => {
+  const builtins: Nameable[] = CommandNames.map((name) => {
     const image = readiness?.image;
     const note =
       name === "imagegen" && image?.ready === false
@@ -70,22 +75,42 @@ export const commandNameables = (readiness: Record<Feature, Readiness> | undefin
         : t(`web.channel.commands.${name}.note`);
     return { token: `/${name}`, name: t(`web.channel.commands.${name}.name`), note, args: t(`web.channel.commands.${name}.args`) };
   });
+  const taken = new Set<string>(CommandNames);
+  const skillItems: Nameable[] = [];
+  for (const s of skills) {
+    if (taken.has(s.id)) continue;
+    taken.add(s.id);
+    skillItems.push({
+      token: `/${s.id}`,
+      name: s.name,
+      note: s.description || t("web.channel.commands.skillNote"),
+      args: t("web.channel.commands.skillArgs"),
+    });
+  }
+  return [...builtins, ...skillItems];
+};
 
 /** The command being typed: / first in the box, the caret still in its word. */
 export function typedCommand(text: string, caret: number) {
   if (!text.startsWith("/") || caret < 1) return undefined;
   const word = text.slice(1, caret);
-  return /^[a-z]*$/u.test(word) ? { start: 0, query: word } : undefined;
+  return /^[a-zA-Z0-9_-]*$/u.test(word) ? { start: 0, query: word } : undefined;
 }
 
-/** A line that is a command, with the words after it; any other line, /usr/bin too, is said as it is. */
-export function commandOf(line: string): { readonly name: CommandName; readonly text: string } | undefined {
-  const m = /^\/([a-z]+)(?:\s+([\s\S]*))?$/u.exec(line.trim());
-  const name = CommandNames.find((n) => n === m?.[1]);
-  return name ? { name, text: (m?.[2] ?? "").trim() } : undefined;
+/** A line that is a command or skill invocation; any other line, /usr/bin too, is said as it is. */
+export function commandOf(line: string, skills: readonly Skill[] = []): ParsedCommand | undefined {
+  const m = /^\/([a-zA-Z0-9_-]+)(?:\s+([\s\S]*))?$/u.exec(line.trim());
+  if (!m) return undefined;
+  const token = m[1] ?? "";
+  const rest = (m[2] ?? "").trim();
+  const builtin = CommandNames.find((n) => n === token);
+  if (builtin) return { kind: "builtin", name: builtin, text: rest };
+  const lowered = token.toLowerCase();
+  const skill = skills.find((s) => s.id.toLowerCase() === lowered) ?? skills.find((s) => s.name.toLowerCase() === lowered);
+  return skill ? { kind: "skill", skill, args: rest } : undefined;
 }
 
-/** Runs a command; one that needs words and has none is refused here, before the server is asked. */
+/** Runs a built-in command; one that needs words and has none is refused here, before the server is asked. */
 export async function runCommand(command: { readonly name: CommandName; readonly text: string }, at: CommandPlace): Promise<CommandDone> {
   if (needsText[command.name] && !command.text) throw new Error(t(`web.channel.commands.${command.name}.needs`));
   return run[command.name](command.text, at);

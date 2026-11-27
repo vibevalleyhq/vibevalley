@@ -190,7 +190,7 @@ struct ToolProperty {
 struct Session<'a> {
     persona: Persona<'a>,
     instructions: String,
-    tools: [Tool; 1],
+    tools: Vec<Tool>,
 }
 
 #[derive(Serialize)]
@@ -233,7 +233,7 @@ pub fn session_update(persona: &str, greeting: &str) -> String {
         session: Session {
             persona: Persona { prompt: persona },
             instructions: prompt::moss_instructions(greeting),
-            tools: [Tool {
+            tools: vec![Tool {
                 kind: "function",
                 name: TOOL,
                 description: prompt::ASK_ORCHESTRATOR,
@@ -248,6 +248,17 @@ pub fn session_update(persona: &str, greeting: &str) -> String {
                     required: ["question"],
                 },
             }],
+        },
+    })
+}
+
+/// Session configuration for dictation-only ASR over MOSS Live (no tools).
+pub fn asr_session_update() -> String {
+    frame(Saying::SessionUpdate {
+        session: Session {
+            persona: Persona { prompt: prompt::ASR_PERSONA },
+            instructions: prompt::ASR_INSTRUCTIONS.into(),
+            tools: vec![],
         },
     })
 }
@@ -359,6 +370,175 @@ impl Realtime for HttpProbe {
                 Vec::new()
             };
             parse_probe_response(key, response.status, body)
+        })
+    }
+}
+
+/// Wraps signed 16-bit little-endian PCM bytes into a standard 44-byte RIFF/WAVE container.
+pub fn pcm16_to_wav(pcm: &[u8], sample_rate: u32, channels: u16) -> Vec<u8> {
+    let data_len = u32::try_from(pcm.len()).unwrap_or(u32::MAX);
+    let block_align = channels.saturating_mul(2);
+    let byte_rate = sample_rate.saturating_mul(u32::from(block_align));
+    let mut wav = Vec::with_capacity(44 + pcm.len());
+    wav.extend_from_slice(b"RIFF");
+    wav.extend_from_slice(&data_len.saturating_add(36).to_le_bytes());
+    wav.extend_from_slice(b"WAVEfmt ");
+    wav.extend_from_slice(&16u32.to_le_bytes());
+    wav.extend_from_slice(&1u16.to_le_bytes());
+    wav.extend_from_slice(&channels.to_le_bytes());
+    wav.extend_from_slice(&sample_rate.to_le_bytes());
+    wav.extend_from_slice(&byte_rate.to_le_bytes());
+    wav.extend_from_slice(&block_align.to_le_bytes());
+    wav.extend_from_slice(&16u16.to_le_bytes());
+    wav.extend_from_slice(b"data");
+    wav.extend_from_slice(&data_len.to_le_bytes());
+    wav.extend_from_slice(pcm);
+    wav
+}
+
+/// One-shot speech-to-text provider used by `voice.asr.transcribe` and batch ASR fallback.
+pub trait Transcriber: Send + Sync {
+    fn transcribe_wav_async<'a>(&'a self, key: &'a Secret, model: &'a str, wav: Vec<u8>) -> crate::BoxFuture<'a, Result<String, String>>;
+}
+
+/// Uploads a short WAV clip via MOSS `/files` and transcribes it through `/audio/transcriptions`.
+pub struct HttpTranscriber(pub Arc<dyn Fetch>);
+
+#[derive(Deserialize)]
+struct UploadedFile {
+    id: String,
+}
+
+#[derive(Deserialize)]
+struct TranscriptionReply {
+    text: Option<String>,
+    task_id: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct TranscriptionTask {
+    status: String,
+    text: Option<String>,
+}
+
+fn multipart_wav_body(wav: &[u8]) -> (String, Vec<u8>) {
+    let boundary = format!("vv-asr-{}", uuid::Uuid::new_v4().simple());
+    let mut body = Vec::with_capacity(wav.len() + 256);
+    body.extend_from_slice(format!("--{boundary}\r\nContent-Disposition: form-data; name=\"purpose\"\r\n\r\naudio\r\n").as_bytes());
+    body.extend_from_slice(
+        format!("--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"dictation.wav\"\r\nContent-Type: audio/wav\r\n\r\n").as_bytes(),
+    );
+    body.extend_from_slice(wav);
+    body.extend_from_slice(format!("\r\n--{boundary}--\r\n").as_bytes());
+    (format!("multipart/form-data; boundary={boundary}"), body)
+}
+
+impl HttpTranscriber {
+    async fn send_async(
+        &self,
+        key: &Secret,
+        method: &'static str,
+        path: &str,
+        body: Option<(String, Vec<u8>)>,
+        timeout: Duration,
+    ) -> Result<(u16, Vec<u8>), String> {
+        let safe = |text: &str| text.replace(key.expose(), "[redacted]").chars().take(200).collect::<String>();
+        let mut headers = vec![
+            ("authorization".into(), format!("Bearer {}", key.expose())),
+            ("accept".into(), "application/json".into()),
+        ];
+        let body = body.map(|(ct, bytes)| {
+            headers.push(("content-type".into(), ct.clone()));
+            (ct, Box::new(std::io::Cursor::new(bytes)) as Box<dyn std::io::Read + Send>)
+        });
+        let mut res = self
+            .0
+            .clone()
+            .fetch_async(
+                Request {
+                    method,
+                    url: format!("{MOSS}{path}"),
+                    headers,
+                    body,
+                    timeout,
+                },
+                tokio_util::sync::CancellationToken::new(),
+            )
+            .await
+            .map_err(|e| match e {
+                FetchError::Timeout => "MOSS transcription timed out".to_string(),
+                FetchError::Network(why) => safe(&why),
+            })?;
+        let status = res.status;
+        let raw = spawn_blocking_traced(move || read_max(&mut res.body, 1 << 20).unwrap_or_default())
+            .await
+            .unwrap_or_default();
+        if !(200..300).contains(&status) {
+            let msg = serde_json::from_slice::<ErrorBody>(&raw)
+                .ok()
+                .and_then(|b| b.error)
+                .and_then(|e| e.message)
+                .filter(|m| !m.is_empty())
+                .unwrap_or_else(|| format!("HTTP {status}"));
+            return Err(safe(&msg));
+        }
+        Ok((status, raw))
+    }
+}
+
+impl Transcriber for HttpTranscriber {
+    fn transcribe_wav_async<'a>(&'a self, key: &'a Secret, model: &'a str, wav: Vec<u8>) -> crate::BoxFuture<'a, Result<String, String>> {
+        Box::pin(async move {
+            let upload_body = multipart_wav_body(&wav);
+            let (_, upload_raw) = self.send_async(key, "POST", "/files", Some(upload_body), Duration::from_secs(30)).await?;
+            let uploaded: UploadedFile = serde_json::from_slice(&upload_raw).map_err(|_| "invalid MOSS file response".to_string())?;
+            let file_id = uploaded.id;
+            let payload = serde_json::json!({
+                "model": model,
+                "file_id": file_id,
+                "response_format": "json",
+                "async": false,
+                "stream": false
+            })
+            .to_string()
+            .into_bytes();
+            let result = async {
+                let (_, tx_raw) = self
+                    .send_async(
+                        key,
+                        "POST",
+                        "/audio/transcriptions",
+                        Some(("application/json".into(), payload)),
+                        Duration::from_secs(60),
+                    )
+                    .await?;
+                let reply: TranscriptionReply = serde_json::from_slice(&tx_raw).map_err(|_| "invalid MOSS transcription response".to_string())?;
+                if let Some(text) = reply.text {
+                    return Ok(text.trim().to_string());
+                }
+                let Some(task_id) = reply.task_id else {
+                    return Err("MOSS transcription returned neither text nor task_id".into());
+                };
+                for attempt in 0..80 {
+                    let wait = if attempt < 4 { 40 } else { 200 };
+                    tokio::time::sleep(Duration::from_millis(wait)).await;
+                    let (_, poll_raw) = self
+                        .send_async(key, "GET", &format!("/audio/tasks/{task_id}"), None, Duration::from_secs(15))
+                        .await?;
+                    let task: TranscriptionTask = serde_json::from_slice(&poll_raw).map_err(|_| "invalid MOSS task response".to_string())?;
+                    match task.status.as_str() {
+                        "SUCCESS" => return Ok(task.text.unwrap_or_default().trim().to_string()),
+                        "FAILED" => return Err("MOSS transcription failed".into()),
+                        _ => {}
+                    }
+                }
+                Err("MOSS transcription timed out".into())
+            }
+            .await;
+            let _ = self
+                .send_async(key, "DELETE", &format!("/files/{file_id}"), None, Duration::from_secs(10))
+                .await;
+            result
         })
     }
 }
@@ -481,5 +661,23 @@ mod tests {
         assert_eq!(probe(Ok((503, ""))).await, Verdict::Failed("HTTP 503".into()));
         assert_eq!(probe(Err(FetchError::Timeout)).await, Verdict::Silent);
         assert_eq!(probe(Err(FetchError::Network("dns".into()))).await, Verdict::Unreachable("dns".into()));
+    }
+
+    #[tokio::test]
+    async fn asr_session_update_has_no_tools_and_transcriber_round_trips_wav() {
+        let update: Value = serde_json::from_str(&asr_session_update()).unwrap();
+        assert_eq!(update["action"], "session.update");
+        assert_eq!(update["session"]["tools"], json!([]));
+        let wav = pcm16_to_wav(&[1, 0, 2, 0], 16_000, 1);
+        assert_eq!(&wav[0..4], b"RIFF");
+        assert_eq!(&wav[8..12], b"WAVE");
+        assert_eq!(wav.len(), 48);
+
+        let (vendor, _) = crate::fake::moss::network();
+        let text = HttpTranscriber(vendor)
+            .transcribe_wav_async(&Secret::new("test-key"), "moss-transcribe-1.0", wav)
+            .await
+            .unwrap();
+        assert_eq!(text, "First synthetic speaker. Second synthetic speaker.");
     }
 }

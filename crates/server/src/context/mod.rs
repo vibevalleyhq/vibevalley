@@ -25,15 +25,13 @@ pub use api::{
     MachineConnection, Mcp, RemoteAuth, RemoteDeviceIdentity, SharedFaultGate, SharedHostDebug, SharedLiveVoice, SharedMachineBus, SharedMcp, SharedRemoteAuth,
     dispatch_mcp_message_async, dispatch_mcp_tunnel_async, refusal,
 };
-pub use error::{AsyncRequestKeys, LookIn, RequestKeys, internal, missing, refused};
-pub use feed::{SliceFeed, SliceFeedSet, SliceFrame, SliceProjectFn, SliceSubscription, SliceWakeGate, StateFeed, encode_slice};
+pub use error::{AsyncRequestKeys, LookIn, internal, missing, refused};
+pub use feed::{SliceFeed, SliceFrame, SliceSubscription, StateFeed, encode_slice};
 pub use http::{
     Fetch, FetchError, Http, PublicBytes, PublicDownload, PublicDownloadError, ReadError, Request, Response, install_tls, read_max, read_max_until,
 };
-pub use live::{FarmEffect, FarmEffectEntry, LiveSessionSnapshot, LiveState, Sink, bridge_live_receiver};
-pub use outbox::{
-    OUTBOX_CONNECTOR_NOTIFY, OUTBOX_SESSION_REPORTED, Outbox, OutboxConfig, OutboxConnectorNotify, OutboxDelivery, OutboxEvent, OutboxSessionReported,
-};
+pub use live::{FarmEffect, LiveSessionSnapshot, LiveState, Sink, bridge_live_receiver};
+pub use outbox::{OUTBOX_CONNECTOR_NOTIFY, OUTBOX_SESSION_REPORTED, Outbox, OutboxConnectorNotify, OutboxDelivery, OutboxEvent, OutboxSessionReported};
 pub use task::{TaskGroup, Ticker};
 
 use crate::service::Service;

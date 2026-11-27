@@ -3,16 +3,68 @@
 use serde::Deserialize;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    CriterionCheck, Deliverable, Issue, IssueAnswer, IssueFilter, IssueRefineInput, IssueReportMemory, IssueRequest, IssueReviewInput, IssueStatus,
-    IssueStatusUpdateInput, IssueTimeline, IssueUpdateInput, MandateStrength, SubmitBranch,
+    ActorKind, ActorRef, BacklogTriageSuggestInput, Caller, CriterionCheck, Deliverable, HumanPauseSource, Issue, IssueAnswer, IssueDigestGetInput,
+    IssueFilter, IssueMandate, IssueRefineInput, IssueRelation, IssueReportMemory, IssueRequest, IssueReviewInput, IssueStatus, IssueStatusUpdateInput,
+    IssueTimeline, IssueUpdateInput, MandateStrength, Priority, RepoHealthStatus, SubmitBranch, TriagePatch,
 };
 
-use super::registry::{ToolRegistry, Who, given};
+use super::registry::{Route, RouteSource, ToolRegistry, Who, given};
 use crate::agent::profile::text;
 use crate::issue::ChildDraft;
-use crate::runtime::{Report, ReportQuestion, ReportStatus};
+use crate::runtime::{Report, ReportQuestion, ReportStatus, RunMode};
 
 const PRIORITIES: &str = "Expected one of: 紧急, 高, 普通, 中, 低, urgent, high, medium, low";
+
+/// The 4 hard authorization tiers enforced on issue mutations in Rust.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AuthTier {
+    /// Tier 1: create and immediately dispatch/draft (`issue_create(start=true|draft=true)`).
+    CreateAndStart,
+    /// Tier 2: split into child issues (`issue_split`).
+    Split,
+    /// Tier 3: modify issue metadata, review, or non-done status (`issue_update`, `issue_review`, `issue_status_update(!done)`).
+    Update,
+    /// Tier 4: complete/deliver/merge an issue (`issue_status_update(done)`).
+    Done,
+}
+
+fn is_approved_cron(f: &ToolRegistry, route: &Route) -> bool {
+    if route.source != Some(RouteSource::Cron) {
+        return false;
+    }
+    let Some(cron_id) = route.cron_id.as_deref().map(str::trim).filter(|id| !id.is_empty()) else {
+        return false;
+    };
+    f.cron.list().into_iter().any(|c| {
+        c.id == cron_id
+            && !c.pending
+            && (c.enabled || (matches!(c.when, vibevalley_protocol::CronWhen::Once(_)) && c.last_run.is_some()))
+            && (c.by == ActorKind::User || !matches!(c.when, vibevalley_protocol::CronWhen::Once(_)) || c.agent.is_some())
+    })
+}
+
+fn authorize_orchestrator(f: &ToolRegistry, route: &Route, tier: AuthTier) -> Result<(), String> {
+    if route.user {
+        return Ok(());
+    }
+    match tier {
+        AuthTier::Done => Err("没成：没有用户当轮明确确认，不能把工单标记为已完成或合并（后台、巡查与定时回合一律拦截）。".into()),
+        AuthTier::CreateAndStart | AuthTier::Split | AuthTier::Update => {
+            if is_approved_cron(f, route) {
+                Ok(())
+            } else {
+                Err("没成：当前属于无用户原话的后台或巡查回合（或未批准的定时触发），缺少授权；请先在频道询问用户确认。".into())
+            }
+        }
+    }
+}
+
+fn authorize_who(f: &ToolRegistry, who: &Who, tier: AuthTier) -> Result<(), String> {
+    match who {
+        Who::Orchestrator(route) => authorize_orchestrator(f, route, tier),
+        Who::Helper(_) => Err("没成：执行会话不能直接执行该工单管理操作。".into()),
+    }
+}
 
 #[derive(Deserialize)]
 pub struct ListArgs {
@@ -135,11 +187,19 @@ pub struct ReviewArgs {
     text: Option<String>,
 }
 
-pub async fn review(f: &ToolRegistry, _who: &Who, a: ReviewArgs) -> Result<String, String> {
+pub async fn review(f: &ToolRegistry, who: &Who, a: ReviewArgs) -> Result<String, String> {
     let item = match f.issue_async(&a.id).await {
         Ok(i) => i,
         Err(why) => return Ok(why),
     };
+    match who {
+        Who::Orchestrator(_) => authorize_who(f, who, AuthTier::Update)?,
+        Who::Helper(h) => {
+            if f.session_mode_async(h).await != crate::agent::mcp::HelperRunMode::ReadOnlyReview || h.issue_id() != Some(item.id.as_str()) {
+                return Err("没成：只有正在审查这个工单的只读审查会话能调用 issue_review。".into());
+            }
+        }
+    }
     let findings = a.findings.map(|f| match f {
         OneOrMany::One(one) => vec![one],
         OneOrMany::Many(many) => many,
@@ -184,17 +244,34 @@ pub async fn comment(f: &ToolRegistry, _: &Who, a: CommentArgs) -> Result<String
     })
 }
 
-pub async fn stop(f: &ToolRegistry, _who: &Who, a: IdArgs) -> Result<String, String> {
+pub async fn stop(f: &ToolRegistry, who: &Who, a: IdArgs) -> Result<String, String> {
+    let Who::Orchestrator(route) = who else {
+        return Err("没成：执行会话不能叫停工单。".into());
+    };
     let item = match f.issue_async(&a.id).await {
         Ok(i) => i,
         Err(why) => return Ok(why),
     };
     let Some(w) = f.worker_of_async(&item).await else {
+        if route.user {
+            return Ok(match f.issue.stop_with_pause_async(&item.id, HumanPauseSource::UserChat).await {
+                Ok(()) => format!("#{} 已记录人工暂停，等待用户明确恢复", item.number),
+                Err(why) => why.to_string(),
+            });
+        }
         return Ok(text::nobody_on(item.number));
     };
-    Ok(match f.runtime.stop_async(&w.id).await {
+    let res = if route.user {
+        f.issue
+            .stop_with_pause_async(&item.id, HumanPauseSource::UserChat)
+            .await
+            .map_err(|e| e.to_string())
+    } else {
+        f.runtime.stop_async(&w.id).await.map_err(|e| e.message)
+    };
+    Ok(match res {
         Ok(()) => format!("#{} 这一轮叫停了", item.number),
-        Err(why) => why.message,
+        Err(why) => why,
     })
 }
 
@@ -241,10 +318,15 @@ pub struct UpdateArgs {
     deliver: Option<Deliverable>,
     priority: Option<String>,
     agent: Option<String>,
+    owner: Option<ActorRef>,
+    #[serde(rename = "blockedBy")]
+    blocked_by: Option<Vec<String>>,
+    relations: Option<Vec<IssueRelation>>,
     attachments: Option<Vec<String>>,
 }
 
-pub async fn update(f: &ToolRegistry, _who: &Who, a: UpdateArgs) -> Result<String, String> {
+pub async fn update(f: &ToolRegistry, who: &Who, a: UpdateArgs) -> Result<String, String> {
+    authorize_who(f, who, AuthTier::Update)?;
     let item = match f.issue_async(&a.id).await {
         Ok(i) => i,
         Err(why) => return Ok(why),
@@ -257,6 +339,9 @@ pub async fn update(f: &ToolRegistry, _who: &Who, a: UpdateArgs) -> Result<Strin
         criteria: a.criteria,
         deliver: a.deliver,
         attachments: a.attachments,
+        owner: a.owner,
+        blocked_by: a.blocked_by,
+        relations: a.relations,
         ..Default::default()
     };
     if let Some(pr) = given(&a.priority) {
@@ -289,11 +374,13 @@ pub struct StatusArgs {
 }
 
 pub async fn status(f: &ToolRegistry, who: &Who, a: StatusArgs) -> Result<String, String> {
+    let to = text::status_named(&a.status).ok_or_else(|| format!("Expected one of: {}", text::STATUS_WORDS))?;
+    let tier = if to == IssueStatus::Done { AuthTier::Done } else { AuthTier::Update };
+    authorize_who(f, who, tier)?;
     let item = match f.issue_async(&a.id).await {
         Ok(i) => i,
         Err(why) => return Ok(why),
     };
-    let to = text::status_named(&a.status).ok_or_else(|| format!("Expected one of: {}", text::STATUS_WORDS))?;
     let mut req = IssueStatusUpdateInput {
         revision: None,
         id: item.id.clone(),
@@ -308,6 +395,15 @@ pub async fn status(f: &ToolRegistry, who: &Who, a: StatusArgs) -> Result<String
         Ok(Some(agent)) => req.agent = Some(agent),
         Ok(None) => {}
         Err(why) => return Ok(format!("没挪：{why}")),
+    }
+    if let Who::Orchestrator(route) = who
+        && route.user
+        && to == IssueStatus::Todo
+        && item.mandate.strength == MandateStrength::Inferred
+    {
+        let mut upgraded = IssueMandate::explicit(&route.envelope, item.mandate.auto_submit_pr);
+        upgraded.max_bot_review_rounds = item.mandate.max_bot_review_rounds;
+        let _ = f.issue.set_mandate_async(&item.id, upgraded).await;
     }
     Ok(match f.issue.status_from_input_async(&req).await.map_err(|e| e.message) {
         Ok(done) => {
@@ -333,6 +429,7 @@ pub struct CreateArgs {
     parent: Option<String>,
     #[serde(rename = "blockedBy")]
     blocked_by: Option<Vec<String>>,
+    relations: Option<Vec<IssueRelation>>,
     repo: Option<String>,
     priority: Option<String>,
     agent: Option<String>,
@@ -343,18 +440,32 @@ pub struct CreateArgs {
     draft: bool,
     #[serde(rename = "autoSubmitPr")]
     auto_submit_pr: Option<bool>,
+    owner: Option<ActorRef>,
     attachments: Option<Vec<String>>,
 }
 
 /// `issue_create`: written down, and sent when asked (`start`).
 pub async fn create(f: &ToolRegistry, who: &Who, a: CreateArgs) -> Result<String, String> {
+    let Who::Orchestrator(route) = who else {
+        return Err("没成：执行会话不能通过 issue_create 建单，请使用 issue_split 拆分子工单。".into());
+    };
     if a.start && a.draft {
         return Ok("没记：起草交回来以前开不了工。要马上做就不起草；要起草就先不开工。".into());
     }
-    let here = match who {
-        Who::Orchestrator(r) => r.channel.clone(),
-        Who::Helper(h) => h.channel_id().unwrap_or("").to_string(),
+    if a.start || a.draft {
+        authorize_orchestrator(f, route, AuthTier::CreateAndStart)?;
+    }
+    if a.auto_submit_pr == Some(true) && !route.user {
+        return Err("没记：仅在用户当轮明确授权时才允许开启自动提交 PR。".into());
+    }
+    let mandate = if route.user {
+        IssueMandate::explicit(&route.envelope, a.auto_submit_pr == Some(true))
+    } else if is_approved_cron(f, route) {
+        IssueMandate::explicit(&format!("cron:{}", route.cron_id.as_deref().unwrap_or("")), false)
+    } else {
+        IssueMandate::inferred(&route.envelope)
     };
+    let here = route.channel.clone();
     let mut channel = f.chat.top_of(&here);
     if let Some(name) = given(&a.channel) {
         match f.chat.channel_by_name(name) {
@@ -368,7 +479,9 @@ pub async fn create(f: &ToolRegistry, who: &Who, a: CreateArgs) -> Result<String
         deliver: a.deliver,
         parent: a.parent,
         blocked_by: a.blocked_by,
+        relations: a.relations,
         auto_submit_pr: a.auto_submit_pr,
+        owner: a.owner,
         attachments: a.attachments,
         ..Default::default()
     };
@@ -390,7 +503,7 @@ pub async fn create(f: &ToolRegistry, who: &Who, a: CreateArgs) -> Result<String
         Ok(None) => {}
         Err(why) => return Ok(format!("没记：{why}")),
     }
-    let applied = match f.issue.create_from_request_async(&req).await.map_err(|e| e.message) {
+    let applied = match f.issue.create_from_request_with_mandate_async(&req, Some(mandate)).await.map_err(|e| e.message) {
         Ok(i) => i,
         Err(why) => return Ok(format!("没记下：{why}")),
     };
@@ -489,7 +602,20 @@ pub struct SplitArgs {
 }
 
 pub async fn split(f: &ToolRegistry, who: &Who, a: SplitArgs) -> Result<String, String> {
-    let (_, mut issue) = helper_issue_async(f, who).await?;
+    if let Who::Orchestrator(route) = who {
+        authorize_orchestrator(f, route, AuthTier::Split)?;
+    }
+    let (me, mut issue) = helper_issue_async(f, who).await?;
+    let mode = RunMode::from_session_issue(&me, Some(&issue));
+    if mode != RunMode::Execution {
+        return Err(format!("没成：当前{}模式只读，不能调用 issue_split。", mode.label_zh()));
+    }
+    if issue.mandate.strength != MandateStrength::Explicit {
+        return Err("没成：当前工单缺少用户或已批准定时的明确授权（Inferred Mandate），不能拆分子工单。".into());
+    }
+    if issue.mandate.is_paused() {
+        return Err("没成：工单已由人工暂停，不能拆分子工单。".into());
+    }
     if let Some(title) = given(&a.title) {
         issue = f
             .issue
@@ -538,10 +664,17 @@ pub struct ReportArgs {
 }
 
 pub async fn report(f: &ToolRegistry, who: &Who, a: ReportArgs) -> Result<String, String> {
-    let Ok((me, _)) = helper_issue_async(f, who).await else {
+    let Ok((me, issue)) = helper_issue_async(f, who).await else {
         return Ok("当前不是正在处理工单的帮工会话，不能交回。 ".into());
     };
+    let mode = RunMode::from_session_issue(&me, Some(&issue));
+    if mode == RunMode::Drafting {
+        return Err("没成：当前起草模式只读，不能调用 issue_report。".into());
+    }
     if a.pr_submit {
+        if mode == RunMode::ReadOnlyAnswer {
+            return Err("没成：当前只读问答模式不能提交 PR。".into());
+        }
         submit(f, who, Some(&a.summary)).await?;
     }
     let report = Report {
@@ -595,6 +728,132 @@ async fn submit(f: &ToolRegistry, who: &Who, summary: Option<&str>) -> Result<St
     };
     let data = f.pull.publish_async(&req, Some(&issue.id)).await.map_err(|e| e.message)?;
     Ok(data.url.unwrap_or(data.branch))
+}
+
+#[derive(Deserialize)]
+pub struct DigestArgs {
+    #[serde(rename = "windowHours")]
+    window_hours: Option<i64>,
+}
+
+pub async fn digest_get(f: &ToolRegistry, _who: &Who, a: DigestArgs) -> Result<String, String> {
+    let digest = f
+        .issue
+        .issue_digest_get_endpoint_async(&IssueDigestGetInput { window_hours: a.window_hours }, f.ctx.clock.as_ref())
+        .await
+        .map_err(|e| e.message)?;
+    let mut parts = Vec::new();
+    let p = &digest.progress;
+    parts.push(format!(
+        "## 一、近期进展与待处理\n- 待回复：{} · 待验收：{} · 卡住：{} · 进行中：{} · 近期完成：{}（运行 {} 次：完成 {} / 失败 {} / 中断 {}）",
+        p.asking.len(),
+        p.reviewing.len(),
+        p.stuck.len(),
+        p.working.len(),
+        p.completed_recent.len(),
+        p.runs_total,
+        p.runs_completed,
+        p.runs_failed,
+        p.runs_interrupted,
+    ));
+    for item in p.asking.iter().chain(p.stuck.iter()).chain(p.reviewing.iter()).take(8) {
+        parts.push(format!(
+            "  - #{} {}{}",
+            item.number,
+            item.title,
+            if item.detail.is_empty() {
+                String::new()
+            } else {
+                format!(" — {}", item.detail)
+            }
+        ));
+    }
+
+    let mut health_lines = vec!["## 二、仓库健康度".to_string()];
+    if digest.repo_health.is_empty() {
+        health_lines.push("- 暂无已挂载仓库".into());
+    } else {
+        for h in &digest.repo_health {
+            let status = match h.status {
+                RepoHealthStatus::OnTrack => "on_track",
+                RepoHealthStatus::AtRisk => "at_risk",
+                RepoHealthStatus::OffTrack => "off_track",
+            };
+            health_lines.push(format!(
+                "- {} [{}]（进行中 {}，待验收 {}，阻塞 {}，卡住 {}，逾期 {}）",
+                h.repo, status, h.in_progress_issues, h.in_review_issues, h.blocked_issues, h.stuck_issues, h.overdue_issues
+            ));
+        }
+    }
+    parts.push(health_lines.join("\n"));
+
+    let mut triage_lines = vec!["## 三、备选池梳理建议（需用户在界面或明确点击确认，绝不自动覆盖）".to_string()];
+    if digest.triage.is_empty() {
+        triage_lines.push("- 暂无待确认的备选池建议".into());
+    } else {
+        for s in &digest.triage {
+            triage_lines.push(format!(
+                "- [{}] #{} {}：{}（原因：{}）",
+                s.id, s.issue_number, s.issue_title, s.summary, s.reason
+            ));
+        }
+    }
+    parts.push(triage_lines.join("\n"));
+    Ok(parts.join("\n\n"))
+}
+
+#[derive(Deserialize)]
+pub struct TriageSuggestArgs {
+    #[serde(rename = "issueId")]
+    issue_id: String,
+    reason: String,
+    summary: Option<String>,
+    priority: Option<String>,
+    repo: Option<String>,
+    agent: Option<String>,
+    tags: Option<Vec<String>>,
+    status: Option<String>,
+    relations: Option<Vec<IssueRelation>>,
+}
+
+pub async fn triage_suggest(f: &ToolRegistry, who: &Who, a: TriageSuggestArgs) -> Result<String, String> {
+    let Who::Orchestrator(_) = who else {
+        return Err("没成：只有主助手能提交备选池梳理建议。".into());
+    };
+    let priority: Option<Priority> = match given(&a.priority) {
+        Some(p) => Some(text::priority_named(p).ok_or(PRIORITIES)?),
+        None => None,
+    };
+    let status = match given(&a.status) {
+        Some(s) => Some(text::status_named(s).ok_or_else(|| format!("Expected one of: {}", text::STATUS_WORDS))?),
+        None => None,
+    };
+    let created = f
+        .issue
+        .issue_triage_suggest_endpoint_async(
+            Caller::Orchestrator,
+            BacklogTriageSuggestInput {
+                issue_id: a.issue_id,
+                reason: a.reason,
+                summary: a.summary,
+                patch: TriagePatch {
+                    priority,
+                    repo: a.repo,
+                    agent: a.agent,
+                    tags: a.tags,
+                    status,
+                    relations: a.relations,
+                    due_at: None,
+                },
+            },
+            f.ctx.clock.as_ref(),
+        )
+        .await
+        .map_err(|e| e.message)?;
+    Ok(format!(
+        "已记下备选池建议（尚未改动工单，等待用户点击确认）：[{}] #{} {} -> {}",
+        created.id, created.issue_number, created.issue_title, created.summary
+    ))
 }
 
 /// The PR title (first line, a leading `#` dropped) and body a helper wrote.

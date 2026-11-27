@@ -13,7 +13,7 @@ use serde_json::Value;
 use vibevalley_i18n::{list, t};
 use vibevalley_protocol::{
     Agent, AgentFrom, AgentRole, AgentTemplate, AgentTemplateSource, ApiError, BizCode, Build, DEFAULT_ORCHESTRATOR, Head, Look, ORCHESTRATOR_RUNTIME,
-    OrchestratorLook, Outfit, PersonaMode, Preview, RuntimeSettings, Skill, Species, TemplateCategory,
+    OrchestratorLook, Outfit, PersonaMode, Preview, RuntimeSettings, Skill, Species, TemplateCategory, Toolset,
 };
 
 use super::preset::default_settings;
@@ -36,8 +36,14 @@ fn refused(text: String) -> ApiError {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 struct Stored {
     agents: Vec<Agent>,
-    skills: Vec<Skill>,
     settings: BTreeMap<String, RuntimeSettings>,
+    #[serde(skip)]
+    user_skills: Vec<Skill>,
+}
+
+struct ReadConfig {
+    stored: Stored,
+    migrated_skills: Vec<Skill>,
 }
 
 /// `castHash`: each code point's leading UTF-16 unit, as the client picks
@@ -66,8 +72,8 @@ pub fn with_cast(mut a: Agent) -> Agent {
     a
 }
 
-/// A profile's look written before `build` and `head` existed is filled in.
-fn look_filled(mut raw: Value) -> Value {
+/// A profile's look written before `build`, `head`, or `toolsets` existed is filled in.
+fn profile_filled(mut raw: Value) -> Value {
     if let Some(look) = raw.get_mut("look").and_then(Value::as_object_mut) {
         for key in ["species", "outfit", "orchestrator"] {
             look.entry(key).or_insert(Value::Null);
@@ -79,13 +85,26 @@ fn look_filled(mut raw: Value) -> Value {
             look.insert("head".into(), "rounded".into());
         }
     }
+    if raw.get("toolsets").is_none_or(Value::is_null) {
+        let role = match raw.get("role").and_then(Value::as_str) {
+            Some("orchestrator") => AgentRole::Orchestrator,
+            _ => AgentRole::Worker,
+        };
+        if let Some(obj) = raw.as_object_mut() {
+            obj.insert(
+                "toolsets".into(),
+                serde_json::to_value(Toolset::defaults_for(role)).unwrap_or(Value::Array(vec![])),
+            );
+        }
+    }
     raw
 }
 
-fn read_stored(text: &str) -> Result<Stored, String> {
+fn read_stored(text: &str) -> Result<ReadConfig, String> {
     #[derive(Deserialize)]
     struct File {
         agents: Vec<Value>,
+        #[serde(default)]
         skills: Vec<Skill>,
         settings: BTreeMap<String, RuntimeSettings>,
     }
@@ -93,13 +112,109 @@ fn read_stored(text: &str) -> Result<Stored, String> {
     let agents = file
         .agents
         .into_iter()
-        .map(|a| decode_value::<Agent>(look_filled(a)).map_err(|e| e.message))
+        .map(|a| decode_value::<Agent>(profile_filled(a)).map_err(|e| e.message))
         .collect::<Result<Vec<_>, _>>()?;
-    Ok(Stored {
-        agents,
-        skills: file.skills,
-        settings: file.settings,
+    Ok(ReadConfig {
+        stored: Stored {
+            agents,
+            settings: file.settings,
+            user_skills: Vec::new(),
+        },
+        migrated_skills: file.skills,
     })
+}
+
+fn skills_dir(home: &Path) -> PathBuf {
+    home.join("skills")
+}
+
+fn valid_skill_id(id: &str) -> bool {
+    !id.is_empty() && !matches!(id, "." | "..") && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+}
+
+fn skill_file(home: &Path, id: &str) -> PathBuf {
+    skills_dir(home).join(id).join("SKILL.md")
+}
+
+fn yaml_scalar(raw: &str) -> String {
+    let trimmed = raw.trim();
+    if trimmed.contains('\n') {
+        let indented: String = trimmed.lines().map(|l| format!("  {l}")).collect::<Vec<_>>().join("\n");
+        return format!("|\n{indented}");
+    }
+    if trimmed.is_empty() {
+        return "\"\"".to_string();
+    }
+    let needs_quotes =
+        trimmed.contains(':') || trimmed.contains('#') || matches!(trimmed.as_bytes()[0], b'>' | b'|' | b'-' | b'[' | b'{' | b'"' | b'\'' | b'*' | b'&' | b'!');
+    if !needs_quotes {
+        trimmed.to_string()
+    } else if !trimmed.contains('"') {
+        format!("\"{trimmed}\"")
+    } else if !trimmed.contains('\'') {
+        format!("'{trimmed}'")
+    } else {
+        format!("\"{}\"", trimmed.replace('"', ""))
+    }
+}
+
+fn format_skill_markdown(skill: &Skill) -> String {
+    let mut out = String::from("---\n");
+    out.push_str(&format!("name: {}\n", yaml_scalar(&skill.name)));
+    if !skill.description.trim().is_empty() {
+        out.push_str(&format!("description: {}\n", yaml_scalar(&skill.description)));
+    }
+    out.push_str("---\n\n");
+    if !skill.body.trim().is_empty() {
+        out.push_str(skill.body.trim());
+        out.push('\n');
+    }
+    out
+}
+
+async fn read_user_skills_async(home: &Path) -> Vec<Skill> {
+    let Ok(mut entries) = tokio::fs::read_dir(skills_dir(home)).await else {
+        return vec![];
+    };
+    let mut dirs = Vec::new();
+    while let Ok(Some(entry)) = entries.next_entry().await {
+        let path = entry.path();
+        if tokio::fs::metadata(&path).await.is_ok_and(|m| m.is_dir()) {
+            dirs.push(path);
+        }
+    }
+    dirs.sort();
+    let own: BTreeSet<String> = built_in_skills().into_iter().map(|k| k.id).collect();
+    let mut out = Vec::new();
+    for dir in dirs {
+        let Some(id) = dir.file_name().and_then(|n| n.to_str()).map(str::to_string) else {
+            continue;
+        };
+        if !valid_skill_id(&id) || own.contains(&id) {
+            continue;
+        }
+        let Ok(text) = tokio::fs::read_to_string(dir.join("SKILL.md")).await else {
+            continue;
+        };
+        let head = vibevalley_runtime::agent::resources::skills::front_matter(&text);
+        out.push(Skill {
+            name: head.get("name").filter(|n| !n.is_empty()).cloned().unwrap_or_else(|| id.clone()),
+            description: head.get("description").cloned().unwrap_or_default(),
+            body: vibevalley_runtime::agent::resources::skills::skill_body(&text),
+            built_in: None,
+            id,
+        });
+    }
+    out
+}
+
+async fn write_user_skill_async(home: &Path, skill: &Skill) -> std::io::Result<()> {
+    let dir = skills_dir(home).join(&skill.id);
+    tokio::fs::create_dir_all(&dir).await?;
+    let path = dir.join("SKILL.md");
+    let tmp = dir.join("SKILL.md.tmp");
+    tokio::fs::write(&tmp, format_skill_markdown(skill)).await?;
+    tokio::fs::rename(&tmp, &path).await
 }
 
 #[derive(Deserialize, Default)]
@@ -338,6 +453,7 @@ fn profile_of(item: &AgentTemplate, id: String, name: String) -> Agent {
         persona: item.persona.clone(),
         persona_mode: item.persona_mode,
         skills: item.skills.clone(),
+        toolsets: Toolset::defaults_for(item.role),
         mcp_servers: vec![],
         disallowed_tools: vec![],
         env: BTreeMap::new(),
@@ -345,6 +461,7 @@ fn profile_of(item: &AgentTemplate, id: String, name: String) -> Agent {
         worktree: item.worktree,
         tags: item.tags.clone(),
         look: item.look.clone(),
+        voice: None,
         from: Some(AgentFrom {
             template: item.id.clone(),
             version: item.version,
@@ -439,16 +556,28 @@ impl ProfileStore {
             Err(e) => return Err(e),
         };
         let built_in = built_in_templates();
-        let mut s = read.unwrap_or_else(|| {
-            let mut agents = Vec::new();
-            for id in starters {
-                if let Some(item) = built_in.iter().find(|x| x.id == *id) {
-                    let made = installed(item, &agents, None);
-                    agents.push(made);
+        let (mut s, migrated_skills) = match read {
+            Some(r) => (r.stored, r.migrated_skills),
+            None => {
+                let mut agents = Vec::new();
+                for id in starters {
+                    if let Some(item) = built_in.iter().find(|x| x.id == *id) {
+                        let made = installed(item, &agents, None);
+                        agents.push(made);
+                    }
                 }
+                (Stored { agents, ..Default::default() }, Vec::new())
             }
-            Stored { agents, ..Default::default() }
-        });
+        };
+        for skill in migrated_skills {
+            if !valid_skill_id(&skill.id) || Self::not_built_in(&skill.id).is_err() {
+                continue;
+            }
+            if tokio::fs::try_exists(skill_file(home, &skill.id)).await.unwrap_or(false) {
+                continue;
+            }
+            write_user_skill_async(home, &skill).await?;
+        }
         // The default orchestrator is always there, and always one.
         if s.agents.iter().any(|a| a.id == DEFAULT_ORCHESTRATOR) {
             for a in s.agents.iter_mut().filter(|a| a.id == DEFAULT_ORCHESTRATOR) {
@@ -460,6 +589,7 @@ impl ProfileStore {
             s.agents.insert(0, made);
         }
         s.agents = s.agents.into_iter().map(with_cast).collect();
+        s.user_skills = read_user_skills_async(home).await;
         let profiles = ProfileStore {
             home: home.to_path_buf(),
             file,
@@ -538,11 +668,10 @@ impl ProfileStore {
         helpers.iter().find(|a| a.id == k).or_else(|| helpers.iter().find(|a| a.name == k)).cloned()
     }
 
-    /// Built-in skills first; they shadow a user skill saved under the same id.
+    /// Built-in skills first, followed by user skills loaded from `<home>/skills/<id>/SKILL.md`.
     pub fn skills(&self) -> Vec<Skill> {
-        let own = built_in_skills();
-        let mut out = own.clone();
-        out.extend(self.stored.lock().skills.iter().filter(|k| !own.iter().any(|o| o.id == k.id)).cloned());
+        let mut out = built_in_skills();
+        out.extend(self.stored.lock().user_skills.clone());
         out
     }
 
@@ -641,7 +770,7 @@ impl ProfileStore {
         Self::not_built_in(id)?;
         self.stored
             .lock()
-            .skills
+            .user_skills
             .iter()
             .find(|k| k.id == id)
             .cloned()
@@ -650,12 +779,26 @@ impl ProfileStore {
 
     pub async fn save_skill_async(&self, skill: Skill) -> Result<Skill, ApiError> {
         Self::not_built_in(&skill.id)?;
+        if !valid_skill_id(&skill.id) {
+            return Err(refused(t("server.agent.noSkill", &[("id", skill.id.clone().into())])));
+        }
+        let _permit = self
+            .write_gate
+            .acquire()
+            .await
+            .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?;
         let kept = Skill { built_in: None, ..skill };
-        self.change_async(|s| {
-            s.skills = upsert(&s.skills, kept.clone(), |k| &k.id);
-            Ok(())
-        })
-        .await?;
+        write_user_skill_async(&self.home, &kept).await.map_err(|e| {
+            refused(t(
+                "server.agent.notSaved",
+                &[
+                    ("file", skill_file(&self.home, &kept.id).to_string_lossy().into_owned().into()),
+                    ("why", e.to_string().into()),
+                ],
+            ))
+        })?;
+        let mut guard = self.stored.lock();
+        guard.user_skills = upsert(&guard.user_skills, kept.clone(), |k| &k.id);
         Ok(kept)
     }
 
@@ -674,31 +817,50 @@ impl ProfileStore {
         let stem = stem.trim_matches('-').to_string();
         let stem = if stem.is_empty() { "skill".to_string() } else { stem };
         let own: BTreeSet<String> = built_in_skills().into_iter().map(|k| k.id).collect();
-        self.change_async(|s| {
-            let taken = |x: &str| own.contains(x) || s.skills.iter().any(|k| k.id == x);
-            let mut id = stem.clone();
-            let mut n = 2;
-            while taken(&id) {
-                id = format!("{stem}-{n}");
-                n += 1;
-            }
-            let created = Skill { id, built_in: None, ..draft };
-            s.skills.push(created.clone());
-            Ok(created)
-        })
-        .await
+        let _permit = self
+            .write_gate
+            .acquire()
+            .await
+            .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?;
+        let existing: BTreeSet<String> = read_user_skills_async(&self.home).await.into_iter().map(|k| k.id).collect();
+        let mut id = stem.clone();
+        let mut n = 2;
+        while own.contains(&id) || existing.contains(&id) || tokio::fs::try_exists(skills_dir(&self.home).join(&id)).await.unwrap_or(false) {
+            id = format!("{stem}-{n}");
+            n += 1;
+        }
+        let created = Skill { id, built_in: None, ..draft };
+        write_user_skill_async(&self.home, &created).await.map_err(|e| {
+            refused(t(
+                "server.agent.notSaved",
+                &[
+                    ("file", skill_file(&self.home, &created.id).to_string_lossy().into_owned().into()),
+                    ("why", e.to_string().into()),
+                ],
+            ))
+        })?;
+        self.stored.lock().user_skills.push(created.clone());
+        Ok(created)
     }
 
     pub async fn remove_skill_async(&self, id: &str) -> Result<(), ApiError> {
         self.deletable_skill(id)?;
+        let dir = skills_dir(&self.home).join(id);
         self.change_async(|s| {
-            s.skills.retain(|k| k.id != id);
+            s.user_skills.retain(|k| k.id != id);
             for a in &mut s.agents {
                 a.skills.retain(|k| k != id);
             }
             Ok(())
         })
-        .await
+        .await?;
+        match tokio::fs::remove_dir_all(&dir).await {
+            Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(refused(t(
+                "server.agent.notSaved",
+                &[("file", dir.to_string_lossy().into_owned().into()), ("why", e.to_string().into())],
+            ))),
+            _ => Ok(()),
+        }
     }
 
     pub fn preview_remove_skill(&self, id: &str) -> Result<Preview, ApiError> {

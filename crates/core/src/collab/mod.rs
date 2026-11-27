@@ -36,7 +36,8 @@ impl From<loro::LoroEncodeError> for CollabError {
 }
 
 pub use doc::{
-    BlockNodeSnapshot, CollabDoc, CommitMeta, DocSnapshot, HTML_TEXT_KEY, HistoryEntry, ResolvedRange, StoreEntrySnapshot, SuggestionSpan, TextRangeAnchor,
-    TreeNode, coalesce_suggestions, decode_frontiers, decode_version_vector, encode_frontiers, encode_version_vector,
+    BlockNodeSnapshot, CollabDoc, CommitMeta, DocSnapshot, HTML_TEXT_KEY, HistoryEntry, ResolvedRange, StoreEntrySnapshot, SuggestionSpan, SyncExport,
+    TextRangeAnchor, TreeNode, coalesce_suggestions, decode_frontiers, decode_version_vector, encode_frontiers, encode_version_vector,
 };
+pub use loro::VersionVector;
 pub use presence::{DEFAULT_PRESENCE_TTL_MS, PresenceHub, PresenceKind, PresencePayload, PresenceViewport};

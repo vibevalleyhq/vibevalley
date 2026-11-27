@@ -1,11 +1,31 @@
 import "../../infra/polyfill";
 import { expect, test } from "nsh/test";
 
-import { type Artifact, ArtifactTypeValues, type LibraryItem, userId } from "@vibevalley/protocol";
+import {
+  type Artifact,
+  ArtifactTypeValues,
+  type Channel,
+  type Issue,
+  type IssueId,
+  type LibraryItem,
+  type MediaJob,
+  type Session,
+  type SessionId,
+  userId,
+} from "@vibevalley/protocol";
 import { artifactId } from "@vibevalley/protocol/schema";
 
 import { type ContentBucket, countContentHub, countForBucket } from "../../infra/state/contentNav";
-import { artifactMatchesType, shownArtifacts, shownMedia } from "./items";
+import {
+  artifactMatchesType,
+  buildCategoryFilterOptions,
+  type ContentContextLookup,
+  countCategoryFilters,
+  resolveArtifactContext,
+  resolveMediaContext,
+  shownArtifacts,
+  shownMedia,
+} from "./items";
 import {
   activeFileId,
   askRemove,
@@ -276,4 +296,66 @@ test("regression: countContentHub sidebar badges match LibraryPage visible count
   expect(counts.total).toBe(artifacts.length + media.length);
   expect(counts.pinned).toBe(2);
   expect(counts.installedApps).toBe(2);
+});
+
+test("category filtering resolves repo, parent/issue, channel, and media origin across artifacts and media", () => {
+  const issues: Pick<Issue, "id" | "number" | "title" | "repo" | "parent">[] = [
+    { id: "i-parent" as IssueId, number: 40, title: "Q4 Platform Work", repo: "vibevalley" },
+    { id: "i-child" as IssueId, number: 42, title: "Board Drag FSM", repo: "vibevalley", parent: "i-parent" as IssueId },
+    { id: "i-docs" as IssueId, number: 51, title: "Site Refresh", repo: "docs-site" },
+  ];
+  const channels: Pick<Channel, "id" | "name" | "title" | "repo">[] = [
+    { id: "general", name: "general", title: "general", repo: "vibevalley" },
+    { id: "marketing", name: "marketing", title: "marketing", repo: "docs-site" },
+  ];
+  const sessions: Pick<Session, "id" | "bindings" | "policy">[] = [
+    {
+      id: "s-1" as SessionId,
+      bindings: [
+        { kind: "issue", id: "i-child" as IssueId },
+        { kind: "channel", id: "general" },
+      ],
+      policy: { kind: "managedWorktree", repo: "vibevalley", branch: "issue-42" },
+    },
+  ];
+  const jobs: Pick<MediaJob, "id" | "source">[] = [{ id: "job-img", source: { kind: "orchestrator", agent: "orchestrator", channel: "marketing" } }];
+  const lookup: ContentContextLookup = {
+    issuesById: new Map(issues.map((i) => [i.id, i])),
+    channelsById: new Map(channels.map((c) => [c.id, c])),
+    sessionsById: new Map(sessions.map((s) => [s.id, s])),
+    jobsById: new Map(jobs.map((j) => [j.id, j])),
+  };
+
+  const artifacts = [
+    makeArtifact({ id: "art-child", title: "FSM Spec", artifactType: "docs", issue: "i-child" as IssueId, channel: "general" }),
+    makeArtifact({ id: "art-site", title: "Launch Deck", artifactType: "slides", issue: "i-docs" as IssueId, channel: "marketing" }),
+  ];
+  const media = [
+    makeMedia({ id: "m-gen", name: "hero.png", type: "image/png", origin: { kind: "generated", job: "job-img", jobKind: "image" } }),
+    makeMedia({ id: "m-up", name: "demo.m4a", type: "audio/mp4", origin: { kind: "uploaded", channel: "general" } }),
+    makeMedia({
+      id: "m-fetch",
+      name: "trace.png",
+      type: "image/png",
+      origin: { kind: "fetched", agent: "laozhou", session: "s-1" as SessionId, from: { path: "out/trace.png" } },
+    }),
+  ];
+
+  expect(resolveArtifactContext(artifacts[0], lookup)).toEqual({ repo: "vibevalley", issueId: "i-parent", channelId: "general" });
+  expect(resolveMediaContext(media[0], lookup)).toEqual({ repo: "docs-site", channelId: "marketing" });
+  expect(resolveMediaContext(media[2], lookup)).toEqual({ repo: "vibevalley", issueId: "i-parent", channelId: "general" });
+
+  const options = buildCategoryFilterOptions({ artifacts, media, lookup, extraRepos: ["extra-repo"] });
+  expect(options.repos.map((r) => r.value)).toEqual(["docs-site", "extra-repo", "vibevalley"]);
+  expect(options.issues.map((p) => p.value)).toEqual(["i-docs", "i-parent"]);
+  expect(options.channels.map((c) => c.value)).toEqual(["general", "marketing"]);
+
+  expect(shownArtifacts(artifacts, { sort: "recent", category: { repo: "vibevalley" }, lookup }).map((a) => a.id)).toEqual(["art-child"]);
+  expect(shownArtifacts(artifacts, { sort: "recent", category: { issueId: "i-parent" }, lookup }).map((a) => a.id)).toEqual(["art-child"]);
+  expect(shownArtifacts(artifacts, { sort: "recent", category: { channelId: "marketing" }, lookup }).map((a) => a.id)).toEqual(["art-site"]);
+
+  expect(shownMedia(media, { category: { repo: "vibevalley" }, lookup }).map((m) => m.attachment.id)).toEqual(["m-up", "m-fetch"]);
+  expect(shownMedia(media, { category: { issueId: "i-parent" }, lookup }).map((m) => m.attachment.id)).toEqual(["m-fetch"]);
+  expect(shownMedia(media, { category: { origin: "generated" }, lookup }).map((m) => m.attachment.id)).toEqual(["m-gen"]);
+  expect(countCategoryFilters({ repo: "vibevalley", issueId: "i-parent" })).toBe(2);
 });

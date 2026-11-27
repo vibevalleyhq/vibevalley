@@ -1,13 +1,12 @@
 import { cleanup, computed, effect, keymap, Scroll, signal, Text, untracked, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
-import type { RuntimeInfo } from "@vibevalley/protocol";
+import type { ActorRef, Attachment, RuntimeInfo } from "@vibevalley/protocol";
 
 import { Button } from "../../../design/Button";
 import { Dialog } from "../../../design/Dialog";
 import { AgentReadinessNote, AgentSelect } from "../../../design/domain/AgentSelect";
 import { Select, TextArea } from "../../../design/Field";
-import { Icon } from "../../../design/Icon";
 import { IconButton } from "../../../design/IconButton";
 import { Banner } from "../../../design/layout";
 import { toast } from "../../../design/toasts";
@@ -18,19 +17,22 @@ import { ready, useRepos, useRuntimes } from "../../../infra/query";
 import { useRouter } from "../../../infra/router";
 import { prefsNow } from "../../../infra/state/prefs";
 import { canSubmitDraft, type DraftSubmitEvent, type DraftSubmitState, draftSubmitTransition, initialDraftSubmit } from "../model/draftSubmit";
-import { formatIsoDate } from "../model/meta";
+import { useIssues } from "../model/history";
 import { createAttachmentUploader, IssueAttachmentStrip } from "./IssueAttachments";
-import { TagEditor } from "./IssueMetaControls";
+import { DatePropertyEditor, OwnerPicker, ParentPicker, TagEditor } from "./IssueMetaControls";
 
 const isRuntimeReady = (runtime: RuntimeInfo) => runtime.installation.status === "available" && runtime.settings.enabled;
 
-/** The repo, helper, optional execution machine, starter template text, tags, attachment ids, or schedule dates for a new issue. */
+/** The repo, helper, owner, optional execution machine, parent issue, starter template text, tags, attachment ids, or schedule dates for a new issue. */
 export interface NewIssueAt {
   readonly repo?: string;
   readonly agent?: string;
+  readonly owner?: ActorRef | undefined;
   readonly machineId?: string;
+  readonly parent?: string;
   readonly text?: string;
   readonly attachments?: readonly string[];
+  readonly attachmentFiles?: readonly Attachment[];
   readonly tags?: readonly string[];
   readonly startAt?: number;
   readonly dueAt?: number;
@@ -44,14 +46,17 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
       text: props.at.text ?? "",
       repo: props.at.repo ?? last.repo,
       agent: props.at.agent ?? (last.pick === "auto" ? "" : last.pick),
-      attachments: [],
+      attachments: [...(props.at.attachmentFiles ?? [])],
     }),
   );
   const machineId = signal(props.at.machineId ?? "");
+  const owner = signal<ActorRef | undefined>(props.at.owner ?? { kind: "user", id: "self" });
+  const parent = signal(props.at.parent ?? "");
   const tags = signal<string[]>([...(props.at.tags ?? [])]);
   const startAt = signal<number | undefined>(props.at.startAt);
   const dueAt = signal<number | undefined>(props.at.dueAt);
-  const scheduledDateText = computed(() => formatIsoDate(startAt() ?? dueAt()));
+  const hasSchedule = computed(() => startAt() !== undefined || dueAt() !== undefined);
+  const allIssues = useIssues();
   const dispatch = (event: DraftSubmitEvent): DraftSubmitState => {
     const next = draftSubmitTransition(untracked(flow), event, newSendKey);
     flow.set(next);
@@ -89,6 +94,8 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
     if (started.kind !== "submitting") return;
     const { submitted, requestKey } = started;
     const pickedMachine = untracked(machineId);
+    const pickedOwner = untracked(owner);
+    const pickedParent = untracked(parent);
     const pickedTags = untracked(tags);
     const pickedStartAt = untracked(startAt);
     const pickedDueAt = untracked(dueAt);
@@ -99,7 +106,9 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
         {
           ...(submitted.repo ? { repo: submitted.repo } : {}),
           ...(submitted.agent ? { agent: submitted.agent } : {}),
+          ...(pickedOwner ? { owner: pickedOwner } : {}),
           ...(pickedMachine ? { machineId: pickedMachine } : {}),
+          ...(pickedParent ? { parent: pickedParent } : {}),
           ...(submitted.attachments.length > 0 ? { attachments: submitted.attachments.map((file) => file.id) } : {}),
           ...(pickedTags.length > 0 ? { tags: pickedTags } : {}),
           ...(pickedStartAt !== undefined ? { startAt: pickedStartAt } : {}),
@@ -151,70 +160,94 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
             onRemove={(id) => dispatch({ kind: "removeAttachment", id })}
             testid="issue-new-attachments"
           />
-          <If when={!noRepos() || !noReadyRuntimes() || hasMultipleMachines()}>
-            <View class="flex-row flex-wrap items-center gap-2">
-              <If when={!noRepos()}>
-                <Select
-                  quiet
-                  size="control"
-                  label={t("web.issue.task.repo")}
-                  testid="issue-new-repo"
-                  value={draft().repo}
-                  placeholder={t("web.issue.todo.whichRepo")}
-                  onChange={(repo) => dispatch({ kind: "setRepo", repo })}
-                  options={repoOptions()}
-                />
-              </If>
-              <If when={!noReadyRuntimes()}>
-                <AgentSelect
-                  quiet
-                  size="control"
-                  label={t("web.issue.detail.helper")}
-                  testid="issue-new-helper"
-                  value={draft().agent}
-                  agents={agents()}
-                  readiness={agentReadiness}
-                  placeholder={t("web.issue.todo.pickForMe")}
-                  onChange={(agent) => dispatch({ kind: "setAgent", agent })}
-                />
-              </If>
-              <If when={hasMultipleMachines()}>
-                <Select
-                  quiet
-                  size="control"
-                  label={t("web.issue.new.machine")}
-                  testid="issue-new-machine"
-                  value={machineId()}
-                  placeholder={t("web.issue.new.machineAuto")}
-                  onChange={(id) => machineId.set(id)}
-                  options={machineOptions()}
-                />
-              </If>
-            </View>
-          </If>
+          <View class="flex-row flex-wrap items-center gap-2">
+            <If when={!noRepos()}>
+              <Select
+                quiet
+                size="control"
+                searchable
+                searchPlaceholder={t("web.shell.palette.mode.search")}
+                emptyText={t("web.base.table.empty")}
+                label={t("web.issue.task.repo")}
+                testid="issue-new-repo"
+                value={draft().repo}
+                placeholder={t("web.issue.todo.whichRepo")}
+                onChange={(repo) => dispatch({ kind: "setRepo", repo })}
+                options={repoOptions()}
+              />
+            </If>
+            <If when={!noReadyRuntimes()}>
+              <AgentSelect
+                quiet
+                size="control"
+                label={t("web.issue.detail.helper")}
+                testid="issue-new-helper"
+                value={draft().agent}
+                agents={agents()}
+                readiness={agentReadiness}
+                placeholder={t("web.issue.todo.pickForMe")}
+                onChange={(agent) => dispatch({ kind: "setAgent", agent })}
+              />
+            </If>
+            <OwnerPicker
+              owner={owner()}
+              allIssues={allIssues()}
+              testid="issue-new-owner"
+              clearable={false}
+              class="min-w-32 shrink-0"
+              onChange={(next) => owner.set(next)}
+            />
+            <If when={hasMultipleMachines()}>
+              <Select
+                quiet
+                size="control"
+                label={t("web.issue.new.machine")}
+                testid="issue-new-machine"
+                value={machineId()}
+                placeholder={t("web.issue.new.machineAuto")}
+                onChange={(id) => machineId.set(id)}
+                options={machineOptions()}
+              />
+            </If>
+          </View>
           <If when={!noReadyRuntimes() && draft().agent !== ""}>
             <AgentReadinessNote agentId={draft().agent} readiness={agentReadiness} testid="issue-new-helper-status" onNavigate={goTo} />
           </If>
+          <View class="flex-row flex-wrap items-center gap-2">
+            <If when={allIssues().length > 0}>
+              <View class="min-w-44 flex-1">
+                <ParentPicker issueId="" parentId={parent()} allIssues={allIssues()} testid="issue-new-parent" onChange={(next) => parent.set(next)} />
+              </View>
+            </If>
+            <View testID={hasSchedule() ? "issue-new-dates" : undefined} class="flex-row flex-wrap items-center gap-2">
+              <View class="w-36">
+                <DatePropertyEditor
+                  label={t("web.issue.dates.startAt")}
+                  placeholder={t("web.issue.dates.startAt")}
+                  value={startAt()}
+                  testid="issue-new-start-at"
+                  quiet={false}
+                  maxMs={dueAt()}
+                  onCommit={(ms) => startAt.set(ms > 0 ? ms : undefined)}
+                />
+              </View>
+              <View class="w-36">
+                <DatePropertyEditor
+                  label={t("web.issue.dates.dueAt")}
+                  placeholder={t("web.issue.dates.dueAt")}
+                  value={dueAt()}
+                  testid="issue-new-due-at"
+                  quiet={false}
+                  minMs={startAt()}
+                  onCommit={(ms) => dueAt.set(ms > 0 ? ms : undefined)}
+                />
+              </View>
+            </View>
+          </View>
           <View class="gap-1">
             <Text class="text-xs font-medium text-muted">{t("web.issue.tags.label")}</Text>
             <TagEditor compact tags={tags()} onChange={(next) => tags.set(next)} testid="issue-new-tags" />
           </View>
-          <If when={scheduledDateText() !== ""}>
-            <View testID="issue-new-dates" class="flex-row items-center gap-1.5 self-start rounded-md border border-line bg-side px-2 py-1">
-              <Icon name="calendar" size={12} tone="water" />
-              <Text class="font-mono text-xs text-ink tabular-nums">{t("web.issue.calendar.scheduledBadge", { date: scheduledDateText() })}</Text>
-              <IconButton
-                testid="issue-new-dates-clear"
-                icon="close"
-                size={12}
-                label={t("web.issue.calendar.clearScheduledDate")}
-                onClick={() => {
-                  startAt.set(undefined);
-                  dueAt.set(undefined);
-                }}
-              />
-            </View>
-          </If>
           <If when={noRepos() || noReadyRuntimes()}>
             <View class="gap-2">
               <If when={noRepos()}>

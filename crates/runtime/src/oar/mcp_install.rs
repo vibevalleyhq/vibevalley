@@ -127,6 +127,17 @@ pub struct McpHostReport {
     pub supports_http: bool,
 }
 
+/// One user-level MCP server entry read from a coding agent's host config.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HostMcpServer {
+    pub host: McpHostId,
+    pub name: String,
+    pub transport: McpTransportSpec,
+    pub enabled: bool,
+    pub config_path: PathBuf,
+}
+
 /// Failure while installing or uninstalling an MCP server entry on a coding agent.
 #[derive(Debug, thiserror::Error)]
 pub enum McpInstallError {
@@ -136,6 +147,8 @@ pub enum McpInstallError {
     UnsupportedTransport { host: McpHostId, reason: String },
     #[error("invalid MCP server name `{0}`")]
     InvalidServerName(String),
+    #[error("MCP server `{name}` not found in host `{host}` config")]
+    ServerNotFound { host: McpHostId, name: String },
     #[error("invalid config file at `{path}`: {message}")]
     InvalidConfig { path: PathBuf, message: String },
     #[error("io error at `{path}`: {message}")]
@@ -350,12 +363,99 @@ pub fn uninstall_mcp_host_in(home_dir: &Path, host: McpHostId, server_name: &str
     uninstall_host_inner(home_dir, host, server_name, false)
 }
 
+/// Lists all user-level MCP servers configured on `host` under `$HOME`.
+pub fn list_host_mcp_servers(host: McpHostId) -> Result<Vec<HostMcpServer>, McpInstallError> {
+    let home_dir = current_home_dir().ok_or(McpInstallError::NoHomeDir(host))?;
+    list_host_mcp_servers_in(&home_dir, host)
+}
+
+/// Returns the user-level MCP configuration file path for `host` under `$HOME`, if `$HOME` is set.
+pub fn host_mcp_config_path(host: McpHostId) -> Option<PathBuf> {
+    current_home_dir().map(|home_dir| host.config_path(&home_dir))
+}
+
+/// Hermetic variant of [`list_host_mcp_servers`] scoped strictly to `home_dir`.
+pub fn list_host_mcp_servers_in(home_dir: &Path, host: McpHostId) -> Result<Vec<HostMcpServer>, McpInstallError> {
+    let config_path = host.config_path(home_dir);
+    match host {
+        McpHostId::Antigravity | McpHostId::Claude | McpHostId::Cursor => read_json_servers(host, &config_path),
+        McpHostId::Codex => codex_toml::read_toml_servers(&config_path),
+    }
+}
+
+/// Atomically adds or updates an MCP server entry on `host` under `$HOME`, optionally renaming from `previous_name`.
+pub fn upsert_host_mcp_server(host: McpHostId, previous_name: Option<&str>, config: &McpServerConfig, enabled: bool) -> Result<HostMcpServer, McpInstallError> {
+    let home_dir = current_home_dir().ok_or(McpInstallError::NoHomeDir(host))?;
+    upsert_host_mcp_server_in(&home_dir, host, previous_name, config, enabled)
+}
+
+/// Hermetic variant of [`upsert_host_mcp_server`] scoped strictly to `home_dir`.
+pub fn upsert_host_mcp_server_in(
+    home_dir: &Path,
+    host: McpHostId,
+    previous_name: Option<&str>,
+    config: &McpServerConfig,
+    enabled: bool,
+) -> Result<HostMcpServer, McpInstallError> {
+    let name = validate_server_name(&config.name)?;
+    let prev = previous_name.map(validate_server_name).transpose()?.filter(|&p| p != name);
+    validate_transport_support(host, &config.transport)?;
+    let config_path = host.config_path(home_dir);
+    match host {
+        McpHostId::Antigravity | McpHostId::Claude | McpHostId::Cursor => {
+            upsert_json_server(host, &config_path, prev, name, &config.transport, enabled)?;
+        }
+        McpHostId::Codex => {
+            codex_toml::upsert_toml_server(&config_path, prev, name, &config.transport, enabled)?;
+        }
+    }
+    Ok(HostMcpServer {
+        host,
+        name: name.to_owned(),
+        transport: config.transport.clone(),
+        enabled,
+        config_path,
+    })
+}
+
+/// Atomically toggles the `enabled` status of an existing MCP server on `host` under `$HOME`.
+pub fn set_host_mcp_server_enabled(host: McpHostId, server_name: &str, enabled: bool) -> Result<HostMcpServer, McpInstallError> {
+    let home_dir = current_home_dir().ok_or(McpInstallError::NoHomeDir(host))?;
+    set_host_mcp_server_enabled_in(&home_dir, host, server_name, enabled)
+}
+
+/// Hermetic variant of [`set_host_mcp_server_enabled`] scoped strictly to `home_dir`.
+pub fn set_host_mcp_server_enabled_in(home_dir: &Path, host: McpHostId, server_name: &str, enabled: bool) -> Result<HostMcpServer, McpInstallError> {
+    let name = validate_server_name(server_name)?;
+    let config_path = host.config_path(home_dir);
+    match host {
+        McpHostId::Antigravity | McpHostId::Claude | McpHostId::Cursor => set_json_server_enabled(host, &config_path, name, enabled),
+        McpHostId::Codex => codex_toml::set_toml_server_enabled(&config_path, name, enabled),
+    }
+}
+
+/// Atomically removes `server_name` from `host`'s user-level MCP configuration under `$HOME`.
+pub fn remove_host_mcp_server(host: McpHostId, server_name: &str) -> Result<(), McpInstallError> {
+    let home_dir = current_home_dir().ok_or(McpInstallError::NoHomeDir(host))?;
+    remove_host_mcp_server_in(&home_dir, host, server_name)
+}
+
+/// Hermetic variant of [`remove_host_mcp_server`] scoped strictly to `home_dir`.
+pub fn remove_host_mcp_server_in(home_dir: &Path, host: McpHostId, server_name: &str) -> Result<(), McpInstallError> {
+    let name = validate_server_name(server_name)?;
+    let config_path = host.config_path(home_dir);
+    match host {
+        McpHostId::Antigravity | McpHostId::Claude | McpHostId::Cursor => remove_json_server(host, &config_path, name),
+        McpHostId::Codex => codex_toml::remove_toml_server(&config_path, name),
+    }
+}
+
 /// Renders a copyable configuration snippet for `config` in `host`'s native config format.
 pub fn render_mcp_snippet(host: McpHostId, config: &McpServerConfig) -> String {
     match host {
         McpHostId::Antigravity | McpHostId::Claude | McpHostId::Cursor => serde_json::to_string_pretty(&json!({
             "mcpServers": {
-                &config.name: encode_json_entry(host, &config.transport),
+                &config.name: encode_json_entry(host, &config.transport, true),
             }
         }))
         .unwrap_or_default(),
@@ -386,38 +486,20 @@ fn probe_host_report(host: McpHostId, home_dir: &Path, desired: &McpServerConfig
 }
 
 fn install_host_inner(home_dir: &Path, host: McpHostId, config: &McpServerConfig, probe_system: bool) -> Result<McpHostReport, McpInstallError> {
-    let name = validate_server_name(&config.name)?;
-    validate_transport_support(host, &config.transport)?;
-    let config_path = host.config_path(home_dir);
-    match host {
-        McpHostId::Antigravity | McpHostId::Claude | McpHostId::Cursor => {
-            upsert_json_server(host, &config_path, name, &config.transport)?;
-        }
-        McpHostId::Codex => {
-            codex_toml::upsert_toml_server(&config_path, name, &config.transport)?;
-        }
-    }
+    upsert_host_mcp_server_in(home_dir, host, None, config, true)?;
     Ok(probe_host_report(host, home_dir, config, probe_system))
 }
 
 fn uninstall_host_inner(home_dir: &Path, host: McpHostId, server_name: &str, probe_system: bool) -> Result<McpHostReport, McpInstallError> {
     let name = validate_server_name(server_name)?;
-    let config_path = host.config_path(home_dir);
-    match host {
-        McpHostId::Antigravity | McpHostId::Claude | McpHostId::Cursor => {
-            remove_json_server(&config_path, name)?;
-        }
-        McpHostId::Codex => {
-            codex_toml::remove_toml_server(&config_path, name)?;
-        }
-    }
+    remove_host_mcp_server_in(home_dir, host, name)?;
     let probe = McpServerConfig::stdio(name, "placeholder", Vec::new());
     Ok(probe_host_report(host, home_dir, &probe, probe_system))
 }
 
 fn read_host_server(host: McpHostId, path: &Path, server_name: &str) -> Result<Option<McpTransportSpec>, McpInstallError> {
     match host {
-        McpHostId::Antigravity | McpHostId::Claude | McpHostId::Cursor => read_json_server(path, server_name),
+        McpHostId::Antigravity | McpHostId::Claude | McpHostId::Cursor => read_json_server(host, path, server_name),
         McpHostId::Codex => codex_toml::read_toml_server(path, server_name),
     }
 }
@@ -507,13 +589,47 @@ fn parse_string_map(path: &Path, field: &str, value: Option<&Value>) -> Result<B
     Ok(out)
 }
 
-fn decode_json_entry(path: &Path, entry: &Value) -> Result<McpTransportSpec, McpInstallError> {
+fn claude_disabled_servers(host: McpHostId, root: &Map<String, Value>) -> std::collections::HashSet<String> {
+    if !matches!(host, McpHostId::Claude) {
+        return std::collections::HashSet::new();
+    }
+    root.get("disabledMcpServers")
+        .and_then(Value::as_array)
+        .map(|items| items.iter().filter_map(Value::as_str).map(str::to_owned).collect())
+        .unwrap_or_default()
+}
+
+fn remove_claude_disabled_server(host: McpHostId, root: &mut Map<String, Value>, server_name: &str) -> bool {
+    if !matches!(host, McpHostId::Claude) {
+        return false;
+    }
+    let Some(Value::Array(arr)) = root.get_mut("disabledMcpServers") else {
+        return false;
+    };
+    let before = arr.len();
+    arr.retain(|v| v.as_str() != Some(server_name));
+    arr.len() != before
+}
+
+fn decode_json_entry(path: &Path, entry: &Value, root_disabled: bool) -> Result<(McpTransportSpec, bool), McpInstallError> {
     let Some(obj) = entry.as_object() else {
         return Err(McpInstallError::InvalidConfig {
             path: path.to_path_buf(),
             message: "MCP server entry must be a JSON object".into(),
         });
     };
+    let entry_disabled = match (obj.get("disabled"), obj.get("enabled")) {
+        (Some(val), _) => val.as_bool().ok_or_else(|| McpInstallError::InvalidConfig {
+            path: path.to_path_buf(),
+            message: "`disabled` must be a JSON boolean".into(),
+        })?,
+        (None, Some(val)) => !val.as_bool().ok_or_else(|| McpInstallError::InvalidConfig {
+            path: path.to_path_buf(),
+            message: "`enabled` must be a JSON boolean".into(),
+        })?,
+        (None, None) => false,
+    };
+    let enabled = !entry_disabled && !root_disabled;
     if let Some(command) = obj.get("command").and_then(Value::as_str) {
         let args = match obj.get("args") {
             None | Some(Value::Null) => Vec::new(),
@@ -538,19 +654,25 @@ fn decode_json_entry(path: &Path, entry: &Value) -> Result<McpTransportSpec, Mcp
             }
         };
         let env = parse_string_map(path, "env", obj.get("env"))?;
-        return Ok(McpTransportSpec::Stdio {
-            command: command.to_owned(),
-            args,
-            env,
-        });
+        return Ok((
+            McpTransportSpec::Stdio {
+                command: command.to_owned(),
+                args,
+                env,
+            },
+            enabled,
+        ));
     }
     if let Some(url) = ["url", "serverUrl", "httpUrl"].into_iter().find_map(|k| obj.get(k).and_then(Value::as_str)) {
         let headers = parse_string_map(path, "headers", obj.get("headers"))?;
-        return Ok(McpTransportSpec::StreamableHttp {
-            url: url.to_owned(),
-            headers,
-            stateless: false,
-        });
+        return Ok((
+            McpTransportSpec::StreamableHttp {
+                url: url.to_owned(),
+                headers,
+                stateless: false,
+            },
+            enabled,
+        ));
     }
     Err(McpInstallError::InvalidConfig {
         path: path.to_path_buf(),
@@ -558,8 +680,8 @@ fn decode_json_entry(path: &Path, entry: &Value) -> Result<McpTransportSpec, Mcp
     })
 }
 
-fn encode_json_entry(host: McpHostId, transport: &McpTransportSpec) -> Value {
-    match transport {
+fn encode_json_entry(host: McpHostId, transport: &McpTransportSpec, enabled: bool) -> Value {
+    let mut obj = match transport {
         McpTransportSpec::Stdio { command, args, env } => {
             let mut obj = Map::new();
             obj.insert("command".into(), json!(command));
@@ -567,7 +689,7 @@ fn encode_json_entry(host: McpHostId, transport: &McpTransportSpec) -> Value {
             if !env.is_empty() {
                 obj.insert("env".into(), json!(env));
             }
-            Value::Object(obj)
+            obj
         }
         McpTransportSpec::StreamableHttp { url, headers, .. } => {
             let mut obj = Map::new();
@@ -578,38 +700,83 @@ fn encode_json_entry(host: McpHostId, transport: &McpTransportSpec) -> Value {
             if !headers.is_empty() {
                 obj.insert("headers".into(), json!(headers));
             }
-            Value::Object(obj)
+            obj
         }
+    };
+    if !enabled {
+        obj.insert("disabled".into(), Value::Bool(true));
     }
+    Value::Object(obj)
 }
 
-fn read_json_server(path: &Path, server_name: &str) -> Result<Option<McpTransportSpec>, McpInstallError> {
-    let raw = read_optional_file(path)?;
-    if raw.is_none() {
-        return Ok(None);
-    }
-    let root = parse_json_root(path, raw)?;
+fn read_json_servers_map<'a>(path: &Path, root: &'a Map<String, Value>) -> Result<Option<&'a Map<String, Value>>, McpInstallError> {
     let Some(servers_val) = root.get("mcpServers") else {
         return Ok(None);
     };
     if servers_val.is_null() {
         return Ok(None);
     }
-    let Some(servers) = servers_val.as_object() else {
-        return Err(McpInstallError::InvalidConfig {
-            path: path.to_path_buf(),
-            message: "`mcpServers` must be a JSON object".into(),
-        });
+    servers_val.as_object().map(Some).ok_or_else(|| McpInstallError::InvalidConfig {
+        path: path.to_path_buf(),
+        message: "`mcpServers` must be a JSON object".into(),
+    })
+}
+
+fn read_json_servers(host: McpHostId, path: &Path) -> Result<Vec<HostMcpServer>, McpInstallError> {
+    let Some(raw) = read_optional_file(path)? else {
+        return Ok(Vec::new());
     };
+    let root = parse_json_root(path, Some(raw))?;
+    let Some(servers) = read_json_servers_map(path, &root)? else {
+        return Ok(Vec::new());
+    };
+    let disabled_list = claude_disabled_servers(host, &root);
+    let mut out = Vec::with_capacity(servers.len());
+    for (name, entry) in servers {
+        let (transport, enabled) = decode_json_entry(path, entry, disabled_list.contains(name))?;
+        out.push(HostMcpServer {
+            host,
+            name: name.clone(),
+            transport,
+            enabled,
+            config_path: path.to_path_buf(),
+        });
+    }
+    out.sort_by(|a, b| a.name.cmp(&b.name));
+    Ok(out)
+}
+
+fn read_json_server(host: McpHostId, path: &Path, server_name: &str) -> Result<Option<McpTransportSpec>, McpInstallError> {
+    let Some(raw) = read_optional_file(path)? else {
+        return Ok(None);
+    };
+    let root = parse_json_root(path, Some(raw))?;
+    let Some(servers) = read_json_servers_map(path, &root)? else {
+        return Ok(None);
+    };
+    let disabled_list = claude_disabled_servers(host, &root);
     match servers.get(server_name) {
-        Some(entry) => decode_json_entry(path, entry).map(Some),
+        Some(entry) => decode_json_entry(path, entry, disabled_list.contains(server_name)).map(|(t, _)| Some(t)),
         None => Ok(None),
     }
 }
 
-fn upsert_json_server(host: McpHostId, path: &Path, server_name: &str, transport: &McpTransportSpec) -> Result<(), McpInstallError> {
+fn upsert_json_server(
+    host: McpHostId,
+    path: &Path,
+    previous_name: Option<&str>,
+    server_name: &str,
+    transport: &McpTransportSpec,
+    enabled: bool,
+) -> Result<(), McpInstallError> {
     let raw = read_optional_file(path)?;
     let mut root = parse_json_root(path, raw)?;
+    if let Some(prev) = previous_name {
+        remove_claude_disabled_server(host, &mut root, prev);
+    }
+    if enabled {
+        remove_claude_disabled_server(host, &mut root, server_name);
+    }
     let servers = match root.entry("mcpServers".to_owned()) {
         serde_json::map::Entry::Vacant(slot) => slot.insert(Value::Object(Map::new())),
         serde_json::map::Entry::Occupied(mut slot) => {
@@ -625,17 +792,79 @@ fn upsert_json_server(host: McpHostId, path: &Path, server_name: &str, transport
             message: "`mcpServers` must be a JSON object".into(),
         });
     };
-    servers_obj.insert(server_name.to_owned(), encode_json_entry(host, transport));
+    if let Some(prev) = previous_name {
+        servers_obj.remove(prev);
+    }
+    servers_obj.insert(server_name.to_owned(), encode_json_entry(host, transport, enabled));
     let mut encoded = serde_json::to_string_pretty(&Value::Object(root)).map_err(|e| io_err(path, e))?;
     encoded.push('\n');
     write_file_atomic(path, encoded.as_bytes())
 }
 
-fn remove_json_server(path: &Path, server_name: &str) -> Result<(), McpInstallError> {
+fn set_json_server_enabled(host: McpHostId, path: &Path, server_name: &str, enabled: bool) -> Result<HostMcpServer, McpInstallError> {
+    let Some(raw) = read_optional_file(path)? else {
+        return Err(McpInstallError::ServerNotFound {
+            host,
+            name: server_name.to_owned(),
+        });
+    };
+    let mut root = parse_json_root(path, Some(raw))?;
+    if enabled {
+        remove_claude_disabled_server(host, &mut root, server_name);
+    }
+    let servers_val = root.get_mut("mcpServers").ok_or_else(|| McpInstallError::ServerNotFound {
+        host,
+        name: server_name.to_owned(),
+    })?;
+    if servers_val.is_null() {
+        return Err(McpInstallError::ServerNotFound {
+            host,
+            name: server_name.to_owned(),
+        });
+    }
+    let Some(servers_obj) = servers_val.as_object_mut() else {
+        return Err(McpInstallError::InvalidConfig {
+            path: path.to_path_buf(),
+            message: "`mcpServers` must be a JSON object".into(),
+        });
+    };
+    let Some(entry) = servers_obj.get_mut(server_name) else {
+        return Err(McpInstallError::ServerNotFound {
+            host,
+            name: server_name.to_owned(),
+        });
+    };
+    let Some(entry_obj) = entry.as_object_mut() else {
+        return Err(McpInstallError::InvalidConfig {
+            path: path.to_path_buf(),
+            message: "MCP server entry must be a JSON object".into(),
+        });
+    };
+    entry_obj.remove("enabled");
+    if enabled {
+        entry_obj.remove("disabled");
+    } else {
+        entry_obj.insert("disabled".into(), Value::Bool(true));
+    }
+    let (transport, final_enabled) = decode_json_entry(path, entry, false)?;
+    let mut encoded = serde_json::to_string_pretty(&Value::Object(root)).map_err(|e| io_err(path, e))?;
+    encoded.push('\n');
+    write_file_atomic(path, encoded.as_bytes())?;
+    Ok(HostMcpServer {
+        host,
+        name: server_name.to_owned(),
+        transport,
+        enabled: final_enabled,
+        config_path: path.to_path_buf(),
+    })
+}
+
+fn remove_json_server(host: McpHostId, path: &Path, server_name: &str) -> Result<(), McpInstallError> {
     let Some(raw) = read_optional_file(path)? else {
         return Ok(());
     };
     let mut root = parse_json_root(path, Some(raw))?;
+    let removed_disabled = remove_claude_disabled_server(host, &mut root, server_name);
     let removed = match root.get_mut("mcpServers") {
         None | Some(Value::Null) => false,
         Some(Value::Object(servers)) => servers.remove(server_name).is_some(),
@@ -646,7 +875,7 @@ fn remove_json_server(path: &Path, server_name: &str) -> Result<(), McpInstallEr
             });
         }
     };
-    if !removed {
+    if !removed && !removed_disabled {
         return Ok(());
     }
     let mut encoded = serde_json::to_string_pretty(&Value::Object(root)).map_err(|e| io_err(path, e))?;
@@ -657,630 +886,95 @@ fn remove_json_server(path: &Path, server_name: &str) -> Result<(), McpInstallEr
 // ---- Comment-preserving TOML editor for Codex (~/.codex/config.toml) --------
 
 mod codex_toml {
+    use toml_edit::{Array, DocumentMut, Item, Table, TableLike, Value};
+
     use super::*;
 
-    #[derive(Debug, Default)]
-    struct ParsedServer {
-        command: Option<String>,
-        args: Vec<String>,
-        env: BTreeMap<String, String>,
-        url: Option<String>,
-        headers: BTreeMap<String, String>,
-        saw_section: bool,
-    }
-
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-    enum MultiLineQuote {
-        None,
-        Basic,
-        Literal,
-    }
-
-    fn invalid(path: &Path, message: impl Into<String>) -> McpInstallError {
+    fn invalid(path: &Path, message: impl fmt::Display) -> McpInstallError {
         McpInstallError::InvalidConfig {
             path: path.to_path_buf(),
-            message: message.into(),
+            message: message.to_string(),
         }
     }
 
-    /// Scans a line outside multiline strings, updating multiline quote state.
-    fn advance_multiline_state(line: &str, mut state: MultiLineQuote) -> MultiLineQuote {
-        let bytes = line.as_bytes();
-        let mut i = 0;
-        while i < bytes.len() {
-            match state {
-                MultiLineQuote::Basic => {
-                    if bytes[i] == b'\\' {
-                        i += 2;
-                        continue;
-                    }
-                    if bytes.get(i..i + 3) == Some(b"\"\"\"") {
-                        state = MultiLineQuote::None;
-                        i += 3;
-                        continue;
-                    }
-                    i += 1;
-                }
-                MultiLineQuote::Literal => {
-                    if bytes.get(i..i + 3) == Some(b"'''") {
-                        state = MultiLineQuote::None;
-                        i += 3;
-                        continue;
-                    }
-                    i += 1;
-                }
-                MultiLineQuote::None => {
-                    if bytes[i] == b'#' {
-                        break;
-                    }
-                    if bytes.get(i..i + 3) == Some(b"\"\"\"") {
-                        state = MultiLineQuote::Basic;
-                        i += 3;
-                        continue;
-                    }
-                    if bytes.get(i..i + 3) == Some(b"'''") {
-                        state = MultiLineQuote::Literal;
-                        i += 3;
-                        continue;
-                    }
-                    if bytes[i] == b'"' {
-                        i += 1;
-                        while i < bytes.len() {
-                            if bytes[i] == b'\\' {
-                                i += 2;
-                                continue;
-                            }
-                            if bytes[i] == b'"' {
-                                i += 1;
-                                break;
-                            }
-                            i += 1;
-                        }
-                        continue;
-                    }
-                    if bytes[i] == b'\'' {
-                        i += 1;
-                        while i < bytes.len() {
-                            if bytes[i] == b'\'' {
-                                i += 1;
-                                break;
-                            }
-                            i += 1;
-                        }
-                        continue;
-                    }
-                    i += 1;
-                }
-            }
-        }
-        state
-    }
-
-    fn strip_comment(line: &str) -> &str {
-        let bytes = line.as_bytes();
-        let mut i = 0;
-        while i < bytes.len() {
-            match bytes[i] {
-                b'#' => return &line[..i],
-                b'"' => {
-                    i += 1;
-                    while i < bytes.len() {
-                        if bytes[i] == b'\\' {
-                            i += 2;
-                            continue;
-                        }
-                        if bytes[i] == b'"' {
-                            i += 1;
-                            break;
-                        }
-                        i += 1;
-                    }
-                }
-                b'\'' => {
-                    i += 1;
-                    while i < bytes.len() {
-                        if bytes[i] == b'\'' {
-                            i += 1;
-                            break;
-                        }
-                        i += 1;
-                    }
-                }
-                _ => i += 1,
-            }
-        }
-        line
-    }
-
-    fn parse_basic_string(src: &str) -> Result<(String, &str), String> {
-        let Some(rest) = src.strip_prefix('"') else {
-            return Err("expected '\"'".into());
+    fn collect_string_map(path: &Path, field: &str, item: &Item, out: &mut BTreeMap<String, String>) -> Result<(), McpInstallError> {
+        let Some(table) = item.as_table_like() else {
+            return Err(invalid(path, format!("`{field}` must be a TOML table")));
         };
-        let mut out = String::new();
-        let mut chars = rest.char_indices();
-        while let Some((idx, ch)) = chars.next() {
-            match ch {
-                '"' => return Ok((out, &rest[idx + 1..])),
-                '\\' => {
-                    let Some((_, esc)) = chars.next() else {
-                        return Err("unterminated escape sequence".into());
-                    };
-                    match esc {
-                        '"' => out.push('"'),
-                        '\\' => out.push('\\'),
-                        'n' => out.push('\n'),
-                        'r' => out.push('\r'),
-                        't' => out.push('\t'),
-                        'b' => out.push('\u{0008}'),
-                        'f' => out.push('\u{000C}'),
-                        'u' | 'U' => {
-                            let digits = if esc == 'u' { 4 } else { 8 };
-                            let mut hex = String::with_capacity(digits);
-                            for _ in 0..digits {
-                                let Some((_, d)) = chars.next() else {
-                                    return Err("incomplete unicode escape".into());
-                                };
-                                hex.push(d);
-                            }
-                            let code = u32::from_str_radix(&hex, 16).map_err(|_| format!("invalid unicode escape `\\{esc}{hex}`"))?;
-                            let decoded = char::from_u32(code).ok_or_else(|| format!("invalid unicode scalar `\\{esc}{hex}`"))?;
-                            out.push(decoded);
-                        }
-                        other => return Err(format!("unsupported TOML escape `\\{other}`")),
-                    }
-                }
-                other => out.push(other),
-            }
-        }
-        Err("unterminated double-quoted string".into())
+        collect_table_strings(path, field, "", table, out)
     }
 
-    fn parse_literal_string(src: &str) -> Result<(String, &str), String> {
-        let Some(rest) = src.strip_prefix('\'') else {
-            return Err("expected `'`".into());
-        };
-        let Some(end) = rest.find('\'') else {
-            return Err("unterminated single-quoted string".into());
-        };
-        Ok((rest[..end].to_owned(), &rest[end + 1..]))
-    }
-
-    fn parse_key_segment(src: &str) -> Result<(String, &str), String> {
-        let trimmed = src.trim_start();
-        if trimmed.starts_with('"') {
-            parse_basic_string(trimmed)
-        } else if trimmed.starts_with('\'') {
-            parse_literal_string(trimmed)
-        } else {
-            let end = trimmed
-                .find(|c: char| !(c.is_ascii_alphanumeric() || c == '_' || c == '-'))
-                .unwrap_or(trimmed.len());
-            if end == 0 {
-                return Err(format!("expected TOML key near `{trimmed}`"));
-            }
-            Ok((trimmed[..end].to_owned(), &trimmed[end..]))
-        }
-    }
-
-    fn parse_dotted_key(src: &str) -> Result<(Vec<String>, &str), String> {
-        let mut parts = Vec::new();
-        let mut rest = src.trim_start();
-        loop {
-            let (seg, after) = parse_key_segment(rest)?;
-            parts.push(seg);
-            let after = after.trim_start();
-            if let Some(next) = after.strip_prefix('.') {
-                rest = next;
+    fn collect_table_strings(path: &Path, field: &str, prefix: &str, table: &dyn TableLike, out: &mut BTreeMap<String, String>) -> Result<(), McpInstallError> {
+        for (k, v) in table.iter() {
+            let full_key = if prefix.is_empty() { k.to_owned() } else { format!("{prefix}.{k}") };
+            if let Some(s) = v.as_str() {
+                out.insert(full_key, s.to_owned());
+            } else if let Some(sub) = v.as_table_like()
+                && v.as_table().is_some_and(Table::is_dotted)
+            {
+                collect_table_strings(path, field, &full_key, sub, out)?;
             } else {
-                return Ok((parts, after));
+                return Err(invalid(path, format!("`{field}.{full_key}` must be a string")));
             }
         }
+        Ok(())
     }
 
-    /// Parses `[a.b."c"]` or `[[a.b]]`. Returns `Ok(Some(path))` if this line is a header.
-    fn parse_table_header(line: &str) -> Result<Option<Vec<String>>, String> {
-        let code = strip_comment(line).trim();
-        if !code.starts_with('[') {
-            return Ok(None);
-        }
-        let (inner, double) = if let Some(rest) = code.strip_prefix("[[") {
-            let Some(body) = rest.strip_suffix("]]") else {
-                return Err(format!("malformed array-of-tables header `{code}`"));
-            };
-            (body, true)
-        } else {
-            let Some(body) = code.strip_prefix('[').and_then(|r| r.strip_suffix(']')) else {
-                return Err(format!("malformed table header `{code}`"));
-            };
-            (body, false)
+    fn decode_toml_entry(path: &Path, server_name: &str, entry: &dyn TableLike) -> Result<(McpTransportSpec, bool), McpInstallError> {
+        let enabled = match entry.get("enabled") {
+            None => true,
+            Some(item) => item.as_bool().ok_or_else(|| invalid(path, "`enabled` must be a boolean"))?,
         };
-        let (path, rem) = parse_dotted_key(inner)?;
-        if !rem.trim().is_empty() {
-            return Err(format!(
-                "unexpected trailing tokens `{}` in {} header",
-                rem.trim(),
-                if double { "array-of-tables" } else { "table" }
+        let command = match entry.get("command") {
+            None => None,
+            Some(item) => {
+                let s = item.as_str().ok_or_else(|| invalid(path, "`command` must be a string"))?;
+                Some(s.to_owned())
+            }
+        };
+        let args = match entry.get("args") {
+            None => Vec::new(),
+            Some(item) => {
+                let arr = item.as_array().ok_or_else(|| invalid(path, "`args` must be a TOML array"))?;
+                let mut out = Vec::with_capacity(arr.len());
+                for val in arr.iter() {
+                    let s = val.as_str().ok_or_else(|| invalid(path, "`args` entries must be strings"))?;
+                    out.push(s.to_owned());
+                }
+                out
+            }
+        };
+        let mut env = BTreeMap::new();
+        if let Some(env_item) = entry.get("env") {
+            collect_string_map(path, "env", env_item, &mut env)?;
+        }
+        let url = match entry.get("url") {
+            None => None,
+            Some(item) => {
+                let s = item.as_str().ok_or_else(|| invalid(path, "`url` must be a string"))?;
+                Some(s.to_owned())
+            }
+        };
+        let mut headers = BTreeMap::new();
+        if let Some(hdr_item) = entry.get("headers") {
+            collect_string_map(path, "headers", hdr_item, &mut headers)?;
+        }
+        if let Some(hdr_item) = entry.get("http_headers") {
+            collect_string_map(path, "http_headers", hdr_item, &mut headers)?;
+        }
+
+        if let Some(command) = command {
+            return Ok((McpTransportSpec::Stdio { command, args, env }, enabled));
+        }
+        if let Some(url) = url {
+            return Ok((
+                McpTransportSpec::StreamableHttp {
+                    url,
+                    headers,
+                    stateless: false,
+                },
+                enabled,
             ));
-        }
-        Ok(Some(path))
-    }
-
-    fn parse_string_value(src: &str) -> Result<(String, &str), String> {
-        let trimmed = src.trim_start();
-        if trimmed.starts_with('"') {
-            parse_basic_string(trimmed)
-        } else if trimmed.starts_with('\'') {
-            parse_literal_string(trimmed)
-        } else {
-            Err(format!("expected TOML string near `{trimmed}`"))
-        }
-    }
-
-    fn parse_string_array(src: &str) -> Result<(Vec<String>, &str), String> {
-        let mut rest = src.trim_start().strip_prefix('[').ok_or_else(|| format!("expected `[` near `{src}`"))?;
-        let mut out = Vec::new();
-        loop {
-            rest = skip_ws_and_comments(rest);
-            if let Some(after) = rest.strip_prefix(']') {
-                return Ok((out, after));
-            }
-            let (item, after) = parse_string_value(rest)?;
-            out.push(item);
-            rest = skip_ws_and_comments(after);
-            if let Some(after_comma) = rest.strip_prefix(',') {
-                rest = after_comma;
-            } else if let Some(after_close) = rest.strip_prefix(']') {
-                return Ok((out, after_close));
-            } else {
-                return Err(format!("expected `,` or `]` in array near `{rest}`"));
-            }
-        }
-    }
-
-    fn parse_inline_string_table(src: &str) -> Result<(BTreeMap<String, String>, &str), String> {
-        let mut rest = src.trim_start().strip_prefix('{').ok_or_else(|| format!("expected `{{` near `{src}`"))?;
-        let mut out = BTreeMap::new();
-        loop {
-            rest = rest.trim_start();
-            if let Some(after) = rest.strip_prefix('}') {
-                return Ok((out, after));
-            }
-            let (key_parts, after_key) = parse_dotted_key(rest)?;
-            let after_eq = after_key
-                .trim_start()
-                .strip_prefix('=')
-                .ok_or_else(|| format!("expected `=` in inline table near `{after_key}`"))?;
-            let (val, after_val) = parse_string_value(after_eq)?;
-            out.insert(key_parts.join("."), val);
-            rest = after_val.trim_start();
-            if let Some(after_comma) = rest.strip_prefix(',') {
-                rest = after_comma;
-            } else if let Some(after_close) = rest.strip_prefix('}') {
-                return Ok((out, after_close));
-            } else {
-                return Err(format!("expected `,` or `}}` in inline table near `{rest}`"));
-            }
-        }
-    }
-
-    fn skip_ws_and_comments(mut src: &str) -> &str {
-        loop {
-            src = src.trim_start();
-            if let Some(comment) = src.strip_prefix('#') {
-                match comment.find('\n') {
-                    Some(nl) => src = &comment[nl + 1..],
-                    None => return "",
-                }
-            } else {
-                return src;
-            }
-        }
-    }
-
-    /// Parses an inline server table like `vibevalley = { command = "...", args = [...] }`.
-    fn parse_inline_server_entry(src: &str, out: &mut ParsedServer) -> Result<(), String> {
-        let mut rest = src
-            .trim_start()
-            .strip_prefix('{')
-            .ok_or_else(|| format!("expected inline table near `{src}`"))?;
-        out.saw_section = true;
-        loop {
-            rest = rest.trim_start();
-            if rest.starts_with('}') {
-                return Ok(());
-            }
-            let (keys, after_key) = parse_dotted_key(rest)?;
-            let after_eq = after_key
-                .trim_start()
-                .strip_prefix('=')
-                .ok_or_else(|| format!("expected `=` near `{after_key}`"))?
-                .trim_start();
-            let after_val = match keys.as_slice() {
-                [k] if k == "command" => {
-                    let (v, r) = parse_string_value(after_eq)?;
-                    out.command = Some(v);
-                    r
-                }
-                [k] if k == "args" => {
-                    let (v, r) = parse_string_array(after_eq)?;
-                    out.args = v;
-                    r
-                }
-                [k] if k == "env" => {
-                    let (v, r) = parse_inline_string_table(after_eq)?;
-                    out.env.extend(v);
-                    r
-                }
-                [k] if k == "url" => {
-                    let (v, r) = parse_string_value(after_eq)?;
-                    out.url = Some(v);
-                    r
-                }
-                [k] if k == "http_headers" || k == "headers" => {
-                    let (v, r) = parse_inline_string_table(after_eq)?;
-                    out.headers.extend(v);
-                    r
-                }
-                _ => skip_inline_value(after_eq)?,
-            };
-            rest = after_val.trim_start();
-            if let Some(next) = rest.strip_prefix(',') {
-                rest = next;
-            } else if rest.starts_with('}') {
-                return Ok(());
-            } else {
-                return Err(format!("expected `,` or `}}` near `{rest}`"));
-            }
-        }
-    }
-
-    fn skip_inline_value(src: &str) -> Result<&str, String> {
-        let trimmed = src.trim_start();
-        if trimmed.starts_with('"') {
-            parse_basic_string(trimmed).map(|(_, r)| r)
-        } else if trimmed.starts_with('\'') {
-            parse_literal_string(trimmed).map(|(_, r)| r)
-        } else if trimmed.starts_with('[') || trimmed.starts_with('{') {
-            let open = trimmed.as_bytes()[0];
-            let close = if open == b'[' { b']' } else { b'}' };
-            let bytes = trimmed.as_bytes();
-            let mut depth = 0usize;
-            let mut i = 0usize;
-            while i < bytes.len() {
-                match bytes[i] {
-                    b'"' => {
-                        let (_, r) = parse_basic_string(&trimmed[i..])?;
-                        i = trimmed.len() - r.len();
-                        continue;
-                    }
-                    b'\'' => {
-                        let (_, r) = parse_literal_string(&trimmed[i..])?;
-                        i = trimmed.len() - r.len();
-                        continue;
-                    }
-                    b if b == open => depth += 1,
-                    b if b == close => {
-                        depth -= 1;
-                        if depth == 0 {
-                            return Ok(&trimmed[i + 1..]);
-                        }
-                    }
-                    _ => {}
-                }
-                i += 1;
-            }
-            Err("unterminated composite value in inline table".into())
-        } else {
-            let end = trimmed.find([',', '}']).unwrap_or(trimmed.len());
-            Ok(&trimmed[end..])
-        }
-    }
-
-    /// Computes bracket balance (`[`/`]` and `{`/`}`) outside string literals and `#` comments.
-    fn delimiter_delta(line: &str) -> i32 {
-        let code = strip_comment(line);
-        let bytes = code.as_bytes();
-        let mut i = 0;
-        let mut delta = 0i32;
-        while i < bytes.len() {
-            match bytes[i] {
-                b'"' => {
-                    i += 1;
-                    while i < bytes.len() {
-                        if bytes[i] == b'\\' {
-                            i += 2;
-                            continue;
-                        }
-                        if bytes[i] == b'"' {
-                            i += 1;
-                            break;
-                        }
-                        i += 1;
-                    }
-                }
-                b'\'' => {
-                    i += 1;
-                    while i < bytes.len() {
-                        if bytes[i] == b'\'' {
-                            i += 1;
-                            break;
-                        }
-                        i += 1;
-                    }
-                }
-                b'[' | b'{' => {
-                    delta += 1;
-                    i += 1;
-                }
-                b']' | b'}' => {
-                    delta -= 1;
-                    i += 1;
-                }
-                _ => i += 1,
-            }
-        }
-        delta
-    }
-
-    fn is_target_section(section: &[String], server_name: &str) -> bool {
-        section.len() >= 2 && section[0] == "mcp_servers" && section[1] == server_name
-    }
-
-    fn is_inline_target_entry(section: &[String], line: &str, server_name: &str) -> bool {
-        if section.len() != 1 || section[0] != "mcp_servers" {
-            return false;
-        }
-        let code = strip_comment(line).trim();
-        if code.is_empty() {
-            return false;
-        }
-        matches!(parse_dotted_key(code), Ok((keys, rem)) if keys.first().map(String::as_str) == Some(server_name) && rem.trim_start().starts_with('='))
-    }
-
-    fn parse_assignment_lines(lines: &[&str], idx: &mut usize) -> Result<Option<(Vec<String>, String)>, String> {
-        let code = strip_comment(lines[*idx]).trim();
-        if code.is_empty() {
-            return Ok(None);
-        }
-        let (keys, after_key) = parse_dotted_key(code)?;
-        let Some(rhs_first) = after_key.trim_start().strip_prefix('=') else {
-            return Err(format!("expected `=` in TOML assignment `{code}`"));
-        };
-        let mut rhs = rhs_first.trim().to_owned();
-        let mut depth = delimiter_delta(rhs_first);
-        while depth > 0 {
-            if *idx + 1 >= lines.len() {
-                return Err("unterminated multiline TOML value".into());
-            }
-            *idx += 1;
-            let next_line = lines[*idx];
-            rhs.push('\n');
-            rhs.push_str(next_line);
-            depth += delimiter_delta(next_line);
-        }
-        Ok(Some((keys, rhs)))
-    }
-
-    pub(super) fn read_toml_server(path: &Path, server_name: &str) -> Result<Option<McpTransportSpec>, McpInstallError> {
-        let Some(raw) = read_optional_file(path)? else {
-            return Ok(None);
-        };
-        let lines: Vec<&str> = raw.lines().collect();
-        let mut section: Vec<String> = Vec::new();
-        let mut quote_state = MultiLineQuote::None;
-        let mut parsed = ParsedServer::default();
-        let mut i = 0;
-
-        while i < lines.len() {
-            let line = lines[i];
-            if quote_state != MultiLineQuote::None {
-                quote_state = advance_multiline_state(line, quote_state);
-                i += 1;
-                continue;
-            }
-            if let Some(header) = parse_table_header(line).map_err(|e| invalid(path, e))? {
-                section = header;
-                if is_target_section(&section, server_name) {
-                    parsed.saw_section = true;
-                }
-                i += 1;
-                continue;
-            }
-            if is_target_section(&section, server_name) {
-                let Some((keys, rhs)) = parse_assignment_lines(&lines, &mut i).map_err(|e| invalid(path, e))? else {
-                    i += 1;
-                    continue;
-                };
-                match section.as_slice() {
-                    [_, _] => match keys.as_slice() {
-                        [k] if k == "command" => {
-                            let (v, rem) = parse_string_value(&rhs).map_err(|e| invalid(path, e))?;
-                            if !rem.trim().is_empty() {
-                                return Err(invalid(path, format!("unexpected tokens after `command`: `{}`", rem.trim())));
-                            }
-                            parsed.command = Some(v);
-                        }
-                        [k] if k == "args" => {
-                            let (v, rem) = parse_string_array(&rhs).map_err(|e| invalid(path, e))?;
-                            if !rem.trim().is_empty() {
-                                return Err(invalid(path, format!("unexpected tokens after `args`: `{}`", rem.trim())));
-                            }
-                            parsed.args = v;
-                        }
-                        [k] if k == "env" => {
-                            let (v, rem) = parse_inline_string_table(&rhs).map_err(|e| invalid(path, e))?;
-                            if !rem.trim().is_empty() {
-                                return Err(invalid(path, format!("unexpected tokens after `env`: `{}`", rem.trim())));
-                            }
-                            parsed.env.extend(v);
-                        }
-                        [prefix, sub] if prefix == "env" => {
-                            let (v, _) = parse_string_value(&rhs).map_err(|e| invalid(path, e))?;
-                            parsed.env.insert(sub.clone(), v);
-                        }
-                        [k] if k == "url" => {
-                            let (v, rem) = parse_string_value(&rhs).map_err(|e| invalid(path, e))?;
-                            if !rem.trim().is_empty() {
-                                return Err(invalid(path, format!("unexpected tokens after `url`: `{}`", rem.trim())));
-                            }
-                            parsed.url = Some(v);
-                        }
-                        [k] if k == "http_headers" || k == "headers" => {
-                            let (v, rem) = parse_inline_string_table(&rhs).map_err(|e| invalid(path, e))?;
-                            if !rem.trim().is_empty() {
-                                return Err(invalid(path, format!("unexpected tokens after `http_headers`: `{}`", rem.trim())));
-                            }
-                            parsed.headers.extend(v);
-                        }
-                        [prefix, sub] if prefix == "http_headers" || prefix == "headers" => {
-                            let (v, _) = parse_string_value(&rhs).map_err(|e| invalid(path, e))?;
-                            parsed.headers.insert(sub.clone(), v);
-                        }
-                        _ => {}
-                    },
-                    [_, _, sub] if sub == "env" => {
-                        let (v, _) = parse_string_value(&rhs).map_err(|e| invalid(path, e))?;
-                        parsed.env.insert(keys.join("."), v);
-                    }
-                    [_, _, sub] if sub == "http_headers" || sub == "headers" => {
-                        let (v, _) = parse_string_value(&rhs).map_err(|e| invalid(path, e))?;
-                        parsed.headers.insert(keys.join("."), v);
-                    }
-                    _ => {}
-                }
-            } else if is_inline_target_entry(&section, line, server_name) {
-                let Some((keys, rhs)) = parse_assignment_lines(&lines, &mut i).map_err(|e| invalid(path, e))? else {
-                    i += 1;
-                    continue;
-                };
-                if keys.len() == 1 {
-                    parse_inline_server_entry(&rhs, &mut parsed).map_err(|e| invalid(path, e))?;
-                }
-            } else {
-                quote_state = advance_multiline_state(line, quote_state);
-            }
-            i += 1;
-        }
-
-        if quote_state != MultiLineQuote::None {
-            return Err(invalid(path, "unterminated multiline TOML string"));
-        }
-        if !parsed.saw_section {
-            return Ok(None);
-        }
-        if let Some(command) = parsed.command {
-            return Ok(Some(McpTransportSpec::Stdio {
-                command,
-                args: parsed.args,
-                env: parsed.env,
-            }));
-        }
-        if let Some(url) = parsed.url {
-            return Ok(Some(McpTransportSpec::StreamableHttp {
-                url,
-                headers: parsed.headers,
-                stateless: false,
-            }));
         }
         Err(invalid(
             path,
@@ -1288,153 +982,227 @@ mod codex_toml {
         ))
     }
 
-    fn format_toml_key(key: &str) -> String {
-        if !key.is_empty() && key.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-') {
-            key.to_owned()
-        } else {
-            format_toml_string(key)
+    pub(super) fn read_toml_servers(path: &Path) -> Result<Vec<HostMcpServer>, McpInstallError> {
+        let Some(raw) = read_optional_file(path)? else {
+            return Ok(Vec::new());
+        };
+        if raw.trim().is_empty() {
+            return Ok(Vec::new());
         }
+        let doc: DocumentMut = raw.parse().map_err(|e| invalid(path, e))?;
+        let Some(servers_item) = doc.get("mcp_servers") else {
+            return Ok(Vec::new());
+        };
+        let Some(servers) = servers_item.as_table_like() else {
+            return Err(invalid(path, "`mcp_servers` must be a TOML table"));
+        };
+        let mut out = Vec::with_capacity(servers.len());
+        for (name, entry_item) in servers.iter() {
+            let Some(entry) = entry_item.as_table_like() else {
+                return Err(invalid(path, format!("`mcp_servers.{name}` must be a TOML table")));
+            };
+            let (transport, enabled) = decode_toml_entry(path, name, entry)?;
+            out.push(HostMcpServer {
+                host: McpHostId::Codex,
+                name: name.to_owned(),
+                transport,
+                enabled,
+                config_path: path.to_path_buf(),
+            });
+        }
+        out.sort_by(|a, b| a.name.cmp(&b.name));
+        Ok(out)
     }
 
-    fn format_toml_string(val: &str) -> String {
-        let mut out = String::with_capacity(val.len() + 2);
-        out.push('"');
-        for ch in val.chars() {
-            match ch {
-                '\\' => out.push_str("\\\\"),
-                '"' => out.push_str("\\\""),
-                '\n' => out.push_str("\\n"),
-                '\r' => out.push_str("\\r"),
-                '\t' => out.push_str("\\t"),
-                c if c.is_control() => out.push_str(&format!("\\u{:04X}", c as u32)),
-                c => out.push(c),
-            }
+    pub(super) fn read_toml_server(path: &Path, server_name: &str) -> Result<Option<McpTransportSpec>, McpInstallError> {
+        let Some(raw) = read_optional_file(path)? else {
+            return Ok(None);
+        };
+        if raw.trim().is_empty() {
+            return Ok(None);
         }
-        out.push('"');
-        out
+        let doc: DocumentMut = raw.parse().map_err(|e| invalid(path, e))?;
+        let Some(servers_item) = doc.get("mcp_servers") else {
+            return Ok(None);
+        };
+        let Some(servers) = servers_item.as_table_like() else {
+            return Err(invalid(path, "`mcp_servers` must be a TOML table"));
+        };
+        let Some(entry_item) = servers.get(server_name) else {
+            return Ok(None);
+        };
+        let Some(entry) = entry_item.as_table_like() else {
+            return Err(invalid(path, format!("`mcp_servers.{server_name}` must be a TOML table")));
+        };
+        decode_toml_entry(path, server_name, entry).map(|(t, _)| Some(t))
     }
 
-    pub(super) fn format_server_section(server_name: &str, transport: &McpTransportSpec) -> String {
-        let key = format_toml_key(server_name);
-        let mut out = String::new();
-        out.push_str(&format!("[mcp_servers.{key}]\n"));
+    fn build_server_table(transport: &McpTransportSpec, enabled: bool) -> Table {
+        let mut table = Table::new();
         match transport {
             McpTransportSpec::Stdio { command, args, env } => {
-                out.push_str(&format!("command = {}\n", format_toml_string(command)));
-                let encoded_args: Vec<String> = args.iter().map(|a| format_toml_string(a)).collect();
-                out.push_str(&format!("args = [{}]\n", encoded_args.join(", ")));
+                table.insert("command", Item::Value(Value::from(command.as_str())));
+                let mut arr = Array::new();
+                for arg in args {
+                    arr.push(arg.as_str());
+                }
+                table.insert("args", Item::Value(Value::Array(arr)));
                 if !env.is_empty() {
-                    out.push_str(&format!("\n[mcp_servers.{key}.env]\n"));
+                    let mut env_table = Table::new();
                     for (k, v) in env {
-                        out.push_str(&format!("{} = {}\n", format_toml_key(k), format_toml_string(v)));
+                        env_table.insert(k, Item::Value(Value::from(v.as_str())));
                     }
+                    table.insert("env", Item::Table(env_table));
                 }
             }
             McpTransportSpec::StreamableHttp { url, headers, .. } => {
-                out.push_str(&format!("url = {}\n", format_toml_string(url)));
+                table.insert("url", Item::Value(Value::from(url.as_str())));
                 if !headers.is_empty() {
-                    out.push_str(&format!("\n[mcp_servers.{key}.http_headers]\n"));
+                    let mut hdr_table = Table::new();
                     for (k, v) in headers {
-                        out.push_str(&format!("{} = {}\n", format_toml_key(k), format_toml_string(v)));
+                        hdr_table.insert(k, Item::Value(Value::from(v.as_str())));
                     }
+                    table.insert("http_headers", Item::Table(hdr_table));
                 }
             }
         }
-        out
+        if !enabled {
+            table.insert("enabled", Item::Value(Value::from(false)));
+        }
+        table
     }
 
-    /// Removes all lines belonging to `[mcp_servers.<name>]`, `[mcp_servers.<name>.*]`,
-    /// or inline `<name> = ...` under `[mcp_servers]`, preserving all other content verbatim.
-    fn strip_server_sections(path: &Path, raw: &str, server_name: &str) -> Result<(String, bool), McpInstallError> {
-        let lines: Vec<&str> = raw.lines().collect();
-        let mut kept: Vec<&str> = Vec::with_capacity(lines.len());
-        let mut section: Vec<String> = Vec::new();
-        let mut quote_state = MultiLineQuote::None;
-        let mut removed_any = false;
-        let mut i = 0;
-
-        while i < lines.len() {
-            let line = lines[i];
-            if quote_state != MultiLineQuote::None {
-                quote_state = advance_multiline_state(line, quote_state);
-                if !is_target_section(&section, server_name) {
-                    kept.push(line);
-                }
-                i += 1;
-                continue;
-            }
-            if let Some(header) = parse_table_header(line).map_err(|e| invalid(path, e))? {
-                section = header;
-                if is_target_section(&section, server_name) {
-                    removed_any = true;
-                    // Trim a single separating blank line directly preceding the removed section.
-                    if kept.last().is_some_and(|l| l.trim().is_empty()) {
-                        kept.pop();
-                    }
-                } else {
-                    kept.push(line);
-                }
-                i += 1;
-                continue;
-            }
-            if is_target_section(&section, server_name) {
-                removed_any = true;
-                quote_state = advance_multiline_state(line, quote_state);
-                i += 1;
-                continue;
-            }
-            if is_inline_target_entry(&section, line, server_name) {
-                removed_any = true;
-                let mut depth = delimiter_delta(line);
-                while depth > 0 && i + 1 < lines.len() {
-                    i += 1;
-                    depth += delimiter_delta(lines[i]);
-                }
-                i += 1;
-                continue;
-            }
-            quote_state = advance_multiline_state(line, quote_state);
-            kept.push(line);
-            i += 1;
-        }
-
-        if quote_state != MultiLineQuote::None {
-            return Err(invalid(path, "unterminated multiline TOML string"));
-        }
-
-        while kept.last().is_some_and(|l| l.trim().is_empty()) {
-            kept.pop();
-        }
-        let mut out = kept.join("\n");
-        if !out.is_empty() {
-            out.push('\n');
-        }
-        Ok((out, removed_any))
+    pub(super) fn format_server_section(server_name: &str, transport: &McpTransportSpec) -> String {
+        let mut doc = DocumentMut::new();
+        let mut mcp_servers = Table::new();
+        mcp_servers.set_implicit(true);
+        mcp_servers.insert(server_name, Item::Table(build_server_table(transport, true)));
+        doc.insert("mcp_servers", Item::Table(mcp_servers));
+        doc.to_string()
     }
 
-    pub(super) fn upsert_toml_server(path: &Path, server_name: &str, transport: &McpTransportSpec) -> Result<(), McpInstallError> {
+    pub(super) fn upsert_toml_server(
+        path: &Path,
+        previous_name: Option<&str>,
+        server_name: &str,
+        transport: &McpTransportSpec,
+        enabled: bool,
+    ) -> Result<(), McpInstallError> {
         let raw = read_optional_file(path)?.unwrap_or_default();
-        let (mut base, _) = strip_server_sections(path, &raw, server_name)?;
-        let section = format_server_section(server_name, transport);
-        if !base.is_empty() {
-            if !base.ends_with('\n') {
-                base.push('\n');
+        let mut doc: DocumentMut = raw.parse().map_err(|e| invalid(path, e))?;
+        let entry = Item::Table(build_server_table(transport, enabled));
+        match doc.get_mut("mcp_servers") {
+            None => {
+                let mut mcp_servers = Table::new();
+                mcp_servers.set_implicit(true);
+                mcp_servers.insert(server_name, entry);
+                doc.insert("mcp_servers", Item::Table(mcp_servers));
             }
-            base.push('\n');
+            Some(Item::Table(table)) => {
+                if let Some(prev) = previous_name {
+                    table.remove(prev);
+                }
+                table.insert(server_name, entry);
+            }
+            Some(Item::Value(Value::InlineTable(inline))) => {
+                let mut table = inline.clone().into_table();
+                if let Some(prev) = previous_name {
+                    table.remove(prev);
+                }
+                table.insert(server_name, entry);
+                doc.insert("mcp_servers", Item::Table(table));
+            }
+            Some(_) => return Err(invalid(path, "`mcp_servers` must be a TOML table")),
         }
-        base.push_str(&section);
-        write_file_atomic(path, base.as_bytes())
+        let mut encoded = doc.to_string();
+        if !encoded.is_empty() && !encoded.ends_with('\n') {
+            encoded.push('\n');
+        }
+        write_file_atomic(path, encoded.as_bytes())
+    }
+
+    pub(super) fn set_toml_server_enabled(path: &Path, server_name: &str, enabled: bool) -> Result<HostMcpServer, McpInstallError> {
+        let Some(raw) = read_optional_file(path)? else {
+            return Err(McpInstallError::ServerNotFound {
+                host: McpHostId::Codex,
+                name: server_name.to_owned(),
+            });
+        };
+        if raw.trim().is_empty() {
+            return Err(McpInstallError::ServerNotFound {
+                host: McpHostId::Codex,
+                name: server_name.to_owned(),
+            });
+        }
+        let mut doc: DocumentMut = raw.parse().map_err(|e| invalid(path, e))?;
+        let Some(servers_item) = doc.get_mut("mcp_servers") else {
+            return Err(McpInstallError::ServerNotFound {
+                host: McpHostId::Codex,
+                name: server_name.to_owned(),
+            });
+        };
+        let Some(servers) = servers_item.as_table_like_mut() else {
+            return Err(invalid(path, "`mcp_servers` must be a TOML table"));
+        };
+        let Some(entry_item) = servers.get_mut(server_name) else {
+            return Err(McpInstallError::ServerNotFound {
+                host: McpHostId::Codex,
+                name: server_name.to_owned(),
+            });
+        };
+        let Some(entry) = entry_item.as_table_like_mut() else {
+            return Err(invalid(path, format!("`mcp_servers.{server_name}` must be a TOML table")));
+        };
+        if enabled {
+            entry.remove("enabled");
+        } else {
+            entry.insert("enabled", Item::Value(Value::from(false)));
+        }
+        let (transport, final_enabled) = decode_toml_entry(path, server_name, entry)?;
+        let mut encoded = doc.to_string();
+        if !encoded.is_empty() && !encoded.ends_with('\n') {
+            encoded.push('\n');
+        }
+        write_file_atomic(path, encoded.as_bytes())?;
+        Ok(HostMcpServer {
+            host: McpHostId::Codex,
+            name: server_name.to_owned(),
+            transport,
+            enabled: final_enabled,
+            config_path: path.to_path_buf(),
+        })
     }
 
     pub(super) fn remove_toml_server(path: &Path, server_name: &str) -> Result<(), McpInstallError> {
         let Some(raw) = read_optional_file(path)? else {
             return Ok(());
         };
-        let (updated, removed) = strip_server_sections(path, &raw, server_name)?;
-        if !removed {
-            return Ok(());
+        let mut doc: DocumentMut = raw.parse().map_err(|e| invalid(path, e))?;
+        match doc.get_mut("mcp_servers") {
+            None => return Ok(()),
+            Some(Item::Table(table)) => {
+                if table.remove(server_name).is_none() {
+                    return Ok(());
+                }
+                if table.is_empty() {
+                    doc.remove("mcp_servers");
+                }
+            }
+            Some(Item::Value(Value::InlineTable(inline))) => {
+                if inline.remove(server_name).is_none() {
+                    return Ok(());
+                }
+                if inline.is_empty() {
+                    doc.remove("mcp_servers");
+                }
+            }
+            Some(_) => return Err(invalid(path, "`mcp_servers` must be a TOML table")),
         }
-        write_file_atomic(path, updated.as_bytes())
+        let mut encoded = doc.to_string();
+        if !encoded.is_empty() && !encoded.ends_with('\n') {
+            encoded.push('\n');
+        }
+        write_file_atomic(path, encoded.as_bytes())
     }
 }
 
@@ -1761,5 +1529,203 @@ model = "o4-mini"
         assert!(codex_stdio.contains("[mcp_servers.vibevalley]"));
         assert!(codex_stdio.contains("command = \"vibevalley\""));
         assert!(codex_stdio.contains("args = [\"mcp\", \"--channel\", \"alpha\"]"));
+    }
+
+    #[test]
+    fn codex_toml_handles_multiline_strings_and_preserves_formatting() {
+        let home = tempfile::tempdir().unwrap();
+        let codex_path = McpHostId::Codex.config_path(home.path());
+        std::fs::create_dir_all(codex_path.parent().unwrap()).unwrap();
+
+        let original = r#"# Top comment stays intact
+developer_instructions = """
+# Not a comment
+[mcp_servers.vibevalley]
+command = "decoy"
+"""
+
+[mcp_servers.other]
+command = "python3"
+args = ["-c", "print('ok')"]
+note = '''
+[mcp_servers.vibevalley]
+url = "http://127.0.0.1:9999/fake"
+'''
+
+[mcp_servers.other.env]
+MULTILINE = """
+line one
+[not.a.table]
+line two
+"""
+"#;
+        std::fs::write(&codex_path, original).unwrap();
+
+        let desired = stdio_cfg("vibevalley", "/usr/local/bin/vibevalley", &["mcp"]).with_env("PROMPT", "line1\nline2\n# keep");
+        assert_eq!(mcp_status_in(home.path(), McpHostId::Codex, &desired).state, McpInstallState::NotInstalled);
+
+        let installed = install_mcp_host_in(home.path(), McpHostId::Codex, &desired).unwrap();
+        assert_eq!(
+            installed.state,
+            McpInstallState::Installed {
+                transport: desired.transport.clone(),
+            }
+        );
+
+        let after_install = std::fs::read_to_string(&codex_path).unwrap();
+        assert!(after_install.contains("# Top comment stays intact"));
+        assert!(after_install.contains("command = \"decoy\""));
+        assert!(after_install.contains("url = \"http://127.0.0.1:9999/fake\""));
+        assert!(after_install.contains("[not.a.table]"));
+
+        // Re-reading round-trips multiline env value accurately.
+        assert_eq!(
+            mcp_status_in(home.path(), McpHostId::Codex, &desired).state,
+            McpInstallState::Installed {
+                transport: desired.transport.clone(),
+            }
+        );
+
+        // Sibling server with multiline string env remains Installed.
+        let other = stdio_cfg("other", "python3", &["-c", "print('ok')"]).with_env("MULTILINE", "line one\n[not.a.table]\nline two\n");
+        assert_eq!(
+            mcp_status_in(home.path(), McpHostId::Codex, &other).state,
+            McpInstallState::Installed {
+                transport: other.transport.clone(),
+            }
+        );
+
+        // Uninstall removes only real [mcp_servers.vibevalley] and leaves multiline decoy strings intact.
+        let removed = uninstall_mcp_host_in(home.path(), McpHostId::Codex, "vibevalley").unwrap();
+        assert_eq!(removed.state, McpInstallState::NotInstalled);
+        let after_remove = std::fs::read_to_string(&codex_path).unwrap();
+        assert!(after_remove.contains("command = \"decoy\""));
+        assert!(after_remove.contains("url = \"http://127.0.0.1:9999/fake\""));
+        assert_eq!(
+            mcp_status_in(home.path(), McpHostId::Codex, &other).state,
+            McpInstallState::Installed { transport: other.transport }
+        );
+    }
+
+    #[test]
+    fn host_mcp_inventory_crud_and_enable_toggle_across_all_four_hosts() {
+        let home = tempfile::tempdir().unwrap();
+
+        // Missing config files yield empty inventory across all four hosts.
+        for &host in McpHostId::ALL {
+            assert!(list_host_mcp_servers_in(home.path(), host).unwrap().is_empty(), "host={host}");
+        }
+
+        // Antigravity: pre-seeded with disabled legacy serverUrl + enabled stdio server.
+        let agy_path = McpHostId::Antigravity.config_path(home.path());
+        std::fs::create_dir_all(agy_path.parent().unwrap()).unwrap();
+        std::fs::write(
+            &agy_path,
+            r#"{
+  "mcpServers": {
+    "linear": { "serverUrl": "https://mcp.linear.app/mcp", "disabled": true },
+    "fs": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"] }
+  }
+}"#,
+        )
+        .unwrap();
+
+        let agy_list = list_host_mcp_servers_in(home.path(), McpHostId::Antigravity).unwrap();
+        assert_eq!(agy_list.len(), 2);
+        assert_eq!(agy_list[0].name, "fs");
+        assert!(agy_list[0].enabled);
+        assert_eq!(agy_list[0].config_path, agy_path);
+        assert_eq!(agy_list[1].name, "linear");
+        assert!(!agy_list[1].enabled);
+        assert_eq!(
+            agy_list[1].transport,
+            McpTransportSpec::StreamableHttp {
+                url: "https://mcp.linear.app/mcp".into(),
+                headers: BTreeMap::new(),
+                stateless: false,
+            }
+        );
+
+        // Claude: pre-seeded with disabledMcpServers list and unrelated state.
+        let claude_path = McpHostId::Claude.config_path(home.path());
+        std::fs::write(
+            &claude_path,
+            r#"{
+  "numStartups": 7,
+  "disabledMcpServers": ["sentry"],
+  "mcpServers": {
+    "sentry": { "type": "http", "url": "https://mcp.sentry.dev/mcp" }
+  }
+}"#,
+        )
+        .unwrap();
+        let claude_list = list_host_mcp_servers_in(home.path(), McpHostId::Claude).unwrap();
+        assert_eq!(claude_list.len(), 1);
+        assert_eq!(claude_list[0].name, "sentry");
+        assert!(!claude_list[0].enabled);
+
+        // Toggle sentry back on in Claude -> clears disabledMcpServers entry and preserves numStartups.
+        let enabled_claude = set_host_mcp_server_enabled_in(home.path(), McpHostId::Claude, "sentry", true).unwrap();
+        assert!(enabled_claude.enabled);
+        let claude_after: Value = serde_json::from_str(&std::fs::read_to_string(&claude_path).unwrap()).unwrap();
+        assert_eq!(claude_after["numStartups"], 7);
+        assert_eq!(claude_after["disabledMcpServers"], json!([]));
+
+        // Full CRUD + rename + toggle across all four hosts.
+        for &host in McpHostId::ALL {
+            let created = upsert_host_mcp_server_in(
+                home.path(),
+                host,
+                None,
+                &stdio_cfg("context7", "npx", &["-y", "@upstash/context7-mcp"]).with_env("API_KEY", "k1"),
+                true,
+            )
+            .unwrap();
+            assert_eq!(created.host, host);
+            assert!(created.enabled);
+
+            let disabled = set_host_mcp_server_enabled_in(home.path(), host, "context7", false).unwrap();
+            assert!(!disabled.enabled);
+            assert!(
+                list_host_mcp_servers_in(home.path(), host)
+                    .unwrap()
+                    .iter()
+                    .any(|s| s.name == "context7" && !s.enabled),
+                "host={host}"
+            );
+
+            let reenabled = set_host_mcp_server_enabled_in(home.path(), host, "context7", true).unwrap();
+            assert!(reenabled.enabled);
+
+            // Rename + switch transport atomically.
+            let renamed = upsert_host_mcp_server_in(
+                home.path(),
+                host,
+                Some("context7"),
+                &http_cfg("context7-http", "https://mcp.context7.com/mcp").with_header("Authorization", "Bearer tok"),
+                false,
+            )
+            .unwrap();
+            assert_eq!(renamed.name, "context7-http");
+            assert!(!renamed.enabled);
+
+            let listed = list_host_mcp_servers_in(home.path(), host).unwrap();
+            assert!(!listed.iter().any(|s| s.name == "context7"), "old name should be gone on {host}");
+            let found = listed.iter().find(|s| s.name == "context7-http").expect("renamed server present");
+            assert!(!found.enabled);
+            assert!(matches!(
+                found.transport,
+                McpTransportSpec::StreamableHttp { ref url, .. } if url == "https://mcp.context7.com/mcp"
+            ));
+
+            remove_host_mcp_server_in(home.path(), host, "context7-http").unwrap();
+            assert!(
+                !list_host_mcp_servers_in(home.path(), host).unwrap().iter().any(|s| s.name == "context7-http"),
+                "removed server must stay absent on {host}"
+            );
+
+            let missing_err = set_host_mcp_server_enabled_in(home.path(), host, "does-not-exist", true).unwrap_err();
+            assert!(matches!(missing_err, McpInstallError::ServerNotFound { .. }), "{missing_err}");
+        }
     }
 }

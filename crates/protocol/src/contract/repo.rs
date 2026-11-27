@@ -153,6 +153,59 @@ pub struct PullRequestCapability {
     pub reason: String,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+pub enum RepoHealthStatus {
+    #[serde(rename = "on_track")]
+    OnTrack,
+    #[serde(rename = "at_risk")]
+    AtRisk,
+    #[serde(rename = "off_track")]
+    OffTrack,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+pub enum RepoHealthReason {
+    #[serde(rename = "stuck_issues")]
+    StuckIssues,
+    #[serde(rename = "failed_checks")]
+    FailedChecks,
+    #[serde(rename = "overdue_issues")]
+    OverdueIssues,
+    #[serde(rename = "asking_user")]
+    AskingUser,
+    #[serde(rename = "blocked_issues")]
+    BlockedIssues,
+    #[serde(rename = "no_active_progress")]
+    NoActiveProgress,
+    #[serde(rename = "stale_activity")]
+    StaleActivity,
+    #[serde(rename = "healthy")]
+    Healthy,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct RepoHealth {
+    pub repo: String,
+    pub status: RepoHealthStatus,
+    pub reasons: Vec<RepoHealthReason>,
+    pub open_issues: i64,
+    pub in_progress_issues: i64,
+    pub in_review_issues: i64,
+    pub blocked_issues: i64,
+    pub stuck_issues: i64,
+    pub asking_issues: i64,
+    pub failed_checks: i64,
+    pub overdue_issues: i64,
+    pub last_commit_at: Option<i64>,
+    pub evaluated_at: i64,
+}
+
 #[skip_serializing_none]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts-gen", derive(TS))]
@@ -167,6 +220,8 @@ pub struct RepoSummary {
     pub last: Option<i64>,
     pub max_sessions: i64,
     pub pull_request: PullRequestCapability,
+    #[serde(default)]
+    pub health: Option<RepoHealth>,
 }
 
 #[skip_serializing_none]
@@ -422,6 +477,9 @@ crate::typescript::module! {
     RepoTemplates,
     PullRequestCapability,
     RepoSummary,
+    RepoHealthStatus,
+    RepoHealthReason,
+    RepoHealth,
     NewRepo,
     MountRepo,
     RepoUnmountInput,

@@ -86,3 +86,50 @@ test("ReposPage mounts a local folder via folder picker, distinguishes local mou
   await fake.pumpUntil(app, () => app.count("id:repos-empty") === 1);
   expect(repos.some((r) => r.name === mountedRepo.name)).toBe(false);
 });
+
+test("ReposPage displays SSOT repo health status badge and breakdown card", async () => {
+  setLocale("en");
+  const repos: RepoSummary[] = [
+    {
+      name: "alpha",
+      path: "/Users/farmer/code/alpha",
+      git: true,
+      external: false,
+      last: Math.floor((SCENARIO_NOW - 20_000) / 1000),
+      maxSessions: 3,
+      pullRequest: { available: true, reason: "" },
+      health: {
+        repo: "alpha",
+        status: "off_track",
+        reasons: ["stuck_issues", "overdue_issues"],
+        openIssues: 4,
+        inProgressIssues: 1,
+        inReviewIssues: 0,
+        blockedIssues: 1,
+        stuckIssues: 1,
+        askingIssues: 0,
+        failedChecks: 0,
+        overdueIssues: 2,
+        lastCommitAt: SCENARIO_NOW - 20_000,
+        evaluatedAt: SCENARIO_NOW,
+      },
+    },
+  ];
+  const fake = fakeHost(scenarios.typical, { route: "/repos/alpha", locale: "en" });
+  fake.respond("repo.list", () => repos);
+
+  const app = await open("../../app/main.tsx", {
+    width: 1280,
+    height: 820,
+    colorScheme: "light",
+    platform: "macos",
+    locale: "en-US",
+    clock: { time: SCENARIO_NOW },
+    host: fake.options,
+  });
+
+  await fake.pumpUntil(app, () => app.count("id:repo-health-badge") === 1 && app.count("id:repo-health-card") === 1);
+  expect(app.shows("id:repo-health-badge >> text:Off track")).toBe(true);
+  expect(app.texts().some((line) => line.includes("Stuck issues need attention"))).toBe(true);
+  expect(app.texts().some((line) => line.includes("Overdue issues past due date"))).toBe(true);
+});

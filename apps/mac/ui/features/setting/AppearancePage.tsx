@@ -1,20 +1,23 @@
-import { host, setColorScheme, signal } from "nsh";
+import { computed, host, setColorScheme, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
+import { BizCode } from "@vibevalley/protocol/api";
 import { MotionChoiceValues, ThemeChoice, ThemeChoiceValues } from "@vibevalley/protocol/host";
 
 import { SettingRow, SettingsGroup } from "../../design/domain/settings";
 import { Select } from "../../design/Field";
 import type { IconName } from "../../design/icons";
+import { Banner } from "../../design/layout";
 import { applyMotion, chooseMotion, motionChoice } from "../../design/motion";
 import { Segmented } from "../../design/Segmented";
+import { reasonOf } from "../../infra/api";
 import { hostApi } from "../../infra/bridge";
 import { currentHost } from "../../infra/host";
 import { prefsNow, ScaleValues, setScale, setTheme, usePrefs } from "../../infra/state/prefs";
 
 const themeIcon: Record<ThemeChoice, IconName> = { light: "themeLight", dark: "themeDark", system: "themeSystem" };
 
-const defaultMonoFonts = [
+export const defaultMonoFonts = [
   "Maple Mono NF CN",
   "JetBrainsMono Nerd Font",
   "JetBrains Maple Mono",
@@ -27,6 +30,85 @@ const defaultMonoFonts = [
   "Monaco",
 ] as const;
 const fontSizes = [11, 12, 13, 14, 15, 16, 18, 20] as const;
+// Escaped CJK glyphs keep `no-cjk-literal` clean while rendering literal bilingual font specimens.
+const fontOptionSpecimen = "Aa 01 \u4e2d\u6587";
+const specimenCodeComment = "// \u4e2d\u82f1\u6587\u7b49\u5bbd\u5bf9\u9f50\uff1a\u8fde\u5b57\u4e0e\u6613\u6df7\u6dc6\u5b57\u7b26";
+
+export interface MonoFontOption {
+  readonly value: string;
+  readonly label: string;
+  readonly installed: boolean;
+  readonly group?: string | undefined;
+}
+
+/** Appends CJK and monospace fallbacks so every font name renders both Latin glyphs and Chinese samples cleanly. */
+export function fontFamilyStack(family: string): string {
+  const trimmed = family.trim();
+  if (trimmed === "") return "'PingFang SC', Menlo, monospace";
+  const escaped = trimmed.replaceAll("'", "\\'");
+  const quoted = /[\s,]/u.test(trimmed) ? `'${escaped}'` : escaped;
+  return `${quoted}, 'PingFang SC', Menlo, monospace`;
+}
+
+/** Places genuinely installed host fonts first (curated order, then alphabetical) before uninstalled fallback presets. */
+export function buildMonoFontOptions(
+  hostFonts: readonly string[],
+  currentFont?: string,
+  labels: { readonly installed: string; readonly fallback: string } = {
+    installed: t("web.setting.appearance.fontGroupInstalled"),
+    fallback: t("web.setting.appearance.fontGroupFallback"),
+  },
+): readonly MonoFontOption[] {
+  const installedUnique: string[] = [];
+  const installedSet = new Set<string>();
+  for (const raw of hostFonts) {
+    const name = raw.trim();
+    if (name !== "" && !installedSet.has(name)) {
+      installedSet.add(name);
+      installedUnique.push(name);
+    }
+  }
+
+  const cur = currentFont?.trim();
+  const hasHostList = installedUnique.length > 0;
+
+  if (!hasHostList) {
+    const presets: string[] = [...defaultMonoFonts];
+    if (cur && !presets.includes(cur)) presets.unshift(cur);
+    return presets.map((name) => ({ value: name, label: name, installed: false }));
+  }
+
+  const installedOrdered: string[] = [];
+  const seen = new Set<string>();
+  for (const preferred of defaultMonoFonts) {
+    if (installedSet.has(preferred) && !seen.has(preferred)) {
+      seen.add(preferred);
+      installedOrdered.push(preferred);
+    }
+  }
+  const restInstalled = installedUnique.filter((name) => !seen.has(name)).toSorted((a, b) => a.localeCompare(b));
+  for (const name of restInstalled) {
+    seen.add(name);
+    installedOrdered.push(name);
+  }
+
+  const fallbackOrdered: string[] = [];
+  if (cur && !seen.has(cur)) {
+    seen.add(cur);
+    fallbackOrdered.push(cur);
+  }
+  for (const preset of defaultMonoFonts) {
+    if (!seen.has(preset)) {
+      seen.add(preset);
+      fallbackOrdered.push(preset);
+    }
+  }
+
+  return [
+    ...installedOrdered.map((name) => ({ value: name, label: name, installed: true, group: labels.installed })),
+    ...fallbackOrdered.map((name) => ({ value: name, label: name, installed: false, group: labels.fallback })),
+  ];
+}
 
 const chooseTheme = (theme: ThemeChoice) => {
   setTheme(theme);
@@ -39,98 +121,211 @@ export function AppearanceGroups() {
   const theme = usePrefs((p) => p.theme);
   const scale = usePrefs((p) => p.scale);
   const monoFont = signal("Maple Mono NF CN");
-  const availableFonts = signal<readonly string[]>(defaultMonoFonts);
+  const installedFonts = signal<readonly string[]>([]);
   const termSize = signal(13);
+  const error = signal<string | undefined>(undefined);
 
-  if (host.available()) {
-    void hostApi.info().then((env) => {
-      if (env.bizCode === 0 && env.data) {
-        const parsedTheme = ThemeChoice.safeParse(env.data.theme);
-        if (parsedTheme.success && parsedTheme.data !== prefsNow().theme) setTheme(parsedTheme.data);
-        if (env.data.motion) applyMotion(env.data.motion);
-        if (env.data.monoFont) monoFont.set(env.data.monoFont);
-        if (Array.isArray(env.data.monoFonts) && env.data.monoFonts.length > 0) {
-          const merged: string[] = [...defaultMonoFonts];
-          for (const f of env.data.monoFonts) {
-            if (!merged.includes(f)) merged.push(f);
-          }
-          availableFonts.set(merged);
+  const fontOptions = computed(() => buildMonoFontOptions(installedFonts(), monoFont()));
+  const installedSet = computed(
+    () =>
+      new Set(
+        installedFonts()
+          .map((f) => f.trim())
+          .filter(Boolean),
+      ),
+  );
+  const uiPreviewSize = computed(() => Math.round((13 * scale()) / 100));
+
+  const loadHostInfo = async () => {
+    if (!host.available()) return;
+    try {
+      const env = await hostApi.info();
+      if (env.bizCode !== 0) {
+        if (env.bizCode !== BizCode.RouteNotFound) {
+          error.set(env.message || t("web.setting.appearance.fontLoadFailed"));
         }
-        if (typeof env.data.terminalFontSize === "number") termSize.set(Math.round(env.data.terminalFontSize));
-        if (typeof env.data.uiFontSize === "number") {
-          const pct = Math.round((env.data.uiFontSize / 13) * 100);
-          const closest = ScaleValues.reduce((best, cur) => (Math.abs(cur - pct) < Math.abs(best - pct) ? cur : best));
-          setScale(closest);
-        }
+        return;
       }
-    });
-  }
+      if (!env.data) return;
+      const parsedTheme = ThemeChoice.safeParse(env.data.theme);
+      if (parsedTheme.success && parsedTheme.data !== prefsNow().theme) setTheme(parsedTheme.data);
+      if (env.data.motion) applyMotion(env.data.motion);
+      if (env.data.monoFont) monoFont.set(env.data.monoFont);
+      if (Array.isArray(env.data.monoFonts)) installedFonts.set(env.data.monoFonts);
+      if (typeof env.data.terminalFontSize === "number") termSize.set(Math.round(env.data.terminalFontSize));
+      if (typeof env.data.uiFontSize === "number") {
+        const pct = Math.round((env.data.uiFontSize / 13) * 100);
+        const closest = ScaleValues.reduce((best, cur) => (Math.abs(cur - pct) < Math.abs(best - pct) ? cur : best));
+        setScale(closest);
+      }
+    } catch (err) {
+      error.set(reasonOf(err));
+    }
+  };
+
+  void loadHostInfo();
+
+  const applyFont = async (patch: { monoFont?: string; terminalFontSize?: number; uiFontSize?: number }, rollback: () => void) => {
+    error.set(undefined);
+    if (!host.available()) return;
+    try {
+      const env = await hostApi.font(patch);
+      if (env.bizCode !== 0) {
+        rollback();
+        error.set(env.message || t("web.setting.appearance.fontApplyFailed"));
+      }
+    } catch (err) {
+      rollback();
+      error.set(reasonOf(err));
+    }
+  };
 
   return (
-    <SettingsGroup title={t("web.setting.nav.appearance")} note={t("web.setting.scope.device")}>
-      <SettingRow label={t("web.setting.appearance.theme")} hint={t("web.setting.appearance.themeHint")}>
-        <Segmented
-          label={t("web.setting.appearance.theme")}
-          testid="theme"
-          value={theme()}
-          options={ThemeChoiceValues.map((v) => ({ value: v, icon: themeIcon[v], label: t(`web.setting.appearance.themes.${v}`) }))}
-          onChange={chooseTheme}
-        />
-      </SettingRow>
-      <SettingRow label={t("web.setting.appearance.motion")} hint={t("web.setting.appearance.motionHint")}>
-        <Segmented
-          label={t("web.setting.appearance.motion")}
-          testid="motion"
-          value={motionChoice()}
-          options={MotionChoiceValues.map((v) => ({ value: v, label: t(`web.setting.appearance.motionOption.${v}`) }))}
-          onChange={chooseMotion}
-        />
-      </SettingRow>
-      <SettingRow label={t("web.setting.appearance.scale")} hint={t("web.setting.appearance.scaleHint")}>
-        <Segmented
-          label={t("web.setting.appearance.scale")}
-          testid="scale"
-          value={String(scale())}
-          options={ScaleValues.map((v) => ({ value: String(v), label: `${v}%` }))}
-          onChange={(v) => {
-            const next = ScaleValues.find((s) => String(s) === v);
-            if (next !== undefined) {
-              setScale(next);
-              const sized = Math.round((13 * next) / 100);
-              termSize.set(sized);
-              void hostApi.font({ terminalFontSize: sized, uiFontSize: sized });
-            }
-          }}
-        />
-      </SettingRow>
-      <SettingRow label={t("web.setting.appearance.monoFontRow")} hint={t("web.setting.appearance.monoFontHint")}>
-        <Select
-          label={t("web.setting.appearance.monoFont")}
-          testid="mono-font"
-          class="w-56"
-          value={monoFont()}
-          options={availableFonts().map((f) => ({ value: f, label: f }))}
-          onChange={(next) => {
-            monoFont.set(next);
-            void hostApi.font({ monoFont: next });
-          }}
-        />
-      </SettingRow>
-      <SettingRow label={t("web.setting.appearance.terminalFontSize")} hint={t("web.setting.appearance.terminalFontSizeHint")} last>
-        <Segmented
-          label={t("web.setting.appearance.terminalFontSize")}
-          testid="terminal-font-size"
-          value={String(termSize())}
-          options={fontSizes.map((s) => ({ value: String(s), label: `${s}pt` }))}
-          onChange={(v) => {
-            const n = Number(v);
-            if (Number.isFinite(n)) {
-              termSize.set(n);
-              void hostApi.font({ terminalFontSize: n });
-            }
-          }}
-        />
-      </SettingRow>
-    </SettingsGroup>
+    <View class="gap-5">
+      <If when={error()}>
+        {(err) => (
+          <Banner tone="bad" role="alert" testID="appearance-error">
+            {err()}
+          </Banner>
+        )}
+      </If>
+
+      <SettingsGroup title={t("web.setting.nav.appearance")} note={t("web.setting.scope.device")}>
+        <SettingRow label={t("web.setting.appearance.theme")} hint={t("web.setting.appearance.themeHint")}>
+          <Segmented
+            label={t("web.setting.appearance.theme")}
+            testid="theme"
+            value={theme()}
+            options={ThemeChoiceValues.map((v) => ({ value: v, icon: themeIcon[v], label: t(`web.setting.appearance.themes.${v}`) }))}
+            onChange={chooseTheme}
+          />
+        </SettingRow>
+        <SettingRow label={t("web.setting.appearance.motion")} hint={t("web.setting.appearance.motionHint")}>
+          <Segmented
+            label={t("web.setting.appearance.motion")}
+            testid="motion"
+            value={motionChoice()}
+            options={MotionChoiceValues.map((v) => ({ value: v, label: t(`web.setting.appearance.motionOption.${v}`) }))}
+            onChange={chooseMotion}
+          />
+        </SettingRow>
+        <SettingRow label={t("web.setting.appearance.scale")} hint={t("web.setting.appearance.scaleHint")}>
+          <Segmented
+            label={t("web.setting.appearance.scale")}
+            testid="scale"
+            value={String(scale())}
+            options={ScaleValues.map((v) => ({ value: String(v), label: `${v}%` }))}
+            onChange={(v) => {
+              const next = ScaleValues.find((s) => String(s) === v);
+              if (next !== undefined) {
+                const prevScale = scale();
+                const prevSize = termSize();
+                setScale(next);
+                const sized = Math.round((13 * next) / 100);
+                termSize.set(sized);
+                void applyFont({ terminalFontSize: sized, uiFontSize: sized }, () => {
+                  setScale(prevScale);
+                  termSize.set(prevSize);
+                });
+              }
+            }}
+          />
+        </SettingRow>
+        <SettingRow label={t("web.setting.appearance.monoFontRow")} hint={t("web.setting.appearance.monoFontHint")}>
+          <Select
+            label={t("web.setting.appearance.monoFont")}
+            testid="mono-font"
+            class="w-64 max-w-full"
+            popupClass="min-w-80 max-h-80"
+            itemClass="group min-h-8 flex-row items-center gap-2 rounded-md px-2 py-1 focus:bg-hover selected:bg-selected disabled:opacity-50"
+            searchable
+            searchPlaceholder={t("web.setting.appearance.fontSearch")}
+            emptyText={t("web.setting.appearance.fontEmpty")}
+            value={monoFont()}
+            options={fontOptions()}
+            renderValue={({ value, label }) => (
+              <Text testID="mono-font-trigger-label" class="min-w-0 flex-1 truncate text-sm text-ink" style={{ fontFamily: fontFamilyStack(value()) }}>
+                {label()}
+              </Text>
+            )}
+            renderOption={(entry) => {
+              const isFallback = () => installedSet().size > 0 && !installedSet().has(entry.value);
+              return (
+                <View testID={`mono-font-option-${entry.value}`} class="min-w-0 flex-1 flex-row items-center gap-2">
+                  <Text
+                    class={`min-w-0 flex-1 truncate text-sm group-selected:font-medium ${isFallback() ? "text-muted" : "text-ink"}`}
+                    style={{ fontFamily: fontFamilyStack(entry.value) }}
+                  >
+                    {entry.title}
+                  </Text>
+                  <Text class="shrink-0 text-xs text-muted" style={{ fontFamily: fontFamilyStack(entry.value) }}>
+                    {fontOptionSpecimen}
+                  </Text>
+                  <If when={isFallback()}>
+                    <View class="shrink-0 rounded-sm bg-hover px-1.5 py-px">
+                      <Text class="text-2xs text-faint">{t("web.setting.appearance.fontFallbackBadge")}</Text>
+                    </View>
+                  </If>
+                </View>
+              );
+            }}
+            onChange={(next) => {
+              const prev = monoFont();
+              monoFont.set(next);
+              void applyFont({ monoFont: next }, () => monoFont.set(prev));
+            }}
+          />
+        </SettingRow>
+        <SettingRow label={t("web.setting.appearance.terminalFontSize")} hint={t("web.setting.appearance.terminalFontSizeHint")} last>
+          <Segmented
+            label={t("web.setting.appearance.terminalFontSize")}
+            testid="terminal-font-size"
+            value={String(termSize())}
+            options={fontSizes.map((s) => ({ value: String(s), label: `${s}pt` }))}
+            onChange={(v) => {
+              const n = Number(v);
+              if (Number.isFinite(n)) {
+                const prev = termSize();
+                termSize.set(n);
+                void applyFont({ terminalFontSize: n }, () => termSize.set(prev));
+              }
+            }}
+          />
+        </SettingRow>
+      </SettingsGroup>
+
+      <SettingsGroup title={t("web.setting.appearance.previewTitle")} note={t("web.setting.appearance.previewNote")} testid="appearance-specimen">
+        <View class="gap-1 border-b border-line px-4 py-3">
+          <View class="flex-row items-center justify-between gap-2">
+            <Text class="text-2xs font-medium text-faint">{t("web.setting.appearance.previewUiHeading")}</Text>
+            <Text testID="specimen-ui-meta" class="font-mono text-2xs text-muted tabular-nums">
+              {`${scale()}% · ${uiPreviewSize()}pt`}
+            </Text>
+          </View>
+          <Text testID="specimen-ui-text" class="text-ink" style={{ fontSize: uiPreviewSize() }}>
+            {t("web.setting.appearance.previewUiBody")}
+          </Text>
+        </View>
+        <View class="gap-1.5 bg-side px-4 py-3">
+          <View class="flex-row items-center justify-between gap-2">
+            <Text class="text-2xs font-medium text-faint">{t("web.setting.appearance.previewCodeHeading")}</Text>
+            <Text testID="specimen-code-meta" class="font-mono text-2xs text-muted tabular-nums">
+              {`${monoFont()} · ${termSize()}pt`}
+            </Text>
+          </View>
+          <View class="gap-0.5 rounded-md border border-line bg-page px-3 py-2.5">
+            <Text testID="specimen-code-comment" class="text-muted" style={{ fontFamily: fontFamilyStack(monoFont()), fontSize: termSize() }}>
+              {specimenCodeComment}
+            </Text>
+            <Text testID="specimen-code-line" class="text-ink" style={{ fontFamily: fontFamilyStack(monoFont()), fontSize: termSize() }}>
+              {"const check = (x: number) => x !== 0O1lI;"}
+            </Text>
+            <Text testID="specimen-code-meta-line" class="text-accent" style={{ fontFamily: fontFamilyStack(monoFont()), fontSize: termSize() }}>
+              {`const font = "${monoFont()}"; // ${termSize()}pt`}
+            </Text>
+          </View>
+        </View>
+      </SettingsGroup>
+    </View>
   );
 }

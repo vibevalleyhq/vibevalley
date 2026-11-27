@@ -14,6 +14,9 @@ export interface VoiceHandlers {
   readonly "voice.call.say": (a: T.VoiceSaid) => Promise<void>;
   /** Whether MOSS Live takes the key: a session is attached and closed again, nothing is said. */
   readonly "voice.moss.verify": () => Promise<T.Validation>;
+  readonly "voice.asr.start": () => Promise<T.VoiceAsrGrant>;
+  readonly "voice.asr.stop": (a: T.VoiceAsrStopInput) => Promise<void>;
+  readonly "voice.asr.transcribe": (a: T.VoiceAsrTranscribeInput) => Promise<T.VoiceAsrResult>;
 }
 
 export const voiceEndpoints: readonly Endpoint[] = [
@@ -64,6 +67,27 @@ export const voiceEndpoints: readonly Endpoint[] = [
     about: [],
     input: S.VoiceSaid,
     result: undefined,
+    can: ["user", "remote"],
+  },
+  {
+    op: "voice.asr.start",
+    about: [],
+    input: undefined,
+    result: S.VoiceAsrGrant,
+    can: ["user", "remote"],
+  },
+  {
+    op: "voice.asr.stop",
+    about: [],
+    input: S.VoiceAsrStopInput,
+    result: undefined,
+    can: ["user", "remote"],
+  },
+  {
+    op: "voice.asr.transcribe",
+    about: [],
+    input: S.VoiceAsrTranscribeInput,
+    result: S.VoiceAsrResult,
     can: ["user", "remote"],
   },
 ];

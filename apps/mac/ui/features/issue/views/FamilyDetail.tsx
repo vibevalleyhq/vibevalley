@@ -14,12 +14,13 @@ import { createMemo } from "../../../infra/solid";
 import { useIntents } from "../../../infra/state/intent";
 import { createIssueActs } from "../model/acts";
 import { useIssues } from "../model/history";
+import { blockerIssuesOf } from "../model/meta";
 import { stageTone } from "../model/overview";
 import { issueSet, labeledIssue, sendLabel } from "../model/write";
 import { ActLines } from "./ActLines";
-import { DatePropertyEditor, ParentPicker, SubIssuesSection, TagEditor } from "./IssueMetaControls";
+import { BlockedByChips, BlockedByPicker, DatePropertyEditor, OwnerMark, OwnerPicker, ParentPicker, SubIssuesSection, TagEditor } from "./IssueMetaControls";
 import { StatusMark } from "./Marks";
-import { IssueNumberPill, IssueSheet, Property, SheetLabel, StagePill } from "./Sheet";
+import { IssueSheet, IssueTrail, Property, SheetLabel, StagePill } from "./Sheet";
 
 export function FamilyDetail(props: { issue: Issue; children: Issue[]; onOpen: (id: string) => void; onClose: (review: boolean) => void }) {
   const allIssues = useIssues();
@@ -29,6 +30,7 @@ export function FamilyDetail(props: { issue: Issue; children: Issue[]; onOpen: (
   const open = computed(() => live().status !== "done" && live().status !== "canceled");
   const setLabel = (label: Omit<Parameters<typeof sendLabel>[1], "id">) => void sendLabel(sets, { id: props.issue.id, ...label });
   const parent = createMemo(() => (live().parent ? allIssues().find((item) => item.id === live().parent) : undefined));
+  const blockers = createMemo(() => blockerIssuesOf(live(), allIssues()));
   const acts = createIssueActs(() => props.issue, {
     act: createAct(),
     complete: () => props.onClose(true),
@@ -41,40 +43,13 @@ export function FamilyDetail(props: { issue: Issue; children: Issue[]; onOpen: (
 
   const heading = (
     <View>
-      <View class="mb-2 flex-row flex-wrap items-center gap-1.5">
-        <If when={live().repo}>
-          {(repo) => (
-            <>
-              <View class="flex-row items-center gap-1 rounded-md bg-side px-1.5 py-0.5">
-                <Icon name="folder" size={12} tone="muted" />
-                <Text class="text-xs font-medium text-muted">{repo()}</Text>
-              </View>
-              <Icon name="next" size={12} tone="faint" />
-            </>
-          )}
-        </If>
-        <If when={live().parent}>
-          {(parentId) => (
-            <>
-              <View
-                role="button"
-                testID="parent-issue"
-                onPress={() => props.onOpen(parentId())}
-                class="flex-row items-center gap-1 rounded-md border border-line bg-side px-1.5 py-0.5 hover:bg-hover"
-              >
-                <Text class="text-xs text-water">{parent() ? `#${parent()!.number} ${parent()!.title}` : t("web.issue.family.parent")}</Text>
-              </View>
-              <Icon name="next" size={12} tone="faint" />
-            </>
-          )}
-        </If>
-        <IssueNumberPill number={live().number} />
-      </View>
+      <IssueTrail parentId={live().parent} parent={parent()} onOpenParent={props.onOpen} />
       <Text role="header" testID="issue-title" class="text-2xl leading-snug font-semibold text-ink">
         {live().title}
       </Text>
       <View class="mt-2.5 flex-row flex-wrap items-center gap-2">
         <StagePill tone={tone()} label={t(`shared.stage.${props.issue.stage.state}`)} />
+        <BlockedByChips blockers={blockers()} max={6} onOpen={props.onOpen} testid="detail-blocked-by" />
       </View>
     </View>
   );
@@ -118,6 +93,16 @@ export function FamilyDetail(props: { issue: Issue; children: Issue[]; onOpen: (
       <Property label={t("web.issue.family.children")} icon={<Icon name="issues" size={13} tone="muted" />}>
         <Text class="text-sm text-ink tabular-nums">{String(props.children.length)}</Text>
       </Property>
+      <Property label={t("web.issue.owner.label")} icon={<OwnerMark owner={live().owner} size={15} />} inset>
+        <OwnerPicker
+          owner={live().owner}
+          allIssues={allIssues()}
+          disabled={!open()}
+          state={labeled().state("owner")}
+          testid="issue-owner"
+          onChange={(owner) => setLabel({ owner: owner ?? { kind: "user", id: "" } })}
+        />
+      </Property>
       <Property label={t("web.issue.family.parent")} icon={<Icon name="indent" size={13} tone="muted" />} inset>
         <ParentPicker
           issueId={live().id}
@@ -126,6 +111,17 @@ export function FamilyDetail(props: { issue: Issue; children: Issue[]; onOpen: (
           disabled={!open()}
           state={labeled().state("parent")}
           onChange={(parent) => setLabel({ parent })}
+        />
+      </Property>
+      <Property align="start" label={t("web.issue.deps.blockedBy")} icon={<Icon name="lock" size={13} tone="muted" />} inset>
+        <BlockedByPicker
+          issueId={live().id}
+          blockedBy={live().blockedBy}
+          allIssues={allIssues()}
+          disabled={!open()}
+          state={labeled().state("blockedBy")}
+          onOpen={props.onOpen}
+          onChange={(blockedBy) => setLabel({ blockedBy })}
         />
       </Property>
       <Property align="start" label={t("web.issue.tags.label")} icon={<Icon name="catalog" size={13} tone="muted" />} inset>
@@ -138,6 +134,7 @@ export function FamilyDetail(props: { issue: Issue; children: Issue[]; onOpen: (
           value={live().startAt}
           disabled={!open()}
           testid="issue-start-at"
+          maxMs={live().dueAt}
           onCommit={(startAt) => setLabel({ startAt })}
         />
       </Property>
@@ -147,6 +144,7 @@ export function FamilyDetail(props: { issue: Issue; children: Issue[]; onOpen: (
           value={live().dueAt}
           disabled={!open()}
           testid="issue-due-at"
+          minMs={live().startAt}
           onCommit={(dueAt) => setLabel({ dueAt })}
         />
       </Property>
