@@ -14,6 +14,7 @@ pub mod digest;
 mod feishu;
 pub mod notify;
 mod qq;
+pub mod render;
 mod service;
 mod weixin;
 
