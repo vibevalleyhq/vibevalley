@@ -77,7 +77,7 @@ VibeValley 作为 macOS 全原生桌面应用，将 GPUI 窗口外壳、`nsh` �
 
 ## 6.5 全键盘操作与快捷键系统
 
-- **工作台快捷键注册表（`apps/mac/ui/infra/base/shortcuts.ts`）**：涵盖 8 大作用域（`everywhere`、`composer`、`lists`、`issues`、`pictures`、`library`、`farm`、`desktop`），包含 `Cmd/Mod+J` 快速切换、`?` 打开 `ShortcutSheet`、`Esc` 逐层关闭弹窗/退出编辑/回到看板、`C` 在工单页快速新建、`Up`/`Down`/`Enter` 列表漫游与回车进入、`Space`/`Delete` 素材库快速预览与删除、农场 `1…6` 切农具、按住 `Alt` 临时透显全员姓名、`Alt+Shift+Space` 全局语音热键。
+- **工作台快捷键注册表（`apps/mac/ui/design/shortcuts.ts`）**：涵盖 8 大作用域（`everywhere`、`composer`、`lists`、`issues`、`pictures`、`library`、`farm`、`desktop`），包含 `Cmd/Mod+J` 快速切换、`?` 打开 `ShortcutSheet`、`Esc` 逐层关闭弹窗/退出编辑/回到看板、`C` 在工单页快速新建、`Up`/`Down`/`Enter` 列表漫游与回车进入、`Space`/`Delete` 素材库快速预览与删除、农场 `1…6` 切农具、按住 `Alt` 临时透显全员姓名、`Alt+Shift+Space` 全局语音热键。
 - **GPUI 原生作用域严格隔离（`apps/mac/src/shell/menus.rs` `bind_keys`）**：
   - 全局级别保留 `Cmd+,`、`Cmd+K` / `Cmd+Shift+P` 调起命令面板、`Cmd+±/0` 缩放字号等；
   - `Cmd+1..9`（切项目）、`Cmd+B`（侧栏开关）、`Cmd+P`（速开文件）、`Cmd+Shift+F`（全库检索）、`Cmd+T`（新终端）、`Cmd+W`（关标签页）、`Cmd+D` / `Cmd+Shift+D`（左右/上下分屏）**全部限定于 `"Workspace"` 键位上下文**，在工作台输入框或表单聚焦时绝不劫持键位；

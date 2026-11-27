@@ -13,7 +13,7 @@
 - **语音朗读状态机（`apps/mac/src/speech_audio.rs`）**：围绕四态枚举 `Phase` 运转：`Idle` → `Playing` → `Draining` → `Stopping`，并通过 `Claim` 句柄绑定服务端 `SharedSpeechStreams` 的生命周期回收通知。
 - **实时双工通话（`apps/mac/src/live_voice.rs`）**：独立 `moss-live` 线程建立 WebSocket 语音流，维护四态 `Phase`（`Idle` / `Connecting` / `Live` / `Stopping`）、静音开关 `muted` 以及实时识别双轨字幕 `heard` / `said`。
 
-### 程序化音效合成器（`apps/mac/src/audio.rs` 与 `apps/mac/ui/design/sound.ts`）
+### 程序化音效合成器（`apps/mac/src/audio.rs` 与 `apps/mac/ui/infra/sound.ts`）
 
 纸雕农场的界面动作与帮工提示音由原生合成器实时计算 PCM 波形并缓存标准 WAV 字节序列：
 

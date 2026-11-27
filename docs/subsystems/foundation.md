@@ -63,7 +63,7 @@
 - **拒绝带 `BizCode`**：对调用方的拒绝是 `ApiError`（带 `bizCode` 与 `next`），网关写成全信封；模块内部可分辨的失败是 `thiserror` 的 enum；预期的结果（合进去或冲突）返回 enum，不当错误。
 - **共享异步底座与单一运行时**：全进程共享唯一多线程 Tokio 运行时 `vibevalley_runtime::rt`（工作线程 `vibevalley-io-{n}`，初始化即安装 `rustls` `ring` 提供方，无 `pollster` 依赖）。`Router`（`router.rs`）对全部 `EndpointId` / `NativeEndpointId` 做编译期穷尽分发并直接调用各域异步处理函数；热读插槽用 `arc-swap`，全局互斥锁用 `parking_lot`（无毒化），重试退避用 `backon`。后台异步与阻塞任务分别经 `TaskGroup` 与 `log::spawn_traced` / `spawn_blocking_traced` 管理，停机统一在 `App::close()` 中异步排空；超时的外部子进程统一使用 `run_command_with_timeout`（`tokio::process::Command` + `.kill_on_drop(true)` + `tokio::time::timeout`），批量多目标外呼以 `JoinSet` + `Semaphore` 有界并发。
 - **无条件 `trace_id` 与 `tracing::Span` 传播**：`Router` 在调用方未传入非零 `trace_id` 时无条件分配单调非零标识并建立请求 span（跨 `spawn_traced` 与 `spawn_blocking_traced` 自动延续），使服务端模块、`sqlx`、macOS `OsLogLayer` 与 `oar-voyage/3` 记录自动关联。
-- **两层确定性虚拟时钟与定向 `loom` 内核检验**：单调异步计时器经 [rt.rs](crates/runtime/src/rt.rs) 的 `rt::current_or_global_handle()` 派发（生产回落全局 `vibevalley-io` 运行时，`#[tokio::test(start_paused = true)]` 下附着当前线程测试时钟，统一使用 `tokio::time::Instant`，`tokio/test-util` 仅限 `[dev-dependencies]`）；挂钟与日历期限逻辑（`cron`、`remote`、`media`、`patrol`）注入 `Clock` / `ManualClock`（[clock.rs](crates/core/src/clock.rs)）。真正依赖原子内存序的四处并发内核（`SliceWakeGate`、`AcpTurnMachine`、`SessionGenerationTable`、`TeardownGate`）抽离至独立子模块并通过 `cargo xtask loom`（`--features loom`）做穷举交错模型检验，业务模块中不出现 `#[cfg(loom)]`。
+- **两层确定性虚拟时钟与定向 `loom` 内核检验**：单调异步计时器经 [lib.rs](crates/rt/src/lib.rs) 的 `rt::current_or_global_handle()` 派发（生产回落全局 `vibevalley-io` 运行时，`#[tokio::test(start_paused = true)]` 下附着当前线程测试时钟，统一使用 `tokio::time::Instant`，`tokio/test-util` 仅限 `[dev-dependencies]`）；挂钟与日历期限逻辑（`cron`、`remote`、`media`、`patrol`）注入 `Clock` / `ManualClock`（[clock.rs](crates/core/src/clock.rs)）。真正依赖原子内存序的四处并发内核（`SliceWakeGate`、`AcpTurnMachine`、`SessionGenerationTable`、`TeardownGate`）抽离至独立子模块并通过 `cargo xtask loom`（`--features loom`）做穷举交错模型检验，业务模块中不出现 `#[cfg(loom)]`。
 
 ### 契约、规则和数据库
 
@@ -100,14 +100,14 @@
 
 ### 话放在哪
 
-- **对用户的话进词典**：`crates/i18n/locales/{zh,en}/<命名空间>.json`；TS 调 `t("key")`（`vibevalley/no-cjk-literal` 拦硬编码中文），Rust 调 `vibevalley_i18n::t`。`vibevalley-i18n` 将前端 `web.*` 词典收在可选特性 `web` 下（默认关闭，保持 `vibevalley-cli` 与独立服务端精简），仅 `crates/rich` 开启该特性并向 `apps/mac` 暴露原生 `VvI18n`（`"vibevalley/rich"` `.translate(...)`），使生产 UI 包无需打入 JS 词典；由 `vp run i18n:gen` 生成的 `@vibevalley/i18n` JS 词典目录（`packages/i18n/src/catalogs.ts`）专供 Node 脚本与无宿主 `nsh test` 按需加载。
+- **对用户的话进词典**：`crates/i18n/locales/{zh,en}/<命名空间>.json`；TS 调 `t("key")`（`vibevalley/no-cjk-literal` 拦硬编码中文），Rust 调 `vibevalley_i18n::t`。`vibevalley-i18n` 仅按文件级监听内嵌服务端、桌面壳与共享词典，纯前端 `web.*` 词典由 `crates/rich`（`build.rs`）直接内嵌并向 `apps/mac` 暴露原生 `VvI18n`（`"vibevalley/rich"` `.translate(...)`），使修改前端文案不会失效 `vibevalley-core` 与 `vibevalley-server`，同时生产 UI 包无需打入 JS 词典；由 `vp run i18n:gen` 生成的 `@vibevalley/i18n` JS 词典目录（`packages/i18n/src/catalogs.ts`）专供 Node 脚本与无宿主 `nsh test` 按需加载。
 - **词典检查覆盖两端**：`vpx scripts/gen/i18n.ts check` 检查缺键、未用键、语言（含 `zh` 非白名单纯英文残值守卫及 3+1 `NoteType` 全覆盖校验）与占位符；识别 TS 模板键和 Rust `format!` 动态键的字面量前缀。Rust 与 TS 的缺键都使检查失败，删词条时两种语言一起删，再运行 `vp run i18n:gen`。
 - **对模型的话在 `assets/`**：助手的提示在 `crates/server/assets/orchestrator/prompts.json`，工具说明在 `crates/server/assets/tools/`，以 Rust 为准；中文编写，要求模型按用户的语言回答。
 - **语言**：存于家目录 `settings.json` 的 `locale`（`vibevalley-protocol::home`）。
 
 ## 怎么走
 
-**新增或修改表。** 服务端改 `crates/server/src/db/entity/<table_name>.rs`（严格一表一文件）、`crates/server/src/db/migration/` 与 `crates/server/src/service/`（或 `durable` 的实体/迁移），并保证 SQLite 与 PostgreSQL 测试均通过（`cargo test -p vibevalley-server --test dual_db`）。宿主 `state.db` 改 [宿主迁移与实体](apps/mac/crates/workspace/src/store/schema.rs) 后跑 `cargo test -p vibevalley-workspace`。[开发指南](docs/development.md)
+**新增或修改表。** 服务端改 `crates/server/src/db/entity/<table_name>.rs`（严格一表一文件）、`crates/server/src/db/migration/` 与 `crates/server/src/service/`（或 `durable` 的实体/迁移），并保证 SQLite 与 PostgreSQL 测试均通过（`cargo test -p vibevalley-server --features postgres --test dual_db`）。宿主 `state.db` 改 [宿主迁移与实体](apps/mac/crates/workspace/src/store/schema.rs) 后跑 `cargo test -p vibevalley-workspace`。[开发指南](docs/development.md)
 
 **新增或修改接口**
 

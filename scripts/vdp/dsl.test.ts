@@ -216,7 +216,7 @@ describe("vdp TS embedded DSL", () => {
     expect(attached.list).toBe(true);
 
     const ids = listScenarios().map((s) => s.id);
-    expect(ids).toEqual(["note", "issues", "chat", "library", "dashboard", "settings"]);
+    expect(ids).toEqual(["note", "doc-editor", "issues", "chat", "library", "dashboard", "settings"]);
     for (const id of ids) {
       expect(SCENARIOS[id]?.id).toBe(id);
     }

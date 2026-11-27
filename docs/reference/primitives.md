@@ -10,6 +10,8 @@
 |---|---|---|
 | `defaultOf` | `channel.ts` | The channel words go to when none is named. |
 | `channelOf` | `channel.ts` | A channel by its id; none when no id is given. |
+| `channelName` | `channel.ts` | Display name of a channel (title for direct messages, name or title otherwise). |
+| `channelLabel` | `channel.ts` | Prefixed channel label (`#name` for channels/threads, title for direct messages). |
 | `actorRoleOf` | `channel.ts` | The agent's role when an actor is an agent; undefined for the user or the system. |
 | `mentionLead` | `channel.ts` | What an @name may follow: anything but a Latin letter, a digit, _ or @, so a@b.com names no one while cjk@w3 does (Chinese runs on without spaces). |
 | `oneLine` | `cut.ts` | Runs of white space are one space. |
@@ -42,12 +44,13 @@
 | 名字 | 文件 | 说的是 |
 |---|---|---|
 | `Root` | `Root.tsx` |  |
+| `setDefaultActReporter` | `act.ts` | Installs the default refusal reporter (wired to `design/toasts` by `app/DesignHost`). |
+| `createAct` | `act.ts` | `say` tells a refusal; defaults to the installed host reporter unless a caller supplies its own. |
 | `localizeAgentProblem` | `agents.ts` | Localizes raw English engine readiness errors and attaches the matching settings route when actionable. |
 | `useWorkAgents` | `agents.ts` | All worker teammates on the roster (both locally dispatched and externally registered). |
 | `useManagedWorkAgents` | `agents.ts` | Only locally dispatched (`managed`) worker teammates eligible for VibeValley OAR execution sessions. |
 | `sortRuntimes` | `agents.ts` |  |
 | `useOrchestrators` | `agents.ts` | The orchestrators' profiles, the default one first. |
-| `orchestratorLookOf` | `agents.ts` | An orchestrator's look (its sprites are manager-<look>); the plain farmer until the profiles are read. |
 | `useAgent` | `agents.ts` | A profile by its id, once the profiles are read; undefined for none or one gone. |
 | `useAgentProblems` | `agents.ts` |  |
 | `useWorkAgentReadiness` | `agents.ts` | Validated runtime & config readiness (from `agent.validate` + `runtime.list`) keyed by agent id for managed OAR workers. |
@@ -94,9 +97,6 @@
 | `matches` | `base/search.ts` | Every word of the query is somewhere in the texts (spelled), ignoring case; an empty query matches everything. |
 | `compareText` | `base/search.ts` |  |
 | `or` | `base/search.ts` |  |
-| `shortcutPlaces` | `base/shortcuts.ts` |  |
-| `shortcuts` | `base/shortcuts.ts` |  |
-| `keyCap` | `base/shortcuts.ts` | A key's cap on the sheet. |
 | `useInterval` | `base/timer.ts` | fn every ms for as long as the reactive owner lives. |
 | `useTimeout` | `base/timer.ts` | A timeout to set from a handler: setting it again replaces the one waiting, and the reactive owner's end clears it. |
 | `typedMarks` | `base/typedMarks.ts` | The text with the marks just typed before the caret as the syntax they stand for. undefined when there are none. |
@@ -112,9 +112,10 @@
 | `act` | `bridge.ts` | Intent for the shell (VibeValley's own panels): open a file, stage, switch project... |
 | `viewName` | `bridge.ts` | Which surface this view shows (set by Rust before the bundle loads). |
 | `useBridge` | `bridged.ts` |  |
+| `followed` | `channelFollow.ts` | Shared live message store for followed channels and single thread roots. |
+| `useFollowed` | `channelFollow.ts` | A channel's messages while it is shown; empty with none. |
+| `useMessage` | `channelFollow.ts` | A message by its place (a thread's parent) while it is shown. |
 | `topsOf` | `channelMeta.ts` |  |
-| `channelName` | `channelMeta.ts` |  |
-| `channelLabel` | `channelMeta.ts` |  |
 | `fixtureTransport` | `fixtures.ts` | `subscriptions`: the events each subscription (by name) sends at once; it then stays open, as a quiet stream would. |
 | `useForm` | `form.ts` |  |
 | `createForm` | `form/form.ts` |  |
@@ -159,6 +160,14 @@
 | `readFarmFormParams` | `hostParams.ts` |  |
 | `readFarmPhoneParams` | `hostParams.ts` |  |
 | `readDevToolsParams` | `hostParams.ts` |  |
+| `newIssueTitle` | `issueActions.ts` | Default placeholder title used when creating an untitled issue draft. |
+| `actionOf` | `issueActions.ts` | Looks up the stage action descriptor matching an `IssueAct` on an issue. |
+| `perform` | `issueActions.ts` | An action sent once, without an overlay (the farm's bed tools, which play their effect after it). |
+| `approveShownChanges` | `issueActions.ts` | Approves the currently inspected diff revision for a change-delivering top-level issue. |
+| `useIssueChanges` | `issueActions.ts` | What completing the issue would merge; read only while it is shown. |
+| `createWriteKey` | `issueActions.ts` | The request key of the issue a box writes: the same words written again after a failure (a lost reply) are the same issue, made once. |
+| `writeIssue` | `issueActions.ts` | The plus: an issue made at once in the backlog. With words, they are its title and its draft starts from them. |
+| `libraryQuery` | `libraryQuery.ts` | The items whose names hold text, in the order sort names; the rail filters and counts them on the page. |
 | `retryRead` | `query.ts` |  |
 | `refetchOnRelink` | `query.ts` |  |
 | `agentsQuery` | `query.ts` |  |
@@ -180,6 +189,10 @@
 | `useQuery` | `query/solid.tsx` |  |
 | `ready` | `query/solid.tsx` |  |
 | `fixOf` | `readiness.ts` | What a feature lacks, in words, and the settings page that fixes it (SettingsStatus.readiness says what lacks). |
+| `sortRepos` | `repos.ts` | Newest commit first, then by name. |
+| `number` | `repos.ts` | As toLocaleString('zh-CN') writes it: 「12,345」. |
+| `percent` | `repos.ts` | Formats a 0..1 share as a compact percentage string. |
+| `languageShares` | `repos.ts` | By label, aliases merged, most lines first; past `top`, the rest is one Other (one leftover keeps its name). |
 | `formatGenUiAction` | `rich.ts` | Formats a GenUI action event into a concise human-readable line for toasts or channel feedback. |
 | `richNative` | `rich.ts` |  |
 | `coreBridge` | `rich.ts` | Returns the synchronous Rust `VvCore` native bridge (or test override in headless tests). |
@@ -233,6 +246,8 @@
 | `createContext` | `solid.ts` |  |
 | `useContext` | `solid.ts` | An nsh context is its own accessor. |
 | `getOwner` | `solid.ts` | nsh has no owner handle; callers only test it for presence. |
+| `SOUNDS` | `sound.ts` | Named UI and farm sound effects supported by the native audio engine. |
+| `playSound` | `sound.ts` | Plays a sound unless muted; stays silent when no host is attached. |
 | `atom` | `state/atom.ts` |  |
 | `Registry` | `state/atom.ts` | Where atoms' values live: the page's one, or a test's or a story's own. |
 | `pageRegistry` | `state/atom.ts` | The page's one registry. |
@@ -289,9 +304,6 @@
 | `isStorageHydrated` | `state/storage.ts` | Reactive flag that turns `true` once boot hydration from native `Storage` settles. |
 | `defineStored` | `state/stored.ts` | A choice kept on this machine, read and set as the page's value; `name` is unique across the page. |
 | `orFallback` | `state/stored.ts` | A field of a stored struct that reads as `fallback` when it is missing or does not decode, so one bad field does not throw away the others. |
-| `useTable` | `table.ts` |  |
-| `defineColumns` | `table/model.ts` |  |
-| `createTable` | `table/model.ts` |  |
 | `transport` | `transport.ts` |  |
 | `setTransport` | `transport.ts` | Swaps the transport (at start-up: the bridge, or a story's fixtures). |
 | `onTransportChange` | `transport.ts` |  |

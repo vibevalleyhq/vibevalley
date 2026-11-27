@@ -1,7 +1,14 @@
 #!/bin/sh
 set -eu
 
-cd "$(git rev-parse --show-toplevel)"
+toplevel=$(git rev-parse --show-toplevel)
+cd "$toplevel"
+if [ "$(git rev-parse --git-dir)" != "$(git rev-parse --git-common-dir)" ] && command -v sccache >/dev/null 2>&1; then
+    export RUSTC_WRAPPER="${RUSTC_WRAPPER:-sccache}"
+    export CARGO_INCREMENTAL=0
+    export SCCACHE_CACHE_SIZE="${SCCACHE_CACHE_SIZE:-40G}"
+    export SCCACHE_BASEDIRS="${SCCACHE_BASEDIRS:-$(dirname "$toplevel")}"
+fi
 main=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null || printf '%s\n' main)
 main=${main#origin/}
 base=$(git merge-base "$main" HEAD)

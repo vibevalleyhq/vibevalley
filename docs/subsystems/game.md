@@ -26,7 +26,7 @@
 | `crates/core/src/game/mod.rs` | 等级（`level_for_commits`）、地块映射（`plot_of`）、帧视图（`view_of`）、特效（`effects_of`）、地块分配（`free_station`、`stationed`）、成就目录与进度计算（`achievements`、`standings_of`） |
 | `crates/core/data/seeds.json` | 内置成就定义 |
 
-接口清单见 [capabilities.md](docs/reference/capabilities.md)（`game.achievement.list`、`game.title.set`、`game.shop.list`、`game.shop.buy`、`game.daily.list`）。
+接口清单见 [capabilities.md](docs/reference/capabilities.md)（`game.shop.list`、`game.shop.buy`）。
 
 ## 模型和不变量
 

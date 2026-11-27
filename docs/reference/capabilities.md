@@ -88,7 +88,6 @@
 | `provider.update` | 按版本保存供应商连接和默认用途 | `/api/v1/provider/update` | ✓ |   |   |   |
 | `provider.verify` | cap.op.provider.verify | `/api/v1/provider/verify` | ✓ |   |   |   |
 | `provider.voice.list` | 查询指定 MOSS 账号的一页音色，不生成音频 | `/api/v1/provider/voice/list` | ✓ |   |   |   |
-| `provider.model.list` | 查询已配置 MOSS 账号的可用模型，不发推理请求 | `/api/v1/provider/model/list` | ✓ |   |   |   |
 
 ## media
 
@@ -179,16 +178,7 @@ MOSS Live 语音通话
 
 | 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 主助手 | 执行会话 |
 |---|---|---|---|---|---|---|
-| `voice.hear` | 交上正在通的那通电话里听到的一句 | `/api/v1/voice/hear` | ✓ | ✓ |   |   |
 | `voice.moss.verify` | 试 MOSS 的钥匙能不能用，什么都不说 | `/api/v1/voice/moss/verify` | ✓ |   |   |   |
-| `voice.grant.create` | 为 MOSS Live 通话签发频道与会话标识 | `/api/v1/voice/grant/create` | ✓ | ✓ |   |   |
-| `voice.call.start` | 开始和主助手通话 | `/api/v1/voice/call/start` | ✓ | ✓ |   |   |
-| `voice.call.stop` | 挂断通话 | `/api/v1/voice/call/stop` | ✓ | ✓ |   |   |
-| `voice.call.hear` | 交上通话里你说的一句 | `/api/v1/voice/call/hear` | ✓ | ✓ |   |   |
-| `voice.call.say` | 交上通话里主助手说出的话 | `/api/v1/voice/call/say` | ✓ | ✓ |   |   |
-| `voice.asr.start` | cap.op.voice.asr.start | `/api/v1/voice/asr/start` | ✓ | ✓ |   |   |
-| `voice.asr.stop` | cap.op.voice.asr.stop | `/api/v1/voice/asr/stop` | ✓ | ✓ |   |   |
-| `voice.asr.transcribe` | cap.op.voice.asr.transcribe | `/api/v1/voice/asr/transcribe` | ✓ | ✓ |   |   |
 
 ## issue
 
@@ -291,7 +281,6 @@ MOSS Live 语音通话
 |---|---|---|---|---|---|---|
 | `game.shop.list` | 列出田头小摊里的庭院摆件和工单模板 | `/api/v1/game/shop/list` | ✓ | ✓ |   |   |
 | `game.shop.buy` | 用金币买一件庭院摆件或工单模板 | `/api/v1/game/shop/buy` | ✓ | ✓ |   |   |
-| `game.daily.list` | 列出今天的每日任务和自动结算金币 | `/api/v1/game/daily/list` | ✓ | ✓ |   |   |
 
 ## runtime
 

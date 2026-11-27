@@ -4,7 +4,7 @@
 
 ## 1. Tokio 运行时边界（`rt`、`pollster`、`rt::handle`、`block_on`）
 
-- [ ] **零 `pollster` 残留**：确认 `Cargo.toml` 与源码中没有引入或调用 `pollster::block_on`；统一走 `vibevalley_runtime::rt`（`crates/runtime/src/rt.rs`）。
+- [ ] **零 `pollster` 残留**：确认 `Cargo.toml` 与源码中没有引入或调用 `pollster::block_on`；统一走 `vibevalley_rt`（`crates/rt/src/lib.rs`，`vibevalley_runtime::rt` 重导出）。
 - [ ] **`rt::current_or_global_handle()` vs `rt::handle()`**：在可能运行于 `#[tokio::test(start_paused = true)]` 测试上下文的异步服务/任务里，必须调用 `rt::current_or_global_handle()` 挂到当前环境运行时，禁止绕过测试时钟直接 `rt::handle().spawn(...)`。仅长生命周期宿主锚点（如 `Listener` in `crates/server/src/gateway/http/mod.rs`）或明确需要 `rt::handle().enter()` 进入全局 `vibevalley-io` 运行时时才用 `rt::handle()`。
 - [ ] **禁止在 `async fn` / Tokio worker 内同步阻塞**：异步函数内不得调用 `rt::block_on`、`Handle::block_on` 或 `std::thread::sleep`，必须 `.await` 对应的 `*_async` 接口；同步阻塞工作必须通过任务隔离（见第 2 节）。
 - [ ] **`Drop` 里的异步收尾不死锁**：优先提供显式 `async fn close_async(&self)` / `async fn shutdown(self)`（如 `Hub::close_async`、`EventBus::close_async`、`Listener::shutdown`）；若保留同步 `Drop` 兜底调用 `rt::block_on`，其后台任务必须锚定在全局多线程运行时（`rt::handle()`），确保在 `CurrentThread` 测试运行时里不会因 `block_in_place` 或自等死锁。
@@ -24,7 +24,7 @@
 
 ## 4. 虚拟时钟与确定性生命周期（`start_paused`、`ManualClock`、`close_async`）
 
-- [ ] **异步定时测试禁睡墙钟**：涉及超时、退避、重试、心跳或节流的异步测试必须使用 `#[tokio::test(start_paused = true)]` + `tokio::time::advance(...)` + `tokio::task::yield_now().await`（参考 `crates/runtime/src/rt.rs`、`crates/server/src/router.rs`、`crates/server/src/context/outbox.rs`），不得依赖真实毫秒睡眠。
+- [ ] **异步定时测试禁睡墙钟**：涉及超时、退避、重试、心跳或节流的异步测试必须使用 `#[tokio::test(start_paused = true)]` + `tokio::time::advance(...)` + `tokio::task::yield_now().await`（参考 `crates/rt/src/lib.rs`、`crates/server/src/router.rs`、`crates/server/src/context/outbox.rs`），不得依赖真实毫秒睡眠。
 - [ ] **业务时钟注入 `ManualClock`**：调度、巡查、过期窗口等逻辑必须经 `Arc<dyn Clock>` 读取时间，测试注入 `ManualClock`（`crates/core/src/clock.rs`），禁止直读 `SystemTime::now()`。
 - [ ] **生命周期关闭可瞬时排空**：启动了后台任务的 `Hub`、`EventBus`、`Remote` 等组件测试，收尾必须显式 `.await` `close_async()`，并验证在虚拟时钟下瞬时完成、无泄漏任务。
 

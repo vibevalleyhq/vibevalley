@@ -6,7 +6,7 @@
 
 ## 读取频道消息
 
-原生工作台经进程内桥调用 `channel.message.list` 读取最新一页。向前翻页时，`before` 取当前最早的消息号。工作台从已读到的最大修订号订阅 `channel.follow`，按消息号合并新增和修改，保留修订号较大的版本。读取分页和申报已读位置是两次调用。[工作台消息列表](apps/mac/ui/features/channel/model/follow.ts) · [频道契约](packages/protocol/src/channel/api.ts)
+原生工作台经进程内桥调用 `channel.message.list` 读取最新一页。向前翻页时，`before` 取当前最早的消息号。工作台从已读到的最大修订号订阅 `channel.follow`，按消息号合并新增和修改，保留修订号较大的版本。读取分页和申报已读位置是两次调用。[工作台消息列表](apps/mac/ui/infra/channelFollow.ts) · [频道契约](packages/protocol/src/channel/api.ts)
 
 命令行通过 HTTP `/api/v1` 访问同一频道服务。执行 `vibevalley channel message list general --limit 10` 可读取田头最近十条消息。
 

@@ -24,7 +24,7 @@
 
 - [ ] **先上屏再发请求，收尾精准去重**：工作区聊天发送（`apps/mac/ui/workspace/ChatPane.tsx`）先清空草稿与附件、分配负 `localSeq` 写入 `inFlightOptimistic` 并插入本地 `user/message` 占位；收到规范 `"history"` 或 `"event"` 回声时按文本/序号移除对应占位并归入规范步骤。
 - [ ] **失败/缺会话完整回滚**：`ensureSession()` 失败、`sendWorkspaceMessage` 返回非 `ok` 或抛异常时，必须执行 `rollbackOptimistic()`：删除占位步骤、清理 `steeredSeqs` 与 `inFlightOptimistic`，且仅在用户尚未输入新草稿时恢复 `rawDraft` 与 `files`。
-- [ ] **变异请求带幂等 `sendKey`**：所有消息、评论与语音发送（`channel.message.send`、`issue.comment.create`、`voice.hear`）在重试或异步发布场景下必须传唯一 `sendKey`（如 `newSendKey()` / `publicationKey(...)`；检查 Mobile `apps/mobile/src/features/ChannelsTab.tsx` 新增重试或乐观发送时同样带上 `sendKey`），避免网络抖动造成重复落库。
+- [ ] **变异请求带幂等 `sendKey`**：所有消息与评论发送（`channel.message.send`、`issue.comment.create`）在重试或异步发布场景下必须传唯一 `sendKey`（如 `newSendKey()` / `publicationKey(...)`；检查 Mobile `apps/mobile/src/features/ChannelsTab.tsx` 新增重试或乐观发送时同样带上 `sendKey`），避免网络抖动造成重复落库。
 
 ## 4. 原生壳帧去重（Rust `Outbox` 与 `Shell` action 门控）
 

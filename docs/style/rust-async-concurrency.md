@@ -6,7 +6,7 @@
 
 ### 单一共享运行时
 
-进程全局唯一的 Tokio 多线程运行时由 [rt.rs](crates/runtime/src/rt.rs) 维护（工作线程名为 `vibevalley-io-<n>`，线程数读取 `VIBEVALLEY_IO_WORKERS` 并钳位在 `1–16`，缺省按硬件并发数钳位在 `2–4`）。工作区不应引入额外异步执行器或 `pollster`，跨同步/异步边界统一通过 `vibevalley_runtime::rt` 暴露的四项原语协作：
+进程全局唯一的 Tokio 多线程运行时由 [lib.rs](crates/rt/src/lib.rs)（`vibevalley-rt` crate，`vibevalley_runtime::rt` 重导出）维护（工作线程名为 `vibevalley-io-<n>`，线程数读取 `VIBEVALLEY_IO_WORKERS` 并钳位在 `1–16`，缺省按硬件并发数钳位在 `2–4`）。工作区不应引入额外异步执行器或 `pollster`，跨同步/异步边界统一通过 `vibevalley_rt` 暴露的四项原语协作：
 
 | 原语 | 职责 | 适用边界 |
 |---|---|---|
@@ -55,8 +55,7 @@
 |---|---|---|---|
 | `Authenticated(CallerContext)` | Bearer 令牌（含 `/api/v1/remote/pair/exchange` 配对握手）或本机 `from_the_farm` | JSON `Envelope` | `command`、`slice`、`live`、`subscribe`、`artifact_view`、`artifact_page`、`issue_watch` |
 | `AuthenticatedQuery(CallerContext)` | 同 `Authenticated`，额外允许 `?token=` 查询参数 | JSON `Envelope` | `/api/v1/attachment/{id}`（浏览器 `<img>` / `<a>` 直连） |
-| `LocalOnly` | 强制 `!state.is_remote && from_the_farm(&parts.headers)` | `BizCode::Forbidden` JSON `Envelope` | `media::upload`、`media::speech`、`mcp` |
-| `LocalOnlyStatus` | 同 `LocalOnly` | 裸 `StatusCode::FORBIDDEN` | `media::content` |
+| `LocalOnly` | 强制 `!state.is_remote && from_the_farm(&parts.headers)` | `BizCode::Forbidden` JSON `Envelope` | `mcp` |
 | `MachineAuth(RemoteDeviceIdentity)` | 强制 Bearer 或 `?token=` 且校验 `SCOPE_REMOTE_MACHINE`，绝不回落 `LocalOwner` | `BizCode::Unauthorized` / `BizCode::Forbidden` | `/api/v1/machine/ws`（[machine_ws.rs](crates/server/src/gateway/http/machine_ws.rs)） |
 
 ### 统一 SSE、字节范围解析与 CLI 代理

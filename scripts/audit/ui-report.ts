@@ -362,7 +362,7 @@ const componentRows = [
     target: "Checkbox / Segmented / Tabs / Tag / Slider / Field / ChipsInput / KeyField",
     verified: "状态切换、逗号分片、Slider 调节、只读 Key 脱敏操作",
   },
-  { group: "浮层与表格", target: "Dialog / MoreMenu / ToastHost / DataTable", verified: "开关弹窗、菜单动作、虚拟时钟 4.1s Toast 自动消失、排序与勾选空态" },
+  { group: "浮层与反馈", target: "Dialog / MoreMenu / ToastHost", verified: "开关弹窗、菜单动作、虚拟时钟 4.1s Toast 自动消失" },
   { group: "富文本与代码", target: "Markdown / CodeBlock", verified: "超长代码折叠展开、剪贴板复制及虚拟时钟 1.6s 已复制状态复位" },
   {
     group: "时钟与领域件",

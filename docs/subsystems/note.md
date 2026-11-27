@@ -18,7 +18,7 @@ Note（`Note`）是 VibeValley 统一的知识、块级文档与多维数据工�
 
 | 位置 | 职责 |
 |---|---|
-| `crates/protocol/src/contract/note.rs`、`crates/protocol/src/contract/endpoints.rs` | 跨端强类型契约与 TS 生成源：`NoteType`、24 种 `BlockKind`、`DocView`、12 种 `BaseColumnKind` / 4 种 `BaseViewKind`、`NoteLink`、协同/在场/建议/历史消息与 33 个 `note.*` RPC + 3 条 SSE 订阅（`note.follow`、`note.suggestion.follow`、`note.presence.follow`） |
+| `crates/protocol/src/contract/note.rs`、`crates/protocol/src/contract/endpoints/note.rs` | 跨端强类型契约与 TS 生成源：`NoteType`、24 种 `BlockKind`、`DocView`、12 种 `BaseColumnKind` / 4 种 `BaseViewKind`、`NoteLink`、协同/在场/建议/历史消息与 33 个 `note.*` RPC + 3 条 SSE 订阅（`note.follow`、`note.suggestion.follow`、`note.presence.follow`） |
 | `packages/protocol/src/note/schema.ts`、`packages/protocol/src/note/api.ts` | 前端边界 Zod Codec（`satisfies Codec<T.*>`）与强类型接口定义 |
 | `crates/core/src/note/mod.rs`、`crates/core/src/note/doc.rs`、`crates/core/src/note/base.rs`、`crates/core/src/note/links.rs`、`crates/core/src/note/manifest.rs`、`crates/core/src/note/path.rs`、`crates/core/src/note/preview.rs`、`crates/core/src/note/starter.rs` | 纯领域内核：路径与大小护栏、Manifest 编解码、4 原语骨架初始化、24 块 `Doc` 解析/投影/Markdown 往返、Base 过滤/排序/分组/汇总/公式/提示词投影、`[[note:...]]`/`[[issue:...]]`/`#N` 链接解析与轻量 `NotePreview` 提取 |
 | `crates/core/src/collab/doc.rs`、`crates/core/src/collab/presence.rs` | Loro 内容平面协同内核：`CollabDoc`（`texts`/`tree`/`entries`/`lists`）、`CommitMeta`、`TextRangeAnchor` 持久游标、浅快照压缩、按 `origin` 选择性撤销与 `PresenceHub`（`EphemeralStore`） |
@@ -27,7 +27,7 @@ Note（`Note`）是 VibeValley 统一的知识、块级文档与多维数据工�
 | `crates/server/src/db/entity/note.rs`、`crates/server/src/db/entity/note_version.rs`、`crates/server/src/db/entity/note_collab.rs`、`crates/server/src/db/entity/note_change.rs`、`crates/server/src/db/entity/note_suggestion.rs`、`crates/server/src/db/entity/note_link.rs`、`crates/server/src/service/note.rs` | 一表一文件实体定义、迁移 `crates/server/src/db/migration/m20261128_100001_replace_artifact_with_note.rs` 与统一数据服务 `NoteService`（`ctx.service.note`） |
 | `crates/server/src/agent/tool/content.rs`、`crates/server/src/agent/mcp/mode.rs`、`crates/cli/src/domains/content/note.rs`、`crates/cli/src/domains/mcp/note.rs`、`crates/cli/src/domains/mcp/note_defs.rs`、`crates/mcp/src/skills.rs` | 进程内 Agent 工具、按运行模式收窄的只读/写权限过滤、CLI `vibevalley note ...` 子命令、MCP `vv_note_*` / `vv_doc_*` / `vv_base_*` 工具与 SEP-2640 `skill://note/*` 目录 |
 | `crates/server/assets/note/types/`、`crates/rich/src/whiteboard.rs` | 4 种 `NoteType` 中英双语 `SKILL.md` / `SKILL.en.md` 与 `references/`；原生 `VvWhiteboard` 嵌入 `CollabDoc` |
-| `apps/mac/ui/features/note/`、`apps/mac/ui/features/content/` | 工作台 `/notes`、`/library`、`PageTree` 侧栏、24 块编辑器、Base 四视图、Row=Page 侧边抽屉、Presenter Mode、Backlinks 与 Channel 晋升弹窗 |
+| `apps/mac/ui/features/note/`（含 `hub/` 与 `hub/seeds/`） | 工作台 `/notes`、`/library`、`ContentShell`、`PageTree` 侧栏、24 块编辑器、Base 四视图、Row=Page 侧边抽屉、Presenter Mode、Backlinks 与 Channel 晋升弹窗 |
 
 全部接口与调用方权限见 [capabilities.md](docs/reference/capabilities.md)（`note.*` 及同域 `library.*`、`media.*`）。
 
@@ -133,7 +133,7 @@ VibeValley 借鉴 Notion 工程体系的核心设计，并按本机 Rust 优先�
 
 #### 4.1 `DocDocument` 与 24 种 `BlockKind` 契约
 
-`"structure/doc.json"` 存储 `DocDocument { version: 1, blocks: Vec<DocBlock> }`，每个 `DocBlock` 包含 `id: String`、扁平化的 `BlockKind`（`#[serde(tag = "type")]`）、可选 `collapsed: Option<bool>` 与递归 `children: Option<Vec<DocBlock>>`。`project_doc_view` 统一计算 `slide_count`（`pageBreak` 计数 `+ 1`）、`word_count` 与 `extracted_links`，且对遗留 `"structure/index.md"` 自动按 `markdown_to_blocks` 兼容投影。
+`"structure/doc.json"` 存储 `DocDocument { version: 1, blocks: Vec<DocBlock> }`，每个 `DocBlock` 包含 `id: String`、扁平化的 `BlockKind`（`#[serde(tag = "type")]`）、可选 `collapsed: Option<bool>` 与递归 `children: Option<Vec<DocBlock>>`。`project_doc_view` 统一计算 `slide_count`（`pageBreak` 计数 `+ 1`）、`word_count` 与 `extracted_links`。
 
 全部 24 种 `BlockKind` 按编辑器斜杠分组规范如下：
 

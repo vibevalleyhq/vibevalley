@@ -50,7 +50,7 @@
 
 1. **核心状态只读不折**：禁止在 TS 组件内部自行推算工单阶段文案、农田作物状态或帮工排队位置；缺字段时到 `crates/protocol/src/contract/` 补契约与 Rust `reduce` 后执行 `cargo xtask protocol --write` 重生成协议。
 2. **显式状态机与幂等保护**：多步弹窗、提交锁与复杂视图选择必须抽离至独立纯函数模型文件（如 `closeFlow.ts`、`draftSubmit.ts`、`libraryView.ts`），销毁动作使用 `ConfirmButton`，发消息与建单使用 `createAct` / `newSendKey` 防重放，绝不引入硬编码睡眠等待。
-3. **键盘一等可达与无障碍完备**：可点击 `<View>` 须附带 `role="button"`（或对应语义角色）、`accessibilityLabel` 与明确焦点环样式（`focus-visible:outline-2 focus-visible:outline-focus`）；新快捷键登记入 `apps/mac/ui/infra/base/shortcuts.ts` 以便 `ShortcutSheet` 自动收录，不与全局或 `Workspace` 热键冲突。
+3. **键盘一等可达与无障碍完备**：可点击 `<View>` 须附带 `role="button"`（或对应语义角色）、`accessibilityLabel` 与明确焦点环样式（`focus-visible:outline-2 focus-visible:outline-focus`）；新快捷键登记入 `apps/mac/ui/design/shortcuts.ts` 以便 `ShortcutSheet` 自动收录，不与全局或 `Workspace` 热键冲突。
 4. **多语言不漏键**：面向用户的全部文案必须录入 `crates/i18n/locales/{zh,en}/` 词典并以 `t("key")` 调用，同时在页面中核验中英文双语长度不会挤乱排版。
 
 ## 8.4 提交前强制自查清单

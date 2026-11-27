@@ -28,6 +28,7 @@ export function resolvePackageOptions(options: {
   targetVersion: string;
   outDir: string;
   outArg?: string | undefined;
+  profileArg?: "debug" | "alpha" | "release" | undefined;
   noDmg: boolean;
   noZip: boolean;
   noLocalFeed: boolean;
@@ -37,7 +38,7 @@ export function resolvePackageOptions(options: {
   sign?: string | undefined;
   notaryProfile?: string | undefined;
 }): {
-  profile: "alpha" | "release";
+  profile: "debug" | "alpha" | "release";
   fast: boolean;
   runVerify: boolean;
   makeDmg: boolean;
@@ -45,7 +46,7 @@ export function resolvePackageOptions(options: {
   localFeed: string | undefined;
   packageArgs: string[];
 } {
-  const profile = options.channel === "alpha" ? "alpha" : "release";
+  const profile = options.profileArg ?? (options.channel === "alpha" ? "debug" : "release");
   const fast = options.channel === "alpha";
   const runVerify = options.channel === "alpha" ? options.verify && !options.skipVerify : !options.skipVerify;
   const makeDmg = !options.noDmg;

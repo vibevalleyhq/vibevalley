@@ -5,9 +5,21 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vite-plus/test";
 
-import { captureVdpScreenshot, createWsVdpDriver, discoverVdpEndpoint, normalizeExplicitVdpUrl, VdpWsClient, type VdpDriver } from "./vdp-client.ts";
+import {
+  captureVdpScreenshot,
+  createWsVdpDriver,
+  discoverVdpEndpoint,
+  normalizeExplicitVdpUrl,
+  resolveVdpCargoBuildArgs,
+  VdpWsClient,
+  type VdpDriver,
+} from "./vdp-client.ts";
 
 describe("vdp-client", () => {
+  it("builds only vibevalley-mac with shot feature for WS VDP runs", () => {
+    expect(resolveVdpCargoBuildArgs()).toEqual(["build", "-p", "vibevalley-mac", "--features", "vibevalley-mac/shot"]);
+  });
+
   it("normalizes explicit VDP URLs and discovers endpoints from debug.json or port", () => {
     expect(normalizeExplicitVdpUrl("http://127.0.0.1:9222/devtools?token=secret-1")).toEqual({
       httpUrl: "http://127.0.0.1:9222",
