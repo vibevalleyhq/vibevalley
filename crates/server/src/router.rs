@@ -144,10 +144,7 @@ impl Router {
             E::MemorySearch => on!(p, MemorySearch, |r| mem.search_endpoint_async(r).await?),
             E::MemoryDelete => void!(p, MemoryDelete, |r| mem.delete_endpoint_async(r).await?),
             E::MemoryPreviewDelete => on!(p, MemoryPreviewDelete, |r| mem.preview_delete_endpoint_async(r).await?),
-            E::OrchestratorOpen => ret!({
-                glue::orch_open(orch).await?;
-                Ok(Value::Null)
-            }),
+            E::OrchestratorOpen => ret!(orch.open_endpoint_async().await.map(|_| Value::Null)),
             E::OrchestratorStop => void!(p, OrchestratorStop, |r| orch.stop_endpoint_async(r).await?),
             E::OrchestratorEvalCreate => on!(p, OrchestratorEvalCreate, |r| orch.eval_create_endpoint_async(r).await?),
             E::OrchestratorApprovalList => on!(p, OrchestratorApprovalList, |r| orch.approvals_endpoint_async(r).await?),
@@ -180,12 +177,7 @@ impl Router {
                 .await?),
             E::IssueHistoryList => ret!(ok_json(brd.issue_history_list_endpoint_async().await?)),
             E::IssueList => on!(p, IssueList, |r| brd.issue_list_endpoint_async(&r, &*c.ctx.clock).await?),
-            E::IssueReview => on!(p, IssueReview, |r| {
-                let pass = r.pass;
-                let i = brd.issue_review_endpoint_async(r).await?;
-                c.game.record_issue_review_async(&i, pass).await;
-                i
-            }),
+            E::IssueReview => on!(p, IssueReview, |r| glue::issue_review(c, r).await?),
             E::IssueSplit => on!(p, IssueSplit, |r| glue::issue_split_async(c, &r).await?),
             E::IssueGet => on!(p, IssueGet, |r| brd.issue_get_endpoint_async(&r.id).await?),
             E::IssueRunList => on!(p, IssueRunList, |r| brd.issue_run_list_endpoint_async(&r.id).await?),
@@ -194,19 +186,15 @@ impl Router {
             E::IssueUpdate => on!(p, IssueUpdate, |r| brd.issue_update_endpoint_async(r).await?),
             E::IssueDelete => void!(p, IssueDelete, |r| brd.issue_delete_endpoint_async(&r.id).await?),
             E::IssuePreviewDelete => on!(p, IssuePreviewDelete, |r| brd.issue_preview_delete_endpoint_async(&r.id).await?),
-            E::IssueStatusUpdate => on!(p, IssueStatusUpdate, |r| {
-                let a = brd.issue_status_update_endpoint_async(&r).await?;
-                c.game.on_issue_status_updated_async(&a.id, a.status).await;
-                a
-            }),
+            E::IssueStatusUpdate => on!(p, IssueStatusUpdate, |r| glue::issue_status_update(c, &r).await?),
             E::IssueStatusPreviewUpdate => on!(p, IssueStatusPreviewUpdate, |r| brd.issue_status_preview_update_endpoint_async(&r).await?),
             E::IssueRefine => on!(p, IssueRefine, |r| brd.issue_refine_endpoint_async(&r).await?),
             E::IssueRetroGet => on!(p, IssueRetroGet, |r| brd.issue_retro_endpoint_async(&r, &*c.ctx.clock).await?),
             E::IssueDigestGet => on!(p, IssueDigestGet, |r| brd.issue_digest_get_endpoint_async(&r, &*c.ctx.clock).await?),
             E::IssueTriageList => ret!(ok_json(brd.issue_triage_list_endpoint_async(&*c.ctx.clock).await?)),
-            E::IssueTriageSuggest => on!(p, IssueTriageSuggest, |r| {
-                brd.issue_triage_suggest_endpoint_async(ctx.caller, r, &*c.ctx.clock).await?
-            }),
+            E::IssueTriageSuggest => on!(p, IssueTriageSuggest, |r| brd
+                .issue_triage_suggest_endpoint_async(ctx.caller, r, &*c.ctx.clock)
+                .await?),
             E::IssueTriageConfirm => on!(p, IssueTriageConfirm, |r| brd.issue_triage_confirm_endpoint_async(&r, &*c.ctx.clock).await?),
             E::IssueTriageDismiss => void!(p, IssueTriageDismiss, |r| brd.issue_triage_dismiss_endpoint_async(&r).await?),
             E::CronCreate => on!(p, CronCreate, |r| c.cron.create_endpoint_async(ctx.caller, r).await?),
@@ -242,8 +230,8 @@ impl Router {
             E::MediaInputList => ret!(ok_json(st.list_inputs_async().await?)),
             E::MediaInputDelete => void!(p, MediaInputDelete, |r| st.delete_input_async(&r.id).await?),
             E::MediaInputPreviewDelete => on!(p, MediaInputPreviewDelete, |r| st.preview_delete_input_async(&r.id).await?),
-            E::MediaDialogueCreate => on!(p, MediaDialogueCreate, |r| glue::media_speakers(c, ctx.caller, r).await?),
-            E::MediaVoiceDesignCreate => on!(p, MediaVoiceDesignCreate, |r| glue::media_voice_design(c, ctx.caller, r).await?),
+            E::MediaDialogueCreate => on!(p, MediaDialogueCreate, |r| med.create_speakers_for_caller_async(ctx.caller, r).await?),
+            E::MediaVoiceDesignCreate => on!(p, MediaVoiceDesignCreate, |r| med.create_voice_design_for_caller_async(ctx.caller, r).await?),
             E::MediaCloneCreate => on!(p, MediaCloneCreate, |r| med.clone_voice_async(r).await?),
             E::MediaTranscriptionCreate => on!(p, MediaTranscriptionCreate, |r| med.transcription_async(r).await?),
             E::MediaAudioResume => on!(p, MediaAudioResume, |r| med.audio_resume_async(&r.id).await?),
@@ -252,7 +240,9 @@ impl Router {
             E::MediaImageCreate => on!(p, MediaImageCreate, |r| med.create_image_for_caller_async(ctx.caller, r).await?),
             E::MediaUnderstandingCreate => on!(p, MediaUnderstandingCreate, |r| med.understanding_async(r).await?),
             E::MediaUnderstandingAuthorize => on!(p, MediaUnderstandingAuthorize, |r| med.authorize_understanding_async(r).await?),
-            E::MediaUnderstandingStart => on!(p, MediaUnderstandingStart, |r| glue::media_start_u(c, ctx.caller, &r.id).await?),
+            E::MediaUnderstandingStart => on!(p, MediaUnderstandingStart, |r| med
+                .start_understanding_for_caller_async(ctx.caller, &r.id)
+                .await?),
             E::MediaSpeechCreate => on!(p, MediaSpeechCreate, |r| med.create_speech_for_caller_async(ctx.caller, r).await?),
             E::MediaSpeechResume => on!(p, MediaSpeechResume, |r| med.resume_async(&r.id).await?),
             E::MediaUnderstandingCleanup => on!(p, MediaUnderstandingCleanup, |r| med.understanding_cleanup_async(&r.id).await?),
@@ -315,10 +305,7 @@ impl Router {
             E::ServerHealthGet => ret!(ok_json(glue::health(c))),
             E::DebugSnapshot => ret!(ok_json(dbg.snapshot_async().await?)),
             E::DebugTimelineList => on!(p, DebugTimelineList, |r| dbg.timeline_list(&r)?),
-            E::DebugTimelineClear => ret!({
-                glue::debug_clear(dbg)?;
-                Ok(Value::Null)
-            }),
+            E::DebugTimelineClear => ret!(dbg.timeline_clear().map(|_| Value::Null)),
             E::DebugTrajectoryList => ret!(ok_json(dbg.trajectory_list_async().await?)),
             E::DebugTrajectoryGet => on!(p, DebugTrajectoryGet, |r| dbg.trajectory_get_async(&r).await?),
             E::DebugTrajectoryExport => on!(p, DebugTrajectoryExport, |r| dbg.trajectory_export_async(&r).await?),
