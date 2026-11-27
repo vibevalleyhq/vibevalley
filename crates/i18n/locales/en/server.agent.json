@@ -25,5 +25,10 @@
   "removeAgent": "Delete the profile \"{name}\" ({id}, on {runtime}): tickets already sent to it keep it",
   "removeSkill": "Delete the skill \"{name}\"",
   "unequip": "Take it off the profiles of {holders}",
-  "quoted": "\"{name}\""
+  "quoted": "\"{name}\"",
+  "invalidCode": "Teammate code \"{code}\" is invalid: use O-01 for assistants and W-01 for helpers",
+  "duplicateCode": "Teammate code \"{code}\" is already used by {other}",
+  "registerMissingName": "Registering an external teammate requires a non-empty name",
+  "invalidAvatar": "Avatar \"{avatar}\" is not a valid Papertrails role avatar",
+  "cannotOverwriteManaged": "\"{id}\" is a managed VibeValley teammate and cannot be overwritten as external"
 }

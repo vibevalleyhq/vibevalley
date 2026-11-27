@@ -9,7 +9,7 @@ use vibevalley_mcp::{
 };
 use vibevalley_protocol::home::{self, ReleaseChannel};
 
-use super::{McpCmd, issue, note, vdp};
+use super::{McpCmd, agent, issue, note, vdp};
 use crate::auth::{self, Secret};
 use crate::client::{Client, Failure, ServerSource};
 use crate::domains::debug::{DebugTargetArgs, ResolvedEndpoint};
@@ -19,6 +19,8 @@ const SERVER_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum McpTool {
+    AgentList,
+    AgentRegister,
     IssueList,
     IssueGet,
     IssueCreate,
@@ -55,6 +57,8 @@ enum McpTool {
 impl McpTool {
     fn from_name(name: &str) -> Option<Self> {
         match name {
+            "vv_agent_list" => Some(Self::AgentList),
+            "vv_agent_register" => Some(Self::AgentRegister),
             "vv_issue_list" => Some(Self::IssueList),
             "vv_issue_get" => Some(Self::IssueGet),
             "vv_issue_create" => Some(Self::IssueCreate),
@@ -100,7 +104,8 @@ pub(super) fn tool_def(name: &str, description: &str, input_schema: Value) -> To
 }
 
 fn tool_definitions() -> Vec<ToolDef> {
-    let mut defs = issue::tool_definitions();
+    let mut defs = agent::tool_definitions();
+    defs.extend(issue::tool_definitions());
     defs.extend(note::tool_definitions());
     defs.extend(vdp::tool_definitions());
     defs
@@ -208,6 +213,8 @@ impl McpServer {
         let args = if raw_args.is_null() { json!({}) } else { raw_args };
 
         match tool {
+            McpTool::AgentList => self.tool_agent_list(args).await,
+            McpTool::AgentRegister => self.tool_agent_register(args).await,
             McpTool::IssueList => self.tool_issue_list(args).await,
             McpTool::IssueGet => self.tool_issue_get(args).await,
             McpTool::IssueCreate => self.tool_issue_create(args).await,
@@ -515,5 +522,30 @@ mod tests {
 
         assert_eq!(lines[7]["id"], 7);
         assert_eq!(lines[7]["error"]["code"], error_code::METHOD_NOT_FOUND);
+    }
+
+    #[test]
+    fn agent_mcp_tools_expose_roster_schema_and_decode_register_args() {
+        let defs = tool_definitions();
+        let list_def = defs.iter().find(|d| d.name == "vv_agent_list").expect("vv_agent_list");
+        assert!(list_def.description.contains("O-XX"));
+        let reg_def = defs.iter().find(|d| d.name == "vv_agent_register").expect("vv_agent_register");
+        let props = reg_def.input_schema["properties"].as_object().expect("properties");
+        for key in ["id", "name", "runtime", "duty", "avatar", "code", "tags"] {
+            assert!(props.contains_key(key), "vv_agent_register missing {key}");
+        }
+        let decoded: super::agent::AgentRegisterArgs = serde_json::from_value(json!({
+            "id": "antigravity",
+            "name": "Antigravity",
+            "runtime": "antigravity",
+            "avatar": "avatar-fullstack",
+            "code": "W-12"
+        }))
+        .unwrap();
+        assert_eq!(decoded.id.as_deref(), Some("antigravity"));
+        assert_eq!(decoded.name, "Antigravity");
+        assert_eq!(decoded.runtime.as_deref(), Some("antigravity"));
+        assert_eq!(decoded.avatar.as_deref(), Some("avatar-fullstack"));
+        assert_eq!(decoded.code.as_deref(), Some("W-12"));
     }
 }

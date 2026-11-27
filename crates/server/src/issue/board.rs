@@ -693,6 +693,9 @@ impl Board {
                 let mv = status_move(&issue, to).map_err(BoardError::Refused)?;
                 match mv {
                     Move::Start => {
+                        if let Some(agent) = issue.assigned_agent() {
+                            self.runtime.driver().check(agent)?;
+                        }
                         if issue.mandate.is_paused() {
                             self.change_async(&issue.id, IssueChange::Resumed).await?;
                         }

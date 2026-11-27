@@ -79,8 +79,10 @@ fn every_tool_maps_to_a_toolset_and_respects_role_can_narrowing() {
 
     let profile = Agent {
         id: "w".into(),
+        code: "W-01".into(),
         name: "w".into(),
         role: AgentRole::Worker,
+        mode: vibevalley_protocol::AgentExecutionMode::Managed,
         duty: String::new(),
         enabled: true,
         runtime: "scripted".into(),

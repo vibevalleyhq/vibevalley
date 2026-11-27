@@ -5,7 +5,11 @@ use std::path::Path;
 use std::sync::Arc;
 
 use serde_json::json;
-use vibevalley_protocol::{Agent, AgentRole, BizCode, Build, DEFAULT_ORCHESTRATOR, Head, Look, ORCHESTRATOR_RUNTIME, PersonaMode, Skill, Species, Toolset};
+use vibevalley_protocol::{
+    ActorRef, Agent, AgentExecutionMode, AgentRegisterInput, AgentRole, BizCode, Build, Caller, DEFAULT_ORCHESTRATOR, Head, IssueRequest,
+    IssueStatus, IssueStatusUpdateInput, Look, NoteCreateRequest, NoteFileWriteItem, NoteFileWriteRequest, NoteHistoryListRequest, NoteType,
+    ORCHESTRATOR_RUNTIME, PersonaMode, Skill, Species, Toolset,
+};
 use vibevalley_server::agent::profile::{Profile, ProfileStore, profile};
 use vibevalley_server::context::{Context, Http, LiveState, Outbox, PublicDownload, StateFeed, TaskGroup};
 use vibevalley_server::service::Service;
@@ -27,8 +31,10 @@ fn open(home: &Path) -> Arc<ProfileStore> {
 fn draft() -> Agent {
     Agent {
         id: String::new(),
+        code: String::new(),
         name: "同名".into(),
         role: AgentRole::Worker,
+        mode: AgentExecutionMode::Managed,
         duty: String::new(),
         enabled: true,
         runtime: "pi".into(),
@@ -677,4 +683,157 @@ fn agent_optional_voice_persists_through_config_without_migration() {
         let reopened = open(home.path());
         assert_eq!(reopened.agent(&created.id).unwrap().voice.as_deref(), Some("voice-one"));
     });
+}
+
+#[test]
+fn teammate_codes_external_registration_and_non_dispatch() {
+    let dir = tempfile::tempdir().unwrap();
+    let app = create_app_blocking(Config {
+        home: dir.path().to_path_buf(),
+        ..Default::default()
+    })
+    .unwrap();
+    let rt_app = app.test_internals();
+    let router = app.router();
+
+    let agents = rt_app.agent.profile.all();
+    let orch = agents.iter().find(|a| a.id == DEFAULT_ORCHESTRATOR).expect("default orchestrator");
+    assert_eq!(orch.code, "O-01");
+    assert_eq!(orch.mode, AgentExecutionMode::Managed);
+    for worker in agents.iter().filter(|a| a.role == AgentRole::Worker) {
+        assert!(worker.code.starts_with("W-"), "expected W-XX code for {}", worker.id);
+    }
+
+    // Register an external coding agent idempotently via router.
+    let first = router.call_as(
+        Caller::User,
+        "agent.register",
+        serde_json::to_value(AgentRegisterInput {
+            id: Some("antigravity-ide".into()),
+            name: "Antigravity".into(),
+            runtime: Some("antigravity".into()),
+            duty: Some("IDE teammate".into()),
+            avatar: None,
+            code: None,
+            tags: Some(vec!["ide".into()]),
+        })
+        .unwrap(),
+    );
+    let registered: Agent = serde_json::from_value(first.data.expect("register ok")).unwrap();
+    assert_eq!(registered.id, "antigravity-ide");
+    assert!(registered.code.starts_with("W-"));
+    assert_eq!(registered.mode, AgentExecutionMode::External);
+    assert_eq!(registered.runtime, "antigravity");
+    let first_avatar = registered.look.avatar.clone().expect("deterministic avatar");
+
+    let second = router.call_as(
+        Caller::User,
+        "agent.register",
+        serde_json::to_value(AgentRegisterInput {
+            id: Some("antigravity-ide".into()),
+            name: "Antigravity Updated".into(),
+            runtime: Some("antigravity".into()),
+            duty: None,
+            avatar: None,
+            code: None,
+            tags: None,
+        })
+        .unwrap(),
+    );
+    let updated: Agent = serde_json::from_value(second.data.expect("idempotent re-register ok")).unwrap();
+    assert_eq!(updated.code, registered.code);
+    assert_eq!(updated.look.avatar.as_deref(), Some(first_avatar.as_str()));
+    assert_eq!(updated.name, "Antigravity Updated");
+
+    // External workers are excluded from OAR dispatch candidates and refused if targeted for execution.
+    vibevalley_runtime::rt::block_on(async {
+        let candidates = rt_app.agent.profile.fleet.candidates_from_cache_async().await;
+        assert!(!candidates.iter().any(|c| c.agent.id == "antigravity-ide"));
+    });
+    let dispatch_err = router.call_as(
+        Caller::User,
+        "issue.create",
+        serde_json::to_value(IssueRequest {
+            title: "Cannot auto-dispatch external".into(),
+            agent: Some("antigravity-ide".into()),
+            ..Default::default()
+        })
+        .unwrap(),
+    );
+    assert_eq!(dispatch_err.biz_code, BizCode::IssueRefused.code());
+
+    // External teammate works as issue owner and note collaborator origin.
+    let owned = router.call_as(
+        Caller::User,
+        "issue.create",
+        serde_json::to_value(IssueRequest {
+            title: "External owned issue".into(),
+            owner: Some(ActorRef::Agent {
+                id: "antigravity-ide".into(),
+            }),
+            ..Default::default()
+        })
+        .unwrap(),
+    );
+    let owned_issue: vibevalley_protocol::Issue = serde_json::from_value(owned.data.expect("owner issue ok")).unwrap();
+    assert_eq!(
+        owned_issue.owner,
+        Some(ActorRef::Agent {
+            id: "antigravity-ide".into(),
+        })
+    );
+    let move_err = router.call_as(
+        Caller::User,
+        "issue.status.update",
+        serde_json::to_value(IssueStatusUpdateInput {
+            id: owned_issue.id.clone(),
+            status: IssueStatus::Todo,
+            ..Default::default()
+        })
+        .unwrap(),
+    );
+    assert_eq!(move_err.biz_code, BizCode::IssueRefused.code());
+
+    let created_note = router.call_as(
+        Caller::User,
+        "note.create",
+        serde_json::to_value(NoteCreateRequest {
+            title: "Collab note".into(),
+            note_type: Some(NoteType::Doc),
+            ..Default::default()
+        })
+        .unwrap(),
+    );
+    let note_id = created_note.data.expect("note create")["id"].as_str().unwrap().to_string();
+    let written = router.call_as(
+        Caller::User,
+        "note.file.write",
+        serde_json::to_value(NoteFileWriteRequest {
+            id: note_id.clone(),
+            files: vec![NoteFileWriteItem {
+                path: "structure/main.md".into(),
+                content: "# Hello\n".into(),
+                encoding: None,
+                mime: None,
+                expected_hash: None,
+            }],
+            origin: Some("agent:antigravity-ide".into()),
+            summary: Some("External update".into()),
+            announce: None,
+        })
+        .unwrap(),
+    );
+    assert_eq!(written.biz_code, 0);
+    let history = router.call_as(
+        Caller::User,
+        "note.history.list",
+        serde_json::to_value(NoteHistoryListRequest {
+            id: note_id,
+            limit: Some(10),
+        })
+        .unwrap(),
+    );
+    let entries: Vec<vibevalley_protocol::NoteHistoryEntry> = serde_json::from_value(history.data.expect("history")).unwrap();
+    assert_eq!(entries[0].origin, "agent:antigravity-ide");
+    assert_eq!(entries[0].agent.as_deref(), Some("antigravity-ide"));
 }

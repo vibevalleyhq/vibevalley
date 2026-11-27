@@ -43,13 +43,14 @@
 |---|---|---|
 | `Root` | `Root.tsx` |  |
 | `localizeAgentProblem` | `agents.ts` | Localizes raw English engine readiness errors and attaches the matching settings route when actionable. |
-| `useWorkAgents` | `agents.ts` | The profiles work is sent to, the helpers; enabled, only those not switched off. |
+| `useWorkAgents` | `agents.ts` | All worker teammates on the roster (both locally dispatched and externally registered). |
+| `useManagedWorkAgents` | `agents.ts` | Only locally dispatched (`managed`) worker teammates eligible for VibeValley OAR execution sessions. |
 | `sortRuntimes` | `agents.ts` |  |
 | `useOrchestrators` | `agents.ts` | The orchestrators' profiles, the default one first. |
 | `orchestratorLookOf` | `agents.ts` | An orchestrator's look (its sprites are manager-<look>); the plain farmer until the profiles are read. |
 | `useAgent` | `agents.ts` | A profile by its id, once the profiles are read; undefined for none or one gone. |
 | `useAgentProblems` | `agents.ts` |  |
-| `useWorkAgentReadiness` | `agents.ts` | Validated runtime & config readiness (from `agent.validate` + `runtime.list`) keyed by agent id. |
+| `useWorkAgentReadiness` | `agents.ts` | Validated runtime & config readiness (from `agent.validate` + `runtime.list`) keyed by agent id for managed OAR workers. |
 | `ApiConnectionError` | `api.ts` | The server could not be reached at all. |
 | `api` | `api.ts` | Calls the in-process Rust server directly through the current bridge transport. |
 | `reasonOf` | `api.ts` | What a refusal says, for a toast or an inline line. |

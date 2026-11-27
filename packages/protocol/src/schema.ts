@@ -43,7 +43,19 @@ export {
   SliceKind,
 } from "./core/schema";
 export { EnvelopeSchema } from "./endpoint";
-export { Agent, AgentTemplate, AgentValidateRequest, AgentValidation, Build, Outfit, PersonaMode, Skill, Species } from "./agent/schema";
+export {
+  Agent,
+  AgentExecutionMode,
+  AgentRegisterInput,
+  AgentTemplate,
+  AgentValidateRequest,
+  AgentValidation,
+  Build,
+  Outfit,
+  PersonaMode,
+  Skill,
+  Species,
+} from "./agent/schema";
 export {
   McpHostId,
   McpHostInfo,

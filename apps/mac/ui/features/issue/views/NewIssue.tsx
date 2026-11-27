@@ -10,7 +10,7 @@ import { Select, TextArea } from "../../../design/Field";
 import { IconButton } from "../../../design/IconButton";
 import { Banner } from "../../../design/layout";
 import { toast } from "../../../design/toasts";
-import { useWorkAgentReadiness, useWorkAgents } from "../../../infra/agents";
+import { useManagedWorkAgents, useWorkAgentReadiness } from "../../../infra/agents";
 import { newSendKey } from "../../../infra/api";
 import { useSessionsSlice } from "../../../infra/frame";
 import { ready, useRepos, useRuntimes } from "../../../infra/query";
@@ -66,7 +66,7 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
     dispatch({ kind: "addAttachment", file });
   });
   const draft = () => flow().draft;
-  const agents = useWorkAgents(true);
+  const agents = useManagedWorkAgents(true);
   const agentReadiness = useWorkAgentReadiness(true);
   const repoList = useRepos();
   const runtimeList = useRuntimes();

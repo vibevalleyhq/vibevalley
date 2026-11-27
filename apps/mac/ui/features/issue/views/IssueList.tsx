@@ -465,15 +465,15 @@ function Row(props: {
         </If>
         <If when={showOwner() ? props.card.issue.owner : undefined}>
           {(owner) => (
-            <View testID="row-owner" class="w-5 shrink-0 items-center justify-center">
-              <OwnerMark owner={owner()} size={15} />
+            <View testID="row-owner" class="max-w-44 shrink-0 flex-row items-center justify-center">
+              <OwnerMark owner={owner()} size={15} showIdentity={owner().kind === "agent"} showMode={props.wide && owner().kind === "agent"} />
             </View>
           )}
         </If>
         <If when={fields().agent}>
-          <View class="w-5 shrink-0 items-center justify-center">
+          <View class="max-w-36 shrink-0 flex-row items-center justify-center">
             <If when={showAgent()}>
-              <CardFace card={props.card} size={18} />
+              <CardFace card={props.card} size={18} showIdentity />
             </If>
           </View>
         </If>

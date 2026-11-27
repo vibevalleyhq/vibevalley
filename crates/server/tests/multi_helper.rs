@@ -37,8 +37,10 @@ fn default_look() -> Look {
 fn worker_profile(id: &str, name: &str, runtime: &str) -> Agent {
     Agent {
         id: id.into(),
+        code: String::new(),
         name: name.into(),
         role: AgentRole::Worker,
+        mode: vibevalley_protocol::AgentExecutionMode::Managed,
         duty: format!("{name} worker"),
         enabled: true,
         runtime: runtime.into(),

@@ -719,6 +719,9 @@ export class VibeValleyApi {
     /** Create allocates an identity; callers with an existing identity use save. */
     create: (a: T.Agent, options?: { signal?: AbortSignal }): Promise<T.Agent> => this.call<T.Agent>("agent.create", "/api/v1/agent/create", a, options),
     update: (a: T.Agent, options?: { signal?: AbortSignal }): Promise<T.Agent> => this.call<T.Agent>("agent.update", "/api/v1/agent/update", a, options),
+    /** Idempotently register or update an external coding agent teammate with a W-XX code. */
+    register: (a: T.AgentRegisterInput, options?: { signal?: AbortSignal }): Promise<T.Agent> =>
+      this.call<T.Agent>("agent.register", "/api/v1/agent/register", a, options),
     delete: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("agent.delete", "/api/v1/agent/delete", a, options),
     /** What delete would do, refused as it would be; nothing changes. */
     previewDelete: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<T.Preview> =>

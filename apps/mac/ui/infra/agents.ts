@@ -37,12 +37,21 @@ export interface AgentReadinessSummary {
   readonly warnings: readonly LocalizedAgentProblem[];
 }
 
-/** The profiles work is sent to, the helpers; enabled, only those not switched off. */
+/** All worker teammates on the roster (both locally dispatched and externally registered). */
 export function useWorkAgents(enabled = false) {
   const all = useAgents();
   return (): Agent[] =>
     ready(all, [])
       .filter((a) => a.role === "worker" && (!enabled || a.enabled))
+      .toSorted((a, b) => Number(b.enabled) - Number(a.enabled));
+}
+
+/** Only locally dispatched (`managed`) worker teammates eligible for VibeValley OAR execution sessions. */
+export function useManagedWorkAgents(enabled = false) {
+  const all = useAgents();
+  return (): Agent[] =>
+    ready(all, [])
+      .filter((a) => a.role === "worker" && (a.mode ?? "managed") === "managed" && (!enabled || a.enabled))
       .toSorted((a, b) => Number(b.enabled) - Number(a.enabled));
 }
 
@@ -93,9 +102,9 @@ const workValidateQuery = defineQuery({
   ...retryRead,
 });
 
-/** Validated runtime & config readiness (from `agent.validate` + `runtime.list`) keyed by agent id. */
+/** Validated runtime & config readiness (from `agent.validate` + `runtime.list`) keyed by agent id for managed OAR workers. */
 export function useWorkAgentReadiness(enabled = true) {
-  const agents = useWorkAgents(enabled);
+  const agents = useManagedWorkAgents(enabled);
   const runtimes = useRuntimes();
   const sig = createMemo(() => {
     const a = agents()

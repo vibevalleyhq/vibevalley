@@ -107,5 +107,6 @@
   "prSubmitUnavailable": "这个工单的仓库没有启用 PR 交付",
   "deliveryNeedsPr": "请先交付一个有效的 PR/MR，再验收完成",
   "notFound": "没有工单 {id}",
-  "wordsRequired": "要说点什么：话不能是空的"
+  "wordsRequired": "要说点什么：话不能是空的",
+  "externalNotDispatchable": "「{name}」（{code}）是外部接入的队友，不能派进 VibeValley 自动执行队列；如需指派归属请设负责人"
 }

@@ -48,7 +48,10 @@ export {
 export type { Envelope } from "./endpoint";
 export {
   type Agent,
+  type AgentExecutionMode,
+  AgentExecutionModeValues,
   type AgentProblem,
+  type AgentRegisterInput,
   type AgentRole,
   type AgentTemplate,
   type AgentValidateRequest,

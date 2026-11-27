@@ -9,7 +9,7 @@ import { Button } from "../../../design/Button";
 import { Select } from "../../../design/Field";
 import { Icon } from "../../../design/Icon";
 import { toast } from "../../../design/toasts";
-import { useWorkAgents } from "../../../infra/agents";
+import { useManagedWorkAgents } from "../../../infra/agents";
 import { api } from "../../../infra/api";
 import { ready, useRepos } from "../../../infra/query";
 import { decodeActorRef } from "../model/display";
@@ -31,7 +31,7 @@ export function BatchTriageBar(props: { selectedIssues: readonly Issue[]; allIss
   const busy = signal(false);
   const tagsOpen = signal(false);
   const tagDraft = signal<string[]>([]);
-  const workAgents = useWorkAgents(true);
+  const workAgents = useManagedWorkAgents(true);
   const repoList = useRepos();
   const ownerOptions = useOwnerOptions(() => props.allIssues);
 

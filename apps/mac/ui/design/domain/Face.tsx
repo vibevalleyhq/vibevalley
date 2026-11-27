@@ -1,15 +1,46 @@
 import { computed, Image, pixelRatio, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
-import { defaultOrchestrator, type Look, type UserProfile } from "@vibevalley/protocol";
+import { type AgentExecutionMode, defaultOrchestrator, type Look, type UserProfile } from "@vibevalley/protocol";
 
 import { orchestratorLookOf } from "../../infra/agents";
 import { useAttachmentUrl } from "../../infra/attachmentFile";
 import { ready, useAgents, useSettings } from "../../infra/query";
 import { orchestratorPortraitUrl, ownerPortraitUrl, ROLE_AVATARS, roleAvatarUrl, speciesPortraitUrl, useAssetsDir } from "../art";
-import { tone } from "../tone";
+import { mix, tone } from "../tone";
 import { castOf, hexColor, orchestratorLooks } from "./cast";
 import { initialOf, RuntimeBadge } from "./RuntimeBadge";
+
+/** Compact monospace badge showing a teammate's permanent `O-XX` / `W-XX` code. */
+export function AgentCodeBadge(props: { code?: string | undefined; external?: boolean | undefined; compact?: boolean | undefined }) {
+  return (
+    <If when={props.code?.trim()}>
+      {(code) => (
+        <View
+          class={`shrink-0 rounded-sm px-1 ${props.compact === true ? "py-0" : "py-px"}`}
+          style={{ backgroundColor: props.external === true ? mix("water", 0.14) : tone("hover") }}
+        >
+          <Text class={`font-mono text-2xs tabular-nums ${props.external === true ? "text-water" : "text-muted"}`}>{code()}</Text>
+        </View>
+      )}
+    </If>
+  );
+}
+
+/** Pill distinguishing locally dispatched (`managed`) vs externally registered (`external`) teammates. */
+export function AgentModeBadge(props: { mode?: AgentExecutionMode | undefined; compact?: boolean | undefined }) {
+  const isExternal = () => props.mode === "external";
+  return (
+    <View
+      class={`shrink-0 rounded-full px-1.5 ${props.compact === true ? "py-0" : "py-px"}`}
+      style={{ backgroundColor: isExternal() ? mix("water", 0.14) : tone("hover") }}
+    >
+      <Text class={`text-2xs font-medium ${isExternal() ? "text-water" : "text-muted"}`}>
+        {isExternal() ? t("web.agent.mode.external") : t("web.agent.mode.managed")}
+      </Text>
+    </View>
+  );
+}
 
 /** `hex` moved `part` of the way to white. */
 const toward = (hex: string, part: number) => {

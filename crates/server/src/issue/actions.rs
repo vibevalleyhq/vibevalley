@@ -147,6 +147,15 @@ async fn moves_words_async(board: &Board, item: &Issue, s: &Settled) -> Result<V
             };
             if let Some(id) = id {
                 if let Some(profile) = driver.profile_info(id) {
+                    if profile.is_external {
+                        return Err(ApiError::new(
+                            BizCode::IssueRefused,
+                            t(
+                                "server.issue.externalNotDispatchable",
+                                &[("name", profile.name.into()), ("code", profile.code.into())],
+                            ),
+                        ));
+                    }
                     Some(profile.name)
                 } else {
                     // Driver without profile registry (e.g. standalone RuntimeDriver) checks via `driver.check`.

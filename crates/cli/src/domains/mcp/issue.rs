@@ -250,7 +250,7 @@ pub(super) fn tool_definitions() -> Vec<ToolDef> {
                         },
                         "required": ["kind", "id"],
                         "additionalProperties": false,
-                        "description": "Optional final owner reference ({ kind: 'user' | 'agent', id }); defaults to local user 'self'."
+                        "description": "Optional final owner reference ({ kind: 'user' | 'agent', id }); use `vv_agent_list` or `vv_agent_register` for teammate ids. Defaults to local user 'self'."
                     }
                 },
                 "required": ["title"]
@@ -277,7 +277,7 @@ pub(super) fn tool_definitions() -> Vec<ToolDef> {
                         },
                         "required": ["kind", "id"],
                         "additionalProperties": false,
-                        "description": "Updated final owner reference ({ kind: 'user' | 'agent', id }), or empty id '' to clear owner."
+                        "description": "Updated final owner reference ({ kind: 'user' | 'agent', id }) (see `vv_agent_list`/`vv_agent_register`), or empty id '' to clear owner."
                     },
                     "parent": { "type": "string", "description": "Updated parent issue number/id, or empty string '' to clear parent." },
                     "blockedBy": { "type": "array", "items": { "type": "string" }, "description": "Replacement blocker issue numbers or ids, or empty array [] to clear blockers." },

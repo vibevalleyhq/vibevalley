@@ -1,7 +1,7 @@
 //! `agent list|create|update|delete`.
 
 use clap::{ArgAction, Args, Subcommand, ValueEnum};
-use vibevalley_protocol::{Agent, AgentDeleteInput, AgentRole, Build, Head, Look, OrchestratorLook, Outfit, PersonaMode, Species, Toolset, ops};
+use vibevalley_protocol::{Agent, AgentDeleteInput, AgentExecutionMode, AgentRole, Build, Head, Look, OrchestratorLook, Outfit, PersonaMode, Species, Toolset, ops};
 
 use crate::client::{Client, Done, Failure, exit};
 use crate::output::line;
@@ -88,9 +88,11 @@ pub enum AgentAction {
 
 fn agent_line(agent: &Agent) -> String {
     line(&[
+        &agent.code,
         &agent.id,
         &agent.name,
         agent.role.as_str(),
+        agent.mode.as_str(),
         &agent.runtime,
         if agent.enabled { "" } else { "off" },
     ])
@@ -129,8 +131,10 @@ pub async fn run(client: &Client, cmd: AgentCmd) -> Done {
             let role: AgentRole = role.into();
             let profile = Agent {
                 id: String::new(),
+                code: String::new(),
                 name,
                 role,
+                mode: AgentExecutionMode::Managed,
                 duty,
                 enabled: true,
                 runtime,

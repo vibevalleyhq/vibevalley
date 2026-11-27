@@ -12,8 +12,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use vibevalley_i18n::{list, t};
 use vibevalley_protocol::{
-    Agent, AgentFrom, AgentRole, AgentTemplate, AgentTemplateSource, ApiError, BizCode, Build, DEFAULT_ORCHESTRATOR, Head, Look, ORCHESTRATOR_RUNTIME,
-    OrchestratorLook, Outfit, PersonaMode, Preview, RuntimeSettings, Skill, Species, TemplateCategory, Toolset,
+    Agent, AgentExecutionMode, AgentFrom, AgentRegisterInput, AgentRole, AgentTemplate, AgentTemplateSource, ApiError, BizCode, Build,
+    DEFAULT_ORCHESTRATOR, Head, Look, ORCHESTRATOR_RUNTIME, OrchestratorLook, Outfit, PersonaMode, Preview, RuntimeSettings, Skill, Species,
+    TemplateCategory, Toolset,
 };
 
 use super::preset::default_settings;
@@ -54,6 +55,158 @@ fn cast_hash(s: &str) -> u32 {
         let unit = ch.encode_utf16(&mut units)[0];
         h.wrapping_mul(31).wrapping_add(unit as u32)
     })
+}
+
+pub const WORKER_ROLE_AVATARS: [&str; 13] = [
+    "avatar-fullstack",
+    "avatar-architect",
+    "avatar-frontend",
+    "avatar-backend",
+    "avatar-reviewer",
+    "avatar-tester",
+    "avatar-designer",
+    "avatar-product",
+    "avatar-scout",
+    "avatar-docs",
+    "avatar-pages",
+    "avatar-slides",
+    "avatar-collector",
+];
+
+fn is_valid_role_avatar(avatar: &str) -> bool {
+    avatar == "avatar-orchestrator" || WORKER_ROLE_AVATARS.contains(&avatar)
+}
+
+fn fnv1a_hash(text: &str) -> u32 {
+    text.chars().fold(2166136261u32, |mut hash, ch| {
+        let mut units = [0u16; 2];
+        let unit = ch.encode_utf16(&mut units)[0];
+        hash ^= unit as u32;
+        hash.wrapping_mul(16777619)
+    })
+}
+
+/// Deterministic Papertrails portrait assignment matching UI `assignWorkerAvatars` collision probing.
+pub fn assign_worker_avatar(id: &str, name: &str, beside: &[Agent]) -> String {
+    let used: BTreeSet<&str> = beside
+        .iter()
+        .filter_map(|a| a.look.avatar.as_deref())
+        .filter(|s| !s.is_empty())
+        .collect();
+    let seed = if !id.trim().is_empty() {
+        id.trim()
+    } else if !name.trim().is_empty() {
+        name.trim()
+    } else {
+        "worker"
+    };
+    let pool_size = WORKER_ROLE_AVATARS.len();
+    let start = (fnv1a_hash(seed) as usize) % pool_size;
+    for step in 0..pool_size {
+        let candidate = WORKER_ROLE_AVATARS[(start + step) % pool_size];
+        if !used.contains(candidate) {
+            return candidate.to_string();
+        }
+    }
+    WORKER_ROLE_AVATARS[start].to_string()
+}
+
+fn code_prefix(role: AgentRole) -> char {
+    match role {
+        AgentRole::Orchestrator => 'O',
+        AgentRole::Worker => 'W',
+    }
+}
+
+fn normalize_code_for_role(raw: &str, role: AgentRole) -> Option<String> {
+    let trimmed = raw.trim();
+    let (prefix, rest) = trimmed.split_once('-')?;
+    let expected = code_prefix(role);
+    if !prefix.eq_ignore_ascii_case(&expected.to_string()) || rest.is_empty() || !rest.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    let n: u32 = rest.parse().ok()?;
+    (n >= 1).then(|| format!("{expected}-{n:02}"))
+}
+
+fn next_free_code(role: AgentRole, beside: &[Agent]) -> String {
+    let prefix = code_prefix(role);
+    (1u32..)
+        .map(|n| format!("{prefix}-{n:02}"))
+        .find(|cand| !beside.iter().any(|a| a.code.eq_ignore_ascii_case(cand)))
+        .expect("a free teammate code")
+}
+
+fn ensure_agent_codes(agents: &mut [Agent]) {
+    let mut seen: BTreeSet<String> = BTreeSet::new();
+    let mut need_assign = Vec::new();
+    for (idx, a) in agents.iter_mut().enumerate() {
+        if let Some(norm) = normalize_code_for_role(&a.code, a.role)
+            && seen.insert(norm.to_ascii_uppercase())
+        {
+            a.code = norm;
+        } else {
+            need_assign.push(idx);
+        }
+    }
+    for idx in need_assign {
+        let prefix = code_prefix(agents[idx].role);
+        let code = (1u32..)
+            .map(|n| format!("{prefix}-{n:02}"))
+            .find(|cand| seen.insert(cand.to_ascii_uppercase()))
+            .expect("a free teammate code");
+        agents[idx].code = code;
+    }
+}
+
+fn resolve_agent_code(raw: &str, role: AgentRole, beside: &[Agent], self_id: Option<&str>) -> Result<String, ApiError> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        if let Some(id) = self_id
+            && let Some(existing) = beside.iter().find(|a| a.id == id)
+            && let Some(norm) = normalize_code_for_role(&existing.code, role)
+            && !beside.iter().any(|a| a.id != id && a.code.eq_ignore_ascii_case(&norm))
+        {
+            return Ok(norm);
+        }
+        return Ok(next_free_code(role, beside));
+    }
+    let normalized = normalize_code_for_role(trimmed, role)
+        .ok_or_else(|| refused(t("server.agent.invalidCode", &[("code", trimmed.into())])))?;
+    if let Some(other) = beside
+        .iter()
+        .find(|a| Some(a.id.as_str()) != self_id && a.code.eq_ignore_ascii_case(&normalized))
+    {
+        return Err(refused(t(
+            "server.agent.duplicateCode",
+            &[("code", normalized.into()), ("other", other.name.clone().into())],
+        )));
+    }
+    Ok(normalized)
+}
+
+fn slug_ascii(raw: &str) -> String {
+    let mut out = String::new();
+    for ch in raw.chars() {
+        if ch.is_ascii_alphanumeric() {
+            out.push(ch.to_ascii_lowercase());
+        } else if !out.ends_with('-') {
+            out.push('-');
+        }
+    }
+    out.trim_matches('-').to_string()
+}
+
+fn derive_external_id(runtime: &str, name: &str) -> String {
+    let r = slug_ascii(runtime);
+    let n = slug_ascii(name);
+    match (r.as_str(), n.as_str()) {
+        ("", "") => format!("ext-{:08x}", fnv1a_hash(name.trim())),
+        (_, "") => format!("{r}-{:08x}", fnv1a_hash(name.trim())),
+        ("", _) | ("external", _) => n,
+        _ if n == r || n.starts_with(&format!("{r}-")) => n,
+        _ => format!("{r}-{n}"),
+    }
 }
 
 pub fn with_cast(mut a: Agent) -> Agent {
@@ -439,11 +592,13 @@ async fn copy_template_async(from: &Path, home: &Path, id: &str) -> std::io::Res
 }
 
 /// A new profile from a template, under the id and name given.
-fn profile_of(item: &AgentTemplate, id: String, name: String) -> Agent {
+fn profile_of(item: &AgentTemplate, id: String, code: String, name: String) -> Agent {
     Agent {
         id,
+        code,
         name,
         role: item.role,
+        mode: AgentExecutionMode::Managed,
         duty: item.duty.clone(),
         enabled: true,
         runtime: item.runtime.clone(),
@@ -512,7 +667,8 @@ fn installed(template: &AgentTemplate, beside: &[Agent], id: Option<&str>) -> Ag
     let ids: Vec<&str> = beside.iter().map(|a| a.id.as_str()).collect();
     let names: Vec<&str> = beside.iter().map(|a| a.name.as_str()).collect();
     let id = id.map(str::to_string).unwrap_or_else(|| free(&template.id, &ids, "-"));
-    profile_of(template, id, free(&template.name, &names, " "))
+    let code = next_free_code(template.role, beside);
+    profile_of(template, id, code, free(&template.name, &names, " "))
 }
 
 fn upsert<T: Clone>(list: &[T], item: T, id: impl Fn(&T) -> &str) -> Vec<T> {
@@ -589,6 +745,7 @@ impl ProfileStore {
             s.agents.insert(0, made);
         }
         s.agents = s.agents.into_iter().map(with_cast).collect();
+        ensure_agent_codes(&mut s.agents);
         s.user_skills = read_user_skills_async(home).await;
         let profiles = ProfileStore {
             home: home.to_path_buf(),
@@ -644,9 +801,17 @@ impl ProfileStore {
         self.stored.lock().agents.clone()
     }
 
-    /// Helper profiles only: the ones work is sent to.
+    /// Worker profiles (managed and external) on the teammates roster.
     pub fn agents(&self) -> Vec<Agent> {
         self.all().into_iter().filter(|a| a.role == AgentRole::Worker).collect()
+    }
+
+    /// Managed worker profiles eligible for automatic OAR dispatch.
+    pub fn managed_workers(&self) -> Vec<Agent> {
+        self.all()
+            .into_iter()
+            .filter(|a| a.role == AgentRole::Worker && a.mode == AgentExecutionMode::Managed)
+            .collect()
     }
 
     pub fn orchestrators(&self) -> Vec<Agent> {
@@ -661,11 +826,16 @@ impl ProfileStore {
         self.stored.lock().agents.iter().find(|a| a.id == id).cloned()
     }
 
-    /// A helper by id, else by name.
+    /// A worker by id, teammate code (`W-XX`), or name.
     pub fn named(&self, key: &str) -> Option<Agent> {
         let k = key.trim();
         let helpers = self.agents();
-        helpers.iter().find(|a| a.id == k).or_else(|| helpers.iter().find(|a| a.name == k)).cloned()
+        helpers
+            .iter()
+            .find(|a| a.id == k)
+            .or_else(|| helpers.iter().find(|a| a.code.eq_ignore_ascii_case(k)))
+            .or_else(|| helpers.iter().find(|a| a.name == k))
+            .cloned()
     }
 
     /// Built-in skills first, followed by user skills loaded from `<home>/skills/<id>/SKILL.md`.
@@ -702,13 +872,15 @@ impl ProfileStore {
         if let Some(why) = Self::role_problem(&a) {
             return Err(refused(why));
         }
-        let cast = with_cast(a);
-        self.change_async(|s| {
-            s.agents = upsert(&s.agents, cast.clone(), |a| &a.id);
-            Ok(())
-        })
-        .await?;
-        self.saved(cast)
+        let saved = self
+            .change_async(|s| {
+                let code = resolve_agent_code(&a.code, a.role, &s.agents, Some(&a.id))?;
+                let cast = with_cast(Agent { code, ..a });
+                s.agents = upsert(&s.agents, cast.clone(), |x| &x.id);
+                Ok(cast)
+            })
+            .await?;
+        self.saved(saved)
     }
 
     pub async fn create_async(&self, draft: Agent) -> Result<Agent, ApiError> {
@@ -721,8 +893,10 @@ impl ProfileStore {
         let created = self
             .change_async(|s| {
                 let n = (1..).find(|n| !s.agents.iter().any(|a| a.id == format!("agent-{n}"))).expect("a free id");
+                let code = resolve_agent_code(&draft.code, draft.role, &s.agents, None)?;
                 let created = with_cast(Agent {
                     id: format!("agent-{n}"),
+                    code,
                     ..draft
                 });
                 s.agents.push(created.clone());
@@ -730,6 +904,112 @@ impl ProfileStore {
             })
             .await?;
         self.saved(created)
+    }
+
+    /// Idempotently registers or updates an `External` worker teammate with a permanent `W-XX` code and deterministic Papertrails avatar.
+    pub async fn register_external_async(&self, input: AgentRegisterInput) -> Result<Agent, ApiError> {
+        let name = input.name.trim().to_string();
+        if name.is_empty() {
+            return Err(refused(t("server.agent.registerMissingName", &[])));
+        }
+        let explicit_avatar = match input.avatar.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+            Some(av) => {
+                if !is_valid_role_avatar(av) {
+                    return Err(refused(t("server.agent.invalidAvatar", &[("avatar", av.into())])));
+                }
+                Some(av.to_string())
+            }
+            None => None,
+        };
+        let explicit_runtime = input
+            .runtime
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(str::to_string);
+        let id = match input.id.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+            Some(raw) => raw.to_string(),
+            None => derive_external_id(explicit_runtime.as_deref().unwrap_or("external"), &name),
+        };
+        let saved = self
+            .change_async(|s| {
+                if let Some(existing) = s.agents.iter().find(|a| a.id == id).cloned() {
+                    if existing.role != AgentRole::Worker || existing.mode != AgentExecutionMode::External {
+                        return Err(refused(t("server.agent.cannotOverwriteManaged", &[("id", id.clone().into())])));
+                    }
+                    let code = match input.code.as_deref().map(str::trim).filter(|c| !c.is_empty()) {
+                        Some(raw_code) => resolve_agent_code(raw_code, AgentRole::Worker, &s.agents, Some(&id))?,
+                        None => resolve_agent_code("", AgentRole::Worker, &s.agents, Some(&id))?,
+                    };
+                    let mut look = existing.look.clone();
+                    if let Some(av) = explicit_avatar {
+                        look.avatar = Some(av);
+                    } else if look.avatar.as_deref().is_none_or(str::is_empty) {
+                        look.avatar = Some(assign_worker_avatar(&id, &name, &s.agents));
+                    }
+                    let next = with_cast(Agent {
+                        code,
+                        name,
+                        enabled: true,
+                        runtime: explicit_runtime.unwrap_or(existing.runtime),
+                        duty: input.duty.as_deref().map(str::trim).map(str::to_string).unwrap_or(existing.duty),
+                        tags: input.tags.unwrap_or(existing.tags),
+                        look,
+                        ..existing
+                    });
+                    s.agents = upsert(&s.agents, next.clone(), |x| &x.id);
+                    return Ok(next);
+                }
+
+                let code = resolve_agent_code(
+                    input.code.as_deref().unwrap_or_default(),
+                    AgentRole::Worker,
+                    &s.agents,
+                    None,
+                )?;
+                let avatar = explicit_avatar.unwrap_or_else(|| assign_worker_avatar(&id, &name, &s.agents));
+                let created = with_cast(Agent {
+                    id,
+                    code,
+                    name,
+                    role: AgentRole::Worker,
+                    mode: AgentExecutionMode::External,
+                    duty: input.duty.as_deref().map(str::trim).unwrap_or_default().to_string(),
+                    enabled: true,
+                    runtime: explicit_runtime.unwrap_or_else(|| "external".to_string()),
+                    machine_id: None,
+                    model: String::new(),
+                    effort: String::new(),
+                    persona: String::new(),
+                    persona_mode: PersonaMode::Append,
+                    skills: vec![],
+                    toolsets: vec![],
+                    mcp_servers: vec![],
+                    disallowed_tools: vec![],
+                    env: BTreeMap::new(),
+                    workdir: String::new(),
+                    worktree: false,
+                    tags: input.tags.unwrap_or_default(),
+                    look: Look {
+                        species: None,
+                        outfit: None,
+                        orchestrator: None,
+                        build: Build::Biped,
+                        head: Head::Rounded,
+                        body: String::new(),
+                        trim: String::new(),
+                        hat: String::new(),
+                        eye: String::new(),
+                        avatar: Some(avatar),
+                    },
+                    voice: None,
+                    from: None,
+                });
+                s.agents.push(created.clone());
+                Ok(created)
+            })
+            .await?;
+        self.saved(saved)
     }
 
     fn deletable_agent(&self, id: &str) -> Result<Agent, ApiError> {
@@ -1019,5 +1299,32 @@ mod tests {
             h = h.wrapping_mul(31).wrapping_add(u as u32);
         }
         assert_eq!(cast_hash("agent-1"), h);
+    }
+
+    #[test]
+    fn worker_avatar_assignment_is_deterministic_and_avoids_collisions() {
+        let mut a1 = profile_of(&built_in_templates()[1], "ext-1".into(), "W-01".into(), "Ext 1".into());
+        a1.look.avatar = None;
+        let first = assign_worker_avatar("ext-1", "Ext 1", &[]);
+        let second = assign_worker_avatar("ext-1", "Ext 1", &[]);
+        assert_eq!(first, second);
+        assert!(WORKER_ROLE_AVATARS.contains(&first.as_str()));
+
+        a1.look.avatar = Some(first.clone());
+        let avoided = assign_worker_avatar("ext-1", "Ext 1", &[a1]);
+        assert_ne!(avoided, first);
+    }
+
+    #[test]
+    fn code_allocation_assigns_unique_o_and_w_codes() {
+        let mut list = vec![
+            profile_of(&built_in_templates()[0], "default".into(), String::new(), "Coordinator".into()),
+            profile_of(&built_in_templates()[1], "dev".into(), "W-02".into(), "Dev".into()),
+            profile_of(&built_in_templates()[1], "qa".into(), "W-02".into(), "QA".into()),
+        ];
+        ensure_agent_codes(&mut list);
+        assert_eq!(list[0].code, "O-01");
+        assert_eq!(list[1].code, "W-02");
+        assert_eq!(list[2].code, "W-01");
     }
 }

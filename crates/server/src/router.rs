@@ -102,6 +102,7 @@ impl Router {
             E::AgentValidate => on!(p, AgentValidate, |r| pr.validate_async(&r.agents).await),
             E::AgentCreate => on!(p, AgentCreate, |r| pr.agent_create_async(r).await?),
             E::AgentUpdate => on!(p, AgentUpdate, |r| pr.agent_update_async(r).await?),
+            E::AgentRegister => on!(p, AgentRegister, |r| pr.agent_register_async(r).await?),
             E::AgentDelete => void!(p, AgentDelete, |r| pr.agent_delete_async(&r.id).await?),
             E::AgentPreviewDelete => on!(p, AgentPreviewDelete, |r| pr.agent_preview_delete(&r.id)?),
             E::AgentTemplateList => ret!(ok_json(pr.templates_async().await)),

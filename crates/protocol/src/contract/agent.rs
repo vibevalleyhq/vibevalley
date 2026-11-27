@@ -413,6 +413,29 @@ pub struct AgentFrom {
     pub version: i64,
 }
 
+/// How a teammate executes work: `managed` runs through VibeValley's OAR session queue; `external` represents an external coding agent on the roster.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+pub enum AgentExecutionMode {
+    #[default]
+    #[serde(rename = "managed")]
+    Managed,
+    #[serde(rename = "external")]
+    External,
+}
+
+impl AgentExecutionMode {
+    pub const ALL: [AgentExecutionMode; 2] = [AgentExecutionMode::Managed, AgentExecutionMode::External];
+
+    /// The string on the wire.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            AgentExecutionMode::Managed => "managed",
+            AgentExecutionMode::External => "external",
+        }
+    }
+}
+
 #[skip_serializing_none]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts-gen", derive(TS))]
@@ -420,8 +443,13 @@ pub struct AgentFrom {
 #[serde(rename_all = "camelCase")]
 pub struct Agent {
     pub id: String,
+    /// Stable teammate code (`O-01`, `O-02` for orchestrators; `W-01`, `W-02`... for workers).
+    #[serde(default)]
+    pub code: String,
     pub name: String,
     pub role: AgentRole,
+    #[serde(default)]
+    pub mode: AgentExecutionMode,
     /// What it does, in a sentence (duty): orchestrators read it to pick who takes a job.
     pub duty: String,
     pub enabled: bool,
@@ -583,6 +611,24 @@ pub struct SkillDeleteInput {
     pub id: String,
 }
 
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct AgentRegisterInput {
+    /// Optional stable teammate id. If omitted, derived deterministically from runtime/name.
+    pub id: Option<String>,
+    pub name: String,
+    pub runtime: Option<String>,
+    pub duty: Option<String>,
+    /// Optional Papertrails portrait asset id (`avatar-*`).
+    pub avatar: Option<String>,
+    /// Optional explicit worker code (`W-XX`).
+    pub code: Option<String>,
+    pub tags: Option<Vec<String>>,
+}
+
 #[cfg(feature = "ts-gen")]
 crate::typescript::module! {
     "agent";
@@ -600,6 +646,7 @@ crate::typescript::module! {
     OrchestratorLook,
     Look,
     AgentFrom,
+    AgentExecutionMode,
     Agent,
     AgentTemplateSource,
     TemplateCategory,
@@ -608,6 +655,7 @@ crate::typescript::module! {
     AgentValidation,
     Skill,
     AgentDeleteInput,
+    AgentRegisterInput,
     AgentTemplateInstallInput,
     AgentTemplateUpdateInput,
     AgentTemplateAddInput,
