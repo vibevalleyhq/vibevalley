@@ -178,6 +178,8 @@ export class VibeValleyApi {
       this.call<T.ProviderStatus>("provider.get", "/api/v1/provider/get", undefined, options),
     update: (a: T.ProviderUpdate, options?: { signal?: AbortSignal }): Promise<T.ProviderStatus> =>
       this.call<T.ProviderStatus>("provider.update", "/api/v1/provider/update", a, options),
+    verify: (a: T.ProviderVerifyRequest, options?: { signal?: AbortSignal }): Promise<T.ProviderStatus> =>
+      this.call<T.ProviderStatus>("provider.verify", "/api/v1/provider/verify", a, options),
     voice: {
       list: (a: T.ProviderVoiceRequest, options?: { signal?: AbortSignal }): Promise<T.ProviderVoiceListing> =>
         this.call<T.ProviderVoiceListing>("provider.voice.list", "/api/v1/provider/voice/list", a, options),

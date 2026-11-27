@@ -122,7 +122,7 @@ test("IssueDetail shows full unclamped title, omits empty repo crumb, localizes 
   expect(app.count("id:issue-comment-composer")).toBe(0);
 
   await app.press("id:issue-error-settings");
-  await fake.pumpUntil(app, () => app.count("id:settings-models") === 1);
+  await fake.pumpUntil(app, () => app.count("id:settings-providers") === 1);
 });
 
 test("IssueDetail renders inline comment composer when an issue thread channel exists", async () => {

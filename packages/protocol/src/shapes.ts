@@ -408,11 +408,18 @@ export {
   type UserProfile,
 } from "./setting/shapes.gen";
 export type {
+  ModelCapability,
+  ProviderBinding,
+  ProviderConnection,
+  ProviderConnectionAdapter,
   ProviderConnectionUpdate,
   ProviderModelListing,
   ProviderModelRequest,
+  ProviderScene,
+  ProviderScenePolicy,
   ProviderStatus,
   ProviderUpdate,
+  ProviderVerifyRequest,
   ProviderVoiceListing,
   ProviderVoiceRequest,
 } from "./provider/shapes.gen";

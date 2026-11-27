@@ -7,7 +7,6 @@
     "label": "Page language"
   },
   "keys": {
-    "deepseekHint": "sk-… (leave empty to keep)",
     "saved": "Saved, in use at once."
   },
   "source": {
@@ -57,7 +56,8 @@
     "profile": "Profile",
     "general": "General",
     "appearance": "Appearance",
-    "models": "Models & Environments",
+    "providers": "Model Providers",
+    "models": "Models & Model Policy",
     "skills": "Skills",
     "mcp": "MCP Integrations",
     "voice": "Voice & Calls",
@@ -75,7 +75,8 @@
     "profile": "profile avatar display name tagline bio",
     "general": "language start workbench farm startup",
     "appearance": "theme dark light size zoom scale font animation motion reduce",
-    "models": "keys accounts DeepSeek MOSS API key models binding environments",
+    "providers": "providers credentials API key verify fetch DeepSeek MiniMax MOSS OpenAI Anthropic",
+    "models": "models policy scene fallback orchestrator chat polish ASR dictation TTS speech realtime vision image",
     "skills": "skills skill built-in installed library prompt",
     "memory": "memory source sources Nowledge EverOS external read write",
     "mcp": "MCP Antigravity Claude Code Codex Cursor stdio streamableHttp integration",
@@ -187,9 +188,11 @@
     "backendS3": "Object Storage (S3)",
     "backendMemory": "In-Memory (Memory)"
   },
+  "providers": {
+    "intro": "Manage credentials for DeepSeek, MiniMax, MOSS, and other providers (1 provider = 1 API key), verify connectivity, and auto-fetch capability-tagged models."
+  },
   "models": {
-    "intro": "Configure model accounts, API keys, and feature bindings.",
-    "deepseekHint": "The assistant and VibeValley's own helpers use it"
+    "intro": "Configure per-scene primary models and fallback policies from discovered provider models only."
   },
   "memory": {
     "intro": "Helpers can also look things up in, and write to, memory outside VibeValley."

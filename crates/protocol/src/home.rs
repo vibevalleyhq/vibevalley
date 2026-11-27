@@ -201,11 +201,31 @@ struct ServerAnnouncement {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct SavedProviderConnection {
+    #[serde(default)]
+    adapter: Option<String>,
+    #[serde(default)]
+    enabled: Option<bool>,
+    #[serde(default)]
+    key: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SavedProviders {
+    #[serde(default)]
+    connections: Vec<SavedProviderConnection>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct SavedSettings {
     #[serde(default)]
     locale: Option<String>,
     #[serde(default)]
     deepseek_api_key: Option<String>,
+    #[serde(default)]
+    providers: Option<SavedProviders>,
 }
 
 /// `VIBEVALLEY_HOME`, else `$HOME/<current_channel().home_dir_name()>`.
@@ -369,7 +389,16 @@ pub fn saved_locale(home: &Path) -> &'static str {
 /// The DeepSeek API key `settings.json` keeps, when non-empty.
 pub fn saved_deepseek_key(home: &Path) -> Option<String> {
     let said: SavedSettings = serde_json::from_str(&std::fs::read_to_string(home.join(SETTINGS_FILE)).ok()?).ok()?;
-    said.deepseek_api_key.as_deref().map(str::trim).filter(|k| !k.is_empty()).map(String::from)
+    let from_providers = said.providers.as_ref().and_then(|p| {
+        p.connections
+            .iter()
+            .find(|c| c.adapter.as_deref() == Some("deepseek") && c.enabled.unwrap_or(true))
+            .and_then(|c| c.key.as_deref())
+            .map(str::trim)
+            .filter(|k| !k.is_empty())
+            .map(String::from)
+    });
+    from_providers.or_else(|| said.deepseek_api_key.as_deref().map(str::trim).filter(|k| !k.is_empty()).map(String::from))
 }
 
 /// Resolves this machine's display name (`VIBEVALLEY_SERVER_NAME`, macOS `scutil --get ComputerName`,

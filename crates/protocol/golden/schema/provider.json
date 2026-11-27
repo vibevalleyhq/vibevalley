@@ -1,23 +1,75 @@
 {
+ "ModelCapability": [
+  "chat",
+  "asr",
+  "tts",
+  "realtime",
+  "vision",
+  "image"
+ ],
  "ProviderModel": [
   {
    "id": "s4490",
-   "owner": "s4491"
+   "owner": "s4491",
+   "capabilities": [
+    "chat"
+   ]
   },
   {
    "id": "s4492",
-   "owner": "s4493"
+   "owner": "s4493",
+   "capabilities": [
+    "asr",
+    "tts"
+   ]
+  }
+ ],
+ "ProviderConnectionAdapter": [
+  "deepseek",
+  "minimax",
+  "moss",
+  "openai",
+  "anthropic"
+ ],
+ "ProviderVerificationStatus": [
+  "unverified",
+  "verified",
+  "failed"
+ ],
+ "ProviderVerification": [
+  {
+   "status": "verified",
+   "checkedAt": 1795782397913
+  },
+  {
+   "status": "failed",
+   "checkedAt": 1795782397914,
+   "error": "authentication failed"
   }
  ],
  "ProviderConnection": [
   {
    "id": "s4494",
    "name": "s4495",
-   "adapter": "moss",
+   "adapter": "deepseek",
    "enabled": true,
    "key": {
     "source": "settings",
     "hint": "s4497"
+   },
+   "baseUrl": "https://api.deepseek.com",
+   "models": [
+    {
+     "id": "deepseek-chat",
+     "owner": "deepseek",
+     "capabilities": [
+      "chat"
+     ]
+    }
+   ],
+   "verification": {
+    "status": "verified",
+    "checkedAt": 1795782397913
    }
   },
   {
@@ -27,11 +79,9 @@
    "enabled": true,
    "key": {
     "source": null
-   }
+   },
+   "models": []
   }
- ],
- "ProviderConnectionAdapter": [
-  "moss"
  ],
  "ProviderBinding": [
   {
@@ -41,6 +91,33 @@
   {
    "connection": "s4503",
    "model": "s4504"
+  }
+ ],
+ "ProviderScene": [
+  "orchestrator",
+  "polish",
+  "transcription",
+  "speech",
+  "speakers",
+  "voiceDesign",
+  "live",
+  "vision",
+  "image",
+  "understanding"
+ ],
+ "ProviderScenePolicy": [
+  {
+   "scene": "orchestrator",
+   "fallbacks": [
+    {
+     "connection": "minimax",
+     "model": "MiniMax-M2.5"
+    }
+   ]
+  },
+  {
+   "scene": "polish",
+   "fallbacks": []
   }
  ],
  "ProviderStatus": [
@@ -55,9 +132,26 @@
      "key": {
       "source": "settings",
       "hint": "s4509"
-     }
+     },
+     "models": [
+      {
+       "id": "moss-live-1.0",
+       "owner": "moss",
+       "capabilities": [
+        "realtime"
+       ]
+      }
+     ]
     }
    ],
+   "orchestrator": {
+    "connection": "deepseek",
+    "model": "deepseek-chat"
+   },
+   "polish": {
+    "connection": "deepseek",
+    "model": "deepseek-chat"
+   },
    "image": {
     "connection": "s4512",
     "model": "s4513"
@@ -66,53 +160,40 @@
     "connection": "s4514",
     "model": "s4515"
    },
-   "liveModels": [
-    "s4516"
-   ],
    "speakers": {
     "connection": "s4517",
     "model": "s4518"
    },
-   "speakersModels": [
-    "s4519"
-   ],
    "voiceDesign": {
     "connection": "s4520",
     "model": "s4521"
    },
-   "voiceDesignModels": [
-    "s4522"
-   ],
    "transcription": {
     "connection": "s4523",
     "model": "s4524"
    },
-   "transcriptionModels": [
-    "s4525"
-   ],
    "vision": {
     "connection": "s4526",
     "model": "s4527"
    },
-   "visionModels": [
-    "s4528"
-   ],
-   "imageModels": [
-    "s4530"
-   ],
    "understanding": {
     "connection": "s4531",
     "model": "s4532"
    },
-   "understandingModels": [
-    "s4533"
-   ],
    "speech": {
     "connection": "s4534",
     "model": "s4535"
    },
-   "speechModels": [
-    "s4536"
+   "scenePolicies": [
+    {
+     "scene": "orchestrator",
+     "fallbacks": [
+      {
+       "connection": "minimax",
+       "model": "MiniMax-M2.5"
+      }
+     ]
+    }
    ]
   },
   {
@@ -125,41 +206,21 @@
      "enabled": true,
      "key": {
       "source": null
-     }
+     },
+     "models": []
     }
    ],
+   "orchestrator": null,
+   "polish": null,
    "image": null,
    "live": null,
-   "liveModels": [
-    "s4541"
-   ],
    "speakers": null,
-   "speakersModels": [
-    "s4542"
-   ],
    "voiceDesign": null,
-   "voiceDesignModels": [
-    "s4543"
-   ],
    "transcription": null,
-   "transcriptionModels": [
-    "s4544"
-   ],
    "vision": null,
-   "visionModels": [
-    "s4545"
-   ],
-   "imageModels": [
-    "s4547"
-   ],
    "understanding": null,
-   "understandingModels": [
-    "s4548"
-   ],
    "speech": null,
-   "speechModels": [
-    "s4549"
-   ]
+   "scenePolicies": []
   }
  ],
  "ProviderConnectionUpdate": [
@@ -168,21 +229,18 @@
    "name": "s4551",
    "adapter": "moss",
    "enabled": true,
-   "key": "s4553"
+   "key": "s4553",
+   "baseUrl": "https://api.mosi.cn/v1"
   },
   {
    "id": "s4554",
    "name": "s4555",
-   "adapter": "moss",
+   "adapter": "deepseek",
    "enabled": true
   }
  ],
  "ProviderUpdate": [
   {
-   "speech": {
-    "connection": "s4557",
-    "model": "s4558"
-   },
    "revision": 4559,
    "connections": [
     {
@@ -193,6 +251,15 @@
      "key": "s4563"
     }
    ],
+   "orchestrator": {
+    "connection": "deepseek",
+    "model": "deepseek-chat"
+   },
+   "polish": null,
+   "speech": {
+    "connection": "s4557",
+    "model": "s4558"
+   },
    "understanding": {
     "connection": "s4564",
     "model": "s4565"
@@ -220,10 +287,20 @@
    "vision": {
     "connection": "s4578",
     "model": "s4579"
-   }
+   },
+   "scenePolicies": [
+    {
+     "scene": "orchestrator",
+     "fallbacks": [
+      {
+       "connection": "minimax",
+       "model": "MiniMax-M2.5"
+      }
+     ]
+    }
+   ]
   },
   {
-   "speech": null,
    "revision": 4580,
    "connections": [
     {
@@ -233,13 +310,27 @@
      "enabled": false
     }
    ],
+   "orchestrator": null,
+   "polish": null,
+   "speech": null,
    "understanding": null,
    "image": null,
    "live": null,
    "speakers": null,
    "voiceDesign": null,
    "transcription": null,
-   "vision": null
+   "vision": null,
+   "scenePolicies": []
+  }
+ ],
+ "ProviderVerifyRequest": [
+  {
+   "connection": "deepseek",
+   "revision": 1
+  },
+  {
+   "connection": "moss",
+   "revision": 2
   }
  ],
  "ProviderModelRequest": [
@@ -313,7 +404,10 @@
    "models": [
     {
      "id": "s4617",
-     "owner": "s4618"
+     "owner": "s4618",
+     "capabilities": [
+      "image"
+     ]
     }
    ]
   },
@@ -323,7 +417,8 @@
    "models": [
     {
      "id": "s4621",
-     "owner": "s4622"
+     "owner": "s4622",
+     "capabilities": []
     }
    ]
   }

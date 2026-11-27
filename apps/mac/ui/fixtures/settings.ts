@@ -9,32 +9,58 @@ const day = 24 * 60 * min;
 
 const provider: ProviderStatus = {
   revision: 3,
-  connections: [{ id: "moss-main", name: "MOSS", adapter: "moss", enabled: true, key: { source: "settings", hint: "…a41c" } }],
+  connections: [
+    {
+      id: "deepseek",
+      name: "DeepSeek",
+      adapter: "deepseek",
+      enabled: true,
+      key: { source: "settings", hint: "…3f9a" },
+      models: [
+        { id: "deepseek-chat", owner: "deepseek", capabilities: ["chat"] },
+        { id: "deepseek-reasoner", owner: "deepseek", capabilities: ["chat"] },
+      ],
+      verification: { status: "verified", checkedAt: now - min },
+    },
+    {
+      id: "moss-main",
+      name: "MOSS",
+      adapter: "moss",
+      enabled: true,
+      key: { source: "settings", hint: "…a41c" },
+      models: [
+        { id: "moss-image-1", owner: "moss", capabilities: ["image"] },
+        { id: "moss-vl", owner: "moss", capabilities: ["vision"] },
+        { id: "moss-tts", owner: "moss", capabilities: ["tts"] },
+        { id: "moss-speakers", owner: "moss", capabilities: ["tts"] },
+        { id: "moss-voice-design", owner: "moss", capabilities: ["tts"] },
+        { id: "moss-transcribe", owner: "moss", capabilities: ["asr"] },
+        { id: "moss-live", owner: "moss", capabilities: ["realtime"] },
+        { id: "moss-live-vision", owner: "moss", capabilities: ["vision"] },
+      ],
+      verification: { status: "verified", checkedAt: now - min },
+    },
+  ],
+  orchestrator: { connection: "deepseek", model: "deepseek-chat" },
+  polish: { connection: "deepseek", model: "deepseek-chat" },
   image: { connection: "moss-main", model: "moss-image-1" },
-  imageModels: ["moss-image-1", "moss-image-1-hd"],
   understanding: { connection: "moss-main", model: "moss-vl" },
-  understandingModels: ["moss-vl"],
   speech: null,
-  speechModels: ["moss-tts"],
   speakers: null,
-  speakersModels: ["moss-speakers"],
   voiceDesign: null,
-  voiceDesignModels: ["moss-voice-design"],
   transcription: { connection: "moss-main", model: "moss-transcribe" },
-  transcriptionModels: ["moss-transcribe"],
   live: { connection: "moss-main", model: "moss-live" },
-  liveModels: ["moss-live"],
   vision: null,
-  visionModels: ["moss-live-vision"],
+  scenePolicies: [],
 };
 
 const models: ProviderModelListing = {
   connection: "moss-main",
   revision: 3,
   models: [
-    { id: "moss-image-1", owner: "moss" },
-    { id: "moss-vl", owner: "moss" },
-    { id: "moss-live", owner: "moss" },
+    { id: "moss-image-1", owner: "moss", capabilities: ["image"] },
+    { id: "moss-vl", owner: "moss", capabilities: ["vision"] },
+    { id: "moss-live", owner: "moss", capabilities: ["realtime"] },
   ],
 };
 
@@ -57,6 +83,7 @@ export const connectors: ConnectorStatus[] = [
 export const responses: Record<string, unknown> = {
   "provider.get": provider,
   "provider.update": provider,
+  "provider.verify": provider,
   "provider.model.list": models,
   "voice.moss.verify": { problem: "" },
   "setting.validate": { problem: "" },

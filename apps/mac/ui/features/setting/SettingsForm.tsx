@@ -31,9 +31,8 @@ import { currentHost } from "../../infra/host";
 import { defineQuery, ready, retryRead, useQuery, useQueryClient, useSettings } from "../../infra/query";
 import { useRouter } from "../../infra/router";
 import { useSaveSettings } from "../../infra/settings";
-import { DeepseekForm } from "./DeepseekForm";
 
-type SettingsPart = "deepseek" | "memory";
+type SettingsPart = "memory";
 
 const sourceLabels: Record<MemorySourceKind, string> = { nowledge: "Nowledge Mem", everos: "EverOS" };
 const sourceAddress: Record<MemorySourceKind, string> = { nowledge: "http://127.0.0.1:14242/mcp/", everos: "http://127.0.0.1:18791" };
@@ -79,18 +78,14 @@ const draftsOf = (status: SettingsStatus) =>
   );
 
 /** Built again for each part (Keyed by the page): a saved form starts over from what the server answered. */
-export function SettingsForm(props: { part: SettingsPart }) {
+export function SettingsForm(_props: { part: SettingsPart }) {
   const settings = useSettings();
   return (
     <If
       when={settings.error()}
       else={
         <If when={ready(settings, undefined)} else={<Quiet>{t("web.base.form.asking")}</Quiet>}>
-          {(status) => (
-            <If when={props.part === "deepseek"} else={<MemoryForm status={untracked(status)} />}>
-              <DeepseekForm status={untracked(status)} />
-            </If>
-          )}
+          {(status) => <MemoryForm status={untracked(status)} />}
         </If>
       }
     >

@@ -3,6 +3,7 @@
 //! shown by hint only; the voice's settings over their defaults; and each
 //! feature's readiness.
 
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -10,9 +11,9 @@ use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    ApiError, BizCode, Feature, KeySource, KeyStatus, LitFalse, LitTrue, Locale, MemorySource, MemorySourceKind, Missing, ProviderBinding, ProviderConnection,
-    ProviderConnectionAdapter, ProviderStatus, Readiness, SettingsStatus, SettingsUpdate, SettingsUpdateVoice, SpacePaths, UserProfile, Validation,
-    VoiceSettings,
+    ApiError, BizCode, Feature, KeySource, KeyStatus, LitFalse, LitTrue, Locale, MemorySource, MemorySourceKind, Missing, ModelCapability, ProviderBinding,
+    ProviderConnection, ProviderConnectionAdapter, ProviderModel, ProviderScene, ProviderScenePolicy, ProviderStatus, ProviderVerification, Readiness,
+    SettingsStatus, SettingsUpdate, SettingsUpdateVoice, SpacePaths, UserProfile, Validation, VoiceSettings,
 };
 
 pub const MOSS: &str = "https://api.mosi.cn/v1";
@@ -41,9 +42,11 @@ pub const UNDERSTANDING_MODELS: [&str; 2] = ["moss-vl-1.0", "moss-vl-1.0-2026-07
 pub const VISION_MODELS: [&str; 2] = ["moss-vl-realtime-1.0", "moss-vl-realtime-1.0-2026-09-09"];
 pub const VOICE_DESIGN_MODELS: [&str; 2] = ["moss-voice-generator-1.0", "moss-voice-generator-1.0-2026-07-22"];
 
-/// What a MOSS account is bound to.
+/// What a provider account is bound to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Use {
+    Orchestrator,
+    Polish,
     Image,
     Understanding,
     Speech,
@@ -55,7 +58,9 @@ pub enum Use {
 }
 
 impl Use {
-    pub const ALL: [Use; 8] = [
+    pub const ALL: [Use; 10] = [
+        Use::Orchestrator,
+        Use::Polish,
         Use::Image,
         Use::Understanding,
         Use::Speech,
@@ -66,21 +71,47 @@ impl Use {
         Use::Vision,
     ];
 
-    pub fn name(self) -> &'static str {
-        match self {
-            Use::Image => "image",
-            Use::Understanding => "understanding",
-            Use::Speech => "speech",
-            Use::Live => "live",
-            Use::Speakers => "speakers",
-            Use::VoiceDesign => "voiceDesign",
-            Use::Transcription => "transcription",
-            Use::Vision => "vision",
+    pub fn from_scene(scene: ProviderScene) -> Self {
+        match scene {
+            ProviderScene::Orchestrator => Use::Orchestrator,
+            ProviderScene::Polish => Use::Polish,
+            ProviderScene::Image => Use::Image,
+            ProviderScene::Understanding => Use::Understanding,
+            ProviderScene::Speech => Use::Speech,
+            ProviderScene::Live => Use::Live,
+            ProviderScene::Speakers => Use::Speakers,
+            ProviderScene::VoiceDesign => Use::VoiceDesign,
+            ProviderScene::Transcription => Use::Transcription,
+            ProviderScene::Vision => Use::Vision,
         }
+    }
+
+    pub fn scene(self) -> ProviderScene {
+        match self {
+            Use::Orchestrator => ProviderScene::Orchestrator,
+            Use::Polish => ProviderScene::Polish,
+            Use::Image => ProviderScene::Image,
+            Use::Understanding => ProviderScene::Understanding,
+            Use::Speech => ProviderScene::Speech,
+            Use::Live => ProviderScene::Live,
+            Use::Speakers => ProviderScene::Speakers,
+            Use::VoiceDesign => ProviderScene::VoiceDesign,
+            Use::Transcription => ProviderScene::Transcription,
+            Use::Vision => ProviderScene::Vision,
+        }
+    }
+
+    pub fn name(self) -> &'static str {
+        self.scene().as_str()
+    }
+
+    pub fn required_capability(self) -> ModelCapability {
+        self.scene().required_capability()
     }
 
     pub fn models(self) -> &'static [&'static str] {
         match self {
+            Use::Orchestrator | Use::Polish => &[],
             Use::Transcription => &TRANSCRIPTION_MODELS,
             Use::Image => &IMAGE_MODELS,
             Use::Understanding => &UNDERSTANDING_MODELS,
@@ -93,7 +124,7 @@ impl Use {
     }
 }
 
-/// A MOSS account as `settings.json` keeps it.
+/// A model provider account as `settings.json` keeps it (1 provider = 1 API Key).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Connection {
@@ -104,9 +135,15 @@ pub struct Connection {
     pub enabled: bool,
     #[serde(default)]
     pub key: Secret,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub models: Vec<ProviderModel>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub verification: Option<ProviderVerification>,
 }
 
-/// The MOSS accounts and what each use is bound to (`ProviderSettings`).
+/// The provider accounts, discovered models, and per-scene bindings/fallback policies.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Providers {
@@ -114,6 +151,10 @@ pub struct Providers {
     pub revision: i64,
     #[serde(default)]
     pub connections: Vec<Connection>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub orchestrator: Option<ProviderBinding>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub polish: Option<ProviderBinding>,
     pub image: Option<ProviderBinding>,
     pub understanding: Option<ProviderBinding>,
     pub speech: Option<ProviderBinding>,
@@ -122,9 +163,11 @@ pub struct Providers {
     pub voice_design: Option<ProviderBinding>,
     pub transcription: Option<ProviderBinding>,
     pub vision: Option<ProviderBinding>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub scene_policies: Vec<ProviderScenePolicy>,
 }
 
-/// One use's account: the connection, its model and key.
+/// One scene's resolved account: the connection, its model and key.
 #[derive(Debug, Clone)]
 pub struct Account {
     pub connection: String,
@@ -136,6 +179,8 @@ pub struct Account {
 impl Providers {
     pub fn binding(&self, u: Use) -> Option<&ProviderBinding> {
         match u {
+            Use::Orchestrator => self.orchestrator.as_ref(),
+            Use::Polish => self.polish.as_ref(),
             Use::Image => self.image.as_ref(),
             Use::Understanding => self.understanding.as_ref(),
             Use::Speech => self.speech.as_ref(),
@@ -147,21 +192,52 @@ impl Providers {
         }
     }
 
+    pub fn fallbacks(&self, scene: ProviderScene) -> &[ProviderBinding] {
+        self.scene_policies
+            .iter()
+            .find(|p| p.scene == scene)
+            .map(|p| p.fallbacks.as_slice())
+            .unwrap_or(&[])
+    }
+
     /// The connection named, enabled and carrying a non-empty key.
     pub fn usable(&self, id: &str) -> Option<&Connection> {
         self.connections.iter().find(|c| c.id == id && c.enabled && !c.key.is_empty())
     }
 
-    /// The account bound to `u`, ready to call.
+    /// The enabled, keyed connection for a given provider adapter.
+    pub fn usable_adapter(&self, adapter: ProviderConnectionAdapter) -> Option<&Connection> {
+        self.connections.iter().find(|c| c.adapter == adapter && c.enabled && !c.key.is_empty())
+    }
+
+    /// Ordered accounts for a scene (primary binding followed by usable fallback bindings).
+    pub fn scene_accounts(&self, scene: ProviderScene) -> Vec<Account> {
+        let mut out = Vec::new();
+        let mut seen = HashSet::new();
+        let mut push_binding = |b: &ProviderBinding| {
+            if let Some(c) = self.usable(&b.connection)
+                && seen.insert((c.id.clone(), b.model.clone()))
+            {
+                out.push(Account {
+                    connection: c.id.clone(),
+                    revision: self.revision,
+                    model: b.model.clone(),
+                    key: c.key.clone(),
+                });
+            }
+        };
+        if let Some(primary) = self.binding(Use::from_scene(scene)) {
+            push_binding(primary);
+        }
+        for fb in self.fallbacks(scene) {
+            push_binding(fb);
+        }
+        out
+    }
+
+    /// The account bound to `u` (or its first usable fallback), ready to call.
     pub fn account(&self, u: Use) -> Option<Account> {
-        let b = self.binding(u)?;
-        let c = self.usable(&b.connection)?;
-        Some(Account {
-            connection: c.id.clone(),
-            revision: self.revision,
-            model: b.model.clone(),
-            key: c.key.clone(),
-        })
+        self.scene_accounts(u.scene()).into_iter().next()
     }
 
     /// A usable connection's account, whatever is bound to it now: a job goes on with the account it was asked with.
@@ -179,7 +255,11 @@ impl Providers {
     pub fn readiness(&self, u: Use) -> Readiness {
         let lacks = |missing| Readiness::False { ready: LitFalse, missing };
         if self.connections.is_empty() {
-            return lacks(Missing::MossAccount);
+            return lacks(if u == Use::Orchestrator {
+                Missing::DeepseekKey
+            } else {
+                Missing::MossAccount
+            });
         }
         let Some(c) = self.binding(u).and_then(|b| self.connections.iter().find(|c| c.id == b.connection)) else {
             return lacks(Missing::Binding);
@@ -188,14 +268,17 @@ impl Providers {
             return lacks(Missing::MossOff);
         }
         if c.key.is_empty() {
-            return lacks(Missing::MossKey);
+            return lacks(if c.adapter == ProviderConnectionAdapter::DeepSeek {
+                Missing::DeepseekKey
+            } else {
+                Missing::MossKey
+            });
         }
         Readiness::True { ready: LitTrue }
     }
 
     /// The providers with each key redacted to its hint.
     pub fn status(&self) -> ProviderStatus {
-        let models = |m: &[&str]| m.iter().map(|s| s.to_string()).collect::<Vec<_>>();
         ProviderStatus {
             revision: self.revision,
             connections: self
@@ -207,24 +290,22 @@ impl Providers {
                     adapter: c.adapter,
                     enabled: c.enabled,
                     key: c.key.status(KeySource::Settings),
+                    base_url: c.base_url.clone(),
+                    models: c.models.clone(),
+                    verification: c.verification.clone(),
                 })
                 .collect(),
+            orchestrator: self.orchestrator.clone(),
+            polish: self.polish.clone(),
             image: self.image.clone(),
             live: self.live.clone(),
-            live_models: models(&LIVE_MODELS),
             speakers: self.speakers.clone(),
-            speakers_models: models(&SPEAKERS_MODELS),
             voice_design: self.voice_design.clone(),
-            voice_design_models: models(&VOICE_DESIGN_MODELS),
             transcription: self.transcription.clone(),
-            transcription_models: models(&TRANSCRIPTION_MODELS),
             vision: self.vision.clone(),
-            vision_models: models(&VISION_MODELS),
-            image_models: models(&IMAGE_MODELS),
             understanding: self.understanding.clone(),
-            understanding_models: models(&UNDERSTANDING_MODELS),
             speech: self.speech.clone(),
-            speech_models: models(&SPEECH_MODELS),
+            scene_policies: self.scene_policies.clone(),
         }
     }
 }
@@ -330,6 +411,35 @@ struct Stored {
     providers: Option<Providers>,
     #[serde(skip_serializing_if = "Option::is_none")]
     profile: Option<UserProfile>,
+}
+
+fn fold_legacy_deepseek_key(stored: &mut Stored) {
+    let legacy = std::mem::take(&mut stored.deepseek_api_key);
+    if legacy.is_empty() {
+        return;
+    }
+    let providers = stored.providers.get_or_insert_with(Providers::default);
+    if let Some(existing) = providers
+        .connections
+        .iter_mut()
+        .find(|c| c.adapter == ProviderConnectionAdapter::DeepSeek)
+    {
+        if existing.key.is_empty() {
+            existing.key = legacy;
+            existing.enabled = true;
+        }
+    } else {
+        providers.connections.push(Connection {
+            id: "deepseek".into(),
+            name: "DeepSeek".into(),
+            adapter: ProviderConnectionAdapter::DeepSeek,
+            enabled: true,
+            key: legacy,
+            base_url: None,
+            models: Vec::new(),
+            verification: None,
+        });
+    }
 }
 
 pub struct Setting {
@@ -445,12 +555,35 @@ fn lacks(missing: Missing) -> Readiness {
     Readiness::False { ready: LitFalse, missing }
 }
 
+fn clear_bindings_for(providers: &mut Providers, connection_id: &str) {
+    for slot in [
+        &mut providers.orchestrator,
+        &mut providers.polish,
+        &mut providers.image,
+        &mut providers.understanding,
+        &mut providers.speech,
+        &mut providers.live,
+        &mut providers.speakers,
+        &mut providers.voice_design,
+        &mut providers.transcription,
+        &mut providers.vision,
+    ] {
+        if slot.as_ref().is_some_and(|b| b.connection == connection_id) {
+            *slot = None;
+        }
+    }
+    for policy in &mut providers.scene_policies {
+        policy.fallbacks.retain(|b| b.connection != connection_id);
+    }
+    providers.scene_policies.retain(|p| !p.fallbacks.is_empty());
+}
+
 impl Setting {
     /// Reads `<home>/settings.json`; one that cannot be read is set aside
     /// (`settings.json.bad`) and the settings start empty.
     pub async fn open_async(config: SettingConfig) -> Arc<Setting> {
         let file = config.home.join(vibevalley_protocol::home::SETTINGS_FILE);
-        let stored = match tokio::fs::read_to_string(&file).await {
+        let mut stored = match tokio::fs::read_to_string(&file).await {
             Ok(text) => match serde_json::from_str::<Stored>(&text) {
                 Ok(parsed) => parsed,
                 Err(_) => {
@@ -460,6 +593,7 @@ impl Setting {
             },
             Err(_) => Stored::default(),
         };
+        fold_legacy_deepseek_key(&mut stored);
         vibevalley_i18n::set_locale(stored.locale.unwrap_or(Locale::Zh).as_str());
         Arc::new(Setting {
             config,
@@ -491,9 +625,32 @@ impl Setting {
         }
     }
 
-    /// The DeepSeek key the orchestrator calls with.
+    fn saved_deepseek_secret(providers: &Providers) -> Secret {
+        providers
+            .connections
+            .iter()
+            .find(|c| c.adapter == ProviderConnectionAdapter::DeepSeek)
+            .map(|c| c.key.clone())
+            .unwrap_or_default()
+    }
+
+    /// Optional DeepSeek key supplied via server config / environment variable.
+    pub fn config_deepseek_key(&self) -> Option<&str> {
+        (!self.config.deepseek_api_key.is_empty()).then_some(self.config.deepseek_api_key.as_str())
+    }
+
+    /// The DeepSeek key the orchestrator calls with (unified provider store, else startup config).
     pub fn deepseek_api_key(&self) -> Option<String> {
-        Self::pick(&self.stored().deepseek_api_key, &self.config.deepseek_api_key).map(|k| k.0.expose().to_string())
+        let providers = self.providers();
+        if let Some(c) = providers.usable_adapter(ProviderConnectionAdapter::DeepSeek) {
+            return Some(c.key.expose().to_string());
+        }
+        (!self.config.deepseek_api_key.is_empty()).then(|| self.config.deepseek_api_key.clone())
+    }
+
+    /// Ordered accounts configured for `scene` (primary binding followed by usable fallbacks).
+    pub fn scene_accounts(&self, scene: ProviderScene) -> Vec<Account> {
+        self.providers().scene_accounts(scene)
     }
 
     /// The GitHub personal access token (`settings.json` wins over `GITHUB_TOKEN`).
@@ -511,9 +668,38 @@ impl Setting {
         voice_over(self.voice_defaults(), &self.stored().voice.unwrap_or_default())
     }
 
-    /// The MOSS providers.
+    /// The unified model providers (`settings.json`).
     pub fn providers(&self) -> Providers {
         self.stored().providers.unwrap_or_default()
+    }
+
+    /// The unified provider status for clients, including any env-sourced DeepSeek key.
+    pub fn provider_status(&self) -> ProviderStatus {
+        let mut status = self.providers().status();
+        if !self.config.deepseek_api_key.is_empty() {
+            let env_key = Secret::new(&self.config.deepseek_api_key).status(KeySource::Config);
+            if let Some(conn) = status
+                .connections
+                .iter_mut()
+                .find(|c| c.adapter == ProviderConnectionAdapter::DeepSeek)
+            {
+                if conn.key.source.is_none() {
+                    conn.key = env_key;
+                }
+            } else {
+                status.connections.push(ProviderConnection {
+                    id: "deepseek".into(),
+                    name: "DeepSeek".into(),
+                    adapter: ProviderConnectionAdapter::DeepSeek,
+                    enabled: true,
+                    key: env_key,
+                    base_url: None,
+                    models: Vec::new(),
+                    verification: None,
+                });
+            }
+        }
+        status
     }
 
     /// Non-empty live secret values (>= 6 chars) for diagnostics redaction, sorted longest first.
@@ -547,17 +733,39 @@ impl Setting {
     pub fn status(&self) -> SettingsStatus {
         let st = self.stored();
         let c = &self.config;
-        let deepseek = Self::pick(&st.deepseek_api_key, &c.deepseek_api_key);
+        let providers = st.providers.clone().unwrap_or_default();
+        let saved_deepseek = Self::saved_deepseek_secret(&providers);
+        let deepseek = Self::pick(&saved_deepseek, &c.deepseek_api_key);
         let github_token = self.github_token_with_source();
         let picked = |k: &Option<(Secret, KeySource)>| match k {
             Some((v, from)) => v.status(*from),
             None => KeyStatus { source: None, hint: None },
         };
-        let providers = st.providers.clone().unwrap_or_default();
         let voice = voice_over(self.voice_defaults(), &st.voice.clone().unwrap_or_default());
         let moss = |u| providers.readiness(u);
+        let orchestrator_readiness = match providers.binding(Use::Orchestrator) {
+            Some(b) => match providers.connections.iter().find(|conn| conn.id == b.connection) {
+                Some(conn) if !conn.enabled => lacks(Missing::MossOff),
+                Some(conn) if !conn.key.is_empty() || (conn.adapter == ProviderConnectionAdapter::DeepSeek && !c.deepseek_api_key.is_empty()) => {
+                    ready()
+                }
+                Some(conn) if conn.adapter == ProviderConnectionAdapter::DeepSeek => lacks(Missing::DeepseekKey),
+                Some(_) => lacks(Missing::MossKey),
+                None => lacks(Missing::Binding),
+            },
+            None => {
+                let saved_enabled_deepseek = providers
+                    .usable_adapter(ProviderConnectionAdapter::DeepSeek)
+                    .is_some();
+                if saved_enabled_deepseek || !c.deepseek_api_key.is_empty() {
+                    ready()
+                } else {
+                    lacks(Missing::DeepseekKey)
+                }
+            }
+        };
         let readiness = [
-            (Feature::Orchestrator, if deepseek.is_some() { ready() } else { lacks(Missing::DeepseekKey) }),
+            (Feature::Orchestrator, orchestrator_readiness),
             (Feature::Image, moss(Use::Image)),
             (Feature::Understanding, moss(Use::Understanding)),
             (Feature::Speech, moss(Use::Speech)),
@@ -620,8 +828,47 @@ impl Setting {
         let next = {
             let guard = self.stored.lock();
             let mut next = guard.clone();
+            next.deepseek_api_key = Secret::default();
             if let Some(given) = &u.deepseek_api_key {
-                next.deepseek_api_key = Secret::new(given.trim());
+                let trimmed = given.trim();
+                let providers = next.providers.get_or_insert_with(Providers::default);
+                if trimmed.is_empty() {
+                    let mut cleared_ids = Vec::new();
+                    for conn in &mut providers.connections {
+                        if conn.adapter == ProviderConnectionAdapter::DeepSeek {
+                            conn.key = Secret::default();
+                            conn.models.clear();
+                            conn.verification = None;
+                            cleared_ids.push(conn.id.clone());
+                        }
+                    }
+                    for id in cleared_ids {
+                        clear_bindings_for(providers, &id);
+                    }
+                } else if let Some(conn) = providers
+                    .connections
+                    .iter_mut()
+                    .find(|c| c.adapter == ProviderConnectionAdapter::DeepSeek)
+                {
+                    if conn.key.expose() != trimmed {
+                        conn.models.clear();
+                        conn.verification = None;
+                    }
+                    conn.key = Secret::new(trimmed);
+                    conn.enabled = true;
+                } else {
+                    providers.connections.push(Connection {
+                        id: "deepseek".into(),
+                        name: "DeepSeek".into(),
+                        adapter: ProviderConnectionAdapter::DeepSeek,
+                        enabled: true,
+                        key: Secret::new(trimmed),
+                        base_url: None,
+                        models: Vec::new(),
+                        verification: None,
+                    });
+                }
+                providers.revision += 1;
             }
             if let Some(given) = &u.github_token {
                 next.github_token = Secret::new(given.trim());
@@ -686,6 +933,7 @@ impl Setting {
             let guard = self.stored.lock();
             let providers = change(&guard.providers.clone().unwrap_or_default())?;
             let mut next = guard.clone();
+            next.deepseek_api_key = Secret::default();
             next.providers = Some(providers.clone());
             (providers, next)
         };

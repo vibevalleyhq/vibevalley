@@ -185,6 +185,7 @@ export const servedEndpoints = [
   { op: "note.cover.set", can: ["user", "remote"], about: ["id"] },
   { op: "provider.get", can: ["user"], about: [] },
   { op: "provider.update", can: ["user"], about: [] },
+  { op: "provider.verify", can: ["user"], about: [] },
   { op: "provider.voice.list", can: ["user"], about: ["connection"] },
   { op: "provider.model.list", can: ["user"], about: [] },
   { op: "setting.get", can: ["user", "remote"], about: [] },

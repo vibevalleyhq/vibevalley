@@ -2,14 +2,15 @@ import { defineScenario } from "../dsl.ts";
 
 const SETTING_SECTIONS = [
   { route: "/settings/general", id: "settings-general", label: "General Settings" },
-  { route: "/settings/models", id: "settings-models", label: "Model Providers & Policy" },
+  { route: "/settings/providers", id: "settings-providers", label: "Model Providers" },
+  { route: "/settings/models", id: "settings-models", label: "Models & Model Policy" },
   { route: "/settings/appearance", id: "settings-appearance", label: "Appearance & Theme" },
   { route: "/settings/remote", id: "settings-remote", label: "Remote Access & Pairing" },
 ] as const;
 
 export const settingsScenario = defineScenario({
   id: "settings",
-  description: "Settings navigation and key subsections (general/models/appearance/remote) in Light & Dark",
+  description: "Settings navigation and key subsections (general/providers/models/appearance/remote) in Light & Dark",
   async run(v) {
     await v.resize(v.viewport.width, v.viewport.height);
 

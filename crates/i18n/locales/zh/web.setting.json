@@ -7,7 +7,6 @@
     "label": "界面语言"
   },
   "keys": {
-    "deepseekHint": "sk-…（不改就空着）",
     "saved": "存好了，马上就用上。"
   },
   "source": {
@@ -57,7 +56,8 @@
     "profile": "个人资料",
     "general": "通用",
     "appearance": "外观",
-    "models": "模型与环境",
+    "providers": "模型商",
+    "models": "模型与模型策略",
     "skills": "技能",
     "mcp": "MCP 接入",
     "voice": "语音与通话",
@@ -75,7 +75,8 @@
     "profile": "个人资料 头像 昵称 签名 avatar profile display name",
     "general": "语言 language 启动 打开 工作台 农场",
     "appearance": "主题 深色 浅色 暗色 dark light 界面大小 缩放 字体 字号 动画 无动画 动效 motion animation",
-    "models": "密钥 钥匙 账号 DeepSeek MOSS API Key 模型 绑定 环境",
+    "providers": "模型商 密钥 钥匙 API Key 凭据 验证 拉取 DeepSeek MiniMax MOSS OpenAI Anthropic",
+    "models": "模型 策略 场景 备选 回退 主助手 润色 听写 语音 实时 视觉 生图 ASR TTS",
     "skills": "技能 skill skills 内置 安装 指南 提示词",
     "memory": "记忆 memory 来源 source Nowledge EverOS 外部记忆 读 写",
     "mcp": "MCP Antigravity Claude Code Codex Cursor stdio streamableHttp 接入 配置",
@@ -187,9 +188,11 @@
     "backendS3": "对象存储 (S3)",
     "backendMemory": "内存存储 (Memory)"
   },
+  "providers": {
+    "intro": "统一配置 DeepSeek、MiniMax、MOSS 等模型商凭据（1 个模型商对应 1 个 API 密钥），验证连通性并自动拉取带能力标签的可用模型。"
+  },
   "models": {
-    "intro": "配置主助手、执行会话与语音功能的模型账号和 API 密钥。",
-    "deepseekHint": "主助手和 VibeValley 自研执行会话用它"
+    "intro": "按场景选择主选模型与备选回退策略；仅从已配置并拉取到可用模型的模型商中选择。"
   },
   "memory": {
     "intro": "执行会话还能去外面的记忆来源里查、往里记。"

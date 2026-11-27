@@ -3078,48 +3078,31 @@
     "revision": 3,
     "connections": [
       {
-        "id": "moss-main",
-        "name": "MOSS",
-        "adapter": "moss",
+        "id": "deepseek",
+        "name": "DeepSeek",
+        "adapter": "deepseek",
         "enabled": true,
         "key": {
           "source": "settings",
-          "hint": "…a41c"
+          "hint": "…3f9a"
+        },
+        "models": [
+          {
+            "id": "deepseek-chat",
+            "owner": "deepseek",
+            "capabilities": ["chat"]
+          },
+          {
+            "id": "deepseek-reasoner",
+            "owner": "deepseek",
+            "capabilities": ["chat"]
+          }
+        ],
+        "verification": {
+          "status": "verified",
+          "checkedAt": 1795782397913
         }
-      }
-    ],
-    "image": {
-      "connection": "moss-main",
-      "model": "moss-image-1"
-    },
-    "imageModels": ["moss-image-1", "moss-image-1-hd"],
-    "understanding": {
-      "connection": "moss-main",
-      "model": "moss-vl"
-    },
-    "understandingModels": ["moss-vl"],
-    "speech": null,
-    "speechModels": ["moss-tts"],
-    "speakers": null,
-    "speakersModels": ["moss-speakers"],
-    "voiceDesign": null,
-    "voiceDesignModels": ["moss-voice-design"],
-    "transcription": {
-      "connection": "moss-main",
-      "model": "moss-transcribe"
-    },
-    "transcriptionModels": ["moss-transcribe"],
-    "live": {
-      "connection": "moss-main",
-      "model": "moss-live"
-    },
-    "liveModels": ["moss-live"],
-    "vision": null,
-    "visionModels": ["moss-live-vision"]
-  },
-  "provider.update": {
-    "revision": 3,
-    "connections": [
+      },
       {
         "id": "moss-main",
         "name": "MOSS",
@@ -3128,37 +3111,316 @@
         "key": {
           "source": "settings",
           "hint": "…a41c"
+        },
+        "models": [
+          {
+            "id": "moss-image-1",
+            "owner": "moss",
+            "capabilities": ["image"]
+          },
+          {
+            "id": "moss-vl",
+            "owner": "moss",
+            "capabilities": ["vision"]
+          },
+          {
+            "id": "moss-tts",
+            "owner": "moss",
+            "capabilities": ["tts"]
+          },
+          {
+            "id": "moss-speakers",
+            "owner": "moss",
+            "capabilities": ["tts"]
+          },
+          {
+            "id": "moss-voice-design",
+            "owner": "moss",
+            "capabilities": ["tts"]
+          },
+          {
+            "id": "moss-transcribe",
+            "owner": "moss",
+            "capabilities": ["asr"]
+          },
+          {
+            "id": "moss-live",
+            "owner": "moss",
+            "capabilities": ["realtime"]
+          },
+          {
+            "id": "moss-live-vision",
+            "owner": "moss",
+            "capabilities": ["vision"]
+          }
+        ],
+        "verification": {
+          "status": "verified",
+          "checkedAt": 1795782397913
         }
       }
     ],
+    "orchestrator": {
+      "connection": "deepseek",
+      "model": "deepseek-chat"
+    },
+    "polish": {
+      "connection": "deepseek",
+      "model": "deepseek-chat"
+    },
     "image": {
       "connection": "moss-main",
       "model": "moss-image-1"
     },
-    "imageModels": ["moss-image-1", "moss-image-1-hd"],
     "understanding": {
       "connection": "moss-main",
       "model": "moss-vl"
     },
-    "understandingModels": ["moss-vl"],
     "speech": null,
-    "speechModels": ["moss-tts"],
     "speakers": null,
-    "speakersModels": ["moss-speakers"],
     "voiceDesign": null,
-    "voiceDesignModels": ["moss-voice-design"],
     "transcription": {
       "connection": "moss-main",
       "model": "moss-transcribe"
     },
-    "transcriptionModels": ["moss-transcribe"],
     "live": {
       "connection": "moss-main",
       "model": "moss-live"
     },
-    "liveModels": ["moss-live"],
     "vision": null,
-    "visionModels": ["moss-live-vision"]
+    "scenePolicies": []
+  },
+  "provider.update": {
+    "revision": 3,
+    "connections": [
+      {
+        "id": "deepseek",
+        "name": "DeepSeek",
+        "adapter": "deepseek",
+        "enabled": true,
+        "key": {
+          "source": "settings",
+          "hint": "…3f9a"
+        },
+        "models": [
+          {
+            "id": "deepseek-chat",
+            "owner": "deepseek",
+            "capabilities": ["chat"]
+          },
+          {
+            "id": "deepseek-reasoner",
+            "owner": "deepseek",
+            "capabilities": ["chat"]
+          }
+        ],
+        "verification": {
+          "status": "verified",
+          "checkedAt": 1795782397913
+        }
+      },
+      {
+        "id": "moss-main",
+        "name": "MOSS",
+        "adapter": "moss",
+        "enabled": true,
+        "key": {
+          "source": "settings",
+          "hint": "…a41c"
+        },
+        "models": [
+          {
+            "id": "moss-image-1",
+            "owner": "moss",
+            "capabilities": ["image"]
+          },
+          {
+            "id": "moss-vl",
+            "owner": "moss",
+            "capabilities": ["vision"]
+          },
+          {
+            "id": "moss-tts",
+            "owner": "moss",
+            "capabilities": ["tts"]
+          },
+          {
+            "id": "moss-speakers",
+            "owner": "moss",
+            "capabilities": ["tts"]
+          },
+          {
+            "id": "moss-voice-design",
+            "owner": "moss",
+            "capabilities": ["tts"]
+          },
+          {
+            "id": "moss-transcribe",
+            "owner": "moss",
+            "capabilities": ["asr"]
+          },
+          {
+            "id": "moss-live",
+            "owner": "moss",
+            "capabilities": ["realtime"]
+          },
+          {
+            "id": "moss-live-vision",
+            "owner": "moss",
+            "capabilities": ["vision"]
+          }
+        ],
+        "verification": {
+          "status": "verified",
+          "checkedAt": 1795782397913
+        }
+      }
+    ],
+    "orchestrator": {
+      "connection": "deepseek",
+      "model": "deepseek-chat"
+    },
+    "polish": {
+      "connection": "deepseek",
+      "model": "deepseek-chat"
+    },
+    "image": {
+      "connection": "moss-main",
+      "model": "moss-image-1"
+    },
+    "understanding": {
+      "connection": "moss-main",
+      "model": "moss-vl"
+    },
+    "speech": null,
+    "speakers": null,
+    "voiceDesign": null,
+    "transcription": {
+      "connection": "moss-main",
+      "model": "moss-transcribe"
+    },
+    "live": {
+      "connection": "moss-main",
+      "model": "moss-live"
+    },
+    "vision": null,
+    "scenePolicies": []
+  },
+  "provider.verify": {
+    "revision": 4,
+    "connections": [
+      {
+        "id": "deepseek",
+        "name": "DeepSeek",
+        "adapter": "deepseek",
+        "enabled": true,
+        "key": {
+          "source": "settings",
+          "hint": "…3f9a"
+        },
+        "models": [
+          {
+            "id": "deepseek-chat",
+            "owner": "deepseek",
+            "capabilities": ["chat"]
+          },
+          {
+            "id": "deepseek-reasoner",
+            "owner": "deepseek",
+            "capabilities": ["chat"]
+          }
+        ],
+        "verification": {
+          "status": "verified",
+          "checkedAt": 1795782397913
+        }
+      },
+      {
+        "id": "moss-main",
+        "name": "MOSS",
+        "adapter": "moss",
+        "enabled": true,
+        "key": {
+          "source": "settings",
+          "hint": "…a41c"
+        },
+        "models": [
+          {
+            "id": "moss-image-1",
+            "owner": "moss",
+            "capabilities": ["image"]
+          },
+          {
+            "id": "moss-vl",
+            "owner": "moss",
+            "capabilities": ["vision"]
+          },
+          {
+            "id": "moss-tts",
+            "owner": "moss",
+            "capabilities": ["tts"]
+          },
+          {
+            "id": "moss-speakers",
+            "owner": "moss",
+            "capabilities": ["tts"]
+          },
+          {
+            "id": "moss-voice-design",
+            "owner": "moss",
+            "capabilities": ["tts"]
+          },
+          {
+            "id": "moss-transcribe",
+            "owner": "moss",
+            "capabilities": ["asr"]
+          },
+          {
+            "id": "moss-live",
+            "owner": "moss",
+            "capabilities": ["realtime"]
+          },
+          {
+            "id": "moss-live-vision",
+            "owner": "moss",
+            "capabilities": ["vision"]
+          }
+        ],
+        "verification": {
+          "status": "verified",
+          "checkedAt": 1795782397913
+        }
+      }
+    ],
+    "orchestrator": {
+      "connection": "deepseek",
+      "model": "deepseek-chat"
+    },
+    "polish": {
+      "connection": "deepseek",
+      "model": "deepseek-chat"
+    },
+    "image": {
+      "connection": "moss-main",
+      "model": "moss-image-1"
+    },
+    "understanding": {
+      "connection": "moss-main",
+      "model": "moss-vl"
+    },
+    "speech": null,
+    "speakers": null,
+    "voiceDesign": null,
+    "transcription": {
+      "connection": "moss-main",
+      "model": "moss-transcribe"
+    },
+    "live": {
+      "connection": "moss-main",
+      "model": "moss-live"
+    },
+    "vision": null,
+    "scenePolicies": []
   },
   "provider.model.list": {
     "connection": "moss-main",
@@ -3166,15 +3428,18 @@
     "models": [
       {
         "id": "moss-image-1",
-        "owner": "moss"
+        "owner": "moss",
+        "capabilities": ["image"]
       },
       {
         "id": "moss-vl",
-        "owner": "moss"
+        "owner": "moss",
+        "capabilities": ["vision"]
       },
       {
         "id": "moss-live",
-        "owner": "moss"
+        "owner": "moss",
+        "capabilities": ["realtime"]
       }
     ]
   },

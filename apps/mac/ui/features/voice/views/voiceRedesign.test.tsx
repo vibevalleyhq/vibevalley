@@ -94,6 +94,6 @@ test("Voice & Call respects reduceMotion off and saves updated MOSS key and mode
 
   const updateCall = fake.calls.findLast((c) => c.op === "provider.update");
   expect(updateCall).toBeDefined();
-  const payload = updateCall!.payload as { connections: { key?: string }[] };
-  expect(payload.connections[0]?.key).toBe("moss-secret-9999");
+  const payload = updateCall!.payload as { connections: { adapter?: string; key?: string }[] };
+  expect(payload.connections.find((c) => c.adapter === "moss")?.key).toBe("moss-secret-9999");
 });

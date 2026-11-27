@@ -61,7 +61,11 @@ fn a_key_saved_here_wins_over_the_configurations_and_only_its_end_is_shown() {
     assert!(!after.to_string().contains("sk-saved"));
     let mode = std::fs::metadata(dir.path().join("settings.json")).unwrap().permissions().mode() & 0o777;
     assert_eq!(mode, 0o600);
-    assert_eq!(file(dir.path()), json!({ "locale": "en", "deepseekApiKey": "sk-saved-in-settings-1234" }));
+    let saved_file = file(dir.path());
+    assert_eq!(saved_file["locale"], "en");
+    assert!(saved_file.get("deepseekApiKey").is_none());
+    assert_eq!(saved_file["providers"]["connections"][0]["adapter"], "deepseek");
+    assert_eq!(saved_file["providers"]["connections"][0]["key"], "sk-saved-in-settings-1234");
     let cleared = call(&app, "setting.update", json!({ "deepseekApiKey": "" }))["data"].clone();
     assert_eq!(cleared["deepseekApiKey"], json!({ "source": "config", "hint": "…0000" }));
     assert!(file(dir.path()).get("deepseekApiKey").is_none());
@@ -69,6 +73,23 @@ fn a_key_saved_here_wins_over_the_configurations_and_only_its_end_is_shown() {
     let again = vibevalley_runtime::rt::block_on(Setting::open_async(config(dir.path())));
     assert_eq!(again.status().locale, vibevalley_protocol::Locale::En);
     app.close_blocking();
+}
+
+#[test]
+fn legacy_top_level_deepseek_key_folds_into_unified_providers_on_open() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("settings.json"), r#"{"deepseekApiKey":"sk-legacy-5678"}"#).unwrap();
+    let setting = vibevalley_runtime::rt::block_on(Setting::open_async(SettingConfig {
+        home: dir.path().to_path_buf(),
+        work_root: dir.path().join("work"),
+        version: "test".into(),
+        ..Default::default()
+    }));
+    assert_eq!(setting.deepseek_api_key().as_deref(), Some("sk-legacy-5678"));
+    let p_status = setting.provider_status();
+    assert_eq!(p_status.connections.len(), 1);
+    assert_eq!(p_status.connections[0].adapter, vibevalley_protocol::ProviderConnectionAdapter::DeepSeek);
+    assert_eq!(p_status.connections[0].key.hint.as_deref(), Some("…5678"));
 }
 
 #[test]
