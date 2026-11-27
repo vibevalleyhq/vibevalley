@@ -1,13 +1,13 @@
 import "../../../infra/polyfill";
 import { expect, test } from "nsh/test";
 
-import type { Issue } from "@vibevalley/protocol";
+import type { BoardSummary, Issue } from "@vibevalley/protocol";
 import { issueId } from "@vibevalley/protocol/schema";
 
 import { Registry } from "../../../infra/state/atom";
 import { buildCards } from "./cards";
 import { boardLook, defaultLook } from "./display";
-import { addUtcDays, buildMonthGrid, buildScheduleForCards, computeSchedule, groupScheduledByDay, shiftIssueDates, shiftMonth, utcDayStart } from "./schedule";
+import { addUtcDays, buildMonthGrid, buildScheduleForCards, groupScheduledByDay, shiftIssueDates, shiftMonth, utcDayStart } from "./schedule";
 
 function issueStub(overrides: Partial<Omit<Issue, "id">> & { id: string; number: number }): Issue {
   return {
@@ -31,125 +31,58 @@ function issueStub(overrides: Partial<Omit<Issue, "id">> & { id: string; number:
   };
 }
 
-test("computeSchedule computes explicit spans, single-date spans, closedAt fallback, overdue flags, and unscheduled issues", () => {
-  const now = Date.UTC(2026, 10, 20, 12, 0, 0); // 2026-11-20
-  const explicitSpan = issueStub({
-    id: "i-span",
-    number: 1,
-    startAt: Date.UTC(2026, 10, 18),
-    dueAt: Date.UTC(2026, 10, 22),
-  });
-  const overdueOpen = issueStub({
-    id: "i-overdue",
-    number: 2,
-    status: "in_progress",
-    dueAt: Date.UTC(2026, 10, 19),
-  });
-  const closedPastDue = issueStub({
-    id: "i-closed",
-    number: 3,
-    status: "done",
-    startAt: Date.UTC(2026, 10, 10),
-    dueAt: Date.UTC(2026, 10, 15),
-    closedAt: Date.UTC(2026, 10, 14),
-  });
-  const startAndClosed = issueStub({
-    id: "i-start-closed",
-    number: 4,
-    status: "done",
-    startAt: Date.UTC(2026, 10, 12),
-    closedAt: Date.UTC(2026, 10, 16),
-  });
-  const unscheduled = issueStub({
-    id: "i-none",
-    number: 5,
-    priority: "urgent",
-  });
-
-  const result = computeSchedule([explicitSpan, overdueOpen, closedPastDue, startAndClosed, unscheduled], now);
-  expect(result.todayDayMs).toBe(Date.UTC(2026, 10, 20));
-  expect(result.unscheduled.map((i) => i.id)).toEqual(["i-none"]);
-  expect(result.scheduled.map((s) => s.issue.id)).toEqual(["i-closed", "i-start-closed", "i-span", "i-overdue"]);
-
-  const byId = new Map<string, (typeof result.scheduled)[number]>(result.scheduled.map((s) => [s.issue.id, s]));
-  expect(byId.get("i-span")?.span).toMatchObject({
-    startMs: Date.UTC(2026, 10, 18),
-    endMs: Date.UTC(2026, 10, 22),
-    durationDays: 5,
+function summaryForSpan(issue: Issue, startMs: number, endMs: number, todayDayMs: number): BoardSummary {
+  const durationDays = Math.round((endMs - startMs) / 86_400_000) + 1;
+  const span = {
+    startMs,
+    endMs,
+    durationDays,
+    hasExplicitStart: true,
+    hasExplicitDue: true,
     rolledUp: false,
     overdue: false,
-  });
-  expect(byId.get("i-overdue")?.span).toMatchObject({
-    startMs: Date.UTC(2026, 10, 19),
-    endMs: Date.UTC(2026, 10, 19),
-    durationDays: 1,
-    overdue: true,
-  });
-  expect(byId.get("i-closed")?.span.overdue).toBe(false);
-  expect(byId.get("i-start-closed")?.span).toMatchObject({
-    startMs: Date.UTC(2026, 10, 12),
-    endMs: Date.UTC(2026, 10, 16),
-    durationDays: 5,
-    overdue: false,
-  });
-});
-
-test("computeSchedule rolls up earliest child start and latest child due onto unscheduled parent and orders children beneath parent", () => {
-  const now = Date.UTC(2026, 10, 20);
-  const parent = issueStub({ id: "p-1", number: 10, title: "Epic" });
-  const childA = issueStub({
-    id: "c-1",
-    number: 11,
-    parent: issueId("p-1"),
-    startAt: Date.UTC(2026, 10, 25),
-    dueAt: Date.UTC(2026, 10, 28),
-  });
-  const childB = issueStub({
-    id: "c-2",
-    number: 12,
-    parent: issueId("p-1"),
-    startAt: Date.UTC(2026, 10, 21),
-    dueAt: Date.UTC(2026, 11, 2),
-  });
-  const sibling = issueStub({
-    id: "s-1",
-    number: 13,
-    startAt: Date.UTC(2026, 10, 22),
-    dueAt: Date.UTC(2026, 10, 24),
-  });
-
-  const result = computeSchedule([childA, parent, sibling, childB], now);
-  expect(result.unscheduled).toEqual([]);
-  expect(result.scheduled.map((r) => ({ id: r.issue.id, depth: r.depth, isParent: r.isParent }))).toEqual([
-    { id: "p-1", depth: 0, isParent: true },
-    { id: "c-2", depth: 1, isParent: false },
-    { id: "c-1", depth: 1, isParent: false },
-    { id: "s-1", depth: 0, isParent: false },
-  ]);
-  expect(result.scheduled[0]?.span).toMatchObject({
-    startMs: Date.UTC(2026, 10, 21),
-    endMs: Date.UTC(2026, 11, 2),
-    rolledUp: true,
-    durationDays: 12,
-  });
-});
+  };
+  return {
+    laneCounts: { backlog: 0, todo: 1, inProgress: 0, inReview: 0, done: 0, canceled: 0 },
+    runningSlots: 0,
+    maxRunning: 3,
+    byIssue: {
+      [issue.id]: {
+        lane: "todo",
+        cardKind: "todo",
+        familyDone: 0,
+        familyTotal: 0,
+        needsWorktreeCheck: false,
+        schedule: span,
+      },
+    },
+    schedule: {
+      todayDayMs,
+      scheduled: [{ issueId: issue.id, span, depth: 0, isParent: false, childCount: 0 }],
+      unscheduledIds: [],
+    },
+  };
+}
 
 test("buildScheduleForCards generates scale ticks and month bands across week, month, and quarter scales", () => {
   const now = Date.UTC(2026, 10, 20);
+  const start = Date.UTC(2026, 10, 20);
+  const end = Date.UTC(2026, 11, 10);
   const issue = issueStub({
     id: "i-1",
     number: 1,
-    startAt: Date.UTC(2026, 10, 20),
-    dueAt: Date.UTC(2026, 11, 10),
+    startAt: start,
+    dueAt: end,
   });
-  const cards = buildCards([{ issue, sessions: [], missingSessions: [] }], undefined, undefined, new Set());
+  const summary = summaryForSpan(issue, start, end, now);
+  const cards = buildCards([{ issue, sessions: [], missingSessions: [] }], { seq: 1, issues: [issue], boardSummary: summary }, undefined, new Set());
 
-  const weekGrid = buildScheduleForCards(cards, [issue], "week", now);
+  const weekGrid = buildScheduleForCards(cards, [issue], "week", now, summary);
   expect(weekGrid.totalDays).toBeGreaterThanOrEqual(28);
   expect(weekGrid.ticks.some((t) => t.isToday)).toBe(true);
   expect(weekGrid.months.length).toBeGreaterThanOrEqual(2);
 
-  const quarterGrid = buildScheduleForCards(cards, [issue], "quarter", now);
+  const quarterGrid = buildScheduleForCards(cards, [issue], "quarter", now, summary);
   expect(quarterGrid.totalDays).toBeGreaterThanOrEqual(98);
   expect(quarterGrid.ticks[0]?.isMonday).toBe(true);
 });
@@ -172,14 +105,22 @@ test("buildMonthGrid creates Mon-Sun calendar grids and groupScheduledByDay maps
   const prev = shiftMonth(2026, 1, -1);
   expect(prev).toEqual({ year: 2025, month: 12 });
 
+  const start = Date.UTC(2026, 10, 25);
+  const end = Date.UTC(2026, 10, 27);
   const spanIssue = issueStub({
     id: "i-cal",
     number: 25,
-    startAt: Date.UTC(2026, 10, 25),
-    dueAt: Date.UTC(2026, 10, 27),
+    startAt: start,
+    dueAt: end,
   });
-  const cards = buildCards([{ issue: spanIssue, sessions: [], missingSessions: [] }], undefined, undefined, new Set());
-  const gridSchedule = buildScheduleForCards(cards, [spanIssue], "month", now);
+  const summary = summaryForSpan(spanIssue, start, end, now);
+  const cards = buildCards(
+    [{ issue: spanIssue, sessions: [], missingSessions: [] }],
+    { seq: 1, issues: [spanIssue], boardSummary: summary },
+    undefined,
+    new Set(),
+  );
+  const gridSchedule = buildScheduleForCards(cards, [spanIssue], "month", now, summary);
   const byDay = groupScheduledByDay(grid, gridSchedule.rows);
   expect(byDay.get("2026-11-24")).toEqual([]);
   expect(byDay.get("2026-11-25")?.length).toBe(1);

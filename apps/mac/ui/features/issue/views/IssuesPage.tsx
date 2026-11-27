@@ -275,7 +275,7 @@ export function IssuesPage(props: { rest: string }) {
   const effectiveGroupBy = (): GroupBy => look().groupBy ?? "none";
   const effectiveHierarchy = (): HierarchyMode => look().hierarchy ?? "all";
   const visibleCards = createMemo(() => shown().filter((c) => hierarchyShows(effectiveHierarchy(), c, allIssues())));
-  const orderedIds = createMemo(() => orderedVisibleCardIds(visibleCards(), look(), allIssues(), older()));
+  const orderedIds = createMemo(() => orderedVisibleCardIds(visibleCards(), look(), allIssues(), older(), Date.now(), board()?.boardSummary));
   const focusedId = signal<string | undefined>(undefined);
   const selectedIds = signal<ReadonlySet<string>>(new Set());
   const selectionAnchor = signal<string | undefined>(undefined);
@@ -519,6 +519,7 @@ export function IssuesPage(props: { rest: string }) {
                         <IssueCalendar
                           cards={visibleCards()}
                           allIssues={allIssues()}
+                          summary={board()?.boardSummary}
                           filtered={filterAny(filter()) || effectiveHierarchy() !== "all"}
                           loading={history.loading()}
                           selected={returnTo()}
@@ -531,6 +532,7 @@ export function IssuesPage(props: { rest: string }) {
                       <IssueTimeline
                         cards={visibleCards()}
                         allIssues={allIssues()}
+                        summary={board()?.boardSummary}
                         filtered={filterAny(filter()) || effectiveHierarchy() !== "all"}
                         loading={history.loading()}
                         selected={activeFocusId()}

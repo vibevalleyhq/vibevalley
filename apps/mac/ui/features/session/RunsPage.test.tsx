@@ -3,7 +3,7 @@ import { expect, open, test } from "nsh/test";
 
 import { setLocale, t } from "@vibevalley/i18n";
 import "@vibevalley/i18n/catalogs";
-import type { SessionView, SliceBundle } from "@vibevalley/protocol";
+import type { SessionEvent, SessionView, SliceBundle } from "@vibevalley/protocol";
 
 import { fakeHost } from "../../fixtures/fakeHost";
 import { SCENARIO_NOW, scenarios } from "../../fixtures/scenarios";
@@ -120,11 +120,34 @@ test("RunsPage shows active rail bar, strips collapsed prompt scaffolding while 
   ].join("\n");
 
   const fake = fakeHost(scenarios.typical, { route: "/runs?session=orchestrator", locale: "zh" });
+  const ev1: SessionEvent = { seq: 1, run: "r1", type: "user/message", text: rawPrompt, time: SCENARIO_NOW - 10_000, revision: 1 };
+  const ev2: SessionEvent = { seq: 2, run: "r1", type: "assistant/message", text: "好的，这就检查。", time: SCENARIO_NOW - 10_000, revision: 1 };
   fake.respond("session.event.list", () => ({
-    events: [
-      { seq: 1, run: "r1", type: "user/message", text: rawPrompt, time: SCENARIO_NOW - 10_000, revision: 1 },
-      { seq: 2, run: "r1", type: "assistant/message", text: "好的，这就检查。", time: SCENARIO_NOW - 10_000, revision: 1 },
-    ],
+    events: [ev1, ev2],
+    hasMore: false,
+    oldestSeq: 1,
+    newestSeq: 2,
+    trajectory: {
+      shown: [ev1, ev2],
+      runs: [{ run: "r1", asked: ev1, steps: [ev2] }],
+      waterfall: {
+        runs: [[SCENARIO_NOW - 10_000, SCENARIO_NOW - 10_000]],
+        spans: [
+          { lane: "asked", start: SCENARIO_NOW - 10_000, end: SCENARIO_NOW - 10_000, seq: 1 },
+          { lane: "model", start: SCENARIO_NOW - 10_000, end: SCENARIO_NOW - 10_000, seq: 2 },
+        ],
+      },
+      summary: { runs: 1, steps: 2, modelMs: 0, toolMs: 0, input: 0, cacheRead: 0, output: 0 },
+      stepDurations: [
+        { seq: 1, durationMs: 0 },
+        { seq: 2, durationMs: 0 },
+      ],
+      stepMeta: [
+        { seq: 1, durationMs: 0, collapsedSummary: "检查发布脚本" },
+        { seq: 2, durationMs: 0 },
+      ],
+      telemetry: { inputTokens: 0, cacheReadTokens: 0, outputTokens: 0, llmRetries: 0, runErrors: 0 },
+    },
   }));
 
   const app = await open("../../app/main.tsx", {
@@ -169,11 +192,28 @@ test("RunsPage localizes raw runtime API-key errors in trajectory step summaries
   ].join("\n");
 
   const fake = fakeHost(scenarios.typical, { route: "/runs?session=orchestrator", locale: "zh" });
+  const errEv1: SessionEvent = { seq: 1, run: "r1", type: "user/message", text: threadReportPrompt, time: SCENARIO_NOW - 10_000, revision: 1 };
+  const errEv2: SessionEvent = { seq: 2, run: "r1", type: "run/error", text: "no API key is set for the model", time: SCENARIO_NOW - 9_000, revision: 1 };
   fake.respond("session.event.list", () => ({
-    events: [
-      { seq: 1, run: "r1", type: "user/message", text: threadReportPrompt, time: SCENARIO_NOW - 10_000, revision: 1 },
-      { seq: 2, run: "r1", type: "run/error", text: "no API key is set for the model", time: SCENARIO_NOW - 9_000, revision: 1 },
-    ],
+    events: [errEv1, errEv2],
+    hasMore: false,
+    oldestSeq: 1,
+    newestSeq: 2,
+    trajectory: {
+      shown: [errEv1, errEv2],
+      runs: [{ run: "r1", asked: errEv1, steps: [errEv2] }],
+      waterfall: {
+        runs: [[SCENARIO_NOW - 10_000, SCENARIO_NOW - 9_000]],
+        spans: [{ lane: "asked", start: SCENARIO_NOW - 10_000, end: SCENARIO_NOW - 9_000, seq: 1 }],
+      },
+      summary: { runs: 1, steps: 2, modelMs: 0, toolMs: 0, input: 0, cacheRead: 0, output: 0 },
+      stepDurations: [{ seq: 1, durationMs: 1_000 }],
+      stepMeta: [
+        { seq: 1, durationMs: 1_000, collapsedSummary: "#general:1 · w1 Ada #4: no API key is set for the model" },
+        { seq: 2, durationMs: 0 },
+      ],
+      telemetry: { inputTokens: 0, cacheReadTokens: 0, outputTokens: 0, llmRetries: 0, runErrors: 1 },
+    },
   }));
 
   const app = await open("../../app/main.tsx", {
@@ -201,26 +241,70 @@ test("RunsPage localizes raw runtime API-key errors in trajectory step summaries
 
 test("Trajectory supports click-to-inspect structured drawers, waterfall click-to-expand, round folding, and expand/collapse all", async () => {
   const fake = fakeHost(scenarios.typical, { route: "/runs?session=orchestrator", locale: "en" });
+  const trEvents: SessionEvent[] = [
+    { seq: 1, run: "r1", type: "user/message", text: "Check build health", time: SCENARIO_NOW - 20_000, revision: 1 },
+    { seq: 2, run: "r1", type: "assistant/thinking", text: "Let me inspect package scripts first.", time: SCENARIO_NOW - 19_000, revision: 1 },
+    {
+      seq: 3,
+      run: "r1",
+      type: "tool/call",
+      tool: "run_command",
+      action: "run_command",
+      text: "Run check",
+      input: '{"command":"vp check"}',
+      time: SCENARIO_NOW - 18_000,
+      revision: 1,
+    },
+    { seq: 4, run: "r1", type: "tool/result", call: 3, ok: true, output: "0 warnings", text: "", time: SCENARIO_NOW - 16_500, revision: 1 },
+    { seq: 5, run: "r1", type: "assistant/message", text: "Build is green.", time: SCENARIO_NOW - 16_000, revision: 1 },
+    { seq: 6, run: "r2", type: "user/message", text: "Any errors?", time: SCENARIO_NOW - 10_000, revision: 1 },
+    { seq: 7, run: "r2", type: "assistant/message", text: "None found.", time: SCENARIO_NOW - 9_000, revision: 1 },
+  ];
+  const trShown: SessionEvent[] = [trEvents[0], trEvents[1], { ...trEvents[2], ok: true, output: "0 warnings" }, trEvents[4], trEvents[5], trEvents[6]];
   fake.respond("session.event.list", () => ({
-    events: [
-      { seq: 1, run: "r1", type: "user/message", text: "Check build health", time: SCENARIO_NOW - 20_000, revision: 1 },
-      { seq: 2, run: "r1", type: "assistant/thinking", text: "Let me inspect package scripts first.", time: SCENARIO_NOW - 19_000, revision: 1 },
-      {
-        seq: 3,
-        run: "r1",
-        type: "tool/call",
-        tool: "run_command",
-        action: "run_command",
-        text: "Run check",
-        input: '{"command":"vp check"}',
-        time: SCENARIO_NOW - 18_000,
-        revision: 1,
+    events: trEvents,
+    hasMore: false,
+    oldestSeq: 1,
+    newestSeq: 7,
+    trajectory: {
+      shown: trShown,
+      runs: [
+        { run: "r1", asked: trShown[0], steps: [trShown[1], trShown[2], trShown[3]] },
+        { run: "r2", asked: trShown[4], steps: [trShown[5]] },
+      ],
+      waterfall: {
+        runs: [
+          [SCENARIO_NOW - 20_000, SCENARIO_NOW - 16_000],
+          [SCENARIO_NOW - 10_000, SCENARIO_NOW - 9_000],
+        ],
+        spans: [
+          { lane: "asked", start: SCENARIO_NOW - 20_000, end: SCENARIO_NOW - 19_000, seq: 1 },
+          { lane: "model", start: SCENARIO_NOW - 19_000, end: SCENARIO_NOW - 18_000, seq: 2 },
+          { lane: "tool", start: SCENARIO_NOW - 18_000, end: SCENARIO_NOW - 16_500, seq: 3 },
+          { lane: "model", start: SCENARIO_NOW - 16_500, end: SCENARIO_NOW - 16_000, seq: 5 },
+          { lane: "asked", start: SCENARIO_NOW - 10_000, end: SCENARIO_NOW - 9_000, seq: 6 },
+          { lane: "model", start: SCENARIO_NOW - 10_000, end: SCENARIO_NOW - 9_000, seq: 7 },
+        ],
       },
-      { seq: 4, run: "r1", type: "tool/result", call: 3, ok: true, output: "0 warnings", text: "", time: SCENARIO_NOW - 16_500, revision: 1 },
-      { seq: 5, run: "r1", type: "assistant/message", text: "Build is green.", time: SCENARIO_NOW - 16_000, revision: 1 },
-      { seq: 6, run: "r2", type: "user/message", text: "Any errors?", time: SCENARIO_NOW - 10_000, revision: 1 },
-      { seq: 7, run: "r2", type: "assistant/message", text: "None found.", time: SCENARIO_NOW - 9_000, revision: 1 },
-    ],
+      summary: { runs: 2, steps: 6, modelMs: 2_500, toolMs: 1_500, input: 0, cacheRead: 0, output: 0 },
+      stepDurations: [
+        { seq: 1, durationMs: 1_000 },
+        { seq: 2, durationMs: 1_000 },
+        { seq: 3, durationMs: 1_500 },
+        { seq: 5, durationMs: 0 },
+        { seq: 6, durationMs: 1_000 },
+        { seq: 7, durationMs: 0 },
+      ],
+      stepMeta: [
+        { seq: 1, durationMs: 1_000, collapsedSummary: "Check build health" },
+        { seq: 2, durationMs: 1_000 },
+        { seq: 3, durationMs: 1_500, readableInput: "$ vp check" },
+        { seq: 5, durationMs: 0 },
+        { seq: 6, durationMs: 1_000, collapsedSummary: "Any errors?" },
+        { seq: 7, durationMs: 0 },
+      ],
+      telemetry: { inputTokens: 0, cacheReadTokens: 0, outputTokens: 0, llmRetries: 0, runErrors: 0 },
+    },
   }));
 
   const app = await open("../../app/main.tsx", {
@@ -312,19 +396,44 @@ test("RunsPage displays telemetry rollup badges, spent cost, and context meter o
   fake.respond("session.event.list", (payload: unknown) => {
     const id = (payload as { id?: string }).id;
     if (id === "w2") {
+      const w2Events: SessionEvent[] = [
+        {
+          seq: 1,
+          revision: 1,
+          run: "r-w2",
+          type: "llm/usage",
+          text: "",
+          time: SCENARIO_NOW - 5_000,
+          tokens: { input: 3_000, cacheRead: 1_000, output: 1_000, contextUsed: 32_000, contextWindow: 100_000 },
+        },
+        { seq: 2, revision: 1, run: "r-w2", type: "llm/retry", text: "rate limited", time: SCENARIO_NOW - 4_000 },
+        { seq: 3, revision: 1, run: "r-w2", type: "run/error", text: "command exited 1", time: SCENARIO_NOW - 3_000 },
+      ];
       return {
-        events: [
-          {
-            seq: 1,
-            run: "r-w2",
-            type: "llm/usage",
-            text: "",
-            time: SCENARIO_NOW - 5_000,
-            tokens: { input: 3_000, cacheRead: 1_000, output: 1_000, contextUsed: 32_000, contextWindow: 100_000 },
+        events: w2Events,
+        hasMore: false,
+        oldestSeq: 1,
+        newestSeq: 3,
+        trajectory: {
+          shown: w2Events,
+          runs: [{ run: "r-w2", steps: w2Events }],
+          waterfall: { runs: [[SCENARIO_NOW - 5_000, SCENARIO_NOW - 3_000]], spans: [] },
+          summary: { runs: 1, steps: 2, modelMs: 0, toolMs: 0, input: 3_000, cacheRead: 1_000, output: 1_000 },
+          stepDurations: [{ seq: 2, durationMs: 1_000 }],
+          stepMeta: [
+            { seq: 2, durationMs: 1_000 },
+            { seq: 3, durationMs: 0 },
+          ],
+          telemetry: {
+            inputTokens: 3_000,
+            cacheReadTokens: 1_000,
+            outputTokens: 1_000,
+            contextUsed: 32_000,
+            contextWindow: 100_000,
+            llmRetries: 1,
+            runErrors: 1,
           },
-          { seq: 2, run: "r-w2", type: "llm/retry", text: "rate limited", time: SCENARIO_NOW - 4_000 },
-          { seq: 3, run: "r-w2", type: "run/error", text: "command exited 1", time: SCENARIO_NOW - 3_000 },
-        ],
+        },
       };
     }
     return { events: [] };

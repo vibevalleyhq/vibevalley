@@ -59,3 +59,17 @@ export type KeyStatus = { source: KeySource | null, hint?: string, };
 
 export const LocaleValues = ["zh", "en"] as const;
 export type Locale = (typeof LocaleValues)[number];
+
+export const CompareAnnotationSideValues = ["before", "after", "both"] as const;
+export type CompareAnnotationSide = (typeof CompareAnnotationSideValues)[number];
+
+export const CompareAnnotationToneValues = ["issue", "fixed", "note"] as const;
+export type CompareAnnotationTone = (typeof CompareAnnotationToneValues)[number];
+
+export type CompareImage = { attachment?: string, url?: string, label?: string, };
+
+export type CompareAnnotation = { n: number, side?: CompareAnnotationSide, rect: [number, number, number, number], tone?: CompareAnnotationTone, note: string, };
+
+export type CompareSpec = { title?: string, before?: CompareImage, after?: CompareImage, image?: CompareImage, annotations?: Array<CompareAnnotation>, };
+
+export type CompareMarkdownSegment = { "kind": "markdown", text: string, } | { "kind": "compare", raw: string, spec: CompareSpec, };

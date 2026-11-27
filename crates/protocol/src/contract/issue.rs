@@ -1547,6 +1547,58 @@ pub struct BoardLaneCounts {
 }
 
 #[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct BoardCardPreview {
+    pub attachment_id: Option<String>,
+    pub url: Option<String>,
+    pub is_compare: bool,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct IssueScheduleSpan {
+    pub start_ms: i64,
+    pub end_ms: i64,
+    pub duration_days: i64,
+    pub has_explicit_start: bool,
+    pub has_explicit_due: bool,
+    pub rolled_up: bool,
+    pub overdue: bool,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct BoardScheduleEntry {
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::IssueId"))]
+    pub issue_id: IssueId,
+    pub span: IssueScheduleSpan,
+    pub depth: i64,
+    pub is_parent: bool,
+    pub child_count: i64,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct BoardSchedule {
+    pub today_day_ms: i64,
+    pub scheduled: Vec<BoardScheduleEntry>,
+    #[cfg_attr(feature = "ts-gen", ts(as = "Vec<crate::typescript::IssueId>"))]
+    pub unscheduled_ids: Vec<IssueId>,
+}
+
+#[skip_serializing_none]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts-gen", derive(TS))]
 #[cfg_attr(feature = "ts-gen", ts(optional_fields))]
@@ -1558,6 +1610,8 @@ pub struct BoardIssueSummary {
     pub family_total: i64,
     pub needs_worktree_check: bool,
     pub prompt: Option<IssuePromptKind>,
+    pub preview: Option<BoardCardPreview>,
+    pub schedule: Option<IssueScheduleSpan>,
 }
 
 #[skip_serializing_none]
@@ -1570,6 +1624,7 @@ pub struct BoardSummary {
     pub running_slots: i64,
     pub max_running: i64,
     pub by_issue: BTreeMap<String, BoardIssueSummary>,
+    pub schedule: Option<BoardSchedule>,
 }
 
 /// Partial field updates proposed for a backlog issue, applied only after explicit user confirmation.
@@ -1710,6 +1765,10 @@ crate::typescript::module! {
     IssueCardKind,
     IssuePromptKind,
     BoardLaneCounts,
+    BoardCardPreview,
+    IssueScheduleSpan,
+    BoardScheduleEntry,
+    BoardSchedule,
     BoardIssueSummary,
     BoardSummary,
     PullRequestState,

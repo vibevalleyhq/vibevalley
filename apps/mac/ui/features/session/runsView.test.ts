@@ -7,8 +7,8 @@ import {
   type Issue,
   type IssueId,
   type Session,
-  type SessionEvent,
   type SessionId,
+  type SessionTelemetry,
   type SessionView,
 } from "@vibevalley/protocol";
 
@@ -339,19 +339,15 @@ test("runTelemetryOf folds session telemetry and step events and isRecoverableRu
     name: "小林",
     phase: { _tag: "resting" },
   });
-  const steps: SessionEvent[] = [
-    {
-      seq: 1,
-      revision: 1,
-      run: "r1",
-      type: "llm/usage",
-      text: "",
-      time: 10,
-      tokens: { input: 2_000, cacheRead: 1_000, output: 500, contextUsed: 45_000, contextWindow: 100_000 },
-    },
-    { seq: 2, revision: 1, run: "r1", type: "llm/retry", text: "retrying", time: 11 },
-    { seq: 3, revision: 1, run: "r1", type: "run/error", text: "timeout", time: 12 },
-  ];
+  const projectedTelemetry: SessionTelemetry = {
+    inputTokens: 2_000,
+    cacheReadTokens: 1_000,
+    outputTokens: 500,
+    contextUsed: 45_000,
+    contextWindow: 100_000,
+    llmRetries: 1,
+    runErrors: 1,
+  };
   const entryFromSteps: ReturnType<typeof buildRunEntries>[number] = {
     kind: "worker",
     id: "w-steps",
@@ -359,7 +355,7 @@ test("runTelemetryOf folds session telemetry and step events and isRecoverableRu
     live: undefined,
     active: false,
   };
-  const rollupSteps = runTelemetryOf(entryFromSteps, steps);
+  const rollupSteps = runTelemetryOf(entryFromSteps, projectedTelemetry);
   expect(rollupSteps.spent?.tokens).toBe(3_500);
   expect(rollupSteps.llmRetries).toBe(1);
   expect(rollupSteps.runErrors).toBe(1);

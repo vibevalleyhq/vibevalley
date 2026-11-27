@@ -232,7 +232,7 @@ pub fn derive_issues(issues: &[Issue], sessions: &[Session]) -> Vec<Issue> {
 pub fn project_board(input: &BoardInput, live: &LiveSnapshot, seq: i64) -> BoardSlice {
     let sessions = overlay_sessions(&input.sessions, &live.sessions);
     let issues = derive_issues(&input.issues, &sessions);
-    let summary = board_summary(&issues, &sessions, &input.channels);
+    let summary = board_summary(&issues, &sessions, &input.channels, input.evaluated_at);
     let repo_health = if input.repos.is_empty() {
         Vec::new()
     } else {

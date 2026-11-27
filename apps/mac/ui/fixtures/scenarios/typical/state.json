@@ -608,6 +608,11 @@
           "familyTotal": 0,
           "needsWorktreeCheck": false
         }
+      },
+      "schedule": {
+        "todayDayMs": 0,
+        "scheduled": [],
+        "unscheduledIds": ["i18", "i22", "i31", "i40", "i12", "i33", "i41", "i42", "i10", "i21", "i34"]
       }
     },
     "commits": {

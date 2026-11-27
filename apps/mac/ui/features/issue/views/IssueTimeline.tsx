@@ -1,7 +1,7 @@
 import { cleanup, computed, PanResponder, Scroll, signal, Text, untracked, View, type ScrollRef } from "nsh";
 
 import { t } from "@vibevalley/i18n";
-import type { Issue } from "@vibevalley/protocol";
+import type { BoardSummary, Issue } from "@vibevalley/protocol";
 
 import { Button } from "../../../design/Button";
 import { Icon } from "../../../design/Icon";
@@ -133,6 +133,7 @@ interface ActiveDragState {
 export function IssueTimeline(props: {
   cards: BoardCard[];
   allIssues: readonly Issue[];
+  summary?: BoardSummary | undefined;
   filtered?: boolean | undefined;
   loading: boolean;
   selected?: string | undefined;
@@ -153,7 +154,7 @@ export function IssueTimeline(props: {
   let disposed = false;
   const frames = createFrameQueue();
 
-  const timeline = computed(() => buildScheduleForCards(props.cards, props.allIssues, scale(), now()));
+  const timeline = computed(() => buildScheduleForCards(props.cards, props.allIssues, scale(), now(), props.summary));
   const dayWidth = computed(() => timelineScaleSpec[scale()].dayWidth);
   const totalGridWidth = computed(() => timeline().totalDays * dayWidth());
   const todayIndex = computed(() => utcDayDiff(timeline().rangeStartMs, timeline().todayDayMs));

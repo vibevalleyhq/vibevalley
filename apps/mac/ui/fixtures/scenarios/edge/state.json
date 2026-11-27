@@ -1391,6 +1391,36 @@
           "needsWorktreeCheck": false,
           "prompt": "stuck_unknown"
         }
+      },
+      "schedule": {
+        "todayDayMs": 0,
+        "scheduled": [],
+        "unscheduledIds": [
+          "i-edge-pr-open",
+          "i-edge-conflict",
+          "i-edge-family",
+          "i-edge-fam-1",
+          "i-edge-fam-2",
+          "i-edge-fam-4",
+          "i-edge-ask",
+          "i-edge-failed",
+          "i-edge-interrupted",
+          "i-edge-fam-5",
+          "i-edge-fam-6",
+          "i-edge-orch",
+          "i-edge-reviewed",
+          "i-edge-quiet",
+          "i-edge-land-merged",
+          "i-edge-land-pr",
+          "i-edge-fam-3",
+          "i-edge-handed",
+          "i-edge-stuck-unknown",
+          "i-edge-land-submitted",
+          "i-edge-land-kept",
+          "i-edge-land-none",
+          "i-edge-canceled",
+          "i-edge-draft"
+        ]
       }
     }
   },

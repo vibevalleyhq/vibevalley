@@ -443,8 +443,9 @@ fn issue_prompt_of(issue: &Issue) -> Option<IssuePromptKind> {
 
 /// Deterministic board summary folded into `BoardSlice`: identical lane counts
 /// for wide and narrow views, active worker slot usage, and per-issue metadata.
-pub(crate) fn board_summary(issues: &[Issue], sessions: &[Session], channels: &[Channel]) -> BoardSummary {
+pub(crate) fn board_summary(issues: &[Issue], sessions: &[Session], channels: &[Channel], evaluated_at: Option<i64>) -> BoardSummary {
     let lookup = lookup_of(issues, sessions);
+    let (board_schedule, schedule_spans) = crate::schedule::compute_board_schedule(issues, evaluated_at.unwrap_or(0));
     let mut on_duty_agents: HashSet<&str> = HashSet::from([DEFAULT_ORCHESTRATOR]);
     for s in sessions {
         if is_on_duty(s)
@@ -504,6 +505,8 @@ pub(crate) fn board_summary(issues: &[Issue], sessions: &[Session], channels: &[
                 family_total,
                 needs_worktree_check,
                 prompt: issue_prompt_of(issue),
+                preview: crate::compare::card_preview_of(issue),
+                schedule: schedule_spans.get(&issue.id).cloned(),
             },
         );
     }
@@ -515,6 +518,7 @@ pub(crate) fn board_summary(issues: &[Issue], sessions: &[Session], channels: &[
         running_slots,
         max_running: MAX_RUNNING as i64,
         by_issue,
+        schedule: Some(board_schedule),
     }
 }
 

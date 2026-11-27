@@ -14,7 +14,7 @@ import {
 
 import "../infra/polyfill";
 import { createComposer, draftOf, drafts, flushDrafts } from "../features/channel/model/composing";
-import { mergeSteps, SessionLogs } from "../features/session/runs";
+import { SessionLogs } from "../features/session/runs";
 import { state as baseState } from "../fixtures/workbench";
 import { useNow } from "../infra/base/dom";
 import {
@@ -95,31 +95,6 @@ function createMockSlicesSource(initial: SliceBundle) {
     },
   };
 }
-
-test("mergeSteps handles fast ascending appends, stale revisions, and stepLimit eviction", () => {
-  const e1 = makeEvent(1, 1);
-  const e2 = makeEvent(2, 1);
-  const initial = mergeSteps([], [e1, e2]);
-  expect(initial.map((s) => s.seq)).toEqual([1, 2]);
-
-  const e2Rev2 = makeEvent(2, 2);
-  const replaced = mergeSteps(initial, [e2Rev2]);
-  expect(replaced.at(-1)?.revision).toBe(2);
-
-  expect(mergeSteps(replaced, [makeEvent(2, 2)])).toBe(replaced);
-  expect(mergeSteps(replaced, [makeEvent(2, 1)])).toBe(replaced);
-
-  const e3 = makeEvent(3, 1);
-  const withThree = mergeSteps(replaced, [e3]);
-  const withMid = mergeSteps(withThree, [makeEvent(0, 1)]);
-  expect(withMid.map((s) => s.seq)).toEqual([0, 1, 2, 3]);
-
-  let log: SessionEvent[] = [];
-  for (let i = 1; i <= 260; i++) log = mergeSteps(log, [makeEvent(i, 1)]);
-  expect(log.length).toBe(240);
-  expect(log[0]?.seq).toBe(21);
-  expect(log.at(-1)?.seq).toBe(260);
-});
 
 test("SessionLogs.subscribeRun isolates live updates to the target run", async () => {
   let pushLive: ((e: LiveEvent) => void) | undefined;

@@ -173,7 +173,56 @@ export type SessionGetInput = { id: string, };
 
 export type SessionEventListInput = { id: string, run?: string, beforeSeq?: number, afterSeq?: number, limit?: number, };
 
-export type SessionEventPage = { events: Array<SessionEvent>, hasMore: boolean, oldestSeq?: number, newestSeq?: number, };
+export type TrajectoryRunView = { run?: string, asked?: SessionEvent, steps: Array<SessionEvent>, };
+
+export const TrajectoryWaterfallLaneValues = ["asked", "model", "tool"] as const;
+export type TrajectoryWaterfallLane = (typeof TrajectoryWaterfallLaneValues)[number];
+
+export type TrajectoryLaneSpan = { lane: TrajectoryWaterfallLane, start: number, end: number, seq: number, };
+
+export type TrajectoryWaterfall = { runs: Array<[number, number]>, spans: Array<TrajectoryLaneSpan>, };
+
+export type TrajectorySummary = { runs: number, steps: number, modelMs: number, toolMs: number, input: number, cacheRead: number, output: number, };
+
+export type TrajectoryStepDuration = { seq: number, durationMs: number, };
+
+export type TrajectoryStepMeta = { seq: number, durationMs: number, readableInput?: string, collapsedSummary?: string, };
+
+export type SessionTrajectoryProjection = { shown: Array<SessionEvent>, runs: Array<TrajectoryRunView>, waterfall: TrajectoryWaterfall, summary: TrajectorySummary, stepDurations: Array<TrajectoryStepDuration>, stepMeta: Array<TrajectoryStepMeta>, telemetry: SessionTelemetry, };
+
+export type ActivityStep = { step: SessionEvent, durationMs?: number, };
+
+export type ActivityEditedFile = { path: string, line?: number, canDiff: boolean, };
+
+export type ActivityCommandPreview = { seq: number, command: string, running: boolean, failed: boolean, };
+
+export const TodoStepStatusValues = ["pending", "in_progress", "done", "skipped", "failed"] as const;
+export type TodoStepStatus = (typeof TodoStepStatusValues)[number];
+
+export type TodoStep = { title: string, status: TodoStepStatus, };
+
+export type TodoChecklist = { seq: number, steps: Array<TodoStep>, doneCount: number, inProgressCount: number, failedCount: number, totalCount: number, activeStep?: TodoStep, };
+
+export type ActivitySummary = { totalSteps: number, thinkingCount: number, readCount: number, searchCount: number, editCount: number, commandCount: number, otherToolCount: number, totalTools: number, runningCount: number, failedCount: number, startedAt: number, durationMs: number, editedFiles: Array<ActivityEditedFile>, latestCommand?: ActivityCommandPreview, };
+
+export type ChatFeedItem = { "kind": "step", key: string, step: SessionEvent, durationMs?: number, trailing: boolean, } | { "kind": "activity", key: string, steps: Array<ActivityStep>, summary: ActivitySummary, trailing: boolean, };
+
+export type ToolTarget = { path: string, line?: number, canDiff: boolean, };
+
+export type ToolDetails = { headline: string, formattedInput: string, outputLines: number, };
+
+export type ChatToolStepProjection = { seq: number, target?: ToolTarget, details: ToolDetails, todo?: TodoChecklist, };
+
+export type ChatTelemetry = { cachedRead: number, uncachedInput: number, totalInput: number, output: number, reasoning: number, contextUsed: number, contextWindow: number, contextPct: number, cacheHitPct: number, turns: number, toolCount: number, hasData: boolean, };
+
+export const BoardTextTokenKindValues = ["text", "mention", "seq", "tag"] as const;
+export type BoardTextTokenKind = (typeof BoardTextTokenKindValues)[number];
+
+export type BoardTextToken = { kind: BoardTextTokenKind, value: string, };
+
+export type ChatSessionProjection = { visibleSteps: Array<SessionEvent>, feedItems: Array<ChatFeedItem>, latestTodos?: TodoChecklist, telemetry: ChatTelemetry, toolEntries: Array<ChatToolStepProjection>, };
+
+export type SessionEventPage = { events: Array<SessionEvent>, hasMore: boolean, oldestSeq?: number, newestSeq?: number, trajectory?: SessionTrajectoryProjection, };
 
 export type SessionBindingInput = { id: string, binding: ContextRef, };
 
@@ -239,4 +288,4 @@ export type SessionRunCodeResult = { id: string, taskId: string, outputJson: str
 
 export type SessionWatchPayload = { id: string, afterSeq?: number, };
 
-export type SessionWatchEvent = { "kind": "state", session: Session, title?: string, model?: string, effort?: string, permissionMode: SessionPermissionMode, pendingPermissions: Array<SessionPermissionRequest>, pendingInteractions: Array<SessionInteractionRequest>, tokens?: EventTokens, swarm?: SessionSwarmState, } | { "kind": "history", session: SessionId, events: Array<SessionEvent>, } | { "kind": "event", session: SessionId, event: SessionEvent, } | { "kind": "missing", session: SessionId, };
+export type SessionWatchEvent = { "kind": "state", session: Session, title?: string, model?: string, effort?: string, permissionMode: SessionPermissionMode, pendingPermissions: Array<SessionPermissionRequest>, pendingInteractions: Array<SessionInteractionRequest>, tokens?: EventTokens, swarm?: SessionSwarmState, } | { "kind": "history", session: SessionId, events: Array<SessionEvent>, projection?: ChatSessionProjection, } | { "kind": "event", session: SessionId, event: SessionEvent, projection?: ChatSessionProjection, } | { "kind": "missing", session: SessionId, };

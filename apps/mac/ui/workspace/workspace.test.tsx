@@ -970,26 +970,82 @@ test("workspace ChatPane drives openWorkspace, session.watch, tool adjacent open
     ],
     tokens: { input: 76_000, cacheRead: 62_400, output: 6_800, reasoning: 2_000, contextUsed: 76_000, contextWindow: 200_000 },
   });
+  const ws1Step1 = { seq: 1, revision: 1, time: 1_700_000_001_000, type: "user/message" as const, text: "Inspect acp.rs" };
+  const ws1Step2 = { seq: 2, revision: 1, time: 1_700_000_002_000, type: "assistant/thinking" as const, text: "Checking ACP v2 handshake" };
+  const ws1Step3 = {
+    seq: 3,
+    revision: 1,
+    time: 1_700_000_003_000,
+    type: "tool/call" as const,
+    action: "edit_file" as const,
+    actionText: "Edit",
+    tool: "replace_file_content",
+    text: "crates/runtime/src/oar/acp/mod.rs",
+    input: JSON.stringify({ path: "crates/runtime/src/oar/acp/mod.rs", line: 136 }),
+  };
+  const ws1Step4 = { seq: 4, revision: 1, time: 1_700_000_004_000, type: "tool/result" as const, call: 3, ok: true, text: "", output: "updated 42 lines" };
+  const ws1Step5 = { seq: 5, revision: 1, time: 1_700_000_005_000, type: "assistant/message" as const, text: "Updated ACP driver." };
+  const ws1Merged3 = { ...ws1Step3, ok: true, output: "updated 42 lines" };
+  const ws1Tel = {
+    cachedRead: 62_400,
+    uncachedInput: 13_600,
+    totalInput: 76_000,
+    output: 6_800,
+    reasoning: 2_000,
+    contextUsed: 76_000,
+    contextWindow: 200_000,
+    contextPct: 38,
+    cacheHitPct: 82,
+    turns: 1,
+    toolCount: 1,
+    hasData: true,
+  };
+  const ws1ToolEntry3 = {
+    seq: 3,
+    target: { path: "crates/runtime/src/oar/acp/mod.rs", line: 136, canDiff: true },
+    details: {
+      headline: "crates/runtime/src/oar/acp/mod.rs:136",
+      formattedInput: JSON.stringify({ path: "crates/runtime/src/oar/acp/mod.rs", line: 136 }, null, 2),
+      outputLines: 1,
+    },
+  };
   await host.emitSub(app, "session.watch", {
     kind: "history",
     session: "sess-ws-1",
-    events: [
-      { seq: 1, revision: 1, time: 1_700_000_001_000, type: "user/message", text: "Inspect acp.rs" },
-      { seq: 2, revision: 1, time: 1_700_000_002_000, type: "assistant/thinking", text: "Checking ACP v2 handshake" },
-      {
-        seq: 3,
-        revision: 1,
-        time: 1_700_000_003_000,
-        type: "tool/call",
-        action: "edit_file",
-        actionText: "Edit",
-        tool: "replace_file_content",
-        text: "crates/runtime/src/oar/acp/mod.rs",
-        input: JSON.stringify({ path: "crates/runtime/src/oar/acp/mod.rs", line: 136 }),
-      },
-      { seq: 4, revision: 1, time: 1_700_000_004_000, type: "tool/result", call: 3, ok: true, text: "", output: "updated 42 lines" },
-      { seq: 5, revision: 1, time: 1_700_000_005_000, type: "assistant/message", text: "Updated ACP driver." },
-    ],
+    events: [ws1Step1, ws1Step2, ws1Step3, ws1Step4, ws1Step5],
+    projection: {
+      visibleSteps: [ws1Step1, ws1Step2, ws1Merged3, ws1Step5],
+      feedItems: [
+        { kind: "step", key: "s:1", step: ws1Step1, durationMs: 1_000, trailing: false },
+        {
+          kind: "activity",
+          key: "g:2",
+          steps: [
+            { step: ws1Step2, durationMs: 1_000 },
+            { step: ws1Merged3, durationMs: 2_000 },
+          ],
+          summary: {
+            totalSteps: 2,
+            thinkingCount: 1,
+            readCount: 0,
+            searchCount: 0,
+            editCount: 1,
+            commandCount: 0,
+            otherToolCount: 0,
+            totalTools: 1,
+            runningCount: 0,
+            failedCount: 0,
+            startedAt: 1_700_000_002_000,
+            durationMs: 3_000,
+            editedFiles: [{ path: "crates/runtime/src/oar/acp/mod.rs", line: 136, canDiff: true }],
+          },
+          trailing: false,
+        },
+        { kind: "step", key: "s:5", step: ws1Step5, trailing: true },
+      ],
+      telemetry: ws1Tel,
+      toolEntries: [ws1ToolEntry3],
+    },
   });
   await host.pump(app);
 
@@ -1018,21 +1074,62 @@ test("workspace ChatPane drives openWorkspace, session.watch, tool adjacent open
   expect(app.texts()).toContain(t("web.shell.chat.toolOutput"));
 
   // Failed tool calls auto-expand their input/output details immediately.
+  const ws1Step6 = {
+    seq: 6,
+    revision: 1,
+    time: 1_700_000_006_000,
+    type: "tool/call" as const,
+    action: "run_command" as const,
+    actionText: "Run",
+    tool: "run_command",
+    text: "cargo test",
+    input: JSON.stringify({ command: "cargo test -p vibevalley-runtime" }),
+    output: "error: test failed",
+    ok: false,
+  };
   await host.emitSub(app, "session.watch", {
     kind: "event",
     session: "sess-ws-1",
-    event: {
-      seq: 6,
-      revision: 1,
-      time: 1_700_000_006_000,
-      type: "tool/call",
-      action: "run_command",
-      actionText: "Run",
-      tool: "run_command",
-      text: "cargo test",
-      input: JSON.stringify({ command: "cargo test -p vibevalley-runtime" }),
-      output: "error: test failed",
-      ok: false,
+    event: ws1Step6,
+    projection: {
+      visibleSteps: [ws1Step1, ws1Step2, ws1Merged3, ws1Step5, ws1Step6],
+      feedItems: [
+        { kind: "step", key: "s:1", step: ws1Step1, durationMs: 1_000, trailing: false },
+        {
+          kind: "activity",
+          key: "g:2",
+          steps: [
+            { step: ws1Step2, durationMs: 1_000 },
+            { step: ws1Merged3, durationMs: 2_000 },
+          ],
+          summary: {
+            totalSteps: 2,
+            thinkingCount: 1,
+            readCount: 0,
+            searchCount: 0,
+            editCount: 1,
+            commandCount: 0,
+            otherToolCount: 0,
+            totalTools: 1,
+            runningCount: 0,
+            failedCount: 0,
+            startedAt: 1_700_000_002_000,
+            durationMs: 3_000,
+            editedFiles: [{ path: "crates/runtime/src/oar/acp/mod.rs", line: 136, canDiff: true }],
+          },
+          trailing: false,
+        },
+        { kind: "step", key: "s:5", step: ws1Step5, durationMs: 1_000, trailing: false },
+        { kind: "step", key: "s:6", step: ws1Step6, trailing: true },
+      ],
+      telemetry: { ...ws1Tel, toolCount: 2 },
+      toolEntries: [
+        ws1ToolEntry3,
+        {
+          seq: 6,
+          details: { headline: "$ cargo test -p vibevalley-runtime", formattedInput: "$ cargo test -p vibevalley-runtime", outputLines: 1 },
+        },
+      ],
     },
   });
   await host.pump(app);
@@ -1631,10 +1728,30 @@ test("regression: ChatPane sends optimistically before session.openWorkspace set
   expect(app.texts()).toContain("Optimistic check");
 
   await host.releaseDeferred(app, "session.send");
+  const optEv = { seq: 1, revision: 1, time: 1_700_000_001_000, type: "user/message" as const, text: "Optimistic check" };
   await host.emitSub(app, "session.watch", {
     kind: "event",
     session: "sess-opt-1",
-    event: { seq: 1, revision: 1, time: 1_700_000_001_000, type: "user/message", text: "Optimistic check" },
+    event: optEv,
+    projection: {
+      visibleSteps: [optEv],
+      feedItems: [{ kind: "step", key: "s:1", step: optEv, trailing: true }],
+      telemetry: {
+        cachedRead: 0,
+        uncachedInput: 0,
+        totalInput: 0,
+        output: 0,
+        reasoning: 0,
+        contextUsed: 0,
+        contextWindow: 200_000,
+        contextPct: 0,
+        cacheHitPct: 0,
+        turns: 1,
+        toolCount: 0,
+        hasData: false,
+      },
+      toolEntries: [],
+    },
   });
   expect(app.count("id:chat-step--1")).toBe(0);
   expect(app.count("id:chat-step-1")).toBe(1);
@@ -1689,18 +1806,36 @@ test("workspace ChatPane opens RichPreviewModal when clicking inline mermaid pre
     pendingPermissions: [],
     pendingInteractions: [],
   });
+  const mermaidStep = {
+    seq: 1,
+    revision: 1,
+    time: 1_700_000_001_000,
+    type: "assistant/message" as const,
+    text: "Architecture:\n\n```mermaid\nflowchart TD\n  UI --> Modal\n```\n",
+  };
   await host.emitSub(app, "session.watch", {
     kind: "history",
     session: "sess-mermaid-1",
-    events: [
-      {
-        seq: 1,
-        revision: 1,
-        time: 1_700_000_001_000,
-        type: "assistant/message",
-        text: "Architecture:\n\n```mermaid\nflowchart TD\n  UI --> Modal\n```\n",
+    events: [mermaidStep],
+    projection: {
+      visibleSteps: [mermaidStep],
+      feedItems: [{ kind: "step", key: "s:1", step: mermaidStep, trailing: true }],
+      telemetry: {
+        cachedRead: 0,
+        uncachedInput: 0,
+        totalInput: 0,
+        output: 0,
+        reasoning: 0,
+        contextUsed: 0,
+        contextWindow: 200_000,
+        contextPct: 0,
+        cacheHitPct: 0,
+        turns: 0,
+        toolCount: 0,
+        hasData: false,
       },
-    ],
+      toolEntries: [],
+    },
   });
   await host.pump(app);
 
@@ -1757,41 +1892,107 @@ test("workspace ChatPane shows collapsed activity latest command, ticks elapsed 
     pendingPermissions: [],
     pendingInteractions: [],
   });
+  const liveStep1 = { seq: 1, revision: 1, time: start, type: "user/message" as const, text: "Run checks and track steps" };
+  const liveStep2 = { seq: 2, revision: 1, time: start + 1_000, type: "assistant/thinking" as const, text: "Preparing verification" };
+  const liveStep3 = {
+    seq: 3,
+    revision: 1,
+    time: start + 2_000,
+    type: "tool/call" as const,
+    action: "other" as const,
+    tool: "update_steps",
+    text: "update_steps",
+    input: JSON.stringify({
+      steps: [
+        { status: "done", title: "Simplify Content Hub" },
+        { status: "in_progress", title: "Upgrade Chat UI" },
+        { status: "pending", title: "Capture screenshots" },
+      ],
+      kind: "other",
+    }),
+    ok: true,
+  };
+  const liveStep4 = {
+    seq: 4,
+    revision: 1,
+    time: start + 3_000,
+    type: "tool/call" as const,
+    action: "run_command" as const,
+    tool: "run_command",
+    text: "vp run mac:check",
+    input: JSON.stringify({ command: "vp run mac:check" }),
+  };
+  const todoInit = {
+    seq: 3,
+    steps: [
+      { title: "Simplify Content Hub", status: "done" as const },
+      { title: "Upgrade Chat UI", status: "in_progress" as const },
+      { title: "Capture screenshots", status: "pending" as const },
+    ],
+    doneCount: 1,
+    inProgressCount: 1,
+    failedCount: 0,
+    totalCount: 3,
+    activeStep: { title: "Upgrade Chat UI", status: "in_progress" as const },
+  };
+  const liveToolEntry3 = {
+    seq: 3,
+    details: { headline: "1/3 · Upgrade Chat UI", formattedInput: liveStep3.input, outputLines: 0 },
+    todo: todoInit,
+  };
+  const liveToolEntry4 = {
+    seq: 4,
+    details: { headline: "$ vp run mac:check", formattedInput: "$ vp run mac:check", outputLines: 0 },
+  };
+  const liveTel = {
+    cachedRead: 0,
+    uncachedInput: 0,
+    totalInput: 0,
+    output: 0,
+    reasoning: 0,
+    contextUsed: 0,
+    contextWindow: 200_000,
+    contextPct: 0,
+    cacheHitPct: 0,
+    turns: 1,
+    toolCount: 2,
+    hasData: false,
+  };
   await host.emitSub(app, "session.watch", {
     kind: "history",
     session: "sess-live-1",
-    events: [
-      { seq: 1, revision: 1, time: start, type: "user/message", text: "Run checks and track steps" },
-      { seq: 2, revision: 1, time: start + 1_000, type: "assistant/thinking", text: "Preparing verification" },
-      {
-        seq: 3,
-        revision: 1,
-        time: start + 2_000,
-        type: "tool/call",
-        action: "other",
-        tool: "update_steps",
-        text: "update_steps",
-        input: JSON.stringify({
-          steps: [
-            { status: "done", title: "Simplify Content Hub" },
-            { status: "in_progress", title: "Upgrade Chat UI" },
-            { status: "pending", title: "Capture screenshots" },
-          ],
-          kind: "other",
-        }),
-        ok: true,
-      },
-      {
-        seq: 4,
-        revision: 1,
-        time: start + 3_000,
-        type: "tool/call",
-        action: "run_command",
-        tool: "run_command",
-        text: "vp run mac:check",
-        input: JSON.stringify({ command: "vp run mac:check" }),
-      },
-    ],
+    events: [liveStep1, liveStep2, liveStep3, liveStep4],
+    projection: {
+      visibleSteps: [liveStep1, liveStep2, liveStep3, liveStep4],
+      feedItems: [
+        { kind: "step", key: "s:1", step: liveStep1, durationMs: 1_000, trailing: false },
+        {
+          kind: "activity",
+          key: "g:2",
+          steps: [{ step: liveStep2, durationMs: 1_000 }, { step: liveStep3, durationMs: 1_000 }, { step: liveStep4 }],
+          summary: {
+            totalSteps: 3,
+            thinkingCount: 1,
+            readCount: 0,
+            searchCount: 0,
+            editCount: 0,
+            commandCount: 1,
+            otherToolCount: 1,
+            totalTools: 2,
+            runningCount: 1,
+            failedCount: 0,
+            startedAt: start + 1_000,
+            durationMs: 2_000,
+            editedFiles: [],
+            latestCommand: { seq: 4, command: "vp run mac:check", running: true, failed: false },
+          },
+          trailing: true,
+        },
+      ],
+      latestTodos: todoInit,
+      telemetry: liveTel,
+      toolEntries: [liveToolEntry3, liveToolEntry4],
+    },
   });
   await host.pump(app);
 
@@ -1820,36 +2021,164 @@ test("workspace ChatPane shows collapsed activity latest command, ticks elapsed 
   expect(app.texts()).toContain("4.0s");
 
   // Finish running command, push updated steps, and mark session resting -> timer stops ticking.
+  const liveStep4Done = { ...liveStep4, ok: true, output: "checks ok" };
+  const liveStep5 = { seq: 5, revision: 1, time: start + 5_000, type: "tool/result" as const, call: 4, ok: true, text: "", output: "checks ok" };
+  const liveStep6 = {
+    seq: 6,
+    revision: 1,
+    time: start + 6_000,
+    type: "tool/call" as const,
+    action: "other" as const,
+    tool: "update_steps",
+    text: "update_steps",
+    input: JSON.stringify({
+      steps: [
+        { status: "done", title: "Simplify Content Hub" },
+        { status: "done", title: "Upgrade Chat UI" },
+        { status: "done", title: "Capture screenshots" },
+      ],
+    }),
+    ok: true,
+  };
+  const todoDone = {
+    seq: 6,
+    steps: [
+      { title: "Simplify Content Hub", status: "done" as const },
+      { title: "Upgrade Chat UI", status: "done" as const },
+      { title: "Capture screenshots", status: "done" as const },
+    ],
+    doneCount: 3,
+    inProgressCount: 0,
+    failedCount: 0,
+    totalCount: 3,
+  };
+  const liveToolEntry4Done = {
+    seq: 4,
+    details: { headline: "$ vp run mac:check", formattedInput: "$ vp run mac:check", outputLines: 1 },
+  };
+  const liveToolEntry6 = {
+    seq: 6,
+    details: { headline: "3/3", formattedInput: liveStep6.input, outputLines: 0 },
+    todo: todoDone,
+  };
   await host.emitSub(app, "session.watch", {
     kind: "event",
     session: "sess-live-1",
-    event: { seq: 5, revision: 1, time: start + 5_000, type: "tool/result", call: 4, ok: true, text: "", output: "checks ok" },
-  });
-  await host.emitSub(app, "session.watch", {
-    kind: "event",
-    session: "sess-live-1",
-    event: {
-      seq: 6,
-      revision: 1,
-      time: start + 6_000,
-      type: "tool/call",
-      action: "other",
-      tool: "update_steps",
-      text: "update_steps",
-      input: JSON.stringify({
-        steps: [
-          { status: "done", title: "Simplify Content Hub" },
-          { status: "done", title: "Upgrade Chat UI" },
-          { status: "done", title: "Capture screenshots" },
-        ],
-      }),
-      ok: true,
+    event: liveStep5,
+    projection: {
+      visibleSteps: [liveStep1, liveStep2, liveStep3, liveStep4Done],
+      feedItems: [
+        { kind: "step", key: "s:1", step: liveStep1, durationMs: 1_000, trailing: false },
+        {
+          kind: "activity",
+          key: "g:2",
+          steps: [{ step: liveStep2, durationMs: 1_000 }, { step: liveStep3, durationMs: 1_000 }, { step: liveStep4Done }],
+          summary: {
+            totalSteps: 3,
+            thinkingCount: 1,
+            readCount: 0,
+            searchCount: 0,
+            editCount: 0,
+            commandCount: 1,
+            otherToolCount: 1,
+            totalTools: 2,
+            runningCount: 0,
+            failedCount: 0,
+            startedAt: start + 1_000,
+            durationMs: 2_000,
+            editedFiles: [],
+            latestCommand: { seq: 4, command: "vp run mac:check", running: false, failed: false },
+          },
+          trailing: true,
+        },
+      ],
+      latestTodos: todoInit,
+      telemetry: liveTel,
+      toolEntries: [liveToolEntry3, liveToolEntry4Done],
     },
   });
   await host.emitSub(app, "session.watch", {
     kind: "event",
     session: "sess-live-1",
-    event: { seq: 7, revision: 1, time: start + 7_000, type: "run/end", text: "done" },
+    event: liveStep6,
+    projection: {
+      visibleSteps: [liveStep1, liveStep2, liveStep3, liveStep4Done, liveStep6],
+      feedItems: [
+        { kind: "step", key: "s:1", step: liveStep1, durationMs: 1_000, trailing: false },
+        {
+          kind: "activity",
+          key: "g:2",
+          steps: [
+            { step: liveStep2, durationMs: 1_000 },
+            { step: liveStep3, durationMs: 1_000 },
+            { step: liveStep4Done, durationMs: 3_000 },
+            { step: liveStep6 },
+          ],
+          summary: {
+            totalSteps: 4,
+            thinkingCount: 1,
+            readCount: 0,
+            searchCount: 0,
+            editCount: 0,
+            commandCount: 1,
+            otherToolCount: 2,
+            totalTools: 3,
+            runningCount: 0,
+            failedCount: 0,
+            startedAt: start + 1_000,
+            durationMs: 5_000,
+            editedFiles: [],
+            latestCommand: { seq: 4, command: "vp run mac:check", running: false, failed: false },
+          },
+          trailing: true,
+        },
+      ],
+      latestTodos: todoDone,
+      telemetry: { ...liveTel, toolCount: 3 },
+      toolEntries: [liveToolEntry3, liveToolEntry4Done, liveToolEntry6],
+    },
+  });
+  const liveStep7 = { seq: 7, revision: 1, time: start + 7_000, type: "run/end" as const, text: "done" };
+  await host.emitSub(app, "session.watch", {
+    kind: "event",
+    session: "sess-live-1",
+    event: liveStep7,
+    projection: {
+      visibleSteps: [liveStep1, liveStep2, liveStep3, liveStep4Done, liveStep6],
+      feedItems: [
+        { kind: "step", key: "s:1", step: liveStep1, durationMs: 1_000, trailing: false },
+        {
+          kind: "activity",
+          key: "g:2",
+          steps: [
+            { step: liveStep2, durationMs: 1_000 },
+            { step: liveStep3, durationMs: 1_000 },
+            { step: liveStep4Done, durationMs: 3_000 },
+            { step: liveStep6 },
+          ],
+          summary: {
+            totalSteps: 4,
+            thinkingCount: 1,
+            readCount: 0,
+            searchCount: 0,
+            editCount: 0,
+            commandCount: 1,
+            otherToolCount: 2,
+            totalTools: 3,
+            runningCount: 0,
+            failedCount: 0,
+            startedAt: start + 1_000,
+            durationMs: 5_000,
+            editedFiles: [],
+            latestCommand: { seq: 4, command: "vp run mac:check", running: false, failed: false },
+          },
+          trailing: true,
+        },
+      ],
+      latestTodos: todoDone,
+      telemetry: { ...liveTel, toolCount: 3 },
+      toolEntries: [liveToolEntry3, liveToolEntry4Done, liveToolEntry6],
+    },
   });
   await host.emitSub(app, "session.watch", {
     kind: "state",

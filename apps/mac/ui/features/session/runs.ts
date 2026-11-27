@@ -1,18 +1,40 @@
 import { z } from "zod";
-// A session's log by run, the work log's words and colours, the trajectory's waterfall and totals, how steps arriving live merge in (mergeSteps), and the log kept per observed session (SessionLogs).
+// Thin UI bindings over Rust session trajectory projections (`SessionEventPage.trajectory` and `VvCore`), plus i18n copy/tones and `SessionLogs`.
 
 import { t } from "@vibevalley/i18n";
-import type { LiveEvent, SessionEvent } from "@vibevalley/protocol";
-import { omitUndefined, oneLine } from "@vibevalley/protocol/rules";
-import { jsonString } from "@vibevalley/protocol/schema";
+import {
+  type LiveEvent,
+  type SessionEvent,
+  type SessionEventPage,
+  type SessionTrajectoryProjection,
+  type TrajectoryRunView,
+  type TrajectorySummary,
+  type TrajectoryWaterfall,
+  type TrajectoryWaterfallLane,
+  TrajectoryWaterfallLaneValues,
+} from "@vibevalley/protocol";
+import { oneLine } from "@vibevalley/protocol/rules";
+import { SessionTrajectoryProjection as SessionTrajectoryProjectionSchema } from "@vibevalley/protocol/schema";
 
 import { big, tookText } from "../../infra/base/format";
+import { coreBridge } from "../../infra/rich";
 import { localizeRuntimeError } from "../../infra/runtimeError";
 import { mergeSteps, shownEvents, stepLimit } from "../../infra/sessionRuns";
 
 export { mergeSteps, shownEvents };
+export type { TrajectorySummary };
+export type RunView = TrajectoryRunView;
+export type Lane = TrajectoryWaterfallLane;
+export const lanes: readonly Lane[] = TrajectoryWaterfallLaneValues;
+
+export interface SessionProjectionState {
+  readonly steps: SessionEvent[];
+  readonly trajectory?: SessionTrajectoryProjection;
+}
 
 const emptySteps: SessionEvent[] = [];
+const emptyProjectionState: SessionProjectionState = { steps: emptySteps };
+const NumberArraySchema = z.array(z.number());
 
 function groupByRun(steps: readonly SessionEvent[]): Map<string, SessionEvent[]> {
   const byRun = new Map<string, SessionEvent[]>();
@@ -39,13 +61,12 @@ function stepsEqual(a: readonly SessionEvent[], b: readonly SessionEvent[]): boo
   return true;
 }
 
-/** One of the server's runs as the log shows it; the steps it heard after the first are among its steps. */
-export interface RunView {
-  /** Undefined for steps outside every run (a log whose start was dropped). */
-  run?: string;
-  /** The first top-level message it heard, when the run opens with one. */
-  asked?: SessionEvent;
-  steps: SessionEvent[];
+/** Projects a full `SessionTrajectoryProjection` from raw events via Rust `VvCore` (used for live/unprojected updates). */
+export function projectTrajectory(steps: readonly SessionEvent[], end: number): SessionTrajectoryProjection | undefined {
+  const json = coreBridge()?.projectTrajectory?.(JSON.stringify(steps), end);
+  if (!json) return undefined;
+  const parsed = SessionTrajectoryProjectionSchema.safeParse(JSON.parse(json));
+  return parsed.success ? parsed.data : undefined;
 }
 
 /** The last top-level thing it said, if any. */
@@ -59,20 +80,9 @@ export function answerOf(r: RunView) {
 
 const allOf = (r: RunView) => (r.asked ? [r.asked, ...r.steps] : r.steps);
 
-/** Split where the server's run changes, never at a message: a run that heard several is one view. A sub-agent's
- * steps carry the run of the call they are under. */
-export function runsOf(steps: SessionEvent[]): RunView[] {
-  const views: RunView[] = [];
-  for (const s of steps) {
-    let view = views.at(-1);
-    if (!view || view.run !== s.run) {
-      view = omitUndefined({ run: s.run, steps: [] });
-      views.push(view);
-    }
-    if (!view.asked && view.steps.length === 0 && s.type === "user/message" && s.under === undefined) view.asked = s;
-    else view.steps.push(s);
-  }
-  return views;
+/** Splits events into runs via Rust `VvCore`. */
+export function runsOf(steps: readonly SessionEvent[]): RunView[] {
+  return projectTrajectory(steps, steps.at(-1)?.time ?? 0)?.runs ?? [];
 }
 
 interface Span {
@@ -80,55 +90,16 @@ interface Span {
   ms: number;
 }
 
-/** Each step lasts until the next one starts. the last until `end` (now, while the run goes on. */
+/** Each step lasts until the next one starts; the last until `end`. */
 export function spansOf(r: RunView, end: number): Span[] {
   const all = allOf(r);
   return all.map((s, i) => ({ step: s, ms: Math.max(0, (all[i + 1]?.time ?? end) - s.time) }));
 }
 
-/** Per-step duration in ms: pairs `tool/call` with its `tool/result` (or `end` while running), and measures other steps until the next event in their run. */
+/** Per-step durations computed by Rust `VvCore`. */
 export function stepDurationsOf(log: readonly SessionEvent[], end: number): Map<number, number> {
-  const durations = new Map<number, number>();
-  const shown = shownEvents([...log]);
-  const views = runsOf(shown);
-
-  views.forEach((view, idx) => {
-    const all = allOf(view);
-    const runEnd = idx === views.length - 1 ? Math.max(end, all.at(-1)?.time ?? end) : (all.at(-1)?.time ?? end);
-    for (let i = 0; i < all.length; i++) {
-      const step = all.at(i);
-      if (step === undefined || step.type === "llm/usage" || step.type === "run/error") continue;
-      if (step.type === "tool/call") continue;
-      const next = all.at(i + 1);
-      const until = next !== undefined ? next.time : runEnd;
-      durations.set(step.seq, Math.max(0, until - step.time));
-    }
-  });
-
-  // Pair every tool/call with its matching tool/result (works for concurrent calls and subagents).
-  const openCalls = new Map<number, { time: number; run: string | undefined }>();
-  const runEnds = new Map<string | undefined, number>();
-  for (const e of log) {
-    if (e.type === "run/start" || e.type === "run/end") continue;
-    const prev = runEnds.get(e.run) ?? 0;
-    if (e.time > prev) runEnds.set(e.run, e.time);
-    if (e.type === "tool/call") {
-      openCalls.set(e.seq, { time: e.time, run: e.run });
-    } else if (e.type === "tool/result" && e.call !== undefined) {
-      const call = openCalls.get(e.call);
-      if (call) {
-        durations.set(e.call, Math.max(0, e.time - call.time));
-        openCalls.delete(e.call);
-      }
-    }
-  }
-  const lastRun = views.at(-1)?.run;
-  for (const [seq, call] of openCalls) {
-    const fallbackEnd = call.run === lastRun ? Math.max(end, runEnds.get(call.run) ?? call.time) : (runEnds.get(call.run) ?? call.time);
-    durations.set(seq, Math.max(0, fallbackEnd - call.time));
-  }
-
-  return durations;
+  const proj = projectTrajectory(log, end);
+  return new Map((proj?.stepDurations ?? []).map((d) => [d.seq, d.durationMs]));
 }
 
 export function runMs(r: RunView, end: number) {
@@ -234,110 +205,25 @@ export function spanTone(step: SessionEvent): string {
   }
 }
 
-const CommandInput = jsonString(z.object({ command: z.exactOptional(z.string()) }));
-const JsonObjectInput = jsonString(z.record(z.string(), z.unknown()));
-
-/** A call's input as it reads best: a command as `$ …`, JSON indented, anything else as it came. */
-export function readableInput(step: SessionEvent) {
-  const raw = step.input?.trim() ?? "";
-  if (!raw) return "";
-  const obj = JsonObjectInput.safeParse(raw);
-  if (obj.success) {
-    const cmd = CommandInput.safeParse(raw);
-    if (cmd.success && cmd.data.command !== undefined) return `$ ${cmd.data.command}`;
-    return JSON.stringify(obj.data, null, 2);
-  }
-  return raw;
+/** A call's input formatted by Rust `VvCore`. */
+export function readableInput(step: SessionEvent): string {
+  if (step.input === undefined || step.input.trim() === "") return "";
+  return coreBridge()?.readableInput?.(JSON.stringify(step)) ?? step.input.trim();
 }
 
-const PROMPT_SCAFFOLDING_RE = /(?:^|\n)(?:【现在】|【现状】|【现状变了】|【群聊】|【输入事件】|\[来源：|这期间群聊里的汇报)/u;
-const USER_SAY_RE = /用户说：/gu;
-const CHAT_BLOCK_RE = /【群聊】([^\n]*?)里有给你的话：\n([\s\S]*?)(?:\n\n你的回答会发在[^\n]*|$)/u;
-const EVENT_BLOCK_RE = /【输入事件】\n([\s\S]*?)(?:\n\n原始载荷用[^\n]*|$)/u;
-const NOW_LINE_RE = /^【现在】/u;
-const SCAFFOLD_BLOCK_START_RE = /^(?:【现状】|【现状变了】|这期间群聊里的汇报)/u;
-const SOURCE_HEAD_RE = /^\[来源：([^\]）]+)\]/u;
-const IMPLICIT_SOURCE_RE = /^(?:用户|群聊)$/u;
-const SITUATION_LINE_RE = /^(?:用户的语言：|仓库（工作目录|可以派的帮工：|各频道里在场的帮工：|你正在回话的地方：|- |\+ |− |\[target=|│)/u;
-const PARENTHETICAL_HINT_RE = /^（(?:用户在对话框里选定了|用户选定了仓库：|这句话是用户用语音说的)/u;
-
-function cleanEnvelopeLine(line: string): string {
-  const msg = /^\[(?:target=[^\]]+|input=[^\]]+)\s+from=([^\]]+)\](?:（改过）)?\s*(.*)$/u.exec(line.trim());
-  if (msg) {
-    const from = (msg[1] ?? "").trim();
-    const text = (msg[2] ?? "").trim();
-    return from && text ? `${from}: ${text}` : text || from;
-  }
-  return line.trim();
+/** Localizes a Rust-collapsed step summary, falling back to `contextUpdate` when scaffolding-only. */
+export function localizeCollapsedSummary(rawSummary: string): string {
+  const resolved = rawSummary === "" ? t("web.session.trajectory.contextUpdate") : rawSummary;
+  return localizeRuntimeError(resolved).text;
 }
 
-function firstPayloadLine(block: string): string {
-  const found = block
-    .split("\n")
-    .map((l) => l.trim())
-    .find((l) => l.length > 0 && !l.startsWith("│"));
-  return found ? cleanEnvelopeLine(found) : "";
-}
-
-/** Strips internal orchestrator prompt-injection scaffolding for collapsed trajectory rows; expanded views keep the full raw text. */
+/** Strips internal orchestrator prompt-injection scaffolding via Rust `VvCore` and localizes runtime errors. */
 export function collapsedStepSummary(step: SessionEvent, body: string): string {
-  return localizeRuntimeError(collapsedStepSummaryRaw(step, body)).text;
-}
-
-function collapsedStepSummaryRaw(step: SessionEvent, body: string): string {
-  if (step.type !== "user/message" || !PROMPT_SCAFFOLDING_RE.test(body)) {
-    return oneLine(body).trim();
+  const native = coreBridge()?.collapsedStepSummary;
+  if (native !== undefined) {
+    return localizeCollapsedSummary(native(step.type, body));
   }
-  let lastUserSayEnd = -1;
-  for (const match of body.matchAll(USER_SAY_RE)) {
-    lastUserSayEnd = match.index + match[0].length;
-  }
-  if (lastUserSayEnd >= 0) {
-    const said = oneLine(body.slice(lastUserSayEnd)).trim();
-    if (said) return said;
-  }
-  const chatMatch = CHAT_BLOCK_RE.exec(body);
-  if (chatMatch) {
-    const target = (chatMatch[1] ?? "").trim();
-    const first = firstPayloadLine(chatMatch[2] ?? "");
-    if (first) return target ? `${target} · ${oneLine(first).trim()}` : oneLine(first).trim();
-  }
-  const eventMatch = EVENT_BLOCK_RE.exec(body);
-  if (eventMatch) {
-    const first = firstPayloadLine(eventMatch[1] ?? "");
-    if (first) return oneLine(first).trim();
-  }
-  let sourceLabel = "";
-  const kept: string[] = [];
-  let skippingBlock = false;
-  for (const rawLine of body.split("\n")) {
-    const line = rawLine.trim();
-    if (!line) {
-      if (skippingBlock) skippingBlock = false;
-      continue;
-    }
-    if (NOW_LINE_RE.test(line)) continue;
-    if (SCAFFOLD_BLOCK_START_RE.test(line)) {
-      skippingBlock = true;
-      continue;
-    }
-    const src = SOURCE_HEAD_RE.exec(line);
-    if (src) {
-      skippingBlock = false;
-      const kind = (src[1] ?? "").trim();
-      if (kind && !IMPLICIT_SOURCE_RE.test(kind)) sourceLabel = kind;
-      continue;
-    }
-    if (skippingBlock) {
-      if (SITUATION_LINE_RE.test(line) || rawLine.startsWith("  ")) continue;
-      skippingBlock = false;
-    }
-    if (PARENTHETICAL_HINT_RE.test(line)) continue;
-    kept.push(cleanEnvelopeLine(line));
-  }
-  const summary = oneLine(kept.join(" ")).trim();
-  if (summary) return sourceLabel ? `${sourceLabel} · ${summary}` : summary;
-  return sourceLabel || t("web.session.trajectory.contextUpdate");
+  return localizeRuntimeError(oneLine(body).trim()).text;
 }
 
 /** What started a run, as its fold says it: the first word is the issue, later ones are words carried to it. */
@@ -350,11 +236,10 @@ export function runTitle(r: RunView, firstAsked: number | undefined, asked?: str
 /** Folded to `lines` when longer. */
 export const isLongText = (text: string, lines: number) => text.length > lines * 60 || text.split("\n").length > lines;
 
-/** The line under a message for the run behind it, or undefined with none to show: a orchestrator's run only when it used tools. */
+/** The line under a message for the run behind it, or undefined with none to show: an orchestrator's run only when it used tools. */
 export function runLabel(steps: SessionEvent[], orchestrator: boolean) {
   const tools = steps.filter((s) => s.type === "tool/call").length;
   if (steps.length === 0 || (orchestrator && tools === 0)) return undefined;
-  // The orchestrator's run, folded: how long it thought and what it used.
   const first = steps.at(0);
   const last = steps.at(-1);
   const took = orchestrator && first && last && steps.length > 1 ? last.time - first.time : undefined;
@@ -362,151 +247,35 @@ export function runLabel(steps: SessionEvent[], orchestrator: boolean) {
   return tools > 0 ? t("web.session.runs.usedTools", { n: tools }) : t("web.session.runs.process");
 }
 
-export type Lane = "asked" | "model" | "tool";
-
-export const lanes: readonly Lane[] = ["asked", "model", "tool"];
-
-/** A stretch of one lane of the waterfall; `seq` is the shown row it opens. */
-interface LaneSpan {
-  readonly lane: Lane;
-  readonly start: number;
-  readonly end: number;
-  readonly seq: number;
-}
-
-interface Waterfall {
-  /** Each run's first and last time: the idle time between runs is not drawn. */
-  readonly runs: readonly (readonly [number, number])[];
-  readonly spans: readonly LaneSpan[];
-}
-
-const WATERFALL_RATIO_THRESHOLD = 8;
-const WATERFALL_MIN_RUN_PX = 44;
-
-/** Allocates horizontal pixel widths for waterfall runs; dampens extreme duration ratios so short runs remain legible. */
+/** Allocates damped horizontal pixel widths for waterfall runs via Rust `VvCore`. */
 export function waterfallWidths(durations: readonly number[], room: number): number[] {
   if (room <= 0 || durations.length === 0) return [];
-  const safe = durations.map((d) => (Number.isFinite(d) && d > 0 ? d : 0));
-  const total = safe.reduce((sum, d) => sum + d, 0);
-  if (total <= 0) return safe.map(() => room / safe.length);
-
-  const positive = safe.filter((d) => d > 0);
-  const minPos = Math.min(...positive);
-  const maxPos = Math.max(...positive);
-  if (maxPos / minPos <= WATERFALL_RATIO_THRESHOLD) {
-    return safe.map((d) => (room * d) / total);
+  const json = coreBridge()?.waterfallWidths?.(JSON.stringify(durations), room);
+  if (json !== undefined) {
+    const parsed = NumberArraySchema.safeParse(JSON.parse(json));
+    if (parsed.success) return parsed.data;
   }
-
-  const minRunPx = Math.min(WATERFALL_MIN_RUN_PX, room / safe.length);
-  const extraRoom = room - positive.length * minRunPx;
-  const weights = safe.map((d) => (d > 0 ? Math.sqrt(d) : 0));
-  const weightTotal = weights.reduce((sum, w) => sum + w, 0);
-  return safe.map((d, i) => (d > 0 ? minRunPx + (extraRoom * (weights[i] ?? 0)) / weightTotal : 0));
+  return durations.map(() => room / durations.length);
 }
 
-/** Lanes from the times the log already has. a step's time is when it began. */
-export function waterfallOf(log: readonly SessionEvent[], end: number): Waterfall {
-  const top = log.filter((e) => e.under === undefined && e.type !== "run/start" && e.type !== "run/end");
-  const groups = runsOf(top).map(allOf);
-  const runs: [number, number][] = [];
-  const spans: LaneSpan[] = [];
-  groups.forEach((steps, g) => {
-    const first = steps.at(0);
-    const last = steps.at(-1);
-    if (!first || !last) return;
-    const from = first.time;
-    const to = g === groups.length - 1 && end > last.time ? end : last.time;
-    runs.push([from, to]);
-    const calls = new Map<number, number>();
-    let waiting = from;
-    let open: [number, number] | undefined;
-    let prev = from;
-    const close = (at: number) => {
-      if (open) spans.push({ lane: "model", start: open[0], end: at < open[0] ? open[0] : at, seq: open[1] });
-      open = undefined;
-    };
-    steps.forEach((e, i) => {
-      switch (e.type) {
-        case "user/message":
-          spans.push({ lane: "asked", start: e.time, end: steps[i + 1]?.time ?? to, seq: e.seq });
-          waiting = e.time;
-          break;
-        case "assistant/thinking":
-        case "assistant/message":
-        case "tool/call":
-          open ??= [waiting, e.seq];
-          if (e.type === "tool/call") calls.set(e.seq, e.time);
-          break;
-        case "llm/usage":
-          close(e.time);
-          waiting = e.time;
-          break;
-        case "tool/result":
-          close(prev);
-          if (e.call !== undefined && calls.has(e.call)) {
-            spans.push({ lane: "tool", start: calls.get(e.call) ?? e.time, end: e.time, seq: e.call });
-            calls.delete(e.call);
-          }
-          waiting = e.time;
-          break;
-        case "memory/recalled":
-          if (!open) waiting = e.time;
-          break;
-        case "run/error":
-          close(e.time);
-          waiting = e.time;
-          break;
-        case "llm/retry":
-        case "permission/request":
-        case "permission/resolved":
-        case "interaction/request":
-        case "interaction/resolved":
-        case "run/end":
-        case "run/start":
-          break;
-      }
-      prev = e.time;
-    });
-    close(to);
-    for (const [seq, start] of calls) spans.push({ lane: "tool", start, end: to, seq });
-  });
-  return { runs, spans };
+/** Waterfall runs and spans computed by Rust `VvCore`. */
+export function waterfallOf(log: readonly SessionEvent[], end: number): TrajectoryWaterfall {
+  return projectTrajectory(log, end)?.waterfall ?? { runs: [], spans: [] };
 }
 
-export interface TrajectorySummary {
-  readonly runs: number;
-  readonly steps: number;
-  readonly modelMs: number;
-  readonly toolMs: number;
-  /** The prompt's tokens not read from the cache, as llm/usage counts them. */
-  readonly input: number;
-  readonly cacheRead: number;
-  readonly output: number;
-}
-
-/** The footer's numbers: rows other than llm/usage are steps; tokens are every llm/usage's, a sub-agent's too. */
-export function summaryOf(log: SessionEvent[], end: number): TrajectorySummary {
-  const shown = shownEvents(log);
-  const fall = waterfallOf(log, end).spans;
-  const sum = (lane: Lane) => fall.filter((s) => s.lane === lane).reduce((n, s) => n + (s.end - s.start), 0);
-  let input = 0;
-  let cacheRead = 0;
-  let output = 0;
-  for (const e of log)
-    if (e.tokens) {
-      input += Math.round(e.tokens.input);
-      cacheRead += Math.round(e.tokens.cacheRead);
-      output += Math.round(e.tokens.output);
+/** Trajectory summary totals computed by Rust `VvCore`. */
+export function summaryOf(log: readonly SessionEvent[], end: number): TrajectorySummary {
+  return (
+    projectTrajectory(log, end)?.summary ?? {
+      runs: 0,
+      steps: 0,
+      modelMs: 0,
+      toolMs: 0,
+      input: 0,
+      cacheRead: 0,
+      output: 0,
     }
-  return {
-    runs: runsOf(shown).length,
-    steps: shown.filter((e) => e.type !== "llm/usage").length,
-    modelMs: sum("model"),
-    toolMs: sum("tool"),
-    input,
-    cacheRead,
-    output,
-  };
+  );
 }
 
 /** null with no usage recorded. */
@@ -562,20 +331,21 @@ export function tagOf(step: SessionEvent, asked?: string, issue = false): string
 interface Log {
   readonly id: string;
   steps: SessionEvent[];
+  trajectory: SessionTrajectoryProjection | undefined;
   byRun: Map<string, SessionEvent[]>;
-  readonly listeners: Set<(steps: SessionEvent[]) => void>;
+  readonly listeners: Set<(state: SessionProjectionState) => void>;
   readonly runListeners: Map<string, Set<(steps: SessionEvent[]) => void>>;
   reading: { during: SessionEvent[]; again: boolean } | undefined;
 }
 
-/** One current log per observed session. Snapshots replace the retained window. */
+/** One current log per observed session. Server-projected trajectories are retained until invalidated by live deltas. */
 export class SessionLogs {
   private readonly logs = new Map<string, Log>();
   private stop: (() => void) | undefined;
 
-  private readonly read: (id: string) => Promise<SessionEvent[]>;
+  private readonly read: (id: string) => Promise<SessionEvent[] | SessionEventPage>;
   private readonly follow: (event: (e: LiveEvent) => void, connected: () => void) => () => void;
-  constructor(read: (id: string) => Promise<SessionEvent[]>, follow: (event: (e: LiveEvent) => void, connected: () => void) => () => void) {
+  constructor(read: (id: string) => Promise<SessionEvent[] | SessionEventPage>, follow: (event: (e: LiveEvent) => void, connected: () => void) => () => void) {
     this.read = read;
     this.follow = follow;
   }
@@ -584,7 +354,7 @@ export class SessionLogs {
     let log = this.logs.get(id);
     const hadSubscribers = log ? log.listeners.size > 0 || log.runListeners.size > 0 : false;
     if (!log) {
-      log = { id, steps: [], byRun: new Map(), listeners: new Set(), runListeners: new Map(), reading: undefined };
+      log = { id, steps: [], trajectory: undefined, byRun: new Map(), listeners: new Set(), runListeners: new Map(), reading: undefined };
       this.logs.set(id, log);
     }
     return { log, isFirst: !hadSubscribers };
@@ -615,9 +385,13 @@ export class SessionLogs {
   }
 
   subscribe(id: string, listener: (steps: SessionEvent[]) => void): () => void {
+    return this.subscribeProjection(id, (state) => listener(state.steps));
+  }
+
+  subscribeProjection(id: string, listener: (state: SessionProjectionState) => void): () => void {
     const { log, isFirst } = this.ensureLog(id);
     log.listeners.add(listener);
-    listener(log.steps);
+    listener(log.trajectory ? { steps: log.steps, trajectory: log.trajectory } : { steps: log.steps });
     this.ensureFollow();
     if (isFirst) void this.refresh(log);
     return () => {
@@ -647,13 +421,19 @@ export class SessionLogs {
     };
   }
 
+  private notifyListeners(log: Log) {
+    const state: SessionProjectionState = log.trajectory ? { steps: log.steps, trajectory: log.trajectory } : { steps: log.steps };
+    for (const listener of log.listeners) listener(state);
+  }
+
   private applyActivity(log: Log, activity: SessionEvent) {
     const prevHead = log.steps[0];
     const nextSteps = mergeSteps(log.steps, [activity]);
     if (stepsEqual(log.steps, nextSteps)) return;
     const evictedHead = log.steps.length >= stepLimit && prevHead !== undefined && nextSteps[0]?.seq !== prevHead.seq;
     log.steps = nextSteps;
-    for (const listener of log.listeners) listener(nextSteps);
+    log.trajectory = projectTrajectory(nextSteps, nextSteps.at(-1)?.time ?? 0);
+    this.notifyListeners(log);
 
     if (log.runListeners.size === 0) {
       log.byRun = groupByRun(nextSteps);
@@ -684,10 +464,11 @@ export class SessionLogs {
     log.byRun = nextByRun;
   }
 
-  private publish(log: Log, steps: SessionEvent[]) {
-    if (stepsEqual(log.steps, steps)) return;
+  private publish(log: Log, steps: SessionEvent[], trajectory: SessionTrajectoryProjection | undefined) {
+    if (stepsEqual(log.steps, steps) && log.trajectory === trajectory) return;
     log.steps = steps;
-    for (const listener of log.listeners) listener(steps);
+    log.trajectory = trajectory;
+    this.notifyListeners(log);
     this.reconcileByRun(log, steps);
   }
 
@@ -699,8 +480,12 @@ export class SessionLogs {
     const reading: NonNullable<Log["reading"]> = { during: [], again: false };
     log.reading = reading;
     try {
-      const snapshot = await this.read(log.id);
-      if (this.logs.get(log.id) === log) this.publish(log, mergeSteps(snapshot, reading.during));
+      const page = await this.read(log.id);
+      if (this.logs.get(log.id) !== log) return;
+      const snapshot = Array.isArray(page) ? page : page.events;
+      const merged = mergeSteps(snapshot, reading.during);
+      const trajectory = !Array.isArray(page) && reading.during.length === 0 ? page.trajectory : projectTrajectory(merged, merged.at(-1)?.time ?? 0);
+      this.publish(log, merged, trajectory);
     } catch (e) {
       // The query retries a failed read. Keep the received steps.
       if (!(e instanceof Error)) throw e;
@@ -710,3 +495,5 @@ export class SessionLogs {
     }
   }
 }
+
+export { emptyProjectionState };

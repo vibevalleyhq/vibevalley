@@ -1,4 +1,4 @@
-import type { Issue } from "@vibevalley/protocol";
+import type { BoardSummary, Issue } from "@vibevalley/protocol";
 
 import { type BoardCard, closedShown, type Lane, lanes } from "./cards";
 import { type BoardLook, groupCards, groupRows, laneOrder, orderRows, rowKeys } from "./display";
@@ -12,7 +12,14 @@ function visibleLaneCards(lane: Lane, cards: readonly BoardCard[], ordering: Boa
 }
 
 /** Visible issue ids in display order, composing with Group By, Hierarchy, View, Ordering, and closed-lane folding. */
-export function orderedVisibleCardIds(cards: readonly BoardCard[], look: BoardLook, allIssues: readonly Issue[], older: boolean, nowMs = Date.now()): string[] {
+export function orderedVisibleCardIds(
+  cards: readonly BoardCard[],
+  look: BoardLook,
+  allIssues: readonly Issue[],
+  older: boolean,
+  nowMs = Date.now(),
+  summary?: BoardSummary,
+): string[] {
   if (cards.length === 0) return [];
   const groupBy = look.groupBy ?? "none";
 
@@ -39,7 +46,7 @@ export function orderedVisibleCardIds(cards: readonly BoardCard[], look: BoardLo
       });
     }
     case "timeline": {
-      const timeline = buildScheduleForCards(cards, allIssues, "month", nowMs);
+      const timeline = buildScheduleForCards(cards, allIssues, "month", nowMs, summary);
       return [...timeline.rows.map((r) => r.card.id), ...timeline.unscheduled.map((c) => c.id)];
     }
     case "calendar":

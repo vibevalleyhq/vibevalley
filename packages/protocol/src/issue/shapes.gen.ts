@@ -47,9 +47,17 @@ export type IssuePromptKind = (typeof IssuePromptKindValues)[number];
 
 export type BoardLaneCounts = { backlog: number, todo: number, inProgress: number, inReview: number, done: number, canceled: number, };
 
-export type BoardIssueSummary = { lane: IssueLane, cardKind: IssueCardKind, familyDone: number, familyTotal: number, needsWorktreeCheck: boolean, prompt?: IssuePromptKind, };
+export type BoardCardPreview = { attachmentId?: string, url?: string, isCompare: boolean, };
 
-export type BoardSummary = { laneCounts: BoardLaneCounts, runningSlots: number, maxRunning: number, byIssue: { [key in string]: BoardIssueSummary }, };
+export type IssueScheduleSpan = { startMs: number, endMs: number, durationDays: number, hasExplicitStart: boolean, hasExplicitDue: boolean, rolledUp: boolean, overdue: boolean, };
+
+export type BoardScheduleEntry = { issueId: IssueId, span: IssueScheduleSpan, depth: number, isParent: boolean, childCount: number, };
+
+export type BoardSchedule = { todayDayMs: number, scheduled: Array<BoardScheduleEntry>, unscheduledIds: Array<IssueId>, };
+
+export type BoardIssueSummary = { lane: IssueLane, cardKind: IssueCardKind, familyDone: number, familyTotal: number, needsWorktreeCheck: boolean, prompt?: IssuePromptKind, preview?: BoardCardPreview, schedule?: IssueScheduleSpan, };
+
+export type BoardSummary = { laneCounts: BoardLaneCounts, runningSlots: number, maxRunning: number, byIssue: { [key in string]: BoardIssueSummary }, schedule?: BoardSchedule, };
 
 export const PullRequestStateValues = ["open", "merged", "closed"] as const;
 export type PullRequestState = (typeof PullRequestStateValues)[number];

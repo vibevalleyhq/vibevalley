@@ -1,5 +1,6 @@
 import { list, t } from "@vibevalley/i18n";
 import type {
+  BoardCardPreview,
   BoardSlice,
   BoardSummary,
   Issue,
@@ -14,7 +15,6 @@ import type {
 import { assignedAgentOf, executionsOf, omitUndefined, sessionIdsOf, stageWantsUser } from "@vibevalley/protocol/rules";
 import { IssueLane as IssueLaneSchema } from "@vibevalley/protocol/schema";
 
-import { splitMarkdownCompareBlocks } from "../../../design/compareModel";
 import { ago, tookText } from "../../../infra/base/format";
 import { matches } from "../../../infra/base/search";
 import { describeSubagents } from "../../session";
@@ -114,7 +114,7 @@ export type BoardCard = (
   /** An issue for the orchestrator: open while the orchestrator works on it, closed once it has answered; never dragged. */
   | { kind: "orchestrator"; id: string; lane: Lane; issue: Issue }
   | { kind: "family"; id: string; lane: Lane; issue: Issue; children: Issue[]; progress?: { readonly done: number; readonly total: number } }
-) & { readonly move?: CardMove };
+) & { readonly move?: CardMove; readonly preview?: BoardCardPreview };
 
 export const cardRepo = (c: BoardCard) => c.issue.repo;
 export const cardAgent = (c: BoardCard) => assignedAgentOf(c.issue);
@@ -138,7 +138,12 @@ export function buildCards(
   for (const row of rows) {
     const issue = row.issue;
     const summary = byIssue?.[issue.id];
-    const base = { id: issue.id, lane: summary?.lane ?? laneOf(issue.status), issue };
+    const base = {
+      id: issue.id,
+      lane: summary?.lane ?? laneOf(issue.status),
+      issue,
+      ...(summary?.preview !== undefined ? { preview: summary.preview } : {}),
+    };
     const children = families.get(issue.id) ?? [];
     if (summary !== undefined) {
       switch (summary.cardKind) {
@@ -202,24 +207,11 @@ export function laneCountOf(lane: Lane, cards: readonly BoardCard[], summary: Bo
   return cards.filter((c) => c.lane === lane).length;
 }
 
-export interface CardPreview {
-  readonly attachmentId?: string;
-  readonly url?: string;
-  readonly isCompare: boolean;
-}
+export type CardPreview = BoardCardPreview;
 
-/** First previewable image for a board card: prefers a valid ```compare block image, then the first image attachment. */
+/** First previewable image for a board card: prefers Rust-projected preview (`BoardIssueSummary.preview`), then image attachment fallback. */
 export function cardPreviewOf(card: BoardCard): CardPreview | undefined {
-  const description = card.issue.description;
-  if (description.includes("compare")) {
-    for (const seg of splitMarkdownCompareBlocks(description)) {
-      if (seg.kind !== "compare") continue;
-      const picked = seg.spec.after ?? seg.spec.before ?? seg.spec.image;
-      if (!picked) continue;
-      if (picked.attachment) return { attachmentId: picked.attachment, isCompare: true };
-      if (picked.url) return { url: picked.url, isCompare: true };
-    }
-  }
+  if (card.preview !== undefined) return card.preview;
   const imageAttachment = card.issue.attachments?.find((att) => att.type.startsWith("image/"));
   if (imageAttachment) return { attachmentId: imageAttachment.id, isCompare: false };
   return undefined;

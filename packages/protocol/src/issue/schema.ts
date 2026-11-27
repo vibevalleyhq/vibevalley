@@ -41,6 +41,36 @@ export const BoardLaneCounts = z.object({
   canceled: z.number(),
 }) satisfies Codec<T.BoardLaneCounts>;
 
+export const BoardCardPreview = z.object({
+  attachmentId: z.exactOptional(z.string()),
+  url: z.exactOptional(z.string()),
+  isCompare: z.boolean(),
+}) satisfies Codec<T.BoardCardPreview>;
+
+export const IssueScheduleSpan = z.object({
+  startMs: z.number(),
+  endMs: z.number(),
+  durationDays: z.number(),
+  hasExplicitStart: z.boolean(),
+  hasExplicitDue: z.boolean(),
+  rolledUp: z.boolean(),
+  overdue: z.boolean(),
+}) satisfies Codec<T.IssueScheduleSpan>;
+
+export const BoardScheduleEntry = z.object({
+  issueId: IssueId,
+  span: IssueScheduleSpan,
+  depth: z.number(),
+  isParent: z.boolean(),
+  childCount: z.number(),
+}) satisfies Codec<T.BoardScheduleEntry>;
+
+export const BoardSchedule = z.object({
+  todayDayMs: z.number(),
+  scheduled: z.array(BoardScheduleEntry),
+  unscheduledIds: z.array(IssueId),
+}) satisfies Codec<T.BoardSchedule>;
+
 export const BoardIssueSummary = z.object({
   lane: IssueLane,
   cardKind: IssueCardKind,
@@ -48,6 +78,8 @@ export const BoardIssueSummary = z.object({
   familyTotal: z.number(),
   needsWorktreeCheck: z.boolean(),
   prompt: z.exactOptional(IssuePromptKind),
+  preview: z.exactOptional(BoardCardPreview),
+  schedule: z.exactOptional(IssueScheduleSpan),
 }) satisfies Codec<T.BoardIssueSummary>;
 
 export const BoardSummary = z.object({
@@ -55,6 +87,7 @@ export const BoardSummary = z.object({
   runningSlots: z.number(),
   maxRunning: z.number(),
   byIssue: z.record(z.string(), BoardIssueSummary),
+  schedule: z.exactOptional(BoardSchedule),
 }) satisfies Codec<T.BoardSummary>;
 
 const PullRequestState = z.enum(T.PullRequestStateValues) satisfies Codec<T.PullRequestState>;

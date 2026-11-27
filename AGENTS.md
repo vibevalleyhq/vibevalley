@@ -97,7 +97,7 @@ agent 照着已有的代码抄，走最短的路，所以要让容易的写法�
 - **契约改在 Rust**：形状和接口表改 `crates/protocol/src/contract`，TS 的类型由它生成；页面要用的同改手写的 `schema.ts` 与 `api.ts`，它们的测试对着生成物查（[契约](docs/subsystems/foundation.md#契约规则和数据库)）。
 - **生成的不手改**：`packages/protocol` 的 `shapes.gen.ts` 与 `endpoints.gen.ts`（`cargo xtask protocol --write`）、`client.ts`（`api:client`）、`packages/i18n/src/catalogs.ts`（`i18n:gen`）、`iconPaths.gen.ts`（`icons:gen`）、golden（`cargo xtask goldens`）和生成的参考表由脚本写出，`cargo xtask protocol` 和 `vp run docs:verify` 查是不是最新。宿主 `state.db` 与服务端、持久执行统一使用 `SeaORM` + `SeaQuery`（服务端与持久执行同时支持 SQLite 与 PostgreSQL，前向增量迁移由 `seaql_server_migrations` / `seaql_migrations` 跟踪并在启动时校验表结构）。
 - **内部不留兼容**：改名、改形状、改落盘格式直接改，不写兼容层、旧数据兜底或迁移脚本；对外 HTTP `v1` 是唯一例外（[接口版本](docs/subsystems/core.md)）。
-- **页面不折状态**：页面只读按域推来的切片（`board`、`sessions`、`collab`、`inbox`、`ops`、`farm`）并写画面摆法，请求只经 `Transport`；缺数据就补进契约与纯投影或调接口问服务端（[客户端](docs/subsystems/app.md)）。
+- **页面不折状态，计算下沉 Rust**：领域计算、Markdown/载荷解析、事件流折叠、汇总聚合与切片投影统一放在 Rust（`crates/core` 与 `crates/rich`），经契约切片/接口或 `vibevalley/rich` 原生模块单源输出给桌面、移动端与命令行；TS 只做薄类型绑定、视图呈现、文案本地化与本地 UI 交互态（筛选、折叠、选中、草稿、拖拽预览），缺数据就补进契约与纯投影或调接口问服务端（[架构](docs/architecture.md#分层)、[客户端](docs/subsystems/app.md)）。
 - **页面守 `nsh` 响应式**：动态 JSX 分支用 `<If>`、列表用带稳定 `key` 的 `<Each>` 或 `<List>`，不解构 `props`、不提前求值访问器、多处派生用 `computed()`（[NSH TSX 规范](docs/style/nsh-tsx.md)）。
 - **处理函数要薄**：`gateway/` 的 HTTP 门、进程内桥、`router.rs` 和页面组件只做鉴权、转发与展示，规则留在所属模块或纯函数里（[架构](docs/architecture.md)）。
 - **执行会话没有权限确认**：服务端只听 `127.0.0.1`，执行会话只在工作区开工（[执行会话](docs/subsystems/session.md)）。

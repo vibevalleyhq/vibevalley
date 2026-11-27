@@ -1,4 +1,4 @@
-import { type Agent, defaultOrchestrator, type Issue, type Session, type SessionEvent, type SessionView, type Spent } from "@vibevalley/protocol";
+import { type Agent, defaultOrchestrator, type Issue, type Session, type SessionTelemetry, type SessionView, type Spent } from "@vibevalley/protocol";
 import { isOrchestratorSession, sessionIssueId, sessionProfile, sessionRepo } from "@vibevalley/protocol/rules";
 
 export type RunsScope = "all" | "active" | "orchestrator" | "worker";
@@ -324,8 +324,8 @@ export interface RunTelemetryRollup {
   readonly runErrors: number;
 }
 
-/** Projects aggregated token usage, Spent cost, context saturation, and retry/error counts for a run entry. */
-export function runTelemetryOf(entry: RunEntry, steps: readonly SessionEvent[] = []): RunTelemetryRollup {
+/** Projects aggregated token usage, Spent cost, context saturation, and retry/error counts from Rust session/trajectory telemetry. */
+export function runTelemetryOf(entry: RunEntry, projectedTelemetry?: SessionTelemetry): RunTelemetryRollup {
   const session = entry.kind === "worker" ? (entry.live ?? entry.session) : entry.live;
   const baseTel = session?.telemetry;
   const spent =
@@ -335,38 +335,9 @@ export function runTelemetryOf(entry: RunEntry, steps: readonly SessionEvent[] =
   const phase = session?.phase;
   const lastOutcome = session?.lastRun?.outcome;
 
-  let stepIn = 0;
-  let stepCache = 0;
-  let stepOut = 0;
-  let stepCtxUsed = 0;
-  let stepCtxWindow = 0;
-  let stepRetries = 0;
-  let stepErrors = 0;
-  for (const s of steps) {
-    if (s.type === "llm/retry") stepRetries += 1;
-    else if (s.type === "run/error") stepErrors += 1;
-    if (s.tokens) {
-      const i = Math.max(0, Math.round(s.tokens.input));
-      const c = Math.max(0, Math.round(s.tokens.cacheRead));
-      const o = Math.max(0, Math.round(s.tokens.output));
-      stepIn += i;
-      stepCache += c;
-      stepOut += o;
-      if (s.tokens.contextUsed !== undefined && s.tokens.contextUsed > 0) {
-        stepCtxUsed = Math.round(s.tokens.contextUsed);
-      } else {
-        const fallback = Math.max(i, c);
-        if (fallback > 0) stepCtxUsed = fallback;
-      }
-      if (s.tokens.contextWindow !== undefined && s.tokens.contextWindow > 0) {
-        stepCtxWindow = Math.round(s.tokens.contextWindow);
-      }
-    }
-  }
-
-  const inputTokens = Math.max(baseTel?.inputTokens ?? 0, stepIn);
-  const cacheReadTokens = Math.max(baseTel?.cacheReadTokens ?? 0, stepCache);
-  const outputTokens = Math.max(baseTel?.outputTokens ?? 0, stepOut);
+  const inputTokens = Math.max(baseTel?.inputTokens ?? 0, projectedTelemetry?.inputTokens ?? 0);
+  const cacheReadTokens = Math.max(baseTel?.cacheReadTokens ?? 0, projectedTelemetry?.cacheReadTokens ?? 0);
+  const outputTokens = Math.max(baseTel?.outputTokens ?? 0, projectedTelemetry?.outputTokens ?? 0);
   const telemetryTokens = inputTokens + cacheReadTokens + outputTokens;
   const totalTokens = Math.max(spent?.tokens ?? 0, telemetryTokens);
 
@@ -377,15 +348,17 @@ export function runTelemetryOf(entry: RunEntry, steps: readonly SessionEvent[] =
         ? { tokens: totalTokens }
         : undefined;
 
+  const stepCtxUsed = projectedTelemetry?.contextUsed ?? 0;
+  const stepCtxWindow = projectedTelemetry?.contextWindow ?? 0;
   const contextUsed = stepCtxUsed > 0 ? stepCtxUsed : (baseTel?.contextUsed ?? 0);
   const contextWindow = stepCtxWindow > 0 ? stepCtxWindow : (baseTel?.contextWindow ?? 0);
   const hasContext = contextUsed > 0 && contextWindow > 0;
   const contextPct = hasContext ? Math.min(100, Math.round((contextUsed / contextWindow) * 100)) : 0;
 
   const liveRetry = phase?._tag === "working" && phase.retry !== undefined ? Math.max(1, phase.retry.attempt) : 0;
-  const llmRetries = Math.max(baseTel?.llmRetries ?? 0, stepRetries, liveRetry);
+  const llmRetries = Math.max(baseTel?.llmRetries ?? 0, projectedTelemetry?.llmRetries ?? 0, liveRetry);
   const failedFlag = phase?._tag === "failed" || lastOutcome === "failed" ? 1 : 0;
-  const runErrors = Math.max(baseTel?.runErrors ?? 0, stepErrors, failedFlag);
+  const runErrors = Math.max(baseTel?.runErrors ?? 0, projectedTelemetry?.runErrors ?? 0, failedFlag);
 
   return {
     inputTokens,

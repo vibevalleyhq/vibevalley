@@ -738,11 +738,14 @@ impl Trajectory {
         }
         let oldest_seq = events.first().map(|e| e.seq);
         let newest_seq = events.last().map(|e| e.seq);
+        let end_ms = events.last().map_or(0, |e| e.time);
+        let trajectory = Some(vibevalley_core::trajectory::project_trajectory(&events, end_ms));
         Some(SessionEventPage {
             events,
             has_more,
             oldest_seq,
             newest_seq,
+            trajectory,
         })
     }
 

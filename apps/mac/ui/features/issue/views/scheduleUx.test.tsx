@@ -106,9 +106,70 @@ test("IssuesPage supports Timeline (Gantt) direct drag/resize, short-bar #N labe
   });
 
   const all = [epicParent, childScheduled, extraA, extraB, unscheduled];
+  const epicSpan = {
+    startMs: todayMs,
+    endMs: addUtcDays(todayMs, 3),
+    durationDays: 4,
+    hasExplicitStart: false,
+    hasExplicitDue: false,
+    rolledUp: true,
+    overdue: false,
+  };
+  const childSpan = {
+    startMs: todayMs,
+    endMs: addUtcDays(todayMs, 3),
+    durationDays: 4,
+    hasExplicitStart: true,
+    hasExplicitDue: true,
+    rolledUp: false,
+    overdue: false,
+  };
+  const extraASpan = {
+    startMs: todayMs,
+    endMs: addUtcDays(todayMs, 1),
+    durationDays: 2,
+    hasExplicitStart: true,
+    hasExplicitDue: true,
+    rolledUp: false,
+    overdue: false,
+  };
+  const extraBSpan = {
+    startMs: todayMs,
+    endMs: addUtcDays(todayMs, 2),
+    durationDays: 3,
+    hasExplicitStart: true,
+    hasExplicitDue: true,
+    rolledUp: false,
+    overdue: false,
+  };
   const state: SliceBundle = {
     ...scenarios.empty.state,
-    board: { seq: 30, issues: all },
+    board: {
+      seq: 30,
+      issues: all,
+      boardSummary: {
+        laneCounts: { backlog: 1, todo: 2, inProgress: 2, inReview: 0, done: 0, canceled: 0 },
+        runningSlots: 0,
+        maxRunning: 3,
+        byIssue: {
+          [epicParent.id]: { lane: "in_progress", cardKind: "family", familyDone: 0, familyTotal: 1, needsWorktreeCheck: false, schedule: epicSpan },
+          [childScheduled.id]: { lane: "in_progress", cardKind: "todo", familyDone: 0, familyTotal: 0, needsWorktreeCheck: false, schedule: childSpan },
+          [extraA.id]: { lane: "todo", cardKind: "todo", familyDone: 0, familyTotal: 0, needsWorktreeCheck: false, schedule: extraASpan },
+          [extraB.id]: { lane: "todo", cardKind: "todo", familyDone: 0, familyTotal: 0, needsWorktreeCheck: false, schedule: extraBSpan },
+          [unscheduled.id]: { lane: "backlog", cardKind: "todo", familyDone: 0, familyTotal: 0, needsWorktreeCheck: false },
+        },
+        schedule: {
+          todayDayMs: todayMs,
+          scheduled: [
+            { issueId: epicParent.id, span: epicSpan, depth: 0, isParent: true, childCount: 1 },
+            { issueId: childScheduled.id, span: childSpan, depth: 1, isParent: false, childCount: 0 },
+            { issueId: extraA.id, span: extraASpan, depth: 0, isParent: false, childCount: 0 },
+            { issueId: extraB.id, span: extraBSpan, depth: 0, isParent: false, childCount: 0 },
+          ],
+          unscheduledIds: [unscheduled.id],
+        },
+      },
+    },
   };
   const fake = fakeHost({ state, responses: scenarios.typical.responses }, { route: "/issues", locale: "zh" });
   fake.respond(
@@ -386,9 +447,51 @@ test("regression: IssueCalendar keeps all 6 week rows completely accessible with
     dueAt: Date.UTC(2026, 11, 6),
   });
   const all = [...scheduled, week6Issue];
+  const week6Day = Date.UTC(2026, 11, 6);
+  const densitySpan = {
+    startMs: todayMs,
+    endMs: addUtcDays(todayMs, 1),
+    durationDays: 2,
+    hasExplicitStart: true,
+    hasExplicitDue: true,
+    rolledUp: false,
+    overdue: false,
+  };
+  const week6Span = {
+    startMs: week6Day,
+    endMs: week6Day,
+    durationDays: 1,
+    hasExplicitStart: true,
+    hasExplicitDue: true,
+    rolledUp: false,
+    overdue: false,
+  };
   const state: SliceBundle = {
     ...scenarios.empty.state,
-    board: { seq: 40, issues: all },
+    board: {
+      seq: 40,
+      issues: all,
+      boardSummary: {
+        laneCounts: { backlog: 0, todo: 1, inProgress: 8, inReview: 0, done: 0, canceled: 0 },
+        runningSlots: 0,
+        maxRunning: 3,
+        byIssue: Object.fromEntries([
+          ...scheduled.map((issue) => [
+            issue.id,
+            { lane: "in_progress" as const, cardKind: "todo" as const, familyDone: 0, familyTotal: 0, needsWorktreeCheck: false, schedule: densitySpan },
+          ]),
+          [week6Issue.id, { lane: "todo" as const, cardKind: "todo" as const, familyDone: 0, familyTotal: 0, needsWorktreeCheck: false, schedule: week6Span }],
+        ]),
+        schedule: {
+          todayDayMs: todayMs,
+          scheduled: [
+            ...scheduled.map((issue) => ({ issueId: issue.id, span: densitySpan, depth: 0, isParent: false, childCount: 0 })),
+            { issueId: week6Issue.id, span: week6Span, depth: 0, isParent: false, childCount: 0 },
+          ],
+          unscheduledIds: [],
+        },
+      },
+    },
   };
 
   for (const vp of [

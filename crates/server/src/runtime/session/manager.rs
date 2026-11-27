@@ -214,11 +214,14 @@ async fn watch_session(
             .collect(),
         None => Vec::new(),
     };
+    let snap_tokens = sessions.workspace_snapshot(&id).tokens;
+    let projection = Some(vibevalley_core::trajectory::project_chat_session(&history, snap_tokens.as_ref(), 200_000));
     if !send_watch_event(
         &sink,
         &SessionWatchEvent::History {
             session: id.clone(),
             events: history,
+            projection,
         },
     ) {
         return;
@@ -265,6 +268,7 @@ async fn watch_session(
                         &SessionWatchEvent::Event {
                             session: e.id.clone(),
                             event: e.activity,
+                            projection: None,
                         },
                     )
                 {

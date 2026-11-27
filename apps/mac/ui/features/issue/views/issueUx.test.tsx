@@ -275,7 +275,33 @@ test("Board uses professional PM lane labels without concurrency badge, renders 
 
   const state: SliceBundle = {
     ...scenarios.empty.state,
-    board: { seq: 15, issues: [compareIssue, imageIssue] },
+    board: {
+      seq: 15,
+      issues: [compareIssue, imageIssue],
+      boardSummary: {
+        laneCounts: { backlog: 2, todo: 0, inProgress: 0, inReview: 0, done: 0, canceled: 0 },
+        runningSlots: 0,
+        maxRunning: 3,
+        byIssue: {
+          [compareIssue.id]: {
+            lane: "backlog",
+            cardKind: "todo",
+            familyDone: 0,
+            familyTotal: 0,
+            needsWorktreeCheck: false,
+            preview: { attachmentId: "att-after", isCompare: true },
+          },
+          [imageIssue.id]: {
+            lane: "backlog",
+            cardKind: "todo",
+            familyDone: 0,
+            familyTotal: 0,
+            needsWorktreeCheck: false,
+            preview: { attachmentId: "att-shot", isCompare: false },
+          },
+        },
+      },
+    },
   };
   const fake = fakeHost({ state, responses: scenarios.typical.responses }, { route: "/issues", locale: "zh" });
   fake.respond("issue.history.list", [
@@ -890,11 +916,50 @@ test("BlockedByPicker edits blockedBy with cycle-safe options and clickable Bloc
   });
   const depSession = makeFailedSession("s-dep-c", "Running telemetry");
 
+  const spanA = {
+    startMs: dayStart,
+    endMs: dayStart + 86_400_000,
+    durationDays: 2,
+    hasExplicitStart: true,
+    hasExplicitDue: true,
+    rolledUp: false,
+    overdue: false,
+  };
+  const spanB = {
+    startMs: dayStart + 86_400_000,
+    endMs: dayStart + 2 * 86_400_000,
+    durationDays: 2,
+    hasExplicitStart: true,
+    hasExplicitDue: true,
+    rolledUp: false,
+    overdue: false,
+  };
   let issuesState = [blockerA, blockedB, candidateC];
   let seq = 30;
   const state: SliceBundle = {
     ...scenarios.empty.state,
-    board: { seq, issues: issuesState },
+    board: {
+      seq,
+      issues: issuesState,
+      boardSummary: {
+        laneCounts: { backlog: 1, todo: 1, inProgress: 1, inReview: 0, done: 0, canceled: 0 },
+        runningSlots: 0,
+        maxRunning: 3,
+        byIssue: {
+          [blockerA.id]: { lane: "todo", cardKind: "todo", familyDone: 0, familyTotal: 0, needsWorktreeCheck: false, schedule: spanA },
+          [blockedB.id]: { lane: "backlog", cardKind: "todo", familyDone: 0, familyTotal: 0, needsWorktreeCheck: false, schedule: spanB },
+          [candidateC.id]: { lane: "in_progress", cardKind: "issue", familyDone: 0, familyTotal: 0, needsWorktreeCheck: false },
+        },
+        schedule: {
+          todayDayMs: dayStart,
+          scheduled: [
+            { issueId: blockerA.id, span: spanA, depth: 0, isParent: false, childCount: 0 },
+            { issueId: blockedB.id, span: spanB, depth: 0, isParent: false, childCount: 0 },
+          ],
+          unscheduledIds: [candidateC.id],
+        },
+      },
+    },
   };
   const fake = fakeHost({ state, responses: scenarios.typical.responses }, { route: "/issues", locale: "en" });
   fake.respond("issue.history.list", () =>

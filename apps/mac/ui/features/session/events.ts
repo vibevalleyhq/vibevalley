@@ -1,14 +1,14 @@
-import type { SessionEvent } from "@vibevalley/protocol";
+import type { SessionEvent, SessionEventPage } from "@vibevalley/protocol";
 
 import { api } from "../../infra/api";
 import { subscribeLive } from "../../infra/frame";
 import { defineQuery, retryRead, useQueryClient, type QueryClient } from "../../infra/query";
 import { type Accessor, createEffect, createSignal } from "../../infra/solid";
-import { SessionLogs } from "./runs";
+import { emptyProjectionState, SessionLogs, type SessionProjectionState } from "./runs";
 
 const eventQuery = defineQuery({
   key: (a: { id: string; read: number }) => ["session-events", a.id, a.read],
-  fetch: async (a, context) => (await api.session.event.list({ id: a.id }, context)).events,
+  fetch: (a, context): Promise<SessionEventPage> => api.session.event.list({ id: a.id }, context),
   gcTime: 0,
   ...retryRead,
 });
@@ -22,7 +22,21 @@ function logsFor(client: QueryClient) {
   return logs;
 }
 
-/** A session's current retained log (the orchestrator's is "orchestrator"). The observer never suspends the page's other reads. */
+/** A session's current retained log and Rust trajectory projection (the orchestrator's is `"orchestrator"`). */
+export function createSessionProjection(id: Accessor<string>, enabled: Accessor<boolean>): Accessor<SessionProjectionState> {
+  const logs = logsFor(useQueryClient());
+  const [state, setState] = createSignal<SessionProjectionState>(emptyProjectionState);
+  createEffect(
+    () => (enabled() ? id() : undefined),
+    (session) => {
+      setState(emptyProjectionState);
+      return session !== undefined ? logs.subscribeProjection(session, setState) : undefined;
+    },
+  );
+  return state;
+}
+
+/** A session's current retained log (the orchestrator's is `"orchestrator"`). The observer never suspends the page's other reads. */
 export function createSessionEvents(id: Accessor<string>, enabled: Accessor<boolean>): Accessor<SessionEvent[]> {
   const logs = logsFor(useQueryClient());
   const [steps, setSteps] = createSignal<SessionEvent[]>([]);

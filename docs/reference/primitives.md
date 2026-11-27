@@ -181,6 +181,8 @@
 | `fixOf` | `readiness.ts` | What a feature lacks, in words, and the settings page that fixes it (SettingsStatus.readiness says what lacks). |
 | `formatGenUiAction` | `rich.ts` | Formats a GenUI action event into a concise human-readable line for toasts or channel feedback. |
 | `richNative` | `rich.ts` |  |
+| `coreBridge` | `rich.ts` | Returns the synchronous Rust `VvCore` native bridge (or test override in headless tests). |
+| `setCoreBridgeForTest` | `rich.ts` | Installs a synchronous `VvCore` stub for headless `nsh test` runs; returns a cleanup callback. |
 | `installNativeI18n` | `rich.ts` | Routes `@vibevalley/i18n` through native Rust `VvI18n` when the host registers it. |
 | `appHistory` | `router/context.tsx` | The one history of the app's page, for code outside the tree (the host's "open this route"). |
 | `useRouter` | `router/context.tsx` |  |
@@ -211,10 +213,10 @@
 | `search` | `router/search.ts` |  |
 | `localizeRuntimeError` | `runtimeError.ts` | Maps raw English runtime API-key errors (e.g. `no API key is set for the model`) into localized copy with a Settings link. |
 | `stepLimit` | `sessionRuns.ts` | The steps kept for one session's log in the page. |
-| `mergeSteps` | `sessionRuns.ts` | By seq and revision, independent of HTTP/live arrival order; capped to `limit` (default `stepLimit`, `null` for uncapped). |
-| `shownEvents` | `sessionRuns.ts` | A call with its result's output and ok; hidden step types (by default results and run bounds) left out. |
-| `extractToolTarget` | `sessionRuns.ts` | Extracts the target file path, line number, and diff capability from a tool step. |
-| `computeTelemetry` | `sessionRuns.ts` | Aggregates token usage, context fill, turns, and tool counts across a session's steps. |
+| `mergeSteps` | `sessionRuns.ts` | Merges incoming steps by `(seq, revision)` via Rust `VvCore`, capping to `limit` when set. |
+| `shownEvents` | `sessionRuns.ts` | Folds `tool/result` onto its matching `tool/call` and drops hidden step types via Rust `VvCore`. |
+| `extractToolTarget` | `sessionRuns.ts` | Extracts the target file path, line number, and diff capability from a tool step via Rust `VvCore`. |
+| `computeTelemetry` | `sessionRuns.ts` | Aggregates token usage, context fill, turns, and tool counts across a session's steps via Rust `VvCore`. |
 | `formatTokens` | `sessionRuns.ts` | Formats a token count compactly (e.g. `62.4k`, `1M`). |
 | `useSaveSettings` | `settings.ts` | Saves, and the settings the server answers with are the cached ones from then on. |
 | `useUpdates` | `settings.ts` | The desktop's own update as it is now and as it changes (Host.update); undefined where the host is not updated from |

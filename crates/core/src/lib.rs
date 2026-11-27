@@ -9,6 +9,7 @@ pub mod channel;
 pub mod clock;
 #[cfg(feature = "collab")]
 pub mod collab;
+pub mod compare;
 pub mod core;
 pub mod cron;
 pub mod deps;
@@ -24,8 +25,10 @@ pub mod retro;
 pub mod rules;
 #[cfg(any(test, feature = "scenarios"))]
 pub mod scenario;
+pub mod schedule;
 pub mod status;
 pub mod text;
+pub mod trajectory;
 
 pub use crate::clock::{Clock, ManualClock, SharedClock, SystemClock, system_clock};
 pub use crate::core::{

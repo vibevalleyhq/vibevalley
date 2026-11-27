@@ -1,7 +1,7 @@
 import { computed, Scroll, signal, Text, View, windowSize } from "nsh";
 
 import { t } from "@vibevalley/i18n";
-import type { Issue, Priority } from "@vibevalley/protocol";
+import type { BoardSummary, Issue, Priority } from "@vibevalley/protocol";
 
 import { Button } from "../../../design/Button";
 import { Icon } from "../../../design/Icon";
@@ -47,6 +47,7 @@ function pillTooltip(row: ScheduledCardRow): string {
 export function IssueCalendar(props: {
   cards: BoardCard[];
   allIssues: readonly Issue[];
+  summary?: BoardSummary | undefined;
   filtered?: boolean | undefined;
   loading: boolean;
   selected?: string | undefined;
@@ -61,7 +62,7 @@ export function IssueCalendar(props: {
   const expandedDays = signal<ReadonlySet<string>>(new Set());
 
   const grid = computed(() => buildMonthGrid(cursor().year, cursor().month, now()));
-  const timeline = computed(() => buildScheduleForCards(props.cards, props.allIssues, "month", now()));
+  const timeline = computed(() => buildScheduleForCards(props.cards, props.allIssues, "month", now(), props.summary));
   const byDay = computed(() => groupScheduledByDay(grid(), timeline().rows));
 
   const goMonth = (delta: number) => {

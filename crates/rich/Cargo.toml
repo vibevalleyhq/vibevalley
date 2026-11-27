@@ -26,6 +26,7 @@ ttf-parser = "0.25"
 vibevalley-core = { path = "../core", features = ["collab"] }
 vibevalley-i18n = { path = "../i18n", features = ["web"] }
 vibevalley-pele = { path = "../engines/pele" }
+vibevalley-protocol = { path = "../protocol" }
 vibevalley-shiki = { path = "../engines/shiki" }
 zstd = { version = "0.14", default-features = false }
 

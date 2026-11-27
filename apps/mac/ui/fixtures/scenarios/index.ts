@@ -6,7 +6,9 @@ import type {
   RetroWindow,
   SessionEvent,
   SessionEventPage,
+  SessionTrajectoryProjection,
   SliceBundle,
+  TrajectoryRunView,
 } from "@vibevalley/protocol";
 import { SliceBundle as SliceBundleSchema } from "@vibevalley/protocol/schema";
 
@@ -176,6 +178,55 @@ function buildMessages(density: ScenarioDensity, now: number): ChatMessage[] {
   return [...anchored, ...extra];
 }
 
+function scenarioTrajectory(events: SessionEvent[]): SessionTrajectoryProjection {
+  const emptyTelemetry = { inputTokens: 0, cacheReadTokens: 0, outputTokens: 0, llmRetries: 0, runErrors: 0 };
+  if (events.length === 0) {
+    return {
+      shown: [],
+      runs: [],
+      waterfall: { runs: [], spans: [] },
+      summary: { runs: 0, steps: 0, modelMs: 0, toolMs: 0, input: 0, cacheRead: 0, output: 0 },
+      stepDurations: [],
+      stepMeta: [],
+      telemetry: emptyTelemetry,
+    };
+  }
+  const results = new Map<number, SessionEvent>();
+  for (const e of events) if (e.type === "tool/result" && e.call !== undefined) results.set(e.call, e);
+  const shown = events.flatMap((e): SessionEvent[] => {
+    if (e.type === "run/start" || e.type === "run/end" || e.type === "tool/result") return [];
+    if (e.type === "tool/call") {
+      const r = results.get(e.seq);
+      if (r) return [{ ...e, ...(r.output !== undefined ? { output: r.output } : {}), ...(r.ok !== undefined ? { ok: r.ok } : {}) }];
+    }
+    return [e];
+  });
+  const runs: TrajectoryRunView[] = [];
+  for (const s of shown) {
+    let cur = runs.at(-1);
+    if (!cur || cur.run !== s.run) {
+      cur = { ...(s.run !== undefined ? { run: s.run } : {}), steps: [] };
+      runs.push(cur);
+    }
+    if (!cur.asked && cur.steps.length === 0 && s.type === "user/message") cur.asked = s;
+    else cur.steps.push(s);
+  }
+  return {
+    shown,
+    runs,
+    waterfall: { runs: runs.map((r) => [r.asked?.time ?? r.steps[0]?.time ?? 0, r.steps.at(-1)?.time ?? r.asked?.time ?? 0]), spans: [] },
+    summary: { runs: runs.length, steps: shown.length, modelMs: 0, toolMs: 0, input: 0, cacheRead: 0, output: 0 },
+    stepDurations: shown.map((s) => ({ seq: s.seq, durationMs: s.seq === 4 ? 1_000 : 0 })),
+    stepMeta: shown.map((s) => ({
+      seq: s.seq,
+      durationMs: s.seq === 4 ? 1_000 : 0,
+      ...(s.input !== undefined ? { readableInput: s.input } : {}),
+      ...(s.type === "user/message" ? { collapsedSummary: s.text } : {}),
+    })),
+    telemetry: emptyTelemetry,
+  };
+}
+
 function eventPage(events: SessionEvent[]): SessionEventPage {
   const oldestSeq = events[0]?.seq;
   const newestSeq = events.at(-1)?.seq;
@@ -184,6 +235,7 @@ function eventPage(events: SessionEvent[]): SessionEventPage {
     hasMore: false,
     ...(oldestSeq !== undefined ? { oldestSeq } : {}),
     ...(newestSeq !== undefined ? { newestSeq } : {}),
+    trajectory: scenarioTrajectory(events),
   };
 }
 

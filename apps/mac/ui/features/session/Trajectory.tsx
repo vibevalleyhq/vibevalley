@@ -1,7 +1,7 @@
 import { Clipboard, colorScheme, Scroll, signal, Text, View, type JSX, type ViewRef } from "nsh";
 
 import { t } from "@vibevalley/i18n";
-import type { OrchestratorEval, Session, SessionEvent } from "@vibevalley/protocol";
+import type { OrchestratorEval, Session, SessionEvent, SessionTrajectoryProjection, TrajectoryStepMeta, TrajectoryWaterfall } from "@vibevalley/protocol";
 import { oneLine } from "@vibevalley/protocol/rules";
 
 import { createAct } from "../../design/act";
@@ -20,7 +20,7 @@ import { ago } from "../../infra/base/format";
 import { useTimeout } from "../../infra/base/timer";
 import { localizeRuntimeError } from "../../infra/runtimeError";
 import { createEffect, createMemo } from "../../infra/solid";
-import { createSessionEvents } from "./events";
+import { createSessionProjection } from "./events";
 import {
   cacheHit,
   collapsedStepSummary,
@@ -28,18 +28,15 @@ import {
   type Lane,
   lanes,
   lastTime,
+  localizeCollapsedSummary,
+  projectTrajectory,
   readableInput,
   runMs,
-  runsOf,
   secondsText,
-  shownEvents,
   spanTone,
-  stepDurationsOf,
-  summaryOf,
   tagOf,
   tokensText,
   type TrajectorySummary,
-  waterfallOf,
   waterfallWidths,
 } from "./runs";
 import { SubagentProgress } from "./SubagentProgress";
@@ -183,7 +180,7 @@ export function TrajectoryLog(props: {
   about?: string;
   subagents?: Session["subagents"];
 }) {
-  const steps = createSessionEvents(
+  const proj = createSessionProjection(
     () => props.id,
     () => true,
   );
@@ -201,7 +198,7 @@ export function TrajectoryLog(props: {
     <View class="min-h-0 flex-1">
       <If when={props.subagents}>{(progress) => <SubagentProgress session={props.id} progress={progress()} now={now()} />}</If>
       <If
-        when={steps().length > 0}
+        when={proj().steps.length > 0}
         else={
           <View class="gap-2">
             {head()}
@@ -209,7 +206,15 @@ export function TrajectoryLog(props: {
           </View>
         }
       >
-        <Trajectory steps={steps()} now={now()} asked={props.asked} working={props.working === true} onMarkWrong={props.onMarkWrong} head={head()} />
+        <Trajectory
+          steps={proj().steps}
+          trajectory={proj().trajectory}
+          now={now()}
+          asked={props.asked}
+          working={props.working === true}
+          onMarkWrong={props.onMarkWrong}
+          head={head()}
+        />
       </If>
     </View>
   );
@@ -220,6 +225,8 @@ interface RowSpec {
   readonly tag: string;
   readonly when: string;
   readonly durationMs: number | undefined;
+  readonly readableInput: string | undefined;
+  readonly collapsedSummary: string | undefined;
   readonly markable: boolean;
 }
 
@@ -236,8 +243,19 @@ interface RunGroup {
   readonly rows: readonly RowSpec[];
 }
 
+const emptySummary: TrajectorySummary = {
+  runs: 0,
+  steps: 0,
+  modelMs: 0,
+  toolMs: 0,
+  input: 0,
+  cacheRead: 0,
+  output: 0,
+};
+
 export function Trajectory(props: {
   steps: SessionEvent[];
+  trajectory?: SessionTrajectoryProjection | undefined;
   now: number;
   asked?: string | undefined;
   working?: boolean;
@@ -253,27 +271,30 @@ export function Trajectory(props: {
   const wrong = signal<ReadonlyMap<number, string>>(new Map());
   const rowRefs = new Map<number, ViewRef>();
 
-  const shown = createMemo(() => shownEvents(props.steps));
+  const end = createMemo(() => {
+    const last = props.steps.at(-1)?.time ?? props.now;
+    return props.working === true && props.now > last ? props.now : last;
+  });
+  const activeProj = createMemo(() => props.trajectory ?? projectTrajectory(props.steps, end()));
+  const shown = createMemo(() => activeProj()?.shown ?? []);
   const errorCount = createMemo(() => shown().filter(isErrorStep).length);
   const hasActiveFilter = createMemo(() => query().trim().length > 0 || stepFilter() !== "all");
   const clearFilters = () => {
     query.set("");
     stepFilter.set("all");
   };
-  const end = createMemo(() => {
-    const last = props.steps.at(-1)?.time ?? props.now;
-    return props.working === true && props.now > last ? props.now : last;
-  });
   const bySeq = createMemo(() => new Map(shown().map((s) => [s.seq, s])));
-  const durations = createMemo(() => stepDurationsOf(props.steps, end()));
-  const summary = createMemo(() => summaryText(summaryOf(props.steps, end())));
+  const metaBySeq = createMemo((): ReadonlyMap<number, TrajectoryStepMeta> => new Map((activeProj()?.stepMeta ?? []).map((m) => [m.seq, m])));
+  const durations = createMemo(() => new Map((activeProj()?.stepDurations ?? []).map((d) => [d.seq, d.durationMs])));
+  const summary = createMemo(() => summaryText(activeProj()?.summary ?? emptySummary));
 
   const groups = createMemo((): readonly RunGroup[] => {
     const firstAsked = shown().find((s) => s.type === "user/message" && s.under === undefined)?.seq;
     const filter = stepFilter();
     const q = query().trim().toLowerCase();
-    const views = runsOf(shown());
+    const views = activeProj()?.runs ?? [];
     const durationMap = durations();
+    const metaMap = metaBySeq();
     const out: RunGroup[] = [];
     let n = 0;
     views.forEach((view, idx) => {
@@ -284,11 +305,14 @@ export function Trajectory(props: {
         if (!matchesStepFilter(step, filter)) continue;
         const tag = tagOf(step, props.asked, step.seq === firstAsked);
         if (q && !haystack(step, tag).includes(q)) continue;
+        const meta = metaMap.get(step.seq);
         rows.push({
           step,
           tag,
           when: ago(step.time, props.now),
           durationMs: durationMap.get(step.seq),
+          readableInput: meta?.readableInput,
+          collapsedSummary: meta?.collapsedSummary,
           markable: !!props.onMarkWrong && step.type === "user/message" && step.under === undefined,
         });
       }
@@ -410,6 +434,7 @@ export function Trajectory(props: {
       </View>
       <WaterfallView
         steps={props.steps}
+        waterfall={activeProj()?.waterfall}
         end={end()}
         selectedSeq={marked()}
         colorOf={(seq) => {
@@ -419,6 +444,8 @@ export function Trajectory(props: {
         summaryOf={(seq) => {
           const s = bySeq().get(seq);
           if (!s) return "";
+          const pre = metaBySeq().get(seq)?.collapsedSummary;
+          if (pre !== undefined) return localizeCollapsedSummary(pre);
           return collapsedStepSummary(s, stepTextOf(s));
         }}
         onPick={show}
@@ -548,7 +575,11 @@ function Row(props: { spec: RowSpec; open: boolean; marked: boolean; refTo: (el:
   const failed = () => (tool() && step().ok === false) || step().type === "run/error";
   const sub = () => step().under !== undefined;
   const bodyText = createMemo(() => stepTextOf(step()));
-  const summaryLine = createMemo(() => collapsedStepSummary(step(), bodyText()));
+  const summaryLine = createMemo(() => {
+    const pre = props.spec.collapsedSummary;
+    if (pre !== undefined) return localizeCollapsedSummary(pre);
+    return collapsedStepSummary(step(), bodyText());
+  });
   const durationLabel = () => {
     const ms = props.spec.durationMs;
     return ms !== undefined && ms >= 100 ? secondsText(ms) : undefined;
@@ -617,14 +648,14 @@ function Row(props: { spec: RowSpec; open: boolean; marked: boolean; refTo: (el:
         <Text class="w-12 shrink-0 text-right text-2xs text-faint tabular-nums">{props.spec.when}</Text>
       </View>
       <If when={props.open}>
-        <StepDrawer step={step()} tag={props.spec.tag} body={bodyText()} durationMs={props.spec.durationMs} />
+        <StepDrawer step={step()} tag={props.spec.tag} body={bodyText()} durationMs={props.spec.durationMs} readableInput={props.spec.readableInput} />
       </If>
     </View>
   );
 }
 
 /** Structured inline inspection drawer opened underneath any trajectory step row. */
-function StepDrawer(props: { step: SessionEvent; tag: string; body: string; durationMs: number | undefined }) {
+function StepDrawer(props: { step: SessionEvent; tag: string; body: string; durationMs: number | undefined; readableInput?: string | undefined }) {
   return (
     <View testID={`step-drawer-${String(props.step.seq)}`} class="border-t border-line py-2.5 pr-3.5 pl-8" style={{ backgroundColor: mix("side", 0.7) }}>
       <If
@@ -635,7 +666,7 @@ function StepDrawer(props: { step: SessionEvent; tag: string; body: string; dura
           </If>
         }
       >
-        <ToolDetail step={props.step} durationMs={props.durationMs} />
+        <ToolDetail step={props.step} durationMs={props.durationMs} readableInput={props.readableInput} />
       </If>
     </View>
   );
@@ -678,7 +709,7 @@ function CopyStepButton(props: { testID: string; copied: boolean; label?: string
   );
 }
 
-function ToolDetail(props: { step: SessionEvent; durationMs: number | undefined }) {
+function ToolDetail(props: { step: SessionEvent; durationMs: number | undefined; readableInput?: string | undefined }) {
   const copiedSlot = signal<"input" | "output" | undefined>(undefined);
   const resetCopy = useTimeout();
   createEffect(
@@ -696,7 +727,7 @@ function ToolDetail(props: { step: SessionEvent; durationMs: number | undefined 
       () => undefined,
     );
   };
-  const input = () => readableInput(props.step);
+  const input = () => props.readableInput ?? readableInput(props.step);
   const running = () => props.step.ok === undefined;
   const failed = () => props.step.ok === false;
   const stateLabel = () =>
@@ -860,6 +891,7 @@ function BodyDetail(props: { step: SessionEvent; tag: string; body: string; dura
 /** Runs side by side by how long each took; the idle time between them is a fixed gap. */
 function WaterfallView(props: {
   steps: SessionEvent[];
+  waterfall?: TrajectoryWaterfall | undefined;
   end: number;
   selectedSeq?: number | undefined;
   colorOf: (seq: number) => string;
@@ -872,7 +904,7 @@ function WaterfallView(props: {
   const between = 4;
   const bars = createMemo(() => {
     colorScheme();
-    const fall = waterfallOf(props.steps, props.end);
+    const fall = props.waterfall ?? projectTrajectory(props.steps, props.end)?.waterfall ?? { runs: [], spans: [] };
     const runs = fall.runs;
     if (width() <= 0 || runs.length === 0) return [];
     const room = Math.max(0, width() - between * (runs.length - 1));

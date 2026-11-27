@@ -12635,6 +12635,7 @@ dependencies = [
  "vibevalley-core",
  "vibevalley-i18n",
  "vibevalley-pele",
+ "vibevalley-protocol",
  "vibevalley-shiki",
  "zstd",
 ]

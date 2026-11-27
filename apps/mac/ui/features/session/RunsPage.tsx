@@ -28,7 +28,7 @@ import { useLocation, useRouter, useSearch } from "../../infra/router";
 import { localizeRuntimeError } from "../../infra/runtimeError";
 import { formatTokens } from "../../infra/sessionRuns";
 import { createEffect, createMemo } from "../../infra/solid";
-import { createSessionEvents } from "./events";
+import { createSessionProjection } from "./events";
 import {
   buildRunEntries,
   filterRunEntries,
@@ -797,10 +797,11 @@ function RunDetail(props: {
   const resetCopy = useTimeout();
   const resumeAct = createAct((msg) => toast(msg));
   const compactAct = createAct((msg) => toast(msg));
-  const steps = createSessionEvents(
+  const proj = createSessionProjection(
     () => props.entry.id,
     () => true,
   );
+  const steps = () => proj().steps;
   createEffect(
     () => props.entry.id,
     () => {
@@ -832,7 +833,7 @@ function RunDetail(props: {
   const workerIssueNumber = () => (props.entry.kind === "worker" ? props.entry.issue?.number : undefined);
   const timing = () => entryTiming(props.entry, props.now);
   const repo = () => (props.entry.kind === "worker" ? sessionRepo(props.entry.session) : undefined);
-  const rollup = createMemo(() => runTelemetryOf(props.entry, steps()));
+  const rollup = createMemo(() => runTelemetryOf(props.entry, proj().trajectory?.telemetry));
   const recoverable = createMemo(() => isRecoverableRun(props.entry));
   const canCompact = createMemo(() => supportsManualCompaction(props.entry));
   const canRunCode = createMemo(() => supportsCodeMode(props.entry));

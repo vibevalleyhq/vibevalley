@@ -158,7 +158,28 @@ test("IssueDetail merges milestones, discussion messages, and expandable per-run
   fake.respond("issue.run.list", runs);
   fake.respond("issue.conversation.get", channel.id);
   fake.respond("channel.message.list", messages);
-  fake.respond("session.event.list", { events, hasMore: false, oldestSeq: 1, newestSeq: 5 });
+  const shownEvents1: SessionEvent[] = [{ ...events[1], output: "ok", ok: true }, events[3]];
+  fake.respond("session.event.list", {
+    events,
+    hasMore: false,
+    oldestSeq: 1,
+    newestSeq: 5,
+    trajectory: {
+      shown: shownEvents1,
+      runs: [{ run: "r1", steps: shownEvents1 }],
+      waterfall: { runs: [], spans: [] },
+      summary: { runs: 1, steps: 2, modelMs: 0, toolMs: 10_000, input: 0, cacheRead: 0, output: 0 },
+      stepDurations: [
+        { seq: 2, durationMs: 10_000 },
+        { seq: 4, durationMs: 0 },
+      ],
+      stepMeta: [
+        { seq: 2, durationMs: 10_000, readableInput: "IssueDetail.tsx" },
+        { seq: 4, durationMs: 0 },
+      ],
+      telemetry: { inputTokens: 0, cacheReadTokens: 0, outputTokens: 0, llmRetries: 0, runErrors: 0 },
+    },
+  });
 
   const app = await open("../../../app/main.tsx", {
     width: 1200,
@@ -255,7 +276,21 @@ test("TodoDetail renders unified issue-activity stream with milestones, comments
   fake.respond("issue.run.list", runs);
   fake.respond("issue.conversation.get", channel.id);
   fake.respond("channel.message.list", messages);
-  fake.respond("session.event.list", { events, hasMore: false, oldestSeq: 1, newestSeq: 2 });
+  fake.respond("session.event.list", {
+    events,
+    hasMore: false,
+    oldestSeq: 1,
+    newestSeq: 2,
+    trajectory: {
+      shown: [events[1]],
+      runs: [{ run: "r-draft", steps: [events[1]] }],
+      waterfall: { runs: [], spans: [] },
+      summary: { runs: 1, steps: 1, modelMs: 0, toolMs: 0, input: 0, cacheRead: 0, output: 0 },
+      stepDurations: [{ seq: 2, durationMs: 0 }],
+      stepMeta: [{ seq: 2, durationMs: 0, readableInput: "TodoDetail" }],
+      telemetry: { inputTokens: 0, cacheReadTokens: 0, outputTokens: 0, llmRetries: 0, runErrors: 0 },
+    },
+  });
 
   const app = await open("../../../app/main.tsx", {
     width: 1200,

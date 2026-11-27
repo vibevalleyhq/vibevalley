@@ -25,7 +25,7 @@ import { CodeBlock } from "./code/CodeBlock";
 import { Diagram } from "./code/Diagram";
 import { GenUi } from "./code/GenUi";
 import { Compare } from "./Compare";
-import { splitMarkdownCompareBlocks, type CompareSpec } from "./compareModel";
+import { CompareSpecSchema, splitMarkdownCompareBlocks, type CompareSpec } from "./compareModel";
 import { fileKind, kindIcon } from "./domain/AttachmentTile";
 import { followDesignHref, useDesignHost } from "./host";
 import { Icon } from "./Icon";
@@ -517,6 +517,15 @@ function MarkdownAttachmentImage(props: {
   );
 }
 
+function parseCompareJsonForFallback(raw: string): CompareSpec | undefined {
+  try {
+    const checked = CompareSpecSchema.safeParse(JSON.parse(raw));
+    return checked.success ? checked.data : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function MarkdownChunk(props: MarkdownChunkProps) {
   const native = richNative();
   if (native) {
@@ -562,6 +571,11 @@ function MarkdownChunk(props: MarkdownChunkProps) {
             return <Canvas data={block.code} />;
           case "genui":
             return <GenUi spec={block.code} streaming={props.streaming} onAction={props.onGenUiAction} />;
+          case "compare": {
+            const spec = parseCompareJsonForFallback(block.code);
+            if (spec) return <Compare spec={spec} />;
+            return <CodeBlock code={block.code} language={block.language} onCopy={props.onCodeCopy} />;
+          }
           default:
             return <CodeBlock code={block.code} language={block.language} onCopy={props.onCodeCopy} />;
         }

@@ -81,6 +81,11 @@
           "familyTotal": 0,
           "needsWorktreeCheck": false
         }
+      },
+      "schedule": {
+        "todayDayMs": 0,
+        "scheduled": [],
+        "unscheduledIds": ["i1"]
       }
     }
   },

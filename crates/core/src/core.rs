@@ -443,7 +443,7 @@ pub fn board_slice(state: &SpaceState, seq: i64) -> BoardSlice {
     BoardSlice {
         seq,
         issues: state.issues.clone(),
-        board_summary: Some(board_summary(&state.issues, &state.sessions, channels)),
+        board_summary: Some(board_summary(&state.issues, &state.sessions, channels, None)),
         commits: state.commits.clone(),
         repo_health: Vec::new(),
     }
