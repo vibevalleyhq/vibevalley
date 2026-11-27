@@ -1,7 +1,9 @@
 //! `agent list|create|update|delete`.
 
 use clap::{ArgAction, Args, Subcommand, ValueEnum};
-use vibevalley_protocol::{Agent, AgentDeleteInput, AgentExecutionMode, AgentRole, Build, Head, Look, OrchestratorLook, Outfit, PersonaMode, Species, Toolset, ops};
+use vibevalley_protocol::{
+    Agent, AgentDeleteInput, AgentExecutionMode, AgentRole, Build, Head, Look, OrchestratorLook, Outfit, PersonaMode, Species, Toolset, ops,
+};
 
 use crate::client::{Client, Done, Failure, exit};
 use crate::output::line;

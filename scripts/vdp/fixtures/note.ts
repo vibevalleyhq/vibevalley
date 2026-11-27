@@ -48,7 +48,7 @@ async function performSeedNoteShowcase(v: VdpScenarioContext): Promise<NoteShowc
       title: "Typography & Contrast Token Spec",
       noteType: "doc",
       sortOrder: 20,
-      issue: issue1Id,
+      issue: issue2Id,
       content: JSON.stringify(
         {
           version: 1,
@@ -387,7 +387,7 @@ async function performSeedNoteShowcase(v: VdpScenarioContext): Promise<NoteShowc
       title: "Note 重构交付追踪 Base",
       noteType: "base",
       sortOrder: 30,
-      issue: issue1Id,
+      issue: issue2Id,
       content: JSON.stringify(baseDoc, null, 2),
     },
     CreatedNoteSchema,
@@ -535,7 +535,7 @@ async function performSeedNoteShowcase(v: VdpScenarioContext): Promise<NoteShowc
       title: "发版演示录屏与逐字稿",
       noteType: "media",
       sortOrder: 50,
-      issue: issue1Id,
+      issue: issue2Id,
       content: JSON.stringify(mediaDoc, null, 2),
     },
     CreatedNoteSchema,
@@ -549,7 +549,7 @@ async function performSeedNoteShowcase(v: VdpScenarioContext): Promise<NoteShowc
       {
         id: "b2",
         type: "prose",
-        text: `这份架构笔记用于统一 **Block Doc**、**多维 Base** 与 **Canvas/Media** 原语设计；核心色彩与对比度规则见 [[note:${childPage.id}]]，整体需求追踪见 [[issue:${issue1Id}]]。`,
+        text: `这份架构笔记用于统一 **Block Doc**、**多维 Base** 与 **Canvas/Media** 原语设计；核心色彩与对比度规则见 [[note:${childPage.id}]]，整体需求追踪见 [[issue:${issue2Id}]]。`,
       },
       {
         id: "b_callout_warn",
@@ -650,7 +650,7 @@ async function performSeedNoteShowcase(v: VdpScenarioContext): Promise<NoteShowc
         speakerNotes: "演示 Doc 中直接嵌入 Base 视图和 Issue 实时状态卡片，以及底部的双向引用面板。",
       },
       { id: "b11", type: "baseEmbed", noteId: baseNote.id, sheetId: "sheet_deliverables", viewId: "v_table" },
-      { id: "b12", type: "issueCard", issueId: issue1Id },
+      { id: "b12", type: "issueCard", issueId: issue2Id },
       {
         id: "b_bookmark",
         type: "bookmark",
@@ -667,7 +667,7 @@ async function performSeedNoteShowcase(v: VdpScenarioContext): Promise<NoteShowc
       title: "VibeValley Note 3+1 编辑体验规范",
       noteType: "doc",
       sortOrder: 10,
-      issue: issue1Id,
+      issue: issue2Id,
       content: JSON.stringify(mainDoc, null, 2),
     },
     CreatedNoteSchema,

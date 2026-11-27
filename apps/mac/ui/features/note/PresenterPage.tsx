@@ -2,17 +2,17 @@ import { cleanup, computed, keymap, Scroll, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import type { DocBlock, DocView } from "@vibevalley/protocol";
-import { noteId } from "@vibevalley/protocol/schema";
 
 import { IconButton } from "../../design/IconButton";
 import { Empty, Kbd } from "../../design/layout";
-import { api, reasonOf } from "../../infra/api";
+import { reasonOf } from "../../infra/api";
 import { useNow } from "../../infra/base/dom";
-import { defineQuery, ready, useQuery } from "../../infra/query";
+import { ready, useQuery } from "../../infra/query";
 import { useRouter } from "../../infra/router";
 import { useVdpNode } from "../../infra/vdpProbe";
 import { noteHref, useNote } from "./NoteCard";
 import { elapsedText, presenterOf, stepped } from "./slides";
+import { noteDocQuery } from "./store";
 
 interface SlideItem {
   readonly id: string;
@@ -21,11 +21,6 @@ interface SlideItem {
   readonly notes: string;
   readonly blocks: readonly DocBlock[];
 }
-
-const presenterDocQuery = defineQuery({
-  key: (id: string) => ["note-doc", id],
-  fetch: (id, context) => api.note.doc.view({ id: noteId(id) }, context),
-});
 
 function summarizeBlock(block: DocBlock): string {
   switch (block.type) {
@@ -132,7 +127,7 @@ export function PresenterPage() {
 function Presenter(props: { id: string; version: number }) {
   const router = useRouter();
   const note = useNote(() => props.id);
-  const docQuery = useQuery(() => presenterDocQuery(props.id));
+  const docQuery = useQuery(() => noteDocQuery(props.id));
   const at = signal(0);
 
   const slides = computed((): readonly SlideItem[] => buildSlidesFromDoc(ready(docQuery, undefined), note.data()?.title ?? ""));

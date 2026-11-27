@@ -12,8 +12,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use vibevalley_protocol::{
-    Agent, AgentRegisterInput, AgentRole, AgentTemplate, AgentValidation, ApiError, Installation, PersonaMode, Preview, RuntimeInfo,
-    RuntimeSettings, Skill,
+    Agent, AgentRegisterInput, AgentRole, AgentTemplate, AgentValidation, ApiError, Installation, PersonaMode, Preview, RuntimeInfo, RuntimeSettings, Skill,
 };
 use vibevalley_runtime::machine::MachineRegistry;
 use vibevalley_runtime::oar::Registry;

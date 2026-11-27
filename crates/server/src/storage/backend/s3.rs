@@ -779,7 +779,7 @@ mod tests {
     <s3:Size>7</s3:Size>
   </s3:Contents>
   <s3:Contents>
-    <s3:Key>prod/&#38;&#x26;&#X3C;&#62;&#x1F600;</s3:Key>
+    <s3:Key>prod/&#38;&#x26;&#x3C;&#62;&#x1F600;</s3:Key>
     <s3:Size>1</s3:Size>
   </s3:Contents>
   <s3:Contents/>

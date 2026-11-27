@@ -600,10 +600,7 @@ impl Voice {
         if self.state.lock().stopped {
             return Err(Self::stopped());
         }
-        self.orchestrator
-            .polish_text_async(prompt::ASR_POLISH_SYSTEM, trimmed)
-            .await
-            .map_err(failed)
+        self.orchestrator.polish_text_async(prompt::ASR_POLISH_SYSTEM, trimmed).await.map_err(failed)
     }
 
     /// Lightweight dictation-only MOSS Live WebSocket credentials (no tools or commentary).

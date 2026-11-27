@@ -397,15 +397,18 @@ fn asr_dictation_and_transcription_endpoints_work_offline() {
 #[test]
 fn asr_transcript_polish_restores_punctuation_and_preserves_empty_fallback() {
     let f = farm(&["我想看一下日志。", "   "]);
-    let polished = vibevalley_runtime::rt::block_on(f.voice().polish_transcript_async("呃 那个 我想我想 看一下 日志".into())).unwrap();
+    let polished = vibevalley_runtime::rt::block_on(f.voice().polish_transcript_async("呃 那个 我想我想 看一下 日志")).unwrap();
     assert_eq!(polished, "我想看一下日志。");
     let seen = f.model.seen.lock().unwrap();
     assert_eq!(seen.len(), 1);
-    assert_eq!(seen[0].messages[0].content.as_deref(), Some(vibevalley_server::voice::prompt::ASR_POLISH_SYSTEM));
+    assert_eq!(
+        seen[0].messages[0].content.as_deref(),
+        Some(vibevalley_server::voice::prompt::ASR_POLISH_SYSTEM)
+    );
     assert_eq!(seen[0].messages[1].content.as_deref(), Some("呃 那个 我想我想 看一下 日志"));
     drop(seen);
 
     // Empty model completion falls back cleanly to the trimmed raw transcript.
-    let kept = vibevalley_runtime::rt::block_on(f.voice().polish_transcript_async("  keep raw text  ".into())).unwrap();
+    let kept = vibevalley_runtime::rt::block_on(f.voice().polish_transcript_async("  keep raw text  ")).unwrap();
     assert_eq!(kept, "keep raw text");
 }

@@ -12,9 +12,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use vibevalley_i18n::{list, t};
 use vibevalley_protocol::{
-    Agent, AgentExecutionMode, AgentFrom, AgentRegisterInput, AgentRole, AgentTemplate, AgentTemplateSource, ApiError, BizCode, Build,
-    DEFAULT_ORCHESTRATOR, Head, Look, ORCHESTRATOR_RUNTIME, OrchestratorLook, Outfit, PersonaMode, Preview, RuntimeSettings, Skill, Species,
-    TemplateCategory, Toolset,
+    Agent, AgentExecutionMode, AgentFrom, AgentRegisterInput, AgentRole, AgentTemplate, AgentTemplateSource, ApiError, BizCode, Build, DEFAULT_ORCHESTRATOR,
+    Head, Look, ORCHESTRATOR_RUNTIME, OrchestratorLook, Outfit, PersonaMode, Preview, RuntimeSettings, Skill, Species, TemplateCategory, Toolset,
 };
 
 use super::preset::default_settings;
@@ -88,11 +87,7 @@ fn fnv1a_hash(text: &str) -> u32 {
 
 /// Deterministic Papertrails portrait assignment matching UI `assignWorkerAvatars` collision probing.
 pub fn assign_worker_avatar(id: &str, name: &str, beside: &[Agent]) -> String {
-    let used: BTreeSet<&str> = beside
-        .iter()
-        .filter_map(|a| a.look.avatar.as_deref())
-        .filter(|s| !s.is_empty())
-        .collect();
+    let used: BTreeSet<&str> = beside.iter().filter_map(|a| a.look.avatar.as_deref()).filter(|s| !s.is_empty()).collect();
     let seed = if !id.trim().is_empty() {
         id.trim()
     } else if !name.trim().is_empty() {
@@ -171,8 +166,7 @@ fn resolve_agent_code(raw: &str, role: AgentRole, beside: &[Agent], self_id: Opt
         }
         return Ok(next_free_code(role, beside));
     }
-    let normalized = normalize_code_for_role(trimmed, role)
-        .ok_or_else(|| refused(t("server.agent.invalidCode", &[("code", trimmed.into())])))?;
+    let normalized = normalize_code_for_role(trimmed, role).ok_or_else(|| refused(t("server.agent.invalidCode", &[("code", trimmed.into())])))?;
     if let Some(other) = beside
         .iter()
         .find(|a| Some(a.id.as_str()) != self_id && a.code.eq_ignore_ascii_case(&normalized))
@@ -874,7 +868,11 @@ impl ProfileStore {
         }
         let saved = self
             .change_async(|s| {
-                let code = resolve_agent_code(&a.code, a.role, &s.agents, Some(&a.id))?;
+                let raw_code = match s.agents.iter().find(|existing| existing.id == a.id) {
+                    Some(existing) if existing.role != a.role && a.code.trim() == existing.code => "",
+                    _ => a.code.as_str(),
+                };
+                let code = resolve_agent_code(raw_code, a.role, &s.agents, Some(&a.id))?;
                 let cast = with_cast(Agent { code, ..a });
                 s.agents = upsert(&s.agents, cast.clone(), |x| &x.id);
                 Ok(cast)
@@ -921,12 +919,7 @@ impl ProfileStore {
             }
             None => None,
         };
-        let explicit_runtime = input
-            .runtime
-            .as_deref()
-            .map(str::trim)
-            .filter(|s| !s.is_empty())
-            .map(str::to_string);
+        let explicit_runtime = input.runtime.as_deref().map(str::trim).filter(|s| !s.is_empty()).map(str::to_string);
         let id = match input.id.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
             Some(raw) => raw.to_string(),
             None => derive_external_id(explicit_runtime.as_deref().unwrap_or("external"), &name),
@@ -961,12 +954,7 @@ impl ProfileStore {
                     return Ok(next);
                 }
 
-                let code = resolve_agent_code(
-                    input.code.as_deref().unwrap_or_default(),
-                    AgentRole::Worker,
-                    &s.agents,
-                    None,
-                )?;
+                let code = resolve_agent_code(input.code.as_deref().unwrap_or_default(), AgentRole::Worker, &s.agents, None)?;
                 let avatar = explicit_avatar.unwrap_or_else(|| assign_worker_avatar(&id, &name, &s.agents));
                 let created = with_cast(Agent {
                     id,

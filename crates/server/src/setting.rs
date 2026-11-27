@@ -254,12 +254,8 @@ impl Providers {
     /// Whether `u` can run, and what it lacks.
     pub fn readiness(&self, u: Use) -> Readiness {
         let lacks = |missing| Readiness::False { ready: LitFalse, missing };
-        if self.connections.is_empty() {
-            return lacks(if u == Use::Orchestrator {
-                Missing::DeepseekKey
-            } else {
-                Missing::MossAccount
-            });
+        if self.connections.is_empty() || (u != Use::Orchestrator && self.connections.iter().all(|c| c.adapter == ProviderConnectionAdapter::DeepSeek)) {
+            return lacks(if u == Use::Orchestrator { Missing::DeepseekKey } else { Missing::MossAccount });
         }
         let Some(c) = self.binding(u).and_then(|b| self.connections.iter().find(|c| c.id == b.connection)) else {
             return lacks(Missing::Binding);
@@ -419,11 +415,7 @@ fn fold_legacy_deepseek_key(stored: &mut Stored) {
         return;
     }
     let providers = stored.providers.get_or_insert_with(Providers::default);
-    if let Some(existing) = providers
-        .connections
-        .iter_mut()
-        .find(|c| c.adapter == ProviderConnectionAdapter::DeepSeek)
-    {
+    if let Some(existing) = providers.connections.iter_mut().find(|c| c.adapter == ProviderConnectionAdapter::DeepSeek) {
         if existing.key.is_empty() {
             existing.key = legacy;
             existing.enabled = true;
@@ -678,11 +670,7 @@ impl Setting {
         let mut status = self.providers().status();
         if !self.config.deepseek_api_key.is_empty() {
             let env_key = Secret::new(&self.config.deepseek_api_key).status(KeySource::Config);
-            if let Some(conn) = status
-                .connections
-                .iter_mut()
-                .find(|c| c.adapter == ProviderConnectionAdapter::DeepSeek)
-            {
+            if let Some(conn) = status.connections.iter_mut().find(|c| c.adapter == ProviderConnectionAdapter::DeepSeek) {
                 if conn.key.source.is_none() {
                     conn.key = env_key;
                 }
@@ -746,17 +734,13 @@ impl Setting {
         let orchestrator_readiness = match providers.binding(Use::Orchestrator) {
             Some(b) => match providers.connections.iter().find(|conn| conn.id == b.connection) {
                 Some(conn) if !conn.enabled => lacks(Missing::MossOff),
-                Some(conn) if !conn.key.is_empty() || (conn.adapter == ProviderConnectionAdapter::DeepSeek && !c.deepseek_api_key.is_empty()) => {
-                    ready()
-                }
+                Some(conn) if !conn.key.is_empty() || (conn.adapter == ProviderConnectionAdapter::DeepSeek && !c.deepseek_api_key.is_empty()) => ready(),
                 Some(conn) if conn.adapter == ProviderConnectionAdapter::DeepSeek => lacks(Missing::DeepseekKey),
                 Some(_) => lacks(Missing::MossKey),
                 None => lacks(Missing::Binding),
             },
             None => {
-                let saved_enabled_deepseek = providers
-                    .usable_adapter(ProviderConnectionAdapter::DeepSeek)
-                    .is_some();
+                let saved_enabled_deepseek = providers.usable_adapter(ProviderConnectionAdapter::DeepSeek).is_some();
                 if saved_enabled_deepseek || !c.deepseek_api_key.is_empty() {
                     ready()
                 } else {
@@ -845,11 +829,7 @@ impl Setting {
                     for id in cleared_ids {
                         clear_bindings_for(providers, &id);
                     }
-                } else if let Some(conn) = providers
-                    .connections
-                    .iter_mut()
-                    .find(|c| c.adapter == ProviderConnectionAdapter::DeepSeek)
-                {
+                } else if let Some(conn) = providers.connections.iter_mut().find(|c| c.adapter == ProviderConnectionAdapter::DeepSeek) {
                     if conn.key.expose() != trimmed {
                         conn.models.clear();
                         conn.verification = None;

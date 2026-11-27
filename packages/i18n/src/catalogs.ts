@@ -789,11 +789,13 @@ export const catalogs = {
         noteSelected: "已选 {n} 个元素",
         clearContext: "移除本次附带的上下文",
         runningHint: "正在处理中，可直接补充说明或点击停止",
-        dictateStart: "语音输入（MOSS ASR）",
+        dictateStart: "语音听写（ASR）",
         dictateStop: "停止语音输入",
         dictateConnecting: "正在连接语音…",
         dictateListening: "正在听写…",
-        dictateFinishing: "正在整理文字…",
+        dictateFinishing: "识别中…",
+        dictatePolishing: "润色中…",
+        dictateRevertRaw: "还原原文",
       },
       manage: {
         name: "名称",
@@ -4782,11 +4784,13 @@ export const catalogs = {
         noteSelected: "{n} selected",
         clearContext: "Remove attached context",
         runningHint: "Working — send a follow-up or click stop",
-        dictateStart: "Voice dictation (MOSS ASR)",
+        dictateStart: "Voice dictation (ASR)",
         dictateStop: "Stop dictation",
         dictateConnecting: "Connecting audio…",
         dictateListening: "Listening…",
         dictateFinishing: "Transcribing…",
+        dictatePolishing: "Polishing…",
+        dictateRevertRaw: "Revert to raw",
       },
       manage: {
         name: "Name",
@@ -8848,6 +8852,8 @@ export interface Messages {
   "web.channel.composer.dictateConnecting": undefined;
   "web.channel.composer.dictateFinishing": undefined;
   "web.channel.composer.dictateListening": undefined;
+  "web.channel.composer.dictatePolishing": undefined;
+  "web.channel.composer.dictateRevertRaw": undefined;
   "web.channel.composer.dictateStart": undefined;
   "web.channel.composer.dictateStop": undefined;
   "web.channel.composer.mention": undefined;

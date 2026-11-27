@@ -637,18 +637,16 @@ impl VoiceOrchestratorPort for Orchestrator {
                 max_tokens: Some(2048),
                 ..Default::default()
             };
-            let cancel = CancelToken::new();
+            let cancel_token = CancellationToken::new();
+            let cancel = CancelToken::from_tokio(cancel_token.clone());
             let mut sink = |_delta: Delta| {};
-            let completion = tokio::time::timeout(
-                std::time::Duration::from_secs(10),
-                self.client().complete_cancellable(&req, &cancel, &mut sink),
-            )
-            .await
-            .map_err(|_| {
-                cancel.cancel();
-                "ASR polish timed out".to_string()
-            })?
-            .map_err(|e| e.to_string())?;
+            let completion = tokio::time::timeout(std::time::Duration::from_secs(10), self.client().complete_cancellable(&req, &cancel, &mut sink))
+                .await
+                .map_err(|_| {
+                    cancel_token.cancel();
+                    "ASR polish timed out".to_string()
+                })?
+                .map_err(|e| e.to_string())?;
             let polished = completion.message.content.unwrap_or_default().trim().to_string();
             Ok(if polished.is_empty() { trimmed.to_string() } else { polished })
         })

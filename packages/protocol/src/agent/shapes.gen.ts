@@ -62,7 +62,13 @@ avatar?: string, };
  */
 export type AgentFrom = { template: string, version: number, };
 
+/**
+ * How a teammate executes work: `managed` runs through VibeValley's OAR session queue; `external` represents an external coding agent on the roster.
+ */
 export const AgentExecutionModeValues = ["managed", "external"] as const;
+/**
+ * How a teammate executes work: `managed` runs through VibeValley's OAR session queue; `external` represents an external coding agent on the roster.
+ */
 export type AgentExecutionMode = (typeof AgentExecutionModeValues)[number];
 
 export type Agent = { id: string,

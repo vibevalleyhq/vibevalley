@@ -108,7 +108,7 @@ mod tests {
         for i in 0..archive.len() {
             let mut file = archive.by_index(i).expect("zip entry");
             assert_eq!(file.compression(), CompressionMethod::Deflated);
-            let name = file.name().to_string();
+            let name = file.name().expect("zip entry name").to_string();
             let mut data = Vec::with_capacity(file.size() as usize);
             file.read_to_end(&mut data).expect("read deflated entry");
             out.push((name, data));

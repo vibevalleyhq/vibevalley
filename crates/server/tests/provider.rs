@@ -5,7 +5,9 @@ use std::io::Cursor;
 use std::sync::Arc;
 
 use serde_json::{Value, json};
-use vibevalley_protocol::{BizCode, ModelCapability, ProviderConnectionAdapter, ProviderScene, ProviderUpdate, ProviderVerificationStatus, ProviderVerifyRequest};
+use vibevalley_protocol::{
+    BizCode, ModelCapability, ProviderConnectionAdapter, ProviderScene, ProviderUpdate, ProviderVerificationStatus, ProviderVerifyRequest,
+};
 use vibevalley_server::context::http::{Fetch, FetchError, Request, Response};
 use vibevalley_server::provider::{Provider, connections_over, infer_model_capabilities};
 use vibevalley_server::setting::{Setting, SettingConfig};
@@ -97,7 +99,10 @@ fn invalid_connection_changes_and_duplicate_adapters_are_refused() {
 
 #[test]
 fn capability_inference_tags_deepseek_minimax_moss_openai_and_anthropic() {
-    assert_eq!(infer_model_capabilities(ProviderConnectionAdapter::DeepSeek, "deepseek-chat"), vec![ModelCapability::Chat]);
+    assert_eq!(
+        infer_model_capabilities(ProviderConnectionAdapter::DeepSeek, "deepseek-chat"),
+        vec![ModelCapability::Chat]
+    );
     assert_eq!(
         infer_model_capabilities(ProviderConnectionAdapter::MiniMax, "MiniMax-M2.5"),
         vec![ModelCapability::Chat]
@@ -247,16 +252,19 @@ fn verify_auto_fetches_tagged_models_records_failures_and_validates_scene_polici
 
         let provider = Provider::new(setting.clone(), fetch);
         let saved = provider
-            .update_async(&serde_json::from_value(json!({
-                "revision": 0,
-                "connections": [
-                    { "id": "deepseek", "name": "DeepSeek", "adapter": "deepseek", "enabled": true, "key": "sk-bad-key" },
-                    { "id": "minimax", "name": "MiniMax", "adapter": "minimax", "enabled": true, "key": "mm-good-key" }
-                ],
-                "orchestrator": null, "polish": null, "speech": null, "understanding": null,
-                "image": null, "live": null, "speakers": null, "voiceDesign": null,
-                "transcription": null, "vision": null, "scenePolicies": []
-            })).unwrap())
+            .update_async(
+                &serde_json::from_value(json!({
+                    "revision": 0,
+                    "connections": [
+                        { "id": "deepseek", "name": "DeepSeek", "adapter": "deepseek", "enabled": true, "key": "sk-bad-key" },
+                        { "id": "minimax", "name": "MiniMax", "adapter": "minimax", "enabled": true, "key": "mm-good-key" }
+                    ],
+                    "orchestrator": null, "polish": null, "speech": null, "understanding": null,
+                    "image": null, "live": null, "speakers": null, "voiceDesign": null,
+                    "transcription": null, "vision": null, "scenePolicies": []
+                }))
+                .unwrap(),
+            )
             .await
             .unwrap();
 
@@ -274,16 +282,19 @@ fn verify_auto_fetches_tagged_models_records_failures_and_validates_scene_polici
 
         // Replace with good DeepSeek key, verify both DeepSeek and MiniMax.
         let fixed = provider
-            .update_async(&serde_json::from_value(json!({
-                "revision": failed.revision,
-                "connections": [
-                    { "id": "deepseek", "name": "DeepSeek", "adapter": "deepseek", "enabled": true, "key": "sk-good-key" },
-                    { "id": "minimax", "name": "MiniMax", "adapter": "minimax", "enabled": true }
-                ],
-                "orchestrator": null, "polish": null, "speech": null, "understanding": null,
-                "image": null, "live": null, "speakers": null, "voiceDesign": null,
-                "transcription": null, "vision": null, "scenePolicies": []
-            })).unwrap())
+            .update_async(
+                &serde_json::from_value(json!({
+                    "revision": failed.revision,
+                    "connections": [
+                        { "id": "deepseek", "name": "DeepSeek", "adapter": "deepseek", "enabled": true, "key": "sk-good-key" },
+                        { "id": "minimax", "name": "MiniMax", "adapter": "minimax", "enabled": true }
+                    ],
+                    "orchestrator": null, "polish": null, "speech": null, "understanding": null,
+                    "image": null, "live": null, "speakers": null, "voiceDesign": null,
+                    "transcription": null, "vision": null, "scenePolicies": []
+                }))
+                .unwrap(),
+            )
             .await
             .unwrap();
         let v1 = provider
@@ -312,40 +323,46 @@ fn verify_auto_fetches_tagged_models_records_failures_and_validates_scene_polici
 
         // Selecting an incompatible capability (e.g. TTS model for orchestrator chat) is refused.
         let bad_scene = provider
-            .update_async(&serde_json::from_value(json!({
-                "revision": v2.revision,
-                "connections": [
-                    { "id": "deepseek", "name": "DeepSeek", "adapter": "deepseek", "enabled": true },
-                    { "id": "minimax", "name": "MiniMax", "adapter": "minimax", "enabled": true }
-                ],
-                "orchestrator": { "connection": "minimax", "model": "speech-02-hd" },
-                "polish": null, "speech": null, "understanding": null,
-                "image": null, "live": null, "speakers": null, "voiceDesign": null,
-                "transcription": null, "vision": null, "scenePolicies": []
-            })).unwrap())
+            .update_async(
+                &serde_json::from_value(json!({
+                    "revision": v2.revision,
+                    "connections": [
+                        { "id": "deepseek", "name": "DeepSeek", "adapter": "deepseek", "enabled": true },
+                        { "id": "minimax", "name": "MiniMax", "adapter": "minimax", "enabled": true }
+                    ],
+                    "orchestrator": { "connection": "minimax", "model": "speech-02-hd" },
+                    "polish": null, "speech": null, "understanding": null,
+                    "image": null, "live": null, "speakers": null, "voiceDesign": null,
+                    "transcription": null, "vision": null, "scenePolicies": []
+                }))
+                .unwrap(),
+            )
             .await;
         assert_eq!(bad_scene.unwrap_err().biz_code, BizCode::ProviderRefused);
 
         // Valid scene bindings + fallback policy save and resolve cleanly.
         let bound = provider
-            .update_async(&serde_json::from_value(json!({
-                "revision": v2.revision,
-                "connections": [
-                    { "id": "deepseek", "name": "DeepSeek", "adapter": "deepseek", "enabled": true },
-                    { "id": "minimax", "name": "MiniMax", "adapter": "minimax", "enabled": true }
-                ],
-                "orchestrator": { "connection": "deepseek", "model": "deepseek-chat" },
-                "polish": { "connection": "deepseek", "model": "deepseek-chat" },
-                "speech": { "connection": "minimax", "model": "speech-02-hd" },
-                "understanding": null, "image": null, "live": null, "speakers": null,
-                "voiceDesign": null, "transcription": null, "vision": null,
-                "scenePolicies": [
-                    {
-                        "scene": "orchestrator",
-                        "fallbacks": [{ "connection": "minimax", "model": "MiniMax-M2.5" }]
-                    }
-                ]
-            })).unwrap())
+            .update_async(
+                &serde_json::from_value(json!({
+                    "revision": v2.revision,
+                    "connections": [
+                        { "id": "deepseek", "name": "DeepSeek", "adapter": "deepseek", "enabled": true },
+                        { "id": "minimax", "name": "MiniMax", "adapter": "minimax", "enabled": true }
+                    ],
+                    "orchestrator": { "connection": "deepseek", "model": "deepseek-chat" },
+                    "polish": { "connection": "deepseek", "model": "deepseek-chat" },
+                    "speech": { "connection": "minimax", "model": "speech-02-hd" },
+                    "understanding": null, "image": null, "live": null, "speakers": null,
+                    "voiceDesign": null, "transcription": null, "vision": null,
+                    "scenePolicies": [
+                        {
+                            "scene": "orchestrator",
+                            "fallbacks": [{ "connection": "minimax", "model": "MiniMax-M2.5" }]
+                        }
+                    ]
+                }))
+                .unwrap(),
+            )
             .await
             .unwrap();
         assert_eq!(bound.orchestrator.as_ref().unwrap().model, "deepseek-chat");

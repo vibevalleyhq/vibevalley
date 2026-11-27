@@ -136,9 +136,6 @@ impl McpServer {
             Ok(agent) => agent,
             Err(failure) => return redact_result(ToolCallResult::error(format_failure(&failure)), &Self::known_secrets(&client, None)),
         };
-        redact_result(
-            ToolCallResult::json(&AgentRosterItem::from(registered)),
-            &Self::known_secrets(&client, None),
-        )
+        redact_result(ToolCallResult::json(&AgentRosterItem::from(registered)), &Self::known_secrets(&client, None))
     }
 }

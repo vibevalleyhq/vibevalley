@@ -142,10 +142,7 @@ fn parse(uri: &str) -> Option<Ref> {
 }
 
 fn percent_decode(s: &str) -> Option<String> {
-    percent_encoding::percent_decode_str(s)
-        .decode_utf8()
-        .ok()
-        .map(std::borrow::Cow::into_owned)
+    percent_encoding::percent_decode_str(s).decode_utf8().ok().map(std::borrow::Cow::into_owned)
 }
 
 /// Snapshots by `<session>:<uri>`, oldest dropped first.

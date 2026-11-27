@@ -83,8 +83,8 @@ export const noteScenario = defineScenario({
     await v.shot("12-presenter-light", { label: "Doc Presenter Mode & Speaker Notes" });
 
     // Issue <-> Note Bidirectional Sidebar
-    await v.nav(`/issues/${ids.issueIds[0]}`);
-    await v.waitRoute(`/issues/${ids.issueIds[0]}`);
+    await v.nav(`/issues/${ids.issueIds[1]}`);
+    await v.waitRoute(`/issues/${ids.issueIds[1]}`);
     await v.wait("issue-notes");
     await v.assertClean("issue-notes-light");
     await v.shot("11-issue-notes-light", { label: "Issue Linked Notes Panel" });

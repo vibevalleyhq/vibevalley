@@ -308,7 +308,6 @@ async fn create_app_inner(mut config: Config, storage_config: StorageConfig, ove
         orchestrator: agent.orchestrator.clone(),
         realtime: overrides.voice_realtime,
         transcriber: overrides.voice_transcriber,
-        model_client: config.model_client,
     });
     let connector = Connector::open_async(ctx.clone(), setting.clone(), channel.clone(), overrides.connector.unwrap_or_default())
         .await

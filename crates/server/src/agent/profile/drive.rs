@@ -4,9 +4,7 @@
 use std::sync::Arc;
 
 use vibevalley_i18n::t;
-use vibevalley_protocol::{
-    Agent, AgentExecutionMode, AgentRole, ApiError, BizCode, Deliverable, Issue, MCPServer, Next, PersonaMode, RuntimeRef, Skill,
-};
+use vibevalley_protocol::{Agent, AgentExecutionMode, AgentRole, ApiError, BizCode, Deliverable, Issue, MCPServer, Next, PersonaMode, RuntimeRef, Skill};
 use vibevalley_runtime::oar::McpServer;
 
 use super::Profile;

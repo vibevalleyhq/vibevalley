@@ -1507,6 +1507,14 @@ mod tests {
             })
             .expect("all 5 diorama slices should deliver initial frames");
 
+            vibevalley_runtime::rt::block_on(async {
+                let _ = tokio::time::timeout(Duration::from_secs(1), async {
+                    while Arc::strong_count(&client) != 1 {
+                        tokio::task::yield_now().await;
+                    }
+                })
+                .await;
+            });
             assert_eq!(Arc::strong_count(&client), 1, "pump task must hold Weak<Client> only");
             let snapshot = bridge.clients_snapshot();
             assert_eq!(snapshot.len(), 1);
@@ -1529,6 +1537,9 @@ mod tests {
             } else {
                 // Cancel task first (matching DioramaView dropping _slice_task before _bridge), then drop _bridge.
                 pump_handle.abort();
+                vibevalley_runtime::rt::block_on(async {
+                    let _ = tokio::time::timeout(Duration::from_secs(1), pump_handle).await;
+                });
                 drop(client);
                 assert_eq!(weak_client.strong_count(), 0);
                 assert!(weak_client.upgrade().is_none());

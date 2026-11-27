@@ -6,9 +6,9 @@ use std::sync::Arc;
 
 use serde_json::json;
 use vibevalley_protocol::{
-    ActorRef, Agent, AgentExecutionMode, AgentRegisterInput, AgentRole, BizCode, Build, Caller, DEFAULT_ORCHESTRATOR, Head, IssueRequest,
-    IssueStatus, IssueStatusUpdateInput, Look, NoteCreateRequest, NoteFileWriteItem, NoteFileWriteRequest, NoteHistoryListRequest, NoteType,
-    ORCHESTRATOR_RUNTIME, PersonaMode, Skill, Species, Toolset,
+    ActorRef, Agent, AgentExecutionMode, AgentRegisterInput, AgentRole, BizCode, Build, Caller, DEFAULT_ORCHESTRATOR, Head, IssueRequest, IssueStatus,
+    IssueStatusUpdateInput, Look, NoteFileWriteItem, NoteFileWriteRequest, NoteHistoryListRequest, NoteRequest, NoteType, ORCHESTRATOR_RUNTIME, PersonaMode,
+    Skill, Species, Toolset,
 };
 use vibevalley_server::agent::profile::{Profile, ProfileStore, profile};
 use vibevalley_server::context::{Context, Http, LiveState, Outbox, PublicDownload, StateFeed, TaskGroup};
@@ -689,8 +689,10 @@ fn agent_optional_voice_persists_through_config_without_migration() {
 fn teammate_codes_external_registration_and_non_dispatch() {
     let dir = tempfile::tempdir().unwrap();
     let app = create_app_blocking(Config {
-        home: dir.path().to_path_buf(),
-        ..Default::default()
+        probe_runtimes: false,
+        orchestrator_listens: false,
+        link_previews: false,
+        ..Config::under(dir.path())
     })
     .unwrap();
     let rt_app = app.test_internals();
@@ -768,27 +770,24 @@ fn teammate_codes_external_registration_and_non_dispatch() {
         "issue.create",
         serde_json::to_value(IssueRequest {
             title: "External owned issue".into(),
-            owner: Some(ActorRef::Agent {
-                id: "antigravity-ide".into(),
-            }),
+            owner: Some(ActorRef::Agent { id: "antigravity-ide".into() }),
             ..Default::default()
         })
         .unwrap(),
     );
     let owned_issue: vibevalley_protocol::Issue = serde_json::from_value(owned.data.expect("owner issue ok")).unwrap();
-    assert_eq!(
-        owned_issue.owner,
-        Some(ActorRef::Agent {
-            id: "antigravity-ide".into(),
-        })
-    );
+    assert_eq!(owned_issue.owner, Some(ActorRef::Agent { id: "antigravity-ide".into() }));
     let move_err = router.call_as(
         Caller::User,
         "issue.status.update",
         serde_json::to_value(IssueStatusUpdateInput {
+            revision: None,
             id: owned_issue.id.clone(),
             status: IssueStatus::Todo,
-            ..Default::default()
+            text: None,
+            agent: None,
+            edit: None,
+            request_key: None,
         })
         .unwrap(),
     );
@@ -797,10 +796,17 @@ fn teammate_codes_external_registration_and_non_dispatch() {
     let created_note = router.call_as(
         Caller::User,
         "note.create",
-        serde_json::to_value(NoteCreateRequest {
+        serde_json::to_value(NoteRequest {
             title: "Collab note".into(),
-            note_type: Some(NoteType::Doc),
-            ..Default::default()
+            note_type: NoteType::Doc,
+            parent_id: None,
+            sort_order: None,
+            content: None,
+            files: None,
+            announce: None,
+            note: None,
+            channel: None,
+            issue: None,
         })
         .unwrap(),
     );
@@ -827,11 +833,7 @@ fn teammate_codes_external_registration_and_non_dispatch() {
     let history = router.call_as(
         Caller::User,
         "note.history.list",
-        serde_json::to_value(NoteHistoryListRequest {
-            id: note_id,
-            limit: Some(10),
-        })
-        .unwrap(),
+        serde_json::to_value(NoteHistoryListRequest { id: note_id, limit: Some(10) }).unwrap(),
     );
     let entries: Vec<vibevalley_protocol::NoteHistoryEntry> = serde_json::from_value(history.data.expect("history")).unwrap();
     assert_eq!(entries[0].origin, "agent:antigravity-ide");

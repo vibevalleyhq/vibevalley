@@ -218,9 +218,7 @@ pub fn connections_over(current: &Providers, update: &ProviderUpdate) -> Result<
             }
         };
         let (models, verification) = match prev {
-            Some(p) if p.adapter == input.adapter && p.key == key && p.base_url == base_url && !key.is_empty() => {
-                (p.models.clone(), p.verification.clone())
-            }
+            Some(p) if p.adapter == input.adapter && p.key == key && p.base_url == base_url && !key.is_empty() => (p.models.clone(), p.verification.clone()),
             _ => (Vec::new(), None),
         };
         connections.push(Connection {
@@ -276,10 +274,7 @@ fn now_ms() -> i64 {
 }
 
 fn provider_refuse(key: &str, adapter: ProviderConnectionAdapter) -> ApiError {
-    ApiError::new(
-        BizCode::ProviderRefused,
-        t(key, &[("provider", provider_display_name(adapter).into())]),
-    )
+    ApiError::new(BizCode::ProviderRefused, t(key, &[("provider", provider_display_name(adapter).into())]))
 }
 
 /// A GET to a provider API: the parsed 2xx body, else its failure in the user's words.
@@ -493,8 +488,7 @@ impl Provider {
                     checked_at: Some(checked_at),
                     error: Some(err.message),
                 };
-                self.store_discovery_async(&r.connection, r.revision, adapter, None, verification)
-                    .await?;
+                self.store_discovery_async(&r.connection, r.revision, adapter, None, verification).await?;
             }
         }
         Ok(self.setting.provider_status())

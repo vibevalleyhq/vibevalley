@@ -7,8 +7,8 @@ use parking_lot::Mutex;
 use serde::Deserialize;
 use tokio_tungstenite::tungstenite::{Message, client::IntoClientRequest};
 use tokio_util::sync::CancellationToken;
-use vibevalley_protocol::{ApiError, BizCode, HostAsrPhase as Phase};
 pub use vibevalley_protocol::HostAsrState as State;
+use vibevalley_protocol::{ApiError, BizCode, HostAsrPhase as Phase};
 use vibevalley_server::gateway::api::{BoxFuture, LiveVoiceLine, LiveVoicePort, SharedLiveVoice};
 
 const PCM_SAMPLE_RATE: u32 = 16_000;
@@ -223,12 +223,14 @@ fn pcm16_to_wav(pcm: &[u8], sample_rate: u32, channels: u16) -> Vec<u8> {
 #[derive(Default)]
 struct ChunkSegmenter {
     buf: Vec<u8>,
+    has_audio: bool,
     has_speech: bool,
     silence_ms: u64,
 }
 
 impl ChunkSegmenter {
     fn take_chunk(&mut self) -> Vec<u8> {
+        self.has_audio = false;
         self.has_speech = false;
         self.silence_ms = 0;
         std::mem::take(&mut self.buf)
@@ -245,6 +247,9 @@ impl ChunkSegmenter {
             return None;
         }
         self.buf.extend_from_slice(pcm);
+        if rms > 0.0 || pcm.iter().any(|&b| b != 0) {
+            self.has_audio = true;
+        }
         let frame_ms = u64::try_from(pcm.len() / PCM_BYTES_PER_MS).unwrap_or(0).max(tick_ms);
         if rms >= VAD_SPEECH_RMS {
             self.has_speech = true;
@@ -268,11 +273,12 @@ impl ChunkSegmenter {
     }
 
     fn flush(&mut self) -> Option<Vec<u8>> {
-        let enough_audio = (self.has_speech && self.buf.len() >= MIN_FLUSH_BYTES) || self.buf.len() >= MIN_QUIET_FLUSH_BYTES;
+        let enough_audio = (self.has_speech && self.buf.len() >= MIN_FLUSH_BYTES) || (self.has_audio && self.buf.len() >= MIN_QUIET_FLUSH_BYTES);
         if enough_audio {
             return Some(self.take_chunk());
         }
         self.buf.clear();
+        self.has_audio = false;
         self.has_speech = false;
         self.silence_ms = 0;
         None
@@ -329,12 +335,7 @@ fn is_retryable_asr_error(err: &ApiError) -> bool {
     !matches!(err.biz_code, BizCode::VoiceUnavailable | BizCode::InvalidInput)
 }
 
-async fn transcribe_chunk_with_retry(
-    backend: &dyn AsrBackend,
-    wav: Vec<u8>,
-    abort: &CancellationToken,
-    retry_base_ms: u64,
-) -> Result<String, String> {
+async fn transcribe_chunk_with_retry(backend: &dyn AsrBackend, wav: Vec<u8>, abort: &CancellationToken, retry_base_ms: u64) -> Result<String, String> {
     let mut attempt = 0usize;
     loop {
         if abort.is_cancelled() {
@@ -1156,7 +1157,7 @@ mod tests {
             backend.clone(),
             (stop_capture, abort),
             ChunkRunOptions {
-                tick_interval: Duration::from_millis(1),
+                tick_interval: Duration::from_millis(10),
                 retry_base_ms: 1,
             },
             &mut hooks,
@@ -1170,10 +1171,7 @@ mod tests {
         assert_eq!(backend.chunk_calls.load(Ordering::SeqCst), 4);
         assert_eq!(hooks.phases, vec![Phase::Listening, Phase::Finishing, Phase::Polishing]);
         assert!(hooks.transcripts.iter().any(|(c, _)| c == "呃那个 我想"));
-        assert_eq!(
-            hooks.polished,
-            Some(("呃那个 我想 看一下日志".to_string(), "我想看一下日志。".to_string()))
-        );
+        assert_eq!(hooks.polished, Some(("呃那个 我想看一下日志".to_string(), "我想看一下日志。".to_string())));
     }
 
     #[tokio::test]
@@ -1209,7 +1207,7 @@ mod tests {
             backend,
             (stop_capture, abort),
             ChunkRunOptions {
-                tick_interval: Duration::from_millis(1),
+                tick_interval: Duration::from_millis(10),
                 retry_base_ms: 1,
             },
             &mut hooks,
@@ -1218,10 +1216,7 @@ mod tests {
         .unwrap();
         release_task.await.unwrap();
 
-        assert_eq!(
-            hooks.polished,
-            Some(("raw chunk text".to_string(), "raw chunk text".to_string()))
-        );
+        assert_eq!(hooks.polished, Some(("raw chunk text".to_string(), "raw chunk text".to_string())));
 
         // Non-retryable VoiceUnavailable does NOT retry.
         struct NonRetryableBackend(AtomicUsize);

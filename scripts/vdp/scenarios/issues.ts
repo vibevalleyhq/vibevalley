@@ -34,14 +34,20 @@ export const issuesScenario = defineScenario({
       await v.press("issue-view-board");
       await v.wait("issues-page");
 
-      await v.nav(`/issues/${ids.issueIds[0]}`);
-      await v.waitRoute(`/issues/${ids.issueIds[0]}`);
+      await v.nav(`/issues/${ids.issueIds[1]}`);
+      await v.waitRoute(`/issues/${ids.issueIds[1]}`);
       await v.wait("issue-notes");
       await v.assertClean(`issues-detail-${theme}`);
       await v.shot(`issues-detail-${theme}`, { label: `Issue Detail & Linked Notes (${theme})` });
     });
 
     await v.theme("light");
+    await v.nav(`/issues/${ids.issueIds[0]}`);
+    await v.waitRoute(`/issues/${ids.issueIds[0]}`);
+    await v.wait("family-detail");
+    await v.assertClean("issues-family-light");
+    await v.shot("issues-family-light", { label: "Parent Family Issue Detail (light)" });
+
     await v.resize(720, 860);
     await v.nav("/issues");
     await v.waitRoute("/issues");

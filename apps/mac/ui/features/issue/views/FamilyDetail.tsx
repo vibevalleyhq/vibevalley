@@ -12,6 +12,7 @@ import { toast } from "../../../design/toasts";
 import { shortMomentText } from "../../../infra/base/format";
 import { createMemo } from "../../../infra/solid";
 import { useIntents } from "../../../infra/state/intent";
+import { useVdpNode } from "../../../infra/vdpProbe";
 import { createIssueActs } from "../model/acts";
 import { useIssues } from "../model/history";
 import { blockerIssuesOf } from "../model/meta";
@@ -23,6 +24,7 @@ import { StatusMark } from "./Marks";
 import { IssueSheet, IssueTrail, Property, SheetLabel, StagePill } from "./Sheet";
 
 export function FamilyDetail(props: { issue: Issue; children: Issue[]; onOpen: (id: string) => void; onClose: (review: boolean) => void }) {
+  useVdpNode({ testId: "family-detail", role: "region" });
   const allIssues = useIssues();
   const sets = useIntents(issueSet);
   const labeled = createMemo(() => labeledIssue(allIssues().find((item) => item.id === props.issue.id) ?? props.issue, sets.list()));

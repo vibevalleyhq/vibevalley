@@ -75,7 +75,7 @@ fn parse_zip_archive(bytes: &[u8]) -> Vec<(String, Vec<u8>)> {
     for i in 0..archive.len() {
         let mut file = archive.by_index(i).expect("zip entry");
         assert_eq!(file.compression(), zip::CompressionMethod::Deflated, "expected DEFLATE compression");
-        let name = file.name().to_string();
+        let name = file.name().expect("zip entry name").to_string();
         let mut data = Vec::with_capacity(file.size() as usize);
         file.read_to_end(&mut data).expect("read zip entry");
         entries.push((name, data));
