@@ -33,6 +33,7 @@ export interface BlockDocViewProps {
   readonly links?: NoteLinkListResult | undefined;
   readonly busy?: boolean | undefined;
   readonly savedAt?: number | undefined;
+  readonly embedded?: boolean | undefined;
   readonly onSaveDoc: (doc: { readonly version: number; readonly blocks: readonly DocBlock[] }) => Promise<void> | void;
   readonly onAppendBlock?: (block: DocBlock, afterBlockId?: string) => Promise<void> | void;
   readonly onRenameTitle?: (title: string) => Promise<void> | void;
@@ -238,9 +239,10 @@ export function BlockDocView(props: BlockDocViewProps) {
     return pic !== undefined ? [pic] : [];
   });
 
-  return (
-    <View testID="note-block-doc-view" class="min-h-0 flex-1 flex-row bg-page">
-      <Scroll class="min-h-0 flex-1" contentClass="mx-auto w-full max-w-3xl gap-3 px-8 pt-10 pb-24">
+  const embedded = () => props.embedded === true;
+  const bodyContent = (
+    <>
+      <If when={!embedded()}>
         <If when={coverSrc()}>
           {(src) => (
             <View testID="doc-cover-strip" class="mb-2 h-36 overflow-hidden rounded-xl border border-line bg-side">
@@ -274,105 +276,127 @@ export function BlockDocView(props: BlockDocViewProps) {
             </If>
           </View>
         </View>
+      </If>
 
-        <If
-          when={blocks().length > 0}
-          else={
-            <View class="py-6">
-              <Empty
-                icon="notes"
-                action={
-                  <Button size="control" tone="primary" icon="add" testID="doc-empty-add-btn" onPress={handleAppendTail}>
-                    {t("web.note.doc.addBlock")}
-                  </Button>
-                }
-              >
-                {t("web.note.doc.empty")}
-              </Empty>
-            </View>
-          }
-        >
-          <View testID="doc-blocks-list" class="gap-1">
-            <Each of={blocks()} key={(b) => b.id}>
-              {(b) => (
-                <View class={highlightedBlockId() === b().id ? "rounded-md bg-selected" : ""}>
-                  <BlockItem
-                    block={b()}
-                    allBlocks={blocks()}
-                    slideIndices={slideIndices()}
-                    note={props.note}
-                    notes={props.notes}
-                    issues={props.issues}
-                    focusedBlockId={focusedBlockId()}
-                    onFocusBlock={(id) => focusedBlockId.set(id)}
-                    onFocusAdjacent={handleFocusAdjacent}
-                    onUpdateBlock={handleUpdateBlock}
-                    onInsertAfter={handleInsertAfter}
-                    onMoveBlock={handleMoveBlock}
-                    onDuplicateBlock={handleDuplicateBlock}
-                    onDeleteBlock={handleDeleteBlock}
-                    onCreateIssueFromBlock={props.onCreateIssueFromBlock}
-                    onOpenNote={props.onOpenNote}
-                    onOpenIssue={props.onOpenIssue}
-                    onScrollToBlock={(targetId) => {
-                      highlightedBlockId.set(targetId);
-                      focusedBlockId.set(targetId);
-                    }}
-                    onOpenLightbox={(pic) => lightboxPicture.set(pic)}
-                  />
-                </View>
-              )}
-            </Each>
+      <If
+        when={blocks().length > 0}
+        else={
+          <View class="py-6">
+            <Empty
+              icon="notes"
+              action={
+                <Button size="control" tone="primary" icon="add" testID="doc-empty-add-btn" onPress={handleAppendTail}>
+                  {t("web.note.doc.addBlock")}
+                </Button>
+              }
+            >
+              {t("web.note.doc.empty")}
+            </Empty>
           </View>
-        </If>
+        }
+      >
+        <View testID="doc-blocks-list" class="gap-1">
+          <Each of={blocks()} key={(b) => b.id}>
+            {(b) => (
+              <View class={highlightedBlockId() === b().id ? "rounded-md bg-selected" : ""}>
+                <BlockItem
+                  block={b()}
+                  allBlocks={blocks()}
+                  slideIndices={slideIndices()}
+                  note={props.note}
+                  notes={props.notes}
+                  issues={props.issues}
+                  focusedBlockId={focusedBlockId()}
+                  onFocusBlock={(id) => focusedBlockId.set(id)}
+                  onFocusAdjacent={handleFocusAdjacent}
+                  onUpdateBlock={handleUpdateBlock}
+                  onInsertAfter={handleInsertAfter}
+                  onMoveBlock={handleMoveBlock}
+                  onDuplicateBlock={handleDuplicateBlock}
+                  onDeleteBlock={handleDeleteBlock}
+                  onCreateIssueFromBlock={props.onCreateIssueFromBlock}
+                  onOpenNote={props.onOpenNote}
+                  onOpenIssue={props.onOpenIssue}
+                  onScrollToBlock={(targetId) => {
+                    highlightedBlockId.set(targetId);
+                    focusedBlockId.set(targetId);
+                  }}
+                  onOpenLightbox={(pic) => lightboxPicture.set(pic)}
+                />
+              </View>
+            )}
+          </Each>
+        </View>
+      </If>
 
-        <View class="flex-row items-center justify-between gap-2 pt-2 pl-14 opacity-70 hover:opacity-100">
-          <Button size="compact" tone="quiet" icon="add" testID="doc-append-block-btn" onPress={handleAppendTail}>
-            {t("web.note.doc.addBlock")}
-          </Button>
+      <View class={`flex-row items-center justify-between gap-2 pt-2 opacity-70 hover:opacity-100 ${embedded() ? "" : "pl-14"}`}>
+        <Button size="compact" tone="quiet" icon="add" testID="doc-append-block-btn" onPress={handleAppendTail}>
+          {t("web.note.doc.addBlock")}
+        </Button>
+        <View class="flex-row items-center gap-2">
+          <If when={embedded() && (dirty() || saving())}>
+            <Text testID="doc-save-status" class="text-2xs text-warn-ink">
+              {saving() ? t("web.base.reading") : t("web.note.page.unsaved")}
+            </Text>
+          </If>
           <Text class="text-2xs text-faint">{t("web.note.doc.slashHint")}</Text>
         </View>
+      </View>
 
-        <If when={backlinksCount() > 0 || outgoingCount() > 0}>
-          <>
-            <VdpAnchor testId="doc-links-panel" role="region" />
-            <View testID="doc-links-panel" class="mt-10 gap-3 border-t border-line pt-6">
-              <View
-                role="button"
-                testID="doc-links-toggle"
-                accessibilityState={{ expanded: linksOpen() }}
-                onPress={() => linksOpen.set(!linksOpen())}
-                class="flex-row items-center gap-2"
-              >
-                <Icon name={linksOpen() ? "choose" : "expand"} size={12} tone="faint" />
-                <Text class="text-xs font-semibold text-muted">{t("web.note.links.backlinks", { n: backlinksCount() })}</Text>
-                <Text class="text-xs text-faint">·</Text>
-                <Text class="text-xs font-medium text-faint">{t("web.note.links.outgoing", { n: outgoingCount() })}</Text>
-              </View>
-              <If when={linksOpen()}>
-                <View class="gap-4 md:flex-row">
-                  <If when={backlinksCount() > 0}>
-                    <View class="min-w-0 flex-1 gap-0.5">
-                      <Each of={props.links?.backlinks ?? []} key={(l) => l.id}>
-                        {(l) => <LinkRowItem link={l()} idPrefix="backlink" onOpenNote={props.onOpenNote} onOpenIssue={props.onOpenIssue} />}
-                      </Each>
-                    </View>
-                  </If>
-                  <If when={outgoingCount() > 0}>
-                    <View class="min-w-0 flex-1 gap-0.5">
-                      <Each of={props.links?.outgoing ?? []} key={(l) => l.id}>
-                        {(l) => <LinkRowItem link={l()} idPrefix="outgoing" onOpenNote={props.onOpenNote} onOpenIssue={props.onOpenIssue} />}
-                      </Each>
-                    </View>
-                  </If>
-                </View>
-              </If>
+      <If when={backlinksCount() > 0 || outgoingCount() > 0}>
+        <>
+          <VdpAnchor testId="doc-links-panel" role="region" />
+          <View testID="doc-links-panel" class={`${embedded() ? "mt-5 pt-4" : "mt-10 pt-6"} gap-3 border-t border-line`}>
+            <View
+              role="button"
+              testID="doc-links-toggle"
+              accessibilityState={{ expanded: linksOpen() }}
+              onPress={() => linksOpen.set(!linksOpen())}
+              class="flex-row items-center gap-2"
+            >
+              <Icon name={linksOpen() ? "choose" : "expand"} size={12} tone="faint" />
+              <Text class="text-xs font-semibold text-muted">{t("web.note.links.backlinks", { n: backlinksCount() })}</Text>
+              <Text class="text-xs text-faint">·</Text>
+              <Text class="text-xs font-medium text-faint">{t("web.note.links.outgoing", { n: outgoingCount() })}</Text>
             </View>
-          </>
-        </If>
-      </Scroll>
+            <If when={linksOpen()}>
+              <View class="gap-4 md:flex-row">
+                <If when={backlinksCount() > 0}>
+                  <View class="min-w-0 flex-1 gap-0.5">
+                    <Each of={props.links?.backlinks ?? []} key={(l) => l.id}>
+                      {(l) => <LinkRowItem link={l()} idPrefix="backlink" onOpenNote={props.onOpenNote} onOpenIssue={props.onOpenIssue} />}
+                    </Each>
+                  </View>
+                </If>
+                <If when={outgoingCount() > 0}>
+                  <View class="min-w-0 flex-1 gap-0.5">
+                    <Each of={props.links?.outgoing ?? []} key={(l) => l.id}>
+                      {(l) => <LinkRowItem link={l()} idPrefix="outgoing" onOpenNote={props.onOpenNote} onOpenIssue={props.onOpenIssue} />}
+                    </Each>
+                  </View>
+                </If>
+              </View>
+            </If>
+          </View>
+        </>
+      </If>
+    </>
+  );
 
-      <If when={showOutlineRail()}>
+  return (
+    <View testID="note-block-doc-view" class={embedded() ? "min-w-0" : "min-h-0 flex-1 flex-row bg-page"}>
+      <If
+        when={embedded()}
+        else={
+          <Scroll class="min-h-0 flex-1" contentClass="mx-auto w-full max-w-3xl gap-3 px-8 pt-10 pb-24">
+            {bodyContent}
+          </Scroll>
+        }
+      >
+        <View class="w-full gap-2">{bodyContent}</View>
+      </If>
+
+      <If when={!embedded() && showOutlineRail()}>
         <View testID="doc-outline-rail" class="hidden w-44 shrink-0 pt-12 pr-4 lg:flex">
           <View class="w-full min-w-0 gap-1 border-l border-line pl-3">
             <Text class="mb-1 text-2xs font-semibold text-faint">{t("web.note.doc.outline")}</Text>

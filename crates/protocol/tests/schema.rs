@@ -283,6 +283,8 @@ pub fn round_trip(name: &str, value: serde_json::Value) -> Option<Result<serde_j
         "IssueAct" => rt::<vibevalley_protocol::IssueAct>(value),
         "IssueAction" => rt::<vibevalley_protocol::IssueAction>(value),
         "IssueAnswer" => rt::<vibevalley_protocol::IssueAnswer>(value),
+        "IssueBodyEnsureInput" => rt::<vibevalley_protocol::IssueBodyEnsureInput>(value),
+        "IssueBodyEnsureResult" => rt::<vibevalley_protocol::IssueBodyEnsureResult>(value),
         "IssueCanceled" => rt::<vibevalley_protocol::IssueCanceled>(value),
         "IssueChildDraft" => rt::<vibevalley_protocol::IssueChildDraft>(value),
         "IssueCommentCreateInput" => rt::<vibevalley_protocol::IssueCommentCreateInput>(value),

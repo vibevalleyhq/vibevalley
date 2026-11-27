@@ -375,6 +375,7 @@ async fn create_app_inner(mut config: Config, storage_config: StorageConfig, ove
     let router = Router::new(core.clone(), remote.clone(), gw);
 
     finish_boot_and_start_feeds(&core.ctx, &core.board, &core.channel, &core.cron, &core.note, &core.game, &core.repo);
+    crate::router::note::backfill_issue_bodies_async(&core).await;
     core.ctx.feed.flush().await;
     core.board.refresh_queue_async().await.map_err(|e| failed("the queue")(&e))?;
     remote.restore_if_enabled_async(router.clone()).await;

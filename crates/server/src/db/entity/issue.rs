@@ -62,6 +62,7 @@ pub struct Model {
     pub owner: Option<String>,
     #[sea_orm(column_type = "Text")]
     pub relations: String,
+    pub body_note_id: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

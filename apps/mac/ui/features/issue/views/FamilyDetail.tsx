@@ -7,18 +7,20 @@ import { createAct } from "../../../design/act";
 import { Button } from "../../../design/Button";
 import { TextArea } from "../../../design/Field";
 import { Icon } from "../../../design/Icon";
-import { Markdown } from "../../../design/Markdown";
 import { toast } from "../../../design/toasts";
 import { shortMomentText } from "../../../infra/base/format";
+import { ready } from "../../../infra/query";
 import { createMemo } from "../../../infra/solid";
 import { useIntents } from "../../../infra/state/intent";
 import { useVdpNode } from "../../../infra/vdpProbe";
+import { IssueBodyEditor, IssueNotes, useNotes } from "../../note";
 import { createIssueActs } from "../model/acts";
 import { useIssues } from "../model/history";
 import { blockerIssuesOf } from "../model/meta";
 import { stageTone } from "../model/overview";
 import { issueSet, labeledIssue, sendLabel } from "../model/write";
 import { ActLines } from "./ActLines";
+import { IssueActivity } from "./IssueActivity";
 import { BlockedByChips, BlockedByPicker, DatePropertyEditor, OwnerMark, OwnerPicker, ParentPicker, SubIssuesSection, TagEditor } from "./IssueMetaControls";
 import { StatusMark } from "./Marks";
 import { IssueSheet, IssueTrail, Property, SheetLabel, StagePill } from "./Sheet";
@@ -26,6 +28,8 @@ import { IssueSheet, IssueTrail, Property, SheetLabel, StagePill } from "./Sheet
 export function FamilyDetail(props: { issue: Issue; children: Issue[]; onOpen: (id: string) => void; onClose: (review: boolean) => void }) {
   useVdpNode({ testId: "family-detail", role: "region" });
   const allIssues = useIssues();
+  const notesQuery = useNotes(() => ({}));
+  const allNotes = computed(() => ready(notesQuery, []));
   const sets = useIntents(issueSet);
   const labeled = createMemo(() => labeledIssue(allIssues().find((item) => item.id === props.issue.id) ?? props.issue, sets.list()));
   const live = () => labeled().issue;
@@ -64,18 +68,32 @@ export function FamilyDetail(props: { issue: Issue; children: Issue[]; onOpen: (
           <TextArea accessibilityLabel={t("shared.act.tell")} value={acts.text()} onInput={acts.setText} />
         </View>
       </If>
-      <If when={live().description}>
-        <View>
-          <SheetLabel first>{t("web.issue.detail.full")}</SheetLabel>
-          <Markdown size="sm" text={live().description} />
-        </View>
+      <If when={live().description !== "" || Boolean(live().bodyNoteId) || open()}>
+        <IssueBodyEditor
+          issue={live()}
+          editable={open()}
+          notes={allNotes()}
+          onOpenIssue={props.onOpen}
+          sectionTitle={t("web.issue.detail.full")}
+          emptyLabel={t("web.issue.todo.addDescription")}
+          testid="issue-requirement"
+        />
       </If>
       <SubIssuesSection
         issueId={live().id}
         allIssues={allIssues().length > 0 ? allIssues() : props.children}
         onOpen={props.onOpen}
-        bordered={Boolean(live().description)}
+        bordered={Boolean(live().description) || Boolean(live().bodyNoteId) || open()}
       />
+      <IssueNotes
+        issue={live().id}
+        heading={
+          <View class="mt-7 border-t border-line pt-5">
+            <SheetLabel first>{t("web.note.issue.title")}</SheetLabel>
+          </View>
+        }
+      />
+      <IssueActivity issue={live()} />
     </>
   );
 

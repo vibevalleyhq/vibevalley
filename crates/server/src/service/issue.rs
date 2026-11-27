@@ -79,6 +79,7 @@ fn read_issue(r: issue::Model) -> DbResult<Issue> {
     item.due_at = r.due_at.map(JsNumber::from);
     item.owner = r.owner.map(read_db_json).transpose()?;
     item.relations = read_db_json(r.relations)?;
+    item.body_note_id = r.body_note_id;
     item.constraints = r.constraints.map(read_db_json).transpose()?;
     item.conflict = r.conflict.map(read_db_json).transpose()?;
     item.last_run = r.last_run.map(read_db_json).transpose()?;
@@ -157,6 +158,7 @@ async fn put_issue_impl<C: ConnectionTrait>(db: &C, t: &Issue) -> DbResult<()> {
         due_at: Set(t.due_at.map(|v| v.get().round() as i64)),
         owner: Set(t.owner.as_ref().map(db_json).transpose()?),
         relations: Set(db_json(&t.relations)?),
+        body_note_id: Set(t.body_note_id.clone()),
     };
     let on_conflict = OnConflict::column(issue::Column::Id)
         .update_columns([
@@ -194,6 +196,7 @@ async fn put_issue_impl<C: ConnectionTrait>(db: &C, t: &Issue) -> DbResult<()> {
             issue::Column::DueAt,
             issue::Column::Owner,
             issue::Column::Relations,
+            issue::Column::BodyNoteId,
         ])
         .to_owned();
     issue::Entity::insert(model).on_conflict(on_conflict).exec(db).await?;
@@ -292,6 +295,26 @@ impl IssueService {
 
     pub(crate) async fn get_in_tx(&self, tx: &Tx, id: &str) -> DbResult<Option<Issue>> {
         get_issue_impl(tx, id).await
+    }
+
+    pub(crate) async fn find_by_body_note_id(&self, note_id: &str) -> DbResult<Option<Issue>> {
+        issue::Entity::find()
+            .filter(issue::Column::BodyNoteId.eq(note_id))
+            .one(self.db.read_conn())
+            .await?
+            .map(read_issue)
+            .transpose()
+    }
+
+    pub(crate) async fn list_without_body_note(&self) -> DbResult<Vec<Issue>> {
+        issue::Entity::find()
+            .filter(issue::Column::BodyNoteId.is_null())
+            .filter(issue::Column::Description.ne(""))
+            .all(self.db.read_conn())
+            .await?
+            .into_iter()
+            .map(read_issue)
+            .collect()
     }
 
     pub async fn put(&self, issue: &Issue) -> DbResult<()> {

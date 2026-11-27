@@ -10,6 +10,7 @@ mod debug;
 mod game;
 mod issue;
 mod issue_board;
+mod issue_body;
 mod issue_edits;
 mod issue_family;
 mod ledger;

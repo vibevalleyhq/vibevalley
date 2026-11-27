@@ -442,6 +442,11 @@ export class VibeValleyApi {
       get: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<T.IssueTimeline> =>
         this.call<T.IssueTimeline>("issue.timeline.get", "/api/v1/issue/timeline/get", a, options),
     },
+    body: {
+      /** Lazily materializes or returns an issue's collaborative Block Doc body note. */
+      ensure: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<T.IssueBodyEnsureResult> =>
+        this.call<T.IssueBodyEnsureResult>("issue.body.ensure", "/api/v1/issue/body/ensure", a, options),
+    },
     status: {
       /** Moving an issue is what it does, by where it stands: todo sends it out (or waits for room), or back from review is another round (the words are the findings. */
       update: (a: { id: string } & T.IssueStatusRequest, options?: { signal?: AbortSignal }): Promise<T.AppliedIssue> =>

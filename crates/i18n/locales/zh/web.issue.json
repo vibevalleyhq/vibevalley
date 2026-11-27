@@ -470,7 +470,8 @@
   },
   "conversation": {
     "older": "加载更早的消息",
-    "placeholder": "写一条评论、补充说明或反馈…"
+    "placeholder": "写一条评论、补充说明或反馈…",
+    "postComment": "发表评论"
   },
   "activity": {
     "title": "动态记录",

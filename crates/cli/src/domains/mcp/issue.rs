@@ -7,8 +7,8 @@ use serde::{Deserialize, Deserializer};
 use serde_json::{Value, json};
 use vibevalley_mcp::{ToolCallResult, ToolDef};
 use vibevalley_protocol::{
-    ActorRef, AppliedIssue, AttachmentUpload, Issue, IssueCommentCreateInput, IssueConversationGetInput, IssueFilter, IssueGetInput, IssueRequest, IssueStatus,
-    IssueStatusUpdateInput, IssueUpdate, IssueUpdateInput, JsNumber, Priority, SayRequest, ops,
+    ActorRef, AppliedIssue, AttachmentUpload, Issue, IssueBodyEnsureInput, IssueCommentCreateInput, IssueConversationGetInput, IssueFilter, IssueGetInput,
+    IssueRequest, IssueStatus, IssueStatusUpdateInput, IssueUpdate, IssueUpdateInput, JsNumber, Priority, SayRequest, ops,
 };
 
 use super::{McpServer, format_failure, non_empty_trimmed, redact_result, tool_def};
@@ -104,6 +104,13 @@ struct IssueListArgs {
 struct IssueGetArgs {
     #[serde(deserialize_with = "deserialize_issue_id")]
     id: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct IssueBodyEnsureArgs {
+    #[serde(deserialize_with = "deserialize_issue_id")]
+    pub(super) id: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -214,7 +221,18 @@ pub(super) fn tool_definitions() -> Vec<ToolDef> {
         ),
         tool_def(
             "vv_issue_get",
-            "Read full details of a VibeValley issue, including description, acceptance criteria, questions, findings, and stage.",
+            "Read full details of a VibeValley issue, including description, bodyNoteId (when backed by a collaborative Doc note), acceptance criteria, questions, findings, and stage. When bodyNoteId is set (or after calling vv_issue_body_ensure), use vv_doc_view / vv_note_read / vv_note_suggest against that note id for rich block-level reading and reviewable edits.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "id": { "type": "string", "description": "Issue number (e.g. '12' or '#12') or issue id." }
+                },
+                "required": ["id"]
+            }),
+        ),
+        tool_def(
+            "vv_issue_body_ensure",
+            "Materialize (or return) the collaborative 24-block Doc note backing an issue body. Returns { issueId, number, bodyNoteId, title, docView }. After ensuring, use vv_doc_view, vv_doc_append_block, vv_note_patch, or vv_note_suggest on bodyNoteId (supporting rich blocks, [[note:...]] wikilinks, diagrams, callouts, and Loro co-editing).",
             json!({
                 "type": "object",
                 "properties": {
@@ -225,12 +243,12 @@ pub(super) fn tool_definitions() -> Vec<ToolDef> {
         ),
         tool_def(
             "vv_issue_create",
-            "Create a new issue directly on the VibeValley board.",
+            "Create a new issue directly on the VibeValley board. Description supports Markdown including [[note:...]] wikilinks; once created, call vv_issue_body_ensure to co-edit its rich 24-block Doc body.",
             json!({
                 "type": "object",
                 "properties": {
                     "title": { "type": "string", "description": "Concise issue title." },
-                    "description": { "type": "string", "description": "Detailed description, repro steps, or visual findings." },
+                    "description": { "type": "string", "description": "Detailed Markdown description (supports [[note:...]] wikilinks, lists, code, tables), repro steps, or visual findings." },
                     "priority": { "type": "string", "enum": ["urgent", "high", "medium", "low"], "description": "Issue priority level." },
                     "status": { "type": "string", "enum": ["backlog", "todo", "in_progress", "in_review", "done", "canceled"], "description": "Optional target status after creation (server defaults to backlog)." },
                     "repo": { "type": "string", "description": "Optional repository name." },
@@ -258,13 +276,13 @@ pub(super) fn tool_definitions() -> Vec<ToolDef> {
         ),
         tool_def(
             "vv_issue_update",
-            "Update an existing VibeValley issue's title, description, priority, repo, agent, owner, parent, tags, startAt, dueAt, criteria, attachments, or transition its status.",
+            "Update an existing VibeValley issue's title, description, priority, repo, agent, owner, parent, tags, startAt, dueAt, criteria, attachments, or transition its status. When an issue has a collaborative bodyNoteId (or non-empty body), agent description updates are diverted into a reviewable note_suggestion on its body Doc instead of overwriting user blocks; for structured block edits, prefer vv_issue_body_ensure + vv_doc_append_block / vv_note_suggest.",
             json!({
                 "type": "object",
                 "properties": {
                     "id": { "type": "string", "description": "Issue number (e.g. '12' or '#12') or issue id." },
                     "title": { "type": "string", "description": "Updated title." },
-                    "description": { "type": "string", "description": "Updated description." },
+                    "description": { "type": "string", "description": "Updated Markdown description (supports [[note:...]] wikilinks). For existing collaborative body docs, agent updates create a reviewable note_suggestion." },
                     "status": { "type": "string", "enum": ["backlog", "todo", "in_progress", "in_review", "done", "canceled"], "description": "Optional target status transition." },
                     "priority": { "type": "string", "enum": ["urgent", "high", "medium", "low"], "description": "Updated priority." },
                     "repo": { "type": "string", "description": "Updated repository name." },
@@ -293,12 +311,12 @@ pub(super) fn tool_definitions() -> Vec<ToolDef> {
         ),
         tool_def(
             "vv_issue_comment",
-            "Post a comment (optionally with uploaded attachment ids or ```compare markdown blocks) to a VibeValley issue thread.",
+            "Post a comment (supports rich Markdown, [[note:...]] note wikilinks, ```compare blocks, and uploaded attachment ids) to a VibeValley issue thread.",
             json!({
                 "type": "object",
                 "properties": {
                     "issueId": { "type": "string", "description": "Issue number (e.g. '12' or '#12') or issue id (alias: 'id')." },
-                    "text": { "type": "string", "description": "Comment body text (Markdown, including ```compare blocks)." },
+                    "text": { "type": "string", "description": "Comment body text (Markdown, including [[note:...]] wikilinks and ```compare blocks)." },
                     "attachments": { "type": "array", "items": { "type": "string" }, "description": "Optional uploaded attachment ids to attach to the comment." }
                 },
                 "required": ["issueId", "text"]
@@ -379,6 +397,30 @@ impl McpServer {
         let client = self.client.read().await;
         let result = match client.ask::<ops::IssueGet>(&IssueGetInput { id }).await {
             Ok(issue) => ToolCallResult::json(&issue),
+            Err(failure) => ToolCallResult::error(format_failure(&failure)),
+        };
+        redact_result(result, &Self::known_secrets(&client, None))
+    }
+
+    pub(super) async fn tool_issue_body_ensure(&self, raw_args: Value) -> ToolCallResult {
+        let args: IssueBodyEnsureArgs = match Self::decode_args("vv_issue_body_ensure", raw_args) {
+            Ok(a) => a,
+            Err(res) => return res,
+        };
+        let id = issue_ref(args.id.trim());
+        if id.is_empty() {
+            return ToolCallResult::error("vv_issue_body_ensure requires a non-empty id");
+        }
+        self.refresh_client().await;
+        let client = self.client.read().await;
+        let result = match client.ask::<ops::IssueBodyEnsure>(&IssueBodyEnsureInput { id }).await {
+            Ok(res) => ToolCallResult::json(&json!({
+                "issueId": res.issue.id,
+                "number": res.issue.number,
+                "bodyNoteId": res.note.id,
+                "title": res.note.title,
+                "docView": res.doc_view,
+            })),
             Err(failure) => ToolCallResult::error(format_failure(&failure)),
         };
         redact_result(result, &Self::known_secrets(&client, None))

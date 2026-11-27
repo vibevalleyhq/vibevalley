@@ -2,7 +2,7 @@
 //! `EndpointId` (203), `NativeEndpointId` (3), and `SUBSCRIPTIONS` (8).
 
 mod glue;
-mod note;
+pub(crate) mod note;
 
 use std::collections::BTreeMap;
 use std::sync::{Arc, Weak};
@@ -171,7 +171,8 @@ impl Router {
             E::IssueRunList => on!(p, IssueRunList, |r| brd.issue_run_list_endpoint_async(&r.id).await?),
             E::IssueTimelineGet => on!(p, IssueTimelineGet, |r| brd.issue_timeline_endpoint_async(&r.id).await?),
             E::IssueCreate => on!(p, IssueCreate, |r| brd.issue_create_endpoint_async(&r).await?),
-            E::IssueUpdate => on!(p, IssueUpdate, |r| brd.issue_update_endpoint_async(r).await?),
+            E::IssueUpdate => on!(p, IssueUpdate, |r| note::issue_update(c, ctx, r).await?),
+            E::IssueBodyEnsure => on!(p, IssueBodyEnsure, |r| note::issue_body_ensure(c, ctx, &r).await?),
             E::IssueDelete => void!(p, IssueDelete, |r| brd.issue_delete_endpoint_async(&r.id).await?),
             E::IssuePreviewDelete => on!(p, IssuePreviewDelete, |r| brd.issue_preview_delete_endpoint_async(&r.id).await?),
             E::IssueStatusUpdate => on!(p, IssueStatusUpdate, |r| glue::issue_status_update(c, &r).await?),

@@ -274,6 +274,9 @@
       "refresh": "重新检测 GitHub，顺带刷新开着的 PR"
     },
     "issue": {
+      "body": {
+        "ensure": "为任务按需懒物化或获取 Block Doc 协作正文笔记"
+      },
       "comment": {
         "create": "给任务带一句话，交给它最新的执行会话"
       },

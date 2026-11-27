@@ -147,11 +147,11 @@ strip = "symbols"
 
 [profile.alpha]
 inherits = "release"
-opt-level = 2
+opt-level = 0
 lto = false
-codegen-units = 16
+codegen-units = 256
 incremental = true
-strip = "symbols"
+strip = "none"
 
 [profile.loom]
 inherits = "dev"

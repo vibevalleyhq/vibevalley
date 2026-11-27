@@ -274,6 +274,8 @@ export {
   DigestProgressSummary,
   Finding,
   Issue,
+  IssueBodyEnsureInput,
+  IssueBodyEnsureResult,
   IssueConstraints,
   IssueDigestGetInput,
   IssueFilter,

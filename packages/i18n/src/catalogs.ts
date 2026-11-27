@@ -1672,7 +1672,7 @@ export const catalogs = {
         missingRuntime: "尚未启用可用环境，配置好编码环境后就能自动起草和开工。",
         goRuntimes: "去配置环境",
       },
-      conversation: { older: "加载更早的消息", placeholder: "写一条评论、补充说明或反馈…" },
+      conversation: { older: "加载更早的消息", placeholder: "写一条评论、补充说明或反馈…", postComment: "发表评论" },
       activity: { title: "动态记录", empty: "需求讨论、进展节点与执行步骤会汇总在这里" },
       attachments: {
         title: "附件",
@@ -3604,8 +3604,9 @@ export const catalogs = {
         },
         check: "检查更新",
         retry: "重试",
+        details: "查看详情",
+        dialogTitle: "应用更新",
         restart: "立即重启更新",
-        restartQuestion: "重启到新版本？",
         workingQuestion: "{n} 个执行会话正在运行，重启会中断它们。确认现在重启？",
         newFarmQuestion: "新版本将从新数据开始，旧数据会保留在家目录里。确认现在重启？",
         download: "前往下载",
@@ -5745,7 +5746,7 @@ export const catalogs = {
         missingRuntime: "No ready environment configured yet. Set up an environment to draft and run tickets.",
         goRuntimes: "Configure environments",
       },
-      conversation: { older: "Load earlier messages", placeholder: "Write a comment, note, or feedback…" },
+      conversation: { older: "Load earlier messages", placeholder: "Write a comment, note, or feedback…", postComment: "Comment" },
       activity: { title: "Activity", empty: "Discussion, milestones, and run steps appear here" },
       attachments: {
         title: "Attachments",
@@ -7747,8 +7748,9 @@ export const catalogs = {
         },
         check: "Check for updates",
         retry: "Retry",
+        details: "Details",
+        dialogTitle: "App update",
         restart: "Restart to update",
-        restartQuestion: "Restart into the new version?",
         workingQuestion: "{n} active sessions are running; restarting will interrupt them. Restart now?",
         newFarmQuestion: "The new version starts from fresh data; the old stays in the home folder. Restart now?",
         download: "Download",
@@ -9591,6 +9593,7 @@ export interface Messages {
   "web.issue.close.working": { readonly who: string | number };
   "web.issue.conversation.older": undefined;
   "web.issue.conversation.placeholder": undefined;
+  "web.issue.conversation.postComment": undefined;
   "web.issue.dates.clearDate": undefined;
   "web.issue.dates.dueAt": undefined;
   "web.issue.dates.notSet": undefined;
@@ -11684,6 +11687,8 @@ export interface Messages {
   "web.setting.about.cliTaken": { readonly link: string | number };
   "web.setting.about.copied": undefined;
   "web.setting.about.copy": undefined;
+  "web.setting.about.details": undefined;
+  "web.setting.about.dialogTitle": undefined;
   "web.setting.about.disabled": undefined;
   "web.setting.about.download": undefined;
   "web.setting.about.downloading": { readonly next: string | number; readonly percent: string | number };
@@ -11712,7 +11717,6 @@ export interface Messages {
   "web.setting.about.repos": undefined;
   "web.setting.about.reposHint": undefined;
   "web.setting.about.restart": undefined;
-  "web.setting.about.restartQuestion": undefined;
   "web.setting.about.retry": undefined;
   "web.setting.about.reveal": undefined;
   "web.setting.about.settings": undefined;

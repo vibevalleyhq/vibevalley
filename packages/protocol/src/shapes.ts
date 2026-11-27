@@ -317,6 +317,8 @@ export {
   type Issue,
   type IssueAct,
   type IssueAction,
+  type IssueBodyEnsureInput,
+  type IssueBodyEnsureResult,
   type IssueDigestGetInput,
   type IssueFilter,
   type IssueHistory,

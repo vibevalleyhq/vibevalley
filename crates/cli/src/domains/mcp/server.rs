@@ -23,6 +23,7 @@ enum McpTool {
     AgentRegister,
     IssueList,
     IssueGet,
+    IssueBodyEnsure,
     IssueCreate,
     IssueUpdate,
     IssueComment,
@@ -61,6 +62,7 @@ impl McpTool {
             "vv_agent_register" => Some(Self::AgentRegister),
             "vv_issue_list" => Some(Self::IssueList),
             "vv_issue_get" => Some(Self::IssueGet),
+            "vv_issue_body_ensure" => Some(Self::IssueBodyEnsure),
             "vv_issue_create" => Some(Self::IssueCreate),
             "vv_issue_update" => Some(Self::IssueUpdate),
             "vv_issue_comment" => Some(Self::IssueComment),
@@ -217,6 +219,7 @@ impl McpServer {
             McpTool::AgentRegister => self.tool_agent_register(args).await,
             McpTool::IssueList => self.tool_issue_list(args).await,
             McpTool::IssueGet => self.tool_issue_get(args).await,
+            McpTool::IssueBodyEnsure => self.tool_issue_body_ensure(args).await,
             McpTool::IssueCreate => self.tool_issue_create(args).await,
             McpTool::IssueUpdate => self.tool_issue_update(args).await,
             McpTool::IssueComment => self.tool_issue_comment(args).await,
@@ -299,7 +302,7 @@ fn build_client_for_home(base: &Client, target_home: &Path, channel: Option<Rele
 #[cfg(test)]
 mod tests {
     use super::super::ChannelArg;
-    use super::issue::{IssueCreateArgs, IssueUpdateArgs};
+    use super::issue::{IssueBodyEnsureArgs, IssueCreateArgs, IssueUpdateArgs};
     use super::note::NoteCreateArgs;
     use super::vdp::VdpOverrideArgs;
     use super::*;
@@ -430,6 +433,14 @@ mod tests {
         assert_eq!(updated.tags, Some(vec!["Bug".into()]));
         assert_eq!(updated.start_at, Some(JsNumber::from(0_i64)));
         assert_eq!(updated.due_at, Some(JsNumber::from(1_760_900_000_000_i64)));
+
+        let ensure_def = defs.iter().find(|d| d.name == "vv_issue_body_ensure").expect("vv_issue_body_ensure");
+        assert!(ensure_def.input_schema["properties"].as_object().is_some_and(|p| p.contains_key("id")));
+        assert!(ensure_def.description.contains("vv_doc_view"));
+        let ensured_num: IssueBodyEnsureArgs = serde_json::from_value(json!({ "id": 146 })).unwrap();
+        assert_eq!(ensured_num.id, "146");
+        let ensured_ref: IssueBodyEnsureArgs = serde_json::from_value(json!({ "id": "#146" })).unwrap();
+        assert_eq!(ensured_ref.id, "#146");
     }
 
     #[test]

@@ -938,6 +938,14 @@ impl Board {
         Ok(AppliedIssue::from_issue(issue, self.seq()))
     }
 
+    pub(crate) async fn set_body_note_id_async(&self, id: &str, note_id: String) -> Result<Issue, ApiError> {
+        self.state.set_body_note_id_async(id, note_id).await.map_err(api)
+    }
+
+    pub(crate) async fn issues_without_body_note_async(&self) -> Result<Vec<Issue>, ApiError> {
+        self.ctx.service.issue.list_without_body_note().await.map_err(|e| api(BoardError::Store(e)))
+    }
+
     pub(crate) async fn issue_delete_endpoint_async(&self, id: &str) -> Result<(), ApiError> {
         let id = self.get_async(id).await?.id;
         self.remove_async(&id).await.map_err(api)

@@ -265,4 +265,28 @@ impl IssueState {
         let kept = self.ctx.service.issue.take_words(id).await?;
         Ok((!kept.is_empty()).then(|| kept.join("\n\n")))
     }
+
+    /// Associates a lazily materialized Block Doc body note with an issue.
+    pub async fn set_body_note_id_async(&self, id: &str, note_id: String) -> Result<Issue> {
+        {
+            let _write = self.write.lock().await;
+            let mut issue = self.ctx.service.issue.get(id).await?.ok_or_else(|| RuntimeError::NoIssue(id.to_owned()))?;
+            if issue.body_note_id.as_deref() != Some(note_id.as_str()) {
+                issue.body_note_id = Some(note_id);
+                let issue_svc = self.ctx.service.issue.clone();
+                let to_save = issue.clone();
+                self.ctx
+                    .service
+                    .write_dirty_with(RuntimeError::Store, |tx| {
+                        Box::pin(async move {
+                            issue_svc.put_in_tx(tx, &to_save).await?;
+                            Ok(((), SliceMask::BOARD | SliceMask::INBOX))
+                        })
+                    })
+                    .await?;
+                self.ctx.mark_dirty(SliceMask::BOARD | SliceMask::INBOX);
+            }
+        }
+        self.issue_async(id).await?.ok_or_else(|| RuntimeError::NoIssue(id.to_owned()))
+    }
 }

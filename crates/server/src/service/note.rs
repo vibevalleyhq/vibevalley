@@ -254,8 +254,17 @@ async fn update_note_field_impl<C: ConnectionTrait, V: Into<sea_orm::Value>>(db:
     Ok(())
 }
 
+fn exclude_issue_body_notes() -> SimpleExpr {
+    let sub = Query::select()
+        .column(issue::Column::BodyNoteId)
+        .from(issue::Entity)
+        .and_where(issue::Column::BodyNoteId.is_not_null())
+        .to_owned();
+    note::Column::Id.not_in_subquery(sub)
+}
+
 async fn list_notes_impl<C: ConnectionTrait>(db: &C, filter: Option<(note::Column, &str)>, limit: Option<u64>) -> DbResult<Vec<NoteRow>> {
-    let mut query = note::Entity::find();
+    let mut query = note::Entity::find().filter(exclude_issue_body_notes());
     if let Some((col, val)) = filter {
         query = query.filter(col.eq(val));
     }
@@ -554,7 +563,7 @@ impl NoteService {
         let mut query = note::Entity::find();
         query = match parent_id {
             Some(pid) => query.filter(note::Column::ParentId.eq(pid)),
-            None => query.filter(note::Column::ParentId.is_null()),
+            None => query.filter(note::Column::ParentId.is_null()).filter(exclude_issue_body_notes()),
         };
         let rows = query
             .order_by_asc(note::Column::SortOrder)

@@ -201,6 +201,7 @@ impl Issue {
             due_at: None,
             owner: None,
             relations: vec![],
+            body_note_id: None,
         }
     }
 }

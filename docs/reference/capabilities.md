@@ -208,6 +208,7 @@ MOSS Live 语音通话
 | `issue.timeline.get` | 任务的时间线和每一轮加起来的花费 | `/api/v1/issue/timeline/get` | ✓ | ✓ |   |   |
 | `issue.create` | 写一张新任务 | `/api/v1/issue/create` | ✓ | ✓ | ✓ |   |
 | `issue.update` | 改一个任务 | `/api/v1/issue/update` | ✓ | ✓ | ✓ |   |
+| `issue.body.ensure` | 为任务按需懒物化或获取 Block Doc 协作正文笔记 | `/api/v1/issue/body/ensure` | ✓ | ✓ | ✓ |   |
 | `issue.delete` | 删掉一个任务 | `/api/v1/issue/delete` | ✓ | ✓ |   |   |
 | `issue.previewDelete` | 试删一个任务：说会删掉什么，不真删 | `/api/v1/issue/previewDelete` | ✓ | ✓ |   |   |
 | `issue.status.update` | 挪任务的状态：派活、再来一轮、完成或取消 | `/api/v1/issue/status/update` | ✓ | ✓ | ✓ |   |

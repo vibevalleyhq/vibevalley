@@ -1,7 +1,8 @@
 // Generated from crates/protocol/src/contract (vp run protocol:ts). Do not edit.
 
 import type { Attachment } from "../attachment/shapes.gen";
-import type { ActorKind, IssueId, Outcome, SessionId, Spent } from "../common/shapes.gen";
+import type { ActorKind, IssueId, NoteId, Outcome, SessionId, Spent } from "../common/shapes.gen";
+import type { DocView, Note } from "../note/shapes.gen";
 import type { Conflict, RepoHealth, ReviewRevision } from "../repo/shapes.gen";
 import type { IssueAnswer, PhaseRestingOnly, Session, SessionEvent } from "../session/shapes.gen";
 
@@ -172,7 +173,7 @@ machineId?: string, assignments: Array<Assignment>, priority: Priority, rank?: n
 /**
  * Tracks runs executed without a worker session (e.g. in-process orchestrator); active while `endedAt` is absent.
  */
-lastRun?: IssueLastRun, answer?: IssueAnswer, stage: IssueStage, attachments?: Array<Attachment>, tags?: Array<string>, startAt?: number, dueAt?: number, owner?: ActorRef, relations?: Array<IssueRelation>, };
+lastRun?: IssueLastRun, answer?: IssueAnswer, stage: IssueStage, attachments?: Array<Attachment>, tags?: Array<string>, startAt?: number, dueAt?: number, owner?: ActorRef, relations?: Array<IssueRelation>, bodyNoteId?: NoteId, };
 
 /**
  * Includes the Core fold `seq` that applied the mutation so clients can await state convergence.
@@ -181,7 +182,7 @@ export type AppliedIssue = { constraints?: IssueConstraints, id: IssueId, number
 /**
  * Target execution host id when pinned to a specific machine; omitted lets the control plane route.
  */
-machineId?: string, assignments: Array<Assignment>, priority: Priority, rank?: number, createdAt: number, queuedAt?: number, closedAt?: number, delivered?: Landing, canceled?: IssueCanceled, parent?: IssueId, blockedBy: Array<IssueId>, cron?: string, status: IssueStatus, moves: Array<IssueStatus>, pullRequest?: PullRequest, deliver: Deliverable, reviewedAt?: number, deliveryEvidence?: DeliveryEvidence, findings: Array<Finding>, questions: Array<Question>, criteria: Array<string>, checks: Array<CriterionCheck>, refining?: IssueRefining, lastRun?: IssueLastRun, answer?: IssueAnswer, stage: IssueStage, attachments?: Array<Attachment>, tags?: Array<string>, startAt?: number, dueAt?: number, owner?: ActorRef, relations?: Array<IssueRelation>, seq: number, };
+machineId?: string, assignments: Array<Assignment>, priority: Priority, rank?: number, createdAt: number, queuedAt?: number, closedAt?: number, delivered?: Landing, canceled?: IssueCanceled, parent?: IssueId, blockedBy: Array<IssueId>, cron?: string, status: IssueStatus, moves: Array<IssueStatus>, pullRequest?: PullRequest, deliver: Deliverable, reviewedAt?: number, deliveryEvidence?: DeliveryEvidence, findings: Array<Finding>, questions: Array<Question>, criteria: Array<string>, checks: Array<CriterionCheck>, refining?: IssueRefining, lastRun?: IssueLastRun, answer?: IssueAnswer, stage: IssueStage, attachments?: Array<Attachment>, tags?: Array<string>, startAt?: number, dueAt?: number, owner?: ActorRef, relations?: Array<IssueRelation>, bodyNoteId?: NoteId, seq: number, };
 
 export type IssueUpdate = { title?: string, description?: string, repo?: string, agent?: string, machineId?: string, priority?: Priority, criteria?: Array<string>, deliver?: Deliverable,
 /**
@@ -349,3 +350,7 @@ export type BacklogTriageSuggestInput = { issueId: string, reason: string, summa
 export type BacklogTriageConfirmInput = { id: string, };
 
 export type BacklogTriageDismissInput = { id: string, };
+
+export type IssueBodyEnsureInput = { id: string, };
+
+export type IssueBodyEnsureResult = { issue: Issue, note: Note, docView: DocView, };

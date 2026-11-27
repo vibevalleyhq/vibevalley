@@ -1,11 +1,12 @@
-import { computed, Text, View } from "nsh";
+import { computed, signal, Text, untracked, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
-import type { ChatMessage, Issue, IssueTimeline, Milestone, Run } from "@vibevalley/protocol";
+import type { ChatMessage, Issue, IssueTimeline, Milestone, Note, Run } from "@vibevalley/protocol";
 import { channelOf, plainText } from "@vibevalley/protocol/rules";
 
 import { createAct } from "../../../design/act";
 import { Button } from "../../../design/Button";
+import { TextArea } from "../../../design/Field";
 import { Icon } from "../../../design/Icon";
 import { Banner } from "../../../design/layout";
 import { Markdown } from "../../../design/Markdown";
@@ -13,13 +14,15 @@ import { motionClass } from "../../../design/motion";
 import { CountPill, Dot } from "../../../design/Tag";
 import { TextLink } from "../../../design/TextLink";
 import { Bubble } from "../../../design/Tip";
+import { toast } from "../../../design/toasts";
 import { api } from "../../../infra/api";
 import { useNow } from "../../../infra/base/dom";
 import { momentText, shortMomentText, tookText } from "../../../infra/base/format";
 import { useCollabSlice } from "../../../infra/frame";
-import { defineQuery, ready, retryRead, useQuery } from "../../../infra/query";
+import { defineQuery, ready, retryRead, useQuery, useQueryClient } from "../../../infra/query";
 import { Link as A } from "../../../infra/router";
 import { Attachments, Composer, followed, issueThreadOf, useFollowed } from "../../channel";
+import { NoteLinkPills, resolveDescriptionNoteLinks, useNotes } from "../../note";
 import { RunSteps, runsHref } from "../../session";
 import { type ActivityItem, mergeIssueActivity, remainingMessageAttachments } from "../model/activity";
 import { useIssueRuns, useIssueTimeline } from "../model/history";
@@ -113,7 +116,8 @@ function MilestoneRow(props: {
   );
 }
 
-function MessageRow(props: { message: ChatMessage; now: number }) {
+function MessageRow(props: { message: ChatMessage; notes: readonly Note[]; now: number }) {
+  const resolved = computed(() => resolveDescriptionNoteLinks(props.message.text, props.notes));
   return (
     <View testID="issue-message" class="min-w-0 rounded-lg border border-line bg-page px-3.5 py-3">
       <View class="mb-1.5 flex-row items-center justify-between gap-2">
@@ -124,7 +128,8 @@ function MessageRow(props: { message: ChatMessage; now: number }) {
       </View>
       <If when={props.message.text.trim() !== "" || props.message.attachments.length === 0}>
         <View testID="issue-message-body" class="min-w-0">
-          <Markdown size="sm" text={props.message.text} />
+          <Markdown size="sm" text={resolved().markdown} />
+          <NoteLinkPills links={resolved().links} />
         </View>
       </If>
       <If when={remainingMessageAttachments(props.message)}>{(files) => <Attachments files={files()} />}</If>
@@ -147,7 +152,11 @@ export function IssueActivity(props: {
 }) {
   const collab = useCollabSlice();
   const now = useNow();
-  const act = createAct();
+  const queries = useQueryClient();
+  const act = createAct((msg) => toast(msg, "bad"));
+  const notesQuery = useNotes(() => ({}));
+  const allNotes = computed(() => ready(notesQuery, []));
+  const commentDraft = signal("");
 
   const ownTimelineQuery = useIssueTimeline(
     () => props.issue,
@@ -168,6 +177,23 @@ export function IssueActivity(props: {
 
   const items = computed(() => mergeIssueActivity(timeline()?.milestones ?? [], feed().messages, runs()));
   const timelineLoading = computed(() => (props.timeline === undefined ? ownTimelineQuery.status() === "pending" : props.timelinePending === true));
+
+  const sendFallbackComment = () => {
+    const raw = untracked(commentDraft);
+    const text = raw.trim();
+    if (!text || act.busy()) return;
+    commentDraft.set("");
+    void act
+      .run(async () => {
+        await api.issue.comment.create({ id: props.issue.id, text });
+        await queries.invalidate({ prefix: ["issues", "conversation", props.issue.id] });
+        await queries.invalidate({ prefix: ["issues", "timeline", props.issue.id] });
+        return true;
+      })
+      .then((ok) => {
+        if (ok !== true && untracked(commentDraft) === "") commentDraft.set(raw);
+      });
+  };
 
   return (
     <View testID="issue-activity" accessibilityLabel={t("web.issue.activity.title")} class="mt-7 border-t border-line pt-5">
@@ -218,7 +244,10 @@ export function IssueActivity(props: {
         <View class="gap-2">
           <Each of={items()} key={(entry) => entry.key}>
             {(entry, i) => (
-              <If when={asMilestone(entry())} else={<If when={asMessage(entry())}>{(msg) => <MessageRow message={msg().message} now={now()} />}</If>}>
+              <If
+                when={asMilestone(entry())}
+                else={<If when={asMessage(entry())}>{(msg) => <MessageRow message={msg().message} notes={allNotes()} now={now()} />}</If>}
+              >
                 {(ms) => (
                   <MilestoneRow
                     item={ms()}
@@ -234,7 +263,36 @@ export function IssueActivity(props: {
           </Each>
         </View>
       </If>
-      <If when={threadChannel()}>
+      <If
+        when={threadChannel()}
+        else={
+          <View testID="issue-comment-fallback-composer" class="mt-3 gap-2 rounded-lg border border-line bg-side p-2.5">
+            <TextArea
+              testID="issue-comment-fallback-input"
+              rows={2}
+              value={commentDraft()}
+              disabled={act.busy()}
+              onInput={(v) => commentDraft.set(v)}
+              submit
+              onSubmit={sendFallbackComment}
+              placeholder={t("web.issue.conversation.placeholder")}
+              accessibilityLabel={t("web.issue.conversation.placeholder")}
+            />
+            <View class="flex-row justify-end">
+              <Button
+                size="compact"
+                tone="primary"
+                icon="send"
+                testID="issue-comment-fallback-send"
+                disabled={act.busy() || commentDraft().trim() === ""}
+                onPress={sendFallbackComment}
+              >
+                {t("web.issue.conversation.postComment")}
+              </Button>
+            </View>
+          </View>
+        }
+      >
         {(ch) => (
           <View testID="issue-comment-composer" class="mt-3 rounded-lg border-r border-b border-l border-line bg-side">
             <Composer channel={ch()} placeholder={t("web.issue.conversation.placeholder")} />

@@ -14,6 +14,7 @@ pub mod m20261127_100002_add_issue_owner;
 pub mod m20261127_100003_extend_memory_profile_episode;
 pub mod m20261127_100004_add_issue_relations;
 pub mod m20261128_100001_replace_artifact_with_note;
+pub mod m20261128_100002_add_issue_body_note_id;
 
 use sea_orm_migration::prelude::*;
 
@@ -37,6 +38,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261127_100003_extend_memory_profile_episode::Migration),
             Box::new(m20261127_100004_add_issue_relations::Migration),
             Box::new(m20261128_100001_replace_artifact_with_note::Migration),
+            Box::new(m20261128_100002_add_issue_body_note_id::Migration),
         ]
     }
 }

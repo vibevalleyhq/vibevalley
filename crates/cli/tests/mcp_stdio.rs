@@ -137,6 +137,7 @@ impl MockIssueState {
             number,
             title: req.title,
             description: req.description.unwrap_or_default(),
+            body_note_id: None,
             mandate: IssueMandate {
                 origin_trigger_id: None,
                 strength: MandateStrength::Explicit,

@@ -497,6 +497,7 @@ mod tests {
         assert!(issue_cols.contains("status"), "issue table must include status column");
         assert!(issue_cols.contains("owner"), "issue table must include owner column");
         assert!(issue_cols.contains("relations"), "issue table must include relations column");
+        assert!(issue_cols.contains("body_note_id"), "issue table must include body_note_id column");
 
         let memory_cols: BTreeSet<&str> = actual_columns
             .get("memory")
@@ -522,7 +523,7 @@ mod tests {
         assert_eq!(memory_row.try_get_by_index::<Option<String>>(3).unwrap(), None);
 
         let migrations = list_applied_migrations(db.read_conn(), DatabaseBackend::Sqlite, &existing).await.unwrap();
-        assert_eq!(migrations.len(), 10);
+        assert_eq!(migrations.len(), 11);
         db.close().await;
     }
 

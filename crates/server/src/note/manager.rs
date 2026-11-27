@@ -7,9 +7,10 @@ use std::time::Duration;
 
 use parking_lot::Mutex;
 use tokio::sync::broadcast;
+use vibevalley_core::SliceMask;
 use vibevalley_core::collab::{CommitMeta, encode_frontiers};
 use vibevalley_core::note::base::extract_base_links;
-use vibevalley_core::note::doc::project_doc_view;
+use vibevalley_core::note::doc::{blocks_to_markdown, parse_doc_document, project_doc_view};
 use vibevalley_core::note::links::{dedup_links, extract_markdown_links};
 use vibevalley_core::note::{type_spec, validate_deletable_path, validate_note_path};
 use vibevalley_i18n::{list, t};
@@ -214,6 +215,34 @@ impl Manager {
         if let Err(err) = self.ctx.service.note.replace_links_for_source(LinkEntityKind::Note, note_id, &links, at).await {
             tracing::warn!(note_id = %note_id, error = %err, "note.replace_links_for_source failed");
         }
+        if ty == NoteType::Doc {
+            self.sync_issue_body_description_async(note_id, files).await;
+        }
+    }
+
+    async fn sync_issue_body_description_async(&self, note_id: &str, files: &BTreeMap<String, Vec<u8>>) {
+        let Ok(Some(mut issue)) = self.ctx.service.issue.find_by_body_note_id(note_id).await else {
+            return;
+        };
+        let Some(bytes) = files.get("structure/doc.json") else {
+            return;
+        };
+        let Ok(raw) = std::str::from_utf8(bytes) else {
+            return;
+        };
+        let Ok(doc) = parse_doc_document(raw) else {
+            return;
+        };
+        let markdown = blocks_to_markdown(&doc.blocks);
+        if issue.description == markdown {
+            return;
+        }
+        issue.description = markdown;
+        if let Err(err) = self.ctx.service.issue.put(&issue).await {
+            tracing::warn!(issue_id = %issue.id, note_id = %note_id, error = %err, "sync_issue_body_description_async failed");
+            return;
+        }
+        self.ctx.mark_dirty(SliceMask::BOARD | SliceMask::INBOX);
     }
 
     async fn wire_of_async(&self, row: NoteRow, versions: Vec<VersionRow>) -> Result<Wire, ApiError> {

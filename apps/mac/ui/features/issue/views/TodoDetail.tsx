@@ -1,5 +1,5 @@
 import { computed, signal, Text, View } from "nsh";
-import { Input, Popover } from "nsh/base";
+import { Popover } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
 import {
@@ -23,7 +23,6 @@ import { ConfirmButton } from "../../../design/ConfirmButton";
 import { AgentReadinessNote, AgentSelect } from "../../../design/domain/AgentSelect";
 import { TextArea } from "../../../design/Field";
 import { Icon } from "../../../design/Icon";
-import { Markdown } from "../../../design/Markdown";
 import { Bubble } from "../../../design/Tip";
 import { toast } from "../../../design/toasts";
 import { mix } from "../../../design/tone";
@@ -35,7 +34,7 @@ import { ready, useQueryClient, useRepos } from "../../../infra/query";
 import { createEffect, createSignal, untrack } from "../../../infra/solid";
 import { useIntents } from "../../../infra/state/intent";
 import { rememberPick } from "../../../infra/state/prefs";
-import { IssueNotes, useNotes } from "../../note";
+import { IssueBodyEditor, IssueNotes, useNotes } from "../../note";
 import { todoStatusLabel } from "../model/cards";
 import { useIssues } from "../model/history";
 import { isRefined, newIssueTitle } from "../model/issue";
@@ -44,7 +43,6 @@ import { issueMove, issueMoveOf, movedIssue, sendMove } from "../model/moves";
 import { ActLines } from "./ActLines";
 import { IssueActivity } from "./IssueActivity";
 import { IssueAttachments } from "./IssueAttachments";
-import { NoteLinkPills, resolveDescriptionNoteLinks } from "./IssueDetail";
 import {
   BlockedByChips,
   BlockedByPicker,
@@ -117,7 +115,6 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
   const newRepo = signal(false);
   const repoActions = signal(false);
   const repoActionCreate = signal(false);
-  const editingDesc = signal(false);
   const refineOpen = signal(false);
   const agents = useManagedWorkAgents(true);
   const agentReadiness = useWorkAgentReadiness(true);
@@ -385,57 +382,20 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
     </If>
   );
 
-  const hasDescription = computed(() => d().description.trim() !== "");
-  const resolvedDescription = computed(() => resolveDescriptionNoteLinks(d().description, allNotes()));
+  const hasDescription = computed(() => d().description.trim() !== "" || Boolean(props.item.bodyNoteId));
   const main = (
     <>
-      <View>
-        <If
-          when={editingDesc()}
-          else={
-            <If
-              when={hasDescription()}
-              else={
-                <If when={!closed()}>
-                  <View role="button" testID="issue-edit-description" onPress={() => editingDesc.set(true)} class="-mx-2 rounded-md px-2 py-2 hover:bg-hover">
-                    <Text class="text-sm text-faint">{t("web.issue.todo.addDescription")}</Text>
-                  </View>
-                </If>
-              }
-            >
-              <View class="mb-2 flex-row items-center justify-between gap-2">
-                <Text class="text-xs font-semibold text-muted">{t("web.issue.todo.description")}</Text>
-                <If when={!closed()}>
-                  <Button size="compact" tone="quiet" icon="edit" testID="issue-edit-description" onPress={() => editingDesc.set(true)}>
-                    {t("web.issue.todo.edit")}
-                  </Button>
-                </If>
-              </View>
-              <View testID="issue-description-preview">
-                <Markdown size="sm" text={resolvedDescription().markdown} />
-                <NoteLinkPills links={resolvedDescription().links} />
-              </View>
-            </If>
-          }
-        >
-          <View class="mb-2 flex-row items-center justify-between gap-2">
-            <Text class="text-xs font-semibold text-muted">{t("web.issue.todo.description")}</Text>
-            <Button size="compact" tone="quiet" icon="check" testID="issue-edit-description-done" onPress={() => editingDesc.set(false)}>
-              {t("web.issue.todo.doneEditing")}
-            </Button>
-          </View>
-          <Input
-            multiline
-            autoFocus
-            testID="issue-description"
-            value={d().description}
-            onChange={(e) => edit({ description: e.value })}
-            placeholder={t("web.issue.todo.descriptionHint")}
-            accessibilityLabel={t("web.issue.todo.description")}
-            class="min-h-22 w-full rounded-md border border-line bg-page px-2.5 py-2 text-sm text-ink placeholder:text-faint focus:border-focus"
-          />
-        </If>
-      </View>
+      <IssueBodyEditor
+        issue={props.item}
+        editable={!closed()}
+        description={d().description}
+        notes={allNotes()}
+        onDraftDescription={(description) => edit({ description })}
+        onOpenIssue={(id) => props.onDone(id)}
+        sectionTitle={t("web.issue.todo.description")}
+        emptyLabel={t("web.issue.todo.addDescription")}
+        placeholder={t("web.issue.todo.descriptionHint")}
+      />
 
       <TodoCriteriaSection
         value={d().criteria}

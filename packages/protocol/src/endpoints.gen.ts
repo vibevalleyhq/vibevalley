@@ -69,6 +69,7 @@ export const servedEndpoints = [
   { op: "issue.timeline.get", can: ["user", "remote"], about: ["id"] },
   { op: "issue.create", can: ["user", "remote", "orchestrator"], about: [] },
   { op: "issue.update", can: ["user", "remote", "orchestrator"], about: ["id"] },
+  { op: "issue.body.ensure", can: ["user", "remote", "orchestrator"], about: ["id"] },
   { op: "issue.delete", can: ["user", "remote"], about: ["id"], dryRun: "issue.previewDelete" },
   { op: "issue.previewDelete", can: ["user", "remote"], about: ["id"] },
   { op: "issue.status.update", can: ["user", "remote", "orchestrator"], about: ["id"], dryRun: "issue.status.previewUpdate" },

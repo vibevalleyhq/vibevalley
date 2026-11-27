@@ -470,7 +470,8 @@
   },
   "conversation": {
     "older": "Load earlier messages",
-    "placeholder": "Write a comment, note, or feedback…"
+    "placeholder": "Write a comment, note, or feedback…",
+    "postComment": "Comment"
   },
   "activity": {
     "title": "Activity",

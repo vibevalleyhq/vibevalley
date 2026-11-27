@@ -619,6 +619,15 @@ pub const ENDPOINTS: &[Endpoint] = &[
         result: Some("AppliedIssue"),
     },
     Endpoint {
+        op: "issue.body.ensure",
+        module: "issue",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote, Caller::Orchestrator],
+        dry_run: None,
+        input: Some("IssueBodyEnsureInput"),
+        result: Some("IssueBodyEnsureResult"),
+    },
+    Endpoint {
         op: "issue.delete",
         module: "issue",
         about: &["id"],
@@ -2415,6 +2424,13 @@ pub mod ops {
         type Input = t::IssueUpdateInput;
         type Result = t::AppliedIssue;
     }
+    /// Lazily materializes or returns an issue's collaborative Block Doc body note.
+    pub struct IssueBodyEnsure;
+    impl Op for IssueBodyEnsure {
+        const NAME: &'static str = "issue.body.ensure";
+        type Input = t::IssueBodyEnsureInput;
+        type Result = t::IssueBodyEnsureResult;
+    }
     pub struct IssueDelete;
     impl Op for IssueDelete {
         const NAME: &'static str = "issue.delete";
@@ -3610,6 +3626,7 @@ endpoint_ids! {
     IssueTimelineGet => "issue.timeline.get",
     IssueCreate => "issue.create",
     IssueUpdate => "issue.update",
+    IssueBodyEnsure => "issue.body.ensure",
     IssueDelete => "issue.delete",
     IssuePreviewDelete => "issue.previewDelete",
     IssueStatusUpdate => "issue.status.update",
