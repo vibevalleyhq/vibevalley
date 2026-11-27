@@ -822,53 +822,66 @@ test("Group By renders collapsible groups across Kanban & List, and hierarchy mo
   });
   await fake.pumpUntil(app, () => app.count("id:issue-card") === 4);
 
-  // Switch Group By -> Owner in Kanban board: creates collapsible owner swimlane groups with counts.
-  await app.press("id:group-by-trigger");
-  await fake.pumpUntil(app, () => app.count(`text:${t("web.issue.groupBy.owner")}`) === 1);
-  await app.press(`text:${t("web.issue.groupBy.owner")}`);
+  // Toolbar folds Group By and Hierarchy cleanly into DisplayMenu without inline layout clutter.
+  expect(app.count("id:issue-layout-bar")).toBe(0);
+
+  // Switch Group By -> Owner via DisplayMenu in Kanban board: creates collapsible owner swimlane groups with counts.
+  const pickGroupBy = async (value: string) => {
+    await app.press("id:group-by-trigger");
+    await fake.pumpUntil(app, () => app.count(`id:group-by-option-${value}`) === 1);
+    await app.press(`id:group-by-option-${value}`);
+  };
+
+  await app.press("id:display");
+  await fake.pumpUntil(app, () => app.count("id:display-menu") === 1);
+  await pickGroupBy("owner");
   await fake.pumpUntil(app, () => app.count("id:issue-group-user:self") === 1);
   expect(app.count("id:issue-group-user:alice")).toBe(1);
   expect(app.count("id:issue-group-agent:laozhou")).toBe(1);
   expect(app.count("id:issue-group-body")).toBe(3);
 
+  // Close DisplayMenu before interacting with board swimlane groups.
+  await app.press("id:display");
+  await fake.pumpUntil(app, () => app.count("id:display-menu") === 0);
+
   // Collapse the self owner group in Kanban.
   await app.press("id:issue-group-user:self");
   await fake.pumpUntil(app, () => app.count("id:issue-group-body") === 2);
 
-  // Switch to List view & Group By -> Priority; verify 4 priority groups and collapsible toggle.
+  // Switch to List view & Group By -> Priority via DisplayMenu; verify 4 priority groups and collapsible toggle.
   await app.press("id:issue-view-list");
   await fake.pumpUntil(app, () => app.count("id:issue-list") === 1);
-  await app.press("id:group-by-trigger");
-  await fake.pumpUntil(app, () => app.count(`text:${t("web.issue.groupBy.priority")}`) === 1);
-  await app.press(`text:${t("web.issue.groupBy.priority")}`);
+  await app.press("id:display");
+  await fake.pumpUntil(app, () => app.count("id:display-menu") === 1);
+  await pickGroupBy("priority");
   await fake.pumpUntil(app, () => app.count("id:issue-group-urgent") === 1);
   expect(app.count("id:issue-group-high")).toBe(1);
   expect(app.count("id:issue-group-medium")).toBe(1);
   expect(app.count("id:issue-group-low")).toBe(1);
 
   // Reset Group By -> None and switch back to Kanban for hierarchy verification.
-  await app.press("id:group-by-trigger");
-  await fake.pumpUntil(app, () => app.count(`text:${t("web.issue.groupBy.none")}`) === 1);
-  await app.press(`text:${t("web.issue.groupBy.none")}`);
+  await pickGroupBy("none");
+  await app.press("id:display");
+  await fake.pumpUntil(app, () => app.count("id:display-menu") === 0);
   await app.press("id:issue-view-board");
   await fake.pumpUntil(app, () => app.count("id:issue-board") === 1);
 
-  // Switch Hierarchy -> top_level: child cards disappear from outer board, leaving parentOne + standalone (2 outer cards).
-  await app.press("id:hierarchy-mode-trigger");
-  await fake.pumpUntil(app, () => app.count(`text:${t("web.issue.hierarchy.top_level")}`) === 1);
-  await app.press(`text:${t("web.issue.hierarchy.top_level")}`);
+  // Switch Hierarchy -> top_level via DisplayMenu: child cards disappear from outer board, leaving parentOne + standalone (2 outer cards).
+  await app.press("id:display");
+  await fake.pumpUntil(app, () => app.count("id:display-menu") === 1);
+  await app.press("id:hierarchy-mode-top_level");
   await fake.pumpUntil(app, () => app.count("id:issue-card") === 2);
   expect(app.count("id:card-children")).toBe(1);
   expect(app.count("id:card-child-i-hier-child-1")).toBe(1);
   expect(app.count("id:card-child-i-hier-child-2")).toBe(1);
   expect(app.texts()).toContain("1/2");
 
-  // Switch Hierarchy -> parents_only: only parentOne remains as outer card (1 outer card), with children still inside.
-  await app.press("id:hierarchy-mode-trigger");
-  await fake.pumpUntil(app, () => app.count(`text:${t("web.issue.hierarchy.parents_only")}`) === 1);
-  await app.press(`text:${t("web.issue.hierarchy.parents_only")}`);
+  // Switch Hierarchy -> parents_only via DisplayMenu: only parentOne remains as outer card (1 outer card), with children still inside.
+  await app.press("id:hierarchy-mode-parents_only");
   await fake.pumpUntil(app, () => app.count("id:issue-card") === 1);
   expect(app.count("id:card-child-i-hier-child-1")).toBe(1);
+  await app.press("id:display");
+  await fake.pumpUntil(app, () => app.count("id:display-menu") === 0);
 
   // Clicking a compact child row directly opens that child's Quick-Peek modal (not the parent).
   await app.press("id:card-child-i-hier-child-1");
@@ -1129,11 +1142,13 @@ test("Keyboard j/k/Enter/e navigation, x/Shift+click multi-select, and BatchTria
   });
   await fake.pumpUntil(app, () => app.count("id:issue-card") === 4);
 
-  // Compose with Hierarchy -> top_level (hides i-kbd-child, leaving 3 top-level cards: 501, 502, 503).
-  await app.press("id:hierarchy-mode-trigger");
-  await fake.pumpUntil(app, () => app.count(`text:${t("web.issue.hierarchy.top_level")}`) === 1);
-  await app.press(`text:${t("web.issue.hierarchy.top_level")}`);
+  // Compose with Hierarchy -> top_level via DisplayMenu (hides i-kbd-child, leaving 3 top-level cards: 501, 502, 503).
+  await app.press("id:display");
+  await fake.pumpUntil(app, () => app.count("id:display-menu") === 1);
+  await app.press("id:hierarchy-mode-top_level");
   await fake.pumpUntil(app, () => app.count("id:issue-card") === 3);
+  await app.keyboard.press("escape");
+  await fake.pumpUntil(app, () => app.count("id:display-menu") === 0);
 
   // j moves focus to first item (#501), j again to #502, Enter opens Quick-Peek for #502.
   await app.keyboard.press("j");
@@ -1284,4 +1299,200 @@ test("Quick-Peek header status badge matches TodoDetail inspector status label o
   expect(app.shows(`id:issue-peek-status >> text:${t("web.issue.todo.draftStatus")}`)).toBe(true);
   expect(app.shows(`id:issue-peek-status >> text:${t("shared.status.backlog")}`)).toBe(false);
   expect(app.shows(`id:todo-status >> text:${t("web.issue.todo.draftStatus")}`)).toBe(true);
+});
+
+test("Unified DisplayMenu toggles density, field visibility, persistence, and reset across Board, List, Timeline, and Calendar", async () => {
+  setLocale("zh");
+  const todayMs = Date.UTC(2026, 10, 20);
+  const child = makeIssueFixture({
+    id: "i-disp-child",
+    number: 702,
+    title: "Child item for progress",
+    parent: "i-disp-main" as IssueId,
+    status: "done",
+    stage: { state: "done", acts: [] },
+  });
+  const cardIssue = makeIssueFixture({
+    id: "i-disp-main",
+    number: 701,
+    title: "Display presentation verification card",
+    status: "todo",
+    priority: "urgent",
+    repo: "vibevalley",
+    owner: { kind: "user", id: "self" },
+    tags: ["UX", "架构"],
+    startAt: todayMs,
+    dueAt: todayMs + 86_400_000,
+    attachments: [{ id: "att-disp", name: "shot.png", type: "image/png", size: 2048 }],
+    assignments: [
+      {
+        id: "a-disp",
+        issue: "i-disp-main" as IssueId,
+        agent: "laozhou",
+        assignedAt: SCENARIO_NOW - 10_000,
+        executions: [],
+      },
+    ],
+    stage: { state: "draft", acts: [] },
+  });
+
+  const state: SliceBundle = {
+    ...scenarios.empty.state,
+    board: {
+      seq: 70,
+      issues: [cardIssue, child],
+      boardSummary: {
+        laneCounts: { backlog: 0, todo: 1, inProgress: 0, inReview: 0, done: 1, canceled: 0 },
+        runningSlots: 0,
+        maxRunning: 3,
+        byIssue: {
+          [cardIssue.id]: {
+            lane: "todo",
+            cardKind: "family",
+            familyDone: 1,
+            familyTotal: 1,
+            needsWorktreeCheck: false,
+            preview: { attachmentId: "att-disp", isCompare: false },
+            schedule: {
+              startMs: todayMs,
+              endMs: todayMs + 86_400_000,
+              durationDays: 2,
+              hasExplicitStart: true,
+              hasExplicitDue: true,
+              rolledUp: false,
+              overdue: false,
+            },
+          },
+          [child.id]: { lane: "done", cardKind: "todo", familyDone: 0, familyTotal: 0, needsWorktreeCheck: false },
+        },
+        schedule: {
+          todayDayMs: todayMs,
+          scheduled: [
+            {
+              issueId: cardIssue.id,
+              span: {
+                startMs: todayMs,
+                endMs: todayMs + 86_400_000,
+                durationDays: 2,
+                hasExplicitStart: true,
+                hasExplicitDue: true,
+                rolledUp: false,
+                overdue: false,
+              },
+              depth: 0,
+              isParent: true,
+              childCount: 1,
+            },
+          ],
+          unscheduledIds: [],
+        },
+      },
+    },
+  };
+
+  const fake = fakeHost({ state, responses: scenarios.typical.responses }, { route: "/issues", locale: "zh" });
+  fake.respond("issue.history.list", [
+    { issue: cardIssue, sessions: [], missingSessions: [] },
+    { issue: child, sessions: [], missingSessions: [] },
+  ]);
+  fake.respond("attachment.file", (payload: unknown) => {
+    const id = (payload as { id?: string } | undefined)?.id ?? "";
+    return { path: `/tmp/${id}.png`, type: "image/png", name: `${id}.png` };
+  });
+
+  const app = await open("../../../app/main.tsx", {
+    width: 1280,
+    height: 820,
+    colorScheme: "light",
+    platform: "macos",
+    clock: { time: SCENARIO_NOW },
+    host: fake.options,
+  });
+  await fake.pumpUntil(app, () => app.count("id:issue-card") === 2 && app.count("id:card-preview") === 1);
+
+  // Default state: comfortable density, all fields visible, no active dot or reset button.
+  expect(app.count("id:display-active-dot")).toBe(0);
+  expect(app.count("id:card-owner")).toBe(1);
+  expect(app.count("id:card-tags")).toBe(1);
+  expect(app.count("id:card-date")).toBe(1);
+  expect(app.count("id:card-preview")).toBe(1);
+  expect(app.texts()).toContain("#701");
+  expect(app.texts()).toContain("1/1");
+  const comfortableCardBox = app.layout("id:issue-card >> nth=0")!;
+
+  // Open DisplayMenu and toggle compact density + hide preview/tags/dates/owner/number/repo.
+  await app.press("id:display");
+  await fake.pumpUntil(app, () => app.count("id:display-menu") === 1);
+  expect(app.count("id:display-reset")).toBe(0);
+  for (const field of ["number", "priority", "repo", "owner", "agent", "tags", "dates", "progress", "preview"]) {
+    expect(app.count(`id:display-field-${field}`)).toBe(1);
+  }
+
+  await app.press("id:density-compact");
+  await app.press("id:display-field-preview");
+  await app.press("id:display-field-tags");
+  await app.press("id:display-field-dates");
+  await app.press("id:display-field-owner");
+  await app.press("id:display-field-number");
+  await app.press("id:display-field-repo");
+  await fake.pump(app);
+
+  expect(app.count("id:display-active-dot")).toBe(1);
+  expect(app.count("id:display-reset")).toBe(1);
+  expect(app.count("id:card-preview")).toBe(0);
+  expect(app.count("id:card-tags")).toBe(0);
+  expect(app.count("id:card-date")).toBe(0);
+  expect(app.count("id:card-owner")).toBe(0);
+  expect(app.texts()).not.toContain("#701");
+
+  const compactCardBox = app.layout("id:issue-card >> nth=0")!;
+  expect(compactCardBox.height).toBeLessThan(comfortableCardBox.height);
+
+  // Stored look persists to app storage.
+  const persisted = JSON.parse(app.storage()["vibevalley.board.look"] ?? "{}") as {
+    density?: string;
+    fields?: Record<string, boolean>;
+  };
+  expect(persisted.density).toBe("compact");
+  expect(persisted.fields?.preview).toBe(false);
+  expect(persisted.fields?.tags).toBe(false);
+
+  await app.keyboard.press("escape");
+  await fake.pumpUntil(app, () => app.count("id:display-menu") === 0);
+
+  // List view honors compact density and hidden fields.
+  await app.press("id:issue-view-list");
+  await fake.pumpUntil(app, () => app.count("id:issue-list") === 1);
+  expect(app.count("id:row-tags")).toBe(0);
+  expect(app.count("id:row-date")).toBe(0);
+  expect(app.count("id:row-updated-at")).toBe(0);
+  expect(app.count("id:row-owner")).toBe(0);
+
+  // Timeline view honors compact density (30px row height) and hidden #701 number.
+  await app.press("id:issue-view-timeline");
+  await fake.pumpUntil(app, () => app.count("id:issue-timeline") === 1);
+  const compactTimelineRow = app.layout("id:timeline-row >> nth=0")!;
+  expect(compactTimelineRow.height).toBe(30);
+  expect(app.count("id:timeline-row >> text:#701")).toBe(0);
+
+  // Calendar view honors compact density and hidden #701 number.
+  await app.press("id:issue-view-calendar");
+  await fake.pumpUntil(app, () => app.count("id:issue-calendar") === 1);
+  expect(app.count("id:calendar-pill >> text:#701")).toBe(0);
+
+  // Reset inside DisplayMenu restores defaults while keeping current view ("calendar").
+  await app.press("id:display");
+  await fake.pumpUntil(app, () => app.count("id:display-reset") === 1);
+  await app.press("id:display-reset");
+  await fake.pumpUntil(app, () => app.count("id:display-reset") === 0);
+  expect(app.count("id:issue-calendar")).toBe(1);
+  expect(app.count("id:display-active-dot")).toBe(0);
+  expect(app.count("id:calendar-pill >> text:#701")).toBe(2);
+
+  await app.press("id:display");
+  await fake.pumpUntil(app, () => app.count("id:display-menu") === 0);
+  await app.press("id:issue-view-timeline");
+  await fake.pumpUntil(app, () => app.count("id:issue-timeline") === 1);
+  expect(app.layout("id:timeline-row >> nth=0")!.height).toBe(38);
+  expect(app.count("id:timeline-row >> text:#701")).toBe(1);
 });

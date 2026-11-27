@@ -103,8 +103,25 @@
     "orderNote": "Unless the order is Default, to-dos cannot be dragged up and down.",
     "defaultNote": "Default is the order you gave the to-dos.",
     "show": "Display",
-    "group": "Group",
+    "listGroup": "List group",
     "order": "Order",
+    "density": "Density",
+    "densities": {
+      "comfortable": "Comfortable",
+      "compact": "Compact"
+    },
+    "fields": "Properties",
+    "field": {
+      "number": "ID",
+      "priority": "Priority",
+      "repo": "Repo",
+      "owner": "Assignee",
+      "agent": "Helper",
+      "tags": "Tags",
+      "dates": "Dates",
+      "progress": "Progress",
+      "preview": "Preview"
+    },
     "reset": "Reset"
   },
   "list": {

@@ -40,19 +40,7 @@ import {
   type Lane,
   noFilter,
 } from "../model/cards";
-import {
-  type BoardLook,
-  boardLook,
-  boardViews,
-  type GroupBy,
-  groupByLabel,
-  groupBys,
-  type HierarchyMode,
-  hierarchyLabel,
-  hierarchyModes,
-  hierarchyShows,
-  viewLabel,
-} from "../model/display";
+import { type BoardLook, boardLook, boardViews, type GroupBy, type HierarchyMode, hierarchyShows, viewLabel } from "../model/display";
 import { useIssueHistory, useNameOf } from "../model/history";
 import { issueIs } from "../model/issue";
 import { type IssueScope, issueScopes, issueTagPresets } from "../model/meta";
@@ -523,6 +511,8 @@ export function IssuesPage(props: { rest: string }) {
                           filtered={filterAny(filter()) || effectiveHierarchy() !== "all"}
                           loading={history.loading()}
                           selected={returnTo()}
+                          density={look().density}
+                          fields={look().fields}
                           onOpen={peek}
                           onNew={startNew}
                           onClearFilter={() => setFilter(noFilter)}
@@ -537,6 +527,8 @@ export function IssuesPage(props: { rest: string }) {
                         loading={history.loading()}
                         selected={activeFocusId()}
                         selectedIds={selectedIds()}
+                        density={look().density}
+                        fields={look().fields}
                         onOpen={peek}
                         onToggleSelect={handleToggleSelect}
                         onUpdateDates={updateScheduleDates}
@@ -558,6 +550,8 @@ export function IssuesPage(props: { rest: string }) {
                     groupBy={effectiveGroupBy()}
                     hierarchy={effectiveHierarchy()}
                     ordering={look().ordering}
+                    density={look().density}
+                    fields={look().fields}
                     onOlder={() => older.set(!older())}
                     onOpen={peek}
                     onToggleSelect={handleToggleSelect}
@@ -579,6 +573,8 @@ export function IssuesPage(props: { rest: string }) {
                 ordering={look().ordering}
                 groupBy={effectiveGroupBy()}
                 hierarchy={effectiveHierarchy()}
+                density={look().density}
+                fields={look().fields}
                 onOlder={() => older.set(!older())}
                 onOpen={peek}
                 onToggleSelect={handleToggleSelect}
@@ -847,10 +843,6 @@ function Toolbar(props: {
       label: t(`web.issue.scope.${s}`),
     })),
   );
-  const groupByOptions = createMemo(() => groupBys.map((g) => ({ value: g, label: groupByLabel[g] })));
-  const hierarchyOptions = createMemo(() => hierarchyModes.map((m) => ({ value: m, label: hierarchyLabel[m] })));
-  const currentGroupBy = (): GroupBy => props.look.groupBy ?? "none";
-  const currentHierarchy = (): HierarchyMode => props.look.hierarchy ?? "all";
   const isFiltered = createMemo(() => filterAny(props.filter));
   const hasFacetFilter = createMemo(() => props.filter.repo !== "" || props.filter.agent !== "" || props.filter.tag !== "" || props.filter.status !== "");
   const compactToolbar = () => windowSize().width < 1100;
@@ -860,9 +852,7 @@ function Toolbar(props: {
       Number(props.filter.repo !== "") +
       Number(props.filter.agent !== "") +
       Number(props.filter.tag !== "") +
-      Number(props.filter.status !== "") +
-      Number(currentGroupBy() !== "none") +
-      Number(currentHierarchy() !== "all"),
+      Number(props.filter.status !== ""),
   );
   return (
     <View testID="issues-toolbar" desktop={{ windowDrag: true }} class="h-11 shrink-0 flex-row items-center gap-2 border-b border-line bg-page px-4">
@@ -980,30 +970,6 @@ function Toolbar(props: {
                     onChange={(status) => props.onFilter({ ...props.filter, status })}
                   />
                 </View>
-                <View class="gap-1">
-                  <Text class="text-xs font-medium text-muted">{t("web.issue.groupBy.label")}</Text>
-                  <Select
-                    size="control"
-                    class="w-full"
-                    label={t("web.issue.groupBy.label")}
-                    testid="group-by"
-                    value={currentGroupBy()}
-                    options={groupByOptions()}
-                    onChange={(groupBy) => props.onLook({ ...props.look, groupBy })}
-                  />
-                </View>
-                <View class="gap-1">
-                  <Text class="text-xs font-medium text-muted">{t("web.issue.hierarchy.label")}</Text>
-                  <Select
-                    size="control"
-                    class="w-full"
-                    label={t("web.issue.hierarchy.label")}
-                    testid="hierarchy-mode"
-                    value={currentHierarchy()}
-                    options={hierarchyOptions()}
-                    onChange={(hierarchy) => props.onLook({ ...props.look, hierarchy })}
-                  />
-                </View>
                 <If when={isFiltered()}>
                   <View class="flex-row items-center justify-between gap-2 border-t border-line pt-2">
                     <Text class="text-xs text-muted tabular-nums">{t("web.issue.page.shown", { shown: props.shown, of: props.cards.length })}</Text>
@@ -1073,33 +1039,6 @@ function Toolbar(props: {
               placeholder={t("web.issue.page.allStatuses")}
               options={statusOptions()}
               onChange={(status) => props.onFilter({ ...props.filter, status })}
-            />
-          </View>
-          <View testID="issue-layout-bar" class="shrink-0 flex-row items-center rounded-md border border-line bg-side pl-1.5">
-            <Icon name="choose" size={14} tone={currentGroupBy() !== "none" || currentHierarchy() !== "all" ? "accent" : "faint"} />
-            <View class="mx-1 h-3.5 w-px bg-line" />
-            <Select
-              quiet
-              size="control"
-              text="xs"
-              class="max-w-24"
-              label={t("web.issue.groupBy.label")}
-              testid="group-by"
-              value={currentGroupBy()}
-              options={groupByOptions()}
-              onChange={(groupBy) => props.onLook({ ...props.look, groupBy })}
-            />
-            <View class="h-3.5 w-px bg-line" />
-            <Select
-              quiet
-              size="control"
-              text="xs"
-              class="max-w-24"
-              label={t("web.issue.hierarchy.label")}
-              testid="hierarchy-mode"
-              value={currentHierarchy()}
-              options={hierarchyOptions()}
-              onChange={(hierarchy) => props.onLook({ ...props.look, hierarchy })}
             />
           </View>
           <If when={isFiltered()}>

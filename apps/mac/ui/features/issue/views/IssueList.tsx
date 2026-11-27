@@ -18,11 +18,15 @@ import { ago } from "../../../infra/base/format";
 import { createEffect } from "../../../infra/solid";
 import { type BoardCard, cardAgent, cardLook, cardRepo, closedShown, laneLabel, laneStatus } from "../model/cards";
 import {
+  type BoardDensity,
+  defaultFields,
+  formatCompactDateLabel,
   type GroupBy,
   groupCards,
   type Grouping,
   groupRows,
   type HierarchyMode,
+  type IssueFieldVisibility,
   laneOrder,
   type Ordering,
   orderRows,
@@ -32,7 +36,7 @@ import {
 import { useIssues, useNameOf } from "../model/history";
 import { blockerIssuesOf, childIssuesOf } from "../model/meta";
 import { EmptyNote, OlderLink } from "./Board";
-import { BlockedByChips, CardChildRows, IssueGroupHeader, ParentBadge, TagPills, useGroupLabel } from "./IssueMetaControls";
+import { BlockedByChips, CardChildRows, IssueGroupHeader, OwnerMark, ParentBadge, TagPills, useGroupLabel } from "./IssueMetaControls";
 import { AgentFaceOf, CardFace, FlagChip, NoFaceMark, PriorityMark, ProgressMark, StatusMark } from "./Marks";
 import type { NewIssueAt } from "./NewIssue";
 import { useWidth } from "./Sheet";
@@ -62,6 +66,8 @@ export function IssueList(props: {
   groupBy?: GroupBy | undefined;
   hierarchy?: HierarchyMode | undefined;
   ordering: Ordering;
+  density?: BoardDensity | undefined;
+  fields?: IssueFieldVisibility | undefined;
   onOlder: () => void;
   onOpen: (id: string) => void;
   onToggleSelect?: ((id: string, opts: { range: boolean }) => void) | undefined;
@@ -79,6 +85,7 @@ export function IssueList(props: {
   const box = useWidth();
   const wide = computed(() => box.width() === 0 || box.width() >= 640);
   const showParentTitle = computed(() => (box.width() === 0 ? windowSize().width >= 1080 : box.width() >= 1000));
+  const compact = computed(() => props.density === "compact");
   const activeGroupBy = computed<GroupBy>(() => props.groupBy ?? "none");
   const groups = computed<ListGroupSection[]>(() => {
     const gb = activeGroupBy();
@@ -146,7 +153,7 @@ export function IssueList(props: {
             </View>
           }
         >
-          <View class="px-4 py-3">
+          <View class={compact() ? "px-3 py-2" : "px-4 py-3"}>
             <Each of={groups()} key={(g) => g.key}>
               {(g) => {
                 const groupLane = computed(() => g().lane);
@@ -180,10 +187,10 @@ export function IssueList(props: {
                   <View
                     accessibilityLabel={label()}
                     testID="issue-group"
-                    class={`mb-3 overflow-hidden rounded-lg border border-line bg-page ${isEmpty() ? "opacity-75" : ""}`}
+                    class={`${compact() ? "mb-2" : "mb-3"} overflow-hidden rounded-lg border border-line bg-page ${isEmpty() ? "opacity-75" : ""}`}
                   >
                     <View
-                      class={`h-8.5 flex-row items-center pr-1.5 ${
+                      class={`${compact() ? "h-7" : "h-8.5"} flex-row items-center pr-1.5 ${
                         isEmpty() ? "rounded-lg bg-page" : showBody() ? "border-b border-line bg-side" : "rounded-lg bg-side"
                       }`}
                     >
@@ -260,6 +267,8 @@ export function IssueList(props: {
                               card={c()}
                               allIssues={resolvedIssues()}
                               hierarchy={props.hierarchy}
+                              density={props.density}
+                              fields={props.fields}
                               wide={wide()}
                               showParentTitle={showParentTitle()}
                               selected={c().id === props.selected}
@@ -295,6 +304,8 @@ function Row(props: {
   card: BoardCard;
   allIssues?: readonly Issue[] | undefined;
   hierarchy?: HierarchyMode | undefined;
+  density?: BoardDensity | undefined;
+  fields?: IssueFieldVisibility | undefined;
   wide: boolean;
   showParentTitle: boolean;
   selected: boolean;
@@ -311,16 +322,27 @@ function Row(props: {
   const now = () => Date.now();
   const look = computed(() => cardLook(props.card, props.nameOf, resolvedIssues(), now()));
   const repo = computed(() => cardRepo(props.card));
+  const fields = computed(() => props.fields ?? defaultFields);
+  const compact = computed(() => props.density === "compact");
   const shownFlags = computed(() => (props.wide ? look().flags : look().flags.slice(0, 1)));
   const parentIssue = computed(() => (props.card.issue.parent ? resolvedIssues().find((item) => item.id === props.card.issue.parent) : undefined));
   const blockerIssues = computed(() => blockerIssuesOf(props.card.issue, resolvedIssues()));
   const childIssues = computed(() =>
     props.hierarchy === "top_level" || props.hierarchy === "parents_only" ? childIssuesOf(props.card.issue.id, resolvedIssues()) : [],
   );
-  const tags = computed(() => props.card.issue.tags ?? []);
+  const tags = computed(() => (fields().tags ? (props.card.issue.tags ?? []) : []));
+  const showProgress = computed(() => (fields().progress ? look().progress : undefined));
+  const dateLabel = computed(() => (fields().dates ? formatCompactDateLabel(props.card.issue) : undefined));
+  const showAgent = computed(() => fields().agent && (Boolean(cardAgent(props.card)) || props.card.kind === "orchestrator"));
+  const showOwner = computed(() => {
+    if (!fields().owner || props.card.issue.owner === undefined) return false;
+    if (showAgent() && props.card.issue.owner.kind === "agent" && props.card.issue.owner.id === cardAgent(props.card)) return false;
+    return true;
+  });
   const attachmentCount = computed(() => props.card.issue.attachments?.length ?? 0);
   const hasTrailingMarks = computed(
-    () => Boolean(look().progress) || blockerIssues().length > 0 || tags().length > 0 || shownFlags().length > 0 || attachmentCount() > 0,
+    () =>
+      Boolean(showProgress()) || blockerIssues().length > 0 || tags().length > 0 || Boolean(dateLabel()) || shownFlags().length > 0 || attachmentCount() > 0,
   );
   let rowEl: ViewRef | undefined;
   createEffect(
@@ -356,7 +378,7 @@ function Row(props: {
           }
           props.onOpen(props.card.id);
         }}
-        class={`group relative min-h-9.5 flex-row items-center gap-2.5 px-2.5 py-1.5 focus-visible:outline-2 focus-visible:outline-focus ${
+        class={`group relative flex-row items-center ${compact() ? "min-h-7.5 gap-2 px-2 py-1" : "min-h-9.5 gap-2.5 px-2.5 py-1.5"} focus-visible:outline-2 focus-visible:outline-focus ${
           props.checked === true || props.selected ? "bg-selected" : "hover:bg-hover"
         }`}
       >
@@ -375,20 +397,22 @@ function Row(props: {
             </View>
           )}
         </If>
-        <View class="w-4 shrink-0 items-center justify-center">
-          <If when={look().priority === "urgent" || look().priority === "high" ? look().priority : undefined}>
-            {(pr) => <PriorityMark priority={pr()} size={13} />}
-          </If>
-        </View>
+        <If when={fields().priority}>
+          <View class="w-4 shrink-0 items-center justify-center">
+            <If when={look().priority === "urgent" || look().priority === "high" ? look().priority : undefined}>
+              {(pr) => <PriorityMark priority={pr()} size={13} />}
+            </If>
+          </View>
+        </If>
         <View class="w-4 shrink-0 items-center justify-center">
           <StatusMark status={look().status} tone={look().statusTone} size={13} />
         </View>
-        <If when={props.wide}>
+        <If when={props.wide && fields().number}>
           <Text class="w-11 shrink-0 truncate font-mono text-xs text-faint tabular-nums">{look().number ?? ""}</Text>
         </If>
         <View class="min-w-0 flex-1 gap-0.5 overflow-hidden">
           <View class="min-w-0 flex-row items-center gap-1.5 overflow-hidden">
-            <Text class="min-w-0 shrink truncate text-sm font-medium text-ink">{look().title}</Text>
+            <Text class={`min-w-0 shrink truncate ${compact() ? "text-xs" : "text-sm"} font-medium text-ink`}>{look().title}</Text>
             <If when={parentIssue()}>
               {(p) => (
                 <View class="min-w-0 max-w-44 shrink overflow-hidden">
@@ -403,7 +427,15 @@ function Row(props: {
           <View class="shrink-0 flex-row items-center gap-1.5">
             <BlockedByChips blockers={blockerIssues()} max={props.wide ? 2 : 1} onOpen={props.onOpen} testid="row-blocked-by" />
             <TagPills tags={tags()} max={props.wide ? 3 : 1} testid="row-tags" />
-            <If when={look().progress}>{(pg) => <ProgressMark done={pg().done} total={pg().total} />}</If>
+            <If when={showProgress()}>{(pg) => <ProgressMark done={pg().done} total={pg().total} />}</If>
+            <If when={dateLabel()}>
+              {(dt) => (
+                <View testID="row-date" class="flex-row items-center gap-0.5 rounded-sm bg-side px-1 py-px">
+                  <Icon name="calendar" size={10} tone="muted" />
+                  <Text class="font-mono text-2xs text-faint tabular-nums">{dt()}</Text>
+                </View>
+              )}
+            </If>
             <If when={attachmentCount() > 0}>
               <View
                 testID="row-attachments"
@@ -420,7 +452,7 @@ function Row(props: {
             </Each>
           </View>
         </If>
-        <If when={props.showRepo && props.wide}>
+        <If when={props.showRepo && props.wide && fields().repo}>
           <View class="w-28 shrink-0 flex-row justify-end">
             <If when={repo()}>
               {(r) => (
@@ -431,12 +463,25 @@ function Row(props: {
             </If>
           </View>
         </If>
-        <View class="w-5 shrink-0 items-center justify-center">
-          <If when={cardAgent(props.card) || props.card.kind === "orchestrator"}>
-            <CardFace card={props.card} size={18} />
-          </If>
-        </View>
-        <Text class="w-14 shrink-0 text-right text-2xs text-faint tabular-nums">{ago(rowKeys(props.card).updatedAt, now())}</Text>
+        <If when={showOwner() ? props.card.issue.owner : undefined}>
+          {(owner) => (
+            <View testID="row-owner" class="w-5 shrink-0 items-center justify-center">
+              <OwnerMark owner={owner()} size={15} />
+            </View>
+          )}
+        </If>
+        <If when={fields().agent}>
+          <View class="w-5 shrink-0 items-center justify-center">
+            <If when={showAgent()}>
+              <CardFace card={props.card} size={18} />
+            </If>
+          </View>
+        </If>
+        <If when={fields().dates}>
+          <Text testID="row-updated-at" class="w-14 shrink-0 text-right text-2xs text-faint tabular-nums">
+            {ago(rowKeys(props.card).updatedAt, now())}
+          </Text>
+        </If>
       </View>
       <If when={childIssues().length > 0}>
         <View class="px-2.5 pb-2">

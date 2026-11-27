@@ -1593,8 +1593,22 @@ export const catalogs = {
         orderNote: "不是「默认」排序时，待办不能上下拖着排先后。",
         defaultNote: "「默认」是待办里你排的先后。",
         show: "显示",
-        group: "分组",
+        listGroup: "列表分组",
         order: "排序",
+        density: "密度",
+        densities: { comfortable: "舒适", compact: "紧凑" },
+        fields: "显示属性",
+        field: {
+          number: "编号",
+          priority: "优先级",
+          repo: "仓库",
+          owner: "负责人",
+          agent: "角色",
+          tags: "标签",
+          dates: "日期",
+          progress: "进度",
+          preview: "预览图",
+        },
         reset: "恢复默认",
       },
       list: {
@@ -5539,8 +5553,22 @@ export const catalogs = {
         orderNote: "Unless the order is Default, to-dos cannot be dragged up and down.",
         defaultNote: "Default is the order you gave the to-dos.",
         show: "Display",
-        group: "Group",
+        listGroup: "List group",
         order: "Order",
+        density: "Density",
+        densities: { comfortable: "Comfortable", compact: "Compact" },
+        fields: "Properties",
+        field: {
+          number: "ID",
+          priority: "Priority",
+          repo: "Repo",
+          owner: "Assignee",
+          agent: "Helper",
+          tags: "Tags",
+          dates: "Dates",
+          progress: "Progress",
+          preview: "Preview",
+        },
         reset: "Reset",
       },
       list: {
@@ -9671,7 +9699,20 @@ export interface Messages {
   "web.issue.digest.triageTitle": undefined;
   "web.issue.display.boardNote": undefined;
   "web.issue.display.defaultNote": undefined;
-  "web.issue.display.group": undefined;
+  "web.issue.display.densities.comfortable": undefined;
+  "web.issue.display.densities.compact": undefined;
+  "web.issue.display.density": undefined;
+  "web.issue.display.field.agent": undefined;
+  "web.issue.display.field.dates": undefined;
+  "web.issue.display.field.number": undefined;
+  "web.issue.display.field.owner": undefined;
+  "web.issue.display.field.preview": undefined;
+  "web.issue.display.field.priority": undefined;
+  "web.issue.display.field.progress": undefined;
+  "web.issue.display.field.repo": undefined;
+  "web.issue.display.field.tags": undefined;
+  "web.issue.display.fields": undefined;
+  "web.issue.display.listGroup": undefined;
   "web.issue.display.order": undefined;
   "web.issue.display.orderNote": undefined;
   "web.issue.display.reset": undefined;

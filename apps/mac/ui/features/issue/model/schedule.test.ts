@@ -6,7 +6,7 @@ import { issueId } from "@vibevalley/protocol/schema";
 
 import { Registry } from "../../../infra/state/atom";
 import { buildCards } from "./cards";
-import { boardLook, defaultLook } from "./display";
+import { boardLook, defaultFields, defaultLook, formatCompactDateLabel, isLookCustomized, resetBoardLook, toggleBoardField } from "./display";
 import { addUtcDays, buildMonthGrid, buildScheduleForCards, groupScheduledByDay, shiftIssueDates, shiftMonth, utcDayStart } from "./schedule";
 
 function issueStub(overrides: Partial<Omit<Issue, "id">> & { id: string; number: number }): Issue {
@@ -164,4 +164,37 @@ test("boardLook preserves valid timeline/calendar views and falls back for unkno
   expect(boardLook.inRegistry(reg2).get().view).toBe("board");
   expect(boardLook.inRegistry(reg2).get().groupBy).toBe("none");
   expect(boardLook.inRegistry(reg2).get().hierarchy).toBe("all");
+  expect(boardLook.inRegistry(reg2).get().density).toBe("comfortable");
+  expect(boardLook.inRegistry(reg2).get().fields).toEqual(defaultFields);
+});
+
+test("boardLook upgrades legacy/partial JSON cleanly and DisplayMenu helpers toggle and reset fields", () => {
+  localStorage.setItem(
+    "vibevalley.board.look",
+    JSON.stringify({ view: "list", grouping: "repo", ordering: "priority", fields: { repo: false, preview: "bad" } }),
+  );
+  const reg = new Registry();
+  const upgraded = boardLook.inRegistry(reg).get();
+  expect(upgraded).toEqual({
+    view: "list",
+    grouping: "repo",
+    ordering: "priority",
+    groupBy: "none",
+    hierarchy: "all",
+    density: "comfortable",
+    fields: { ...defaultFields, repo: false, preview: true },
+  });
+
+  expect(isLookCustomized(defaultLook)).toBe(false);
+  expect(isLookCustomized({ ...defaultLook, view: "timeline" })).toBe(false);
+  expect(isLookCustomized({ ...defaultLook, density: "compact" })).toBe(true);
+
+  const toggled = toggleBoardField({ ...defaultLook, view: "timeline", density: "compact" }, "tags");
+  expect(toggled.fields.tags).toBe(false);
+  expect(isLookCustomized(toggled)).toBe(true);
+  expect(resetBoardLook(toggled)).toEqual({ ...defaultLook, view: "timeline" });
+
+  expect(formatCompactDateLabel({ startAt: Date.UTC(2026, 10, 5), dueAt: Date.UTC(2026, 10, 26) })).toBe("11-26");
+  expect(formatCompactDateLabel({ startAt: Date.UTC(2026, 10, 5) })).toBe("11-05");
+  expect(formatCompactDateLabel({})).toBeUndefined();
 });

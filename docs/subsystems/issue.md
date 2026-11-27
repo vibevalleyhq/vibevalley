@@ -115,6 +115,15 @@ PR/MR 创建或更新后在串内记录真实链接；关联保存在 Issue，�
 
 建单、改字段、挪状态、起草和看改动的规则由 `work/issue` 的带类型函数提供；HTTP 端点和助手工具调用同一份函数，工具不经 Hub 再调工单接口。
 
+### 视图展示槽位与统一 DisplayMenu
+
+工单页面（`apps/mac/ui/features/issue`）通过单一持久化的 `BoardLook`（`model/display.ts`，键 `vibevalley.board.look`，经 Zod `orFallback` 向后兼容缺省/局部历史配置）统一驱动四种视图（`board`、`list`、`timeline`、`calendar`），由工具栏右上角 `DisplayMenu`（`views/DisplayMenu.tsx`）集中托管排版与字段开关，工具栏仅保留作用域、搜索、属性筛选与视图切换：
+
+- **分组与层级**：`groupBy`（`none` / `repo` / `owner` / `agent` / `priority` / `parent`）在看板与列表间共享泳道/折叠组；`grouping`（`status` / `repo` / `agent` / `none`）用于 `groupBy === "none"` 时的列表分组；`hierarchy`（`all` / `top_level` / `parents_only`）控制子工单展开或折叠到父卡内行。
+- **排序与密度**：`ordering`（`manual` / `priority` / `updated` / `created`）与 `density`（`comfortable` / `compact`）同步调节看板卡片/列距、列表行高（`min-h-9.5` vs `min-h-7.5`）、甘特图行高（`38px` vs `30px`）及日历格高度。
+- **固定展示槽位（`fields.*`）**：`number`（`#N`）、`priority`（`PriorityMark` / 优先级圆点）、`repo`（仓库标签）、`owner`（`OwnerMark` 负责人头像）、`agent`（`CardFace` 执行角色与未指派提示）、`tags`（`TagPills`）、`dates`（紧凑截止/计划日期与列表更新时间）、`progress`（`ProgressMark` 子工单/标准进度）与 `preview`（看板附件/对比缩略图），默认全开并支持一键重置（保留当前视图标签）。
+- **无整卡悬停浮层**：看板卡片与列表行容器不挂载整段详情悬停气泡，仅保留状态、附件计数、依赖与父单等字段级微提示；Quick-Peek 顶栏状态徽标与详情侧栏共享 `cardStatusLabel` / `todoStatusLabel`（需求池草稿统一显示「草稿」）。
+
 ## 和谁打交道
 
 - **帮工（oar 和档案）**：`Sessions` 经 `Drivers`（`crates/server/src/runtime/session/driver.rs`，服务端给的是 `crates/server/src/agent/profile/drive.rs`）把指派的档案变成农机和参数，在 worktree 里跑一轮；轨迹由 `crates/server/src/runtime/session/journal.rs` 记。
