@@ -319,3 +319,54 @@ test("TodoDetail truncates long parent trail pill without colliding with #N and 
   expect(app.count("id:issue-start-at-icon")).toBe(0);
   expect(app.count("id:issue-due-at-icon")).toBe(0);
 });
+
+test("TodoDetail hides inline new/mount repo links when repo is already bound and tucks them behind secondary affordance", async () => {
+  const baseTodo =
+    scenarios.typical.state.board.issues.find((i) => i.status === "backlog") ?? scenarios.typical.state.board.issues.find((i) => i.status === "todo");
+  if (!baseTodo) throw new Error("typical scenario must include a backlog or todo issue");
+  const boundTodo = {
+    ...baseTodo,
+    repo: "vibevalley",
+    status: "backlog" as const,
+    stage: { state: "draft" as const, acts: [] },
+  };
+  const state = {
+    ...scenarios.typical.state,
+    board: {
+      ...scenarios.typical.state.board,
+      issues: scenarios.typical.state.board.issues.map((i) => (i.id === boundTodo.id ? boundTodo : i)),
+    },
+  };
+  const fake = fakeHost({ state, responses: scenarios.typical.responses }, { route: `/issues/${boundTodo.id}`, locale: "zh" });
+  fake.respond("host.pickFolder", () => ({ path: "/Users/dev/extra-repo", name: "extra-repo", git: true }));
+  fake.respond("repo.mount", () => ({
+    name: "extra-repo",
+    path: "/Users/dev/extra-repo",
+    git: true,
+    external: true,
+    maxSessions: 2,
+    pullRequest: { available: false, reason: "" },
+  }));
+
+  const app = await open("../../../app/main.tsx", {
+    width: 1200,
+    height: 800,
+    colorScheme: "light",
+    platform: "macos",
+    clock: { time: SCENARIO_NOW },
+    host: fake.options,
+  });
+  await fake.pumpUntil(app, () => app.count("id:issue-repo") === 1);
+
+  // Bound repo keeps inspector uncluttered: inline links are hidden behind repo-actions.
+  expect(app.count("id:new-repo")).toBe(0);
+  expect(app.count("id:mount-local-repo")).toBe(0);
+  expect(app.count("id:repo-actions")).toBe(1);
+
+  // Secondary affordance still offers New repo & Mount local repo on demand.
+  await app.press("id:repo-actions");
+  await fake.pumpUntil(app, () => app.count("id:new-repo") === 1 && app.count("id:mount-local-repo") === 1);
+  await app.press("id:mount-local-repo");
+  await fake.pump(app);
+  expect(fake.calls.some((c) => c.op === "repo.mount")).toBe(true);
+});

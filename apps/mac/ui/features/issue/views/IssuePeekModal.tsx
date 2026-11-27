@@ -8,7 +8,7 @@ import { useModalOverlay } from "../../../design/Dialog";
 import { Icon } from "../../../design/Icon";
 import { IconButton } from "../../../design/IconButton";
 import { fadeAnimation } from "../../../design/motion";
-import { type BoardCard, cardRepo } from "../model/cards";
+import { type BoardCard, cardRepo, cardStatusLabel } from "../model/cards";
 import { StatusMark } from "./Marks";
 import { createIssueChrome, IssueChromeContext, IssueNumberPill } from "./Sheet";
 
@@ -53,7 +53,7 @@ export function IssuePeekModal(props: { card: BoardCard; blocked: () => boolean;
               </If>
               <View testID="issue-peek-status" class="shrink-0 flex-row items-center gap-1.5 rounded-full bg-hover px-2 py-0.5">
                 <StatusMark status={props.card.issue.status} size={12} />
-                <Text class="text-2xs font-medium text-muted">{t(`shared.status.${props.card.issue.status}`)}</Text>
+                <Text class="text-2xs font-medium text-muted">{cardStatusLabel(props.card)}</Text>
               </View>
             </View>
             <View class="shrink-0 flex-row items-center gap-1.5">

@@ -1775,6 +1775,7 @@ export const catalogs = {
         firstRepo: "还没有仓库：新建一个",
         newRepoLink: "新建仓库",
         mountLocalLink: "关联本地仓库",
+        repoActions: "新建或关联仓库",
         priority: "优先级",
         inQueue: "排队中：{ago}排上的，有并发上限就按看板上的先后自动开工。",
         unqueue: "不排了",
@@ -5722,6 +5723,7 @@ export const catalogs = {
         firstRepo: "No repo yet: make one",
         newRepoLink: "New repo",
         mountLocalLink: "Mount local repo",
+        repoActions: "New or mount repo",
         priority: "Priority",
         inQueue: "Queued {ago}: it starts by itself in the board's order when a spot frees up.",
         unqueue: "Unqueue",
@@ -9891,6 +9893,7 @@ export interface Messages {
   "web.issue.todo.refining": { readonly who: string | number };
   "web.issue.todo.refiningLine": undefined;
   "web.issue.todo.remove": undefined;
+  "web.issue.todo.repoActions": undefined;
   "web.issue.todo.repoHint": undefined;
   "web.issue.todo.repoName": undefined;
   "web.issue.todo.revive": undefined;

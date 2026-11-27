@@ -412,9 +412,6 @@ export function RelationsPicker(props: {
             onChange={setForKind}
             onClear={() => props.onChange([])}
           />
-          <If when={resolvedAll().length > 0}>
-            <RelationChips relations={resolvedAll()} max={12} onOpen={(id) => props.onOpen?.(id)} testid={`${testid()}-chips`} />
-          </If>
         </View>
       }
     >

@@ -50,6 +50,20 @@ export const laneStatus: Record<Lane, IssueStatus> = {
 /** A card says its own status only where its lane does not. */
 export const ownStatus = (lane: Lane, status: IssueStatus) => status !== laneStatus[lane];
 
+/** Status label shared by TodoDetail inspector and Quick-Peek header pill for unstarted drafts/todos. */
+export function todoStatusLabel(status: IssueStatus): string {
+  if (status === "backlog") return t("web.issue.todo.draftStatus");
+  if (status === "todo") return t("web.issue.todo.todoStatus");
+  return t(`shared.status.${status}`);
+}
+
+/** Consistent status pill label across Quick-Peek header and detail inspectors. */
+export function cardStatusLabel(card: BoardCard): string {
+  if (card.kind === "todo") return todoStatusLabel(card.issue.status);
+  if (card.kind === "family") return t(`shared.stage.${card.issue.stage.state}`);
+  return t(`shared.status.${card.issue.status}`);
+}
+
 function laneOf(s: IssueStatus): Lane {
   return s;
 }

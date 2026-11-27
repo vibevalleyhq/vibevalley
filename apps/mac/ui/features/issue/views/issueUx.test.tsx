@@ -1237,6 +1237,9 @@ test("Issue detail displays and updates non-blocking relations without blocking 
 
   await fake.pumpUntil(app, () => app.count("id:issue-relations-picker") === 1 && app.count("id:detail-relations") === 1);
   expect(app.texts()).toContain("Related #602");
+  // Editable inspector omits duplicate RelationChips beneath Combobox (kept only for readonly mode).
+  expect(app.count("id:issue-relations-picker-chips")).toBe(0);
+  expect(app.count("id:issue-relations-picker-readonly")).toBe(0);
 
   // Clear relations via picker clear button and Save.
   await app.press("id:issue-relations-picker-clear");
@@ -1247,4 +1250,38 @@ test("Issue detail displays and updates non-blocking relations without blocking 
     id: primary.id,
     relations: [],
   });
+});
+
+test("Quick-Peek header status badge matches TodoDetail inspector status label on backlog drafts", async () => {
+  setLocale("zh");
+  const draftIssue = makeIssueFixture({
+    id: "i-peek-draft",
+    number: 603,
+    title: "Backlog draft consistency check",
+    status: "backlog",
+    repo: "vibevalley",
+    stage: { state: "draft", acts: [] },
+  });
+  const state: SliceBundle = {
+    ...scenarios.empty.state,
+    board: { seq: 60, issues: [draftIssue] },
+  };
+  const fake = fakeHost({ state, responses: scenarios.typical.responses }, { route: "/issues", locale: "zh" });
+  fake.respond("issue.history.list", [{ issue: draftIssue, sessions: [], missingSessions: [] }]);
+
+  const app = await open("../../../app/main.tsx", {
+    width: 1280,
+    height: 820,
+    colorScheme: "light",
+    platform: "macos",
+    clock: { time: SCENARIO_NOW },
+    host: fake.options,
+  });
+  await fake.pumpUntil(app, () => app.count("id:issue-card") === 1);
+
+  await app.press("id:issue-card");
+  await fake.pumpUntil(app, () => app.count("id:issue-peek-modal") === 1 && app.count("id:todo-status") === 1);
+  expect(app.shows(`id:issue-peek-status >> text:${t("web.issue.todo.draftStatus")}`)).toBe(true);
+  expect(app.shows(`id:issue-peek-status >> text:${t("shared.status.backlog")}`)).toBe(false);
+  expect(app.shows(`id:todo-status >> text:${t("web.issue.todo.draftStatus")}`)).toBe(true);
 });
