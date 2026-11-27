@@ -196,6 +196,9 @@ export const servedEndpoints = [
   { op: "remote.device.revoke", can: ["user"], about: ["id"] },
   { op: "remote.whoami", can: ["user", "remote"], about: [] },
   { op: "machine.list", can: ["user", "remote"], about: [] },
+  { op: "game.shop.list", can: ["user", "remote"], about: [] },
+  { op: "game.shop.buy", can: ["user", "remote"], about: ["id"] },
+  { op: "game.daily.list", can: ["user", "remote"], about: [] },
 ] as const;
 
 export const servedSubscriptions = [

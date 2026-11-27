@@ -263,6 +263,16 @@ MOSS Live 语音通话
 | `artifact.collab.import` | 导入端上的 Loro 增量更新并合入作品目录，可选返回服务端缺失增量 | `/api/v1/artifact/collab/import` | ✓ | ✓ |   |   |
 | `artifact.cover.set` | cap.op.artifact.cover.set | `/api/v1/artifact/cover/set` | ✓ | ✓ |   |   |
 
+## game
+
+里程碑和称号
+
+| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 主助手 | 执行会话 |
+|---|---|---|---|---|---|---|
+| `game.shop.list` | 列出田头小摊里的庭院摆件和工单模板 | `/api/v1/game/shop/list` | ✓ | ✓ |   |   |
+| `game.shop.buy` | 用金币买一件庭院摆件或工单模板 | `/api/v1/game/shop/buy` | ✓ | ✓ |   |   |
+| `game.daily.list` | 列出今天的每日任务和自动结算金币 | `/api/v1/game/daily/list` | ✓ | ✓ |   |   |
+
 ## runtime
 
 引擎：机器上的编码 agent

@@ -416,6 +416,7 @@ impl SliceFeedSet {
                 level: FarmLevel::default(),
                 plots: Default::default(),
                 plays: Default::default(),
+                decorations: Vec::new(),
             },
             progress: None,
             effects: Vec::new(),

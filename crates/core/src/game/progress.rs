@@ -10,6 +10,7 @@ use vibevalley_protocol::{
     LedgerEntryLevel, LedgerEntryMoment, LedgerEntryTold, Outcome, Progress, ProgressNews, ProgressTitle, SessionClose, SpaceState, USER_ID, Unlock,
 };
 
+use super::daily::{DayActivity, daily_board_for, local_day};
 use super::frame::{AchievementDef, achievements, level_for_commits};
 use crate::deps::{DagNode, dag_layers};
 use crate::status::{is_hired, session_of, session_on_issue};
@@ -49,6 +50,7 @@ pub struct Seen {
     pub conflicted: Vec<String>,
     pub reviewed: Vec<String>,
     pub runtimes: Vec<String>,
+    pub daily: BTreeMap<String, DayActivity>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -67,6 +69,8 @@ fn empty_progress() -> Progress {
         title: None,
         agents: BTreeMap::new(),
         multiplier: Some(JsNumber::from(1.0)),
+        purchased: vec![],
+        daily: None,
     }
 }
 
@@ -133,7 +137,12 @@ fn tallied(p: &mut Progress, entry: &LedgerEntry) {
         | LedgerEntry::Voice(_)
         | LedgerEntry::Busy6(_)
         | LedgerEntry::Level(_)
-        | LedgerEntry::Titled(_) => {}
+        | LedgerEntry::Titled(_)
+        | LedgerEntry::Purchased(_)
+        | LedgerEntry::DailySettled(_)
+        | LedgerEntry::CheckPassed(_)
+        | LedgerEntry::ReviewCompleted(_)
+        | LedgerEntry::Delivered(_) => {}
     }
 }
 
@@ -155,6 +164,7 @@ pub fn progress_step(folded: &Folded, entry: &LedgerEntry) -> (Folded, ProgressN
     let mut coins = 0;
     let mut session = None;
     let at = entry.at();
+    let day = (at > 0).then(|| local_day(at));
     match entry {
         LedgerEntry::Harvested(e) => {
             let streak = p.streak + 1;
@@ -189,6 +199,13 @@ pub fn progress_step(folded: &Folded, entry: &LedgerEntry) -> (Folded, ProgressN
             if week_day == 0 || week_day == 6 {
                 at_least(&mut counts, "weekend", 1);
             }
+            if let Some(d) = day.as_deref() {
+                seen.daily
+                    .entry(d.to_string())
+                    .or_default()
+                    .clean_harvest
+                    .insert(format!("session:{}", e.session));
+            }
         }
         LedgerEntry::Failed(e) => {
             p.streak = 0;
@@ -199,12 +216,30 @@ pub fn progress_step(folded: &Folded, entry: &LedgerEntry) -> (Folded, ProgressN
             added(&mut seen.told, &e.session);
             at_least(&mut counts, "s_tell", 1);
         }
-        LedgerEntry::Reviewed(e) => added(&mut seen.reviewed, &e.session),
+        LedgerEntry::Reviewed(e) => {
+            added(&mut seen.reviewed, &e.session);
+            if let Some(d) = day.as_deref() {
+                seen.daily
+                    .entry(d.to_string())
+                    .or_default()
+                    .reviews_completed
+                    .insert(format!("diff:{}", e.session));
+            }
+        }
         LedgerEntry::Family(e) => {
             coins += task_coins(e.merged);
             at_least(&mut counts, "big_graph", e.merged);
             if e.parallel {
                 bump(&mut counts, "parallel_graph", 1);
+            }
+            if e.merged > 0
+                && let Some(d) = day.as_deref()
+            {
+                seen.daily
+                    .entry(d.to_string())
+                    .or_default()
+                    .milestone_done
+                    .insert(format!("family:{}", e.issue));
             }
         }
         LedgerEntry::Handoff(_) => bump(&mut counts, "handoff", 1),
@@ -231,6 +266,41 @@ pub fn progress_step(folded: &Folded, entry: &LedgerEntry) -> (Folded, ProgressN
                 p.title = Some(ProgressTitle { id: a.id.clone(), tier });
             }
         }
+        LedgerEntry::Purchased(e) => {
+            p.coins = (p.coins - e.price).max(0);
+            added(&mut p.purchased, &e.item_id);
+        }
+        LedgerEntry::DailySettled(e) => {
+            let act = seen.daily.entry(e.day.clone()).or_default();
+            if !act.settled.contains_key(&e.task_id) {
+                act.settled.insert(e.task_id.clone(), at);
+                act.settled_coins += e.coins;
+                coins += e.coins;
+            }
+        }
+        LedgerEntry::CheckPassed(e) => {
+            if let Some(d) = day.as_deref() {
+                seen.daily.entry(d.to_string()).or_default().tests_passed.insert(e.key.clone());
+            }
+        }
+        LedgerEntry::ReviewCompleted(e) => {
+            if let Some(d) = day.as_deref() {
+                seen.daily
+                    .entry(d.to_string())
+                    .or_default()
+                    .reviews_completed
+                    .insert(format!("review:{}", e.key));
+            }
+        }
+        LedgerEntry::Delivered(e) => {
+            if let Some(d) = day.as_deref() {
+                let act = seen.daily.entry(d.to_string()).or_default();
+                act.milestone_done.insert(format!("delivered:{}", e.issue));
+                if e.clean {
+                    act.clean_harvest.insert(format!("issue:{}", e.issue));
+                }
+            }
+        }
     }
     at_least(&mut counts, "steady", p.best_streak);
 
@@ -251,6 +321,9 @@ pub fn progress_step(folded: &Folded, entry: &LedgerEntry) -> (Folded, ProgressN
     p.counts = counts;
     p.unlocked.extend(unlocked.clone());
     p.multiplier = Some(JsNumber::from(streak_multiplier(p.streak)));
+    if let Some(d) = day.as_deref() {
+        p.daily = Some(daily_board_for(&seen.daily, d));
+    }
     let news = ProgressNews {
         coins: (coins != 0).then_some(coins),
         session,

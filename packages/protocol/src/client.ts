@@ -575,6 +575,19 @@ export class VibeValleyApi {
     },
   };
 
+  readonly game = {
+    shop: {
+      list: (options?: { signal?: AbortSignal }): Promise<T.FarmShopView> =>
+        this.call<T.FarmShopView>("game.shop.list", "/api/v1/game/shop/list", undefined, options),
+      buy: (a: T.ShopPurchaseRequest, options?: { signal?: AbortSignal }): Promise<T.FarmShopView> =>
+        this.call<T.FarmShopView>("game.shop.buy", "/api/v1/game/shop/buy", a, options),
+    },
+    daily: {
+      list: (options?: { signal?: AbortSignal }): Promise<T.DailyTaskBoard> =>
+        this.call<T.DailyTaskBoard>("game.daily.list", "/api/v1/game/daily/list", undefined, options),
+    },
+  };
+
   readonly runtime = {
     list: (options?: { signal?: AbortSignal }): Promise<T.RuntimeInfo[]> =>
       this.call<T.RuntimeInfo[]>("runtime.list", "/api/v1/runtime/list", undefined, options),

@@ -1761,6 +1761,33 @@ pub const ENDPOINTS: &[Endpoint] = &[
         input: None,
         result: Some("Vec<MachineInfo>"),
     },
+    Endpoint {
+        op: "game.shop.list",
+        module: "game",
+        about: &[],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: None,
+        result: Some("FarmShopView"),
+    },
+    Endpoint {
+        op: "game.shop.buy",
+        module: "game",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("ShopPurchaseRequest"),
+        result: Some("FarmShopView"),
+    },
+    Endpoint {
+        op: "game.daily.list",
+        module: "game",
+        about: &[],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: None,
+        result: Some("DailyTaskBoard"),
+    },
 ];
 
 /// Each endpoint as a type: its name, input and result.
@@ -3029,6 +3056,24 @@ pub mod ops {
         type Input = ();
         type Result = Vec<t::MachineInfo>;
     }
+    pub struct GameShopList;
+    impl Op for GameShopList {
+        const NAME: &'static str = "game.shop.list";
+        type Input = ();
+        type Result = t::FarmShopView;
+    }
+    pub struct GameShopBuy;
+    impl Op for GameShopBuy {
+        const NAME: &'static str = "game.shop.buy";
+        type Input = t::ShopPurchaseRequest;
+        type Result = t::FarmShopView;
+    }
+    pub struct GameDailyList;
+    impl Op for GameDailyList {
+        const NAME: &'static str = "game.daily.list";
+        type Input = ();
+        type Result = t::DailyTaskBoard;
+    }
 }
 
 /// Every server subscription, naming who may subscribe (`can`) and its wire payload/event types.
@@ -3388,6 +3433,10 @@ endpoint_ids! {
     RemoteDeviceRevoke => "remote.device.revoke",
     RemoteWhoami => "remote.whoami",
     MachineList => "machine.list",
+    // game
+    GameShopList => "game.shop.list",
+    GameShopBuy => "game.shop.buy",
+    GameDailyList => "game.daily.list",
 }
 
 #[cfg(test)]

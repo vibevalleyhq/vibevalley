@@ -133,3 +133,37 @@ test("FarmPhone ErrorBoundary catches child failures and recovers on retry witho
   await app.press("id:farm-error-retry");
   await app.waitFor("id:farm-phone-idle");
 });
+
+test("FarmForm shop surfaces daily tasks, buys a decoration & template, and hands template straight to sow", async () => {
+  const shopApp = await open("./FarmPhone.story.tsx", {
+    width: 560,
+    height: 760,
+    colorScheme: "light",
+    platform: "macos",
+    host: {
+      params: {
+        view: "farm-form",
+        locale: "en",
+        kind: "shop",
+        repo: "vibevalley",
+        station: 0,
+      },
+    },
+  });
+
+  await shopApp.waitFor("id:shop-item-deco_stone_lantern");
+  expect(shopApp.texts().some((line) => line.includes("120 coins available"))).toBe(true);
+  expect(shopApp.shows("id:daily-task-2026-11-27:tests_passed")).toBe(true);
+  expect(shopApp.texts().some((line) => line.includes("Auto-settled +25"))).toBe(true);
+
+  await shopApp.press("id:shop-buy-deco_stone_lantern");
+  await shopApp.waitFor("id:shop-owned-deco_stone_lantern");
+  expect(shopApp.texts().some((line) => line.includes("80 coins available"))).toBe(true);
+
+  await shopApp.press("id:shop-buy-tmpl_regression_guard");
+  await shopApp.waitFor("id:shop-plant-tmpl_regression_guard");
+  expect(shopApp.texts().some((line) => line.includes("35 coins available"))).toBe(true);
+
+  await shopApp.press("id:shop-plant-tmpl_regression_guard");
+  await shopApp.waitFor("id:sow-text");
+});

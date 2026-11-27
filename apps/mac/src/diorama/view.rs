@@ -553,6 +553,11 @@ impl DioramaView {
         });
         let toast_text = d.active_toast().map(str::to_string);
         let has_missed = d.phone.ringing.is_some() || d.phone.missed(&d.frame.inbox).next().is_some();
+        let shop_coins = d.frame.progress.as_ref().map_or(0, |p| p.coins);
+        let daily_summary = d.frame.progress.as_ref().and_then(|p| p.daily.as_ref()).map(|board| {
+            let done = board.tasks.iter().filter(|task| task.completed).count() as i64;
+            (done, board.tasks.len() as i64)
+        });
 
         let ui_dark = app_dark(window, cx);
         let palette = HudPalette::for_scene(ui_dark, active_tod);
@@ -741,17 +746,64 @@ impl DioramaView {
                 )
         });
 
+        let shop_pill = {
+            let mut pill = div()
+                .absolute()
+                .top(px(12.0))
+                .left(px(14.0))
+                .flex()
+                .items_center()
+                .gap(px(8.0))
+                .px(px(9.0))
+                .py(px(4.0))
+                .rounded(px(9.0))
+                .bg(palette.surface)
+                .border_1()
+                .border_color(palette.border)
+                .cursor_pointer()
+                .hover(move |s| s.bg(hover_bg))
+                .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .on_mouse_down(
+                    MouseButton::Left,
+                    cx.listener(|v, _, _, cx| {
+                        cx.stop_propagation();
+                        let req = match &v.scene {
+                            SceneState::Ready(d) => json!({ "kind": "shop", "repo": d.repo }),
+                            _ => return,
+                        };
+                        v.dispatch_action(DioramaAction::OpenForm(req), cx);
+                    }),
+                )
+                .child(
+                    div()
+                        .text_size(px(11.5))
+                        .text_color(palette.ink)
+                        .child(t("web.farm.hud.coins", &[("n", shop_coins.into())])),
+                );
+            if let Some((done, total)) = daily_summary {
+                pill = pill.child(hud_divider(&palette)).child(
+                    div()
+                        .text_size(px(11.5))
+                        .text_color(palette.muted)
+                        .child(t("web.farm.hud.daily", &[("done", done.into()), ("total", total.into())])),
+                );
+            }
+            pill.child(hud_divider(&palette))
+                .child(div().text_size(px(11.5)).text_color(palette.ink).child(t("web.farm.hud.shop", &[])))
+        };
+
         let mut overlay = div()
             .absolute()
             .inset_0()
             .children(anchor_pills)
+            .child(shop_pill)
             .child(div().absolute().top(px(12.0)).right(px(12.0)).child(toolbar));
 
         if let Some(msg) = toast_text.filter(|m| !m.is_empty()) {
             overlay = overlay.child(
                 div()
                     .absolute()
-                    .top(px(12.0))
+                    .top(px(48.0))
                     .left(px(14.0))
                     .px(px(10.0))
                     .py(px(5.0))

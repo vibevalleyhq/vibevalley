@@ -278,7 +278,19 @@ export type {
   OrchestratorEval,
   OrchestratorEvalRequest,
 } from "./orchestrator/shapes.gen";
-export type { AchievementList, FarmFrame } from "./game/shapes.gen";
+export type {
+  AchievementList,
+  DailyTask,
+  DailyTaskBoard,
+  DailyTaskKind,
+  FarmFrame,
+  FarmShopView,
+  ShopItem,
+  ShopItemKind,
+  ShopPurchaseRequest,
+  YardDecoration,
+  YardDecorationPlacement,
+} from "./game/shapes.gen";
 export { type Attachment, type AttachmentImportPathInput, type AttachmentUpload } from "./attachment/shapes.gen";
 export {
   type ConnectorID,

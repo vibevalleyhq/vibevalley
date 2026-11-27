@@ -59,7 +59,7 @@ const TemplateBlank = z.object({
   end: z.number(),
 }) satisfies Codec<T.TemplateBlank>;
 
-const IssueTemplate = z.object({
+export const IssueTemplate = z.object({
   id: z.string(),
   title: z.string(),
   done: z.string(),

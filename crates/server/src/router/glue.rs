@@ -104,7 +104,9 @@ impl AppCore {
 
 pub(crate) async fn repo_templates_async(c: &AppCore, id: &str) -> Result<RepoTemplates, ApiError> {
     let issues = c.board.issues_async().await.map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?;
-    c.repo.templates_async(id, &issues, |a| c.agent.profile.is_orchestrator(a)).await
+    let mut out = c.repo.templates_async(id, &issues, |a| c.agent.profile.is_orchestrator(a)).await?;
+    c.game.append_purchased_templates(&mut out);
+    Ok(out)
 }
 
 pub(crate) async fn issue_split_async(c: &AppCore, req: &vibevalley_protocol::IssueSplitInput) -> Result<String, ApiError> {

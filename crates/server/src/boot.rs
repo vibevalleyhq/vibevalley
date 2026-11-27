@@ -224,7 +224,7 @@ pub(crate) fn register_session_reported_outbox(
                         .on_session_reported(&reported.runtime, report.spent.as_ref().and_then(|s| s.cny).map(|n| n.0));
                 }
                 if let Some(g) = g.upgrade() {
-                    g.on_session_reported(&reported, report.outcome);
+                    g.record_session_report_async(&reported, report.outcome).await;
                 }
             }
             if let Some(conn) = conn.upgrade() {

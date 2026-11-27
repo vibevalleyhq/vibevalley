@@ -16,5 +16,80 @@
     "gold": "Up to gold",
     "silver": "Up to silver",
     "unlocked": "Achievement unlocked"
+  },
+  "shop": {
+    "purchasedKind": "Shop templates",
+    "notFound": "No such item at the farm shop: {id}",
+    "alreadyOwned": "Already owned",
+    "notEnoughCoins": "Not enough coins: need {need}, have {have}",
+    "items": {
+      "deco_stone_lantern": {
+        "title": "Stone Lantern",
+        "detail": "A carved paper stone lantern beside the bridge steps that glows warmly at dusk."
+      },
+      "deco_flower_border": {
+        "title": "Flower Border",
+        "detail": "A cluster of field blooms along the yard path to brighten the garden."
+      },
+      "deco_bamboo_grove": {
+        "title": "Bamboo Grove",
+        "detail": "Slender stalks of bamboo east of the barn that sway gently in the breeze."
+      },
+      "deco_weeping_willow": {
+        "title": "Weeping Willow",
+        "detail": "A paper willow planted by the canal bank, draping soft fronds over the water."
+      },
+      "deco_painted_boat": {
+        "title": "Painted Boat",
+        "detail": "A small paper awning boat moored on the canal alongside the fields."
+      },
+      "deco_rockery": {
+        "title": "Garden Rockery",
+        "detail": "Layered scholar stones arranged in the yard corner for classic depth."
+      },
+      "tmpl_regression_guard": {
+        "title": "Add regression test: 〔feature or bug〕",
+        "detail": "Unlocks a ticket template focused on reproduction-first regression guards.",
+        "done": "Write a failing regression test first, implement the fix, and pass {test} and {lint}"
+      },
+      "tmpl_edge_hardening": {
+        "title": "Harden edge cases: 〔module or endpoint〕",
+        "detail": "Unlocks a ticket template for boundary validation and error path coverage.",
+        "done": "Add null, bounds, and error-path handling with unit tests, passing {test} and {lint}"
+      },
+      "tmpl_subsystem_docs": {
+        "title": "Sync subsystem docs: 〔topic〕",
+        "detail": "Unlocks a ticket template for aligning subsystem documentation with reality.",
+        "done": "Update the matching subsystem doc to match current code and contracts, and pass docs checks"
+      },
+      "tmpl_perf_profile": {
+        "title": "Optimize slow path: 〔page or endpoint〕",
+        "detail": "Unlocks a ticket template for measure-first bottleneck investigation.",
+        "done": "Profile and eliminate the bottleneck with before/after measurements, passing {test}"
+      },
+      "tmpl_security_audit": {
+        "title": "Audit boundaries & auth: 〔module〕",
+        "detail": "Unlocks a ticket template for reviewing decoding boundaries and access checks.",
+        "done": "Verify auth, input decoding, and path boundaries with regression tests passing {test}"
+      }
+    }
+  },
+  "daily": {
+    "tests_passed": {
+      "title": "Verified Check",
+      "detail": "Record 1 passing project check or met acceptance check on a ticket."
+    },
+    "reviews_completed": {
+      "title": "Thorough Review",
+      "detail": "Complete 1 ticket review based on actual work rather than churn."
+    },
+    "clean_harvest": {
+      "title": "Clean Delivery",
+      "detail": "Deliver 1 ticket cleanly with zero unresolved findings."
+    },
+    "milestone_done": {
+      "title": "Ship a Ticket",
+      "detail": "Move 1 ticket cleanly through to done."
+    }
   }
 }

@@ -10,8 +10,8 @@ use serde_json::{Value, json};
 use vibevalley_diorama::pick::pick;
 use vibevalley_diorama::world::is_cutaway_building;
 use vibevalley_diorama::{
-    AssetBundle, DioramaHit, DioramaWorld, DofMode, HelperTaskSync, MetalRenderer, PlotStage, PlotTicketSync, RenderQuality, RenderSceneInput, ScreenAnchor,
-    TimeOfDay, YardSnapshotSync, prepare_scene_input,
+    AssetBundle, DecorationSync, DioramaHit, DioramaWorld, DofMode, HelperTaskSync, MetalRenderer, PlotStage, PlotTicketSync, RenderQuality, RenderSceneInput,
+    ScreenAnchor, TimeOfDay, YardSnapshotSync, prepare_scene_input,
 };
 use vibevalley_protocol::{
     Agent, BoardSlice, CallState, CollabSlice, Crop, FarmFrame, GameEffect, InboxSlice, Issue, IssueStage, IssueStageKind, SessionView, SessionsSlice,
@@ -211,7 +211,7 @@ impl Drop for RenderWorker {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum DioramaAction {
     OpenForm(Value),
     Route(String),
@@ -288,6 +288,42 @@ impl DioramaScene {
         scene.sync_from_frame();
         scene.refresh_anchors(true);
         Ok(scene)
+    }
+
+    #[cfg(test)]
+    pub fn new_for_test(repo: Option<String>) -> Self {
+        let dist = Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/diorama"));
+        let full = AssetBundle::load(dist).expect("repo diorama assets");
+        let meta = Arc::new(full.metadata_only());
+        let world = DioramaWorld::new(&meta);
+        let now = Instant::now();
+        Self {
+            bundle: meta,
+            world,
+            frame: Frame::default(),
+            profiles: Vec::new(),
+            repo,
+            phone: Phone::default(),
+            manual_tod: None,
+            hovered: None,
+            anchors: Vec::new(),
+            toast: None,
+            view_size: (960.0, 640.0),
+            last_telemetry: TelemetrySnapshot::default(),
+            frame_gen: 0,
+            latest_frame: None,
+            last_tick: now,
+            last_activity: now,
+            last_camera_motion: now,
+            last_submit: now,
+            last_anchors_at: now,
+            heard_farm: None,
+            heard_board: None,
+            heard_sessions: None,
+            heard_inbox: None,
+            sounds: Vec::new(),
+            worker: None,
+        }
     }
 
     pub fn touch(&mut self) {
@@ -545,9 +581,25 @@ impl DioramaScene {
             });
         }
 
+        let decorations = self
+            .frame
+            .view
+            .decorations
+            .iter()
+            .map(|d| DecorationSync {
+                id: d.id.clone(),
+                asset: d.asset.clone(),
+                x: d.x.0 as f32,
+                z: d.z.0 as f32,
+                yaw_deg: d.yaw_deg.0 as f32,
+                scale: d.scale.0 as f32,
+            })
+            .collect();
+
         self.world.apply_domain_sync(YardSnapshotSync {
             plots,
             helpers,
+            decorations,
             time_of_day: self.manual_tod.or_else(|| Some(wall_clock_time_of_day())),
         });
     }
@@ -739,10 +791,7 @@ impl DioramaScene {
             "panel:log" => DioramaAction::Route("/runs".into()),
             "panel:warehouse" => DioramaAction::Route("/issues".into()),
             "panel:achievements" | "panel:graphs" => DioramaAction::Route("/agents".into()),
-            "panel:shop" => {
-                self.show_toast("田头小摊筹备中");
-                DioramaAction::None
-            }
+            "panel:shop" => DioramaAction::OpenForm(json!({ "kind": "shop", "repo": self.repo })),
             route if route.starts_with('/') => DioramaAction::Route(route.to_string()),
             other => DioramaAction::Route(other.to_string()),
         }
@@ -947,5 +996,39 @@ mod tests {
             let actual = w as f32 / h as f32;
             assert!((expected - actual).abs() < 0.03, "aspect mismatch: {expected} vs {actual}");
         }
+    }
+
+    #[test]
+    fn panel_shop_opens_shop_form_with_repo_and_syncs_unlocked_decorations() {
+        let mut scene = DioramaScene::new_for_test(Some("demo".into()));
+        let action = scene.dispatch_building_opens("panel:shop");
+        assert_eq!(action, DioramaAction::OpenForm(json!({ "kind": "shop", "repo": "demo" })));
+        scene.apply_farm(FarmFrame {
+            seq: 5,
+            view: vibevalley_protocol::FarmView {
+                level: vibevalley_protocol::FarmLevel { level: 1, xp: 0, need: 10 },
+                plots: Default::default(),
+                plays: Default::default(),
+                decorations: vec![vibevalley_protocol::YardDecoration {
+                    id: "deco_stone_lantern".into(),
+                    asset: "p_lantern".into(),
+                    title: "Stone Lantern".into(),
+                    x: vibevalley_protocol::JsNumber::from(2.15),
+                    z: vibevalley_protocol::JsNumber::from(-1.85),
+                    yaw_deg: vibevalley_protocol::JsNumber::from(12.0),
+                    scale: vibevalley_protocol::JsNumber::from(1.15),
+                }],
+            },
+            progress: None,
+            effects: vec![],
+        });
+        assert!(
+            scene
+                .world
+                .props
+                .iter()
+                .any(|p| p.id == "shop_deco_deco_stone_lantern" && p.asset == "p_lantern"),
+            "unlocked yard decoration must appear in diorama world props"
+        );
     }
 }

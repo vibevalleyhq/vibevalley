@@ -299,7 +299,7 @@ pub fn project_ops(input: &OpsInput, seq: i64) -> OpsSlice {
 pub fn project_farm(input: &FarmInput, live: &LiveSnapshot, seq: i64) -> FarmFrame {
     let sessions = overlay_sessions(&input.sessions, &live.sessions);
     let issues = derive_issues(&input.issues, &sessions);
-    let view = farm_view(&issues, &sessions, Some(&live.plays), input.commits.as_ref());
+    let view = farm_view(&issues, &sessions, Some(&live.plays), input.commits.as_ref(), input.progress.as_ref());
     FarmFrame {
         seq,
         view,

@@ -13,12 +13,16 @@ use tokio::task::JoinHandle as TaskHandle;
 use tokio_util::sync::CancellationToken;
 use vibevalley_core::SliceMask;
 use vibevalley_core::game::progress::{Folded, family_entry, progress_fold, progress_step};
-use vibevalley_core::game::{free_station, play_of, played_doing, played_run};
+use vibevalley_core::game::{
+    daily_board_for, free_station, local_day, play_of, played_doing, played_run, purchased_issue_templates, shop_item, shop_items_view, unsettled_daily_tasks,
+};
 use vibevalley_core::rules::farm_of;
+use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    AchievementList, Actor, AgentRole, ApiError, ChooseTitleRequest, Doing, Issue, LedgerEntry, LedgerEntryCalled, LedgerEntryConflicted, LedgerEntryFailed,
-    LedgerEntryHandoff, LedgerEntryHarvested, LedgerEntryHired, LedgerEntryMoment, LedgerEntryReviewed, LedgerEntryTitled, LedgerEntryTold, Millis, Outcome,
-    Session, SessionClose, SessionId, SessionPlay,
+    AchievementList, Actor, AgentRole, ApiError, BizCode, CheckResult, ChooseTitleRequest, DailyTaskBoard, Doing, FarmShopView, Issue, IssueTemplate,
+    LedgerEntry, LedgerEntryCalled, LedgerEntryCheckPassed, LedgerEntryConflicted, LedgerEntryDailySettled, LedgerEntryDelivered, LedgerEntryFailed,
+    LedgerEntryHandoff, LedgerEntryHarvested, LedgerEntryHired, LedgerEntryMoment, LedgerEntryPurchased, LedgerEntryReviewCompleted, LedgerEntryReviewed,
+    LedgerEntryTitled, LedgerEntryTold, Millis, Outcome, ProjectCheckStatus, RepoStack, Session, SessionClose, SessionId, SessionPlay, ShopPurchaseRequest,
 };
 
 use crate::context::Context;
@@ -94,13 +98,34 @@ where
 
 impl Game {
     /// Opens the farm ledger under `home`, folds existing entries into `progress`,
-    /// seeds `ctx.live`, and marks `SliceMask::FARM` dirty.
+    /// settles any completed today's daily tasks not yet settled, seeds `ctx.live`,
+    /// and marks `SliceMask::FARM` dirty.
     pub async fn open_async(home: &Path, ctx: Arc<Context>, repo: Arc<Repo>) -> Arc<Self> {
         let file = home.join("ledger.jsonl");
-        let folded = progress_fold(&read_ledger_async(&file).await);
+        let mut folded = progress_fold(&read_ledger_async(&file).await);
+        let at = ctx.now();
+        let day = local_day(at);
+        let mut pending_lines = Vec::new();
+        for task in unsettled_daily_tasks(&folded.seen.daily, &day) {
+            let settled = LedgerEntry::DailySettled(LedgerEntryDailySettled {
+                at,
+                day: day.clone(),
+                task_id: task.id,
+                task_kind: task.kind,
+                coins: task.reward_coins,
+            });
+            if let Ok(line) = serde_json::to_string(&settled) {
+                pending_lines.push(line);
+                folded = progress_step(&folded, &settled).0;
+            }
+        }
+        folded.progress.daily = Some(daily_board_for(&folded.seen.daily, &day));
         ctx.live.set_progress(Some(folded.progress.clone()));
         ctx.mark_dirty(SliceMask::FARM);
         let (writer_tx, mut writer_rx) = mpsc::unbounded_channel::<String>();
+        for line in pending_lines {
+            let _ = writer_tx.send(line);
+        }
         let writer_handle = ctx.task.spawn_named("game.ledger", async move {
             use tokio::io::AsyncWriteExt;
             let mut opened: Option<tokio::fs::File> = None;
@@ -111,6 +136,9 @@ impl Game {
                 if let Some(f) = opened.as_mut() {
                     let _ = f.write_all(line.as_bytes()).await;
                     let _ = f.write_all(b"\n").await;
+                    if writer_rx.is_empty() {
+                        let _ = f.flush().await;
+                    }
                 }
             }
             if let Some(f) = opened.as_mut() {
@@ -184,6 +212,7 @@ impl Game {
         }
         let prev_total = prev.as_ref().map(|c| c.total);
         self.ctx.live.set_commits(Some(next.clone()));
+        self.refresh_daily();
         let (level, _) = vibevalley_core::game::level_for_commits(next.total);
         let known = self.folded.lock().progress.counts.get("farm_level").copied().unwrap_or(1);
         if level > known {
@@ -206,22 +235,44 @@ impl Game {
         self.soon.notify_one();
     }
 
-    /// Appends one ledger entry, folds it into `progress`, updates `ctx.live`,
+    /// Appends one ledger entry, folds it into `progress`, settles any newly
+    /// completed daily tasks for the current calendar day, updates `ctx.live`,
     /// pushes progress burst effects, and marks `SliceMask::FARM` dirty.
     pub fn record(&self, entry: LedgerEntry) {
         let at = self.ctx.now();
         let entry = entry.with_at(at);
         let Ok(line) = serde_json::to_string(&entry) else { return };
+        let day = local_day(at);
         let (progress, news) = {
             let mut folded = self.folded.lock();
-            if let Some(tx) = self.writer_tx.lock().as_ref() {
-                if tx.send(line).is_err() {
-                    return;
-                }
-            } else {
+            let guard = self.writer_tx.lock();
+            let Some(tx) = guard.as_ref() else {
+                return;
+            };
+            if tx.send(line).is_err() {
                 return;
             }
-            let (next, news) = progress_step(&folded, &entry);
+            let (mut next, mut news) = progress_step(&folded, &entry);
+            for task in unsettled_daily_tasks(&next.seen.daily, &day) {
+                let settled = LedgerEntry::DailySettled(LedgerEntryDailySettled {
+                    at,
+                    day: day.clone(),
+                    task_id: task.id,
+                    task_kind: task.kind,
+                    coins: task.reward_coins,
+                });
+                if let Ok(settled_line) = serde_json::to_string(&settled)
+                    && tx.send(settled_line).is_ok()
+                {
+                    let (after, settled_news) = progress_step(&next, &settled);
+                    next = after;
+                    if let Some(c) = settled_news.coins {
+                        news.coins = Some(news.coins.unwrap_or(0) + c);
+                    }
+                    news.unlocked.extend(settled_news.unlocked);
+                }
+            }
+            next.progress.daily = Some(daily_board_for(&next.seen.daily, &day));
             let progress = next.progress.clone();
             *folded = next;
             (progress, news)
@@ -232,6 +283,22 @@ impl Game {
         if !effects.is_empty() {
             self.ctx.live.push_farm_effects(effects);
         }
+        self.ctx.mark_dirty(SliceMask::FARM);
+    }
+
+    /// Ensures `progress.daily` reflects the current calendar day from `ctx.now()`.
+    pub fn refresh_daily(&self) {
+        let day = local_day(self.ctx.now());
+        let updated = {
+            let mut folded = self.folded.lock();
+            if folded.progress.daily.as_ref().map(|d| d.day.as_str()) == Some(day.as_str()) {
+                return;
+            }
+            let board = daily_board_for(&folded.seen.daily, &day);
+            folded.progress.daily = Some(board);
+            folded.progress.clone()
+        };
+        self.ctx.live.set_progress(Some(updated));
         self.ctx.mark_dirty(SliceMask::FARM);
     }
 
@@ -475,6 +542,196 @@ impl Game {
             .await
             .map_err(|e| ApiError::new(vibevalley_protocol::BizCode::InternalError, e.to_string()))?;
         Ok(())
+    }
+
+    pub fn purchased_templates(&self, stack: Option<&RepoStack>) -> Vec<IssueTemplate> {
+        let folded = self.folded.lock();
+        purchased_issue_templates(&folded.progress.purchased, stack)
+    }
+
+    pub fn append_purchased_templates(&self, out: &mut vibevalley_protocol::RepoTemplates) {
+        let purchased = self.purchased_templates(Some(&out.stack));
+        if !purchased.is_empty() {
+            out.kinds.push(vibevalley_protocol::TemplateKind {
+                id: "purchased".into(),
+                name: t("server.game.shop.purchasedKind", &[]),
+                icon: "plot-flowering".into(),
+                templates: purchased,
+            });
+        }
+    }
+
+    pub async fn record_issue_review_async(&self, issue: &Issue, pass: bool) {
+        self.on_issue_reviewed(issue, pass);
+        if pass && issue.status == vibevalley_protocol::IssueStatus::Done {
+            self.on_issue_status_updated_async(&issue.id, issue.status).await;
+        }
+    }
+
+    pub async fn on_issue_status_updated_async(&self, issue_id: &str, status: vibevalley_protocol::IssueStatus) {
+        if status == vibevalley_protocol::IssueStatus::Done {
+            let all = self.ctx.service.issue.all().await.unwrap_or_default();
+            if let Some(issue) = all.iter().find(|i| i.id == issue_id) {
+                self.on_issue_delivered(issue, &all);
+            }
+        }
+    }
+
+    pub async fn record_session_report_async(&self, session: &Session, outcome: Outcome) {
+        let issue = if outcome == Outcome::Completed {
+            match session.issue_id() {
+                Some(iid) => self.ctx.service.issue.get(iid).await.ok().flatten(),
+                None => None,
+            }
+        } else {
+            None
+        };
+        self.on_session_reported_with_issue(session, outcome, issue.as_ref());
+    }
+
+    pub fn on_issue_check_passed(&self, key: &str) {
+        let day = local_day(self.ctx.now());
+        {
+            let folded = self.folded.lock();
+            if folded.seen.daily.get(&day).is_some_and(|a| a.tests_passed.contains(key)) {
+                return;
+            }
+        }
+        self.record(LedgerEntry::CheckPassed(LedgerEntryCheckPassed { at: 0, key: key.to_string() }));
+    }
+
+    pub fn on_issue_reviewed(&self, issue: &Issue, passed: bool) {
+        let day = local_day(self.ctx.now());
+        let review_key = format!("review:{}", issue.id);
+        let already = {
+            let folded = self.folded.lock();
+            folded.seen.daily.get(&day).is_some_and(|a| a.reviews_completed.contains(&review_key))
+        };
+        if !already {
+            self.record(LedgerEntry::ReviewCompleted(LedgerEntryReviewCompleted {
+                at: 0,
+                key: issue.id.clone(),
+                passed,
+            }));
+        }
+        if let Some(check) = issue.delivery_evidence.as_ref().and_then(|e| e.check.as_ref())
+            && check.status == ProjectCheckStatus::Passed
+        {
+            self.on_issue_check_passed(&format!("{}:{}", issue.id, check.candidate_commit));
+        }
+    }
+
+    pub fn on_issue_delivered(&self, issue: &Issue, all_issues: &[Issue]) {
+        if let Some(check) = issue.delivery_evidence.as_ref().and_then(|e| e.check.as_ref())
+            && check.status == ProjectCheckStatus::Passed
+        {
+            self.on_issue_check_passed(&format!("{}:{}", issue.id, check.candidate_commit));
+        } else if !issue.checks.is_empty() && issue.checks.iter().all(|c| c.result == CheckResult::Met) {
+            self.on_issue_check_passed(&format!("{}:criteria", issue.id));
+        }
+        let day = local_day(self.ctx.now());
+        let delivered_key = format!("delivered:{}", issue.id);
+        let already = {
+            let folded = self.folded.lock();
+            folded.seen.daily.get(&day).is_some_and(|a| a.milestone_done.contains(&delivered_key))
+        };
+        if !already {
+            self.record(LedgerEntry::Delivered(LedgerEntryDelivered {
+                at: 0,
+                issue: issue.id.clone(),
+                clean: issue.findings.iter().all(|f| f.resolved),
+            }));
+        }
+        let children: Vec<&Issue> = all_issues.iter().filter(|c| c.parent.as_deref() == Some(issue.id.as_str())).collect();
+        if !children.is_empty() {
+            self.on_family_done(&issue.id, &children);
+        }
+    }
+
+    pub fn on_session_reported_with_issue(&self, session: &Session, outcome: Outcome, issue: Option<&Issue>) {
+        self.on_session_reported(session, outcome);
+        if outcome != Outcome::Completed {
+            return;
+        }
+        let Some(issue) = issue else { return };
+        if let Some(check) = issue.delivery_evidence.as_ref().and_then(|e| e.check.as_ref())
+            && check.status == ProjectCheckStatus::Passed
+        {
+            self.on_issue_check_passed(&format!("{}:{}", issue.id, check.candidate_commit));
+        } else if !issue.checks.is_empty() && issue.checks.iter().all(|c| c.result == CheckResult::Met) {
+            self.on_issue_check_passed(&format!("{}:checks", issue.id));
+        }
+    }
+
+    pub async fn daily_list_async(&self) -> Result<DailyTaskBoard, ApiError> {
+        self.refresh_daily();
+        let day = local_day(self.ctx.now());
+        let folded = self.folded.lock();
+        Ok(daily_board_for(&folded.seen.daily, &day))
+    }
+
+    pub async fn shop_list_async(&self) -> Result<FarmShopView, ApiError> {
+        self.refresh_daily();
+        let day = local_day(self.ctx.now());
+        let folded = self.folded.lock();
+        Ok(FarmShopView {
+            coins: folded.progress.coins,
+            items: shop_items_view(&folded.progress.purchased, None),
+            daily: daily_board_for(&folded.seen.daily, &day),
+        })
+    }
+
+    pub async fn shop_buy_async(&self, req: &ShopPurchaseRequest) -> Result<FarmShopView, ApiError> {
+        let Some(spec) = shop_item(&req.id) else {
+            return Err(ApiError::new(
+                BizCode::NotFound,
+                t("server.game.shop.notFound", &[("id", req.id.clone().into())]),
+            ));
+        };
+        let at = self.ctx.now();
+        let day = local_day(at);
+        let (progress, view) = {
+            let mut folded = self.folded.lock();
+            if folded.progress.purchased.iter().any(|id| id == spec.id) {
+                return Err(ApiError::new(BizCode::Refused, t("server.game.shop.alreadyOwned", &[])));
+            }
+            if folded.progress.coins < spec.price {
+                return Err(ApiError::new(
+                    BizCode::Refused,
+                    t(
+                        "server.game.shop.notEnoughCoins",
+                        &[("need", spec.price.into()), ("have", folded.progress.coins.into())],
+                    ),
+                ));
+            }
+            let entry = LedgerEntry::Purchased(LedgerEntryPurchased {
+                at,
+                item_id: spec.id.to_string(),
+                item_kind: spec.kind,
+                price: spec.price,
+            });
+            let line = serde_json::to_string(&entry).map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?;
+            let guard = self.writer_tx.lock();
+            let Some(tx) = guard.as_ref() else {
+                return Err(ApiError::new(BizCode::ServiceUnavailable, "game ledger closed"));
+            };
+            tx.send(line)
+                .map_err(|e| ApiError::new(BizCode::InternalError, format!("ledger write failed: {e}")))?;
+            let (mut next, _) = progress_step(&folded, &entry);
+            let daily = daily_board_for(&next.seen.daily, &day);
+            next.progress.daily = Some(daily.clone());
+            let progress = next.progress.clone();
+            let view = FarmShopView {
+                coins: progress.coins,
+                items: shop_items_view(&progress.purchased, None),
+                daily,
+            };
+            *folded = next;
+            (progress, view)
+        };
+        self.ctx.live.set_progress(Some(progress));
+        self.ctx.mark_dirty(SliceMask::FARM);
+        Ok(view)
     }
 }
 

@@ -231,7 +231,23 @@ export {
   OrchestratorEvalRequest,
 } from "./orchestrator/schema";
 export { InboxItem } from "./inbox/schema";
-export { Achievement, AchievementList, AchievementStanding, ChooseTitleRequest, FarmFrame, FarmView } from "./game/schema";
+export {
+  Achievement,
+  AchievementList,
+  AchievementStanding,
+  ChooseTitleRequest,
+  DailyTask,
+  DailyTaskBoard,
+  DailyTaskKind,
+  FarmFrame,
+  FarmShopView,
+  FarmView,
+  ShopItem,
+  ShopItemKind,
+  ShopPurchaseRequest,
+  YardDecoration,
+  YardDecorationPlacement,
+} from "./game/schema";
 export {
   ArtifactAppletInfo,
   ConnectionSaveRequest,

@@ -131,6 +131,7 @@
 | `useCollabSlice` | `frame.ts` |  |
 | `useInboxSlice` | `frame.ts` |  |
 | `useOpsSlice` | `frame.ts` |  |
+| `useFarmSlice` | `frame.ts` |  |
 | `useLink` | `frame.ts` |  |
 | `useRefreshSlice` | `frame.ts` |  |
 | `useSessionsMap` | `frame.ts` |  |

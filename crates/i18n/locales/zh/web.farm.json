@@ -2,7 +2,8 @@
   "panel": {
     "harvest": "收获{name}的地",
     "sow": "播种 · 第 {plot} 块地",
-    "water": "给{name}浇水"
+    "water": "给{name}浇水",
+    "shop": "田头小摊"
   },
   "menu": {
     "issues": "工单",
@@ -30,7 +31,28 @@
     "resetCamera": "回正",
     "phone": "手机",
     "enter": "进入",
-    "backToYard": "返回庭院"
+    "backToYard": "返回庭院",
+    "shop": "小摊",
+    "coins": "{n} 金币",
+    "daily": "今日 {done}/{total}"
+  },
+  "shop": {
+    "coins": "当前金币 {n}",
+    "todayTasks": "今日轻量任务",
+    "settledToday": "今日已自动结算 {n} 金币，直接记入账本。",
+    "decorations": "庭院摆件",
+    "decorationsNote": "仅装饰纸雕庭院，不加并发位也不提速。",
+    "templates": "工单模板",
+    "templatesNote": "买下后直接进播种「常见的活」，方便派发同类任务。",
+    "price": "{n} 金币",
+    "buy": "买下",
+    "owned": "已拥有",
+    "useNow": "去播种",
+    "retry": "重新看看小摊"
+  },
+  "daily": {
+    "settled": "已自动结算 +{n}",
+    "progress": "{progress}/{target} · +{reward} 金币"
   },
   "sow": {
     "homeless": "这座农场不是哪个仓库的",

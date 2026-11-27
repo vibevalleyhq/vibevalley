@@ -1,8 +1,8 @@
 import "../infra/polyfill";
-import { ErrorBoundary, host, keymap, Scroll, signal, Text, View, type JSX } from "nsh";
+import { computed, ErrorBoundary, host, keymap, Scroll, signal, Text, View, type JSX } from "nsh";
 
 import { setLocale, t } from "@vibevalley/i18n";
-import type { Changes, Issue, IssueAct, RepoTemplates } from "@vibevalley/protocol";
+import type { Changes, DailyTask, FarmShopView, Issue, IssueAct, RepoTemplates, ShopItem } from "@vibevalley/protocol";
 
 import { TextArea } from "../design/Field";
 import { Icon } from "../design/Icon";
@@ -14,7 +14,7 @@ import { useIssueChanges } from "../features/issue/model/history";
 import { createWriteKey, writeIssue } from "../features/issue/model/write";
 import { useWorkAgents } from "../infra/agents";
 import { api, newSendKey, reasonOf } from "../infra/api";
-import { useBoardSlice, useCollabSlice, useIssue, useSession } from "../infra/frame";
+import { useBoardSlice, useCollabSlice, useFarmSlice, useIssue, useSession } from "../infra/frame";
 import { readFarmFormParams, readHostLocale } from "../infra/hostParams";
 import { ready, useRepos } from "../infra/query";
 import { Root } from "../infra/Root";
@@ -93,12 +93,12 @@ function FormErrorFallback(props: { readonly error: unknown; readonly reset: () 
   );
 }
 
-function Sow() {
+function Sow(props: { initialWords?: string }) {
   const { repo, station } = readFarmFormParams();
   const agents = useWorkAgents(true);
   const repos = useRepos();
   const who = signal("");
-  const words = signal("");
+  const words = signal(props.initialWords ?? "");
   const busy = signal(false);
   const error = signal("");
   const seeds = signal<RepoTemplates | undefined>(undefined);
@@ -381,11 +381,198 @@ function Work(props: { kind: string; issue: () => Issue }) {
   );
 }
 
-function Content() {
-  const { issue: issueId, kind } = readFarmFormParams();
-  if (kind === "sow") return <Sow />;
+function DailyTaskRow(props: { task: () => DailyTask }) {
+  const done = () => props.task().settled || props.task().completed;
+  return (
+    <View testID={`daily-task-${props.task().id}`} class="flex-row items-center justify-between gap-2 rounded-md border border-line bg-page px-2.5 py-2">
+      <View class="flex-1 gap-0.5">
+        <Words>{props.task().title}</Words>
+        <Words tone="muted">{props.task().detail}</Words>
+      </View>
+      <View class={`rounded px-2 py-0.5 ${done() ? "bg-ok-soft" : "bg-elevated"}`}>
+        <Text class={`font-mono text-xs tabular-nums ${done() ? "text-ok-ink" : "text-muted"}`}>
+          {props.task().settled
+            ? t("web.farm.daily.settled", { n: props.task().rewardCoins })
+            : t("web.farm.daily.progress", { progress: props.task().progress, target: props.task().target, reward: props.task().rewardCoins })}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+function ShopItemCard(props: {
+  item: () => ShopItem;
+  owned: boolean;
+  coins: number;
+  busy: boolean;
+  repo: string;
+  onBuy: (id: string) => void;
+  onPlant: (text: string) => void;
+}) {
+  return (
+    <View testID={`shop-item-${props.item().id}`} class="flex-row items-center justify-between gap-2 rounded-md border border-line bg-page px-2.5 py-2">
+      <View class="flex-1 gap-0.5">
+        <View class="flex-row items-center gap-1.5">
+          <Words>{props.item().title}</Words>
+          <Text class="font-mono text-xs tabular-nums text-muted">{t("web.farm.shop.price", { n: props.item().price })}</Text>
+        </View>
+        <Words tone="muted">{props.item().detail}</Words>
+      </View>
+      <If
+        when={props.owned}
+        else={
+          <Key
+            id={`shop-buy-${props.item().id}`}
+            primary
+            title={t("web.farm.shop.buy")}
+            disabled={props.busy || props.coins < props.item().price}
+            onPress={() => props.onBuy(props.item().id)}
+          />
+        }
+      >
+        <View class="flex-row items-center gap-1.5">
+          <View testID={`shop-owned-${props.item().id}`} class="rounded bg-ok-soft px-2 py-0.5">
+            <Text class="font-sans text-xs text-ok-ink">{t("web.farm.shop.owned")}</Text>
+          </View>
+          <If when={props.repo !== "" && props.item().template !== undefined}>
+            <Key id={`shop-plant-${props.item().id}`} title={t("web.farm.shop.useNow")} onPress={() => props.onPlant(props.item().template?.text ?? "")} />
+          </If>
+        </View>
+      </If>
+    </View>
+  );
+}
+
+function Shop(props: { onPlant: (text: string) => void }) {
+  const { repo } = readFarmFormParams();
+  const farm = useFarmSlice();
+  const view = signal<FarmShopView | undefined>(undefined);
+  const buying = signal("");
+  const error = signal("");
+
+  const load = async () => {
+    try {
+      error.set("");
+      view.set(await api.game.shop.list());
+    } catch (e) {
+      error.set(reasonOf(e));
+    }
+  };
+  void load();
+
+  const buy = async (id: string) => {
+    if (buying()) return;
+    buying.set(id);
+    error.set("");
+    try {
+      view.set(await api.game.shop.buy({ id }));
+    } catch (e) {
+      error.set(reasonOf(e));
+    } finally {
+      buying.set("");
+    }
+  };
+
+  const coins = computed(() => view()?.coins ?? farm()?.progress?.coins ?? 0);
+  const ownedIds = computed(() => {
+    const owned = new Set(farm()?.progress?.purchased ?? []);
+    for (const item of view()?.items ?? []) {
+      if (item.owned) owned.add(item.id);
+    }
+    return owned;
+  });
+  const daily = computed(() => view()?.daily ?? farm()?.progress?.daily);
+  const decorations = computed(() => (view()?.items ?? []).filter((item) => item.kind === "decoration"));
+  const templates = computed(() => (view()?.items ?? []).filter((item) => item.kind === "template"));
+
+  return (
+    <Shell title={t("web.farm.panel.shop")} icon="catalog">
+      <View class="flex-row items-center justify-between rounded-lg border border-line bg-side px-3 py-2">
+        <Words size={16}>{t("web.farm.shop.coins", { n: coins() })}</Words>
+        <If when={daily()}>{(board) => <Words tone="muted">{t("web.farm.shop.settledToday", { n: board().settledCoinsToday })}</Words>}</If>
+      </View>
+
+      <If
+        when={view()}
+        else={
+          <If
+            when={error() !== ""}
+            else={
+              <View testID="farm-shop-loading" class="gap-2 rounded-lg border border-line bg-side p-3">
+                <Words tone="muted">{t("web.farm.native.loading")}</Words>
+                <SkeletonLines rows={4} surface="side" />
+              </View>
+            }
+          >
+            <View class="gap-2 rounded-lg border border-berry bg-bad-soft p-3">
+              <Words tone="error">{error()}</Words>
+              <Buttons>
+                <Key id="shop-retry" title={t("web.farm.shop.retry")} onPress={() => void load()} />
+              </Buttons>
+            </View>
+          </If>
+        }
+      >
+        <If when={daily()}>
+          {(board) => (
+            <View class="gap-1.5 rounded-lg border border-line bg-side p-2.5">
+              <Words size={16}>{t("web.farm.shop.todayTasks")}</Words>
+              <Each of={board().tasks} key={(task) => task.id}>
+                {(task) => <DailyTaskRow task={task} />}
+              </Each>
+            </View>
+          )}
+        </If>
+
+        <View class="gap-1.5 rounded-lg border border-line bg-side p-2.5">
+          <Words size={16}>{t("web.farm.shop.decorations")}</Words>
+          <Words tone="muted">{t("web.farm.shop.decorationsNote")}</Words>
+          <Each of={decorations()} key={(item) => item.id}>
+            {(item) => (
+              <ShopItemCard
+                item={item}
+                owned={ownedIds().has(item().id)}
+                coins={coins()}
+                busy={buying() !== ""}
+                repo={repo}
+                onBuy={(id) => void buy(id)}
+                onPlant={props.onPlant}
+              />
+            )}
+          </Each>
+        </View>
+
+        <View class="gap-1.5 rounded-lg border border-line bg-side p-2.5">
+          <Words size={16}>{t("web.farm.shop.templates")}</Words>
+          <Words tone="muted">{t("web.farm.shop.templatesNote")}</Words>
+          <Each of={templates()} key={(item) => item.id}>
+            {(item) => (
+              <ShopItemCard
+                item={item}
+                owned={ownedIds().has(item().id)}
+                coins={coins()}
+                busy={buying() !== ""}
+                repo={repo}
+                onBuy={(id) => void buy(id)}
+                onPlant={props.onPlant}
+              />
+            )}
+          </Each>
+        </View>
+      </If>
+
+      <If when={error() !== "" && view() !== undefined}>
+        <View class="rounded-lg border border-berry bg-bad-soft px-3 py-2">
+          <Words tone="error">{error()}</Words>
+        </View>
+      </If>
+    </Shell>
+  );
+}
+
+function WorkByIssue(props: { issueId: string | undefined; kind: string }) {
   const board = useBoardSlice();
-  const issue = useIssue(() => issueId);
+  const issue = useIssue(() => props.issueId);
   return (
     <If
       when={issue()}
@@ -410,8 +597,32 @@ function Content() {
         </Shell>
       }
     >
-      {(item) => <Work kind={kind} issue={item} />}
+      {(item) => <Work kind={props.kind} issue={item} />}
     </If>
+  );
+}
+
+function Content() {
+  const { issue: issueId, kind } = readFarmFormParams();
+  const activeKind = signal(kind);
+  const seedPrefill = signal("");
+  return (
+    <View class="flex-1">
+      <If when={activeKind() === "shop"}>
+        <Shop
+          onPlant={(text) => {
+            seedPrefill.set(text);
+            activeKind.set("sow");
+          }}
+        />
+      </If>
+      <If when={activeKind() === "sow"}>
+        <Sow initialWords={seedPrefill()} />
+      </If>
+      <If when={activeKind() !== "shop" && activeKind() !== "sow"}>
+        <WorkByIssue issueId={issueId} kind={kind} />
+      </If>
+    </View>
   );
 }
 

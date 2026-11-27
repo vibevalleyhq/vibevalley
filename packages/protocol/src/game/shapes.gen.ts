@@ -1,7 +1,7 @@
 // Generated from crates/protocol/src/contract (vp run protocol:ts). Do not edit.
 
 import type { IssueId, SessionId } from "../common/shapes.gen";
-import type { Repo } from "../repo/shapes.gen";
+import type { IssueTemplate, Repo } from "../repo/shapes.gen";
 import type { SessionAction } from "../session/shapes.gen";
 
 export const AchievementCategoryValues = ["starter", "harvest", "craft", "thrift", "team", "secret"] as const;
@@ -31,7 +31,27 @@ export type AgentTally = { hired: number, harvested: number, failed: number, };
 
 export type ProgressTitle = { id: string, tier: number, };
 
-export type Progress = { coins: number, streak: number, bestStreak: number, counts: { [key in string]: number }, unlocked: Array<Unlock>, title?: ProgressTitle, agents: { [key in string]: AgentTally }, multiplier?: number, };
+export const ShopItemKindValues = ["decoration", "template"] as const;
+export type ShopItemKind = (typeof ShopItemKindValues)[number];
+
+export type YardDecorationPlacement = { asset: string, x: number, z: number, yawDeg: number, scale: number, };
+
+export type YardDecoration = { id: string, asset: string, title: string, x: number, z: number, yawDeg: number, scale: number, };
+
+export type ShopItem = { id: string, kind: ShopItemKind, title: string, detail: string, price: number, owned: boolean, decoration?: YardDecorationPlacement, template?: IssueTemplate, };
+
+export const DailyTaskKindValues = ["tests_passed", "reviews_completed", "clean_harvest", "milestone_done"] as const;
+export type DailyTaskKind = (typeof DailyTaskKindValues)[number];
+
+export type DailyTask = { id: string, kind: DailyTaskKind, title: string, detail: string, progress: number, target: number, rewardCoins: number, completed: boolean, settled: boolean, settledAt?: number, };
+
+export type DailyTaskBoard = { day: string, tasks: Array<DailyTask>, settledCoinsToday: number, };
+
+export type FarmShopView = { coins: number, items: Array<ShopItem>, daily: DailyTaskBoard, };
+
+export type ShopPurchaseRequest = { id: string, };
+
+export type Progress = { coins: number, streak: number, bestStreak: number, counts: { [key in string]: number }, unlocked: Array<Unlock>, title?: ProgressTitle, agents: { [key in string]: AgentTally }, multiplier?: number, purchased?: Array<string>, daily?: DailyTaskBoard, };
 
 export type ProgressNews = { coins?: number, session?: SessionId, unlocked: Array<Unlock>, };
 
@@ -55,7 +75,11 @@ plots: { [key in string]: PlotView },
 /**
  * Each session's station and step history, by the session's id; the farm reads only this.
  */
-plays: { [key in string]: SessionPlayView }, };
+plays: { [key in string]: SessionPlayView },
+/**
+ * Unlocked yard decorations rendered in the 3D diorama scene.
+ */
+decorations?: Array<YardDecoration>, };
 
 export type FarmFrame = { seq: number, view: FarmView, progress?: Progress, effects: Array<GameEffect>, };
 
@@ -103,10 +127,20 @@ export type LedgerEntryLevel = { "kind": "level", at: number, level: number, };
 
 export type LedgerEntryTitled = { "kind": "titled", at: number, achievement?: string, tier?: number, };
 
+export type LedgerEntryPurchased = { "kind": "purchased", at: number, itemId: string, itemKind: ShopItemKind, price: number, };
+
+export type LedgerEntryDailySettled = { "kind": "dailySettled", at: number, day: string, taskId: string, taskKind: DailyTaskKind, coins: number, };
+
+export type LedgerEntryCheckPassed = { "kind": "checkPassed", at: number, key: string, };
+
+export type LedgerEntryReviewCompleted = { "kind": "reviewCompleted", at: number, key: string, passed: boolean, };
+
+export type LedgerEntryDelivered = { "kind": "delivered", at: number, issue: IssueId, clean: boolean, };
+
 /**
  * Told apart by `kind`.
  */
-export type LedgerEntry = LedgerEntryHarvested | LedgerEntryFailed | LedgerEntryConflicted | LedgerEntryTold | LedgerEntryReviewed | LedgerEntryFamily | LedgerEntryHandoff | LedgerEntryCalled | LedgerEntryHired | LedgerEntryMoment | LedgerEntryLevel | LedgerEntryTitled;
+export type LedgerEntry = LedgerEntryHarvested | LedgerEntryFailed | LedgerEntryConflicted | LedgerEntryTold | LedgerEntryReviewed | LedgerEntryFamily | LedgerEntryHandoff | LedgerEntryCalled | LedgerEntryHired | LedgerEntryMoment | LedgerEntryLevel | LedgerEntryTitled | LedgerEntryPurchased | LedgerEntryDailySettled | LedgerEntryCheckPassed | LedgerEntryReviewCompleted | LedgerEntryDelivered;
 
 export type ChooseTitleRequest = { achievement?: string, tier?: number, };
 

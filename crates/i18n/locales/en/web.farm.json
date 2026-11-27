@@ -2,7 +2,8 @@
   "panel": {
     "harvest": "Harvest {name}'s plot",
     "sow": "Sow · plot {plot}",
-    "water": "Water {name}"
+    "water": "Water {name}",
+    "shop": "Farm Shop"
   },
   "menu": {
     "issues": "Tickets",
@@ -30,7 +31,28 @@
     "resetCamera": "Reset",
     "phone": "Phone",
     "enter": "Enter",
-    "backToYard": "Back to yard"
+    "backToYard": "Back to yard",
+    "shop": "Shop",
+    "coins": "{n} coins",
+    "daily": "Today {done}/{total}"
+  },
+  "shop": {
+    "coins": "{n} coins available",
+    "todayTasks": "Today's lightweight tasks",
+    "settledToday": "Auto-settled {n} coins today directly into your ledger.",
+    "decorations": "Yard decorations",
+    "decorationsNote": "Purely decorative yard pieces — no extra slots or speed boosts.",
+    "templates": "Ticket templates",
+    "templatesNote": "Unlocked templates appear right inside Sow → Common jobs.",
+    "price": "{n} coins",
+    "buy": "Buy",
+    "owned": "Owned",
+    "useNow": "Sow with this",
+    "retry": "Reload shop"
+  },
+  "daily": {
+    "settled": "Auto-settled +{n}",
+    "progress": "{progress}/{target} · +{reward} coins"
   },
   "sow": {
     "homeless": "This farm belongs to no repo",

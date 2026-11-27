@@ -33,14 +33,28 @@ pub struct HelperTaskSync {
     pub role: Option<String>,
 }
 
+/// Unlocked yard decoration synced from the farm shop ledger into the 3D scene.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DecorationSync {
+    pub id: String,
+    pub asset: String,
+    pub x: f32,
+    pub z: f32,
+    pub yaw_deg: f32,
+    pub scale: f32,
+}
+
 /// Idempotent host-to-diorama snapshot payload applied via [`crate::DioramaWorld::apply_domain_sync`].
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct YardSnapshotSync {
     #[serde(default)]
     pub plots: Vec<PlotTicketSync>,
     #[serde(default)]
     pub helpers: Vec<HelperTaskSync>,
+    #[serde(default)]
+    pub decorations: Vec<DecorationSync>,
     #[serde(default)]
     pub time_of_day: Option<TimeOfDay>,
 }

@@ -1327,7 +1327,7 @@ export const catalogs = {
       status: { loading: "加载中…", error: "加载开发者工具数据失败：{reason}", disabled: "服务端未启用开发者工具。", empty: "暂无数据。" },
     },
     "web.farm": {
-      panel: { harvest: "收获{name}的地", sow: "播种 · 第 {plot} 块地", water: "给{name}浇水" },
+      panel: { harvest: "收获{name}的地", sow: "播种 · 第 {plot} 块地", water: "给{name}浇水", shop: "田头小摊" },
       menu: { issues: "工单", repos: "仓库" },
       native: { close: "关闭", loading: "载入中…" },
       chat: {
@@ -1350,7 +1350,25 @@ export const catalogs = {
         phone: "手机",
         enter: "进入",
         backToYard: "返回庭院",
+        shop: "小摊",
+        coins: "{n} 金币",
+        daily: "今日 {done}/{total}",
       },
+      shop: {
+        coins: "当前金币 {n}",
+        todayTasks: "今日轻量任务",
+        settledToday: "今日已自动结算 {n} 金币，直接记入账本。",
+        decorations: "庭院摆件",
+        decorationsNote: "仅装饰纸雕庭院，不加并发位也不提速。",
+        templates: "工单模板",
+        templatesNote: "买下后直接进播种「常见的活」，方便派发同类任务。",
+        price: "{n} 金币",
+        buy: "买下",
+        owned: "已拥有",
+        useNow: "去播种",
+        retry: "重新看看小摊",
+      },
+      daily: { settled: "已自动结算 +{n}", progress: "{progress}/{target} · +{reward} 金币" },
       sow: {
         homeless: "这座农场不是哪个仓库的",
         toMap: "种地要先进一个仓库的农场：去「仓库」里挑一个仓库。",
@@ -5099,7 +5117,7 @@ export const catalogs = {
       },
     },
     "web.farm": {
-      panel: { harvest: "Harvest {name}'s plot", sow: "Sow · plot {plot}", water: "Water {name}" },
+      panel: { harvest: "Harvest {name}'s plot", sow: "Sow · plot {plot}", water: "Water {name}", shop: "Farm Shop" },
       menu: { issues: "Tickets", repos: "Repos" },
       native: { close: "Close", loading: "Loading…" },
       chat: {
@@ -5122,7 +5140,25 @@ export const catalogs = {
         phone: "Phone",
         enter: "Enter",
         backToYard: "Back to yard",
+        shop: "Shop",
+        coins: "{n} coins",
+        daily: "Today {done}/{total}",
       },
+      shop: {
+        coins: "{n} coins available",
+        todayTasks: "Today's lightweight tasks",
+        settledToday: "Auto-settled {n} coins today directly into your ledger.",
+        decorations: "Yard decorations",
+        decorationsNote: "Purely decorative yard pieces — no extra slots or speed boosts.",
+        templates: "Ticket templates",
+        templatesNote: "Unlocked templates appear right inside Sow → Common jobs.",
+        price: "{n} coins",
+        buy: "Buy",
+        owned: "Owned",
+        useNow: "Sow with this",
+        retry: "Reload shop",
+      },
+      daily: { settled: "Auto-settled +{n}", progress: "{progress}/{target} · +{reward} coins" },
       sow: {
         homeless: "This farm belongs to no repo",
         toMap: "To plant, enter a repo's farm first: open Repos and pick a repository.",
@@ -8988,6 +9024,8 @@ export interface Messages {
   "web.farm.chat.fold": undefined;
   "web.farm.chat.greeting": undefined;
   "web.farm.chat.send": undefined;
+  "web.farm.daily.progress": { readonly progress: string | number; readonly reward: string | number; readonly target: string | number };
+  "web.farm.daily.settled": { readonly n: string | number };
   "web.farm.harvest.counts": { readonly commits: string | number; readonly files: string | number };
   "web.farm.harvest.letGo": undefined;
   "web.farm.harvest.repo": { readonly repo: string | number };
@@ -8995,6 +9033,8 @@ export interface Messages {
   "web.farm.harvest.take": { readonly base: string | number };
   "web.farm.hud.backToYard": undefined;
   "web.farm.hud.closeRoof": undefined;
+  "web.farm.hud.coins": { readonly n: string | number };
+  "web.farm.hud.daily": { readonly done: string | number; readonly total: string | number };
   "web.farm.hud.dawn": undefined;
   "web.farm.hud.dusk": undefined;
   "web.farm.hud.enter": undefined;
@@ -9003,12 +9043,14 @@ export interface Messages {
   "web.farm.hud.noon": undefined;
   "web.farm.hud.phone": undefined;
   "web.farm.hud.resetCamera": undefined;
+  "web.farm.hud.shop": undefined;
   "web.farm.hud.workbench": undefined;
   "web.farm.menu.issues": undefined;
   "web.farm.menu.repos": undefined;
   "web.farm.native.close": undefined;
   "web.farm.native.loading": undefined;
   "web.farm.panel.harvest": { readonly name: string | number };
+  "web.farm.panel.shop": undefined;
   "web.farm.panel.sow": { readonly plot: string | number };
   "web.farm.panel.water": { readonly name: string | number };
   "web.farm.phone.again": undefined;
@@ -9107,6 +9149,18 @@ export interface Messages {
   "web.farm.phone.sokoban.undo": undefined;
   "web.farm.phone.start": undefined;
   "web.farm.plotOf": { readonly name: string | number };
+  "web.farm.shop.buy": undefined;
+  "web.farm.shop.coins": { readonly n: string | number };
+  "web.farm.shop.decorations": undefined;
+  "web.farm.shop.decorationsNote": undefined;
+  "web.farm.shop.owned": undefined;
+  "web.farm.shop.price": { readonly n: string | number };
+  "web.farm.shop.retry": undefined;
+  "web.farm.shop.settledToday": { readonly n: string | number };
+  "web.farm.shop.templates": undefined;
+  "web.farm.shop.templatesNote": undefined;
+  "web.farm.shop.todayTasks": undefined;
+  "web.farm.shop.useNow": undefined;
   "web.farm.sow.draft": undefined;
   "web.farm.sow.homeless": undefined;
   "web.farm.sow.how": { readonly repo: string | number };

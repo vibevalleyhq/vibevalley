@@ -631,6 +631,38 @@
   {
    "kind": "titled",
    "at": 2376
+  },
+  {
+   "kind": "purchased",
+   "at": 2377,
+   "itemId": "deco_stone_lantern",
+   "itemKind": "decoration",
+   "price": 40
+  },
+  {
+   "kind": "dailySettled",
+   "at": 2378,
+   "day": "2026-11-27",
+   "taskId": "2026-11-27:tests_passed",
+   "taskKind": "tests_passed",
+   "coins": 25
+  },
+  {
+   "kind": "checkPassed",
+   "at": 2379,
+   "key": "i1:abc"
+  },
+  {
+   "kind": "reviewCompleted",
+   "at": 2380,
+   "key": "i1",
+   "passed": true
+  },
+  {
+   "kind": "delivered",
+   "at": 2381,
+   "issue": "i1",
+   "clean": true
   }
  ],
  "ChooseTitleRequest": [
@@ -676,6 +708,102 @@
      "next": 5
     }
    ]
+  }
+ ],
+ "ShopItemKind": [
+  "decoration",
+  "template"
+ ],
+ "DailyTaskKind": [
+  "tests_passed",
+  "reviews_completed",
+  "clean_harvest",
+  "milestone_done"
+ ],
+ "YardDecorationPlacement": [
+  {
+   "asset": "p_lantern",
+   "x": 2.15,
+   "z": -1.85,
+   "yawDeg": 12,
+   "scale": 1.15
+  }
+ ],
+ "YardDecoration": [
+  {
+   "id": "deco_stone_lantern",
+   "asset": "p_lantern",
+   "title": "Stone lantern",
+   "x": 2.15,
+   "z": -1.85,
+   "yawDeg": 12,
+   "scale": 1.15
+  }
+ ],
+ "ShopItem": [
+  {
+   "id": "deco_stone_lantern",
+   "kind": "decoration",
+   "title": "Stone lantern",
+   "detail": "Lights the courtyard path",
+   "price": 40,
+   "owned": false,
+   "decoration": {
+    "asset": "p_lantern",
+    "x": 2.15,
+    "z": -1.85,
+    "yawDeg": 12,
+    "scale": 1.15
+   }
+  }
+ ],
+ "DailyTask": [
+  {
+   "id": "2026-11-27:tests_passed",
+   "kind": "tests_passed",
+   "title": "Run checks",
+   "detail": "Pass verification checks on a ticket",
+   "progress": 1,
+   "target": 1,
+   "rewardCoins": 25,
+   "completed": true,
+   "settled": true,
+   "settledAt": 1795739000000
+  }
+ ],
+ "DailyTaskBoard": [
+  {
+   "day": "2026-11-27",
+   "tasks": [
+    {
+     "id": "2026-11-27:tests_passed",
+     "kind": "tests_passed",
+     "title": "Run checks",
+     "detail": "Pass verification checks on a ticket",
+     "progress": 0,
+     "target": 1,
+     "rewardCoins": 25,
+     "completed": false,
+     "settled": false
+    }
+   ],
+   "settledCoinsToday": 0
+  }
+ ],
+ "FarmShopView": [
+  {
+   "coins": 100,
+   "items": [],
+   "daily": {
+    "day": "2026-11-27",
+    "tasks": [],
+    "settledCoinsToday": 0
+   }
+  }
+ ],
+ "ShopPurchaseRequest": [
+  {
+   "id": "deco_stone_lantern"
   }
  ]
 }

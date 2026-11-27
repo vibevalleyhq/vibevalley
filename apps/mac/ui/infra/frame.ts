@@ -5,6 +5,7 @@ import {
   type BoardSlice,
   type Channel,
   type CollabSlice,
+  type FarmFrame,
   type InboxSlice,
   type Issue,
   type LiveEvent,
@@ -249,6 +250,7 @@ export const useSessionsSlice = (): Accessor<SessionsSlice | undefined> => useSl
 export const useCollabSlice = (): Accessor<CollabSlice | undefined> => useSlice("collab");
 export const useInboxSlice = (): Accessor<InboxSlice | undefined> => useSlice("inbox");
 export const useOpsSlice = (): Accessor<OpsSlice | undefined> => useSlice("ops");
+export const useFarmSlice = (): Accessor<FarmFrame | undefined> => useSlice("farm");
 export const useLink = (): Accessor<Link> => useSlices().link;
 
 export function useRefreshSlice(kind: SliceKind): () => void {

@@ -180,7 +180,12 @@ impl Router {
                 .await?),
             E::IssueHistoryList => ret!(ok_json(brd.issue_history_list_endpoint_async().await?)),
             E::IssueList => on!(p, IssueList, |r| brd.issue_list_endpoint_async(&r, &*c.ctx.clock).await?),
-            E::IssueReview => on!(p, IssueReview, |r| brd.issue_review_endpoint_async(r).await?),
+            E::IssueReview => on!(p, IssueReview, |r| {
+                let pass = r.pass;
+                let i = brd.issue_review_endpoint_async(r).await?;
+                c.game.record_issue_review_async(&i, pass).await;
+                i
+            }),
             E::IssueSplit => on!(p, IssueSplit, |r| glue::issue_split_async(c, &r).await?),
             E::IssueGet => on!(p, IssueGet, |r| brd.issue_get_endpoint_async(&r.id).await?),
             E::IssueRunList => on!(p, IssueRunList, |r| brd.issue_run_list_endpoint_async(&r.id).await?),
@@ -189,7 +194,11 @@ impl Router {
             E::IssueUpdate => on!(p, IssueUpdate, |r| brd.issue_update_endpoint_async(r).await?),
             E::IssueDelete => void!(p, IssueDelete, |r| brd.issue_delete_endpoint_async(&r.id).await?),
             E::IssuePreviewDelete => on!(p, IssuePreviewDelete, |r| brd.issue_preview_delete_endpoint_async(&r.id).await?),
-            E::IssueStatusUpdate => on!(p, IssueStatusUpdate, |r| brd.issue_status_update_endpoint_async(&r).await?),
+            E::IssueStatusUpdate => on!(p, IssueStatusUpdate, |r| {
+                let a = brd.issue_status_update_endpoint_async(&r).await?;
+                c.game.on_issue_status_updated_async(&a.id, a.status).await;
+                a
+            }),
             E::IssueStatusPreviewUpdate => on!(p, IssueStatusPreviewUpdate, |r| brd.issue_status_preview_update_endpoint_async(&r).await?),
             E::IssueRefine => on!(p, IssueRefine, |r| brd.issue_refine_endpoint_async(&r).await?),
             E::IssueRetroGet => on!(p, IssueRetroGet, |r| brd.issue_retro_endpoint_async(&r, &*c.ctx.clock).await?),
@@ -315,6 +324,9 @@ impl Router {
             E::RemoteDeviceRevoke => void!(p, RemoteDeviceRevoke, |r| self.remote.revoke_device_async(r).await?),
             E::RemoteWhoami => ret!(ok_json(self.remote.whoami_async(&ctx.principal, ctx.caller).await?)),
             E::MachineList => ret!(ok_json(c.machine.list())),
+            E::GameShopList => ret!(ok_json(c.game.shop_list_async().await?)),
+            E::GameShopBuy => on!(p, GameShopBuy, |r| c.game.shop_buy_async(&r).await?),
+            E::GameDailyList => ret!(ok_json(c.game.daily_list_async().await?)),
         }
     }
 }

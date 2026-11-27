@@ -16,5 +16,80 @@
     "gold": "升到金牌",
     "silver": "升到银牌",
     "unlocked": "解锁成就"
+  },
+  "shop": {
+    "purchasedKind": "小摊模板",
+    "notFound": "田头小摊没有这件东西：{id}",
+    "alreadyOwned": "这件已经买过了",
+    "notEnoughCoins": "金币不够，还差一点：需要 {need}，现在有 {have}",
+    "items": {
+      "deco_stone_lantern": {
+        "title": "石灯笼",
+        "detail": "立在桥边石阶旁的纸雕石灯，入夜会泛起暖光，装点庭院。"
+      },
+      "deco_flower_border": {
+        "title": "田埂花丛",
+        "detail": "种在田边的小簇野花与灌木，给院子添一抹亮色。"
+      },
+      "deco_bamboo_grove": {
+        "title": "竹林",
+        "detail": "修竹几竿立在农舍东侧，风吹过时纸叶轻轻摇晃。"
+      },
+      "deco_weeping_willow": {
+        "title": "垂柳",
+        "detail": "栽在河畔的一株垂柳，细柳垂在水面旁。"
+      },
+      "deco_painted_boat": {
+        "title": "乌篷画舫",
+        "detail": "泊在渠道水面的纸雕小舟，伴着田园流水。"
+      },
+      "deco_rockery": {
+        "title": "太湖石假山",
+        "detail": "叠在院落一角的玲珑石景，衬得庭院更有层次。"
+      },
+      "tmpl_regression_guard": {
+        "title": "补回归测试：〔功能或缺陷〕",
+        "detail": "解锁一个专门盯着回归护栏的工单模板，播种时可直接选用。",
+        "done": "先写一个能稳定复现问题的回归测试并确认失败，再完成修复，确保 {test} 与 {lint} 全过"
+      },
+      "tmpl_edge_hardening": {
+        "title": "加固边界输入：〔模块或接口〕",
+        "detail": "解锁边界与空值校验工单模板，方便快速派发收口任务。",
+        "done": "补齐空值、越界与异常路径校验及对应单元测试，跑过 {test} 与 {lint}"
+      },
+      "tmpl_subsystem_docs": {
+        "title": "同步子系统文档：〔主题〕",
+        "detail": "解锁文档沉淀工单模板，对照真实代码更新对应子系统文档。",
+        "done": "对照当前代码与契约更新对应子系统文档并清理过时说明，确保文档校验通过"
+      },
+      "tmpl_perf_profile": {
+        "title": "排查慢路径：〔页面或接口〕",
+        "detail": "解锁性能瓶颈定位工单模板，先量测再优化热点路径。",
+        "done": "定位并消除冗余查询或卡顿瓶颈，附改前后基准或耗时对比并跑过 {test}"
+      },
+      "tmpl_security_audit": {
+        "title": "自查权限与边界：〔模块〕",
+        "detail": "解锁权限与输入审计工单模板，重点核对鉴权与契约边界。",
+        "done": "核对鉴权、输入解码与路径边界，为漏洞风险补测试并在 {test} 中验证"
+      }
+    }
+  },
+  "daily": {
+    "tests_passed": {
+      "title": "一次过审测试",
+      "detail": "完成 1 次带通过检查结果（如测试或构建通过）的工单交付或检查。"
+    },
+    "reviews_completed": {
+      "title": "认真复核一次",
+      "detail": "完成 1 次工单评审或检查核对，不靠刷提交数凑数。"
+    },
+    "clean_harvest": {
+      "title": "零遗留交付",
+      "detail": "完成 1 张没有未解问题与失败检查的干净交付工单。"
+    },
+    "milestone_done": {
+      "title": "收成一张工单",
+      "detail": "把 1 张工单稳定推进到完成交付状态。"
+    }
   }
 }
