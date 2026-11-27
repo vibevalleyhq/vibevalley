@@ -82,25 +82,5 @@ pub fn minute_of(at: i64) -> String {
 
 /// Infers a MIME type from a file extension for upload convenience.
 pub fn guess_mime(path: &Path) -> &'static str {
-    match path.extension().and_then(|e| e.to_str()).map(|e| e.to_ascii_lowercase()).as_deref() {
-        Some("png") => "image/png",
-        Some("jpg" | "jpeg") => "image/jpeg",
-        Some("gif") => "image/gif",
-        Some("webp") => "image/webp",
-        Some("svg") => "image/svg+xml",
-        Some("mp3") => "audio/mpeg",
-        Some("wav") => "audio/wav",
-        Some("flac") => "audio/flac",
-        Some("aac" | "m4a") => "audio/aac",
-        Some("ogg" | "opus") => "audio/ogg",
-        Some("mp4") => "video/mp4",
-        Some("webm") => "video/webm",
-        Some("mov") => "video/quicktime",
-        Some("pdf") => "application/pdf",
-        Some("json") => "application/json",
-        Some("html" | "htm") => "text/html",
-        Some("md" | "markdown") => "text/markdown",
-        Some("txt") => "text/plain",
-        _ => "application/octet-stream",
-    }
+    vibevalley_core::note::infer_mime(&path.to_string_lossy())
 }

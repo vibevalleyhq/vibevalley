@@ -1464,19 +1464,7 @@ impl Media {
         if length == 0 {
             return Err("nothing came".into());
         }
-        let mut wav = Vec::with_capacity(44 + length);
-        wav.extend_from_slice(b"RIFF");
-        wav.extend_from_slice(&((36 + length) as u32).to_le_bytes());
-        wav.extend_from_slice(b"WAVEfmt ");
-        wav.extend_from_slice(&16u32.to_le_bytes());
-        wav.extend_from_slice(&1u16.to_le_bytes());
-        wav.extend_from_slice(&(channels as u16).to_le_bytes());
-        wav.extend_from_slice(&(rate as u32).to_le_bytes());
-        wav.extend_from_slice(&((rate as usize * block) as u32).to_le_bytes());
-        wav.extend_from_slice(&(block as u16).to_le_bytes());
-        wav.extend_from_slice(&16u16.to_le_bytes());
-        wav.extend_from_slice(b"data");
-        wav.extend_from_slice(&(length as u32).to_le_bytes());
+        let mut wav = vibevalley_core::audio::wav_with_header_pcm16(rate as u32, channels as u16, length as u32);
         wav.extend_from_slice(&pcm[..length]);
         let name = format!("moss-{id}{}.wav", if complete { "" } else { "-partial" });
         let (attachment, input) = self.keep_bytes_async(id, wav, &name, "audio/wav").await?;

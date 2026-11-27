@@ -490,13 +490,20 @@ pub struct Part {
     pub bytes: Box<dyn Read + Send>,
 }
 
+fn sanitize_multipart_header_value(raw: &str) -> String {
+    raw.chars().filter(|c| !matches!(c, '"' | '\r' | '\n' | '\0')).collect()
+}
+
 fn multipart(parts: Vec<Part>) -> (String, Box<dyn Read + Send>) {
     let boundary = format!("vibevalley-{}", uuid::Uuid::new_v4().simple());
     let mut body: Box<dyn Read + Send> = Box::new(std::io::empty());
     for p in parts {
-        let mut head = format!("--{boundary}\r\ncontent-disposition: form-data; name=\"{}\"", p.name);
+        let name = sanitize_multipart_header_value(&p.name);
+        let mut head = format!("--{boundary}\r\ncontent-disposition: form-data; name=\"{name}\"");
         if let Some(f) = &p.filename {
-            head.push_str(&format!("; filename=\"{}\"\r\ncontent-type: {}", f.replace('"', ""), p.kind));
+            let filename = sanitize_multipart_header_value(f);
+            let kind = sanitize_multipart_header_value(&p.kind);
+            head.push_str(&format!("; filename=\"{filename}\"\r\ncontent-type: {kind}"));
         }
         head.push_str("\r\n\r\n");
         body = Box::new(body.chain(std::io::Cursor::new(head.into_bytes())).chain(p.bytes).chain(&b"\r\n"[..]));
@@ -1405,5 +1412,37 @@ fn sse(
         if pending.len() > max {
             return Err(StreamError::Vendor(VendorError::new(Reason::TooLarge, Outcome::Unknown)));
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn multipart_sanitizes_quotes_and_newlines_in_headers() {
+        let parts = vec![
+            Part {
+                name: "pur\"pose\r\nx: 1".into(),
+                filename: None,
+                kind: String::new(),
+                bytes: Box::new(std::io::Cursor::new(b"audio".to_vec())),
+            },
+            Part {
+                name: "file".into(),
+                filename: Some("bad\"name\r\nEvil: 1.wav".into()),
+                kind: "audio/wav\r\nX-Injected: yes".into(),
+                bytes: Box::new(std::io::Cursor::new(b"RIFF".to_vec())),
+            },
+        ];
+        let (kind, mut reader) = multipart(parts);
+        assert!(kind.starts_with("multipart/form-data; boundary=vibevalley-"));
+        let mut raw = Vec::new();
+        reader.read_to_end(&mut raw).unwrap();
+        let text = String::from_utf8(raw).unwrap();
+        assert!(text.contains("name=\"purposex: 1\""));
+        assert!(text.contains("filename=\"badnameEvil: 1.wav\"\r\ncontent-type: audio/wavX-Injected: yes\r\n\r\n"));
+        assert!(!text.contains("\r\nEvil:"));
+        assert!(!text.contains("\r\nX-Injected:"));
     }
 }

@@ -35,11 +35,7 @@ impl WorktreeManager {
     }
 
     pub fn git_available() -> bool {
-        let Some(paths) = std::env::var_os("PATH") else {
-            return false;
-        };
-        let bin = if cfg!(windows) { "git.exe" } else { "git" };
-        std::env::split_paths(&paths).any(|dir| is_executable_file(&dir.join(bin)))
+        which::which("git").is_ok()
     }
 
     /// Creates a deterministic isolated directory under `<root>/sessions/<sanitized_session_id>`
@@ -283,18 +279,6 @@ fn ensure_lexical_child(base: &Path, target: &Path) -> Result<(), String> {
         ));
     }
     Ok(())
-}
-
-fn is_executable_file(path: &Path) -> bool {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt as _;
-        fs::metadata(path).is_ok_and(|m| m.is_file() && (m.permissions().mode() & 0o111) != 0)
-    }
-    #[cfg(not(unix))]
-    {
-        path.is_file()
-    }
 }
 
 fn is_git_repo(path: &Path) -> bool {

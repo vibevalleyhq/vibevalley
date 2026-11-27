@@ -759,20 +759,7 @@ mod synth {
         let mut level = 0.0_f64;
 
         let data_bytes = (out.len() * 2) as u32;
-        let mut wav = Vec::with_capacity(44 + out.len() * 2);
-        wav.extend_from_slice(b"RIFF");
-        wav.extend_from_slice(&(36 + data_bytes).to_le_bytes());
-        wav.extend_from_slice(b"WAVE");
-        wav.extend_from_slice(b"fmt ");
-        wav.extend_from_slice(&16u32.to_le_bytes());
-        wav.extend_from_slice(&1u16.to_le_bytes());
-        wav.extend_from_slice(&1u16.to_le_bytes());
-        wav.extend_from_slice(&RATE.to_le_bytes());
-        wav.extend_from_slice(&(RATE * 2).to_le_bytes());
-        wav.extend_from_slice(&2u16.to_le_bytes());
-        wav.extend_from_slice(&16u16.to_le_bytes());
-        wav.extend_from_slice(b"data");
-        wav.extend_from_slice(&data_bytes.to_le_bytes());
+        let mut wav = vibevalley_core::audio::wav_with_header_pcm16(RATE, 1, data_bytes);
 
         for sample in out {
             let x = sample * VOLUME;

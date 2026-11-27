@@ -12,7 +12,7 @@ use serde_json::{Map, Value, json};
 
 use crate::oar::{AccountUsage, AgentError, EventKind, Installation, InteractionOption, PermissionMode, Result, SessionOptions, SubagentStatus, UsageWindow};
 
-pub(crate) const MIN_VERSION: (u64, u64, u64) = (1, 5, 0);
+pub(crate) const MIN_VERSION: semver::Version = semver::Version::new(1, 5, 0);
 pub(crate) const FIELD_TEXT_LIMIT: usize = 8 * 1024;
 pub(crate) const PAYLOAD_BYTE_LIMIT: usize = 64 * 1024;
 pub(crate) const PAYLOAD_NODE_LIMIT: usize = 512;
@@ -20,19 +20,21 @@ pub(crate) const PAYLOAD_NODE_LIMIT: usize = 512;
 const AUTH_LINK_PREFIX: &str = "Open the following link to authenticate the ACP server:";
 const USAGE_TIMEOUT: Duration = Duration::from_secs(20);
 
-pub(crate) fn parse_semver(raw: &str) -> Option<(u64, u64, u64)> {
+pub(crate) fn parse_semver(raw: &str) -> Option<semver::Version> {
     for token in raw.split(|c: char| c.is_whitespace() || matches!(c, ',' | ';' | '(' | ')' | '[' | ']')) {
-        let trimmed = token.trim().trim_start_matches('v').trim_start_matches('V');
-        let core = trimmed.split(['-', '+']).next().unwrap_or(trimmed);
-        let mut parts = core.split('.');
-        let Some(major) = parts.next().and_then(|p| p.parse::<u64>().ok()) else {
+        let trimmed = token.trim().trim_start_matches(['v', 'V']);
+        if trimmed.is_empty() {
             continue;
-        };
-        let Some(minor) = parts.next().and_then(|p| p.parse::<u64>().ok()) else {
-            continue;
-        };
-        let patch = parts.next().and_then(|p| p.parse::<u64>().ok()).unwrap_or(0);
-        return Some((major, minor, patch));
+        }
+        if let Ok(ver) = semver::Version::parse(trimmed) {
+            return Some(ver);
+        }
+        if let Some((major, minor)) = trimmed.split_once('.')
+            && !minor.contains('.')
+            && let (Ok(maj), Ok(min)) = (major.parse::<u64>(), minor.parse::<u64>())
+        {
+            return Some(semver::Version::new(maj, min, 0));
+        }
     }
     None
 }

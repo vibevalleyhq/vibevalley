@@ -3,6 +3,7 @@
 //! `inbox_slice`, `ops_slice`, `farm_frame`), schedules (`cron`),
 //! and notes (`note`).
 
+pub mod audio;
 pub mod brief;
 pub mod channel;
 pub mod clock;

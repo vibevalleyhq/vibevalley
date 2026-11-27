@@ -538,25 +538,6 @@ fn url_match_at(logical: &LogicalLine, target_byte: usize, at: Point) -> Option<
     None
 }
 
-fn percent_decode_bytes(input: &[u8]) -> Vec<u8> {
-    let hex = |b: u8| (b as char).to_digit(16).map(|d| d as u8);
-    let mut out = Vec::with_capacity(input.len());
-    let mut i = 0;
-    while i < input.len() {
-        if input[i] == b'%'
-            && i + 2 < input.len()
-            && let (Some(hi), Some(lo)) = (hex(input[i + 1]), hex(input[i + 2]))
-        {
-            out.push((hi << 4) | lo);
-            i += 3;
-        } else {
-            out.push(input[i]);
-            i += 1;
-        }
-    }
-    out
-}
-
 fn resolve_file_url(url: &str, allow_dir: bool) -> Option<LinkTarget> {
     let rest = if starts_with_ignore_ascii_case(url, "file://") {
         &url["file://".len()..]
@@ -574,7 +555,8 @@ fn resolve_file_url(url: &str, allow_dir: bool) -> Option<LinkTarget> {
         None => (path_part, None),
     };
     let without_query = without_frag.split_once('?').map_or(without_frag, |(p, _)| p);
-    let decoded = PathBuf::from(OsString::from_vec(percent_decode_bytes(without_query.as_bytes())));
+    let decoded_bytes: Vec<u8> = percent_encoding::percent_decode(without_query.as_bytes()).collect();
+    let decoded = PathBuf::from(OsString::from_vec(decoded_bytes));
     if decoded.as_os_str().len() <= 1 {
         return None;
     }

@@ -199,34 +199,6 @@ fn strip_query_and_fragment(raw: &str) -> &str {
     raw.split(['?', '#']).next().unwrap_or(raw)
 }
 
-fn hex_nibble(byte: u8) -> Option<u8> {
-    match byte {
-        b'0'..=b'9' => Some(byte - b'0'),
-        b'a'..=b'f' => Some(byte - b'a' + 10),
-        b'A'..=b'F' => Some(byte - b'A' + 10),
-        _ => None,
-    }
-}
-
-fn percent_decode(raw: &str) -> String {
-    let bytes = raw.as_bytes();
-    let mut out = Vec::with_capacity(bytes.len());
-    let mut i = 0;
-    while i < bytes.len() {
-        if bytes[i] == b'%'
-            && i + 2 < bytes.len()
-            && let (Some(hi), Some(lo)) = (hex_nibble(bytes[i + 1]), hex_nibble(bytes[i + 2]))
-        {
-            out.push((hi << 4) | lo);
-            i += 3;
-            continue;
-        }
-        out.push(bytes[i]);
-        i += 1;
-    }
-    String::from_utf8_lossy(&out).into_owned()
-}
-
 fn has_prefix_ignore_ascii_case(value: &str, prefix: &str) -> bool {
     value.len() >= prefix.len() && value.is_char_boundary(prefix.len()) && value[..prefix.len()].eq_ignore_ascii_case(prefix)
 }
@@ -260,7 +232,7 @@ fn resolve_local_candidate(raw: &str, base: Option<&Path>) -> Option<PathBuf> {
         return Some(found);
     }
 
-    let decoded = percent_decode(stripped);
+    let decoded = percent_encoding::percent_decode_str(stripped).decode_utf8_lossy();
     if decoded != stripped
         && let Some(found) = verify_readable_local_file(&join(&decoded))
     {

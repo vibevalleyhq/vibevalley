@@ -8,10 +8,11 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use backon::{BackoffBuilder, ExponentialBuilder};
+use hmac::{Hmac, KeyInit, Mac};
 use jiff::Timestamp;
 use jiff::tz::TimeZone;
 use reqwest::{Method, StatusCode};
-use sha2::{Digest, Sha256};
+use sha2::Sha256;
 use url::Url;
 
 use super::config::S3Config;
@@ -30,50 +31,20 @@ const DEFAULT_RETRY_MIN_DELAY: Duration = Duration::from_millis(100);
 const DEFAULT_RETRY_MAX_DELAY: Duration = Duration::from_secs(2);
 const MAX_LIST_PAGES: usize = 10_000;
 
-/// Pure RFC 2104 HMAC-SHA256 implemented over [`sha2::Sha256`] with zero extra dependencies.
+const S3_ENCODE_SET: &percent_encoding::AsciiSet = &percent_encoding::NON_ALPHANUMERIC.remove(b'-').remove(b'_').remove(b'.').remove(b'~');
+const S3_PATH_ENCODE_SET: &percent_encoding::AsciiSet = &S3_ENCODE_SET.remove(b'/');
+
+/// Computes RFC 2104 HMAC-SHA256 using `hmac::Hmac<Sha256>`.
 pub(crate) fn hmac_sha256(key: &[u8], data: &[u8]) -> [u8; 32] {
-    const BLOCK_SIZE: usize = 64;
-    let mut k = [0u8; BLOCK_SIZE];
-    if key.len() > BLOCK_SIZE {
-        let digest = Sha256::digest(key);
-        k[..32].copy_from_slice(&digest);
-    } else {
-        k[..key.len()].copy_from_slice(key);
-    }
-
-    let mut ipad = [0x36u8; BLOCK_SIZE];
-    let mut opad = [0x5cu8; BLOCK_SIZE];
-    for i in 0..BLOCK_SIZE {
-        ipad[i] ^= k[i];
-        opad[i] ^= k[i];
-    }
-
-    let mut inner = Sha256::new();
-    inner.update(ipad);
-    inner.update(data);
-    let inner_hash = inner.finalize();
-
-    let mut outer = Sha256::new();
-    outer.update(opad);
-    outer.update(inner_hash);
-    outer.finalize().into()
+    let mut mac = <Hmac<Sha256> as KeyInit>::new_from_slice(key).expect("HMAC accepts keys of any length");
+    mac.update(data);
+    mac.finalize().into_bytes().into()
 }
 
 /// RFC 3986 percent-encoding following AWS SigV4 rules (uppercase hex).
 pub(crate) fn uri_encode(input: &str, encode_slash: bool) -> String {
-    const UPPER: &[u8; 16] = b"0123456789ABCDEF";
-    let mut out = String::with_capacity(input.len());
-    for &b in input.as_bytes() {
-        let unreserved = b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.' | b'~');
-        if unreserved || (!encode_slash && b == b'/') {
-            out.push(b as char);
-        } else {
-            out.push('%');
-            out.push(UPPER[(b >> 4) as usize] as char);
-            out.push(UPPER[(b & 0x0f) as usize] as char);
-        }
-    }
-    out
+    let set = if encode_slash { S3_ENCODE_SET } else { S3_PATH_ENCODE_SET };
+    percent_encoding::utf8_percent_encode(input, set).to_string()
 }
 
 fn format_amz_timestamps(ts: Timestamp) -> (String, String) {
@@ -620,189 +591,17 @@ pub(crate) struct ListObjectsV2Page {
     pub next_continuation_token: Option<String>,
 }
 
-fn unescape_xml(raw: &str) -> String {
-    let mut out = String::with_capacity(raw.len());
-    let bytes = raw.as_bytes();
-    let mut i = 0usize;
-    while i < bytes.len() {
-        if bytes[i] == b'&'
-            && let Some(rel_semi) = raw[i + 1..].find(';')
-            && rel_semi > 0
-            && rel_semi <= 16
-        {
-            let entity = &raw[i + 1..i + 1 + rel_semi];
-            if !entity.contains(['<', '&']) {
-                let decoded = match entity {
-                    "amp" => Some('&'),
-                    "lt" => Some('<'),
-                    "gt" => Some('>'),
-                    "quot" => Some('"'),
-                    "apos" => Some('\''),
-                    _ if entity.starts_with("#x") || entity.starts_with("#X") => u32::from_str_radix(&entity[2..], 16).ok().and_then(char::from_u32),
-                    _ if entity.starts_with('#') => entity[1..].parse::<u32>().ok().and_then(char::from_u32),
-                    _ => None,
-                };
-                if let Some(ch) = decoded {
-                    out.push(ch);
-                    i += 1 + rel_semi + 1;
-                    continue;
-                }
-            }
-        }
-        let ch = raw[i..].chars().next().expect("valid UTF-8");
-        out.push(ch);
-        i += ch.len_utf8();
-    }
-    out
+fn xml_node_text(node: roxmltree::Node<'_, '_>) -> String {
+    node.descendants().filter(|n| n.is_text()).filter_map(|n| n.text()).collect()
 }
 
-fn local_xml_name(qname: &str) -> &str {
-    qname.rsplit_once(':').map_or(qname, |(_, local)| local)
-}
-
-fn find_tag_end(bytes: &[u8], open_lt: usize) -> Option<usize> {
-    let mut i = open_lt + 1;
-    let mut quote: Option<u8> = None;
-    while i < bytes.len() {
-        let b = bytes[i];
-        if let Some(q) = quote {
-            if b == q {
-                quote = None;
-            }
-        } else if b == b'"' || b == b'\'' {
-            quote = Some(b);
-        } else if b == b'>' {
-            return Some(i);
-        }
-        i += 1;
-    }
-    None
-}
-
-fn collect_xml_elements<'a>(xml: &'a str, target_local: &str) -> Result<Vec<&'a str>, StorageError> {
-    let bytes = xml.as_bytes();
-    let mut out = Vec::new();
-    let mut i = 0usize;
-    let mut match_depth = 0usize;
-    let mut content_start = 0usize;
-
-    while i < bytes.len() {
-        let Some(rel_lt) = xml[i..].find('<') else {
-            break;
-        };
-        let lt = i + rel_lt;
-        let rest = &xml[lt..];
-
-        if rest.starts_with("<!--") {
-            let Some(end_rel) = xml[lt + 4..].find("-->") else {
-                return Err(StorageError::Protocol(format!("unterminated XML comment while reading <{target_local}>")));
-            };
-            i = lt + 4 + end_rel + 3;
-            continue;
-        }
-        if rest.starts_with("<![CDATA[") {
-            let Some(end_rel) = xml[lt + 9..].find("]]>") else {
-                return Err(StorageError::Protocol(format!("unterminated CDATA section while reading <{target_local}>")));
-            };
-            i = lt + 9 + end_rel + 3;
-            continue;
-        }
-        if rest.starts_with("<?") {
-            let Some(end_rel) = xml[lt + 2..].find("?>") else {
-                return Err(StorageError::Protocol(format!(
-                    "unterminated processing instruction while reading <{target_local}>"
-                )));
-            };
-            i = lt + 2 + end_rel + 2;
-            continue;
-        }
-        if rest.starts_with("<!") {
-            let Some(gt) = find_tag_end(bytes, lt) else {
-                return Err(StorageError::Protocol(format!("unterminated XML declaration while reading <{target_local}>")));
-            };
-            i = gt + 1;
-            continue;
-        }
-
-        let Some(gt) = find_tag_end(bytes, lt) else {
-            return Err(StorageError::Protocol(format!("unterminated XML tag while reading <{target_local}>")));
-        };
-        let inside = xml[lt + 1..gt].trim();
-        if let Some(closing) = inside.strip_prefix('/') {
-            let name = closing.split_whitespace().next().unwrap_or("");
-            if local_xml_name(name) == target_local && match_depth > 0 {
-                match_depth -= 1;
-                if match_depth == 0 {
-                    out.push(&xml[content_start..lt]);
-                }
-            }
-            i = gt + 1;
-            continue;
-        }
-
-        let self_closing = inside.ends_with('/');
-        let header = inside.strip_suffix('/').unwrap_or(inside).trim();
-        let name = header.split(|c: char| c.is_ascii_whitespace() || c == '/').next().unwrap_or("");
-        if local_xml_name(name) == target_local {
-            if self_closing {
-                if match_depth == 0 {
-                    out.push("");
-                }
-            } else {
-                if match_depth == 0 {
-                    content_start = gt + 1;
-                }
-                match_depth += 1;
-            }
-        }
-        i = gt + 1;
-    }
-
-    if match_depth > 0 {
-        return Err(StorageError::Protocol(format!("unterminated <{target_local}> element in XML response")));
-    }
-    Ok(out)
-}
-
-fn decode_xml_element_text(inner: &str) -> String {
-    let bytes = inner.as_bytes();
-    let mut out = String::with_capacity(inner.len());
-    let mut i = 0usize;
-
-    while i < bytes.len() {
-        let Some(rel_lt) = inner[i..].find('<') else {
-            out.push_str(&unescape_xml(&inner[i..]));
-            break;
-        };
-        let lt = i + rel_lt;
-        out.push_str(&unescape_xml(&inner[i..lt]));
-        let rest = &inner[lt..];
-
-        if rest.starts_with("<!--")
-            && let Some(end_rel) = inner[lt + 4..].find("-->")
-        {
-            i = lt + 4 + end_rel + 3;
-            continue;
-        }
-        if rest.starts_with("<![CDATA[")
-            && let Some(end_rel) = inner[lt + 9..].find("]]>")
-        {
-            out.push_str(&inner[lt + 9..lt + 9 + end_rel]);
-            i = lt + 9 + end_rel + 3;
-            continue;
-        }
-        if let Some(gt) = find_tag_end(bytes, lt) {
-            i = gt + 1;
-            continue;
-        }
-        out.push_str(&unescape_xml(&inner[lt..]));
-        break;
-    }
-    out
+fn find_xml_tag_text(root: roxmltree::Node<'_, '_>, tag: &str) -> Option<String> {
+    root.descendants().find(|n| n.is_element() && n.tag_name().name() == tag).map(xml_node_text)
 }
 
 fn extract_xml_tag(xml: &str, tag: &str) -> Option<String> {
-    collect_xml_elements(xml, tag).ok()?.into_iter().next().map(decode_xml_element_text)
+    let doc = roxmltree::Document::parse(xml).ok()?;
+    find_xml_tag_text(doc.root(), tag)
 }
 
 fn parse_http_or_iso_timestamp(raw: &str) -> Option<i64> {
@@ -813,12 +612,14 @@ fn parse_http_or_iso_timestamp(raw: &str) -> Option<i64> {
 }
 
 pub(crate) fn parse_list_objects_v2_xml(xml: &str, strip_prefix: Option<&str>) -> Result<ListObjectsV2Page, StorageError> {
-    let is_truncated = extract_xml_tag(xml, "IsTruncated").map(|s| s.eq_ignore_ascii_case("true")).unwrap_or(false);
-    let next_continuation_token = extract_xml_tag(xml, "NextContinuationToken").filter(|s| !s.is_empty());
+    let doc = roxmltree::Document::parse(xml).map_err(|e| StorageError::Protocol(format!("invalid S3 XML response: {e}")))?;
+    let root = doc.root();
+    let is_truncated = find_xml_tag_text(root, "IsTruncated").is_some_and(|s| s.eq_ignore_ascii_case("true"));
+    let next_continuation_token = find_xml_tag_text(root, "NextContinuationToken").filter(|s| !s.is_empty());
 
     let mut objects = Vec::new();
-    for block in collect_xml_elements(xml, "Contents")? {
-        let Some(raw_key) = extract_xml_tag(block, "Key") else {
+    for block in root.descendants().filter(|n| n.is_element() && n.tag_name().name() == "Contents") {
+        let Some(raw_key) = find_xml_tag_text(block, "Key") else {
             continue;
         };
         let logical_key = match strip_prefix {
@@ -828,9 +629,9 @@ pub(crate) fn parse_list_objects_v2_xml(xml: &str, strip_prefix: Option<&str>) -
             },
             None => raw_key,
         };
-        let size = extract_xml_tag(block, "Size").and_then(|s| s.parse::<u64>().ok()).unwrap_or(0);
-        let etag = extract_xml_tag(block, "ETag").map(|e| clean_etag(&e)).filter(|e| !e.is_empty());
-        let last_modified_ms = extract_xml_tag(block, "LastModified").and_then(|s| parse_http_or_iso_timestamp(&s));
+        let size = find_xml_tag_text(block, "Size").and_then(|s| s.parse::<u64>().ok()).unwrap_or(0);
+        let etag = find_xml_tag_text(block, "ETag").map(|e| clean_etag(&e)).filter(|e| !e.is_empty());
+        let last_modified_ms = find_xml_tag_text(block, "LastModified").and_then(|s| parse_http_or_iso_timestamp(&s));
 
         objects.push(ObjectMeta {
             key: logical_key,
@@ -963,10 +764,6 @@ mod tests {
 
     #[test]
     fn xml_parser_handles_single_pass_entities_numeric_refs_namespaces_attributes_and_cdata() {
-        assert_eq!(unescape_xml("&amp;lt;tag&amp;gt;"), "&lt;tag&gt;");
-        assert_eq!(unescape_xml("&#38;&#x26;&#X3C;&#62;&#x1F600;"), "&&<>😀");
-        assert_eq!(unescape_xml("raw &unknown; &amp"), "raw &unknown; &amp");
-
         let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
 <s3:ListBucketResult xmlns:s3="http://s3.amazonaws.com/doc/2006-03-01/">
   <!-- <s3:IsTruncated>false</s3:IsTruncated> -->
@@ -981,18 +778,24 @@ mod tests {
     <s3:Key><![CDATA[prod/raw&amp;cdata]]></s3:Key>
     <s3:Size>7</s3:Size>
   </s3:Contents>
+  <s3:Contents>
+    <s3:Key>prod/&#38;&#x26;&#X3C;&#62;&#x1F600;</s3:Key>
+    <s3:Size>1</s3:Size>
+  </s3:Contents>
   <s3:Contents/>
 </s3:ListBucketResult>"#;
 
         let page = parse_list_objects_v2_xml(xml, Some("prod/")).unwrap();
         assert!(page.is_truncated);
         assert_eq!(page.next_continuation_token.as_deref(), Some("tok-2"));
-        assert_eq!(page.objects.len(), 2);
+        assert_eq!(page.objects.len(), 3);
         assert_eq!(page.objects[0].key, "a&lt;b/c");
         assert_eq!(page.objects[0].size, 42);
         assert_eq!(page.objects[0].etag.as_deref(), Some("abc1"));
         assert_eq!(page.objects[1].key, "raw&amp;cdata");
         assert_eq!(page.objects[1].size, 7);
+        assert_eq!(page.objects[2].key, "&&<>😀");
+        assert_eq!(page.objects[2].size, 1);
 
         let unterminated = "<ListBucketResult><Contents><Key>a</Key></ListBucketResult>";
         assert!(matches!(parse_list_objects_v2_xml(unterminated, None), Err(StorageError::Protocol(_))));

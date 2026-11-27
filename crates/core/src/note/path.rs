@@ -130,40 +130,47 @@ pub fn validate_prefix(prefix: &str) -> Result<(), String> {
 }
 
 fn ext_of(path: &str) -> String {
-    let base = path.rsplit('/').next().unwrap_or("");
+    let base = path.rsplit(['/', '\\']).next().unwrap_or("");
     match base.rfind('.') {
         Some(dot) => base[dot..].to_ascii_lowercase(),
         None => String::new(),
     }
 }
 
-/// Infers a canonical MIME type from a note-relative file path.
+/// Infers a canonical MIME type from a file path extension.
 pub fn infer_mime(path: &str) -> &'static str {
     match ext_of(path).as_str() {
         ".json" => "application/json",
-        ".md" => "text/markdown",
+        ".md" | ".markdown" => "text/markdown",
         ".mmd" => "text/vnd.mermaid",
-        ".html" => "text/html",
+        ".html" | ".htm" => "text/html",
         ".css" => "text/css",
         ".js" | ".mjs" => "text/javascript",
         ".svg" => "image/svg+xml",
         ".csv" => "text/csv",
-        ".txt" => "text/plain",
+        ".txt" | ".log" => "text/plain",
         ".png" => "image/png",
         ".jpg" | ".jpeg" => "image/jpeg",
         ".gif" => "image/gif",
         ".webp" => "image/webp",
         ".avif" => "image/avif",
+        ".heic" => "image/heic",
         ".ico" => "image/x-icon",
         ".woff2" => "font/woff2",
         ".woff" => "font/woff",
         ".ttf" => "font/ttf",
         ".otf" => "font/otf",
         ".mp3" => "audio/mpeg",
+        ".m4a" => "audio/mp4",
+        ".flac" => "audio/flac",
+        ".aac" => "audio/aac",
         ".wav" => "audio/wav",
-        ".ogg" => "audio/ogg",
-        ".mp4" => "video/mp4",
+        ".ogg" | ".opus" => "audio/ogg",
+        ".mp4" | ".m4v" => "video/mp4",
+        ".mov" => "video/quicktime",
         ".webm" => "video/webm",
+        ".pdf" => "application/pdf",
+        ".zip" => "application/zip",
         _ => "application/octet-stream",
     }
 }

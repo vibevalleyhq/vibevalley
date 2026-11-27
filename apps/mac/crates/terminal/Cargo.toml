@@ -8,6 +8,7 @@ license.workspace = true
 flume = { workspace = true }
 libc = "0.2.191"
 libghostty-vt = { git = "https://github.com/uzaaft/libghostty-rs", rev = "cd4d497e8c698b27054a677ce19d1bd1a1a4d8bf", version = "0.2.1", default-features = false }
+percent-encoding = { workspace = true }
 portable-pty = "0.9.0"
 serde = { workspace = true }
 thiserror = { workspace = true }

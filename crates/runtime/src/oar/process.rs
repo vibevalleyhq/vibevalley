@@ -169,11 +169,7 @@ pub(crate) fn find_binary(name: &str) -> Option<PathBuf> {
     if let Some(path) = chosen {
         return is_executable(&path).then_some(path);
     }
-    let direct = Path::new(name);
-    if direct.components().count() > 1 {
-        return is_executable(direct).then(|| direct.to_path_buf());
-    }
-    search_dirs().into_iter().map(|dir| dir.join(name)).find(|candidate| is_executable(candidate))
+    which::which_in(name, Some(child_path()), ".").ok()
 }
 
 fn child_path() -> std::ffi::OsString {

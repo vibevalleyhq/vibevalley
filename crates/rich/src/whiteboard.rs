@@ -3171,7 +3171,7 @@ fn emit_export_request(cx: Scope<VvWhiteboardEvent>, fmt: crate::engine::whitebo
             drop(spawn(async move {
                 match answer.await {
                     Ok(bytes) => {
-                        let b64 = encode_base64(&bytes);
+                        let b64 = BASE64.encode(&bytes);
                         cx.emit(VvWhiteboardEvent::Export(VvWhiteboardExportEvent {
                             format: SharedString::from("png"),
                             filename: SharedString::from(format!("{base}.png")),
@@ -3597,26 +3597,6 @@ fn ctx_item(label: impl Into<String>, on_press: impl Fn() + 'static) -> AnyEleme
         .on_press(move |_: &PressEvent| on_press())
         .child(text(label.into()).text_size(px(12.0)).text_color(AdaptiveUi::INK))
         .into_element()
-}
-
-fn encode_base64(bytes: &[u8]) -> String {
-    const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
-    for chunk in bytes.chunks(3) {
-        let b0 = u32::from(chunk[0]);
-        let b1 = if chunk.len() > 1 { u32::from(chunk[1]) } else { 0 };
-        let b2 = if chunk.len() > 2 { u32::from(chunk[2]) } else { 0 };
-        let triple = (b0 << 16) | (b1 << 8) | b2;
-        out.push(TABLE[((triple >> 18) & 0x3f) as usize] as char);
-        out.push(TABLE[((triple >> 12) & 0x3f) as usize] as char);
-        out.push(if chunk.len() > 1 {
-            TABLE[((triple >> 6) & 0x3f) as usize] as char
-        } else {
-            '='
-        });
-        out.push(if chunk.len() > 2 { TABLE[(triple & 0x3f) as usize] as char } else { '=' });
-    }
-    out
 }
 
 const ICON_CURSOR: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4l13 7-6 2-3 6z"/></svg>"#;
