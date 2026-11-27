@@ -1142,7 +1142,6 @@ function CardView(props: {
         testID="issue-card"
         accessibilityLabel={look().title}
         accessibilityState={{ selected: props.selected || props.checked === true, busy: props.card.move?.state === "moving" }}
-        tooltip={<If when={look().detail}>{(d) => <Bubble text={d()} />}</If>}
         class={[
           "group relative overflow-hidden rounded-lg border px-3 py-2.5 focus-visible:outline-2 focus-visible:outline-focus",
           props.drag.dragging()?.id === props.card.id

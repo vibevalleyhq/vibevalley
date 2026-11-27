@@ -349,7 +349,6 @@ function Row(props: {
         }}
         accessibilityLabel={look().title}
         accessibilityState={{ selected: props.selected || props.checked === true }}
-        tooltip={<If when={look().detail}>{(d) => <Bubble text={d()} />}</If>}
         onPress={(e) => {
           if (e.modifiers.shift && props.onToggleSelect) {
             props.onToggleSelect(props.card.id, { range: true });
