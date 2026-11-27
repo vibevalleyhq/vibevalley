@@ -107,6 +107,22 @@ export const catalogs = {
       avatar: "角色头像",
       avatarHint: "在工作台与聊天里展示这个头像；留空时显示农场里的小动物。",
       avatarAnimal: "默认小动物",
+      avatarLabels: {
+        orchestrator: "全能主助手",
+        fullstack: "全栈工程师",
+        architect: "系统架构师",
+        frontend: "前端工程师",
+        backend: "后端工程师",
+        reviewer: "代码审查员",
+        tester: "测试工程师",
+        designer: "UI/UX 设计师",
+        product: "产品经理",
+        scout: "技术调研员",
+        docs: "技术文档师",
+        pages: "数据看板师",
+        slides: "演示汇报师",
+        collector: "素材收集员",
+      },
       looksAs: "在农场里是",
       looksHint: "只是长相：同一个引擎可以是不同的动物。",
       wears: "穿什么",
@@ -222,7 +238,8 @@ export const catalogs = {
         updated: "照模板更新好了",
         galleryTitle: "开箱即用的模板",
         galleryIntro: "按分工挑一份模板：自带风格、人设与技能，一键采用即可派活。",
-        manageLink: "全部模板与导入",
+        showGallery: "展开模板",
+        hideGallery: "收起模板",
         adopt: "一键采用",
         adopted: "已采用 {n}",
         adoptedToast: "已采用「{name}」",
@@ -3968,6 +3985,22 @@ export const catalogs = {
       avatar: "Role avatar",
       avatarHint: "Shown in lists and chat; when unset, the farm animal face is shown.",
       avatarAnimal: "Animal face",
+      avatarLabels: {
+        orchestrator: "All-Round Assistant",
+        fullstack: "Full-Stack Engineer",
+        architect: "System Architect",
+        frontend: "Frontend Engineer",
+        backend: "Backend Engineer",
+        reviewer: "Code Reviewer",
+        tester: "QA Engineer",
+        designer: "UI/UX Designer",
+        product: "Product Manager",
+        scout: "Tech Scout",
+        docs: "Technical Writer",
+        pages: "Dashboard Builder",
+        slides: "Presentation Lead",
+        collector: "Asset Collector",
+      },
       looksAs: "On the farm it is",
       looksHint: "Only looks: the same runtime can be different animals.",
       wears: "Wears",
@@ -4088,7 +4121,8 @@ export const catalogs = {
         updated: "Updated from the template",
         galleryTitle: "Starter templates",
         galleryIntro: "Adopt a ready-to-use role with a working style, persona, and skills.",
-        manageLink: "All templates & import",
+        showGallery: "Show templates",
+        hideGallery: "Hide templates",
         adopt: "Adopt",
         adopted: "{n} adopted",
         adoptedToast: 'Adopted "{name}"',
@@ -7991,6 +8025,20 @@ export interface Messages {
   "web.agent.avatar": undefined;
   "web.agent.avatarAnimal": undefined;
   "web.agent.avatarHint": undefined;
+  "web.agent.avatarLabels.architect": undefined;
+  "web.agent.avatarLabels.backend": undefined;
+  "web.agent.avatarLabels.collector": undefined;
+  "web.agent.avatarLabels.designer": undefined;
+  "web.agent.avatarLabels.docs": undefined;
+  "web.agent.avatarLabels.frontend": undefined;
+  "web.agent.avatarLabels.fullstack": undefined;
+  "web.agent.avatarLabels.orchestrator": undefined;
+  "web.agent.avatarLabels.pages": undefined;
+  "web.agent.avatarLabels.product": undefined;
+  "web.agent.avatarLabels.reviewer": undefined;
+  "web.agent.avatarLabels.scout": undefined;
+  "web.agent.avatarLabels.slides": undefined;
+  "web.agent.avatarLabels.tester": undefined;
   "web.agent.backToAll": undefined;
   "web.agent.can": { readonly runtime: string | number };
   "web.agent.cannot": undefined;
@@ -8142,8 +8190,8 @@ export interface Messages {
   "web.agent.templates.from": { readonly name: string | number; readonly version: string | number };
   "web.agent.templates.galleryIntro": undefined;
   "web.agent.templates.galleryTitle": undefined;
+  "web.agent.templates.hideGallery": undefined;
   "web.agent.templates.intro": undefined;
-  "web.agent.templates.manageLink": undefined;
   "web.agent.templates.noPersona": undefined;
   "web.agent.templates.notHere": { readonly runtime: string | number };
   "web.agent.templates.onServer": undefined;
@@ -8151,6 +8199,7 @@ export interface Messages {
   "web.agent.templates.openLine": undefined;
   "web.agent.templates.preview": undefined;
   "web.agent.templates.removeSure": undefined;
+  "web.agent.templates.showGallery": undefined;
   "web.agent.templates.skill": { readonly description: string | number; readonly name: string | number };
   "web.agent.templates.style": { readonly style: string | number };
   "web.agent.templates.title": undefined;

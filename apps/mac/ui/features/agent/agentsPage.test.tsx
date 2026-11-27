@@ -81,6 +81,7 @@ test("AgentsPage uses unified top bar, localizes API-key readiness errors with c
   expect(app.count("id:desk")).toBe(0);
   expect(app.count("id:agents-toolbar")).toBe(1);
   expect(app.count("id:open-templates")).toBe(1);
+  expect(app.count("id:gallery-manage-templates")).toBe(0);
   expect(app.count("id:new-orchestrator")).toBe(1);
   expect(app.count("id:new-agent")).toBe(1);
   expect(app.texts()).toContain("专家");
@@ -91,8 +92,10 @@ test("AgentsPage uses unified top bar, localizes API-key readiness errors with c
   expect(app.texts().some((line) => line.includes("no DeepSeek API key is set"))).toBe(false);
   expect(app.count("id:agent-card-fix-laozhou")).toBe(1);
 
-  // Template cards render description below header, preview toggle button, and concise built-in runtime label.
-  expect(app.count("id:template-look")).toBeGreaterThan(0);
+  // Starter templates collapse by default when agents exist, and expand cleanly on toggle.
+  expect(app.count("id:template-look")).toBe(0);
+  await app.press("id:agents-templates-toggle");
+  await fake.pumpUntil(app, () => app.count("id:template-look") > 0);
   expect(app.texts()).toContain("跑在内置引擎");
   expect(app.texts().some((line) => line.includes("跑在 VibeValley 自己的 agent"))).toBe(false);
 
@@ -100,6 +103,44 @@ test("AgentsPage uses unified top bar, localizes API-key readiness errors with c
   await app.press("id:agent-card-fix-laozhou");
   await fake.pumpUntil(app, () => app.count("id:settings-models") === 1);
   expect(app.count("id:settings-models")).toBe(1);
+});
+
+test("AgentPage avatar picker has unique labels for every role avatar and Stage omits redundant name/duty pill", async () => {
+  setLocale("zh");
+  const fake = fakeHost(scenarios.typical, { route: "/agents/laozhou", locale: "zh" });
+  const app = await open("../../app/main.tsx", {
+    width: 1280,
+    height: 820,
+    colorScheme: "light",
+    platform: "macos",
+    clock: { time: SCENARIO_NOW },
+    host: fake.options,
+  });
+  await fake.pumpUntil(app, () => app.count("id:agent-avatar-picker") === 1 && app.count("id:agent-stage") === 1);
+
+  const expectedLabels = [
+    "默认小动物",
+    "全能主助手",
+    "全栈工程师",
+    "系统架构师",
+    "前端工程师",
+    "后端工程师",
+    "代码审查员",
+    "测试工程师",
+    "UI/UX 设计师",
+    "产品经理",
+    "技术调研员",
+    "技术文档师",
+    "数据看板师",
+    "演示汇报师",
+    "素材收集员",
+  ];
+  for (const label of expectedLabels) {
+    expect(app.shows(`id:agent-avatar-picker >> text:${label}`)).toBe(true);
+  }
+  expect(app.texts().filter((label) => label === "系统架构师").length).toBe(1);
+
+  expect(app.shows("id:agent-stage >> text:老周")).toBe(false);
 });
 
 test("AgentsPage keeps primary + New CTA unclipped at 900x720 by collapsing secondary links into overflow menu", async () => {

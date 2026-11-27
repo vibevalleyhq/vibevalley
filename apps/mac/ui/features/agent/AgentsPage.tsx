@@ -82,6 +82,7 @@ function AgentsPage() {
   const roleFilter = signal<RoleFilter>("all");
   const category = signal<CategoryFilter>("all");
   const query = signal("");
+  const templatesOpen = signal(false);
   const width = signal(0);
   const wide = createMemo(() => width() === 0 || width() >= 720);
   const compactToolbar = createMemo(() => (width() > 0 ? width() < 980 : windowSize().width < 1060));
@@ -110,6 +111,7 @@ function AgentsPage() {
   const hasProfileSection = createMemo(
     () => (showsOrchestrators(roleFilter()) && visibleOrchestrators().length > 0) || (showsWorkers(roleFilter()) && visibleWorkers().length > 0),
   );
+  const showTemplatesBody = createMemo(() => templatesOpen() || !hasProfileSection() || needle().length > 0);
   const roleOptions = createMemo(() => [
     { value: "all" as const, label: t("web.agent.list.all"), count: totalCount() },
     { value: "orchestrator" as const, label: t("web.agent.list.orchestrators"), count: orchestrators().length },
@@ -140,12 +142,9 @@ function AgentsPage() {
         class="h-11 shrink-0 flex-row items-center justify-between gap-2 border-b border-line bg-page px-4"
       >
         <View class="min-w-0 shrink flex-row items-center gap-2">
-          <View class="shrink-0 flex-row items-center gap-2">
-            <Text role="header" class="shrink-0 text-sm font-semibold text-ink">
-              {t("web.base.place.team.label")}
-            </Text>
-            <CountPill count={totalCount()} />
-          </View>
+          <Text role="header" class="shrink-0 text-sm font-semibold text-ink">
+            {t("web.base.place.team.label")}
+          </Text>
           <View class="h-4 w-px shrink-0 bg-line" />
           <Segmented
             testid="agents-role-filter"
@@ -268,32 +267,39 @@ function AgentsPage() {
                     </View>
                     <Text class="text-xs leading-relaxed text-muted">{t("web.agent.templates.galleryIntro")}</Text>
                   </View>
-                  <ButtonLink href="/agents/templates" tone="quiet" size="compact" testID="gallery-manage-templates">
-                    <>
-                      <Text class="text-xs font-medium text-muted">{t("web.agent.templates.manageLink")}</Text>
-                      <Icon name="next" size={12} tone="muted" />
-                    </>
-                  </ButtonLink>
+                  <If when={hasProfileSection() && needle().length === 0}>
+                    <Button
+                      tone="quiet"
+                      size="compact"
+                      testID="agents-templates-toggle"
+                      icon={templatesOpen() ? "collapse" : "expand"}
+                      onPress={() => templatesOpen.set(!templatesOpen())}
+                    >
+                      {templatesOpen() ? t("web.agent.templates.hideGallery") : t("web.agent.templates.showGallery")}
+                    </Button>
+                  </If>
                 </View>
-                <Segmented
-                  testid="templates-category-filter"
-                  label={t("web.agent.templates.galleryTitle")}
-                  value={category()}
-                  onChange={(v) => category.set(v)}
-                  options={[
-                    { value: "all", label: categoryLabel("all"), count: roleMatchedTemplates().length },
-                    ...TemplateCategoryValues.map((cat) => ({
-                      value: cat,
-                      label: categoryLabel(cat),
-                      count: roleMatchedTemplates().filter((tpl) => templateCategoryOf(tpl) === cat).length,
-                    })),
-                  ]}
-                />
-                <View class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  <Each of={visibleTemplates()} key={(tpl) => tpl.id}>
-                    {(tpl) => <TemplateCard template={tpl()} runtimes={ready(runtimes, [])} />}
-                  </Each>
-                </View>
+                <If when={showTemplatesBody()}>
+                  <Segmented
+                    testid="templates-category-filter"
+                    label={t("web.agent.templates.galleryTitle")}
+                    value={category()}
+                    onChange={(v) => category.set(v)}
+                    options={[
+                      { value: "all", label: categoryLabel("all"), count: roleMatchedTemplates().length },
+                      ...TemplateCategoryValues.map((cat) => ({
+                        value: cat,
+                        label: categoryLabel(cat),
+                        count: roleMatchedTemplates().filter((tpl) => templateCategoryOf(tpl) === cat).length,
+                      })),
+                    ]}
+                  />
+                  <View class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    <Each of={visibleTemplates()} key={(tpl) => tpl.id}>
+                      {(tpl) => <TemplateCard template={tpl()} runtimes={ready(runtimes, [])} />}
+                    </Each>
+                  </View>
+                </If>
               </View>
             </If>
           </If>
