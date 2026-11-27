@@ -360,7 +360,7 @@ fn asr_dictation_and_transcription_endpoints_work_offline() {
     let asr_grant = f.ok("voice.asr.start", json!(null));
     let session_id = asr_grant["sessionId"].as_str().unwrap().to_string();
     assert!(session_id.starts_with("asr-"));
-    assert_eq!(asr_grant["model"], "moss-live-1.0");
+    assert_eq!(asr_grant["model"], "moss-transcribe-1.0");
 
     let line = f.voice().asr_line().unwrap();
     assert_eq!(line.url(), "wss://api.mosi.cn/v1/realtime?model=moss-live-1.0");
@@ -376,4 +376,36 @@ fn asr_dictation_and_transcription_endpoints_work_offline() {
     assert_eq!(transcribed["text"], "合成听写结果");
 
     f.ok("voice.asr.stop", json!({ "sessionId": session_id }));
+
+    // Fallback to Live when Transcription is unbound.
+    f.ok(
+        "provider.update",
+        json!({
+            "revision": 1,
+            "connections": [{ "id": "moss", "name": "MOSS", "adapter": "moss", "enabled": true, "key": "test-key" }],
+            "live": { "connection": "moss", "model": "moss-live-1.0" },
+            "transcription": null,
+            "image": null, "understanding": null, "speech": null, "speakers": null,
+            "voiceDesign": null, "vision": null
+        }),
+    );
+    assert!(!f.voice().can_transcribe());
+    let live_fallback = f.ok("voice.asr.start", json!(null));
+    assert_eq!(live_fallback["model"], "moss-live-1.0");
+}
+
+#[test]
+fn asr_transcript_polish_restores_punctuation_and_preserves_empty_fallback() {
+    let f = farm(&["我想看一下日志。", "   "]);
+    let polished = vibevalley_runtime::rt::block_on(f.voice().polish_transcript_async("呃 那个 我想我想 看一下 日志".into())).unwrap();
+    assert_eq!(polished, "我想看一下日志。");
+    let seen = f.model.seen.lock().unwrap();
+    assert_eq!(seen.len(), 1);
+    assert_eq!(seen[0].messages[0].content.as_deref(), Some(vibevalley_server::voice::prompt::ASR_POLISH_SYSTEM));
+    assert_eq!(seen[0].messages[1].content.as_deref(), Some("呃 那个 我想我想 看一下 日志"));
+    drop(seen);
+
+    // Empty model completion falls back cleanly to the trimmed raw transcript.
+    let kept = vibevalley_runtime::rt::block_on(f.voice().polish_transcript_async("  keep raw text  ".into())).unwrap();
+    assert_eq!(kept, "keep raw text");
 }

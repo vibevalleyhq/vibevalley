@@ -209,7 +209,7 @@ export type HostLiveVoiceState = { phase: HostLiveVoicePhase, muted: boolean, mi
 /**
  * Native ASR dictation phase (`host.asr*`).
  */
-export const HostAsrPhaseValues = ["idle", "connecting", "listening", "finishing"] as const;
+export const HostAsrPhaseValues = ["idle", "connecting", "listening", "finishing", "polishing"] as const;
 /**
  * Native ASR dictation phase (`host.asr*`).
  */
@@ -218,7 +218,7 @@ export type HostAsrPhase = (typeof HostAsrPhaseValues)[number];
 /**
  * Snapshot returned by `host.asr*` bridge operations.
  */
-export type HostAsrState = { phase: HostAsrPhase, micLevel: number, text: string, partial: string, problem: string | null, };
+export type HostAsrState = { phase: HostAsrPhase, micLevel: number, text: string, partial: string, rawText?: string, problem: string | null, };
 
 /**
  * Native speech-stream playback phase (`host.speech*`).

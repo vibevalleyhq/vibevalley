@@ -51,9 +51,13 @@ pub trait MemoryRecallPort: Send + Sync {
     fn recall_text<'a>(&'a self, agent: &'a str, session: Option<&'a str>, repo: &'a str, query: &'a str) -> BoxFuture<'a, String>;
 }
 
-/// Decouples `voice` live-call briefing from concrete `orchestrator` construction and offline voice tests.
+/// Decouples `voice` live-call briefing and dictation polish from concrete `orchestrator` construction and offline voice tests.
 pub trait VoiceOrchestratorPort: Send + Sync {
     fn brief<'a>(&'a self, line: String, wait: Duration) -> BoxFuture<'a, Option<String>>;
+    fn polish_text_async<'a>(&'a self, _system: &'a str, text: &'a str) -> BoxFuture<'a, Result<String, String>> {
+        let fallback = text.trim().to_string();
+        Box::pin(async move { Ok(fallback) })
+    }
 }
 
 /// Where a scheduled digest cron delivers its summary.

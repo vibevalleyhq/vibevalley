@@ -155,11 +155,13 @@
     "noteSelected": "{n} selected",
     "clearContext": "Remove attached context",
     "runningHint": "Working — send a follow-up or click stop",
-    "dictateStart": "Voice dictation (MOSS ASR)",
+    "dictateStart": "Voice dictation (ASR)",
     "dictateStop": "Stop dictation",
     "dictateConnecting": "Connecting audio…",
     "dictateListening": "Listening…",
-    "dictateFinishing": "Transcribing…"
+    "dictateFinishing": "Transcribing…",
+    "dictatePolishing": "Polishing…",
+    "dictateRevertRaw": "Revert to raw"
   },
   "manage": {
     "name": "Name",
