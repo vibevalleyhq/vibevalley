@@ -30,10 +30,20 @@ import {
   laneStatus,
   ownStatus,
 } from "../model/cards";
-import { type GroupBy, groupCards, type HierarchyMode, laneOrder, type Ordering } from "../model/display";
+import {
+  type BoardDensity,
+  defaultFields,
+  formatCompactDateLabel,
+  type GroupBy,
+  groupCards,
+  type HierarchyMode,
+  type IssueFieldVisibility,
+  laneOrder,
+  type Ordering,
+} from "../model/display";
 import { useIssues, useNameOf } from "../model/history";
 import { blockerIssuesOf, childIssuesOf } from "../model/meta";
-import { BlockedByChips, CardChildRows, IssueGroupHeader, ParentBadge, TagPills, useGroupLabel } from "./IssueMetaControls";
+import { BlockedByChips, CardChildRows, IssueGroupHeader, OwnerMark, ParentBadge, TagPills, useGroupLabel } from "./IssueMetaControls";
 import { CardFace, FlagChip, PriorityMark, ProgressMark, StatusMark } from "./Marks";
 
 /** Under the closed ones: how many older are folded away, or back to the recent ones. */
@@ -128,6 +138,8 @@ export interface BoardProps {
   ordering: Ordering;
   groupBy?: GroupBy | undefined;
   hierarchy?: HierarchyMode | undefined;
+  density?: BoardDensity | undefined;
+  fields?: IssueFieldVisibility | undefined;
   onOlder: () => void;
   onOpen: (id: string) => void;
   onToggleSelect?: ((id: string, opts: { range: boolean }) => void) | undefined;
@@ -834,6 +846,8 @@ function CardListRows(props: { board: BoardProps; lane: Lane; cards: BoardCard[]
             checked={props.board.selectedIds?.has(c().id) === true}
             selectionActive={(props.board.selectedIds?.size ?? 0) > 0}
             hierarchy={props.board.hierarchy}
+            density={props.board.density}
+            fields={props.board.fields}
             allIssues={props.board.allIssues}
             onOpen={props.board.onOpen}
             onToggleSelect={props.board.onToggleSelect}
@@ -864,11 +878,12 @@ function SwimlaneCell(props: { board: BoardProps; groupKey: string; lane: Lane; 
     if (props.narrow) return bg;
     return { width: Math.max(props.laneWidth - 16, 176), ...bg };
   };
+  const compact = computed(() => props.board.density === "compact");
   return (
     <View
       ref={(r) => props.drag.lane(`${props.groupKey}:${props.lane}`, props.lane, r)}
       testID={`swimlane-${props.groupKey || "none"}-${props.lane}`}
-      class={`min-h-14 gap-2 rounded-lg border p-1.5 ${props.narrow ? "min-w-0 flex-1" : "shrink-0"} ${over() ? "border-leaf" : "border-transparent bg-side"}`}
+      class={`min-h-14 rounded-lg border ${compact() ? "gap-1.5 p-1" : "gap-2 p-1.5"} ${props.narrow ? "min-w-0 flex-1" : "shrink-0"} ${over() ? "border-leaf" : "border-transparent bg-side"}`}
       style={cellStyle()}
     >
       <If when={placeholderGhost()}>{(g) => <DropPlaceholder lane={props.lane} number={g().number} title={g().title} height={g().h} />}</If>
@@ -904,19 +919,20 @@ function LaneView(props: {
     if (props.narrow) return bg;
     return { width: props.laneWidth, ...bg };
   };
+  const compact = computed(() => p().density === "compact");
   return (
     <View
       ref={(r) => props.drag.lane(props.lane, props.lane, r)}
       accessibilityLabel={laneLabel[props.lane]}
       testID={`lane-${props.lane}`}
       accessibilityState={{ selected: over() }}
-      class={`h-full ${props.narrow ? "min-w-55 flex-1" : "shrink-0"} rounded-xl border p-2.5 ${over() ? "border-leaf" : "border-transparent bg-side"}`}
+      class={`h-full ${props.narrow ? "min-w-55 flex-1" : "shrink-0"} rounded-xl border ${compact() ? "p-2" : "p-2.5"} ${over() ? "border-leaf" : "border-transparent bg-side"}`}
       style={laneStyle()}
     >
-      <View class="mb-1.5">
+      <View class={compact() ? "mb-1" : "mb-1.5"}>
         <LaneHeader lane={props.lane} count={props.count} showNew={showHeaderNew()} newButtonTestId={newButtonTestId()} onNew={() => p().onNew()} />
       </View>
-      <Scroll class="min-h-0 flex-1" contentClass="gap-2 pb-0.5">
+      <Scroll class="min-h-0 flex-1" contentClass={compact() ? "gap-1.5 pb-0.5" : "gap-2 pb-0.5"}>
         <If
           when={p().loading}
           else={
@@ -1027,6 +1043,8 @@ function CardView(props: {
   checked?: boolean | undefined;
   selectionActive?: boolean | undefined;
   hierarchy?: HierarchyMode | undefined;
+  density?: BoardDensity | undefined;
+  fields?: IssueFieldVisibility | undefined;
   allIssues?: readonly Issue[] | undefined;
   onOpen: (id: string) => void;
   onToggleSelect?: ((id: string, opts: { range: boolean }) => void) | undefined;
@@ -1041,31 +1059,47 @@ function CardView(props: {
   const look = computed(() => cardLook(props.card, nameOf(), resolvedIssues(), Date.now()));
   const repo = computed(() => cardRepo(props.card));
   const preview = computed(() => cardPreviewOf(props.card));
+  const fields = computed(() => props.fields ?? defaultFields);
+  const compact = computed(() => props.density === "compact");
+  const showNumber = computed(() => fields().number && Boolean(look().number));
+  const showRepo = computed(() => fields().repo && Boolean(repo()));
   const loud = computed(() => {
+    if (!fields().priority) return undefined;
     const pr = look().priority;
     return pr === "urgent" || pr === "high" ? pr : undefined;
   });
-  const hasFace = computed(() => Boolean(cardAgent(props.card)) || props.card.kind === "orchestrator");
-  const hasTopRow = computed(() => Boolean(look().number || repo() || loud() || hasFace() || props.checked === true || props.selectionActive === true));
+  const hasFace = computed(() => fields().agent && (Boolean(cardAgent(props.card)) || props.card.kind === "orchestrator"));
+  const showOwner = computed(() => {
+    if (!fields().owner || props.card.issue.owner === undefined) return false;
+    if (hasFace() && props.card.issue.owner.kind === "agent" && props.card.issue.owner.id === cardAgent(props.card)) return false;
+    return true;
+  });
+  const hasTopRow = computed(() =>
+    Boolean(showNumber() || showRepo() || loud() || hasFace() || showOwner() || props.checked === true || props.selectionActive === true),
+  );
   const showsStatus = computed(() => ownStatus(props.card.lane, look().status));
   const unassignedTodo = computed(
-    () => props.card.kind === "todo" && props.card.lane === "todo" && props.card.issue.status !== "backlog" && !cardAgent(props.card),
+    () => fields().agent && props.card.kind === "todo" && props.card.lane === "todo" && props.card.issue.status !== "backlog" && !cardAgent(props.card),
   );
   const parentIssue = computed(() => (props.card.issue.parent ? resolvedIssues().find((item) => item.id === props.card.issue.parent) : undefined));
   const blockerIssues = computed(() => blockerIssuesOf(props.card.issue, resolvedIssues()));
   const childIssues = computed(() =>
     props.hierarchy === "top_level" || props.hierarchy === "parents_only" ? childIssuesOf(props.card.issue.id, resolvedIssues()) : [],
   );
-  const tags = computed(() => props.card.issue.tags ?? []);
+  const tags = computed(() => (fields().tags ? (props.card.issue.tags ?? []) : []));
+  const dateLabel = computed(() => (fields().dates ? formatCompactDateLabel(props.card.issue) : undefined));
+  const showProgress = computed(() => (fields().progress ? look().progress : undefined));
+  const showPreview = computed(() => (fields().preview ? preview() : undefined));
   const attachmentCount = computed(() => props.card.issue.attachments?.length ?? 0);
   const marks = computed(
     () =>
       showsStatus() ||
       unassignedTodo() ||
-      Boolean(look().progress) ||
+      Boolean(showProgress()) ||
       Boolean(parentIssue()) ||
       blockerIssues().length > 0 ||
       tags().length > 0 ||
+      Boolean(dateLabel()) ||
       attachmentCount() > 0 ||
       look().flags.length > 0,
   );
@@ -1142,9 +1176,9 @@ function CardView(props: {
         testID="issue-card"
         accessibilityLabel={look().title}
         accessibilityState={{ selected: props.selected || props.checked === true, busy: props.card.move?.state === "moving" }}
-        tooltip={<If when={look().detail}>{(d) => <Bubble text={d()} />}</If>}
         class={[
-          "group relative overflow-hidden rounded-lg border px-3 py-2.5 focus-visible:outline-2 focus-visible:outline-focus",
+          "group relative overflow-hidden rounded-lg border focus-visible:outline-2 focus-visible:outline-focus",
+          compact() ? "px-2.5 py-1.5" : "px-3 py-2.5",
           props.drag.dragging()?.id === props.card.id
             ? "border-dashed border-line-strong bg-elevated opacity-35"
             : props.checked === true || props.selected
@@ -1175,15 +1209,24 @@ function CardView(props: {
                   </View>
                 )}
               </If>
-              <If when={look().number}>{(num) => <Text class="shrink-0 font-mono text-2xs font-medium text-faint tabular-nums">{num()}</Text>}</If>
-              <If when={look().number && repo()}>
+              <If when={showNumber() ? look().number : undefined}>
+                {(num) => <Text class="shrink-0 font-mono text-2xs font-medium text-faint tabular-nums">{num()}</Text>}
+              </If>
+              <If when={showNumber() && showRepo()}>
                 <Text class="shrink-0 text-2xs text-faint">·</Text>
               </If>
-              <If when={repo()}>{(r) => <Text class="min-w-0 flex-1 truncate text-2xs text-faint">{r()}</Text>}</If>
+              <If when={showRepo() ? repo() : undefined}>{(r) => <Text class="min-w-0 flex-1 truncate text-2xs text-faint">{r()}</Text>}</If>
             </View>
-            <If when={loud() || hasFace()}>
+            <If when={loud() || hasFace() || showOwner()}>
               <View class="shrink-0 flex-row items-center gap-1.5">
                 <If when={loud()}>{(pr) => <PriorityMark priority={pr()} size={12} />}</If>
+                <If when={showOwner() ? props.card.issue.owner : undefined}>
+                  {(owner) => (
+                    <View testID="card-owner">
+                      <OwnerMark owner={owner()} size={16} />
+                    </View>
+                  )}
+                </If>
                 <If when={hasFace()}>
                   <CardFace card={props.card} size={18} />
                 </If>
@@ -1191,12 +1234,16 @@ function CardView(props: {
             </If>
           </View>
         </If>
-        <Text class={`${hasTopRow() ? "mt-1.5 " : ""}line-clamp-2 text-sm leading-[19px] font-medium text-ink`}>{look().title}</Text>
+        <Text
+          class={`${hasTopRow() ? (compact() ? "mt-1 " : "mt-1.5 ") : ""}line-clamp-2 ${compact() ? "text-xs leading-4" : "text-sm leading-[19px]"} font-medium text-ink`}
+        >
+          {look().title}
+        </Text>
         <If when={look().wait}>{(wait) => <Text class="mt-1 line-clamp-1 text-xs text-water">{wait()}</Text>}</If>
-        <If when={preview()}>{(pv) => <CardThumbnail preview={pv()} />}</If>
+        <If when={showPreview()}>{(pv) => <CardThumbnail preview={pv()} />}</If>
         {/* Only what differs from the lane's default: its own status, unassigned todo, progress, attachments, flags. */}
         <If when={marks()}>
-          <View testID="card-marks" class="mt-2 flex-row flex-wrap items-center gap-1.5">
+          <View testID="card-marks" class={`${compact() ? "mt-1 gap-1" : "mt-2 gap-1.5"} flex-row flex-wrap items-center`}>
             <If when={showsStatus()}>
               <StatusMark status={look().status} tone={look().statusTone} size={13} />
             </If>
@@ -1210,7 +1257,7 @@ function CardView(props: {
                 <Text class="text-2xs font-medium text-muted">{t("web.issue.card.assignHelper")}</Text>
               </View>
             </If>
-            <If when={look().progress}>{(pg) => <ProgressMark done={pg().done} total={pg().total} />}</If>
+            <If when={showProgress()}>{(pg) => <ProgressMark done={pg().done} total={pg().total} />}</If>
             <If when={parentIssue()}>{(p) => <ParentBadge parent={p()} onOpen={props.onOpen} testid="card-parent-badge" />}</If>
             <BlockedByChips
               blockers={blockerIssues()}
@@ -1221,6 +1268,14 @@ function CardView(props: {
               testid="card-blocked-by"
             />
             <TagPills tags={tags()} max={3} testid="card-tags" />
+            <If when={dateLabel()}>
+              {(dt) => (
+                <View testID="card-date" class="flex-row items-center gap-0.5 rounded-sm bg-side px-1 py-px">
+                  <Icon name="calendar" size={10} tone="muted" />
+                  <Text class="font-mono text-2xs text-faint tabular-nums">{dt()}</Text>
+                </View>
+              )}
+            </If>
             <If when={attachmentCount() > 0}>
               <View
                 testID="card-attachments"

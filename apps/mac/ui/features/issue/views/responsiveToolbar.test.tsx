@@ -76,6 +76,7 @@ test("IssuesPage collapses secondary filters into a filter popover below 1100px 
 
     expect(app.count("id:issue-filter-popover")).toBe(1);
     expect(app.count("id:issue-filter-bar")).toBe(0);
+    expect(app.count("id:issue-layout-bar")).toBe(0);
 
     const toolbar = app.layout("id:issues-toolbar");
     expect(toolbar).not.toBeNull();
@@ -99,6 +100,21 @@ test("IssuesPage collapses secondary filters into a filter popover below 1100px 
     expect(app.count("id:filter-repo")).toBe(1);
     expect(app.count("id:filter-agent")).toBe(1);
     expect(app.count("id:filter-tag")).toBe(1);
+    expect(app.count("id:group-by")).toBe(0);
+    expect(app.count("id:hierarchy-mode")).toBe(0);
+
+    await app.keyboard.press("escape");
+    await fake.pumpUntil(app, () => app.count("id:issue-filter-popover-menu") === 0);
+
+    // Unified DisplayMenu opens cleanly at 900px without clipping and owns groupBy/hierarchy/density/fields.
+    await app.press("id:display");
+    await fake.pumpUntil(app, () => app.count("id:display-menu") === 1);
+    expect(app.count("id:group-by")).toBe(1);
+    expect(app.count("id:hierarchy-mode")).toBe(1);
+    expect(app.count("id:density")).toBe(1);
+    const menuBox = app.layout("id:display-menu")!;
+    expect(menuBox.x).toBeGreaterThanOrEqual(0);
+    expect(menuBox.x + menuBox.width).toBeLessThanOrEqual(900);
   }
 });
 

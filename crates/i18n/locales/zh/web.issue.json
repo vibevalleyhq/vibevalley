@@ -103,8 +103,25 @@
     "orderNote": "不是「默认」排序时，待办不能上下拖着排先后。",
     "defaultNote": "「默认」是待办里你排的先后。",
     "show": "显示",
-    "group": "分组",
+    "listGroup": "列表分组",
     "order": "排序",
+    "density": "密度",
+    "densities": {
+      "comfortable": "舒适",
+      "compact": "紧凑"
+    },
+    "fields": "显示属性",
+    "field": {
+      "number": "编号",
+      "priority": "优先级",
+      "repo": "仓库",
+      "owner": "负责人",
+      "agent": "角色",
+      "tags": "标签",
+      "dates": "日期",
+      "progress": "进度",
+      "preview": "预览图"
+    },
     "reset": "恢复默认"
   },
   "list": {
@@ -301,6 +318,7 @@
     "firstRepo": "还没有仓库：新建一个",
     "newRepoLink": "新建仓库",
     "mountLocalLink": "关联本地仓库",
+    "repoActions": "新建或关联仓库",
     "priority": "优先级",
     "inQueue": "排队中：{ago}排上的，有并发上限就按看板上的先后自动开工。",
     "unqueue": "不排了",

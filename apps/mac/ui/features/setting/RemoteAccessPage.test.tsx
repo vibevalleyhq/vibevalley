@@ -133,6 +133,8 @@ test("RemoteAccessPage: disabled -> enable -> pair/QR/copy -> revoke device -> d
   expect(app.count("id:settings-section-github")).toBe(1);
   expect(app.count("id:settings-section-remote")).toBe(1);
   expect(app.texts()).toContain(t("web.remote.title"));
+  expect(app.texts().filter((line) => line === t("web.remote.subtitle")).length).toBe(1);
+  expect(app.texts()).toContain(t("web.setting.remote.toggleLabel"));
   expect(app.texts()).toContain(t("web.remote.toggle.disabled"));
   expect(app.texts()).toContain(t("web.remote.tailscale.offline"));
   expect(app.count("id:remote-pair-create")).toBe(0);

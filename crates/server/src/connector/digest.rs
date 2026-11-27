@@ -9,7 +9,9 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
 use vibevalley_core::rules::actor_role_of;
 use vibevalley_i18n::{locale as current_locale, t, t_in};
-use vibevalley_protocol::{AgentRole, Channel, ChannelType, ChatMessage, Issue, IssueStageKind, MessageKind, Millis, Outcome, Session, Spent, StuckReason};
+use vibevalley_protocol::{
+    AgentRole, Channel, ChannelType, ChatMessage, ConnectorID, Issue, IssueStageKind, MessageKind, Millis, Outcome, Session, Spent, StuckReason,
+};
 
 use crate::context::text::{clip_plain, plain_text, within};
 
@@ -39,16 +41,30 @@ pub fn user_line(m: &ChatMessage, place: &Channel) -> String {
     format!("{head}\n{}", plain_text(&m.text))
 }
 
-/// `text` in pieces of at most `max` UTF-16 units, cut at a line's end when one is past the middle.
+/// `text` in pieces of at most `max` UTF-16 units, preferring paragraph (`\n\n`) then line (`\n`) boundaries.
 pub fn split_text(text: &str, max: usize) -> Vec<String> {
+    if text.is_empty() {
+        return vec![];
+    }
+    let max = max.max(1);
     let mut pieces = vec![];
     let mut rest = text;
     while rest.encode_utf16().count() > max {
-        let window = &rest[..within(rest, max)];
-        let at = match window.rfind('\n') {
-            Some(cut) if window[..cut].encode_utf16().count() * 2 > max => cut,
-            _ => window.len(),
-        };
+        let window_end = within(rest, max);
+        let window = &rest[..window_end];
+        let para_cut = window
+            .rfind("\n\n")
+            .filter(|&cut| window[..cut].encode_utf16().count() * 3 >= max && !rest[..cut].trim_end().is_empty());
+        let line_cut = window
+            .rfind('\n')
+            .filter(|&cut| window[..cut].encode_utf16().count() * 2 > max && !rest[..cut].trim_end().is_empty());
+        let at = para_cut.or(line_cut).unwrap_or_else(|| {
+            if window_end > 0 {
+                window_end
+            } else {
+                rest.chars().next().map_or(0, char::len_utf8)
+            }
+        });
         pieces.push(rest[..at].trim_end().to_string());
         rest = rest[at..].trim_start();
     }
@@ -58,19 +74,161 @@ pub fn split_text(text: &str, max: usize) -> Vec<String> {
     pieces
 }
 
-/// Many waiting lines as one: how many, and the start of each.
+/// Structured notification item parsed for grouped digest rendering.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DigestEntry {
+    pub category_label: String,
+    pub target: Option<String>,
+    pub summary: String,
+}
+
+impl DigestEntry {
+    /// Builds a deduplicated [`DigestEntry`] directly from a [`PersonalEvent`].
+    pub fn from_event(locale: &str, event: &PersonalEvent) -> Self {
+        let formatted = format_personal_event_in(locale, event);
+        parse_digest_entry(&event.outbox_message_id(), &formatted)
+    }
+}
+
+/// Parses an outbox notification body into a deduplicated [`DigestEntry`].
+pub fn parse_digest_entry(message_id: &str, body: &str) -> DigestEntry {
+    let trimmed = body.trim();
+    if trimmed.is_empty() {
+        return DigestEntry {
+            category_label: String::new(),
+            target: None,
+            summary: String::new(),
+        };
+    }
+    let (raw_head, rest) = match trimmed.split_once('\n') {
+        Some((h, r)) => (h.trim(), r),
+        None => (trimmed, ""),
+    };
+    let head = strip_heading_wrappers(raw_head);
+    let inner = strip_outer_brackets(head);
+
+    let Some(inner) = inner else {
+        return DigestEntry {
+            category_label: String::new(),
+            target: None,
+            summary: clip_plain(trimmed, 90),
+        };
+    };
+
+    let (category_label, mut target) = match inner.split_once(" · ") {
+        Some((cat, tgt)) => {
+            let tgt = tgt.trim();
+            (cat.trim().to_string(), (!tgt.is_empty()).then(|| tgt.to_string()))
+        }
+        None => (inner.trim().to_string(), None),
+    };
+
+    let first_para_lines = first_paragraph_lines(rest);
+    let is_perm = message_id.starts_with("push:perm:") || first_para_lines.first().is_some_and(|l| l.starts_with("工具：") || l.starts_with("Tool: "));
+    let raw_summary = if is_perm {
+        first_para_lines.into_iter().take(2).collect::<Vec<_>>().join(" · ")
+    } else {
+        first_para_lines.into_iter().next().unwrap_or("").to_string()
+    };
+
+    let summary = dedupe_summary_against_target(&mut target, &raw_summary);
+    DigestEntry {
+        category_label,
+        target,
+        summary,
+    }
+}
+
+fn strip_heading_wrappers(s: &str) -> &str {
+    let s = s.trim();
+    let s = s.strip_prefix("### ").map(str::trim).unwrap_or(s);
+    s.strip_prefix("**").and_then(|inner| inner.strip_suffix("**")).map(str::trim).unwrap_or(s)
+}
+
+fn strip_outer_brackets(s: &str) -> Option<&str> {
+    let s = s.trim();
+    if let Some(inner) = s.strip_prefix('【').and_then(|rest| rest.strip_suffix('】')) {
+        return Some(inner);
+    }
+    if let Some(inner) = s.strip_prefix('[').and_then(|rest| rest.strip_suffix(']')) {
+        return Some(inner);
+    }
+    None
+}
+
+fn first_paragraph_lines(rest: &str) -> Vec<&str> {
+    if rest.starts_with('\n') || rest.starts_with("\r\n") {
+        let after_blank = rest.trim_start_matches(['\r', '\n']);
+        if after_blank.trim_start().starts_with("---") || !after_blank.contains("\n\n") {
+            return Vec::new();
+        }
+    }
+    let mut lines = Vec::new();
+    for line in rest.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed == "---" {
+            if !lines.is_empty() {
+                break;
+            }
+            continue;
+        }
+        lines.push(trimmed);
+    }
+    lines
+}
+
+fn issue_number_prefix(target: &str) -> Option<&str> {
+    let after_hash = target.strip_prefix('#')?;
+    let digits_len = after_hash.bytes().take_while(|b| b.is_ascii_digit()).count();
+    if digits_len == 0 {
+        return None;
+    }
+    let end = 1 + digits_len;
+    if target.as_bytes().get(end) == Some(&b' ') {
+        Some(&target[..end])
+    } else {
+        None
+    }
+}
+
+fn strip_issue_prefix(target: &str) -> &str {
+    match issue_number_prefix(target) {
+        Some(prefix) => target[prefix.len()..].trim_start(),
+        None => target,
+    }
+}
+
+fn dedupe_summary_against_target(target: &mut Option<String>, raw_summary: &str) -> String {
+    let clean_summary = clip_plain(raw_summary, 240);
+    if clean_summary.is_empty() {
+        return String::new();
+    }
+    if let Some(tgt) = target.as_deref() {
+        let clean_tgt = clip_plain(tgt, 240);
+        let title_part = strip_issue_prefix(&clean_tgt);
+        if clean_summary == clean_tgt || (!title_part.is_empty() && clean_summary == title_part) {
+            return String::new();
+        }
+        if title_part.ends_with('…') {
+            let prefix = title_part.trim_end_matches('…').trim_end();
+            if !prefix.is_empty() && clean_summary.starts_with(prefix) {
+                let tail = &clean_summary[prefix.len()..];
+                if !tail.starts_with([':', '：']) {
+                    *target = Some(match issue_number_prefix(&clean_tgt) {
+                        Some(num) => format!("{num} {}", clip_plain(&clean_summary, 72)),
+                        None => clip_plain(&clean_summary, 72),
+                    });
+                    return String::new();
+                }
+            }
+        }
+    }
+    clip_plain(&clean_summary, 100)
+}
+
+/// Many waiting lines as one: grouped, deduplicated, and separated by blank lines.
 pub fn digest(lines: &[String]) -> String {
-    let firsts: Vec<String> = lines
-        .iter()
-        .map(|l| {
-            let mut parts = l.split('\n');
-            let head = parts.next().unwrap_or("");
-            let body = parts.next().unwrap_or("");
-            let cut = within(body, 60);
-            format!("{head} {}{}", &body[..cut], if cut < body.len() { "…" } else { "" })
-        })
-        .collect();
-    t("server.connector.digest", &[("n", lines.len().into()), ("lines", firsts.join("\n").into())])
+    super::render::render_digest_lines(ConnectorID::Weixin, &current_locale(), lines)
 }
 
 /// Spaces and the pairing word in front (配对, or pair) allowed, whatever the locale.
@@ -464,6 +622,19 @@ pub(super) fn issue_target_label(number: Option<i64>, title: Option<&str>) -> St
     }
 }
 
+fn is_redundant_summary(issue_title: Option<&str>, summary: &str) -> bool {
+    let clean_summary = clip_plain(summary, 240);
+    if clean_summary.is_empty() {
+        return true;
+    }
+    let Some(title) = issue_title else {
+        return false;
+    };
+    let clean_title = clip_plain(title, 240);
+    let clipped_title = clip_plain(title, 48);
+    clean_summary == clean_title || clean_summary == clipped_title
+}
+
 /// Formats a [`PersonalEvent`] into concise, actionable i18n plain text for WeChat / chat connectors.
 pub fn format_personal_event(event: &PersonalEvent) -> String {
     format_personal_event_in(&current_locale(), event)
@@ -486,8 +657,12 @@ pub fn format_personal_event_in(locale: &str, event: &PersonalEvent) -> String {
             }
         }
         PersonalEventKind::IssueReviewing { summary } => {
-            let s = clip_plain(summary, 240);
-            t_in(locale, "server.connector.push.reviewing", &[("target", target.into()), ("summary", s.into())])
+            if is_redundant_summary(event.issue_title.as_deref(), summary) {
+                t_in(locale, "server.connector.push.reviewingNoSummary", &[("target", target.into())])
+            } else {
+                let s = clip_plain(summary, 240);
+                t_in(locale, "server.connector.push.reviewing", &[("target", target.into()), ("summary", s.into())])
+            }
         }
         PersonalEventKind::IssueConflict { base, files, why } => {
             if files.is_empty() && !why.is_empty() {
@@ -510,12 +685,20 @@ pub fn format_personal_event_in(locale: &str, event: &PersonalEvent) -> String {
             }
         }
         PersonalEventKind::IssueInterrupted { summary } => {
-            let s = clip_plain(summary, 200);
-            t_in(locale, "server.connector.push.interrupted", &[("target", target.into()), ("summary", s.into())])
+            if is_redundant_summary(event.issue_title.as_deref(), summary) {
+                t_in(locale, "server.connector.push.interruptedNoSummary", &[("target", target.into())])
+            } else {
+                let s = clip_plain(summary, 200);
+                t_in(locale, "server.connector.push.interrupted", &[("target", target.into()), ("summary", s.into())])
+            }
         }
         PersonalEventKind::IssueFailed { summary } => {
-            let s = clip_plain(summary, 200);
-            t_in(locale, "server.connector.push.failed", &[("target", target.into()), ("summary", s.into())])
+            if is_redundant_summary(event.issue_title.as_deref(), summary) {
+                t_in(locale, "server.connector.push.failedNoSummary", &[("target", target.into())])
+            } else {
+                let s = clip_plain(summary, 200);
+                t_in(locale, "server.connector.push.failed", &[("target", target.into()), ("summary", s.into())])
+            }
         }
         PersonalEventKind::RunCompleted { session_name, summary, tokens } => {
             let name = clip_plain(session_name, 40);
@@ -588,13 +771,65 @@ mod tests {
     }
 
     #[test]
+    fn split_text_prefers_paragraph_boundaries_before_single_newlines() {
+        let g1 = format!("【待你验收 (2)】\n1. #1 {}\n2. #2 {}", "甲".repeat(20), "乙".repeat(20));
+        let g2 = format!("【需要回复 (2)】\n1. #3 {}\n2. #4 {}", "丙".repeat(20), "丁".repeat(20));
+        let full = format!("{g1}\n\n{g2}");
+        // Max fits g1 cleanly, while g1 + part of g2 would cut mid-group if single \n were used.
+        let pieces = split_text(&full, 90);
+        assert_eq!(pieces, vec![g1, g2]);
+    }
+
+    #[test]
     fn what_waited_is_one_digest_of_first_lines() {
         vibevalley_i18n::set_locale("zh");
         let lines: Vec<String> = ["一", "二", "三", "四"].iter().map(|w| format!("【助手】\n收到：{w}\n第二行")).collect();
         assert_eq!(
             digest(&lines),
-            "你不在的时候有 4 条消息：\n【助手】 收到：一\n【助手】 收到：二\n【助手】 收到：三\n【助手】 收到：四\n\n完整的在默认频道里。"
+            "你不在的时候有 4 条消息：\n\n【助手 (4)】\n1. 收到：一\n2. 收到：二\n3. 收到：三\n4. 收到：四\n\n完整的在默认频道里。"
         );
+    }
+
+    #[test]
+    fn format_personal_event_omits_redundant_title_summary_and_parses_digest_entry_cleanly() {
+        use vibevalley_protocol::IssueStage;
+
+        let mut issue = Issue::new("i83", 83, "[UX/工作区] 优化侧栏导航与交互", 1_000);
+        issue.stage = IssueStage {
+            state: IssueStageKind::Reviewing,
+            since: Some(2_000),
+            stuck: None,
+            lead: None,
+            acts: vec![],
+        };
+
+        let ev = personal_event_for_issue(&issue, None, 2_000, None).unwrap();
+        let zh = format_personal_event_in("zh", &ev);
+        assert_eq!(zh, "【待你验收 · #83 [UX/工作区] 优化侧栏导航与交互】\n\n请在工作台验收或回复意见。");
+        let en = format_personal_event_in("en", &ev);
+        assert_eq!(
+            en,
+            "[Ready for Review · #83 [UX/工作区] 优化侧栏导航与交互]\n\nReview in VibeValley or reply with feedback."
+        );
+
+        let entry = DigestEntry::from_event("zh", &ev);
+        assert_eq!(
+            entry,
+            DigestEntry {
+                category_label: "待你验收".into(),
+                target: Some("#83 [UX/工作区] 优化侧栏导航与交互".into()),
+                summary: String::new(),
+            }
+        );
+
+        // Even legacy bodies that repeat the title on line 2 are deduplicated when parsed.
+        let legacy = "【待你验收 · #83 [UX/工作区] 优化侧栏导航与交互】\n[UX/工作区] 优化侧栏导航与交互\n\n请在工作台验收或回复意见。";
+        assert_eq!(parse_digest_entry("push:issue:i83:reviewing:x", legacy), entry);
+
+        // Distinct session summaries remain preserved.
+        let ev_with_summary = personal_event_for_issue(&issue, Some("补充了快捷键与焦点管理"), 2_000, None).unwrap();
+        let entry_with_summary = DigestEntry::from_event("zh", &ev_with_summary);
+        assert_eq!(entry_with_summary.summary, "补充了快捷键与焦点管理");
     }
 
     #[test]

@@ -12,9 +12,11 @@ import { Bubble } from "../../../design/Tip";
 import { mix } from "../../../design/tone";
 import { useNow } from "../../../infra/base/dom";
 import type { BoardCard } from "../model/cards";
+import { type BoardDensity, defaultFields, type IssueFieldVisibility } from "../model/display";
 import { formatIsoDate } from "../model/meta";
 import { buildMonthGrid, buildScheduleForCards, groupScheduledByDay, monthDateParts, type ScheduledCardRow, shiftMonth } from "../model/schedule";
 import { EmptyNote } from "./Board";
+import { OwnerMark } from "./IssueMetaControls";
 import type { NewIssueAt } from "./NewIssue";
 
 const MAX_PILLS_PER_DAY = 3;
@@ -51,12 +53,16 @@ export function IssueCalendar(props: {
   filtered?: boolean | undefined;
   loading: boolean;
   selected?: string | undefined;
+  density?: BoardDensity | undefined;
+  fields?: IssueFieldVisibility | undefined;
   onOpen: (id: string) => void;
   onNew: (at: NewIssueAt) => void;
   onClearFilter?: (() => void) | undefined;
 }) {
   const now = useNow(60_000);
   const compactHeight = () => windowSize().height < 780;
+  const compact = computed(() => props.density === "compact");
+  const fields = computed(() => props.fields ?? defaultFields);
   const initial = monthDateParts(now());
   const cursor = signal<{ year: number; month: number }>(initial);
   const expandedDays = signal<ReadonlySet<string>>(new Set());
@@ -130,7 +136,7 @@ export function IssueCalendar(props: {
               {(week, weekIdx) => (
                 <View
                   testID={`calendar-week-${weekIdx()}`}
-                  class={`${compactHeight() ? "min-h-20" : "min-h-28"} grow flex-row ${weekIdx() < grid().weeks.length - 1 ? "border-b border-line" : ""}`}
+                  class={`${compact() ? (compactHeight() ? "min-h-16" : "min-h-22") : compactHeight() ? "min-h-20" : "min-h-28"} grow flex-row ${weekIdx() < grid().weeks.length - 1 ? "border-b border-line" : ""}`}
                 >
                   <Each of={week()} key={(cell) => cell.dateKey}>
                     {(cell, colIdx) => {
@@ -141,7 +147,7 @@ export function IssueCalendar(props: {
                       return (
                         <View
                           testID={`calendar-day-${cell().dateKey}`}
-                          class={`group min-w-0 flex-1 gap-1 p-1.5 ${colIdx() < 6 ? "border-r border-line" : ""} ${
+                          class={`group min-w-0 flex-1 ${compact() ? "gap-0.5 p-1" : "gap-1 p-1.5"} ${colIdx() < 6 ? "border-r border-line" : ""} ${
                             cell().inMonth ? "bg-page" : "bg-side opacity-65"
                           }`}
                           style={cell().isWeekend && cell().inMonth ? { backgroundColor: mix("side", 0.45) } : undefined}
@@ -193,14 +199,19 @@ export function IssueCalendar(props: {
                                     accessibilityState={{ selected: isSelected() }}
                                     tooltip={<Bubble text={pillTooltip(r())} />}
                                     onPress={() => props.onOpen(r().card.id)}
-                                    class={`flex-row items-center gap-1 rounded-sm border px-1.5 py-0.5 hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus ${
+                                    class={`flex-row items-center gap-1 rounded-sm border px-1.5 ${compact() ? "py-0" : "py-0.5"} hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus ${
                                       isSelected() ? "border-accent bg-selected" : "border-line bg-side"
                                     }`}
                                     style={bg() && !isSelected() ? { backgroundColor: bg() } : undefined}
                                   >
-                                    <Dot tone={priorityDotTone[r().issue.priority]} size={6} ring={false} />
-                                    <Text class="shrink-0 font-mono text-2xs text-faint tabular-nums">{`#${r().issue.number}`}</Text>
+                                    <If when={fields().priority}>
+                                      <Dot tone={priorityDotTone[r().issue.priority]} size={6} ring={false} />
+                                    </If>
+                                    <If when={fields().number}>
+                                      <Text class="shrink-0 font-mono text-2xs text-faint tabular-nums">{`#${r().issue.number}`}</Text>
+                                    </If>
                                     <Text class="min-w-0 flex-1 truncate text-2xs font-medium text-ink">{r().issue.title}</Text>
+                                    <If when={fields().owner ? r().issue.owner : undefined}>{(owner) => <OwnerMark owner={owner()} size={12} />}</If>
                                   </View>
                                 );
                               }}

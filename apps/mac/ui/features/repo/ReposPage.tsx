@@ -4,7 +4,7 @@ import { list, t } from "@vibevalley/i18n";
 import type { RepoActivity, RepoHealth, RepoHealthStatus, RepoLanguages, RepoSummary } from "@vibevalley/protocol";
 
 import { createAct } from "../../design/act";
-import { Button, ButtonLink } from "../../design/Button";
+import { Button } from "../../design/Button";
 import { ConfirmButton } from "../../design/ConfirmButton";
 import { Dialog } from "../../design/Dialog";
 import { OpenTerminal } from "../../design/domain/OpenTerminal";
@@ -111,19 +111,7 @@ export function ReposPage(props: { rest: string }) {
     // The list is the page's side column, against the rail as the chat's and the notes' are (ui/layout.tsx Split edge).
     <View testID="repos-page" class="h-full min-h-0 flex-1 md:flex-row">
       <Scroll class="max-h-60 shrink-0 border-b border-line bg-side md:max-h-none md:w-70 md:border-r md:border-b-0" contentClass="px-2 py-3">
-        <ListCard
-          bare
-          title={t("web.repo.list")}
-          label={t("web.repo.list")}
-          testid="repos"
-          action={
-            <If when={readHostParams().globalShell}>
-              <ButtonLink href="/workspace" icon="terminal" size="compact" testID="open-workspace">
-                {t("web.repo.openWorkspace")}
-              </ButtonLink>
-            </If>
-          }
-        >
+        <ListCard bare title={t("web.repo.list")} label={t("web.repo.list")} testid="repos">
           <View class="flex-row items-center gap-1.5 px-2 pt-0.5 pb-1.5">
             <Button icon="folder" size="compact" class="flex-1 justify-center" testID="mount-local-repo" onPress={() => openAdd("local")}>
               {t("web.repo.mountLocal")}
@@ -172,7 +160,7 @@ export function ReposPage(props: { rest: string }) {
       </Scroll>
       <Scroll class="min-h-120 min-w-0 flex-1 bg-page md:min-h-0" contentClass="p-4">
         {/* Keyed by the name, a plain value: the panel's queries ask about this one repo for its life. */}
-        <If when={selected()?.name} else={<ReposOverviewEmpty onMountLocal={() => openAdd("local")} />}>
+        <If when={selected()?.name} else={<ReposOverviewEmpty hasRepos={sorted().length > 0} onMountLocal={() => openAdd("local")} />}>
           {(name) => <Keyed key={name()}>{() => <RepoPanel name={untrack(name)} repos={sorted} healthFor={healthFor} now={now()} />}</Keyed>}
         </If>
       </Scroll>
@@ -197,19 +185,28 @@ export function ReposPage(props: { rest: string }) {
   );
 }
 
-function ReposOverviewEmpty(props: { onMountLocal: () => void }) {
+function ReposOverviewEmpty(props: { hasRepos: boolean; onMountLocal: () => void }) {
   return (
-    <Empty
-      icon="repos"
-      testid="repos-empty"
-      action={
-        <Button icon="folder" testID="repos-empty-mount" onPress={props.onMountLocal}>
-          {t("web.repo.mountLocal")}
-        </Button>
+    <If
+      when={props.hasRepos}
+      else={
+        <Empty
+          icon="repos"
+          testid="repos-empty"
+          action={
+            <Button icon="folder" testID="repos-empty-mount" onPress={props.onMountLocal}>
+              {t("web.repo.mountLocal")}
+            </Button>
+          }
+        >
+          {t("web.repo.none")}
+        </Empty>
       }
     >
-      {t("web.repo.allLine")}
-    </Empty>
+      <Empty icon="repos" testid="repos-empty">
+        {t("web.repo.selectPrompt")}
+      </Empty>
+    </If>
   );
 }
 
@@ -225,21 +222,19 @@ function RepoPanel(props: { name: string; repos: () => RepoSummary[]; healthFor:
 function RepoHealthCard(props: { health: RepoHealth }) {
   const reasonText = () => list(props.health.reasons.map((r) => t(`shared.repoHealthReason.${r}`)));
   return (
-    <Card
-      title={t("web.repo.health.title")}
-      action={<RepoHealthBadge status={props.health.status} testid="repo-health-card-badge" />}
-      testid="repo-health-card"
-    >
-      <Text class="text-sm text-ink">{reasonText()}</Text>
+    <Card title={t("web.repo.health.title")} testid="repo-health-card">
+      <If when={props.health.status !== "on_track" && props.health.reasons.length > 0}>
+        <Text class="text-sm text-ink">{reasonText()}</Text>
+      </If>
       <View class="flex-row flex-wrap gap-x-6 gap-y-2">
-        <Stat label={t("web.repo.health.open", { n: props.health.openIssues })} value={String(props.health.openIssues)} />
-        <Stat label={t("web.repo.health.inProgress", { n: props.health.inProgressIssues })} value={String(props.health.inProgressIssues)} />
-        <Stat label={t("web.repo.health.inReview", { n: props.health.inReviewIssues })} value={String(props.health.inReviewIssues)} />
-        <Stat label={t("web.repo.health.blocked", { n: props.health.blockedIssues })} value={String(props.health.blockedIssues)} />
-        <Stat label={t("web.repo.health.stuck", { n: props.health.stuckIssues })} value={String(props.health.stuckIssues)} />
-        <Stat label={t("web.repo.health.asking", { n: props.health.askingIssues })} value={String(props.health.askingIssues)} />
-        <Stat label={t("web.repo.health.failedChecks", { n: props.health.failedChecks })} value={String(props.health.failedChecks)} />
-        <Stat label={t("web.repo.health.overdue", { n: props.health.overdueIssues })} value={String(props.health.overdueIssues)} />
+        <Stat label={t("web.repo.health.open")} value={String(props.health.openIssues)} />
+        <Stat label={t("web.repo.health.inProgress")} value={String(props.health.inProgressIssues)} />
+        <Stat label={t("web.repo.health.inReview")} value={String(props.health.inReviewIssues)} />
+        <Stat label={t("web.repo.health.blocked")} value={String(props.health.blockedIssues)} />
+        <Stat label={t("web.repo.health.stuck")} value={String(props.health.stuckIssues)} />
+        <Stat label={t("web.repo.health.asking")} value={String(props.health.askingIssues)} />
+        <Stat label={t("web.repo.health.failedChecks")} value={String(props.health.failedChecks)} />
+        <Stat label={t("web.repo.health.overdue")} value={String(props.health.overdueIssues)} />
       </View>
     </Card>
   );

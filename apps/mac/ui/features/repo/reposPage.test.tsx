@@ -60,6 +60,10 @@ test("ReposPage mounts a local folder via folder picker, distinguishes local mou
     host: fake.options,
   });
   await fake.pumpUntil(app, () => app.count("id:repos-page") === 1 && app.count("id:mount-local-repo") === 1);
+  expect(app.count("id:open-workspace")).toBe(0);
+  expect(app.count("id:repos-empty")).toBe(1);
+  expect(app.count("id:repos-empty-mount")).toBe(0);
+  expect(app.texts()).toContain(t("web.repo.selectPrompt"));
 
   await app.press("id:mount-local-repo");
   await fake.pumpUntil(app, () => app.count("id:new-repo-dialog") === 1 && app.count("id:repo-pick-folder") === 1);
@@ -114,6 +118,30 @@ test("ReposPage displays SSOT repo health status badge and breakdown card", asyn
         evaluatedAt: SCENARIO_NOW,
       },
     },
+    {
+      name: "beta",
+      path: "/Users/farmer/code/beta",
+      git: true,
+      external: false,
+      last: Math.floor((SCENARIO_NOW - 10_000) / 1000),
+      maxSessions: 3,
+      pullRequest: { available: true, reason: "" },
+      health: {
+        repo: "beta",
+        status: "on_track",
+        reasons: ["healthy"],
+        openIssues: 0,
+        inProgressIssues: 0,
+        inReviewIssues: 0,
+        blockedIssues: 0,
+        stuckIssues: 0,
+        askingIssues: 0,
+        failedChecks: 0,
+        overdueIssues: 0,
+        lastCommitAt: SCENARIO_NOW - 10_000,
+        evaluatedAt: SCENARIO_NOW,
+      },
+    },
   ];
   const fake = fakeHost(scenarios.typical, { route: "/repos/alpha", locale: "en" });
   fake.respond("repo.list", () => repos);
@@ -129,7 +157,16 @@ test("ReposPage displays SSOT repo health status badge and breakdown card", asyn
   });
 
   await fake.pumpUntil(app, () => app.count("id:repo-health-badge") === 1 && app.count("id:repo-health-card") === 1);
+  expect(app.count("id:repo-health-card-badge")).toBe(0);
   expect(app.shows("id:repo-health-badge >> text:Off track")).toBe(true);
+  expect(app.shows("id:repo-health-card >> text:Open")).toBe(true);
+  expect(app.texts().some((line) => line === "Open 4")).toBe(false);
   expect(app.texts().some((line) => line.includes("Stuck issues need attention"))).toBe(true);
   expect(app.texts().some((line) => line.includes("Overdue issues past due date"))).toBe(true);
+
+  // On-track repos omit redundant reason tautology and duplicate card badge.
+  await app.press("id:list-row-beta");
+  await fake.pumpUntil(app, () => app.shows("id:repo-health-badge >> text:On track"));
+  expect(app.count("id:repo-health-card-badge")).toBe(0);
+  expect(app.texts().some((line) => line.includes("Healthy and moving smoothly"))).toBe(false);
 });

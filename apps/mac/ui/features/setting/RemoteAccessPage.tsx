@@ -448,7 +448,7 @@ export function RemoteAccessPage() {
               </If>
 
               <SettingsGroup>
-                <SettingRow label={t("web.remote.title")} hint={t("web.remote.subtitle")} testid="remote-toggle-row">
+                <SettingRow label={t("web.setting.remote.toggleLabel")} hint={t("web.setting.remote.toggleHint")} testid="remote-toggle-row">
                   <View testID="remote-status-badge">
                     <Tag
                       icon="lock"

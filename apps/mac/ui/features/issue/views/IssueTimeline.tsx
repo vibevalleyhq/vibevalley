@@ -12,7 +12,8 @@ import { CountPill } from "../../../design/Tag";
 import { Bubble } from "../../../design/Tip";
 import { mix, tone } from "../../../design/tone";
 import { useNow } from "../../../infra/base/dom";
-import type { BoardCard, Tone } from "../model/cards";
+import { type BoardCard, cardAgent, type Tone } from "../model/cards";
+import { type BoardDensity, defaultFields, type IssueFieldVisibility } from "../model/display";
 import { blockerIssuesOf, formatIsoDate } from "../model/meta";
 import {
   addUtcDays,
@@ -27,13 +28,11 @@ import {
   utcDayStart,
 } from "../model/schedule";
 import { EmptyNote } from "./Board";
-import { BlockedByChips } from "./IssueMetaControls";
-import { PriorityMark, StatusMark } from "./Marks";
+import { BlockedByChips, OwnerMark } from "./IssueMetaControls";
+import { CardFace, PriorityMark, StatusMark } from "./Marks";
 import type { NewIssueAt } from "./NewIssue";
 
-const ROW_HEIGHT = 38;
 const HEADER_HEIGHT = 42;
-const LEFT_COL_WIDTH = 272;
 const MONTH_LABEL_RESERVE = 104;
 const DRAG_ACTIVATION_PX = 4;
 
@@ -138,6 +137,8 @@ export function IssueTimeline(props: {
   loading: boolean;
   selected?: string | undefined;
   selectedIds?: ReadonlySet<string> | undefined;
+  density?: BoardDensity | undefined;
+  fields?: IssueFieldVisibility | undefined;
   onOpen: (id: string) => void;
   onToggleSelect?: ((id: string, opts: { range: boolean }) => void) | undefined;
   onUpdateDates: (id: string, dates: { startAt?: number; dueAt?: number }) => Promise<void> | void;
@@ -150,6 +151,11 @@ export function IssueTimeline(props: {
   const scrollX = signal(0);
   const activeDrag = signal<ActiveDragState | undefined>(undefined);
   const now = useNow(60_000);
+  const compact = computed(() => props.density === "compact");
+  const fields = computed(() => props.fields ?? defaultFields);
+  const rowHeight = () => (compact() ? 30 : 38);
+  const barHeight = () => (compact() ? 20 : 24);
+  const leftColWidth = () => (compact() ? 240 : 272);
   let timelineScroll: ScrollRef | undefined;
   let disposed = false;
   const frames = createFrameQueue();
@@ -190,7 +196,10 @@ export function IssueTimeline(props: {
   return (
     <If when={!props.loading} else={<EmptyNote>{t("web.issue.reading")}</EmptyNote>}>
       <View testID="issue-timeline" class="min-h-0 flex-1 bg-page">
-        <View testID="timeline-header" class="h-10 shrink-0 flex-row items-center justify-between gap-2 border-b border-line bg-side px-4">
+        <View
+          testID="timeline-header"
+          class={`${compact() ? "h-9" : "h-10"} shrink-0 flex-row items-center justify-between gap-2 border-b border-line bg-side px-4`}
+        >
           <View class="flex-row items-center gap-2">
             <Segmented
               label={t("web.issue.timeline.scale.label")}
@@ -257,7 +266,7 @@ export function IssueTimeline(props: {
               <Scroll class="min-h-0 flex-1">
                 <View class="min-w-0 flex-row items-start">
                   {/* Fixed left issue column synchronized vertically via outer Scroll */}
-                  <View class="shrink-0 border-r border-line bg-page" style={{ width: LEFT_COL_WIDTH }}>
+                  <View class="shrink-0 border-r border-line bg-page" style={{ width: leftColWidth() }}>
                     <View class="flex-row items-center justify-between border-b border-line bg-side px-3" style={{ height: HEADER_HEIGHT }}>
                       <Text class="text-xs font-semibold text-muted">{t("web.issue.timeline.issuesColumn")}</Text>
                       <CountPill count={timeline().rows.length} />
@@ -266,6 +275,13 @@ export function IssueTimeline(props: {
                       {(r) => {
                         const selected = () => props.selected === r().card.id || props.selectedIds?.has(r().card.id) === true;
                         const blockers = computed(() => blockerIssuesOf(r().issue, props.allIssues));
+                        const showAgent = computed(() => fields().agent && (Boolean(cardAgent(r().card)) || r().card.kind === "orchestrator"));
+                        const showOwner = computed(() => {
+                          const owner = r().issue.owner;
+                          if (!fields().owner || owner === undefined) return false;
+                          if (showAgent() && owner.kind === "agent" && owner.id === cardAgent(r().card)) return false;
+                          return true;
+                        });
                         return (
                           <View
                             role="button"
@@ -281,7 +297,7 @@ export function IssueTimeline(props: {
                             }}
                             class={`flex-row items-center gap-1.5 border-b pr-2.5 ${selected() ? "bg-selected" : "hover:bg-hover"}`}
                             style={{
-                              height: ROW_HEIGHT,
+                              height: rowHeight(),
                               paddingLeft: 10 + r().depth * 14,
                               borderColor: mix("line", 0.55),
                             }}
@@ -290,14 +306,20 @@ export function IssueTimeline(props: {
                               <Icon name="indent" size={11} tone="faint" />
                             </If>
                             <StatusMark status={r().issue.status} size={13} />
-                            <Text class="shrink-0 font-mono text-2xs text-faint tabular-nums">{`#${r().issue.number}`}</Text>
+                            <If when={fields().number}>
+                              <Text class="shrink-0 font-mono text-2xs text-faint tabular-nums">{`#${r().issue.number}`}</Text>
+                            </If>
                             <Text class="min-w-0 flex-1 truncate text-xs font-medium text-ink">{r().issue.title}</Text>
                             <BlockedByChips blockers={blockers()} max={1} compact onOpen={props.onOpen} testid="timeline-blocked-by" />
                             <If when={r().span.overdue}>
                               <View class="size-1.5 shrink-0 rounded-full bg-berry" />
                             </If>
-                            <If when={r().issue.priority === "urgent" || r().issue.priority === "high" ? r().issue.priority : undefined}>
+                            <If when={fields().priority && (r().issue.priority === "urgent" || r().issue.priority === "high") ? r().issue.priority : undefined}>
                               {(pr) => <PriorityMark priority={pr()} size={11} />}
+                            </If>
+                            <If when={showOwner() ? r().issue.owner : undefined}>{(owner) => <OwnerMark owner={owner()} size={14} />}</If>
+                            <If when={showAgent()}>
+                              <CardFace card={r().card} size={14} />
                             </If>
                           </View>
                         );
@@ -398,7 +420,7 @@ export function IssueTimeline(props: {
                       </View>
 
                       {/* Grid body + vertical Today marker + schedule bars */}
-                      <View class="relative" style={{ height: timeline().rows.length * ROW_HEIGHT, width: totalGridWidth() }}>
+                      <View class="relative" style={{ height: timeline().rows.length * rowHeight(), width: totalGridWidth() }}>
                         {/* Day/week vertical lines */}
                         <Each of={timeline().ticks} key={(tk) => tk.dateKey}>
                           {(tk, idx) => (
@@ -501,8 +523,8 @@ export function IssueTimeline(props: {
                                 testID={`timeline-lane-${r().issue.id}`}
                                 class="absolute right-0 left-0 flex-row items-center border-b"
                                 style={{
-                                  top: rowIdx() * ROW_HEIGHT,
-                                  height: ROW_HEIGHT,
+                                  top: rowIdx() * rowHeight(),
+                                  height: rowHeight(),
                                   borderColor: mix("line", 0.45),
                                 }}
                               >
@@ -525,7 +547,7 @@ export function IssueTimeline(props: {
                                   style={{
                                     left: barLeft(),
                                     width: barWidth(),
-                                    height: 24,
+                                    height: barHeight(),
                                     backgroundColor: barFillColor(barTone()),
                                     borderColor: barBorderColor(barTone(), selected()),
                                   }}
@@ -542,11 +564,11 @@ export function IssueTimeline(props: {
                                     />
                                   </View>
 
-                                  <If when={showCompactNumber()}>
+                                  <If when={showCompactNumber() && fields().number}>
                                     <Text class="shrink-0 font-mono text-2xs font-medium text-ink tabular-nums">{`#${r().issue.number}`}</Text>
-                                    <If when={showFullTitle()}>
-                                      <Text class="min-w-0 flex-1 truncate text-2xs font-medium text-ink">{r().issue.title}</Text>
-                                    </If>
+                                  </If>
+                                  <If when={showFullTitle()}>
+                                    <Text class="min-w-0 flex-1 truncate text-2xs font-medium text-ink">{r().issue.title}</Text>
                                   </If>
 
                                   <View

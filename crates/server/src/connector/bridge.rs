@@ -24,15 +24,16 @@ use vibevalley_protocol::{
 
 use super::adapter::{App, AppFailed, FailedKind, Inbound, LoginIo, Progress, Receiving};
 use super::digest::{
-    DIGEST_OVER, IssueReplyAction, PermissionReplyAction, PushTarget, ReplyParseError, digest, is_pairing, issue_target_label, parse_issue_reply,
-    parse_permission_reply, parse_push_issue_message_id, parse_push_message_id, parse_push_perm_message_id, short_id, split_text, user_line,
+    DIGEST_OVER, DigestEntry, IssueReplyAction, PermissionReplyAction, PushTarget, ReplyParseError, is_pairing, issue_target_label, parse_digest_entry,
+    parse_issue_reply, parse_permission_reply, parse_push_issue_message_id, parse_push_message_id, parse_push_perm_message_id, short_id, split_text, user_line,
 };
+use super::render::{adapt_notification, render_digest};
 use crate::channel::{Chat, Saying};
 use crate::context::port::ConnectorIssuePort;
 use crate::context::text::clip_plain;
 use crate::context::{Context, now};
 use crate::runtime::Runtime;
-use crate::service::connector::{ConnectorAccountRow, ConnectorInboundRow};
+use crate::service::connector::{ConnectorAccountRow, ConnectorInboundRow, ConnectorOutgoingRow};
 use crate::service::{DbError, internal_db};
 use crate::setting::{Secret, Setting};
 
@@ -209,10 +210,31 @@ struct Shown {
     login_try: u64,
 }
 
+/// One logical outgoing delivery batch, possibly split across channel-sized pieces.
+struct DrainBatch {
+    seqs: Vec<i64>,
+    pieces: Vec<String>,
+}
+
 /// Prepared outgoing work for [`Bridge::drain`].
 struct DrainPlan {
     account: Account,
-    batches: Vec<(Vec<i64>, String)>,
+    batches: Vec<DrainBatch>,
+}
+
+fn coalesce_outgoing(rows: &[&ConnectorOutgoingRow]) -> Vec<(String, String)> {
+    let mut grouped: Vec<(String, String)> = Vec::new();
+    for row in rows {
+        if let Some((_, existing_body)) = grouped.iter_mut().find(|(msg, _)| msg == &row.message) {
+            if !existing_body.is_empty() && !row.body.is_empty() {
+                existing_body.push('\n');
+            }
+            existing_body.push_str(&row.body);
+        } else {
+            grouped.push((row.message.clone(), row.body.clone()));
+        }
+    }
+    grouped
 }
 
 /// The account's work now: a login task, or receiving and worker tasks.
@@ -567,14 +589,31 @@ impl Bridge {
             return Ok(None);
         }
         let (digests, regular): (Vec<_>, Vec<_>) = pending.into_iter().partition(|r| r.message.starts_with("digest:"));
-        let mut batches: Vec<(Vec<i64>, String)> = Vec::new();
-        if late && regular.len() > DIGEST_OVER {
-            let lines: Vec<String> = regular.iter().map(|r| r.body.clone()).collect();
-            batches.push((regular.iter().map(|r| r.seq).collect(), digest(&lines)));
+        let mut batches: Vec<DrainBatch> = Vec::new();
+        let coalesced = coalesce_outgoing(&regular);
+        if late && coalesced.len() > DIGEST_OVER {
+            let entries: Vec<DigestEntry> = coalesced.into_iter().map(|(message_id, body)| parse_digest_entry(&message_id, &body)).collect();
+            let rendered = render_digest(id, &entries);
+            let pieces = split_text(&rendered, self.app.max_chars());
+            batches.push(DrainBatch {
+                seqs: regular.iter().map(|r| r.seq).collect(),
+                pieces,
+            });
         } else {
-            batches.extend(regular.into_iter().map(|r| (vec![r.seq], r.body.clone())));
+            for r in regular {
+                let text = if r.message.starts_with("push:") {
+                    adapt_notification(id, &r.body)
+                } else {
+                    r.body.clone()
+                };
+                let pieces = split_text(&text, self.app.max_chars());
+                batches.push(DrainBatch { seqs: vec![r.seq], pieces });
+            }
         }
-        batches.extend(digests.into_iter().map(|r| (vec![r.seq], r.body.clone())));
+        for r in digests {
+            let pieces = split_text(&r.body, self.app.max_chars());
+            batches.push(DrainBatch { seqs: vec![r.seq], pieces });
+        }
         Ok(Some(DrainPlan { account: a, batches }))
     }
 
@@ -588,40 +627,39 @@ impl Bridge {
         };
         let id = self.id();
         let connectors = &self.env.ctx.service.connector;
-        for (rows, text) in batches {
-            if cancel.is_cancelled() {
-                return false;
-            }
-            let sent = self.app.send(&a.keys, &a.user, &text, &a.reply_context).await;
-            let ok = match sent {
-                Ok(ext) => match connectors.sent(&rows, now(), &ext).await {
-                    Ok(()) => {
-                        self.clear_transient_err_async().await;
-                        self.tell_async().await;
-                        true
-                    }
-                    Err(e) => {
-                        self.set_err_async(e.to_string()).await;
-                        false
-                    }
-                },
-                Err(refused) => {
-                    if let Err(e) = connectors.not_sent(&rows, &refused.message).await {
-                        eprintln!("vibevalley-server: connector: {}: {e}", id.as_str());
-                    }
-                    match refused.kind {
-                        FailedKind::Stale => {
-                            self.pause_async().await;
-                        }
-                        // Tried again later, and with the user's next message.
-                        FailedKind::Restricted => self.clear_transient_err_async().await,
-                        FailedKind::Failed => self.set_err_async(refused.message).await,
-                    }
-                    false
+        for batch in batches {
+            let mut last_ext = String::new();
+            for piece in batch.pieces {
+                if cancel.is_cancelled() {
+                    return false;
                 }
-            };
-            if !ok {
-                return false;
+                match self.app.send(&a.keys, &a.user, &piece, &a.reply_context).await {
+                    Ok(ext) => last_ext = ext,
+                    Err(refused) => {
+                        if let Err(e) = connectors.not_sent(&batch.seqs, &refused.message).await {
+                            eprintln!("vibevalley-server: connector: {}: {e}", id.as_str());
+                        }
+                        match refused.kind {
+                            FailedKind::Stale => {
+                                self.pause_async().await;
+                            }
+                            // Tried again later, and with the user's next message.
+                            FailedKind::Restricted => self.clear_transient_err_async().await,
+                            FailedKind::Failed => self.set_err_async(refused.message).await,
+                        }
+                        return false;
+                    }
+                }
+            }
+            match connectors.sent(&batch.seqs, now(), &last_ext).await {
+                Ok(()) => {
+                    self.clear_transient_err_async().await;
+                    self.tell_async().await;
+                }
+                Err(e) => {
+                    self.set_err_async(e.to_string()).await;
+                    return false;
+                }
             }
         }
         true
@@ -1522,8 +1560,11 @@ mod tests {
         bridge.tell_async().await;
     }
 
+    static LOCALE_GUARD: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
     #[tokio::test]
     async fn quote_replies_execute_actions_enforce_idempotency_and_send_localized_receipts() {
+        let _locale = LOCALE_GUARD.lock().await;
         let (_dir, ctx, app, issue_port, bridge) = setup_bridge("zh").await;
         let cancel = CancellationToken::new();
 
@@ -1715,5 +1756,138 @@ mod tests {
 
         let _ = ctx.shutdown(Duration::from_secs(1)).await;
         ctx.service.close().await;
+    }
+
+    #[tokio::test]
+    async fn late_drain_routes_nineteen_review_notifications_through_channel_renderer() {
+        let _locale = LOCALE_GUARD.lock().await;
+        struct ChannelStubApp {
+            id: ConnectorID,
+            max_chars: usize,
+            sent: Mutex<Vec<String>>,
+        }
+
+        impl App for ChannelStubApp {
+            fn id(&self) -> ConnectorID {
+                self.id
+            }
+
+            fn max_chars(&self) -> usize {
+                self.max_chars
+            }
+
+            fn reads(&self, _: &Secret) -> bool {
+                true
+            }
+
+            fn login<'a>(
+                &'a self,
+                _: &'a ConnectorLogin,
+                _: &'a LoginIo<'a>,
+                _: &'a CancellationToken,
+            ) -> super::super::adapter::BoxFuture<'a, Option<Result<Linked<Secret>, AppFailed>>> {
+                unreachable!()
+            }
+
+            fn receive<'a>(&'a self, _: &'a Secret, _: &'a Receiving<'a>) -> super::super::adapter::BoxFuture<'a, AppFailed> {
+                unreachable!()
+            }
+
+            fn send<'a>(&'a self, _: &'a Secret, _: &'a str, text: &'a str, _: &'a str) -> super::super::adapter::BoxFuture<'a, Result<String, AppFailed>> {
+                let mut sent = self.sent.lock();
+                sent.push(text.to_owned());
+                let ext = format!("ext-{}", sent.len());
+                Box::pin(async move { Ok(ext) })
+            }
+        }
+
+        for (channel, max_chars) in [(ConnectorID::Weixin, 1800), (ConnectorID::Feishu, 4000), (ConnectorID::Qq, 2000)] {
+            vibevalley_i18n::set_locale("zh");
+            let dir = tempfile::tempdir().unwrap();
+            let home = dir.path().join("home");
+            let work = dir.path().join("work");
+            tokio::fs::create_dir_all(&home).await.unwrap();
+            tokio::fs::create_dir_all(&work).await.unwrap();
+
+            let service = Service::open(&home).await.unwrap();
+            let clock = Arc::new(ManualClock::new(1_700_000_000_000));
+            let outbox = Arc::new(Outbox::new(service.clone()).with_clock(clock.clone()));
+            let ctx = Arc::new(Context::new(
+                service.clone(),
+                TaskGroup::new(),
+                Arc::new(LiveState::new()),
+                outbox,
+                Arc::new(StateFeed::new()),
+                clock,
+                Arc::new(Http),
+                Arc::new(PublicDownload),
+            ));
+            let setting = Setting::open_async(SettingConfig {
+                home: home.clone(),
+                work_root: work,
+                version: "0.1.0".into(),
+                deepseek_api_key: String::new(),
+                storage_backend: None,
+            })
+            .await;
+            let storage = Storage::open_async(&home, ctx.clone()).await.unwrap();
+            let chat = Chat::open_async(ctx.clone(), storage, false).await.unwrap();
+            let env = Arc::new(Env {
+                ctx: ctx.clone(),
+                setting,
+                chat,
+                issue: OnceLock::new(),
+                runtime: OnceLock::new(),
+                retry_first: Duration::from_millis(50),
+                retry_most: Duration::from_millis(200),
+                reconnect: Duration::from_millis(50),
+                moment: Duration::from_millis(50),
+                closing: AtomicBool::new(false),
+            });
+            let app = Arc::new(ChannelStubApp {
+                id: channel,
+                max_chars,
+                sent: Mutex::new(Vec::new()),
+            });
+            let bridge = Bridge::new(app.clone(), env);
+            service.connector.connect(channel, "{}", "peer-1", None, 1_000, "retired").await.unwrap();
+            bridge.load_async().await;
+
+            // Queue 19 pending review notifications (simulating legacy repeated-title bodies + deduplicated bodies).
+            for n in 83..102 {
+                let body = format!("【待你验收 · #{n} [UX/工作区] 工单标题 {n}】\n[UX/工作区] 工单标题 {n}\n\n请在工作台验收或回复意见。");
+                ctx.service
+                    .connector
+                    .add_outgoing_once(channel, &format!("push:run:reviewing:r-{n}"), &[body], 2_000 + n)
+                    .await
+                    .unwrap();
+            }
+            assert_eq!(ctx.service.connector.count_pending(channel).await.unwrap(), 19);
+
+            let cancel = CancellationToken::new();
+            assert!(bridge.drain(true, &cancel).await);
+            assert_eq!(ctx.service.connector.count_pending(channel).await.unwrap(), 0);
+
+            let sent = app.sent.lock().clone();
+            assert_eq!(sent.len(), 1, "{channel:?} should coalesce 19 items into 1 digest message");
+            let text = &sent[0];
+            assert!(text.contains("1. #83 [UX/工作区] 工单标题 83"), "{channel:?}: {text}");
+            assert!(text.contains("19. #101 [UX/工作区] 工单标题 101"), "{channel:?}: {text}");
+            assert_eq!(text.matches("[UX/工作区] 工单标题 83").count(), 1, "{channel:?}: title duplicated: {text}");
+            match channel {
+                ConnectorID::Weixin | ConnectorID::Qq => {
+                    assert!(text.contains("【待你验收 (19)】\n1. "), "{channel:?}: {text}");
+                    assert!(!text.contains("**") && !text.contains("###"));
+                }
+                ConnectorID::Feishu => {
+                    assert!(text.contains("**你不在的时候有 19 条消息**"), "{text}");
+                    assert!(text.contains("### 【待你验收 (19)】\n1. "), "{text}");
+                    assert!(text.contains("\n\n---\n完整的在默认频道里。"), "{text}");
+                }
+            }
+
+            let _ = ctx.shutdown(Duration::from_secs(1)).await;
+            ctx.service.close().await;
+        }
     }
 }

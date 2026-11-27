@@ -16,7 +16,6 @@ import {
 import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
 import { AgentFace } from "../../design/domain/Face";
-import { OpenTerminal } from "../../design/domain/OpenTerminal";
 import { RuntimeIcon } from "../../design/domain/RuntimeIcon";
 import { SettingRow, SettingsGroup } from "../../design/domain/settings";
 import { Icon } from "../../design/Icon";
@@ -116,11 +115,6 @@ const statusDotClass = (entry: MachineRuntimeEntry): string => {
   if (entry.info.installation.status === "available") return entry.info.settings.enabled ? "bg-leaf" : "bg-faint";
   if (entry.info.installation.status === "unsupported" && entry.info.installation.signInCommand) return "bg-wheat";
   return "bg-berry";
-};
-
-const availableVersion = (entry: MachineRuntimeEntry): string | undefined => {
-  const inst = entry.info?.installation;
-  return inst?.status === "available" ? (inst.version ?? undefined) : undefined;
 };
 
 /** The folder of an absolute command, where a terminal for the runtime opens. */
@@ -318,13 +312,6 @@ export function RuntimesPage(props: { rest: string }) {
                     <Dot tone={machineStatusMeta(sel().machine.status).dot} size={6} ring={false} />
                     <Text class="max-w-36 truncate text-2xs font-medium text-muted">{sel().machine.name}</Text>
                   </View>
-                  <If when={availableVersion(sel().entry)}>
-                    {(version) => (
-                      <View class="h-5 shrink-0 items-center justify-center rounded-full bg-hover px-2">
-                        <Text class="font-mono text-2xs font-medium text-muted tabular-nums">{version()}</Text>
-                      </View>
-                    )}
-                  </If>
                 </View>
               )}
             </If>
@@ -644,40 +631,10 @@ function RuntimeWorkspace(props: {
         </View>
       </View>
 
-      {/* Overview / Installation card */}
-      <If when={inst()}>
+      {/* Overview / Installation card (non-available states only; available path is merged into Settings) */}
+      <If when={inst() && inst()?.status !== "available" ? inst() : undefined}>
         {(i) => (
           <SettingsGroup title={t("web.runtime.installation")} note={machine().name}>
-            <If when={variant(i(), "status", "available")}>
-              {(avail) => (
-                <>
-                  <SettingRow label={t("web.runtime.binPath")} last={checkedAtHint() === undefined}>
-                    <View tooltip={<Bubble text={avail().command} />} class="max-w-72 rounded-md border border-line bg-side px-2 py-0.5">
-                      <Text class="truncate font-mono text-xs text-muted">{avail().command}</Text>
-                    </View>
-                    <If when={folderOf(avail().command)}>{(cwd) => <OpenTerminal cwd={cwd()} title={entry().label} testid="runtime-terminal" />}</If>
-                  </SettingRow>
-                  <If when={checkedAtHint()}>
-                    {(checked) => (
-                      <SettingRow label={t("web.runtime.source")} hint={checked()} last>
-                        <View class="rounded-full bg-hover px-2 py-0.5">
-                          <Text class="text-2xs font-medium text-muted">
-                            {avail().via === "bundled" ? t("web.runtime.bundled") : t("web.runtime.commandLine")}
-                          </Text>
-                        </View>
-                        <If when={avail().version}>
-                          {(ver) => (
-                            <View class="rounded-md border border-line bg-side px-2 py-0.5">
-                              <Text class="font-mono text-xs tabular-nums text-ink">{ver()}</Text>
-                            </View>
-                          )}
-                        </If>
-                      </SettingRow>
-                    )}
-                  </If>
-                </>
-              )}
-            </If>
             <If when={variant(i(), "status", "unsupported")}>
               {(unsup) => (
                 <SettingRow label={t("web.runtime.installation")} hint={checkedAtHint()} last>
@@ -915,8 +872,12 @@ function RuntimeInspector(props: {
               mcpHost={machine().here ? mcpHostOf(info().id) : undefined}
               onMcpServersSynced={props.onMcpServersSynced}
             />
-            <InventoryCard title={t("web.runtime.skills")} entries={info().skills} />
-            <InventoryCard title={t("web.runtime.tools")} entries={info().tools} />
+            <If when={(info().skills?.length ?? 0) > 0}>
+              <InventoryCard title={t("web.runtime.skills")} entries={info().skills} />
+            </If>
+            <If when={(info().tools?.length ?? 0) > 0}>
+              <InventoryCard title={t("web.runtime.tools")} entries={info().tools} />
+            </If>
           </>
         )}
       </If>

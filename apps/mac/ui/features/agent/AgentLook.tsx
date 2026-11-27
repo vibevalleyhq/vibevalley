@@ -7,9 +7,8 @@ import { ROLE_AVATARS } from "../../design/art";
 import { Button } from "../../design/Button";
 import { castOf, outfitLabel, type Pose, randomLook, speciesLabel, stagePoses } from "../../design/domain/cast";
 import { AgentFace } from "../../design/domain/Face";
-import { Bubble, Hint } from "../../design/Tip";
+import { Hint } from "../../design/Tip";
 import { mix, tone } from "../../design/tone";
-import { ready, useAgentTemplates } from "../../infra/query";
 
 const WORKER_DEFAULT_AVATARS = ROLE_AVATARS.filter((id) => id !== "avatar-orchestrator");
 
@@ -85,13 +84,41 @@ export function Labeled(props: {
   );
 }
 
+function avatarLabel(id: (typeof ROLE_AVATARS)[number]): string {
+  switch (id) {
+    case "avatar-orchestrator":
+      return t("web.agent.avatarLabels.orchestrator");
+    case "avatar-fullstack":
+      return t("web.agent.avatarLabels.fullstack");
+    case "avatar-architect":
+      return t("web.agent.avatarLabels.architect");
+    case "avatar-frontend":
+      return t("web.agent.avatarLabels.frontend");
+    case "avatar-backend":
+      return t("web.agent.avatarLabels.backend");
+    case "avatar-reviewer":
+      return t("web.agent.avatarLabels.reviewer");
+    case "avatar-tester":
+      return t("web.agent.avatarLabels.tester");
+    case "avatar-designer":
+      return t("web.agent.avatarLabels.designer");
+    case "avatar-product":
+      return t("web.agent.avatarLabels.product");
+    case "avatar-scout":
+      return t("web.agent.avatarLabels.scout");
+    case "avatar-docs":
+      return t("web.agent.avatarLabels.docs");
+    case "avatar-pages":
+      return t("web.agent.avatarLabels.pages");
+    case "avatar-slides":
+      return t("web.agent.avatarLabels.slides");
+    case "avatar-collector":
+      return t("web.agent.avatarLabels.collector");
+  }
+}
+
 export function LookPanel(props: { draft: Agent; onChange: (look: Agent["look"]) => void }) {
   const cast = () => castOf(props.draft.look, props.draft.id);
-  const templates = useAgentTemplates();
-  const avatarLabel = (id: string) => {
-    const tpl = ready(templates, []).find((item) => item.look.avatar === id);
-    return tpl?.name ?? id.replace(/^avatar-/u, "");
-  };
   return (
     <View class="gap-5">
       <View class="flex-row">
@@ -100,7 +127,7 @@ export function LookPanel(props: { draft: Agent; onChange: (look: Agent["look"])
         </Button>
       </View>
       <Labeled label={t("web.agent.avatar")} hint={t("web.agent.avatarHint")}>
-        <View class="grid grid-cols-3 gap-1.5">
+        <View testID="agent-avatar-picker" class="grid grid-cols-3 gap-1.5">
           <Tile
             active={!props.draft.look.avatar}
             label={t("web.agent.avatarAnimal")}
@@ -174,7 +201,6 @@ function Tile(props: { active: boolean; label: string; onClick: () => void; chil
       role="button"
       accessibilityLabel={props.label}
       accessibilityState={{ selected: props.active }}
-      tooltip={<Bubble text={props.label} />}
       onPress={() => props.onClick()}
       class={`items-center gap-0.5 rounded-md border px-1 pt-1 pb-1.5 focus-visible:outline-2 focus-visible:outline-focus ${
         props.active ? "border-accent bg-selected" : "border-line hover:border-faint hover:bg-hover"
@@ -186,12 +212,12 @@ function Tile(props: { active: boolean; label: string; onClick: () => void; chil
   );
 }
 
-/** Papertrails portrait card on the stage, with name, duty, and active pose pill. */
+/** Papertrails portrait card on the stage, with active pose pill. */
 export function Stage(props: { draft: Agent; pose: Pose }) {
   const cast = () => castOf(props.draft.look, props.draft.id);
   const pose = () => stagePoses.find((p) => p.pose === props.pose)?.label ?? "";
   return (
-    <View class="min-h-72 flex-1 items-center justify-center overflow-hidden bg-agent-stage-middle">
+    <View testID="agent-stage" class="min-h-72 flex-1 items-center justify-center overflow-hidden bg-agent-stage-middle">
       <Canvas
         class="absolute inset-0"
         draw={(ctx) => {
@@ -213,16 +239,6 @@ export function Stage(props: { draft: Agent; pose: Pose }) {
           look={withDefaultWorkerAvatar(props.draft)}
           size={152}
         />
-      </View>
-      <View class="absolute inset-x-0 bottom-4 items-center gap-1">
-        <View class="rounded-md px-3 py-0.5" style={{ backgroundColor: mix("paper", 0.92) }}>
-          <Text class="text-lg font-semibold text-bark-900">{props.draft.name || t("web.agent.unnamedAgent")}</Text>
-        </View>
-        <If when={props.draft.duty}>
-          <View class="max-w-96 rounded-sm px-2 py-0.5" style={{ backgroundColor: mix("paper", 0.78) }}>
-            <Text class="text-center text-xs text-bark-900">{props.draft.duty}</Text>
-          </View>
-        </If>
       </View>
       <View class="absolute top-3 right-4 rounded-sm px-2 py-0.5" style={{ backgroundColor: mix("paper", 0.78) }}>
         <Text class="text-xs font-medium text-bark-900">{`${speciesLabel[cast().species]} · ${outfitLabel[cast().outfit]} · ${pose()}`}</Text>

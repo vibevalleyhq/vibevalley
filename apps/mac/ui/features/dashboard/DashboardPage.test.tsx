@@ -95,14 +95,9 @@ function sampleRetro(window: RetroWindow): IssueRetroReport {
   };
 }
 
-test("DashboardPage renders profile overview, switches to hosted /dashboard/runs, and renders /runs seamlessly", async () => {
+test("DashboardPage omits redundant profile hero card, hides zero pending rows, switches to hosted /dashboard/runs, and renders /runs seamlessly", async () => {
   setLocale("en");
   const fake = fakeHost(scenarios.typical, { route: "/dashboard", locale: "en" });
-  const baseSettings = scenarios.typical.responses["setting.get"] as Record<string, unknown>;
-  fake.respond("setting.get", {
-    ...baseSettings,
-    profile: { displayName: "Ada", tagline: "Keeping the board green", avatarPreset: "monogram" },
-  });
 
   const app = await open("../../app/main.tsx", {
     width: 1200,
@@ -117,14 +112,28 @@ test("DashboardPage renders profile overview, switches to hosted /dashboard/runs
   await fake.pumpUntil(app, () => app.count("id:dashboard-overview") === 1);
   expect(app.count("id:dashboard-header")).toBe(1);
   expect(app.count("id:desk")).toBe(0);
-  expect(app.shows("id:dashboard-profile-card >> text:Ada")).toBe(true);
-  expect(app.shows("id:dashboard-profile-card >> text:Keeping the board green")).toBe(true);
+  expect(app.count("id:dashboard-profile-card")).toBe(0);
   expect(app.count("id:dashboard-stat-working")).toBe(1);
   expect(app.count("id:dashboard-stat-waiting")).toBe(1);
   expect(app.count("id:dashboard-pulse")).toBe(1);
   expect(app.count("id:dashboard-pending")).toBe(1);
+  expect(app.count("id:dashboard-pending-waiting")).toBe(1);
+  expect(app.count("id:dashboard-pending-review")).toBe(1);
+  expect(app.count("id:dashboard-pending-todo")).toBe(1);
+  expect(app.texts()).toContain("Waiting on your reply");
+  expect(app.texts()).toContain("Issues in review");
+  expect(app.texts()).toContain("Todo issues");
+  expect(app.texts().some((line) => line.includes("waiting on your reply"))).toBe(false);
   expect(app.count("id:dashboard-recent-runs")).toBe(1);
   expect(app.count("id:dashboard-quick-mcp")).toBe(1);
+
+  // When all pending items clear, zero rows collapse to the calm empty note.
+  await fake.setSlice(app, "inbox", { ...scenarios.typical.state.inbox, items: [] });
+  await fake.pumpUntil(app, () => app.count("id:dashboard-pending-waiting") === 0);
+  await fake.setSlice(app, "board", { ...scenarios.typical.state.board, issues: [] });
+  await fake.pumpUntil(app, () => app.count("id:dashboard-pending-empty") === 1);
+  expect(app.count("id:dashboard-pending-review")).toBe(0);
+  expect(app.count("id:dashboard-pending-todo")).toBe(0);
 
   await app.press("id:dashboard-tabs-runs");
   await fake.pumpUntil(app, () => app.count("id:runs-page") === 1);
@@ -297,6 +306,20 @@ test("DashboardPage renders 3-part Morning Digest and applies backlog triage ONL
         overdueIssues: 0,
         evaluatedAt: SCENARIO_NOW,
       },
+      {
+        repo: "beta",
+        status: "on_track",
+        reasons: ["healthy"],
+        openIssues: 0,
+        inProgressIssues: 0,
+        inReviewIssues: 0,
+        blockedIssues: 0,
+        stuckIssues: 0,
+        askingIssues: 0,
+        failedChecks: 0,
+        overdueIssues: 0,
+        evaluatedAt: SCENARIO_NOW,
+      },
     ],
     triage: [
       {
@@ -336,6 +359,9 @@ test("DashboardPage renders 3-part Morning Digest and applies backlog triage ONL
   expect(app.count("id:digest-part-progress")).toBe(1);
   expect(app.count("id:digest-part-health")).toBe(1);
   expect(app.count("id:digest-part-triage")).toBe(1);
+  expect(app.shows("id:digest-part-health >> text:Waiting for user response")).toBe(true);
+  expect(app.shows("id:digest-part-health >> text:On track")).toBe(true);
+  expect(app.texts().some((line) => line.includes("Healthy and moving smoothly"))).toBe(false);
 
   // Confirm is NEVER auto-invoked on render.
   expect(fake.calls.some((c) => c.op === "issue.triage.confirm")).toBe(false);

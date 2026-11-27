@@ -120,8 +120,7 @@
     },
     "profile": {
       "defaultName": "工作台用户",
-      "defaultTagline": "在工作台与默认频道统筹角色与工单",
-      "edit": "编辑个人资料"
+      "defaultTagline": "在工作台与默认频道统筹角色与工单"
     },
     "stats": {
       "working": "运行中会话",
@@ -137,9 +136,10 @@
     },
     "pending": {
       "title": "工作台待关注",
-      "waiting": "{n} 项正在等你答复",
-      "inReview": "{n} 张工单待验收",
-      "todo": "{n} 张待办工单",
+      "waiting": "正在等你答复",
+      "inReview": "工单待验收",
+      "todo": "待办工单",
+      "empty": "暂无需要立即处理的事项。",
       "openIssues": "打开工单看板"
     },
     "recent": {

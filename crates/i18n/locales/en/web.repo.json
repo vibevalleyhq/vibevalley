@@ -5,6 +5,7 @@
   "repos": "Code bases",
   "all": "All",
   "allLine": "The whole map: an island for each repo",
+  "selectPrompt": "Select a repository from the list to inspect its health, languages, and commit history.",
   "notGit": "Not a git repository yet",
   "finding": "Looking…",
   "none": "No repos in the work folder yet. Press New repo to add one, or download one from GitHub.",
@@ -108,13 +109,13 @@
   "unmountTip": "Stop managing this external folder in VibeValley without deleting files on disk",
   "health": {
     "title": "Health",
-    "open": "Open {n}",
-    "inProgress": "Working {n}",
-    "inReview": "Review {n}",
-    "blocked": "Blocked {n}",
-    "stuck": "Stuck {n}",
-    "asking": "Asking {n}",
-    "failedChecks": "Failed checks {n}",
-    "overdue": "Overdue {n}"
+    "open": "Open",
+    "inProgress": "Working",
+    "inReview": "Review",
+    "blocked": "Blocked",
+    "stuck": "Stuck",
+    "asking": "Asking",
+    "failedChecks": "Failed checks",
+    "overdue": "Overdue"
   }
 }

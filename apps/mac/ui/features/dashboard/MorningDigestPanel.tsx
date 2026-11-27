@@ -173,7 +173,9 @@ export function MorningDigestPanel() {
                               <Text class="text-2xs font-medium">{t(`shared.repoHealth.${h().status}`)}</Text>
                             </View>
                           </View>
-                          <Text class="truncate text-xs text-muted">{list(h().reasons.map((r) => t(`shared.repoHealthReason.${r}`)))}</Text>
+                          <If when={h().status !== "on_track" && h().reasons.length > 0}>
+                            <Text class="truncate text-xs text-muted">{list(h().reasons.map((r) => t(`shared.repoHealthReason.${r}`)))}</Text>
+                          </If>
                         </A>
                       )}
                     </Each>

@@ -8,6 +8,7 @@ import { compareText, or } from "../../../infra/base/search";
 import { defineStored, orFallback } from "../../../infra/state/stored";
 import { type BoardCard, type Lane, lanes } from "./cards";
 import { endedAt } from "./issue";
+import { formatIsoDate } from "./meta";
 
 export type BoardView = "board" | "list" | "timeline" | "calendar";
 export const boardViews = ["board", "list", "timeline", "calendar"] as const satisfies readonly BoardView[];
@@ -21,42 +22,38 @@ export const viewLabel: Record<BoardView, string> = {
 /** Groups of the list view. The board keeps its status lanes whatever this is: a drag between lanes moves status. */
 export type Grouping = "status" | "repo" | "agent" | "none";
 export const groupings = ["status", "repo", "agent", "none"] as const satisfies readonly Grouping[];
-export const groupingLabel: Record<Grouping, string> = {
-  status: t("web.issue.boardLabels.grouping.status"),
-  repo: t("web.issue.boardLabels.grouping.repo"),
-  agent: t("web.issue.boardLabels.grouping.agent"),
-  none: t("web.issue.boardLabels.grouping.none"),
-};
 
 /** Multi-dimensional toolbar grouping across Kanban and List views. */
 export type GroupBy = "none" | "repo" | "owner" | "agent" | "priority" | "parent";
 export const groupBys = ["none", "repo", "owner", "agent", "priority", "parent"] as const satisfies readonly GroupBy[];
-export const groupByLabel: Record<GroupBy, string> = {
-  none: t("web.issue.groupBy.none"),
-  repo: t("web.issue.groupBy.repo"),
-  owner: t("web.issue.groupBy.owner"),
-  agent: t("web.issue.groupBy.agent"),
-  priority: t("web.issue.groupBy.priority"),
-  parent: t("web.issue.groupBy.parent"),
-};
 
 /** Hierarchy visibility mode across Kanban and List views. */
 export type HierarchyMode = "all" | "top_level" | "parents_only";
 export const hierarchyModes = ["all", "top_level", "parents_only"] as const satisfies readonly HierarchyMode[];
-export const hierarchyLabel: Record<HierarchyMode, string> = {
-  all: t("web.issue.hierarchy.all"),
-  top_level: t("web.issue.hierarchy.top_level"),
-  parents_only: t("web.issue.hierarchy.parents_only"),
-};
 
 /** `manual` keeps the order the rows came in: the history's, which for todo is the user's own order. */
 export type Ordering = "manual" | "priority" | "updated" | "created";
 export const orderings = ["manual", "priority", "updated", "created"] as const satisfies readonly Ordering[];
-export const orderingLabel: Record<Ordering, string> = {
-  manual: t("web.issue.boardLabels.ordering.manual"),
-  priority: t("web.issue.boardLabels.ordering.priority"),
-  updated: t("web.issue.boardLabels.ordering.updated"),
-  created: t("web.issue.boardLabels.ordering.created"),
+
+/** Visual density across Board, List, Timeline, and Calendar views. */
+export type BoardDensity = "comfortable" | "compact";
+export const boardDensities = ["comfortable", "compact"] as const satisfies readonly BoardDensity[];
+
+/** Toggleable issue metadata slots controlled by DisplayMenu across issue views. */
+export const issueFieldKeys = ["number", "priority", "repo", "owner", "agent", "tags", "dates", "progress", "preview"] as const;
+export type IssueFieldKey = (typeof issueFieldKeys)[number];
+export type IssueFieldVisibility = Record<IssueFieldKey, boolean>;
+
+export const defaultFields: IssueFieldVisibility = {
+  number: true,
+  priority: true,
+  repo: true,
+  owner: true,
+  agent: true,
+  tags: true,
+  dates: true,
+  progress: true,
+  preview: true,
 };
 
 export interface BoardLook {
@@ -65,9 +62,31 @@ export interface BoardLook {
   ordering: Ordering;
   groupBy: GroupBy;
   hierarchy: HierarchyMode;
+  density: BoardDensity;
+  fields: IssueFieldVisibility;
 }
 
-export const defaultLook: BoardLook = { view: "board", grouping: "status", ordering: "manual", groupBy: "none", hierarchy: "all" };
+export const defaultLook: BoardLook = {
+  view: "board",
+  grouping: "status",
+  ordering: "manual",
+  groupBy: "none",
+  hierarchy: "all",
+  density: "comfortable",
+  fields: defaultFields,
+};
+
+const fieldsSchema = z.object({
+  number: orFallback(z.boolean(), defaultFields.number),
+  priority: orFallback(z.boolean(), defaultFields.priority),
+  repo: orFallback(z.boolean(), defaultFields.repo),
+  owner: orFallback(z.boolean(), defaultFields.owner),
+  agent: orFallback(z.boolean(), defaultFields.agent),
+  tags: orFallback(z.boolean(), defaultFields.tags),
+  dates: orFallback(z.boolean(), defaultFields.dates),
+  progress: orFallback(z.boolean(), defaultFields.progress),
+  preview: orFallback(z.boolean(), defaultFields.preview),
+});
 
 // How the board looks on this machine: kept across reloads (state/stored.ts), each part falling back on its own.
 export const boardLook = defineStored(
@@ -76,11 +95,52 @@ export const boardLook = defineStored(
     view: orFallback(z.literal(boardViews), defaultLook.view),
     grouping: orFallback(z.literal(groupings), defaultLook.grouping),
     ordering: orFallback(z.literal(orderings), defaultLook.ordering),
-    groupBy: orFallback(z.literal(groupBys), "none"),
-    hierarchy: orFallback(z.literal(hierarchyModes), "all"),
+    groupBy: orFallback(z.literal(groupBys), defaultLook.groupBy),
+    hierarchy: orFallback(z.literal(hierarchyModes), defaultLook.hierarchy),
+    density: orFallback(z.literal(boardDensities), defaultLook.density),
+    fields: orFallback(fieldsSchema, defaultFields),
   }),
   defaultLook,
 );
+
+/** Whether any display setting (excluding active view tab) differs from `defaultLook`. */
+export function isLookCustomized(look: BoardLook): boolean {
+  return (
+    look.grouping !== defaultLook.grouping ||
+    look.ordering !== defaultLook.ordering ||
+    (look.groupBy ?? defaultLook.groupBy) !== defaultLook.groupBy ||
+    (look.hierarchy ?? defaultLook.hierarchy) !== defaultLook.hierarchy ||
+    (look.density ?? defaultLook.density) !== defaultLook.density ||
+    issueFieldKeys.some((k) => (look.fields?.[k] ?? true) !== defaultFields[k])
+  );
+}
+
+/** Toggles one field visibility flag cleanly while preserving all other display settings. */
+export function toggleBoardField(look: BoardLook, key: IssueFieldKey): BoardLook {
+  const current = look.fields ?? defaultFields;
+  return {
+    ...look,
+    fields: {
+      ...current,
+      [key]: !current[key],
+    },
+  };
+}
+
+/** Resets all DisplayMenu presentation settings to defaults while preserving the active view tab. */
+export function resetBoardLook(look: BoardLook): BoardLook {
+  return {
+    ...defaultLook,
+    view: look.view,
+  };
+}
+
+/** Compact `MM-DD` label for an issue's due/start date badge when present. */
+export function formatCompactDateLabel(issue: Pick<Issue, "startAt" | "dueAt">): string | undefined {
+  const target = issue.dueAt !== undefined && issue.dueAt > 0 ? issue.dueAt : issue.startAt !== undefined && issue.startAt > 0 ? issue.startAt : undefined;
+  if (target === undefined) return undefined;
+  return formatIsoDate(target).slice(5);
+}
 
 export function encodeActorRef(owner: ActorRef | undefined): string {
   if (!owner) return "";

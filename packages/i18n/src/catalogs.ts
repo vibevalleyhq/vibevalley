@@ -107,6 +107,22 @@ export const catalogs = {
       avatar: "角色头像",
       avatarHint: "在工作台与聊天里展示这个头像；留空时显示农场里的小动物。",
       avatarAnimal: "默认小动物",
+      avatarLabels: {
+        orchestrator: "全能主助手",
+        fullstack: "全栈工程师",
+        architect: "系统架构师",
+        frontend: "前端工程师",
+        backend: "后端工程师",
+        reviewer: "代码审查员",
+        tester: "测试工程师",
+        designer: "UI/UX 设计师",
+        product: "产品经理",
+        scout: "技术调研员",
+        docs: "技术文档师",
+        pages: "数据看板师",
+        slides: "演示汇报师",
+        collector: "素材收集员",
+      },
       looksAs: "在农场里是",
       looksHint: "只是长相：同一个引擎可以是不同的动物。",
       wears: "穿什么",
@@ -222,7 +238,8 @@ export const catalogs = {
         updated: "照模板更新好了",
         galleryTitle: "开箱即用的模板",
         galleryIntro: "按分工挑一份模板：自带风格、人设与技能，一键采用即可派活。",
-        manageLink: "全部模板与导入",
+        showGallery: "展开模板",
+        hideGallery: "收起模板",
         adopt: "一键采用",
         adopted: "已采用 {n}",
         adoptedToast: "已采用「{name}」",
@@ -695,7 +712,7 @@ export const catalogs = {
             reworkLine: "返工率：{reworkRate}（{issues} 张工单，{findings} 条问题，未解决 {unresolved} 条）",
           },
         },
-        profile: { defaultName: "工作台用户", defaultTagline: "在工作台与默认频道统筹角色与工单", edit: "编辑个人资料" },
+        profile: { defaultName: "工作台用户", defaultTagline: "在工作台与默认频道统筹角色与工单" },
         stats: { working: "运行中会话", waiting: "等你回应", issues: "待办与进行中", review: "待验收" },
         pulse: {
           title: "活跃引擎与执行脉搏",
@@ -703,7 +720,14 @@ export const catalogs = {
           active: "{n} 个会话正在干活",
           openRuns: "查看全部运行记录",
         },
-        pending: { title: "工作台待关注", waiting: "{n} 项正在等你答复", inReview: "{n} 张工单待验收", todo: "{n} 张待办工单", openIssues: "打开工单看板" },
+        pending: {
+          title: "工作台待关注",
+          waiting: "正在等你答复",
+          inReview: "工单待验收",
+          todo: "待办工单",
+          empty: "暂无需要立即处理的事项。",
+          openIssues: "打开工单看板",
+        },
         recent: { title: "最近运行记录", empty: "还没有运行记录。" },
         quick: { title: "快捷入口" },
       },
@@ -1593,8 +1617,22 @@ export const catalogs = {
         orderNote: "不是「默认」排序时，待办不能上下拖着排先后。",
         defaultNote: "「默认」是待办里你排的先后。",
         show: "显示",
-        group: "分组",
+        listGroup: "列表分组",
         order: "排序",
+        density: "密度",
+        densities: { comfortable: "舒适", compact: "紧凑" },
+        fields: "显示属性",
+        field: {
+          number: "编号",
+          priority: "优先级",
+          repo: "仓库",
+          owner: "负责人",
+          agent: "角色",
+          tags: "标签",
+          dates: "日期",
+          progress: "进度",
+          preview: "预览图",
+        },
         reset: "恢复默认",
       },
       list: {
@@ -1775,6 +1813,7 @@ export const catalogs = {
         firstRepo: "还没有仓库：新建一个",
         newRepoLink: "新建仓库",
         mountLocalLink: "关联本地仓库",
+        repoActions: "新建或关联仓库",
         priority: "优先级",
         inQueue: "排队中：{ago}排上的，有并发上限就按看板上的先后自动开工。",
         unqueue: "不排了",
@@ -2837,6 +2876,7 @@ export const catalogs = {
       repos: "代码库",
       all: "全部",
       allLine: "整张地图：每个仓库一座岛",
+      selectPrompt: "从左侧选择一个仓库查看健康度、语言分布与提交历史。",
       notGit: "还不是 git 仓库",
       finding: "在找……",
       none: "工作区里还没有仓库。点「新增仓库」新建一个，或从 GitHub 下载一个。",
@@ -2926,14 +2966,14 @@ export const catalogs = {
       unmountTip: "仅从 VibeValley 列表移除关联，不会删除磁盘上的本地文件夹",
       health: {
         title: "仓库健康度",
-        open: "开着 {n}",
-        inProgress: "进行中 {n}",
-        inReview: "待验收 {n}",
-        blocked: "阻塞 {n}",
-        stuck: "卡住 {n}",
-        asking: "待回复 {n}",
-        failedChecks: "检查失败 {n}",
-        overdue: "已逾期 {n}",
+        open: "开着",
+        inProgress: "进行中",
+        inReview: "待验收",
+        blocked: "阻塞",
+        stuck: "卡住",
+        asking: "待回复",
+        failedChecks: "检查失败",
+        overdue: "已逾期",
       },
     },
     "web.runtime": {
@@ -2954,8 +2994,6 @@ export const catalogs = {
       noRuntimes: "读不到引擎：",
       usedBy: " · {n} 个 agent",
       reading: "读取中…",
-      bundled: "随 oar 一起装",
-      commandLine: "命令行",
       unsupportedWhy: "不支持：{why}",
       checkedAt: "检测于 {clock}",
       recheck: "重新检测",
@@ -2991,6 +3029,7 @@ export const catalogs = {
       enabledHint: "停用后，用它的 agent 都派不出去。",
       binPath: "命令路径",
       binPathHint: "对应 oar 的 OAR_{id}_BIN。留空就在 PATH 里找。",
+      binPathResolved: "当前：{path} · 对应 oar 的 OAR_{id}_BIN，留空就在 PATH 里找。",
       auto: "自动查找",
       defaultModel: "默认模型",
       defaultModelHint: "agent 没指定模型时用它。",
@@ -3084,7 +3123,6 @@ export const catalogs = {
       },
       quickActions: "快捷操作",
       installation: "安装与路径",
-      source: "安装方式",
       mcpServer: {
         add: "添加",
         addTitle: "添加 MCP 服务器",
@@ -3514,6 +3552,7 @@ export const catalogs = {
         call: "通话",
       },
       readiness: { ready: "{feature}：可以用了", lacks: "{feature}：{why}", fix: "去设置" },
+      remote: { toggleLabel: "手机与客户端接入", toggleHint: "开启后允许已配对设备经 Tailscale 连接到这台 Mac。" },
     },
     "web.shell": {
       sidebar: {
@@ -3944,6 +3983,22 @@ export const catalogs = {
       avatar: "Role avatar",
       avatarHint: "Shown in lists and chat; when unset, the farm animal face is shown.",
       avatarAnimal: "Animal face",
+      avatarLabels: {
+        orchestrator: "All-Round Assistant",
+        fullstack: "Full-Stack Engineer",
+        architect: "System Architect",
+        frontend: "Frontend Engineer",
+        backend: "Backend Engineer",
+        reviewer: "Code Reviewer",
+        tester: "QA Engineer",
+        designer: "UI/UX Designer",
+        product: "Product Lead",
+        scout: "Tech Scout",
+        docs: "Technical Writer",
+        pages: "Dashboard Builder",
+        slides: "Presentation Lead",
+        collector: "Asset Collector",
+      },
       looksAs: "On the farm it is",
       looksHint: "Only looks: the same runtime can be different animals.",
       wears: "Wears",
@@ -4064,7 +4119,8 @@ export const catalogs = {
         updated: "Updated from the template",
         galleryTitle: "Starter templates",
         galleryIntro: "Adopt a ready-to-use role with a working style, persona, and skills.",
-        manageLink: "All templates & import",
+        showGallery: "Show templates",
+        hideGallery: "Hide templates",
         adopt: "Adopt",
         adopted: "{n} adopted",
         adoptedToast: 'Adopted "{name}"',
@@ -4545,7 +4601,7 @@ export const catalogs = {
             reworkLine: "Rework: {reworkRate} ({issues} issues, {findings} findings, {unresolved} unresolved)",
           },
         },
-        profile: { defaultName: "Workspace User", defaultTagline: "Coordinating roles and issues across your workspace", edit: "Edit profile" },
+        profile: { defaultName: "Workspace User", defaultTagline: "Coordinating roles and issues across your workspace" },
         stats: { working: "Active sessions", waiting: "Needs response", issues: "Open issues", review: "In review" },
         pulse: {
           title: "Live Execution Pulse",
@@ -4555,9 +4611,10 @@ export const catalogs = {
         },
         pending: {
           title: "Needs Review & Action",
-          waiting: "{n} waiting on your reply",
-          inReview: "{n} issues in review",
-          todo: "{n} todo issues",
+          waiting: "Waiting on your reply",
+          inReview: "Issues in review",
+          todo: "Todo issues",
+          empty: "Nothing needs your attention right now.",
           openIssues: "Open issues board",
         },
         recent: { title: "Recent Runs", empty: "No runs recorded yet." },
@@ -5538,8 +5595,22 @@ export const catalogs = {
         orderNote: "Unless the order is Default, to-dos cannot be dragged up and down.",
         defaultNote: "Default is the order you gave the to-dos.",
         show: "Display",
-        group: "Group",
+        listGroup: "List group",
         order: "Order",
+        density: "Density",
+        densities: { comfortable: "Comfortable", compact: "Compact" },
+        fields: "Properties",
+        field: {
+          number: "ID",
+          priority: "Priority",
+          repo: "Repo",
+          owner: "Assignee",
+          agent: "Helper",
+          tags: "Tags",
+          dates: "Dates",
+          progress: "Progress",
+          preview: "Preview",
+        },
         reset: "Reset",
       },
       list: {
@@ -5722,6 +5793,7 @@ export const catalogs = {
         firstRepo: "No repo yet: make one",
         newRepoLink: "New repo",
         mountLocalLink: "Mount local repo",
+        repoActions: "New or mount repo",
         priority: "Priority",
         inQueue: "Queued {ago}: it starts by itself in the board's order when a spot frees up.",
         unqueue: "Unqueue",
@@ -6835,6 +6907,7 @@ export const catalogs = {
       repos: "Code bases",
       all: "All",
       allLine: "The whole map: an island for each repo",
+      selectPrompt: "Select a repository from the list to inspect its health, languages, and commit history.",
       notGit: "Not a git repository yet",
       finding: "Looking…",
       none: "No repos in the work folder yet. Press New repo to add one, or download one from GitHub.",
@@ -6924,14 +6997,14 @@ export const catalogs = {
       unmountTip: "Stop managing this external folder in VibeValley without deleting files on disk",
       health: {
         title: "Health",
-        open: "Open {n}",
-        inProgress: "Working {n}",
-        inReview: "Review {n}",
-        blocked: "Blocked {n}",
-        stuck: "Stuck {n}",
-        asking: "Asking {n}",
-        failedChecks: "Failed checks {n}",
-        overdue: "Overdue {n}",
+        open: "Open",
+        inProgress: "Working",
+        inReview: "Review",
+        blocked: "Blocked",
+        stuck: "Stuck",
+        asking: "Asking",
+        failedChecks: "Failed checks",
+        overdue: "Overdue",
       },
     },
     "web.runtime": {
@@ -6952,8 +7025,6 @@ export const catalogs = {
       noRuntimes: "The machines could not be read: ",
       usedBy: " · {n} agents",
       reading: "Reading…",
-      bundled: "installed with oar",
-      commandLine: "command line",
       unsupportedWhy: "Unsupported: {why}",
       checkedAt: "checked at {clock}",
       recheck: "Check again",
@@ -6990,6 +7061,7 @@ export const catalogs = {
       enabledHint: "Disabled, the agents using it cannot be sent.",
       binPath: "Command path",
       binPathHint: "oar's OAR_{id}_BIN. Empty searches the PATH.",
+      binPathResolved: "Resolved: {path} · oar's OAR_{id}_BIN; empty searches PATH.",
       auto: "Find it",
       defaultModel: "Default model",
       defaultModelHint: "Used when an agent names no model.",
@@ -7092,7 +7164,6 @@ export const catalogs = {
       },
       quickActions: "Quick actions",
       installation: "Installation",
-      source: "Install source",
       mcpServer: {
         add: "Add",
         addTitle: "Add MCP server",
@@ -7532,6 +7603,7 @@ export const catalogs = {
         call: "Calls",
       },
       readiness: { ready: "{feature}: ready", lacks: "{feature}: {why}", fix: "Set it up" },
+      remote: { toggleLabel: "Mobile & client listener", toggleHint: "Allow paired devices to connect to this Mac over Tailscale." },
     },
     "web.shell": {
       sidebar: {
@@ -7949,6 +8021,20 @@ export interface Messages {
   "web.agent.avatar": undefined;
   "web.agent.avatarAnimal": undefined;
   "web.agent.avatarHint": undefined;
+  "web.agent.avatarLabels.architect": undefined;
+  "web.agent.avatarLabels.backend": undefined;
+  "web.agent.avatarLabels.collector": undefined;
+  "web.agent.avatarLabels.designer": undefined;
+  "web.agent.avatarLabels.docs": undefined;
+  "web.agent.avatarLabels.frontend": undefined;
+  "web.agent.avatarLabels.fullstack": undefined;
+  "web.agent.avatarLabels.orchestrator": undefined;
+  "web.agent.avatarLabels.pages": undefined;
+  "web.agent.avatarLabels.product": undefined;
+  "web.agent.avatarLabels.reviewer": undefined;
+  "web.agent.avatarLabels.scout": undefined;
+  "web.agent.avatarLabels.slides": undefined;
+  "web.agent.avatarLabels.tester": undefined;
   "web.agent.backToAll": undefined;
   "web.agent.can": { readonly runtime: string | number };
   "web.agent.cannot": undefined;
@@ -8100,8 +8186,8 @@ export interface Messages {
   "web.agent.templates.from": { readonly name: string | number; readonly version: string | number };
   "web.agent.templates.galleryIntro": undefined;
   "web.agent.templates.galleryTitle": undefined;
+  "web.agent.templates.hideGallery": undefined;
   "web.agent.templates.intro": undefined;
-  "web.agent.templates.manageLink": undefined;
   "web.agent.templates.noPersona": undefined;
   "web.agent.templates.notHere": { readonly runtime: string | number };
   "web.agent.templates.onServer": undefined;
@@ -8109,6 +8195,7 @@ export interface Messages {
   "web.agent.templates.openLine": undefined;
   "web.agent.templates.preview": undefined;
   "web.agent.templates.removeSure": undefined;
+  "web.agent.templates.showGallery": undefined;
   "web.agent.templates.skill": { readonly description: string | number; readonly name: string | number };
   "web.agent.templates.style": { readonly style: string | number };
   "web.agent.templates.title": undefined;
@@ -8541,14 +8628,14 @@ export interface Messages {
   "web.base.compare.uploadFailed": { readonly why: string | number };
   "web.base.compare.uploading": undefined;
   "web.base.compare.zoom": { readonly label: string | number };
-  "web.base.dashboard.pending.inReview": { readonly n: string | number };
+  "web.base.dashboard.pending.empty": undefined;
+  "web.base.dashboard.pending.inReview": undefined;
   "web.base.dashboard.pending.openIssues": undefined;
   "web.base.dashboard.pending.title": undefined;
-  "web.base.dashboard.pending.todo": { readonly n: string | number };
-  "web.base.dashboard.pending.waiting": { readonly n: string | number };
+  "web.base.dashboard.pending.todo": undefined;
+  "web.base.dashboard.pending.waiting": undefined;
   "web.base.dashboard.profile.defaultName": undefined;
   "web.base.dashboard.profile.defaultTagline": undefined;
-  "web.base.dashboard.profile.edit": undefined;
   "web.base.dashboard.pulse.active": { readonly n: string | number };
   "web.base.dashboard.pulse.empty": undefined;
   "web.base.dashboard.pulse.openRuns": undefined;
@@ -9669,7 +9756,20 @@ export interface Messages {
   "web.issue.digest.triageTitle": undefined;
   "web.issue.display.boardNote": undefined;
   "web.issue.display.defaultNote": undefined;
-  "web.issue.display.group": undefined;
+  "web.issue.display.densities.comfortable": undefined;
+  "web.issue.display.densities.compact": undefined;
+  "web.issue.display.density": undefined;
+  "web.issue.display.field.agent": undefined;
+  "web.issue.display.field.dates": undefined;
+  "web.issue.display.field.number": undefined;
+  "web.issue.display.field.owner": undefined;
+  "web.issue.display.field.preview": undefined;
+  "web.issue.display.field.priority": undefined;
+  "web.issue.display.field.progress": undefined;
+  "web.issue.display.field.repo": undefined;
+  "web.issue.display.field.tags": undefined;
+  "web.issue.display.fields": undefined;
+  "web.issue.display.listGroup": undefined;
   "web.issue.display.order": undefined;
   "web.issue.display.orderNote": undefined;
   "web.issue.display.reset": undefined;
@@ -9891,6 +9991,7 @@ export interface Messages {
   "web.issue.todo.refining": { readonly who: string | number };
   "web.issue.todo.refiningLine": undefined;
   "web.issue.todo.remove": undefined;
+  "web.issue.todo.repoActions": undefined;
   "web.issue.todo.repoHint": undefined;
   "web.issue.todo.repoName": undefined;
   "web.issue.todo.revive": undefined;
@@ -10866,14 +10967,14 @@ export interface Messages {
   "web.repo.github": undefined;
   "web.repo.githubAddress": undefined;
   "web.repo.githubHint": undefined;
-  "web.repo.health.asking": { readonly n: string | number };
-  "web.repo.health.blocked": { readonly n: string | number };
-  "web.repo.health.failedChecks": { readonly n: string | number };
-  "web.repo.health.inProgress": { readonly n: string | number };
-  "web.repo.health.inReview": { readonly n: string | number };
-  "web.repo.health.open": { readonly n: string | number };
-  "web.repo.health.overdue": { readonly n: string | number };
-  "web.repo.health.stuck": { readonly n: string | number };
+  "web.repo.health.asking": undefined;
+  "web.repo.health.blocked": undefined;
+  "web.repo.health.failedChecks": undefined;
+  "web.repo.health.inProgress": undefined;
+  "web.repo.health.inReview": undefined;
+  "web.repo.health.open": undefined;
+  "web.repo.health.overdue": undefined;
+  "web.repo.health.stuck": undefined;
   "web.repo.health.title": undefined;
   "web.repo.how": undefined;
   "web.repo.inYear": undefined;
@@ -10932,6 +11033,7 @@ export interface Messages {
   "web.repo.rows.4": undefined;
   "web.repo.rows.5": undefined;
   "web.repo.rows.6": undefined;
+  "web.repo.selectPrompt": undefined;
   "web.repo.thenRecount": undefined;
   "web.repo.times": { readonly n: string | number };
   "web.repo.uncounted": undefined;
@@ -10953,10 +11055,10 @@ export interface Messages {
   "web.runtime.balance": { readonly enough: boolean; readonly provider: string | number };
   "web.runtime.binPath": undefined;
   "web.runtime.binPathHint": { readonly id: string | number };
+  "web.runtime.binPathResolved": { readonly id: string | number; readonly path: string | number };
   "web.runtime.budget": undefined;
   "web.runtime.budgetHint": { readonly pi: boolean; readonly spent: string | number };
   "web.runtime.budgetLabel": undefined;
-  "web.runtime.bundled": undefined;
   "web.runtime.can": undefined;
   "web.runtime.capability.accountUsage": undefined;
   "web.runtime.capability.checkUpdate": undefined;
@@ -10967,7 +11069,6 @@ export interface Messages {
   "web.runtime.capability.upgrade": undefined;
   "web.runtime.checkedAt": { readonly clock: string | number };
   "web.runtime.checking": undefined;
-  "web.runtime.commandLine": undefined;
   "web.runtime.default": undefined;
   "web.runtime.defaultEffort": undefined;
   "web.runtime.defaultModel": undefined;
@@ -11095,7 +11196,6 @@ export interface Messages {
   "web.runtime.signInTerminal": undefined;
   "web.runtime.signedOut": { readonly runtime: string | number };
   "web.runtime.skills": undefined;
-  "web.runtime.source": undefined;
   "web.runtime.spentToday": { readonly spent: string | number };
   "web.runtime.spentTodayBudget": { readonly budget: string | number; readonly spent: string | number };
   "web.runtime.stats.cumulativeSpend": undefined;
@@ -11472,6 +11572,8 @@ export interface Messages {
   "web.setting.readiness.fix": undefined;
   "web.setting.readiness.lacks": { readonly feature: string | number; readonly why: string | number };
   "web.setting.readiness.ready": { readonly feature: string | number };
+  "web.setting.remote.toggleHint": undefined;
+  "web.setting.remote.toggleLabel": undefined;
   "web.setting.scope.device": undefined;
   "web.setting.scope.farm": undefined;
   "web.setting.source.address": { readonly label: string | number };

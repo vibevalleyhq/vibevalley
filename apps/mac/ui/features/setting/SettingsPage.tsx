@@ -1,16 +1,18 @@
 import { computed, Scroll, signal, Text, View, windowSize, type JSX } from "nsh";
 
-import { t } from "@vibevalley/i18n";
-import { FeatureValues } from "@vibevalley/protocol";
+import { list, t } from "@vibevalley/i18n";
+import { type Feature, FeatureValues, type Missing, type Readiness } from "@vibevalley/protocol";
 
-import { Readiness } from "../../design/domain/Readiness";
 import { SettingsPage as Page, SettingsSearch } from "../../design/domain/settings";
 import { SearchField } from "../../design/Field";
 import { Icon } from "../../design/Icon";
 import type { IconName } from "../../design/icons";
 import { ActiveBar } from "../../design/layout";
 import { Splitter, usePaneWidth } from "../../design/Splitter";
+import { TextLink } from "../../design/TextLink";
 import { matches } from "../../infra/base/search";
+import { ready, settingsQuery, useQuery } from "../../infra/query";
+import { fixOf } from "../../infra/readiness";
 import { Link as A, Navigate } from "../../infra/router";
 import { ConnectorsPage } from "../connector";
 import { ProviderModels } from "../provider";
@@ -76,10 +78,126 @@ function legacyRedirect(rest: string): string | undefined {
   }
 }
 
+type ReadinessRow =
+  | { readonly key: string; readonly ready: true; readonly text: string }
+  | { readonly key: string; readonly ready: false; readonly text: string; readonly fixHref?: string | undefined };
+
+function buildReadinessRows(
+  features: readonly Feature[],
+  all: Record<Feature, Readiness>,
+  options: { collapseSameReason?: boolean; selfHref?: string },
+): ReadinessRow[] {
+  const readyNames: string[] = [];
+  const lackingByMissing = new Map<Missing, Feature[]>();
+  const rows: ReadinessRow[] = [];
+
+  if (options.collapseSameReason === true) {
+    for (const f of features) {
+      const state = all[f];
+      if (state.ready) {
+        readyNames.push(t(`web.setting.feature.${f}`));
+      } else {
+        const group = lackingByMissing.get(state.missing);
+        if (group) group.push(f);
+        else lackingByMissing.set(state.missing, [f]);
+      }
+    }
+    if (readyNames.length > 0) {
+      rows.push({
+        key: `ready:${readyNames.join(",")}`,
+        ready: true,
+        text: t("web.setting.readiness.ready", { feature: list(readyNames) }),
+      });
+    }
+    for (const [missing, group] of lackingByMissing) {
+      const fix = fixOf(missing);
+      rows.push({
+        key: `lacks:${missing}`,
+        ready: false,
+        text: t("web.setting.readiness.lacks", {
+          feature: list(group.map((f) => t(`web.setting.feature.${f}`))),
+          why: fix.words,
+        }),
+        ...(fix.href !== options.selfHref ? { fixHref: fix.href } : {}),
+      });
+    }
+    return rows;
+  }
+
+  for (const f of features) {
+    const state = all[f];
+    const name = t(`web.setting.feature.${f}`);
+    if (state.ready) {
+      rows.push({ key: `ready:${f}`, ready: true, text: t("web.setting.readiness.ready", { feature: name }) });
+    } else {
+      const fix = fixOf(state.missing);
+      rows.push({
+        key: `lacks:${f}`,
+        ready: false,
+        text: t("web.setting.readiness.lacks", { feature: name, why: fix.words }),
+        ...(fix.href !== options.selfHref ? { fixHref: fix.href } : {}),
+      });
+    }
+  }
+  return rows;
+}
+
+function SettingsReadiness(props: { features: readonly Feature[]; selfHref?: string; collapseSameReason?: boolean }) {
+  const settings = useQuery(settingsQuery);
+  const rows = computed(() => {
+    const readiness = ready(settings, undefined)?.readiness;
+    if (!readiness) return undefined;
+    return buildReadinessRows(props.features, readiness, {
+      ...(props.collapseSameReason !== undefined ? { collapseSameReason: props.collapseSameReason } : {}),
+      ...(props.selfHref !== undefined ? { selfHref: props.selfHref } : {}),
+    });
+  });
+
+  return (
+    <If when={rows()}>
+      {(items) => (
+        <View class="gap-1.5 rounded-lg bg-side px-3.5 py-2.5" testID="readiness">
+          <Each of={items()} key={(row) => row.key}>
+            {(row) => {
+              const fixHref = () => {
+                const r = row();
+                return !r.ready ? r.fixHref : undefined;
+              };
+              return (
+                <View class="flex-row flex-wrap items-center gap-2" testID={row().ready ? "readiness-row-ready" : "readiness-row-lacking"}>
+                  <If
+                    when={!row().ready}
+                    else={
+                      <>
+                        <Icon name="ticked" size={14} tone="leaf" />
+                        <Text class="text-sm text-ink">{row().text}</Text>
+                      </>
+                    }
+                  >
+                    <Icon name="warn" size={14} />
+                    <Text class="text-sm text-ink">{row().text}</Text>
+                    <If when={fixHref()}>
+                      {(href) => (
+                        <TextLink href={href()} testid="readiness-fix">
+                          {t("web.setting.readiness.fix")}
+                        </TextLink>
+                      )}
+                    </If>
+                  </If>
+                </View>
+              );
+            }}
+          </Each>
+        </View>
+      )}
+    </If>
+  );
+}
+
 function VoiceSettings() {
   return (
     <Page title={t("web.setting.nav.voice")} description={t("web.voice.moss.intro")}>
-      <Readiness features={FeatureValues.filter((f) => f === "live" || f === "vision" || f === "call")} />
+      <SettingsReadiness features={FeatureValues.filter((f) => f === "live" || f === "vision" || f === "call")} collapseSameReason />
       <VoiceForm part="line" />
     </Page>
   );
@@ -103,7 +221,7 @@ function SectionBody(props: { id: string; connectorId: string | undefined }) {
       </If>
       <If when={props.id === "models"}>
         <Page title={t("web.setting.nav.models")} hint={t("web.setting.models.intro")}>
-          <Readiness features={["orchestrator", "call"]} />
+          <SettingsReadiness features={["orchestrator", "call"]} selfHref="/settings/models" />
           <SettingsForm part="deepseek" />
           <ProviderModels />
         </Page>
@@ -187,14 +305,14 @@ export function SettingsPage(props: { rest: string }) {
                     <If when={workspaceShown().length > 0}>
                       <NavGroup title={t("web.setting.nav.groupWorkspace")}>
                         <Each of={workspaceShown()} key={(s) => s.id}>
-                          {(s) => <SectionLink section={s()} current={s() === current()} />}
+                          {(s) => <SectionLink section={s()} current={s().id === current().id} />}
                         </Each>
                       </NavGroup>
                     </If>
                     <If when={connectShown().length > 0}>
                       <NavGroup title={t("web.setting.nav.groupConnect")}>
                         <Each of={connectShown()} key={(s) => s.id}>
-                          {(s) => <SectionLink section={s()} current={s() === current()} />}
+                          {(s) => <SectionLink section={s()} current={s().id === current().id} />}
                         </Each>
                       </NavGroup>
                     </If>
@@ -204,7 +322,7 @@ export function SettingsPage(props: { rest: string }) {
                       <Text class="px-2.5 pt-0.5 pb-1 text-2xs font-semibold text-faint">{t("web.setting.nav.groupAbout")}</Text>
                       <View class="gap-0.5">
                         <Each of={aboutShown()} key={(s) => s.id}>
-                          {(s) => <SectionLink section={s()} current={s() === current()} />}
+                          {(s) => <SectionLink section={s()} current={s().id === current().id} />}
                         </Each>
                       </View>
                     </View>
@@ -252,7 +370,7 @@ function SectionLink(props: { section: Section; current: boolean }) {
       accessibilityLabel={props.section.label}
       accessibilityState={{ selected: props.current }}
       class={`relative group h-8 flex-row items-center gap-2.5 rounded-md px-2.5 focus-visible:outline-2 focus-visible:outline-focus ${
-        props.current ? "bg-selected" : "hover:bg-hover"
+        props.current ? "bg-selected" : "bg-transparent hover:bg-hover"
       }`}
     >
       <If when={props.current}>

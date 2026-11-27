@@ -350,3 +350,48 @@ test("6-lane Kanban fits all 6 lanes at 1680px and renders 5 unclipped lanes at 
   expect(done1280.x + done1280.width).toBeLessThanOrEqual(scroll1280.x + scroll1280.width + 1);
   expect(canceled1280.x).toBeGreaterThanOrEqual(scroll1280.x + scroll1280.width);
 });
+
+test("regression: Board cards and List rows omit full-body hover tooltips while keeping field micro-tooltips", async () => {
+  setLocale("zh");
+  const item: Issue = {
+    ...makeTodoIssue("i-hover-clean", "Clean card without full-body pop tip", "laozhou"),
+    attachments: [{ id: "att-1", name: "spec.png", type: "image/png", size: 1024 }],
+  };
+  const state: SliceBundle = {
+    ...scenarios.empty.state,
+    board: { seq: 5, issues: [item] },
+  };
+  const { app, fake } = await mountBoard(
+    "typical",
+    (f) => {
+      f.respond("issue.history.list", [{ issue: item, sessions: [], missingSessions: [] }]);
+    },
+    { state },
+  );
+  await fake.pumpUntil(app, () => app.count("id:issue-card") === 1 && app.count("id:card-attachments") === 1);
+
+  // Hovering the Board card past Bubble delay (300ms) must not pop up cardLook.detail ("写于 …").
+  await app.hover("id:issue-card");
+  await app.wait(400);
+  const boardHoverTexts = app.texts().join("\n");
+  expect(boardHoverTexts).not.toContain("写于 ");
+  expect(boardHoverTexts).not.toContain(t("web.issue.card.pickFirst"));
+
+  // Hovering the attachment micro-badge still renders its concise tooltip.
+  await app.hover("id:card-attachments");
+  await app.wait(400);
+  expect(app.texts()).toContain(t("web.issue.attachments.count", { n: 1 }));
+
+  // Switch to List view: hovering the row must not render full-body detail overlay, while micro-tooltips remain.
+  await app.press("id:issue-view-list");
+  await fake.pumpUntil(app, () => app.count("id:issue-list") === 1 && app.count("id:row-attachments") === 1);
+  await app.hover("id:issue-card");
+  await app.wait(400);
+  const listHoverTexts = app.texts().join("\n");
+  expect(listHoverTexts).not.toContain("写于 ");
+  expect(listHoverTexts).not.toContain(t("web.issue.card.pickFirst"));
+
+  await app.hover("id:row-attachments");
+  await app.wait(400);
+  expect(app.texts()).toContain(t("web.issue.attachments.count", { n: 1 }));
+});
