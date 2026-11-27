@@ -252,11 +252,11 @@ pub(crate) fn collect_targets(shell: &Shell, attached_ids: &HashSet<String>, cx:
         }
     }
 
-    if route.as_deref().is_some_and(|r| r.starts_with("/library") || r.starts_with("/artifacts")) {
+    if route.as_deref().is_some_and(|r| r.starts_with("/library") || r.starts_with("/notes")) {
         targets.push(VdpTarget {
             id: "webview".into(),
             kind: VdpTargetKind::Webview,
-            title: "Artifact WebView".into(),
+            title: "Note WebView".into(),
             url: route,
             attached: attached_ids.contains("webview"),
         });

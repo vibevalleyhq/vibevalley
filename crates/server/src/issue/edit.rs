@@ -158,6 +158,8 @@ impl Board {
             if let Some(owner) = upd.owner.clone() {
                 issue.owner = super::board::normalize_owner_with_driver(self.runtime.driver().as_ref(), Some(owner));
             }
+            let updated_id = was.id.clone();
+            let updated_desc = issue.description.clone();
             let mut edited = vec![issue];
             edited.extend(peer_relation_updates);
             if let Some(before) = &upd.before {
@@ -174,6 +176,15 @@ impl Board {
             drop(_work);
             if should_refresh_queue {
                 self.refresh_queue_unlocked_async().await;
+            }
+            if upd.description.is_some() {
+                let links = vibevalley_core::note::links::extract_markdown_links(&updated_desc);
+                let _ = self
+                    .ctx
+                    .service
+                    .note
+                    .replace_links_for_source(vibevalley_protocol::LinkEntityKind::Issue, &updated_id, &links, at)
+                    .await;
             }
             self.stored_async(&was.id).await
         })

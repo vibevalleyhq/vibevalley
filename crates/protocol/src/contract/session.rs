@@ -419,9 +419,9 @@ pub enum ContextRef {
     #[serde(rename_all = "camelCase")]
     Channel { id: String },
     #[serde(rename_all = "camelCase")]
-    Artifact {
-        #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::ArtifactId"))]
-        id: ArtifactId,
+    Note {
+        #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::NoteId"))]
+        id: NoteId,
     },
 }
 

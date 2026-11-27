@@ -292,260 +292,6 @@ export const catalogs = {
       targetMachineDraining: "{name}（排空中）",
       selector: { ready: "就绪", warn: "提醒", error: "不可用", checking: "检测中…", fix: "去设置" },
     },
-    "web.artifact": {
-      card: { version: "第 {version} 稿", open: "打开「{title}」" },
-      preview: { slides: "{n} 页", shots: "{n} 镜", scenes: "{n} 场", nodes: "{n} 节点", edges: "{n} 连线" },
-      page: {
-        delete: "删掉",
-        deleteAsk: "删掉「{title}」？对话里的卡片还在。",
-        deleted: "删掉了「{title}」",
-        gone: "这份作品已经删掉了，或者没有这份作品。",
-        new: "新建",
-        none: "还没有作品：写个标题新建一篇，或者让执行会话交一份上来。",
-        all: "全部作品",
-        title: "标题",
-        more: "更多",
-        rail: "这篇的旁注",
-        railShow: "打开旁注",
-        railHide: "收起旁注",
-        backToLibrary: "返回作品库",
-        previewTab: "预览",
-        filesTab: "文件",
-        filesTabCount: "文件 ({n})",
-        viewMode: "视图模式",
-        liveVersion: "实时",
-        directory: "目录",
-        newFileLabel: "新文件路径",
-        discard: "放弃更改",
-        unsaved: "未保存",
-        deleteFileAsk: "删除文件「{path}」？",
-        snapshotNote: "手动快照",
-      },
-      docs: { split: "分栏", edit: "编辑", read: "阅读" },
-      outline: {
-        progress: "{done}/{total} 已完成",
-        hideDone: "隐藏已完成",
-        showDone: "显示已完成",
-        quickAdd: "输入内容后按回车快速添加…",
-        kindHeading: "标题",
-        kindBullet: "要点",
-        kindTodo: "待办",
-        cycleKind: "切换类型 ({kind})",
-        indent: "缩进",
-        outdent: "取消缩进",
-        addChild: "添加子项",
-        untitled: "新条目",
-      },
-      sheet: { filterPlaceholder: "筛选行…", addRow: "新增一行", empty: "暂无工作表", rowsCount: "{n} 行" },
-      diagram: { visual: "图谱视图", structure: "节点与连线", nodes: "节点", edges: "连线" },
-      motion: {
-        timeline: "时间线片段",
-        layers: "{n} 个图层",
-        play: "播放",
-        stop: "暂停",
-        restart: "回到开头",
-        loop: "循环播放",
-        prevStep: "后退 0.5 秒",
-        nextStep: "前进 0.5 秒",
-        chapters: "章节",
-      },
-      storyboard: {
-        gridMode: "分镜卡片",
-        animaticMode: "动态预演",
-        totalDuration: "总时长 {sec} 秒",
-        shotOf: "第 {n} / {total} 镜",
-        sfx: "音效",
-        transition: "转场",
-      },
-      prototype: { viewportLabel: "视口尺寸", viewportFull: "铺满", viewportTablet: "平板", viewportMobile: "手机", reload: "重新载入" },
-      files: { codeMode: "源码", htmlPreviewMode: "网页预览" },
-      issue: {
-        title: "作品",
-        empty: "还没有关联作品",
-        linkExisting: "关联已有作品…",
-        linkPlaceholder: "搜索作品…",
-        linkEmpty: "没有可关联的作品",
-        new: "新建作品",
-        newDialogTitle: "新建关联作品",
-        newTitle: "标题",
-        newTitlePlaceholder: "给作品起个标题…",
-        newType: "类型",
-        newCreate: "创建",
-        unlink: "取消关联「{title}」",
-        linkedToast: "已关联「{title}」",
-        unlinkedToast: "已取消关联「{title}」",
-      },
-      blocks: { saved: "都存好了", user: "你", start: "从这里开始写……" },
-      canvas: { label: "打开的作品", close: "关掉", openPage: "在作品页打开" },
-      suggestions: { title: "建议（{n}）", by: "{name} 提的", accept: "接受", reject: "不要", delete: "删掉这一块" },
-      types: {
-        defaultBadge: "默认体系",
-        setDefault: "设为默认设计体系",
-        unsetDefault: "取消默认",
-        docs: "协作文档",
-        outline: "大纲笔记",
-        slides: "幻灯片",
-        dashboard: "数据看板",
-        motion: "动态短片",
-        whiteboard: "无限白板",
-        design: "界面画板",
-        designSystem: "设计体系",
-        sheet: "电子表格",
-        prototype: "交互原型",
-        diagram: "结构图表",
-        storyboard: "分镜脚本",
-      },
-      timeline: {
-        title: "历史记录",
-        show: "打开历史记录",
-        hide: "收起历史记录",
-        savedVersions: "已保存版本",
-        commits: "变更记录",
-        loading: "正在载入历史…",
-        empty: "还没有可回放的提交",
-        backToLive: "回到最新",
-        previewBanner: "历史只读预览 · {summary}",
-        versionBanner: "正在查看第 {version} 稿（只读）{note}",
-        turn: "第 {n} 轮",
-        restore: "恢复到此版本",
-        restored: "已恢复到所选版本",
-        fork: "分叉为新作品",
-        forkTitle: "{title}（分支）",
-        forked: "已分叉为「{title}」",
-        undoTurn: "撤销此轮改动",
-        undoneOrigin: "已撤销该来源的改动",
-        compact: "压缩历史",
-        compacted: "已压缩历史快照",
-      },
-      dashboard: { exportCsv: "导出 CSV" },
-      whiteboard: {
-        pan: "平移",
-        select: "选择",
-        rect: "矩形",
-        sticky: "便签",
-        card: "卡片",
-        diamond: "菱形",
-        text: "文字",
-        container: "分区容器",
-        pen: "画笔",
-        sticker: "贴纸",
-        arrow: "连线箭头",
-        timeline: "时间线",
-        undo: "撤销",
-        redo: "重做",
-        duplicate: "复制",
-        chatWithOrchestrator: "问助手",
-        templateTimeline: "时间线模板",
-        templateArchitecture: "架构图模板",
-        inspector: "属性检查器",
-        label: "标题",
-        body: "正文",
-        noSticker: "无贴纸",
-        save: "保存",
-        entryJson: "条目 JSON",
-        saveJson: "保存 JSON",
-        exportedSvg: "已导出 SVG",
-        exportedPng: "已导出 PNG",
-        exportedJson: "已导出 JSON",
-        exportedJsonCanvas: "已导出 JSON Canvas",
-        deleteSelected: "删除选中",
-        zoomIn: "放大",
-        zoomOut: "缩小",
-        fitView: "适应画布",
-        elements: "{n} 个元素",
-        emptyHint: "从底部工具栏放置卡片、时间线、连线与贴纸，或一键载入模板开始协作",
-        fillDefault: "默认",
-        fillSun: "暖黄",
-        fillPeach: "暖橘",
-        fillLeaf: "叶绿",
-        fillWater: "湖蓝",
-        fillLavender: "淡紫",
-        fillBerry: "莓红",
-        fillSide: "灰底",
-        curveSmooth: "平滑曲线",
-        curveOrthogonal: "直角折线",
-        curveStraight: "直线",
-        styleSolid: "实线",
-        styleDashed: "虚线",
-      },
-      design: {
-        themeLight: "浅色",
-        themeDark: "深色",
-        propsTitle: "属性控制杆",
-        enabled: "开启",
-        disabled: "关闭",
-        emptyCanvas: "暂无画板元素，可在工作区中添加组件",
-      },
-      designSystem: {
-        components: "组件预览",
-        colors: "色彩令牌",
-        typography: "字体排印",
-        spacing: "间距尺度",
-        radius: "圆角尺度",
-        guidelinesDo: "推荐",
-        guidelinesDont: "避免",
-        previewTheme: "预览主题",
-        specimen: "Aa Bb 永和九年 0123456789",
-      },
-      slidesStore: { addSlide: "加一页" },
-      edit: { save: "存成新的一稿", saved: "存成了第 {version} 稿" },
-      slides: {
-        previous: "上一页",
-        next: "下一页",
-        present: "全屏放映",
-        presenter: "演讲者视图",
-        editSlide: "编辑本页",
-        doneEdit: "完成编辑",
-        slideTitleLabel: "标题",
-        slideSubtitleLabel: "副标题",
-        slideLayoutLabel: "版式",
-        layoutCover: "封面",
-        layoutContent: "正文",
-        slideBulletsLabel: "要点（每行一条）",
-        slideNotesLabel: "演讲备注",
-      },
-      presenter: {
-        missing: "没说要讲哪一份幻灯片：从作品的「演讲者视图」打开。",
-        current: "这一页",
-        next: "下一页",
-        end: "这是最后一页",
-        notes: "备注",
-        noNotes: "这一页没有备注",
-        clock: "讲了多久",
-        restart: "重新计时",
-        aside: "下一页和备注",
-        waiting: "等待演示页就绪",
-        empty: "没有可演示的页",
-        loadFailure: "演示页未能载入：{reason}",
-      },
-      standalone: { missing: "这份作品已经删掉了，或者没有这份作品。", version: "第 {version} 稿", live: "最新" },
-      applet: {
-        button: "安装为桌面应用",
-        badgeInstalled: "已安装",
-        modalTitle: "本地桌面应用",
-        subtitle: "将这份作品安装为独立 Mac 应用，可从聚焦搜索或程序坞直接打开。",
-        appNameLabel: "应用名称",
-        appNamePlaceholder: "输入应用显示名称",
-        alwaysOnTopLabel: "窗口置顶",
-        alwaysOnTopHint: "独立应用窗口保持在其它窗口之上。",
-        statusInstalled: "已安装",
-        statusNotInstalled: "尚未安装",
-        bundlePathLabel: "应用位置",
-        bundleIdLabel: "应用标识",
-        install: "安装应用",
-        reinstall: "更新并重装",
-        installing: "正在安装…",
-        open: "打开应用",
-        openApp: "打开独立应用",
-        manageApp: "管理应用",
-        uninstall: "卸载",
-        installedToast: "已安装「{name}.app」",
-        uninstalledToast: "已卸载「{name}.app」",
-        openedToast: "正在打开「{name}.app」",
-        nameRequired: "请先输入应用名称",
-        unavailable: "当前宿主不支持安装本地桌面应用",
-      },
-    },
     "web.audio": {
       title: "音频工作台",
       notice:
@@ -2711,6 +2457,180 @@ export const catalogs = {
         recalledLast: "想起过 {n} 次，上次 {last}",
       },
     },
+    "web.note": {
+      card: { version: "第 {version} 稿", open: "打开「{title}」" },
+      preview: { blocks: "{n} 个块", slides: "{n} 页", rows: "{n} 行", nodes: "{n} 节点" },
+      page: {
+        delete: "删掉",
+        deleteAsk: "删掉「{title}」？对话里的卡片还在。",
+        deleted: "删掉了「{title}」",
+        gone: "这篇笔记已经删掉了，或者没有这篇笔记。",
+        new: "新建笔记",
+        none: "还没有笔记：写个标题新建一篇，或者让执行会话交一份上来。",
+        all: "全部笔记",
+        title: "标题",
+        more: "更多",
+        rail: "这篇的旁注",
+        railShow: "打开旁注",
+        railHide: "收起旁注",
+        backToLibrary: "返回笔记列表",
+        previewTab: "预览",
+        filesTab: "文件",
+        filesTabCount: "文件 ({n})",
+        viewMode: "视图模式",
+        liveVersion: "实时",
+        directory: "目录",
+        newFileLabel: "新文件路径",
+        discard: "放弃更改",
+        unsaved: "未保存",
+        deleteFileAsk: "删除文件「{path}」？",
+        snapshotNote: "手动快照",
+      },
+      tree: { title: "页面树", newRoot: "新建页面", newChild: "添加子页面", moveToRoot: "移到顶层", empty: "页面树里还没有笔记" },
+      links: { outgoing: "引用去向 ({n})", backlinks: "反向链接 ({n})", empty: "暂无反向链接" },
+      doc: {
+        addBlock: "添加内容块",
+        slashHint: "输入 / 插入内容块，或输入 [[ 关联笔记或工单",
+        blocksCount: "{n} 块",
+        wordsCount: "{n} 字",
+        slidesCount: "{n} 页",
+        empty: "空白文档——添加一个内容块开始",
+      },
+      base: {
+        table: "表格",
+        board: "看板",
+        gallery: "画廊",
+        timeline: "时间线",
+        addRow: "新增一行",
+        runAgentColumn: "运行 Agent",
+        runningAgentColumn: "运行中…",
+        agentRanToast: "已对 {n} 行执行 Agent 列",
+        filterPlaceholder: "筛选行…",
+        empty: "暂无数据行",
+        rowsCount: "{n} 行",
+      },
+      files: { codeMode: "源码", htmlPreviewMode: "网页预览" },
+      issue: {
+        title: "关联笔记",
+        empty: "还没有关联笔记",
+        linkExisting: "关联已有笔记…",
+        linkPlaceholder: "搜索笔记…",
+        linkEmpty: "没有可关联的笔记",
+        new: "新建笔记",
+        newDialogTitle: "新建关联笔记",
+        newTitle: "标题",
+        newTitlePlaceholder: "给笔记起个标题…",
+        newType: "基元类型",
+        newCreate: "创建",
+        unlink: "取消关联「{title}」",
+        linkedToast: "已关联「{title}」",
+        unlinkedToast: "已取消关联「{title}」",
+      },
+      blocks: { saved: "都存好了", user: "你", start: "从这里开始写……" },
+      canvas: { label: "打开的笔记", close: "关掉", openPage: "在笔记页打开" },
+      suggestions: { title: "建议（{n}）", by: "{name} 提的", accept: "接受", reject: "不要", delete: "删掉这一块" },
+      types: { doc: "块文档", base: "多维库", canvas: "自由画布", media: "媒体记录" },
+      timeline: {
+        title: "历史记录",
+        show: "打开历史记录",
+        hide: "收起历史记录",
+        savedVersions: "已保存版本",
+        commits: "变更记录",
+        loading: "正在载入历史…",
+        empty: "还没有可回放的提交",
+        backToLive: "回到最新",
+        previewBanner: "历史只读预览 · {summary}",
+        versionBanner: "正在查看第 {version} 稿（只读）{note}",
+        turn: "第 {n} 轮",
+        restore: "恢复到此版本",
+        restored: "已恢复到所选版本",
+        fork: "分叉为新笔记",
+        forkTitle: "{title}（分支）",
+        forked: "已分叉为「{title}」",
+        undoTurn: "撤销此轮改动",
+        undoneOrigin: "已撤销该来源的改动",
+        compact: "压缩历史",
+        compacted: "已压缩历史快照",
+      },
+      edit: { save: "存成新的一稿", saved: "存成了第 {version} 稿" },
+      whiteboard: {
+        pan: "平移",
+        select: "选择",
+        rect: "矩形",
+        sticky: "便签",
+        card: "卡片",
+        diamond: "菱形",
+        text: "文字",
+        container: "分区容器",
+        pen: "画笔",
+        sticker: "贴纸",
+        arrow: "连线箭头",
+        timeline: "时间线",
+        undo: "撤销",
+        redo: "重做",
+        duplicate: "复制",
+        chatWithOrchestrator: "问助手",
+        templateTimeline: "时间线模板",
+        templateArchitecture: "架构图模板",
+        inspector: "属性检查器",
+        label: "标题",
+        body: "正文",
+        noSticker: "无贴纸",
+        save: "保存",
+        entryJson: "条目 JSON",
+        saveJson: "保存 JSON",
+        exportedSvg: "已导出 SVG",
+        exportedPng: "已导出 PNG",
+        exportedJson: "已导出 JSON",
+        exportedJsonCanvas: "已导出 JSON Canvas",
+        deleteSelected: "删除选中",
+        zoomIn: "放大",
+        zoomOut: "缩小",
+        fitView: "适应画布",
+        elements: "{n} 个元素",
+        emptyHint: "从底部工具栏放置卡片、时间线、连线与贴纸，或一键载入模板开始协作",
+        fillDefault: "默认",
+        fillSun: "暖黄",
+        fillPeach: "暖橘",
+        fillLeaf: "叶绿",
+        fillWater: "湖蓝",
+        fillLavender: "淡紫",
+        fillBerry: "莓红",
+        fillSide: "灰底",
+        curveSmooth: "平滑曲线",
+        curveOrthogonal: "直角折线",
+        curveStraight: "直线",
+        styleSolid: "实线",
+        styleDashed: "虚线",
+      },
+      standalone: { missing: "这篇笔记已经删掉了，或者没有这篇笔记。", version: "第 {version} 稿", live: "最新" },
+      applet: {
+        button: "安装为桌面应用",
+        badgeInstalled: "已安装",
+        modalTitle: "本地桌面应用",
+        subtitle: "将这篇笔记安装为独立 Mac 应用，可从聚焦搜索或程序坞直接打开。",
+        appNameLabel: "应用名称",
+        appNamePlaceholder: "输入应用显示名称",
+        alwaysOnTopLabel: "窗口置顶",
+        alwaysOnTopHint: "独立应用窗口保持在其它窗口之上。",
+        statusInstalled: "已安装",
+        statusNotInstalled: "尚未安装",
+        bundlePathLabel: "应用位置",
+        bundleIdLabel: "应用标识",
+        install: "安装应用",
+        reinstall: "更新并重装",
+        installing: "正在安装…",
+        open: "打开应用",
+        openApp: "打开独立应用",
+        manageApp: "管理应用",
+        uninstall: "卸载",
+        installedToast: "已安装「{name}.app」",
+        uninstalledToast: "已卸载「{name}.app」",
+        openedToast: "正在打开「{name}.app」",
+        nameRequired: "请先输入应用名称",
+        unavailable: "当前宿主不支持安装本地桌面应用",
+      },
+    },
     "web.orchestrator": {
       looks: {
         farmer: { name: "青年农夫", blurb: "草帽、背带裤，爱笑的年轻人。" },
@@ -4172,260 +4092,6 @@ export const catalogs = {
       targetMachineOffline: "{name} (offline)",
       targetMachineDraining: "{name} (draining)",
       selector: { ready: "Ready", warn: "Warning", error: "Unavailable", checking: "Checking…", fix: "Fix" },
-    },
-    "web.artifact": {
-      card: { version: "Version {version}", open: 'Open "{title}"' },
-      preview: { slides: "{n} slides", shots: "{n} shots", scenes: "{n} scenes", nodes: "{n} nodes", edges: "{n} edges" },
-      page: {
-        delete: "Delete",
-        deleteAsk: "Delete “{title}”? Its cards stay in the conversation.",
-        deleted: 'Deleted "{title}"',
-        gone: "This artifact was deleted, or there is no such artifact.",
-        new: "New",
-        none: "No artifacts yet: give one a title to start it, or have a helper hand one in.",
-        all: "All artifacts",
-        title: "Title",
-        more: "More",
-        rail: "Beside this artifact",
-        railShow: "Show the side panel",
-        railHide: "Hide the side panel",
-        backToLibrary: "Back to artifacts",
-        previewTab: "Preview",
-        filesTab: "Files",
-        filesTabCount: "Files ({n})",
-        viewMode: "View mode",
-        liveVersion: "Live",
-        directory: "Directory",
-        newFileLabel: "New file path",
-        discard: "Discard",
-        unsaved: "Unsaved",
-        deleteFileAsk: "Delete file “{path}”?",
-        snapshotNote: "Snapshot",
-      },
-      docs: { split: "Split", edit: "Edit", read: "Read" },
-      outline: {
-        progress: "{done}/{total} done",
-        hideDone: "Hide done",
-        showDone: "Show done",
-        quickAdd: "Type and press Enter to add…",
-        kindHeading: "Heading",
-        kindBullet: "Bullet",
-        kindTodo: "Todo",
-        cycleKind: "Switch type ({kind})",
-        indent: "Indent",
-        outdent: "Outdent",
-        addChild: "Add child",
-        untitled: "New item",
-      },
-      sheet: { filterPlaceholder: "Filter rows…", addRow: "Add row", empty: "No sheets", rowsCount: "{n} rows" },
-      diagram: { visual: "Diagram", structure: "Nodes & edges", nodes: "Nodes", edges: "Edges" },
-      motion: {
-        timeline: "Timeline scenes",
-        layers: "{n} layers",
-        play: "Play",
-        stop: "Stop",
-        restart: "Restart",
-        loop: "Loop",
-        prevStep: "Step back 0.5s",
-        nextStep: "Step forward 0.5s",
-        chapters: "Chapters",
-      },
-      storyboard: {
-        gridMode: "Grid",
-        animaticMode: "Animatic",
-        totalDuration: "{sec}s total",
-        shotOf: "Shot {n} of {total}",
-        sfx: "SFX",
-        transition: "Transition",
-      },
-      prototype: { viewportLabel: "Viewport", viewportFull: "Full", viewportTablet: "Tablet", viewportMobile: "Mobile", reload: "Reload" },
-      files: { codeMode: "Code", htmlPreviewMode: "Preview" },
-      issue: {
-        title: "Artifacts",
-        empty: "No linked artifacts yet",
-        linkExisting: "Link existing artifact…",
-        linkPlaceholder: "Search artifacts…",
-        linkEmpty: "No matching unlinked artifacts",
-        new: "New artifact",
-        newDialogTitle: "New linked artifact",
-        newTitle: "Title",
-        newTitlePlaceholder: "Give this artifact a title…",
-        newType: "Type",
-        newCreate: "Create",
-        unlink: 'Unlink "{title}"',
-        linkedToast: 'Linked "{title}"',
-        unlinkedToast: 'Unlinked "{title}"',
-      },
-      blocks: { saved: "All saved", user: "You", start: "Start writing here…" },
-      canvas: { label: "Open artifact", close: "Close", openPage: "Open its page" },
-      suggestions: { title: "Suggestions ({n})", by: "From {name}", accept: "Accept", reject: "Dismiss", delete: "Delete this block" },
-      types: {
-        defaultBadge: "Default DS",
-        setDefault: "Set as default design system",
-        unsetDefault: "Unset default",
-        docs: "Document",
-        outline: "Outline Note",
-        slides: "Slide Deck",
-        dashboard: "Dashboard",
-        motion: "Motion Film",
-        whiteboard: "Whiteboard",
-        design: "Design Canvas",
-        designSystem: "Design System",
-        sheet: "Sheet",
-        prototype: "Prototype",
-        diagram: "Diagram",
-        storyboard: "Storyboard",
-      },
-      timeline: {
-        title: "Version history",
-        show: "Show version history",
-        hide: "Hide version history",
-        savedVersions: "Saved versions",
-        commits: "Changes",
-        loading: "Loading history…",
-        empty: "No history commits yet",
-        backToLive: "Back to live",
-        previewBanner: "Read-only history preview · {summary}",
-        versionBanner: "Viewing version {version} (read-only){note}",
-        turn: "Turn {n}",
-        restore: "Restore",
-        restored: "Restored to selected commit",
-        fork: "Fork",
-        forkTitle: "{title} (Fork)",
-        forked: "Forked as “{title}”",
-        undoTurn: "Undo this turn",
-        undoneOrigin: "Undid edits from this origin",
-        compact: "Compact",
-        compacted: "Compacted history snapshot",
-      },
-      dashboard: { exportCsv: "Export CSV" },
-      whiteboard: {
-        pan: "Pan",
-        select: "Select",
-        rect: "Rectangle",
-        sticky: "Sticky note",
-        card: "Card",
-        diamond: "Diamond",
-        text: "Text",
-        container: "Container",
-        pen: "Pen",
-        sticker: "Sticker",
-        arrow: "Arrow",
-        timeline: "Timeline",
-        undo: "Undo",
-        redo: "Redo",
-        duplicate: "Duplicate",
-        chatWithOrchestrator: "Ask Assistant",
-        templateTimeline: "Timeline template",
-        templateArchitecture: "Architecture template",
-        inspector: "Inspector",
-        label: "Title / Label",
-        body: "Body",
-        noSticker: "None",
-        save: "Save",
-        entryJson: "Entry JSON",
-        saveJson: "Save JSON",
-        exportedSvg: "Exported SVG",
-        exportedPng: "Exported PNG",
-        exportedJson: "Exported JSON",
-        exportedJsonCanvas: "Exported JSON Canvas",
-        deleteSelected: "Delete selected",
-        zoomIn: "Zoom in",
-        zoomOut: "Zoom out",
-        fitView: "Fit view",
-        elements: "{n} elements",
-        emptyHint: "Place cards, timelines, connectors, and stickers from the bottom bar, or start from a template",
-        fillDefault: "Default",
-        fillSun: "Sun",
-        fillPeach: "Peach",
-        fillLeaf: "Leaf",
-        fillWater: "Water",
-        fillLavender: "Lavender",
-        fillBerry: "Berry",
-        fillSide: "Neutral",
-        curveSmooth: "Smooth",
-        curveOrthogonal: "Orthogonal",
-        curveStraight: "Straight",
-        styleSolid: "Solid",
-        styleDashed: "Dashed",
-      },
-      design: {
-        themeLight: "Light",
-        themeDark: "Dark",
-        propsTitle: "Props Inspector",
-        enabled: "Enabled",
-        disabled: "Disabled",
-        emptyCanvas: "No layers in this artboard yet",
-      },
-      designSystem: {
-        components: "Components",
-        colors: "Color Tokens",
-        typography: "Typography",
-        spacing: "Spacing",
-        radius: "Radius",
-        guidelinesDo: "Do",
-        guidelinesDont: "Don't",
-        previewTheme: "Preview Theme",
-        specimen: "The quick brown fox jumps · 0123456789",
-      },
-      slidesStore: { addSlide: "Add slide" },
-      edit: { save: "Save as a new version", saved: "Saved as version {version}" },
-      slides: {
-        previous: "Previous slide",
-        next: "Next slide",
-        present: "Present full screen",
-        presenter: "Presenter view",
-        editSlide: "Edit slide",
-        doneEdit: "Done",
-        slideTitleLabel: "Title",
-        slideSubtitleLabel: "Subtitle",
-        slideLayoutLabel: "Layout",
-        layoutCover: "Cover",
-        layoutContent: "Content",
-        slideBulletsLabel: "Bullets (one per line)",
-        slideNotesLabel: "Speaker notes",
-      },
-      presenter: {
-        missing: "No deck named: open the presenter view from an artifact's controls.",
-        current: "This slide",
-        next: "Next slide",
-        end: "This is the last slide",
-        notes: "Notes",
-        noNotes: "No notes on this slide",
-        clock: "Time so far",
-        restart: "Restart timer",
-        aside: "Next slide and notes",
-        waiting: "Waiting for the slide deck",
-        empty: "This deck has no slides",
-        loadFailure: "Could not load the slide deck: {reason}",
-      },
-      standalone: { missing: "This artifact was deleted, or there is no such artifact.", version: "v{version}", live: "Live" },
-      applet: {
-        button: "Install as App",
-        badgeInstalled: "Installed",
-        modalTitle: "Local Desktop App",
-        subtitle: "Install this artifact as a standalone Mac app you can launch from Spotlight or the Dock.",
-        appNameLabel: "App Name",
-        appNamePlaceholder: "Enter app display name",
-        alwaysOnTopLabel: "Always on Top",
-        alwaysOnTopHint: "Keep the standalone applet window floating above other windows.",
-        statusInstalled: "Installed",
-        statusNotInstalled: "Not installed",
-        bundlePathLabel: "Bundle Path",
-        bundleIdLabel: "Bundle ID",
-        install: "Install App",
-        reinstall: "Update & Reinstall",
-        installing: "Installing…",
-        open: "Open App",
-        openApp: "Open Standalone App",
-        manageApp: "Manage App",
-        uninstall: "Uninstall",
-        installedToast: "Installed “{name}.app”",
-        uninstalledToast: "Uninstalled “{name}.app”",
-        openedToast: "Opening “{name}.app”",
-        nameRequired: "Enter an app name first",
-        unavailable: "Local desktop app installation is unavailable in this host",
-      },
     },
     "web.audio": {
       title: "Audio studio",
@@ -6729,6 +6395,180 @@ export const catalogs = {
         recalledLast: "recalled {n} times, last {last}",
       },
     },
+    "web.note": {
+      card: { version: "Version {version}", open: 'Open "{title}"' },
+      preview: { blocks: "{n} blocks", slides: "{n} slides", rows: "{n} rows", nodes: "{n} nodes" },
+      page: {
+        delete: "Delete",
+        deleteAsk: "Delete “{title}”? Its cards stay in the conversation.",
+        deleted: 'Deleted "{title}"',
+        gone: "This note was deleted, or there is no such note.",
+        new: "New note",
+        none: "No notes yet: give one a title to start writing, or have a helper hand one in.",
+        all: "All notes",
+        title: "Title",
+        more: "More",
+        rail: "Beside this note",
+        railShow: "Show the side panel",
+        railHide: "Hide the side panel",
+        backToLibrary: "Back to notes",
+        previewTab: "Preview",
+        filesTab: "Files",
+        filesTabCount: "Files ({n})",
+        viewMode: "View mode",
+        liveVersion: "Live",
+        directory: "Directory",
+        newFileLabel: "New file path",
+        discard: "Discard",
+        unsaved: "Unsaved",
+        deleteFileAsk: "Delete file “{path}”?",
+        snapshotNote: "Snapshot",
+      },
+      tree: { title: "Pages", newRoot: "New page", newChild: "Add subpage", moveToRoot: "Move to top level", empty: "No pages in tree yet" },
+      links: { outgoing: "Outgoing links ({n})", backlinks: "Backlinks ({n})", empty: "No backlinks yet" },
+      doc: {
+        addBlock: "Add block",
+        slashHint: "Type / for blocks or [[ to link a note or issue",
+        blocksCount: "{n} blocks",
+        wordsCount: "{n} words",
+        slidesCount: "{n} slides",
+        empty: "Empty document — add a block to start",
+      },
+      base: {
+        table: "Table",
+        board: "Board",
+        gallery: "Gallery",
+        timeline: "Timeline",
+        addRow: "Add row",
+        runAgentColumn: "Run Agent",
+        runningAgentColumn: "Running…",
+        agentRanToast: "Ran agent column on {n} row(s)",
+        filterPlaceholder: "Filter rows…",
+        empty: "No rows yet",
+        rowsCount: "{n} rows",
+      },
+      files: { codeMode: "Code", htmlPreviewMode: "Preview" },
+      issue: {
+        title: "Notes",
+        empty: "No linked notes yet",
+        linkExisting: "Link existing note…",
+        linkPlaceholder: "Search notes…",
+        linkEmpty: "No matching unlinked notes",
+        new: "New note",
+        newDialogTitle: "New linked note",
+        newTitle: "Title",
+        newTitlePlaceholder: "Give this note a title…",
+        newType: "Primitive",
+        newCreate: "Create",
+        unlink: 'Unlink "{title}"',
+        linkedToast: 'Linked "{title}"',
+        unlinkedToast: 'Unlinked "{title}"',
+      },
+      blocks: { saved: "All saved", user: "You", start: "Start writing here…" },
+      canvas: { label: "Open note", close: "Close", openPage: "Open note page" },
+      suggestions: { title: "Suggestions ({n})", by: "From {name}", accept: "Accept", reject: "Dismiss", delete: "Delete this block" },
+      types: { doc: "Block Doc", base: "Base", canvas: "Canvas", media: "Media" },
+      timeline: {
+        title: "Version history",
+        show: "Show version history",
+        hide: "Hide version history",
+        savedVersions: "Saved versions",
+        commits: "Changes",
+        loading: "Loading history…",
+        empty: "No history commits yet",
+        backToLive: "Back to live",
+        previewBanner: "Read-only history preview · {summary}",
+        versionBanner: "Viewing version {version} (read-only){note}",
+        turn: "Turn {n}",
+        restore: "Restore",
+        restored: "Restored to selected commit",
+        fork: "Fork",
+        forkTitle: "{title} (Fork)",
+        forked: "Forked as “{title}”",
+        undoTurn: "Undo this turn",
+        undoneOrigin: "Undid edits from this origin",
+        compact: "Compact",
+        compacted: "Compacted history snapshot",
+      },
+      edit: { save: "Save as a new version", saved: "Saved as version {version}" },
+      whiteboard: {
+        pan: "Pan",
+        select: "Select",
+        rect: "Rectangle",
+        sticky: "Sticky note",
+        card: "Card",
+        diamond: "Diamond",
+        text: "Text",
+        container: "Container",
+        pen: "Pen",
+        sticker: "Sticker",
+        arrow: "Arrow",
+        timeline: "Timeline",
+        undo: "Undo",
+        redo: "Redo",
+        duplicate: "Duplicate",
+        chatWithOrchestrator: "Ask Assistant",
+        templateTimeline: "Timeline template",
+        templateArchitecture: "Architecture template",
+        inspector: "Inspector",
+        label: "Title / Label",
+        body: "Body",
+        noSticker: "None",
+        save: "Save",
+        entryJson: "Entry JSON",
+        saveJson: "Save JSON",
+        exportedSvg: "Exported SVG",
+        exportedPng: "Exported PNG",
+        exportedJson: "Exported JSON",
+        exportedJsonCanvas: "Exported JSON Canvas",
+        deleteSelected: "Delete selected",
+        zoomIn: "Zoom in",
+        zoomOut: "Zoom out",
+        fitView: "Fit view",
+        elements: "{n} elements",
+        emptyHint: "Place cards, timelines, connectors, and stickers from the bottom bar, or start from a template",
+        fillDefault: "Default",
+        fillSun: "Sun",
+        fillPeach: "Peach",
+        fillLeaf: "Leaf",
+        fillWater: "Water",
+        fillLavender: "Lavender",
+        fillBerry: "Berry",
+        fillSide: "Neutral",
+        curveSmooth: "Smooth",
+        curveOrthogonal: "Orthogonal",
+        curveStraight: "Straight",
+        styleSolid: "Solid",
+        styleDashed: "Dashed",
+      },
+      standalone: { missing: "This note was deleted, or there is no such note.", version: "v{version}", live: "Live" },
+      applet: {
+        button: "Install as App",
+        badgeInstalled: "Installed",
+        modalTitle: "Local Desktop App",
+        subtitle: "Install this note as a standalone Mac app you can launch from Spotlight or the Dock.",
+        appNameLabel: "App Name",
+        appNamePlaceholder: "Enter app display name",
+        alwaysOnTopLabel: "Always on Top",
+        alwaysOnTopHint: "Keep the standalone applet window floating above other windows.",
+        statusInstalled: "Installed",
+        statusNotInstalled: "Not installed",
+        bundlePathLabel: "Bundle Path",
+        bundleIdLabel: "Bundle ID",
+        install: "Install App",
+        reinstall: "Update & Reinstall",
+        installing: "Installing…",
+        open: "Open App",
+        openApp: "Open Standalone App",
+        manageApp: "Manage App",
+        uninstall: "Uninstall",
+        installedToast: "Installed “{name}.app”",
+        uninstalledToast: "Uninstalled “{name}.app”",
+        openedToast: "Opening “{name}.app”",
+        nameRequired: "Enter an app name first",
+        unavailable: "Local desktop app installation is unavailable in this host",
+      },
+    },
     "web.orchestrator": {
       looks: {
         farmer: { name: "Young farmer", blurb: "Straw hat and overalls, always smiling." },
@@ -8231,261 +8071,6 @@ export interface Messages {
   "web.agent.workdirTip": undefined;
   "web.agent.worktree": undefined;
   "web.agent.worktreeHint": undefined;
-  "web.artifact.applet.alwaysOnTopHint": undefined;
-  "web.artifact.applet.alwaysOnTopLabel": undefined;
-  "web.artifact.applet.appNameLabel": undefined;
-  "web.artifact.applet.appNamePlaceholder": undefined;
-  "web.artifact.applet.badgeInstalled": undefined;
-  "web.artifact.applet.bundleIdLabel": undefined;
-  "web.artifact.applet.bundlePathLabel": undefined;
-  "web.artifact.applet.button": undefined;
-  "web.artifact.applet.install": undefined;
-  "web.artifact.applet.installedToast": { readonly name: string | number };
-  "web.artifact.applet.installing": undefined;
-  "web.artifact.applet.manageApp": undefined;
-  "web.artifact.applet.modalTitle": undefined;
-  "web.artifact.applet.nameRequired": undefined;
-  "web.artifact.applet.open": undefined;
-  "web.artifact.applet.openApp": undefined;
-  "web.artifact.applet.openedToast": { readonly name: string | number };
-  "web.artifact.applet.reinstall": undefined;
-  "web.artifact.applet.statusInstalled": undefined;
-  "web.artifact.applet.statusNotInstalled": undefined;
-  "web.artifact.applet.subtitle": undefined;
-  "web.artifact.applet.unavailable": undefined;
-  "web.artifact.applet.uninstall": undefined;
-  "web.artifact.applet.uninstalledToast": { readonly name: string | number };
-  "web.artifact.blocks.saved": undefined;
-  "web.artifact.blocks.start": undefined;
-  "web.artifact.blocks.user": undefined;
-  "web.artifact.canvas.close": undefined;
-  "web.artifact.canvas.label": undefined;
-  "web.artifact.canvas.openPage": undefined;
-  "web.artifact.card.open": { readonly title: string | number };
-  "web.artifact.card.version": { readonly version: string | number };
-  "web.artifact.dashboard.exportCsv": undefined;
-  "web.artifact.design.disabled": undefined;
-  "web.artifact.design.emptyCanvas": undefined;
-  "web.artifact.design.enabled": undefined;
-  "web.artifact.design.propsTitle": undefined;
-  "web.artifact.design.themeDark": undefined;
-  "web.artifact.design.themeLight": undefined;
-  "web.artifact.designSystem.colors": undefined;
-  "web.artifact.designSystem.components": undefined;
-  "web.artifact.designSystem.guidelinesDo": undefined;
-  "web.artifact.designSystem.guidelinesDont": undefined;
-  "web.artifact.designSystem.previewTheme": undefined;
-  "web.artifact.designSystem.radius": undefined;
-  "web.artifact.designSystem.spacing": undefined;
-  "web.artifact.designSystem.specimen": undefined;
-  "web.artifact.designSystem.typography": undefined;
-  "web.artifact.diagram.edges": undefined;
-  "web.artifact.diagram.nodes": undefined;
-  "web.artifact.diagram.structure": undefined;
-  "web.artifact.diagram.visual": undefined;
-  "web.artifact.docs.edit": undefined;
-  "web.artifact.docs.read": undefined;
-  "web.artifact.docs.split": undefined;
-  "web.artifact.edit.save": undefined;
-  "web.artifact.edit.saved": { readonly version: string | number };
-  "web.artifact.files.codeMode": undefined;
-  "web.artifact.files.htmlPreviewMode": undefined;
-  "web.artifact.issue.empty": undefined;
-  "web.artifact.issue.linkEmpty": undefined;
-  "web.artifact.issue.linkExisting": undefined;
-  "web.artifact.issue.linkPlaceholder": undefined;
-  "web.artifact.issue.linkedToast": { readonly title: string | number };
-  "web.artifact.issue.new": undefined;
-  "web.artifact.issue.newCreate": undefined;
-  "web.artifact.issue.newDialogTitle": undefined;
-  "web.artifact.issue.newTitle": undefined;
-  "web.artifact.issue.newTitlePlaceholder": undefined;
-  "web.artifact.issue.newType": undefined;
-  "web.artifact.issue.title": undefined;
-  "web.artifact.issue.unlink": { readonly title: string | number };
-  "web.artifact.issue.unlinkedToast": { readonly title: string | number };
-  "web.artifact.motion.chapters": undefined;
-  "web.artifact.motion.layers": { readonly n: string | number };
-  "web.artifact.motion.loop": undefined;
-  "web.artifact.motion.nextStep": undefined;
-  "web.artifact.motion.play": undefined;
-  "web.artifact.motion.prevStep": undefined;
-  "web.artifact.motion.restart": undefined;
-  "web.artifact.motion.stop": undefined;
-  "web.artifact.motion.timeline": undefined;
-  "web.artifact.outline.addChild": undefined;
-  "web.artifact.outline.cycleKind": { readonly kind: string | number };
-  "web.artifact.outline.hideDone": undefined;
-  "web.artifact.outline.indent": undefined;
-  "web.artifact.outline.kindBullet": undefined;
-  "web.artifact.outline.kindHeading": undefined;
-  "web.artifact.outline.kindTodo": undefined;
-  "web.artifact.outline.outdent": undefined;
-  "web.artifact.outline.progress": { readonly done: string | number; readonly total: string | number };
-  "web.artifact.outline.quickAdd": undefined;
-  "web.artifact.outline.showDone": undefined;
-  "web.artifact.outline.untitled": undefined;
-  "web.artifact.page.all": undefined;
-  "web.artifact.page.backToLibrary": undefined;
-  "web.artifact.page.delete": undefined;
-  "web.artifact.page.deleteAsk": { readonly title: string | number };
-  "web.artifact.page.deleteFileAsk": { readonly path: string | number };
-  "web.artifact.page.deleted": { readonly title: string | number };
-  "web.artifact.page.directory": undefined;
-  "web.artifact.page.discard": undefined;
-  "web.artifact.page.filesTab": undefined;
-  "web.artifact.page.filesTabCount": { readonly n: string | number };
-  "web.artifact.page.gone": undefined;
-  "web.artifact.page.liveVersion": undefined;
-  "web.artifact.page.more": undefined;
-  "web.artifact.page.new": undefined;
-  "web.artifact.page.newFileLabel": undefined;
-  "web.artifact.page.none": undefined;
-  "web.artifact.page.previewTab": undefined;
-  "web.artifact.page.rail": undefined;
-  "web.artifact.page.railHide": undefined;
-  "web.artifact.page.railShow": undefined;
-  "web.artifact.page.snapshotNote": undefined;
-  "web.artifact.page.title": undefined;
-  "web.artifact.page.unsaved": undefined;
-  "web.artifact.page.viewMode": undefined;
-  "web.artifact.presenter.aside": undefined;
-  "web.artifact.presenter.clock": undefined;
-  "web.artifact.presenter.current": undefined;
-  "web.artifact.presenter.empty": undefined;
-  "web.artifact.presenter.end": undefined;
-  "web.artifact.presenter.loadFailure": { readonly reason: string | number };
-  "web.artifact.presenter.missing": undefined;
-  "web.artifact.presenter.next": undefined;
-  "web.artifact.presenter.noNotes": undefined;
-  "web.artifact.presenter.notes": undefined;
-  "web.artifact.presenter.restart": undefined;
-  "web.artifact.presenter.waiting": undefined;
-  "web.artifact.preview.edges": { readonly n: string | number };
-  "web.artifact.preview.nodes": { readonly n: string | number };
-  "web.artifact.preview.scenes": { readonly n: string | number };
-  "web.artifact.preview.shots": { readonly n: string | number };
-  "web.artifact.preview.slides": { readonly n: string | number };
-  "web.artifact.prototype.reload": undefined;
-  "web.artifact.prototype.viewportFull": undefined;
-  "web.artifact.prototype.viewportLabel": undefined;
-  "web.artifact.prototype.viewportMobile": undefined;
-  "web.artifact.prototype.viewportTablet": undefined;
-  "web.artifact.sheet.addRow": undefined;
-  "web.artifact.sheet.empty": undefined;
-  "web.artifact.sheet.filterPlaceholder": undefined;
-  "web.artifact.sheet.rowsCount": { readonly n: string | number };
-  "web.artifact.slides.doneEdit": undefined;
-  "web.artifact.slides.editSlide": undefined;
-  "web.artifact.slides.layoutContent": undefined;
-  "web.artifact.slides.layoutCover": undefined;
-  "web.artifact.slides.next": undefined;
-  "web.artifact.slides.present": undefined;
-  "web.artifact.slides.presenter": undefined;
-  "web.artifact.slides.previous": undefined;
-  "web.artifact.slides.slideBulletsLabel": undefined;
-  "web.artifact.slides.slideLayoutLabel": undefined;
-  "web.artifact.slides.slideNotesLabel": undefined;
-  "web.artifact.slides.slideSubtitleLabel": undefined;
-  "web.artifact.slides.slideTitleLabel": undefined;
-  "web.artifact.slidesStore.addSlide": undefined;
-  "web.artifact.standalone.live": undefined;
-  "web.artifact.standalone.missing": undefined;
-  "web.artifact.standalone.version": { readonly version: string | number };
-  "web.artifact.storyboard.animaticMode": undefined;
-  "web.artifact.storyboard.gridMode": undefined;
-  "web.artifact.storyboard.sfx": undefined;
-  "web.artifact.storyboard.shotOf": { readonly n: string | number; readonly total: string | number };
-  "web.artifact.storyboard.totalDuration": { readonly sec: string | number };
-  "web.artifact.storyboard.transition": undefined;
-  "web.artifact.suggestions.accept": undefined;
-  "web.artifact.suggestions.by": { readonly name: string | number };
-  "web.artifact.suggestions.delete": undefined;
-  "web.artifact.suggestions.reject": undefined;
-  "web.artifact.suggestions.title": { readonly n: string | number };
-  "web.artifact.timeline.backToLive": undefined;
-  "web.artifact.timeline.commits": undefined;
-  "web.artifact.timeline.compact": undefined;
-  "web.artifact.timeline.compacted": undefined;
-  "web.artifact.timeline.empty": undefined;
-  "web.artifact.timeline.fork": undefined;
-  "web.artifact.timeline.forkTitle": { readonly title: string | number };
-  "web.artifact.timeline.forked": { readonly title: string | number };
-  "web.artifact.timeline.hide": undefined;
-  "web.artifact.timeline.loading": undefined;
-  "web.artifact.timeline.previewBanner": { readonly summary: string | number };
-  "web.artifact.timeline.restore": undefined;
-  "web.artifact.timeline.restored": undefined;
-  "web.artifact.timeline.savedVersions": undefined;
-  "web.artifact.timeline.show": undefined;
-  "web.artifact.timeline.title": undefined;
-  "web.artifact.timeline.turn": { readonly n: string | number };
-  "web.artifact.timeline.undoTurn": undefined;
-  "web.artifact.timeline.undoneOrigin": undefined;
-  "web.artifact.timeline.versionBanner": { readonly note: string | number; readonly version: string | number };
-  "web.artifact.types.dashboard": undefined;
-  "web.artifact.types.defaultBadge": undefined;
-  "web.artifact.types.design": undefined;
-  "web.artifact.types.designSystem": undefined;
-  "web.artifact.types.diagram": undefined;
-  "web.artifact.types.docs": undefined;
-  "web.artifact.types.motion": undefined;
-  "web.artifact.types.outline": undefined;
-  "web.artifact.types.prototype": undefined;
-  "web.artifact.types.setDefault": undefined;
-  "web.artifact.types.sheet": undefined;
-  "web.artifact.types.slides": undefined;
-  "web.artifact.types.storyboard": undefined;
-  "web.artifact.types.unsetDefault": undefined;
-  "web.artifact.types.whiteboard": undefined;
-  "web.artifact.whiteboard.arrow": undefined;
-  "web.artifact.whiteboard.body": undefined;
-  "web.artifact.whiteboard.card": undefined;
-  "web.artifact.whiteboard.chatWithOrchestrator": undefined;
-  "web.artifact.whiteboard.container": undefined;
-  "web.artifact.whiteboard.curveOrthogonal": undefined;
-  "web.artifact.whiteboard.curveSmooth": undefined;
-  "web.artifact.whiteboard.curveStraight": undefined;
-  "web.artifact.whiteboard.deleteSelected": undefined;
-  "web.artifact.whiteboard.diamond": undefined;
-  "web.artifact.whiteboard.duplicate": undefined;
-  "web.artifact.whiteboard.elements": { readonly n: string | number };
-  "web.artifact.whiteboard.emptyHint": undefined;
-  "web.artifact.whiteboard.entryJson": undefined;
-  "web.artifact.whiteboard.exportedJson": undefined;
-  "web.artifact.whiteboard.exportedJsonCanvas": undefined;
-  "web.artifact.whiteboard.exportedPng": undefined;
-  "web.artifact.whiteboard.exportedSvg": undefined;
-  "web.artifact.whiteboard.fillBerry": undefined;
-  "web.artifact.whiteboard.fillDefault": undefined;
-  "web.artifact.whiteboard.fillLavender": undefined;
-  "web.artifact.whiteboard.fillLeaf": undefined;
-  "web.artifact.whiteboard.fillPeach": undefined;
-  "web.artifact.whiteboard.fillSide": undefined;
-  "web.artifact.whiteboard.fillSun": undefined;
-  "web.artifact.whiteboard.fillWater": undefined;
-  "web.artifact.whiteboard.fitView": undefined;
-  "web.artifact.whiteboard.inspector": undefined;
-  "web.artifact.whiteboard.label": undefined;
-  "web.artifact.whiteboard.noSticker": undefined;
-  "web.artifact.whiteboard.pan": undefined;
-  "web.artifact.whiteboard.pen": undefined;
-  "web.artifact.whiteboard.rect": undefined;
-  "web.artifact.whiteboard.redo": undefined;
-  "web.artifact.whiteboard.save": undefined;
-  "web.artifact.whiteboard.saveJson": undefined;
-  "web.artifact.whiteboard.select": undefined;
-  "web.artifact.whiteboard.sticker": undefined;
-  "web.artifact.whiteboard.sticky": undefined;
-  "web.artifact.whiteboard.styleDashed": undefined;
-  "web.artifact.whiteboard.styleSolid": undefined;
-  "web.artifact.whiteboard.templateArchitecture": undefined;
-  "web.artifact.whiteboard.templateTimeline": undefined;
-  "web.artifact.whiteboard.text": undefined;
-  "web.artifact.whiteboard.timeline": undefined;
-  "web.artifact.whiteboard.undo": undefined;
-  "web.artifact.whiteboard.zoomIn": undefined;
-  "web.artifact.whiteboard.zoomOut": undefined;
   "web.audio.account": undefined;
   "web.audio.addSpeaker": undefined;
   "web.audio.addTurn": undefined;
@@ -10770,6 +10355,189 @@ export interface Messages {
   "web.memory.memory.words": undefined;
   "web.memory.memory.wordsHint": undefined;
   "web.memory.memory.yours": undefined;
+  "web.note.applet.alwaysOnTopHint": undefined;
+  "web.note.applet.alwaysOnTopLabel": undefined;
+  "web.note.applet.appNameLabel": undefined;
+  "web.note.applet.appNamePlaceholder": undefined;
+  "web.note.applet.badgeInstalled": undefined;
+  "web.note.applet.bundleIdLabel": undefined;
+  "web.note.applet.bundlePathLabel": undefined;
+  "web.note.applet.button": undefined;
+  "web.note.applet.install": undefined;
+  "web.note.applet.installedToast": { readonly name: string | number };
+  "web.note.applet.installing": undefined;
+  "web.note.applet.manageApp": undefined;
+  "web.note.applet.modalTitle": undefined;
+  "web.note.applet.nameRequired": undefined;
+  "web.note.applet.open": undefined;
+  "web.note.applet.openApp": undefined;
+  "web.note.applet.openedToast": { readonly name: string | number };
+  "web.note.applet.reinstall": undefined;
+  "web.note.applet.statusInstalled": undefined;
+  "web.note.applet.statusNotInstalled": undefined;
+  "web.note.applet.subtitle": undefined;
+  "web.note.applet.unavailable": undefined;
+  "web.note.applet.uninstall": undefined;
+  "web.note.applet.uninstalledToast": { readonly name: string | number };
+  "web.note.base.addRow": undefined;
+  "web.note.base.agentRanToast": { readonly n: string | number };
+  "web.note.base.board": undefined;
+  "web.note.base.empty": undefined;
+  "web.note.base.filterPlaceholder": undefined;
+  "web.note.base.gallery": undefined;
+  "web.note.base.rowsCount": { readonly n: string | number };
+  "web.note.base.runAgentColumn": undefined;
+  "web.note.base.runningAgentColumn": undefined;
+  "web.note.base.table": undefined;
+  "web.note.base.timeline": undefined;
+  "web.note.blocks.saved": undefined;
+  "web.note.blocks.start": undefined;
+  "web.note.blocks.user": undefined;
+  "web.note.canvas.close": undefined;
+  "web.note.canvas.label": undefined;
+  "web.note.canvas.openPage": undefined;
+  "web.note.card.open": { readonly title: string | number };
+  "web.note.card.version": { readonly version: string | number };
+  "web.note.doc.addBlock": undefined;
+  "web.note.doc.blocksCount": { readonly n: string | number };
+  "web.note.doc.empty": undefined;
+  "web.note.doc.slashHint": undefined;
+  "web.note.doc.slidesCount": { readonly n: string | number };
+  "web.note.doc.wordsCount": { readonly n: string | number };
+  "web.note.edit.save": undefined;
+  "web.note.edit.saved": { readonly version: string | number };
+  "web.note.files.codeMode": undefined;
+  "web.note.files.htmlPreviewMode": undefined;
+  "web.note.issue.empty": undefined;
+  "web.note.issue.linkEmpty": undefined;
+  "web.note.issue.linkExisting": undefined;
+  "web.note.issue.linkPlaceholder": undefined;
+  "web.note.issue.linkedToast": { readonly title: string | number };
+  "web.note.issue.new": undefined;
+  "web.note.issue.newCreate": undefined;
+  "web.note.issue.newDialogTitle": undefined;
+  "web.note.issue.newTitle": undefined;
+  "web.note.issue.newTitlePlaceholder": undefined;
+  "web.note.issue.newType": undefined;
+  "web.note.issue.title": undefined;
+  "web.note.issue.unlink": { readonly title: string | number };
+  "web.note.issue.unlinkedToast": { readonly title: string | number };
+  "web.note.links.backlinks": { readonly n: string | number };
+  "web.note.links.empty": undefined;
+  "web.note.links.outgoing": { readonly n: string | number };
+  "web.note.page.all": undefined;
+  "web.note.page.backToLibrary": undefined;
+  "web.note.page.delete": undefined;
+  "web.note.page.deleteAsk": { readonly title: string | number };
+  "web.note.page.deleteFileAsk": { readonly path: string | number };
+  "web.note.page.deleted": { readonly title: string | number };
+  "web.note.page.directory": undefined;
+  "web.note.page.discard": undefined;
+  "web.note.page.filesTab": undefined;
+  "web.note.page.filesTabCount": { readonly n: string | number };
+  "web.note.page.gone": undefined;
+  "web.note.page.liveVersion": undefined;
+  "web.note.page.more": undefined;
+  "web.note.page.new": undefined;
+  "web.note.page.newFileLabel": undefined;
+  "web.note.page.none": undefined;
+  "web.note.page.previewTab": undefined;
+  "web.note.page.rail": undefined;
+  "web.note.page.railHide": undefined;
+  "web.note.page.railShow": undefined;
+  "web.note.page.snapshotNote": undefined;
+  "web.note.page.title": undefined;
+  "web.note.page.unsaved": undefined;
+  "web.note.page.viewMode": undefined;
+  "web.note.preview.blocks": { readonly n: string | number };
+  "web.note.preview.nodes": { readonly n: string | number };
+  "web.note.preview.rows": { readonly n: string | number };
+  "web.note.preview.slides": { readonly n: string | number };
+  "web.note.standalone.live": undefined;
+  "web.note.standalone.missing": undefined;
+  "web.note.standalone.version": { readonly version: string | number };
+  "web.note.suggestions.accept": undefined;
+  "web.note.suggestions.by": { readonly name: string | number };
+  "web.note.suggestions.delete": undefined;
+  "web.note.suggestions.reject": undefined;
+  "web.note.suggestions.title": { readonly n: string | number };
+  "web.note.timeline.backToLive": undefined;
+  "web.note.timeline.commits": undefined;
+  "web.note.timeline.compact": undefined;
+  "web.note.timeline.compacted": undefined;
+  "web.note.timeline.empty": undefined;
+  "web.note.timeline.fork": undefined;
+  "web.note.timeline.forkTitle": { readonly title: string | number };
+  "web.note.timeline.forked": { readonly title: string | number };
+  "web.note.timeline.hide": undefined;
+  "web.note.timeline.loading": undefined;
+  "web.note.timeline.previewBanner": { readonly summary: string | number };
+  "web.note.timeline.restore": undefined;
+  "web.note.timeline.restored": undefined;
+  "web.note.timeline.savedVersions": undefined;
+  "web.note.timeline.show": undefined;
+  "web.note.timeline.title": undefined;
+  "web.note.timeline.turn": { readonly n: string | number };
+  "web.note.timeline.undoTurn": undefined;
+  "web.note.timeline.undoneOrigin": undefined;
+  "web.note.timeline.versionBanner": { readonly note: string | number; readonly version: string | number };
+  "web.note.tree.empty": undefined;
+  "web.note.tree.moveToRoot": undefined;
+  "web.note.tree.newChild": undefined;
+  "web.note.tree.newRoot": undefined;
+  "web.note.tree.title": undefined;
+  "web.note.types.base": undefined;
+  "web.note.types.canvas": undefined;
+  "web.note.types.doc": undefined;
+  "web.note.types.media": undefined;
+  "web.note.whiteboard.arrow": undefined;
+  "web.note.whiteboard.body": undefined;
+  "web.note.whiteboard.card": undefined;
+  "web.note.whiteboard.chatWithOrchestrator": undefined;
+  "web.note.whiteboard.container": undefined;
+  "web.note.whiteboard.curveOrthogonal": undefined;
+  "web.note.whiteboard.curveSmooth": undefined;
+  "web.note.whiteboard.curveStraight": undefined;
+  "web.note.whiteboard.deleteSelected": undefined;
+  "web.note.whiteboard.diamond": undefined;
+  "web.note.whiteboard.duplicate": undefined;
+  "web.note.whiteboard.elements": { readonly n: string | number };
+  "web.note.whiteboard.emptyHint": undefined;
+  "web.note.whiteboard.entryJson": undefined;
+  "web.note.whiteboard.exportedJson": undefined;
+  "web.note.whiteboard.exportedJsonCanvas": undefined;
+  "web.note.whiteboard.exportedPng": undefined;
+  "web.note.whiteboard.exportedSvg": undefined;
+  "web.note.whiteboard.fillBerry": undefined;
+  "web.note.whiteboard.fillDefault": undefined;
+  "web.note.whiteboard.fillLavender": undefined;
+  "web.note.whiteboard.fillLeaf": undefined;
+  "web.note.whiteboard.fillPeach": undefined;
+  "web.note.whiteboard.fillSide": undefined;
+  "web.note.whiteboard.fillSun": undefined;
+  "web.note.whiteboard.fillWater": undefined;
+  "web.note.whiteboard.fitView": undefined;
+  "web.note.whiteboard.inspector": undefined;
+  "web.note.whiteboard.label": undefined;
+  "web.note.whiteboard.noSticker": undefined;
+  "web.note.whiteboard.pan": undefined;
+  "web.note.whiteboard.pen": undefined;
+  "web.note.whiteboard.rect": undefined;
+  "web.note.whiteboard.redo": undefined;
+  "web.note.whiteboard.save": undefined;
+  "web.note.whiteboard.saveJson": undefined;
+  "web.note.whiteboard.select": undefined;
+  "web.note.whiteboard.sticker": undefined;
+  "web.note.whiteboard.sticky": undefined;
+  "web.note.whiteboard.styleDashed": undefined;
+  "web.note.whiteboard.styleSolid": undefined;
+  "web.note.whiteboard.templateArchitecture": undefined;
+  "web.note.whiteboard.templateTimeline": undefined;
+  "web.note.whiteboard.text": undefined;
+  "web.note.whiteboard.timeline": undefined;
+  "web.note.whiteboard.undo": undefined;
+  "web.note.whiteboard.zoomIn": undefined;
+  "web.note.whiteboard.zoomOut": undefined;
   "web.orchestrator.approval.allow": undefined;
   "web.orchestrator.approval.deny": undefined;
   "web.orchestrator.approval.title": undefined;

@@ -330,7 +330,7 @@ pub struct DebugStateCounts {
     pub channels: u32,
     pub agents: u32,
     pub repos: u32,
-    pub artifacts: u32,
+    pub notes: u32,
     pub inbox: u32,
     pub media_jobs: u32,
 }
@@ -369,10 +369,10 @@ pub struct DebugCollabPresence {
 #[cfg_attr(feature = "ts-gen", derive(TS))]
 #[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
-pub struct DebugCollabArtifactState {
-    pub artifact_id: String,
+pub struct DebugCollabNoteState {
+    pub note_id: String,
     pub title: String,
-    pub artifact_type: String,
+    pub note_type: String,
     pub seq: i64,
     pub snapshot_bytes: u32,
     pub frontiers: String,
@@ -400,7 +400,7 @@ pub struct DebugStateCache {
     pub counts: DebugStateCounts,
     pub caches: Vec<DebugCacheStat>,
     #[serde(default)]
-    pub collab: Vec<DebugCollabArtifactState>,
+    pub collab: Vec<DebugCollabNoteState>,
 }
 
 #[skip_serializing_none]
@@ -466,7 +466,7 @@ crate::typescript::module! {
     DebugCacheStat,
     DebugCollabClock,
     DebugCollabPresence,
-    DebugCollabArtifactState,
+    DebugCollabNoteState,
     DebugStateCounts,
     DebugStateCache,
     DebugOverrideConfig,

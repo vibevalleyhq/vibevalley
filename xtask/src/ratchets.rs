@@ -506,7 +506,7 @@ const BANNED_PLURAL_STORE_NAMES: &[&str] = &[
     "Crons",
     "Repos",
     "Memories",
-    "Artifacts",
+    "Notes",
     "Attachments",
     "Connectors",
     "Machines",
@@ -694,7 +694,8 @@ fn check_singular_server_store_names(file: &SourceFile, non_test_code: &str) -> 
                         file: file.path.clone(),
                         line,
                         message: format!("plural server store type `{kw} {ident}` is forbidden ({})", index.snippet_at(line)),
-                        fix: "Use singular `*Store` names (e.g. `ArtifactStore`, `IssueStore`, `AgentStore`) with no plural compatibility aliases.".to_owned(),
+                        fix: "Use singular `*Store` / `Manager` names (e.g. `NoteStore`, `IssueStore`, `AgentStore`) with no plural compatibility aliases."
+                            .to_owned(),
                         see: NAMING_DOC,
                         details: Vec::new(),
                     });
@@ -1162,8 +1163,8 @@ mod tests {
             sf("crates/server/src/app/mod.rs", "mod hub;\npub fn attach_custom(&self) {}\n"),
             sf("crates/server/src/work/issue/mod.rs", "use crate::app::hub::Hub;\npub fn bus(b: EventBus) {}\n"),
             sf(
-                "crates/server/src/content/artifact/mod.rs",
-                "pub struct ArtifactStore;\npub type Artifacts = ArtifactStore;\npub struct Sessions;\n",
+                "crates/server/src/note/mod.rs",
+                "pub struct NoteStore;\npub type Notes = NoteStore;\npub struct Sessions;\n",
             ),
             sf(
                 "apps/mac/src/hosted/mod.rs",
@@ -1171,11 +1172,11 @@ mod tests {
             ),
             sf("crates/server/src/work/session/sessions.rs", "pub async fn attach_binding_async() {}\n"),
             sf(
-                "crates/server/src/content/artifact/tests.rs",
-                "pub struct Artifacts;\n// EventBus and app::hub in comments are ignored\n",
+                "crates/server/src/note/tests.rs",
+                "pub struct Notes;\n// EventBus and app::hub in comments are ignored\n",
             ),
             sf(
-                "crates/server/src/content/artifact/mod_with_cfg_test.rs",
+                "crates/server/src/note/mod_with_cfg_test.rs",
                 "#[cfg(test)]\nmod tests { pub struct Memories; }\n",
             ),
         ];
@@ -1189,9 +1190,9 @@ mod tests {
                 "no-app-hub@crates/server/src/app/hub/mod.rs:1",
                 "no-app-hub@crates/server/src/app/mod.rs:1",
                 "no-attach-slot@crates/server/src/app/mod.rs:2",
-                "singular-server-store-names@crates/server/src/content/artifact/mod.rs:2",
-                "singular-server-store-names@crates/server/src/content/artifact/mod.rs:3",
-                "singular-server-store-names@crates/server/src/content/artifact/tests.rs:1",
+                "singular-server-store-names@crates/server/src/note/mod.rs:2",
+                "singular-server-store-names@crates/server/src/note/mod.rs:3",
+                "singular-server-store-names@crates/server/src/note/tests.rs:1",
                 "no-app-hub@crates/server/src/work/issue/mod.rs:1",
                 "no-event-bus@crates/server/src/work/issue/mod.rs:2",
             ]
@@ -1201,8 +1202,8 @@ mod tests {
     #[test]
     fn singular_store_guardrail_ignores_cfg_test_external_submodules_and_comments() {
         let files = vec![
-            sf("crates/server/src/content/mod.rs", "#[cfg(test)]\nmod tests;\n"),
-            sf("crates/server/src/content/tests.rs", "pub struct Artifacts;\n"),
+            sf("crates/server/src/note/mod.rs", "#[cfg(test)]\nmod tests;\n"),
+            sf("crates/server/src/note/tests.rs", "pub struct Notes;\n"),
             sf(
                 "crates/server/src/content/library.rs",
                 "// struct Agents\nconst DOC: &str = \"struct Sessions; EventBus; app::hub; attach_mcp\";\npub struct LibraryStore;\n",

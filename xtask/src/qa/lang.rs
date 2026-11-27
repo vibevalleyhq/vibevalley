@@ -2601,7 +2601,7 @@ mod tests {
 
         let analysis = analyze_file(
             Path::new("/repo"),
-            Path::new("/repo/apps/mac/ui/features/artifact/html.tsx"),
+            Path::new("/repo/apps/mac/ui/features/note/html.tsx"),
             &src,
             Lang::TypeScript,
         );
@@ -2613,10 +2613,10 @@ mod tests {
         assert_eq!(
             keys,
             vec![
-                ("features.artifact.html", "renderHtml", Visibility::Public, FormKind::Arrow),
-                ("features.artifact.html.HtmlView", "render", Visibility::Public, FormKind::Method),
-                ("features.artifact.html.HtmlView", "reset", Visibility::Private, FormKind::Method),
-                ("features.artifact.html.HtmlView", "#secret", Visibility::Private, FormKind::Method),
+                ("features.note.html", "renderHtml", Visibility::Public, FormKind::Arrow),
+                ("features.note.html.HtmlView", "render", Visibility::Public, FormKind::Method),
+                ("features.note.html.HtmlView", "reset", Visibility::Private, FormKind::Method),
+                ("features.note.html.HtmlView", "#secret", Visibility::Private, FormKind::Method),
             ]
         );
         assert!(

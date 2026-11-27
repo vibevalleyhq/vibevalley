@@ -289,9 +289,9 @@ where
     let domain_sub = match spec.name {
         "channel.follow" => sub!(ChannelFollow),
         "channel.reports" => sub!(ChannelReports),
-        "artifact.follow" => sub!(ArtifactFollow),
-        "artifact.suggestion.follow" => sub!(ArtifactSuggestionFollow),
-        "artifact.presence.follow" => sub!(ArtifactPresenceFollow),
+        "note.follow" => sub!(NoteFollow),
+        "note.suggestion.follow" => sub!(NoteSuggestionFollow),
+        "note.presence.follow" => sub!(NotePresenceFollow),
         "session.watch" => sub!(SessionWatch),
         "issue.watch" => sub!(IssueWatch),
         other => return Err(refusal(BizCode::RouteNotFound, format!("no subscription {other}"))),

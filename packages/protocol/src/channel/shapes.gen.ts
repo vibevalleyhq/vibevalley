@@ -1,8 +1,8 @@
 // Generated from crates/protocol/src/contract (vp run protocol:ts). Do not edit.
 
-import type { ArtifactCard, ArtifactViewContext } from "../artifact/shapes.gen";
 import type { Attachment } from "../attachment/shapes.gen";
 import type { Actor, MessageId, Outcome, SessionId, Spent } from "../common/shapes.gen";
+import type { NoteCard, NoteViewContext } from "../note/shapes.gen";
 
 export const MessageKindValues = ["chat", "dispatch", "report", "notice"] as const;
 export type MessageKind = (typeof MessageKindValues)[number];
@@ -28,7 +28,7 @@ revision: number, replyTo?: number, edited?: number,
 /**
  * Timestamp of deletion; text and attachments are cleared while `number` is preserved.
  */
-deleted?: number, pinned?: number, reactions: Array<Reaction>, attachments: Array<Attachment>, embeds: Array<Embed>, artifact?: ArtifactCard, viewContext?: ArtifactViewContext, };
+deleted?: number, pinned?: number, reactions: Array<Reaction>, attachments: Array<Attachment>, embeds: Array<Embed>, note?: NoteCard, viewContext?: NoteViewContext, };
 
 export const ChannelTypeValues = ["channel", "direct", "thread"] as const;
 export type ChannelType = (typeof ChannelTypeValues)[number];
@@ -70,7 +70,7 @@ export type ChannelEvent = { "_tag": "Message", message: ChatMessage, } | { "_ta
  */
 export type ChannelCommand = { name: string, args: string, };
 
-export type SayRequest = { id: string, text: string, viewContext?: ArtifactViewContext, replyTo?: number, attachments?: Array<string>, station?: number, agent?: string, repo?: string, sendKey?: string,
+export type SayRequest = { id: string, text: string, viewContext?: NoteViewContext, replyTo?: number, attachments?: Array<string>, station?: number, agent?: string, repo?: string, sendKey?: string,
 /**
  * Orchestrator profile id that alone receives this message (e.g. `/imagegen`).
  */

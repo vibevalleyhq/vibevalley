@@ -708,7 +708,7 @@ impl Shell {
             HostOp::AppletUninstall(req) => {
                 Self::bg(
                     cx,
-                    move || crate::applet::AppletHost::uninstall_applet(&req.artifact_id),
+                    move || crate::applet::AppletHost::uninstall_applet(&req.note_id),
                     move |_, result, _| {
                         reply.send(match result {
                             Ok(res) => Envelope::ok(json!(res)),
@@ -721,7 +721,7 @@ impl Shell {
             HostOp::AppletOpen(req) => {
                 Self::bg(
                     cx,
-                    move || crate::applet::AppletHost::open_applet(&req.artifact_id),
+                    move || crate::applet::AppletHost::open_applet(&req.note_id),
                     move |_, result, _| {
                         reply.send(match result {
                             Ok(res) => Envelope::ok(json!(res)),

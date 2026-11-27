@@ -22,16 +22,16 @@ use vibevalley_runtime::agent::{AgentEvent, Brain, BrainError, Message, TurnOutc
 
 use super::types::Input;
 use crate::agent::tool::Route;
-use crate::artifact::Manager as ArtifactManager;
 use crate::channel::{Chat, Posting};
 use crate::issue::Board;
+use crate::note::Manager as NoteManager;
 use crate::runtime::Runtime;
 
 pub(super) trait OrchestratorHost: Send + Sync {
     fn chat(&self) -> &Chat;
     fn runtime(&self) -> &Runtime;
     fn issue(&self) -> &Board;
-    fn artifact(&self) -> &ArtifactManager;
+    fn note(&self) -> &NoteManager;
     fn brain_at_async<'a>(&'a self, id: &'a str, route: &'a Arc<Mutex<Route>>, model: &'a str) -> BoxFuture<'a, Brain>;
     fn record_worker_compaction_episode(&self, session_id: &str, level: &str, summary: &str);
 }
@@ -102,7 +102,7 @@ struct ReviewChanges {
 struct ReviewDeliverables {
     report: crate::runtime::Report,
     changes: Option<ReviewChanges>,
-    artifacts: Vec<vibevalley_protocol::Artifact>,
+    notes: Vec<vibevalley_protocol::Note>,
 }
 
 #[derive(Serialize)]
@@ -160,16 +160,17 @@ impl ReviewProvider for Bound {
             } else {
                 None
             };
-            let artifacts = o
-                .artifact()
-                .list_async(&vibevalley_protocol::ArtifactListRequest {
+            let notes = o
+                .note()
+                .list_async(&vibevalley_protocol::NoteListRequest {
                     channel: None,
                     issue: Some(issue.id.clone()),
-                    artifact_type: None,
+                    note_type: None,
+                    parent_id: None,
                 })
                 .await
                 .map_err(|e| Error::Invalid(e.message))?;
-            let deliverables = serde_json::to_string(&ReviewDeliverables { report, changes, artifacts })?;
+            let deliverables = serde_json::to_string(&ReviewDeliverables { report, changes, notes })?;
             const EVIDENCE_CHARS: usize = 16_000;
             Ok(Some(OutcomeReview {
                 task_prompt: format!("{}\n{}", issue.title, issue.description),

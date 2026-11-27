@@ -10,12 +10,12 @@ use vibevalley_core::projection::{
 };
 use vibevalley_protocol::{ApiError, SliceKind};
 
-use crate::artifact::Manager as ArtifactManager;
 use crate::channel::Chat;
 use crate::context::{Context, encode_slice};
 use crate::cron::Scheduler as CronScheduler;
 use crate::game::Game;
 use crate::issue::Board;
+use crate::note::Manager as NoteManager;
 use crate::repo::Repo;
 use crate::service::DbError;
 
@@ -26,7 +26,7 @@ pub(crate) struct SliceSources {
     pub board: Arc<Board>,
     pub channel: Arc<Chat>,
     pub cron: Arc<CronScheduler>,
-    pub artifact: Arc<ArtifactManager>,
+    pub note: Arc<NoteManager>,
     pub game: Arc<Game>,
     pub repo: Arc<Repo>,
 }
@@ -103,7 +103,7 @@ pub(crate) async fn project_slice_json(sources: &SliceSources, kind: SliceKind, 
         }
         SliceKind::Ops => {
             let crons = sources.cron.list();
-            let media = sources.artifact.media.list_async().await.map_err(err)?;
+            let media = sources.note.media.list_async().await.map_err(err)?;
             let input = OpsInput { crons, media: Some(media) };
             encode_slice(&project_ops(&input, seq)).map_err(err)
         }
@@ -127,7 +127,7 @@ pub(crate) fn finish_boot_and_start_feeds(
     board: &Arc<Board>,
     channel: &Arc<Chat>,
     cron: &Arc<CronScheduler>,
-    artifact: &Arc<ArtifactManager>,
+    note: &Arc<NoteManager>,
     game: &Arc<Game>,
     repo: &Arc<Repo>,
 ) {
@@ -136,7 +136,7 @@ pub(crate) fn finish_boot_and_start_feeds(
         board: board.clone(),
         channel: channel.clone(),
         cron: cron.clone(),
-        artifact: artifact.clone(),
+        note: note.clone(),
         game: game.clone(),
         repo: repo.clone(),
     };

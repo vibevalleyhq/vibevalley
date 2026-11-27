@@ -314,11 +314,11 @@ fn daily_tasks_track_quality_metrics_dedup_churn_and_auto_settle_into_ledger() {
     let coins_after = game.progress().coins;
     assert_eq!(coins_after, expected_reward, "churn must not settle any task twice");
 
+    app.close_blocking();
+
     let ledger_body = std::fs::read_to_string(dir.path().join("ledger.jsonl")).unwrap();
     let settled_lines = ledger_body.lines().filter(|l| l.contains("\"dailySettled\"")).count();
     assert_eq!(settled_lines, 3, "expected exactly 3 dailySettled ledger entries: {ledger_body}");
-
-    app.close_blocking();
 
     // Restart replays exact settled coins and daily board without double-settling.
     let restarted = create_app_blocking(Config {

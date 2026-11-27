@@ -57,7 +57,7 @@ test("every rule here is one the page uses", () => {
   ).toEqual([]);
 });
 
-test("an HTML artifact's sandbox is written once, here", () => {
+test("an HTML preview sandbox is written once, here", () => {
   // A page test says what the browser got in its own words: it may not import the rule it checks.
   const copies = outside
     .flatMap((d) => files(join(root, d)))

@@ -2,8 +2,8 @@
 
 use clap::{Args, Subcommand};
 use vibevalley_protocol::{
-    ArtifactViewContext, Channel, ChannelMessageDeleteInput, ChannelMessageListInput, ChannelPinListInput, ChannelPinSetInput, ChannelRequest, ChatMessage,
-    MessageSearch, SayRequest, ops,
+    Channel, ChannelMessageDeleteInput, ChannelMessageListInput, ChannelPinListInput, ChannelPinSetInput, ChannelRequest, ChatMessage, MessageSearch,
+    NoteViewContext, SayRequest, ops,
 };
 
 use crate::client::{Client, Done};
@@ -111,7 +111,7 @@ pub enum ChannelMessageAction {
         /// Attachment id to include (repeatable)
         #[arg(long)]
         attachment: Vec<String>,
-        /// ArtifactViewContext JSON (inline JSON, '-' for stdin, or '@file')
+        /// NoteViewContext JSON (inline JSON, '-' for stdin, or '@file')
         #[arg(long)]
         view_context: Option<String>,
     },
@@ -203,7 +203,7 @@ pub async fn run(client: &Client, cmd: ChannelCmd) -> Done {
                 attachment,
                 view_context,
             } => {
-                let parsed_ctx = view_context.as_deref().map(read_json_input::<ArtifactViewContext>).transpose()?;
+                let parsed_ctx = view_context.as_deref().map(read_json_input::<NoteViewContext>).transpose()?;
                 let request = SayRequest {
                     id: channel.clone(),
                     text: words.join(" "),

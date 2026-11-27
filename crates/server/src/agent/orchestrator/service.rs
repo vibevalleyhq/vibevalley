@@ -21,11 +21,11 @@ use super::types::{Input, Instance};
 use super::words::Source;
 use crate::BoxFuture;
 use crate::agent::tool::{Route, RouteSource};
-use crate::artifact::Manager as ArtifactManager;
 use crate::channel::{Chat, Posting, Saying};
 use crate::context::error::{LookIn, missing};
 use crate::context::port::{CronOrchestratorPort, VoiceOrchestratorPort};
 use crate::issue::Board;
+use crate::note::Manager as NoteManager;
 use crate::runtime::{Runtime, Step};
 
 impl OrchestratorHost for Orchestrator {
@@ -41,8 +41,8 @@ impl OrchestratorHost for Orchestrator {
         &self.issue
     }
 
-    fn artifact(&self) -> &ArtifactManager {
-        &self.artifact
+    fn note(&self) -> &NoteManager {
+        &self.note
     }
 
     fn brain_at_async<'a>(&'a self, id: &'a str, route: &'a Arc<Mutex<Route>>, model: &'a str) -> BoxFuture<'a, Brain> {
@@ -108,7 +108,7 @@ impl Orchestrator {
                 runtime: p.runtime,
                 repo: p.repo,
                 memory: p.memory,
-                artifact: p.artifact,
+                note: p.note,
                 home: p.home,
                 key: p.key,
                 client: p.client,

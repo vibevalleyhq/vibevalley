@@ -10,10 +10,10 @@ export type IssueId = Branded<"IssueId">;
 /** A session's id: w1, w2…, for the whole life of the farm. */
 export type SessionId = Branded<"SessionId">;
 
-/** An artifact's id. */
-export type ArtifactId = Branded<"ArtifactId">;
+/** A note's id. */
+export type NoteId = Branded<"NoteId">;
 
-/** A suggested change to an artifact file. */
+/** A suggested change to a note file. */
 export type SuggestionId = Branded<"SuggestionId">;
 
 export type MessageId = Branded<"MessageId">;

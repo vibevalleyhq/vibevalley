@@ -1,4 +1,4 @@
-//! Host bridge and `.app` bundle installer for local artifact applets.
+//! Host bridge and `.app` bundle installer for local note applets.
 //!
 //! Frozen NDJSON wire protocol shared byte-for-byte with `apps/shim` over
 //! `$VIBEVALLEY_HOME/applet.sock`.

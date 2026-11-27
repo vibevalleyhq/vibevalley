@@ -1,0 +1,856 @@
+{
+ "NoteType": [
+  "doc",
+  "base",
+  "canvas",
+  "media"
+ ],
+ "NoteFileEncoding": [
+  "utf8",
+  "base64"
+ ],
+ "NoteCard": [
+  {
+   "id": "n1",
+   "title": "Design Spec",
+   "noteType": "doc",
+   "version": 1,
+   "note": "Initial draft"
+  }
+ ],
+ "NoteVersion": [
+  {
+   "version": 1,
+   "size": 128,
+   "note": "Initial",
+   "by": "u1",
+   "byName": "Alice",
+   "at": 1700000000000,
+   "channel": "c1"
+  }
+ ],
+ "NoteSaid": [
+  {
+   "channel": "c1",
+   "number": 1
+  }
+ ],
+ "NoteCover": [
+  {
+   "path": "/tmp/note/n1/.cover-1.png",
+   "url": "/api/v1/note/n1/cover?seq=1",
+   "mime": "image/png",
+   "seq": 1,
+   "updatedAt": 1700000000000
+  }
+ ],
+ "NoteCoverSetRequest": [
+  {
+   "id": "n1",
+   "seq": 1,
+   "mime": "image/png",
+   "data": "AAAA"
+  }
+ ],
+ "NotePreviewOutlineItem": [
+  {
+   "depth": 1,
+   "text": "Overview",
+   "kind": "heading"
+  }
+ ],
+ "NotePreviewSwatch": [
+  {
+   "name": "Accent",
+   "light": "#D97757"
+  }
+ ],
+ "NotePreviewKpi": [
+  {
+   "label": "Tasks",
+   "value": "12"
+  }
+ ],
+ "NotePreviewMinimapShape": [
+  {
+   "x": 10,
+   "y": 20,
+   "w": 100,
+   "h": 40,
+   "kind": "rect",
+   "label": "Box"
+  }
+ ],
+ "NotePreview": [
+  {
+   "_tag": "doc",
+   "heading": "Overview",
+   "excerpt": "Hello",
+   "blockCount": 3,
+   "slideCount": 1,
+   "outline": [
+    {
+     "depth": 1,
+     "text": "Overview",
+     "kind": "heading"
+    }
+   ]
+  },
+  {
+   "_tag": "base",
+   "sheetName": "Roadmap",
+   "columns": [
+    "Title",
+    "Status"
+   ],
+   "rows": [
+    [
+     "Ship Note",
+     "In Progress"
+    ]
+   ],
+   "totalRows": 1,
+   "totalCols": 2
+  },
+  {
+   "_tag": "canvas",
+   "shapes": [
+    {
+     "x": 0,
+     "y": 0,
+     "w": 80,
+     "h": 50,
+     "kind": "card"
+    }
+   ],
+   "nodeCount": 1,
+   "theme": "warm"
+  },
+  {
+   "_tag": "media",
+   "mediaKind": "audio",
+   "caption": "Voice memo",
+   "durationSec": 42,
+   "frameAsset": "asset/image/cover.png",
+   "framePath": "/tmp/note/n1/asset/image/cover.png"
+  }
+ ],
+ "Note": [
+  {
+   "id": "n1",
+   "title": "Architecture Spec",
+   "noteType": "doc",
+   "parentId": "n0",
+   "sortOrder": 10,
+   "channel": "c1",
+   "by": "u1",
+   "byName": "Alice",
+   "version": 1,
+   "seq": 2,
+   "versions": [
+    {
+     "version": 1,
+     "size": 128,
+     "note": "Initial",
+     "by": "u1",
+     "byName": "Alice",
+     "at": 1700000000000,
+     "channel": "c1"
+    }
+   ],
+   "at": 1700000000000,
+   "updated": 1700000000100
+  }
+ ],
+ "NoteFileMeta": [
+  {
+   "path": "structure/doc.json",
+   "mime": "application/json",
+   "size": 128,
+   "hash": "abc",
+   "updatedAt": 1700000000000
+  }
+ ],
+ "NoteFileListRequest": [
+  {
+   "id": "n1",
+   "prefix": "structure/"
+  }
+ ],
+ "NoteFileListResult": [
+  {
+   "noteId": "n1",
+   "seq": 1,
+   "files": []
+  }
+ ],
+ "NoteFileGetRequest": [
+  {
+   "id": "n1",
+   "path": "structure/doc.json"
+  }
+ ],
+ "NoteFileContent": [
+  {
+   "noteId": "n1",
+   "path": "structure/doc.json",
+   "mime": "application/json",
+   "encoding": "utf8",
+   "content": "{}",
+   "size": 2,
+   "hash": "abc",
+   "updatedAt": 1700000000000
+  }
+ ],
+ "NoteFileWriteItem": [
+  {
+   "path": "structure/doc.json",
+   "content": "{}",
+   "encoding": "utf8",
+   "mime": "application/json"
+  }
+ ],
+ "NoteFileWriteRequest": [
+  {
+   "id": "n1",
+   "files": [
+    {
+     "path": "structure/doc.json",
+     "content": "{}"
+    }
+   ],
+   "origin": "user"
+  }
+ ],
+ "NoteFileWriteResult": [
+  {
+   "noteId": "n1",
+   "seq": 2,
+   "files": []
+  }
+ ],
+ "NoteFileDeleteRequest": [
+  {
+   "id": "n1",
+   "path": "asset/tmp.txt"
+  }
+ ],
+ "NoteFileDeleteResult": [
+  {
+   "noteId": "n1",
+   "seq": 3,
+   "path": "asset/tmp.txt"
+  }
+ ],
+ "NoteTypeInfo": [
+  {
+   "type": "doc",
+   "title": "Doc",
+   "summary": "Structured block doc",
+   "entry": "structure/doc.json",
+   "references": []
+  }
+ ],
+ "NoteTypeReadRequest": [
+  {
+   "type": "doc",
+   "reference": "guide.md"
+  }
+ ],
+ "NoteTypeGuide": [
+  {
+   "type": "doc",
+   "title": "Doc",
+   "reference": null,
+   "content": "# Doc",
+   "references": [
+    "guide.md"
+   ]
+  }
+ ],
+ "NoteViewContext": [
+  {
+   "noteId": "n1",
+   "noteType": "doc",
+   "title": "Spec",
+   "seq": 1,
+   "activePath": "structure/doc.json",
+   "selectedIds": [
+    "b1"
+   ]
+  }
+ ],
+ "NoteRequest": [
+  {
+   "title": "New Note",
+   "noteType": "doc",
+   "parentId": "n0",
+   "sortOrder": 1,
+   "content": "# Hello"
+  }
+ ],
+ "NoteVersionRequest": [
+  {
+   "id": "n1",
+   "note": "Checkpoint"
+  }
+ ],
+ "NoteUpdateRequest": [
+  {
+   "id": "n1",
+   "title": "Renamed",
+   "parentId": "n0",
+   "sortOrder": 2,
+   "issue": "i1"
+  }
+ ],
+ "NoteListRequest": [
+  {
+   "channel": "c1",
+   "noteType": "doc"
+  }
+ ],
+ "NoteReadRequest": [
+  {
+   "id": "n1",
+   "version": 1
+  }
+ ],
+ "NoteContent": [
+  {
+   "version": 1,
+   "content": "# Hello"
+  }
+ ],
+ "NoteGetInput": [
+  {
+   "id": "n1"
+  }
+ ],
+ "NoteDeleteInput": [
+  {
+   "id": "n1"
+  }
+ ],
+ "NoteFollowPayload": [
+  {
+   "id": "n1",
+   "after": 0
+  }
+ ],
+ "NoteEvent": [
+  {
+   "_tag": "Files",
+   "seq": 2,
+   "files": [],
+   "deleted": [],
+   "origin": "user",
+   "frontiers": "1@1"
+  }
+ ],
+ "NoteSuggestionListInput": [
+  {
+   "id": "n1"
+  }
+ ],
+ "NoteSuggestionCreateInput": [
+  {
+   "id": "n1",
+   "path": "structure/doc.json",
+   "baseRev": 1,
+   "change": {
+    "content": "{}"
+   }
+  }
+ ],
+ "NoteSuggestionAcceptInput": [
+  {
+   "id": "n1",
+   "suggestion": "sug-1"
+  }
+ ],
+ "NoteSuggestionFollowPayload": [
+  {
+   "id": "n1"
+  }
+ ],
+ "NotePresenceKind": [
+  "cursor",
+  "selection",
+  "highlight",
+  "viewport"
+ ],
+ "NotePresence": [
+  {
+   "id": "peer-1",
+   "name": "Alice",
+   "kind": "cursor",
+   "updatedAt": 1700000000000
+  }
+ ],
+ "NotePresenceUpdateRequest": [
+  {
+   "id": "n1",
+   "peerId": "peer-1"
+  }
+ ],
+ "NotePresenceFollowRequest": [
+  {
+   "id": "n1"
+  }
+ ],
+ "NotePresenceEvent": [
+  {
+   "_tag": "Snapshot",
+   "peers": []
+  }
+ ],
+ "NoteHistoryEntry": [
+  {
+   "frontiers": "1@1",
+   "author": "u1",
+   "origin": "user",
+   "summary": "Edited doc",
+   "at": 1700000000000
+  }
+ ],
+ "NoteHistoryListRequest": [
+  {
+   "id": "n1",
+   "limit": 20
+  }
+ ],
+ "NoteHistoryPreviewRequest": [
+  {
+   "id": "n1",
+   "frontiers": "1@1"
+  }
+ ],
+ "NoteHistoryPreviewResult": [
+  {
+   "noteId": "n1",
+   "noteType": "doc",
+   "frontiers": "1@1",
+   "files": []
+  }
+ ],
+ "NoteHistoryRestoreRequest": [
+  {
+   "id": "n1",
+   "frontiers": "1@1",
+   "note": "Restored"
+  }
+ ],
+ "NoteHistoryForkRequest": [
+  {
+   "id": "n1",
+   "frontiers": "1@1",
+   "title": "Forked"
+  }
+ ],
+ "NoteHistoryUndoOriginRequest": [
+  {
+   "id": "n1",
+   "origin": "user"
+  }
+ ],
+ "NoteHistoryCompactRequest": [
+  {
+   "id": "n1"
+  }
+ ],
+ "NoteCollabExportRequest": [
+  {
+   "id": "n1"
+  }
+ ],
+ "NoteCollabExportResult": [
+  {
+   "noteId": "n1",
+   "seq": 1,
+   "versionVector": "1:1",
+   "frontiers": "1@1",
+   "snapshot": true,
+   "update": "AQID"
+  }
+ ],
+ "NoteCollabImportRequest": [
+  {
+   "id": "n1",
+   "update": "AQID",
+   "origin": "user"
+  }
+ ],
+ "NoteCollabImportResult": [
+  {
+   "noteId": "n1",
+   "seq": 2,
+   "versionVector": "1:2",
+   "frontiers": "2@1",
+   "files": [],
+   "deleted": []
+  }
+ ],
+ "LinkEntityKind": [
+  "note",
+  "issue"
+ ],
+ "LinkRelation": [
+  "link",
+  "embed"
+ ],
+ "NoteLinkRef": [
+  {
+   "kind": "note",
+   "id": "n2",
+   "relation": "link",
+   "title": "Linked Note"
+  },
+  {
+   "kind": "issue",
+   "id": "i1",
+   "relation": "embed"
+  }
+ ],
+ "NoteTreeMoveRequest": [
+  {
+   "id": "n1",
+   "parentId": "n0",
+   "sortOrder": 5
+  }
+ ],
+ "NoteLink": [
+  {
+   "id": "lnk-1",
+   "sourceKind": "note",
+   "sourceId": "n1",
+   "targetKind": "issue",
+   "targetId": "i1",
+   "relation": "embed",
+   "title": "Ship Note",
+   "noteType": "doc",
+   "createdAt": 1700000000000
+  }
+ ],
+ "NoteLinkListRequest": [
+  {
+   "entityKind": "note",
+   "entityId": "n1"
+  }
+ ],
+ "NoteLinkListResult": [
+  {
+   "outgoing": [],
+   "backlinks": []
+  }
+ ],
+ "DocKpiItem": [
+  {
+   "label": "Velocity",
+   "value": "24",
+   "delta": "+12%",
+   "tone": "ok"
+  }
+ ],
+ "DocChartSeries": [
+  {
+   "name": "Completed",
+   "data": [
+    3,
+    5,
+    8
+   ]
+  }
+ ],
+ "DocColumn": [
+  {
+   "blocks": [
+    {
+     "id": "b-col-1",
+     "type": "prose",
+     "text": "Column text"
+    }
+   ]
+  }
+ ],
+ "BlockKind": [
+  {
+   "type": "prose",
+   "text": "Hello [[note:n2]]"
+  },
+  {
+   "type": "heading",
+   "level": 2,
+   "text": "Section"
+  },
+  {
+   "type": "todo",
+   "checked": true,
+   "text": "Done item"
+  },
+  {
+   "type": "divider"
+  }
+ ],
+ "DocBlock": [
+  {
+   "id": "b1",
+   "type": "heading",
+   "level": 1,
+   "text": "Overview"
+  },
+  {
+   "id": "b2",
+   "type": "baseEmbed",
+   "noteId": "n2",
+   "sheetId": "s1",
+   "viewId": "v1"
+  }
+ ],
+ "DocView": [
+  {
+   "noteId": "n1",
+   "title": "Overview",
+   "blocks": [],
+   "slideCount": 1,
+   "wordCount": 12,
+   "extractedLinks": []
+  }
+ ],
+ "NoteDocViewRequest": [
+  {
+   "id": "n1"
+  }
+ ],
+ "NoteDocAppendBlockRequest": [
+  {
+   "id": "n1",
+   "block": {
+    "id": "b1",
+    "type": "prose",
+    "text": "Appended"
+   },
+   "afterBlockId": "b0",
+   "origin": "user"
+  }
+ ],
+ "BaseColumnKind": [
+  "text",
+  "number",
+  "select",
+  "multiSelect",
+  "date",
+  "checkbox",
+  "media",
+  "issueRef",
+  "agentRef",
+  "agentAction",
+  "noteRef",
+  "formula"
+ ],
+ "BaseViewKind": [
+  "table",
+  "board",
+  "gallery",
+  "timeline"
+ ],
+ "BaseSummaryOp": [
+  "count",
+  "sum",
+  "avg",
+  "min",
+  "max"
+ ],
+ "BaseFilterOp": [
+  "eq",
+  "neq",
+  "contains",
+  "notEmpty",
+  "empty"
+ ],
+ "BaseSelectOption": [
+  {
+   "value": "open",
+   "label": "Open",
+   "color": "green"
+  }
+ ],
+ "BaseAgentColumnConfig": [
+  {
+   "agentId": "a1",
+   "promptTemplate": "Summarize {{title}}",
+   "targetColumnId": "c_summary",
+   "spawnIssueRepo": "vibevalley"
+  }
+ ],
+ "BaseColumn": [
+  {
+   "id": "c1",
+   "name": "Title",
+   "kind": "text",
+   "width": 220
+  },
+  {
+   "id": "c_calc",
+   "name": "Double",
+   "kind": "formula",
+   "formula": "{Score} * 2"
+  }
+ ],
+ "BaseCellValue": [
+  {
+   "_tag": "text",
+   "value": "Hello"
+  },
+  {
+   "_tag": "number",
+   "value": 42
+  },
+  {
+   "_tag": "noteRef",
+   "noteId": "n1"
+  },
+  {
+   "_tag": "agentRun",
+   "status": "done",
+   "summary": "Ok",
+   "sessionId": "s1",
+   "spawnedIssueId": "i1",
+   "updatedAt": 1700000000000
+  }
+ ],
+ "BaseRow": [
+  {
+   "id": "r1",
+   "cells": {
+    "c1": {
+     "_tag": "text",
+     "value": "Row 1"
+    }
+   },
+   "pageNoteId": "n_page",
+   "createdAt": 1700000000000,
+   "updatedAt": 1700000000100
+  }
+ ],
+ "BaseFilterRule": [
+  {
+   "columnId": "c1",
+   "op": "contains",
+   "value": "Row"
+  }
+ ],
+ "BaseSortRule": [
+  {
+   "columnId": "c1",
+   "desc": false
+  }
+ ],
+ "BaseSummaryConfig": [
+  {
+   "columnId": "c1",
+   "op": "count"
+  }
+ ],
+ "BaseViewConfig": [
+  {
+   "id": "v1",
+   "name": "All Rows",
+   "kind": "table"
+  }
+ ],
+ "BaseSheet": [
+  {
+   "id": "s1",
+   "name": "Default",
+   "columns": [],
+   "rows": [],
+   "views": []
+  }
+ ],
+ "BaseSheetMeta": [
+  {
+   "id": "s1",
+   "name": "Default",
+   "rowCount": 0
+  }
+ ],
+ "BaseGroupSnapshot": [
+  {
+   "key": "open",
+   "label": "Open",
+   "rowIds": [
+    "r1"
+   ],
+   "count": 1
+  }
+ ],
+ "BaseSummaryResult": [
+  {
+   "columnId": "c1",
+   "op": "count",
+   "value": "1"
+  }
+ ],
+ "BaseViewRequest": [
+  {
+   "id": "n1",
+   "sheetId": "s1",
+   "viewId": "v1"
+  }
+ ],
+ "BaseViewSnapshot": [
+  {
+   "noteId": "n1",
+   "sheets": [
+    {
+     "id": "s1",
+     "name": "Default",
+     "rowCount": 1
+    }
+   ],
+   "activeSheetId": "s1",
+   "activeViewId": "v1",
+   "activeViewKind": "table",
+   "columns": [],
+   "rows": [],
+   "groups": [],
+   "summaries": [],
+   "totalRows": 1
+  }
+ ],
+ "BaseUpsertRowRequest": [
+  {
+   "id": "n1",
+   "sheetId": "s1",
+   "rowId": "r1",
+   "cells": {},
+   "origin": "user"
+  }
+ ],
+ "BaseRunAgentColumnRequest": [
+  {
+   "id": "n1",
+   "sheetId": "s1",
+   "columnId": "c_agent",
+   "rowIds": [
+    "r1"
+   ],
+   "origin": "user"
+  }
+ ],
+ "BaseRunAgentColumnResult": [
+  {
+   "noteId": "n1",
+   "sheetId": "s1",
+   "columnId": "c_agent",
+   "executed": 1,
+   "updatedRowIds": [
+    "r1"
+   ],
+   "spawnedIssueIds": [
+    "i1"
+   ]
+  }
+ ]
+}

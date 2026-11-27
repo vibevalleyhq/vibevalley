@@ -20,24 +20,35 @@ fn every_listed_tool_runs() {
 }
 
 #[test]
-fn artifact_directory_tools_are_listed_with_expected_replay_safety() {
+fn note_directory_tools_are_listed_with_expected_replay_safety() {
     for tools in [orchestrator(), helper()] {
         for (op, expected_safe) in [
             ("issue.list", true),
             ("issue.get", true),
-            ("artifact.type.list", true),
-            ("artifact.type.read", true),
-            ("artifact.file.list", true),
-            ("artifact.file.get", true),
-            ("artifact.file.write", false),
-            ("artifact.file.delete", false),
-            ("artifact.suggestion.list", true),
-            ("artifact.suggestion.create", false),
+            ("note.type.list", true),
+            ("note.type.read", true),
+            ("note.link.list", true),
+            ("note.doc.view", true),
+            ("note.base.view", true),
+            ("note.tree.move", false),
+            ("note.doc.appendBlock", false),
+            ("note.base.upsertRow", false),
+            ("note.file.list", true),
+            ("note.file.get", true),
+            ("note.file.write", false),
+            ("note.file.delete", false),
+            ("note.suggestion.list", true),
+            ("note.suggestion.create", false),
         ] {
             let t = tools.iter().find(|t| t.words.op == op).unwrap_or_else(|| panic!("missing {op}"));
             assert_eq!(t.replay_safe(), expected_safe, "replay_safe mismatch for {op}");
         }
     }
+    let run_col = orchestrator()
+        .into_iter()
+        .find(|t| t.words.op == "note.base.runAgentColumn")
+        .expect("missing note.base.runAgentColumn");
+    assert!(!run_col.replay_safe());
 }
 
 #[test]

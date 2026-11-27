@@ -8,7 +8,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
-use vibevalley_protocol::{ApiError, ArtifactCard, ChatMessage, ConnectorID, Issue, Millis, MorningDigest, Run, Session};
+use vibevalley_protocol::{ApiError, ChatMessage, ConnectorID, Issue, Millis, MorningDigest, NoteCard, Run, Session};
 
 use crate::BoxFuture;
 
@@ -22,7 +22,7 @@ pub trait CronAgentPort: Send + Sync {
     fn resolve_agent_id(&self, named: &str) -> Option<String>;
 }
 
-/// Breaks the `channel <- artifact` layering edge so `Chat` implements card/attachment announcements directly.
+/// Breaks the `channel <- note` layering edge so `Chat` implements card/attachment announcements directly.
 pub trait ChannelAnnounce: Send + Sync {
     fn place_exists(&self, id: &str) -> bool;
     fn orchestrator_in(&self, channel: &str) -> String;
@@ -32,7 +32,7 @@ pub trait ChannelAnnounce: Send + Sync {
         from: &'a str,
         channel: &'a str,
         text: &'a str,
-        card: ArtifactCard,
+        card: NoteCard,
         run: Option<String>,
         send_key: String,
     ) -> BoxFuture<'a, Result<ChatMessage, ApiError>>;

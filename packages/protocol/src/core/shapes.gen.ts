@@ -78,10 +78,6 @@ export type ChannelFollowPayload = { id: string, after: number, };
 
 export type ChannelReportsPayload = { after?: string, };
 
-export type ArtifactFollowPayload = { id: string, after: number, };
-
-export type ArtifactSuggestionFollowPayload = { id: string, };
-
 export const RetroWindowValues = ["7d", "14d", "30d", "all"] as const;
 export type RetroWindow = (typeof RetroWindowValues)[number];
 

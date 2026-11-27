@@ -56,7 +56,7 @@ impl McpHandler for Mcp {
     }
 
     fn skills(&self) -> Option<&SkillCatalog> {
-        Some(&skills::ARTIFACT_SKILLS)
+        Some(&skills::NOTE_SKILLS)
     }
 
     fn resolve_skills_async<'a>(&'a self, _ctx: &'a RequestContext) -> vibevalley_mcp::BoxFuture<'a, Option<Cow<'a, SkillCatalog>>> {
@@ -228,7 +228,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn server_mcp_exposes_discover_and_all_12_artifact_skills() {
+    async fn server_mcp_exposes_discover_and_all_4_note_skills() {
         let mcp = Mcp::new(Arc::new(StubDispatch), "0.1.0-test".into());
 
         // SEP-2575 server/discover without initialize.
@@ -240,41 +240,28 @@ mod tests {
         assert_eq!(body["result"]["stateless"], true);
         assert_eq!(body["result"]["capabilities"]["extensions"][EXT_SKILLS]["directoryRead"], true);
 
-        // SEP-2640 skills/list exposes all 12 embedded artifact types.
+        // SEP-2640 skills/list exposes all 4 embedded note types.
         let list_req = r#"{"jsonrpc":"2.0","id":2,"method":"skills/list","params":{}}"#;
         let list_reply = dispatch_http(mcp.as_ref(), &HttpHeaders::default(), None, list_req).await;
         let list_body: Value = serde_json::from_str(list_reply.body.as_deref().unwrap()).unwrap();
         let skills = list_body["result"]["skills"].as_array().unwrap();
-        assert_eq!(skills.len(), 12, "{skills:?}");
-        for slug in [
-            "dashboard",
-            "design",
-            "design-system",
-            "diagram",
-            "docs",
-            "motion",
-            "outline",
-            "prototype",
-            "sheet",
-            "slides",
-            "storyboard",
-            "whiteboard",
-        ] {
-            let expected_uri = format!("skill://artifact/{slug}");
+        assert_eq!(skills.len(), 4, "{skills:?}");
+        for slug in ["doc", "base", "canvas", "media"] {
+            let expected_uri = format!("skill://note/{slug}");
             assert!(skills.iter().any(|s| s["uri"] == expected_uri), "missing {expected_uri}");
         }
 
         // SEP-2640 skills/get + supporting file + resources/read on skill://.
-        let get_req = r#"{"jsonrpc":"2.0","id":3,"method":"skills/get","params":{"uri":"skill://artifact/outline"}}"#;
+        let get_req = r#"{"jsonrpc":"2.0","id":3,"method":"skills/get","params":{"uri":"skill://note/doc"}}"#;
         let get_reply = dispatch_http(mcp.as_ref(), &HttpHeaders::default(), None, get_req).await;
         let get_body: Value = serde_json::from_str(get_reply.body.as_deref().unwrap()).unwrap();
-        assert_eq!(get_body["result"]["uri"], "skill://artifact/outline");
-        assert!(get_body["result"]["content"].as_str().unwrap().contains("outline"));
+        assert_eq!(get_body["result"]["uri"], "skill://note/doc");
+        assert!(get_body["result"]["content"].as_str().unwrap().contains("doc"));
 
-        let read_ref = r#"{"jsonrpc":"2.0","id":4,"method":"resources/read","params":{"uri":"skill://artifact/outline/references/format.md"}}"#;
+        let read_ref = r#"{"jsonrpc":"2.0","id":4,"method":"resources/read","params":{"uri":"skill://note/doc/references/format.md"}}"#;
         let read_reply = dispatch_http(mcp.as_ref(), &HttpHeaders::default(), None, read_ref).await;
         let read_body: Value = serde_json::from_str(read_reply.body.as_deref().unwrap()).unwrap();
-        assert_eq!(read_body["result"]["contents"][0]["uri"], "skill://artifact/outline/references/format.md");
+        assert_eq!(read_body["result"]["contents"][0]["uri"], "skill://note/doc/references/format.md");
         assert_eq!(read_body["result"]["contents"][0]["mimeType"], "text/markdown");
         assert!(!read_body["result"]["contents"][0]["text"].as_str().unwrap().is_empty());
 

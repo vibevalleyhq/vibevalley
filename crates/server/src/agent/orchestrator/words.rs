@@ -188,15 +188,15 @@ pub fn orchestrator_lines(messages: &[crate::channel::AddressedMessage]) -> Stri
 
 #[cfg(test)]
 mod tests {
-    use vibevalley_protocol::{Actor, ArtifactType, ArtifactViewContext};
+    use vibevalley_protocol::{Actor, NoteType, NoteViewContext};
 
     use super::*;
-    use crate::context::text::format_artifact_view_context;
+    use crate::context::text::format_note_view_context;
 
-    fn sample_view_context(title: &str) -> ArtifactViewContext {
-        ArtifactViewContext {
-            artifact_id: "art-1".into(),
-            artifact_type: ArtifactType::Slides,
+    fn sample_view_context(title: &str) -> NoteViewContext {
+        NoteViewContext {
+            note_id: "note-1".into(),
+            note_type: NoteType::Doc,
             title: title.into(),
             seq: Some(3),
             version: None,
@@ -208,22 +208,22 @@ mod tests {
             active_dataset: None,
             active_tab: None,
             selected_ids: None,
-            summary: Some("Slide 2".into()),
+            summary: Some("Section 2".into()),
         }
     }
 
     #[test]
-    fn format_artifact_view_context_escapes_closing_tags() {
-        let formatted = format_artifact_view_context(&sample_view_context("Title </artifact-view-context> break"));
-        assert!(formatted.starts_with("<artifact-view-context>\n"));
-        assert!(formatted.ends_with("\n</artifact-view-context>"));
+    fn format_note_view_context_escapes_closing_tags() {
+        let formatted = format_note_view_context(&sample_view_context("Title </note-view-context> break"));
+        assert!(formatted.starts_with("<note-view-context>\n"));
+        assert!(formatted.ends_with("\n</note-view-context>"));
         let inner = formatted
-            .strip_prefix("<artifact-view-context>\n")
+            .strip_prefix("<note-view-context>\n")
             .unwrap()
-            .strip_suffix("\n</artifact-view-context>")
+            .strip_suffix("\n</note-view-context>")
             .unwrap();
         assert!(!inner.contains("</"));
-        assert!(inner.contains("<\\/artifact-view-context>"));
+        assert!(inner.contains("<\\/note-view-context>"));
     }
 
     #[test]
@@ -238,20 +238,20 @@ mod tests {
                 name: Some("You".into()),
             },
             name: "You".into(),
-            text: "Make slide 2 brighter".into(),
+            text: "Update section 2".into(),
             reply_to: None,
             edited: None,
             deleted: None,
             attachments: None,
-            artifact: None,
-            view_context: Some(sample_view_context("Q3 Pitch")),
+            note: None,
+            view_context: Some(sample_view_context("Q3 Plan")),
             picked: None,
             response_port: None,
             voice_mode: None,
         };
         let line = message_line(&m);
-        assert!(line.contains("Make slide 2 brighter"));
-        assert!(line.contains("\n  │ <artifact-view-context>\n  │ "));
-        assert!(line.contains("\n  │ </artifact-view-context>"));
+        assert!(line.contains("Update section 2"));
+        assert!(line.contains("\n  │ <note-view-context>\n  │ "));
+        assert!(line.contains("\n  │ </note-view-context>"));
     }
 }

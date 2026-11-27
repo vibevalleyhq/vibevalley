@@ -192,10 +192,10 @@ export const DebugCollabPresence = z.object({
   updatedAt: z.number(),
 }) satisfies Codec<T.DebugCollabPresence>;
 
-export const DebugCollabArtifactState = z.object({
-  artifactId: z.string(),
+export const DebugCollabNoteState = z.object({
+  noteId: z.string(),
   title: z.string(),
-  artifactType: z.string(),
+  noteType: z.string(),
   seq: z.number(),
   snapshotBytes: z.number(),
   frontiers: z.string(),
@@ -206,7 +206,7 @@ export const DebugCollabArtifactState = z.object({
   presenceCount: z.number(),
   presence: z.array(DebugCollabPresence),
   updatedAt: z.number(),
-}) satisfies Codec<T.DebugCollabArtifactState>;
+}) satisfies Codec<T.DebugCollabNoteState>;
 
 export const DebugStateCounts = z.object({
   issues: z.number(),
@@ -214,7 +214,7 @@ export const DebugStateCounts = z.object({
   channels: z.number(),
   agents: z.number(),
   repos: z.number(),
-  artifacts: z.number(),
+  notes: z.number(),
   inbox: z.number(),
   mediaJobs: z.number(),
 }) satisfies Codec<T.DebugStateCounts>;
@@ -225,7 +225,7 @@ export const DebugStateCache = z.object({
   sliceWatchers: z.record(z.string(), z.number()),
   counts: DebugStateCounts,
   caches: z.array(DebugCacheStat),
-  collab: z.array(DebugCollabArtifactState),
+  collab: z.array(DebugCollabNoteState),
 }) satisfies Codec<T.DebugStateCache>;
 
 export const DebugOverrideConfig = z.object({

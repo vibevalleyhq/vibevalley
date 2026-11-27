@@ -238,8 +238,8 @@ mod tests {
     #[test]
     fn normalize_key_accepts_valid_relative_keys() {
         assert_eq!(normalize_key("attachments/abc123").unwrap(), "attachments/abc123");
-        assert_eq!(normalize_key("artifact/id1/structure/main.md").unwrap(), "artifact/id1/structure/main.md");
-        assert_eq!(normalize_key("artifact/id1/.cover.json").unwrap(), "artifact/id1/.cover.json");
+        assert_eq!(normalize_key("note/id1/structure/main.md").unwrap(), "note/id1/structure/main.md");
+        assert_eq!(normalize_key("note/id1/.cover.json").unwrap(), "note/id1/.cover.json");
         assert_eq!(normalize_key("single-file").unwrap(), "single-file");
     }
 
@@ -270,7 +270,7 @@ mod tests {
         assert_eq!(normalize_prefix("").unwrap(), "");
         assert_eq!(normalize_prefix("attachments").unwrap(), "attachments");
         assert_eq!(normalize_prefix("attachments/").unwrap(), "attachments/");
-        assert_eq!(normalize_prefix("artifact/a1/structure/").unwrap(), "artifact/a1/structure/");
+        assert_eq!(normalize_prefix("note/a1/structure/").unwrap(), "note/a1/structure/");
 
         for bad in ["/", "/abs", "a//b", "a/../b", "..", ".", "a\\b", "a\0b", "a\tb", "a//"] {
             assert!(normalize_prefix(bad).is_err(), "expected prefix `{bad}` to be rejected");

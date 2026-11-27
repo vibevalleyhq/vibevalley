@@ -13,7 +13,7 @@ use serde_json::{Value, json};
 use vibevalley_mcp::{
     BoxFuture, ContentBlock, EXT_SKILLS, HEADER_METHOD, HEADER_NAME, HEADER_PROTOCOL_VERSION, HttpHeaders, META_CLIENT_CAPABILITIES, META_PROTOCOL_VERSION,
     McpHandler, McpServerConfig, McpTransportSpec, PROTOCOL_LEGACY, PROTOCOL_STATELESS, RequestContext, ResourceContent, ResourceDef, ResourceTemplateDef,
-    RpcError, SUPPORTED_PROTOCOLS, ServerCapabilities, ServerInfo, SkillCatalog, ToolCallResult, ToolDef, builtin_artifact_skills, dispatch_http, error_code,
+    RpcError, SUPPORTED_PROTOCOLS, ServerCapabilities, ServerInfo, SkillCatalog, ToolCallResult, ToolDef, builtin_note_skills, dispatch_http, error_code,
     scrub_resource_content, scrub_secrets, scrub_tool_result, serve_io,
 };
 
@@ -114,14 +114,14 @@ impl McpHandler for DemoHandler {
 
 fn sample_embedded_skills() -> SkillCatalog {
     SkillCatalog::from_embedded_entries(
-        "artifact",
+        "note",
         &[
             (
-                "outline/SKILL.md",
-                "---\nname: outline\ndescription: Hierarchical tree outline guide\ntags: [artifact, writing]\n---\n# Outline\nUse nodes.\n",
+                "doc/SKILL.md",
+                "---\nname: doc\ndescription: Structured block document guide\ntags: [note, writing]\n---\n# Doc\nUse blocks.\n",
             ),
-            ("outline/references/format.md", "# Outline JSON Format\nRoot ids and nodes.\n"),
-            ("docs/SKILL.md", "# docs: Collaborative Document\nMulti-section markdown.\n"),
+            ("doc/references/format.md", "# Doc JSON Format\nBlock ids and content.\n"),
+            ("base/SKILL.md", "# base: Multi-dimensional database\nTables, views, and agent columns.\n"),
         ],
     )
 }
@@ -429,24 +429,11 @@ fn secret_redaction_scrubs_longest_first_across_text_tool_and_resource() {
 }
 
 #[tokio::test]
-async fn builtin_artifact_skills_catalog_exposes_all_12_types_and_merges_local() {
-    let mut catalog = builtin_artifact_skills();
-    assert_eq!(catalog.len(), 12);
-    for slug in [
-        "dashboard",
-        "design",
-        "design-system",
-        "diagram",
-        "docs",
-        "motion",
-        "outline",
-        "prototype",
-        "sheet",
-        "slides",
-        "storyboard",
-        "whiteboard",
-    ] {
-        let uri = format!("skill://artifact/{slug}");
+async fn builtin_note_skills_catalog_exposes_all_4_types_and_merges_local() {
+    let mut catalog = builtin_note_skills();
+    assert_eq!(catalog.len(), 4);
+    for slug in ["doc", "base", "canvas", "media"] {
+        let uri = format!("skill://note/{slug}");
         let doc = catalog.get(&uri, None).unwrap_or_else(|| panic!("missing {uri}"));
         assert_eq!(doc.uri, uri);
         assert!(doc.files.iter().any(|f| f == "SKILL.en.md"), "{slug} missing SKILL.en.md");
@@ -457,11 +444,11 @@ async fn builtin_artifact_skills_catalog_exposes_all_12_types_and_merges_local()
     std::fs::create_dir_all(&local_skill).unwrap();
     std::fs::write(local_skill.join("SKILL.md"), "# triage: Local triage\nCheck issues.\n").unwrap();
     catalog.merge(SkillCatalog::from_directory("local", dir.path()).unwrap());
-    assert_eq!(catalog.len(), 13);
+    assert_eq!(catalog.len(), 5);
 
     let handler = DemoHandler::new(catalog);
-    let list_req = json!({ "jsonrpc": "2.0", "id": 1, "method": "skills/list", "params": { "tag": "artifact" } }).to_string();
+    let list_req = json!({ "jsonrpc": "2.0", "id": 1, "method": "skills/list", "params": { "tag": "note" } }).to_string();
     let reply = dispatch_http(&handler, &HttpHeaders::default(), None, &list_req).await;
     let body: Value = serde_json::from_str(reply.body.as_deref().unwrap()).unwrap();
-    assert_eq!(body["result"]["skills"].as_array().unwrap().len(), 12);
+    assert_eq!(body["result"]["skills"].as_array().unwrap().len(), 4);
 }

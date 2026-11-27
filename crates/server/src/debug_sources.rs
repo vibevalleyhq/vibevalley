@@ -10,20 +10,20 @@ use serde_json::json;
 use vibevalley_core::collab::{CollabDoc, DEFAULT_PRESENCE_TTL_MS, encode_frontiers, encode_version_vector};
 use vibevalley_core::projection::{InboxInput, derive_issues, overlay_sessions, project_inbox};
 use vibevalley_protocol::{
-    ApiError, ArtifactListRequest, ArtifactPresenceUpdateRequest, BizCode, DebugCollabArtifactState, DebugCollabClock, DebugCollabPresence,
-    DebugRuntimeSummary, DebugTrajectoryKind, SessionEvent,
+    ApiError, BizCode, DebugCollabClock, DebugCollabNoteState, DebugCollabPresence, DebugRuntimeSummary, DebugTrajectoryKind, NoteListRequest,
+    NotePresenceUpdateRequest, SessionEvent,
 };
 use vibevalley_runtime::agent::durable::ExportOptions;
 use vibevalley_runtime::oar::set_observer;
 
 use crate::agent::Agent;
-use crate::artifact::Manager as ArtifactManager;
 use crate::channel::Chat;
 use crate::context::Context;
 use crate::context::api::{BoxFuture, SharedHostDebug};
 use crate::cron::Scheduler as CronScheduler;
 use crate::debug::{DebugDataSource, DebugKit, DebugParts, DebugStateSnapshot, DurableExportSummary, RuntimeProbeSnapshot};
 use crate::issue::Board;
+use crate::note::Manager as NoteManager;
 use crate::repo::Repo;
 use crate::runtime::Runtime;
 use crate::setting::Setting;
@@ -35,7 +35,7 @@ pub(crate) fn build_debug_kit(
     board: &Arc<Board>,
     agent: &Arc<Agent>,
     repo: &Arc<Repo>,
-    artifact: &Arc<ArtifactManager>,
+    note: &Arc<NoteManager>,
     channel: &Arc<Chat>,
     cron: &Arc<CronScheduler>,
     setting: &Arc<Setting>,
@@ -53,7 +53,7 @@ pub(crate) fn build_debug_kit(
         board: board.clone(),
         agent: agent.clone(),
         repo: repo.clone(),
-        artifact: artifact.clone(),
+        note: note.clone(),
         channel: channel.clone(),
         cron: cron.clone(),
     });
@@ -81,7 +81,7 @@ pub(crate) struct ServerDebugSources {
     pub board: Arc<Board>,
     pub agent: Arc<Agent>,
     pub repo: Arc<Repo>,
-    pub artifact: Arc<ArtifactManager>,
+    pub note: Arc<NoteManager>,
     pub channel: Arc<Chat>,
     pub cron: Arc<CronScheduler>,
 }
@@ -147,10 +147,10 @@ impl DebugDataSource for ServerDebugSources {
             let issues = derive_issues(&raw_issues, &sessions);
             let channels = self.channel.channels_snapshot_async().await.unwrap_or_default();
             let user_mentions = self.channel.user_mentions_snapshot_async().await.unwrap_or_default();
-            let artifacts = self.artifact.list_async(&ArtifactListRequest::default()).await.unwrap_or_default();
-            let collab_rows = self.ctx.service.artifact.list_collab_snapshots(64).await.unwrap_or_default();
-            let collab = self.inspect_collab_states_async(&artifacts, collab_rows).await;
-            let media_jobs = self.artifact.media.list_async().await.unwrap_or_default();
+            let notes = self.note.list_async(&NoteListRequest::default()).await.unwrap_or_default();
+            let collab_rows = self.ctx.service.note.list_collab_snapshots(64).await.unwrap_or_default();
+            let collab = self.inspect_collab_states_async(&notes, collab_rows).await;
+            let media_jobs = self.note.media.list_async().await.unwrap_or_default();
             let crons = self.cron.list();
             let (call, call_reason) = self.ctx.live.call_snapshot();
             let live_snap = self.ctx.live.to_core_snapshot(false);
@@ -172,7 +172,7 @@ impl DebugDataSource for ServerDebugSources {
                 sessions,
                 channel_count: channels.len() as u32,
                 repo_count: self.repo.list_async().await.len() as u32,
-                artifact_count: artifacts.len() as u32,
+                note_count: notes.len() as u32,
                 media_job_count: media_jobs.len() as u32,
                 inbox_count: inbox.items.len() as u32,
                 state_cache_json: json!({
@@ -246,24 +246,24 @@ impl DebugDataSource for ServerDebugSources {
 impl ServerDebugSources {
     async fn inspect_collab_states_async(
         &self,
-        artifacts: &[vibevalley_protocol::Artifact],
-        collab_rows: Vec<crate::service::artifact::CollabSnapshotRow>,
-    ) -> Vec<DebugCollabArtifactState> {
-        let mut by_id: BTreeMap<String, (Option<crate::service::artifact::CollabSnapshotRow>, Option<&vibevalley_protocol::Artifact>)> = BTreeMap::new();
-        for art in artifacts.iter().take(64) {
-            by_id.insert(art.id.clone(), (None, Some(art)));
+        notes: &[vibevalley_protocol::Note],
+        collab_rows: Vec<crate::service::note::CollabSnapshotRow>,
+    ) -> Vec<DebugCollabNoteState> {
+        let mut by_id: BTreeMap<String, (Option<crate::service::note::CollabSnapshotRow>, Option<&vibevalley_protocol::Note>)> = BTreeMap::new();
+        for n in notes.iter().take(64) {
+            by_id.insert(n.id.clone(), (None, Some(n)));
         }
         for row in collab_rows {
-            let artifact_id = row.artifact_id.clone();
-            by_id.entry(artifact_id).or_insert((None, None)).0 = Some(row);
+            let note_id = row.note_id.clone();
+            by_id.entry(note_id).or_insert((None, None)).0 = Some(row);
         }
 
         let mut out = Vec::new();
-        for (artifact_id, (row_opt, art_opt)) in by_id {
+        for (note_id, (row_opt, note_opt)) in by_id {
             let live_presence = self
-                .artifact
-                .update_presence_async(&ArtifactPresenceUpdateRequest {
-                    id: artifact_id.clone(),
+                .note
+                .update_presence_async(&NotePresenceUpdateRequest {
+                    id: note_id.clone(),
                     presence: None,
                     peer_id: None,
                 })
@@ -325,12 +325,12 @@ impl ServerDebugSources {
                     updated_at: p.updated_at,
                 })
                 .collect();
-            let updated_at = doc_updated_at.max(art_opt.map_or(0, |a| a.updated));
-            out.push(DebugCollabArtifactState {
-                artifact_id,
-                title: art_opt.map_or_else(String::new, |a| a.title.clone()),
-                artifact_type: art_opt.map_or_else(|| "unknown".to_string(), |a| a.artifact_type.as_str().to_string()),
-                seq: art_opt.map_or(0, |a| a.seq),
+            let updated_at = doc_updated_at.max(note_opt.map_or(0, |a| a.updated));
+            out.push(DebugCollabNoteState {
+                note_id,
+                title: note_opt.map_or_else(String::new, |a| a.title.clone()),
+                note_type: note_opt.map_or_else(|| "unknown".to_string(), |a| a.note_type.as_str().to_string()),
+                seq: note_opt.map_or(0, |a| a.seq),
                 snapshot_bytes,
                 frontiers,
                 frontier_ids,
@@ -342,7 +342,7 @@ impl ServerDebugSources {
                 updated_at,
             });
         }
-        out.sort_by(|a, b| b.updated_at.cmp(&a.updated_at).then_with(|| a.artifact_id.cmp(&b.artifact_id)));
+        out.sort_by(|a, b| b.updated_at.cmp(&a.updated_at).then_with(|| a.note_id.cmp(&b.note_id)));
         out
     }
 }

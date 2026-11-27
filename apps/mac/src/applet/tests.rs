@@ -35,7 +35,7 @@ fn shim_to_host_wire_protocol_roundtrips_with_exact_camel_case_fields() {
     let cases = vec![
         (
             ShimToHost::Attach {
-                artifact_id: "art-1".into(),
+                note_id: "note-1".into(),
                 width: 960.0,
                 height: 640.0,
                 scale: 2.0,
@@ -43,7 +43,7 @@ fn shim_to_host_wire_protocol_roundtrips_with_exact_camel_case_fields() {
             },
             json!({
                 "type": "attach",
-                "artifactId": "art-1",
+                "noteId": "note-1",
                 "width": 960.0,
                 "height": 640.0,
                 "scale": 2.0,
@@ -196,17 +196,17 @@ fn host_to_shim_wire_protocol_roundtrips_with_exact_camel_case_fields() {
             HostToShim::ReadyLayer {
                 context_id: 4242,
                 title: "Spec".into(),
-                artifact_type: "docs".into(),
+                note_type: "doc".into(),
             },
-            json!({ "type": "readyLayer", "contextId": 4242, "title": "Spec", "artifactType": "docs" }),
+            json!({ "type": "readyLayer", "contextId": 4242, "title": "Spec", "noteType": "doc" }),
         ),
         (
             HostToShim::ReadyWebview {
                 html: "<html></html>".into(),
                 title: "Proto".into(),
-                artifact_type: "prototype".into(),
+                note_type: "canvas".into(),
             },
-            json!({ "type": "readyWebview", "html": "<html></html>", "title": "Proto", "artifactType": "prototype" }),
+            json!({ "type": "readyWebview", "html": "<html></html>", "title": "Proto", "noteType": "canvas" }),
         ),
         (
             HostToShim::UpdateWebview {
@@ -241,23 +241,23 @@ fn host_to_shim_wire_protocol_roundtrips_with_exact_camel_case_fields() {
 #[test]
 fn applet_info_and_install_request_roundtrip() {
     let req = AppletInstallRequest {
-        artifact_id: "art-123".into(),
-        artifact_type: "board".into(),
-        app_name: "My Board".into(),
+        note_id: "note-123".into(),
+        note_type: "base".into(),
+        app_name: "My Base".into(),
         always_on_top: true,
     };
     let req_json = serde_json::to_value(&req).unwrap();
     assert_eq!(
         req_json,
-        json!({ "artifactId": "art-123", "artifactType": "board", "appName": "My Board", "alwaysOnTop": true })
+        json!({ "noteId": "note-123", "noteType": "base", "appName": "My Base", "alwaysOnTop": true })
     );
     assert_eq!(serde_json::from_value::<AppletInstallRequest>(req_json).unwrap(), req);
 
     let info = AppletInfo {
-        artifact_id: "art-123".into(),
-        artifact_type: "whiteboard".into(),
+        note_id: "note-123".into(),
+        note_type: "canvas".into(),
         app_name: "My Board".into(),
-        bundle_id: "dev.vibevalley.applet.art-123".into(),
+        bundle_id: "dev.vibevalley.applet.note-123".into(),
         bundle_path: "/tmp/My Board.app".into(),
         always_on_top: true,
         installed: true,

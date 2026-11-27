@@ -1,25 +1,25 @@
 ---
 name: 网页和报表
-description: 用户要一页报表、一个看板、一份带图表的调研、一个能点的小工具或演示页时用：交一份 display 为 page 的网页 Artifact。
+description: 用户要一页报表、一个看板、一份带图表的调研、一个能点的小工具或演示页时用：创建一篇包含图表/交互块的 doc 笔记，或含自包含页面的 canvas/doc 目录笔记。
 ---
 
-交一份网页 Artifact：`artifact_create` 时 `kind` 填 `html`，`display` 不填或填 `page`。先写成工作目录里的一个文件，用 `file` 交上来。
+交付一份交互看板或调研报表：`note_create` 时 `noteType` 优先填 `doc`（使用 ```chart / ```genui 块与表格），需要独立 HTML/SVG 展板时用 `note_file_write` 写入 `structure/` 并设 `noteType: "doc"` 或 `"canvas"`。
 
 **沙箱的规矩**（交上来会先查，不合的被退回，说哪一行、怎么改）：
 
 - 连不了网：不能 `fetch`、不能调农场的接口、不能提交表单、不能再嵌一个页面。数据写进页面里。
 - 样式和脚本写在这一个文件里；库只能从 `cdn.jsdelivr.net`、`cdnjs.cloudflare.com` 加载（写明确的版本号），字体还能从 Google Fonts 加载。
-- 图片、音视频内联成 `data:`。
+- 图片、音视频内联成 `data:` 或放入 `asset/`。
 - 一稿最多 5 MB。
 
 **做法。**
 
 1. **先想看的人要什么。** 一页回答一个问题：「这周打卡有没有异常」「两种方案哪个好」。最重要的结论放在最上面，一眼看到；细节往下放。
-2. **数据放在一处。** 写进一段 `<script type="application/json" id="data">`，页面的脚本从它读。数字从仓库、日志、工单、用户给的材料里来，写明出处和时间；不编数字，算不出来的说算不出来。
-3. **图表。** 能用表格说清的用表格；要画图用一个库（比如 jsdelivr 上的 Chart.js 或 ECharts），一种意思一种颜色，坐标轴和单位写清楚。
-4. **样子跟着工作台。** 用工作台注进来的 CSS 变量，页面自然跟着用户的浅色深色走：字 `--vv-ink`、`--vv-muted`、`--vv-faint`，底 `--vv-page`，线 `--vv-line`，强调 `--vv-accent`，状态色 `--vv-leaf`（好）、`--vv-wheat`（等、注意）、`--vv-berry`（坏）、`--vv-water`（信息），字体 `--vv-font-sans`、`--vv-font-mono`。别写死黑白底色。
+2. **数据放在一处。** 写进一段 `<script type="application/json" id="data">` 或 `base` 笔记的 `structure/base.json`，页面的脚本从它读。数字从仓库、日志、工单、用户给的材料里来，写明出处和时间；不编数字，算不出来的说算不出来。
+3. **图表。** 能用表格说清的用 `base` 或表格；在 `doc` 里可直接嵌 ```` ```chart ```` 或 ```` ```genui ```` 块；自定义 HTML 页可用 Chart.js 或 ECharts。
+4. **样子跟着工作台。** 用工作台注进来的 CSS 变量，页面自然跟着用户的浅色深色走：字 `--vv-ink`、`--vv-muted`、`--vv-faint`，底 `--vv-page`，线 `--vv-line`，强调 `--vv-accent`，状态色 `--vv-leaf`、`--vv-wheat`、`--vv-berry`、`--vv-water`，字体 `--vv-font-sans`、`--vv-font-mono`。
 5. **窄屏也能看。** 宽度用百分比或 `max-width`，表格太宽就横向滚动，不让整页溢出。
-6. **交上来，再改。** `note` 写一句这页回答什么问题。用户回复卡片就是评论，照着改完用 `artifact_version_create` 交整份新的一稿。
+6. **交上来，再改。** `note` 写一句这页回答什么问题。用户回复卡片就是评论，照着改完用 `note_version_create` 切新的一稿。
 
 起手模板：
 

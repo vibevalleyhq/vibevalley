@@ -16,7 +16,7 @@ use super::board::Board;
 use super::chat::{IssueChat, KeyedLaneQueue, REPORT_MAX, view_context_of};
 use crate::channel::{ChannelDispatched, Chat, Committed, DeliveryTargetKind, Meta, Note, Noticing, QueuedDelivery, Seat, profile_id};
 use crate::context::Context;
-use crate::context::text::{format_artifact_view_context, head};
+use crate::context::text::{format_note_view_context, head};
 use crate::runtime::{MailboxSource, MailboxStatus, OUTBOX_SESSION_REPORTED, OutboxSessionReported, SessionLifecycleEvent};
 
 #[derive(Clone)]
@@ -284,7 +284,7 @@ impl SessionChat {
         }
         let settle_id = mail_entry.as_ref().map(|e| e.id);
         let words = match view_context_of(&c) {
-            Some(vc) => format!("{}\n{}", format_artifact_view_context(&vc), c.row.body),
+            Some(vc) => format!("{}\n{}", format_note_view_context(&vc), c.row.body),
             None => c.row.body.clone(),
         };
         enum TalkOutcome {

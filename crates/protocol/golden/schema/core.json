@@ -1,5 +1,5 @@
 {
- "ArtifactFollowPayload": [
+ "NoteFollowPayload": [
   {
    "after": 7191,
    "id": "s7190"
@@ -9,7 +9,7 @@
    "id": "s7192"
   }
  ],
- "ArtifactSuggestionFollowPayload": [
+ "NoteSuggestionFollowPayload": [
   {
    "id": "s7194"
   },
@@ -109,10 +109,10 @@
      "role": "orchestrator"
     },
     "agent": "s5615",
-    "artifact": {
+    "note": {
      "id": "s5641",
      "title": "s5642",
-     "artifactType": "docs",
+     "noteType": "doc",
      "version": 5643,
      "note": "s5644"
     },
@@ -286,10 +286,10 @@
        "kind": "user"
       },
       "agent": "s5719",
-      "artifact": {
+      "note": {
        "id": "s5743",
        "title": "s5744",
-       "artifactType": "docs",
+       "noteType": "doc",
        "version": 5745,
        "note": "s5746"
       },

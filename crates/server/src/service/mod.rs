@@ -16,23 +16,23 @@ use sea_orm::sea_query::Expr;
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, PrimaryKeyTrait, QueryFilter, Update};
 use vibevalley_core::SliceMask;
 
-pub(crate) mod artifact;
 pub(crate) mod channel;
 pub(crate) mod connector;
 pub(crate) mod cron;
 pub(crate) mod issue;
 pub(crate) mod memory;
+pub(crate) mod note;
 pub(crate) mod outbox;
 pub(crate) mod remote;
 pub(crate) mod session;
 pub(crate) mod storage;
 
-pub(crate) use artifact::ArtifactService;
 pub(crate) use channel::ChannelService;
 pub(crate) use connector::ConnectorService;
 pub(crate) use cron::CronService;
 pub(crate) use issue::IssueService;
 pub(crate) use memory::MemoryService;
+pub(crate) use note::NoteService;
 pub(crate) use outbox::OutboxService;
 pub(crate) use remote::RemoteService;
 pub(crate) use session::SessionService;
@@ -103,7 +103,7 @@ pub struct Service {
     pub(crate) storage: StorageService,
     pub(crate) channel: ChannelService,
     pub(crate) connector: ConnectorService,
-    pub(crate) artifact: ArtifactService,
+    pub(crate) note: NoteService,
     pub session: SessionService,
     pub issue: IssueService,
     pub(crate) memory: MemoryService,
@@ -119,7 +119,7 @@ impl Service {
             storage: StorageService::new(database.clone()),
             channel: ChannelService::new(database.clone()),
             connector: ConnectorService::new(database.clone()),
-            artifact: ArtifactService::new(database.clone()),
+            note: NoteService::new(database.clone()),
             session: SessionService::new(database.clone()),
             issue: IssueService::new(database.clone()),
             memory: MemoryService::new(database.clone()),

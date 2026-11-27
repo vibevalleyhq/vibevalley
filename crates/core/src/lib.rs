@@ -1,9 +1,8 @@
 //! VibeValley's projection and domain rules: core state folding (`reduce`),
 //! per-domain slice projections (`board_slice`, `sessions_slice`, `collab_slice`,
 //! `inbox_slice`, `ops_slice`, `farm_frame`), schedules (`cron`),
-//! and artifacts (`artifact`).
+//! and notes (`note`).
 
-pub mod artifact;
 pub mod brief;
 pub mod channel;
 pub mod clock;
@@ -17,6 +16,7 @@ pub mod game;
 pub mod health;
 mod inbox;
 pub mod moves;
+pub mod note;
 pub mod pr;
 pub mod projection;
 pub mod prompts;

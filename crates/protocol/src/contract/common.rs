@@ -13,10 +13,10 @@ pub type IssueId = String;
 /// A session's id: w1, w2…, for the whole life of the farm.
 pub type SessionId = String;
 
-/// An artifact's id.
-pub type ArtifactId = String;
+/// A note's id.
+pub type NoteId = String;
 
-/// A suggested change to an artifact file.
+/// A suggested change to a note file.
 pub type SuggestionId = String;
 
 pub type MessageId = String;

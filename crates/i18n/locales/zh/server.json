@@ -11,7 +11,7 @@
     "channel": "列出频道，找它的 id",
     "graph": "列出计划，找它的 id",
     "memories": "列出它的记忆，找那一条的 id",
-    "artifact": "列出作品，找它的 id",
+    "note": "列出笔记，找它的 id",
     "library": "列出媒体库，找它的 id"
   },
   "repoRef": "仓库 {id}",

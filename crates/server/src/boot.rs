@@ -1,6 +1,6 @@
 //! Bootstrap wiring helpers invoked by [`crate::app::create_app`]: runtime
 //! registry assembly, lazy cron orchestrator binding, outbox registration, and
-//! cross-domain event bridges (chat→artifact and runtime/chat→farm skin).
+//! cross-domain event bridges (chat→note and runtime/chat→farm skin).
 
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
@@ -164,11 +164,11 @@ pub(crate) async fn seat_orchestrators_and_watch(ctx: &Context, profile: &Arc<Pr
     }));
 }
 
-pub(crate) fn spawn_chat_artifact_bridge(ctx: &Context, channel: &Chat) -> broadcast::Receiver<ChatMessage> {
+pub(crate) fn spawn_chat_note_bridge(ctx: &Context, channel: &Chat) -> broadcast::Receiver<ChatMessage> {
     let (chat_msg_tx, chat_msg_rx) = broadcast::channel(256);
     let mut msg_events = channel.subscribe_message_events();
     let cancel = ctx.task.child_token();
-    ctx.spawn("artifact.chat_messages", async move {
+    ctx.spawn("note.chat_messages", async move {
         loop {
             tokio::select! {
                 biased;

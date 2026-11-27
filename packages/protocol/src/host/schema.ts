@@ -339,25 +339,25 @@ export const HostQrPayload = z.object({
   border: z.exactOptional(z.number()),
 }) satisfies Codec<T.HostQrPayload>;
 
-export const ArtifactAppletInfo = z.object({
-  artifactId: z.string(),
-  artifactType: z.string(),
+export const NoteAppletInfo = z.object({
+  noteId: z.string(),
+  noteType: z.string(),
   appName: z.string(),
   bundleId: z.string(),
   bundlePath: z.string(),
   alwaysOnTop: z.boolean(),
   installed: z.boolean(),
-}) satisfies Codec<T.ArtifactAppletInfo>;
+}) satisfies Codec<T.NoteAppletInfo>;
 
 export const HostAppletInstallPayload = z.object({
-  artifactId: z.string(),
-  artifactType: z.string(),
+  noteId: z.string(),
+  noteType: z.string(),
   appName: z.string(),
   alwaysOnTop: z.boolean(),
 }) satisfies Codec<T.HostAppletInstallPayload>;
 
 export const HostAppletIdPayload = z.object({
-  artifactId: z.string(),
+  noteId: z.string(),
 }) satisfies Codec<T.HostAppletIdPayload>;
 
 const HostCaptureWebViewPayload = z.object({

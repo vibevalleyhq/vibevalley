@@ -10,7 +10,7 @@ use super::words::Source;
 use crate::BoxFuture;
 use crate::agent::profile::text;
 use crate::channel::{Chat, Committed, DeliveryTargetKind, QueuedDelivery, actor_of, meta_of};
-use crate::context::text::format_artifact_view_context;
+use crate::context::text::format_note_view_context;
 use crate::service::session::{MailboxSource, MailboxStatus};
 
 pub(super) trait ChatIntake: Send + Sync {
@@ -186,7 +186,7 @@ impl Orchestrator {
             .view_context
             .as_ref()
             .filter(|_| c.row.deleted_at.is_none())
-            .map(|vc| format!("{}\n", format_artifact_view_context(vc)))
+            .map(|vc| format!("{}\n", format_note_view_context(vc)))
             .unwrap_or_default();
         let command_note = meta
             .command

@@ -356,15 +356,15 @@ mod tests {
     }
 
     #[test]
-    fn regression_web_base_and_artifact_rich_ui_keys_are_embedded_in_both_languages() {
+    fn regression_web_base_and_note_rich_ui_keys_are_embedded_in_both_languages() {
         for key in [
             "web.base.rich.copy",
             "web.base.rich.copied",
             "web.base.rich.more",
             "web.base.rich.less",
             "web.base.rich.diagram",
-            "web.artifact.whiteboard.inspector",
-            "web.artifact.whiteboard.fitView",
+            "web.note.whiteboard.inspector",
+            "web.note.whiteboard.fitView",
         ] {
             for lang in ["zh", "en"] {
                 let translated = t_in(lang, key, &[]);

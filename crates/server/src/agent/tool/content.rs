@@ -1,20 +1,23 @@
-//! Resources, artifacts, the library and media: direct typed calls into domain
+//! Resources, notes, the library and media: direct typed calls into domain
 //! services and [`crate::agent::mcp::Resource`] (`vv://`), keeping actor-scoped
-//! artifact/media/library writes strongly typed with zero `block_on`.
+//! note/media/library writes strongly typed with zero `block_on`.
 
 use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 use vibevalley_core::collab::CommitMeta;
 use vibevalley_protocol::{
-    ArtifactFileDeleteRequest, ArtifactFileGetRequest, ArtifactFileListRequest, ArtifactFileWriteRequest, ArtifactListRequest, ArtifactRequest,
-    ArtifactSuggestionCreateInput, ArtifactType, ArtifactTypeReadRequest, ArtifactVersionRequest, LibraryAddRequest, LibraryListRequest, MediaImageRequest,
-    MediaSource, MediaSpeakersRequest, MediaSpeechRequest, MediaVoiceDesignRequest, Session,
+    BaseRunAgentColumnRequest, BaseUpsertRowRequest, BaseViewRequest, LibraryAddRequest, LibraryListRequest, MediaImageRequest, MediaSource,
+    MediaSpeakersRequest, MediaSpeechRequest, MediaVoiceDesignRequest, NoteDocAppendBlockRequest, NoteFileDeleteRequest, NoteFileGetRequest,
+    NoteFileListRequest, NoteFileWriteRequest, NoteLinkListRequest, NoteListRequest, NoteRequest, NoteSuggestionCreateInput, NoteTreeMoveRequest, NoteType,
+    NoteTypeReadRequest, NoteVersionRequest, Session,
 };
 
 use super::registry::{ToolRegistry, Who, given};
 use crate::agent::mcp::ResourceReadArgs as McpResourceReadArgs;
-use crate::artifact::{AddedBy, Maker};
+use crate::issue::NewIssue;
+use crate::note::base::ExecutedAgentCellOutcome;
+use crate::note::{AddedBy, Maker};
 
 fn text<T: serde::Serialize>(v: &T) -> Result<String, String> {
     serde_json::to_string(v).map_err(|e| e.to_string())
@@ -72,19 +75,19 @@ pub async fn image(f: &ToolRegistry, who: &Who, req: MediaImageRequest) -> Resul
         agent: here.agent.clone(),
         channel: here.channel.clone(),
     };
-    text(&f.artifact.media.image_async(req, source).await.map_err(|e| e.message)?)
+    text(&f.note.media.image_async(req, source).await.map_err(|e| e.message)?)
 }
 
 pub async fn speech(f: &ToolRegistry, who: &Who, req: MediaSpeechRequest) -> Result<String, String> {
-    text(&f.artifact.media.speech_async(req, mandate(who)?).await.map_err(|e| e.message)?)
+    text(&f.note.media.speech_async(req, mandate(who)?).await.map_err(|e| e.message)?)
 }
 
 pub async fn dialogue(f: &ToolRegistry, who: &Who, req: MediaSpeakersRequest) -> Result<String, String> {
-    text(&f.artifact.media.speakers_async(req, mandate(who)?).await.map_err(|e| e.message)?)
+    text(&f.note.media.speakers_async(req, mandate(who)?).await.map_err(|e| e.message)?)
 }
 
 pub async fn voice_design(f: &ToolRegistry, who: &Who, req: MediaVoiceDesignRequest) -> Result<String, String> {
-    text(&f.artifact.media.voice_design_async(req, mandate(who)?).await.map_err(|e| e.message)?)
+    text(&f.note.media.voice_design_async(req, mandate(who)?).await.map_err(|e| e.message)?)
 }
 
 /// Understanding the user approved for this channel, started for them.
@@ -92,33 +95,27 @@ pub async fn understand(f: &ToolRegistry, who: &Who, a: IdArgs) -> Result<String
     let MediaSource::Orchestrator { agent, channel } = mandate(who)? else {
         return Err(vibevalley_i18n::t("server.media.userRequired", &[]));
     };
-    text(
-        &f.artifact
-            .media
-            .start_understanding_async(&a.id, &agent, &channel)
-            .await
-            .map_err(|e| e.message)?,
-    )
+    text(&f.note.media.start_understanding_async(&a.id, &agent, &channel).await.map_err(|e| e.message)?)
 }
 
 pub async fn job_get(f: &ToolRegistry, _who: &Who, a: IdArgs) -> Result<String, String> {
-    text(&f.artifact.media.get_async(&a.id).await.map_err(|e| e.message)?)
+    text(&f.note.media.get_async(&a.id).await.map_err(|e| e.message)?)
 }
 
 pub async fn job_list(f: &ToolRegistry, _who: &Who, _: EmptyArgs) -> Result<String, String> {
-    text(&f.artifact.media.list_async().await.map_err(|e| e.message)?)
+    text(&f.note.media.list_async().await.map_err(|e| e.message)?)
 }
 
 pub async fn job_cancel(f: &ToolRegistry, _who: &Who, a: IdArgs) -> Result<String, String> {
-    text(&f.artifact.media.cancel_async(&a.id).await.map_err(|e| e.message)?)
+    text(&f.note.media.cancel_async(&a.id).await.map_err(|e| e.message)?)
 }
 
 pub async fn job_download(f: &ToolRegistry, _who: &Who, a: IdArgs) -> Result<String, String> {
-    text(&f.artifact.media.retry_download_async(&a.id).await.map_err(|e| e.message)?)
+    text(&f.note.media.retry_download_async(&a.id).await.map_err(|e| e.message)?)
 }
 
 pub async fn library_list(f: &ToolRegistry, _who: &Who, req: LibraryListRequest) -> Result<String, String> {
-    let items = f.artifact.library.list_async(&req).await.map_err(|e| e.message)?;
+    let items = f.note.library.list_async(&req).await.map_err(|e| e.message)?;
     if items.is_empty() {
         return Ok("素材库里没有这样的文件。".into());
     }
@@ -138,19 +135,20 @@ pub async fn library_add(f: &ToolRegistry, who: &Who, req: LibraryAddRequest) ->
             dir: me.cwd.as_deref().map(PathBuf::from),
         },
     };
-    let item = f.artifact.library.add_async(&req, &by).await.map_err(|e| format!("没成：{}", e.message))?;
+    let item = f.note.library.add_async(&req, &by).await.map_err(|e| format!("没成：{}", e.message))?;
     Ok(format!("放进素材库了：「{}」，id={}。", item.attachment.name, item.attachment.id))
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ArtifactListArgs {
+pub struct NoteListArgs {
     channel: Option<String>,
     issue: Option<String>,
-    artifact_type: Option<ArtifactType>,
+    note_type: Option<NoteType>,
+    parent_id: Option<String>,
 }
 
-pub async fn artifact_list(f: &ToolRegistry, who: &Who, a: ArtifactListArgs) -> Result<String, String> {
+pub async fn note_list(f: &ToolRegistry, who: &Who, a: NoteListArgs) -> Result<String, String> {
     let channel = given(&a.channel).map(String::from);
     let mut issue = match given(&a.issue) {
         Some(r) => Some(f.issue_async(r).await?.id),
@@ -160,30 +158,31 @@ pub async fn artifact_list(f: &ToolRegistry, who: &Who, a: ArtifactListArgs) -> 
         issue = me.issue_id().map(String::from);
     }
     text(
-        &f.artifact
-            .list_async(&ArtifactListRequest {
+        &f.note
+            .list_async(&NoteListRequest {
                 channel,
                 issue,
-                artifact_type: a.artifact_type,
+                note_type: a.note_type,
+                parent_id: given(&a.parent_id).map(String::from),
             })
             .await
             .map_err(|e| e.message)?,
     )
 }
 
-pub async fn artifact_get(f: &ToolRegistry, _who: &Who, a: IdArgs) -> Result<String, String> {
-    text(&f.artifact.get_async(&a.id).await.map_err(|e| e.message)?)
+pub async fn note_get(f: &ToolRegistry, _who: &Who, a: IdArgs) -> Result<String, String> {
+    text(&f.note.get_async(&a.id).await.map_err(|e| e.message)?)
 }
 
 #[derive(Deserialize)]
-pub struct ArtifactContentArgs {
+pub struct NoteContentArgs {
     #[serde(default)]
     id: String,
     version: Option<i64>,
 }
 
-pub async fn artifact_content(f: &ToolRegistry, _who: &Who, a: ArtifactContentArgs) -> Result<String, String> {
-    let content = f.artifact.content_async(&a.id, a.version).await.map_err(|e| e.message)?;
+pub async fn note_content(f: &ToolRegistry, _who: &Who, a: NoteContentArgs) -> Result<String, String> {
+    let content = f.note.content_async(&a.id, a.version).await.map_err(|e| e.message)?;
     text(&content)
 }
 
@@ -210,13 +209,13 @@ fn actor_of(who: &Who) -> &str {
 }
 
 #[derive(Deserialize)]
-pub struct ArtifactCreateArgs {
+pub struct NoteCreateArgs {
     #[serde(flatten)]
-    req: ArtifactRequest,
+    req: NoteRequest,
     file: Option<String>,
 }
 
-pub async fn artifact_create(f: &ToolRegistry, who: &Who, mut a: ArtifactCreateArgs) -> Result<String, String> {
+pub async fn note_create(f: &ToolRegistry, who: &Who, mut a: NoteCreateArgs) -> Result<String, String> {
     let file = given(&a.file).map(str::to_string);
     if a.req.content.is_some() && file.is_some() {
         return Err("content 和 file 只能填一个".into());
@@ -243,13 +242,13 @@ pub async fn artifact_create(f: &ToolRegistry, who: &Who, mut a: ArtifactCreateA
             }
         }
     }
-    text(&f.artifact.create_async(&maker_of(who), &a.req).await.map_err(|e| e.message)?)
+    text(&f.note.create_async(&maker_of(who), &a.req).await.map_err(|e| e.message)?)
 }
 
 #[derive(Deserialize)]
-pub struct ArtifactVersionArgs {
+pub struct NoteVersionArgs {
     #[serde(flatten)]
-    req: ArtifactVersionRequest,
+    req: NoteVersionRequest,
     file: Option<String>,
 }
 
@@ -269,63 +268,123 @@ fn commit_meta_for_who(f: &ToolRegistry, who: &Who, summary: Option<String>) -> 
     }
 }
 
-pub async fn artifact_version(f: &ToolRegistry, who: &Who, mut a: ArtifactVersionArgs) -> Result<String, String> {
+pub async fn note_version(f: &ToolRegistry, who: &Who, mut a: NoteVersionArgs) -> Result<String, String> {
     if let Who::Helper(me) = who
         && let Some(content) = read_helper_file(f, me, &a.file).await?
     {
         a.req.content = Some(content);
     }
     let meta = commit_meta_for_who(f, who, a.req.note.clone());
-    text(&f.artifact.version_with_meta_async(&maker_of(who), &a.req, &meta).await.map_err(|e| e.message)?)
+    text(&f.note.version_with_meta_async(&maker_of(who), &a.req, &meta).await.map_err(|e| e.message)?)
 }
 
-pub async fn artifact_type_list(f: &ToolRegistry, _who: &Who, _: EmptyArgs) -> Result<String, String> {
-    text(&f.artifact.list_types_async().await.map_err(|e| e.message)?)
+pub async fn note_tree_move(f: &ToolRegistry, _who: &Who, req: NoteTreeMoveRequest) -> Result<String, String> {
+    text(&f.note.move_tree_async(&req).await.map_err(|e| e.message)?)
 }
 
-pub async fn artifact_type_read(f: &ToolRegistry, _who: &Who, req: ArtifactTypeReadRequest) -> Result<String, String> {
-    text(&f.artifact.read_type_async(&req).await.map_err(|e| e.message)?)
+pub async fn note_link_list(f: &ToolRegistry, _who: &Who, req: NoteLinkListRequest) -> Result<String, String> {
+    text(&f.note.list_links_async(&req).await.map_err(|e| e.message)?)
 }
 
-pub async fn artifact_file_list(f: &ToolRegistry, _who: &Who, mut req: ArtifactFileListRequest) -> Result<String, String> {
-    req.id = req.id.trim().to_string();
-    text(&f.artifact.list_files_async(&req).await.map_err(|e| e.message)?)
+pub async fn note_doc_view(f: &ToolRegistry, _who: &Who, a: IdArgs) -> Result<String, String> {
+    text(&f.note.doc_view_async(a.id.trim()).await.map_err(|e| e.message)?)
 }
 
-pub async fn artifact_file_get(f: &ToolRegistry, _who: &Who, mut req: ArtifactFileGetRequest) -> Result<String, String> {
-    req.id = req.id.trim().to_string();
-    text(&f.artifact.get_file_async(&req).await.map_err(|e| e.message)?)
+pub async fn note_doc_append_block(f: &ToolRegistry, who: &Who, req: NoteDocAppendBlockRequest) -> Result<String, String> {
+    text(&f.note.doc_append_block_async(&maker_of(who), &req).await.map_err(|e| e.message)?)
 }
 
-pub async fn artifact_file_write(f: &ToolRegistry, who: &Who, mut req: ArtifactFileWriteRequest) -> Result<String, String> {
-    req.id = req.id.trim().to_string();
-    let meta = commit_meta_for_who(f, who, req.summary.clone());
+pub async fn note_base_view(f: &ToolRegistry, _who: &Who, req: BaseViewRequest) -> Result<String, String> {
+    text(&f.note.base_view_async(&req).await.map_err(|e| e.message)?)
+}
+
+pub async fn note_base_upsert_row(f: &ToolRegistry, who: &Who, req: BaseUpsertRowRequest) -> Result<String, String> {
+    text(&f.note.base_upsert_row_async(&maker_of(who), &req).await.map_err(|e| e.message)?)
+}
+
+pub async fn note_base_run_agent_column(f: &ToolRegistry, who: &Who, req: BaseRunAgentColumnRequest) -> Result<String, String> {
+    let plan = f.note.prepare_base_agent_column_async(&req).await.map_err(|e| e.message)?;
+    let mut outcomes = Vec::with_capacity(plan.tasks.len());
+    for task in &plan.tasks {
+        let mut outcome = ExecutedAgentCellOutcome {
+            row_id: task.row_id.clone(),
+            column_id: plan.column_id.clone(),
+            target_column_id: task.target_column_id.clone(),
+            status: "done".to_owned(),
+            summary: format!("Prepared task: {}", task.row_title),
+            session_id: None,
+            spawned_issue_id: None,
+        };
+        if let Some(repo) = &task.spawn_issue_repo {
+            match f
+                .issue
+                .create_async(NewIssue {
+                    title: task.row_title.clone(),
+                    description: task.rendered_prompt.clone(),
+                    repo: Some(PathBuf::from(repo)),
+                    agent: task.agent_id.clone().unwrap_or_default(),
+                    ..Default::default()
+                })
+                .await
+            {
+                Ok(issue) => {
+                    outcome.status = "spawned".to_owned();
+                    outcome.summary = format!("Spawned issue #{}", issue.number);
+                    outcome.spawned_issue_id = Some(issue.id);
+                }
+                Err(err) => {
+                    outcome.status = "error".to_owned();
+                    outcome.summary = err.to_string();
+                }
+            }
+        }
+        outcomes.push(outcome);
+    }
     text(
-        &f.artifact
-            .write_files_with_meta_async(&maker_of(who), &req, &meta)
+        &f.note
+            .apply_base_agent_column_outcomes_async(&maker_of(who), &plan, &outcomes)
             .await
             .map_err(|e| e.message)?,
     )
 }
 
-pub async fn artifact_file_delete(f: &ToolRegistry, who: &Who, mut req: ArtifactFileDeleteRequest) -> Result<String, String> {
+pub async fn note_type_list(f: &ToolRegistry, _who: &Who, _: EmptyArgs) -> Result<String, String> {
+    text(&f.note.list_types_async().await.map_err(|e| e.message)?)
+}
+
+pub async fn note_type_read(f: &ToolRegistry, _who: &Who, req: NoteTypeReadRequest) -> Result<String, String> {
+    text(&f.note.read_type_async(&req).await.map_err(|e| e.message)?)
+}
+
+pub async fn note_file_list(f: &ToolRegistry, _who: &Who, mut req: NoteFileListRequest) -> Result<String, String> {
+    req.id = req.id.trim().to_string();
+    text(&f.note.list_files_async(&req).await.map_err(|e| e.message)?)
+}
+
+pub async fn note_file_get(f: &ToolRegistry, _who: &Who, mut req: NoteFileGetRequest) -> Result<String, String> {
+    req.id = req.id.trim().to_string();
+    text(&f.note.get_file_async(&req).await.map_err(|e| e.message)?)
+}
+
+pub async fn note_file_write(f: &ToolRegistry, who: &Who, mut req: NoteFileWriteRequest) -> Result<String, String> {
     req.id = req.id.trim().to_string();
     let meta = commit_meta_for_who(f, who, req.summary.clone());
-    text(
-        &f.artifact
-            .delete_file_with_meta_async(&maker_of(who), &req, &meta)
-            .await
-            .map_err(|e| e.message)?,
-    )
+    text(&f.note.write_files_with_meta_async(&maker_of(who), &req, &meta).await.map_err(|e| e.message)?)
 }
 
-pub async fn artifact_suggestion_list(f: &ToolRegistry, _who: &Who, a: IdArgs) -> Result<String, String> {
-    text(&f.artifact.suggestions_async(a.id.trim()).await.map_err(|e| e.message)?)
-}
-
-pub async fn artifact_suggestion_create(f: &ToolRegistry, who: &Who, mut req: ArtifactSuggestionCreateInput) -> Result<String, String> {
+pub async fn note_file_delete(f: &ToolRegistry, who: &Who, mut req: NoteFileDeleteRequest) -> Result<String, String> {
     req.id = req.id.trim().to_string();
-    text(&f.artifact.create_suggestion_async(actor_of(who), &req).await.map_err(|e| e.message)?)
+    let meta = commit_meta_for_who(f, who, req.summary.clone());
+    text(&f.note.delete_file_with_meta_async(&maker_of(who), &req, &meta).await.map_err(|e| e.message)?)
+}
+
+pub async fn note_suggestion_list(f: &ToolRegistry, _who: &Who, a: IdArgs) -> Result<String, String> {
+    text(&f.note.suggestions_async(a.id.trim()).await.map_err(|e| e.message)?)
+}
+
+pub async fn note_suggestion_create(f: &ToolRegistry, who: &Who, mut req: NoteSuggestionCreateInput) -> Result<String, String> {
+    req.id = req.id.trim().to_string();
+    text(&f.note.create_suggestion_async(actor_of(who), &req).await.map_err(|e| e.message)?)
 }
 
 /// `file`: a file in the helper's own folder becomes the content.
@@ -360,7 +419,7 @@ fn inside(dir: &Path, name: &str) -> Result<PathBuf, String> {
 
 #[cfg(test)]
 mod tests {
-    use vibevalley_protocol::{ArtifactRequest, ArtifactType};
+    use vibevalley_protocol::{NoteRequest, NoteType};
 
     #[test]
     fn a_file_outside_the_folder_is_refused() {
@@ -371,20 +430,21 @@ mod tests {
     }
 
     #[test]
-    fn artifact_request_accepts_all_12_types() {
-        for ty in ArtifactType::ALL {
-            let req = ArtifactRequest {
+    fn note_request_accepts_all_4_types() {
+        for ty in NoteType::ALL {
+            let req = NoteRequest {
                 title: "Spec".into(),
-                artifact_type: ty,
+                note_type: ty,
+                parent_id: None,
+                sort_order: None,
                 content: Some("body".into()),
                 files: None,
-                is_default: None,
                 announce: None,
                 note: None,
                 channel: None,
                 issue: None,
             };
-            assert_eq!(req.artifact_type, ty);
+            assert_eq!(req.note_type, ty);
         }
     }
 }

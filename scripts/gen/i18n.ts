@@ -3,7 +3,7 @@ import { existsSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from
 import { join, relative } from "node:path";
 
 import { placeholderKinds, placeholders } from "@vibevalley/i18n";
-import { ARTIFACT_TYPES, type ArtifactType } from "@vibevalley/protocol";
+import { NOTE_TYPES } from "@vibevalley/protocol";
 
 import { readGlossary, wordProblems } from "../docs/glossary.ts";
 import { messageUses } from "./i18n-uses.ts";
@@ -85,43 +85,14 @@ export function zhUntranslatedProblems(
   return problems;
 }
 
-function artifactTypeDictKey(type: ArtifactType): string {
-  switch (type) {
-    case "docs":
-      return "docs";
-    case "outline":
-      return "outline";
-    case "slides":
-      return "slides";
-    case "dashboard":
-      return "dashboard";
-    case "motion":
-      return "motion";
-    case "whiteboard":
-      return "whiteboard";
-    case "design":
-      return "design";
-    case "design-system":
-      return "designSystem";
-    case "sheet":
-      return "sheet";
-    case "prototype":
-      return "prototype";
-    case "diagram":
-      return "diagram";
-    case "storyboard":
-      return "storyboard";
-  }
-}
-
-/** Asserts every canonical `ArtifactType` in `ARTIFACT_TYPES` has a non-empty `web.artifact.types.*` entry. */
-export function artifactTypeParityProblems(locale: string, entries: ReadonlyMap<string, string>): string[] {
+/** Asserts every canonical `NoteType` in `NOTE_TYPES` has a non-empty `web.note.types.*` entry. */
+export function noteTypeParityProblems(locale: string, entries: ReadonlyMap<string, string>): string[] {
   const problems: string[] = [];
-  for (const type of ARTIFACT_TYPES) {
-    const key = `web.artifact.types.${artifactTypeDictKey(type)}`;
+  for (const type of NOTE_TYPES) {
+    const key = `web.note.types.${type}`;
     const value = entries.get(key);
     if (value === undefined || value.trim() === "") {
-      problems.push(`${locale}: missing ${key} for ArtifactType "${type}"`);
+      problems.push(`${locale}: missing ${key} for NoteType "${type}"`);
     }
   }
   return problems;
@@ -247,7 +218,7 @@ function check(): string[] {
     const localeMessages = messages(locale);
     problems.push(...wordProblems(glossary, locale, localeMessages));
     problems.push(...glyphLabelProblems(locale, localeMessages));
-    problems.push(...artifactTypeParityProblems(locale, localeMessages));
+    problems.push(...noteTypeParityProblems(locale, localeMessages));
   }
   if (!existsSync(catalogsFile) || readFileSync(catalogsFile, "utf8") !== formatted(generated()))
     problems.push("packages/i18n/src/catalogs.ts is stale: run vpx scripts/gen/i18n.ts gen");

@@ -333,8 +333,8 @@ fn ops_shaped_like_get_routes_still_reach_the_server() {
     let (fake, l) = start();
     for (path, op) in [
         ("attachment/create", "attachment.create"),
-        ("artifact/file/list", "artifact.file.list"),
-        ("artifact/suggestion/accept", "artifact.suggestion.accept"),
+        ("note/file/list", "note.file.list"),
+        ("note/suggestion/accept", "note.suggestion.accept"),
         ("issue/watch/x", "issue.watch.x"),
         ("subscribe/thing", "subscribe.thing"),
         ("slice/board", "slice.board"),
@@ -399,7 +399,7 @@ fn events_aliases_live_sse_stream() {
 }
 
 #[test]
-fn loopback_and_artifact_route_validators_match_exact_ascii_rules() {
+fn loopback_and_note_route_validators_match_exact_ascii_rules() {
     for good in ["127.0.0.1", "127.0.0.1:8787", "localhost", "localhost:3000", "[::1]", "[::1]:8787"] {
         assert!(is_loopback(good), "{good}");
     }
@@ -913,7 +913,7 @@ fn slice_returns_service_unavailable_when_server_has_no_async_subscription() {
 fn gateway_mcp_route_serves_stateless_discover_skills_and_routable_headers() {
     use vibevalley_mcp::{
         EXT_SKILLS, HEADER_METHOD, HEADER_NAME, HEADER_PROTOCOL_VERSION, McpHandler, PROTOCOL_STATELESS, RequestContext, RpcError, ServerCapabilities,
-        ServerInfo, SkillCatalog, ToolCallResult, ToolDef, builtin_artifact_skills, dispatch_json, error_code,
+        ServerInfo, SkillCatalog, ToolCallResult, ToolDef, builtin_note_skills, dispatch_json, error_code,
     };
 
     struct GatewayMcpDoor {
@@ -936,8 +936,8 @@ fn gateway_mcp_route_serves_stateless_discover_skills_and_routable_headers() {
         fn list_tools<'a>(&'a self, _ctx: &'a RequestContext) -> vibevalley_mcp::BoxFuture<'a, Result<Vec<ToolDef>, RpcError>> {
             Box::pin(async {
                 Ok(vec![ToolDef {
-                    name: "vv_artifact_list".into(),
-                    description: "List artifacts".into(),
+                    name: "vv_note_list".into(),
+                    description: "List notes".into(),
                     input_schema: json!({ "type": "object", "properties": {} }),
                 }])
             })
@@ -1003,9 +1003,7 @@ fn gateway_mcp_route_serves_stateless_discover_skills_and_routable_headers() {
         }
     }
 
-    let door = Arc::new(GatewayMcpDoor {
-        skills: builtin_artifact_skills(),
-    });
+    let door = Arc::new(GatewayMcpDoor { skills: builtin_note_skills() });
     let server: Shared = Arc::new(WithMcpDoor {
         inner: Arc::new(FakeServer::new()),
         door,
@@ -1027,7 +1025,7 @@ fn gateway_mcp_route_serves_stateless_discover_skills_and_routable_headers() {
     assert_eq!(discover_body["result"]["stateless"], true);
     assert_eq!(discover_body["result"]["capabilities"]["extensions"][EXT_SKILLS]["directoryRead"], true);
 
-    // 2. SEP-2640 skills/list returns all 12 artifact type skills.
+    // 2. SEP-2640 skills/list returns all 4 note type skills.
     let skills = agent()
         .post(&mcp_url)
         .json(&json!({ "jsonrpc": "2.0", "id": 2, "method": "skills/list", "params": {} }))
@@ -1035,7 +1033,7 @@ fn gateway_mcp_route_serves_stateless_discover_skills_and_routable_headers() {
         .unwrap();
     assert_eq!(skills.status().as_u16(), 200);
     let skills_body: Value = skills.json().unwrap();
-    assert_eq!(skills_body["result"]["skills"].as_array().unwrap().len(), 12);
+    assert_eq!(skills_body["result"]["skills"].as_array().unwrap().len(), 4);
 
     // 3. SEP-2243 Mcp-Name mismatch returns HTTP 400 with -32020.
     let mismatch = agent()
@@ -1046,7 +1044,7 @@ fn gateway_mcp_route_serves_stateless_discover_skills_and_routable_headers() {
             "jsonrpc": "2.0",
             "id": 3,
             "method": "tools/call",
-            "params": { "name": "vv_artifact_list", "arguments": {} }
+            "params": { "name": "vv_note_list", "arguments": {} }
         }))
         .send()
         .unwrap();

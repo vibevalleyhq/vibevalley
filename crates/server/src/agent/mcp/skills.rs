@@ -1,4 +1,4 @@
-//! SEP-2640 skill catalog loading for MCP: combines embedded artifact guides,
+//! SEP-2640 skill catalog loading for MCP: combines embedded note guides,
 //! built-in agent skills, and on-demand user skills from `$VIBEVALLEY_HOME/skills`.
 
 use std::borrow::Cow;
@@ -8,17 +8,17 @@ use std::sync::LazyLock;
 use include_dir::{Dir, include_dir};
 use vibevalley_mcp::SkillCatalog;
 
-static ARTIFACT_SKILL_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/assets/artifact/types");
+static NOTE_SKILL_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/assets/note/types");
 static AGENT_SKILL_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/assets/agent/skills");
 
-pub(super) static ARTIFACT_SKILLS: LazyLock<SkillCatalog> = LazyLock::new(|| {
+pub(super) static NOTE_SKILLS: LazyLock<SkillCatalog> = LazyLock::new(|| {
     let mut entries = Vec::new();
-    collect_embedded_skill_files(&ARTIFACT_SKILL_DIR, &mut entries);
-    SkillCatalog::from_embedded_entries("artifact", &entries)
+    collect_embedded_skill_files(&NOTE_SKILL_DIR, &mut entries);
+    SkillCatalog::from_embedded_entries("note", &entries)
 });
 
 static BUILTIN_SKILLS: LazyLock<SkillCatalog> = LazyLock::new(|| {
-    let mut catalog = ARTIFACT_SKILLS.clone();
+    let mut catalog = NOTE_SKILLS.clone();
     let mut entries = Vec::new();
     collect_embedded_skill_files(&AGENT_SKILL_DIR, &mut entries);
     catalog.merge(SkillCatalog::from_embedded_entries("built-in", &entries));
@@ -40,7 +40,7 @@ fn collect_embedded_skill_files<'a>(dir: &'a Dir<'a>, out: &mut Vec<(&'a str, &'
 /// on demand without blocking the Tokio runtime thread.
 pub(super) async fn catalog_for_home(home: Option<&Path>) -> Cow<'static, SkillCatalog> {
     let Some(home) = home else {
-        return Cow::Borrowed(&ARTIFACT_SKILLS);
+        return Cow::Borrowed(&NOTE_SKILLS);
     };
     let mut catalog = BUILTIN_SKILLS.clone();
     let user_dir = home.join("skills");

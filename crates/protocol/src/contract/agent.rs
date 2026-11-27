@@ -87,8 +87,8 @@ pub enum Toolset {
     Media,
     #[serde(rename = "library")]
     Library,
-    #[serde(rename = "artifact")]
-    Artifact,
+    #[serde(rename = "note")]
+    Note,
 }
 
 impl Toolset {
@@ -102,7 +102,7 @@ impl Toolset {
         Toolset::Memory,
         Toolset::Media,
         Toolset::Library,
-        Toolset::Artifact,
+        Toolset::Note,
     ];
 
     /// The string on the wire.
@@ -117,7 +117,7 @@ impl Toolset {
             Toolset::Memory => "memory",
             Toolset::Media => "media",
             Toolset::Library => "library",
-            Toolset::Artifact => "artifact",
+            Toolset::Note => "note",
         }
     }
 
@@ -132,7 +132,7 @@ impl Toolset {
                 Toolset::Resource,
                 Toolset::Memory,
                 Toolset::Library,
-                Toolset::Artifact,
+                Toolset::Note,
             ],
         }
     }

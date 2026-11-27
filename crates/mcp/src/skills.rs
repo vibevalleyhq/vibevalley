@@ -11,18 +11,18 @@ use crate::protocol::{ResourceContent, ResourceDef, ResourceTemplateDef};
 
 pub const SKILL_URI_SCHEME: &str = "skill://";
 
-include!(concat!(env!("OUT_DIR"), "/artifact_skills.rs"));
+include!(concat!(env!("OUT_DIR"), "/note_skills.rs"));
 
-static BUILTIN_ARTIFACT_SKILLS: LazyLock<SkillCatalog> = LazyLock::new(|| SkillCatalog::from_embedded_entries("artifact", ARTIFACT_SKILL_ENTRIES));
+static BUILTIN_NOTE_SKILLS: LazyLock<SkillCatalog> = LazyLock::new(|| SkillCatalog::from_embedded_entries("note", NOTE_SKILL_ENTRIES));
 
-/// Returns the cached SEP-2640 catalog containing all 12 built-in `skill://artifact/*` guides.
-pub fn builtin_artifact_skill_catalog() -> &'static SkillCatalog {
-    &BUILTIN_ARTIFACT_SKILLS
+/// Returns the cached SEP-2640 catalog containing all 4 built-in `skill://note/*` guides.
+pub fn builtin_note_skill_catalog() -> &'static SkillCatalog {
+    &BUILTIN_NOTE_SKILLS
 }
 
-/// Returns a cloned SEP-2640 catalog containing all 12 built-in `skill://artifact/*` guides.
-pub fn builtin_artifact_skills() -> SkillCatalog {
-    BUILTIN_ARTIFACT_SKILLS.clone()
+/// Returns a cloned SEP-2640 catalog containing all 4 built-in `skill://note/*` guides.
+pub fn builtin_note_skills() -> SkillCatalog {
+    BUILTIN_NOTE_SKILLS.clone()
 }
 
 /// Skill metadata entry returned by `skills/list`.

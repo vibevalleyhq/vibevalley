@@ -41,7 +41,7 @@ Commands:
   check                                Run fmt --check, clippy -D warnings, and nextest/test
   changed [--base <ref>] [--dry-run]   Check affected Rust crates and transitive reverse dependents
   loom                                 Run loom concurrency tests (runtime & server)
-  goldens [--check]                    Run vibevalley-core artifact golden tests
+  goldens [--check]                    Run vibevalley-core note golden tests
   protocol [--write]                   Check (or with --write, regenerate) TS contract & goldens
   audit [--boundaries] [--ratchets] [--arch] [--uml] [--deps]
                                        Run module-boundary, ratchet, arch, UML strict, and UI deps audits
@@ -153,7 +153,7 @@ fn cmd_goldens(root: &Path, args: &[String]) -> Result<i32, String> {
     if let Some(code) = handle_no_extra_args(args, "Usage: cargo xtask goldens [--check]", true) {
         return Ok(code);
     }
-    run_cargo(root, &["test", "-p", "vibevalley-core", "--test", "artifact_golden"], &[])
+    run_cargo(root, &["test", "-p", "vibevalley-core", "--test", "note_golden"], &[])
 }
 
 fn cmd_protocol(root: &Path, args: &[String]) -> Result<i32, String> {

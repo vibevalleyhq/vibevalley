@@ -5,8 +5,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    Actor, AgentRole, ApiError, ArtifactCard, ArtifactViewContext, Attachment, BizCode, ChannelCommand, ChannelType, ChatMessage, Embed, MessageKind, Notify,
-    Outcome, Reaction, Spent, SubjectKind, USER_ID,
+    Actor, AgentRole, ApiError, Attachment, BizCode, ChannelCommand, ChannelType, ChatMessage, Embed, MessageKind, NoteCard, NoteViewContext, Notify, Outcome,
+    Reaction, Spent, SubjectKind, USER_ID,
 };
 
 use crate::context::{LookIn, missing, refused as refuse};
@@ -280,9 +280,9 @@ pub struct Meta {
     #[serde(default, skip_serializing_if = "is_empty_opt_vec")]
     pub embeds: Option<Vec<Embed>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub artifact: Option<ArtifactCard>,
+    pub note: Option<NoteCard>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub view_context: Option<ArtifactViewContext>,
+    pub view_context: Option<NoteViewContext>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub picked: Option<Picked>,
     #[serde(default, skip_serializing_if = "is_empty_opt_str")]
@@ -411,7 +411,7 @@ pub fn to_message(row: &MsgRow) -> ChatMessage {
             .collect(),
         attachments: meta.attachments.unwrap_or_default(),
         embeds: meta.embeds.unwrap_or_default(),
-        artifact: meta.artifact.filter(|_| !gone),
+        note: meta.note.filter(|_| !gone),
         view_context: meta.view_context.filter(|_| !gone),
     }
 }
@@ -423,9 +423,9 @@ pub struct FileAt {
     pub path: String,
 }
 
-/// An artifact a message shows, as an agent reads it.
+/// A note a message shows, as an agent reads it.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ArtifactRef {
+pub struct NoteRef {
     pub id: String,
     pub title: String,
     pub version: i64,
@@ -451,9 +451,9 @@ pub struct AddressedMessage {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub attachments: Option<Vec<FileAt>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub artifact: Option<ArtifactRef>,
+    pub note: Option<NoteRef>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub view_context: Option<ArtifactViewContext>,
+    pub view_context: Option<NoteViewContext>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub picked: Option<Picked>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -551,7 +551,7 @@ pub struct Saying {
     pub reply_to: Option<i64>,
     pub attachments: Vec<String>,
     pub picked: Option<Picked>,
-    pub view_context: Option<ArtifactViewContext>,
+    pub view_context: Option<NoteViewContext>,
     /// Delivers only to this orchestrator.
     pub to: Option<String>,
     /// Optional slash skill invocation parsed by the channel composer.
@@ -561,7 +561,7 @@ pub struct Saying {
 /// What was made, shown on the message that says so.
 #[derive(Debug, Clone)]
 pub enum Made {
-    Card(ArtifactCard),
+    Card(NoteCard),
     Attachments(Vec<String>),
 }
 

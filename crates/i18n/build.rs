@@ -20,7 +20,7 @@ fn main() {
                     || stem.starts_with("server.")
                     || (include_all_web && stem.starts_with("web."))
                     || stem == "web.base"
-                    || stem == "web.artifact"
+                    || stem == "web.note"
                     || stem == "web.farm"
                     || stem.starts_with("web.farm."))
             {

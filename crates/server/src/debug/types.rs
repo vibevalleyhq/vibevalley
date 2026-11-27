@@ -3,7 +3,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use serde_json::Value;
-use vibevalley_protocol::{ApiError, DebugCollabArtifactState, DebugRuntimeSummary, DebugTrajectoryKind, Issue, Session, SessionEvent};
+use vibevalley_protocol::{ApiError, DebugCollabNoteState, DebugRuntimeSummary, DebugTrajectoryKind, Issue, Session, SessionEvent};
 
 use crate::context::Context;
 use crate::context::api::{BoxFuture, SharedHostDebug};
@@ -34,15 +34,15 @@ pub struct DebugStateSnapshot {
     pub sessions: Vec<Session>,
     pub channel_count: u32,
     pub repo_count: u32,
-    pub artifact_count: u32,
+    pub note_count: u32,
     pub media_job_count: u32,
     pub inbox_count: u32,
     pub state_cache_json: Value,
-    pub collab: Vec<DebugCollabArtifactState>,
+    pub collab: Vec<DebugCollabNoteState>,
 }
 
 /// Narrow read-only data provider implemented in `app.rs` bridging
-/// `Trajectory`, `Agent`, `Repo`, `Artifact`, and `Orchestrator`.
+/// `Trajectory`, `Agent`, `Repo`, `Note`, and `Orchestrator`.
 pub trait DebugDataSource: Send + Sync {
     fn trajectory_events(&self, session_id: &str) -> Vec<SessionEvent>;
     fn open_trajectory_ids(&self) -> Vec<String>;

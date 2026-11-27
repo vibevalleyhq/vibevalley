@@ -779,23 +779,23 @@ fn state_cache_inspects_live_loro_frontiers_and_ephemeral_presence() {
 
     let created = started.router().call_as(
         Caller::User,
-        "artifact.create",
-        json!({ "title": "Collab Inspector Doc", "artifactType": "docs", "announce": false }),
+        "note.create",
+        json!({ "title": "Collab Inspector Doc", "noteType": "doc", "announce": false }),
     );
     assert_eq!(created.biz_code, 0, "{}", created.message);
-    let art_id = created.data.unwrap()["id"].as_str().unwrap().to_string();
+    let note_id = created.data.unwrap()["id"].as_str().unwrap().to_string();
 
     let presence = started.router().call_as(
         Caller::User,
-        "artifact.presence.update",
+        "note.presence.update",
         json!({
-            "id": art_id,
+            "id": note_id,
             "presence": {
                 "id": "peer-alice",
                 "name": "Alice",
                 "color": "#3b82f6",
                 "kind": "cursor",
-                "path": "structure/doc.md",
+                "path": "structure/doc.json",
                 "nodeId": "sec-1",
                 "status": "editing sk-collab-secret-token",
                 "updatedAt": 0
@@ -811,10 +811,10 @@ fn state_cache_inspects_live_loro_frontiers_and_ephemeral_presence() {
         .state_cache
         .collab
         .iter()
-        .find(|c| c.artifact_id == art_id)
-        .unwrap_or_else(|| panic!("missing collab state for {art_id} in {:?}", snap.state_cache.collab));
+        .find(|c| c.note_id == note_id)
+        .unwrap_or_else(|| panic!("missing collab state for {note_id} in {:?}", snap.state_cache.collab));
     assert_eq!(entry.title, "Collab Inspector Doc");
-    assert_eq!(entry.artifact_type, "docs");
+    assert_eq!(entry.note_type, "doc");
     assert!(entry.snapshot_bytes > 0);
     assert!(entry.ephemeral_ttl_ms > 0);
     assert_eq!(entry.presence_count, 1);
@@ -822,7 +822,7 @@ fn state_cache_inspects_live_loro_frontiers_and_ephemeral_presence() {
     assert_eq!(entry.presence[0].id, "peer-alice");
     assert_eq!(entry.presence[0].name, "Alice");
     assert_eq!(entry.presence[0].node_id.as_deref(), Some("sec-1"));
-    assert_eq!(entry.presence[0].path.as_deref(), Some("structure/doc.md"));
+    assert_eq!(entry.presence[0].path.as_deref(), Some("structure/doc.json"));
     let serialized = serde_json::to_string(&snap.state_cache.collab).unwrap();
     assert!(!serialized.contains("sk-collab-secret-token"), "leaked secret in collab snapshot: {serialized}");
 

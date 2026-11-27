@@ -30,7 +30,7 @@ const SERVER_HIGHER_MODULES: &[&str] = &[
     "channel",
     "connector",
     "voice",
-    "artifact",
+    "note",
     "runtime",
     "repo",
     "setting",

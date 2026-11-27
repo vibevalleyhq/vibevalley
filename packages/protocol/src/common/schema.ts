@@ -11,7 +11,7 @@ const branded = <B extends T.Branded<string>>(): z.ZodType<B, string> =>
 
 export const IssueId = branded<T.IssueId>();
 export const SessionId = branded<T.SessionId>();
-export const ArtifactId = branded<T.ArtifactId>();
+export const NoteId = branded<T.NoteId>();
 export const SuggestionId = branded<T.SuggestionId>();
 export const MessageId = branded<T.MessageId>();
 
@@ -22,7 +22,7 @@ function mint<K extends string>(_kind: K): (s: string) => T.Branded<K> {
 }
 export const issueId = mint("IssueId");
 export const sessionId = mint("SessionId");
-export const artifactId = mint("ArtifactId");
+export const noteId = mint("NoteId");
 export const messageId = mint("MessageId");
 
 /** JSON text read as x: a stored column, a file, a line. Not JSON, or JSON not of x's shape, fails the parse. */

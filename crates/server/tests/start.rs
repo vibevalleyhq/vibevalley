@@ -159,13 +159,7 @@ fn every_contract_endpoint_and_subscription_is_registered_and_hub_drops_cleanly(
         .collect();
     assert!(missing_ops.is_empty(), "unregistered endpoints: {missing_ops:?}");
 
-    for sub in [
-        "channel.follow",
-        "channel.reports",
-        "artifact.follow",
-        "artifact.suggestion.follow",
-        "issue.watch",
-    ] {
+    for sub in ["channel.follow", "channel.reports", "note.follow", "note.suggestion.follow", "issue.watch"] {
         assert!(app.router().answers_subscription(sub), "unregistered subscription: {sub}");
     }
 

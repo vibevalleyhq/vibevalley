@@ -509,104 +509,129 @@ export class VibeValleyApi {
     },
   };
 
-  readonly artifact = {
-    /** The artifacts announced in a channel or made for an issue, newest change first; every one the workspace has when neither is given. */
-    list: (a: T.ArtifactListRequest, options?: { signal?: AbortSignal }): Promise<T.Artifact[]> =>
-      this.call<T.Artifact[]>("artifact.list", "/api/v1/artifact/list", a, options),
-    get: (a: { id: T.ArtifactId }, options?: { signal?: AbortSignal }): Promise<T.Artifact> =>
-      this.call<T.Artifact>("artifact.get", "/api/v1/artifact/get", a, options),
-    /** Creates a new directory-backed artifact seeded with starter files for its `artifactType`. */
-    create: (a: T.ArtifactRequest, options?: { signal?: AbortSignal }): Promise<T.Artifact> =>
-      this.call<T.Artifact>("artifact.create", "/api/v1/artifact/create", a, options),
-    /** Updates an artifact's title, linked issue, or default design-system flag. */
-    update: (a: T.ArtifactUpdateRequest, options?: { signal?: AbortSignal }): Promise<T.Artifact> =>
-      this.call<T.Artifact>("artifact.update", "/api/v1/artifact/update", a, options),
-    delete: (a: { id: T.ArtifactId }, options?: { signal?: AbortSignal }): Promise<void> =>
-      this.call<void>("artifact.delete", "/api/v1/artifact/delete", a, options),
-    previewDelete: (a: { id: T.ArtifactId }, options?: { signal?: AbortSignal }): Promise<T.Preview> =>
-      this.call<T.Preview>("artifact.previewDelete", "/api/v1/artifact/previewDelete", a, options),
+  readonly note = {
+    /** Notes filtered by channel, issue, noteType, or parentId, newest first. */
+    list: (a: T.NoteListRequest, options?: { signal?: AbortSignal }): Promise<T.Note[]> => this.call<T.Note[]>("note.list", "/api/v1/note/list", a, options),
+    get: (a: { id: T.NoteId }, options?: { signal?: AbortSignal }): Promise<T.Note> => this.call<T.Note>("note.get", "/api/v1/note/get", a, options),
+    /** Creates a new directory-backed note seeded with starter files for its `noteType`. */
+    create: (a: T.NoteRequest, options?: { signal?: AbortSignal }): Promise<T.Note> => this.call<T.Note>("note.create", "/api/v1/note/create", a, options),
+    /** Updates a note's title, parent, sort order, or linked issue. */
+    update: (a: T.NoteUpdateRequest, options?: { signal?: AbortSignal }): Promise<T.Note> =>
+      this.call<T.Note>("note.update", "/api/v1/note/update", a, options),
+    delete: (a: { id: T.NoteId }, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("note.delete", "/api/v1/note/delete", a, options),
+    previewDelete: (a: { id: T.NoteId }, options?: { signal?: AbortSignal }): Promise<T.Preview> =>
+      this.call<T.Preview>("note.previewDelete", "/api/v1/note/previewDelete", a, options),
     content: {
-      /** Reads the artifact's primary entry file content (optionally at a historical immutable snapshot version). */
-      get: (a: T.ArtifactReadRequest, options?: { signal?: AbortSignal }): Promise<T.ArtifactContent> =>
-        this.call<T.ArtifactContent>("artifact.content.get", "/api/v1/artifact/content/get", a, options),
+      /** Reads the note's primary entry file content (optionally at a historical immutable snapshot version). */
+      get: (a: T.NoteReadRequest, options?: { signal?: AbortSignal }): Promise<T.NoteContent> =>
+        this.call<T.NoteContent>("note.content.get", "/api/v1/note/content/get", a, options),
     },
     version: {
       /** Cuts a new immutable directory snapshot version over the latest state. */
-      create: (a: T.ArtifactVersionRequest, options?: { signal?: AbortSignal }): Promise<T.Artifact> =>
-        this.call<T.Artifact>("artifact.version.create", "/api/v1/artifact/version/create", a, options),
+      create: (a: T.NoteVersionRequest, options?: { signal?: AbortSignal }): Promise<T.Note> =>
+        this.call<T.Note>("note.version.create", "/api/v1/note/version/create", a, options),
+    },
+    tree: {
+      /** Moves a note within the page tree hierarchy (enforcing cycle protection). */
+      move: (a: T.NoteTreeMoveRequest, options?: { signal?: AbortSignal }): Promise<T.Note> =>
+        this.call<T.Note>("note.tree.move", "/api/v1/note/tree/move", a, options),
+    },
+    link: {
+      /** Lists outgoing `[[note:...]]`/`[[issue:...]]` links and backlinks for a note or issue. */
+      list: (a: T.NoteLinkListRequest, options?: { signal?: AbortSignal }): Promise<T.NoteLinkListResult> =>
+        this.call<T.NoteLinkListResult>("note.link.list", "/api/v1/note/link/list", a, options),
+    },
+    doc: {
+      /** Projects a `doc` note's blocks, slide count, word count, and extracted links. */
+      view: (a: T.NoteDocViewRequest, options?: { signal?: AbortSignal }): Promise<T.DocView> =>
+        this.call<T.DocView>("note.doc.view", "/api/v1/note/doc/view", a, options),
+      /** Appends a DocBlock to a `doc` note cleanly via Loro CRDT. */
+      appendBlock: (a: T.NoteDocAppendBlockRequest, options?: { signal?: AbortSignal }): Promise<T.DocView> =>
+        this.call<T.DocView>("note.doc.appendBlock", "/api/v1/note/doc/appendBlock", a, options),
+    },
+    base: {
+      /** Projects a filtered, sorted, grouped, and summarized Multi-Dimensional Base sheet. */
+      view: (a: T.BaseViewRequest, options?: { signal?: AbortSignal }): Promise<T.BaseViewSnapshot> =>
+        this.call<T.BaseViewSnapshot>("note.base.view", "/api/v1/note/base/view", a, options),
+      /** Inserts or updates a row in a `base` note sheet. */
+      upsertRow: (a: T.BaseUpsertRowRequest, options?: { signal?: AbortSignal }): Promise<T.BaseViewSnapshot> =>
+        this.call<T.BaseViewSnapshot>("note.base.upsertRow", "/api/v1/note/base/upsertRow", a, options),
+      /** Runs an Agent Action column across selected or pending rows of a `base` note sheet. */
+      runAgentColumn: (a: T.BaseRunAgentColumnRequest, options?: { signal?: AbortSignal }): Promise<T.BaseRunAgentColumnResult> =>
+        this.call<T.BaseRunAgentColumnResult>("note.base.runAgentColumn", "/api/v1/note/base/runAgentColumn", a, options),
     },
     type: {
-      /** All 12 artifact types and the workspace's standing default design-system if any. */
-      list: (options?: { signal?: AbortSignal }): Promise<T.ArtifactTypeInfo[]> =>
-        this.call<T.ArtifactTypeInfo[]>("artifact.type.list", "/api/v1/artifact/type/list", undefined, options),
-      /** An artifact type's SKILL.md guide or one of its named reference chapters. */
-      read: (a: T.ArtifactTypeReadRequest, options?: { signal?: AbortSignal }): Promise<T.ArtifactTypeGuide> =>
-        this.call<T.ArtifactTypeGuide>("artifact.type.read", "/api/v1/artifact/type/read", a, options),
+      /** All 4 consolidated note primitives (`doc`, `base`, `canvas`, `media`). */
+      list: (options?: { signal?: AbortSignal }): Promise<T.NoteTypeInfo[]> =>
+        this.call<T.NoteTypeInfo[]>("note.type.list", "/api/v1/note/type/list", undefined, options),
+      /** A note primitive's SKILL.md guide or one of its named reference chapters. */
+      read: (a: T.NoteTypeReadRequest, options?: { signal?: AbortSignal }): Promise<T.NoteTypeGuide> =>
+        this.call<T.NoteTypeGuide>("note.type.read", "/api/v1/note/type/read", a, options),
     },
     file: {
-      /** Lists files (`manifest.json`, `structure/*`, `asset/*`) inside an artifact directory. */
-      list: (a: T.ArtifactFileListRequest, options?: { signal?: AbortSignal }): Promise<T.ArtifactFileListResult> =>
-        this.call<T.ArtifactFileListResult>("artifact.file.list", "/api/v1/artifact/file/list", a, options),
-      /** Reads one file by relative path inside an artifact directory (or historical version snapshot). */
-      get: (a: T.ArtifactFileGetRequest, options?: { signal?: AbortSignal }): Promise<T.ArtifactFileContent> =>
-        this.call<T.ArtifactFileContent>("artifact.file.get", "/api/v1/artifact/file/get", a, options),
+      /** Lists files (`manifest.json`, `structure/*`, `asset/*`) inside a note directory. */
+      list: (a: T.NoteFileListRequest, options?: { signal?: AbortSignal }): Promise<T.NoteFileListResult> =>
+        this.call<T.NoteFileListResult>("note.file.list", "/api/v1/note/file/list", a, options),
+      /** Reads one file by relative path inside a note directory (or historical version snapshot). */
+      get: (a: T.NoteFileGetRequest, options?: { signal?: AbortSignal }): Promise<T.NoteFileContent> =>
+        this.call<T.NoteFileContent>("note.file.get", "/api/v1/note/file/get", a, options),
       /** Atomically writes one or more files into `structure/` or `asset/` with origin attribution and collab sync. */
-      write: (a: T.ArtifactFileWriteRequest, options?: { signal?: AbortSignal }): Promise<T.ArtifactFileWriteResult> =>
-        this.call<T.ArtifactFileWriteResult>("artifact.file.write", "/api/v1/artifact/file/write", a, options),
+      write: (a: T.NoteFileWriteRequest, options?: { signal?: AbortSignal }): Promise<T.NoteFileWriteResult> =>
+        this.call<T.NoteFileWriteResult>("note.file.write", "/api/v1/note/file/write", a, options),
       /** Deletes a relative path under `structure/` or `asset/` with origin attribution and collab sync. */
-      delete: (a: T.ArtifactFileDeleteRequest, options?: { signal?: AbortSignal }): Promise<T.ArtifactFileDeleteResult> =>
-        this.call<T.ArtifactFileDeleteResult>("artifact.file.delete", "/api/v1/artifact/file/delete", a, options),
+      delete: (a: T.NoteFileDeleteRequest, options?: { signal?: AbortSignal }): Promise<T.NoteFileDeleteResult> =>
+        this.call<T.NoteFileDeleteResult>("note.file.delete", "/api/v1/note/file/delete", a, options),
     },
     suggestion: {
-      /** The open and resolved suggestions on an artifact, oldest first. */
-      list: (a: { id: T.ArtifactId }, options?: { signal?: AbortSignal }): Promise<T.Suggestion[]> =>
-        this.call<T.Suggestion[]>("artifact.suggestion.list", "/api/v1/artifact/suggestion/list", a, options),
-      /** A proposed edit to a file or structured target inside an artifact directory. */
-      create: (a: { id: T.ArtifactId } & T.SuggestionCreate, options?: { signal?: AbortSignal }): Promise<T.Suggestion> =>
-        this.call<T.Suggestion>("artifact.suggestion.create", "/api/v1/artifact/suggestion/create", a, options),
-      /** Accepts a pending suggestion and applies it to the artifact directory and collab state. */
-      accept: (a: { id: T.ArtifactId; suggestion: T.SuggestionId }, options?: { signal?: AbortSignal }): Promise<T.Suggestion> =>
-        this.call<T.Suggestion>("artifact.suggestion.accept", "/api/v1/artifact/suggestion/accept", a, options),
-      reject: (a: { id: T.ArtifactId; suggestion: T.SuggestionId }, options?: { signal?: AbortSignal }): Promise<T.Suggestion> =>
-        this.call<T.Suggestion>("artifact.suggestion.reject", "/api/v1/artifact/suggestion/reject", a, options),
+      /** The open and resolved suggestions on a note, oldest first. */
+      list: (a: { id: T.NoteId }, options?: { signal?: AbortSignal }): Promise<T.Suggestion[]> =>
+        this.call<T.Suggestion[]>("note.suggestion.list", "/api/v1/note/suggestion/list", a, options),
+      /** A proposed edit to a file or structured target inside a note directory. */
+      create: (a: { id: T.NoteId } & T.SuggestionCreate, options?: { signal?: AbortSignal }): Promise<T.Suggestion> =>
+        this.call<T.Suggestion>("note.suggestion.create", "/api/v1/note/suggestion/create", a, options),
+      /** Accepts a pending suggestion and applies it to the note directory and collab state. */
+      accept: (a: { id: T.NoteId; suggestion: T.SuggestionId }, options?: { signal?: AbortSignal }): Promise<T.Suggestion> =>
+        this.call<T.Suggestion>("note.suggestion.accept", "/api/v1/note/suggestion/accept", a, options),
+      reject: (a: { id: T.NoteId; suggestion: T.SuggestionId }, options?: { signal?: AbortSignal }): Promise<T.Suggestion> =>
+        this.call<T.Suggestion>("note.suggestion.reject", "/api/v1/note/suggestion/reject", a, options),
     },
     presence: {
       /** Ephemeral live presence update (cursor, selection, highlight, viewport); never persisted to SQLite. */
-      update: (a: T.ArtifactPresenceUpdateRequest, options?: { signal?: AbortSignal }): Promise<void> =>
-        this.call<void>("artifact.presence.update", "/api/v1/artifact/presence/update", a, options),
+      update: (a: T.NotePresenceUpdateRequest, options?: { signal?: AbortSignal }): Promise<void> =>
+        this.call<void>("note.presence.update", "/api/v1/note/presence/update", a, options),
     },
     history: {
-      /** Newest first. */
-      list: (a: T.ArtifactHistoryListRequest, options?: { signal?: AbortSignal }): Promise<T.ArtifactHistoryEntry[]> =>
-        this.call<T.ArtifactHistoryEntry[]>("artifact.history.list", "/api/v1/artifact/history/list", a, options),
+      /** Collaborative commit history timeline, newest first. */
+      list: (a: T.NoteHistoryListRequest, options?: { signal?: AbortSignal }): Promise<T.NoteHistoryEntry[]> =>
+        this.call<T.NoteHistoryEntry[]>("note.history.list", "/api/v1/note/history/list", a, options),
       /** Read-only snapshot projection at the requested Loro frontiers. */
-      preview: (a: T.ArtifactHistoryPreviewRequest, options?: { signal?: AbortSignal }): Promise<T.ArtifactHistoryPreviewResult> =>
-        this.call<T.ArtifactHistoryPreviewResult>("artifact.history.preview", "/api/v1/artifact/history/preview", a, options),
-      /** Restore an artifact to the snapshot at the requested Loro frontiers as a new commit. */
-      restore: (a: T.ArtifactHistoryRestoreRequest, options?: { signal?: AbortSignal }): Promise<T.Artifact> =>
-        this.call<T.Artifact>("artifact.history.restore", "/api/v1/artifact/history/restore", a, options),
-      /** Fork a new artifact starting from the snapshot at the requested Loro frontiers. */
-      fork: (a: T.ArtifactHistoryForkRequest, options?: { signal?: AbortSignal }): Promise<T.Artifact> =>
-        this.call<T.Artifact>("artifact.history.fork", "/api/v1/artifact/history/fork", a, options),
+      preview: (a: T.NoteHistoryPreviewRequest, options?: { signal?: AbortSignal }): Promise<T.NoteHistoryPreviewResult> =>
+        this.call<T.NoteHistoryPreviewResult>("note.history.preview", "/api/v1/note/history/preview", a, options),
+      /** Restore a note to the snapshot at the requested Loro frontiers as a new commit. */
+      restore: (a: T.NoteHistoryRestoreRequest, options?: { signal?: AbortSignal }): Promise<T.Note> =>
+        this.call<T.Note>("note.history.restore", "/api/v1/note/history/restore", a, options),
+      /** Fork a new note starting from the snapshot at the requested Loro frontiers. */
+      fork: (a: T.NoteHistoryForkRequest, options?: { signal?: AbortSignal }): Promise<T.Note> =>
+        this.call<T.Note>("note.history.fork", "/api/v1/note/history/fork", a, options),
       /** Selectively undo commits matching one origin while preserving concurrent edits from other actors. */
-      undoOrigin: (a: T.ArtifactHistoryUndoOriginRequest, options?: { signal?: AbortSignal }): Promise<T.Artifact> =>
-        this.call<T.Artifact>("artifact.history.undoOrigin", "/api/v1/artifact/history/undoOrigin", a, options),
+      undoOrigin: (a: T.NoteHistoryUndoOriginRequest, options?: { signal?: AbortSignal }): Promise<T.Note> =>
+        this.call<T.Note>("note.history.undoOrigin", "/api/v1/note/history/undoOrigin", a, options),
       /** Compact old operation history into a shallow snapshot while keeping current state intact. */
-      compact: (a: T.ArtifactHistoryCompactRequest, options?: { signal?: AbortSignal }): Promise<T.Artifact> =>
-        this.call<T.Artifact>("artifact.history.compact", "/api/v1/artifact/history/compact", a, options),
+      compact: (a: T.NoteHistoryCompactRequest, options?: { signal?: AbortSignal }): Promise<T.Note> =>
+        this.call<T.Note>("note.history.compact", "/api/v1/note/history/compact", a, options),
     },
     collab: {
       /** Export incremental Loro CRDT updates (or full snapshot) relative to a client VersionVector. */
-      export: (a: T.ArtifactCollabExportRequest, options?: { signal?: AbortSignal }): Promise<T.ArtifactCollabExportResult> =>
-        this.call<T.ArtifactCollabExportResult>("artifact.collab.export", "/api/v1/artifact/collab/export", a, options),
-      /** Import incremental Loro CRDT updates (or snapshot) into an artifact and optionally return missing server updates. */
-      import: (a: T.ArtifactCollabImportRequest, options?: { signal?: AbortSignal }): Promise<T.ArtifactCollabImportResult> =>
-        this.call<T.ArtifactCollabImportResult>("artifact.collab.import", "/api/v1/artifact/collab/import", a, options),
+      export: (a: T.NoteCollabExportRequest, options?: { signal?: AbortSignal }): Promise<T.NoteCollabExportResult> =>
+        this.call<T.NoteCollabExportResult>("note.collab.export", "/api/v1/note/collab/export", a, options),
+      /** Import incremental Loro CRDT updates (or snapshot) into a note and optionally return missing server updates. */
+      import: (a: T.NoteCollabImportRequest, options?: { signal?: AbortSignal }): Promise<T.NoteCollabImportResult> =>
+        this.call<T.NoteCollabImportResult>("note.collab.import", "/api/v1/note/collab/import", a, options),
     },
     cover: {
-      /** Saves a derived auto-captured cover image outside the artifact directory and CRDT. */
-      set: (a: T.ArtifactCoverSetRequest, options?: { signal?: AbortSignal }): Promise<T.ArtifactCover> =>
-        this.call<T.ArtifactCover>("artifact.cover.set", "/api/v1/artifact/cover/set", a, options),
+      /** Saves a derived auto-captured cover image outside the note directory and CRDT. */
+      set: (a: T.NoteCoverSetRequest, options?: { signal?: AbortSignal }): Promise<T.NoteCover> =>
+        this.call<T.NoteCover>("note.cover.set", "/api/v1/note/cover/set", a, options),
     },
   };
 

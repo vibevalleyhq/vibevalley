@@ -1,4 +1,4 @@
-//! Silent, host-side `WKWebView` cover capture for macOS visual artifacts.
+//! Silent, host-side `WKWebView` cover capture for macOS visual notes.
 //!
 //! Captures the active visible `WKWebView` directly through WebKit's native
 //! `takeSnapshotWithConfiguration:completionHandler:` API, completely outside

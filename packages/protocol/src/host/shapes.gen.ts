@@ -128,19 +128,19 @@ export type HostRandomBytesPayload = { length: number, };
 export type HostQrPayload = { text: string, border?: number, };
 
 /**
- * Installed or queried metadata for a local macOS artifact applet `.app` bundle.
+ * Installed or queried metadata for a local macOS note applet `.app` bundle.
  */
-export type ArtifactAppletInfo = { artifactId: string, artifactType: string, appName: string, bundleId: string, bundlePath: string, alwaysOnTop: boolean, installed: boolean, };
+export type NoteAppletInfo = { noteId: string, noteType: string, appName: string, bundleId: string, bundlePath: string, alwaysOnTop: boolean, installed: boolean, };
 
 /**
  * Request payload for `host.appletInstall`.
  */
-export type HostAppletInstallPayload = { artifactId: string, artifactType: string, appName: string, alwaysOnTop: boolean, };
+export type HostAppletInstallPayload = { noteId: string, noteType: string, appName: string, alwaysOnTop: boolean, };
 
 /**
  * Request payload for `host.appletUninstall` and `host.appletOpen`.
  */
-export type HostAppletIdPayload = { artifactId: string, };
+export type HostAppletIdPayload = { noteId: string, };
 
 /**
  * Result payload returned by `host.appletUninstall`.

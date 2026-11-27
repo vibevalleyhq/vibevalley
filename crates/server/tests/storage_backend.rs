@@ -1,6 +1,6 @@
 //! Integration tests for the pluggable [`StorageBackend`] layer (`LocalFsBackend`,
 //! `MemoryBackend`, `S3Backend` over an in-process SigV4-verifying mock HTTP S3 server),
-//! read-through attachment/media caching, artifact remote mirroring, and `create_app_with_storage`.
+//! read-through attachment/media caching, note remote mirroring, and `create_app_with_storage`.
 
 use std::collections::{BTreeMap, HashMap};
 use std::io::Cursor;
@@ -22,7 +22,7 @@ use serde_json::json;
 use sha2::{Digest, Sha256};
 use tokio::net::TcpListener;
 use tokio_util::sync::{CancellationToken, DropGuard};
-use vibevalley_protocol::{ArtifactFileEncoding, ArtifactFileWriteItem, ArtifactType, AttachmentUpload, MediaInputPhase, MediaInputRequest};
+use vibevalley_protocol::{AttachmentUpload, MediaInputPhase, MediaInputRequest, NoteFileEncoding, NoteFileWriteItem, NoteType};
 use vibevalley_server::Config;
 use vibevalley_server::app::create_app_with_storage;
 use vibevalley_server::context::{Context, Http, LiveState, Outbox, PublicDownload, StateFeed, TaskGroup};
@@ -371,7 +371,7 @@ async fn assert_backend_contract(backend: &dyn StorageBackend) {
         .await
         .unwrap();
     backend
-        .put("artifact/a1/structure/doc.md", b"# Hi".to_vec(), Some("text/markdown"))
+        .put("note/n1/structure/doc.json", b"{}".to_vec(), Some("application/json"))
         .await
         .unwrap();
 
@@ -388,7 +388,7 @@ async fn assert_backend_contract(backend: &dyn StorageBackend) {
     let all_keys: Vec<&str> = all_list.iter().map(|m| m.key.as_str()).collect();
     assert_eq!(
         all_keys,
-        vec!["artifact/a1/structure/doc.md", "attachments/k1", "attachments/k2", "attachments/k3",]
+        vec!["attachments/k1", "attachments/k2", "attachments/k3", "note/n1/structure/doc.json",]
     );
 
     // Overwrite works cleanly.
@@ -526,45 +526,41 @@ async fn s3_storage_attachment_read_through_cache_media_inputs_and_artifact_mirr
     assert_eq!(std::fs::read(&media_file.path).unwrap(), png_bytes);
     storage.release_input_pins_async("job-s3").await.unwrap();
 
-    // 6. ArtifactStorage mirrors files + version snapshots to S3 and restores cleanly after local wipe.
-    let (_metas, _raw) = storage
-        .artifact
-        .init_directory_async("art-1", ArtifactType::Docs, "Spec", None, &[], None)
-        .await
-        .unwrap();
+    // 6. NoteStorage mirrors files + version snapshots to S3 and restores cleanly after local wipe.
+    let (_metas, _raw) = storage.note.init_directory_async("note-1", NoteType::Doc, "Spec", None, &[]).await.unwrap();
     storage
-        .artifact
+        .note
         .write_files_async(
-            "art-1",
-            ArtifactType::Docs,
+            "note-1",
+            NoteType::Doc,
             "Spec",
-            &[ArtifactFileWriteItem {
+            &[NoteFileWriteItem {
                 path: "structure/notes.md".into(),
                 content: "# Mirrored to S3\n".into(),
-                encoding: Some(ArtifactFileEncoding::Utf8),
+                encoding: Some(NoteFileEncoding::Utf8),
                 mime: None,
                 expected_hash: None,
             }],
         )
         .await
         .unwrap();
-    let (snap_id, _) = storage.artifact.snapshot_version_async("art-1").await.unwrap();
+    let (snap_id, _) = storage.note.snapshot_version_async("note-1").await.unwrap();
 
-    // Wipe local artifact dir and restore from S3 backend.
-    std::fs::remove_dir_all(storage.artifact.artifact_dir("art-1")).unwrap();
-    assert!(!storage.artifact.artifact_dir("art-1").exists());
-    let restored_count = storage.artifact.restore_from_backend_async("art-1", None).await.unwrap();
+    // Wipe local note dir and restore from S3 backend.
+    std::fs::remove_dir_all(storage.note.note_dir("note-1")).unwrap();
+    assert!(!storage.note.note_dir("note-1").exists());
+    let restored_count = storage.note.restore_from_backend_async("note-1", None).await.unwrap();
     assert!(restored_count >= 2);
-    let restored_note = storage.artifact.read_file_async("art-1", "Spec", "structure/notes.md", None).await.unwrap();
+    let restored_note = storage.note.read_file_async("note-1", "Spec", "structure/notes.md", None).await.unwrap();
     assert_eq!(restored_note.content, "# Mirrored to S3\n");
 
     // Wipe local snapshot dir and restore snapshot from S3 backend.
-    std::fs::remove_dir_all(storage.artifact.snapshot_dir("art-1", &snap_id)).unwrap();
-    let restored_snap = storage.artifact.restore_from_backend_async("art-1", Some(&snap_id)).await.unwrap();
+    std::fs::remove_dir_all(storage.note.snapshot_dir("note-1", &snap_id)).unwrap();
+    let restored_snap = storage.note.restore_from_backend_async("note-1", Some(&snap_id)).await.unwrap();
     assert!(restored_snap >= 2);
     let snap_note = storage
-        .artifact
-        .read_file_async("art-1", "Spec", "structure/notes.md", Some(&snap_id))
+        .note
+        .read_file_async("note-1", "Spec", "structure/notes.md", Some(&snap_id))
         .await
         .unwrap();
     assert_eq!(snap_note.content, "# Mirrored to S3\n");

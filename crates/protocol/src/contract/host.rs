@@ -960,15 +960,15 @@ pub struct HostQrPayload {
     pub border: Option<u32>,
 }
 
-/// Installed or queried metadata for a local macOS artifact applet `.app` bundle.
+/// Installed or queried metadata for a local macOS note applet `.app` bundle.
 #[skip_serializing_none]
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts-gen", derive(TS))]
 #[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
-pub struct ArtifactAppletInfo {
-    pub artifact_id: String,
-    pub artifact_type: String,
+pub struct NoteAppletInfo {
+    pub note_id: String,
+    pub note_type: String,
     pub app_name: String,
     pub bundle_id: String,
     pub bundle_path: String,
@@ -983,8 +983,8 @@ pub struct ArtifactAppletInfo {
 #[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct HostAppletInstallPayload {
-    pub artifact_id: String,
-    pub artifact_type: String,
+    pub note_id: String,
+    pub note_type: String,
     pub app_name: String,
     #[serde(default)]
     pub always_on_top: bool,
@@ -997,7 +997,7 @@ pub struct HostAppletInstallPayload {
 #[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct HostAppletIdPayload {
-    pub artifact_id: String,
+    pub note_id: String,
 }
 
 /// Result payload returned by `host.appletUninstall`.
@@ -1582,7 +1582,7 @@ crate::typescript::module! {
     HostSha256Payload,
     HostRandomBytesPayload,
     HostQrPayload,
-    ArtifactAppletInfo,
+    NoteAppletInfo,
     HostAppletInstallPayload,
     HostAppletIdPayload,
     AppletRemoveResult,
@@ -1806,27 +1806,27 @@ mod tests {
             (
                 "host.appletInstall",
                 json!({
-                    "artifactId": "art-1",
-                    "artifactType": "dashboard",
+                    "noteId": "n1",
+                    "noteType": "base",
                     "appName": "Metrics",
                     "alwaysOnTop": true
                 }),
                 HostOp::AppletInstall(HostAppletInstallPayload {
-                    artifact_id: "art-1".into(),
-                    artifact_type: "dashboard".into(),
+                    note_id: "n1".into(),
+                    note_type: "base".into(),
                     app_name: "Metrics".into(),
                     always_on_top: true,
                 }),
             ),
             (
                 "host.appletUninstall",
-                json!({ "artifactId": "art-1" }),
-                HostOp::AppletUninstall(HostAppletIdPayload { artifact_id: "art-1".into() }),
+                json!({ "noteId": "n1" }),
+                HostOp::AppletUninstall(HostAppletIdPayload { note_id: "n1".into() }),
             ),
             (
                 "host.appletOpen",
-                json!({ "artifactId": "art-1" }),
-                HostOp::AppletOpen(HostAppletIdPayload { artifact_id: "art-1".into() }),
+                json!({ "noteId": "n1" }),
+                HostOp::AppletOpen(HostAppletIdPayload { note_id: "n1".into() }),
             ),
             ("host.captureWebView", json!(null), HostOp::CaptureWebView(HostCaptureWebViewPayload::default())),
             (
@@ -1898,16 +1898,16 @@ mod tests {
         assert!(HostOp::from_wire("host.randomBytes", json!({ "length": -1 })).is_err());
         assert!(HostOp::from_wire("host.qr", json!({ "text": "hi", "extra": 1 })).is_err());
         assert!(HostOp::from_wire("host.appletList", json!({ "extra": 1 })).is_err());
-        assert!(HostOp::from_wire("host.appletInstall", json!({ "artifactId": "art-1" })).is_err());
+        assert!(HostOp::from_wire("host.appletInstall", json!({ "noteId": "n1" })).is_err());
         assert!(
             HostOp::from_wire(
                 "host.appletInstall",
-                json!({ "artifactId": "art-1", "artifactType": "docs", "appName": "Docs", "alwaysOnTop": false, "extra": 1 })
+                json!({ "noteId": "n1", "noteType": "doc", "appName": "Docs", "alwaysOnTop": false, "extra": 1 })
             )
             .is_err()
         );
         assert!(HostOp::from_wire("host.appletUninstall", json!({})).is_err());
-        assert!(HostOp::from_wire("host.appletOpen", json!({ "artifactId": "art-1", "extra": 1 })).is_err());
+        assert!(HostOp::from_wire("host.appletOpen", json!({ "noteId": "n1", "extra": 1 })).is_err());
         assert!(HostOp::from_wire("host.captureWebView", json!({ "width": 640, "extra": true })).is_err());
         assert!(HostOp::from_wire("host.vdpDiscover", json!({ "extra": true })).is_err());
         assert!(HostOp::from_wire("host.vdpCall", json!({})).is_err());
@@ -1915,12 +1915,12 @@ mod tests {
     }
 
     #[test]
-    fn artifact_applet_info_round_trips_wire_json() {
-        let info = ArtifactAppletInfo {
-            artifact_id: "art-1".into(),
-            artifact_type: "dashboard".into(),
+    fn note_applet_info_round_trips_wire_json() {
+        let info = NoteAppletInfo {
+            note_id: "n1".into(),
+            note_type: "base".into(),
             app_name: "Metrics".into(),
-            bundle_id: "dev.vibevalley.applet.art-1".into(),
+            bundle_id: "dev.vibevalley.applet.n1".into(),
             bundle_path: "/Users/demo/Applications/VibeValley Apps/Metrics.app".into(),
             always_on_top: true,
             installed: true,
@@ -1929,16 +1929,16 @@ mod tests {
         assert_eq!(
             encoded,
             json!({
-                "artifactId": "art-1",
-                "artifactType": "dashboard",
+                "noteId": "n1",
+                "noteType": "base",
                 "appName": "Metrics",
-                "bundleId": "dev.vibevalley.applet.art-1",
+                "bundleId": "dev.vibevalley.applet.n1",
                 "bundlePath": "/Users/demo/Applications/VibeValley Apps/Metrics.app",
                 "alwaysOnTop": true,
                 "installed": true,
             })
         );
-        assert_eq!(serde_json::from_value::<ArtifactAppletInfo>(encoded).unwrap(), info);
+        assert_eq!(serde_json::from_value::<NoteAppletInfo>(encoded).unwrap(), info);
     }
 
     #[test]

@@ -5,7 +5,6 @@
 
 pub mod agent;
 pub mod app;
-pub mod artifact;
 mod boot;
 pub mod channel;
 pub mod config;
@@ -21,6 +20,7 @@ pub mod gateway;
 pub mod issue;
 pub mod log;
 pub mod machine;
+pub mod note;
 mod projection;
 pub mod provider;
 pub mod repo;

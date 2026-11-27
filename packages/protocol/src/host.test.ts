@@ -4,10 +4,10 @@ import {
   AppletInstallInput,
   AppletOpenResult,
   AppletRemoveResult,
-  ArtifactAppletInfo,
   CommandLineState,
   HostCapturedImage,
   MotionChoice,
+  NoteAppletInfo,
   ThemeChoice,
   type UpdateFailureKind,
   type UpdateManual,
@@ -108,9 +108,9 @@ test("host state schemas decode valid wire payloads and reject malformed shapes"
   expect(MotionChoice.safeParse("reduced").success).toBe(false);
 
   expect(
-    ArtifactAppletInfo.parse({
-      artifactId: "art-1",
-      artifactType: "dashboard",
+    NoteAppletInfo.parse({
+      noteId: "art-1",
+      noteType: "base",
       appName: "Metrics",
       bundleId: "dev.vibevalley.applet.art-1",
       bundlePath: "/Users/demo/Applications/VibeValley Apps/Metrics.app",
@@ -118,12 +118,12 @@ test("host state schemas decode valid wire payloads and reject malformed shapes"
       installed: true,
     }).installed,
   ).toBe(true);
-  expect(ArtifactAppletInfo.safeParse({ artifactId: "art-1" }).success).toBe(false);
+  expect(NoteAppletInfo.safeParse({ noteId: "art-1" }).success).toBe(false);
 
   expect(
     AppletInstallInput.parse({
-      artifactId: "art-1",
-      artifactType: "dashboard",
+      noteId: "art-1",
+      noteType: "base",
       appName: "Metrics",
       alwaysOnTop: false,
     }).appName,

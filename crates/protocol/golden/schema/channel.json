@@ -98,10 +98,10 @@
      "image": "s1623"
     }
    ],
-   "artifact": {
+   "note": {
     "id": "s1624",
     "title": "s1625",
-    "artifactType": "docs",
+    "noteType": "doc",
     "version": 1626,
     "note": "s1627"
    }
@@ -282,10 +282,10 @@
       "image": "s1758"
      }
     ],
-    "artifact": {
+    "note": {
      "id": "s1759",
      "title": "s1760",
-     "artifactType": "docs",
+     "noteType": "doc",
      "version": 1761,
      "note": "s1762"
     }
@@ -436,10 +436,10 @@
         "image": "s1851"
        }
       ],
-      "artifact": {
+      "note": {
        "id": "s1852",
        "title": "s1853",
-       "artifactType": "docs",
+       "noteType": "doc",
        "version": 1854,
        "note": "s1855"
       }
@@ -575,10 +575,10 @@
       "image": "s1924"
      }
     ],
-    "artifact": {
+    "note": {
      "id": "s1925",
      "title": "s1926",
-     "artifactType": "docs",
+     "noteType": "doc",
      "version": 1927,
      "note": "s1928"
     }
@@ -822,10 +822,10 @@
       "image": "s2050"
      }
     ],
-    "artifact": {
+    "note": {
      "id": "s2051",
      "title": "s2052",
-     "artifactType": "docs",
+     "noteType": "doc",
      "version": 2053,
      "note": "s2054"
     }

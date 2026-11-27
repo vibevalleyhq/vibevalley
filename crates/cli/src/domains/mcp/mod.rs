@@ -1,13 +1,13 @@
 //! `mcp`: standard stdio MCP (Model Context Protocol) JSON-RPC 2.0 server exposing
-//! VibeValley Issues, collaborative Artifacts (+ SEP-2640 `skill://artifact/*` guides),
+//! VibeValley Issues, collaborative Notes (+ SEP-2640 `skill://note/*` guides),
 //! and live VDP debugging tools to external coding and ACP agents.
 //!
 //! Stdout is reserved strictly for newline-delimited JSON-RPC 2.0 responses;
 //! all diagnostics go to stderr.
 
-mod artifact;
-mod artifact_defs;
 mod issue;
+mod note;
+mod note_defs;
 mod server;
 mod vdp;
 

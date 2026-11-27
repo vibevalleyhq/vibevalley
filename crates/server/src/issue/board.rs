@@ -246,7 +246,7 @@ pub(super) struct TriageStore {
 
 /// Issue board domain service.
 pub struct Board {
-    ctx: Arc<Context>,
+    pub(super) ctx: Arc<Context>,
     pub(super) state: Arc<IssueState>,
     pub(super) runtime: Arc<Runtime>,
     pub(super) repos: Option<Arc<Repo>>,
@@ -644,7 +644,15 @@ impl Board {
             self.state.put_issues_async(&to_put).await?;
             id
         };
-        self.stored_async(&id).await
+        let created = self.stored_async(&id).await?;
+        let links = vibevalley_core::note::links::extract_markdown_links(&created.description);
+        let _ = self
+            .ctx
+            .service
+            .note
+            .replace_links_for_source(vibevalley_protocol::LinkEntityKind::Issue, &created.id, &links, now())
+            .await;
+        Ok(created)
     }
 
     pub(super) fn verify_approval(issue: &Issue, to: IssueStatus, seen: Option<&vibevalley_protocol::ReviewRevision>) -> Result<()> {

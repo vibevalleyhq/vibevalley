@@ -5,7 +5,7 @@ use std::sync::Arc;
 use serde::Deserialize;
 use serde_json::{Value, json};
 use vibevalley_protocol::{
-    ApiError, BizCode, DebugBundleResult, DebugCacheStat, DebugCollabArtifactState, DebugGraph, DebugGraphClient, DebugGraphSession, DebugOverrideConfig,
+    ApiError, BizCode, DebugBundleResult, DebugCacheStat, DebugCollabNoteState, DebugGraph, DebugGraphClient, DebugGraphSession, DebugOverrideConfig,
     DebugOverview, DebugRuntimeSummary, DebugSnapshot, DebugStateCache, DebugStateCounts, DebugTimelinePage, DebugTimelineQuery, DebugTrajectoryDetail,
     DebugTrajectoryExportRequest, DebugTrajectoryExportResult, DebugTrajectoryGetRequest, DebugTrajectoryKind, DebugTrajectorySummary, Issue, Session,
 };
@@ -62,7 +62,7 @@ struct StateMetrics {
     sessions: u32,
     channels: u32,
     repos: u32,
-    artifacts: u32,
+    notes: u32,
     media_jobs: u32,
     inbox: u32,
     active_sessions: u32,
@@ -74,7 +74,7 @@ fn extract_state_metrics(snap: &DebugStateSnapshot) -> StateMetrics {
         sessions: snap.sessions.len() as u32,
         channels: snap.channel_count,
         repos: snap.repo_count,
-        artifacts: snap.artifact_count,
+        notes: snap.note_count,
         media_jobs: snap.media_job_count,
         inbox: snap.inbox_count,
         active_sessions: snap.sessions.iter().filter(|s| s.phase.is_working()).count() as u32,
@@ -192,7 +192,7 @@ impl DebugKit {
         self.ctx.feed.watcher_counts()
     }
 
-    fn redact_collab_states(collab: &[DebugCollabArtifactState], redactor: &Redactor, count: &mut u32) -> Vec<DebugCollabArtifactState> {
+    fn redact_collab_states(collab: &[DebugCollabNoteState], redactor: &Redactor, count: &mut u32) -> Vec<DebugCollabNoteState> {
         collab
             .iter()
             .map(|c| {
@@ -214,7 +214,7 @@ impl DebugKit {
         metrics: &StateMetrics,
         mut caches: Vec<DebugCacheStat>,
         agent_count: u32,
-        collab: &[DebugCollabArtifactState],
+        collab: &[DebugCollabNoteState],
         redactor: &Redactor,
         count: &mut u32,
     ) -> DebugStateCache {
@@ -229,7 +229,7 @@ impl DebugKit {
                 channels: metrics.channels,
                 agents: agent_count,
                 repos: metrics.repos,
-                artifacts: metrics.artifacts,
+                notes: metrics.notes,
                 inbox: metrics.inbox,
                 media_jobs: metrics.media_jobs,
             },

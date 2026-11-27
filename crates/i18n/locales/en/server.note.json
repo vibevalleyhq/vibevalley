@@ -1,0 +1,43 @@
+{
+  "noTitle": "A note needs a title",
+  "longTitle": "The title is too long: at most {max} characters",
+  "badKind": "No note of kind {kind}: only {kinds}",
+  "missing": "There is no note {id}",
+  "noVersion": "\"{title}\" has no version {version}; the latest is {latest}",
+  "made": "Made \"{title}\"",
+  "versioned": "\"{title}\" is at version {version}",
+  "withNote": "{said}: {note}",
+  "preview": {
+    "remove": "Delete \"{title}\" and its {n} versions",
+    "cards": "Its cards stay in the conversation and say it was deleted when opened"
+  },
+  "suggestion": {
+    "empty": "The suggestion changes nothing",
+    "beyond": "The suggestion is for rev {rev}, but the block is only at rev {now}",
+    "missing": "There is no suggestion {id}",
+    "staleFile": "{path} changed since {hash}; refresh and propose again",
+    "deleteConflict": "A delete suggestion must apply to the file itself without an offset range"
+  },
+  "file": {
+    "missing": "\"{title}\" has no file at {path}"
+  },
+  "noReference": "{type} has no reference chapter named {reference}; available: {available}",
+  "types": {
+    "doc": {
+      "title": "Document",
+      "summary": "Notion-style structured block document (structure/doc.json) with nested blocks, charts/GenUI, backlinks, and real-time collaboration"
+    },
+    "base": {
+      "title": "Base",
+      "summary": "Multi-sheet structured database (structure/base.json) with table/board/gallery/timeline views, summaries, and batch Agent Action columns"
+    },
+    "canvas": {
+      "title": "Canvas",
+      "summary": "Spatial canvas and diagrams (structure/canvas.json) with nodes, connectors, frames, and collaborative suggestions"
+    },
+    "media": {
+      "title": "Media Note",
+      "summary": "Multimedia & transcript note (structure/media.json) organizing recordings, speech audio, generated images, and timelines"
+    }
+  }
+}

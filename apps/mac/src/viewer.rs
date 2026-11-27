@@ -504,7 +504,7 @@ fn build_html_preview_bundle() -> Result<Bundle, String> {
 
 fn html_mode_labels() -> (String, String) {
     (
-        vibevalley_i18n::t("web.artifact.page.previewTab", &[]),
+        vibevalley_i18n::t("web.note.page.previewTab", &[]),
         vibevalley_i18n::t("web.base.rich.viewSource", &[]),
     )
 }

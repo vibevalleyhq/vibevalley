@@ -402,7 +402,7 @@ fn built_in_skills_are_read_only_and_listed_first() {
         for (id, expected_skills) in [
             ("slides", vec!["slides"]),
             ("collector", vec!["collector"]),
-            ("pages", vec!["pages", "artifacts"]),
+            ("pages", vec!["pages", "notes"]),
             ("reviewer", vec!["reviewer"]),
         ] {
             let t = s.templates_async().await.into_iter().find(|t| t.id == id).unwrap();

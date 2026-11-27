@@ -8,11 +8,11 @@ use vibevalley_protocol::{Issue, Session};
 use crate::agent::mcp::Resource;
 use crate::agent::memory::Memory;
 use crate::agent::profile::{Profile, text};
-use crate::artifact::Manager as ArtifactManager;
 use crate::channel::Chat;
 use crate::context::Context;
 use crate::cron::Scheduler as CronScheduler;
 use crate::issue::{Board, Pull};
+use crate::note::Manager as NoteManager;
 use crate::repo::Repo;
 use crate::runtime::Runtime;
 use crate::storage::Storage;
@@ -80,7 +80,7 @@ pub struct ToolRegistry {
     pub repo: Arc<Repo>,
     pub chat: Arc<Chat>,
     pub pull: Arc<Pull>,
-    pub artifact: Arc<ArtifactManager>,
+    pub note: Arc<NoteManager>,
     pub storage: Arc<Storage>,
     pub repos_root: PathBuf,
 }

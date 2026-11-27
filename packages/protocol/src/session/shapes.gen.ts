@@ -1,6 +1,6 @@
 // Generated from crates/protocol/src/contract (vp run protocol:ts). Do not edit.
 
-import type { AgentRole, ArtifactId, IssueId, Outcome, Retry, SessionId, Spent } from "../common/shapes.gen";
+import type { AgentRole, IssueId, NoteId, Outcome, Retry, SessionId, Spent } from "../common/shapes.gen";
 import type { MachinePlatform, MachineStatus } from "../machine/shapes.gen";
 
 export const SessionActionValues = ["run_command", "read_file", "edit_file", "search", "web", "mcp", "wait", "other", "thinking", "speaking_text", "none"] as const;
@@ -11,7 +11,7 @@ export type SessionController = (typeof SessionControllerValues)[number];
 
 export type ExecutionPolicy = { "kind": "directCwd", repo?: string, permissionMode: SessionPermissionMode, } | { "kind": "managedWorktree", repo: string, branch?: string, } | { "kind": "sandboxDir" };
 
-export type ContextRef = { "kind": "issue", id: IssueId, refining?: boolean, } | { "kind": "channel", id: string, } | { "kind": "artifact", id: ArtifactId, };
+export type ContextRef = { "kind": "issue", id: IssueId, refining?: boolean, } | { "kind": "channel", id: string, } | { "kind": "note", id: NoteId, };
 
 export type Doing = { action: SessionAction, label: string, };
 

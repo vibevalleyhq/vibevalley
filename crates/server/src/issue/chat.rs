@@ -15,12 +15,12 @@ use tokio::task::JoinHandle as TaskHandle;
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::TaskTracker;
 use vibevalley_i18n::t;
-use vibevalley_protocol::{ApiError, Applied, ArtifactViewContext, BizCode, ChannelType, MessageKind, NoticeLevel, Outcome, Session, SubjectKind};
+use vibevalley_protocol::{ApiError, Applied, BizCode, ChannelType, MessageKind, NoteViewContext, NoticeLevel, Outcome, Session, SubjectKind};
 
 use super::board::Board;
 use crate::channel::{ChannelDispatched, Chat, Committed, DeliveryTargetKind, Meta, Note, Noticing, QueuedDelivery, Saying, Seat, ThreadSubject, meta_of};
 use crate::context::error::{LookIn, missing, refused};
-use crate::context::text::{format_artifact_view_context, head};
+use crate::context::text::{format_note_view_context, head};
 use crate::context::{Context, now};
 use crate::runtime::{IssueReportDoc, MailboxSource, OUTBOX_SESSION_REPORTED, OutboxSessionReported, SessionLifecycleEvent};
 
@@ -33,7 +33,7 @@ fn warn(what: &str, e: &ApiError) {
     eprintln!("vibevalley-server: issue-chat: {what}: {}", e.message);
 }
 
-pub(super) fn view_context_of(c: &Committed) -> Option<ArtifactViewContext> {
+pub(super) fn view_context_of(c: &Committed) -> Option<NoteViewContext> {
     if c.row.deleted_at.is_some() {
         return None;
     }
@@ -61,7 +61,7 @@ fn line_of(channel: &Chat, c: &Committed) -> String {
     let edited = if c.row.edited_at.is_some() { "（改过）" } else { "" };
     let view = view_context_of(c)
         .as_ref()
-        .map(|vc| format!("\n  │ {}", format_artifact_view_context(vc).replace('\n', "\n  │ ")))
+        .map(|vc| format!("\n  │ {}", format_note_view_context(vc).replace('\n', "\n  │ ")))
         .unwrap_or_default();
     format!(
         "[target={target} msg={}{reply} from={from}]{edited} {}{view}",
@@ -869,7 +869,7 @@ impl IssueChat {
         }
         let mut text = c.row.body.trim().to_string();
         if let Some(vc) = view_context_of(&c) {
-            text = format!("{}\n{text}", format_artifact_view_context(&vc));
+            text = format!("{}\n{text}", format_note_view_context(&vc));
         }
         let mut earlier_ids: Vec<(i64, String)> = Vec::new();
         let mut earlier_lines: Vec<String> = Vec::new();

@@ -13,7 +13,7 @@ export type PersonaMode = (typeof PersonaModeValues)[number];
 /**
  * Capability groups controlling which built-in farm tools an agent profile can call.
  */
-export const ToolsetValues = ["issue", "session", "channel", "repo", "cron", "resource", "memory", "media", "library", "artifact"] as const;
+export const ToolsetValues = ["issue", "session", "channel", "repo", "cron", "resource", "memory", "media", "library", "note"] as const;
 /**
  * Capability groups controlling which built-in farm tools an agent profile can call.
  */

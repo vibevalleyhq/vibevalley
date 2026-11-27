@@ -1,5 +1,5 @@
-// Native NSWindow hosting CALayerHost (for GPUI-rendered artifacts), sandboxed WKWebView (for prototype
-// artifacts), or a connecting/reconnecting/error status view.
+// Native NSWindow hosting CALayerHost (for GPUI-rendered notes), sandboxed WKWebView (for preview
+// notes), or a connecting/reconnecting/error status view.
 
 import AppKit
 import QuartzCore
@@ -17,7 +17,7 @@ final class ShimWindowController: NSObject, NSWindowDelegate {
   }
 
   private let statusView: ShimStatusView
-  private let artifactId: String?
+  private let noteId: String?
   private let storage: AppletStorage?
   private var mode: ContentMode = .status
   private var isAttached = false
@@ -38,12 +38,12 @@ final class ShimWindowController: NSObject, NSWindowDelegate {
   var onAlwaysOnTopChanged: ((Bool) -> Void)?
   var onOpenInHostRequested: (() -> Void)?
 
-  init(title: String, artifactId: String?, serverHome: String, alwaysOnTop: Bool) {
+  init(title: String, noteId: String?, serverHome: String, alwaysOnTop: Bool) {
     self.alwaysOnTop = alwaysOnTop
     self.currentTitle = title
-    let cleanArtifact = artifactId?.trimmingCharacters(in: .whitespacesAndNewlines)
-    self.artifactId = (cleanArtifact?.isEmpty == false) ? cleanArtifact : nil
-    self.storage = self.artifactId.map { AppletStorage(serverHome: serverHome, artifactId: $0) }
+    let cleanNote = noteId?.trimmingCharacters(in: .whitespacesAndNewlines)
+    self.noteId = (cleanNote?.isEmpty == false) ? cleanNote : nil
+    self.storage = self.noteId.map { AppletStorage(serverHome: serverHome, noteId: $0) }
     self.window = NSWindow(
       contentRect: NSRect(x: 0, y: 0, width: 1120, height: 760),
       styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
@@ -62,8 +62,8 @@ final class ShimWindowController: NSObject, NSWindowDelegate {
     window.level = alwaysOnTop ? .floating : .normal
     window.acceptsMouseMovedEvents = true
     window.isReleasedWhenClosed = false
-    if let id = self.artifactId {
-      let autosaveName = AppletStorage.windowAutosaveName(forArtifactId: id)
+    if let id = self.noteId {
+      let autosaveName = AppletStorage.windowAutosaveName(forNoteId: id)
       window.setFrameAutosaveName(autosaveName)
       if !window.setFrameUsingName(autosaveName) {
         window.center()
@@ -120,7 +120,7 @@ final class ShimWindowController: NSObject, NSWindowDelegate {
       isAttached = true
       if case .status = mode {
         showStatus(
-          title: "Loading artifact...",
+          title: "Loading note...",
           detail: "Attached to VibeValley host",
           spinning: true,
           showReconnect: false
@@ -170,7 +170,7 @@ final class ShimWindowController: NSObject, NSWindowDelegate {
       alwaysOnTop = enabled
     case .error(let message):
       showStatus(
-        title: "Artifact Error",
+        title: "Note Error",
         detail: message,
         spinning: false,
         showReconnect: true

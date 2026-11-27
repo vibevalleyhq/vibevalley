@@ -3,7 +3,7 @@ name = "vibevalley-core"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "VibeValley's domain state reduction, frame projection, schedule rules, and artifact engine"
+description = "VibeValley's domain state reduction, frame projection, schedule rules, and note engine"
 
 [features]
 default = ["collab"]

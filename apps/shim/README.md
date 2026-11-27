@@ -1,7 +1,7 @@
 # apps/shim
 
-Standalone macOS App Shim for VibeValley local artifact applets: a thin native AppKit process (`VibeValleyShim`) that
-gives an installed artifact its own Dock icon, `Cmd+Tab` identity, menu bar, and window while delegating rendering and
+Standalone macOS App Shim for VibeValley local note applets: a thin native AppKit process (`VibeValleyShim`) that
+gives an installed note its own Dock icon, `Cmd+Tab` identity, menu bar, and window while delegating rendering and
 CRDT state to the single running VibeValley host process over `$VIBEVALLEY_HOME/applet.sock`.
 
 ```text

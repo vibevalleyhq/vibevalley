@@ -1330,256 +1330,319 @@ pub const ENDPOINTS: &[Endpoint] = &[
         result: Some("VoiceAsrResult"),
     },
     Endpoint {
-        op: "artifact.list",
-        module: "artifact",
+        op: "note.list",
+        module: "note",
         about: &[],
         can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
         dry_run: None,
-        input: Some("ArtifactListRequest"),
-        result: Some("Vec<Artifact>"),
+        input: Some("NoteListRequest"),
+        result: Some("Vec<Note>"),
     },
     Endpoint {
-        op: "artifact.get",
-        module: "artifact",
+        op: "note.get",
+        module: "note",
         about: &["id"],
         can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
         dry_run: None,
-        input: Some("ArtifactGetInput"),
-        result: Some("Artifact"),
+        input: Some("NoteGetInput"),
+        result: Some("Note"),
     },
     Endpoint {
-        op: "artifact.content.get",
-        module: "artifact",
+        op: "note.content.get",
+        module: "note",
         about: &["id"],
         can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
         dry_run: None,
-        input: Some("ArtifactReadRequest"),
-        result: Some("ArtifactContent"),
+        input: Some("NoteReadRequest"),
+        result: Some("NoteContent"),
     },
     Endpoint {
-        op: "artifact.create",
-        module: "artifact",
+        op: "note.create",
+        module: "note",
         about: &[],
         can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
         dry_run: None,
-        input: Some("ArtifactRequest"),
-        result: Some("Artifact"),
+        input: Some("NoteRequest"),
+        result: Some("Note"),
     },
     Endpoint {
-        op: "artifact.version.create",
-        module: "artifact",
+        op: "note.version.create",
+        module: "note",
         about: &["id"],
         can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
         dry_run: None,
-        input: Some("ArtifactVersionRequest"),
-        result: Some("Artifact"),
+        input: Some("NoteVersionRequest"),
+        result: Some("Note"),
     },
     Endpoint {
-        op: "artifact.update",
-        module: "artifact",
+        op: "note.update",
+        module: "note",
         about: &["id"],
         can: &[Caller::User, Caller::Remote],
         dry_run: None,
-        input: Some("ArtifactUpdateRequest"),
-        result: Some("Artifact"),
+        input: Some("NoteUpdateRequest"),
+        result: Some("Note"),
     },
     Endpoint {
-        op: "artifact.delete",
-        module: "artifact",
+        op: "note.delete",
+        module: "note",
         about: &["id"],
         can: &[Caller::User, Caller::Remote],
-        dry_run: Some("artifact.previewDelete"),
-        input: Some("ArtifactDeleteInput"),
+        dry_run: Some("note.previewDelete"),
+        input: Some("NoteDeleteInput"),
         result: None,
     },
     Endpoint {
-        op: "artifact.previewDelete",
-        module: "artifact",
+        op: "note.previewDelete",
+        module: "note",
         about: &["id"],
         can: &[Caller::User, Caller::Remote],
         dry_run: None,
-        input: Some("ArtifactDeleteInput"),
+        input: Some("NoteDeleteInput"),
         result: Some("Preview"),
     },
     Endpoint {
-        op: "artifact.type.list",
-        module: "artifact",
+        op: "note.tree.move",
+        module: "note",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
+        dry_run: None,
+        input: Some("NoteTreeMoveRequest"),
+        result: Some("Note"),
+    },
+    Endpoint {
+        op: "note.link.list",
+        module: "note",
+        about: &["entityId"],
+        can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
+        dry_run: None,
+        input: Some("NoteLinkListRequest"),
+        result: Some("NoteLinkListResult"),
+    },
+    Endpoint {
+        op: "note.doc.view",
+        module: "note",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
+        dry_run: None,
+        input: Some("NoteDocViewRequest"),
+        result: Some("DocView"),
+    },
+    Endpoint {
+        op: "note.doc.appendBlock",
+        module: "note",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
+        dry_run: None,
+        input: Some("NoteDocAppendBlockRequest"),
+        result: Some("DocView"),
+    },
+    Endpoint {
+        op: "note.base.view",
+        module: "note",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
+        dry_run: None,
+        input: Some("BaseViewRequest"),
+        result: Some("BaseViewSnapshot"),
+    },
+    Endpoint {
+        op: "note.base.upsertRow",
+        module: "note",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
+        dry_run: None,
+        input: Some("BaseUpsertRowRequest"),
+        result: Some("BaseViewSnapshot"),
+    },
+    Endpoint {
+        op: "note.base.runAgentColumn",
+        module: "note",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote, Caller::Orchestrator],
+        dry_run: None,
+        input: Some("BaseRunAgentColumnRequest"),
+        result: Some("BaseRunAgentColumnResult"),
+    },
+    Endpoint {
+        op: "note.type.list",
+        module: "note",
         about: &[],
         can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
         dry_run: None,
         input: None,
-        result: Some("Vec<ArtifactTypeInfo>"),
+        result: Some("Vec<NoteTypeInfo>"),
     },
     Endpoint {
-        op: "artifact.type.read",
-        module: "artifact",
+        op: "note.type.read",
+        module: "note",
         about: &[],
         can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
         dry_run: None,
-        input: Some("ArtifactTypeReadRequest"),
-        result: Some("ArtifactTypeGuide"),
+        input: Some("NoteTypeReadRequest"),
+        result: Some("NoteTypeGuide"),
     },
     Endpoint {
-        op: "artifact.file.list",
-        module: "artifact",
+        op: "note.file.list",
+        module: "note",
         about: &["id"],
         can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
         dry_run: None,
-        input: Some("ArtifactFileListRequest"),
-        result: Some("ArtifactFileListResult"),
+        input: Some("NoteFileListRequest"),
+        result: Some("NoteFileListResult"),
     },
     Endpoint {
-        op: "artifact.file.get",
-        module: "artifact",
+        op: "note.file.get",
+        module: "note",
         about: &["id"],
         can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
         dry_run: None,
-        input: Some("ArtifactFileGetRequest"),
-        result: Some("ArtifactFileContent"),
+        input: Some("NoteFileGetRequest"),
+        result: Some("NoteFileContent"),
     },
     Endpoint {
-        op: "artifact.file.write",
-        module: "artifact",
+        op: "note.file.write",
+        module: "note",
         about: &["id"],
         can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
         dry_run: None,
-        input: Some("ArtifactFileWriteRequest"),
-        result: Some("ArtifactFileWriteResult"),
+        input: Some("NoteFileWriteRequest"),
+        result: Some("NoteFileWriteResult"),
     },
     Endpoint {
-        op: "artifact.file.delete",
-        module: "artifact",
+        op: "note.file.delete",
+        module: "note",
         about: &["id"],
         can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
         dry_run: None,
-        input: Some("ArtifactFileDeleteRequest"),
-        result: Some("ArtifactFileDeleteResult"),
+        input: Some("NoteFileDeleteRequest"),
+        result: Some("NoteFileDeleteResult"),
     },
     Endpoint {
-        op: "artifact.suggestion.list",
-        module: "artifact",
+        op: "note.suggestion.list",
+        module: "note",
         about: &["id"],
         can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
         dry_run: None,
-        input: Some("ArtifactSuggestionListInput"),
+        input: Some("NoteSuggestionListInput"),
         result: Some("Vec<Suggestion>"),
     },
     Endpoint {
-        op: "artifact.suggestion.create",
-        module: "artifact",
+        op: "note.suggestion.create",
+        module: "note",
         about: &["id"],
         can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
         dry_run: None,
-        input: Some("ArtifactSuggestionCreateInput"),
+        input: Some("NoteSuggestionCreateInput"),
         result: Some("Suggestion"),
     },
     Endpoint {
-        op: "artifact.suggestion.accept",
-        module: "artifact",
+        op: "note.suggestion.accept",
+        module: "note",
         about: &["id"],
         can: &[Caller::User, Caller::Remote],
         dry_run: None,
-        input: Some("ArtifactSuggestionAcceptInput"),
+        input: Some("NoteSuggestionAcceptInput"),
         result: Some("Suggestion"),
     },
     Endpoint {
-        op: "artifact.suggestion.reject",
-        module: "artifact",
+        op: "note.suggestion.reject",
+        module: "note",
         about: &["id"],
         can: &[Caller::User, Caller::Remote],
         dry_run: None,
-        input: Some("ArtifactSuggestionAcceptInput"),
+        input: Some("NoteSuggestionAcceptInput"),
         result: Some("Suggestion"),
     },
     Endpoint {
-        op: "artifact.presence.update",
-        module: "artifact",
+        op: "note.presence.update",
+        module: "note",
         about: &["id"],
         can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
         dry_run: None,
-        input: Some("ArtifactPresenceUpdateRequest"),
+        input: Some("NotePresenceUpdateRequest"),
         result: None,
     },
     Endpoint {
-        op: "artifact.history.list",
-        module: "artifact",
+        op: "note.history.list",
+        module: "note",
         about: &["id"],
         can: &[Caller::User, Caller::Remote],
         dry_run: None,
-        input: Some("ArtifactHistoryListRequest"),
-        result: Some("Vec<ArtifactHistoryEntry>"),
+        input: Some("NoteHistoryListRequest"),
+        result: Some("Vec<NoteHistoryEntry>"),
     },
     Endpoint {
-        op: "artifact.history.preview",
-        module: "artifact",
+        op: "note.history.preview",
+        module: "note",
         about: &["id"],
         can: &[Caller::User, Caller::Remote],
         dry_run: None,
-        input: Some("ArtifactHistoryPreviewRequest"),
-        result: Some("ArtifactHistoryPreviewResult"),
+        input: Some("NoteHistoryPreviewRequest"),
+        result: Some("NoteHistoryPreviewResult"),
     },
     Endpoint {
-        op: "artifact.history.restore",
-        module: "artifact",
+        op: "note.history.restore",
+        module: "note",
         about: &["id"],
         can: &[Caller::User, Caller::Remote],
         dry_run: None,
-        input: Some("ArtifactHistoryRestoreRequest"),
-        result: Some("Artifact"),
+        input: Some("NoteHistoryRestoreRequest"),
+        result: Some("Note"),
     },
     Endpoint {
-        op: "artifact.history.fork",
-        module: "artifact",
+        op: "note.history.fork",
+        module: "note",
         about: &["id"],
         can: &[Caller::User, Caller::Remote],
         dry_run: None,
-        input: Some("ArtifactHistoryForkRequest"),
-        result: Some("Artifact"),
+        input: Some("NoteHistoryForkRequest"),
+        result: Some("Note"),
     },
     Endpoint {
-        op: "artifact.history.undoOrigin",
-        module: "artifact",
+        op: "note.history.undoOrigin",
+        module: "note",
         about: &["id"],
         can: &[Caller::User, Caller::Remote],
         dry_run: None,
-        input: Some("ArtifactHistoryUndoOriginRequest"),
-        result: Some("Artifact"),
+        input: Some("NoteHistoryUndoOriginRequest"),
+        result: Some("Note"),
     },
     Endpoint {
-        op: "artifact.history.compact",
-        module: "artifact",
+        op: "note.history.compact",
+        module: "note",
         about: &["id"],
         can: &[Caller::User, Caller::Remote],
         dry_run: None,
-        input: Some("ArtifactHistoryCompactRequest"),
-        result: Some("Artifact"),
+        input: Some("NoteHistoryCompactRequest"),
+        result: Some("Note"),
     },
     Endpoint {
-        op: "artifact.collab.export",
-        module: "artifact",
+        op: "note.collab.export",
+        module: "note",
         about: &["id"],
         can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
         dry_run: None,
-        input: Some("ArtifactCollabExportRequest"),
-        result: Some("ArtifactCollabExportResult"),
+        input: Some("NoteCollabExportRequest"),
+        result: Some("NoteCollabExportResult"),
     },
     Endpoint {
-        op: "artifact.collab.import",
-        module: "artifact",
+        op: "note.collab.import",
+        module: "note",
         about: &["id"],
         can: &[Caller::User, Caller::Remote],
         dry_run: None,
-        input: Some("ArtifactCollabImportRequest"),
-        result: Some("ArtifactCollabImportResult"),
+        input: Some("NoteCollabImportRequest"),
+        result: Some("NoteCollabImportResult"),
     },
     Endpoint {
-        op: "artifact.cover.set",
-        module: "artifact",
+        op: "note.cover.set",
+        module: "note",
         about: &["id"],
         can: &[Caller::User, Caller::Remote],
         dry_run: None,
-        input: Some("ArtifactCoverSetRequest"),
-        result: Some("ArtifactCover"),
+        input: Some("NoteCoverSetRequest"),
+        result: Some("NoteCover"),
     },
     Endpoint {
         op: "provider.get",
@@ -2839,197 +2902,246 @@ pub mod ops {
         type Input = t::VoiceAsrTranscribeInput;
         type Result = t::VoiceAsrResult;
     }
-    /// The artifacts announced in a channel or made for an issue, newest change first; every one the farm has when neither is given.
-    pub struct ArtifactList;
-    impl Op for ArtifactList {
-        const NAME: &'static str = "artifact.list";
-        type Input = t::ArtifactListRequest;
-        type Result = Vec<t::Artifact>;
+    /// The notes announced in a channel or made for an issue, newest change first; every one the workspace has when neither is given.
+    pub struct NoteList;
+    impl Op for NoteList {
+        const NAME: &'static str = "note.list";
+        type Input = t::NoteListRequest;
+        type Result = Vec<t::Note>;
     }
-    pub struct ArtifactGet;
-    impl Op for ArtifactGet {
-        const NAME: &'static str = "artifact.get";
-        type Input = t::ArtifactGetInput;
-        type Result = t::Artifact;
+    pub struct NoteGet;
+    impl Op for NoteGet {
+        const NAME: &'static str = "note.get";
+        type Input = t::NoteGetInput;
+        type Result = t::Note;
     }
-    /// Reads the artifact's primary entry file content (optionally at a historical version snapshot).
-    pub struct ArtifactContentGet;
-    impl Op for ArtifactContentGet {
-        const NAME: &'static str = "artifact.content.get";
-        type Input = t::ArtifactReadRequest;
-        type Result = t::ArtifactContent;
+    /// Reads the note's primary entry file content (optionally at a historical version snapshot).
+    pub struct NoteContentGet;
+    impl Op for NoteContentGet {
+        const NAME: &'static str = "note.content.get";
+        type Input = t::NoteReadRequest;
+        type Result = t::NoteContent;
     }
-    /// Creates a new directory-backed artifact seeded with starter files for its `artifact_type`.
-    pub struct ArtifactCreate;
-    impl Op for ArtifactCreate {
-        const NAME: &'static str = "artifact.create";
-        type Input = t::ArtifactRequest;
-        type Result = t::Artifact;
+    /// Creates a new directory-backed note seeded with starter files for its `note_type`.
+    pub struct NoteCreate;
+    impl Op for NoteCreate {
+        const NAME: &'static str = "note.create";
+        type Input = t::NoteRequest;
+        type Result = t::Note;
     }
     /// Cuts a new immutable directory snapshot version over the latest state.
-    pub struct ArtifactVersionCreate;
-    impl Op for ArtifactVersionCreate {
-        const NAME: &'static str = "artifact.version.create";
-        type Input = t::ArtifactVersionRequest;
-        type Result = t::Artifact;
+    pub struct NoteVersionCreate;
+    impl Op for NoteVersionCreate {
+        const NAME: &'static str = "note.version.create";
+        type Input = t::NoteVersionRequest;
+        type Result = t::Note;
     }
-    /// Updates an artifact's title or default design-system flag.
-    pub struct ArtifactUpdate;
-    impl Op for ArtifactUpdate {
-        const NAME: &'static str = "artifact.update";
-        type Input = t::ArtifactUpdateRequest;
-        type Result = t::Artifact;
+    /// Updates a note's title, tree placement, or linked issue.
+    pub struct NoteUpdate;
+    impl Op for NoteUpdate {
+        const NAME: &'static str = "note.update";
+        type Input = t::NoteUpdateRequest;
+        type Result = t::Note;
     }
-    pub struct ArtifactDelete;
-    impl Op for ArtifactDelete {
-        const NAME: &'static str = "artifact.delete";
-        type Input = t::ArtifactDeleteInput;
+    pub struct NoteDelete;
+    impl Op for NoteDelete {
+        const NAME: &'static str = "note.delete";
+        type Input = t::NoteDeleteInput;
         type Result = ();
     }
-    pub struct ArtifactPreviewDelete;
-    impl Op for ArtifactPreviewDelete {
-        const NAME: &'static str = "artifact.previewDelete";
-        type Input = t::ArtifactDeleteInput;
+    pub struct NotePreviewDelete;
+    impl Op for NotePreviewDelete {
+        const NAME: &'static str = "note.previewDelete";
+        type Input = t::NoteDeleteInput;
         type Result = t::Preview;
     }
-    /// All 12 artifact types and the workspace's standing default design-system if any.
-    pub struct ArtifactTypeList;
-    impl Op for ArtifactTypeList {
-        const NAME: &'static str = "artifact.type.list";
+    /// Moves a note in the workspace page tree (`parent_id`, `sort_order`).
+    pub struct NoteTreeMove;
+    impl Op for NoteTreeMove {
+        const NAME: &'static str = "note.tree.move";
+        type Input = t::NoteTreeMoveRequest;
+        type Result = t::Note;
+    }
+    /// Lists outgoing links and incoming backlinks for a note or issue.
+    pub struct NoteLinkList;
+    impl Op for NoteLinkList {
+        const NAME: &'static str = "note.link.list";
+        type Input = t::NoteLinkListRequest;
+        type Result = t::NoteLinkListResult;
+    }
+    /// Projects a `doc` note into strongly-typed `DocView` blocks, counts, and extracted links.
+    pub struct NoteDocView;
+    impl Op for NoteDocView {
+        const NAME: &'static str = "note.doc.view";
+        type Input = t::NoteDocViewRequest;
+        type Result = t::DocView;
+    }
+    /// Appends a strongly-typed `DocBlock` into a `doc` note.
+    pub struct NoteDocAppendBlock;
+    impl Op for NoteDocAppendBlock {
+        const NAME: &'static str = "note.doc.appendBlock";
+        type Input = t::NoteDocAppendBlockRequest;
+        type Result = t::DocView;
+    }
+    /// Projects a `base` note into filtered/sorted/grouped `BaseViewSnapshot`.
+    pub struct NoteBaseView;
+    impl Op for NoteBaseView {
+        const NAME: &'static str = "note.base.view";
+        type Input = t::BaseViewRequest;
+        type Result = t::BaseViewSnapshot;
+    }
+    /// Creates or updates a row in a `base` note and returns the refreshed view snapshot.
+    pub struct NoteBaseUpsertRow;
+    impl Op for NoteBaseUpsertRow {
+        const NAME: &'static str = "note.base.upsertRow";
+        type Input = t::BaseUpsertRowRequest;
+        type Result = t::BaseViewSnapshot;
+    }
+    /// Runs an `agentAction` column across selected rows of a `base` note.
+    pub struct NoteBaseRunAgentColumn;
+    impl Op for NoteBaseRunAgentColumn {
+        const NAME: &'static str = "note.base.runAgentColumn";
+        type Input = t::BaseRunAgentColumnRequest;
+        type Result = t::BaseRunAgentColumnResult;
+    }
+    /// All 4 note primitives (`doc`, `base`, `canvas`, `media`).
+    pub struct NoteTypeList;
+    impl Op for NoteTypeList {
+        const NAME: &'static str = "note.type.list";
         type Input = ();
-        type Result = Vec<t::ArtifactTypeInfo>;
+        type Result = Vec<t::NoteTypeInfo>;
     }
-    /// An artifact type's SKILL.md guide or one of its named reference chapters.
-    pub struct ArtifactTypeRead;
-    impl Op for ArtifactTypeRead {
-        const NAME: &'static str = "artifact.type.read";
-        type Input = t::ArtifactTypeReadRequest;
-        type Result = t::ArtifactTypeGuide;
+    /// A note type's SKILL.md guide or one of its named reference chapters.
+    pub struct NoteTypeRead;
+    impl Op for NoteTypeRead {
+        const NAME: &'static str = "note.type.read";
+        type Input = t::NoteTypeReadRequest;
+        type Result = t::NoteTypeGuide;
     }
-    /// Lists files (`manifest.json`, `structure/*`, `asset/*`) inside an artifact directory.
-    pub struct ArtifactFileList;
-    impl Op for ArtifactFileList {
-        const NAME: &'static str = "artifact.file.list";
-        type Input = t::ArtifactFileListRequest;
-        type Result = t::ArtifactFileListResult;
+    /// Lists files (`manifest.json`, `structure/*`, `asset/*`) inside a note directory.
+    pub struct NoteFileList;
+    impl Op for NoteFileList {
+        const NAME: &'static str = "note.file.list";
+        type Input = t::NoteFileListRequest;
+        type Result = t::NoteFileListResult;
     }
-    /// Reads one file by relative path inside an artifact directory (or historical version snapshot).
-    pub struct ArtifactFileGet;
-    impl Op for ArtifactFileGet {
-        const NAME: &'static str = "artifact.file.get";
-        type Input = t::ArtifactFileGetRequest;
-        type Result = t::ArtifactFileContent;
+    /// Reads one file by relative path inside a note directory (or historical version snapshot).
+    pub struct NoteFileGet;
+    impl Op for NoteFileGet {
+        const NAME: &'static str = "note.file.get";
+        type Input = t::NoteFileGetRequest;
+        type Result = t::NoteFileContent;
     }
     /// Atomically writes one or more files into `structure/` or `asset/` with origin attribution and collab sync.
-    pub struct ArtifactFileWrite;
-    impl Op for ArtifactFileWrite {
-        const NAME: &'static str = "artifact.file.write";
-        type Input = t::ArtifactFileWriteRequest;
-        type Result = t::ArtifactFileWriteResult;
+    pub struct NoteFileWrite;
+    impl Op for NoteFileWrite {
+        const NAME: &'static str = "note.file.write";
+        type Input = t::NoteFileWriteRequest;
+        type Result = t::NoteFileWriteResult;
     }
     /// Deletes a relative path under `structure/` or `asset/` with origin attribution and collab sync.
-    pub struct ArtifactFileDelete;
-    impl Op for ArtifactFileDelete {
-        const NAME: &'static str = "artifact.file.delete";
-        type Input = t::ArtifactFileDeleteRequest;
-        type Result = t::ArtifactFileDeleteResult;
+    pub struct NoteFileDelete;
+    impl Op for NoteFileDelete {
+        const NAME: &'static str = "note.file.delete";
+        type Input = t::NoteFileDeleteRequest;
+        type Result = t::NoteFileDeleteResult;
     }
-    /// The open and resolved suggestions on an artifact, oldest first.
-    pub struct ArtifactSuggestionList;
-    impl Op for ArtifactSuggestionList {
-        const NAME: &'static str = "artifact.suggestion.list";
-        type Input = t::ArtifactSuggestionListInput;
+    /// The open and resolved suggestions on a note, oldest first.
+    pub struct NoteSuggestionList;
+    impl Op for NoteSuggestionList {
+        const NAME: &'static str = "note.suggestion.list";
+        type Input = t::NoteSuggestionListInput;
         type Result = Vec<t::Suggestion>;
     }
-    /// A proposed edit to a file or structured target inside an artifact directory.
-    pub struct ArtifactSuggestionCreate;
-    impl Op for ArtifactSuggestionCreate {
-        const NAME: &'static str = "artifact.suggestion.create";
-        type Input = t::ArtifactSuggestionCreateInput;
+    /// A proposed edit to a file or structured target inside a note directory.
+    pub struct NoteSuggestionCreate;
+    impl Op for NoteSuggestionCreate {
+        const NAME: &'static str = "note.suggestion.create";
+        type Input = t::NoteSuggestionCreateInput;
         type Result = t::Suggestion;
     }
-    /// Accepts a pending suggestion and applies it to the artifact directory and collab state.
-    pub struct ArtifactSuggestionAccept;
-    impl Op for ArtifactSuggestionAccept {
-        const NAME: &'static str = "artifact.suggestion.accept";
-        type Input = t::ArtifactSuggestionAcceptInput;
+    /// Accepts a pending suggestion and applies it to the note directory and collab state.
+    pub struct NoteSuggestionAccept;
+    impl Op for NoteSuggestionAccept {
+        const NAME: &'static str = "note.suggestion.accept";
+        type Input = t::NoteSuggestionAcceptInput;
         type Result = t::Suggestion;
     }
-    pub struct ArtifactSuggestionReject;
-    impl Op for ArtifactSuggestionReject {
-        const NAME: &'static str = "artifact.suggestion.reject";
-        type Input = t::ArtifactSuggestionAcceptInput;
+    pub struct NoteSuggestionReject;
+    impl Op for NoteSuggestionReject {
+        const NAME: &'static str = "note.suggestion.reject";
+        type Input = t::NoteSuggestionAcceptInput;
         type Result = t::Suggestion;
     }
     /// Ephemeral live presence update (cursor, selection, highlight, viewport); never persisted to SQLite.
-    pub struct ArtifactPresenceUpdate;
-    impl Op for ArtifactPresenceUpdate {
-        const NAME: &'static str = "artifact.presence.update";
-        type Input = t::ArtifactPresenceUpdateRequest;
+    pub struct NotePresenceUpdate;
+    impl Op for NotePresenceUpdate {
+        const NAME: &'static str = "note.presence.update";
+        type Input = t::NotePresenceUpdateRequest;
         type Result = ();
     }
-    /// Commit history timeline for a collaborative artifact, newest first.
-    pub struct ArtifactHistoryList;
-    impl Op for ArtifactHistoryList {
-        const NAME: &'static str = "artifact.history.list";
-        type Input = t::ArtifactHistoryListRequest;
-        type Result = Vec<t::ArtifactHistoryEntry>;
+    /// Commit history timeline for a collaborative note, newest first.
+    pub struct NoteHistoryList;
+    impl Op for NoteHistoryList {
+        const NAME: &'static str = "note.history.list";
+        type Input = t::NoteHistoryListRequest;
+        type Result = Vec<t::NoteHistoryEntry>;
     }
     /// Read-only snapshot projection at the requested Loro frontiers.
-    pub struct ArtifactHistoryPreview;
-    impl Op for ArtifactHistoryPreview {
-        const NAME: &'static str = "artifact.history.preview";
-        type Input = t::ArtifactHistoryPreviewRequest;
-        type Result = t::ArtifactHistoryPreviewResult;
+    pub struct NoteHistoryPreview;
+    impl Op for NoteHistoryPreview {
+        const NAME: &'static str = "note.history.preview";
+        type Input = t::NoteHistoryPreviewRequest;
+        type Result = t::NoteHistoryPreviewResult;
     }
-    /// Restore an artifact to the snapshot at the requested Loro frontiers as a new commit.
-    pub struct ArtifactHistoryRestore;
-    impl Op for ArtifactHistoryRestore {
-        const NAME: &'static str = "artifact.history.restore";
-        type Input = t::ArtifactHistoryRestoreRequest;
-        type Result = t::Artifact;
+    /// Restore a note to the snapshot at the requested Loro frontiers as a new commit.
+    pub struct NoteHistoryRestore;
+    impl Op for NoteHistoryRestore {
+        const NAME: &'static str = "note.history.restore";
+        type Input = t::NoteHistoryRestoreRequest;
+        type Result = t::Note;
     }
-    /// Fork a new artifact starting from the snapshot at the requested Loro frontiers.
-    pub struct ArtifactHistoryFork;
-    impl Op for ArtifactHistoryFork {
-        const NAME: &'static str = "artifact.history.fork";
-        type Input = t::ArtifactHistoryForkRequest;
-        type Result = t::Artifact;
+    /// Fork a new note starting from the snapshot at the requested Loro frontiers.
+    pub struct NoteHistoryFork;
+    impl Op for NoteHistoryFork {
+        const NAME: &'static str = "note.history.fork";
+        type Input = t::NoteHistoryForkRequest;
+        type Result = t::Note;
     }
     /// Selectively undo commits matching one origin while preserving concurrent edits from other actors.
-    pub struct ArtifactHistoryUndoOrigin;
-    impl Op for ArtifactHistoryUndoOrigin {
-        const NAME: &'static str = "artifact.history.undoOrigin";
-        type Input = t::ArtifactHistoryUndoOriginRequest;
-        type Result = t::Artifact;
+    pub struct NoteHistoryUndoOrigin;
+    impl Op for NoteHistoryUndoOrigin {
+        const NAME: &'static str = "note.history.undoOrigin";
+        type Input = t::NoteHistoryUndoOriginRequest;
+        type Result = t::Note;
     }
     /// Compact old operation history into a shallow snapshot while keeping current state intact.
-    pub struct ArtifactHistoryCompact;
-    impl Op for ArtifactHistoryCompact {
-        const NAME: &'static str = "artifact.history.compact";
-        type Input = t::ArtifactHistoryCompactRequest;
-        type Result = t::Artifact;
+    pub struct NoteHistoryCompact;
+    impl Op for NoteHistoryCompact {
+        const NAME: &'static str = "note.history.compact";
+        type Input = t::NoteHistoryCompactRequest;
+        type Result = t::Note;
     }
     /// Export incremental Loro CRDT updates (or snapshot) relative to a client VersionVector.
-    pub struct ArtifactCollabExport;
-    impl Op for ArtifactCollabExport {
-        const NAME: &'static str = "artifact.collab.export";
-        type Input = t::ArtifactCollabExportRequest;
-        type Result = t::ArtifactCollabExportResult;
+    pub struct NoteCollabExport;
+    impl Op for NoteCollabExport {
+        const NAME: &'static str = "note.collab.export";
+        type Input = t::NoteCollabExportRequest;
+        type Result = t::NoteCollabExportResult;
     }
-    /// Import incremental Loro CRDT updates (or snapshot) into an artifact and optionally return missing server updates.
-    pub struct ArtifactCollabImport;
-    impl Op for ArtifactCollabImport {
-        const NAME: &'static str = "artifact.collab.import";
-        type Input = t::ArtifactCollabImportRequest;
-        type Result = t::ArtifactCollabImportResult;
+    /// Import incremental Loro CRDT updates (or snapshot) into a note and optionally return missing server updates.
+    pub struct NoteCollabImport;
+    impl Op for NoteCollabImport {
+        const NAME: &'static str = "note.collab.import";
+        type Input = t::NoteCollabImportRequest;
+        type Result = t::NoteCollabImportResult;
     }
-    /// Saves a derived auto-captured cover image outside the artifact directory and CRDT.
-    pub struct ArtifactCoverSet;
-    impl Op for ArtifactCoverSet {
-        const NAME: &'static str = "artifact.cover.set";
-        type Input = t::ArtifactCoverSetRequest;
-        type Result = t::ArtifactCover;
+    /// Saves a derived auto-captured cover image outside the note directory and CRDT.
+    pub struct NoteCoverSet;
+    impl Op for NoteCoverSet {
+        const NAME: &'static str = "note.cover.set";
+        type Input = t::NoteCoverSetRequest;
+        type Result = t::NoteCover;
     }
     pub struct ProviderGet;
     impl Op for ProviderGet {
@@ -3265,25 +3377,25 @@ pub const SUBSCRIPTIONS: &[SubscriptionSpec] = &[
         event: "ChannelEvent",
     },
     SubscriptionSpec {
-        name: "artifact.follow",
-        module: "artifact",
+        name: "note.follow",
+        module: "note",
         can: &[Caller::User, Caller::Remote],
-        payload: "ArtifactFollowPayload",
-        event: "ArtifactEvent",
+        payload: "NoteFollowPayload",
+        event: "NoteEvent",
     },
     SubscriptionSpec {
-        name: "artifact.suggestion.follow",
-        module: "artifact",
+        name: "note.suggestion.follow",
+        module: "note",
         can: &[Caller::User, Caller::Remote],
-        payload: "ArtifactSuggestionFollowPayload",
+        payload: "NoteSuggestionFollowPayload",
         event: "SuggestionEvent",
     },
     SubscriptionSpec {
-        name: "artifact.presence.follow",
-        module: "artifact",
+        name: "note.presence.follow",
+        module: "note",
         can: &[Caller::User, Caller::Remote],
-        payload: "ArtifactPresenceFollowRequest",
-        event: "ArtifactPresenceEvent",
+        payload: "NotePresenceFollowRequest",
+        event: "NotePresenceEvent",
     },
     SubscriptionSpec {
         name: "session.watch",
@@ -3320,26 +3432,26 @@ pub mod subscriptions {
         type Payload = t::ChannelReportsPayload;
         type Event = t::ChannelEvent;
     }
-    pub struct ArtifactFollow;
-    impl Subscription for ArtifactFollow {
-        const NAME: &'static str = "artifact.follow";
+    pub struct NoteFollow;
+    impl Subscription for NoteFollow {
+        const NAME: &'static str = "note.follow";
         const CAN: &'static [Caller] = &[Caller::User, Caller::Remote];
-        type Payload = t::ArtifactFollowPayload;
-        type Event = t::ArtifactEvent;
+        type Payload = t::NoteFollowPayload;
+        type Event = t::NoteEvent;
     }
-    pub struct ArtifactSuggestionFollow;
-    impl Subscription for ArtifactSuggestionFollow {
-        const NAME: &'static str = "artifact.suggestion.follow";
+    pub struct NoteSuggestionFollow;
+    impl Subscription for NoteSuggestionFollow {
+        const NAME: &'static str = "note.suggestion.follow";
         const CAN: &'static [Caller] = &[Caller::User, Caller::Remote];
-        type Payload = t::ArtifactSuggestionFollowPayload;
+        type Payload = t::NoteSuggestionFollowPayload;
         type Event = t::SuggestionEvent;
     }
-    pub struct ArtifactPresenceFollow;
-    impl Subscription for ArtifactPresenceFollow {
-        const NAME: &'static str = "artifact.presence.follow";
+    pub struct NotePresenceFollow;
+    impl Subscription for NotePresenceFollow {
+        const NAME: &'static str = "note.presence.follow";
         const CAN: &'static [Caller] = &[Caller::User, Caller::Remote];
-        type Payload = t::ArtifactPresenceFollowRequest;
-        type Event = t::ArtifactPresenceEvent;
+        type Payload = t::NotePresenceFollowRequest;
+        type Event = t::NotePresenceEvent;
     }
     pub struct SessionWatch;
     impl Subscription for SessionWatch {
@@ -3551,35 +3663,42 @@ endpoint_ids! {
     VoiceAsrStart => "voice.asr.start",
     VoiceAsrStop => "voice.asr.stop",
     VoiceAsrTranscribe => "voice.asr.transcribe",
-    // artifact
-    ArtifactList => "artifact.list",
-    ArtifactGet => "artifact.get",
-    ArtifactContentGet => "artifact.content.get",
-    ArtifactCreate => "artifact.create",
-    ArtifactVersionCreate => "artifact.version.create",
-    ArtifactUpdate => "artifact.update",
-    ArtifactDelete => "artifact.delete",
-    ArtifactPreviewDelete => "artifact.previewDelete",
-    ArtifactTypeList => "artifact.type.list",
-    ArtifactTypeRead => "artifact.type.read",
-    ArtifactFileList => "artifact.file.list",
-    ArtifactFileGet => "artifact.file.get",
-    ArtifactFileWrite => "artifact.file.write",
-    ArtifactFileDelete => "artifact.file.delete",
-    ArtifactSuggestionList => "artifact.suggestion.list",
-    ArtifactSuggestionCreate => "artifact.suggestion.create",
-    ArtifactSuggestionAccept => "artifact.suggestion.accept",
-    ArtifactSuggestionReject => "artifact.suggestion.reject",
-    ArtifactPresenceUpdate => "artifact.presence.update",
-    ArtifactHistoryList => "artifact.history.list",
-    ArtifactHistoryPreview => "artifact.history.preview",
-    ArtifactHistoryRestore => "artifact.history.restore",
-    ArtifactHistoryFork => "artifact.history.fork",
-    ArtifactHistoryUndoOrigin => "artifact.history.undoOrigin",
-    ArtifactHistoryCompact => "artifact.history.compact",
-    ArtifactCollabExport => "artifact.collab.export",
-    ArtifactCollabImport => "artifact.collab.import",
-    ArtifactCoverSet => "artifact.cover.set",
+    // note
+    NoteList => "note.list",
+    NoteGet => "note.get",
+    NoteContentGet => "note.content.get",
+    NoteCreate => "note.create",
+    NoteVersionCreate => "note.version.create",
+    NoteUpdate => "note.update",
+    NoteDelete => "note.delete",
+    NotePreviewDelete => "note.previewDelete",
+    NoteTreeMove => "note.tree.move",
+    NoteLinkList => "note.link.list",
+    NoteDocView => "note.doc.view",
+    NoteDocAppendBlock => "note.doc.appendBlock",
+    NoteBaseView => "note.base.view",
+    NoteBaseUpsertRow => "note.base.upsertRow",
+    NoteBaseRunAgentColumn => "note.base.runAgentColumn",
+    NoteTypeList => "note.type.list",
+    NoteTypeRead => "note.type.read",
+    NoteFileList => "note.file.list",
+    NoteFileGet => "note.file.get",
+    NoteFileWrite => "note.file.write",
+    NoteFileDelete => "note.file.delete",
+    NoteSuggestionList => "note.suggestion.list",
+    NoteSuggestionCreate => "note.suggestion.create",
+    NoteSuggestionAccept => "note.suggestion.accept",
+    NoteSuggestionReject => "note.suggestion.reject",
+    NotePresenceUpdate => "note.presence.update",
+    NoteHistoryList => "note.history.list",
+    NoteHistoryPreview => "note.history.preview",
+    NoteHistoryRestore => "note.history.restore",
+    NoteHistoryFork => "note.history.fork",
+    NoteHistoryUndoOrigin => "note.history.undoOrigin",
+    NoteHistoryCompact => "note.history.compact",
+    NoteCollabExport => "note.collab.export",
+    NoteCollabImport => "note.collab.import",
+    NoteCoverSet => "note.cover.set",
     // provider & setting
     ProviderGet => "provider.get",
     ProviderUpdate => "provider.update",

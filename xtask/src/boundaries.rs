@@ -67,7 +67,7 @@ impl Layer {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PeerDomain {
     Issue,
-    Artifact,
+    Note,
     Memory,
     Connector,
     Voice,
@@ -77,7 +77,7 @@ impl PeerDomain {
     fn as_str(self) -> &'static str {
         match self {
             Self::Issue => "issue",
-            Self::Artifact => "artifact",
+            Self::Note => "note",
             Self::Memory => "agent/memory",
             Self::Connector => "connector",
             Self::Voice => "voice",
@@ -136,7 +136,7 @@ fn is_known_domain(domain: &str) -> bool {
             | "channel"
             | "connector"
             | "voice"
-            | "artifact"
+            | "note"
             | "issue"
             | "agent"
             | "cron"
@@ -158,9 +158,9 @@ pub fn classify_server_module(module_id: &str) -> Option<ModuleClassification> {
             layer: Layer::L2,
             peer_domain: Some(PeerDomain::Issue),
         }),
-        "artifact" => Some(ModuleClassification {
+        "note" => Some(ModuleClassification {
             layer: Layer::L2,
-            peer_domain: Some(PeerDomain::Artifact),
+            peer_domain: Some(PeerDomain::Note),
         }),
         "agent/memory" => Some(ModuleClassification {
             layer: Layer::L2,
@@ -1337,10 +1337,10 @@ mod tests {
             })
         );
         assert_eq!(
-            classify_server_module("artifact"),
+            classify_server_module("note"),
             Some(ModuleClassification {
                 layer: Layer::L2,
-                peer_domain: Some(PeerDomain::Artifact)
+                peer_domain: Some(PeerDomain::Note)
             })
         );
         assert_eq!(
@@ -1386,7 +1386,7 @@ mod tests {
             ),
             sf("crates/server/src/service/issue.rs", "use crate::issue::Board;\n"),
             sf("crates/server/src/app.rs", "use crate::issue::Board;\n"),
-            sf("crates/server/src/router.rs", "use crate::artifact::Manager;\n"),
+            sf("crates/server/src/router.rs", "use crate::note::Manager;\n"),
             sf("crates/server/src/db/mod.rs", "pub fn bad() -> crate::runtime::Runtime { todo!() }"),
             sf(
                 "crates/server/src/gateway/api/mod.rs",
@@ -1463,7 +1463,7 @@ mod tests {
             sf("crates/server/src/agent/profile/mod.rs", "use crate::agent::memory::Memory;\n"),
             sf("crates/server/src/setting.rs", "use crate::agent::orchestrator::Orchestrator;\n"),
             sf("crates/server/src/voice/mod.rs", "use crate::agent::orchestrator::Orchestrator;\n"),
-            sf("crates/server/src/artifact/mod.rs", "use crate::issue::Board;\n"),
+            sf("crates/server/src/note/mod.rs", "use crate::issue::Board;\n"),
             sf("crates/server/src/issue/board.rs", "use crate::connector::Connector;\n"),
         ];
         let violations: Vec<String> = audit_files(&files)
@@ -1475,8 +1475,8 @@ mod tests {
             violations,
             vec![
                 "crates/server/src/agent/profile/mod.rs:1",
-                "crates/server/src/artifact/mod.rs:1",
                 "crates/server/src/issue/board.rs:1",
+                "crates/server/src/note/mod.rs:1",
                 "crates/server/src/setting.rs:1",
                 "crates/server/src/voice/mod.rs:1",
             ]
@@ -1487,7 +1487,7 @@ mod tests {
     fn resolves_relative_super_imports_and_grouped_use_trees() {
         let files = vec![
             sf("crates/server/src/runtime/session/mod.rs", "use super::super::cron::Scheduler;\n"),
-            sf("crates/server/src/storage/mod.rs", "use super::{artifact::Manager, issue::Board};\n"),
+            sf("crates/server/src/storage/mod.rs", "use super::{note::Manager, issue::Board};\n"),
         ];
         let violations = audit_files(&files);
         assert_eq!(violations.len(), 3);
@@ -1507,10 +1507,7 @@ mod tests {
                 "crates/server/src/issue/board.rs",
                 "use crate::channel::Chat;\nuse crate::repo::Repo;\nuse crate::runtime::Runtime;\n",
             ),
-            sf(
-                "crates/server/src/artifact/mod.rs",
-                "use crate::setting::Setting;\nuse crate::storage::Storage;\n",
-            ),
+            sf("crates/server/src/note/mod.rs", "use crate::setting::Setting;\nuse crate::storage::Storage;\n"),
             sf(
                 "crates/server/src/connector/bridge.rs",
                 "use crate::channel::Chat;\n#[cfg(test)]\n#[path = \"bridge_test.rs\"]\nmod tests;",

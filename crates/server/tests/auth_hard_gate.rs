@@ -350,7 +350,10 @@ fn three_run_modes_narrow_prompts_in_chinese_and_mcp_write_tools() {
         "issue_report",
         "issue_split",
         "issue_pr_submit",
-        "artifact_file_write",
+        "note_file_write",
+        "note_doc_append_block",
+        "note_base_upsert_row",
+        "note_base_run_agent_column",
         "memory_create",
         "channel_message_send",
     ] {
@@ -402,8 +405,11 @@ fn three_run_modes_narrow_prompts_in_chinese_and_mcp_write_tools() {
     for forbidden in [
         "issue_split",
         "issue_pr_submit",
-        "artifact_file_write",
-        "artifact_create",
+        "note_file_write",
+        "note_create",
+        "note_doc_append_block",
+        "note_base_upsert_row",
+        "note_base_run_agent_column",
         "memory_create",
         "channel_message_send",
     ] {

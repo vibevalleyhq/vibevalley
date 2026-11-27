@@ -302,7 +302,7 @@ fn auto_reviewer_dispatches_on_in_review_rejects_and_passes_within_max_bot_round
         assert!(tool_names.iter().any(|n| n == "issue_diff_get"), "{tool_names:?}");
         assert!(tool_names.iter().any(|n| n == "issue_review"), "{tool_names:?}");
         assert!(!tool_names.iter().any(|n| n == "issue_update"), "{tool_names:?}");
-        assert!(!tool_names.iter().any(|n| n == "artifact_file_write"), "{tool_names:?}");
+        assert!(!tool_names.iter().any(|n| n == "note_file_write"), "{tool_names:?}");
 
         let denied = rpc(
             &door,
@@ -572,7 +572,7 @@ fn thread_agent_mentions_dispatch_readonly_collaborators_without_clobbering_prim
         assert!(names.iter().any(|n| n == "channel_message_send"), "{names:?}");
         assert!(names.iter().any(|n| n == "issue_report"), "{names:?}");
         assert!(!names.iter().any(|n| n == "issue_review"), "{names:?}");
-        assert!(!names.iter().any(|n| n == "artifact_file_write"), "{names:?}");
+        assert!(!names.iter().any(|n| n == "note_file_write"), "{names:?}");
 
         let denied = rpc(
             &door,

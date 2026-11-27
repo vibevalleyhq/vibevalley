@@ -20,8 +20,8 @@ pub mod words;
 pub use model::Inner;
 pub use service::Chat;
 pub use types::{
-    AddressedMessage, ArtifactRef, CATCH_UP_MAX, ChannelDispatched, ChannelEvent, ChannelMessageEvent, Committed, DeliveryTargetKind, FileAt, HeldBy, Info,
-    KEEP_CHANNELS, Made, Meta, Note, Noticing, Picked, Place, Posting, QueuedDelivery, ReadOptions, ReadResult, Reason, Saying, Seat, Speaking, Spoken,
+    AddressedMessage, CATCH_UP_MAX, ChannelDispatched, ChannelEvent, ChannelMessageEvent, Committed, DeliveryTargetKind, FileAt, HeldBy, Info, KEEP_CHANNELS,
+    Made, Meta, Note, NoteRef, Noticing, Picked, Place, Posting, QueuedDelivery, ReadOptions, ReadResult, Reason, Saying, Seat, Speaking, Spoken,
     ThreadSubject, actor_of, line_of, meta_of, meta_text, profile_id, to_message,
 };
 

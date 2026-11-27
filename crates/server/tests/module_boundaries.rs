@@ -42,7 +42,7 @@ fn server_modules_respect_layer_and_skin_boundaries() {
         "channel",
         "agent/profile",
     ];
-    let l2_dirs = ["issue", "artifact", "agent/memory", "connector", "voice"];
+    let l2_dirs = ["issue", "note", "agent/memory", "connector", "voice"];
     let l3_targets = [
         "crate::cron::",
         "crate::game::",
@@ -68,7 +68,7 @@ fn server_modules_respect_layer_and_skin_boundaries() {
                 if is_l1 {
                     for l2 in [
                         "crate::issue::",
-                        "crate::artifact::",
+                        "crate::note::",
                         "crate::agent::memory::",
                         "crate::connector::",
                         "crate::voice::",
@@ -124,7 +124,7 @@ fn server_spine_and_gateway_never_import_domain_modules() {
         "crate::channel::",
         "crate::connector::",
         "crate::voice::",
-        "crate::artifact::",
+        "crate::note::",
         "crate::issue::",
         "crate::agent::",
         "crate::cron::",

@@ -7,8 +7,8 @@ import Testing
   @Test func roundtripsAllShimToHostVariantsWithTypeTag() throws {
     let mods = Modifiers(control: true, alt: false, shift: true, platform: true, function: false)
     let cases: [ShimToHost] = [
-      .attach(artifactId: "art-1", width: 1120, height: 760, scale: 2, displayId: 69733248),
-      .attach(artifactId: "art-2", width: 800, height: 600, scale: 1, displayId: nil),
+      .attach(noteId: "art-1", width: 1120, height: 760, scale: 2, displayId: 69733248),
+      .attach(noteId: "art-2", width: 800, height: 600, scale: 1, displayId: nil),
       .resize(width: 1280, height: 800, scale: 2),
       .mouseDown(x: 12.5, y: 44.0, button: .left, clickCount: 2, modifiers: mods),
       .mouseUp(x: 12.5, y: 44.0, button: .right, clickCount: 1, modifiers: .none),
@@ -75,10 +75,10 @@ import Testing
     let unitData = try WireCodec.encodeLine(ShimToHost.openInHost)
     #expect(String(decoding: unitData, as: UTF8.self) == "{\"type\":\"openInHost\"}\n")
 
-    let attachNull = #"{"type":"attach","artifactId":"a1","width":800,"height":600,"scale":2,"displayId":null}"#
+    let attachNull = #"{"type":"attach","noteId":"a1","width":800,"height":600,"scale":2,"displayId":null}"#
     #expect(
       try WireCodec.decode(ShimToHost.self, fromLine: attachNull)
-        == .attach(artifactId: "a1", width: 800, height: 600, scale: 2, displayId: nil)
+        == .attach(noteId: "a1", width: 800, height: 600, scale: 2, displayId: nil)
     )
 
     let moveNull = #"{"type":"mouseMove","x":1,"y":2,"pressedButton":null,"modifiers":{"control":false,"alt":false,"shift":false,"platform":false,"function":false}}"#
@@ -96,12 +96,12 @@ import Testing
 
   @Test func roundtripsAllHostToShimVariantsWithTypeTag() throws {
     let cases: [HostToShim] = [
-      .readyLayer(contextId: 0x1234_5678, title: "Sprint Board", artifactType: "dashboard"),
-      .readyWebview(html: "<!doctype html><h1>Hi</h1>", title: "Proto", artifactType: "prototype"),
-      .updateWebview(html: "<!doctype html><h1>Updated</h1>", title: "Proto v2"),
+      .readyLayer(contextId: 0x1234_5678, title: "Sprint Board", noteType: "base"),
+      .readyWebview(html: "<!doctype html><h1>Hi</h1>", title: "Canvas", noteType: "canvas"),
+      .updateWebview(html: "<!doctype html><h1>Updated</h1>", title: "Canvas v2"),
       .setTitle(title: "Renamed"),
       .setAlwaysOnTop(enabled: true),
-      .error(message: "Artifact not found"),
+      .error(message: "Note not found"),
       .closing,
     ]
 
@@ -145,8 +145,8 @@ import Testing
 
   @Test func resolvesEnvPlistAndCliOverridesInPrecedenceOrder() {
     let plist: [String: Any] = [
-      "VVArtifactId": "art-plist",
-      "VVArtifactType": "dashboard",
+      "VVNoteId": "art-plist",
+      "VVNoteType": "base",
       "VVChannel": "alpha",
       "VVHostAppPath": "/Applications/VibeValley Alpha.app",
       "VVAlwaysOnTop": true,
@@ -161,8 +161,8 @@ import Testing
       environment: ["VIBEVALLEY_HOME": "/tmp/vv-env-home"],
       userHomeDirectory: "/Users/tester"
     )
-    #expect(envOnly.artifactId == "art-plist")
-    #expect(envOnly.artifactType == "dashboard")
+    #expect(envOnly.noteId == "art-plist")
+    #expect(envOnly.noteType == "base")
     #expect(envOnly.channel == .alpha)
     #expect(envOnly.serverHome == "/tmp/vv-env-home")
     #expect(envOnly.socketPath == "/tmp/vv-env-home/applet.sock")
@@ -176,7 +176,7 @@ import Testing
     let cliOverridden = BundleConfig.resolve(
       arguments: [
         "VibeValleyShim",
-        "--artifact", "art-cli",
+        "--note", "art-cli",
         "--server-home", "/tmp/cli-home",
         "--socket", "/tmp/override.sock",
         "--title=CLI Title",
@@ -187,7 +187,7 @@ import Testing
       environment: ["VIBEVALLEY_HOME": "/tmp/vv-env-home", "VIBEVALLEY_CHANNEL": "beta"],
       userHomeDirectory: "/Users/tester"
     )
-    #expect(cliOverridden.artifactId == "art-cli")
+    #expect(cliOverridden.noteId == "art-cli")
     #expect(cliOverridden.channel == .beta)
     #expect(cliOverridden.serverHome == "/tmp/cli-home")
     #expect(cliOverridden.socketPath == "/tmp/override.sock")
@@ -197,14 +197,14 @@ import Testing
   }
 
   @Test func supportsAlwaysOnTopFlagAndTitleFallbacks() {
-    let withArtifactFallback = BundleConfig.resolve(
-      arguments: ["VibeValleyShim", "--always-on-top", "--artifact", "art-99"],
+    let withNoteFallback = BundleConfig.resolve(
+      arguments: ["VibeValleyShim", "--always-on-top", "--note", "art-99"],
       infoDictionary: [:],
       environment: [:],
       userHomeDirectory: "/Users/tester"
     )
-    #expect(withArtifactFallback.alwaysOnTop == true)
-    #expect(withArtifactFallback.title == "art-99")
+    #expect(withNoteFallback.alwaysOnTop == true)
+    #expect(withNoteFallback.title == "art-99")
 
     let withBundleNameFallback = BundleConfig.resolve(
       arguments: ["VibeValleyShim"],
@@ -256,7 +256,7 @@ import Testing
     #expect(AppletStorage.sanitizeIdentifier("../../etc/passwd") == "etc_passwd")
     #expect(AppletStorage.sanitizeIdentifier("..__.") == "default")
     #expect(AppletStorage.sanitizeIdentifier("art_focus-01") == "art_focus-01")
-    #expect(AppletStorage.windowAutosaveName(forArtifactId: "../art:1") == "VibeValleyApplet.art_1")
+    #expect(AppletStorage.windowAutosaveName(forNoteId: "../art:1") == "VibeValleyApplet.art_1")
   }
 
   @Test func persistsSetRemoveAndClearAcrossReloadsAndEnforcesCaps() throws {

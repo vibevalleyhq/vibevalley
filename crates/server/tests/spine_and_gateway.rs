@@ -86,7 +86,7 @@ fn single_server_db_shares_pool_wal_fk_and_reopens_cleanly() {
     });
     assert_eq!(journal.to_lowercase(), "wal");
 
-    // Exercise writes across issue, channel, attachment, artifact, memory, cron, remote.
+    // Exercise writes across issue, channel, attachment, note, memory, cron, remote.
     let issue = started.router().call_as(Caller::User, "issue.create", json!({ "title": "Single DB task" }));
     assert_eq!(issue.biz_code, 0, "{}", issue.message);
     let issue_id = issue.data.unwrap()["id"].as_str().unwrap().to_string();
@@ -114,12 +114,16 @@ fn single_server_db_shares_pool_wal_fk_and_reopens_cleanly() {
     );
     assert_eq!(sent.biz_code, 0, "{}", sent.message);
 
-    let artifact = started.router().call_as(
+    let note = started.router().call_as(
         Caller::User,
-        "artifact.create",
-        json!({ "title": "Spec", "artifactType": "docs", "content": "# Hello" }),
+        "note.create",
+        json!({
+            "title": "Spec",
+            "noteType": "doc",
+            "content": "{\"version\":1,\"blocks\":[{\"id\":\"b1\",\"type\":\"paragraph\",\"text\":\"Hello\"}]}"
+        }),
     );
-    assert_eq!(artifact.biz_code, 0, "{}", artifact.message);
+    assert_eq!(note.biz_code, 0, "{}", note.message);
 
     // Confirm only server.db exists in home (no sidecar per-module .db files).
     let db_files: Vec<String> = std::fs::read_dir(dir.path())
@@ -149,8 +153,8 @@ fn single_server_db_shares_pool_wal_fk_and_reopens_cleanly() {
         .data
         .unwrap();
     assert!(msgs.to_string().contains("persisted across close"));
-    let arts = reopened.router().call_as(Caller::User, "artifact.list", json!({})).data.unwrap();
-    assert!(arts.as_array().unwrap().iter().any(|a| a["title"] == "Spec"));
+    let notes = reopened.router().call_as(Caller::User, "note.list", json!({})).data.unwrap();
+    assert!(notes.as_array().unwrap().iter().any(|a| a["title"] == "Spec"));
     reopened.close_blocking();
 }
 

@@ -138,11 +138,6 @@ macro_rules! entity_table {
 
 fn expected_server_schema() -> Vec<ExpectedTable> {
     vec![
-        entity_table!(artifact),
-        entity_table!(artifact_change),
-        entity_table!(artifact_collab),
-        entity_table!(artifact_suggestion),
-        entity_table!(artifact_version),
         entity_table!(attachment),
         entity_table!(channel),
         entity_table!(channel_delivery),
@@ -163,6 +158,12 @@ fn expected_server_schema() -> Vec<ExpectedTable> {
         entity_table!(media_job),
         entity_table!(media_library_item),
         entity_table!(memory),
+        entity_table!(note),
+        entity_table!(note_change),
+        entity_table!(note_collab),
+        entity_table!(note_link),
+        entity_table!(note_suggestion),
+        entity_table!(note_version),
         entity_table!(outbox_item),
         entity_table!(pull),
         entity_table!(pull_event),
@@ -459,30 +460,6 @@ mod tests {
             .await
             .expect("legacy pre-SeaORM db must upgrade cleanly via baseline reconciliation migration");
 
-        let artifact_row = db
-            .read_conn()
-            .query_one_raw(Statement::from_string(
-                DatabaseBackend::Sqlite,
-                "SELECT id, title, artifact_type, seq FROM artifact WHERE id = 'a1'",
-            ))
-            .await
-            .unwrap()
-            .expect("artifact row preserved");
-        assert_eq!(artifact_row.try_get_by_index::<String>(1).unwrap(), "Legacy Whiteboard");
-        assert_eq!(artifact_row.try_get_by_index::<String>(2).unwrap(), "whiteboard");
-        assert_eq!(artifact_row.try_get_by_index::<i64>(3).unwrap(), 5);
-
-        let collab_row = db
-            .read_conn()
-            .query_one_raw(Statement::from_string(
-                DatabaseBackend::Sqlite,
-                "SELECT snapshot FROM artifact_collab WHERE artifact_id = 'a1'",
-            ))
-            .await
-            .unwrap()
-            .expect("artifact_collab snapshot preserved");
-        assert_eq!(collab_row.try_get_by_index::<Vec<u8>>(0).unwrap(), vec![1, 2, 3]);
-
         let session_row = db
             .read_conn()
             .query_one_raw(Statement::from_string(
@@ -502,6 +479,9 @@ mod tests {
         let existing = list_existing_tables(db.read_conn(), DatabaseBackend::Sqlite).await.unwrap();
         assert!(!existing.contains("pkm_term"));
         assert!(!existing.contains("artifact_entry"));
+        assert!(!existing.contains("artifact"));
+        assert!(existing.contains("note"));
+        assert!(existing.contains("note_link"));
 
         let actual_columns = load_actual_columns(db.read_conn(), DatabaseBackend::Sqlite, &existing).await.unwrap();
         let issue_cols: BTreeSet<&str> = actual_columns
@@ -542,7 +522,7 @@ mod tests {
         assert_eq!(memory_row.try_get_by_index::<Option<String>>(3).unwrap(), None);
 
         let migrations = list_applied_migrations(db.read_conn(), DatabaseBackend::Sqlite, &existing).await.unwrap();
-        assert_eq!(migrations.len(), 9);
+        assert_eq!(migrations.len(), 10);
         db.close().await;
     }
 

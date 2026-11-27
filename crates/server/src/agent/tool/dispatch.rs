@@ -267,19 +267,26 @@ fn handler(op: &str) -> Option<Run> {
         "media.job.download" => typed!(content::job_download),
         "library.item.list" => typed!(content::library_list),
         "library.item.add" => typed!(content::library_add),
-        "artifact.list" => typed!(content::artifact_list),
-        "artifact.get" => typed!(content::artifact_get),
-        "artifact.content.get" => typed!(content::artifact_content),
-        "artifact.create" => typed!(content::artifact_create),
-        "artifact.version.create" => typed!(content::artifact_version),
-        "artifact.file.list" => typed!(content::artifact_file_list),
-        "artifact.file.get" => typed!(content::artifact_file_get),
-        "artifact.file.write" => typed!(content::artifact_file_write),
-        "artifact.file.delete" => typed!(content::artifact_file_delete),
-        "artifact.suggestion.list" => typed!(content::artifact_suggestion_list),
-        "artifact.suggestion.create" => typed!(content::artifact_suggestion_create),
-        "artifact.type.list" => typed!(content::artifact_type_list),
-        "artifact.type.read" => typed!(content::artifact_type_read),
+        "note.list" => typed!(content::note_list),
+        "note.get" => typed!(content::note_get),
+        "note.content.get" => typed!(content::note_content),
+        "note.create" => typed!(content::note_create),
+        "note.version.create" => typed!(content::note_version),
+        "note.tree.move" => typed!(content::note_tree_move),
+        "note.link.list" => typed!(content::note_link_list),
+        "note.doc.view" => typed!(content::note_doc_view),
+        "note.doc.appendBlock" => typed!(content::note_doc_append_block),
+        "note.base.view" => typed!(content::note_base_view),
+        "note.base.upsertRow" => typed!(content::note_base_upsert_row),
+        "note.base.runAgentColumn" => typed!(content::note_base_run_agent_column),
+        "note.file.list" => typed!(content::note_file_list),
+        "note.file.get" => typed!(content::note_file_get),
+        "note.file.write" => typed!(content::note_file_write),
+        "note.file.delete" => typed!(content::note_file_delete),
+        "note.suggestion.list" => typed!(content::note_suggestion_list),
+        "note.suggestion.create" => typed!(content::note_suggestion_create),
+        "note.type.list" => typed!(content::note_type_list),
+        "note.type.read" => typed!(content::note_type_read),
         _ => return None,
     })
 }
@@ -332,7 +339,7 @@ impl Tool {
     /// Reads only: safe to run again if the process died while it ran.
     pub fn replay_safe(&self) -> bool {
         let op = self.words.op.as_str();
-        op.ends_with(".list") || op.ends_with(".get") || op.ends_with(".read") || op == "memory.search"
+        op.ends_with(".list") || op.ends_with(".get") || op.ends_with(".read") || op.ends_with(".view") || op == "memory.search"
     }
 }
 
