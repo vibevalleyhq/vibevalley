@@ -1,16 +1,31 @@
 {
   "title": "Remote Access",
-  "subtitle": "View and control VibeValley on this Mac from your phone over Tailscale.",
+  "subtitle": "View and control VibeValley on this Mac from your phone directly over the same Wi-Fi LAN, or over optional Tailscale WAN.",
   "toggle": {
     "enable": "Enable remote access",
     "disable": "Disable remote access",
     "enabled": "Enabled",
     "disabled": "Disabled"
   },
+  "mode": {
+    "label": "Connection mode",
+    "lan": "LAN direct",
+    "tailscale": "Tailscale WAN",
+    "lanHint": "Connect phones on the same Wi-Fi directly without Tailscale",
+    "tailscaleHint": "Connect from outside your local network over encrypted Tailscale WAN"
+  },
+  "lan": {
+    "label": "LAN direct (same Wi-Fi)",
+    "hint": "No Tailscale required; auto-detects this Mac's non-loopback LAN IPv4",
+    "ready": "LAN ready",
+    "active": "Active",
+    "unavailable": "No LAN IPv4"
+  },
   "tailscale": {
     "online": "Tailscale online",
     "offline": "Tailscale offline",
-    "ip": "Tailscale IP",
+    "ip": "Tailscale WAN (optional)",
+    "optionalHint": "Optional WAN enhancement; LAN direct works even without Tailscale",
     "url": "Access URL"
   },
   "pair": {
@@ -37,7 +52,7 @@
   },
   "mobile": {
     "pairTitle": "Connect to Mac",
-    "pairSubtitle": "Enter the address and one-time pairing code shown in Remote Access settings on your Mac.",
+    "pairSubtitle": "Scan the QR code in Remote Access settings on your Mac, or enter the LAN / Tailscale address and one-time pairing code.",
     "urlLabel": "Mac address",
     "codeLabel": "Pairing code",
     "deviceNameLabel": "Device name",

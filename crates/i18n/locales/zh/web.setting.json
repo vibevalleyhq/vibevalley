@@ -71,7 +71,7 @@
     "voice": "电话 通话 MOSS Live 实时 视觉 转写 语音",
     "chat": "微信 飞书 QQ 聊天通道 连接器 配对",
     "github": "GitHub gh PR 登录",
-    "remote": "远程 手机 Tailscale 配对 二维码 设备 iOS Android CLI 命令行 执行机 沙箱 监听 令牌 总控端 内嵌 远端",
+    "remote": "远程 手机 局域网 LAN Wi-Fi 直连 Tailscale 配对 二维码 设备 iOS Android CLI 命令行 执行机 沙箱 监听 令牌 总控端 内嵌 远端",
     "data": "家目录 设置文件 仓库 目录 工作树 存储 后端 数据 data storage",
     "about": "版本 更新 命令行 CLI version update"
   },
@@ -268,6 +268,6 @@
   },
   "remote": {
     "toggleLabel": "手机与客户端接入",
-    "toggleHint": "开启后允许已配对设备经 Tailscale 连接到这台 Mac。"
+    "toggleHint": "开启后允许已配对设备通过局域网直连或 Tailscale 连接到这台 Mac。"
   }
 }
