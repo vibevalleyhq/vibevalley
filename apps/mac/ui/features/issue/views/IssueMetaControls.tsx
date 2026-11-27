@@ -535,7 +535,7 @@ export function OwnerMark(props: { owner: ActorRef | undefined; size?: number | 
 }
 
 /** Resolves a human-readable display label for an `ActorRef` owner. */
-export function useOwnerLabel(): () => (owner: ActorRef | undefined) => string {
+function useOwnerLabel(): () => (owner: ActorRef | undefined) => string {
   const settings = useSettings();
   const agents = useAgents();
   return computed(() => {

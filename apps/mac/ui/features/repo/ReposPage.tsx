@@ -68,7 +68,7 @@ function healthBadgeClasses(status: RepoHealthStatus): { box: string; ink: strin
   }
 }
 
-export function RepoHealthBadge(props: { status: RepoHealthStatus; testid?: string }) {
+function RepoHealthBadge(props: { status: RepoHealthStatus; testid?: string }) {
   const style = () => healthBadgeClasses(props.status);
   return (
     <View testID={props.testid ?? "repo-health-badge"} class={`rounded-sm px-1.5 py-0.5 ${style().box}`}>

@@ -13,13 +13,13 @@ import { useRefreshSlice } from "../../infra/frame";
 import { defineQuery, ready, retryRead, useQuery, useQueryClient } from "../../infra/query";
 import { Link as A } from "../../infra/router";
 
-export const morningDigestQuery = defineQuery({
+const morningDigestQuery = defineQuery({
   key: () => ["issue-digest"],
   fetch: (_, context) => api.issue.digest.get({}, context),
   ...retryRead,
 });
 
-export const backlogTriageQuery = defineQuery({
+const backlogTriageQuery = defineQuery({
   key: () => ["issue-triage"],
   fetch: (_, context) => api.issue.triage.list(context),
   ...retryRead,
@@ -36,7 +36,7 @@ function healthToneClasses(status: RepoHealthStatus): string {
   }
 }
 
-export function TriageSuggestionList(props: { suggestions: readonly BacklogTriageSuggestion[]; onChanged?: () => void }) {
+function TriageSuggestionList(props: { suggestions: readonly BacklogTriageSuggestion[]; onChanged?: () => void }) {
   const act = createAct();
   const client = useQueryClient();
   const refreshBoard = useRefreshSlice("board");

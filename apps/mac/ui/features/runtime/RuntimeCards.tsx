@@ -431,12 +431,12 @@ export function mcpHostOf(runtimeId: string): McpHostId | undefined {
   return undefined;
 }
 
-export const mcpServerListQuery = defineQuery({
+const mcpServerListQuery = defineQuery({
   key: (host: McpHostId) => ["runtime", "mcpServer", host],
   fetch: (host: McpHostId, context) => api.runtime.mcpServer.list({ host }, context),
 });
 
-export function mcpEntryTarget(entry: McpServerEntry): string {
+function mcpEntryTarget(entry: McpServerEntry): string {
   if (entry.transport === "stdio") {
     const cmd = entry.command ?? "";
     return entry.args.length > 0 ? `${cmd} ${entry.args.join(" ")}` : cmd;
@@ -852,7 +852,7 @@ export interface RuntimeSessionSummary {
   hasCost: boolean;
 }
 
-export function summarizeRuntimeSessions(sessions: readonly SessionView[]): RuntimeSessionSummary {
+function summarizeRuntimeSessions(sessions: readonly SessionView[]): RuntimeSessionSummary {
   let recentRunsCount = 0;
   let failedCount = 0;
   let totalErrors = 0;

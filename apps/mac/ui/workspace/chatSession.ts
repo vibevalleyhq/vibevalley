@@ -24,7 +24,6 @@ import type {
   SessionWorkspace,
   TodoChecklist,
   TodoStep,
-  TodoStepStatus,
   ToolDetails,
 } from "@vibevalley/protocol";
 import { PriorityValues } from "@vibevalley/protocol";
@@ -40,7 +39,7 @@ import {
 } from "@vibevalley/protocol/schema";
 
 import { coreBridge } from "../infra/rich";
-import { computeTelemetry, extractToolTarget, formatTokens, mergeSteps, type ToolTarget } from "../infra/sessionRuns";
+import { computeTelemetry, extractToolTarget, formatTokens, mergeSteps } from "../infra/sessionRuns";
 import { transport } from "../infra/transport";
 
 export {
@@ -68,9 +67,7 @@ export {
   type SessionWorkspace,
   type TodoChecklist,
   type TodoStep,
-  type TodoStepStatus,
   type ToolDetails,
-  type ToolTarget,
 };
 
 export interface ComposerFile {
@@ -195,11 +192,6 @@ export function projectChatSession(steps: readonly SessionEvent[], latestTokens?
   return parsed.success ? parsed.data : undefined;
 }
 
-/** Joins `tool/call` steps with their matching `tool/result` (`call === seq`) and drops lifecycle/usage bounds via Rust `VvCore`. */
-export function visibleChatSteps(steps: readonly SessionEvent[]): SessionEvent[] {
-  return projectChatSession(steps)?.visibleSteps ?? [];
-}
-
 /** Parses `update_steps` / `TodoWrite` / `update_plan` payloads into a structured checklist via Rust `VvCore`. */
 export function parseTodoChecklist(step: Pick<SessionEvent, "seq" | "type" | "tool" | "input">): TodoChecklist | undefined {
   const json = coreBridge()?.parseTodoChecklist?.(
@@ -213,16 +205,6 @@ export function parseTodoChecklist(step: Pick<SessionEvent, "seq" | "type" | "to
   if (!json) return undefined;
   const parsed = TodoChecklistSchema.safeParse(JSON.parse(json));
   return parsed.success ? parsed.data : undefined;
-}
-
-/** Returns the latest todo checklist from a session transcript via Rust `VvCore`. */
-export function latestSessionTodos(steps: readonly SessionEvent[]): TodoChecklist | undefined {
-  return projectChatSession(steps)?.latestTodos;
-}
-
-/** Groups consecutive intermediate steps into collapsible activity clusters via Rust `VvCore`. */
-export function groupChatSteps(steps: readonly SessionEvent[]): ChatFeedItem[] {
-  return projectChatSession(steps)?.feedItems ?? [];
 }
 
 /** Compact wall-clock duration label (`320ms`, `4.2s`, `1m 12s`). */

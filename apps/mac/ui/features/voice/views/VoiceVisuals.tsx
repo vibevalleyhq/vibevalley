@@ -56,14 +56,14 @@ export function VoiceOrb(props: { phase: HostLiveVoicePhase; muted: boolean; mic
       style={{ width: baseSize() + 28, height: baseSize() + 28 }}
     >
       <View
-        class={`absolute inset-0 items-center justify-center rounded-full ${motionClass("transition-all duration-150")}`}
+        class={`absolute inset-0 items-center justify-center rounded-full ${motionClass("transition-transform duration-150")}`}
         style={{
           backgroundColor: mix(orbTone(), haloOpacity()),
           transform: reduced() ? undefined : [{ scale: ringScale() }],
         }}
       />
       <View
-        class={`absolute rounded-full border border-line ${motionClass("transition-all duration-150")}`}
+        class="absolute rounded-full border border-line"
         style={{
           width: baseSize() + 12,
           height: baseSize() + 12,
@@ -71,7 +71,7 @@ export function VoiceOrb(props: { phase: HostLiveVoicePhase; muted: boolean; mic
         }}
       />
       <View
-        class={`items-center justify-center rounded-full border border-line-strong ${CORE_BG_CLASSES[orbTone()]} ${motionClass("transition-all duration-150")}`}
+        class={`items-center justify-center rounded-full border border-line-strong ${CORE_BG_CLASSES[orbTone()]}`}
         style={{
           width: baseSize() - 16,
           height: baseSize() - 16,
@@ -117,7 +117,7 @@ export function MicWaveform(props: { level: number; active: boolean; muted?: boo
         {(i) => (
           <View
             testID={`${props.testid ?? "mic-waveform"}-bar-${i()}`}
-            class={`rounded-full ${props.compact === true ? "w-0.5" : "w-1"} ${motionClass("transition-all duration-75")}`}
+            class={`rounded-full ${props.compact === true ? "w-0.5" : "w-1"} ${motionClass("transition-opacity duration-75")}`}
             style={{
               height: barHeight(i()),
               backgroundColor: tone(barTone()),

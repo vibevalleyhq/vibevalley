@@ -145,9 +145,7 @@
   },
   "sheet": {
     "less": "Less",
-    "more": "More",
-    "at": "At \"{stage}\"",
-    "stageDone": "{stage}: done"
+    "more": "More"
   },
   "acts": {
     "reopened": "Ticket reopened",
@@ -281,10 +279,6 @@
     "refiningLine": "It is reading the code, and will fill in the fields below.",
     "questions": "{n, plural, one {The draft is written, and it has a question for you} other {The draft is written, and it has # questions for you}}",
     "questionsLine": "Answer below, and it drafts again by your answers.",
-    "drafted": "The draft is written",
-    "draftedLine": "Look it over, change what you like, and start it.",
-    "what": "What should be done?",
-    "whatLine": "A line is enough: a helper reads the code and writes it up as a ticket.",
     "titleHint": "Such as: add Remember me to the sign-in page",
     "title": "Title",
     "descriptionHint": "Description: why, what to do, what not to do, which files it may touch (drafting writes it)",
@@ -311,14 +305,12 @@
     "inQueue": "Queued {ago}: it starts by itself in the board's order when a spot frees up.",
     "unqueue": "Unqueue",
     "pickHelper": "Pick a helper first",
-    "start": "Confirm and dispatch",
     "save": "Save",
     "remove": "Delete",
     "newRepo": "New repo",
     "repoHint": "The repo's name, which is also its folder under the work folder",
     "repoName": "Repo name",
     "create": "Create",
-    "writeOwn": "Write it yourself",
     "edit": "Edit",
     "doneEditing": "Done",
     "addDescription": "Add description…",
@@ -359,11 +351,6 @@
       "in_review": "In Review",
       "done": "Done",
       "canceled": "Canceled"
-    },
-    "stage": {
-      "talk": "Talk it through",
-      "work": "Get it worked",
-      "finish": "Finish"
     },
     "newIssue": "New ticket"
   },

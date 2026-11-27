@@ -9,7 +9,6 @@ import {
   type SessionTrajectoryProjection,
   type TrajectoryRunView,
   type TrajectorySummary,
-  type TrajectoryWaterfall,
   type TrajectoryWaterfallLane,
   TrajectoryWaterfallLaneValues,
 } from "@vibevalley/protocol";
@@ -21,7 +20,7 @@ import { coreBridge } from "../../infra/rich";
 import { localizeRuntimeError } from "../../infra/runtimeError";
 import { mergeSteps, shownEvents, stepLimit } from "../../infra/sessionRuns";
 
-export { mergeSteps, shownEvents };
+export { shownEvents };
 export type { TrajectorySummary };
 export type RunView = TrajectoryRunView;
 export type Lane = TrajectoryWaterfallLane;
@@ -80,11 +79,6 @@ export function answerOf(r: RunView) {
 
 const allOf = (r: RunView) => (r.asked ? [r.asked, ...r.steps] : r.steps);
 
-/** Splits events into runs via Rust `VvCore`. */
-export function runsOf(steps: readonly SessionEvent[]): RunView[] {
-  return projectTrajectory(steps, steps.at(-1)?.time ?? 0)?.runs ?? [];
-}
-
 interface Span {
   step: SessionEvent;
   ms: number;
@@ -94,12 +88,6 @@ interface Span {
 export function spansOf(r: RunView, end: number): Span[] {
   const all = allOf(r);
   return all.map((s, i) => ({ step: s, ms: Math.max(0, (all[i + 1]?.time ?? end) - s.time) }));
-}
-
-/** Per-step durations computed by Rust `VvCore`. */
-export function stepDurationsOf(log: readonly SessionEvent[], end: number): Map<number, number> {
-  const proj = projectTrajectory(log, end);
-  return new Map((proj?.stepDurations ?? []).map((d) => [d.seq, d.durationMs]));
 }
 
 export function runMs(r: RunView, end: number) {
@@ -256,26 +244,6 @@ export function waterfallWidths(durations: readonly number[], room: number): num
     if (parsed.success) return parsed.data;
   }
   return durations.map(() => room / durations.length);
-}
-
-/** Waterfall runs and spans computed by Rust `VvCore`. */
-export function waterfallOf(log: readonly SessionEvent[], end: number): TrajectoryWaterfall {
-  return projectTrajectory(log, end)?.waterfall ?? { runs: [], spans: [] };
-}
-
-/** Trajectory summary totals computed by Rust `VvCore`. */
-export function summaryOf(log: readonly SessionEvent[], end: number): TrajectorySummary {
-  return (
-    projectTrajectory(log, end)?.summary ?? {
-      runs: 0,
-      steps: 0,
-      modelMs: 0,
-      toolMs: 0,
-      input: 0,
-      cacheRead: 0,
-      output: 0,
-    }
-  );
 }
 
 /** null with no usage recorded. */

@@ -145,9 +145,7 @@
   },
   "sheet": {
     "less": "收起",
-    "more": "更多",
-    "at": "在「{stage}」",
-    "stageDone": "{stage}做完了"
+    "more": "更多"
   },
   "acts": {
     "reopened": "工单重开了",
@@ -281,10 +279,6 @@
     "refiningLine": "它在读代码，写好了会填进下面各栏。",
     "questions": "草稿写好了，它有 {n} 个问题要问你",
     "questionsLine": "在下面回答，它照你的回答再起草一版。",
-    "drafted": "草稿写好了",
-    "draftedLine": "看一遍、改一改，没问题就开工。",
-    "what": "想做什么？",
-    "whatLine": "写一句就行：执行会话读过代码，替你写成工单。",
     "titleHint": "比如：给登录页加上记住我",
     "title": "标题",
     "descriptionHint": "说明：为什么、要做的、不做的、可能涉及哪些文件（起草会写好）",
@@ -311,14 +305,12 @@
     "inQueue": "排队中：{ago}排上的，有并发上限就按看板上的先后自动开工。",
     "unqueue": "不排了",
     "pickHelper": "先选好角色",
-    "start": "确认需求并派发",
     "save": "存下改动",
     "remove": "删掉",
     "newRepo": "新建仓库",
     "repoHint": "仓库名，也是工作区下的文件夹名",
     "repoName": "仓库名",
     "create": "新建",
-    "writeOwn": "自己写说明",
     "edit": "编辑",
     "doneEditing": "完成编辑",
     "addDescription": "添加说明…",
@@ -359,11 +351,6 @@
       "in_review": "待验收",
       "done": "已完成",
       "canceled": "已废弃"
-    },
-    "stage": {
-      "talk": "聊清楚",
-      "work": "安排活",
-      "finish": "完成"
     },
     "newIssue": "新工单"
   },

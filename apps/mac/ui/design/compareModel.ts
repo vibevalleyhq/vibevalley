@@ -1,23 +1,10 @@
 import { z } from "zod";
 
 import type { CompareAnnotation, CompareAnnotationSide, CompareAnnotationTone, CompareImage, CompareMarkdownSegment, CompareSpec } from "@vibevalley/protocol";
-import {
-  CompareAnnotation as CompareAnnotationWire,
-  CompareAnnotationSide as CompareAnnotationSideWire,
-  CompareAnnotationTone as CompareAnnotationToneWire,
-  CompareImage as CompareImageWire,
-  CompareMarkdownSegment as CompareMarkdownSegmentWire,
-  CompareSpec as CompareSpecWire,
-} from "@vibevalley/protocol/schema";
+import { CompareMarkdownSegment as CompareMarkdownSegmentWire, CompareSpec as CompareSpecWire } from "@vibevalley/protocol/schema";
 
 import { coreBridge } from "../infra/rich";
 
-export const CompareAnnotationSideSchema = CompareAnnotationSideWire;
-export const CompareAnnotationToneSchema = CompareAnnotationToneWire;
-export const CompareImageSchema = CompareImageWire.refine((v) => (v.attachment !== undefined && v.attachment !== "") || (v.url !== undefined && v.url !== ""), {
-  message: "Compare image requires either attachment or url",
-});
-export const CompareAnnotationSchema = CompareAnnotationWire;
 export const CompareSpecSchema = CompareSpecWire.refine((v) => v.before !== undefined || v.after !== undefined || v.image !== undefined, {
   message: "Compare spec requires before, after, or image",
 });

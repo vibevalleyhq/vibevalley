@@ -1,2 +1,2 @@
 export { DashboardPage, type DashboardTab } from "./DashboardPage";
-export { BacklogTriagePanel, MorningDigestPanel } from "./MorningDigestPanel";
+export { BacklogTriagePanel } from "./MorningDigestPanel";

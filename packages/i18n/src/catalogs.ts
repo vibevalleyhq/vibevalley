@@ -1631,7 +1631,7 @@ export const catalogs = {
         refreshing: "正在同步…",
       },
       marks: { priority: "优先级：{word}" },
-      sheet: { less: "收起", more: "更多", at: "在「{stage}」", stageDone: "{stage}做完了" },
+      sheet: { less: "收起", more: "更多" },
       acts: {
         reopened: "工单重开了",
         goesOn: "{helper} 接着做。",
@@ -1753,10 +1753,6 @@ export const catalogs = {
         refiningLine: "它在读代码，写好了会填进下面各栏。",
         questions: "草稿写好了，它有 {n} 个问题要问你",
         questionsLine: "在下面回答，它照你的回答再起草一版。",
-        drafted: "草稿写好了",
-        draftedLine: "看一遍、改一改，没问题就开工。",
-        what: "想做什么？",
-        whatLine: "写一句就行：执行会话读过代码，替你写成工单。",
         titleHint: "比如：给登录页加上记住我",
         title: "标题",
         descriptionHint: "说明：为什么、要做的、不做的、可能涉及哪些文件（起草会写好）",
@@ -1783,14 +1779,12 @@ export const catalogs = {
         inQueue: "排队中：{ago}排上的，有并发上限就按看板上的先后自动开工。",
         unqueue: "不排了",
         pickHelper: "先选好角色",
-        start: "确认需求并派发",
         save: "存下改动",
         remove: "删掉",
         newRepo: "新建仓库",
         repoHint: "仓库名，也是工作区下的文件夹名",
         repoName: "仓库名",
         create: "新建",
-        writeOwn: "自己写说明",
         edit: "编辑",
         doneEditing: "完成编辑",
         addDescription: "添加说明…",
@@ -1806,7 +1800,6 @@ export const catalogs = {
         grouping: { status: "状态", repo: "仓库", agent: "角色", none: "不分组" },
         ordering: { manual: "默认", priority: "优先级", updated: "最近更新", created: "创建时间" },
         lane: { backlog: "需求池", todo: "待办", in_progress: "进行中", in_review: "待验收", done: "已完成", canceled: "已废弃" },
-        stage: { talk: "聊清楚", work: "安排活", finish: "完成" },
         newIssue: "新工单",
       },
       trigger: {
@@ -5583,7 +5576,7 @@ export const catalogs = {
         refreshing: "Syncing…",
       },
       marks: { priority: "Priority: {word}" },
-      sheet: { less: "Less", more: "More", at: 'At "{stage}"', stageDone: "{stage}: done" },
+      sheet: { less: "Less", more: "More" },
       acts: {
         reopened: "Ticket reopened",
         goesOn: "{helper} carries on.",
@@ -5707,10 +5700,6 @@ export const catalogs = {
         refiningLine: "It is reading the code, and will fill in the fields below.",
         questions: "{n, plural, one {The draft is written, and it has a question for you} other {The draft is written, and it has # questions for you}}",
         questionsLine: "Answer below, and it drafts again by your answers.",
-        drafted: "The draft is written",
-        draftedLine: "Look it over, change what you like, and start it.",
-        what: "What should be done?",
-        whatLine: "A line is enough: a helper reads the code and writes it up as a ticket.",
         titleHint: "Such as: add Remember me to the sign-in page",
         title: "Title",
         descriptionHint: "Description: why, what to do, what not to do, which files it may touch (drafting writes it)",
@@ -5737,14 +5726,12 @@ export const catalogs = {
         inQueue: "Queued {ago}: it starts by itself in the board's order when a spot frees up.",
         unqueue: "Unqueue",
         pickHelper: "Pick a helper first",
-        start: "Confirm and dispatch",
         save: "Save",
         remove: "Delete",
         newRepo: "New repo",
         repoHint: "The repo's name, which is also its folder under the work folder",
         repoName: "Repo name",
         create: "Create",
-        writeOwn: "Write it yourself",
         edit: "Edit",
         doneEditing: "Done",
         addDescription: "Add description…",
@@ -5760,7 +5747,6 @@ export const catalogs = {
         grouping: { status: "Status", repo: "Repo", agent: "Helper", none: "No grouping" },
         ordering: { manual: "Default", priority: "Priority", updated: "Last updated", created: "Created" },
         lane: { backlog: "Backlog", todo: "Todo", in_progress: "In Progress", in_review: "In Review", done: "Done", canceled: "Canceled" },
-        stage: { talk: "Talk it through", work: "Get it worked", finish: "Finish" },
         newIssue: "New ticket",
       },
       trigger: {
@@ -9528,9 +9514,6 @@ export interface Messages {
   "web.issue.boardLabels.ordering.manual": undefined;
   "web.issue.boardLabels.ordering.priority": undefined;
   "web.issue.boardLabels.ordering.updated": undefined;
-  "web.issue.boardLabels.stage.finish": undefined;
-  "web.issue.boardLabels.stage.talk": undefined;
-  "web.issue.boardLabels.stage.work": undefined;
   "web.issue.boardLabels.view.board": undefined;
   "web.issue.boardLabels.view.calendar": undefined;
   "web.issue.boardLabels.view.list": undefined;
@@ -9840,10 +9823,8 @@ export interface Messages {
   "web.issue.scope.backlog": undefined;
   "web.issue.scope.canceled": undefined;
   "web.issue.scope.label": undefined;
-  "web.issue.sheet.at": { readonly stage: string | number };
   "web.issue.sheet.less": undefined;
   "web.issue.sheet.more": undefined;
-  "web.issue.sheet.stageDone": { readonly stage: string | number };
   "web.issue.tags.add": undefined;
   "web.issue.tags.allTags": undefined;
   "web.issue.tags.byTag": undefined;
@@ -9892,8 +9873,6 @@ export interface Messages {
   "web.issue.todo.doneEditing": undefined;
   "web.issue.todo.draft": undefined;
   "web.issue.todo.draftStatus": undefined;
-  "web.issue.todo.drafted": undefined;
-  "web.issue.todo.draftedLine": undefined;
   "web.issue.todo.edit": undefined;
   "web.issue.todo.firstRepo": undefined;
   "web.issue.todo.inQueue": { readonly ago: string | number };
@@ -9916,19 +9895,15 @@ export interface Messages {
   "web.issue.todo.repoName": undefined;
   "web.issue.todo.revive": undefined;
   "web.issue.todo.save": undefined;
-  "web.issue.todo.start": undefined;
   "web.issue.todo.status": undefined;
   "web.issue.todo.talk": undefined;
   "web.issue.todo.title": undefined;
   "web.issue.todo.titleHint": undefined;
   "web.issue.todo.todoStatus": undefined;
   "web.issue.todo.unqueue": undefined;
-  "web.issue.todo.what": undefined;
   "web.issue.todo.whatHint": undefined;
   "web.issue.todo.whatLabel": undefined;
-  "web.issue.todo.whatLine": undefined;
   "web.issue.todo.whichRepo": undefined;
-  "web.issue.todo.writeOwn": undefined;
   "web.issue.triage.addTags": undefined;
   "web.issue.triage.agent": undefined;
   "web.issue.triage.clear": undefined;

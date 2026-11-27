@@ -13,7 +13,7 @@ const iconTone: Partial<Record<IconName, string>> = {
 const cachedPath = createIconPathCache((d) => new Path2D(d));
 
 /** Resolves an icon's hex color: explicit `color`, explicit `tone`, status fallback (`iconTone`), or `"ink"`. */
-export function resolveIconColor(props: { readonly name: IconName; readonly color?: string; readonly tone?: string }): string {
+function resolveIconColor(props: { readonly name: IconName; readonly color?: string; readonly tone?: string }): string {
   // Track colorScheme so light/dark switches redraw the canvas with the updated token hex.
   colorScheme();
   if (props.color !== undefined) return props.color;

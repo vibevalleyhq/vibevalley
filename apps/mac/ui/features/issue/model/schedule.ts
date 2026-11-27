@@ -61,14 +61,6 @@ const isPositiveTimestamp = (v: number | undefined): v is number => v !== undefi
 
 export type ScheduledSpan = IssueScheduleSpan;
 
-export interface ScheduledIssueEntry {
-  readonly issue: Issue;
-  readonly span: ScheduledSpan;
-  readonly depth: number;
-  readonly isParent: boolean;
-  readonly childCount: number;
-}
-
 export interface ScheduledCardRow {
   readonly card: BoardCard;
   readonly issue: Issue;
@@ -135,40 +127,6 @@ function projectScheduleViaNative(issues: readonly Issue[], now: number): BoardS
   if (!json) return undefined;
   const parsed = BoardScheduleSchema.safeParse(JSON.parse(json));
   return parsed.success ? parsed.data : undefined;
-}
-
-/** Delegates schedule rollup, overdue derivation, and hierarchical ordering to Rust `VvCore`. */
-export function computeSchedule(
-  issues: readonly Issue[],
-  now = Date.now(),
-): {
-  readonly scheduled: ScheduledIssueEntry[];
-  readonly unscheduled: Issue[];
-  readonly todayDayMs: number;
-} {
-  const todayDayMs = utcDayStart(now);
-  const projection = projectScheduleViaNative(issues, now);
-  if (!projection) return { scheduled: [], unscheduled: [...issues], todayDayMs };
-
-  const byId = new Map(issues.map((i) => [i.id, i]));
-  const scheduled: ScheduledIssueEntry[] = [];
-  for (const entry of projection.scheduled) {
-    const issue = byId.get(entry.issueId);
-    if (!issue) continue;
-    scheduled.push({
-      issue,
-      span: entry.span,
-      depth: entry.depth,
-      isParent: entry.isParent,
-      childCount: entry.childCount,
-    });
-  }
-  const unscheduled: Issue[] = [];
-  for (const id of projection.unscheduledIds) {
-    const issue = byId.get(id);
-    if (issue) unscheduled.push(issue);
-  }
-  return { scheduled, unscheduled, todayDayMs: projection.todayDayMs };
 }
 
 /** Builds timeline rows from Rust-projected `BoardSummary.schedule` (or `VvCore`) plus pure UTC axis ticks and month bands. */

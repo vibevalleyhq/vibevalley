@@ -103,7 +103,7 @@ export const ChannelEvent = z.discriminatedUnion("_tag", [
   z.object({ _tag: z.literal("Reset") }),
 ]) satisfies Codec<T.ChannelEvent>;
 
-export const ChannelCommand = z.object({
+const ChannelCommand = z.object({
   name: z.string(),
   args: z.string(),
 }) satisfies Codec<T.ChannelCommand>;

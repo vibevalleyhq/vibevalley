@@ -13,7 +13,7 @@ const AgentProblem = z.object({
 
 export const PersonaMode = z.enum(T.PersonaModeValues) satisfies Codec<T.PersonaMode>;
 
-export const Toolset = z.enum(T.ToolsetValues) satisfies Codec<T.Toolset>;
+const Toolset = z.enum(T.ToolsetValues) satisfies Codec<T.Toolset>;
 
 const MCPServerStdio = z.object({
   type: z.literal("stdio"),
