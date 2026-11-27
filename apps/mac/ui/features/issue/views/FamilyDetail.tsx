@@ -43,7 +43,7 @@ export function FamilyDetail(props: { issue: Issue; children: Issue[]; onOpen: (
 
   const heading = (
     <View>
-      <IssueTrail number={live().number} repo={live().repo} parentId={live().parent} parent={parent()} onOpenParent={props.onOpen} />
+      <IssueTrail parentId={live().parent} parent={parent()} onOpenParent={props.onOpen} />
       <Text role="header" testID="issue-title" class="text-2xl leading-snug font-semibold text-ink">
         {live().title}
       </Text>

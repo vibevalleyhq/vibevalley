@@ -13,7 +13,6 @@ import { mix } from "../../../design/tone";
 import { useTimeout } from "../../../infra/base/timer";
 import { createEffect } from "../../../infra/solid";
 import type { Tone } from "../model/cards";
-import { type Stage, stageLabel, stages } from "../model/issue";
 
 export interface IssueChrome {
   readonly hasSheet: () => boolean;
@@ -259,30 +258,6 @@ export function Note(props: { tone?: Tone | undefined; children: JSX.Element; cl
   );
 }
 
-/** Draft -> Active -> Done, the one it is at marked. */
-export function Stages(props: { at: Stage }) {
-  const ati = () => stages.indexOf(props.at);
-  return (
-    <View class="flex-row items-center" accessibilityLabel={t("web.issue.sheet.at", { stage: stageLabel[props.at] })}>
-      <Each of={stages} key={(s) => s}>
-        {(s, i) => (
-          <View class={`flex-row items-center ${i() > 0 ? "flex-1" : ""}`}>
-            <If when={i() > 0}>
-              <View class={`mx-2 h-px flex-1 ${i() <= ati() ? "bg-leaf" : "bg-line"}`} />
-            </If>
-            <View class="flex-row items-center gap-1.5">
-              <If when={i() < ati()} else={<View class={`h-2 w-2 rounded-full ${s() === props.at ? "bg-wheat" : "bg-line"}`} />}>
-                <Icon name="check" size={12} label={t("web.issue.sheet.stageDone", { stage: stageLabel[s()] })} />
-              </If>
-              <Text class={`text-sm ${s() === props.at ? "font-semibold text-ink" : i() < ati() ? "text-accent" : "text-faint"}`}>{stageLabel[s()]}</Text>
-            </View>
-          </View>
-        )}
-      </Each>
-    </View>
-  );
-}
-
 export function Pick<V extends string>(props: {
   label: string;
   value: V;
@@ -358,45 +333,29 @@ export function IssueNumberPill(props: { number: number }) {
   );
 }
 
-/** Shared breadcrumb trail (`repo > #parent > #number`) across issue detail pages. */
+/** Parent issue link shown above the issue title when nested under a parent issue. */
 export function IssueTrail(props: {
-  number: number;
-  repo?: string | undefined;
   parentId?: string | undefined;
   parent?: Pick<Issue, "number" | "title"> | undefined;
   onOpenParent?: ((id: string) => void) | undefined;
 }) {
   return (
-    <View accessibilityLabel={t("web.issue.detail.trail")} testID="issue-trail" class="mb-2.5 min-w-0 flex-row flex-wrap items-center gap-1.5">
-      <If when={props.repo}>
-        {(repo) => (
-          <>
-            <View class="min-w-0 max-w-48 shrink flex-row items-center gap-1 overflow-hidden rounded-md bg-side px-1.5 py-0.5">
-              <Icon name="folder" size={12} tone="muted" />
-              <Text class="min-w-0 truncate text-xs font-medium text-muted">{repo()}</Text>
-            </View>
-            <Icon name="next" size={12} tone="faint" />
-          </>
-        )}
-      </If>
-      <If when={props.parentId}>
-        {(parentId) => (
-          <>
-            <View
-              role="button"
-              testID="parent-issue"
-              onPress={() => props.onOpenParent?.(parentId())}
-              class="min-w-0 max-w-64 shrink flex-row items-center gap-1 overflow-hidden rounded-md border border-line bg-side px-1.5 py-0.5 hover:border-line-strong hover:bg-hover"
-            >
-              <Text class="min-w-0 truncate text-xs text-water">
-                {props.parent ? `#${props.parent.number} ${props.parent.title}` : t("web.issue.family.parent")}
-              </Text>
-            </View>
-            <Icon name="next" size={12} tone="faint" />
-          </>
-        )}
-      </If>
-      <IssueNumberPill number={props.number} />
-    </View>
+    <If when={props.parentId}>
+      {(parentId) => (
+        <View accessibilityLabel={t("web.issue.detail.trail")} testID="issue-trail" class="mb-2.5 min-w-0 flex-row flex-wrap items-center gap-1.5">
+          <View
+            role="button"
+            testID="parent-issue"
+            onPress={() => props.onOpenParent?.(parentId())}
+            class="min-w-0 max-w-64 shrink flex-row items-center gap-1 overflow-hidden rounded-md border border-line bg-side px-1.5 py-0.5 hover:border-line-strong hover:bg-hover"
+          >
+            <Icon name="indent" size={12} tone="water" />
+            <Text class="min-w-0 truncate text-xs text-water">
+              {props.parent ? `#${props.parent.number} ${props.parent.title}` : t("web.issue.family.parent")}
+            </Text>
+          </View>
+        </View>
+      )}
+    </If>
   );
 }

@@ -142,7 +142,7 @@ export function IssueDetail(props: {
   const stageMeta = computed(() => statusParts().slice(1).filter(Boolean));
   const heading = (
     <View>
-      <IssueTrail number={props.issue.number} repo={s().repo || undefined} parentId={live().parent} parent={parent()} onOpenParent={openIssue} />
+      <IssueTrail parentId={live().parent} parent={parent()} onOpenParent={openIssue} />
       <View class="flex-row flex-wrap items-baseline gap-x-2">
         <IssueTitle shown={s().title} full={live().title} editable={s().open} state={labeled().state("title")} onSave={(title) => setLabel({ title })} />
       </View>

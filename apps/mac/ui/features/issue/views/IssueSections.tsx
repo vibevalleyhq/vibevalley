@@ -26,7 +26,7 @@ import { updateIssueAttachments } from "../model/write";
 import { ActLines } from "./ActLines";
 import { IssueAttachments } from "./IssueAttachments";
 import { StatusMark } from "./Marks";
-import { IssueNumberPill, IssueSheet, Note, Property, SheetLabel, StagePill } from "./Sheet";
+import { IssueSheet, Note, Property, SheetLabel, StagePill } from "./Sheet";
 
 /** A question of the helper's: its options are replies as they are, one click each. */
 export function Question(props: { ask: QuestionItem; busy: boolean; onPick: (words: string) => void }) {
@@ -207,8 +207,6 @@ export function OrchestratorIssueDetail(props: { issue: Issue }) {
           <Icon name="agents" size={12} tone="muted" />
           <Text class="text-xs font-medium text-muted">{t("web.issue.orchestrator")}</Text>
         </View>
-        <Icon name="next" size={12} tone="faint" />
-        <IssueNumberPill number={props.issue.number} />
       </View>
       <Text role="header" class="text-2xl leading-snug font-semibold text-ink">
         {props.issue.title}

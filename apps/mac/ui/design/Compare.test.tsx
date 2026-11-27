@@ -3,7 +3,7 @@ import { expect, open, test } from "nsh/test";
 
 import { setLocale } from "@vibevalley/i18n";
 import "@vibevalley/i18n/catalogs";
-import type { Attachment, Channel, ChatMessage, Issue, IssueId, MessageId, Session, SessionId, SliceBundle } from "@vibevalley/protocol";
+import type { Attachment, Channel, ChatMessage, Issue, IssueId, MessageId, SliceBundle } from "@vibevalley/protocol";
 
 import { fakeHost } from "../fixtures/fakeHost";
 import { SCENARIO_NOW, scenarios } from "../fixtures/scenarios";
@@ -298,24 +298,9 @@ test("Composer CompareUploadDialog picks and uploads two images and inserts comp
   }
 });
 
-test("IssueAttachments Add compare uploads via pick and file drop, links attachments, and posts compare comment", async () => {
+test("IssueAttachments omits redundant Compare upload action while preserving file upload", async () => {
   {
     setLocale("zh");
-    const session: Session = {
-      id: "s-cmp-1" as SessionId,
-      controller: "issueBoard",
-      role: "worker",
-      name: "老周",
-      profile: "laozhou",
-      runtime: "vibevalley",
-      policy: { kind: "sandboxDir" },
-      bindings: [],
-      phase: { _tag: "resting" },
-      hiredAt: SCENARIO_NOW - 300_000,
-      brief: "Verify before/after comparison in issue detail",
-      runs: 1,
-      lastRun: { outcome: "completed", summary: "Done", at: SCENARIO_NOW - 60_000 },
-    };
     const issue: Issue = {
       id: "i-cmp-1" as IssueId,
       number: 42,
@@ -330,15 +315,7 @@ test("IssueAttachments Add compare uploads via pick and file drop, links attachm
       checks: [],
       questions: [],
       findings: [],
-      assignments: [
-        {
-          id: "assign-cmp-1",
-          issue: "i-cmp-1" as IssueId,
-          agent: "laozhou",
-          assignedAt: SCENARIO_NOW - 300_000,
-          executions: [{ kind: "worker", session: session.id, startedAt: SCENARIO_NOW - 300_000 }],
-        },
-      ],
+      assignments: [],
       blockedBy: [],
       createdAt: SCENARIO_NOW - 600_000,
       stage: { state: "reviewing", acts: [{ act: "complete", does: "move", status: "done", words: "none" }], lead: "complete" },
@@ -348,42 +325,9 @@ test("IssueAttachments Add compare uploads via pick and file drop, links attachm
       ...scenarios.empty.state,
       board: { seq: 12, issues: [issue] },
     };
-    let createdIdx = 0;
     const fake = fakeHost({ state, responses: scenarios.typical.responses }, { route: `/issues/${issue.id}`, locale: "zh" });
-    fake.respond("issue.history.list", [{ issue, sessions: [session], missingSessions: [] }]);
+    fake.respond("issue.history.list", [{ issue, sessions: [], missingSessions: [] }]);
     fake.respond("issue.timeline.get", { milestones: [{ at: SCENARIO_NOW - 600_000, kind: "opened", text: "开了这个工单" }] });
-    fake.respond("attachment.create", (payload: unknown): Attachment => {
-      const p = payload as { name?: string; type?: string };
-      createdIdx += 1;
-      return {
-        id: `att-issue-${createdIdx}`,
-        name: p.name ?? `issue-${createdIdx}.png`,
-        type: p.type ?? "image/png",
-        size: SAMPLE_PNG_BYTES.length,
-      };
-    });
-    fake.respond("attachment.importPath", (payload: unknown): Attachment => {
-      const p = payload as { path?: string };
-      createdIdx += 1;
-      const base = (p.path ?? "drop.png").split("/").at(-1) ?? "drop.png";
-      return {
-        id: `att-issue-${createdIdx}`,
-        name: base,
-        type: "image/png",
-        size: SAMPLE_PNG_BYTES.length,
-      };
-    });
-    fake.respond("host.readFile", (payload: unknown) => {
-      const p = payload as { path?: string };
-      const base = (p.path ?? "drop.png").split("/").at(-1) ?? "drop.png";
-      return { data: "iVBORw0KGgo=", type: "image/png", name: base };
-    });
-    fake.respond("attachment.file", (payload: unknown) => {
-      const id = (payload as { id?: string } | undefined)?.id ?? "att";
-      return { path: `/tmp/${id}.png`, type: "image/png", name: `${id}.png` };
-    });
-    fake.respond("issue.update", { ...issue, seq: 13 });
-    fake.respond("issue.comment.create", { seq: 14 });
 
     const app = await open("../app/main.tsx", {
       width: 1200,
@@ -393,34 +337,7 @@ test("IssueAttachments Add compare uploads via pick and file drop, links attachm
       clock: { time: SCENARIO_NOW },
       host: fake.options,
     });
-    await fake.pumpUntil(app, () => app.count("id:issue-add-compare") === 1);
-
-    app.onPick(() => [{ name: "issue-before.png", type: "image/png", data: SAMPLE_PNG_BYTES }]);
-
-    await app.press("id:issue-add-compare");
-    expect(app.count("id:compare-upload-dialog")).toBe(1);
-
-    await app.press("id:compare-pick-before");
-    await fake.pumpUntil(app, () => app.count("id:compare-slot-name-before") === 1);
-
-    await app.dropFiles("id:compare-slot-after", ["file:///tmp/issue-after.png"]);
-    await fake.pumpUntil(app, () => app.count("id:compare-slot-name-after") === 1);
-    expect(app.texts()).toContain("issue-after.png");
-
-    fake.clearCalls();
-    await app.press("id:compare-upload-submit");
-    await fake.pumpUntil(app, () => app.count("id:compare-upload-dialog") === 0);
-
-    const updateCalls = fake.calls.filter((c) => c.op === "issue.update");
-    expect(updateCalls.length).toBeGreaterThanOrEqual(1);
-    const commentCall = fake.calls.find((c) => c.op === "issue.comment.create");
-    expect(commentCall).toBeDefined();
-    const commentPayload = commentCall?.payload as { id?: string; text?: string } | undefined;
-    expect(commentPayload?.id).toBe(issue.id);
-    const rawComment = commentPayload?.text ?? "";
-    expect(rawComment).toContain("```compare");
-    const spec = JSON.parse(rawComment.slice(rawComment.indexOf("{"), rawComment.lastIndexOf("}") + 1)) as CompareSpec;
-    expect(spec.before?.attachment).toBe("att-issue-1");
-    expect(spec.after?.attachment).toBe("att-issue-2");
+    await fake.pumpUntil(app, () => app.count("id:issue-attach-file") === 1);
+    expect(app.count("id:issue-add-compare")).toBe(0);
   }
 });

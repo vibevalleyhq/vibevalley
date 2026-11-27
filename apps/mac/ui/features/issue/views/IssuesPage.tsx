@@ -71,7 +71,7 @@ import { IssueList, type ListAdd } from "./IssueList";
 import { IssuePeekModal } from "./IssuePeekModal";
 import { IssueTimeline } from "./IssueTimeline";
 import { NewIssue, type NewIssueAt } from "./NewIssue";
-import { createIssueChrome, IssueChromeContext } from "./Sheet";
+import { createIssueChrome, IssueChromeContext, IssueNumberPill } from "./Sheet";
 import { dispatchedNotice, TodoDetail } from "./TodoDetail";
 
 export type IssueOverlay =
@@ -604,17 +604,26 @@ export function IssuesPage(props: { rest: string }) {
           })()}
           key={(cur) => cur}
         >
-          {(at) => (
-            <IssueView onBack={() => open(undefined)} backLabel={fromScene() ?? t("web.issue.page.backToBoard")} blocked={dialogUp}>
-              <Detail
-                id={at()}
-                cards={all}
-                known={!history.loading() && history.rows() !== undefined}
-                open={open}
-                onClose={(issue, session, review) => dispatchOverlay({ kind: "openClose", issue, session, review })}
-              />
-            </IssueView>
-          )}
+          {(at) => {
+            const cur = () => all().find((c) => c.id === at() || issueIs(c.issue, at()) || String(c.issue.number) === at());
+            return (
+              <IssueView
+                onBack={() => open(undefined)}
+                backLabel={fromScene() ?? t("web.issue.page.backToBoard")}
+                issueNumber={cur()?.issue.number}
+                repo={cur() ? cardRepo(cur()!) : undefined}
+                blocked={dialogUp}
+              >
+                <Detail
+                  id={at()}
+                  cards={all}
+                  known={!history.loading() && history.rows() !== undefined}
+                  open={open}
+                  onClose={(issue, session, review) => dispatchOverlay({ kind: "openClose", issue, session, review })}
+                />
+              </IssueView>
+            );
+          }}
         </Each>
       </If>
       <If when={peekCard()}>
@@ -735,7 +744,14 @@ function Detail(props: {
 }
 
 /** An issue's own page, at its URL: Issues or Escape goes back to the board as it was left. */
-function IssueView(props: { onBack: () => void; backLabel: string; blocked: () => boolean; children: JSX.Element }) {
+function IssueView(props: {
+  onBack: () => void;
+  backLabel: string;
+  issueNumber?: number | undefined;
+  repo?: string | undefined;
+  blocked: () => boolean;
+  children: JSX.Element;
+}) {
   const chrome = createIssueChrome();
   // A dialog over the issue takes Escape first (blocked); on narrow screens the drawer closes before the page goes back.
   keymap.bind(
@@ -753,15 +769,30 @@ function IssueView(props: { onBack: () => void; backLabel: string; blocked: () =
   return (
     <IssueChromeContext.Provider value={chrome}>
       <View testID="issue" class="min-h-0 flex-1">
-        <View desktop={{ windowDrag: true }} class="h-11 shrink-0 flex-row items-center justify-between gap-2 border-b border-line bg-page px-4">
-          <View
-            role="button"
-            testID="issue-close"
-            onPress={() => props.onBack()}
-            class={`-ml-2 h-7 flex-row items-center gap-1 rounded-md px-2 ${motionClass("transition-transform duration-120 ease-out")} hover:bg-hover active:translate-y-px`}
-          >
-            <Icon name="back" size={14} tone="muted" />
-            <Text class="text-sm font-medium text-muted">{props.backLabel}</Text>
+        <View
+          testID="issue-topbar"
+          desktop={{ windowDrag: true }}
+          class="h-11 shrink-0 flex-row items-center justify-between gap-2 border-b border-line bg-page px-4"
+        >
+          <View class="min-w-0 flex-1 flex-row items-center gap-2">
+            <View
+              role="button"
+              testID="issue-close"
+              onPress={() => props.onBack()}
+              class={`-ml-2 h-7 shrink-0 flex-row items-center gap-1 rounded-md px-2 ${motionClass("transition-transform duration-120 ease-out")} hover:bg-hover active:translate-y-px`}
+            >
+              <Icon name="back" size={14} tone="muted" />
+              <Text class="text-sm font-medium text-muted">{props.backLabel}</Text>
+            </View>
+            <If when={props.issueNumber !== undefined}>{() => <IssueNumberPill number={props.issueNumber!} />}</If>
+            <If when={props.repo}>
+              {(r) => (
+                <View class="min-w-0 shrink flex-row items-center gap-1 rounded-md border border-line bg-side px-1.5 py-0.5">
+                  <Icon name="folder" size={12} tone="muted" />
+                  <Text class="min-w-0 truncate text-xs font-medium text-muted">{r()}</Text>
+                </View>
+              )}
+            </If>
           </View>
           <If when={chrome.hasSheet()}>
             <IconButton

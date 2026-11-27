@@ -96,10 +96,11 @@ test("IssueDetail shows full unclamped title, omits empty repo crumb, localizes 
   const texts = app.texts();
   // Full title (> 40 chars) is preserved intact without truncation.
   expect(texts).toContain(LONG_TITLE);
-  // Breadcrumb omits "没有仓库" and cleanly shows #4.
-  expect(app.count("id:issue-trail")).toBe(1);
-  expect(app.count("id:issue-trail >> text:#4")).toBe(1);
-  expect(app.count(`id:issue-trail >> text:${t("web.issue.detail.noRepo")}`)).toBe(0);
+  // Top bar cleanly shows #4 via issue-copy-id and omits duplicate body trail and empty repo crumb.
+  expect(app.count("id:issue-copy-id")).toBe(1);
+  expect(app.count("id:issue-copy-id >> text:#4")).toBe(1);
+  expect(app.count("id:issue-trail")).toBe(0);
+  expect(app.count(`id:issue-topbar >> text:${t("web.issue.detail.noRepo")}`)).toBe(0);
   // Unchecked criteria circles are rendered with testID.
   expect(app.count("id:criterion-unsaid")).toBe(2);
   // Empty attachments section collapses into compact attach button without orphaned count.

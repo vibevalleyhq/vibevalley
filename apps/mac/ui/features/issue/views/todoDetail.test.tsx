@@ -139,7 +139,7 @@ test("TodoDetail defaults to preview-first Markdown, Compare, visual criteria ch
     criteria: ["Markdown headings and Compare slider render by default", "Editing controls toggle inline cleanly"],
   });
 
-  // Preview-first state: wrapping text title, Markdown + Compare preview, visual criteria rows, and calm action bar hiding issue-talk.
+  // Preview-first state: wrapping text title, Markdown + Compare preview, visual criteria rows, and calm layout without duplicate banners/compare/trail clutter.
   expect(app.texts()).toContain(longTitle);
   expect(app.count("id:issue-title-input")).toBe(0);
   expect(app.count("id:issue-description-preview")).toBe(1);
@@ -148,7 +148,12 @@ test("TodoDetail defaults to preview-first Markdown, Compare, visual criteria ch
   expect(app.count("id:issue-criteria-preview")).toBe(1);
   expect(app.count("id:todo-criterion")).toBe(2);
   expect(app.count("id:issue-criteria-input")).toBe(0);
+  expect(app.count("id:issue-talk-card")).toBe(0);
   expect(app.count("id:issue-talk")).toBe(0);
+  expect(app.count("id:issue-start")).toBe(0);
+  expect(app.count("id:issue-add-compare")).toBe(0);
+  expect(app.count("id:issue-trail")).toBe(0);
+  expect(app.count("id:issue-copy-id")).toBe(1);
   expect(app.count("id:issue-draft-toggle")).toBe(1);
 
   const titleBox = app.layout("id:issue-title");
