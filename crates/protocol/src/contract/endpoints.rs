@@ -1717,6 +1717,15 @@ pub const ENDPOINTS: &[Endpoint] = &[
         result: Some("DebugTrajectoryDetail"),
     },
     Endpoint {
+        op: "debug.trajectory.export",
+        module: "debug",
+        about: &["id"],
+        can: &[Caller::User],
+        dry_run: None,
+        input: Some("DebugTrajectoryExportRequest"),
+        result: Some("DebugTrajectoryExportResult"),
+    },
+    Endpoint {
         op: "debug.override.set",
         module: "debug",
         about: &[],
@@ -3076,6 +3085,12 @@ pub mod ops {
         type Input = t::DebugTrajectoryGetRequest;
         type Result = t::DebugTrajectoryDetail;
     }
+    pub struct DebugTrajectoryExport;
+    impl Op for DebugTrajectoryExport {
+        const NAME: &'static str = "debug.trajectory.export";
+        type Input = t::DebugTrajectoryExportRequest;
+        type Result = t::DebugTrajectoryExportResult;
+    }
     pub struct DebugOverrideSet;
     impl Op for DebugOverrideSet {
         const NAME: &'static str = "debug.override.set";
@@ -3507,6 +3522,7 @@ endpoint_ids! {
     DebugTimelineClear => "debug.timeline.clear",
     DebugTrajectoryList => "debug.trajectory.list",
     DebugTrajectoryGet => "debug.trajectory.get",
+    DebugTrajectoryExport => "debug.trajectory.export",
     DebugOverrideSet => "debug.override.set",
     DebugBundleExport => "debug.bundle.export",
     // remote & machine

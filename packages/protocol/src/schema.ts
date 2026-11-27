@@ -217,6 +217,9 @@ export { Cron, CronRequest, CronUpdate, CronWhenWeekly } from "./cron/schema";
 export {
   DebugBundleResult,
   DebugCacheStat,
+  DebugCollabArtifactState,
+  DebugCollabClock,
+  DebugCollabPresence,
   DebugGraph,
   DebugGraphClient,
   DebugGraphSession,
@@ -231,9 +234,12 @@ export {
   DebugTimelinePage,
   DebugTimelineQuery,
   DebugTrajectoryDetail,
+  DebugTrajectoryExportRequest,
+  DebugTrajectoryExportResult,
   DebugTrajectoryGetRequest,
   DebugTrajectoryKind,
   DebugTrajectoryRawEntry,
+  DebugTrajectorySubagentNode,
   DebugTrajectorySummary,
   DebugTrajectoryTurn,
 } from "./debug/schema";

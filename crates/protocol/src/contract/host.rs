@@ -483,6 +483,32 @@ pub enum HostAction {
     ToggleDevtools,
     DetachDevtools,
     CloseDevtools,
+    DevtoolsInspectorMode {
+        enabled: bool,
+    },
+    DevtoolsHighlight {
+        #[serde(default)]
+        test_id: Option<String>,
+        #[serde(default)]
+        x: Option<f32>,
+        #[serde(default)]
+        y: Option<f32>,
+        #[serde(default)]
+        width: Option<f32>,
+        #[serde(default)]
+        height: Option<f32>,
+        #[serde(default)]
+        label: Option<String>,
+        #[serde(default)]
+        source: Option<String>,
+        #[serde(default)]
+        surface: Option<String>,
+    },
+    DevtoolsJumpSource {
+        path: String,
+        #[serde(default)]
+        line: Option<u32>,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]

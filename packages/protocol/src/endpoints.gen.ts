@@ -191,6 +191,7 @@ export const servedEndpoints = [
   { op: "debug.timeline.clear", can: ["user"], about: [] },
   { op: "debug.trajectory.list", can: ["user"], about: [] },
   { op: "debug.trajectory.get", can: ["user"], about: ["id"] },
+  { op: "debug.trajectory.export", can: ["user"], about: ["id"] },
   { op: "debug.override.set", can: ["user"], about: [] },
   { op: "debug.bundle.export", can: ["user"], about: [] },
   { op: "remote.status", can: ["user"], about: [] },

@@ -10,14 +10,13 @@ use serde_json::{Value, json};
 use tokio_tungstenite::tungstenite::Message as ClientWsMsg;
 use vibevalley_protocol::home::{debug_json_path, read_debug_endpoint};
 use vibevalley_protocol::{
-    HostVdpCallPayload, VDP_PROTOCOL_VERSION, VdpCommand, VdpError, VdpLogEntriesResult, VdpLogEntry, VdpLogLevel, VdpMouseButton, VdpMouseEventKind,
-    VdpNotification, VdpPageFrameEvent, VdpRequest, VdpTarget, VdpTargetAttachParams, VdpTargetAttachResult, VdpTargetDetachParams, VdpTargetKind,
-    VdpTargetListResult, VdpVersionInfo, VdpWireMessage,
+    HostVdpCallPayload, VDP_PROTOCOL_VERSION, VdpCommand, VdpError, VdpLogEntriesResult, VdpLogEntry, VdpLogLevel, VdpNotification, VdpPageFrameEvent,
+    VdpRequest, VdpTarget, VdpTargetAttachParams, VdpTargetAttachResult, VdpTargetDetachParams, VdpTargetKind, VdpTargetListResult, VdpUiBounds,
+    VdpUiInspectAtResult, VdpVersionInfo, VdpWireMessage,
 };
 
-use super::executor::parse_legacy_mouse_arg;
+use super::executor::{hit_from_hosted_node, select_deepest_hit};
 use super::parse_debug_port_from;
-use super::script::{ScriptStep, parse_script_lines, parse_script_step};
 use super::vdp::{BoxFuture, VdpDispatcher, VdpServer, call_remote_vdp, resolve_loopback_ws_url, resolve_ui_response, ui_requests};
 
 #[derive(Default)]
@@ -108,28 +107,61 @@ fn debug_port_parser_handles_cli_flag_env_and_disabled_default() {
 }
 
 #[test]
-fn script_parser_preserves_legacy_lines_and_mouse_syntax() {
-    let lines = parse_script_lines(
-        "
-        # comment
-        {\"shell\":\"wait:250\"}
-        {\"shell\":\"wait_update\"}
-        {\"shell\":\"toggle_theme\"}
-        {\"type\":\"open_file\",\"path\":\"/tmp/a.rs\"}
-        ",
-    );
-    assert_eq!(lines.len(), 4);
-    assert_eq!(parse_script_step(&lines[0]), ScriptStep::WaitMs(250));
-    assert_eq!(parse_script_step(&lines[1]), ScriptStep::WaitUpdate);
-    assert_eq!(parse_script_step(&lines[2]), ScriptStep::ShellCommand("toggle_theme".into()));
-    assert!(matches!(parse_script_step(&lines[3]), ScriptStep::ActionJson(_)));
+fn inspector_hit_selection_prefers_smallest_leaf_and_translates_surface_origin() {
+    let root = VdpUiInspectAtResult {
+        hit: true,
+        surface: Some("workbench".into()),
+        test_id: Some("view:workbench".into()),
+        role: Some("root".into()),
+        bounds: Some(VdpUiBounds {
+            x: 0.0,
+            y: 0.0,
+            width: 1200.0,
+            height: 800.0,
+        }),
+        ..Default::default()
+    };
+    let panel = VdpUiInspectAtResult {
+        hit: true,
+        surface: Some("workspace".into()),
+        test_id: Some("pane:diorama:farm".into()),
+        role: Some("canvas".into()),
+        source: Some("apps/mac/src/diorama/view.rs:1".into()),
+        bounds: Some(VdpUiBounds {
+            x: 64.0,
+            y: 0.0,
+            width: 800.0,
+            height: 800.0,
+        }),
+        ..Default::default()
+    };
+    let button = hit_from_hosted_node(
+        "sidebar",
+        64.0,
+        0.0,
+        &vibevalley_protocol::VdpUiNode {
+            test_id: Some("sidebar-tab-git".into()),
+            role: Some("button".into()),
+            text: Some("Git".into()),
+            route: None,
+            source: Some("apps/mac/ui/workspace/Sidebar.tsx:88".into()),
+            bounds: Some(VdpUiBounds {
+                x: 16.0,
+                y: 40.0,
+                width: 48.0,
+                height: 24.0,
+            }),
+            pressable: Some(true),
+            children: None,
+        },
+    )
+    .unwrap();
+    assert_eq!(button.bounds.unwrap().x, 80.0);
 
-    let mouse = parse_legacy_mouse_arg("click, 120.5, 44, right").unwrap();
-    assert_eq!(mouse.kind, VdpMouseEventKind::Click);
-    assert_eq!(mouse.x, 120.5);
-    assert_eq!(mouse.y, 44.0);
-    assert_eq!(mouse.button, Some(VdpMouseButton::Right));
-    assert!(parse_legacy_mouse_arg("bogus,1,2").is_err());
+    let chosen = select_deepest_hit(90.0, 50.0, vec![root, panel, button]).unwrap();
+    assert_eq!(chosen.test_id.as_deref(), Some("sidebar-tab-git"));
+    assert_eq!(chosen.source.as_deref(), Some("apps/mac/ui/workspace/Sidebar.tsx:88"));
+    assert!(select_deepest_hit(1500.0, 50.0, vec![]).is_none());
 }
 
 #[test]

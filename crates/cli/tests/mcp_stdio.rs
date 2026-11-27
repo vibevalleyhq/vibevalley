@@ -892,7 +892,7 @@ async fn drive_mock_vdp(mut socket: WebSocket, state: MockVdpState) {
                             height: 36.0,
                         }),
                         pressable: Some(true),
-                        children: None,
+                        ..Default::default()
                     }],
                 };
                 send_ws_json(&mut socket, &VdpResponse::ok(req.id, serde_json::to_value(out).unwrap(), req.session_id)).await;

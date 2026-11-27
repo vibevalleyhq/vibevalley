@@ -70,6 +70,9 @@
   "files": {
     "missingInWorktree": "This file is unavailable in the issue worktree: {path}"
   },
+  "devtools": {
+    "inspectingHint": "Click an element to inspect · Esc to cancel"
+  },
   "startup": {
     "titleSchema": "Database Schema Mismatch",
     "titleFailed": "VibeValley Failed to Start",

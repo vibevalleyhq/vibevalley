@@ -4,32 +4,62 @@ import { t } from "@vibevalley/i18n";
 import type { DebugTimelineEvent, DebugTimelinePage } from "@vibevalley/protocol";
 
 import { SearchField } from "../../design/Field";
+import { Icon } from "../../design/Icon";
 import { IconButton } from "../../design/IconButton";
 import { Banner, Empty, Toggle } from "../../design/layout";
 import { Tag } from "../../design/Tag";
 import { api, reasonOf } from "../../infra/api";
 import { wallClockText } from "../../infra/base/format";
-import { formatJson, isSlowEvent, laneLabel, laneTone, slowBadgeTone, TIMELINE_LANES, type TimelineLaneFilter } from "./format";
+import { formatJson, isSlowEvent, laneLabel, laneTone, slowBadgeTone, TIMELINE_LANES, type TimelineJumpFocus, type TimelineLaneFilter } from "./format";
 import { JsonPreview } from "./shared";
 
 const TIMELINE_LIMIT = 60;
+const TIMELINE_JUMP_LIMIT = 200;
 
-export function TimelineTab(props: { fallbackEvents: () => readonly DebugTimelineEvent[]; refreshTick: () => number; onCleared?: () => void }) {
+export function TimelineTab(props: {
+  fallbackEvents: () => readonly DebugTimelineEvent[];
+  refreshTick: () => number;
+  onCleared?: () => void;
+  focus?: () => TimelineJumpFocus | undefined;
+  onJumpToTrajectory?: (target: { traceId?: number | undefined; timestampMs: number; summary: string }) => void;
+}) {
   const lane = signal<TimelineLaneFilter>("all");
   const search = signal("");
   const slowOnly = signal(false);
   const page = signal<DebugTimelinePage | undefined>(undefined);
   const error = signal<string | undefined>(undefined);
   const expandedId = signal<number | undefined>(undefined);
+  const highlightedId = signal<number | undefined>(undefined);
   const clearing = signal(false);
 
   let inFlight = false;
   let activeLane: TimelineLaneFilter | undefined;
   let pendingLane: TimelineLaneFilter | undefined;
   let loadSeq = 0;
+  let handledFocusKey = -1;
 
-  const load = async (targetLane: TimelineLaneFilter, force = false) => {
-    if (inFlight) {
+  const findMatchingEvent = (events: readonly DebugTimelineEvent[], focus: TimelineJumpFocus): DebugTimelineEvent | undefined => {
+    if (focus.traceId !== undefined) {
+      const byTrace = events.find((ev) => ev.traceId === focus.traceId);
+      if (byTrace) return byTrace;
+    }
+    if (focus.timestampMs !== undefined && events.length > 0) {
+      let best = events[0];
+      let bestDist = Math.abs((best?.time ?? 0) - focus.timestampMs);
+      for (const ev of events) {
+        const dist = Math.abs(ev.time - focus.timestampMs);
+        if (dist < bestDist) {
+          best = ev;
+          bestDist = dist;
+        }
+      }
+      return best;
+    }
+    return undefined;
+  };
+
+  const load = async (targetLane: TimelineLaneFilter, force = false, limit = TIMELINE_LIMIT, applyFocus?: TimelineJumpFocus) => {
+    if (inFlight && !applyFocus) {
       if (force || pendingLane !== undefined || targetLane !== activeLane) {
         pendingLane = targetLane;
       }
@@ -46,11 +76,18 @@ export function TimelineTab(props: { fallbackEvents: () => readonly DebugTimelin
         try {
           const res = await api.debug.timeline.list({
             ...(current !== "all" ? { lane: current } : {}),
-            limit: TIMELINE_LIMIT,
+            limit,
           });
           if (seq === loadSeq) {
             page.set(res);
             error.set(undefined);
+            if (applyFocus) {
+              const matched = findMatchingEvent(res.events, applyFocus);
+              if (matched) {
+                expandedId.set(matched.id);
+                highlightedId.set(matched.id);
+              }
+            }
           }
         } catch (e) {
           if (seq === loadSeq) error.set(reasonOf(e));
@@ -68,6 +105,23 @@ export function TimelineTab(props: { fallbackEvents: () => readonly DebugTimelin
     void props.refreshTick();
     untracked(() => {
       void load(currentLane);
+    });
+  });
+
+  effect(() => {
+    const f = props.focus?.();
+    if (!f || f.key === handledFocusKey) return;
+    handledFocusKey = f.key;
+    untracked(() => {
+      lane.set("all");
+      slowOnly.set(false);
+      search.set(f.traceId !== undefined ? "" : (f.search ?? ""));
+      const localMatch = findMatchingEvent(page()?.events ?? props.fallbackEvents(), f);
+      if (localMatch) {
+        expandedId.set(localMatch.id);
+        highlightedId.set(localMatch.id);
+      }
+      void load("all", true, TIMELINE_JUMP_LIMIT, f);
     });
   });
 
@@ -171,15 +225,19 @@ export function TimelineTab(props: { fallbackEvents: () => readonly DebugTimelin
           <Each of={visibleEvents()} key={(ev) => ev.id}>
             {(ev) => {
               const expanded = () => expandedId() === ev().id;
+              const highlighted = () => highlightedId() === ev().id;
               const slow = () => isSlowEvent(ev());
               return (
-                <View class="rounded-md border border-line bg-page">
+                <View class={`rounded-md border bg-page ${highlighted() ? "border-focus" : "border-line"}`}>
                   <View
                     role="button"
                     testID={`timeline-row-${ev().id}`}
                     accessibilityState={{ expanded: expanded() }}
-                    onPress={() => expandedId.set(expanded() ? undefined : ev().id)}
-                    class="flex-row items-center gap-2 px-2.5 py-2 hover:bg-hover"
+                    onPress={() => {
+                      highlightedId.set(undefined);
+                      expandedId.set(expanded() ? undefined : ev().id);
+                    }}
+                    class={`flex-row items-center gap-2 px-2.5 py-2 ${highlighted() ? "bg-selected" : "hover:bg-hover"}`}
                   >
                     <Tag tone={laneTone(ev().lane)} label={laneLabel(ev().lane)} />
                     <Text class="shrink-0 font-mono text-2xs tabular-nums text-faint">{wallClockText(ev().time)}</Text>
@@ -199,12 +257,31 @@ export function TimelineTab(props: { fallbackEvents: () => readonly DebugTimelin
                   </View>
                   <If when={expanded()}>
                     <View testID={`timeline-detail-${ev().id}`} class="gap-2 border-t border-line bg-side p-2.5">
-                      <View class="flex-row flex-wrap items-center gap-2">
-                        <If when={ev().traceId !== undefined}>
-                          <Text class="font-mono text-2xs text-muted">{t("web.devtools.timeline.correlationId", { id: ev().traceId ?? 0 })}</Text>
-                        </If>
-                        <If when={ev().durationUs !== undefined}>
-                          <Text class="font-mono text-2xs text-muted">{t("web.devtools.timeline.durationUs", { us: ev().durationUs ?? 0 })}</Text>
+                      <View class="flex-row flex-wrap items-center justify-between gap-2">
+                        <View class="flex-row flex-wrap items-center gap-2">
+                          <If when={ev().traceId !== undefined}>
+                            <Text class="font-mono text-2xs text-muted">{t("web.devtools.timeline.correlationId", { id: ev().traceId ?? 0 })}</Text>
+                          </If>
+                          <If when={ev().durationUs !== undefined}>
+                            <Text class="font-mono text-2xs text-muted">{t("web.devtools.timeline.durationUs", { us: ev().durationUs ?? 0 })}</Text>
+                          </If>
+                        </View>
+                        <If when={props.onJumpToTrajectory !== undefined}>
+                          <View
+                            role="button"
+                            testID={`timeline-jump-trajectory-${ev().id}`}
+                            onPress={() =>
+                              props.onJumpToTrajectory?.({
+                                ...(ev().traceId !== undefined ? { traceId: ev().traceId } : {}),
+                                timestampMs: ev().time,
+                                summary: ev().summary,
+                              })
+                            }
+                            class="flex-row items-center gap-1 rounded-sm border border-line bg-page px-2 py-0.5 hover:bg-hover"
+                          >
+                            <Icon name="log" size={11} tone="accent" />
+                            <Text class="text-2xs font-medium text-ink">{t("web.devtools.actions.jumpToTrajectory")}</Text>
+                          </View>
                         </If>
                       </View>
                       <If when={ev().detail !== undefined} else={<Text class="text-xs text-muted">{t("web.devtools.status.empty")}</Text>}>

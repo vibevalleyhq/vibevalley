@@ -321,6 +321,7 @@ impl Router {
             }),
             E::DebugTrajectoryList => ret!(ok_json(dbg.trajectory_list_async().await?)),
             E::DebugTrajectoryGet => on!(p, DebugTrajectoryGet, |r| dbg.trajectory_get_async(&r).await?),
+            E::DebugTrajectoryExport => on!(p, DebugTrajectoryExport, |r| dbg.trajectory_export_async(&r).await?),
             E::DebugOverrideSet => on!(p, DebugOverrideSet, |r| dbg.override_set(r)?),
             E::DebugBundleExport => ret!(ok_json(dbg.bundle_export_async().await?)),
             E::RemoteStatus => ret!(ok_json(self.remote.status_async().await?)),

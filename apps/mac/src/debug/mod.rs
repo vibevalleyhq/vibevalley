@@ -1,15 +1,12 @@
-//! Unified desktop debugging, automation scripts, and live VDP (VibeValley DevTools Protocol) host.
+//! Unified desktop debugging and live VDP (VibeValley DevTools Protocol) host.
 //!
-//! - `VIBEVALLEY_DEBUG_DUMP=<file>` and `VIBEVALLEY_DEBUG_SCRIPT=<file>` live in [`script`]
-//!   and delegate every window/shell action to [`executor`].
-//! - Live loopback VDP (`--remote-debugging-port=<port>` or `VIBEVALLEY_DEBUG_PORT=<port>`)
-//!   lives in [`vdp`] and shares the exact same [`executor`] command plane.
-//! - Disabled by default: when no debug port is configured, zero sockets open, zero
-//!   `debug.json` files are written, and zero per-frame/log overhead is incurred.
+//! Live loopback VDP (`--remote-debugging-port=<port>` or `VIBEVALLEY_DEBUG_PORT=<port>`)
+//! lives in [`vdp`] and delegates window/shell inspection & automation to [`executor`].
+//! Disabled by default: when no debug port is configured, zero sockets open, zero
+//! `debug.json` files are written, and zero per-frame/log overhead is incurred.
 
-mod executor;
-mod script;
-mod vdp;
+pub(crate) mod executor;
+pub(crate) mod vdp;
 
 #[cfg(test)]
 mod tests;
@@ -80,10 +77,8 @@ pub(crate) fn set_vdp_log_active(active: bool) {
     VDP_LOG_ACTIVE.store(active, Ordering::Release);
 }
 
-/// Starts legacy debug dump/script automation and (when opted in) the live VDP host server.
+/// Starts the opt-in live VDP host server when configured via `--remote-debugging-port` or `VIBEVALLEY_DEBUG_PORT`.
 pub fn start(shell: Entity<Shell>, window: WindowHandle<Shell>, cx: &mut App) {
-    script::start(shell.clone(), window, cx);
-
     let Some(port) = *VDP_CONFIGURED_PORT.lock() else {
         return;
     };

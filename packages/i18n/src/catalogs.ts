@@ -1198,7 +1198,15 @@ export const catalogs = {
         apply: "应用",
         reset: "重置",
         disconnect: "模拟断开",
+        inspect: "检视画布元素",
+        inspectCancel: "取消检视",
+        jumpToSource: "跳转到源码",
+        clearHighlight: "清除高亮",
+        exportTrajectory: "导出评测包",
+        jumpToTimeline: "跳至时间线",
+        jumpToTrajectory: "跳至轨迹",
       },
+      inspector: { title: "画布与界面检视", active: "检视模式已开启 — 点击主窗口任意元素或画布即可定位。", surface: "所在层", noSource: "未记录源码位置" },
       lanes: { all: "全部通道", coreApply: "Core::apply", bridgeRpc: "桥接 RPC", oarWire: "OAR 协议流", gpuiFrame: "GPUI 渲染帧" },
       overview: {
         channel: "发布通道",
@@ -1243,6 +1251,8 @@ export const catalogs = {
         rawPayload: "原始载荷",
         truncated: "已截断（原 {bytes} B）",
         subagents: "子代理",
+        subagentTree: "子代理调用树",
+        allAgents: "全部代理",
         systemPrompt: "系统提示词",
         turns: "轮次",
         turnIndex: "第 {index} 轮",
@@ -1252,6 +1262,9 @@ export const catalogs = {
         voyageRecords: "原始记录",
         emptyList: "暂无轨迹记录。",
         selectPrompt: "选择一条轨迹以查看各轮详情和原始帧。",
+        exported: "已导出评测包至 {dir}",
+        inspectCmd: "检视命令",
+        replayCmd: "回放命令",
       },
       state: {
         seq: "状态序号",
@@ -1269,6 +1282,12 @@ export const catalogs = {
         inbox: "收件箱",
         mediaJobs: "媒体",
         emptyCaches: "暂无缓存统计。",
+        collab: "Loro 协同与瞬态在场",
+        emptyCollab: "暂无活跃协同作品。",
+        frontiers: "Frontiers 前沿",
+        presence: "EphemeralStore 在场节点",
+        noPeers: "暂无活跃在场节点",
+        ttl: "有效 {ms}ms",
       },
       lab: {
         rpcDelayMs: "RPC 延迟 (ms)",
@@ -5030,6 +5049,19 @@ export const catalogs = {
         apply: "Apply",
         reset: "Reset",
         disconnect: "Simulate Disconnect",
+        inspect: "Inspect Canvas",
+        inspectCancel: "Cancel Inspect",
+        jumpToSource: "Jump to Source",
+        clearHighlight: "Clear Highlight",
+        exportTrajectory: "Export Eval Bundle",
+        jumpToTimeline: "View in Timeline",
+        jumpToTrajectory: "View in Trajectory",
+      },
+      inspector: {
+        title: "Canvas Inspector",
+        active: "Inspector active — click any element or canvas in the main window.",
+        surface: "Surface",
+        noSource: "No source location recorded",
       },
       lanes: { all: "All Lanes", coreApply: "Core::apply", bridgeRpc: "Bridge RPC", oarWire: "OAR Wire", gpuiFrame: "GPUI Frame" },
       overview: {
@@ -5075,6 +5107,8 @@ export const catalogs = {
         rawPayload: "Raw Payload",
         truncated: "Truncated ({bytes} B)",
         subagents: "Subagents",
+        subagentTree: "Subagent Tree",
+        allAgents: "All Agents",
         systemPrompt: "System Prompt",
         turns: "Rounds",
         turnIndex: "Round #{index}",
@@ -5084,6 +5118,9 @@ export const catalogs = {
         voyageRecords: "Voyage Records",
         emptyList: "No trajectories recorded yet.",
         selectPrompt: "Select a trajectory to inspect its rounds and raw frames.",
+        exported: "Exported eval bundle to {dir}",
+        inspectCmd: "Inspect Command",
+        replayCmd: "Replay Command",
       },
       state: {
         seq: "State Seq",
@@ -5101,6 +5138,12 @@ export const catalogs = {
         inbox: "Inbox",
         mediaJobs: "Media",
         emptyCaches: "No cache metrics reported.",
+        collab: "Loro Collab & EphemeralStore",
+        emptyCollab: "No active collaborative artifacts.",
+        frontiers: "Frontiers",
+        presence: "EphemeralStore Peers",
+        noPeers: "No active ephemeral peers",
+        ttl: "TTL {ms}ms",
       },
       lab: {
         rpcDelayMs: "RPC Delay (ms)",
@@ -8970,17 +9013,28 @@ export interface Messages {
   "web.devtools.actions.apply": undefined;
   "web.devtools.actions.autoRefresh": undefined;
   "web.devtools.actions.clear": undefined;
+  "web.devtools.actions.clearHighlight": undefined;
   "web.devtools.actions.close": undefined;
   "web.devtools.actions.copied": undefined;
   "web.devtools.actions.copy": undefined;
   "web.devtools.actions.detach": undefined;
   "web.devtools.actions.disconnect": undefined;
   "web.devtools.actions.exportBundle": undefined;
+  "web.devtools.actions.exportTrajectory": undefined;
   "web.devtools.actions.exporting": undefined;
+  "web.devtools.actions.inspect": undefined;
+  "web.devtools.actions.inspectCancel": undefined;
+  "web.devtools.actions.jumpToSource": undefined;
+  "web.devtools.actions.jumpToTimeline": undefined;
+  "web.devtools.actions.jumpToTrajectory": undefined;
   "web.devtools.actions.pause": undefined;
   "web.devtools.actions.refresh": undefined;
   "web.devtools.actions.reset": undefined;
   "web.devtools.actions.resume": undefined;
+  "web.devtools.inspector.active": undefined;
+  "web.devtools.inspector.noSource": undefined;
+  "web.devtools.inspector.surface": undefined;
+  "web.devtools.inspector.title": undefined;
   "web.devtools.lab.applied": undefined;
   "web.devtools.lab.disconnectTopic": undefined;
   "web.devtools.lab.disconnectTopicPlaceholder": undefined;
@@ -9077,16 +9131,22 @@ export interface Messages {
   "web.devtools.state.artifacts": undefined;
   "web.devtools.state.caches": undefined;
   "web.devtools.state.channels": undefined;
+  "web.devtools.state.collab": undefined;
   "web.devtools.state.counts": undefined;
   "web.devtools.state.emptyCaches": undefined;
+  "web.devtools.state.emptyCollab": undefined;
   "web.devtools.state.entries": { readonly count: string | number };
+  "web.devtools.state.frontiers": undefined;
   "web.devtools.state.inbox": undefined;
   "web.devtools.state.issues": undefined;
   "web.devtools.state.mediaJobs": undefined;
+  "web.devtools.state.noPeers": undefined;
+  "web.devtools.state.presence": undefined;
   "web.devtools.state.repos": undefined;
   "web.devtools.state.seq": undefined;
   "web.devtools.state.sessions": undefined;
   "web.devtools.state.slices": undefined;
+  "web.devtools.state.ttl": { readonly ms: string | number };
   "web.devtools.state.watchers": { readonly count: string | number };
   "web.devtools.status.disabled": undefined;
   "web.devtools.status.empty": undefined;
@@ -9107,16 +9167,21 @@ export interface Messages {
   "web.devtools.timeline.slow": undefined;
   "web.devtools.timeline.slowOnly": undefined;
   "web.devtools.title": undefined;
+  "web.devtools.trajectory.allAgents": undefined;
   "web.devtools.trajectory.emptyList": undefined;
   "web.devtools.trajectory.events": undefined;
+  "web.devtools.trajectory.exported": { readonly dir: string | number };
+  "web.devtools.trajectory.inspectCmd": undefined;
   "web.devtools.trajectory.kind.issueSession": undefined;
   "web.devtools.trajectory.kind.orchestrator": undefined;
   "web.devtools.trajectory.kind.workspaceChat": undefined;
   "web.devtools.trajectory.prompt": undefined;
   "web.devtools.trajectory.rawEntries": undefined;
   "web.devtools.trajectory.rawPayload": undefined;
+  "web.devtools.trajectory.replayCmd": undefined;
   "web.devtools.trajectory.selectPrompt": undefined;
   "web.devtools.trajectory.silentError": undefined;
+  "web.devtools.trajectory.subagentTree": undefined;
   "web.devtools.trajectory.subagents": undefined;
   "web.devtools.trajectory.systemPrompt": undefined;
   "web.devtools.trajectory.tokens": undefined;

@@ -149,7 +149,8 @@
     "cacheRead": 0,
     "output": 120
    },
-   "silentErrors": []
+   "silentErrors": [],
+   "traceIds": []
   },
   {
    "index": 1,
@@ -158,6 +159,21 @@
    "rawEntries": [],
    "silentErrors": [
     "parse frame failed"
+   ],
+   "traceIds": []
+  }
+ ],
+ "DebugTrajectorySubagentNode": [
+  {
+   "id": "root",
+   "path": "root",
+   "label": "root",
+   "status": "completed",
+   "turnCount": 1,
+   "eventCount": 2,
+   "rawCount": 1,
+   "traceIds": [
+    7
    ]
   }
  ],
@@ -181,12 +197,14 @@
      "startedAt": 1700000000000,
      "events": [],
      "rawEntries": [],
-     "silentErrors": []
+     "silentErrors": [],
+     "traceIds": []
     }
    ],
    "subagentPaths": [
     "root/verifier"
    ],
+   "subagentNodes": [],
    "voyageRecordCount": 5
   }
  ],
@@ -197,6 +215,29 @@
   },
   {
    "id": "orchestrator"
+  }
+ ],
+ "DebugTrajectoryExportRequest": [
+  {
+   "id": "w1",
+   "kind": "issue_session",
+   "outDir": "/tmp/exports/w1"
+  },
+  {
+   "id": "orchestrator"
+  }
+ ],
+ "DebugTrajectoryExportResult": [
+  {
+   "dir": "/tmp/exports/w1",
+   "replaySpecPath": "/tmp/exports/w1/replay.json",
+   "conversationId": "w1",
+   "sourceKind": "durable_store",
+   "entriesExported": 6,
+   "tasksExported": 1,
+   "conversationsExported": 1,
+   "inspectCmd": "vibevalley-eval inspect --store /tmp/exports/w1",
+   "replayCmd": "vibevalley-eval replay --spec /tmp/exports/w1/replay.json"
   }
  ],
  "DebugRuntimeSummary": [
@@ -320,6 +361,56 @@
    "mediaJobs": 0
   }
  ],
+ "DebugCollabClock": [
+  {
+   "peerId": "1234",
+   "counter": 1
+  }
+ ],
+ "DebugCollabPresence": [
+  {
+   "id": "peer-alice",
+   "name": "Alice",
+   "kind": "cursor",
+   "nodeId": "sec-1",
+   "path": "structure/doc.md",
+   "updatedAt": 1700000000000
+  }
+ ],
+ "DebugCollabArtifactState": [
+  {
+   "artifactId": "art-1",
+   "title": "Architecture Spec",
+   "artifactType": "doc",
+   "seq": 12,
+   "snapshotBytes": 512,
+   "frontiers": "1@1234",
+   "frontierIds": [
+    {
+     "peerId": "1234",
+     "counter": 1
+    }
+   ],
+   "versionVector": "1234:2",
+   "vvEntries": [
+    {
+     "peerId": "1234",
+     "counter": 2
+    }
+   ],
+   "ephemeralTtlMs": 30000,
+   "presenceCount": 1,
+   "presence": [
+    {
+     "id": "peer-alice",
+     "name": "Alice",
+     "kind": "cursor",
+     "updatedAt": 1700000000000
+    }
+   ],
+   "updatedAt": 1700000000100
+  }
+ ],
  "DebugStateCache": [
   {
    "seq": 99,
@@ -346,7 +437,8 @@
      "name": "pkm_pages",
      "entries": 24
     }
-   ]
+   ],
+   "collab": []
   }
  ],
  "DebugOverrideConfig": [
@@ -416,7 +508,8 @@
      "inbox": 0,
      "mediaJobs": 0
     },
-    "caches": []
+    "caches": [],
+    "collab": []
    },
    "recentTimeline": []
   }

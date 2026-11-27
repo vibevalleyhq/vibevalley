@@ -213,6 +213,7 @@ function WorkbenchSurface() {
     testId: "workbench-page",
     role: "main",
     route: () => location().pathname,
+    source: "apps/mac/ui/app/Workbench.tsx:212",
     getRef: () => pageRef,
   });
   return (

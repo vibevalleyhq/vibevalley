@@ -7,11 +7,14 @@ use std::io::BufReader;
 use std::path::{Path, PathBuf};
 
 use serde::Serialize;
-use serde_json::Value;
+use serde_json::{Value, json};
 use vibevalley_protocol::{
-    ApiError, BizCode, DebugTrajectoryDetail, DebugTrajectoryGetRequest, DebugTrajectoryKind, DebugTrajectoryRawEntry, DebugTrajectorySummary,
-    DebugTrajectoryTurn, EventTokens, Issue, ORCHESTRATOR_RUNTIME, Phase, Session, SessionController, SessionEvent, SessionEventType,
+    ApiError, BizCode, DebugTrajectoryDetail, DebugTrajectoryExportRequest, DebugTrajectoryExportResult, DebugTrajectoryGetRequest, DebugTrajectoryKind,
+    DebugTrajectoryRawEntry, DebugTrajectorySubagentNode, DebugTrajectorySummary, DebugTrajectoryTurn, EventTokens, Issue, ORCHESTRATOR_RUNTIME, Phase,
+    Session, SessionController, SessionEvent, SessionEventType, SessionSubagents, SubagentStatus,
 };
+use vibevalley_runtime::agent::durable::{Store, Task, TaskStatus};
+use vibevalley_runtime::agent::eval::{EvalProfile, ReplaySpec};
 use vibevalley_runtime::oar::voyage::{Header as VoyageHeader, Kind as VoyageKind, Reader as VoyageReader, Record as VoyageRecord};
 use vibevalley_runtime::oar::{EventKind as OarEventKind, StopReason};
 
@@ -42,6 +45,7 @@ pub(crate) struct SessionStateMeta {
     pub status: Option<&'static str>,
     pub updated_at: i64,
     pub title: Option<String>,
+    pub subagents: Option<SessionSubagents>,
 }
 
 #[derive(Debug, Default)]
@@ -112,6 +116,7 @@ pub(crate) fn extract_session_meta(issues: &[Issue], sessions: &[Session], id: &
         status: session.map(|s| phase_status_str(&s.phase)),
         updated_at: session.map(|s| s.last_run.as_ref().map_or(s.hired_at, |r| r.at.max(s.hired_at))).unwrap_or(0),
         title,
+        subagents: session.and_then(|s| s.subagents.clone()),
     })
 }
 
@@ -150,6 +155,7 @@ pub(crate) fn extract_trajectory_index(issues: &[Issue], sessions: &[Session]) -
                 status: Some(phase_status_str(&s.phase)),
                 updated_at: s.last_run.as_ref().map_or(s.hired_at, |r| r.at.max(s.hired_at)),
                 title,
+                subagents: s.subagents.clone(),
             },
         );
     }
@@ -164,6 +170,7 @@ pub(crate) fn extract_trajectory_index(issues: &[Issue], sessions: &[Session]) -
             status: None,
             updated_at: 0,
             title: Some(format!("#{num} {t}")),
+            subagents: None,
         });
     }
 
@@ -760,6 +767,7 @@ fn push_session_event_to_turns(
             raw_entries: Vec::new(),
             tokens: None,
             silent_errors: Vec::new(),
+            trace_ids: Vec::new(),
         });
         turn_runs.push(ev.run.clone());
     } else if ev.r#type == SessionEventType::UserMessage
@@ -831,6 +839,7 @@ fn build_voyage_only_turns(records: &[VoyageRecord], redactor: &Redactor, count:
                 raw_entries: Vec::new(),
                 tokens: None,
                 silent_errors: Vec::new(),
+                trace_ids: Vec::new(),
             });
         }
         if !rec.span_id.is_empty() && (start_new || active_span.is_none()) {
@@ -888,8 +897,252 @@ fn build_turns(events: Vec<SessionEvent>, voyage: Option<&LoadedVoyage>, redacto
 
     for turn in &mut turns {
         turn.duration_ms = turn.ended_at.map(|end| (end - turn.started_at).max(0));
+        let trace_set: BTreeSet<i64> = turn.raw_entries.iter().filter_map(|e| e.trace_id).collect();
+        turn.trace_ids = trace_set.into_iter().collect();
     }
     (turns, subagent_paths)
+}
+
+fn subagent_status_str(status: SubagentStatus) -> &'static str {
+    match status {
+        SubagentStatus::PendingInit => "pending_init",
+        SubagentStatus::Running => "running",
+        SubagentStatus::Interrupted => "interrupted",
+        SubagentStatus::Completed => "completed",
+        SubagentStatus::Errored => "errored",
+        SubagentStatus::Shutdown => "shutdown",
+        SubagentStatus::NotFound => "not_found",
+    }
+}
+
+fn oar_subagent_status_str(status: &vibevalley_runtime::oar::SubagentStatus) -> &'static str {
+    match status {
+        vibevalley_runtime::oar::SubagentStatus::PendingInit => "pending_init",
+        vibevalley_runtime::oar::SubagentStatus::Running => "running",
+        vibevalley_runtime::oar::SubagentStatus::Interrupted => "interrupted",
+        vibevalley_runtime::oar::SubagentStatus::Completed => "completed",
+        vibevalley_runtime::oar::SubagentStatus::Errored => "errored",
+        vibevalley_runtime::oar::SubagentStatus::Shutdown => "shutdown",
+        vibevalley_runtime::oar::SubagentStatus::NotFound => "not_found",
+    }
+}
+
+#[derive(Default)]
+struct SubagentNodeAccum {
+    parent_id: Option<String>,
+    path: String,
+    label: String,
+    agent_name: Option<String>,
+    status: Option<String>,
+    turns: BTreeSet<u32>,
+    event_count: u32,
+    raw_count: u32,
+    started_at: Option<i64>,
+    ended_at: Option<i64>,
+    trace_ids: BTreeSet<i64>,
+}
+
+fn touch_subagent_time(acc: &mut SubagentNodeAccum, ts: i64) {
+    if ts > 0 {
+        acc.started_at = Some(acc.started_at.map_or(ts, |s| s.min(ts)));
+        acc.ended_at = Some(acc.ended_at.map_or(ts, |e| e.max(ts)));
+    }
+}
+
+fn build_subagent_nodes(
+    meta: Option<&SessionStateMeta>,
+    turns: &[DebugTrajectoryTurn],
+    voyage: Option<&LoadedVoyage>,
+    redactor: &Redactor,
+    count: &mut u32,
+) -> Vec<DebugTrajectorySubagentNode> {
+    let mut nodes: BTreeMap<String, SubagentNodeAccum> = BTreeMap::new();
+    let root_thread = meta.and_then(|m| m.subagents.as_ref()).map(|s| s.root_thread_id.as_str());
+
+    let ensure_path_chain = |nodes: &mut BTreeMap<String, SubagentNodeAccum>, segments: &[&str], count: &mut u32| -> Option<String> {
+        let mut parent: Option<String> = None;
+        let mut prefix = String::new();
+        for (idx, seg) in segments.iter().enumerate() {
+            let clean_seg = redactor.redact_str(seg.trim(), count);
+            if clean_seg.is_empty() {
+                continue;
+            }
+            if !prefix.is_empty() {
+                prefix.push('/');
+            }
+            prefix.push_str(&clean_seg);
+            let entry = nodes.entry(prefix.clone()).or_insert_with(|| SubagentNodeAccum {
+                parent_id: parent.clone(),
+                path: prefix.clone(),
+                label: clean_seg.clone(),
+                ..Default::default()
+            });
+            if idx > 0 && entry.parent_id.is_none() {
+                entry.parent_id = parent.clone();
+            }
+            parent = Some(prefix.clone());
+        }
+        parent
+    };
+
+    if let Some(subagents) = meta.and_then(|m| m.subagents.as_ref()) {
+        for thread in &subagents.threads {
+            let id = redactor.redact_str(thread.thread_id.trim(), count);
+            if id.is_empty() {
+                continue;
+            }
+            let parent_id = thread
+                .parent_thread_id
+                .as_deref()
+                .map(str::trim)
+                .filter(|p| !p.is_empty() && Some(*p) != root_thread)
+                .map(|p| redactor.redact_str(p, count));
+            let agent_name = thread.agent_name.as_deref().map(|n| redactor.redact_str(n, count));
+            let label = agent_name.clone().unwrap_or_else(|| id.clone());
+            let entry = nodes.entry(id.clone()).or_insert_with(|| SubagentNodeAccum {
+                parent_id: parent_id.clone(),
+                path: id.clone(),
+                label: label.clone(),
+                agent_name: agent_name.clone(),
+                ..Default::default()
+            });
+            if entry.parent_id.is_none() {
+                entry.parent_id = parent_id;
+            }
+            if entry.agent_name.is_none() {
+                entry.agent_name = agent_name;
+            }
+            if entry.label.is_empty() {
+                entry.label = label;
+            }
+            if let Some(status) = thread.status {
+                entry.status = Some(subagent_status_str(status).to_string());
+            }
+            touch_subagent_time(entry, thread.updated_at);
+        }
+    }
+
+    for turn in turns {
+        for ev in &turn.events {
+            let Some(raw_tid) = ev.thread_id.as_deref().map(str::trim).filter(|s| !s.is_empty()) else {
+                continue;
+            };
+            let tid = redactor.redact_str(raw_tid, count);
+            let entry = nodes.entry(tid.clone()).or_insert_with(|| SubagentNodeAccum {
+                parent_id: None,
+                path: tid.clone(),
+                label: tid.clone(),
+                ..Default::default()
+            });
+            entry.turns.insert(turn.index);
+            entry.event_count += 1;
+            touch_subagent_time(entry, ev.time);
+        }
+        for raw in &turn.raw_entries {
+            if raw.agent_path.is_empty() {
+                continue;
+            }
+            let segs: Vec<&str> = raw.agent_path.iter().map(String::as_str).collect();
+            if let Some(leaf_id) = ensure_path_chain(&mut nodes, &segs, count)
+                && let Some(entry) = nodes.get_mut(&leaf_id)
+            {
+                entry.turns.insert(turn.index);
+                entry.raw_count += 1;
+                touch_subagent_time(entry, raw.time);
+                if let Some(trace) = raw.trace_id {
+                    entry.trace_ids.insert(trace);
+                }
+            }
+        }
+    }
+
+    if let Some(loaded) = voyage {
+        for rec in &loaded.records {
+            let parent_from_rec = if rec.agent_path.is_empty() {
+                None
+            } else {
+                let segs: Vec<&str> = rec.agent_path.iter().map(String::as_str).collect();
+                ensure_path_chain(&mut nodes, &segs, count)
+            };
+            for native in &rec.native_events {
+                match &native.kind {
+                    OarEventKind::SubagentSpawned { thread_id, agent_name, .. } => {
+                        let id = redactor.redact_str(thread_id.trim(), count);
+                        if id.is_empty() {
+                            continue;
+                        }
+                        let agent_clean = agent_name.as_deref().map(|n| redactor.redact_str(n, count));
+                        let entry = nodes.entry(id.clone()).or_insert_with(|| SubagentNodeAccum {
+                            parent_id: parent_from_rec.clone().filter(|p| p != &id),
+                            path: parent_from_rec.as_ref().map_or_else(|| id.clone(), |p| format!("{p}/{id}")),
+                            label: agent_clean.clone().unwrap_or_else(|| id.clone()),
+                            agent_name: agent_clean.clone(),
+                            status: Some("running".to_string()),
+                            ..Default::default()
+                        });
+                        if entry.parent_id.is_none() {
+                            entry.parent_id = parent_from_rec.clone().filter(|p| p != &id);
+                        }
+                        if entry.agent_name.is_none() {
+                            entry.agent_name = agent_clean;
+                        }
+                        touch_subagent_time(entry, rec.received_at as i64);
+                        if let Some(trace) = rec.trace_id {
+                            entry.trace_ids.insert(trace as i64);
+                        }
+                    }
+                    OarEventKind::SubagentStatusChanged { thread_id, status, .. } => {
+                        let id = redactor.redact_str(thread_id.trim(), count);
+                        if id.is_empty() {
+                            continue;
+                        }
+                        let entry = nodes.entry(id.clone()).or_insert_with(|| SubagentNodeAccum {
+                            parent_id: parent_from_rec.clone().filter(|p| p != &id),
+                            path: id.clone(),
+                            label: id.clone(),
+                            ..Default::default()
+                        });
+                        entry.status = Some(oar_subagent_status_str(status).to_string());
+                        touch_subagent_time(entry, rec.received_at as i64);
+                    }
+                    OarEventKind::SubagentWait { thread_id, .. }
+                    | OarEventKind::SubagentMessage { thread_id, .. }
+                    | OarEventKind::SubagentPlanUpdated { thread_id, .. } => {
+                        let id = redactor.redact_str(thread_id.trim(), count);
+                        if !id.is_empty() {
+                            let entry = nodes.entry(id.clone()).or_insert_with(|| SubagentNodeAccum {
+                                parent_id: parent_from_rec.clone().filter(|p| p != &id),
+                                path: id.clone(),
+                                label: id.clone(),
+                                ..Default::default()
+                            });
+                            touch_subagent_time(entry, rec.received_at as i64);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    let existing_ids: BTreeSet<String> = nodes.keys().cloned().collect();
+    nodes
+        .into_iter()
+        .map(|(id, acc)| DebugTrajectorySubagentNode {
+            parent_id: acc.parent_id.filter(|p| p != &id && existing_ids.contains(p)),
+            id,
+            path: acc.path,
+            label: acc.label,
+            agent_name: acc.agent_name,
+            status: acc.status,
+            turn_count: acc.turns.len() as u32,
+            event_count: acc.event_count,
+            raw_count: acc.raw_count,
+            started_at: acc.started_at,
+            ended_at: acc.ended_at,
+            trace_ids: acc.trace_ids.into_iter().collect(),
+        })
+        .collect()
 }
 
 fn resolve_trajectory_runtime(meta: Option<&SessionStateMeta>, voyage: Option<&LoadedVoyage>, kind: DebugTrajectoryKind) -> String {
@@ -946,7 +1199,11 @@ pub(crate) async fn build_detail_async(
         .or_else(|| voyage.as_ref().and_then(extract_voyage_system_prompt));
     let system_prompt = redactor.redact_opt_str(raw_system_prompt, redacted_count);
 
-    let (turns, subagent_set) = build_turns(events, voyage.as_ref(), redactor, redacted_count);
+    let (turns, mut subagent_set) = build_turns(events, voyage.as_ref(), redactor, redacted_count);
+    let subagent_nodes = build_subagent_nodes(meta, &turns, voyage.as_ref(), redactor, redacted_count);
+    for node in &subagent_nodes {
+        subagent_set.insert(node.path.clone());
+    }
 
     let mut total_tokens: Option<EventTokens> = None;
     let mut updated_at = meta.map_or(0, |m| m.updated_at);
@@ -982,6 +1239,7 @@ pub(crate) async fn build_detail_async(
         system_prompt,
         turns,
         subagent_paths: subagent_set.into_iter().collect(),
+        subagent_nodes,
         voyage_record_count,
     })
 }
@@ -1207,6 +1465,256 @@ pub(crate) async fn export_snapshot_async(
         }
     }
     TrajectoryExport { summaries, details }
+}
+
+async fn redact_jsonl_tree_async(root: &Path, redactor: &Redactor) -> Result<(), ApiError> {
+    let mut stack = vec![root.to_path_buf()];
+    while let Some(dir) = stack.pop() {
+        let Ok(mut entries) = tokio::fs::read_dir(&dir).await else {
+            continue;
+        };
+        while let Ok(Some(entry)) = entries.next_entry().await {
+            let path = entry.path();
+            if path.is_dir() {
+                stack.push(path);
+                continue;
+            }
+            if path.extension().is_some_and(|e| e == "jsonl")
+                && let Ok(raw) = tokio::fs::read_to_string(&path).await
+            {
+                let mut count = 0u32;
+                let clean = redactor.redact_owned(raw, &mut count);
+                if count > 0 {
+                    tokio::fs::write(&path, clean)
+                        .await
+                        .map_err(|e| ApiError::new(BizCode::InternalError, format!("redact export {}: {e}", path.display())))?;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn turn_prompt_for_replay(detail: &DebugTrajectoryDetail) -> String {
+    detail
+        .turns
+        .iter()
+        .rev()
+        .find_map(|t| t.prompt.as_deref().map(str::trim).filter(|p| !p.is_empty()))
+        .unwrap_or("Continue from the exported trajectory state.")
+        .to_string()
+}
+
+pub(crate) async fn export_bundle_async(
+    home: &Path,
+    meta: Option<&SessionStateMeta>,
+    sources: &dyn DebugDataSource,
+    redactor: &Redactor,
+    req: &DebugTrajectoryExportRequest,
+    orchestrator_ids: &[String],
+) -> Result<DebugTrajectoryExportResult, ApiError> {
+    let get_req = DebugTrajectoryGetRequest {
+        id: req.id.clone(),
+        kind: req.kind,
+    };
+    let mut redacted_count = 0u32;
+    let detail = build_detail_async(home, meta, sources, redactor, &get_req, orchestrator_ids, &mut redacted_count).await?;
+    let safe_id = detail.summary.id.clone();
+    let dest_dir = match req.out_dir.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+        Some(custom) => PathBuf::from(custom),
+        None => home
+            .join("debug-exports")
+            .join(format!("trajectory-{safe_id}-{}", detail.summary.updated_at.max(0))),
+    };
+    tokio::fs::create_dir_all(&dest_dir)
+        .await
+        .map_err(|e| ApiError::new(BizCode::InternalError, format!("create export dir: {e}")))?;
+
+    let (conv_id, source_kind, entries_exported, tasks_exported, conversations_exported, at_seq) =
+        if let Some(durable) = sources.export_durable_conversation_async(&safe_id, &dest_dir).await? {
+            redact_jsonl_tree_async(&dest_dir, redactor).await?;
+            let ro = Store::open_any_read_only(&dest_dir)
+                .await
+                .map_err(|e| ApiError::new(BizCode::InternalError, format!("verify exported store: {e}")))?;
+            let target_conv = durable.conversation_id.clone();
+            let seq = ro
+                .read_async(move |r| Box::pin(async move { Ok(r.conversation_async(&target_conv).await.map(|c| (c.next_seq - 1).max(0)).unwrap_or(0)) }))
+                .await
+                .unwrap_or(0);
+            let _ = ro.close().await;
+            (
+                durable.conversation_id,
+                "durable".to_string(),
+                durable.entries_exported,
+                durable.tasks_exported,
+                durable.conversations_exported,
+                seq,
+            )
+        } else {
+            let store = Store::jsonl(&dest_dir).map_err(|e| ApiError::new(BizCode::InternalError, format!("open jsonl export store: {e}")))?;
+            let root_conv = safe_id.clone();
+            let detail_clone = detail.clone();
+            let (entries_exported, tasks_exported, conversations_exported, at_seq) = store
+                .write_with_async((root_conv.clone(), detail_clone), |tx, (conv_id, detail)| {
+                    Box::pin(async move {
+                        tx.create_conversation_async(conv_id, &detail.summary.runtime).await?;
+                        let mut convs = 1u32;
+                        let mut entries = 0u32;
+                        let mut tasks = 0u32;
+                        if let Some(sys) = &detail.system_prompt
+                            && !sys.trim().is_empty()
+                        {
+                            tx.append_entry_async(conv_id, "pi.system", &json!({ "text": sys })).await?;
+                            entries += 1;
+                        }
+                        for turn in &detail.turns {
+                            if let Some(prompt) = &turn.prompt
+                                && !prompt.trim().is_empty()
+                            {
+                                tx.append_entry_async(conv_id, "pi.user", &json!({ "text": prompt })).await?;
+                                entries += 1;
+                            }
+                            if !turn.events.is_empty() {
+                                for ev in &turn.events {
+                                    match ev.r#type {
+                                        SessionEventType::AssistantMessage => {
+                                            tx.append_entry_async(conv_id, "pi.assistant", &json!({ "text": ev.text })).await?;
+                                            entries += 1;
+                                        }
+                                        SessionEventType::ToolCall => {
+                                            let tool_name = ev.tool.as_deref().unwrap_or("tool");
+                                            tx.append_entry_async(
+                                                conv_id,
+                                                "pi.assistant",
+                                                &json!({
+                                                    "text": "",
+                                                    "toolCalls": [{
+                                                        "id": format!("call-{}-{}", turn.index, ev.seq),
+                                                        "toolName": tool_name,
+                                                        "argsJson": ev.input.as_deref().unwrap_or("{}"),
+                                                    }]
+                                                }),
+                                            )
+                                            .await?;
+                                            entries += 1;
+                                        }
+                                        SessionEventType::ToolResult => {
+                                            let tool_name = ev.tool.as_deref().unwrap_or("tool");
+                                            tx.append_entry_async(
+                                                conv_id,
+                                                "pi.tool_result",
+                                                &json!({
+                                                    "toolCallId": format!("call-{}-{}", turn.index, ev.seq),
+                                                    "toolName": tool_name,
+                                                    "ok": ev.ok.unwrap_or(true),
+                                                    "output": ev.output.as_deref().unwrap_or(&ev.text),
+                                                }),
+                                            )
+                                            .await?;
+                                            entries += 1;
+                                        }
+                                        SessionEventType::RunError => {
+                                            tx.append_entry_async(conv_id, "pi.error", &json!({ "text": ev.text })).await?;
+                                            entries += 1;
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                            } else if !turn.raw_entries.is_empty() {
+                                for raw in &turn.raw_entries {
+                                    tx.append_entry_async(
+                                        conv_id,
+                                        "pi.assistant",
+                                        &json!({
+                                            "text": raw.summary,
+                                            "frameType": raw.frame_type,
+                                            "agentPath": raw.agent_path,
+                                        }),
+                                    )
+                                    .await?;
+                                    entries += 1;
+                                }
+                            }
+                        }
+                        for (idx, node) in detail.subagent_nodes.iter().enumerate() {
+                            let child_conv = format!("subagent:{}", node.id);
+                            let task_id = format!("task-subagent-{idx}");
+                            let mut task = Task::new("subagent", node.status.as_deref().unwrap_or("done"));
+                            task.id = task_id.clone();
+                            task.conversation_id = conv_id.clone();
+                            task.status = TaskStatus::Terminal;
+                            task.terminal_reason = node.status.clone().unwrap_or_else(|| "done".into());
+                            task.memo = json!({
+                                "threadId": node.id,
+                                "parentId": node.parent_id,
+                                "path": node.path,
+                                "label": node.label,
+                            });
+                            tx.create_task_async(task).await?;
+                            tasks += 1;
+                            tx.create_owned_conversation_async(&child_conv, &detail.summary.runtime, &task_id).await?;
+                            tx.append_entry_async(
+                                &child_conv,
+                                "pi.assistant",
+                                &json!({
+                                    "text": format!("subagent {} ({})", node.label, node.path),
+                                    "turnCount": node.turn_count,
+                                    "eventCount": node.event_count,
+                                }),
+                            )
+                            .await?;
+                            convs += 1;
+                            entries += 1;
+                        }
+                        let head = tx.conversation_async(conv_id).await.map(|c| (c.next_seq - 1).max(0)).unwrap_or(0);
+                        Ok((entries, tasks, convs, head))
+                    })
+                })
+                .await
+                .map_err(|e| ApiError::new(BizCode::InternalError, format!("write trajectory jsonl bundle: {e}")))?;
+            store
+                .close()
+                .await
+                .map_err(|e| ApiError::new(BizCode::InternalError, format!("flush trajectory export store: {e}")))?;
+            (
+                root_conv,
+                "trajectory".to_string(),
+                entries_exported,
+                tasks_exported,
+                conversations_exported,
+                at_seq,
+            )
+        };
+
+    let replay_spec_path = dest_dir.join("replay.json");
+    let spec = ReplaySpec {
+        source_path: dest_dir.clone(),
+        conversation_id: Some(conv_id.clone()),
+        at_seq,
+        prompt: turn_prompt_for_replay(&detail),
+        workspace: None,
+        profile: EvalProfile::default(),
+        graders: Vec::new(),
+        timeout_secs: 120,
+    };
+    let spec_json = serde_json::to_string_pretty(&spec).map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?;
+    tokio::fs::write(&replay_spec_path, spec_json)
+        .await
+        .map_err(|e| ApiError::new(BizCode::InternalError, format!("write replay spec: {e}")))?;
+
+    let dir_str = dest_dir.display().to_string();
+    let replay_str = replay_spec_path.display().to_string();
+    Ok(DebugTrajectoryExportResult {
+        dir: dir_str.clone(),
+        replay_spec_path: replay_str.clone(),
+        conversation_id: conv_id,
+        source_kind,
+        entries_exported,
+        tasks_exported,
+        conversations_exported,
+        inspect_cmd: format!("vibevalley-eval inspect {dir_str}"),
+        replay_cmd: format!("vibevalley-eval replay {replay_str}"),
+    })
 }
 
 #[cfg(test)]

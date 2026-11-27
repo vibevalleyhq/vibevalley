@@ -106,6 +106,8 @@ export class VibeValleyApi {
         this.call<T.DebugTrajectorySummary[]>("debug.trajectory.list", "/api/v1/debug/trajectory/list", undefined, options),
       get: (a: T.DebugTrajectoryGetRequest, options?: { signal?: AbortSignal }): Promise<T.DebugTrajectoryDetail> =>
         this.call<T.DebugTrajectoryDetail>("debug.trajectory.get", "/api/v1/debug/trajectory/get", a, options),
+      export: (a: T.DebugTrajectoryExportRequest, options?: { signal?: AbortSignal }): Promise<T.DebugTrajectoryExportResult> =>
+        this.call<T.DebugTrajectoryExportResult>("debug.trajectory.export", "/api/v1/debug/trajectory/export", a, options),
     },
     override: {
       set: (a: T.DebugOverrideConfig, options?: { signal?: AbortSignal }): Promise<T.DebugOverrideConfig> =>

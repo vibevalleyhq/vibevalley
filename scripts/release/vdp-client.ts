@@ -14,6 +14,7 @@ export interface VdpUiNode {
   readonly role?: string | null | undefined;
   readonly text?: string | null | undefined;
   readonly route?: string | null | undefined;
+  readonly source?: string | null | undefined;
   readonly pressable?: boolean | undefined;
   readonly children?: readonly VdpUiNode[] | null | undefined;
 }
@@ -110,6 +111,7 @@ export const UiNodeSchema: z.ZodType<VdpUiNode> = z.lazy(() =>
     role: z.string().nullable().optional(),
     text: z.string().nullable().optional(),
     route: z.string().nullable().optional(),
+    source: z.string().nullable().optional(),
     pressable: z.boolean().optional(),
     children: z.array(UiNodeSchema).nullable().optional(),
   }),
@@ -556,6 +558,64 @@ export class VdpWsClient {
   close(): void {
     this.ws.close();
   }
+}
+
+export const UpdateStateSchema = z.object({
+  ready: z.boolean(),
+  state: z.looseObject({ _tag: z.string() }),
+});
+
+export const RawScreenshotResultSchema = z.object({
+  mime: z.string(),
+  data: z.string(),
+  width: z.number(),
+  height: z.number(),
+});
+
+export async function waitForVdpEndpoint(opts: {
+  readonly homeDir: string;
+  readonly expectedPid?: number;
+  readonly timeoutMs?: number;
+  readonly appExited?: () => number | null;
+  readonly logPath?: string;
+}): Promise<ReturnType<typeof discoverVdpEndpoint>> {
+  const deadline = Date.now() + (opts.timeoutMs ?? 20_000);
+  let lastErr: unknown;
+  while (Date.now() < deadline) {
+    const code = opts.appExited?.();
+    if (code !== null && code !== undefined) {
+      const logTail = opts.logPath && existsSync(opts.logPath) ? readFileSync(opts.logPath, "utf8").slice(-1500) : "";
+      throw new Error(`app exited early (${code}) before writing debug.json${logTail ? `\n--- app.log ---\n${logTail}` : ""}`);
+    }
+    try {
+      const endpoint = discoverVdpEndpoint({ home: opts.homeDir });
+      if (opts.expectedPid === undefined || endpoint.pid === opts.expectedPid) {
+        return endpoint;
+      }
+      lastErr = new Error(`debug.json belongs to pid ${String(endpoint.pid)} instead of ${opts.expectedPid}`);
+    } catch (err) {
+      lastErr = err;
+    }
+    await sleep(100);
+  }
+  const logTail = opts.logPath && existsSync(opts.logPath) ? readFileSync(opts.logPath, "utf8").slice(-1500) : "";
+  throw new Error(
+    `timed out waiting for VDP endpoint in ${opts.homeDir}: ${lastErr instanceof Error ? lastErr.message : String(lastErr)}${
+      logTail ? `\n--- app.log ---\n${logTail}` : ""
+    }`,
+  );
+}
+
+export async function captureVdpPngFile(
+  client: VdpWsClient,
+  outPath: string,
+  target: "shell" | "webview" = "shell",
+): Promise<{ readonly path: string; readonly width: number; readonly height: number; readonly bytes: number }> {
+  const raw = await client.callDecoded("Page.captureScreenshot", { target }, RawScreenshotResultSchema);
+  const bytes = Buffer.from(raw.data, "base64");
+  mkdirSync(dirname(outPath), { recursive: true });
+  writeFileSync(outPath, bytes);
+  return { path: outPath, width: raw.width, height: raw.height, bytes: bytes.length };
 }
 
 export function createWsVdpDriver(client: VdpWsClient): VdpDriver {

@@ -5,9 +5,9 @@ use std::sync::Arc;
 use serde::Deserialize;
 use serde_json::{Value, json};
 use vibevalley_protocol::{
-    ApiError, BizCode, DebugBundleResult, DebugCacheStat, DebugGraph, DebugGraphClient, DebugGraphSession, DebugOverrideConfig, DebugOverview,
-    DebugRuntimeSummary, DebugSnapshot, DebugStateCache, DebugStateCounts, DebugTimelinePage, DebugTimelineQuery, DebugTrajectoryDetail,
-    DebugTrajectoryGetRequest, DebugTrajectoryKind, DebugTrajectorySummary, Issue, Session,
+    ApiError, BizCode, DebugBundleResult, DebugCacheStat, DebugCollabArtifactState, DebugGraph, DebugGraphClient, DebugGraphSession, DebugOverrideConfig,
+    DebugOverview, DebugRuntimeSummary, DebugSnapshot, DebugStateCache, DebugStateCounts, DebugTimelinePage, DebugTimelineQuery, DebugTrajectoryDetail,
+    DebugTrajectoryExportRequest, DebugTrajectoryExportResult, DebugTrajectoryGetRequest, DebugTrajectoryKind, DebugTrajectorySummary, Issue, Session,
 };
 
 use super::bundle::{self, BundlePayloads};
@@ -192,7 +192,32 @@ impl DebugKit {
         self.ctx.feed.watcher_counts()
     }
 
-    fn build_state_cache(&self, metrics: &StateMetrics, mut caches: Vec<DebugCacheStat>, agent_count: u32) -> DebugStateCache {
+    fn redact_collab_states(collab: &[DebugCollabArtifactState], redactor: &Redactor, count: &mut u32) -> Vec<DebugCollabArtifactState> {
+        collab
+            .iter()
+            .map(|c| {
+                let mut next = c.clone();
+                next.title = redactor.redact_owned(next.title, count);
+                for p in &mut next.presence {
+                    p.name = redactor.redact_owned(std::mem::take(&mut p.name), count);
+                    p.status = redactor.redact_opt_str(p.status.take(), count);
+                    p.node_id = redactor.redact_opt_str(p.node_id.take(), count);
+                    p.path = redactor.redact_opt_str(p.path.take(), count);
+                }
+                next
+            })
+            .collect()
+    }
+
+    fn build_state_cache(
+        &self,
+        metrics: &StateMetrics,
+        mut caches: Vec<DebugCacheStat>,
+        agent_count: u32,
+        collab: &[DebugCollabArtifactState],
+        redactor: &Redactor,
+        count: &mut u32,
+    ) -> DebugStateCache {
         caches.extend(self.collector.cache_stats());
         DebugStateCache {
             seq: self.ctx.feed.seq(),
@@ -209,6 +234,7 @@ impl DebugKit {
                 media_jobs: metrics.media_jobs,
             },
             caches,
+            collab: Self::redact_collab_states(collab, redactor, count),
         }
     }
 
@@ -234,15 +260,22 @@ impl DebugKit {
     pub async fn snapshot_async(&self) -> Result<DebugSnapshot, ApiError> {
         self.ensure_enabled()?;
         let redactor = Redactor::from_setting(&self.setting);
-        let mut count = 0u32;
-        let mut host = self.read_host_payload(&redactor, &mut count);
+        let mut prior_redactions = 0u32;
+        let mut host = self.read_host_payload(&redactor, &mut prior_redactions);
         let probe = self.sources.runtime_probe();
         let snap = self.sources.state_snapshot_async().await;
         let metrics = extract_state_metrics(&snap);
         let raw_sessions = extract_graph_sessions(&snap.issues, &snap.sessions, &probe.orchestrator_ids);
         let active_clients = host.clients.len() as u32;
-        let graph = finish_graph(raw_sessions, std::mem::take(&mut host.clients), &redactor, &mut count);
-        let state_cache = self.build_state_cache(&metrics, std::mem::take(&mut host.caches), probe.agent_count);
+        let graph = finish_graph(raw_sessions, std::mem::take(&mut host.clients), &redactor, &mut prior_redactions);
+        let state_cache = self.build_state_cache(
+            &metrics,
+            std::mem::take(&mut host.caches),
+            probe.agent_count,
+            &snap.collab,
+            &redactor,
+            &mut prior_redactions,
+        );
         let overview = self.build_overview(metrics.active_sessions, active_clients, &mut host, probe.runtimes);
         let routes = host.routes.unwrap_or_else(Self::default_routes);
         let overrides = self.collector.overrides();
@@ -304,6 +337,19 @@ impl DebugKit {
         .await
     }
 
+    pub async fn trajectory_export_async(&self, req: &DebugTrajectoryExportRequest) -> Result<DebugTrajectoryExportResult, ApiError> {
+        self.ensure_enabled()?;
+        let id = req.id.trim();
+        if !trajectory::is_safe_id(id) {
+            return Err(ApiError::new(BizCode::InvalidInput, "invalid trajectory id"));
+        }
+        let snap = self.sources.state_snapshot_async().await;
+        let meta = trajectory::extract_session_meta(&snap.issues, &snap.sessions, id);
+        let probe = self.sources.runtime_probe();
+        let redactor = Redactor::from_setting(&self.setting);
+        trajectory::export_bundle_async(&self.home, meta.as_ref(), self.sources.as_ref(), &redactor, req, &probe.orchestrator_ids).await
+    }
+
     pub async fn graph_async(&self) -> Result<DebugGraph, ApiError> {
         self.ensure_enabled()?;
         let redactor = Redactor::from_setting(&self.setting);
@@ -337,7 +383,14 @@ impl DebugKit {
         let index = trajectory::extract_trajectory_index(&snap.issues, &snap.sessions);
         let active_clients = host.clients.len() as u32;
         let graph = finish_graph(raw_sessions, std::mem::take(&mut host.clients), &redactor, &mut prior_redactions);
-        let state_cache = self.build_state_cache(&metrics, std::mem::take(&mut host.caches), probe.agent_count);
+        let state_cache = self.build_state_cache(
+            &metrics,
+            std::mem::take(&mut host.caches),
+            probe.agent_count,
+            &snap.collab,
+            &redactor,
+            &mut prior_redactions,
+        );
         let overview = self.build_overview(metrics.active_sessions, active_clients, &mut host, probe.runtimes);
         let routes = host.routes.unwrap_or_else(Self::default_routes);
         let overrides = self.collector.overrides();

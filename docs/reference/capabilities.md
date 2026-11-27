@@ -30,6 +30,7 @@
 | `debug.timeline.clear` | 清空开发者工具时间线缓冲区 | `/api/v1/debug/timeline/clear` | ✓ |   |   |   |
 | `debug.trajectory.list` | 列出可检视的执行会话、工作区对话与主助手轨迹摘要 | `/api/v1/debug/trajectory/list` | ✓ |   |   |   |
 | `debug.trajectory.get` | 读取单条执行会话、工作区对话或主助手轨迹详情与原始帧 | `/api/v1/debug/trajectory/get` | ✓ |   |   |   |
+| `debug.trajectory.export` | cap.op.debug.trajectory.export | `/api/v1/debug/trajectory/export` | ✓ |   |   |   |
 | `debug.override.set` | 更新故障注入与延迟覆盖配置 | `/api/v1/debug/override/set` | ✓ |   |   |   |
 | `debug.bundle.export` | 导出脱敏后的本机诊断包 | `/api/v1/debug/bundle/export` | ✓ |   |   |   |
 

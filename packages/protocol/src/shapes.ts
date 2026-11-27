@@ -272,6 +272,7 @@ export {
 export { type Cron, type CronRequest, type CronUpdate, type CronView } from "./cron/shapes.gen";
 export type {
   DebugBundleResult,
+  DebugCollabArtifactState,
   DebugGraph,
   DebugOverrideConfig,
   DebugOverview,
@@ -282,8 +283,11 @@ export type {
   DebugTimelinePage,
   DebugTimelineQuery,
   DebugTrajectoryDetail,
+  DebugTrajectoryExportRequest,
+  DebugTrajectoryExportResult,
   DebugTrajectoryGetRequest,
   DebugTrajectoryKind,
+  DebugTrajectorySubagentNode,
   DebugTrajectorySummary,
   DebugTrajectoryTurn,
 } from "./debug/shapes.gen";

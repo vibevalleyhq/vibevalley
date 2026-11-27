@@ -1,6 +1,6 @@
 # 验收应用
 
-[验收](.agents/skills/vv-acceptance/SKILL.md)的一份分册：起一个和用户的数据隔开的原生应用（`apps/mac`），用脚本一步一步驱动它，把要看的页面和纸雕农场场景截成 PNG，拿眼睛看。不用看屏幕，锁屏时也能跑。命令以 `apps/mac/src/debug/script.rs` 与 `apps/mac/src/debug/executor.rs` 为准。
+[验收](.agents/skills/vv-acceptance/SKILL.md)的一份分册：起一个和用户的数据隔开的原生应用（`apps/mac`），通过 VDP 回环调试门（`VIBEVALLEY_DEBUG_PORT=0` + `vibevalley debug` / 类型化 JSON-RPC）一步一步驱动它，把要看的页面和纸雕农场场景截成 PNG，拿眼睛看。不用看屏幕，锁屏时也能跑。命令以 `crates/protocol/src/vdp.rs` 与 `apps/mac/src/debug/executor.rs` 为准。
 
 ## 什么时候用
 
@@ -53,7 +53,7 @@ vp run ui:gallery -- --out /tmp/vv-app-gallery
    mkdir -p /tmp/vv-app/home /tmp/vv-app/work
    VIBEVALLEY_ASSETS="$PWD/assets" VIBEVALLEY_DIORAMA_DIST="$PWD/assets/diorama" \
    VIBEVALLEY_HOME=/tmp/vv-app/home VIBEVALLEY_WORK_ROOT=/tmp/vv-app/work VIBEVALLEY_STORE=/tmp/vv-app/state.db VIBEVALLEY_NO_OPENING=1 \
-   VIBEVALLEY_DEBUG_DUMP=/tmp/vv-app/dump.json VIBEVALLEY_DEBUG_SCRIPT=/tmp/vv-app/steps.txt \
+   VIBEVALLEY_DEBUG_PORT=0 \
      target/debug/vibevalley-mac 2> /tmp/vv-app/app.log
    ```
 
@@ -80,7 +80,7 @@ vp run ui:gallery -- --out /tmp/vv-app-gallery
    | `close_kind:<diorama\|hosted\|terminal>[@<标题里的字>]`、`close_tab_id:<id>` | 关掉脚本自己开的窗格（布局会存下来） |
    | 不带 `shell` 的一行 JSON | 当成页面发来的动作（`apps/mac/src/hosted/bridge.rs` 的 `Action`），如 `{"type":"openFarm","repo":""}` |
 
-4. 读证据：截图；`dump.json`（每秒重写：项目、布局、每个终端可见的字、每个托管视图收到的帧和报的错、纸雕窗格的状态 `diorama`）；`app.log` 里 `debug script:` 开头的行是每一步和它的结果。
+4. 读证据：截图；`vibevalley debug state --json`（项目、布局、每个终端可见的字、每个托管视图收到的帧和报的错、纸雕窗格的状态 `diorama`）；`app.log` 里记录每一步执行情况的行。
 5. 打开截图，对照改动检查内容、用语、溢出和重叠，浅色、深色各看一张。空状态只能证明空状态，不能代替列表、卡片和详情的验收。
 
 ## 验证宿主存储隔离
@@ -95,14 +95,14 @@ vp run ui:gallery -- --out /tmp/vv-app-gallery
 
 - 脚本文件、起应用的命令、`app.log` 里每步的行。
 - 和改动有关的截图，以及截图里对应的变化；改了布局时附一张窄窗口的。
-- 切主题后核对画面颜色确实变化，不能只看 `theme_dark`；打开农场再缩窄窗口，`dump.json` 的 `diorama.kind` 应仍是 `farm`，不能先缩窄再重新打开农场代替这一步。
-- `dump.json` 里托管视图没有报错（`hosted` 下的错误是空的）。
+- 切主题后核对画面颜色确实变化，不能只看 `theme_dark`；打开农场再缩窄窗口，`vibevalley debug state --json` 的 `diorama.kind` 应仍是 `farm`，不能先缩窄再重新打开农场代替这一步。
+- `vibevalley debug state --json` 里托管视图没有报错（`hosted` 下的错误是空的）。
 
 ## 出错时
 
 - **视图说包没打出来**：没有 nsh 或没跑 `vp run mac:check`；看构建时 `cargo:warning=nsh build` 的行。
 - **`shot` 没写出文件**：构建没带 `--features shot`，或路径的目录不存在；看 `app.log`。
-- **页面是空的或一直在读**：`dump.json` 里看那个视图有没有收到 `state` 帧；用真服务端时看 `app.log` 里 `vibevalley server:` 的行。
+- **页面是空的或一直在读**：通过 `vibevalley debug state --json`（或 VDP `Shell.getState`）看那个视图有没有收到 `state` 帧；用真服务端时看 `app.log` 里 `vibevalley server:` 的行。
 - **`key` 一步写着 `handled=false`**：焦点不在认这个快捷键的地方；先 `mouse:click` 到那个窗格。
 - **纸雕窗格是空的**：`assets/` 找不到（`VIBEVALLEY_ASSETS` 指过去），或未同步 Papertrails 产物（[开发](docs/development.md#素材音效和官网)）。
 
@@ -132,7 +132,7 @@ vp run ui:gallery -- --out /tmp/vv-app-gallery
 
 1. 跑 `vp run package:mac --version 0.0.1 --out /tmp/vv-package-old` 和 `vp run package:mac --version 0.0.2 --out /tmp/vv-package-new --skip-build`。默认使用本地 ad-hoc 签名，不上传或公证；发布包才显式传 `--sign` 和 `--notary-profile`。
 2. 跑 `vp run update-check --from /tmp/vv-package-old/VibeValley.app --to /tmp/vv-package-new/release.json`。脚本复制旧包到临时目录，用本机 HTTP 提供新清单和 ZIP，以隔离家目录运行旧包，等它校验并在退出后替换，再启动新包。
-3. 核对打印的证据目录：`result.json` 的 `ok`、`restarted`、`serverHealthy`、`signatureVerified` 均为 true，`before`、`after` 是两个版本；`app.log` 含 ready 状态，`health.json` 是新进程的健康响应，`dump.json` 的 `loaded` 是 true、`load_error` 为空，`workbench` 已应用 `state` 帧且没有错误。
+3. 核对打印的证据目录：`result.json` 的 `ok`、`restarted`、`serverHealthy`、`signatureVerified` 均为 true，`before`、`after` 是两个版本；`app.log` 含 ready 状态，`health.json` 是新进程的健康响应，VDP `Shell.getState`（保存为 `dump.json`）的 `loaded` 是 true、`load_error` 为空，`workbench` 已应用 `state` 帧且没有错误。
 4. 检查新旧输出目录都含 `.app`、`.dmg`、`.zip`、`release.json`。用 `codesign --verify --deep --strict <app>` 验签；ad-hoc 验签不代表 Developer ID 或公证通过。
 
 在候选包上运行 `vpx scripts/release/verify-farm-dispatch.ts /绝对路径/VibeValley.app`。脚本在原生农场手机上输入一条派工请求。回环模型返回建单工具调用。脚本还验包内 CLI 的 doctor 与频道读写，并等真实时钟触发一次定时任务。测试环境使用临时家目录和假凭据，沙箱只允许回环出站。凭 `result.json`、`local-model.json`、`field.json` 和 `cron.json` 对账。Debug 构建使用 `--features shot` 时另有渲染截图。该用例使用 1280 × 820 点窗口的农场布局。

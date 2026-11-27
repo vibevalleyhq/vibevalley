@@ -1,7 +1,7 @@
 import { spawn, execFileSync, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
-import { cp, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, realpath, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
@@ -13,6 +13,7 @@ import { z } from "zod";
 import { pathOf } from "@vibevalley/protocol";
 
 import { retainedUpdateData, seedUpdateIssue } from "./update-data.ts";
+import { UpdateStateSchema, VdpWsClient, waitForVdpEndpoint } from "./vdp-client.ts";
 
 const { values } = parseArgs({ options: { from: { type: "string" }, to: { type: "string" } } });
 if (!values.from || !values.to) throw new Error("update-check --from <old/VibeValley.app> --to <new/release.json>");
@@ -36,14 +37,8 @@ await cp(source, app, { recursive: true });
 await mkdir(join(dir, "home"));
 await mkdir(join(dir, "work"));
 await mkdir(join(dir, "user"));
-const steps = join(dir, "steps.jsonl");
 const project = join(dir, "retained-project");
 await mkdir(project);
-await writeFile(
-  steps,
-  [{ type: "activate_path", path: project }, { shell: "save" }, { shell: "wait_update" }, { shell: "quit" }].map((step) => JSON.stringify(step)).join("\n") +
-    "\n",
-);
 let allowUpdateFeed: (() => void) | undefined;
 const oldDataReady = new Promise<void>((resolve) => {
   allowUpdateFeed = resolve;
@@ -88,12 +83,11 @@ Object.assign(env, {
   GIT_AUTHOR_EMAIL: "upgrade@example.invalid",
   GIT_COMMITTER_EMAIL: "upgrade@example.invalid",
   VIBEVALLEY_UPDATE_FEED: `http://127.0.0.1:${address.port}/release.json`,
-  VIBEVALLEY_DEBUG_SCRIPT: steps,
-  VIBEVALLEY_DEBUG_DUMP: join(dir, "dump.json"),
+  VIBEVALLEY_DEBUG_PORT: "0",
 });
 let child: ChildProcess | undefined;
 let log = "";
-async function launch(timeout: number, onReady: (url: string) => Promise<void>) {
+async function launch(timeout: number, onReady: (url: string, vdp: VdpWsClient) => Promise<void>) {
   child = spawn(join(app, "Contents/MacOS/vibevalley-mac"), [], { cwd: join(dir, "work"), env, stdio: ["ignore", "pipe", "pipe"] });
   child.stdout?.on("data", (b: Buffer) => {
     log += b.toString();
@@ -138,7 +132,20 @@ async function launch(timeout: number, onReady: (url: string) => Promise<void>) 
       } catch {
         /* The new process has not announced its server yet. */
       }
-      if (url !== undefined) return onReady(url);
+      if (url !== undefined) {
+        const endpoint = await waitForVdpEndpoint({
+          homeDir: join(dir, "home"),
+          ...(child?.pid !== undefined ? { expectedPid: child.pid } : {}),
+          timeoutMs: Math.max(5_000, deadline - Date.now()),
+          appExited: () => child?.exitCode ?? null,
+        });
+        const vdp = await VdpWsClient.connect(endpoint, 15_000);
+        try {
+          return await onReady(url, vdp);
+        } finally {
+          vdp.close();
+        }
+      }
       if (child?.exitCode !== null) throw new Error("Packaged app exited before its server became healthy");
       await delay(100);
     }
@@ -148,15 +155,28 @@ async function launch(timeout: number, onReady: (url: string) => Promise<void>) 
 }
 try {
   let retained: Awaited<ReturnType<typeof retainedUpdateData>> | undefined;
-  await launch(150_000, async (url) => {
+  let stagedReady = false;
+  await launch(150_000, async (url, vdp) => {
+    await vdp.call("Shell.dispatchAction", { action: { type: "activate_path", path: project } });
+    await vdp.call("Shell.save", {});
     const id = await seedUpdateIssue(url);
     retained = await retainedUpdateData(url, id, dir);
     await writeFile(join(dir, "before-data.json"), JSON.stringify(retained, null, 2));
     allowUpdateFeed?.();
+    const updateDeadline = Date.now() + 90_000;
+    while (Date.now() < updateDeadline) {
+      const updateState = await vdp.callDecoded("Shell.getUpdateState", {}, UpdateStateSchema);
+      if (updateState.ready) {
+        stagedReady = true;
+        break;
+      }
+      await delay(200);
+    }
+    await vdp.call("Shell.quit", {});
   });
   if (!retained) throw new Error("The old package did not save the update test data");
   const expected = retained;
-  if (!log.includes('"_tag":"ready"') || !log.includes("update ready=true")) throw new Error("The old package never staged its update");
+  if (!stagedReady) throw new Error("The old package never staged its update");
   const deadline = Date.now() + 20_000;
   let after = before;
   while (Date.now() < deadline) {
@@ -170,28 +190,37 @@ try {
   }
   if (after !== release.version) throw new Error("The updater did not replace the installed copy");
   execFileSync("codesign", ["--verify", "--deep", "--strict", app]);
-  await writeFile(
-    steps,
-    [{ shell: 'hosted:vv {"route":"/issues"}' }, { shell: "wait:5000" }, { shell: "quit" }].map((step) => JSON.stringify(step)).join("\n") + "\n",
-  );
   env.VIBEVALLEY_UPDATE_FEED = "off";
-  await rm(join(dir, "dump.json"));
-  await launch(40_000, async (url) => {
-    const restored = await retainedUpdateData(url, expected.issue.id, dir);
-    await writeFile(join(dir, "after-data.json"), JSON.stringify(restored, null, 2));
-    if (JSON.stringify(restored) !== JSON.stringify(expected))
-      throw new Error("Upgrade changed issue, conversation, workspace or Git data; compare before-data.json and after-data.json");
-  });
   const view = z.object({
     view: z.string(),
     ready: z.boolean(),
     errors: z.array(z.string()),
     applied: z.array(z.object({ topic: z.string(), rev: z.number() })),
   });
-  const dump = z
-    .object({ loaded: z.boolean(), load_error: z.string().nullish(), workbench: view, sidebar: view })
-    .parse(JSON.parse(await readFile(join(dir, "dump.json"), "utf8")));
-  if (!dump.loaded || dump.load_error != null) throw new Error("The updated app did not load its workspace");
+  const DumpSchema = z.object({ loaded: z.boolean(), load_error: z.string().nullish(), workbench: view, sidebar: view });
+  let dump: z.infer<typeof DumpSchema> | undefined;
+  await launch(40_000, async (url, vdp) => {
+    const restored = await retainedUpdateData(url, expected.issue.id, dir);
+    await writeFile(join(dir, "after-data.json"), JSON.stringify(restored, null, 2));
+    if (JSON.stringify(restored) !== JSON.stringify(expected))
+      throw new Error("Upgrade changed issue, conversation, workspace or Git data; compare before-data.json and after-data.json");
+    await vdp.call("Shell.openPane", { kind: "hosted", params: { module: "vv", props: { route: "/issues" } } });
+    const dumpDeadline = Date.now() + 15_000;
+    while (Date.now() < dumpDeadline) {
+      const raw = await vdp.call("Shell.getState", {});
+      const parsed = DumpSchema.safeParse(raw);
+      if (parsed.success && parsed.data.loaded && parsed.data.load_error == null && parsed.data.workbench.ready) {
+        await writeFile(join(dir, "dump.json"), JSON.stringify(raw, null, 2));
+        dump = parsed.data;
+        if (parsed.data.workbench.applied.some((frame) => frame.topic === "state")) {
+          break;
+        }
+      }
+      await delay(150);
+    }
+    await vdp.call("Shell.quit", {});
+  });
+  if (!dump || !dump.loaded || dump.load_error != null) throw new Error("The updated app did not load its workspace");
   if (
     !dump.workbench.ready ||
     dump.workbench.errors.length > 0 ||

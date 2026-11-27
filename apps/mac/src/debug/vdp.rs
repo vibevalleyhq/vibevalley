@@ -27,7 +27,8 @@ use tokio_util::sync::{CancellationToken, DropGuard};
 use vibevalley_protocol::home::{DebugEndpointGuard, write_debug_endpoint};
 use vibevalley_protocol::{
     HostVdpCallPayload, SliceKind, VDP_PROTOCOL_VERSION, VdpAckResult, VdpBufferedEvent, VdpCommand, VdpEndpointInfo, VdpError, VdpEvent, VdpLogEntriesResult,
-    VdpNotification, VdpRequest, VdpResponse, VdpScreenshotResult, VdpTarget, VdpTargetAttachResult, VdpTargetListResult, VdpVersionInfo, VdpWireMessage,
+    VdpNotification, VdpRequest, VdpResponse, VdpScreenshotResult, VdpTarget, VdpTargetAttachResult, VdpTargetListResult, VdpUiInspectAtResult, VdpUiNode,
+    VdpVersionInfo, VdpWireMessage,
 };
 use vibevalley_server::gateway::bridge::{BizCode, CallerContext, Envelope, Server as BridgeServer, refusal};
 
@@ -165,10 +166,18 @@ pub(crate) trait VdpDispatcher: Send + Sync + 'static {
 // GPUI foreground command channel & production dispatcher
 // ---------------------------------------------------------------------------
 
+pub(crate) type HostedViewInspectEntry = (String, f32, f32, Entity<crate::hosted::HostedView>);
+pub(crate) type PrepareInspectReply = (Vec<HostedViewInspectEntry>, Option<VdpUiInspectAtResult>);
+
 pub(crate) enum GpuiCommand {
     ListTargets {
         attached: HashSet<String>,
         reply: oneshot::Sender<Result<Vec<VdpTarget>, VdpError>>,
+    },
+    PrepareInspectAt {
+        x: f32,
+        y: f32,
+        reply: oneshot::Sender<PrepareInspectReply>,
     },
     Execute {
         command: VdpCommand,
@@ -236,6 +245,103 @@ impl GpuiVdpDispatcher {
             Err(_) => Err(VdpError::timeout(format!("{method} timed out after {}ms", timeout.as_millis()))),
         }
     }
+
+    async fn dispatch_inspect_at(&self, x: f32, y: f32) -> Result<Value, VdpError> {
+        let (tx, rx) = oneshot::channel();
+        self.sender()
+            .send_async(GpuiCommand::PrepareInspectAt { x, y, reply: tx })
+            .await
+            .map_err(|_| VdpError::unavailable("main window is closed"))?;
+        let (hosted_views, native_hit) = match tokio::time::timeout(GPUI_DISPATCH_TIMEOUT, rx).await {
+            Ok(Ok(pair)) => pair,
+            Ok(Err(_)) => return Err(VdpError::unavailable("main window closed during inspect preparation")),
+            Err(_) => return Err(VdpError::timeout("UI.inspectAt preparation timed out")),
+        };
+
+        let mut candidates = Vec::new();
+        if let Some(native) = native_hit {
+            candidates.push(native);
+        }
+        for (surface, ox, oy, _hosted) in hosted_views {
+            if let Ok(val) = self.dispatch_ui(Some(surface.clone()), "UI.query", json!({}), Duration::from_millis(900)).await
+                && let Some(nodes) = val.get("nodes").and_then(Value::as_array)
+            {
+                for raw in nodes {
+                    if let Ok(node) = serde_json::from_value::<VdpUiNode>(raw.clone())
+                        && let Some(hit) = executor::hit_from_hosted_node(&surface, ox, oy, &node)
+                    {
+                        candidates.push(hit);
+                    }
+                }
+            }
+        }
+        let best = executor::select_deepest_hit(x, y, candidates).unwrap_or_else(|| VdpUiInspectAtResult {
+            hit: false,
+            ..Default::default()
+        });
+        if best.hit {
+            let (htx, hrx) = oneshot::channel();
+            let _ = self
+                .sender()
+                .send_async(GpuiCommand::Execute {
+                    command: VdpCommand::UiHighlight(vibevalley_protocol::VdpUiHighlightParams {
+                        test_id: best.test_id.clone(),
+                        bounds: best.bounds,
+                        label: best.text.clone(),
+                        source: best.source.clone(),
+                        surface: best.surface.clone(),
+                    }),
+                    reply: htx,
+                })
+                .await;
+            let _ = tokio::time::timeout(GPUI_DISPATCH_TIMEOUT, hrx).await;
+        }
+        serde_json::to_value(best).map_err(|e| VdpError::internal(e.to_string()))
+    }
+}
+
+/// Probes mounted [`crate::hosted::HostedView`] instances for Canvas Inspector clicks on the GPUI executor.
+pub(crate) async fn inspect_hosted_views_at(
+    hosted_views: Vec<(String, f32, f32, Entity<crate::hosted::HostedView>)>,
+    x: f32,
+    y: f32,
+    native_fallback: Option<VdpUiInspectAtResult>,
+    timeout: Duration,
+) -> Option<VdpUiInspectAtResult> {
+    let hub_opt = active_hub_slot().read().clone();
+    let dispatcher = hub_opt.map(|h| h.dispatcher.clone());
+    let mut candidates = Vec::new();
+    if let Some(native) = native_fallback {
+        candidates.push(native);
+    }
+    if let Some(disp) = dispatcher {
+        for (surface, ox, oy, _) in hosted_views {
+            if let Ok(val) = disp
+                .dispatch(
+                    VdpCommand::UiQuery(vibevalley_protocol::VdpUiQueryParams {
+                        test_id: None,
+                        text: None,
+                        role: None,
+                        view: Some(surface.clone()),
+                    }),
+                    None,
+                )
+                .await
+                && let Some(nodes) = val.get("nodes").and_then(Value::as_array)
+            {
+                for raw in nodes {
+                    if let Ok(node) = serde_json::from_value::<VdpUiNode>(raw.clone())
+                        && let Some(hit) = executor::hit_from_hosted_node(&surface, ox, oy, &node)
+                    {
+                        candidates.push(hit);
+                    }
+                }
+            }
+        }
+    } else {
+        let _ = (hosted_views, timeout);
+    }
+    executor::select_deepest_hit(x, y, candidates)
 }
 
 fn parse_slice_kind(name: &str) -> Result<SliceKind, VdpError> {
@@ -317,6 +423,7 @@ impl VdpDispatcher for GpuiVdpDispatcher {
                     let wire_params = serde_json::to_value(&params).unwrap_or_else(|_| json!({}));
                     self.dispatch_ui(view, "UI.waitFor", wire_params, Duration::from_millis(wait_ms + 1_500)).await
                 }
+                VdpCommand::UiInspectAt(params) => self.dispatch_inspect_at(params.x, params.y).await,
                 other => {
                     let (tx, rx) = oneshot::channel();
                     self.sender()
@@ -371,6 +478,13 @@ pub(crate) fn spawn_gpui_command_loop(shell: Entity<Shell>, window: WindowHandle
                     let targets = executor::collect_targets(shell.read(cx), &attached, cx);
                     let _ = reply.send(Ok(targets));
                 }
+                GpuiCommand::PrepareInspectAt { x, y, reply } => {
+                    let vp = window.viewport_size();
+                    let s = shell.read(cx);
+                    let hosted = executor::hosted_view_origins(s, f32::from(vp.width), f32::from(vp.height), cx);
+                    let native = executor::inspect_native_at(s, x, y, f32::from(vp.width), f32::from(vp.height), cx);
+                    let _ = reply.send((hosted, native));
+                }
                 GpuiCommand::Execute { command, reply } => {
                     let outcome = execute_on_gpui(&shell, command, window, cx);
                     let _ = reply.send(outcome);
@@ -422,7 +536,20 @@ fn execute_on_gpui(shell: &Entity<Shell>, command: VdpCommand, window: &mut gpui
         VdpCommand::ShellGetTerminalGrid(params) => GpuiExecResult::Ready(executor::exec_get_terminal_grid(shell.read(cx), &params, cx)),
         VdpCommand::ShellSendTerminalInput(params) => GpuiExecResult::Ready(shell.update(cx, |s, cx| executor::exec_send_terminal_input(s, &params, cx))),
         VdpCommand::ShellRunCommand(params) => GpuiExecResult::Ready(executor::exec_run_command(shell, &params, window, cx)),
+        VdpCommand::ShellDispatchAction(params) => GpuiExecResult::Ready(Ok(shell.update(cx, |s, cx| executor::exec_dispatch_action(s, &params, window, cx)))),
+        VdpCommand::ShellSave => GpuiExecResult::Ready(Ok(shell.update(cx, executor::exec_save))),
+        VdpCommand::ShellQuit => {
+            cx.spawn(async move |cx| {
+                cx.background_executor().timer(Duration::from_millis(20)).await;
+                cx.update(|cx| cx.quit());
+            })
+            .detach();
+            GpuiExecResult::Ready(Ok(json!(VdpAckResult { ok: true })))
+        }
+        VdpCommand::ShellGetUpdateState => GpuiExecResult::Ready(Ok(executor::exec_get_update_state())),
+        VdpCommand::ShellSetDioramaClock(params) => GpuiExecResult::Ready(Ok(shell.update(cx, |s, cx| executor::exec_set_diorama_clock(s, &params, cx)))),
         VdpCommand::PageCaptureScreenshot(params) => executor::capture_screenshot(&params, window, cx),
+        VdpCommand::PageDraw => GpuiExecResult::Ready(Ok(executor::exec_page_draw(shell, window, cx))),
         VdpCommand::PageGetMetrics => {
             let metrics = executor::page_metrics(window, cx);
             GpuiExecResult::Ready(serde_json::to_value(metrics).map_err(|e| VdpError::internal(e.to_string())))
@@ -437,6 +564,8 @@ fn execute_on_gpui(shell: &Entity<Shell>, command: VdpCommand, window: &mut gpui
         VdpCommand::InputDispatchMouse(params) => GpuiExecResult::Ready(
             executor::dispatch_mouse(&params, window, cx).and_then(|res| serde_json::to_value(res).map_err(|e| VdpError::internal(e.to_string()))),
         ),
+        VdpCommand::UiHighlight(params) => GpuiExecResult::Ready(Ok(shell.update(cx, |s, cx| executor::exec_ui_highlight(s, &params, cx)))),
+        VdpCommand::UiSetInspectorMode(params) => GpuiExecResult::Ready(Ok(shell.update(cx, |s, cx| executor::exec_ui_set_inspector_mode(s, &params, cx)))),
         // Handled before reaching the GPUI thread:
         VdpCommand::TargetList
         | VdpCommand::TargetAttach(_)
@@ -445,6 +574,7 @@ fn execute_on_gpui(shell: &Entity<Shell>, command: VdpCommand, window: &mut gpui
         | VdpCommand::UiQuery(_)
         | VdpCommand::UiPress(_)
         | VdpCommand::UiWaitFor(_)
+        | VdpCommand::UiInspectAt(_)
         | VdpCommand::ServerSlice(_)
         | VdpCommand::ServerInvoke(_)
         | VdpCommand::LogEnable

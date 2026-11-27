@@ -401,6 +401,29 @@ async fn collab_snapshot_impl<C: ConnectionTrait>(db: &C, artifact_id: &str) -> 
     Ok(artifact_collab::Entity::find_by_id(artifact_id.to_owned()).one(db).await?.map(|m| m.snapshot))
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct CollabSnapshotRow {
+    pub(crate) artifact_id: String,
+    pub(crate) snapshot: Vec<u8>,
+    pub(crate) updated_at: i64,
+}
+
+async fn list_collab_snapshots_impl<C: ConnectionTrait>(db: &C, limit: i64) -> DbResult<Vec<CollabSnapshotRow>> {
+    Ok(artifact_collab::Entity::find()
+        .order_by_desc(artifact_collab::Column::UpdatedAt)
+        .order_by_asc(artifact_collab::Column::ArtifactId)
+        .limit(u64::try_from(limit.clamp(1, i64::MAX)).unwrap_or(64))
+        .all(db)
+        .await?
+        .into_iter()
+        .map(|m| CollabSnapshotRow {
+            artifact_id: m.artifact_id,
+            snapshot: m.snapshot,
+            updated_at: m.updated_at,
+        })
+        .collect())
+}
+
 async fn upsert_collab_snapshot_impl<C: ConnectionTrait>(db: &C, artifact_id: &str, snapshot: &[u8], updated_at: i64) -> DbResult<()> {
     let model = artifact_collab::ActiveModel {
         artifact_id: Set(artifact_id.into()),
@@ -607,6 +630,10 @@ impl ArtifactService {
 
     pub(crate) async fn collab_snapshot(&self, artifact_id: &str) -> DbResult<Option<Vec<u8>>> {
         collab_snapshot_impl(self.db.read_conn(), artifact_id).await
+    }
+
+    pub(crate) async fn list_collab_snapshots(&self, limit: i64) -> DbResult<Vec<CollabSnapshotRow>> {
+        list_collab_snapshots_impl(self.db.read_conn(), limit).await
     }
 
     pub(crate) async fn upsert_collab_snapshot(&self, artifact_id: &str, snapshot: &[u8], updated_at: i64) -> DbResult<()> {

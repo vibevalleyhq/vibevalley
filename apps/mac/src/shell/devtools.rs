@@ -15,6 +15,7 @@ use super::Shell;
 use super::menus::{CloseWindow, ToggleDevtools};
 
 pub const DEVTOOLS_VISIBLE_TOPIC: &str = "devtools_visible";
+pub const INSPECTOR_STATE_TOPIC: &str = "inspector";
 
 pub fn devtools_enabled_from(raw: Option<&str>) -> bool {
     raw.map(str::trim) == Some("1")
@@ -174,6 +175,8 @@ pub struct DevtoolsSlot {
     pub detached_window: Option<WindowHandle<DevtoolsWindow>>,
     pub detached_view: Option<WeakEntity<HostedView>>,
     pub(super) _detached_sub: Option<Subscription>,
+    pub inspecting: bool,
+    pub highlighted: Option<vibevalley_protocol::VdpUiInspectAtResult>,
 }
 
 impl DevtoolsSlot {
@@ -185,6 +188,8 @@ impl DevtoolsSlot {
             detached_window: None,
             detached_view: None,
             _detached_sub: None,
+            inspecting: false,
+            highlighted: None,
         }
     }
 }
@@ -358,7 +363,15 @@ impl Shell {
                             })
                             .detach();
                         }
-                        HostedEvent::Ready => {}
+                        HostedEvent::Ready => {
+                            let main_shell = main_shell.clone();
+                            cx.spawn(async move |_, cx| {
+                                let _ = cx.update_window(main_window, |_, _, cx| {
+                                    let _ = main_shell.update(cx, |shell, cx| shell.push_devtools_inspector(cx));
+                                });
+                            })
+                            .detach();
+                        }
                     }
                 });
                 let focus = cx.focus_handle();
@@ -412,10 +425,186 @@ impl Shell {
         let sub = cx.subscribe_in(&view, window, |this, _, event: &HostedEvent, window, cx| match event {
             HostedEvent::Action(action) => this.on_action(action.clone(), window, cx),
             HostedEvent::HostCall { op, reply } => this.host_call(op.clone(), reply.clone(), window, cx),
-            HostedEvent::Ready => this.push_devtools_overlay_visibility(cx),
+            HostedEvent::Ready => {
+                this.push_devtools_overlay_visibility(cx);
+                this.push_devtools_inspector(cx);
+            }
         });
         self.overlays.devtools.overlay = Some((view, sub));
         self.push_devtools_overlay_visibility(cx);
+        self.push_devtools_inspector(cx);
+    }
+
+    pub(super) fn push_devtools_inspector(&self, cx: &mut Context<Self>) {
+        let payload = json!({
+            "inspecting": self.overlays.devtools.inspecting,
+            "selection": self.overlays.devtools.highlighted,
+        });
+        self.devtools_for_each_view(cx, |v, cx| v.push(INSPECTOR_STATE_TOPIC, payload.clone(), cx));
+    }
+
+    pub fn set_devtools_inspecting(&mut self, enabled: bool, cx: &mut Context<Self>) {
+        if !self.overlays.devtools.state.enabled {
+            return;
+        }
+        if self.overlays.devtools.inspecting != enabled {
+            self.overlays.devtools.inspecting = enabled;
+            self.push_devtools_inspector(cx);
+            cx.notify();
+        }
+    }
+
+    pub fn set_devtools_highlight(&mut self, hit: Option<vibevalley_protocol::VdpUiInspectAtResult>, cx: &mut Context<Self>) {
+        self.overlays.devtools.highlighted = hit;
+        self.push_devtools_inspector(cx);
+        cx.notify();
+    }
+
+    pub(super) fn is_point_in_devtools_chrome(&self, x: f32, y: f32, window: &Window) -> bool {
+        if !self.overlays.devtools.state.enabled {
+            return false;
+        }
+        let vp = window.viewport_size();
+        let w = f32::from(vp.width);
+        let h = f32::from(vp.height);
+        if y >= (h - 44.0) && (x >= (w * 0.5 - 220.0) && x <= (w * 0.5 + 220.0)) {
+            return true;
+        }
+        if self.overlays.devtools.state.is_overlay_open() {
+            let top = h - 44.0 - 460.0;
+            let bottom = h - 44.0;
+            if x >= 24.0 && x <= (w - 24.0) && y >= top && y <= bottom {
+                return true;
+            }
+        }
+        false
+    }
+
+    pub fn handle_inspector_click(&mut self, x: f32, y: f32, window: &Window, cx: &mut Context<Self>) {
+        let vp = window.viewport_size();
+        let vp_w = f32::from(vp.width);
+        let vp_h = f32::from(vp.height);
+        let native_hit = crate::debug::executor::inspect_native_at(self, x, y, vp_w, vp_h, cx);
+        let hosted_views = crate::debug::executor::hosted_view_origins(self, vp_w, vp_h, cx);
+        self.overlays.devtools.inspecting = false;
+        self.overlays.devtools.highlighted = native_hit.clone();
+        self.push_devtools_inspector(cx);
+        cx.notify();
+
+        let shell_weak = cx.weak_entity();
+        let win_handle = window.window_handle();
+        cx.spawn(async move |_, cx| {
+            let best = crate::debug::vdp::inspect_hosted_views_at(hosted_views, x, y, native_hit, Duration::from_millis(800)).await;
+            if let Some(hit) = best {
+                let _ = cx.update_window(win_handle, |_, _, cx| {
+                    let _ = shell_weak.update(cx, |shell, cx| {
+                        shell.set_devtools_highlight(Some(hit), cx);
+                    });
+                });
+            }
+        })
+        .detach();
+    }
+
+    pub fn jump_to_devtools_source(&mut self, raw_path: &str, line: Option<u32>, window: &mut Window, cx: &mut Context<Self>) {
+        let trimmed = raw_path.trim();
+        if trimmed.is_empty() {
+            return;
+        }
+        let candidate = std::path::PathBuf::from(trimmed);
+        let resolved = if candidate.is_absolute() {
+            candidate
+        } else {
+            let from_active = self.workspace.ws.active().map(|p| p.root().join(trimmed)).filter(|p| p.exists());
+            let from_any = self.workspace.ws.projects().iter().find_map(|p| {
+                let c = p.root().join(trimmed);
+                c.exists().then_some(c)
+            });
+            let from_repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .and_then(|p| p.parent())
+                .map(|root| root.join(trimmed))
+                .filter(|p| p.exists());
+            from_active.or(from_any).or(from_repo).unwrap_or(candidate)
+        };
+        if resolved.exists() {
+            self.open_file_adjacent(resolved, line, window, cx);
+        }
+    }
+
+    pub(super) fn render_inspector_overlay(&self, window: &Window, cx: &Context<Self>) -> Option<gpui::Div> {
+        let inspecting = self.overlays.devtools.inspecting;
+        let hit = self.overlays.devtools.highlighted.as_ref();
+        if !inspecting && hit.is_none() {
+            return None;
+        }
+        let colors = &Ui::get(cx).colors;
+        let mono = Ui::get(cx).mono();
+        let vp = window.viewport_size();
+        let vp_w = f32::from(vp.width);
+        let vp_h = f32::from(vp.height);
+
+        let mut overlay = div().absolute().inset_0();
+        if inspecting {
+            overlay = overlay.child(
+                div()
+                    .id("inspector-mode-banner")
+                    .absolute()
+                    .top(px(8.0))
+                    .left(px((vp_w * 0.5 - 150.0).max(8.0)))
+                    .px(px(10.0))
+                    .py(px(4.0))
+                    .rounded(px(999.0))
+                    .bg(colors.accent)
+                    .text_color(colors.bg)
+                    .font_family(mono.clone())
+                    .text_xs()
+                    .child(vibevalley_i18n::t("desktop.devtools.inspectingHint", &[])),
+            );
+        }
+        if let Some(sel) = hit
+            && let Some(b) = sel.bounds
+            && b.width > 0.0
+            && b.height > 0.0
+        {
+            let tag = match (&sel.test_id, &sel.source) {
+                (Some(id), Some(src)) => format!("{id} · {src}"),
+                (Some(id), None) => id.clone(),
+                (None, Some(src)) => src.clone(),
+                (None, None) => sel.surface.clone().unwrap_or_else(|| "element".to_string()),
+            };
+            let badge_top = if b.y >= 24.0 { b.y - 22.0 } else { (b.y + b.height + 4.0).min(vp_h - 24.0) };
+            let badge_left = b.x.clamp(8.0, (vp_w - 280.0).max(8.0));
+            overlay = overlay
+                .child(
+                    div()
+                        .id("inspector-highlight-box")
+                        .absolute()
+                        .left(px(b.x))
+                        .top(px(b.y))
+                        .w(px(b.width))
+                        .h(px(b.height))
+                        .border_2()
+                        .border_color(colors.accent)
+                        .bg(gpui::hsla(0.58, 0.75, 0.52, 0.12)),
+                )
+                .child(
+                    div()
+                        .id("inspector-highlight-label")
+                        .absolute()
+                        .left(px(badge_left))
+                        .top(px(badge_top))
+                        .px(px(6.0))
+                        .py(px(2.0))
+                        .rounded(px(4.0))
+                        .bg(colors.accent)
+                        .text_color(colors.bg)
+                        .font_family(mono)
+                        .text_xs()
+                        .child(tag),
+                );
+        }
+        Some(overlay)
     }
 
     pub(super) fn devtools_for_each_view(&self, cx: &mut Context<Self>, mut f: impl FnMut(&mut HostedView, &mut Context<HostedView>)) {

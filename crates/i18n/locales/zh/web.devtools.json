@@ -23,7 +23,20 @@
     "copied": "已复制",
     "apply": "应用",
     "reset": "重置",
-    "disconnect": "模拟断开"
+    "disconnect": "模拟断开",
+    "inspect": "检视画布元素",
+    "inspectCancel": "取消检视",
+    "jumpToSource": "跳转到源码",
+    "clearHighlight": "清除高亮",
+    "exportTrajectory": "导出评测包",
+    "jumpToTimeline": "跳至时间线",
+    "jumpToTrajectory": "跳至轨迹"
+  },
+  "inspector": {
+    "title": "画布与界面检视",
+    "active": "检视模式已开启 — 点击主窗口任意元素或画布即可定位。",
+    "surface": "所在层",
+    "noSource": "未记录源码位置"
   },
   "lanes": {
     "all": "全部通道",
@@ -82,6 +95,8 @@
     "rawPayload": "原始载荷",
     "truncated": "已截断（原 {bytes} B）",
     "subagents": "子代理",
+    "subagentTree": "子代理调用树",
+    "allAgents": "全部代理",
     "systemPrompt": "系统提示词",
     "turns": "轮次",
     "turnIndex": "第 {index} 轮",
@@ -90,7 +105,10 @@
     "rawEntries": "原始帧",
     "voyageRecords": "原始记录",
     "emptyList": "暂无轨迹记录。",
-    "selectPrompt": "选择一条轨迹以查看各轮详情和原始帧。"
+    "selectPrompt": "选择一条轨迹以查看各轮详情和原始帧。",
+    "exported": "已导出评测包至 {dir}",
+    "inspectCmd": "检视命令",
+    "replayCmd": "回放命令"
   },
   "state": {
     "seq": "状态序号",
@@ -107,7 +125,13 @@
     "artifacts": "作品",
     "inbox": "收件箱",
     "mediaJobs": "媒体",
-    "emptyCaches": "暂无缓存统计。"
+    "emptyCaches": "暂无缓存统计。",
+    "collab": "Loro 协同与瞬态在场",
+    "emptyCollab": "暂无活跃协同作品。",
+    "frontiers": "Frontiers 前沿",
+    "presence": "EphemeralStore 在场节点",
+    "noPeers": "暂无活跃在场节点",
+    "ttl": "有效 {ms}ms"
   },
   "lab": {
     "rpcDelayMs": "RPC 延迟 (ms)",

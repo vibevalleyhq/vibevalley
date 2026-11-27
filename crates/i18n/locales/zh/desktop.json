@@ -70,6 +70,9 @@
   "files": {
     "missingInWorktree": "此工单的工作区中无法打开 {path}"
   },
+  "devtools": {
+    "inspectingHint": "点击页面或画布元素以检视 · 按 Esc 取消"
+  },
   "startup": {
     "titleSchema": "数据库结构不匹配",
     "titleFailed": "VibeValley 无法启动",

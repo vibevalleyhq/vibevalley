@@ -157,6 +157,29 @@ pub struct DebugTrajectoryTurn {
     pub raw_entries: Vec<DebugTrajectoryRawEntry>,
     pub tokens: Option<EventTokens>,
     pub silent_errors: Vec<String>,
+    #[serde(default)]
+    pub trace_ids: Vec<i64>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct DebugTrajectorySubagentNode {
+    pub id: String,
+    pub parent_id: Option<String>,
+    pub path: String,
+    pub label: String,
+    pub agent_name: Option<String>,
+    pub status: Option<String>,
+    pub turn_count: u32,
+    pub event_count: u32,
+    pub raw_count: u32,
+    pub started_at: Option<Millis>,
+    pub ended_at: Option<Millis>,
+    #[serde(default)]
+    pub trace_ids: Vec<i64>,
 }
 
 #[skip_serializing_none]
@@ -169,6 +192,8 @@ pub struct DebugTrajectoryDetail {
     pub system_prompt: Option<String>,
     pub turns: Vec<DebugTrajectoryTurn>,
     pub subagent_paths: Vec<String>,
+    #[serde(default)]
+    pub subagent_nodes: Vec<DebugTrajectorySubagentNode>,
     pub voyage_record_count: u32,
 }
 
@@ -180,6 +205,34 @@ pub struct DebugTrajectoryDetail {
 pub struct DebugTrajectoryGetRequest {
     pub id: String,
     pub kind: Option<DebugTrajectoryKind>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct DebugTrajectoryExportRequest {
+    pub id: String,
+    pub kind: Option<DebugTrajectoryKind>,
+    pub out_dir: Option<String>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct DebugTrajectoryExportResult {
+    pub dir: String,
+    pub replay_spec_path: String,
+    pub conversation_id: String,
+    pub source_kind: String,
+    pub entries_exported: u32,
+    pub tasks_exported: u32,
+    pub conversations_exported: u32,
+    pub inspect_cmd: String,
+    pub replay_cmd: String,
 }
 
 #[skip_serializing_none]
@@ -283,6 +336,59 @@ pub struct DebugStateCounts {
 }
 
 #[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct DebugCollabClock {
+    pub peer_id: String,
+    pub counter: i32,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct DebugCollabPresence {
+    pub id: String,
+    pub name: String,
+    pub color: Option<String>,
+    pub kind: String,
+    pub status: Option<String>,
+    pub node_id: Option<String>,
+    pub path: Option<String>,
+    pub offset: Option<u32>,
+    pub end_offset: Option<u32>,
+    pub session_id: Option<String>,
+    pub updated_at: Millis,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct DebugCollabArtifactState {
+    pub artifact_id: String,
+    pub title: String,
+    pub artifact_type: String,
+    pub seq: i64,
+    pub snapshot_bytes: u32,
+    pub frontiers: String,
+    #[serde(default)]
+    pub frontier_ids: Vec<DebugCollabClock>,
+    pub version_vector: String,
+    #[serde(default)]
+    pub vv_entries: Vec<DebugCollabClock>,
+    pub ephemeral_ttl_ms: i64,
+    pub presence_count: u32,
+    #[serde(default)]
+    pub presence: Vec<DebugCollabPresence>,
+    pub updated_at: Millis,
+}
+
+#[skip_serializing_none]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts-gen", derive(TS))]
 #[cfg_attr(feature = "ts-gen", ts(optional_fields))]
@@ -293,6 +399,8 @@ pub struct DebugStateCache {
     pub slice_watchers: BTreeMap<String, u32>,
     pub counts: DebugStateCounts,
     pub caches: Vec<DebugCacheStat>,
+    #[serde(default)]
+    pub collab: Vec<DebugCollabArtifactState>,
 }
 
 #[skip_serializing_none]
@@ -345,14 +453,20 @@ crate::typescript::module! {
     DebugTrajectorySummary,
     DebugTrajectoryRawEntry,
     DebugTrajectoryTurn,
+    DebugTrajectorySubagentNode,
     DebugTrajectoryDetail,
     DebugTrajectoryGetRequest,
+    DebugTrajectoryExportRequest,
+    DebugTrajectoryExportResult,
     DebugRuntimeSummary,
     DebugOverview,
     DebugGraphClient,
     DebugGraphSession,
     DebugGraph,
     DebugCacheStat,
+    DebugCollabClock,
+    DebugCollabPresence,
+    DebugCollabArtifactState,
     DebugStateCounts,
     DebugStateCache,
     DebugOverrideConfig,

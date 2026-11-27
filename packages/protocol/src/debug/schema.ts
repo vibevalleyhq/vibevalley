@@ -69,13 +69,30 @@ export const DebugTrajectoryTurn = z.object({
   rawEntries: z.array(DebugTrajectoryRawEntry),
   tokens: z.exactOptional(EventTokens),
   silentErrors: z.array(z.string()),
+  traceIds: z.array(z.number()),
 }) satisfies Codec<T.DebugTrajectoryTurn>;
+
+export const DebugTrajectorySubagentNode = z.object({
+  id: z.string(),
+  parentId: z.exactOptional(z.string()),
+  path: z.string(),
+  label: z.string(),
+  agentName: z.exactOptional(z.string()),
+  status: z.exactOptional(z.string()),
+  turnCount: z.number(),
+  eventCount: z.number(),
+  rawCount: z.number(),
+  startedAt: z.exactOptional(z.number()),
+  endedAt: z.exactOptional(z.number()),
+  traceIds: z.array(z.number()),
+}) satisfies Codec<T.DebugTrajectorySubagentNode>;
 
 export const DebugTrajectoryDetail = z.object({
   summary: DebugTrajectorySummary,
   systemPrompt: z.exactOptional(z.string()),
   turns: z.array(DebugTrajectoryTurn),
   subagentPaths: z.array(z.string()),
+  subagentNodes: z.array(DebugTrajectorySubagentNode),
   voyageRecordCount: z.number(),
 }) satisfies Codec<T.DebugTrajectoryDetail>;
 
@@ -83,6 +100,24 @@ export const DebugTrajectoryGetRequest = z.object({
   id: z.string(),
   kind: z.exactOptional(DebugTrajectoryKind),
 }) satisfies Codec<T.DebugTrajectoryGetRequest>;
+
+export const DebugTrajectoryExportRequest = z.object({
+  id: z.string(),
+  kind: z.exactOptional(DebugTrajectoryKind),
+  outDir: z.exactOptional(z.string()),
+}) satisfies Codec<T.DebugTrajectoryExportRequest>;
+
+export const DebugTrajectoryExportResult = z.object({
+  dir: z.string(),
+  replaySpecPath: z.string(),
+  conversationId: z.string(),
+  sourceKind: z.string(),
+  entriesExported: z.number(),
+  tasksExported: z.number(),
+  conversationsExported: z.number(),
+  inspectCmd: z.string(),
+  replayCmd: z.string(),
+}) satisfies Codec<T.DebugTrajectoryExportResult>;
 
 export const DebugRuntimeSummary = z.object({
   id: z.string(),
@@ -138,6 +173,41 @@ export const DebugCacheStat = z.object({
   detail: z.exactOptional(z.string()),
 }) satisfies Codec<T.DebugCacheStat>;
 
+export const DebugCollabClock = z.object({
+  peerId: z.string(),
+  counter: z.number(),
+}) satisfies Codec<T.DebugCollabClock>;
+
+export const DebugCollabPresence = z.object({
+  id: z.string(),
+  name: z.string(),
+  color: z.exactOptional(z.string()),
+  kind: z.string(),
+  status: z.exactOptional(z.string()),
+  nodeId: z.exactOptional(z.string()),
+  path: z.exactOptional(z.string()),
+  offset: z.exactOptional(z.number()),
+  endOffset: z.exactOptional(z.number()),
+  sessionId: z.exactOptional(z.string()),
+  updatedAt: z.number(),
+}) satisfies Codec<T.DebugCollabPresence>;
+
+export const DebugCollabArtifactState = z.object({
+  artifactId: z.string(),
+  title: z.string(),
+  artifactType: z.string(),
+  seq: z.number(),
+  snapshotBytes: z.number(),
+  frontiers: z.string(),
+  frontierIds: z.array(DebugCollabClock),
+  versionVector: z.string(),
+  vvEntries: z.array(DebugCollabClock),
+  ephemeralTtlMs: z.number(),
+  presenceCount: z.number(),
+  presence: z.array(DebugCollabPresence),
+  updatedAt: z.number(),
+}) satisfies Codec<T.DebugCollabArtifactState>;
+
 export const DebugStateCounts = z.object({
   issues: z.number(),
   sessions: z.number(),
@@ -155,6 +225,7 @@ export const DebugStateCache = z.object({
   sliceWatchers: z.record(z.string(), z.number()),
   counts: DebugStateCounts,
   caches: z.array(DebugCacheStat),
+  collab: z.array(DebugCollabArtifactState),
 }) satisfies Codec<T.DebugStateCache>;
 
 export const DebugOverrideConfig = z.object({

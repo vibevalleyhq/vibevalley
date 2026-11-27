@@ -415,6 +415,20 @@ impl VdpShellSendTerminalInputParams {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct VdpShellDispatchActionParams {
+    pub action: crate::HostAction,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct VdpShellSetDioramaClockParams {
+    #[serde(default)]
+    pub seconds: Option<f32>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct VdpShellRunCommandParams {
@@ -624,11 +638,66 @@ pub struct VdpUiNode {
     #[serde(default)]
     pub text: Option<String>,
     #[serde(default)]
+    pub route: Option<String>,
+    #[serde(default)]
+    pub source: Option<String>,
+    #[serde(default)]
     pub bounds: Option<VdpUiBounds>,
     #[serde(default)]
     pub pressable: Option<bool>,
     #[serde(default)]
     pub children: Option<Vec<VdpUiNode>>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct VdpUiInspectAtParams {
+    pub x: f32,
+    pub y: f32,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VdpUiInspectAtResult {
+    pub hit: bool,
+    #[serde(default)]
+    pub surface: Option<String>,
+    #[serde(default)]
+    pub test_id: Option<String>,
+    #[serde(default)]
+    pub role: Option<String>,
+    #[serde(default)]
+    pub text: Option<String>,
+    #[serde(default)]
+    pub route: Option<String>,
+    #[serde(default)]
+    pub source: Option<String>,
+    #[serde(default)]
+    pub bounds: Option<VdpUiBounds>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct VdpUiHighlightParams {
+    #[serde(default)]
+    pub test_id: Option<String>,
+    #[serde(default)]
+    pub bounds: Option<VdpUiBounds>,
+    #[serde(default)]
+    pub label: Option<String>,
+    #[serde(default)]
+    pub source: Option<String>,
+    #[serde(default)]
+    pub surface: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct VdpUiInspectorModeParams {
+    pub enabled: bool,
 }
 
 #[skip_serializing_none]
@@ -725,7 +794,13 @@ pub enum VdpCommand {
     ShellGetTerminalGrid(VdpShellGetTerminalGridParams),
     ShellSendTerminalInput(VdpShellSendTerminalInputParams),
     ShellRunCommand(VdpShellRunCommandParams),
+    ShellDispatchAction(VdpShellDispatchActionParams),
+    ShellSave,
+    ShellQuit,
+    ShellGetUpdateState,
+    ShellSetDioramaClock(VdpShellSetDioramaClockParams),
     PageCaptureScreenshot(VdpCaptureScreenshotParams),
+    PageDraw,
     PageGetMetrics,
     InputDispatchKey(VdpDispatchKeyParams),
     InputTypeText(VdpTypeTextParams),
@@ -734,6 +809,9 @@ pub enum VdpCommand {
     UiQuery(VdpUiQueryParams),
     UiPress(VdpUiPressParams),
     UiWaitFor(VdpUiWaitForParams),
+    UiInspectAt(VdpUiInspectAtParams),
+    UiHighlight(VdpUiHighlightParams),
+    UiSetInspectorMode(VdpUiInspectorModeParams),
     ServerSlice(VdpServerSliceParams),
     ServerInvoke(VdpServerInvokeParams),
     LogEnable,
@@ -755,7 +833,13 @@ impl VdpCommand {
         "Shell.getTerminalGrid",
         "Shell.sendTerminalInput",
         "Shell.runCommand",
+        "Shell.dispatchAction",
+        "Shell.save",
+        "Shell.quit",
+        "Shell.getUpdateState",
+        "Shell.setDioramaClock",
         "Page.captureScreenshot",
+        "Page.draw",
         "Page.getMetrics",
         "Input.dispatchKey",
         "Input.typeText",
@@ -764,6 +848,9 @@ impl VdpCommand {
         "UI.query",
         "UI.press",
         "UI.waitFor",
+        "UI.inspectAt",
+        "UI.highlight",
+        "UI.setInspectorMode",
         "Server.slice",
         "Server.invoke",
         "Log.enable",
@@ -785,7 +872,13 @@ impl VdpCommand {
             VdpCommand::ShellGetTerminalGrid(_) => "Shell.getTerminalGrid",
             VdpCommand::ShellSendTerminalInput(_) => "Shell.sendTerminalInput",
             VdpCommand::ShellRunCommand(_) => "Shell.runCommand",
+            VdpCommand::ShellDispatchAction(_) => "Shell.dispatchAction",
+            VdpCommand::ShellSave => "Shell.save",
+            VdpCommand::ShellQuit => "Shell.quit",
+            VdpCommand::ShellGetUpdateState => "Shell.getUpdateState",
+            VdpCommand::ShellSetDioramaClock(_) => "Shell.setDioramaClock",
             VdpCommand::PageCaptureScreenshot(_) => "Page.captureScreenshot",
+            VdpCommand::PageDraw => "Page.draw",
             VdpCommand::PageGetMetrics => "Page.getMetrics",
             VdpCommand::InputDispatchKey(_) => "Input.dispatchKey",
             VdpCommand::InputTypeText(_) => "Input.typeText",
@@ -794,6 +887,9 @@ impl VdpCommand {
             VdpCommand::UiQuery(_) => "UI.query",
             VdpCommand::UiPress(_) => "UI.press",
             VdpCommand::UiWaitFor(_) => "UI.waitFor",
+            VdpCommand::UiInspectAt(_) => "UI.inspectAt",
+            VdpCommand::UiHighlight(_) => "UI.highlight",
+            VdpCommand::UiSetInspectorMode(_) => "UI.setInspectorMode",
             VdpCommand::ServerSlice(_) => "Server.slice",
             VdpCommand::ServerInvoke(_) => "Server.invoke",
             VdpCommand::LogEnable => "Log.enable",
@@ -804,9 +900,15 @@ impl VdpCommand {
 
     pub fn to_params(&self) -> serde_json::Value {
         match self {
-            VdpCommand::TargetList | VdpCommand::ShellGetState | VdpCommand::PageGetMetrics | VdpCommand::LogEnable | VdpCommand::LogDisable => {
-                serde_json::json!({})
-            }
+            VdpCommand::TargetList
+            | VdpCommand::ShellGetState
+            | VdpCommand::ShellSave
+            | VdpCommand::ShellQuit
+            | VdpCommand::ShellGetUpdateState
+            | VdpCommand::PageDraw
+            | VdpCommand::PageGetMetrics
+            | VdpCommand::LogEnable
+            | VdpCommand::LogDisable => serde_json::json!({}),
             VdpCommand::TargetAttach(p) => serde_json::to_value(p).expect("serialize VdpTargetAttachParams"),
             VdpCommand::TargetDetach(p) => serde_json::to_value(p).expect("serialize VdpTargetDetachParams"),
             VdpCommand::ShellNavigate(p) => serde_json::to_value(p).expect("serialize VdpShellNavigateParams"),
@@ -817,6 +919,8 @@ impl VdpCommand {
             VdpCommand::ShellGetTerminalGrid(p) => serde_json::to_value(p).expect("serialize VdpShellGetTerminalGridParams"),
             VdpCommand::ShellSendTerminalInput(p) => serde_json::to_value(p).expect("serialize VdpShellSendTerminalInputParams"),
             VdpCommand::ShellRunCommand(p) => serde_json::to_value(p).expect("serialize VdpShellRunCommandParams"),
+            VdpCommand::ShellDispatchAction(p) => serde_json::to_value(p).expect("serialize VdpShellDispatchActionParams"),
+            VdpCommand::ShellSetDioramaClock(p) => serde_json::to_value(p).expect("serialize VdpShellSetDioramaClockParams"),
             VdpCommand::PageCaptureScreenshot(p) => serde_json::to_value(p).expect("serialize VdpCaptureScreenshotParams"),
             VdpCommand::InputDispatchKey(p) => serde_json::to_value(p).expect("serialize VdpDispatchKeyParams"),
             VdpCommand::InputTypeText(p) => serde_json::to_value(p).expect("serialize VdpTypeTextParams"),
@@ -825,6 +929,9 @@ impl VdpCommand {
             VdpCommand::UiQuery(p) => serde_json::to_value(p).expect("serialize VdpUiQueryParams"),
             VdpCommand::UiPress(p) => serde_json::to_value(p).expect("serialize VdpUiPressParams"),
             VdpCommand::UiWaitFor(p) => serde_json::to_value(p).expect("serialize VdpUiWaitForParams"),
+            VdpCommand::UiInspectAt(p) => serde_json::to_value(p).expect("serialize VdpUiInspectAtParams"),
+            VdpCommand::UiHighlight(p) => serde_json::to_value(p).expect("serialize VdpUiHighlightParams"),
+            VdpCommand::UiSetInspectorMode(p) => serde_json::to_value(p).expect("serialize VdpUiInspectorModeParams"),
             VdpCommand::ServerSlice(p) => serde_json::to_value(p).expect("serialize VdpServerSliceParams"),
             VdpCommand::ServerInvoke(p) => serde_json::to_value(p).expect("serialize VdpServerInvokeParams"),
             VdpCommand::LogGetEntries(p) => serde_json::to_value(p).expect("serialize VdpLogGetEntriesParams"),
@@ -857,7 +964,13 @@ impl VdpCommand {
             "Shell.getTerminalGrid" => decode(method, optional_object(params)).map(VdpCommand::ShellGetTerminalGrid),
             "Shell.sendTerminalInput" => decode(method, params).map(VdpCommand::ShellSendTerminalInput),
             "Shell.runCommand" => decode(method, params).map(VdpCommand::ShellRunCommand),
+            "Shell.dispatchAction" => decode(method, params).map(VdpCommand::ShellDispatchAction),
+            "Shell.save" => expect_empty(&params).map(|()| VdpCommand::ShellSave),
+            "Shell.quit" => expect_empty(&params).map(|()| VdpCommand::ShellQuit),
+            "Shell.getUpdateState" => expect_empty(&params).map(|()| VdpCommand::ShellGetUpdateState),
+            "Shell.setDioramaClock" => decode(method, optional_object(params)).map(VdpCommand::ShellSetDioramaClock),
             "Page.captureScreenshot" => decode(method, optional_object(params)).map(VdpCommand::PageCaptureScreenshot),
+            "Page.draw" => expect_empty(&params).map(|()| VdpCommand::PageDraw),
             "Page.getMetrics" => expect_empty(&params).map(|()| VdpCommand::PageGetMetrics),
             "Input.dispatchKey" => decode(method, params).map(VdpCommand::InputDispatchKey),
             "Input.typeText" => decode(method, params).map(VdpCommand::InputTypeText),
@@ -866,6 +979,9 @@ impl VdpCommand {
             "UI.query" => decode(method, optional_object(params)).map(VdpCommand::UiQuery),
             "UI.press" => decode(method, params).map(VdpCommand::UiPress),
             "UI.waitFor" => decode(method, optional_object(params)).map(VdpCommand::UiWaitFor),
+            "UI.inspectAt" => decode(method, params).map(VdpCommand::UiInspectAt),
+            "UI.highlight" => decode(method, optional_object(params)).map(VdpCommand::UiHighlight),
+            "UI.setInspectorMode" => decode(method, params).map(VdpCommand::UiSetInspectorMode),
             "Server.slice" => decode(method, params).map(VdpCommand::ServerSlice),
             "Server.invoke" => decode(method, params).map(VdpCommand::ServerInvoke),
             "Log.enable" => expect_empty(&params).map(|()| VdpCommand::LogEnable),
@@ -1117,6 +1233,19 @@ mod tests {
                 json!({ "command": "palette:commands" }),
             ),
             (
+                VdpCommand::ShellDispatchAction(VdpShellDispatchActionParams {
+                    action: crate::HostAction::ActivatePath { path: "/tmp/repo".into() },
+                }),
+                json!({ "action": { "type": "activate_path", "path": "/tmp/repo" } }),
+            ),
+            (VdpCommand::ShellSave, json!({})),
+            (VdpCommand::ShellQuit, json!({})),
+            (VdpCommand::ShellGetUpdateState, json!({})),
+            (
+                VdpCommand::ShellSetDioramaClock(VdpShellSetDioramaClockParams { seconds: Some(1.5) }),
+                json!({ "seconds": 1.5 }),
+            ),
+            (
                 VdpCommand::PageCaptureScreenshot(VdpCaptureScreenshotParams {
                     target: Some(VdpScreenshotTarget::Webview),
                     width: Some(1280),
@@ -1124,6 +1253,7 @@ mod tests {
                 }),
                 json!({ "target": "webview", "width": 1280, "height": 720 }),
             ),
+            (VdpCommand::PageDraw, json!({})),
             (VdpCommand::PageGetMetrics, json!({})),
             (
                 VdpCommand::InputDispatchKey(VdpDispatchKeyParams { keys: "cmd-1".into() }),
@@ -1177,6 +1307,35 @@ mod tests {
                 json!({ "testId": "library-grid", "view": "workbench", "timeoutMs": 5000 }),
             ),
             (
+                VdpCommand::UiInspectAt(VdpUiInspectAtParams { x: 42.0, y: 84.0 }),
+                json!({ "x": 42.0, "y": 84.0 }),
+            ),
+            (
+                VdpCommand::UiHighlight(VdpUiHighlightParams {
+                    test_id: Some("nav-issues".into()),
+                    bounds: Some(VdpUiBounds {
+                        x: 10.0,
+                        y: 20.0,
+                        width: 100.0,
+                        height: 32.0,
+                    }),
+                    label: Some("Issues".into()),
+                    source: Some("apps/mac/ui/app/Shell.tsx:42".into()),
+                    surface: Some("workbench".into()),
+                }),
+                json!({
+                    "testId": "nav-issues",
+                    "bounds": { "x": 10.0, "y": 20.0, "width": 100.0, "height": 32.0 },
+                    "label": "Issues",
+                    "source": "apps/mac/ui/app/Shell.tsx:42",
+                    "surface": "workbench"
+                }),
+            ),
+            (
+                VdpCommand::UiSetInspectorMode(VdpUiInspectorModeParams { enabled: true }),
+                json!({ "enabled": true }),
+            ),
+            (
                 VdpCommand::ServerSlice(VdpServerSliceParams { name: "board".into() }),
                 json!({ "name": "board" }),
             ),
@@ -1213,7 +1372,17 @@ mod tests {
 
     #[test]
     fn optional_and_unit_commands_accept_missing_or_null_params_and_reject_invalid() {
-        for method in ["Target.list", "Shell.getState", "Page.getMetrics", "Log.enable", "Log.disable"] {
+        for method in [
+            "Target.list",
+            "Shell.getState",
+            "Shell.save",
+            "Shell.quit",
+            "Shell.getUpdateState",
+            "Page.draw",
+            "Page.getMetrics",
+            "Log.enable",
+            "Log.disable",
+        ] {
             let req: VdpRequest = serde_json::from_value(json!({ "id": 1, "method": method })).unwrap();
             assert_eq!(req.decode_command().unwrap().method(), method);
             let err = VdpCommand::from_wire(method, json!({ "extra": 1 })).unwrap_err();
@@ -1224,10 +1393,12 @@ mod tests {
             "Shell.closePane",
             "Shell.setTheme",
             "Shell.getTerminalGrid",
+            "Shell.setDioramaClock",
             "Page.captureScreenshot",
             "UI.getTree",
             "UI.query",
             "UI.waitFor",
+            "UI.highlight",
             "Log.getEntries",
         ] {
             let decoded = VdpCommand::from_wire(method, serde_json::Value::Null).unwrap();

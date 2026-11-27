@@ -143,6 +143,7 @@ const sampleSnapshot: DebugSnapshot = {
       mediaJobs: 0,
     },
     caches: [{ name: "panes", entries: 3, detail: "2 file, 1 terminal" }],
+    collab: [],
   },
   recentTimeline: sampleTimelineEvents,
 };
@@ -189,7 +190,53 @@ const sampleTrajectories: DebugTrajectorySummary[] = [
 const sampleTrajectoryDetail: DebugTrajectoryDetail = {
   summary: sampleIssueTrajectory,
   systemPrompt: "You are a helpful coding assistant. [REDACTED]",
-  subagentPaths: ["root/worker-a", "root/worker-b"],
+  subagentPaths: ["root/worker-a", "root/worker-b", "root/worker-a/sub-leaf"],
+  subagentNodes: [
+    {
+      id: "root",
+      path: "root",
+      label: "root",
+      status: "completed",
+      turnCount: 1,
+      eventCount: 2,
+      rawCount: 1,
+      traceIds: [777],
+    },
+    {
+      id: "root/worker-a",
+      parentId: "root",
+      path: "root/worker-a",
+      label: "worker-a",
+      agentName: "worker-a",
+      status: "running",
+      turnCount: 1,
+      eventCount: 1,
+      rawCount: 1,
+      traceIds: [777],
+    },
+    {
+      id: "root/worker-a/sub-leaf",
+      parentId: "root/worker-a",
+      path: "root/worker-a/sub-leaf",
+      label: "sub-leaf",
+      status: "completed",
+      turnCount: 1,
+      eventCount: 0,
+      rawCount: 0,
+      traceIds: [],
+    },
+    {
+      id: "root/worker-b",
+      parentId: "root",
+      path: "root/worker-b",
+      label: "worker-b",
+      status: "completed",
+      turnCount: 0,
+      eventCount: 0,
+      rawCount: 0,
+      traceIds: [],
+    },
+  ],
   voyageRecordCount: 4,
   turns: [
     {
@@ -200,6 +247,7 @@ const sampleTrajectoryDetail: DebugTrajectoryDetail = {
       durationMs: 2500,
       tokens: { input: 1200, cacheRead: 800, cacheWrite: 150, reasoning: 300, output: 450, contextUsed: 2900, contextWindow: 10000 },
       silentErrors: ["QUOTA_EXHAUSTED on fallback model"],
+      traceIds: [777],
       events: [
         { seq: 1, revision: 1, time: NOW - 3500, type: "tool/call", tool: "read_file", text: "Reading theme.json", ok: true },
         { seq: 2, revision: 1, time: NOW - 2000, type: "assistant/message", text: "Updated styles using tokens" },
@@ -923,4 +971,226 @@ test("DevTools Remote VDP stays accessible when local debug.snapshot is disabled
   expect(app.texts()).toContain("127.0.0.1:9333");
   expect(app.texts()).toContain("/farm");
   expect(app.count("id:vdp-target-shell")).toBe(1);
+});
+
+test("DevTools Canvas Inspector toggles mode, displays bounds/source, jumps to source, and clears highlight", async () => {
+  setLocale("en");
+  const host = createDevToolsHost(
+    { detached: false },
+    {
+      "debug.snapshot": () => sampleSnapshot,
+    },
+  );
+
+  const app = await open("../../ShellApp.story.tsx", {
+    width: 1100,
+    height: 760,
+    colorScheme: "light",
+    platform: "macos",
+    clock: { time: NOW },
+    host: host.options,
+  });
+  await host.pumpUntil(app, () => app.count("id:devtools-overview") === 1);
+
+  const acts = () =>
+    app.host
+      .posts()
+      .filter((p) => p.name === "action")
+      .map((p) => p.data);
+
+  await app.press("id:devtools-inspect-toggle");
+  expect(acts()).toContainEqual({ type: "devtools_inspector_mode", enabled: true });
+
+  await host.pushFrame(app, "inspector", {
+    inspecting: true,
+    selection: {
+      hit: true,
+      surface: "workbench",
+      testId: "place-issues",
+      role: "button",
+      source: "apps/mac/ui/app/Shell.tsx:88",
+      bounds: { x: 12.4, y: 84.2, width: 140.1, height: 32.8 },
+    },
+  });
+  await host.pump(app);
+
+  expect(app.count("id:devtools-inspector-bar")).toBe(1);
+  expect(app.texts()).toContain("place-issues");
+  expect(app.texts()).toContain("12,84 140×33");
+  expect(app.texts()).toContain("apps/mac/ui/app/Shell.tsx:88");
+
+  await app.press("id:devtools-jump-source");
+  expect(acts()).toContainEqual({
+    type: "devtools_jump_source",
+    path: "apps/mac/ui/app/Shell.tsx",
+    line: 88,
+  });
+
+  await app.press("id:devtools-clear-highlight");
+  expect(acts()).toContainEqual({ type: "devtools_highlight" });
+});
+
+test("DevTools supports Timeline <-> Trajectory bidirectional jump, nested subagent tree filtering, and one-click eval export", async () => {
+  setLocale("en");
+  const host = createDevToolsHost(
+    { detached: false },
+    {
+      "debug.snapshot": () => ({
+        ...sampleSnapshot,
+        recentTimeline: [
+          ...sampleTimelineEvents,
+          {
+            id: 4,
+            time: NOW - 3400,
+            lane: "bridge_rpc",
+            kind: "tool.call",
+            traceId: 777,
+            durationUs: 1200,
+            summary: "Trace 777 correlated RPC",
+            slow: false,
+          },
+        ],
+      }),
+      "debug.timeline.list": (): DebugTimelinePage => ({
+        events: [
+          ...sampleTimelineEvents,
+          {
+            id: 4,
+            time: NOW - 3400,
+            lane: "bridge_rpc",
+            kind: "tool.call",
+            traceId: 777,
+            durationUs: 1200,
+            summary: "Trace 777 correlated RPC",
+            slow: false,
+          },
+        ],
+        latestId: 4,
+        dropped: 0,
+      }),
+      "debug.trajectory.list": () => sampleTrajectories,
+      "debug.trajectory.get": () => sampleTrajectoryDetail,
+      "debug.trajectory.export": (payload: unknown) => {
+        const req = payload as { id: string };
+        return {
+          dir: `/tmp/exports/${req.id}`,
+          replaySpecPath: `/tmp/exports/${req.id}/replay.json`,
+          conversationId: req.id,
+          sourceKind: "durable_store",
+          entriesExported: 6,
+          tasksExported: 1,
+          conversationsExported: 1,
+          inspectCmd: `vibevalley-eval inspect --store /tmp/exports/${req.id}`,
+          replayCmd: `vibevalley-eval replay --spec /tmp/exports/${req.id}/replay.json`,
+        };
+      },
+    },
+  );
+
+  const app = await open("../../ShellApp.story.tsx", {
+    width: 1180,
+    height: 780,
+    colorScheme: "light",
+    platform: "macos",
+    clock: { time: NOW },
+    host: host.options,
+  });
+  await host.pumpUntil(app, () => app.count("id:devtools-overview") === 1);
+
+  // 1. Timeline -> Trajectory jump via traceId 777.
+  await app.press("id:devtools-tab-timeline");
+  await host.pumpUntil(app, () => app.count("id:timeline-row-4") === 1);
+  await app.press("id:timeline-row-4");
+  expect(app.count("id:timeline-jump-trajectory-4")).toBe(1);
+
+  await app.press("id:timeline-jump-trajectory-4");
+  await host.pumpUntil(app, () => app.count("id:trajectory-raw-payload-1-10") === 1);
+  expect(app.count("id:devtools-trajectory")).toBe(1);
+
+  // 2. Nested subagent tree & filtering + clear.
+  expect(app.count("id:trajectory-subagent-tree")).toBe(1);
+  expect(app.count("id:trajectory-subagent-node-root")).toBe(1);
+  expect(app.count("id:trajectory-subagent-node-root/worker-a")).toBe(1);
+  expect(app.count("id:trajectory-subagent-node-root/worker-a/sub-leaf")).toBe(1);
+  await app.press("id:trajectory-subagent-node-root/worker-a");
+  expect(app.count("id:trajectory-subagent-clear")).toBe(1);
+  await app.press("id:trajectory-subagent-clear");
+  expect(app.count("id:trajectory-subagent-clear")).toBe(0);
+
+  // 3. One-click trajectory eval bundle export.
+  await app.press("id:trajectory-export");
+  await host.pumpUntil(app, () => app.count("id:trajectory-export-result") === 1);
+  expect(host.calls.some((c) => c.op === "debug.trajectory.export")).toBe(true);
+  expect(app.texts().some((s) => s.includes("vibevalley-eval inspect --store /tmp/exports/sess-1"))).toBe(true);
+  await app.press("id:trajectory-export-copy-replay");
+  expect(app.clipboard()).toBe("vibevalley-eval replay --spec /tmp/exports/sess-1/replay.json");
+
+  // 4. Trajectory -> Timeline jump back via traceId 777.
+  await app.press("id:trajectory-raw-jump-1-10");
+  await host.pumpUntil(app, () => app.count("id:timeline-detail-4") === 1);
+  expect(app.count("id:devtools-timeline")).toBe(1);
+});
+
+test("DevTools StateCacheTab renders live Loro frontiers, version vectors, and EphemeralStore presence", async () => {
+  setLocale("en");
+  const host = createDevToolsHost(
+    { detached: false },
+    {
+      "debug.snapshot": (): DebugSnapshot => ({
+        ...sampleSnapshot,
+        stateCache: {
+          ...sampleSnapshot.stateCache,
+          collab: [
+            {
+              artifactId: "art-doc-1",
+              title: "Architecture Spec",
+              artifactType: "doc",
+              seq: 42,
+              snapshotBytes: 1024,
+              frontiers: "1@1234",
+              frontierIds: [{ peerId: "1234", counter: 1 }],
+              versionVector: "1234:2",
+              vvEntries: [{ peerId: "1234", counter: 2 }],
+              ephemeralTtlMs: 30_000,
+              presenceCount: 1,
+              presence: [
+                {
+                  id: "peer-alice",
+                  name: "Alice",
+                  kind: "human",
+                  nodeId: "block-3",
+                  path: "sections/0",
+                  offset: 4,
+                  endOffset: 12,
+                  updatedAt: NOW - 200,
+                },
+              ],
+              updatedAt: NOW - 100,
+            },
+          ],
+        },
+      }),
+    },
+  );
+
+  const app = await open("../../ShellApp.story.tsx", {
+    width: 1100,
+    height: 760,
+    colorScheme: "light",
+    platform: "macos",
+    clock: { time: NOW },
+    host: host.options,
+  });
+  await host.pumpUntil(app, () => app.count("id:devtools-overview") === 1);
+
+  await app.press("id:devtools-tab-state");
+  expect(app.count("id:state-collab-section")).toBe(1);
+  expect(app.count("id:state-collab-art-doc-1")).toBe(1);
+  expect(app.texts()).toContain("Architecture Spec");
+  expect(app.texts().some((s) => s.includes("1234:1"))).toBe(true);
+  expect(app.texts().some((s) => s.includes("1234=2"))).toBe(true);
+  expect(app.count("id:state-collab-peer-peer-alice")).toBe(1);
+  expect(app.texts()).toContain("Alice");
+  await app.press("id:state-collab-copy-frontiers");
+  expect(app.clipboard()).toBe("1@1234");
 });

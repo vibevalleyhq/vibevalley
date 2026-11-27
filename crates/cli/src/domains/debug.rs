@@ -19,8 +19,8 @@ use vibevalley_protocol::{
     Next, VdpCaptureScreenshotParams, VdpCommand, VdpDispatchKeyParams, VdpDispatchMouseParams, VdpEndpointInfo, VdpError, VdpEvent, VdpInputResult,
     VdpMouseButton, VdpMouseEventKind, VdpNotification, VdpRequest, VdpScreenshotResult, VdpScreenshotTarget, VdpServerInvokeParams, VdpServerSliceParams,
     VdpShellNavigateParams, VdpShellResizeParams, VdpShellSetThemeParams, VdpTarget, VdpTargetListResult, VdpTypeTextParams, VdpUiBounds, VdpUiGetTreeParams,
-    VdpUiNode, VdpUiPressParams, VdpUiPressResult, VdpUiQueryParams, VdpUiQueryResult, VdpUiTreeResult, VdpUiWaitForParams, VdpUiWaitForResult, VdpVersionInfo,
-    VdpWireMessage, home,
+    VdpUiInspectAtParams, VdpUiInspectAtResult, VdpUiNode, VdpUiPressParams, VdpUiPressResult, VdpUiQueryParams, VdpUiQueryResult, VdpUiTreeResult,
+    VdpUiWaitForParams, VdpUiWaitForResult, VdpVersionInfo, VdpWireMessage, home,
 };
 
 use crate::auth::Secret;
@@ -218,6 +218,15 @@ pub enum DebugAction {
         /// Wait timeout in milliseconds
         #[arg(long, default_value_t = 5000)]
         timeout_ms: u64,
+    },
+
+    /// Inspect the UI or native element at logical window coordinates (UI.inspectAt)
+    #[command(after_help = "Examples:\n  vibevalley debug ui-inspect-at 320 180\n  vibevalley debug ui-inspect-at 640 420 --json")]
+    UiInspectAt {
+        /// Logical X coordinate
+        x: f32,
+        /// Logical Y coordinate
+        y: f32,
     },
 
     /// Fetch a live server state slice through the VDP host (Server.slice)
@@ -695,6 +704,9 @@ fn format_ui_node_line(node: &VdpUiNode, indent: usize) -> String {
     if let Some(bounds) = node.bounds {
         parts.push(format_bounds(bounds));
     }
+    if let Some(source) = &node.source {
+        parts.push(format!("@{source}"));
+    }
     if node.pressable == Some(true) {
         parts.push("pressable".into());
     }
@@ -738,6 +750,20 @@ fn format_ui_wait(res: &VdpUiWaitForResult) -> String {
         lines.push(format_ui_node_line(node, 1));
     }
     lines.join("\n")
+}
+
+fn format_ui_inspect(res: &VdpUiInspectAtResult) -> String {
+    if !res.hit {
+        return "miss".into();
+    }
+    let bounds = res.bounds.map(format_bounds).unwrap_or_default();
+    line(&[
+        res.surface.as_deref().unwrap_or("window"),
+        res.test_id.as_deref().unwrap_or("-"),
+        res.role.as_deref().unwrap_or(""),
+        res.source.as_deref().unwrap_or(""),
+        &bounds,
+    ])
 }
 
 fn format_value_pretty(val: &Value) -> String {
@@ -1066,6 +1092,20 @@ pub async fn run(client: &Client, cmd: DebugCmd) -> Done {
                 .await?;
             ws.close().await;
             client.output.show(&res, format_ui_wait);
+            Ok(())
+        }
+
+        DebugAction::UiInspectAt { x, y } => {
+            if !x.is_finite() || !y.is_finite() {
+                return Err(Failure::usage("InvalidValue", "inspect coordinates must be finite numbers"));
+            }
+            let endpoint = resolve_endpoint(client, &cmd.target)?;
+            let mut ws = VdpWsClient::connect(&endpoint).await?;
+            let res: VdpUiInspectAtResult = ws
+                .call_typed(&VdpCommand::UiInspectAt(VdpUiInspectAtParams { x, y }), DEFAULT_RPC_TIMEOUT)
+                .await?;
+            ws.close().await;
+            client.output.show(&res, format_ui_inspect);
             Ok(())
         }
 

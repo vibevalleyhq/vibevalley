@@ -4,6 +4,7 @@ import { z } from "zod";
 import { t } from "@vibevalley/i18n";
 import type { DebugOverrideConfig, DebugSnapshot } from "@vibevalley/protocol";
 
+import { Button } from "../../design/Button";
 import { Icon } from "../../design/Icon";
 import { IconButton } from "../../design/IconButton";
 import type { IconName } from "../../design/icons";
@@ -16,7 +17,7 @@ import { act, frame } from "../../infra/bridge";
 import { readDevToolsParams } from "../../infra/hostParams";
 import { onSettled } from "../../infra/solid";
 import { useVdpNode } from "../../infra/vdpProbe";
-import { DEVTOOLS_TABS, type DevToolsTab, formatFrameMs, isDisabledError } from "./format";
+import { DEVTOOLS_TABS, type DevToolsTab, formatFrameMs, isDisabledError, type TimelineJumpFocus, type TrajectoryJumpFocus } from "./format";
 import { LabOverridesTab } from "./LabOverridesTab";
 import { OverviewTab } from "./OverviewTab";
 import { type AttachedRemoteVdp, RemoteVdpPanel } from "./RemoteVdpPanel";
@@ -46,6 +47,37 @@ function tabMeta(tab: DevToolsTab): { icon: IconName; label: string } {
 
 const devtoolsVisibleSchema = z.object({ visible: z.exactOptional(z.boolean()) });
 
+const inspectorBoundsSchema = z.object({
+  x: z.number(),
+  y: z.number(),
+  width: z.number(),
+  height: z.number(),
+});
+
+const inspectorSelectionSchema = z.object({
+  hit: z.boolean(),
+  surface: z.exactOptional(z.string()),
+  testId: z.exactOptional(z.string()),
+  role: z.exactOptional(z.string()),
+  text: z.exactOptional(z.string()),
+  route: z.exactOptional(z.string()),
+  source: z.exactOptional(z.string()),
+  bounds: z.exactOptional(inspectorBoundsSchema),
+});
+
+const inspectorFrameSchema = z.object({
+  inspecting: z.boolean(),
+  selection: z.exactOptional(inspectorSelectionSchema.nullable()),
+});
+
+function parseSourceLocation(source: string): { path: string; line?: number | undefined } {
+  const trimmed = source.trim();
+  const match = /^(.+?):(\d+)$/u.exec(trimmed);
+  if (!match) return { path: trimmed };
+  const line = Number(match[2]);
+  return Number.isFinite(line) && line > 0 ? { path: match[1] ?? trimmed, line } : { path: match[1] ?? trimmed };
+}
+
 export function DevToolsApp() {
   const { detached } = readDevToolsParams();
   const activeTab = signal<DevToolsTab>("overview");
@@ -56,10 +88,22 @@ export function DevToolsApp() {
   const autoRefresh = signal(true);
   const refreshTick = signal(0);
   const remoteConn = signal<AttachedRemoteVdp | undefined>(undefined);
-  const visibleFrame = frame("devtools_visible", devtoolsVisibleSchema);
-  const visible = computed(() => visibleFrame()?.visible !== false);
+  const timelineFocus = signal<TimelineJumpFocus | undefined>(undefined);
+  const trajectoryFocus = signal<TrajectoryJumpFocus | undefined>(undefined);
+  let jumpSeq = 0;
 
-  useVdpNode({ testId: "devtools-root", role: "main", text: () => t("web.devtools.title") });
+  const visibleFrame = frame("devtools_visible", devtoolsVisibleSchema);
+  const inspectorFrame = frame("inspector", inspectorFrameSchema);
+  const visible = computed(() => visibleFrame()?.visible !== false);
+  const inspecting = computed(() => inspectorFrame()?.inspecting === true);
+  const inspected = computed(() => inspectorFrame()?.selection ?? undefined);
+
+  useVdpNode({
+    testId: "devtools-root",
+    role: "main",
+    text: () => t("web.devtools.title"),
+    source: "apps/mac/ui/features/devtools/DevToolsApp.tsx:82",
+  });
 
   let inFlight = false;
   let wasVisible = true;
@@ -111,6 +155,37 @@ export function DevToolsApp() {
     if (current) snapshot.set({ ...current, overrides: next });
   };
 
+  const onJumpToTimeline = (target: { traceId?: number | undefined; timestampMs: number }) => {
+    jumpSeq += 1;
+    timelineFocus.set({
+      ...(target.traceId !== undefined ? { traceId: target.traceId } : {}),
+      timestampMs: target.timestampMs,
+      key: jumpSeq,
+    });
+    activeTab.set("timeline");
+  };
+
+  const onJumpToTrajectory = (target: { traceId?: number | undefined; timestampMs: number; summary: string }) => {
+    jumpSeq += 1;
+    trajectoryFocus.set({
+      ...(target.traceId !== undefined ? { traceId: target.traceId } : {}),
+      timestampMs: target.timestampMs,
+      key: jumpSeq,
+    });
+    activeTab.set("trajectory");
+  };
+
+  const jumpToInspectedSource = () => {
+    const source = inspected()?.source;
+    if (!source) return;
+    const loc = parseSourceLocation(source);
+    act({
+      type: "devtools_jump_source",
+      path: loc.path,
+      ...(loc.line !== undefined ? { line: loc.line } : {}),
+    });
+  };
+
   return (
     <View testID="devtools-root" class="flex-1 bg-page">
       <View testID="devtools-topbar" class="h-10 shrink-0 flex-row items-center justify-between gap-2 border-b border-line bg-side px-3">
@@ -138,6 +213,14 @@ export function DevToolsApp() {
         </View>
 
         <View class="shrink-0 flex-row items-center gap-1">
+          <IconButton
+            icon="understand"
+            size={14}
+            pressed={inspecting()}
+            label={inspecting() ? t("web.devtools.actions.inspectCancel") : t("web.devtools.actions.inspect")}
+            testid="devtools-inspect-toggle"
+            onClick={() => act({ type: "devtools_inspector_mode", enabled: !inspecting() })}
+          />
           <IconButton icon="refresh" size={14} label={t("web.devtools.actions.refresh")} testid="devtools-refresh" onClick={() => void refresh()} />
           <IconButton
             icon={autoRefresh() ? "stop" : "play"}
@@ -159,6 +242,54 @@ export function DevToolsApp() {
           <IconButton icon="close" size={14} label={t("web.devtools.actions.close")} testid="devtools-close" onClick={() => act({ type: "close_devtools" })} />
         </View>
       </View>
+
+      <If when={inspecting() || inspected() !== undefined}>
+        <View testID="devtools-inspector-bar" class="flex-row flex-wrap items-center justify-between gap-2 border-b border-line bg-selected px-3 py-1.5">
+          <View class="min-w-0 flex-1 flex-row flex-wrap items-center gap-2">
+            <Icon name="understand" size={13} tone="accent" />
+            <Text class="text-xs font-semibold text-ink">{t("web.devtools.inspector.title")}</Text>
+            <If when={inspecting()}>
+              <Text class="text-xs text-muted">{t("web.devtools.inspector.active")}</Text>
+            </If>
+            <If when={inspected() !== undefined}>
+              <View class="flex-row flex-wrap items-center gap-1.5">
+                <If when={Boolean(inspected()!.testId)}>
+                  <Tag tone="info" label={inspected()!.testId ?? ""} />
+                </If>
+                <If when={Boolean(inspected()!.surface)}>
+                  <Tag tone="neutral" label={`${t("web.devtools.inspector.surface")}: ${inspected()!.surface ?? ""}`} />
+                </If>
+                <If when={inspected()!.bounds !== undefined}>
+                  <Text testID="devtools-inspector-bounds" class="font-mono text-2xs text-muted">
+                    {`${Math.round(inspected()!.bounds!.x)},${Math.round(inspected()!.bounds!.y)} ${Math.round(inspected()!.bounds!.width)}×${Math.round(inspected()!.bounds!.height)}`}
+                  </Text>
+                </If>
+                <If when={Boolean(inspected()!.source)} else={<Text class="text-2xs text-faint">{t("web.devtools.inspector.noSource")}</Text>}>
+                  <Text testID="devtools-inspector-source" class="font-mono text-2xs text-water">
+                    {inspected()!.source}
+                  </Text>
+                </If>
+              </View>
+            </If>
+          </View>
+          <View class="flex-row items-center gap-1.5">
+            <If when={Boolean(inspected()?.source)}>
+              <Button size="compact" tone="primary" icon="file" testID="devtools-jump-source" onPress={jumpToInspectedSource}>
+                {t("web.devtools.actions.jumpToSource")}
+              </Button>
+            </If>
+            <If when={inspected() !== undefined}>
+              <IconButton
+                icon="close"
+                size={14}
+                label={t("web.devtools.actions.clearHighlight")}
+                testid="devtools-clear-highlight"
+                onClick={() => act({ type: "devtools_highlight" })}
+              />
+            </If>
+          </View>
+        </View>
+      </If>
 
       <View class="min-h-0 flex-1 flex-row">
         <View testID="devtools-rail" class="w-12 shrink-0 items-center gap-1 border-r border-line bg-rail py-2">
@@ -223,10 +354,16 @@ export function DevToolsApp() {
                       <RoutesTab routes={() => snapshot()!.routes} />
                     </If>
                     <If when={activeTab() === "timeline"}>
-                      <TimelineTab fallbackEvents={() => snapshot()!.recentTimeline} refreshTick={refreshTick} onCleared={() => void refresh()} />
+                      <TimelineTab
+                        fallbackEvents={() => snapshot()!.recentTimeline}
+                        refreshTick={refreshTick}
+                        focus={() => timelineFocus()}
+                        onJumpToTrajectory={onJumpToTrajectory}
+                        onCleared={() => void refresh()}
+                      />
                     </If>
                     <If when={activeTab() === "trajectory"}>
-                      <TrajectoryTab refreshTick={refreshTick} />
+                      <TrajectoryTab refreshTick={refreshTick} focus={() => trajectoryFocus()} onJumpToTimeline={onJumpToTimeline} />
                     </If>
                     <If when={activeTab() === "state"}>
                       <StateCacheTab stateCache={() => snapshot()!.stateCache} />

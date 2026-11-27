@@ -44,6 +44,7 @@ function Slot(props: { to: string; place: string; label: string; name?: string; 
     role: "link",
     text: () => props.label,
     route: () => props.to,
+    source: "apps/mac/ui/app/Shell.tsx:42",
     parentId: "workbench-page",
     getRef: () => slotRef,
     onPress: () => router.navigate(props.to),

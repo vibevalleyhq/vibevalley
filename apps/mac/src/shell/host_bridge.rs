@@ -198,6 +198,40 @@ impl Shell {
             }
             Action::DetachDevtools => self.detach_devtools(window, cx),
             Action::CloseDevtools => self.close_devtools(cx),
+            Action::DevtoolsInspectorMode { enabled } => self.set_devtools_inspecting(enabled, cx),
+            Action::DevtoolsHighlight {
+                test_id,
+                x,
+                y,
+                width,
+                height,
+                label,
+                source,
+                surface,
+            } => {
+                let bounds = match (x, y, width, height) {
+                    (Some(x), Some(y), Some(width), Some(height)) => Some(vibevalley_protocol::VdpUiBounds { x, y, width, height }),
+                    _ => None,
+                };
+                if test_id.is_none() && bounds.is_none() {
+                    self.set_devtools_highlight(None, cx);
+                } else {
+                    self.set_devtools_highlight(
+                        Some(vibevalley_protocol::VdpUiInspectAtResult {
+                            hit: true,
+                            surface,
+                            test_id,
+                            role: None,
+                            text: label,
+                            route: None,
+                            source,
+                            bounds,
+                        }),
+                        cx,
+                    );
+                }
+            }
+            Action::DevtoolsJumpSource { path, line } => self.jump_to_devtools_source(&path, line, window, cx),
         }
     }
 

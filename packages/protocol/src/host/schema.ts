@@ -203,6 +203,19 @@ export const HostAction = z.discriminatedUnion("type", [
   z.object({ type: z.literal("toggle_devtools") }),
   z.object({ type: z.literal("detach_devtools") }),
   z.object({ type: z.literal("close_devtools") }),
+  z.object({ type: z.literal("devtools_inspector_mode"), enabled: z.boolean() }),
+  z.object({
+    type: z.literal("devtools_highlight"),
+    test_id: z.exactOptional(z.string()),
+    x: z.exactOptional(z.number()),
+    y: z.exactOptional(z.number()),
+    width: z.exactOptional(z.number()),
+    height: z.exactOptional(z.number()),
+    label: z.exactOptional(z.string()),
+    source: z.exactOptional(z.string()),
+    surface: z.exactOptional(z.string()),
+  }),
+  z.object({ type: z.literal("devtools_jump_source"), path: z.string(), line: z.exactOptional(z.number()) }),
 ]) satisfies Codec<T.HostAction>;
 
 export const HostThemeChoice = z.enum(T.HostThemeChoiceValues) satisfies Codec<T.HostThemeChoice>;
