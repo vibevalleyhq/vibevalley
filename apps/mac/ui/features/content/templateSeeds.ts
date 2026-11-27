@@ -1,6 +1,7 @@
 import { t } from "@vibevalley/i18n";
-import type { ArtifactFileWriteItem } from "@vibevalley/protocol";
+import type { BaseCellValue, BaseColumn, BaseRow, BaseSheet, DocBlock, NoteFileWriteItem } from "@vibevalley/protocol";
 
+import { buildDocFromMarkdown } from "../note/html";
 import { type AppTemplateSeed, buildAppSeedFiles } from "./appSeeds";
 import { buildVisualSeedFiles, type VisualTemplateSeed } from "./visualSeeds";
 
@@ -518,11 +519,11 @@ export function buildWhiteboardDocument(variant: WhiteboardTemplateVariant): Rec
   return { version: 1, grid: "dots", viewport: { x: 0, y: 0, zoom: 1 }, elements };
 }
 
-function jsonWriteItem(path: string, value: unknown): ArtifactFileWriteItem {
+function jsonWriteItem(path: string, value: unknown): NoteFileWriteItem {
   return { path, content: `${JSON.stringify(value, null, 2)}\n`, mime: "application/json" };
 }
 
-function textWriteItem(path: string, content: string, mime: string): ArtifactFileWriteItem {
+function textWriteItem(path: string, content: string, mime: string): NoteFileWriteItem {
   return { path, content, mime };
 }
 
@@ -533,7 +534,7 @@ function escapeHtml(raw: string): string {
 function buildDocFiles(
   seed: "docRfc" | "docAdr" | "docPostmortem" | "docApiSpec" | "docRunbook" | "docSecurity" | "docMigration" | "docPerf",
   title: string,
-): ArtifactFileWriteItem[] {
+): NoteFileWriteItem[] {
   const bodies: Record<typeof seed, string> = {
     docRfc: t("web.library.content.templates.seed.docRfcBody", { title }),
     docAdr: t("web.library.content.templates.seed.docAdrBody", { title }),
@@ -544,10 +545,10 @@ function buildDocFiles(
     docMigration: t("web.library.content.templates.seed.docMigrationBody", { title }),
     docPerf: t("web.library.content.templates.seed.docPerfBody", { title }),
   };
-  return [textWriteItem("structure/index.md", bodies[seed], "text/markdown")];
+  return [jsonWriteItem("structure/doc.json", buildDocFromMarkdown(title, bodies[seed]))];
 }
 
-function buildDiagramFiles(seed: "diagMicroservices" | "diagSequence" | "diagErd" | "diagCicd" | "diagStateMachine", title: string): ArtifactFileWriteItem[] {
+function buildDiagramFiles(seed: "diagMicroservices" | "diagSequence" | "diagErd" | "diagCicd" | "diagStateMachine", title: string): NoteFileWriteItem[] {
   const payload = (() => {
     switch (seed) {
       case "diagMicroservices":
@@ -659,82 +660,125 @@ function buildDiagramFiles(seed: "diagMicroservices" | "diagSequence" | "diagErd
         };
     }
   })();
-  return [jsonWriteItem("structure/diagram.json", payload)];
+  const mermaidLines = [
+    `flowchart ${payload.direction}`,
+    ...payload.nodes.map((n) => `  ${n.id}["${n.label.replaceAll('"', "'")}"]`),
+    ...payload.edges.map((e) => `  ${e.from} -->|${e.label.replaceAll("|", "/")}| ${e.to}`),
+  ];
+  return [
+    jsonWriteItem("structure/doc.json", {
+      version: 1,
+      blocks: [
+        { id: "b1", type: "heading", level: 1, text: title },
+        { id: "b2", type: "diagram", title, source: mermaidLines.join("\n") },
+      ],
+    }),
+  ];
 }
 
-function buildSheetFiles(seed: "sheetBenchmark" | "sheetTechMatrix" | "sheetTestMatrix" | "sheetApiInventory", title: string): ArtifactFileWriteItem[] {
+function toBaseSheet(
+  id: string,
+  name: string,
+  columns: readonly { readonly key: string; readonly title: string; readonly type: "string" | "number" }[],
+  rows: readonly Record<string, string | number>[],
+): BaseSheet {
+  const baseCols: BaseColumn[] = columns.map((c) => ({
+    id: c.key,
+    name: c.title,
+    kind: c.type === "number" ? "number" : "text",
+    width: c.type === "number" ? 130 : 200,
+  }));
+  const baseRows: BaseRow[] = rows.map((r, idx) => {
+    const cells: Record<string, BaseCellValue> = {};
+    for (const c of columns) {
+      const val = r[c.key];
+      cells[c.key] =
+        c.type === "number" && typeof val === "number" ? { _tag: "number", value: val } : { _tag: "text", value: val !== undefined ? String(val) : "" };
+    }
+    return {
+      id: `r${idx + 1}`,
+      cells,
+      createdAt: 0,
+      updatedAt: 0,
+    };
+  });
+  return {
+    id,
+    name,
+    columns: baseCols,
+    rows: baseRows,
+    views: [{ id: `v_${id}_table`, name: t("web.note.base.table"), kind: "table" }],
+  };
+}
+
+function buildSheetFiles(seed: "sheetBenchmark" | "sheetTechMatrix" | "sheetTestMatrix" | "sheetApiInventory", title: string): NoteFileWriteItem[] {
   switch (seed) {
     case "sheetBenchmark": {
       const tab1 = t("web.library.content.templates.seed.sheetBenchTab1");
       const tab2 = t("web.library.content.templates.seed.sheetBenchTab2");
       return [
-        jsonWriteItem("structure/workbook.json", {
-          title,
-          locale: "en-US",
-          currency: "USD",
+        jsonWriteItem("structure/base.json", {
+          version: 1,
           sheets: [
-            { id: "sheet1", title: tab1, file: "structure/sheets/sheet1.json" },
-            { id: "sheet2", title: tab2, file: "structure/sheets/sheet2.json" },
-          ],
-          namedRanges: {},
-        }),
-        jsonWriteItem("structure/sheets/sheet1.json", {
-          id: "sheet1",
-          title: tab1,
-          columns: [
-            { key: "scenario", title: t("web.library.content.templates.seed.sheetBenchColCase"), type: "string" },
-            { key: "baseline", title: t("web.library.content.templates.seed.sheetBenchColBaseline"), type: "number" },
-            { key: "current", title: t("web.library.content.templates.seed.sheetBenchColCurrent"), type: "number" },
-            { key: "p99", title: t("web.library.content.templates.seed.sheetBenchColP99"), type: "number" },
-            { key: "mem", title: t("web.library.content.templates.seed.sheetBenchColMem"), type: "number" },
-            { key: "status", title: t("web.library.content.templates.seed.sheetBenchColStatus"), type: "string" },
-          ],
-          rows: [
-            {
-              scenario: t("web.library.content.templates.seed.sheetBenchR1Case"),
-              baseline: 1420,
-              current: 2385,
-              p99: 4.2,
-              mem: 68,
-              status: t("web.library.content.templates.seed.sheetBenchR1Status"),
-            },
-            {
-              scenario: t("web.library.content.templates.seed.sheetBenchR2Case"),
-              baseline: 890,
-              current: 1352,
-              p99: 11.8,
-              mem: 112,
-              status: t("web.library.content.templates.seed.sheetBenchR2Status"),
-            },
-            {
-              scenario: t("web.library.content.templates.seed.sheetBenchR3Case"),
-              baseline: 310,
-              current: 520,
-              p99: 16.4,
-              mem: 94,
-              status: t("web.library.content.templates.seed.sheetBenchR3Status"),
-            },
-            {
-              scenario: t("web.library.content.templates.seed.sheetBenchR4Case"),
-              baseline: 640,
-              current: 690,
-              p99: 21.0,
-              mem: 86,
-              status: t("web.library.content.templates.seed.sheetBenchR4Status"),
-            },
-          ],
-        }),
-        jsonWriteItem("structure/sheets/sheet2.json", {
-          id: "sheet2",
-          title: tab2,
-          columns: [
-            { key: "param", title: t("web.library.content.templates.seed.sheetBenchEnvKey"), type: "string" },
-            { key: "value", title: t("web.library.content.templates.seed.sheetBenchEnvVal"), type: "string" },
-          ],
-          rows: [
-            { param: t("web.library.content.templates.seed.sheetBenchEnvR1"), value: "64" },
-            { param: t("web.library.content.templates.seed.sheetBenchEnvR2"), value: "100,000 rows" },
-            { param: t("web.library.content.templates.seed.sheetBenchEnvR3"), value: "5" },
+            toBaseSheet(
+              "sheet1",
+              tab1,
+              [
+                { key: "scenario", title: t("web.library.content.templates.seed.sheetBenchColCase"), type: "string" },
+                { key: "baseline", title: t("web.library.content.templates.seed.sheetBenchColBaseline"), type: "number" },
+                { key: "current", title: t("web.library.content.templates.seed.sheetBenchColCurrent"), type: "number" },
+                { key: "p99", title: t("web.library.content.templates.seed.sheetBenchColP99"), type: "number" },
+                { key: "mem", title: t("web.library.content.templates.seed.sheetBenchColMem"), type: "number" },
+                { key: "status", title: t("web.library.content.templates.seed.sheetBenchColStatus"), type: "string" },
+              ],
+              [
+                {
+                  scenario: t("web.library.content.templates.seed.sheetBenchR1Case"),
+                  baseline: 1420,
+                  current: 2385,
+                  p99: 4.2,
+                  mem: 68,
+                  status: t("web.library.content.templates.seed.sheetBenchR1Status"),
+                },
+                {
+                  scenario: t("web.library.content.templates.seed.sheetBenchR2Case"),
+                  baseline: 890,
+                  current: 1352,
+                  p99: 11.8,
+                  mem: 112,
+                  status: t("web.library.content.templates.seed.sheetBenchR2Status"),
+                },
+                {
+                  scenario: t("web.library.content.templates.seed.sheetBenchR3Case"),
+                  baseline: 310,
+                  current: 520,
+                  p99: 16.4,
+                  mem: 94,
+                  status: t("web.library.content.templates.seed.sheetBenchR3Status"),
+                },
+                {
+                  scenario: t("web.library.content.templates.seed.sheetBenchR4Case"),
+                  baseline: 640,
+                  current: 690,
+                  p99: 21.0,
+                  mem: 86,
+                  status: t("web.library.content.templates.seed.sheetBenchR4Status"),
+                },
+              ],
+            ),
+            toBaseSheet(
+              "sheet2",
+              tab2,
+              [
+                { key: "param", title: t("web.library.content.templates.seed.sheetBenchEnvKey"), type: "string" },
+                { key: "value", title: t("web.library.content.templates.seed.sheetBenchEnvVal"), type: "string" },
+              ],
+              [
+                { param: t("web.library.content.templates.seed.sheetBenchEnvR1"), value: "64" },
+                { param: t("web.library.content.templates.seed.sheetBenchEnvR2"), value: "100,000 rows" },
+                { param: t("web.library.content.templates.seed.sheetBenchEnvR3"), value: "5" },
+              ],
+            ),
           ],
         }),
       ];
@@ -742,59 +786,57 @@ function buildSheetFiles(seed: "sheetBenchmark" | "sheetTechMatrix" | "sheetTest
     case "sheetTechMatrix": {
       const tab = t("web.library.content.templates.seed.sheetTechTab");
       return [
-        jsonWriteItem("structure/workbook.json", {
-          title,
-          locale: "en-US",
-          currency: "USD",
-          sheets: [{ id: "sheet1", title: tab, file: "structure/sheets/sheet1.json" }],
-          namedRanges: {},
-        }),
-        jsonWriteItem("structure/sheets/sheet1.json", {
-          id: "sheet1",
-          title: tab,
-          columns: [
-            { key: "dim", title: t("web.library.content.templates.seed.sheetTechColDim"), type: "string" },
-            { key: "weight", title: t("web.library.content.templates.seed.sheetTechColWeight"), type: "number" },
-            { key: "optA", title: t("web.library.content.templates.seed.sheetTechColOptA"), type: "number" },
-            { key: "optB", title: t("web.library.content.templates.seed.sheetTechColOptB"), type: "number" },
-            { key: "note", title: t("web.library.content.templates.seed.sheetTechColNote"), type: "string" },
-          ],
-          rows: [
-            {
-              dim: t("web.library.content.templates.seed.sheetTechR1Dim"),
-              weight: 30,
-              optA: 9,
-              optB: 6,
-              note: t("web.library.content.templates.seed.sheetTechR1Note"),
-            },
-            {
-              dim: t("web.library.content.templates.seed.sheetTechR2Dim"),
-              weight: 25,
-              optA: 9,
-              optB: 5,
-              note: t("web.library.content.templates.seed.sheetTechR2Note"),
-            },
-            {
-              dim: t("web.library.content.templates.seed.sheetTechR3Dim"),
-              weight: 15,
-              optA: 6,
-              optB: 9,
-              note: t("web.library.content.templates.seed.sheetTechR3Note"),
-            },
-            {
-              dim: t("web.library.content.templates.seed.sheetTechR4Dim"),
-              weight: 20,
-              optA: 8,
-              optB: 6,
-              note: t("web.library.content.templates.seed.sheetTechR4Note"),
-            },
-            {
-              dim: t("web.library.content.templates.seed.sheetTechR5Dim"),
-              weight: 10,
-              optA: 8,
-              optB: 8,
-              note: t("web.library.content.templates.seed.sheetTechR5Note"),
-            },
+        jsonWriteItem("structure/base.json", {
+          version: 1,
+          sheets: [
+            toBaseSheet(
+              "sheet1",
+              tab || title,
+              [
+                { key: "dim", title: t("web.library.content.templates.seed.sheetTechColDim"), type: "string" },
+                { key: "weight", title: t("web.library.content.templates.seed.sheetTechColWeight"), type: "number" },
+                { key: "optA", title: t("web.library.content.templates.seed.sheetTechColOptA"), type: "number" },
+                { key: "optB", title: t("web.library.content.templates.seed.sheetTechColOptB"), type: "number" },
+                { key: "note", title: t("web.library.content.templates.seed.sheetTechColNote"), type: "string" },
+              ],
+              [
+                {
+                  dim: t("web.library.content.templates.seed.sheetTechR1Dim"),
+                  weight: 30,
+                  optA: 9,
+                  optB: 6,
+                  note: t("web.library.content.templates.seed.sheetTechR1Note"),
+                },
+                {
+                  dim: t("web.library.content.templates.seed.sheetTechR2Dim"),
+                  weight: 25,
+                  optA: 9,
+                  optB: 5,
+                  note: t("web.library.content.templates.seed.sheetTechR2Note"),
+                },
+                {
+                  dim: t("web.library.content.templates.seed.sheetTechR3Dim"),
+                  weight: 15,
+                  optA: 6,
+                  optB: 9,
+                  note: t("web.library.content.templates.seed.sheetTechR3Note"),
+                },
+                {
+                  dim: t("web.library.content.templates.seed.sheetTechR4Dim"),
+                  weight: 20,
+                  optA: 8,
+                  optB: 6,
+                  note: t("web.library.content.templates.seed.sheetTechR4Note"),
+                },
+                {
+                  dim: t("web.library.content.templates.seed.sheetTechR5Dim"),
+                  weight: 10,
+                  optA: 8,
+                  optB: 8,
+                  note: t("web.library.content.templates.seed.sheetTechR5Note"),
+                },
+              ],
+            ),
           ],
         }),
       ];
@@ -802,57 +844,55 @@ function buildSheetFiles(seed: "sheetBenchmark" | "sheetTechMatrix" | "sheetTest
     case "sheetTestMatrix": {
       const tab = t("web.library.content.templates.seed.sheetTestTab");
       return [
-        jsonWriteItem("structure/workbook.json", {
-          title,
-          locale: "en-US",
-          currency: "USD",
-          sheets: [{ id: "sheet1", title: tab, file: "structure/sheets/sheet1.json" }],
-          namedRanges: {},
-        }),
-        jsonWriteItem("structure/sheets/sheet1.json", {
-          id: "sheet1",
-          title: tab,
-          columns: [
-            { key: "id", title: t("web.library.content.templates.seed.sheetTestColId"), type: "string" },
-            { key: "area", title: t("web.library.content.templates.seed.sheetTestColArea"), type: "string" },
-            { key: "scenario", title: t("web.library.content.templates.seed.sheetTestColCase"), type: "string" },
-            { key: "layer", title: t("web.library.content.templates.seed.sheetTestColEnv"), type: "string" },
-            { key: "team", title: t("web.library.content.templates.seed.sheetTestColOwner"), type: "string" },
-            { key: "status", title: t("web.library.content.templates.seed.sheetTestColResult"), type: "string" },
-          ],
-          rows: [
-            {
-              id: "TC-01",
-              area: t("web.library.content.templates.seed.sheetTestR1Area"),
-              scenario: t("web.library.content.templates.seed.sheetTestR1Case"),
-              layer: t("web.library.content.templates.seed.sheetTestR1Env"),
-              team: t("web.library.content.templates.seed.sheetTestR1Owner"),
-              status: t("web.library.content.templates.seed.sheetTestR1Res"),
-            },
-            {
-              id: "TC-02",
-              area: t("web.library.content.templates.seed.sheetTestR2Area"),
-              scenario: t("web.library.content.templates.seed.sheetTestR2Case"),
-              layer: t("web.library.content.templates.seed.sheetTestR2Env"),
-              team: t("web.library.content.templates.seed.sheetTestR2Owner"),
-              status: t("web.library.content.templates.seed.sheetTestR2Res"),
-            },
-            {
-              id: "TC-03",
-              area: t("web.library.content.templates.seed.sheetTestR3Area"),
-              scenario: t("web.library.content.templates.seed.sheetTestR3Case"),
-              layer: t("web.library.content.templates.seed.sheetTestR3Env"),
-              team: t("web.library.content.templates.seed.sheetTestR3Owner"),
-              status: t("web.library.content.templates.seed.sheetTestR3Res"),
-            },
-            {
-              id: "TC-04",
-              area: t("web.library.content.templates.seed.sheetTestR4Area"),
-              scenario: t("web.library.content.templates.seed.sheetTestR4Case"),
-              layer: t("web.library.content.templates.seed.sheetTestR4Env"),
-              team: t("web.library.content.templates.seed.sheetTestR4Owner"),
-              status: t("web.library.content.templates.seed.sheetTestR4Res"),
-            },
+        jsonWriteItem("structure/base.json", {
+          version: 1,
+          sheets: [
+            toBaseSheet(
+              "sheet1",
+              tab || title,
+              [
+                { key: "id", title: t("web.library.content.templates.seed.sheetTestColId"), type: "string" },
+                { key: "area", title: t("web.library.content.templates.seed.sheetTestColArea"), type: "string" },
+                { key: "scenario", title: t("web.library.content.templates.seed.sheetTestColCase"), type: "string" },
+                { key: "layer", title: t("web.library.content.templates.seed.sheetTestColEnv"), type: "string" },
+                { key: "team", title: t("web.library.content.templates.seed.sheetTestColOwner"), type: "string" },
+                { key: "status", title: t("web.library.content.templates.seed.sheetTestColResult"), type: "string" },
+              ],
+              [
+                {
+                  id: "TC-01",
+                  area: t("web.library.content.templates.seed.sheetTestR1Area"),
+                  scenario: t("web.library.content.templates.seed.sheetTestR1Case"),
+                  layer: t("web.library.content.templates.seed.sheetTestR1Env"),
+                  team: t("web.library.content.templates.seed.sheetTestR1Owner"),
+                  status: t("web.library.content.templates.seed.sheetTestR1Res"),
+                },
+                {
+                  id: "TC-02",
+                  area: t("web.library.content.templates.seed.sheetTestR2Area"),
+                  scenario: t("web.library.content.templates.seed.sheetTestR2Case"),
+                  layer: t("web.library.content.templates.seed.sheetTestR2Env"),
+                  team: t("web.library.content.templates.seed.sheetTestR2Owner"),
+                  status: t("web.library.content.templates.seed.sheetTestR2Res"),
+                },
+                {
+                  id: "TC-03",
+                  area: t("web.library.content.templates.seed.sheetTestR3Area"),
+                  scenario: t("web.library.content.templates.seed.sheetTestR3Case"),
+                  layer: t("web.library.content.templates.seed.sheetTestR3Env"),
+                  team: t("web.library.content.templates.seed.sheetTestR3Owner"),
+                  status: t("web.library.content.templates.seed.sheetTestR3Res"),
+                },
+                {
+                  id: "TC-04",
+                  area: t("web.library.content.templates.seed.sheetTestR4Area"),
+                  scenario: t("web.library.content.templates.seed.sheetTestR4Case"),
+                  layer: t("web.library.content.templates.seed.sheetTestR4Env"),
+                  team: t("web.library.content.templates.seed.sheetTestR4Owner"),
+                  status: t("web.library.content.templates.seed.sheetTestR4Res"),
+                },
+              ],
+            ),
           ],
         }),
       ];
@@ -860,57 +900,55 @@ function buildSheetFiles(seed: "sheetBenchmark" | "sheetTechMatrix" | "sheetTest
     case "sheetApiInventory": {
       const tab = t("web.library.content.templates.seed.sheetApiTab");
       return [
-        jsonWriteItem("structure/workbook.json", {
-          title,
-          locale: "en-US",
-          currency: "USD",
-          sheets: [{ id: "sheet1", title: tab, file: "structure/sheets/sheet1.json" }],
-          namedRanges: {},
-        }),
-        jsonWriteItem("structure/sheets/sheet1.json", {
-          id: "sheet1",
-          title: tab,
-          columns: [
-            { key: "method", title: t("web.library.content.templates.seed.sheetApiColMethod"), type: "string" },
-            { key: "path", title: t("web.library.content.templates.seed.sheetApiColPath"), type: "string" },
-            { key: "auth", title: t("web.library.content.templates.seed.sheetApiColAuth"), type: "string" },
-            { key: "rate", title: t("web.library.content.templates.seed.sheetApiColRate"), type: "string" },
-            { key: "team", title: t("web.library.content.templates.seed.sheetApiColOwner"), type: "string" },
-            { key: "stability", title: t("web.library.content.templates.seed.sheetApiColStability"), type: "string" },
-          ],
-          rows: [
-            {
-              method: "GET",
-              path: "/api/v1/slice/board",
-              auth: t("web.library.content.templates.seed.sheetApiR1Auth"),
-              rate: t("web.library.content.templates.seed.sheetApiR1Rate"),
-              team: t("web.library.content.templates.seed.sheetApiR1Owner"),
-              stability: t("web.library.content.templates.seed.sheetApiR1Stab"),
-            },
-            {
-              method: "POST",
-              path: "/api/v1/artifact/create",
-              auth: t("web.library.content.templates.seed.sheetApiR2Auth"),
-              rate: t("web.library.content.templates.seed.sheetApiR2Rate"),
-              team: t("web.library.content.templates.seed.sheetApiR2Owner"),
-              stability: t("web.library.content.templates.seed.sheetApiR2Stab"),
-            },
-            {
-              method: "POST",
-              path: "/api/v1/session/send",
-              auth: t("web.library.content.templates.seed.sheetApiR3Auth"),
-              rate: t("web.library.content.templates.seed.sheetApiR3Rate"),
-              team: t("web.library.content.templates.seed.sheetApiR3Owner"),
-              stability: t("web.library.content.templates.seed.sheetApiR3Stab"),
-            },
-            {
-              method: "POST",
-              path: "/api/v1/remote/pair/exchange",
-              auth: t("web.library.content.templates.seed.sheetApiR4Auth"),
-              rate: t("web.library.content.templates.seed.sheetApiR4Rate"),
-              team: t("web.library.content.templates.seed.sheetApiR4Owner"),
-              stability: t("web.library.content.templates.seed.sheetApiR4Stab"),
-            },
+        jsonWriteItem("structure/base.json", {
+          version: 1,
+          sheets: [
+            toBaseSheet(
+              "sheet1",
+              tab || title,
+              [
+                { key: "method", title: t("web.library.content.templates.seed.sheetApiColMethod"), type: "string" },
+                { key: "path", title: t("web.library.content.templates.seed.sheetApiColPath"), type: "string" },
+                { key: "auth", title: t("web.library.content.templates.seed.sheetApiColAuth"), type: "string" },
+                { key: "rate", title: t("web.library.content.templates.seed.sheetApiColRate"), type: "string" },
+                { key: "team", title: t("web.library.content.templates.seed.sheetApiColOwner"), type: "string" },
+                { key: "stability", title: t("web.library.content.templates.seed.sheetApiColStability"), type: "string" },
+              ],
+              [
+                {
+                  method: "GET",
+                  path: "/api/v1/slice/board",
+                  auth: t("web.library.content.templates.seed.sheetApiR1Auth"),
+                  rate: t("web.library.content.templates.seed.sheetApiR1Rate"),
+                  team: t("web.library.content.templates.seed.sheetApiR1Owner"),
+                  stability: t("web.library.content.templates.seed.sheetApiR1Stab"),
+                },
+                {
+                  method: "POST",
+                  path: "/api/v1/note/create",
+                  auth: t("web.library.content.templates.seed.sheetApiR2Auth"),
+                  rate: t("web.library.content.templates.seed.sheetApiR2Rate"),
+                  team: t("web.library.content.templates.seed.sheetApiR2Owner"),
+                  stability: t("web.library.content.templates.seed.sheetApiR2Stab"),
+                },
+                {
+                  method: "POST",
+                  path: "/api/v1/session/send",
+                  auth: t("web.library.content.templates.seed.sheetApiR3Auth"),
+                  rate: t("web.library.content.templates.seed.sheetApiR3Rate"),
+                  team: t("web.library.content.templates.seed.sheetApiR3Owner"),
+                  stability: t("web.library.content.templates.seed.sheetApiR3Stab"),
+                },
+                {
+                  method: "POST",
+                  path: "/api/v1/remote/pair/exchange",
+                  auth: t("web.library.content.templates.seed.sheetApiR4Auth"),
+                  rate: t("web.library.content.templates.seed.sheetApiR4Rate"),
+                  team: t("web.library.content.templates.seed.sheetApiR4Owner"),
+                  stability: t("web.library.content.templates.seed.sheetApiR4Stab"),
+                },
+              ],
+            ),
           ],
         }),
       ];
@@ -918,112 +956,94 @@ function buildSheetFiles(seed: "sheetBenchmark" | "sheetTechMatrix" | "sheetTest
   }
 }
 
-function buildDashboardFiles(seed: "dashSlo" | "dashDora", title: string): ArtifactFileWriteItem[] {
+function buildDashboardFiles(seed: "dashSlo" | "dashDora", title: string): NoteFileWriteItem[] {
   if (seed === "dashSlo") {
-    return [
-      jsonWriteItem("structure/dashboard.json", {
-        title,
-        filters: [],
-        panels: [
-          {
-            id: "kpi_avail",
-            kind: "kpi",
-            label: t("web.library.content.templates.seed.dashSloP1"),
-            source: { dataset: "structure/data/sample.json", field: "availability", agg: "avg" },
-            format: "percent",
-          },
-          {
-            id: "kpi_p99",
-            kind: "kpi",
-            label: t("web.library.content.templates.seed.dashSloP2"),
-            source: { dataset: "structure/data/sample.json", field: "p99Ms", agg: "max" },
-            format: "number",
-          },
-          {
-            id: "kpi_budget",
-            kind: "kpi",
-            label: t("web.library.content.templates.seed.dashSloP3"),
-            source: { dataset: "structure/data/sample.json", field: "budgetLeft", agg: "min" },
-            format: "percent",
-          },
-          {
-            id: "kpi_alerts",
-            kind: "table",
-            label: t("web.library.content.templates.seed.dashSloP4"),
-            source: { dataset: "structure/data/sample.json", field: "alerts7d", agg: "sum" },
-            format: "number",
-          },
+    const services = [
+      t("web.library.content.templates.seed.dashSloR1"),
+      t("web.library.content.templates.seed.dashSloR2"),
+      t("web.library.content.templates.seed.dashSloR3"),
+      t("web.library.content.templates.seed.dashSloR4"),
+    ];
+    const blocks: DocBlock[] = [
+      { id: "b1", type: "heading", level: 1, text: title },
+      {
+        id: "b2",
+        type: "kpi",
+        items: [
+          { label: t("web.library.content.templates.seed.dashSloP1"), value: "99.97%" },
+          { label: t("web.library.content.templates.seed.dashSloP2"), value: "28 ms" },
+          { label: t("web.library.content.templates.seed.dashSloP3"), value: "76%" },
+          { label: t("web.library.content.templates.seed.dashSloP4"), value: "3" },
         ],
-      }),
-      jsonWriteItem("structure/data/sample.json", {
-        schema: [
-          { name: "service", label: t("web.library.content.templates.seed.dashSloServiceCol"), type: "string" },
-          { name: "availability", label: t("web.library.content.templates.seed.dashSloAvailCol"), type: "number" },
-          { name: "p99Ms", label: t("web.library.content.templates.seed.dashSloP99Col"), type: "number" },
-          { name: "budgetLeft", label: t("web.library.content.templates.seed.dashSloBudgetCol"), type: "number" },
-          { name: "alerts7d", label: t("web.library.content.templates.seed.dashSloAlertsCol"), type: "number" },
+      },
+      {
+        id: "b3",
+        type: "chart",
+        title: t("web.library.content.templates.seed.dashSloP2"),
+        kind: "bar",
+        labels: services,
+        series: [{ name: t("web.library.content.templates.seed.dashSloP99Col"), data: [14, 19, 11, 28] }],
+      },
+      {
+        id: "b4",
+        type: "table",
+        headers: [
+          t("web.library.content.templates.seed.dashSloServiceCol"),
+          t("web.library.content.templates.seed.dashSloAvailCol"),
+          t("web.library.content.templates.seed.dashSloP99Col"),
+          t("web.library.content.templates.seed.dashSloBudgetCol"),
+          t("web.library.content.templates.seed.dashSloAlertsCol"),
         ],
         rows: [
-          { service: t("web.library.content.templates.seed.dashSloR1"), availability: 99.98, p99Ms: 14, budgetLeft: 92, alerts7d: 0 },
-          { service: t("web.library.content.templates.seed.dashSloR2"), availability: 99.96, p99Ms: 19, budgetLeft: 84, alerts7d: 1 },
-          { service: t("web.library.content.templates.seed.dashSloR3"), availability: 99.99, p99Ms: 11, budgetLeft: 96, alerts7d: 0 },
-          { service: t("web.library.content.templates.seed.dashSloR4"), availability: 99.94, p99Ms: 28, budgetLeft: 76, alerts7d: 2 },
+          [services[0] ?? "", "99.98%", "14", "92%", "0"],
+          [services[1] ?? "", "99.96%", "19", "84%", "1"],
+          [services[2] ?? "", "99.99%", "11", "96%", "0"],
+          [services[3] ?? "", "99.94%", "28", "76%", "2"],
         ],
-      }),
+      },
     ];
+    return [jsonWriteItem("structure/doc.json", { version: 1, blocks })];
   }
 
-  return [
-    jsonWriteItem("structure/dashboard.json", {
-      title,
-      filters: [],
-      panels: [
-        {
-          id: "kpi_deploys",
-          kind: "kpi",
-          label: t("web.library.content.templates.seed.dashDoraP1"),
-          source: { dataset: "structure/data/sample.json", field: "deploys", agg: "avg" },
-          format: "number",
-        },
-        {
-          id: "kpi_lead",
-          kind: "kpi",
-          label: t("web.library.content.templates.seed.dashDoraP2"),
-          source: { dataset: "structure/data/sample.json", field: "leadTimeHours", agg: "avg" },
-          format: "number",
-        },
-        {
-          id: "kpi_cfr",
-          kind: "kpi",
-          label: t("web.library.content.templates.seed.dashDoraP3"),
-          source: { dataset: "structure/data/sample.json", field: "failureRate", agg: "avg" },
-          format: "percent",
-        },
-        {
-          id: "kpi_mttr",
-          kind: "table",
-          label: t("web.library.content.templates.seed.dashDoraP4"),
-          source: { dataset: "structure/data/sample.json", field: "mttrMin", agg: "avg" },
-          format: "number",
-        },
+  const blocks: DocBlock[] = [
+    { id: "b1", type: "heading", level: 1, text: title },
+    {
+      id: "b2",
+      type: "kpi",
+      items: [
+        { label: t("web.library.content.templates.seed.dashDoraP1"), value: "23.5" },
+        { label: t("web.library.content.templates.seed.dashDoraP2"), value: "4.8 h" },
+        { label: t("web.library.content.templates.seed.dashDoraP3"), value: "2.7%" },
+        { label: t("web.library.content.templates.seed.dashDoraP4"), value: "16 min" },
       ],
-    }),
-    jsonWriteItem("structure/data/sample.json", {
-      schema: [
-        { name: "week", label: t("web.library.content.templates.seed.dashDoraWeekCol"), type: "string" },
-        { name: "deploys", label: t("web.library.content.templates.seed.dashDoraDeployCol"), type: "number" },
-        { name: "leadTimeHours", label: t("web.library.content.templates.seed.dashDoraLeadCol"), type: "number" },
-        { name: "failureRate", label: t("web.library.content.templates.seed.dashDoraCfrCol"), type: "number" },
-        { name: "mttrMin", label: t("web.library.content.templates.seed.dashDoraMttrCol"), type: "number" },
+    },
+    {
+      id: "b3",
+      type: "chart",
+      title: t("web.library.content.templates.seed.dashDoraP1"),
+      kind: "bar",
+      labels: ["W44", "W45", "W46", "W47"],
+      series: [{ name: t("web.library.content.templates.seed.dashDoraDeployCol"), data: [18, 22, 25, 29] }],
+    },
+    {
+      id: "b4",
+      type: "table",
+      headers: [
+        t("web.library.content.templates.seed.dashDoraWeekCol"),
+        t("web.library.content.templates.seed.dashDoraDeployCol"),
+        t("web.library.content.templates.seed.dashDoraLeadCol"),
+        t("web.library.content.templates.seed.dashDoraCfrCol"),
+        t("web.library.content.templates.seed.dashDoraMttrCol"),
       ],
       rows: [
-        { week: "W44", deploys: 18, leadTimeHours: 6.4, failureRate: 4.2, mttrMin: 22 },
-        { week: "W45", deploys: 22, leadTimeHours: 5.1, failureRate: 3.1, mttrMin: 17 },
-        { week: "W46", deploys: 25, leadTimeHours: 4.3, failureRate: 2.0, mttrMin: 14 },
-        { week: "W47", deploys: 29, leadTimeHours: 3.6, failureRate: 1.5, mttrMin: 11 },
+        ["W44", "18", "6.4", "4.2%", "22"],
+        ["W45", "22", "5.1", "3.1%", "17"],
+        ["W46", "25", "4.3", "2.0%", "14"],
+        ["W47", "29", "3.6", "1.5%", "11"],
       ],
-    }),
+    },
   ];
+  return [jsonWriteItem("structure/doc.json", { version: 1, blocks })];
 }
 
 interface SlideSeedSpec {
@@ -1036,7 +1056,7 @@ interface SlideSeedSpec {
   readonly notes: string;
 }
 
-function buildSlidesFiles(seed: "slidesArchReview" | "slidesReleaseDemo", title: string): ArtifactFileWriteItem[] {
+function buildSlidesFiles(seed: "slidesArchReview" | "slidesReleaseDemo", title: string): NoteFileWriteItem[] {
   const specs: readonly SlideSeedSpec[] =
     seed === "slidesArchReview"
       ? [
@@ -1166,27 +1186,20 @@ function buildSlidesFiles(seed: "slidesArchReview" | "slidesReleaseDemo", title:
           },
         ];
 
-  return [
-    jsonWriteItem("structure/deck.json", {
-      title,
-      aspectRatio: "16:9",
-      designSystemId: null,
-      slides: specs.map((s) => ({ id: s.id, file: s.file, title: s.title })),
-    }),
-    ...specs.map((s) =>
-      jsonWriteItem(s.file, {
-        id: s.id,
-        layout: s.layout,
-        title: s.title,
-        subtitle: s.subtitle,
-        blocks: s.bullets.map((text) => ({ kind: "bullet", text })),
-        notes: s.notes,
-      }),
-    ),
-  ];
+  const blocks: DocBlock[] = [];
+  let seq = 0;
+  for (const [idx, s] of specs.entries()) {
+    if (idx > 0) {
+      blocks.push({ id: `pb_${++seq}`, type: "pageBreak", title: s.title, speakerNotes: s.notes });
+    }
+    blocks.push({ id: `h_${++seq}`, type: "heading", level: idx === 0 ? 1 : 2, text: s.title });
+    if (s.subtitle) blocks.push({ id: `p_${++seq}`, type: "prose", text: s.subtitle });
+    if (s.bullets.length > 0) blocks.push({ id: `l_${++seq}`, type: "list", ordered: false, items: [...s.bullets] });
+  }
+  return [jsonWriteItem("structure/doc.json", { version: 1, blocks })];
 }
 
-function buildPrototypeFiles(seed: "protoApiPlayground" | "protoComponentLab", title: string): ArtifactFileWriteItem[] {
+function buildPrototypeFiles(seed: "protoApiPlayground" | "protoComponentLab", title: string): NoteFileWriteItem[] {
   const safeTitle = escapeHtml(title);
   if (seed === "protoApiPlayground") {
     const labels = {
@@ -1302,6 +1315,13 @@ payloadEl.addEventListener("input", renderCurl);
 renderCurl();
 `;
     return [
+      jsonWriteItem("structure/doc.json", {
+        version: 1,
+        blocks: [
+          { id: "b1", type: "heading", level: 1, text: title },
+          { id: "b2", type: "preview", entry: "structure/index.html", height: 520, title },
+        ],
+      }),
       textWriteItem("structure/index.html", html, "text/html"),
       textWriteItem("structure/styles.css", css, "text/css"),
       textWriteItem("structure/app.js", js, "application/javascript"),
@@ -1430,13 +1450,20 @@ document.querySelectorAll("button[data-width]").forEach((btn) => {
 render();
 `;
   return [
+    jsonWriteItem("structure/doc.json", {
+      version: 1,
+      blocks: [
+        { id: "b1", type: "heading", level: 1, text: title },
+        { id: "b2", type: "preview", entry: "structure/index.html", height: 520, title },
+      ],
+    }),
     textWriteItem("structure/index.html", html, "text/html"),
     textWriteItem("structure/styles.css", css, "text/css"),
     textWriteItem("structure/app.js", js, "application/javascript"),
   ];
 }
 
-export function buildDeliverableSeedFiles(seed: DeliverableTemplateSeed, title: string): ArtifactFileWriteItem[] {
+export function buildDeliverableSeedFiles(seed: DeliverableTemplateSeed, title: string): NoteFileWriteItem[] {
   switch (seed) {
     case "docRfc":
     case "docAdr":

@@ -1,9 +1,9 @@
 import { t } from "@vibevalley/i18n";
-import type { ArtifactFileWriteItem } from "@vibevalley/protocol";
+import type { NoteFileWriteItem } from "@vibevalley/protocol";
 
 export type VisualTemplateSeed = "designWorkspaceUi" | "dsPapertrails" | "motionLaunchReel" | "storyboardProductFilm";
 
-function jsonWriteItem(path: string, data: unknown): ArtifactFileWriteItem {
+function jsonWriteItem(path: string, data: unknown): NoteFileWriteItem {
   return {
     path,
     content: `${JSON.stringify(data, null, 2)}\n`,
@@ -12,7 +12,7 @@ function jsonWriteItem(path: string, data: unknown): ArtifactFileWriteItem {
   };
 }
 
-function buildDesignWorkspaceUi(title: string): ArtifactFileWriteItem[] {
+function buildDesignWorkspaceUi(title: string): NoteFileWriteItem[] {
   const desktop = {
     id: "desktop-workspace",
     name: t("web.library.content.templates.seed.designDesktopName"),
@@ -128,7 +128,7 @@ function buildDesignWorkspaceUi(title: string): ArtifactFileWriteItem[] {
   return [jsonWriteItem("structure/frames/main.json", desktop), jsonWriteItem("structure/frames/mobile-companion.json", mobile)];
 }
 
-function buildDesignSystemPapertrails(title: string): ArtifactFileWriteItem[] {
+function buildDesignSystemPapertrails(title: string): NoteFileWriteItem[] {
   const tokens = {
     name: title,
     version: "1.0.0",
@@ -209,7 +209,7 @@ function buildDesignSystemPapertrails(title: string): ArtifactFileWriteItem[] {
   ];
 }
 
-function buildMotionLaunchReel(title: string): ArtifactFileWriteItem[] {
+function buildMotionLaunchReel(title: string): NoteFileWriteItem[] {
   const timeline = {
     title,
     width: 1920,
@@ -271,7 +271,7 @@ function buildMotionLaunchReel(title: string): ArtifactFileWriteItem[] {
   ];
 }
 
-function buildStoryboardProductFilm(title: string): ArtifactFileWriteItem[] {
+function buildStoryboardProductFilm(title: string): NoteFileWriteItem[] {
   return [
     jsonWriteItem("structure/shots.json", {
       title,
@@ -324,15 +324,81 @@ function buildStoryboardProductFilm(title: string): ArtifactFileWriteItem[] {
   ];
 }
 
-export function buildVisualSeedFiles(seed: VisualTemplateSeed, title: string): ArtifactFileWriteItem[] {
+export function buildVisualSeedFiles(seed: VisualTemplateSeed, title: string): NoteFileWriteItem[] {
   switch (seed) {
     case "designWorkspaceUi":
-      return buildDesignWorkspaceUi(title);
+      return [
+        jsonWriteItem("structure/board.json", {
+          version: 1,
+          grid: "architectural",
+          theme: "warm",
+          viewport: { x: 0, y: 0, zoom: 1 },
+          elements: {
+            t1: { id: "t1", type: "text", variant: "title", x: 60, y: 40, w: 620, h: 48, label: title },
+            f1: {
+              id: "f1",
+              type: "card",
+              x: 60,
+              y: 120,
+              w: 420,
+              h: 260,
+              label: t("web.library.content.templates.seed.designDesktopName"),
+              body: t("web.library.content.templates.seed.designPropCtaDefault"),
+              fill: "default",
+            },
+          },
+        }),
+        ...buildDesignWorkspaceUi(title),
+      ];
     case "dsPapertrails":
-      return buildDesignSystemPapertrails(title);
+      return [
+        jsonWriteItem("structure/board.json", {
+          version: 1,
+          grid: "dots",
+          theme: "warm",
+          viewport: { x: 0, y: 0, zoom: 1 },
+          elements: {
+            t1: { id: "t1", type: "text", variant: "title", x: 60, y: 40, w: 620, h: 48, label: title },
+            s1: { id: "s1", type: "sticky", x: 60, y: 120, w: 180, h: 120, label: "Accent #4D7A2A", fill: "leaf" },
+            s2: { id: "s2", type: "sticky", x: 260, y: 120, w: 180, h: 120, label: "Water #2B7A9B", fill: "water" },
+            s3: { id: "s3", type: "sticky", x: 460, y: 120, w: 180, h: 120, label: "Wheat #C89B3C", fill: "sun" },
+          },
+        }),
+        ...buildDesignSystemPapertrails(title),
+      ];
     case "motionLaunchReel":
-      return buildMotionLaunchReel(title);
+      return [
+        jsonWriteItem("structure/media.json", {
+          version: 1,
+          title,
+          mediaKind: "video",
+          caption: t("web.library.content.templates.seed.motionSc2CardBody"),
+          durationSec: 9.0,
+          posterAsset: null,
+          items: [
+            { id: "sc01-hook", label: t("web.library.content.templates.seed.motionCh1"), startSec: 0, endSec: 3.0 },
+            { id: "sc02-features", label: t("web.library.content.templates.seed.motionCh2"), startSec: 3.0, endSec: 6.0 },
+            { id: "sc03-cta", label: t("web.library.content.templates.seed.motionCh3"), startSec: 6.0, endSec: 9.0 },
+          ],
+        }),
+        ...buildMotionLaunchReel(title),
+      ];
     case "storyboardProductFilm":
-      return buildStoryboardProductFilm(title);
+      return [
+        jsonWriteItem("structure/media.json", {
+          version: 1,
+          title,
+          mediaKind: "video",
+          caption: t("web.library.content.templates.seed.sbTone"),
+          durationSec: 8.0,
+          posterAsset: null,
+          items: [
+            { id: "sh01", label: t("web.library.content.templates.seed.sbS1Scene"), durationSec: 2.5 },
+            { id: "sh02", label: t("web.library.content.templates.seed.sbS2Scene"), durationSec: 3.0 },
+            { id: "sh03", label: t("web.library.content.templates.seed.sbS3Scene"), durationSec: 2.5 },
+          ],
+        }),
+        ...buildStoryboardProductFilm(title),
+      ];
   }
 }

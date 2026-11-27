@@ -1,7 +1,7 @@
 import { computed, Scroll, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
-import type { DebugCollabArtifactState, DebugStateCache } from "@vibevalley/protocol";
+import type { DebugCollabNoteState, DebugStateCache } from "@vibevalley/protocol";
 
 import { Tag } from "../../design/Tag";
 import { formatBytes, formatJson, SLICE_NAMES } from "./format";
@@ -34,7 +34,7 @@ export function StateCacheTab(props: { stateCache: () => DebugStateCache }) {
       { key: "channels", label: t("web.devtools.state.channels"), value: c.channels },
       { key: "agents", label: t("web.devtools.state.agents"), value: c.agents },
       { key: "repos", label: t("web.devtools.state.repos"), value: c.repos },
-      { key: "artifacts", label: t("web.devtools.state.artifacts"), value: c.artifacts },
+      { key: "notes", label: t("web.devtools.state.notes"), value: c.notes },
       { key: "inbox", label: t("web.devtools.state.inbox"), value: c.inbox },
       { key: "mediaJobs", label: t("web.devtools.state.mediaJobs"), value: c.mediaJobs },
     ] as const;
@@ -52,20 +52,20 @@ export function StateCacheTab(props: { stateCache: () => DebugStateCache }) {
     });
   });
 
-  const selectedCollab = computed<DebugCollabArtifactState | undefined>(() => {
+  const selectedCollab = computed<DebugCollabNoteState | undefined>(() => {
     const items = sc().collab;
     if (items.length === 0) return undefined;
     const id = selectedCollabId();
-    return items.find((item) => item.artifactId === id) ?? items[0];
+    return items.find((item) => item.noteId === id) ?? items[0];
   });
 
   const collabPreviewJson = computed(() => {
     const c = selectedCollab();
     if (!c) return "";
     return formatJson({
-      artifactId: c.artifactId,
+      noteId: c.noteId,
       title: c.title,
-      artifactType: c.artifactType,
+      noteType: c.noteType,
       seq: c.seq,
       snapshotBytes: c.snapshotBytes,
       frontiers: c.frontiers,
@@ -161,21 +161,21 @@ export function StateCacheTab(props: { stateCache: () => DebugStateCache }) {
           }
         >
           <View class="overflow-hidden rounded-md border border-line bg-page">
-            <Each of={sc().collab} key={(c) => c.artifactId}>
+            <Each of={sc().collab} key={(c) => c.noteId}>
               {(item, idx) => {
-                const active = () => selectedCollab()?.artifactId === item().artifactId;
+                const active = () => selectedCollab()?.noteId === item().noteId;
                 return (
                   <View
                     role="button"
-                    testID={`state-collab-${item().artifactId}`}
+                    testID={`state-collab-${item().noteId}`}
                     accessibilityState={{ selected: active() }}
-                    onPress={() => selectedCollabId.set(item().artifactId)}
+                    onPress={() => selectedCollabId.set(item().noteId)}
                     class={`gap-1.5 px-3 py-2.5 ${idx() > 0 ? "border-t border-line" : ""} ${active() ? "bg-selected" : "hover:bg-hover"}`}
                   >
                     <View class="flex-row flex-wrap items-center justify-between gap-2">
                       <View class="min-w-0 flex-1 flex-row items-center gap-1.5">
-                        <Text class="truncate text-xs font-medium text-ink">{item().title || item().artifactId}</Text>
-                        <Tag tone="neutral" label={item().artifactType} />
+                        <Text class="truncate text-xs font-medium text-ink">{item().title || item().noteId}</Text>
+                        <Tag tone="neutral" label={item().noteType} />
                       </View>
                       <View class="flex-row items-center gap-1.5">
                         <Tag tone="info" label={`seq ${item().seq}`} />

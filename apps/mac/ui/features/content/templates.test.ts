@@ -3,29 +3,28 @@ import { expect, test } from "nsh/test";
 
 import { setLocale } from "@vibevalley/i18n";
 import "@vibevalley/i18n/catalogs";
-import { ARTIFACT_TYPES, type ArtifactType } from "@vibevalley/protocol";
+import { NOTE_TYPES, type NoteType } from "@vibevalley/protocol";
 
-import { buildOutlineFromMarkdown } from "../artifact";
-import { CONTENT_TEMPLATES, templateBadge, templateDesc, templateIcon, templateMatchesQuery, templateName } from "./templates";
+import { buildDocFromMarkdown } from "../note/html";
+import { CONTENT_TEMPLATES, templateBadge, templateDesc, templateIcon, templateMatchesQuery, templateName, templateNoteType } from "./templates";
 import { buildDeliverableSeedFiles, buildWhiteboardDocument, noteStarterMarkdown } from "./templateSeeds";
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
-test("content templates expose 65 unique entries covering all 12 artifact types", () => {
+test("content templates expose 65 unique entries covering all 3+1 note primitives", () => {
   expect(CONTENT_TEMPLATES.length).toBe(65);
   expect(new Set(CONTENT_TEMPLATES.map((t) => t.id)).size).toBe(65);
   expect(new Set(CONTENT_TEMPLATES.map((t) => t.key)).size).toBe(65);
 
-  const coveredTypes = new Set<ArtifactType>();
+  const coveredTypes = new Set<NoteType>();
   for (const tpl of CONTENT_TEMPLATES) {
-    if (tpl.kind === "note") coveredTypes.add("outline");
-    else if (tpl.kind === "whiteboard") coveredTypes.add("whiteboard");
-    else if (tpl.kind === "deliverable") coveredTypes.add(tpl.artifactType);
+    const nt = templateNoteType(tpl);
+    if (nt !== undefined) coveredTypes.add(nt);
   }
-  for (const artifactType of ARTIFACT_TYPES) {
-    expect(coveredTypes.has(artifactType)).toBe(true);
+  for (const noteType of NOTE_TYPES) {
+    expect(coveredTypes.has(noteType)).toBe(true);
   }
 
   const engineeringCount = CONTENT_TEMPLATES.filter((t) => t.engineering === true).length;
@@ -47,15 +46,15 @@ test("all templates resolve non-empty localized names, descriptions, icons, and 
   }
 });
 
-test("every note, whiteboard, and seeded deliverable template generates valid structured files", () => {
+test("every doc, canvas, base, and media template generates valid canonical structure files", () => {
   for (const locale of ["zh", "en"] as const) {
     setLocale(locale);
     for (const tpl of CONTENT_TEMPLATES) {
       const title = templateName(tpl);
       if (tpl.kind === "note") {
-        const doc = buildOutlineFromMarkdown(title, noteStarterMarkdown(tpl.variant));
-        expect(doc.rootIds.length).toBeGreaterThan(0);
-        expect(Object.keys(doc.nodes).length).toBeGreaterThan(0);
+        const doc = buildDocFromMarkdown(title, noteStarterMarkdown(tpl.variant));
+        expect(doc.version).toBe(1);
+        expect(doc.blocks.length).toBeGreaterThan(0);
       } else if (tpl.kind === "whiteboard") {
         const board = buildWhiteboardDocument(tpl.variant);
         expect(board.version).toBe(1);
@@ -66,97 +65,45 @@ test("every note, whiteboard, and seeded deliverable template generates valid st
         expect(files.length).toBeGreaterThan(0);
         const byPath = new Map(files.map((f) => [f.path, f]));
 
-        if (tpl.artifactType === "docs") {
-          const entry = byPath.get("structure/index.md");
-          expect(entry?.content).toContain(title);
-        } else if (tpl.artifactType === "diagram") {
-          const raw = byPath.get("structure/diagram.json")?.content ?? "";
-          const parsed: unknown = JSON.parse(raw);
-          expect(isRecord(parsed)).toBe(true);
-          if (isRecord(parsed)) {
-            const nodes = Array.isArray(parsed.nodes) ? parsed.nodes : [];
-            const edges = Array.isArray(parsed.edges) ? parsed.edges : [];
-            expect(nodes.length).toBeGreaterThanOrEqual(5);
-            expect(edges.length).toBeGreaterThanOrEqual(5);
-            const ids = new Set(nodes.filter(isRecord).map((n) => n.id));
-            for (const edge of edges.filter(isRecord)) {
-              expect(ids.has(edge.from)).toBe(true);
-              expect(ids.has(edge.to)).toBe(true);
+        if (tpl.noteType === "doc") {
+          const docRaw = byPath.get("structure/doc.json")?.content ?? "{}";
+          const doc: unknown = JSON.parse(docRaw);
+          expect(isRecord(doc) && doc.version === 1 && Array.isArray(doc.blocks) && doc.blocks.length > 0).toBe(true);
+          if (tpl.previewShape === "prototype") {
+            const html = byPath.get("structure/index.html")?.content ?? "";
+            const css = byPath.get("structure/styles.css")?.content ?? "";
+            const js = byPath.get("structure/app.js")?.content ?? "";
+            expect(html).toContain('./styles.css"');
+            expect(html).toContain('./app.js"');
+            expect(css.length).toBeGreaterThan(20);
+            expect(js.length).toBeGreaterThan(20);
+            expect(html).not.toMatch(/\son[a-z]+\s*=/iu);
+          }
+        } else if (tpl.noteType === "base") {
+          const baseRaw = byPath.get("structure/base.json")?.content ?? "{}";
+          const baseDoc: unknown = JSON.parse(baseRaw);
+          expect(isRecord(baseDoc) && baseDoc.version === 1 && Array.isArray(baseDoc.sheets) && baseDoc.sheets.length > 0).toBe(true);
+          if (isRecord(baseDoc) && Array.isArray(baseDoc.sheets)) {
+            for (const sheet of baseDoc.sheets.filter(isRecord)) {
+              expect(Array.isArray(sheet.columns) && sheet.columns.length > 0).toBe(true);
+              expect(Array.isArray(sheet.rows) && sheet.rows.length > 0).toBe(true);
             }
           }
-        } else if (tpl.artifactType === "sheet") {
-          const wbRaw = byPath.get("structure/workbook.json")?.content ?? "";
-          const wb: unknown = JSON.parse(wbRaw);
-          expect(isRecord(wb)).toBe(true);
-          if (isRecord(wb) && Array.isArray(wb.sheets)) {
-            expect(wb.sheets.length).toBeGreaterThan(0);
-            for (const ref of wb.sheets.filter(isRecord)) {
-              const sheetFile = typeof ref.file === "string" ? byPath.get(ref.file) : undefined;
-              expect(sheetFile).toBeDefined();
-              const sheetObj: unknown = JSON.parse(sheetFile?.content ?? "{}");
-              expect(isRecord(sheetObj) && Array.isArray(sheetObj.rows) && sheetObj.rows.length > 0).toBe(true);
-            }
-          }
-        } else if (tpl.artifactType === "dashboard") {
-          const dashRaw = byPath.get("structure/dashboard.json")?.content ?? "";
-          const dash: unknown = JSON.parse(dashRaw);
-          expect(isRecord(dash)).toBe(true);
-          if (isRecord(dash) && Array.isArray(dash.panels)) {
-            expect(dash.panels.length).toBe(4);
-            for (const panel of dash.panels.filter(isRecord)) {
-              const src = isRecord(panel.source) ? panel.source : undefined;
-              const dsPath = typeof src?.dataset === "string" ? src.dataset : "";
-              const dsFile = byPath.get(dsPath);
-              expect(dsFile).toBeDefined();
-              const dsObj: unknown = JSON.parse(dsFile?.content ?? "{}");
-              expect(isRecord(dsObj) && Array.isArray(dsObj.rows) && dsObj.rows.length > 0).toBe(true);
-            }
-          }
-        } else if (tpl.artifactType === "slides") {
-          const deckRaw = byPath.get("structure/deck.json")?.content ?? "";
-          const deck: unknown = JSON.parse(deckRaw);
-          expect(isRecord(deck)).toBe(true);
-          if (isRecord(deck) && Array.isArray(deck.slides)) {
-            expect(deck.slides.length).toBe(5);
-            const firstSlide = deck.slides[0];
-            expect(isRecord(firstSlide) && firstSlide.file === "structure/slides/s01-cover.json").toBe(true);
-            for (const ref of deck.slides.filter(isRecord)) {
-              const slideFile = typeof ref.file === "string" ? byPath.get(ref.file) : undefined;
-              expect(slideFile).toBeDefined();
-            }
-          }
-        } else if (tpl.artifactType === "prototype") {
-          const html = byPath.get("structure/index.html")?.content ?? "";
-          const css = byPath.get("structure/styles.css")?.content ?? "";
-          const js = byPath.get("structure/app.js")?.content ?? "";
-          expect(html).toContain('./styles.css"');
-          expect(html).toContain('./app.js"');
-          expect(css.length).toBeGreaterThan(20);
-          expect(js.length).toBeGreaterThan(20);
-          expect(html).not.toMatch(/\son[a-z]+\s*=/iu);
-        } else if (tpl.artifactType === "design") {
-          const frameRaw = byPath.get("structure/frames/main.json")?.content ?? "{}";
-          const frame: unknown = JSON.parse(frameRaw);
-          expect(isRecord(frame) && isRecord(frame.root)).toBe(true);
-        } else if (tpl.artifactType === "design-system") {
-          const tokensRaw = byPath.get("structure/tokens.json")?.content ?? "{}";
-          const tokens: unknown = JSON.parse(tokensRaw);
-          expect(isRecord(tokens) && Array.isArray(tokens.color)).toBe(true);
-        } else if (tpl.artifactType === "motion") {
-          const tlRaw = byPath.get("structure/timeline.json")?.content ?? "{}";
-          const tl: unknown = JSON.parse(tlRaw);
-          expect(isRecord(tl) && Array.isArray(tl.scenes) && tl.scenes.length > 0).toBe(true);
-        } else if (tpl.artifactType === "storyboard") {
-          const sbRaw = byPath.get("structure/shots.json")?.content ?? "{}";
-          const sb: unknown = JSON.parse(sbRaw);
-          expect(isRecord(sb) && Array.isArray(sb.shots) && sb.shots.length > 0).toBe(true);
+        } else if (tpl.noteType === "canvas") {
+          const boardRaw = byPath.get("structure/board.json")?.content ?? "{}";
+          const board: unknown = JSON.parse(boardRaw);
+          expect(isRecord(board) && board.version === 1 && isRecord(board.elements)).toBe(true);
+        } else if (tpl.noteType === "media") {
+          const mediaRaw = byPath.get("structure/media.json")?.content ?? "{}";
+          const media: unknown = JSON.parse(mediaRaw);
+          expect(isRecord(media) && media.version === 1 && Array.isArray(media.items) && media.items.length > 0).toBe(true);
         }
       }
     }
   }
 });
 
-test("templateMatchesQuery matches R&D keywords, artifact badges, and localized titles", () => {
+test("templateMatchesQuery matches R&D keywords, note badges, and localized titles", () => {
   setLocale("zh");
   const matchesFor = (q: string) => CONTENT_TEMPLATES.filter((t) => templateMatchesQuery(t, q)).map((t) => t.id);
 

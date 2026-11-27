@@ -1,7 +1,7 @@
 import type { CommandItem } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
-import type { Artifact, ArtifactType, Issue, Session, SessionView } from "@vibevalley/protocol";
+import type { Issue, Note, NoteType, Session, SessionView } from "@vibevalley/protocol";
 import { oneLine, sessionIssueId, sessionProfile, sessionRepo } from "@vibevalley/protocol/rules";
 
 import type { IconName } from "../design/icons";
@@ -31,7 +31,7 @@ const COMMAND_KEYWORDS: Readonly<Record<string, readonly string[]>> = {
   "nav.dashboard": ["dashboard", "overview", "/dashboard"],
   "nav.dashboard.runs": ["dashboard", "runs", "trajectory", "/dashboard/runs"],
   "nav.dashboard.retro": ["dashboard", "retro", "analytics", "cycle", "/dashboard/retro"],
-  "nav.content": ["library", "artifacts", "/library"],
+  "nav.content": ["library", "notes", "/library"],
   "nav.team": ["agents", "experts", "/agents"],
   "nav.runtimes": ["runtimes", "engines", "/runtimes"],
   "nav.repos": ["repos", "repositories", "/repos"],
@@ -57,47 +57,23 @@ function extraKeywordsForCommand(id: string): readonly string[] {
   }
 }
 
-const ARTIFACT_TYPE_ICONS: Record<ArtifactType, IconName> = {
-  docs: "artifacts",
-  outline: "notes",
-  slides: "present",
-  dashboard: "catalog",
-  motion: "video",
-  whiteboard: "idea",
-  design: "devices",
-  "design-system": "appearance",
-  sheet: "log",
-  prototype: "web",
-  diagram: "branch",
-  storyboard: "image",
+const NOTE_TYPE_ICONS: Record<NoteType, IconName> = {
+  doc: "notes",
+  base: "catalog",
+  canvas: "idea",
+  media: "video",
 };
 
-function artifactTypeLabel(type: ArtifactType): string {
+function noteTypeLabel(type: NoteType): string {
   switch (type) {
-    case "docs":
-      return t("web.artifact.types.docs");
-    case "outline":
-      return t("web.artifact.types.outline");
-    case "slides":
-      return t("web.artifact.types.slides");
-    case "dashboard":
-      return t("web.artifact.types.dashboard");
-    case "motion":
-      return t("web.artifact.types.motion");
-    case "whiteboard":
-      return t("web.artifact.types.whiteboard");
-    case "design":
-      return t("web.artifact.types.design");
-    case "design-system":
-      return t("web.artifact.types.designSystem");
-    case "sheet":
-      return t("web.artifact.types.sheet");
-    case "prototype":
-      return t("web.artifact.types.prototype");
-    case "diagram":
-      return t("web.artifact.types.diagram");
-    case "storyboard":
-      return t("web.artifact.types.storyboard");
+    case "doc":
+      return t("web.note.types.doc");
+    case "base":
+      return t("web.note.types.base");
+    case "canvas":
+      return t("web.note.types.canvas");
+    case "media":
+      return t("web.note.types.media");
   }
 }
 
@@ -173,7 +149,7 @@ export function buildCommandsPaletteEntries(input: {
   readonly baseItems: readonly PaletteEntryInput[];
   readonly query: string;
   readonly issues: readonly Issue[];
-  readonly artifacts: readonly Artifact[];
+  readonly notes: readonly Note[];
   readonly sessions: readonly Session[];
   readonly liveSessions: readonly SessionView[];
 }): BuiltPaletteEntries {
@@ -216,9 +192,9 @@ export function buildCommandsPaletteEntries(input: {
     metaById.set(id, { detail, icon: "issues", route: `/issues/${encodeURIComponent(issue.id)}` });
   }
 
-  const artifactGroup = t("web.shell.palette.groups.artifacts");
-  const matchedArtifacts = input.artifacts
-    .filter((artifact) => matches(q, [artifact.title, artifact.artifactType, artifactTypeLabel(artifact.artifactType), artifact.byName, artifact.id]))
+  const noteGroup = t("web.shell.palette.groups.artifacts");
+  const matchedNotes = input.notes
+    .filter((note) => matches(q, [note.title, note.noteType, noteTypeLabel(note.noteType), note.byName, note.id]))
     .toSorted((a, b) => {
       const aTitleHit = spelled(a.title, qLower) ? 0 : 1;
       const bTitleHit = spelled(b.title, qLower) ? 0 : 1;
@@ -227,12 +203,12 @@ export function buildCommandsPaletteEntries(input: {
     })
     .slice(0, MAX_ENTITY_RESULTS);
 
-  for (const artifact of matchedArtifacts) {
-    const id = `artifact:${artifact.id}`;
-    const typeLabel = artifactTypeLabel(artifact.artifactType);
-    const detail = [typeLabel, artifact.byName].filter(Boolean).join(" · ");
-    items.push({ id, label: artifact.title, group: artifactGroup });
-    metaById.set(id, { detail, icon: ARTIFACT_TYPE_ICONS[artifact.artifactType], route: `/artifacts/${encodeURIComponent(artifact.id)}` });
+  for (const note of matchedNotes) {
+    const id = `note:${note.id}`;
+    const typeLabel = noteTypeLabel(note.noteType);
+    const detail = [typeLabel, note.byName].filter(Boolean).join(" · ");
+    items.push({ id, label: note.title, group: noteGroup });
+    metaById.set(id, { detail, icon: NOTE_TYPE_ICONS[note.noteType], route: `/notes/${encodeURIComponent(note.id)}` });
   }
 
   const issueById = new Map<string, Issue>(input.issues.map((i) => [i.id, i]));

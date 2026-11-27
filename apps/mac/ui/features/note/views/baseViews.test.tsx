@@ -163,7 +163,7 @@ test("CanvasView, MediaView, CollabToolbar, HistoryPanel, and NoteDirectoryView 
 
   // NoteDirectoryView: directory listing & file edit.
   await app.press("id:bench-tab-files");
-  await app.waitFor("id:note-files-view");
+  await app.waitFor("id:note-directory-view");
   await app.waitFor("id:note-file-row-structure/base.json");
   await app.press("id:note-file-row-manifest.json");
   await app.waitFor("text:manifest.json");

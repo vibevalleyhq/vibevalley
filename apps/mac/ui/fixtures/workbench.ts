@@ -4,12 +4,12 @@ import { issueId } from "@vibevalley/protocol/schema";
 
 import { min, now, sampleIssue as issue, sampleSession as session, working } from "../features/issue/model/issue.samples";
 import { responses as agentsResponses } from "./agents";
-import { responses as artifactsResponses } from "./artifacts";
 import { responses as assetResponses } from "./assets";
 import { chatState, crons, responses as chatResponses } from "./chat";
 import { responses as issuesResponses } from "./issues";
 import { mediaJobs, responses as libraryResponses } from "./library";
 import { responses as memoryResponses } from "./memory";
+import { responses as notesResponses } from "./notes";
 import { connectors, responses as settingsResponses } from "./settings";
 
 const w = session("w1", "laozhou", working(now - 3 * min), {
@@ -109,6 +109,6 @@ export const responses: Record<string, unknown> = {
   ...settingsResponses,
   ...memoryResponses,
   ...assetResponses,
-  ...artifactsResponses,
+  ...notesResponses,
   ...libraryResponses,
 };

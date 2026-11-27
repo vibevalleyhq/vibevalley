@@ -66,29 +66,28 @@
     "audio": "音频工作台"
   },
   "content": {
-    "title": "作品",
+    "title": "笔记",
     "new": "新建",
-    "searchAll": "搜索全部作品…",
-    "sidebarToggle": "展开或收起作品导航",
+    "searchAll": "搜索全部笔记…",
+    "sidebarToggle": "展开或收起笔记导航",
     "recent": "全部最近",
     "pinned": "置顶收藏",
-    "pinnedEmpty": "还没有置顶作品。悬停任意作品或素材并点击图钉即可置顶到这里。",
+    "pinnedEmpty": "还没有置顶笔记。悬停任意笔记或素材并点击图钉即可置顶到这里。",
     "installedApps": "已安装应用",
-    "installedAppsEmpty": "还没有安装独立应用。在任意作品卡片或详情右上角点击「安装为应用」，即可把它装成独立的 macOS 桌面应用并在此集中启动与管理。",
+    "installedAppsEmpty": "还没有安装独立应用。在任意笔记卡片或详情右上角点击「安装为应用」，即可把它装成独立的 macOS 桌面应用并在此集中启动与管理。",
     "pin": "置顶",
     "unpin": "取消置顶",
     "pinnedToast": "已置顶收藏",
     "unpinnedToast": "已取消置顶",
-    "artifacts": "作品",
+    "artifacts": "笔记",
     "media": "素材",
     "moreTypes": "更多类型 ({n})",
     "fewerTypes": "收起空类型",
-    "sendArtifact": "发到频道",
     "exportArtifact": "导出",
     "turnIntoIssue": "转为工单",
     "issueCreated": "已创建工单",
     "artifactType": {
-      "all": "全部作品"
+      "all": "全部笔记"
     },
     "inspector": {
       "openExternal": "系统打开",
@@ -99,7 +98,7 @@
       "stopAudio": "停止播放"
     },
     "templates": {
-      "title": "新建作品",
+      "title": "新建笔记",
       "search": "搜索模板…",
       "searchCount": "找到 {n} 个模板",
       "empty": "没有匹配的模板",
@@ -748,12 +747,12 @@
       }
     },
     "search": {
-      "title": "搜索作品",
-      "placeholder": "搜索笔记、作品和素材…",
-      "empty": "未找到匹配的笔记、作品或素材",
+      "title": "搜索笔记",
+      "placeholder": "搜索笔记和素材…",
+      "empty": "未找到匹配的笔记或素材",
       "typeMedia": "素材",
       "scopeAll": "全部",
-      "scopeArtifacts": "作品",
+      "scopeArtifacts": "笔记",
       "scopeMedia": "素材"
     }
   }

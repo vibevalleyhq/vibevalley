@@ -2,7 +2,7 @@ import { cleanup, computed, effect, keymap, Picker, signal, Text, untracked, Vie
 import { Input, Progress } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
-import { type ArtifactViewContext, type Channel, type HostAsrState as AsrSnapshot, userId } from "@vibevalley/protocol";
+import { type Channel, type HostAsrState as AsrSnapshot, type NoteViewContext, userId } from "@vibevalley/protocol";
 import { sessionProfile } from "@vibevalley/protocol/rules";
 import { HostAsrState } from "@vibevalley/protocol/schema";
 
@@ -24,7 +24,7 @@ import { useCollabSlice, useSessionsSlice } from "../../../infra/frame";
 import { useRouter } from "../../../infra/router";
 import { useIntents } from "../../../infra/state/intent";
 import { transport } from "../../../infra/transport";
-import { activeArtifactViewContext, artifactChatFocus, clearActiveArtifactViewContext } from "../../artifact";
+import { activeNoteViewContext, clearActiveNoteViewContext, noteChatFocus } from "../../note";
 import { MicWaveform } from "../../voice";
 import { attachFiles, chatMarks, chatSay, createComposer, draftOf, drafts, setEditingId, uploadsIn, useReplying, type ComposerKey } from "../model/composing";
 import { followed } from "../model/follow";
@@ -45,15 +45,15 @@ const key = (name: string, shiftKey = false): ComposerKey & { prevented: boolean
   return k;
 };
 
-function artifactContextLabel(ctx: ArtifactViewContext): string {
-  const parts = [t("web.channel.composer.artifactContext", { title: ctx.title })];
-  if (ctx.slideIndex !== undefined) parts.push(t("web.channel.composer.artifactSlide", { n: ctx.slideIndex + 1 }));
+function noteContextLabel(ctx: NoteViewContext): string {
+  const parts = [t("web.channel.composer.noteContext", { title: ctx.title })];
+  if (ctx.slideIndex !== undefined) parts.push(t("web.channel.composer.noteSlide", { n: ctx.slideIndex + 1 }));
   else if (ctx.activeArtboard) parts.push(ctx.activeArtboard);
   else if (ctx.activeTab) parts.push(ctx.activeTab);
   else if (ctx.activeDataset) parts.push(ctx.activeDataset);
   else if (ctx.activePath) parts.push(ctx.activePath);
   if (ctx.selectedIds && ctx.selectedIds.length > 0) {
-    parts.push(t("web.channel.composer.artifactSelected", { n: ctx.selectedIds.length }));
+    parts.push(t("web.channel.composer.noteSelected", { n: ctx.selectedIds.length }));
   }
   return parts.join(" · ");
 }
@@ -138,7 +138,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
     target: () => {
       const files = draftFiles();
       const replyNumber = replying()?.number ?? props.replyTo;
-      const viewContext = untracked(activeArtifactViewContext);
+      const viewContext = untracked(activeNoteViewContext);
       return {
         id: props.channel?.id ?? "",
         ...(replyNumber !== undefined ? { replyTo: replyNumber } : {}),
@@ -318,9 +318,9 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
     return () => offs.forEach((off) => off());
   });
   let inputRef: InputRef | undefined;
-  const initialChatFocusSeq = untracked(artifactChatFocus);
+  const initialChatFocusSeq = untracked(noteChatFocus);
   effect(() => {
-    const req = artifactChatFocus();
+    const req = noteChatFocus();
     if (req > initialChatFocusSeq) {
       queueMicrotask(() => inputRef?.focus());
     }
@@ -411,20 +411,20 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
           </View>
         )}
       </If>
-      <If when={activeArtifactViewContext()}>
+      <If when={activeNoteViewContext()}>
         {(ctx) => (
           <View
-            testID="artifact-context-pill"
+            testID="note-context-pill"
             class="mb-2 h-6 max-w-full min-w-0 flex-row items-center gap-1.5 self-start rounded-full border border-line bg-side pr-1 pl-2.5"
           >
-            <Icon name="artifacts" size={12} tone="muted" />
-            <Text class="min-w-0 shrink truncate text-xs text-ink">{artifactContextLabel(ctx())}</Text>
+            <Icon name="notes" size={12} tone="muted" />
+            <Text class="min-w-0 shrink truncate text-xs text-ink">{noteContextLabel(ctx())}</Text>
             <BoxButton
               icon="close"
               iconSize={12}
-              testid="artifact-context-clear"
+              testid="note-context-clear"
               label={t("web.channel.composer.clearContext")}
-              onPress={clearActiveArtifactViewContext}
+              onPress={clearActiveNoteViewContext}
               class="h-5 w-5 shrink-0 rounded-full"
             />
           </View>

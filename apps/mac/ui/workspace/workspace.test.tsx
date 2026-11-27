@@ -700,16 +700,16 @@ test("workspace Palette handles commands filter/select/close and remote search/f
   expect(host.acts).toContainEqual({ type: "search", query: "TODO" });
 });
 
-test("workspace Palette searches global commands, issues (#N/title), artifacts (title/type), and trajectory runs (session/agent)", async () => {
+test("workspace Palette searches global commands, issues (#N/title), notes (title/type), and trajectory runs (session/agent)", async () => {
   const host = workspaceHost(
     { view: "palette" },
     {
-      "artifact.list": [
+      "note.list": [
         {
           id: "art-deck-1",
           title: "Q4 Architecture Deck",
-          artifactType: "slides",
-          isDefault: false,
+          noteType: "doc",
+          sortOrder: 1,
           by: "user",
           byName: "Lucas",
           version: 1,
@@ -719,10 +719,10 @@ test("workspace Palette searches global commands, issues (#N/title), artifacts (
           updated: 1_700_000_050_000,
         },
         {
-          id: "art-doc-2",
-          title: "Palette Spec",
-          artifactType: "docs",
-          isDefault: false,
+          id: "art-board-2",
+          title: "Palette Board",
+          noteType: "canvas",
+          sortOrder: 2,
           by: "coder",
           byName: "Coder",
           version: 0,
@@ -841,14 +841,14 @@ test("workspace Palette searches global commands, issues (#N/title), artifacts (
   await app.press("text:#88 OAuth login flow");
   expect(host.acts).toEqual([{ type: "open_route", path: "/issues/iss-88" }, { type: "palette_close" }]);
 
-  // Artifact search by type ("slides") and title jumps to /artifacts/<id>.
+  // Note search by type ("doc") and title jumps to /notes/<id>.
   host.clearActs();
   await app.clear("id:palette-root");
-  await app.type("id:palette-root", "slides");
+  await app.type("id:palette-root", "doc");
   expect(app.texts()).toContain("Q4 Architecture Deck");
-  expect(app.texts()).not.toContain("Palette Spec");
+  expect(app.texts()).not.toContain("Palette Board");
   await app.press("text:Q4 Architecture Deck");
-  expect(host.acts).toEqual([{ type: "open_route", path: "/artifacts/art-deck-1" }, { type: "palette_close" }]);
+  expect(host.acts).toEqual([{ type: "open_route", path: "/notes/art-deck-1" }, { type: "palette_close" }]);
 
   // Trajectory run search by agent profile / session id jumps to /dashboard/runs?session=<id>.
   host.clearActs();

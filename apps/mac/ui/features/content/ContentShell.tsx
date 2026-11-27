@@ -2,7 +2,7 @@ import { effect, keymap, View, type JSX } from "nsh";
 
 import { useLocation } from "../../infra/router";
 import {
-  activeArtifactType,
+  activeNoteType,
   contentBrowseBucket,
   contentPresenting,
   contentSidebarOpen,
@@ -26,7 +26,7 @@ export function ContentShell(props: { children: JSX.Element }) {
   keymap.bind("mod+\\", () => contentSidebarOpen.update((open) => !open), { when: "always" });
   keymap.bind(
     "mod+n",
-    () => openTemplatePicker(templatePickerContextFor(contentBrowseBucket(), location().pathname.startsWith("/artifacts/") ? activeArtifactType() : undefined)),
+    () => openTemplatePicker(templatePickerContextFor(contentBrowseBucket(), location().pathname.startsWith("/notes/") ? activeNoteType() : undefined)),
     { when: "notEditing" },
   );
   keymap.bind("mod+f", () => openContentSearch(), { when: "notEditing" });

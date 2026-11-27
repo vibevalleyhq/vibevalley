@@ -81,8 +81,8 @@ test("empty scenario keeps every major route stable across themes and narrow wid
     expect(app.count("id:runs-page")).toBe(1);
     expect(app.count("id:runs-empty")).toBe(1);
   });
-  await visit(app, fake, "/artifacts", row, () => {
-    expect(app.count("id:artifacts")).toBe(1);
+  await visit(app, fake, "/notes", row, () => {
+    expect(app.count("id:notes")).toBe(1);
   });
   await visit(app, fake, "/library", row, () => {
     expect(app.count("id:library-page")).toBe(1);
@@ -278,8 +278,8 @@ test("typical scenario verifies multi-stage BDD transitions and virtual-clock po
     expect(app.count("id:orchestrator-runs-link")).toBe(1);
   });
 
-  await visit(app, fake, "/artifacts", row, () => {
-    expect(app.count("id:artifacts")).toBe(1);
+  await visit(app, fake, "/notes", row, () => {
+    expect(app.count("id:notes")).toBe(1);
   });
   await visit(app, fake, "/library", row, () => {
     expect(app.count("id:library-page")).toBe(1);

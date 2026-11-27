@@ -1,8 +1,7 @@
 import { t } from "@vibevalley/i18n";
 import {
-  type Artifact,
-  type ArtifactType,
   type Channel,
+  type DocBlock,
   type Issue,
   type LibraryFileKind,
   type LibraryItem,
@@ -11,13 +10,15 @@ import {
   type MediaJob,
   type MediaSummary,
   type MediaUnderstandingJob,
+  type Note,
+  type NoteType,
   type Session,
 } from "@vibevalley/protocol";
 import { sessionChannelId, sessionIssueId, sessionRepo } from "@vibevalley/protocol/rules";
 
-import { type ArtifactFacet, artifactFacetOf, mediaKindOf } from "../../infra/state/contentNav";
+import { mediaKindOf, type NoteFacet, noteFacetOf } from "../../infra/state/contentNav";
 
-export type ArtifactTypeFilter = ArtifactFacet;
+export type NoteTypeFilter = NoteFacet;
 
 export interface ContentContextLookup {
   readonly issuesById: ReadonlyMap<string, Pick<Issue, "id" | "number" | "title" | "repo" | "parent">>;
@@ -61,8 +62,17 @@ const emptyLookup: ContentContextLookup = {
 
 export const kindOf = (mime: string): LibraryFileKind => mediaKindOf(mime);
 
-export const artifactMatchesType = (a: { readonly artifactType: ArtifactType }, type: ArtifactTypeFilter | undefined): boolean =>
-  type === undefined || artifactFacetOf(a) === type;
+export const noteMatchesType = (n: { readonly noteType: NoteType }, type: NoteTypeFilter | undefined): boolean => type === undefined || noteFacetOf(n) === type;
+
+/** Wraps plain text or Markdown paragraphs into a canonical `DocDocument` JSON payload for `note.create`. */
+export function textToDocJson(text: string): string {
+  const blocks: DocBlock[] = text
+    .split(/\r?\n\r?\n/u)
+    .map((chunk) => chunk.trim())
+    .filter(Boolean)
+    .map((chunk, i) => ({ id: `b${i + 1}`, type: "prose", text: chunk }));
+  return `${JSON.stringify({ version: 1, blocks }, null, 2)}\n`;
+}
 
 function resolveIssueAndRepo(
   rawIssueId: string | undefined,
@@ -80,9 +90,9 @@ function resolveIssueAndRepo(
   };
 }
 
-export function resolveArtifactContext(artifact: Pick<Artifact, "channel" | "said" | "issue">, lookup: ContentContextLookup): ContentItemContext {
-  const channelId = artifact.channel ?? artifact.said?.channel;
-  const resolved = resolveIssueAndRepo(artifact.issue, channelId, lookup);
+export function resolveNoteContext(note: Pick<Note, "channel" | "said" | "issue">, lookup: ContentContextLookup): ContentItemContext {
+  const channelId = note.channel ?? note.said?.channel;
+  const resolved = resolveIssueAndRepo(note.issue, channelId, lookup);
   return {
     ...resolved,
     ...(channelId !== undefined && channelId !== "" ? { channelId } : {}),
@@ -151,7 +161,7 @@ export function countCategoryFilters(filter: ContentCategoryFilter): number {
 }
 
 export function buildCategoryFilterOptions(input: {
-  readonly artifacts: readonly Pick<Artifact, "channel" | "said" | "issue">[];
+  readonly notes: readonly Pick<Note, "channel" | "said" | "issue">[];
   readonly media: readonly Pick<LibraryItem, "origin">[];
   readonly lookup: ContentContextLookup;
   readonly extraRepos?: readonly string[];
@@ -164,7 +174,7 @@ export function buildCategoryFilterOptions(input: {
     if (ctx.issueId !== undefined && ctx.issueId !== "") issueIds.add(ctx.issueId);
     if (ctx.channelId !== undefined && ctx.channelId !== "") channelIds.add(ctx.channelId);
   };
-  for (const a of input.artifacts) record(resolveArtifactContext(a, input.lookup));
+  for (const n of input.notes) record(resolveNoteContext(n, input.lookup));
   for (const m of input.media) record(resolveMediaContext(m, input.lookup));
   for (const ch of input.lookup.channelsById.values()) {
     channelIds.add(ch.id);
@@ -188,23 +198,23 @@ export function buildCategoryFilterOptions(input: {
   return { repos, issues, channels };
 }
 
-export const shownArtifacts = (
-  all: readonly Artifact[],
+export const shownNotes = (
+  all: readonly Note[],
   filter: {
-    readonly artifactType?: ArtifactTypeFilter | undefined;
+    readonly noteType?: NoteTypeFilter | undefined;
     readonly sort: LibrarySort;
     readonly pinnedOnly?: boolean | undefined;
     readonly pinned?: ReadonlySet<string> | undefined;
     readonly category?: ContentCategoryFilter | undefined;
     readonly lookup?: ContentContextLookup | undefined;
   },
-): Artifact[] => {
+): Note[] => {
   const lookup = filter.lookup ?? emptyLookup;
   const filtered = all.filter(
-    (a) =>
-      artifactMatchesType(a, filter.artifactType) &&
-      (filter.pinnedOnly !== true || filter.pinned?.has(`artifact:${a.id}`) === true) &&
-      matchesCategoryFilter(resolveArtifactContext(a, lookup), filter.category),
+    (n) =>
+      noteMatchesType(n, filter.noteType) &&
+      (filter.pinnedOnly !== true || filter.pinned?.has(`note:${n.id}`) === true) &&
+      matchesCategoryFilter(resolveNoteContext(n, lookup), filter.category),
   );
   if (filter.sort === "name") return filtered.toSorted((a, b) => a.title.localeCompare(b.title));
   return filtered.toSorted((a, b) => b.updated - a.updated);

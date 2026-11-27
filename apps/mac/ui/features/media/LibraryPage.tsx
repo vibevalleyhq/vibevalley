@@ -2,7 +2,7 @@ import { effect, keymap, Picker, Scroll, signal, Text, untracked, View, windowSi
 import { Popover } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
-import { type Artifact, type LibraryItem, type LibrarySort, LibrarySortValues, type MediaJob } from "@vibevalley/protocol";
+import { type LibraryItem, type LibrarySort, LibrarySortValues, type MediaJob, type Note, type NoteType } from "@vibevalley/protocol";
 
 import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
@@ -38,12 +38,11 @@ import {
   togglePinned,
 } from "../../infra/state/contentNav";
 import { prefsNow, setLibraryTile } from "../../infra/state/prefs";
-import { artifactTypeLabel, buildOutlineFromMarkdown, inferArtifactFromName, InstallAppletModal, useArtifacts, useInstalledApplets } from "../artifact";
+import { InstallAppletModal, noteHref, noteTypeLabel, useInstalledApplets, useNotes } from "../note";
 import { AudioPanel } from "./AudioPanel";
 import { ImagePanel } from "./ImagePanel";
 import { Inspector } from "./Inspector";
 import {
-  type ArtifactTypeFilter,
   buildCategoryFilterOptions,
   type ContentCategoryFilter,
   type ContentContextLookup,
@@ -55,15 +54,17 @@ import {
   making,
   type Names,
   neighbor,
-  shownArtifacts,
+  type NoteTypeFilter,
   shownMedia,
+  shownNotes,
+  textToDocJson,
   understoodText,
 } from "./items";
 import {
   activeFileId,
   askRemove,
-  bucketArtifactType,
   bucketFileKind,
+  bucketNoteType,
   cancelRemove,
   clearSelection,
   closeLightbox,
@@ -79,13 +80,13 @@ import {
   reconcileSelection,
   selectBucketSelection,
   selectedFileIds,
-  showsArtifactsInBucket,
   showsMediaInBucket,
+  showsNotesInBucket,
 } from "./libraryView";
 import { libraryQuery } from "./listing";
 import { publicationKey } from "./publication";
 import { SpeechPanel } from "./SpeechPanel";
-import { ArtifactTiles, knows, MakingTiles, ratioOf, type Seen, tileGap, Tiles } from "./Tiles";
+import { knows, MakingTiles, NoteTiles, ratioOf, type Seen, tileGap, Tiles } from "./Tiles";
 import { UnderstandingPanel } from "./UnderstandingPanel";
 
 type Make = "image" | "speech" | "audio";
@@ -94,30 +95,38 @@ const tileMin = 96;
 const isMediaMakeSupported = (b: ContentBucket) => showsMediaInBucket(b) && bucketFileKind(b) !== "video" && bucketFileKind(b) !== "other";
 const tileMax = 280;
 
-const deliverableNameRe =
-  /\.(?:(?:slide|slides|visual|canvas|design|dashboard|motion|prototype|page)\.(?:json|html)|html|htm|whiteboard(?:\.json|\.html)?|(?:design-system|tokens|sheet|diagram|storyboard|outline)\.json|outline\.md|doc\.md|md|markdown)$/iu;
-const markdownFileRe = /\.(?:md|markdown)$/iu;
+const noteFileNameRe = /\.(?:base\.json|canvas\.json|whiteboard\.json|media\.json|md|markdown)$/iu;
 
-function importDeliverable(filename: string, content: string, inOutlineBucket: boolean): Promise<Artifact> {
-  const inferred = inferArtifactFromName(filename, content);
-  if (inferred.artifactType === "outline" || (inOutlineBucket && markdownFileRe.test(filename))) {
-    const outlineContent = markdownFileRe.test(filename) ? `${JSON.stringify(buildOutlineFromMarkdown(inferred.title, content), null, 2)}\n` : content;
-    return api.artifact.create({
-      title: inferred.title,
-      artifactType: "outline",
-      content: outlineContent,
-    });
+function inferNoteFile(filename: string, content: string): { readonly title: string; readonly noteType: NoteType; readonly content: string } {
+  const trimmed = filename.trim();
+  if (/\.base\.json$/iu.test(trimmed)) {
+    return { title: trimmed.replace(/\.base\.json$/iu, "") || trimmed, noteType: "base", content };
   }
-  return api.artifact.create({
+  if (/\.(?:canvas|whiteboard)\.json$/iu.test(trimmed)) {
+    return { title: trimmed.replace(/\.(?:canvas|whiteboard)\.json$/iu, "") || trimmed, noteType: "canvas", content };
+  }
+  if (/\.media\.json$/iu.test(trimmed)) {
+    return { title: trimmed.replace(/\.media\.json$/iu, "") || trimmed, noteType: "media", content };
+  }
+  return {
+    title: trimmed.replace(/\.(?:doc\.md|md|markdown)$/iu, "") || trimmed,
+    noteType: "doc",
+    content: textToDocJson(content),
+  };
+}
+
+function importNoteFile(filename: string, content: string): Promise<Note> {
+  const inferred = inferNoteFile(filename, content);
+  return api.note.create({
     title: inferred.title,
-    artifactType: inferred.artifactType,
-    content,
+    noteType: inferred.noteType,
+    content: inferred.content,
   });
 }
 
-function artifactTypeTitle(type: ArtifactTypeFilter | undefined): string {
+function noteTypeTitle(type: NoteTypeFilter | undefined): string {
   if (type === undefined) return t("web.library.content.artifactType.all");
-  return artifactTypeLabel(type);
+  return noteTypeLabel(type);
 }
 
 function titleOfBucket(bucket: ContentBucket): string {
@@ -128,8 +137,8 @@ function titleOfBucket(bucket: ContentBucket): string {
       return t("web.library.content.pinned");
     case "apps":
       return t("web.library.content.installedApps");
-    case "artifacts":
-      return artifactTypeTitle(bucket.artifactType);
+    case "notes":
+      return noteTypeTitle(bucket.noteType);
     case "media":
       return bucket.fileKind === undefined ? t("web.library.content.media") : t(`web.library.kind.${bucket.fileKind}`);
   }
@@ -148,13 +157,13 @@ export function LibraryPage() {
   const sort = signal<LibrarySort>("recent");
   const category = signal<ContentCategoryFilter>(emptyCategoryFilter);
   const items = useQuery(() => libraryQuery({ text: "", sort: sort() }), { interval: () => 10_000, keepPrevious: true });
-  const artifactsQuery = useArtifacts(() => ({}));
+  const notesQuery = useNotes(() => ({}));
   const installedApplets = useInstalledApplets();
   const selection = signal<LibrarySelection>(initialLibrarySelection);
   const dragging = signal(false);
   const gridWidth = signal<number | undefined>(undefined);
   const seen = signal<ReadonlyMap<string, Seen>>(new Map());
-  const appletTarget = signal<Artifact | undefined>(undefined);
+  const appletTarget = signal<Note | undefined>(undefined);
   const act = createAct();
 
   const bucket = () => contentBrowseBucket();
@@ -165,13 +174,13 @@ export function LibraryPage() {
     return allowed.map((value) => ({ value, label: t(`web.library.sort.${value}`) }));
   });
   const allMedia = createMemo((): readonly LibraryItem[] => ready(items, undefined) ?? []);
-  const allArtifacts = createMemo((): readonly Artifact[] => ready(artifactsQuery, undefined) ?? []);
+  const allNotes = createMemo((): readonly Note[] => ready(notesQuery, undefined) ?? []);
   const installedMap = createMemo(
     () =>
       new Map(
         installedApplets()
           .filter((item) => item.installed)
-          .map((item) => [item.artifactId, item]),
+          .map((item) => [item.noteId, item]),
       ),
   );
   const jobs = (): readonly MediaJob[] => ops()?.media ?? [];
@@ -195,7 +204,7 @@ export function LibraryPage() {
   });
   const categoryOptions = createMemo(() =>
     buildCategoryFilterOptions({
-      artifacts: allArtifacts(),
+      notes: allNotes(),
       media: allMedia(),
       lookup: contextLookup(),
       extraRepos: ready(reposQuery, []).map((r) => r.name),
@@ -211,17 +220,17 @@ export function LibraryPage() {
     return w < 920;
   });
 
-  const visibleArtifacts = createMemo(() => {
-    if (!showsArtifactsInBucket(bucket())) return [];
-    const base = shownArtifacts(allArtifacts(), {
-      artifactType: bucketArtifactType(bucket()),
+  const visibleNotes = createMemo(() => {
+    if (!showsNotesInBucket(bucket())) return [];
+    const base = shownNotes(allNotes(), {
+      noteType: bucketNoteType(bucket()),
       sort: effectiveSort(),
       pinnedOnly: pinnedOnly(),
       pinned: pinnedSet(),
       category: effectiveCategory(),
       lookup: contextLookup(),
     });
-    return appsOnly() ? base.filter((a) => installedMap().has(a.id)) : base;
+    return appsOnly() ? base.filter((n) => installedMap().has(n.id)) : base;
   });
   const visibleMedia = createMemo(() =>
     showsMediaInBucket(bucket())
@@ -235,8 +244,8 @@ export function LibraryPage() {
       : [],
   );
 
-  const totalCount = createMemo(() => visibleArtifacts().length + visibleMedia().length);
-  const sectionCount = createMemo(() => (visibleArtifacts().length > 0 ? 1 : 0) + (visibleMedia().length > 0 ? 1 : 0));
+  const totalCount = createMemo(() => visibleNotes().length + visibleMedia().length);
+  const sectionCount = createMemo(() => (visibleNotes().length > 0 ? 1 : 0) + (visibleMedia().length > 0 ? 1 : 0));
   const ids = createMemo(() => visibleMedia().map((item) => item.attachment.id));
   const imageItems = createMemo(() => visibleMedia().filter((item) => kindOf(item.attachment.type) === "image"));
 
@@ -336,17 +345,17 @@ export function LibraryPage() {
     return allMedia().find((item) => item.attachment.id === id)?.attachment ?? { id, name: id, type: "", size: 0 };
   });
 
-  const openArtifact = (id: string) => router.navigate(`/artifacts/${encodeURIComponent(id)}`);
+  const openNote = (id: string) => router.navigate(noteHref(id));
 
   const handleTogglePin = (key: string) => {
     const nowPinned = togglePinned(key);
     toast(nowPinned ? t("web.library.content.pinnedToast") : t("web.library.content.unpinnedToast"));
   };
 
-  const finishUpload = async (lastArtifact: Artifact | undefined, lastMedia: LibraryItem | undefined) => {
-    if (lastArtifact !== undefined) {
-      await queries.invalidate({ prefix: ["artifacts"] });
-      if (lastMedia === undefined) openArtifact(lastArtifact.id);
+  const finishUpload = async (lastNote: Note | undefined, lastMedia: LibraryItem | undefined) => {
+    if (lastNote !== undefined) {
+      await queries.invalidate({ prefix: ["notes"] });
+      if (lastMedia === undefined) openNote(lastNote.id);
     }
     if (lastMedia !== undefined) {
       void items.refetch();
@@ -359,13 +368,12 @@ export function LibraryPage() {
       ? Promise.resolve()
       : act.run(async () => {
           let lastMedia: LibraryItem | undefined;
-          let lastArtifact: Artifact | undefined;
-          const inOutlineBucket = bucketArtifactType(untracked(contentBrowseBucket)) === "outline";
+          let lastNote: Note | undefined;
           for (const entry of entries) {
             const data = await entry.data;
             const filename = entry.name.trim() || "file";
-            if (deliverableNameRe.test(filename)) {
-              lastArtifact = await importDeliverable(filename, decodeBase64Utf8(data), inOutlineBucket);
+            if (noteFileNameRe.test(filename)) {
+              lastNote = await importNoteFile(filename, decodeBase64Utf8(data));
             } else {
               const kept = await api.attachment.create({
                 name: filename,
@@ -375,7 +383,7 @@ export function LibraryPage() {
               lastMedia = await api.library.item.add({ attachment: kept.id });
             }
           }
-          await finishUpload(lastArtifact, lastMedia);
+          await finishUpload(lastNote, lastMedia);
         });
 
   const pickFiles = async () => {
@@ -388,22 +396,21 @@ export function LibraryPage() {
       ? Promise.resolve()
       : act.run(async () => {
           let lastMedia: LibraryItem | undefined;
-          let lastArtifact: Artifact | undefined;
-          const inOutlineBucket = bucketArtifactType(untracked(contentBrowseBucket)) === "outline";
+          let lastNote: Note | undefined;
           for (const uri of uris) {
             const pathOrUri = localPathFromUri(uri) ?? uri;
             const basename = pathOrUri.split("/").at(-1)?.trim() ?? "";
-            if (deliverableNameRe.test(basename)) {
+            if (noteFileNameRe.test(basename)) {
               const read = await hostApi.readFile(uri);
               if (read.bizCode !== 0 || !read.data) continue;
               const filename = read.data.name.trim() || basename || "file";
-              lastArtifact = await importDeliverable(filename, decodeBase64Utf8(read.data.data), inOutlineBucket);
+              lastNote = await importNoteFile(filename, decodeBase64Utf8(read.data.data));
             } else {
               const kept = await importLocalAttachment(uri);
               lastMedia = await api.library.item.add({ attachment: kept.id });
             }
           }
-          await finishUpload(lastArtifact, lastMedia);
+          await finishUpload(lastNote, lastMedia);
         });
 
   const pick = (id: string, how: { readonly add: boolean; readonly range: boolean }) => {
@@ -468,7 +475,7 @@ export function LibraryPage() {
     { when: "notEditing", passThrough: true },
   );
 
-  const empty = () => allArtifacts().length === 0 && allMedia().length === 0 && activeMediaCount() === 0;
+  const empty = () => allNotes().length === 0 && allMedia().length === 0 && activeMediaCount() === 0;
   const nothingShown = () => totalCount() === 0;
   const bucketTitle = () => titleOfBucket(bucket());
 
@@ -739,9 +746,7 @@ export function LibraryPage() {
               when={!nothingShown()}
               else={
                 <Empty
-                  icon={
-                    appsOnly() ? "devices" : pinnedOnly() ? "pin" : showsArtifactsInBucket(bucket()) && !showsMediaInBucket(bucket()) ? "artifacts" : "media"
-                  }
+                  icon={appsOnly() ? "devices" : pinnedOnly() ? "pin" : showsNotesInBucket(bucket()) && !showsMediaInBucket(bucket()) ? "notes" : "media"}
                   testid={appsOnly() ? "library-apps-empty" : "library-nothing-shown"}
                   action={
                     <View class="flex-row flex-wrap items-center justify-center gap-2">
@@ -750,7 +755,7 @@ export function LibraryPage() {
                           {t("web.issue.page.clear")}
                         </Button>
                       </If>
-                      <If when={bucket().kind === "artifacts"}>
+                      <If when={bucket().kind === "notes"}>
                         <Button tone="primary" icon="add" onPress={() => openTemplatePicker(templatePickerContextFor(bucket()))}>
                           {t("web.library.content.new")}
                         </Button>
@@ -782,35 +787,35 @@ export function LibraryPage() {
                 </Empty>
               }
             >
-              <If when={visibleArtifacts().length > 0}>
+              <If when={visibleNotes().length > 0}>
                 <View class="gap-2.5">
                   <If when={sectionCount() > 1}>
                     <View class="flex-row items-center gap-1.5">
                       <Text class="text-xs font-semibold text-muted">{t("web.library.content.artifacts")}</Text>
-                      <CountPill count={visibleArtifacts().length} hoverBright />
+                      <CountPill count={visibleNotes().length} hoverBright />
                     </View>
                   </If>
-                  <ArtifactTiles
-                    artifacts={visibleArtifacts()}
+                  <NoteTiles
+                    notes={visibleNotes()}
                     width={inner()}
-                    onOpen={(id) => openArtifact(id)}
-                    isPinned={(id) => isPinned(`artifact:${id}`)}
-                    onTogglePin={(id) => handleTogglePin(`artifact:${id}`)}
-                    onDelete={(art) => {
+                    onOpen={(id) => openNote(id)}
+                    isPinned={(id) => isPinned(`note:${id}`)}
+                    onTogglePin={(id) => handleTogglePin(`note:${id}`)}
+                    onDelete={(n) => {
                       void act.run(async () => {
-                        await api.artifact.delete({ id: art.id });
-                        toast(t("web.artifact.page.deleted", { title: art.title }));
-                        void queries.invalidate({ prefix: ["artifacts"] });
+                        await api.note.delete({ id: n.id });
+                        toast(t("web.note.page.deleted", { title: n.title }));
+                        void queries.invalidate({ prefix: ["notes"] });
                       });
                     }}
                     installedApplets={installedMap()}
                     canInstallApplet={currentHost().applet !== undefined}
-                    onInstallApplet={(a) => appletTarget.set(a)}
+                    onInstallApplet={(n) => appletTarget.set(n)}
                     onOpenApplet={(id) =>
                       void currentHost()
                         .applet?.open(id)
                         .then(
-                          () => toast(t("web.artifact.applet.openedToast", { name: installedMap().get(id)?.appName ?? id })),
+                          () => toast(t("web.note.applet.openedToast", { name: installedMap().get(id)?.appName ?? id })),
                           (e: unknown) => toast(reasonOf(e), "bad"),
                         )
                     }
@@ -932,7 +937,7 @@ export function LibraryPage() {
         )}
       </If>
 
-      <If when={appletTarget()}>{(a) => <InstallAppletModal open artifact={a()} onClose={() => appletTarget.set(undefined)} />}</If>
+      <If when={appletTarget()}>{(n) => <InstallAppletModal open note={n()} onClose={() => appletTarget.set(undefined)} />}</If>
     </View>
   );
 }

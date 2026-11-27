@@ -130,7 +130,7 @@ export function OrchestratorProfile(props: { saved?: Agent | undefined; start: A
                   <IconButton icon="thread" label={t("web.agent.talk")} testid="talk" disabled={act.busy()} onClick={talk} />
                   <If when={saved().id !== defaultOrchestrator}>
                     <MoreMenu
-                      label={t("web.artifact.page.more")}
+                      label={t("web.note.page.more")}
                       testid="agent-more"
                       items={[{ key: "delete", label: t("web.agent.remove"), icon: "delete", danger: true, onSelect: () => asking.set(true) }]}
                     />

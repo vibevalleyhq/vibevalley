@@ -55,6 +55,7 @@ export interface BlockItemProps {
   readonly block: DocBlock;
   readonly allBlocks: readonly DocBlock[];
   readonly slideIndices: ReadonlyMap<string, number>;
+  readonly note?: Note | undefined;
   readonly notes: readonly Note[];
   readonly issues: readonly Issue[];
   readonly focusedBlockId?: string | undefined;
@@ -523,6 +524,7 @@ function renderBlockContent(blockType: BlockType, props: BlockItemProps): JSX.El
                   block={child}
                   allBlocks={props.allBlocks}
                   slideIndices={props.slideIndices}
+                  note={props.note}
                   notes={props.notes}
                   issues={props.issues}
                   focusedBlockId={props.focusedBlockId}
@@ -608,6 +610,7 @@ function renderBlockContent(blockType: BlockType, props: BlockItemProps): JSX.El
                   block={child}
                   allBlocks={props.allBlocks}
                   slideIndices={props.slideIndices}
+                  note={props.note}
                   notes={props.notes}
                   issues={props.issues}
                   focusedBlockId={props.focusedBlockId}
@@ -668,7 +671,7 @@ function renderBlockContent(blockType: BlockType, props: BlockItemProps): JSX.El
     case "preview":
       return (
         <If when={props.block.type === "preview" ? props.block : undefined}>
-          {(b) => <PreviewBlockView block={b()} onUpdate={(next) => props.onUpdateBlock(b().id, next)} />}
+          {(b) => <PreviewBlockView block={b()} note={props.note} onUpdate={(next) => props.onUpdateBlock(b().id, next)} />}
         </If>
       );
     case "baseEmbed":

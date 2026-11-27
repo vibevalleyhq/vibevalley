@@ -5,9 +5,7 @@
   },
   "preview": {
     "blocks": "{n} 个块",
-    "slides": "{n} 页",
-    "rows": "{n} 行",
-    "nodes": "{n} 节点"
+    "slides": "{n} 页"
   },
   "page": {
     "delete": "删掉",
@@ -25,7 +23,6 @@
     "backToLibrary": "返回笔记列表",
     "previewTab": "预览",
     "filesTab": "文件",
-    "filesTabCount": "文件 ({n})",
     "viewMode": "视图模式",
     "liveVersion": "实时",
     "directory": "目录",
@@ -113,8 +110,6 @@
   },
   "timeline": {
     "title": "历史记录",
-    "show": "打开历史记录",
-    "hide": "收起历史记录",
     "savedVersions": "已保存版本",
     "commits": "变更记录",
     "loading": "正在载入历史…",

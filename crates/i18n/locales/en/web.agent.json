@@ -147,7 +147,7 @@
     "memory": "Memory",
     "media": "Media",
     "library": "Library",
-    "artifact": "Artifacts"
+    "note": "Notes"
   },
   "unreported": "This runtime does not report this.",
   "none": "None.",

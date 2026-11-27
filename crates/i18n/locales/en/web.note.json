@@ -5,9 +5,7 @@
   },
   "preview": {
     "blocks": "{n} blocks",
-    "slides": "{n} slides",
-    "rows": "{n} rows",
-    "nodes": "{n} nodes"
+    "slides": "{n} slides"
   },
   "page": {
     "delete": "Delete",
@@ -25,7 +23,6 @@
     "backToLibrary": "Back to notes",
     "previewTab": "Preview",
     "filesTab": "Files",
-    "filesTabCount": "Files ({n})",
     "viewMode": "View mode",
     "liveVersion": "Live",
     "directory": "Directory",
@@ -113,8 +110,6 @@
   },
   "timeline": {
     "title": "Version history",
-    "show": "Show version history",
-    "hide": "Hide version history",
     "savedVersions": "Saved versions",
     "commits": "Changes",
     "loading": "Loading history…",

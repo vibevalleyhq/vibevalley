@@ -47,7 +47,7 @@ fn translates_zh_and_en_across_shared_and_web_namespaces() {
         ("shared.action.run_command", "跑命令", "running a command"),
         ("web.shell.sidebar.title", "工作区", "Workspace"),
         ("web.issue.family.children", "子工单", "Child issues"),
-        ("web.artifact.page.delete", "删掉", "Delete"),
+        ("web.note.page.delete", "删掉", "Delete"),
         ("web.setting.language.title", "语言", "Language"),
         ("web.farm.hud.workbench", "工作台", "Workbench"),
     ];
@@ -92,7 +92,7 @@ fn interpolates_strings_numbers_booleans_plurals_and_handles_fallbacks() {
     assert_eq!(translate_json("zh", "web.shell.sidebar.terminalCount", Some(r#"{"n":3}"#)), "3 个终端");
     assert_eq!(translate_json("en", "web.shell.sidebar.terminalCount", Some(r#"{"n":3.0}"#)), "3 terminals");
     assert_eq!(translate_json("en", "web.issue.page.shown", Some(r#"{"shown":2,"of":4}"#)), "2 / 4");
-    assert_eq!(translate_json("zh", "web.artifact.card.version", Some(r#"{"version":1.5}"#)), "第 1.5 稿");
+    assert_eq!(translate_json("zh", "web.note.card.version", Some(r#"{"version":1.5}"#)), "第 1.5 稿");
 
     // ICU plural branches (`one` vs `other`) in English and plain count in Chinese.
     assert_eq!(translate_json("en", "web.issue.detail.runCount", Some(r#"{"n":1}"#)), "1 round");
@@ -159,7 +159,7 @@ fn quickjs_native_module_calls_translate_synchronously() {
             [rich.translate("en", "web.issue.detail.noCriteria", JSON.stringify({ answer: false })), "This ticket has no criteria for done: judge by its changes when it comes back."],
             // Fallbacks: unknown locale -> zh, malformed JSON -> no params, unknown key -> key
             [rich.translate("de", "web.farm.hud.workbench"), "工作台"],
-            [rich.translate("en", "web.artifact.page.delete", "{broken"), "Delete"],
+            [rich.translate("en", "web.note.page.delete", "{broken"), "Delete"],
             [rich.translate("en", "missing.key.check", JSON.stringify({ a: 1 })), "missing.key.check"],
         ];
 

@@ -150,9 +150,9 @@
     "attach": "附上文件",
     "uploadFailed": "没传上去：{why}",
     "command": "命令",
-    "artifactContext": "当前上下文：{title}",
-    "artifactSlide": "第 {n} 页",
-    "artifactSelected": "已选 {n} 个元素",
+    "noteContext": "当前上下文：{title}",
+    "noteSlide": "第 {n} 页",
+    "noteSelected": "已选 {n} 个元素",
     "clearContext": "移除本次附带的上下文",
     "runningHint": "正在处理中，可直接补充说明或点击停止",
     "dictateStart": "语音输入（MOSS ASR）",
@@ -198,17 +198,17 @@
     "markUnread": "从这里标成未读",
     "jump": "跳到这条",
     "promoteIssue": "转为工单",
-    "saveArtifact": "存为作品"
+    "saveNote": "存为笔记"
   },
   "promote": {
     "source": "来自 {where}",
-    "saveTitle": "将消息存为作品",
-    "artifactTitle": "标题",
-    "artifactType": "类型",
-    "artifactContent": "内容",
-    "artifactSave": "保存作品",
-    "artifactSaved": "已存为「{title}」",
-    "artifactNote": "存自 {where}",
+    "saveTitle": "将消息存为笔记",
+    "noteTitle": "标题",
+    "noteType": "类型",
+    "noteContent": "内容",
+    "noteSave": "保存笔记",
+    "noteSaved": "已存为「{title}」",
+    "noteNote": "存自 {where}",
     "fallbackTitle": "第 {number} 条消息"
   },
   "switcher": {

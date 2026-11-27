@@ -1,8 +1,9 @@
-import { computed, Image, signal, Text, untracked, View, WebView } from "nsh";
+import { computed, effect, Image, signal, Text, untracked, View, WebView } from "nsh";
 import { Input } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
 import type { DocBlock, DocKpiItem, Issue, IssueId, IssueStatus, Note, NoteId } from "@vibevalley/protocol";
+import { noteId } from "@vibevalley/protocol/schema";
 
 import { Button } from "../../../design/Button";
 import { Chart } from "../../../design/code/Chart";
@@ -14,6 +15,9 @@ import { IconButton } from "../../../design/IconButton";
 import type { Picture } from "../../../design/Lightbox";
 import { Segmented } from "../../../design/Segmented";
 import { Dot, type DotTone } from "../../../design/Tag";
+import { api } from "../../../infra/api";
+import { currentHost } from "../../../infra/host";
+import { useQueryClient } from "../../../infra/query";
 import { buildChartSpecJson, filterIssuesForList, resolveIssueRef, updateKpiItem } from "./docOps";
 
 export type KpiBlockData = Extract<DocBlock, { type: "kpi" }>;
@@ -368,10 +372,67 @@ export function MediaBlockView(props: {
   );
 }
 
-export function PreviewBlockView(props: { readonly block: PreviewBlockData; readonly onUpdate: (next: PreviewBlockData) => void }) {
+const COVER_CAPTURE_DELAY_MS = 800;
+const COVER_CAPTURE_WIDTH = 640;
+const COVER_CAPTURE_HEIGHT = 400;
+
+/** Tracks `${noteId}:${seq}` pairs already attempted this session so failed or no-op captures do not loop. */
+const attemptedCoverCaptures = new Set<string>();
+
+export function resetCapturedCoverCache(): void {
+  attemptedCoverCaptures.clear();
+}
+
+export function PreviewBlockView(props: {
+  readonly block: PreviewBlockData;
+  readonly note?: Note | undefined;
+  readonly onUpdate: (next: PreviewBlockData) => void;
+}) {
+  const queries = useQueryClient();
   const editing = signal(false);
   const frameHeight = () => Math.max(120, Math.min(720, props.block.height ?? 260));
   const html = computed(() => sandboxHtmlForPreview(props.block.entry, props.block.title));
+
+  effect(() => {
+    const n = props.note;
+    if (!n) return;
+    if (n.cover?.seq === n.seq) return;
+    const capture = currentHost().captureWebView;
+    if (capture === undefined) return;
+
+    const attemptKey = `${n.id}:${n.seq}`;
+    if (attemptedCoverCaptures.has(attemptKey)) return;
+
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      if (cancelled) return;
+      attemptedCoverCaptures.add(attemptKey);
+      void (async () => {
+        try {
+          const captured = await capture({ width: COVER_CAPTURE_WIDTH, height: COVER_CAPTURE_HEIGHT });
+          if (cancelled || captured === null) return;
+          await api.note.cover.set({
+            id: noteId(n.id),
+            seq: n.seq,
+            mime: captured.mime,
+            data: captured.data,
+            width: captured.width,
+            height: captured.height,
+          });
+          if (!cancelled) {
+            void queries.invalidate({ prefix: ["notes"] });
+          }
+        } catch {
+          // Background auto-cover capture is silent best-effort; never surface errors to the user.
+        }
+      })();
+    }, COVER_CAPTURE_DELAY_MS);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  });
 
   return (
     <View testID={`doc-preview-${props.block.id}`} class="overflow-hidden rounded-lg border border-line bg-side">

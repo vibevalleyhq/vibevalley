@@ -6,7 +6,7 @@
 // after reconnectDelayMs, as there. The fetcher parameter is gone (no HTTP).
 import type { z } from "zod";
 
-import type { ArtifactEvent, ArtifactId, ArtifactPresenceEvent, ChannelEvent, SuggestionEvent } from "@vibevalley/protocol";
+import type { ChannelEvent, NoteEvent, NoteId, NotePresenceEvent, SuggestionEvent } from "@vibevalley/protocol";
 import { type SubscriptionName, subscriptions } from "@vibevalley/protocol/api";
 
 import { transport } from "./transport";
@@ -65,14 +65,14 @@ function subscribe<E>(name: SubscriptionName, payload: unknown, event: z.ZodType
 export const followChannel = (id: string, after: number, on: (e: ChannelEvent) => void, ended: () => void) =>
   subscribe("channel.follow", { id, after }, subscriptions["channel.follow"].event, on, ended);
 
-/** An artifact directory's file changes after this seq, then each committed batch from now on. */
-export const followArtifact = (id: string, after: number, on: (e: ArtifactEvent) => void, ended?: () => void) =>
-  subscribe("artifact.follow", { id, after }, subscriptions["artifact.follow"].event, on, ended);
+/** A note directory's file changes after this seq, then each committed batch from now on. */
+export const followNote = (id: string, after: number, on: (e: NoteEvent) => void, ended?: () => void) =>
+  subscribe("note.follow", { id, after }, subscriptions["note.follow"].event, on, ended);
 
-/** An artifact's suggestions as they now are, then the whole list after each change. */
+/** A note's suggestions as they now are, then the whole list after each change. */
 export const followSuggestions = (id: string, on: (e: SuggestionEvent) => void, ended?: () => void) =>
-  subscribe("artifact.suggestion.follow", { id }, subscriptions["artifact.suggestion.follow"].event, on, ended);
+  subscribe("note.suggestion.follow", { id }, subscriptions["note.suggestion.follow"].event, on, ended);
 
-/** An artifact's ephemeral live presence peers as a snapshot, then incremental upserts and removals. */
-export const followArtifactPresence = (id: ArtifactId, on: (e: ArtifactPresenceEvent) => void, ended?: () => void) =>
-  subscribe("artifact.presence.follow", { id }, subscriptions["artifact.presence.follow"].event, on, ended);
+/** A note's ephemeral live presence peers as a snapshot, then incremental upserts and removals. */
+export const followNotePresence = (id: NoteId, on: (e: NotePresenceEvent) => void, ended?: () => void) =>
+  subscribe("note.presence.follow", { id }, subscriptions["note.presence.follow"].event, on, ended);

@@ -48,7 +48,7 @@ describe("ui-tokens guardrail", () => {
   it("excludes external/export-only files and enforces zero violations across the workbench", () => {
     const files = listWebUiFiles();
     expect(files).not.toContain("apps/mac/ui/features/repo/repos.ts");
-    expect(files).not.toContain("apps/mac/ui/features/artifact/WhiteboardView.tsx");
+    expect(files).not.toContain("apps/mac/ui/features/note/WhiteboardView.tsx");
     expect(files).not.toContain("apps/mac/ui/design/Qr.tsx");
 
     expect(scanAllWebUi()).toEqual([]);

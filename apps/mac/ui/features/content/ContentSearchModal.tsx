@@ -16,8 +16,8 @@ import { ready, useQuery } from "../../infra/query";
 import { useRouter } from "../../infra/router";
 import { createMemo } from "../../infra/solid";
 import { closeContentSearch, contentBrowseBucket, contentFocusMediaId, contentSearchOpen, isPinned, mediaKindOf } from "../../infra/state/contentNav";
-import { artifactHref, artifactIcon, kindLabel, useArtifacts } from "../artifact";
 import { libraryQuery } from "../media";
+import { kindLabel, noteHref, noteIcon, useNotes } from "../note";
 
 export function ContentSearchModal() {
   return (
@@ -40,7 +40,7 @@ export function ContentSearchModal() {
 type SearchHit =
   | {
       readonly key: string;
-      readonly kind: "artifact";
+      readonly kind: "note";
       readonly id: string;
       readonly title: string;
       readonly subtitle: string;
@@ -70,31 +70,31 @@ const mediaIcon: Record<LibraryFileKind, IconName> = {
 function SearchBody() {
   const router = useRouter();
   const now = useNow();
-  const artifacts = useArtifacts(() => ({}));
+  const notes = useNotes(() => ({}));
   const media = useQuery(() => libraryQuery({ text: "", sort: "recent" }), { interval: () => 10_000, keepPrevious: true });
 
   const query = signal("");
-  const scope = signal<"all" | "artifacts" | "media">("all");
+  const scope = signal<"all" | "notes" | "media">("all");
   const active = signal(0);
 
   const hits = createMemo((): readonly SearchHit[] => {
     const q = query().trim().toLowerCase();
     const curScope = scope();
-    const allArtifacts = curScope === "media" ? [] : (ready(artifacts, undefined) ?? []);
-    const allMedia = curScope === "artifacts" ? [] : (ready(media, undefined) ?? []);
+    const allNotes = curScope === "media" ? [] : (ready(notes, undefined) ?? []);
+    const allMedia = curScope === "notes" ? [] : (ready(media, undefined) ?? []);
     const currentNow = now();
 
-    const artifactHits: SearchHit[] = allArtifacts
-      .filter((a) => !q || spelled(a.title, q) || spelled(kindLabel(a), q) || spelled(a.byName, q) || a.artifactType.toLowerCase().includes(q))
-      .map((a) => ({
-        key: `artifact:${a.id}`,
-        kind: "artifact",
-        id: a.id,
-        title: a.title,
-        subtitle: `${a.byName} · ${ago(a.updated, currentNow)}`,
-        badge: kindLabel(a),
-        icon: artifactIcon(a),
-        updated: a.updated,
+    const noteHits: SearchHit[] = allNotes
+      .filter((n) => !q || spelled(n.title, q) || spelled(kindLabel(n), q) || spelled(n.byName, q) || n.noteType.toLowerCase().includes(q))
+      .map((n) => ({
+        key: `note:${n.id}`,
+        kind: "note",
+        id: n.id,
+        title: n.title,
+        subtitle: `${n.byName} · ${ago(n.updated, currentNow)}`,
+        badge: kindLabel(n),
+        icon: noteIcon(n),
+        updated: n.updated,
       }));
 
     const mediaHits: SearchHit[] = allMedia
@@ -115,17 +115,17 @@ function SearchBody() {
       });
 
     if (!q) {
-      return [...artifactHits, ...mediaHits].toSorted((a, b) => b.updated - a.updated).slice(0, 14);
+      return [...noteHits, ...mediaHits].toSorted((a, b) => b.updated - a.updated).slice(0, 14);
     }
 
-    return [...artifactHits.slice(0, 16), ...mediaHits.slice(0, 8)].slice(0, 24);
+    return [...noteHits.slice(0, 16), ...mediaHits.slice(0, 8)].slice(0, 24);
   });
 
   const openHit = (hit: SearchHit) => {
     closeContentSearch();
     switch (hit.kind) {
-      case "artifact":
-        router.navigate(artifactHref(hit.id));
+      case "note":
+        router.navigate(noteHref(hit.id));
         return;
       case "media":
         contentBrowseBucket.set({ kind: "media" });
@@ -198,7 +198,7 @@ function SearchBody() {
             }}
             options={[
               { value: "all", label: t("web.library.content.search.scopeAll") },
-              { value: "artifacts", label: t("web.library.content.search.scopeArtifacts") },
+              { value: "notes", label: t("web.library.content.search.scopeArtifacts") },
               { value: "media", label: t("web.library.content.search.scopeMedia") },
             ]}
           />

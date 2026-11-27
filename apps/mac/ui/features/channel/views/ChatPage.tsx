@@ -14,7 +14,7 @@ import { Bubble } from "../../../design/Tip";
 import { Keyed } from "../../../infra/base/dom";
 import { useRouter } from "../../../infra/router";
 import { createMemo } from "../../../infra/solid";
-import { ArtifactCanvas } from "../../artifact";
+import { NoteCanvas } from "../../note";
 import { useMarkedChat } from "../model/marks";
 import { channelLabel, channelName, chatPath, pointedAt, topOf, topsOf } from "../model/places";
 import { listenToReports, setListenToReports, useChannelReportPlayback } from "../model/reportPlayback";
@@ -47,12 +47,12 @@ function Chat() {
   const dialog = signal<"none" | "new" | "search">("none");
   // A message's address (?m=) lights it up in the pane it is in: the thread's, or the channel's.
   const point = () => pointedAt(router.path());
-  // An artifact opened beside the talk that made it (?artifact=).
-  const artifact = () => new URLSearchParams(router.path().split("?")[1] ?? "").get("artifact") ?? undefined;
-  const closeArtifact = () => {
+  // A note opened beside the talk that made it (?note=).
+  const note = () => new URLSearchParams(router.path().split("?")[1] ?? "").get("note") ?? undefined;
+  const closeNote = () => {
     const [path, query] = router.path().split("?");
     const params = new URLSearchParams(query ?? "");
-    params.delete("artifact");
+    params.delete("note");
     const qs = params.toString();
     router.navigate(`${path}${qs ? `?${qs}` : ""}`, { replace: true });
   };
@@ -87,10 +87,10 @@ function Chat() {
           </View>
         )}
       </If>
-      <If when={artifact()}>
+      <If when={note()}>
         {(id) => (
           <View class={`border-l border-line bg-page ${lg() ? "w-130 shrink-0" : "absolute inset-0 z-20"}`}>
-            <Keyed key={id()}>{() => <ArtifactCanvas id={untracked(id)} onClose={closeArtifact} />}</Keyed>
+            <Keyed key={id()}>{() => <NoteCanvas id={untracked(id)} onClose={closeNote} />}</Keyed>
           </View>
         )}
       </If>

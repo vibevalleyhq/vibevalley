@@ -7,7 +7,7 @@
         "title": "写一句话就能起草工单",
         "priority": "medium",
         "status": "backlog",
-        "createdAt": 1795686543370,
+        "createdAt": 1795736077913,
         "assignments": [],
         "mandate": {
           "strength": "explicit",
@@ -37,13 +37,13 @@
         "title": "看板拖拽的手感",
         "priority": "high",
         "status": "todo",
-        "createdAt": 1795684323370,
+        "createdAt": 1795733857913,
         "assignments": [
           {
             "id": "a22",
             "issue": "i22",
             "agent": "laozhou",
-            "assignedAt": 1795684323370,
+            "assignedAt": 1795733857913,
             "executions": []
           }
         ],
@@ -65,7 +65,7 @@
           "acts": []
         },
         "repo": "vibevalley",
-        "queuedAt": 1795732863370
+        "queuedAt": 1795782397913
       },
       "sessions": [],
       "missingSessions": []
@@ -77,7 +77,7 @@
         "title": "灵动岛的动画",
         "priority": "low",
         "status": "todo",
-        "createdAt": 1795682103370,
+        "createdAt": 1795731637913,
         "assignments": [],
         "mandate": {
           "strength": "explicit",
@@ -107,13 +107,13 @@
         "title": "首页的加载条",
         "priority": "medium",
         "status": "todo",
-        "createdAt": 1795679883370,
+        "createdAt": 1795729417913,
         "assignments": [
           {
             "id": "a24",
             "issue": "i24",
             "agent": "xiaolin",
-            "assignedAt": 1795679883370,
+            "assignedAt": 1795729417913,
             "executions": []
           }
         ],
@@ -146,18 +146,18 @@
         "title": "修好登录",
         "priority": "urgent",
         "status": "in_progress",
-        "createdAt": 1795693203370,
+        "createdAt": 1795742737913,
         "assignments": [
           {
             "id": "a18",
             "issue": "i18",
             "agent": "laozhou",
-            "assignedAt": 1795693203370,
+            "assignedAt": 1795742737913,
             "executions": [
               {
                 "kind": "worker",
                 "session": "w1",
-                "startedAt": 1795731963370
+                "startedAt": 1795781497913
               }
             ]
           }
@@ -200,11 +200,11 @@
               "id": "i18"
             }
           ],
-          "hiredAt": 1795730643370,
+          "hiredAt": 1795780177913,
           "runs": 2,
           "phase": {
             "_tag": "working",
-            "since": 1795732983370,
+            "since": 1795782517913,
             "doing": {
               "action": "edit_file",
               "label": "改 session.ts",
@@ -227,18 +227,18 @@
         "title": "补齐看板的测试",
         "priority": "medium",
         "status": "in_review",
-        "createdAt": 1795695423370,
+        "createdAt": 1795744957913,
         "assignments": [
           {
             "id": "a17",
             "issue": "i17",
             "agent": "xiaolin",
-            "assignedAt": 1795695423370,
+            "assignedAt": 1795744957913,
             "executions": [
               {
                 "kind": "worker",
                 "session": "w2",
-                "startedAt": 1795731963370
+                "startedAt": 1795781497913
               }
             ]
           }
@@ -281,7 +281,7 @@
               "id": "i17"
             }
           ],
-          "hiredAt": 1795730643370,
+          "hiredAt": 1795780177913,
           "runs": 2,
           "phase": {
             "_tag": "resting"
@@ -290,7 +290,7 @@
           "lastRun": {
             "outcome": "completed",
             "summary": "登录过期回到登录页，加了两条测试。",
-            "at": 1795732683370
+            "at": 1795782217913
           }
         }
       ],
@@ -303,18 +303,18 @@
         "title": "设置按用途分组",
         "priority": "medium",
         "status": "done",
-        "createdAt": 1795706523370,
+        "createdAt": 1795756057913,
         "assignments": [
           {
             "id": "a12",
             "issue": "i12",
             "agent": "laozhou",
-            "assignedAt": 1795706523370,
+            "assignedAt": 1795756057913,
             "executions": [
               {
                 "kind": "worker",
                 "session": "w3",
-                "startedAt": 1795731963370
+                "startedAt": 1795781497913
               }
             ]
           }
@@ -337,7 +337,7 @@
           "acts": []
         },
         "repo": "vibevalley",
-        "closedAt": 1795725963370,
+        "closedAt": 1795775497913,
         "delivered": "merged"
       },
       "sessions": [
@@ -359,7 +359,7 @@
               "id": "i12"
             }
           ],
-          "hiredAt": 1795715163370,
+          "hiredAt": 1795764697913,
           "runs": 2,
           "phase": {
             "_tag": "done"
@@ -385,7 +385,7 @@
       "persona": "",
       "personaMode": "append",
       "skills": [],
-      "toolsets": ["issue", "session", "channel", "repo", "cron", "resource", "memory", "media", "library", "artifact"],
+      "toolsets": ["issue", "session", "channel", "repo", "cron", "resource", "memory", "media", "library", "note"],
       "mcpServers": [],
       "disallowedTools": [],
       "env": {},
@@ -416,7 +416,7 @@
       "persona": "你是后端老周：先读测试，再改代码，改完把测试跑一遍。",
       "personaMode": "append",
       "skills": ["review"],
-      "toolsets": ["issue", "session", "channel", "resource", "memory", "library", "artifact"],
+      "toolsets": ["issue", "session", "channel", "resource", "memory", "library", "note"],
       "mcpServers": [
         {
           "type": "stdio",
@@ -460,7 +460,7 @@
       "persona": "",
       "personaMode": "append",
       "skills": [],
-      "toolsets": ["issue", "session", "channel", "repo", "cron", "resource", "memory", "media", "library", "artifact"],
+      "toolsets": ["issue", "session", "channel", "resource", "memory", "library", "note"],
       "mcpServers": [],
       "disallowedTools": [],
       "env": {},
@@ -492,7 +492,7 @@
       "persona": "",
       "personaMode": "append",
       "skills": [],
-      "toolsets": ["issue", "session", "channel", "repo", "cron", "resource", "memory", "media", "library", "artifact"],
+      "toolsets": ["issue", "session", "channel", "resource", "memory", "library", "note"],
       "mcpServers": [],
       "disallowedTools": [],
       "env": {},
@@ -709,7 +709,7 @@
       "path": "/Users/farmer/code/vibevalley",
       "git": true,
       "external": false,
-      "last": 1795722363370,
+      "last": 1795771897913,
       "maxSessions": 3,
       "pullRequest": {
         "available": true,
@@ -721,7 +721,7 @@
       "path": "/Users/farmer/code/site",
       "git": true,
       "external": false,
-      "last": 1795301163370,
+      "last": 1795350697913,
       "maxSessions": 2,
       "pullRequest": {
         "available": false,
@@ -782,12 +782,12 @@
           {
             "label": "5 小时",
             "usedPercent": 38,
-            "resetsAt": 1795740363370
+            "resetsAt": 1795789897913
           },
           {
             "label": "本周",
             "usedPercent": 61,
-            "resetsAt": 1795913163370
+            "resetsAt": 1795962697913
           }
         ]
       },
@@ -834,7 +834,7 @@
         "defaultEffort": "medium",
         "env": {}
       },
-      "checkedAt": 1795733043370,
+      "checkedAt": 1795782577913,
       "id": "claude",
       "preset": {
         "id": "claude",
@@ -888,7 +888,7 @@
           {
             "label": "5 小时",
             "usedPercent": 94,
-            "resetsAt": 1795734363370
+            "resetsAt": 1795783897913
           }
         ]
       },
@@ -909,7 +909,7 @@
         "defaultEffort": "",
         "env": {}
       },
-      "checkedAt": 1795733043370,
+      "checkedAt": 1795782577913,
       "id": "codex",
       "preset": {
         "id": "codex",
@@ -955,7 +955,7 @@
         "defaultEffort": "",
         "env": {}
       },
-      "checkedAt": 1795733043370,
+      "checkedAt": 1795782577913,
       "id": "opencode",
       "preset": {
         "id": "opencode",
@@ -1011,7 +1011,7 @@
         "env": {},
         "dailyBudget": 5
       },
-      "checkedAt": 1795733043370,
+      "checkedAt": 1795782577913,
       "id": "vibevalley",
       "preset": {
         "id": "vibevalley",
@@ -1043,12 +1043,12 @@
       {
         "hash": "a1b2c3d",
         "subject": "Send an expired session back to the sign-in page",
-        "at": 1795732623370
+        "at": 1795782157913
       },
       {
         "hash": "e4f5a6b",
         "subject": "Test the expiry on both sides of the boundary",
-        "at": 1795732923370
+        "at": 1795782457913
       }
     ],
     "files": [
@@ -1076,19 +1076,19 @@
   "issue.timeline.get": {
     "milestones": [
       {
-        "at": 1795730763370,
+        "at": 1795780297913,
         "kind": "opened",
         "text": "写下这张工单"
       },
       {
-        "at": 1795731963370,
+        "at": 1795781497913,
         "kind": "started",
         "who": "老周",
         "text": "开始做了",
         "run": "run-1"
       },
       {
-        "at": 1795732323370,
+        "at": 1795781857913,
         "kind": "reported",
         "who": "老周",
         "text": "交回来了",
@@ -1096,14 +1096,14 @@
         "run": "run-1"
       },
       {
-        "at": 1795732623370,
+        "at": 1795782157913,
         "kind": "started",
         "who": "老周",
         "text": "你带了话，接着做一轮",
         "run": "run-2"
       },
       {
-        "at": 1795732803370,
+        "at": 1795782337913,
         "kind": "reported",
         "who": "老周",
         "text": "交回来了",
@@ -1130,7 +1130,7 @@
             "parentThreadId": "main",
             "task": "复查登录提示",
             "status": "completed",
-            "updatedAt": 1795731963370
+            "updatedAt": 1795781497913
           }
         ]
       },
@@ -1138,8 +1138,8 @@
         "kind": "issue"
       },
       "heard": [],
-      "startedAt": 1795731963370,
-      "endedAt": 1795732323370,
+      "startedAt": 1795781497913,
+      "endedAt": 1795781857913,
       "outcome": "completed",
       "summary": "过期回到登录页，加了两条测试。"
     },
@@ -1151,8 +1151,8 @@
         "message": "再补一条跨过期限的测试。"
       },
       "heard": ["再补一条跨过期限的测试。"],
-      "startedAt": 1795732623370,
-      "endedAt": 1795732803370,
+      "startedAt": 1795782157913,
+      "endedAt": 1795782337913,
       "outcome": "completed",
       "summary": "补了跨过期限的测试。"
     }
@@ -1163,7 +1163,7 @@
       {
         "seq": 1,
         "revision": 1,
-        "time": 1795732623371,
+        "time": 1795782157914,
         "type": "run/start",
         "text": "",
         "run": "run-1"
@@ -1171,7 +1171,7 @@
       {
         "seq": 2,
         "revision": 1,
-        "time": 1795732623371,
+        "time": 1795782157914,
         "type": "user/message",
         "text": "修好登录过期：过期就回到登录页，说清楚为什么。",
         "run": "run-1"
@@ -1179,7 +1179,7 @@
       {
         "seq": 3,
         "revision": 1,
-        "time": 1795732624371,
+        "time": 1795782158914,
         "type": "memory/recalled",
         "text": "这个仓库的测试用 vp test；会话的有效期在 session.ts。",
         "run": "run-1"
@@ -1187,7 +1187,7 @@
       {
         "seq": 4,
         "revision": 1,
-        "time": 1795732625371,
+        "time": 1795782159914,
         "type": "assistant/thinking",
         "text": "先看 session.ts 怎么判断过期，再找登录页。",
         "run": "run-1"
@@ -1195,7 +1195,7 @@
       {
         "seq": 5,
         "revision": 1,
-        "time": 1795732627371,
+        "time": 1795782161914,
         "type": "tool/call",
         "text": "",
         "action": "read_file",
@@ -1207,7 +1207,7 @@
       {
         "seq": 6,
         "revision": 1,
-        "time": 1795732628371,
+        "time": 1795782162914,
         "type": "tool/result",
         "text": "",
         "call": 5,
@@ -1218,7 +1218,7 @@
       {
         "seq": 7,
         "revision": 1,
-        "time": 1795732631371,
+        "time": 1795782165914,
         "type": "tool/call",
         "text": "",
         "action": "edit_file",
@@ -1230,7 +1230,7 @@
       {
         "seq": 8,
         "revision": 1,
-        "time": 1795732633371,
+        "time": 1795782167914,
         "type": "tool/result",
         "text": "",
         "call": 7,
@@ -1241,7 +1241,7 @@
       {
         "seq": 9,
         "revision": 1,
-        "time": 1795732637371,
+        "time": 1795782171914,
         "type": "tool/call",
         "text": "",
         "action": "run_command",
@@ -1253,7 +1253,7 @@
       {
         "seq": 10,
         "revision": 1,
-        "time": 1795732658371,
+        "time": 1795782192914,
         "type": "tool/result",
         "text": "",
         "call": 9,
@@ -1264,7 +1264,7 @@
       {
         "seq": 11,
         "revision": 1,
-        "time": 1795732660371,
+        "time": 1795782194914,
         "type": "llm/retry",
         "text": "模型忙，2 秒后再试（第 1 次）",
         "run": "run-1"
@@ -1272,7 +1272,7 @@
       {
         "seq": 12,
         "revision": 1,
-        "time": 1795732665371,
+        "time": 1795782199914,
         "type": "tool/call",
         "text": "",
         "action": "edit_file",
@@ -1284,7 +1284,7 @@
       {
         "seq": 13,
         "revision": 1,
-        "time": 1795732666371,
+        "time": 1795782200914,
         "type": "tool/result",
         "text": "",
         "call": 12,
@@ -1295,7 +1295,7 @@
       {
         "seq": 14,
         "revision": 1,
-        "time": 1795732668371,
+        "time": 1795782202914,
         "type": "tool/call",
         "text": "",
         "action": "run_command",
@@ -1307,7 +1307,7 @@
       {
         "seq": 15,
         "revision": 1,
-        "time": 1795732686371,
+        "time": 1795782220914,
         "type": "tool/result",
         "text": "",
         "call": 14,
@@ -1318,7 +1318,7 @@
       {
         "seq": 16,
         "revision": 1,
-        "time": 1795732687371,
+        "time": 1795782221914,
         "type": "llm/usage",
         "text": "",
         "tokens": {
@@ -1331,7 +1331,7 @@
       {
         "seq": 17,
         "revision": 1,
-        "time": 1795732689371,
+        "time": 1795782223914,
         "type": "assistant/message",
         "text": "改好了：过期回到登录页，登录页说「登录过期了」。加了两条测试，都过了。",
         "run": "run-1"
@@ -1339,7 +1339,7 @@
       {
         "seq": 18,
         "revision": 1,
-        "time": 1795732689371,
+        "time": 1795782223914,
         "type": "run/end",
         "text": "",
         "run": "run-1"
@@ -1347,7 +1347,7 @@
       {
         "seq": 19,
         "revision": 1,
-        "time": 1795732923371,
+        "time": 1795782457914,
         "type": "run/start",
         "text": "",
         "run": "run-2"
@@ -1355,7 +1355,7 @@
       {
         "seq": 20,
         "revision": 1,
-        "time": 1795732923371,
+        "time": 1795782457914,
         "type": "user/message",
         "text": "再补一条跨过期限的测试。",
         "run": "run-2"
@@ -1363,7 +1363,7 @@
       {
         "seq": 21,
         "revision": 1,
-        "time": 1795732925371,
+        "time": 1795782459914,
         "type": "assistant/thinking",
         "text": "在过期前一秒和后一秒各测一次。",
         "run": "run-2"
@@ -1371,7 +1371,7 @@
       {
         "seq": 22,
         "revision": 1,
-        "time": 1795732929371,
+        "time": 1795782463914,
         "type": "tool/call",
         "text": "",
         "action": "run_command",
@@ -1400,11 +1400,11 @@
         "branch": "issue-32-settings"
       },
       "bindings": [],
-      "hiredAt": 1795730643370,
+      "hiredAt": 1795780177913,
       "runs": 2,
       "phase": {
         "_tag": "working",
-        "since": 1795732923370,
+        "since": 1795782457913,
         "doing": {
           "action": "edit_file",
           "label": "改 session.ts",
@@ -1440,14 +1440,14 @@
                 "status": "pending"
               }
             ],
-            "updatedAt": 1795733043370
+            "updatedAt": 1795782577913
           },
           {
             "threadId": "review-groups",
             "parentThreadId": "main",
             "task": "核对分组名称",
             "status": "completed",
-            "updatedAt": 1795732983370
+            "updatedAt": 1795782517913
           }
         ]
       }
@@ -1466,11 +1466,11 @@
         "branch": "issue-31-login"
       },
       "bindings": [],
-      "hiredAt": 1795730643370,
+      "hiredAt": 1795780177913,
       "runs": 3,
       "phase": {
         "_tag": "closed",
-        "at": 1795732863370,
+        "at": 1795782397913,
         "closed": "merged"
       },
       "phaseText": "",
@@ -1478,7 +1478,7 @@
       "lastRun": {
         "outcome": "completed",
         "summary": "过期回到登录页，登录页说明原因，加了两条测试。",
-        "at": 1795732803370
+        "at": 1795782337913
       }
     }
   ],
@@ -1522,7 +1522,7 @@
   ],
   "repo.language.list": {
     "repo": "vibevalley",
-    "at": 1795732563370,
+    "at": 1795782097913,
     "languages": [
       {
         "name": "TypeScript",
@@ -1570,7 +1570,7 @@
   },
   "repo.activity.get": {
     "repo": "vibevalley",
-    "at": 1795732563370,
+    "at": 1795782097913,
     "days": [
       {
         "day": "2026-11-27",
@@ -2548,8 +2548,8 @@
       }
     ],
     "total": 1030,
-    "first": 1759445163370,
-    "last": 1795722363370
+    "first": 1759494697913,
+    "last": 1795771897913
   },
   "channel.message.list": [
     {
@@ -2565,7 +2565,7 @@
       "name": "用户",
       "kind": "chat",
       "text": "登录过期的问题谁来修？",
-      "at": 1795730823371,
+      "at": 1795780357914,
       "revision": 1,
       "mentions": [],
       "spoken": false,
@@ -2588,7 +2588,7 @@
       "name": "助手",
       "kind": "chat",
       "text": "派给老周了，在工单 #18 里。",
-      "at": 1795730883371,
+      "at": 1795780417914,
       "revision": 1,
       "mentions": [],
       "spoken": false,
@@ -2611,7 +2611,7 @@
       "name": "助手",
       "kind": "chat",
       "text": "他说半小时左右。",
-      "at": 1795730943371,
+      "at": 1795780477914,
       "revision": 1,
       "mentions": [],
       "spoken": false,
@@ -2634,7 +2634,7 @@
       "name": "老周",
       "kind": "chat",
       "text": "收到，先看 session.ts。",
-      "at": 1795731003371,
+      "at": 1795780537914,
       "revision": 1,
       "mentions": [],
       "spoken": false,
@@ -2642,10 +2642,10 @@
       "attachments": [],
       "embeds": [],
       "agent": "laozhou",
-      "artifact": {
+      "note": {
         "id": "art-login",
         "title": "登录流程",
-        "artifactType": "prototype",
+        "noteType": "doc",
         "version": 2,
         "note": "多一条测试"
       },
@@ -2665,7 +2665,7 @@
       "name": "老周",
       "kind": "report",
       "text": "改好了：过期回到登录页，加了两条测试。",
-      "at": 1795731063371,
+      "at": 1795780597914,
       "revision": 1,
       "mentions": [],
       "spoken": false,
@@ -2694,7 +2694,7 @@
       "name": "老周",
       "kind": "report",
       "text": "测试起不来：缺一个环境变量。",
-      "at": 1795731123371,
+      "at": 1795780657914,
       "revision": 1,
       "mentions": [],
       "spoken": false,
@@ -2721,7 +2721,7 @@
       "name": "用户",
       "kind": "chat",
       "text": "设计稿和录屏在这，参考 https://example.com/design",
-      "at": 1795731183371,
+      "at": 1795780717914,
       "revision": 1,
       "mentions": [],
       "spoken": false,
@@ -2786,7 +2786,7 @@
       "name": "老周",
       "kind": "chat",
       "text": "## 改了什么\n\n- `session.ts`：过期判断\n- `Login.tsx`：提示文案",
-      "at": 1795731243371,
+      "at": 1795780777914,
       "revision": 1,
       "mentions": [],
       "spoken": false,
@@ -2809,14 +2809,14 @@
       "name": "用户",
       "kind": "chat",
       "text": "周五之前合进去。",
-      "at": 1795731303371,
+      "at": 1795780837914,
       "revision": 1,
       "mentions": [],
       "spoken": false,
       "reactions": [],
       "attachments": [],
       "embeds": [],
-      "edited": 1795733043371,
+      "edited": 1795782577914,
       "outcome": null
     },
     {
@@ -2833,14 +2833,14 @@
       "name": "助手",
       "kind": "chat",
       "text": "记下了：周五之前。",
-      "at": 1795731363371,
+      "at": 1795780897914,
       "revision": 1,
       "mentions": [],
       "spoken": false,
       "reactions": [],
       "attachments": [],
       "embeds": [],
-      "pinned": 1795733103371,
+      "pinned": 1795782637914,
       "outcome": null
     },
     {
@@ -2857,7 +2857,7 @@
       "name": "老周",
       "kind": "chat",
       "text": "（这条删了）",
-      "at": 1795731423371,
+      "at": 1795780957914,
       "revision": 1,
       "mentions": [],
       "spoken": false,
@@ -2865,7 +2865,7 @@
       "attachments": [],
       "embeds": [],
       "agent": "laozhou",
-      "deleted": 1795733103371,
+      "deleted": 1795782637914,
       "outcome": null
     }
   ],
@@ -2884,14 +2884,14 @@
       "name": "助手",
       "kind": "chat",
       "text": "记下了：周五之前。",
-      "at": 1795731363371,
+      "at": 1795780897914,
       "revision": 1,
       "mentions": [],
       "spoken": false,
       "reactions": [],
       "attachments": [],
       "embeds": [],
-      "pinned": 1795733103371,
+      "pinned": 1795782637914,
       "outcome": null
     }
   ],
@@ -3038,7 +3038,7 @@
     "loggedIn": true,
     "account": "lucas",
     "reason": "",
-    "checkedAt": 1795733163371
+    "checkedAt": 1795782697914
   },
   "github.refresh": {
     "installed": true,
@@ -3046,7 +3046,7 @@
     "loggedIn": true,
     "account": "lucas",
     "reason": "",
-    "checkedAt": 1795733163371
+    "checkedAt": 1795782697914
   },
   "attachment.file": {
     "path": "/Users/farmer/.vibevalley/attachments/login.png",
@@ -3183,8 +3183,8 @@
     "pairCode": "",
     "user": "用户",
     "channel": "general",
-    "since": 1795473963371,
-    "lastInbound": 1795732443371,
+    "since": 1795523497915,
+    "lastInbound": 1795781977915,
     "pending": 2,
     "error": ""
   },
@@ -3195,8 +3195,8 @@
     "pairCode": "",
     "user": "用户",
     "channel": "general",
-    "since": 1795473963371,
-    "lastInbound": 1795732443371,
+    "since": 1795523497915,
+    "lastInbound": 1795781977915,
     "pending": 2,
     "error": ""
   },
@@ -3207,8 +3207,8 @@
     "pairCode": "",
     "user": "用户",
     "channel": "general",
-    "since": 1795473963371,
-    "lastInbound": 1795732443371,
+    "since": 1795523497915,
+    "lastInbound": 1795781977915,
     "pending": 2,
     "error": ""
   },
@@ -3222,7 +3222,7 @@
         "author": "agent",
         "repo": "vibevalley",
         "session": "w3",
-        "at": 1795715163371,
+        "at": 1795764697914,
         "recalled": 0,
         "fading": false
       },
@@ -3233,9 +3233,9 @@
         "text": "这个仓库的测试用 vp test；不要开 next dev。",
         "author": "user",
         "repo": "vibevalley",
-        "at": 1795473963371,
+        "at": 1795523497914,
         "recalled": 4,
-        "recalledAt": 1795646763371,
+        "recalledAt": 1795696297914,
         "fading": false
       },
       {
@@ -3246,7 +3246,7 @@
         "author": "agent",
         "session": "w1",
         "repo": "vibevalley",
-        "at": 1794696363371,
+        "at": 1794745897914,
         "recalled": 0,
         "fading": true
       },
@@ -3256,9 +3256,9 @@
         "kind": "note",
         "text": "提交信息写中文，一句话说清改了什么。",
         "author": "user",
-        "at": 1794005163371,
+        "at": 1794054697914,
         "recalled": 9,
-        "recalledAt": 1795725963371,
+        "recalledAt": 1795775497914,
         "fading": false
       },
       {
@@ -3269,7 +3269,7 @@
         "author": "system",
         "repo": "vibevalley",
         "source": "nowledge",
-        "at": 1795214763371,
+        "at": 1795264297914,
         "recalled": 1,
         "fading": false
       }
@@ -3307,22 +3307,22 @@
     "text": "这个仓库的测试用 vp test；不要开 next dev。",
     "author": "user",
     "repo": "vibevalley",
-    "at": 1795473963371,
+    "at": 1795523497914,
     "recalled": 4,
-    "recalledAt": 1795646763371,
+    "recalledAt": 1795696297914,
     "fading": false
   },
   "memory.delete": null,
   "host.assetsDir": {
-    "path": "/Users/lucasay/.gemini/antigravity-cli/worktrees/ed9f7657-8af1-41cf-bc21-2713a1045e4c/swarm-w5-activity-stream-2c694451/assets"
+    "path": "/Users/lucasay/.gemini/antigravity-cli/worktrees/ed9f7657-8af1-41cf-bc21-2713a1045e4c/swarm-note-workbench-shell-b0632d17/assets"
   },
   "host.playSound": null,
-  "artifact.list": [
+  "note.list": [
     {
       "id": "art-plan",
       "title": "看板拖拽的方案",
-      "artifactType": "docs",
-      "isDefault": false,
+      "noteType": "doc",
+      "sortOrder": 1,
       "channel": "general",
       "said": {
         "channel": "general",
@@ -3335,18 +3335,28 @@
       "seq": 4,
       "versions": [],
       "preview": {
-        "_tag": "docs",
+        "_tag": "doc",
         "heading": "目标",
-        "excerpt": "卡片拖到别的列就改状态，拖到同列就排序；松手前看得到落点。"
+        "excerpt": "卡片拖到别的列就改状态，拖到同列就排序；松手前看得到落点。",
+        "blockCount": 4,
+        "slideCount": 1,
+        "outline": [
+          {
+            "depth": 0,
+            "text": "目标",
+            "kind": "heading"
+          }
+        ]
       },
-      "at": 1795727763370,
-      "updated": 1795732803370
+      "at": 1795777297914,
+      "updated": 1795782337914
     },
     {
       "id": "art-login",
       "title": "登录流程",
-      "artifactType": "prototype",
-      "isDefault": false,
+      "noteType": "doc",
+      "parentId": "art-plan",
+      "sortOrder": 1,
       "channel": "general",
       "said": {
         "channel": "general",
@@ -3364,7 +3374,7 @@
           "note": "第一版",
           "by": "w1",
           "byName": "老周",
-          "at": 1795730163370,
+          "at": 1795779697914,
           "channel": "general",
           "number": 2
         },
@@ -3374,24 +3384,33 @@
           "note": "多一条测试",
           "by": "w1",
           "byName": "老周",
-          "at": 1795731963370,
+          "at": 1795781497914,
           "channel": "general",
           "number": 4
         }
       ],
       "preview": {
-        "_tag": "prototype",
+        "_tag": "doc",
         "heading": "登录流程",
-        "subtitle": "登录过期时，回到登录页并记住要去的地方。"
+        "excerpt": "登录过期时，回到登录页并记住要去的地方。",
+        "blockCount": 2,
+        "slideCount": 1,
+        "outline": [
+          {
+            "depth": 0,
+            "text": "登录流程",
+            "kind": "heading"
+          }
+        ]
       },
-      "at": 1795730163370,
-      "updated": 1795731963370
+      "at": 1795779697914,
+      "updated": 1795781497914
     },
     {
       "id": "art-deck",
       "title": "本周进展",
-      "artifactType": "slides",
-      "isDefault": false,
+      "noteType": "doc",
+      "sortOrder": 2,
       "channel": "general",
       "by": "orchestrator",
       "byName": "助手",
@@ -3404,61 +3423,61 @@
           "note": "周会用",
           "by": "orchestrator",
           "byName": "助手",
-          "at": 1795722363370,
+          "at": 1795771897914,
           "channel": "general"
         }
       ],
       "preview": {
-        "_tag": "slides",
-        "firstTitle": "本周进展",
-        "firstSubtitle": "田头周会",
-        "slideCount": 2
+        "_tag": "doc",
+        "heading": "本周进展",
+        "excerpt": "田头周会",
+        "blockCount": 5,
+        "slideCount": 2,
+        "outline": [
+          {
+            "depth": 0,
+            "text": "本周进展",
+            "kind": "heading"
+          },
+          {
+            "depth": 0,
+            "text": "做完的",
+            "kind": "heading"
+          }
+        ]
       },
-      "at": 1795722363370,
-      "updated": 1795722363370
+      "at": 1795771897914,
+      "updated": 1795771897914
     },
     {
       "id": "art-mine",
       "title": "发版前要查的",
-      "artifactType": "outline",
-      "isDefault": false,
+      "noteType": "base",
+      "sortOrder": 3,
       "by": "user",
       "byName": "用户",
       "version": 0,
       "seq": 1,
       "versions": [],
       "preview": {
-        "_tag": "outline",
-        "items": [
-          {
-            "depth": 0,
-            "text": "发版前",
-            "kind": "heading"
-          },
-          {
-            "depth": 1,
-            "text": "跑一遍全部测试",
-            "kind": "todo",
-            "checked": false
-          },
-          {
-            "depth": 1,
-            "text": "看一眼深色主题",
-            "kind": "todo",
-            "checked": false
-          }
+        "_tag": "base",
+        "sheetName": "发版前要查的",
+        "columns": ["任务", "状态"],
+        "rows": [
+          ["跑一遍全部测试", "doing"],
+          ["看一眼深色主题", "todo"]
         ],
-        "todoDone": 0,
-        "todoTotal": 2
+        "totalRows": 2,
+        "totalCols": 2
       },
-      "at": 1795639563370,
-      "updated": 1795643163370
+      "at": 1795689097914,
+      "updated": 1795692697914
     },
     {
       "id": "art-launch-board",
       "title": "产品发布时间线",
-      "artifactType": "whiteboard",
-      "isDefault": false,
+      "noteType": "canvas",
+      "sortOrder": 4,
       "channel": "general",
       "said": {
         "channel": "general",
@@ -3471,7 +3490,7 @@
       "seq": 18,
       "versions": [],
       "preview": {
-        "_tag": "whiteboard",
+        "_tag": "canvas",
         "shapes": [
           {
             "x": 0.08,
@@ -3500,15 +3519,35 @@
         ],
         "nodeCount": 5
       },
-      "at": 1795730763370,
-      "updated": 1795733043370
+      "at": 1795780297914,
+      "updated": 1795782577914
+    },
+    {
+      "id": "art-reel",
+      "title": "灵动岛交互演示",
+      "noteType": "media",
+      "sortOrder": 5,
+      "issue": "i23",
+      "by": "orchestrator",
+      "byName": "助手",
+      "version": 0,
+      "seq": 1,
+      "versions": [],
+      "preview": {
+        "_tag": "media",
+        "mediaKind": "video",
+        "caption": "灵动岛展开、收起与通知提示演示",
+        "durationSec": 9
+      },
+      "at": 1795781797914,
+      "updated": 1795782097914
     }
   ],
-  "artifact.get": {
+  "note.get": {
     "id": "art-plan",
     "title": "看板拖拽的方案",
-    "artifactType": "docs",
-    "isDefault": false,
+    "noteType": "doc",
+    "sortOrder": 1,
     "channel": "general",
     "said": {
       "channel": "general",
@@ -3521,108 +3560,393 @@
     "seq": 4,
     "versions": [],
     "preview": {
-      "_tag": "docs",
+      "_tag": "doc",
       "heading": "目标",
-      "excerpt": "卡片拖到别的列就改状态，拖到同列就排序；松手前看得到落点。"
+      "excerpt": "卡片拖到别的列就改状态，拖到同列就排序；松手前看得到落点。",
+      "blockCount": 4,
+      "slideCount": 1,
+      "outline": [
+        {
+          "depth": 0,
+          "text": "目标",
+          "kind": "heading"
+        }
+      ]
     },
-    "at": 1795727763370,
-    "updated": 1795732803370
+    "at": 1795777297914,
+    "updated": 1795782337914
   },
-  "artifact.content.get": {
+  "note.content.get": {
     "version": 2,
     "content": "<!doctype html>\n<html><head><meta charset=\"utf-8\"><title>登录流程</title>\n<style>body{font:16px/1.6 system-ui;margin:0;padding:32px 40px;background:#fcfcfb;color:#1c1917}h1{margin:0 0 12px}ol{padding-left:1.2em}.box{border:1px solid #e5e5e5;border-radius:8px;padding:12px 16px;margin-top:16px}</style>\n</head><body>\n<h1>登录流程</h1>\n<p>登录过期时，回到登录页并记住要去的地方。</p>\n<ol><li>打开任一页</li><li>会话过期：跳到 /login?next=…</li><li>登录后回到原页</li></ol>\n<div class=\"box\">三条测试：过期跳转、登录后回跳、next 只收站内地址。</div>\n</body></html>"
   },
-  "artifact.file.list": {
-    "artifactId": "art-launch-board",
+  "note.doc.view": {
+    "noteId": "art-plan",
+    "title": "看板拖拽的方案",
+    "blocks": [
+      {
+        "id": "b1",
+        "type": "heading",
+        "level": 2,
+        "text": "目标"
+      },
+      {
+        "id": "b2",
+        "type": "prose",
+        "text": "卡片拖到别的列就改状态，拖到同列就排序；松手前看得到落点。"
+      },
+      {
+        "id": "b3",
+        "type": "heading",
+        "level": 2,
+        "text": "做法"
+      },
+      {
+        "id": "b4",
+        "type": "list",
+        "ordered": false,
+        "items": ["按下时量好每列和每张卡的位置", "拖动时画一张影子卡，不动原卡", "松手时发 issue.status.update"]
+      }
+    ],
+    "slideCount": 1,
+    "wordCount": 42,
+    "extractedLinks": []
+  },
+  "note.doc.appendBlock": {
+    "noteId": "art-plan",
+    "title": "看板拖拽的方案",
+    "blocks": [
+      {
+        "id": "b1",
+        "type": "heading",
+        "level": 2,
+        "text": "目标"
+      },
+      {
+        "id": "b2",
+        "type": "prose",
+        "text": "卡片拖到别的列就改状态，拖到同列就排序；松手前看得到落点。"
+      },
+      {
+        "id": "b3",
+        "type": "heading",
+        "level": 2,
+        "text": "做法"
+      },
+      {
+        "id": "b4",
+        "type": "list",
+        "ordered": false,
+        "items": ["按下时量好每列和每张卡的位置", "拖动时画一张影子卡，不动原卡", "松手时发 issue.status.update"]
+      }
+    ],
+    "slideCount": 1,
+    "wordCount": 42,
+    "extractedLinks": []
+  },
+  "note.base.view": {
+    "noteId": "art-mine",
+    "sheets": [
+      {
+        "id": "sheet1",
+        "name": "发版前要查的",
+        "rowCount": 2
+      }
+    ],
+    "activeSheetId": "sheet1",
+    "activeViewId": "v_table",
+    "activeViewKind": "table",
+    "columns": [
+      {
+        "id": "c_title",
+        "name": "任务",
+        "kind": "text",
+        "width": 240
+      },
+      {
+        "id": "c_status",
+        "name": "状态",
+        "kind": "select",
+        "width": 140,
+        "options": [
+          {
+            "value": "todo",
+            "label": "待办",
+            "color": "stone"
+          },
+          {
+            "value": "doing",
+            "label": "进行中",
+            "color": "amber"
+          },
+          {
+            "value": "done",
+            "label": "完成",
+            "color": "green"
+          }
+        ]
+      }
+    ],
+    "rows": [
+      {
+        "id": "r1",
+        "cells": {
+          "c_title": {
+            "_tag": "text",
+            "value": "跑一遍全部测试"
+          },
+          "c_status": {
+            "_tag": "text",
+            "value": "doing"
+          }
+        },
+        "createdAt": 1795689097914,
+        "updatedAt": 1795692697914
+      },
+      {
+        "id": "r2",
+        "cells": {
+          "c_title": {
+            "_tag": "text",
+            "value": "看一眼深色主题"
+          },
+          "c_status": {
+            "_tag": "text",
+            "value": "todo"
+          }
+        },
+        "createdAt": 1795689097914,
+        "updatedAt": 1795692697914
+      }
+    ],
+    "groups": [],
+    "summaries": [],
+    "totalRows": 2
+  },
+  "note.base.upsertRow": {
+    "noteId": "art-mine",
+    "sheets": [
+      {
+        "id": "sheet1",
+        "name": "发版前要查的",
+        "rowCount": 2
+      }
+    ],
+    "activeSheetId": "sheet1",
+    "activeViewId": "v_table",
+    "activeViewKind": "table",
+    "columns": [
+      {
+        "id": "c_title",
+        "name": "任务",
+        "kind": "text",
+        "width": 240
+      },
+      {
+        "id": "c_status",
+        "name": "状态",
+        "kind": "select",
+        "width": 140,
+        "options": [
+          {
+            "value": "todo",
+            "label": "待办",
+            "color": "stone"
+          },
+          {
+            "value": "doing",
+            "label": "进行中",
+            "color": "amber"
+          },
+          {
+            "value": "done",
+            "label": "完成",
+            "color": "green"
+          }
+        ]
+      }
+    ],
+    "rows": [
+      {
+        "id": "r1",
+        "cells": {
+          "c_title": {
+            "_tag": "text",
+            "value": "跑一遍全部测试"
+          },
+          "c_status": {
+            "_tag": "text",
+            "value": "doing"
+          }
+        },
+        "createdAt": 1795689097914,
+        "updatedAt": 1795692697914
+      },
+      {
+        "id": "r2",
+        "cells": {
+          "c_title": {
+            "_tag": "text",
+            "value": "看一眼深色主题"
+          },
+          "c_status": {
+            "_tag": "text",
+            "value": "todo"
+          }
+        },
+        "createdAt": 1795689097914,
+        "updatedAt": 1795692697914
+      }
+    ],
+    "groups": [],
+    "summaries": [],
+    "totalRows": 2
+  },
+  "note.base.runAgentColumn": {
+    "noteId": "art-mine",
+    "sheetId": "sheet1",
+    "columnId": "c_status",
+    "executed": 1,
+    "updatedRowIds": ["r1"],
+    "spawnedIssueIds": []
+  },
+  "note.tree.move": {
+    "id": "art-login",
+    "title": "登录流程",
+    "noteType": "doc",
+    "parentId": "art-plan",
+    "sortOrder": 1,
+    "channel": "general",
+    "said": {
+      "channel": "general",
+      "number": 2
+    },
+    "issue": "i18",
+    "by": "w1",
+    "byName": "老周",
+    "version": 2,
+    "seq": 2,
+    "versions": [
+      {
+        "version": 1,
+        "size": 1200,
+        "note": "第一版",
+        "by": "w1",
+        "byName": "老周",
+        "at": 1795779697914,
+        "channel": "general",
+        "number": 2
+      },
+      {
+        "version": 2,
+        "size": 1200,
+        "note": "多一条测试",
+        "by": "w1",
+        "byName": "老周",
+        "at": 1795781497914,
+        "channel": "general",
+        "number": 4
+      }
+    ],
+    "preview": {
+      "_tag": "doc",
+      "heading": "登录流程",
+      "excerpt": "登录过期时，回到登录页并记住要去的地方。",
+      "blockCount": 2,
+      "slideCount": 1,
+      "outline": [
+        {
+          "depth": 0,
+          "text": "登录流程",
+          "kind": "heading"
+        }
+      ]
+    },
+    "at": 1795779697914,
+    "updated": 1795781497914
+  },
+  "note.link.list": {
+    "outgoing": [],
+    "backlinks": []
+  },
+  "note.file.list": {
+    "noteId": "art-launch-board",
     "seq": 18,
     "files": [
       {
         "path": "manifest.json",
         "mime": "application/json",
-        "size": 141,
-        "hash": "6438ff5c",
-        "updatedAt": 1795732863370
+        "size": 133,
+        "hash": "48ca9979",
+        "updatedAt": 1795782397914
       },
       {
         "path": "structure/board.json",
         "mime": "application/json",
         "size": 1427,
         "hash": "d24e81ae",
-        "updatedAt": 1795732863370
+        "updatedAt": 1795782397914
       }
     ]
   },
-  "artifact.file.get": {
-    "artifactId": "art-plan",
-    "path": "structure/index.md",
-    "mime": "text/markdown",
+  "note.file.get": {
+    "noteId": "art-plan",
+    "path": "structure/doc.json",
+    "mime": "application/json",
     "encoding": "utf8",
-    "content": "## 目标\n\n卡片拖到别的列就改状态，拖到同列就排序；松手前看得到落点。\n\n## 做法\n\n- 按下时量好每列和每张卡的位置\n- 拖动时画一张影子卡，**不动原卡**\n- 松手时发 issue.status.update\n",
-    "size": 110,
-    "hash": "9b9254d2",
-    "updatedAt": 1795732863370
+    "content": "{\n  \"version\": 1,\n  \"blocks\": [\n    {\n      \"id\": \"b1\",\n      \"type\": \"heading\",\n      \"level\": 2,\n      \"text\": \"目标\"\n    },\n    {\n      \"id\": \"b2\",\n      \"type\": \"prose\",\n      \"text\": \"卡片拖到别的列就改状态，拖到同列就排序；松手前看得到落点。\"\n    },\n    {\n      \"id\": \"b3\",\n      \"type\": \"heading\",\n      \"level\": 2,\n      \"text\": \"做法\"\n    },\n    {\n      \"id\": \"b4\",\n      \"type\": \"list\",\n      \"ordered\": false,\n      \"items\": [\n        \"按下时量好每列和每张卡的位置\",\n        \"拖动时画一张影子卡，不动原卡\",\n        \"松手时发 issue.status.update\"\n      ]\n    }\n  ]\n}",
+    "size": 511,
+    "hash": "e5dc8f20",
+    "updatedAt": 1795782397914
   },
-  "artifact.file.write": {
-    "artifactId": "art-plan",
+  "note.file.write": {
+    "noteId": "art-plan",
     "seq": 5,
     "files": [
       {
-        "path": "structure/index.md",
-        "mime": "text/markdown",
-        "size": 110,
-        "hash": "9b9254d2",
-        "updatedAt": 1795732863370
+        "path": "structure/doc.json",
+        "mime": "application/json",
+        "size": 511,
+        "hash": "e5dc8f20",
+        "updatedAt": 1795782397914
       }
     ]
   },
-  "artifact.file.delete": {
-    "artifactId": "art-plan",
+  "note.file.delete": {
+    "noteId": "art-plan",
     "seq": 6,
     "path": "structure/extra.md"
   },
-  "artifact.suggestion.list": [],
-  "artifact.create": {
+  "note.suggestion.list": [],
+  "note.create": {
     "id": "art-new",
     "title": "未命名",
-    "artifactType": "docs",
-    "isDefault": false,
+    "noteType": "doc",
+    "sortOrder": 3,
     "by": "user",
     "byName": "用户",
     "version": 0,
     "seq": 0,
     "versions": [],
     "preview": {
-      "_tag": "outline",
-      "items": [
-        {
-          "depth": 0,
-          "text": "发版前",
-          "kind": "heading"
-        },
-        {
-          "depth": 1,
-          "text": "跑一遍全部测试",
-          "kind": "todo",
-          "checked": false
-        },
-        {
-          "depth": 1,
-          "text": "看一眼深色主题",
-          "kind": "todo",
-          "checked": false
-        }
+      "_tag": "base",
+      "sheetName": "发版前要查的",
+      "columns": ["任务", "状态"],
+      "rows": [
+        ["跑一遍全部测试", "doing"],
+        ["看一眼深色主题", "todo"]
       ],
-      "todoDone": 0,
-      "todoTotal": 2
+      "totalRows": 2,
+      "totalCols": 2
     },
-    "at": 1795639563370,
-    "updated": 1795643163370
+    "at": 1795689097914,
+    "updated": 1795692697914
   },
-  "artifact.version.create": {
+  "note.version.create": {
     "id": "art-plan",
     "title": "看板拖拽的方案",
-    "artifactType": "docs",
-    "isDefault": false,
+    "noteType": "doc",
+    "sortOrder": 1,
     "channel": "general",
     "said": {
       "channel": "general",
@@ -3635,18 +3959,27 @@
     "seq": 4,
     "versions": [],
     "preview": {
-      "_tag": "docs",
+      "_tag": "doc",
       "heading": "目标",
-      "excerpt": "卡片拖到别的列就改状态，拖到同列就排序；松手前看得到落点。"
+      "excerpt": "卡片拖到别的列就改状态，拖到同列就排序；松手前看得到落点。",
+      "blockCount": 4,
+      "slideCount": 1,
+      "outline": [
+        {
+          "depth": 0,
+          "text": "目标",
+          "kind": "heading"
+        }
+      ]
     },
-    "at": 1795727763370,
-    "updated": 1795732803370
+    "at": 1795777297914,
+    "updated": 1795782337914
   },
-  "artifact.update": {
+  "note.update": {
     "id": "art-plan",
     "title": "看板拖拽的方案",
-    "artifactType": "docs",
-    "isDefault": false,
+    "noteType": "doc",
+    "sortOrder": 1,
     "channel": "general",
     "said": {
       "channel": "general",
@@ -3659,47 +3992,56 @@
     "seq": 4,
     "versions": [],
     "preview": {
-      "_tag": "docs",
+      "_tag": "doc",
       "heading": "目标",
-      "excerpt": "卡片拖到别的列就改状态，拖到同列就排序；松手前看得到落点。"
+      "excerpt": "卡片拖到别的列就改状态，拖到同列就排序；松手前看得到落点。",
+      "blockCount": 4,
+      "slideCount": 1,
+      "outline": [
+        {
+          "depth": 0,
+          "text": "目标",
+          "kind": "heading"
+        }
+      ]
     },
-    "at": 1795727763370,
-    "updated": 1795732803370
+    "at": 1795777297914,
+    "updated": 1795782337914
   },
-  "artifact.delete": null,
-  "artifact.cover.set": {
+  "note.delete": null,
+  "note.cover.set": {
     "path": "/tmp/art-login-cover-2.png",
-    "url": "/api/v1/artifact/art-login/cover?seq=2",
+    "url": "/api/v1/note/art-login/cover?seq=2",
     "mime": "image/png",
     "seq": 2,
     "width": 640,
     "height": 400,
-    "updatedAt": 1795733163370
+    "updatedAt": 1795782697914
   },
-  "artifact.presence.update": null,
-  "artifact.history.list": [],
-  "artifact.history.preview": {
-    "artifactId": "art-plan",
-    "artifactType": "docs",
+  "note.presence.update": null,
+  "note.history.list": [],
+  "note.history.preview": {
+    "noteId": "art-plan",
+    "noteType": "doc",
     "frontiers": "f0",
     "files": [
       {
-        "artifactId": "art-plan",
-        "path": "structure/index.md",
-        "mime": "text/markdown",
+        "noteId": "art-plan",
+        "path": "structure/doc.json",
+        "mime": "application/json",
         "encoding": "utf8",
-        "content": "## 目标\n\n卡片拖到别的列就改状态，拖到同列就排序；松手前看得到落点。\n\n## 做法\n\n- 按下时量好每列和每张卡的位置\n- 拖动时画一张影子卡，**不动原卡**\n- 松手时发 issue.status.update\n",
-        "size": 110,
-        "hash": "9b9254d2",
-        "updatedAt": 1795732863370
+        "content": "{\n  \"version\": 1,\n  \"blocks\": [\n    {\n      \"id\": \"b1\",\n      \"type\": \"heading\",\n      \"level\": 2,\n      \"text\": \"目标\"\n    },\n    {\n      \"id\": \"b2\",\n      \"type\": \"prose\",\n      \"text\": \"卡片拖到别的列就改状态，拖到同列就排序；松手前看得到落点。\"\n    },\n    {\n      \"id\": \"b3\",\n      \"type\": \"heading\",\n      \"level\": 2,\n      \"text\": \"做法\"\n    },\n    {\n      \"id\": \"b4\",\n      \"type\": \"list\",\n      \"ordered\": false,\n      \"items\": [\n        \"按下时量好每列和每张卡的位置\",\n        \"拖动时画一张影子卡，不动原卡\",\n        \"松手时发 issue.status.update\"\n      ]\n    }\n  ]\n}",
+        "size": 511,
+        "hash": "e5dc8f20",
+        "updatedAt": 1795782397914
       }
     ]
   },
-  "artifact.history.restore": {
+  "note.history.restore": {
     "id": "art-plan",
     "title": "看板拖拽的方案",
-    "artifactType": "docs",
-    "isDefault": false,
+    "noteType": "doc",
+    "sortOrder": 1,
     "channel": "general",
     "said": {
       "channel": "general",
@@ -3712,18 +4054,27 @@
     "seq": 4,
     "versions": [],
     "preview": {
-      "_tag": "docs",
+      "_tag": "doc",
       "heading": "目标",
-      "excerpt": "卡片拖到别的列就改状态，拖到同列就排序；松手前看得到落点。"
+      "excerpt": "卡片拖到别的列就改状态，拖到同列就排序；松手前看得到落点。",
+      "blockCount": 4,
+      "slideCount": 1,
+      "outline": [
+        {
+          "depth": 0,
+          "text": "目标",
+          "kind": "heading"
+        }
+      ]
     },
-    "at": 1795727763370,
-    "updated": 1795732803370
+    "at": 1795777297914,
+    "updated": 1795782337914
   },
-  "artifact.history.fork": {
+  "note.history.fork": {
     "id": "art-forked",
     "title": "看板拖拽的方案（分支）",
-    "artifactType": "docs",
-    "isDefault": false,
+    "noteType": "doc",
+    "sortOrder": 1,
     "channel": "general",
     "said": {
       "channel": "general",
@@ -3736,18 +4087,27 @@
     "seq": 4,
     "versions": [],
     "preview": {
-      "_tag": "docs",
+      "_tag": "doc",
       "heading": "目标",
-      "excerpt": "卡片拖到别的列就改状态，拖到同列就排序；松手前看得到落点。"
+      "excerpt": "卡片拖到别的列就改状态，拖到同列就排序；松手前看得到落点。",
+      "blockCount": 4,
+      "slideCount": 1,
+      "outline": [
+        {
+          "depth": 0,
+          "text": "目标",
+          "kind": "heading"
+        }
+      ]
     },
-    "at": 1795727763370,
-    "updated": 1795732803370
+    "at": 1795777297914,
+    "updated": 1795782337914
   },
-  "artifact.history.undoOrigin": {
+  "note.history.undoOrigin": {
     "id": "art-plan",
     "title": "看板拖拽的方案",
-    "artifactType": "docs",
-    "isDefault": false,
+    "noteType": "doc",
+    "sortOrder": 1,
     "channel": "general",
     "said": {
       "channel": "general",
@@ -3760,18 +4120,27 @@
     "seq": 4,
     "versions": [],
     "preview": {
-      "_tag": "docs",
+      "_tag": "doc",
       "heading": "目标",
-      "excerpt": "卡片拖到别的列就改状态，拖到同列就排序；松手前看得到落点。"
+      "excerpt": "卡片拖到别的列就改状态，拖到同列就排序；松手前看得到落点。",
+      "blockCount": 4,
+      "slideCount": 1,
+      "outline": [
+        {
+          "depth": 0,
+          "text": "目标",
+          "kind": "heading"
+        }
+      ]
     },
-    "at": 1795727763370,
-    "updated": 1795732803370
+    "at": 1795777297914,
+    "updated": 1795782337914
   },
-  "artifact.history.compact": {
+  "note.history.compact": {
     "id": "art-plan",
     "title": "看板拖拽的方案",
-    "artifactType": "docs",
-    "isDefault": false,
+    "noteType": "doc",
+    "sortOrder": 1,
     "channel": "general",
     "said": {
       "channel": "general",
@@ -3784,12 +4153,21 @@
     "seq": 4,
     "versions": [],
     "preview": {
-      "_tag": "docs",
+      "_tag": "doc",
       "heading": "目标",
-      "excerpt": "卡片拖到别的列就改状态，拖到同列就排序；松手前看得到落点。"
+      "excerpt": "卡片拖到别的列就改状态，拖到同列就排序；松手前看得到落点。",
+      "blockCount": 4,
+      "slideCount": 1,
+      "outline": [
+        {
+          "depth": 0,
+          "text": "目标",
+          "kind": "heading"
+        }
+      ]
     },
-    "at": 1795727763370,
-    "updated": 1795732803370
+    "at": 1795777297914,
+    "updated": 1795782337914
   },
   "library.item.add": {
     "attachment": {
@@ -3803,8 +4181,8 @@
       "job": "job-image",
       "jobKind": "image"
     },
-    "addedAt": 1795731363371,
-    "lastAt": 1795731363371
+    "addedAt": 1795780897914,
+    "lastAt": 1795780897914
   },
   "library.item.delete": null,
   "provider.voice.list": {
@@ -3851,8 +4229,8 @@
     },
     "canCancel": false,
     "canRetryDownload": false,
-    "createdAt": 1795731363371,
-    "updatedAt": 1795731383371
+    "createdAt": 1795780897914,
+    "updatedAt": 1795780917914
   },
   "media.speech.create": {
     "kind": "speech",
@@ -3891,8 +4269,8 @@
     "resultInput": null,
     "canCancel": false,
     "canRetryDownload": false,
-    "createdAt": 1795732443371,
-    "updatedAt": 1795732463371
+    "createdAt": 1795781977914,
+    "updatedAt": 1795781997914
   },
   "media.dialogue.create": {
     "model": "moss-speakers",
@@ -3944,8 +4322,8 @@
       ],
       "format": "mp3"
     },
-    "createdAt": 1795731963371,
-    "updatedAt": 1795731983371
+    "createdAt": 1795781497914,
+    "updatedAt": 1795781517914
   },
   "media.job.download": {
     "model": "moss-speakers",
@@ -3997,8 +4375,8 @@
       ],
       "format": "mp3"
     },
-    "createdAt": 1795731963371,
-    "updatedAt": 1795731983371
+    "createdAt": 1795781497914,
+    "updatedAt": 1795781517914
   },
   "media.job.cancel": {
     "kind": "image",
@@ -4017,8 +4395,8 @@
     "problem": "",
     "canCancel": true,
     "canRetryDownload": false,
-    "createdAt": 1795733103371,
-    "updatedAt": 1795733123371
+    "createdAt": 1795782637914,
+    "updatedAt": 1795782657914
   },
   "media.input.adopt": {
     "id": "in-poster",
@@ -4028,8 +4406,8 @@
     "size": 482113,
     "phase": "ready",
     "hash": "2222222222222222222222222222222222222222222222222222222222222222",
-    "createdAt": 1795733163371,
-    "expiresAt": 1795736763371,
+    "createdAt": 1795782697914,
+    "expiresAt": 1795786297914,
     "canDelete": true
   },
   "media.understanding.create": {
@@ -4072,8 +4450,8 @@
     "canCancel": false,
     "canCleanup": false,
     "canRetryDownload": false,
-    "createdAt": 1795731663371,
-    "updatedAt": 1795731683371
+    "createdAt": 1795781197914,
+    "updatedAt": 1795781217914
   },
   "media.transcription.create": {
     "model": "moss-transcribe-diarize-pro",
@@ -4134,7 +4512,7 @@
       "allowUpload": true,
       "diarize": true
     },
-    "createdAt": 1795730463371,
-    "updatedAt": 1795730483371
+    "createdAt": 1795779997914,
+    "updatedAt": 1795780017914
   }
 }

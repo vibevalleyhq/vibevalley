@@ -23,7 +23,7 @@ import { localizeRuntimeError } from "../../../infra/runtimeError";
 import { createEffect } from "../../../infra/solid";
 import { useLatest } from "../../../infra/state/atom";
 import { useIntents } from "../../../infra/state/intent";
-import { ArtifactCard } from "../../artifact";
+import { NoteCard } from "../../note";
 import { RunSteps } from "../../session";
 import { chatSay, editingId, pendingLines, setEditingId } from "../model/composing";
 import { followed, useMessage } from "../model/follow";
@@ -559,7 +559,7 @@ function MessageRow(props: {
         <Dispatch m={props.m} />
       </If>
       <If when={props.m.attachments.length > 0 ? props.m.attachments : undefined}>{(files) => <Attachments files={files()} />}</If>
-      <If when={props.m.deleted === undefined ? props.m.artifact : undefined}>{(card) => <ArtifactCard card={card()} />}</If>
+      <If when={props.m.deleted === undefined ? props.m.note : undefined}>{(card) => <NoteCard card={card()} />}</If>
       <If when={props.m.deleted === undefined && props.m.text !== "" ? props.m.text : undefined}>{(text) => <LinkedMessages text={text()} />}</If>
       <If when={props.m.deleted === undefined && props.m.embeds.length > 0 ? props.m.embeds : undefined}>{(embeds) => <Embeds embeds={embeds()} />}</If>
       <If when={props.m.reactions.length > 0}>

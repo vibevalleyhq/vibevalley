@@ -35,7 +35,7 @@ import { ready, useQueryClient, useRepos } from "../../../infra/query";
 import { createEffect, createSignal, untrack } from "../../../infra/solid";
 import { useIntents } from "../../../infra/state/intent";
 import { rememberPick } from "../../../infra/state/prefs";
-import { IssueArtifacts } from "../../artifact";
+import { IssueNotes, useNotes } from "../../note";
 import { todoStatusLabel } from "../model/cards";
 import { useIssues } from "../model/history";
 import { isRefined, newIssueTitle } from "../model/issue";
@@ -44,6 +44,7 @@ import { issueMove, issueMoveOf, movedIssue, sendMove } from "../model/moves";
 import { ActLines } from "./ActLines";
 import { IssueActivity } from "./IssueActivity";
 import { IssueAttachments } from "./IssueAttachments";
+import { NoteLinkPills, resolveDescriptionNoteLinks } from "./IssueDetail";
 import {
   BlockedByChips,
   BlockedByPicker,
@@ -121,6 +122,8 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
   const agents = useWorkAgents(true);
   const agentReadiness = useWorkAgentReadiness(true);
   const allIssues = useIssues();
+  const notesQuery = useNotes(() => ({}));
+  const allNotes = computed(() => ready(notesQuery, []));
   const queries = useQueryClient();
   const repoList = useRepos();
   const repos = computed(() => ready(repoList, []).map((p) => p.name));
@@ -383,6 +386,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
   );
 
   const hasDescription = computed(() => d().description.trim() !== "");
+  const resolvedDescription = computed(() => resolveDescriptionNoteLinks(d().description, allNotes()));
   const main = (
     <>
       <View>
@@ -408,7 +412,8 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
                 </If>
               </View>
               <View testID="issue-description-preview">
-                <Markdown size="sm" text={d().description} />
+                <Markdown size="sm" text={resolvedDescription().markdown} />
+                <NoteLinkPills links={resolvedDescription().links} />
               </View>
             </If>
           }
@@ -443,11 +448,11 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
       {talk()}
       <IssueAttachments files={d().attachments} editable={!closed()} busy={busy()} onAdd={addAttachment} onRemove={removeAttachment} />
       <SubIssuesSection issueId={props.item.id} allIssues={allIssues()} onOpen={(id) => props.onDone(id)} />
-      <IssueArtifacts
+      <IssueNotes
         issue={props.item.id}
         heading={
           <View class="mt-7 border-t border-line pt-5">
-            <SheetLabel first>{t("web.artifact.issue.title")}</SheetLabel>
+            <SheetLabel first>{t("web.note.issue.title")}</SheetLabel>
           </View>
         }
       />

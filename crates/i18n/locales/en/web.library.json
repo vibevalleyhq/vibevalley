@@ -66,29 +66,28 @@
     "audio": "Audio workbench"
   },
   "content": {
-    "title": "Artifacts",
+    "title": "Notes",
     "new": "New",
-    "searchAll": "Search all artifacts…",
-    "sidebarToggle": "Toggle artifacts sidebar",
+    "searchAll": "Search all notes…",
+    "sidebarToggle": "Toggle notes sidebar",
     "recent": "All recent",
     "pinned": "Pinned",
-    "pinnedEmpty": "Nothing pinned yet. Hover any artifact or media item and click the pin icon to keep it handy here.",
+    "pinnedEmpty": "Nothing pinned yet. Hover any note or media item and click the pin icon to keep it handy here.",
     "installedApps": "Installed Apps",
-    "installedAppsEmpty": "No standalone apps installed yet. Click “Install as App” on any artifact card or toolbar to install it as an independent macOS app and manage it here.",
+    "installedAppsEmpty": "No standalone apps installed yet. Click “Install as App” on any note card or toolbar to install it as an independent macOS app and manage it here.",
     "pin": "Pin",
     "unpin": "Unpin",
     "pinnedToast": "Pinned",
     "unpinnedToast": "Unpinned",
-    "artifacts": "Artifacts",
+    "artifacts": "Notes",
     "media": "Media",
     "moreTypes": "More types ({n})",
     "fewerTypes": "Hide empty types",
-    "sendArtifact": "Send to channel",
     "exportArtifact": "Export",
     "turnIntoIssue": "Turn into ticket",
     "issueCreated": "Ticket created",
     "artifactType": {
-      "all": "All artifacts"
+      "all": "All notes"
     },
     "inspector": {
       "openExternal": "Open externally",
@@ -99,7 +98,7 @@
       "stopAudio": "Stop audio"
     },
     "templates": {
-      "title": "New artifact",
+      "title": "New note",
       "search": "Search templates…",
       "searchCount": "{n} matching templates",
       "empty": "No matching templates",
@@ -748,12 +747,12 @@
       }
     },
     "search": {
-      "title": "Search artifacts",
-      "placeholder": "Search notes, artifacts, and media…",
-      "empty": "No matching notes, artifacts, or media",
+      "title": "Search notes",
+      "placeholder": "Search notes and media…",
+      "empty": "No matching notes or media",
       "typeMedia": "Media",
       "scopeAll": "All",
-      "scopeArtifacts": "Artifacts",
+      "scopeArtifacts": "Notes",
       "scopeMedia": "Media"
     }
   }

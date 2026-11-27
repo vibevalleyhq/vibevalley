@@ -47,7 +47,7 @@ export function CollabToolbar(props: CollabToolbarProps) {
           <Each of={remotePeers()} key={(p) => p.id}>
             {(peer) => (
               <View testID={`collab-peer-${peer().id}`} class="h-6 flex-row items-center gap-1.5 rounded-full border border-line bg-side pr-2 pl-1">
-                <View class="size-4 items-center justify-center rounded-full bg-accent">
+                <View testID="note-presence-pill" class="size-4 items-center justify-center rounded-full bg-accent">
                   <Text class="text-2xs font-semibold text-page">{peerInitial(peer().name)}</Text>
                 </View>
                 <Text class="max-w-24 truncate text-2xs font-medium text-ink">{peer().status ? `${peer().name} · ${peer().status}` : peer().name}</Text>

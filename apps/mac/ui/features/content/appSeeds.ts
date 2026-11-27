@@ -1,8 +1,8 @@
-import type { ArtifactFileWriteItem } from "@vibevalley/protocol";
+import type { NoteFileWriteItem } from "@vibevalley/protocol";
 
 export type AppTemplateSeed = "protoFocusStudio" | "protoSynthPad" | "protoParticleLab" | "protoTokenCalculator" | "protoCssGlassStudio" | "protoDeskKanban";
 
-function textWriteItem(path: string, content: string, mime: string): ArtifactFileWriteItem {
+function textWriteItem(path: string, content: string, mime: string): NoteFileWriteItem {
   return { path, content, encoding: "utf8", mime };
 }
 
@@ -10,7 +10,7 @@ function escapeHtml(raw: string): string {
   return raw.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 }
 
-function buildFocusStudio(title: string): ArtifactFileWriteItem[] {
+function buildFocusStudio(title: string): NoteFileWriteItem[] {
   const safe = escapeHtml(title);
   const html = `<!doctype html>
 <html lang="en">
@@ -411,7 +411,7 @@ renderTasks();
   ];
 }
 
-function buildSynthPad(title: string): ArtifactFileWriteItem[] {
+function buildSynthPad(title: string): NoteFileWriteItem[] {
   const safe = escapeHtml(title);
   const html = `<!doctype html>
 <html lang="en">
@@ -730,7 +730,7 @@ drawScope();
   ];
 }
 
-function buildParticleLab(title: string): ArtifactFileWriteItem[] {
+function buildParticleLab(title: string): NoteFileWriteItem[] {
   const safe = escapeHtml(title);
   const html = `<!doctype html>
 <html lang="en">
@@ -921,7 +921,7 @@ requestAnimationFrame(step);
   ];
 }
 
-function buildTokenCalculator(title: string): ArtifactFileWriteItem[] {
+function buildTokenCalculator(title: string): NoteFileWriteItem[] {
   const safe = escapeHtml(title);
   const html = `<!doctype html>
 <html lang="en">
@@ -1102,7 +1102,7 @@ compute();
   ];
 }
 
-function buildCssGlassStudio(title: string): ArtifactFileWriteItem[] {
+function buildCssGlassStudio(title: string): NoteFileWriteItem[] {
   const safe = escapeHtml(title);
   const html = `<!doctype html>
 <html lang="en">
@@ -1212,7 +1212,7 @@ update();
   ];
 }
 
-function buildDeskKanban(title: string): ArtifactFileWriteItem[] {
+function buildDeskKanban(title: string): NoteFileWriteItem[] {
   const safe = escapeHtml(title);
   const html = `<!doctype html>
 <html lang="en">
@@ -1359,19 +1359,40 @@ render();
   ];
 }
 
-export function buildAppSeedFiles(seed: AppTemplateSeed, title: string): ArtifactFileWriteItem[] {
-  switch (seed) {
-    case "protoFocusStudio":
-      return buildFocusStudio(title);
-    case "protoSynthPad":
-      return buildSynthPad(title);
-    case "protoParticleLab":
-      return buildParticleLab(title);
-    case "protoTokenCalculator":
-      return buildTokenCalculator(title);
-    case "protoCssGlassStudio":
-      return buildCssGlassStudio(title);
-    case "protoDeskKanban":
-      return buildDeskKanban(title);
-  }
+export function buildAppSeedFiles(seed: AppTemplateSeed, title: string): NoteFileWriteItem[] {
+  const appFiles = (() => {
+    switch (seed) {
+      case "protoFocusStudio":
+        return buildFocusStudio(title);
+      case "protoSynthPad":
+        return buildSynthPad(title);
+      case "protoParticleLab":
+        return buildParticleLab(title);
+      case "protoTokenCalculator":
+        return buildTokenCalculator(title);
+      case "protoCssGlassStudio":
+        return buildCssGlassStudio(title);
+      case "protoDeskKanban":
+        return buildDeskKanban(title);
+    }
+  })();
+  return [
+    {
+      path: "structure/doc.json",
+      mime: "application/json",
+      encoding: "utf8",
+      content: `${JSON.stringify(
+        {
+          version: 1,
+          blocks: [
+            { id: "b1", type: "heading", level: 1, text: title },
+            { id: "b2", type: "preview", entry: "structure/index.html", height: 540, title },
+          ],
+        },
+        null,
+        2,
+      )}\n`,
+    },
+    ...appFiles,
+  ];
 }

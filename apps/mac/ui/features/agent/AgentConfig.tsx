@@ -489,7 +489,7 @@ function SkillPicker(props: { draft: Agent; runtime?: RuntimeInfo | undefined; p
   );
 }
 
-const workerToolsets: readonly Toolset[] = ["issue", "session", "channel", "resource", "memory", "library", "artifact"];
+const workerToolsets: readonly Toolset[] = ["issue", "session", "channel", "resource", "memory", "library", "note"];
 
 export const defaultToolsets = (role: Agent["role"]): Toolset[] => (role === "orchestrator" ? [...ToolsetValues] : [...workerToolsets]);
 

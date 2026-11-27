@@ -1,12 +1,14 @@
 import { t } from "@vibevalley/i18n";
-import { ARTIFACT_TYPES, type ArtifactType } from "@vibevalley/protocol";
+import { NOTE_TYPE_SPECS, type NoteType } from "@vibevalley/protocol";
 
 import type { IconName } from "../../design/icons";
 import { spelled } from "../../infra/base/search";
 import type { QueryClient } from "../../infra/query";
 import type { RouterController } from "../../infra/router/context";
 import type { TemplateCategory } from "../../infra/state/contentNav";
-import { artifactHref, artifactTypeIcon, artifactTypeLabel, BOARD_FILE_PATH, buildOutlineFromMarkdown, createTypedArtifact } from "../artifact";
+import { buildDocFromMarkdown } from "../note/html";
+import { noteHref, noteTypeIcon, noteTypeLabel } from "../note/NoteCard";
+import { createTypedNote } from "../note/store";
 import {
   buildDeliverableSeedFiles,
   buildWhiteboardDocument,
@@ -17,7 +19,18 @@ import {
 } from "./templateSeeds";
 
 type AiMediaMakeTab = "image" | "speech" | "audio";
-type DeliverableArtifactType = Exclude<ArtifactType, "outline" | "whiteboard">;
+
+export type DeliverablePreviewKind =
+  | "design-system"
+  | "dashboard"
+  | "slides"
+  | "design"
+  | "motion"
+  | "prototype"
+  | "diagram"
+  | "sheet"
+  | "storyboard"
+  | "document";
 
 type DeliverableTemplateKey =
   | "artDocs"
@@ -68,595 +81,695 @@ interface TemplateBase {
 }
 
 export type ContentTemplate =
-  | (TemplateBase & { readonly kind: "note"; readonly variant: NoteTemplateVariant; readonly icon: IconName })
-  | (TemplateBase & { readonly kind: "whiteboard"; readonly variant: WhiteboardTemplateVariant })
+  | (TemplateBase & { readonly kind: "note"; readonly noteType: "doc"; readonly variant: NoteTemplateVariant; readonly icon: IconName })
+  | (TemplateBase & { readonly kind: "whiteboard"; readonly noteType: "canvas"; readonly variant: WhiteboardTemplateVariant })
   | (TemplateBase & {
       readonly kind: "deliverable";
-      readonly artifactType: DeliverableArtifactType;
+      readonly noteType: NoteType;
+      readonly previewShape: DeliverablePreviewKind;
       readonly seed?: DeliverableTemplateSeed;
       readonly icon?: IconName;
     })
   | (TemplateBase & { readonly kind: "ai"; readonly makeTab: AiMediaMakeTab; readonly icon: IconName });
 
-export const TEMPLATE_CATEGORIES: readonly TemplateCategory[] = ["recommended", "apps", "engineering", "note", "whiteboard", "deliverable", "ai"];
+export const TEMPLATE_CATEGORIES: readonly TemplateCategory[] = ["recommended", "apps", "engineering", "doc", "base", "canvas", "media", "ai"];
 
-const DELIVERABLE_TEMPLATE_META: Record<DeliverableArtifactType, { readonly id: string; readonly key: DeliverableTemplateKey; readonly recommended: boolean }> =
+const GENERIC_DELIVERABLE_TEMPLATES: readonly ContentTemplate[] = [
+  { id: "tpl-art-docs", key: "artDocs", category: "doc", recommended: true, kind: "deliverable", noteType: "doc", previewShape: "document", icon: "artifacts" },
+  { id: "tpl-art-slides", key: "artSlides", category: "doc", recommended: true, kind: "deliverable", noteType: "doc", previewShape: "slides", icon: "present" },
   {
-    docs: { id: "tpl-art-docs", key: "artDocs", recommended: true },
-    slides: { id: "tpl-art-slides", key: "artSlides", recommended: true },
-    dashboard: { id: "tpl-art-dashboard", key: "artDashboard", recommended: false },
-    design: { id: "tpl-art-design", key: "artDesign", recommended: false },
-    "design-system": { id: "tpl-art-design-system", key: "artDesignSystem", recommended: false },
-    motion: { id: "tpl-art-motion", key: "artMotion", recommended: false },
-    prototype: { id: "tpl-art-prototype", key: "artHtml", recommended: false },
-    sheet: { id: "tpl-art-sheet", key: "artSheet", recommended: false },
-    diagram: { id: "tpl-art-diagram", key: "artDiagram", recommended: false },
-    storyboard: { id: "tpl-art-storyboard", key: "artStoryboard", recommended: false },
-  };
-
-const isDeliverableArtifactType = (type: ArtifactType): type is DeliverableArtifactType => type !== "outline" && type !== "whiteboard";
-
-const GENERIC_DELIVERABLE_TEMPLATES: readonly ContentTemplate[] = ARTIFACT_TYPES.filter(isDeliverableArtifactType).map((artifactType) => ({
-  id: DELIVERABLE_TEMPLATE_META[artifactType].id,
-  key: DELIVERABLE_TEMPLATE_META[artifactType].key,
-  category: "deliverable",
-  recommended: DELIVERABLE_TEMPLATE_META[artifactType].recommended,
-  kind: "deliverable",
-  artifactType,
-}));
+    id: "tpl-art-dashboard",
+    key: "artDashboard",
+    category: "doc",
+    recommended: false,
+    kind: "deliverable",
+    noteType: "doc",
+    previewShape: "dashboard",
+    icon: "catalog",
+  },
+  {
+    id: "tpl-art-design",
+    key: "artDesign",
+    category: "canvas",
+    recommended: false,
+    kind: "deliverable",
+    noteType: "canvas",
+    previewShape: "design",
+    icon: "devices",
+  },
+  {
+    id: "tpl-art-design-system",
+    key: "artDesignSystem",
+    category: "canvas",
+    recommended: false,
+    kind: "deliverable",
+    noteType: "canvas",
+    previewShape: "design-system",
+    icon: "appearance",
+  },
+  {
+    id: "tpl-art-motion",
+    key: "artMotion",
+    category: "media",
+    recommended: false,
+    kind: "deliverable",
+    noteType: "media",
+    previewShape: "motion",
+    icon: "video",
+  },
+  {
+    id: "tpl-art-prototype",
+    key: "artHtml",
+    category: "doc",
+    recommended: false,
+    kind: "deliverable",
+    noteType: "doc",
+    previewShape: "prototype",
+    icon: "web",
+  },
+  { id: "tpl-art-sheet", key: "artSheet", category: "base", recommended: false, kind: "deliverable", noteType: "base", previewShape: "sheet", icon: "log" },
+  {
+    id: "tpl-art-diagram",
+    key: "artDiagram",
+    category: "doc",
+    recommended: false,
+    kind: "deliverable",
+    noteType: "doc",
+    previewShape: "diagram",
+    icon: "branch",
+  },
+  {
+    id: "tpl-art-storyboard",
+    key: "artStoryboard",
+    category: "media",
+    recommended: false,
+    kind: "deliverable",
+    noteType: "media",
+    previewShape: "storyboard",
+    icon: "image",
+  },
+];
 
 const ENGINEERING_DELIVERABLE_TEMPLATES: readonly ContentTemplate[] = [
   {
     id: "tpl-doc-rfc",
     key: "docRfc",
-    category: "deliverable",
+    category: "doc",
     recommended: true,
     engineering: true,
     tags: ["rfc", "design", "spec", "architecture", "proposal"],
     kind: "deliverable",
-    artifactType: "docs",
+    noteType: "doc",
+    previewShape: "document",
     seed: "docRfc",
     icon: "file",
   },
   {
     id: "tpl-doc-adr",
     key: "docAdr",
-    category: "deliverable",
+    category: "doc",
     recommended: true,
     engineering: true,
     tags: ["adr", "architecture", "decision", "tradeoff"],
     kind: "deliverable",
-    artifactType: "docs",
+    noteType: "doc",
+    previewShape: "document",
     seed: "docAdr",
     icon: "branch",
   },
   {
     id: "tpl-doc-postmortem",
     key: "docPostmortem",
-    category: "deliverable",
+    category: "doc",
     recommended: true,
     engineering: true,
     tags: ["postmortem", "incident", "sev", "root-cause", "rca"],
     kind: "deliverable",
-    artifactType: "docs",
+    noteType: "doc",
+    previewShape: "document",
     seed: "docPostmortem",
     icon: "warn",
   },
   {
     id: "tpl-doc-api-spec",
     key: "docApiSpec",
-    category: "deliverable",
+    category: "doc",
     recommended: false,
     engineering: true,
     tags: ["api", "http", "rest", "contract", "schema", "openapi"],
     kind: "deliverable",
-    artifactType: "docs",
+    noteType: "doc",
+    previewShape: "document",
     seed: "docApiSpec",
     icon: "plug",
   },
   {
     id: "tpl-doc-runbook",
     key: "docRunbook",
-    category: "deliverable",
+    category: "doc",
     recommended: false,
     engineering: true,
     tags: ["runbook", "ops", "sre", "oncall", "rollback"],
     kind: "deliverable",
-    artifactType: "docs",
+    noteType: "doc",
+    previewShape: "document",
     seed: "docRunbook",
     icon: "terminal",
   },
   {
     id: "tpl-doc-security",
     key: "docSecurity",
-    category: "deliverable",
+    category: "doc",
     recommended: false,
     engineering: true,
     tags: ["security", "stride", "threat", "auth", "audit"],
     kind: "deliverable",
-    artifactType: "docs",
+    noteType: "doc",
+    previewShape: "document",
     seed: "docSecurity",
     icon: "lock",
   },
   {
     id: "tpl-doc-migration",
     key: "docMigration",
-    category: "deliverable",
+    category: "doc",
     recommended: false,
     engineering: true,
     tags: ["migration", "database", "sql", "schema", "backfill"],
     kind: "deliverable",
-    artifactType: "docs",
+    noteType: "doc",
+    previewShape: "document",
     seed: "docMigration",
     icon: "copy",
   },
   {
     id: "tpl-doc-perf",
     key: "docPerf",
-    category: "deliverable",
+    category: "doc",
     recommended: false,
     engineering: true,
     tags: ["performance", "benchmark", "latency", "p99", "qps", "flamegraph"],
     kind: "deliverable",
-    artifactType: "docs",
+    noteType: "doc",
+    previewShape: "document",
     seed: "docPerf",
     icon: "bolt",
   },
   {
     id: "tpl-diag-microservices",
     key: "diagMicroservices",
-    category: "deliverable",
+    category: "doc",
     recommended: true,
     engineering: true,
     tags: ["microservices", "topology", "architecture", "gateway"],
     kind: "deliverable",
-    artifactType: "diagram",
+    noteType: "doc",
+    previewShape: "diagram",
     seed: "diagMicroservices",
     icon: "devices",
   },
   {
     id: "tpl-diag-sequence",
     key: "diagSequence",
-    category: "deliverable",
+    category: "doc",
     recommended: true,
     engineering: true,
     tags: ["sequence", "flow", "rpc", "request", "outbox"],
     kind: "deliverable",
-    artifactType: "diagram",
+    noteType: "doc",
+    previewShape: "diagram",
     seed: "diagSequence",
     icon: "send",
   },
   {
     id: "tpl-diag-erd",
     key: "diagErd",
-    category: "deliverable",
+    category: "doc",
     recommended: false,
     engineering: true,
     tags: ["er", "erd", "database", "schema", "sql", "entity"],
     kind: "deliverable",
-    artifactType: "diagram",
+    noteType: "doc",
+    previewShape: "diagram",
     seed: "diagErd",
     icon: "folder",
   },
   {
     id: "tpl-diag-cicd",
     key: "diagCicd",
-    category: "deliverable",
+    category: "doc",
     recommended: false,
     engineering: true,
     tags: ["ci", "cd", "cicd", "pipeline", "deploy", "canary"],
     kind: "deliverable",
-    artifactType: "diagram",
+    noteType: "doc",
+    previewShape: "diagram",
     seed: "diagCicd",
     icon: "bolt",
   },
   {
     id: "tpl-diag-statemachine",
     key: "diagStateMachine",
-    category: "deliverable",
+    category: "doc",
     recommended: false,
     engineering: true,
     tags: ["fsm", "state", "machine", "lifecycle", "transition"],
     kind: "deliverable",
-    artifactType: "diagram",
+    noteType: "doc",
+    previewShape: "diagram",
     seed: "diagStateMachine",
     icon: "branch",
   },
   {
     id: "tpl-sheet-benchmark",
     key: "sheetBenchmark",
-    category: "deliverable",
+    category: "base",
     recommended: true,
     engineering: true,
     tags: ["benchmark", "qps", "p99", "latency", "memory", "sheet"],
     kind: "deliverable",
-    artifactType: "sheet",
+    noteType: "base",
+    previewShape: "sheet",
     seed: "sheetBenchmark",
     icon: "bolt",
   },
   {
     id: "tpl-sheet-tech-matrix",
     key: "sheetTechMatrix",
-    category: "deliverable",
+    category: "base",
     recommended: false,
     engineering: true,
     tags: ["matrix", "evaluation", "tradeoff", "comparison", "scoring"],
     kind: "deliverable",
-    artifactType: "sheet",
+    noteType: "base",
+    previewShape: "sheet",
     seed: "sheetTechMatrix",
     icon: "filter",
   },
   {
     id: "tpl-sheet-test-matrix",
     key: "sheetTestMatrix",
-    category: "deliverable",
+    category: "base",
     recommended: false,
     engineering: true,
     tags: ["qa", "test", "regression", "matrix", "coverage"],
     kind: "deliverable",
-    artifactType: "sheet",
+    noteType: "base",
+    previewShape: "sheet",
     seed: "sheetTestMatrix",
     icon: "ticked",
   },
   {
     id: "tpl-sheet-api-inventory",
     key: "sheetApiInventory",
-    category: "deliverable",
+    category: "base",
     recommended: false,
     engineering: true,
     tags: ["api", "inventory", "endpoints", "rate-limit", "auth"],
     kind: "deliverable",
-    artifactType: "sheet",
+    noteType: "base",
+    previewShape: "sheet",
     seed: "sheetApiInventory",
     icon: "plug",
   },
   {
     id: "tpl-dash-slo",
     key: "dashSlo",
-    category: "deliverable",
+    category: "doc",
     recommended: true,
     engineering: true,
     tags: ["slo", "sla", "sli", "reliability", "error-budget", "dashboard"],
     kind: "deliverable",
-    artifactType: "dashboard",
+    noteType: "doc",
+    previewShape: "dashboard",
     seed: "dashSlo",
     icon: "bolt",
   },
   {
     id: "tpl-dash-dora",
     key: "dashDora",
-    category: "deliverable",
+    category: "doc",
     recommended: false,
     engineering: true,
     tags: ["dora", "metrics", "mttr", "lead-time", "deploy"],
     kind: "deliverable",
-    artifactType: "dashboard",
+    noteType: "doc",
+    previewShape: "dashboard",
     seed: "dashDora",
     icon: "calendar",
   },
   {
     id: "tpl-slides-arch-review",
     key: "slidesArchReview",
-    category: "deliverable",
+    category: "doc",
     recommended: false,
     engineering: true,
     tags: ["slides", "architecture", "review", "deck"],
     kind: "deliverable",
-    artifactType: "slides",
+    noteType: "doc",
+    previewShape: "slides",
     seed: "slidesArchReview",
     icon: "present",
   },
   {
     id: "tpl-slides-release-demo",
     key: "slidesReleaseDemo",
-    category: "deliverable",
+    category: "doc",
     recommended: false,
     engineering: true,
     tags: ["slides", "demo", "release", "tech-talk"],
     kind: "deliverable",
-    artifactType: "slides",
+    noteType: "doc",
+    previewShape: "slides",
     seed: "slidesReleaseDemo",
     icon: "present",
   },
   {
     id: "tpl-proto-api-playground",
     key: "protoApiPlayground",
-    category: "deliverable",
+    category: "doc",
     recommended: false,
     engineering: true,
     standaloneApp: true,
     tags: ["api", "json", "curl", "sandbox", "schema", "prototype"],
     kind: "deliverable",
-    artifactType: "prototype",
+    noteType: "doc",
+    previewShape: "prototype",
     seed: "protoApiPlayground",
     icon: "web",
   },
   {
     id: "tpl-proto-component-lab",
     key: "protoComponentLab",
-    category: "deliverable",
+    category: "doc",
     recommended: false,
     engineering: true,
     standaloneApp: true,
     tags: ["ui", "component", "states", "theme", "sandbox", "prototype"],
     kind: "deliverable",
-    artifactType: "prototype",
+    noteType: "doc",
+    previewShape: "prototype",
     seed: "protoComponentLab",
     icon: "devices",
   },
   {
     id: "tpl-proto-focus-studio",
     key: "protoFocusStudio",
-    category: "deliverable",
+    category: "doc",
     recommended: true,
     standaloneApp: true,
     tags: ["pomodoro", "focus", "timer", "ambient", "app", "prototype"],
     kind: "deliverable",
-    artifactType: "prototype",
+    noteType: "doc",
+    previewShape: "prototype",
     seed: "protoFocusStudio",
     icon: "clock",
   },
   {
     id: "tpl-proto-synth-pad",
     key: "protoSynthPad",
-    category: "deliverable",
+    category: "doc",
     recommended: true,
     standaloneApp: true,
     tags: ["synth", "audio", "drum", "sequencer", "music", "app"],
     kind: "deliverable",
-    artifactType: "prototype",
+    noteType: "doc",
+    previewShape: "prototype",
     seed: "protoSynthPad",
     icon: "audio",
   },
   {
     id: "tpl-proto-particle-lab",
     key: "protoParticleLab",
-    category: "deliverable",
+    category: "doc",
     recommended: true,
     standaloneApp: true,
     tags: ["particle", "generative", "canvas", "shader", "art", "app"],
     kind: "deliverable",
-    artifactType: "prototype",
+    noteType: "doc",
+    previewShape: "prototype",
     seed: "protoParticleLab",
     icon: "bolt",
   },
   {
     id: "tpl-proto-token-calculator",
     key: "protoTokenCalculator",
-    category: "deliverable",
+    category: "doc",
     recommended: false,
     engineering: true,
     standaloneApp: true,
     tags: ["ai", "token", "cost", "pricing", "simulator", "app"],
     kind: "deliverable",
-    artifactType: "prototype",
+    noteType: "doc",
+    previewShape: "prototype",
     seed: "protoTokenCalculator",
     icon: "spend",
   },
   {
     id: "tpl-proto-css-glass-studio",
     key: "protoCssGlassStudio",
-    category: "deliverable",
+    category: "doc",
     recommended: false,
     standaloneApp: true,
     tags: ["css", "glass", "blur", "gradient", "design", "app"],
     kind: "deliverable",
-    artifactType: "prototype",
+    noteType: "doc",
+    previewShape: "prototype",
     seed: "protoCssGlassStudio",
     icon: "appearance",
   },
   {
     id: "tpl-proto-desk-kanban",
     key: "protoDeskKanban",
-    category: "deliverable",
+    category: "doc",
     recommended: false,
     standaloneApp: true,
     tags: ["kanban", "todo", "board", "productivity", "app"],
     kind: "deliverable",
-    artifactType: "prototype",
+    noteType: "doc",
+    previewShape: "prototype",
     seed: "protoDeskKanban",
     icon: "issues",
   },
   {
     id: "tpl-design-workspace-ui",
     key: "designWorkspaceUi",
-    category: "deliverable",
+    category: "canvas",
     recommended: true,
     tags: ["design", "ui", "artboard", "responsive", "props"],
     kind: "deliverable",
-    artifactType: "design",
+    noteType: "canvas",
+    previewShape: "design",
     seed: "designWorkspaceUi",
     icon: "devices",
   },
   {
     id: "tpl-ds-papertrails",
     key: "dsPapertrails",
-    category: "deliverable",
+    category: "canvas",
     recommended: false,
     tags: ["design-system", "tokens", "palette", "components"],
     kind: "deliverable",
-    artifactType: "design-system",
+    noteType: "canvas",
+    previewShape: "design-system",
     seed: "dsPapertrails",
     icon: "appearance",
   },
   {
     id: "tpl-motion-launch-reel",
     key: "motionLaunchReel",
-    category: "deliverable",
+    category: "media",
     recommended: true,
     tags: ["motion", "animation", "reel", "timeline"],
     kind: "deliverable",
-    artifactType: "motion",
+    noteType: "media",
+    previewShape: "motion",
     seed: "motionLaunchReel",
     icon: "play",
   },
   {
     id: "tpl-storyboard-product-film",
     key: "storyboardProductFilm",
-    category: "deliverable",
+    category: "media",
     recommended: false,
     tags: ["storyboard", "film", "shots", "script"],
     kind: "deliverable",
-    artifactType: "storyboard",
+    noteType: "media",
+    previewShape: "storyboard",
     seed: "storyboardProductFilm",
     icon: "video",
   },
 ];
 
 export const CONTENT_TEMPLATES: readonly ContentTemplate[] = [
-  { id: "tpl-note-blank", key: "noteBlank", category: "note", recommended: true, icon: "notes", kind: "note", variant: "blank" },
+  { id: "tpl-note-blank", key: "noteBlank", category: "doc", recommended: true, icon: "notes", kind: "note", noteType: "doc", variant: "blank" },
   {
     id: "tpl-note-tech",
     key: "noteTech",
-    category: "note",
+    category: "doc",
     recommended: true,
     engineering: true,
     tags: ["tech", "spec", "design"],
     icon: "issues",
     kind: "note",
+    noteType: "doc",
     variant: "tech",
   },
-  { id: "tpl-note-meeting", key: "noteMeeting", category: "note", recommended: false, icon: "chat", kind: "note", variant: "meeting" },
-  { id: "tpl-note-daily", key: "noteDaily", category: "note", recommended: false, icon: "calendar", kind: "note", variant: "daily" },
+  { id: "tpl-note-meeting", key: "noteMeeting", category: "doc", recommended: false, icon: "chat", kind: "note", noteType: "doc", variant: "meeting" },
+  { id: "tpl-note-daily", key: "noteDaily", category: "doc", recommended: false, icon: "calendar", kind: "note", noteType: "doc", variant: "daily" },
   {
     id: "tpl-note-pr-review",
     key: "notePrReview",
-    category: "note",
+    category: "doc",
     recommended: false,
     engineering: true,
     tags: ["pr", "code-review", "checklist"],
     icon: "diff",
     kind: "note",
+    noteType: "doc",
     variant: "prReview",
   },
   {
     id: "tpl-note-debug",
     key: "noteDebug",
-    category: "note",
+    category: "doc",
     recommended: false,
     engineering: true,
     tags: ["debug", "bug", "root-cause", "triage"],
     icon: "bug",
     kind: "note",
+    noteType: "doc",
     variant: "debug",
   },
   {
     id: "tpl-note-release",
     key: "noteRelease",
-    category: "note",
+    category: "doc",
     recommended: true,
     engineering: true,
     tags: ["release", "deploy", "canary", "rollback"],
     icon: "check",
     kind: "note",
+    noteType: "doc",
     variant: "release",
   },
   {
     id: "tpl-note-oncall",
     key: "noteOncall",
-    category: "note",
+    category: "doc",
     recommended: false,
     engineering: true,
     tags: ["oncall", "handoff", "alerts", "sre"],
     icon: "clock",
     kind: "note",
+    noteType: "doc",
     variant: "oncall",
   },
   {
     id: "tpl-note-onboarding",
     key: "noteOnboarding",
-    category: "note",
+    category: "doc",
     recommended: false,
     engineering: true,
     tags: ["onboarding", "codebase", "guide"],
     icon: "folder",
     kind: "note",
+    noteType: "doc",
     variant: "onboarding",
   },
   {
     id: "tpl-note-sprint-retro",
     key: "noteSprintRetro",
-    category: "note",
+    category: "doc",
     recommended: false,
     engineering: true,
     tags: ["retro", "sprint", "debt"],
     icon: "refresh",
     kind: "note",
+    noteType: "doc",
     variant: "sprintRetro",
   },
-  { id: "tpl-wb-blank", key: "wbBlank", category: "whiteboard", recommended: true, kind: "whiteboard", variant: "blank" },
+  { id: "tpl-wb-blank", key: "wbBlank", category: "canvas", recommended: true, kind: "whiteboard", noteType: "canvas", variant: "blank" },
   {
     id: "tpl-wb-arch",
     key: "wbArch",
-    category: "whiteboard",
+    category: "canvas",
     recommended: true,
     engineering: true,
     tags: ["architecture", "system", "whiteboard"],
     kind: "whiteboard",
+    noteType: "canvas",
     variant: "arch",
   },
   {
     id: "tpl-wb-timeline",
     key: "wbTimeline",
-    category: "whiteboard",
+    category: "canvas",
     recommended: false,
     kind: "whiteboard",
+    noteType: "canvas",
     variant: "timeline",
   },
   {
     id: "tpl-wb-journey",
     key: "wbJourney",
-    category: "whiteboard",
+    category: "canvas",
     recommended: false,
     kind: "whiteboard",
+    noteType: "canvas",
     variant: "journey",
   },
   {
     id: "tpl-wb-workshop",
     key: "wbWorkshop",
-    category: "whiteboard",
+    category: "canvas",
     recommended: false,
     kind: "whiteboard",
+    noteType: "canvas",
     variant: "workshop",
   },
   {
     id: "tpl-wb-event-storming",
     key: "wbEventStorming",
-    category: "whiteboard",
+    category: "canvas",
     recommended: false,
     engineering: true,
     tags: ["ddd", "event-storming", "domain", "cqrs"],
     kind: "whiteboard",
+    noteType: "canvas",
     variant: "eventStorming",
   },
   {
     id: "tpl-wb-c4",
     key: "wbC4",
-    category: "whiteboard",
+    category: "canvas",
     recommended: false,
     engineering: true,
     tags: ["c4", "container", "architecture", "gateway"],
     kind: "whiteboard",
+    noteType: "canvas",
     variant: "c4",
   },
   {
     id: "tpl-wb-incident-map",
     key: "wbIncidentMap",
-    category: "whiteboard",
+    category: "canvas",
     recommended: false,
     engineering: true,
     tags: ["incident", "rca", "debug", "triage"],
     kind: "whiteboard",
+    noteType: "canvas",
     variant: "incidentMap",
   },
   {
     id: "tpl-wb-tradeoff",
     key: "wbTradeoff",
-    category: "whiteboard",
+    category: "canvas",
     recommended: false,
     engineering: true,
     tags: ["tradeoff", "crdt", "ot", "decision"],
     kind: "whiteboard",
+    noteType: "canvas",
     variant: "tradeoff",
   },
   ...GENERIC_DELIVERABLE_TEMPLATES,
@@ -666,14 +779,12 @@ export const CONTENT_TEMPLATES: readonly ContentTemplate[] = [
   { id: "tpl-ai-audio", key: "aiAudio", category: "ai", recommended: false, icon: "audio", kind: "ai", makeTab: "audio" },
 ];
 
-export function templateArtifactType(tpl: ContentTemplate): ArtifactType | undefined {
+export function templateNoteType(tpl: ContentTemplate): NoteType | undefined {
   switch (tpl.kind) {
     case "note":
-      return "outline";
     case "whiteboard":
-      return "whiteboard";
     case "deliverable":
-      return tpl.artifactType;
+      return tpl.noteType;
     case "ai":
       return undefined;
   }
@@ -685,9 +796,9 @@ export function templateIcon(tpl: ContentTemplate): IconName {
     case "ai":
       return tpl.icon;
     case "whiteboard":
-      return artifactTypeIcon.whiteboard;
+      return noteTypeIcon.canvas;
     case "deliverable":
-      return tpl.icon ?? artifactTypeIcon[tpl.artifactType];
+      return tpl.icon ?? noteTypeIcon[tpl.noteType];
   }
 }
 
@@ -698,11 +809,9 @@ export const templateDesc = (tpl: ContentTemplate): string => t(`web.library.con
 export function templateBadge(tpl: ContentTemplate): string {
   switch (tpl.kind) {
     case "note":
-      return artifactTypeLabel("outline");
     case "whiteboard":
-      return artifactTypeLabel("whiteboard");
     case "deliverable":
-      return artifactTypeLabel(tpl.artifactType);
+      return noteTypeLabel(tpl.noteType);
     case "ai":
       return t("web.library.content.templates.cat.ai");
   }
@@ -737,26 +846,28 @@ export async function createFromTemplate(
   switch (tpl.kind) {
     case "note": {
       const title = uniqueNoteTitle(baseTitle, deps.existingNoteTitles);
-      const outlineJson = `${JSON.stringify(buildOutlineFromMarkdown(title, noteStarterMarkdown(tpl.variant)), null, 2)}\n`;
-      const made = await createTypedArtifact("outline", title, { content: outlineJson });
-      await deps.queries.invalidate({ prefix: ["artifacts"] });
-      deps.router.navigate(artifactHref(made.id));
+      const docJson = `${JSON.stringify(buildDocFromMarkdown(title, noteStarterMarkdown(tpl.variant)), null, 2)}\n`;
+      const made = await createTypedNote("doc", title, {
+        files: [{ path: "structure/doc.json", content: docJson, mime: "application/json" }],
+      });
+      await deps.queries.invalidate({ prefix: ["notes"] });
+      deps.router.navigate(noteHref(made.id));
       return;
     }
     case "whiteboard": {
       const boardDoc = buildWhiteboardDocument(tpl.variant);
-      const made = await createTypedArtifact("whiteboard", baseTitle, {
-        files: [{ path: BOARD_FILE_PATH, content: `${JSON.stringify(boardDoc, null, 2)}\n`, mime: "application/json" }],
+      const made = await createTypedNote("canvas", baseTitle, {
+        files: [{ path: NOTE_TYPE_SPECS.canvas.entryPath, content: `${JSON.stringify(boardDoc, null, 2)}\n`, mime: "application/json" }],
       });
-      await deps.queries.invalidate({ prefix: ["artifacts"] });
-      deps.router.navigate(artifactHref(made.id));
+      await deps.queries.invalidate({ prefix: ["notes"] });
+      deps.router.navigate(noteHref(made.id));
       return;
     }
     case "deliverable": {
       const files = tpl.seed ? buildDeliverableSeedFiles(tpl.seed, baseTitle) : undefined;
-      const made = await createTypedArtifact(tpl.artifactType, baseTitle, files ? { files } : undefined);
-      await deps.queries.invalidate({ prefix: ["artifacts"] });
-      deps.router.navigate(artifactHref(made.id));
+      const made = await createTypedNote(tpl.noteType, baseTitle, files ? { files } : undefined);
+      await deps.queries.invalidate({ prefix: ["notes"] });
+      deps.router.navigate(noteHref(made.id));
       return;
     }
     case "ai": {

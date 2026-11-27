@@ -8,10 +8,10 @@ import {
   type AppletInstallInput,
   AppletOpenResult,
   AppletRemoveResult,
-  ArtifactAppletInfo,
   CommandLineState,
   HostCapturedImage,
   MotionChoice,
+  NoteAppletInfo,
   ThemeChoice,
 } from "@vibevalley/protocol/host";
 import { DesktopConnectionSnapshot as DesktopConnectionSnapshotSchema, EnvelopeSchema, sliceDecoders } from "@vibevalley/protocol/schema";
@@ -304,7 +304,7 @@ const AssetsDirSchema = z.object({ path: z.string() });
 const PickFileSchema = z.object({ path: z.string(), name: z.string(), type: z.string() }).nullable();
 const PickFolderSchema = z.object({ path: z.string(), name: z.string(), git: z.boolean() }).nullable();
 const ReadFileSchema = z.object({ data: z.string(), type: z.string(), name: z.string() });
-const AppletListSchema = z.array(ArtifactAppletInfo);
+const AppletListSchema = z.array(NoteAppletInfo);
 
 const VdpEndpointInfoSchema = z.object({
   protocolVersion: z.string(),
@@ -371,9 +371,9 @@ export const hostApi = {
   cliInstall: () => callDecoded("host.cliInstall", null, CommandLineState),
   cliRemove: () => callDecoded("host.cliRemove", null, CommandLineState),
   appletList: () => callDecoded("host.appletList", null, AppletListSchema),
-  appletInstall: (input: AppletInstallInput) => callDecoded("host.appletInstall", input, ArtifactAppletInfo),
-  appletUninstall: (artifactId: string) => callDecoded("host.appletUninstall", { artifactId }, AppletRemoveResult),
-  appletOpen: (artifactId: string) => callDecoded("host.appletOpen", { artifactId }, AppletOpenResult),
+  appletInstall: (input: AppletInstallInput) => callDecoded("host.appletInstall", input, NoteAppletInfo),
+  appletUninstall: (noteId: string) => callDecoded("host.appletUninstall", { noteId }, AppletRemoveResult),
+  appletOpen: (noteId: string) => callDecoded("host.appletOpen", { noteId }, AppletOpenResult),
   captureWebView: (options?: { width?: number; height?: number }) =>
     callDecoded("host.captureWebView", options ?? {}, HostCapturedImage.nullable(), { timeoutMs: 8_000 }),
   vdpDiscover: (extraHomes?: readonly string[]) =>

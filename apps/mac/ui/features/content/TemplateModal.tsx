@@ -1,7 +1,7 @@
 import { computed, Scroll, signal, Text, untracked, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
-import type { ArtifactType } from "@vibevalley/protocol";
+import type { NoteType } from "@vibevalley/protocol";
 
 import { createAct } from "../../design/act";
 import { Dialog } from "../../design/Dialog";
@@ -14,18 +14,19 @@ import { mix } from "../../design/tone";
 import { ready, useQueryClient } from "../../infra/query";
 import { useRouter } from "../../infra/router";
 import { closeTemplatePicker, type TemplateCategory, templatePickerState } from "../../infra/state/contentNav";
-import { artifactTypeLabel, useArtifacts } from "../artifact";
+import { noteTypeLabel, useNotes } from "../note";
 import {
   CONTENT_TEMPLATES,
   type ContentTemplate,
   createFromTemplate,
+  type DeliverablePreviewKind,
   TEMPLATE_CATEGORIES,
-  templateArtifactType,
   templateBadge,
   templateDesc,
   templateIcon,
   templateMatchesQuery,
   templateName,
+  templateNoteType,
 } from "./templates";
 
 export function TemplateModal() {
@@ -40,23 +41,35 @@ export function TemplateModal() {
       scroll={false}
       testid="content-template-modal"
     >
-      <If when={state()}>
-        {(s) => <TemplateModalBody initialCategory={untracked(() => s().category)} initialArtifactType={untracked(() => s().artifactType)} />}
-      </If>
+      <If when={state()}>{(s) => <TemplateModalBody initialCategory={untracked(() => s().category)} initialNoteType={untracked(() => s().noteType)} />}</If>
     </Dialog>
   );
 }
 
-type TemplateTab = TemplateCategory | `type:${ArtifactType}`;
+type TemplateTab = TemplateCategory;
 
-function TemplateModalBody(props: { initialCategory: TemplateCategory; initialArtifactType?: ArtifactType | undefined }) {
+function categoryLabel(c: TemplateCategory): string {
+  switch (c) {
+    case "doc":
+    case "base":
+    case "canvas":
+    case "media":
+      return noteTypeLabel(c);
+    case "recommended":
+    case "apps":
+    case "engineering":
+    case "ai":
+      return t(`web.library.content.templates.cat.${c}`);
+  }
+}
+
+function TemplateModalBody(props: { initialCategory: TemplateCategory; initialNoteType?: NoteType | undefined }) {
   const queries = useQueryClient();
   const router = useRouter();
-  const artifacts = useArtifacts(() => ({}));
+  const notes = useNotes(() => ({}));
   const act = createAct();
-  const scopedType = untracked(() => props.initialArtifactType);
-  const hasTypeTab = scopedType !== undefined && scopedType !== "outline" && scopedType !== "whiteboard";
-  const initialTab: TemplateTab = hasTypeTab ? `type:${scopedType}` : untracked(() => props.initialCategory);
+  const scopedType = untracked(() => props.initialNoteType);
+  const initialTab: TemplateTab = scopedType ?? untracked(() => props.initialCategory);
   const selectedTab = signal<TemplateTab>(initialTab);
   const query = signal("");
 
@@ -66,31 +79,28 @@ function TemplateModalBody(props: { initialCategory: TemplateCategory; initialAr
     return CONTENT_TEMPLATES.filter((tpl) => {
       const catMatch = q
         ? true
-        : hasTypeTab && tab === `type:${scopedType}`
-          ? templateArtifactType(tpl) === scopedType
-          : tab === "recommended"
-            ? tpl.recommended
-            : tab === "apps"
-              ? tpl.standaloneApp === true
-              : tab === "engineering"
-                ? tpl.engineering === true
-                : tpl.category === tab;
+        : tab === "recommended"
+          ? tpl.recommended
+          : tab === "apps"
+            ? tpl.standaloneApp === true
+            : tab === "engineering"
+              ? tpl.engineering === true
+              : tab === "ai"
+                ? tpl.category === "ai"
+                : templateNoteType(tpl) === tab;
       if (!catMatch) return false;
       return templateMatchesQuery(tpl, q);
     });
   });
   const hasFiltered = computed(() => filtered().length > 0);
-  const categoryOptions: { value: TemplateTab; label: string }[] = [
-    ...(hasTypeTab ? [{ value: `type:${scopedType}` as TemplateTab, label: artifactTypeLabel(scopedType) }] : []),
-    ...TEMPLATE_CATEGORIES.map((c) => ({
-      value: c as TemplateTab,
-      label: t(`web.library.content.templates.cat.${c}`),
-    })),
-  ];
+  const categoryOptions: { value: TemplateTab; label: string }[] = TEMPLATE_CATEGORIES.map((c) => ({
+    value: c,
+    label: categoryLabel(c),
+  }));
 
   const pick = (tpl: ContentTemplate) => {
     if (act.busy()) return;
-    const existingNoteTitles = (ready(artifacts, undefined) ?? []).filter((a) => a.artifactType === "outline").map((a) => a.title);
+    const existingNoteTitles = (ready(notes, undefined) ?? []).filter((n) => n.noteType === "doc").map((n) => n.title);
     closeTemplatePicker();
     void act.run(() => createFromTemplate(tpl, { queries, router, existingNoteTitles }));
   };
@@ -235,29 +245,8 @@ function TemplatePreview(props: { tpl: ContentTemplate }) {
   );
 }
 
-type DeliverablePreviewKind = "design-system" | "dashboard" | "slides" | "design" | "motion" | "prototype" | "diagram" | "sheet" | "storyboard" | "document";
-
-function deliverablePreviewKind(type: ArtifactType): DeliverablePreviewKind {
-  switch (type) {
-    case "design-system":
-    case "dashboard":
-    case "slides":
-    case "design":
-    case "motion":
-    case "prototype":
-    case "diagram":
-    case "sheet":
-    case "storyboard":
-      return type;
-    case "docs":
-    case "outline":
-    case "whiteboard":
-      return "document";
-  }
-}
-
 function DeliverablePreview(props: { tpl: ContentTemplate }) {
-  const previewKind = () => deliverablePreviewKind(props.tpl.kind === "deliverable" ? props.tpl.artifactType : "docs");
+  const previewKind = (): DeliverablePreviewKind => (props.tpl.kind === "deliverable" ? props.tpl.previewShape : "document");
   return (
     <View class="h-full w-full items-center justify-center">
       <If when={previewKind() === "design-system"}>

@@ -188,7 +188,7 @@ function Creator(props: { saved?: Agent | undefined; start: Agent; all: readonly
                 }}
               />
               <MoreMenu
-                label={t("web.artifact.page.more")}
+                label={t("web.note.page.more")}
                 testid="agent-more"
                 items={[{ key: "delete", label: t("web.agent.remove"), icon: "delete", danger: true, onSelect: () => asking.set(true) }]}
               />

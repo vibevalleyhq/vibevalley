@@ -138,7 +138,7 @@ const sampleSnapshot: DebugSnapshot = {
       channels: 2,
       agents: 4,
       repos: 2,
-      artifacts: 5,
+      notes: 5,
       inbox: 1,
       mediaJobs: 0,
     },
@@ -1142,9 +1142,9 @@ test("DevTools StateCacheTab renders live Loro frontiers, version vectors, and E
           ...sampleSnapshot.stateCache,
           collab: [
             {
-              artifactId: "art-doc-1",
+              noteId: "note-doc-1",
               title: "Architecture Spec",
-              artifactType: "doc",
+              noteType: "doc",
               seq: 42,
               snapshotBytes: 1024,
               frontiers: "1@1234",
@@ -1185,7 +1185,7 @@ test("DevTools StateCacheTab renders live Loro frontiers, version vectors, and E
 
   await app.press("id:devtools-tab-state");
   expect(app.count("id:state-collab-section")).toBe(1);
-  expect(app.count("id:state-collab-art-doc-1")).toBe(1);
+  expect(app.count("id:state-collab-note-doc-1")).toBe(1);
   expect(app.texts()).toContain("Architecture Spec");
   expect(app.texts().some((s) => s.includes("1234:1"))).toBe(true);
   expect(app.texts().some((s) => s.includes("1234=2"))).toBe(true);

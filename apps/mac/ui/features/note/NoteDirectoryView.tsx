@@ -159,7 +159,7 @@ export function NoteDirectoryView(props: NoteDirectoryViewProps) {
   const referencedNotes = computed(() => extractNoteRefs(draftContent()));
 
   return (
-    <View testID="note-files-view" class="min-h-0 min-w-0 flex-1 bg-page">
+    <View testID="note-directory-view" class="min-h-0 min-w-0 flex-1 bg-page">
       <If when={snapshot().error}>{(err) => <Banner edge>{err()}</Banner>}</If>
 
       <View class="min-h-0 min-w-0 flex-1 flex-row">

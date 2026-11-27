@@ -2,7 +2,7 @@ import { Scroll, signal, Text, View, type JSX } from "nsh";
 import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
-import { ARTIFACT_TYPES, type LibraryFileKind, LibraryFileKindValues } from "@vibevalley/protocol";
+import { type LibraryFileKind, LibraryFileKindValues, NOTE_TYPES } from "@vibevalley/protocol";
 
 import { Button } from "../../design/Button";
 import { Icon } from "../../design/Icon";
@@ -15,7 +15,7 @@ import { ready, useQuery } from "../../infra/query";
 import { useLocation, useRouter } from "../../infra/router";
 import { createMemo } from "../../infra/solid";
 import {
-  activeArtifactType,
+  activeNoteType,
   type ContentBucket,
   contentBrowseBucket,
   contentSidebarOpen,
@@ -27,16 +27,16 @@ import {
   templatePickerContextFor,
 } from "../../infra/state/contentNav";
 import { defineStored } from "../../infra/state/stored";
-import { artifactTypeIcon, artifactTypeLabel, useArtifacts, useInstalledApplets } from "../artifact";
 import { libraryQuery } from "../media";
+import { noteTypeIcon, noteTypeLabel, useInstalledApplets, useNotes } from "../note";
 
-const artifactsSectionOpen = defineStored("content.sidebar.artifacts", z.boolean(), true);
+const notesSectionOpen = defineStored("content.sidebar.notes", z.boolean(), true);
 const mediaSectionOpen = defineStored("content.sidebar.media", z.boolean(), true);
 
-const artifactFacets = ARTIFACT_TYPES.map((type) => ({
+const noteFacets = NOTE_TYPES.map((type) => ({
   type,
-  icon: () => artifactTypeIcon[type],
-  label: () => artifactTypeLabel(type),
+  icon: () => noteTypeIcon[type],
+  label: () => noteTypeLabel(type),
 }));
 
 const mediaKinds: readonly LibraryFileKind[] = LibraryFileKindValues;
@@ -58,29 +58,29 @@ const rowClass = (active: boolean, indent = false) =>
 export function ContentSidebar() {
   const router = useRouter();
   const location = useLocation();
-  const showEmptyArtifacts = signal(false);
+  const showEmptyNotes = signal(false);
   const showEmptyMedia = signal(false);
 
-  const artifacts = useArtifacts(() => ({}));
+  const notes = useNotes(() => ({}));
   const media = useQuery(() => libraryQuery({ text: "", sort: "recent" }), { interval: () => 10_000, keepPrevious: true });
   const installedApplets = useInstalledApplets();
 
-  const allArtifacts = createMemo(() => ready(artifacts, undefined) ?? []);
+  const allNotes = createMemo(() => ready(notes, undefined) ?? []);
   const allMedia = createMemo(() => ready(media, undefined) ?? []);
   const installedIds = createMemo(
     () =>
       new Set(
         installedApplets()
           .filter((item) => item.installed)
-          .map((item) => item.artifactId),
+          .map((item) => item.noteId),
       ),
   );
 
   const inBrowse = createMemo(() => location().pathname === "/library" || location().pathname.startsWith("/library/"));
   const bucket = () => contentBrowseBucket();
-  const allArtifactsActive = createMemo(() => {
+  const allNotesActive = createMemo(() => {
     const b = contentBrowseBucket();
-    return inBrowse() && b.kind === "artifacts" && b.artifactType === undefined;
+    return inBrowse() && b.kind === "notes" && b.noteType === undefined;
   });
   const allMediaActive = createMemo(() => {
     const b = contentBrowseBucket();
@@ -89,32 +89,32 @@ export function ContentSidebar() {
 
   const counts = createMemo(() =>
     countContentHub({
-      artifacts: allArtifacts(),
+      notes: allNotes(),
       media: allMedia(),
       pinned: new Set(pinnedKeys()),
-      installedArtifactIds: installedIds(),
+      installedNoteIds: installedIds(),
     }),
   );
 
-  const activeArtifactFilter = createMemo(() => {
+  const activeNoteFilter = createMemo(() => {
     const b = bucket();
-    return inBrowse() && b.kind === "artifacts" ? b.artifactType : undefined;
+    return inBrowse() && b.kind === "notes" ? b.noteType : undefined;
   });
   const activeMediaFilter = createMemo(() => {
     const b = bucket();
     return inBrowse() && b.kind === "media" ? b.fileKind : undefined;
   });
 
-  const visibleArtifactFacets = createMemo(() => {
+  const visibleNoteFacets = createMemo(() => {
     const c = counts();
-    const activeType = activeArtifactFilter();
-    const expanded = showEmptyArtifacts();
-    return artifactFacets.filter((facet) => expanded || facet.type === activeType || countForBucket(c, { kind: "artifacts", artifactType: facet.type }) > 0);
+    const activeType = activeNoteFilter();
+    const expanded = showEmptyNotes();
+    return noteFacets.filter((facet) => expanded || facet.type === activeType || countForBucket(c, { kind: "notes", noteType: facet.type }) > 0);
   });
-  const emptyArtifactFacetCount = createMemo(() => {
+  const emptyNoteFacetCount = createMemo(() => {
     const c = counts();
-    const activeType = activeArtifactFilter();
-    return artifactFacets.filter((facet) => facet.type !== activeType && countForBucket(c, { kind: "artifacts", artifactType: facet.type }) === 0).length;
+    const activeType = activeNoteFilter();
+    return noteFacets.filter((facet) => facet.type !== activeType && countForBucket(c, { kind: "notes", noteType: facet.type }) === 0).length;
   });
 
   const visibleMediaKinds = createMemo(() => {
@@ -154,7 +154,7 @@ export function ContentSidebar() {
           icon="add"
           testID="content-new-btn"
           tooltip={<Bubble text={`${t("web.library.content.new")} (⌘N)`} />}
-          onPress={() => openTemplatePicker(templatePickerContextFor(bucket(), inBrowse() ? undefined : activeArtifactType()))}
+          onPress={() => openTemplatePicker(templatePickerContextFor(bucket(), inBrowse() ? undefined : activeNoteType()))}
         >
           {t("web.library.content.new")}
         </Button>
@@ -204,38 +204,38 @@ export function ContentSidebar() {
         </View>
 
         <NavSection
-          testID="content-nav-artifacts-section"
-          navTestID="content-nav-artifacts-all"
-          toggleTestID="content-nav-artifacts-toggle"
+          testID="content-nav-notes-section"
+          navTestID="content-nav-notes-all"
+          toggleTestID="content-nav-notes-toggle"
           title={t("web.library.content.artifacts")}
-          count={counts().artifacts}
-          active={allArtifactsActive()}
-          open={artifactsSectionOpen.get()}
-          onSelect={() => selectBucket({ kind: "artifacts" })}
-          onToggle={() => artifactsSectionOpen.update((on) => !on)}
+          count={counts().notes}
+          active={allNotesActive()}
+          open={notesSectionOpen.get()}
+          onSelect={() => selectBucket({ kind: "notes" })}
+          onToggle={() => notesSectionOpen.update((on) => !on)}
         >
-          <Each of={visibleArtifactFacets()} key={(facet) => facet.type}>
+          <Each of={visibleNoteFacets()} key={(facet) => facet.type}>
             {(facet) => {
-              const active = () => activeArtifactFilter() === facet().type;
+              const active = () => activeNoteFilter() === facet().type;
               return (
                 <NavRow
-                  testID={`content-nav-artifact-${facet().type}`}
+                  testID={`content-nav-note-${facet().type}`}
                   icon={facet().icon()}
                   label={facet().label()}
-                  count={countForBucket(counts(), { kind: "artifacts", artifactType: facet().type })}
+                  count={countForBucket(counts(), { kind: "notes", noteType: facet().type })}
                   active={active()}
                   indent
-                  onPress={() => selectBucket({ kind: "artifacts", artifactType: facet().type })}
+                  onPress={() => selectBucket({ kind: "notes", noteType: facet().type })}
                 />
               );
             }}
           </Each>
-          <If when={emptyArtifactFacetCount() > 0}>
+          <If when={emptyNoteFacetCount() > 0}>
             <FoldEmptyToggle
-              testID="content-nav-artifacts-more"
-              expanded={showEmptyArtifacts()}
-              hiddenCount={emptyArtifactFacetCount()}
-              onToggle={() => showEmptyArtifacts.set(!showEmptyArtifacts())}
+              testID="content-nav-notes-more"
+              expanded={showEmptyNotes()}
+              hiddenCount={emptyNoteFacetCount()}
+              onToggle={() => showEmptyNotes.set(!showEmptyNotes())}
             />
           </If>
         </NavSection>

@@ -2,8 +2,8 @@ import { computed, effect, Image, signal, Text, View } from "nsh";
 import { Popover } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
-import { type Artifact, type LibraryItem, type MediaJob, userId } from "@vibevalley/protocol";
-import type { ArtifactAppletInfo } from "@vibevalley/protocol/host";
+import { type LibraryItem, type MediaJob, type Note, userId } from "@vibevalley/protocol";
+import type { NoteAppletInfo } from "@vibevalley/protocol/host";
 
 import { Button } from "../../design/Button";
 import { Icon } from "../../design/Icon";
@@ -12,9 +12,9 @@ import { Bubble } from "../../design/Tip";
 import { useAttachmentUrl } from "../../infra/attachmentFile";
 import { useNow } from "../../infra/base/dom";
 import { ago } from "../../infra/base/format";
-import { artifactIcon, kindLabel } from "../artifact";
-import { ArtifactPreview } from "./ArtifactPreview";
+import { kindLabel, noteIcon } from "../note";
 import { durationText, extOf, justify, kindOf, type Placed } from "./items";
+import { NotePreview } from "./NotePreview";
 
 export interface Seen {
   readonly ratio?: number;
@@ -250,56 +250,55 @@ function Tile(props: {
   );
 }
 
-const artifactCardMinWidth = 256;
+const noteCardMinWidth = 256;
 
-export function artifactMetaLine(artifact: Artifact, nowMs: number): string {
-  const parts: string[] = [kindLabel(artifact)];
-  if (artifact.isDefault) parts.push(t("web.artifact.types.defaultBadge"));
-  if (artifact.by !== userId && artifact.byName.trim() !== "") parts.push(artifact.byName);
-  if (artifact.version > 0) parts.push(t("web.library.inspector.versionBadge", { version: artifact.version }));
-  parts.push(ago(artifact.updated, nowMs));
+export function noteMetaLine(note: Note, nowMs: number): string {
+  const parts: string[] = [kindLabel(note)];
+  if (note.by !== userId && note.byName.trim() !== "") parts.push(note.byName);
+  if (note.version > 0) parts.push(t("web.library.inspector.versionBadge", { version: note.version }));
+  parts.push(ago(note.updated, nowMs));
   return parts.join(" · ");
 }
 
-export function ArtifactTiles(props: {
-  artifacts: readonly Artifact[];
+export function NoteTiles(props: {
+  notes: readonly Note[];
   width?: number | undefined;
   onOpen: (id: string) => void;
   isPinned: (id: string) => boolean;
   onTogglePin: (id: string) => void;
-  onDelete?: ((artifact: Artifact) => void) | undefined;
-  installedApplets?: ReadonlyMap<string, ArtifactAppletInfo> | undefined;
+  onDelete?: ((note: Note) => void) | undefined;
+  installedApplets?: ReadonlyMap<string, NoteAppletInfo> | undefined;
   canInstallApplet?: boolean | undefined;
-  onInstallApplet?: ((artifact: Artifact) => void) | undefined;
-  onOpenApplet?: ((artifactId: string) => void) | undefined;
+  onInstallApplet?: ((note: Note) => void) | undefined;
+  onOpenApplet?: ((noteId: string) => void) | undefined;
 }) {
   const now = useNow();
   const cardWidth = computed(() => {
     const w = props.width;
-    if (w === undefined || w <= 0) return artifactCardMinWidth;
-    const cols = Math.max(1, Math.floor((w + tileGap) / (artifactCardMinWidth + tileGap)));
+    if (w === undefined || w <= 0) return noteCardMinWidth;
+    const cols = Math.max(1, Math.floor((w + tileGap) / (noteCardMinWidth + tileGap)));
     return Math.floor((w - tileGap * (cols - 1)) / cols);
   });
   const stageWidth = computed(() => Math.max(0, cardWidth() - 2));
   const stageHeight = computed(() => Math.round((stageWidth() * 10) / 16));
   return (
-    <View testID="library-artifacts" class="flex-row flex-wrap gap-3">
-      <Each of={props.artifacts} key={(a) => a.id}>
-        {(a) => {
-          const pinned = () => props.isPinned(a().id);
-          const installed = () => props.installedApplets?.get(a().id);
+    <View testID="library-notes" class="flex-row flex-wrap gap-3">
+      <Each of={props.notes} key={(n) => n.id}>
+        {(n) => {
+          const pinned = () => props.isPinned(n().id);
+          const installed = () => props.installedApplets?.get(n().id);
           return (
             <View
               role="button"
-              testID={`library-artifact-${a().id}`}
-              accessibilityLabel={a().title}
-              tooltip={<Bubble text={a().title} />}
-              onPress={() => props.onOpen(a().id)}
+              testID={`library-note-${n().id}`}
+              accessibilityLabel={n().title}
+              tooltip={<Bubble text={n().title} />}
+              onPress={() => props.onOpen(n().id)}
               style={{ width: cardWidth() }}
               class="group relative shrink-0 overflow-hidden rounded-lg border border-line bg-page hover:border-faint focus-visible:outline-2 focus-visible:outline-focus"
             >
               <View class="relative overflow-hidden border-b border-line bg-side" style={{ width: stageWidth(), height: stageHeight() }}>
-                <ArtifactPreview artifact={a()} width={stageWidth()} height={stageHeight()} />
+                <NotePreview note={n()} width={stageWidth()} height={stageHeight()} />
                 <View class="absolute top-2 right-2 flex-row items-center gap-1">
                   <If
                     when={installed()}
@@ -307,10 +306,10 @@ export function ArtifactTiles(props: {
                       <If when={props.canInstallApplet === true}>
                         <View
                           role="button"
-                          testID={`library-artifact-install-app-${a().id}`}
-                          accessibilityLabel={t("web.artifact.applet.button")}
-                          tooltip={<Bubble text={t("web.artifact.applet.button")} />}
-                          onPress={() => props.onInstallApplet?.(a())}
+                          testID={`library-note-install-app-${n().id}`}
+                          accessibilityLabel={t("web.note.applet.button")}
+                          tooltip={<Bubble text={t("web.note.applet.button")} />}
+                          onPress={() => props.onInstallApplet?.(n())}
                           class="size-6 shrink-0 items-center justify-center rounded-sm border border-line bg-elevated opacity-0 shadow-raise group-hover:opacity-100 hover:bg-selected focus:opacity-100 focus-visible:outline-2 focus-visible:outline-focus"
                         >
                           <Icon name="devices" size={12} tone="muted" />
@@ -321,30 +320,30 @@ export function ArtifactTiles(props: {
                     {(info) => (
                       <View
                         role="button"
-                        testID={`library-artifact-manage-app-${a().id}`}
-                        accessibilityLabel={t("web.artifact.applet.manageApp")}
-                        tooltip={<Bubble text={`${info().appName} · ${t("web.artifact.applet.manageApp")}`} />}
-                        onPress={() => props.onInstallApplet?.(a())}
+                        testID={`library-note-manage-app-${n().id}`}
+                        accessibilityLabel={t("web.note.applet.manageApp")}
+                        tooltip={<Bubble text={`${info().appName} · ${t("web.note.applet.manageApp")}`} />}
+                        onPress={() => props.onInstallApplet?.(n())}
                         class="size-6 shrink-0 items-center justify-center rounded-sm border border-line bg-elevated opacity-0 shadow-raise group-hover:opacity-100 hover:bg-selected focus:opacity-100 focus-visible:outline-2 focus-visible:outline-focus"
                       >
                         <Icon name="devices" size={12} tone="ok-ink" />
                       </View>
                     )}
                   </If>
-                  <CardPinButton testid={`library-artifact-pin-${a().id}`} pinned={pinned()} elevated onToggle={() => props.onTogglePin(a().id)} />
-                  <If when={props.onDelete}>{(onDel) => <DeleteArtifactButton artifact={a()} onDelete={onDel()} />}</If>
+                  <CardPinButton testid={`library-note-pin-${n().id}`} pinned={pinned()} elevated onToggle={() => props.onTogglePin(n().id)} />
+                  <If when={props.onDelete}>{(onDel) => <DeleteNoteButton note={n()} onDelete={onDel()} />}</If>
                 </View>
               </View>
               <View class="gap-1 px-3 py-2.5">
                 <View class="flex-row items-center gap-1.5">
-                  <Text class="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{a().title}</Text>
+                  <Text class="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{n().title}</Text>
                   <If when={installed()}>
                     <View
                       role="button"
-                      testID={`library-artifact-open-app-${a().id}`}
-                      accessibilityLabel={t("web.artifact.applet.openApp")}
-                      tooltip={<Bubble text={t("web.artifact.applet.openApp")} />}
-                      onPress={() => props.onOpenApplet?.(a().id)}
+                      testID={`library-note-open-app-${n().id}`}
+                      accessibilityLabel={t("web.note.applet.openApp")}
+                      tooltip={<Bubble text={t("web.note.applet.openApp")} />}
+                      onPress={() => props.onOpenApplet?.(n().id)}
                       class="size-6 shrink-0 items-center justify-center rounded-sm border border-line bg-ok-soft hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
                     >
                       <Icon name="open" size={12} tone="ok-ink" />
@@ -352,8 +351,8 @@ export function ArtifactTiles(props: {
                   </If>
                 </View>
                 <View class="flex-row items-center gap-1.5">
-                  <Icon name={artifactIcon(a())} size={12} tone="faint" />
-                  <Text class="min-w-0 flex-1 truncate text-xs text-muted tabular-nums">{artifactMetaLine(a(), now())}</Text>
+                  <Icon name={noteIcon(n())} size={12} tone="faint" />
+                  <Text class="min-w-0 flex-1 truncate text-xs text-muted tabular-nums">{noteMetaLine(n(), now())}</Text>
                 </View>
               </View>
             </View>
@@ -364,7 +363,7 @@ export function ArtifactTiles(props: {
   );
 }
 
-function DeleteArtifactButton(props: { artifact: Artifact; onDelete: (artifact: Artifact) => void }) {
+function DeleteNoteButton(props: { note: Note; onDelete: (note: Note) => void }) {
   const open = signal(false);
   return (
     <Popover
@@ -377,9 +376,9 @@ function DeleteArtifactButton(props: { artifact: Artifact; onDelete: (artifact: 
       trigger={
         <View
           role="button"
-          testID={`library-artifact-delete-${props.artifact.id}`}
-          accessibilityLabel={t("web.artifact.page.delete")}
-          tooltip={<Bubble text={t("web.artifact.page.delete")} />}
+          testID={`library-note-delete-${props.note.id}`}
+          accessibilityLabel={t("web.note.page.delete")}
+          tooltip={<Bubble text={t("web.note.page.delete")} />}
           onPress={() => open.set(true)}
           class={`size-6 shrink-0 items-center justify-center rounded-sm border border-line shadow-raise focus-visible:outline-2 focus-visible:outline-focus ${
             open() ? "bg-bad-soft opacity-100" : "bg-elevated opacity-0 group-hover:opacity-100 hover:bg-bad-soft focus:opacity-100"
@@ -390,7 +389,7 @@ function DeleteArtifactButton(props: { artifact: Artifact; onDelete: (artifact: 
       }
     >
       <View class="gap-2.5">
-        <Text class="text-xs leading-relaxed text-ink">{t("web.artifact.page.deleteAsk", { title: props.artifact.title })}</Text>
+        <Text class="text-xs leading-relaxed text-ink">{t("web.note.page.deleteAsk", { title: props.note.title })}</Text>
         <View class="flex-row items-center justify-end gap-1.5">
           <Button size="compact" tone="quiet" onPress={() => open.set(false)}>
             {t("web.base.form.never")}
@@ -399,14 +398,14 @@ function DeleteArtifactButton(props: { artifact: Artifact; onDelete: (artifact: 
             size="compact"
             tone="danger"
             icon="delete"
-            testID="library-artifact-delete-confirm"
+            testID="library-note-delete-confirm"
             onPress={() => {
-              const target = props.artifact;
+              const target = props.note;
               open.set(false);
               props.onDelete(target);
             }}
           >
-            {t("web.artifact.page.delete")}
+            {t("web.note.page.delete")}
           </Button>
         </View>
       </View>

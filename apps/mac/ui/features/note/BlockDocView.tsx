@@ -287,6 +287,7 @@ export function BlockDocView(props: BlockDocViewProps) {
                     block={b()}
                     allBlocks={blocks()}
                     slideIndices={slideIndices()}
+                    note={props.note}
                     notes={props.notes}
                     issues={props.issues}
                     focusedBlockId={focusedBlockId()}

@@ -46,8 +46,8 @@ const agent = (more: Partial<Agent> & Pick<Agent, "id" | "name">): Agent => ({
   skills: [],
   toolsets:
     more.role === "orchestrator"
-      ? ["issue", "session", "channel", "repo", "cron", "resource", "memory", "media", "library", "artifact"]
-      : ["issue", "session", "channel", "resource", "memory", "library", "artifact"],
+      ? ["issue", "session", "channel", "repo", "cron", "resource", "memory", "media", "library", "note"]
+      : ["issue", "session", "channel", "resource", "memory", "library", "note"],
   mcpServers: [],
   disallowedTools: [],
   env: {},

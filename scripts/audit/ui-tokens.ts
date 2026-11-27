@@ -19,7 +19,7 @@ const EXCLUDE_GLOBS = [
   // GitHub Linguist external programming-language palette.
   "features/repo/repos.ts",
   // Serialized Excalidraw SVG export fills and isolated WebView stylesheet.
-  "features/artifact/WhiteboardView.tsx",
+  "features/note/WhiteboardView.tsx",
   // ISO QR specification requires strict #ffffff / #000000 contrast regardless of theme.
   "design/Qr.tsx",
 ] as const;
@@ -80,10 +80,10 @@ const RULE_EXEMPTIONS: Readonly<Record<string, readonly ViolationRule[]>> = {
   // Third-party WeChat/Feishu/QQ brand stand-ins and QR quiet frame.
   "apps/mac/ui/features/connector/ConnectorsPage.tsx": ["hardcoded-color"],
   // Sandboxed WebView HTML CSS custom properties (--vv-*).
-  "apps/mac/ui/features/artifact/shell.ts": ["hardcoded-color"],
+  "apps/mac/ui/features/note/shell.ts": ["hardcoded-color"],
   // Pure whiteboard SVG illustrations, canvas themes, and WebView runtime stylesheet.
-  "apps/mac/ui/features/artifact/whiteboard.ts": ["hardcoded-color"],
-  // Starter artifact HTML/design JSON seed templates authored for user sandboxes.
+  "apps/mac/ui/features/note/whiteboard.ts": ["hardcoded-color"],
+  // Starter note HTML/design JSON seed templates authored for user sandboxes.
   "apps/mac/ui/features/content/appSeeds.ts": ["hardcoded-color"],
   "apps/mac/ui/features/content/templateSeeds.ts": ["hardcoded-color"],
   "apps/mac/ui/features/content/visualSeeds.ts": ["hardcoded-color"],

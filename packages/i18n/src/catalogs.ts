@@ -210,7 +210,7 @@ export const catalogs = {
         memory: "记忆",
         media: "媒体",
         library: "资料库",
-        artifact: "作品",
+        note: "笔记",
       },
       unreported: "这个引擎不报告这一项。",
       none: "没有。",
@@ -340,7 +340,7 @@ export const catalogs = {
       executionStreaming: "流式文字与说话人",
       partialTitle: "部分转写",
       partialTranscript: "部分转写——并非完整结果。",
-      savePartialTranscript: "将部分转写保存为作品",
+      savePartialTranscript: "将部分转写保存为笔记",
       chooseFile: "选一个音频文件",
       copyTranscript: "复制转写",
       copyPartialTranscript: "复制部分转写",
@@ -349,8 +349,8 @@ export const catalogs = {
       transcribe: "开始转写",
       timeline: "说话人时间轴",
       noTimestamps: "厂商没有返回带时间戳的分段。",
-      saveTranscript: "将转写保存为作品",
-      openTranscript: "打开已保存的转写作品",
+      saveTranscript: "将转写保存为笔记",
+      openTranscript: "打开已保存的转写笔记",
       downloadAudio: "下载音频",
       history: "音频任务",
       empty: "还没有音频任务。",
@@ -779,9 +779,9 @@ export const catalogs = {
         attach: "附上文件",
         uploadFailed: "没传上去：{why}",
         command: "命令",
-        artifactContext: "当前上下文：{title}",
-        artifactSlide: "第 {n} 页",
-        artifactSelected: "已选 {n} 个元素",
+        noteContext: "当前上下文：{title}",
+        noteSlide: "第 {n} 页",
+        noteSelected: "已选 {n} 个元素",
         clearContext: "移除本次附带的上下文",
         runningHint: "正在处理中，可直接补充说明或点击停止",
         dictateStart: "语音输入（MOSS ASR）",
@@ -827,17 +827,17 @@ export const catalogs = {
         markUnread: "从这里标成未读",
         jump: "跳到这条",
         promoteIssue: "转为工单",
-        saveArtifact: "存为作品",
+        saveNote: "存为笔记",
       },
       promote: {
         source: "来自 {where}",
-        saveTitle: "将消息存为作品",
-        artifactTitle: "标题",
-        artifactType: "类型",
-        artifactContent: "内容",
-        artifactSave: "保存作品",
-        artifactSaved: "已存为「{title}」",
-        artifactNote: "存自 {where}",
+        saveTitle: "将消息存为笔记",
+        noteTitle: "标题",
+        noteType: "类型",
+        noteContent: "内容",
+        noteSave: "保存笔记",
+        noteSaved: "已存为「{title}」",
+        noteNote: "存自 {where}",
         fallbackTitle: "第 {number} 条消息",
       },
       switcher: {
@@ -1061,12 +1061,12 @@ export const catalogs = {
         channels: "频道",
         agents: "角色",
         repos: "仓库",
-        artifacts: "作品",
+        notes: "笔记",
         inbox: "收件箱",
         mediaJobs: "媒体",
         emptyCaches: "暂无缓存统计。",
         collab: "Loro 协同与瞬态在场",
-        emptyCollab: "暂无活跃协同作品。",
+        emptyCollab: "暂无活跃协同笔记。",
         frontiers: "Frontiers 前沿",
         presence: "EphemeralStore 在场节点",
         noPeers: "暂无活跃在场节点",
@@ -1797,28 +1797,27 @@ export const catalogs = {
       understood: "理解的结果",
       makeTabs: { image: "生图", speech: "单人语音", audio: "音频工作台" },
       content: {
-        title: "作品",
+        title: "笔记",
         new: "新建",
-        searchAll: "搜索全部作品…",
-        sidebarToggle: "展开或收起作品导航",
+        searchAll: "搜索全部笔记…",
+        sidebarToggle: "展开或收起笔记导航",
         recent: "全部最近",
         pinned: "置顶收藏",
-        pinnedEmpty: "还没有置顶作品。悬停任意作品或素材并点击图钉即可置顶到这里。",
+        pinnedEmpty: "还没有置顶笔记。悬停任意笔记或素材并点击图钉即可置顶到这里。",
         installedApps: "已安装应用",
-        installedAppsEmpty: "还没有安装独立应用。在任意作品卡片或详情右上角点击「安装为应用」，即可把它装成独立的 macOS 桌面应用并在此集中启动与管理。",
+        installedAppsEmpty: "还没有安装独立应用。在任意笔记卡片或详情右上角点击「安装为应用」，即可把它装成独立的 macOS 桌面应用并在此集中启动与管理。",
         pin: "置顶",
         unpin: "取消置顶",
         pinnedToast: "已置顶收藏",
         unpinnedToast: "已取消置顶",
-        artifacts: "作品",
+        artifacts: "笔记",
         media: "素材",
         moreTypes: "更多类型 ({n})",
         fewerTypes: "收起空类型",
-        sendArtifact: "发到频道",
         exportArtifact: "导出",
         turnIntoIssue: "转为工单",
         issueCreated: "已创建工单",
-        artifactType: { all: "全部作品" },
+        artifactType: { all: "全部笔记" },
         inspector: {
           openExternal: "系统打开",
           saveAs: "另存为",
@@ -1828,7 +1827,7 @@ export const catalogs = {
           stopAudio: "停止播放",
         },
         templates: {
-          title: "新建作品",
+          title: "新建笔记",
           search: "搜索模板…",
           searchCount: "找到 {n} 个模板",
           empty: "没有匹配的模板",
@@ -2296,12 +2295,12 @@ export const catalogs = {
           },
         },
         search: {
-          title: "搜索作品",
-          placeholder: "搜索笔记、作品和素材…",
-          empty: "未找到匹配的笔记、作品或素材",
+          title: "搜索笔记",
+          placeholder: "搜索笔记和素材…",
+          empty: "未找到匹配的笔记或素材",
           typeMedia: "素材",
           scopeAll: "全部",
-          scopeArtifacts: "作品",
+          scopeArtifacts: "笔记",
           scopeMedia: "素材",
         },
       },
@@ -2459,7 +2458,7 @@ export const catalogs = {
     },
     "web.note": {
       card: { version: "第 {version} 稿", open: "打开「{title}」" },
-      preview: { blocks: "{n} 个块", slides: "{n} 页", rows: "{n} 行", nodes: "{n} 节点" },
+      preview: { blocks: "{n} 个块", slides: "{n} 页" },
       page: {
         delete: "删掉",
         deleteAsk: "删掉「{title}」？对话里的卡片还在。",
@@ -2476,7 +2475,6 @@ export const catalogs = {
         backToLibrary: "返回笔记列表",
         previewTab: "预览",
         filesTab: "文件",
-        filesTabCount: "文件 ({n})",
         viewMode: "视图模式",
         liveVersion: "实时",
         directory: "目录",
@@ -2532,8 +2530,6 @@ export const catalogs = {
       types: { doc: "块文档", base: "多维库", canvas: "自由画布", media: "媒体记录" },
       timeline: {
         title: "历史记录",
-        show: "打开历史记录",
-        hide: "收起历史记录",
         savedVersions: "已保存版本",
         commits: "变更记录",
         loading: "正在载入历史…",
@@ -4011,7 +4007,7 @@ export const catalogs = {
         memory: "Memory",
         media: "Media",
         library: "Library",
-        artifact: "Artifacts",
+        note: "Notes",
       },
       unreported: "This runtime does not report this.",
       none: "None.",
@@ -4142,7 +4138,7 @@ export const catalogs = {
       executionStreaming: "Streaming text and speakers",
       partialTitle: "Partial transcript",
       partialTranscript: "Partial transcript — not a completed result.",
-      savePartialTranscript: "Save partial transcript as artifact",
+      savePartialTranscript: "Save partial transcript as note",
       chooseFile: "Choose an audio file",
       copyTranscript: "Copy transcript",
       copyPartialTranscript: "Copy partial transcript",
@@ -4151,7 +4147,7 @@ export const catalogs = {
       transcribe: "Start transcription",
       timeline: "Speaker timeline",
       noTimestamps: "The provider returned no timestamped segments.",
-      saveTranscript: "Save transcript as artifact",
+      saveTranscript: "Save transcript as note",
       openTranscript: "Open saved transcript",
       downloadAudio: "Download audio",
       history: "Audio tasks",
@@ -4606,9 +4602,9 @@ export const catalogs = {
         attach: "Attach a file",
         uploadFailed: "Not uploaded: {why}",
         command: "Commands",
-        artifactContext: "Context: {title}",
-        artifactSlide: "Slide {n}",
-        artifactSelected: "{n} selected",
+        noteContext: "Context: {title}",
+        noteSlide: "Slide {n}",
+        noteSelected: "{n} selected",
         clearContext: "Remove attached context",
         runningHint: "Working — send a follow-up or click stop",
         dictateStart: "Voice dictation (MOSS ASR)",
@@ -4654,17 +4650,17 @@ export const catalogs = {
         markUnread: "Mark unread from here",
         jump: "Jump to it",
         promoteIssue: "Promote to ticket",
-        saveArtifact: "Save as artifact",
+        saveNote: "Save as note",
       },
       promote: {
         source: "From {where}",
-        saveTitle: "Save message as artifact",
-        artifactTitle: "Title",
-        artifactType: "Type",
-        artifactContent: "Content",
-        artifactSave: "Save artifact",
-        artifactSaved: 'Saved as "{title}"',
-        artifactNote: "Saved from {where}",
+        saveTitle: "Save message as note",
+        noteTitle: "Title",
+        noteType: "Type",
+        noteContent: "Content",
+        noteSave: "Save note",
+        noteSaved: 'Saved as "{title}"',
+        noteNote: "Saved from {where}",
         fallbackTitle: "Message #{number}",
       },
       switcher: {
@@ -4912,12 +4908,12 @@ export const catalogs = {
         channels: "Channels",
         agents: "Profiles",
         repos: "Repos",
-        artifacts: "Artifacts",
+        notes: "Notes",
         inbox: "Inbox",
         mediaJobs: "Media",
         emptyCaches: "No cache metrics reported.",
         collab: "Loro Collab & EphemeralStore",
-        emptyCollab: "No active collaborative artifacts.",
+        emptyCollab: "No active collaborative notes.",
         frontiers: "Frontiers",
         presence: "EphemeralStore Peers",
         noPeers: "No active ephemeral peers",
@@ -5702,29 +5698,28 @@ export const catalogs = {
       understood: "What it shows",
       makeTabs: { image: "Image", speech: "Speech", audio: "Audio workbench" },
       content: {
-        title: "Artifacts",
+        title: "Notes",
         new: "New",
-        searchAll: "Search all artifacts…",
-        sidebarToggle: "Toggle artifacts sidebar",
+        searchAll: "Search all notes…",
+        sidebarToggle: "Toggle notes sidebar",
         recent: "All recent",
         pinned: "Pinned",
-        pinnedEmpty: "Nothing pinned yet. Hover any artifact or media item and click the pin icon to keep it handy here.",
+        pinnedEmpty: "Nothing pinned yet. Hover any note or media item and click the pin icon to keep it handy here.",
         installedApps: "Installed Apps",
         installedAppsEmpty:
-          "No standalone apps installed yet. Click “Install as App” on any artifact card or toolbar to install it as an independent macOS app and manage it here.",
+          "No standalone apps installed yet. Click “Install as App” on any note card or toolbar to install it as an independent macOS app and manage it here.",
         pin: "Pin",
         unpin: "Unpin",
         pinnedToast: "Pinned",
         unpinnedToast: "Unpinned",
-        artifacts: "Artifacts",
+        artifacts: "Notes",
         media: "Media",
         moreTypes: "More types ({n})",
         fewerTypes: "Hide empty types",
-        sendArtifact: "Send to channel",
         exportArtifact: "Export",
         turnIntoIssue: "Turn into ticket",
         issueCreated: "Ticket created",
-        artifactType: { all: "All artifacts" },
+        artifactType: { all: "All notes" },
         inspector: {
           openExternal: "Open externally",
           saveAs: "Save as",
@@ -5734,7 +5729,7 @@ export const catalogs = {
           stopAudio: "Stop audio",
         },
         templates: {
-          title: "New artifact",
+          title: "New note",
           search: "Search templates…",
           searchCount: "{n} matching templates",
           empty: "No matching templates",
@@ -6226,12 +6221,12 @@ export const catalogs = {
           },
         },
         search: {
-          title: "Search artifacts",
-          placeholder: "Search notes, artifacts, and media…",
-          empty: "No matching notes, artifacts, or media",
+          title: "Search notes",
+          placeholder: "Search notes and media…",
+          empty: "No matching notes or media",
           typeMedia: "Media",
           scopeAll: "All",
-          scopeArtifacts: "Artifacts",
+          scopeArtifacts: "Notes",
           scopeMedia: "Media",
         },
       },
@@ -6397,7 +6392,7 @@ export const catalogs = {
     },
     "web.note": {
       card: { version: "Version {version}", open: 'Open "{title}"' },
-      preview: { blocks: "{n} blocks", slides: "{n} slides", rows: "{n} rows", nodes: "{n} nodes" },
+      preview: { blocks: "{n} blocks", slides: "{n} slides" },
       page: {
         delete: "Delete",
         deleteAsk: "Delete “{title}”? Its cards stay in the conversation.",
@@ -6414,7 +6409,6 @@ export const catalogs = {
         backToLibrary: "Back to notes",
         previewTab: "Preview",
         filesTab: "Files",
-        filesTabCount: "Files ({n})",
         viewMode: "View mode",
         liveVersion: "Live",
         directory: "Directory",
@@ -6470,8 +6464,6 @@ export const catalogs = {
       types: { doc: "Block Doc", base: "Base", canvas: "Canvas", media: "Media" },
       timeline: {
         title: "Version history",
-        show: "Show version history",
-        hide: "Hide version history",
         savedVersions: "Saved versions",
         commits: "Changes",
         loading: "Loading history…",
@@ -8043,13 +8035,13 @@ export interface Messages {
   "web.agent.templates.updateHint": undefined;
   "web.agent.templates.updated": undefined;
   "web.agent.templates.willUse": { readonly runtime: string | number };
-  "web.agent.toolset.artifact": undefined;
   "web.agent.toolset.channel": undefined;
   "web.agent.toolset.cron": undefined;
   "web.agent.toolset.issue": undefined;
   "web.agent.toolset.library": undefined;
   "web.agent.toolset.media": undefined;
   "web.agent.toolset.memory": undefined;
+  "web.agent.toolset.note": undefined;
   "web.agent.toolset.repo": undefined;
   "web.agent.toolset.resource": undefined;
   "web.agent.toolset.session": undefined;
@@ -8503,9 +8495,6 @@ export interface Messages {
   "web.channel.commands.stop.name": undefined;
   "web.channel.commands.stop.needs": undefined;
   "web.channel.commands.stop.note": undefined;
-  "web.channel.composer.artifactContext": { readonly title: string | number };
-  "web.channel.composer.artifactSelected": { readonly n: string | number };
-  "web.channel.composer.artifactSlide": { readonly n: string | number };
   "web.channel.composer.attach": undefined;
   "web.channel.composer.cancelReply": undefined;
   "web.channel.composer.clearContext": undefined;
@@ -8517,6 +8506,9 @@ export interface Messages {
   "web.channel.composer.dictateStop": undefined;
   "web.channel.composer.mention": undefined;
   "web.channel.composer.notSent": { readonly why: string | number };
+  "web.channel.composer.noteContext": { readonly title: string | number };
+  "web.channel.composer.noteSelected": { readonly n: string | number };
+  "web.channel.composer.noteSlide": { readonly n: string | number };
   "web.channel.composer.replying": { readonly name: string | number };
   "web.channel.composer.runningHint": undefined;
   "web.channel.composer.send": undefined;
@@ -8659,7 +8651,7 @@ export interface Messages {
   "web.channel.more.label": undefined;
   "web.channel.more.markUnread": undefined;
   "web.channel.more.promoteIssue": undefined;
-  "web.channel.more.saveArtifact": undefined;
+  "web.channel.more.saveNote": undefined;
   "web.channel.names.everyone": undefined;
   "web.channel.names.everyoneNote": undefined;
   "web.channel.names.issueThread": undefined;
@@ -8677,13 +8669,13 @@ export interface Messages {
   "web.channel.pins.none": undefined;
   "web.channel.pins.open": undefined;
   "web.channel.pins.title": undefined;
-  "web.channel.promote.artifactContent": undefined;
-  "web.channel.promote.artifactNote": { readonly where: string | number };
-  "web.channel.promote.artifactSave": undefined;
-  "web.channel.promote.artifactSaved": { readonly title: string | number };
-  "web.channel.promote.artifactTitle": undefined;
-  "web.channel.promote.artifactType": undefined;
   "web.channel.promote.fallbackTitle": { readonly number: string | number };
+  "web.channel.promote.noteContent": undefined;
+  "web.channel.promote.noteNote": { readonly where: string | number };
+  "web.channel.promote.noteSave": undefined;
+  "web.channel.promote.noteSaved": { readonly title: string | number };
+  "web.channel.promote.noteTitle": undefined;
+  "web.channel.promote.noteType": undefined;
   "web.channel.promote.saveTitle": undefined;
   "web.channel.promote.source": { readonly where: string | number };
   "web.channel.replies": { readonly n: number };
@@ -8897,7 +8889,6 @@ export interface Messages {
   "web.devtools.routes.empty": undefined;
   "web.devtools.routes.searchPlaceholder": undefined;
   "web.devtools.state.agents": undefined;
-  "web.devtools.state.artifacts": undefined;
   "web.devtools.state.caches": undefined;
   "web.devtools.state.channels": undefined;
   "web.devtools.state.collab": undefined;
@@ -8910,6 +8901,7 @@ export interface Messages {
   "web.devtools.state.issues": undefined;
   "web.devtools.state.mediaJobs": undefined;
   "web.devtools.state.noPeers": undefined;
+  "web.devtools.state.notes": undefined;
   "web.devtools.state.presence": undefined;
   "web.devtools.state.repos": undefined;
   "web.devtools.state.seq": undefined;
@@ -9642,7 +9634,6 @@ export interface Messages {
   "web.library.content.search.title": undefined;
   "web.library.content.search.typeMedia": undefined;
   "web.library.content.searchAll": undefined;
-  "web.library.content.sendArtifact": undefined;
   "web.library.content.sidebarToggle": undefined;
   "web.library.content.templates.cat.ai": undefined;
   "web.library.content.templates.cat.apps": undefined;
@@ -10434,7 +10425,6 @@ export interface Messages {
   "web.note.page.directory": undefined;
   "web.note.page.discard": undefined;
   "web.note.page.filesTab": undefined;
-  "web.note.page.filesTabCount": { readonly n: string | number };
   "web.note.page.gone": undefined;
   "web.note.page.liveVersion": undefined;
   "web.note.page.more": undefined;
@@ -10450,8 +10440,6 @@ export interface Messages {
   "web.note.page.unsaved": undefined;
   "web.note.page.viewMode": undefined;
   "web.note.preview.blocks": { readonly n: string | number };
-  "web.note.preview.nodes": { readonly n: string | number };
-  "web.note.preview.rows": { readonly n: string | number };
   "web.note.preview.slides": { readonly n: string | number };
   "web.note.standalone.live": undefined;
   "web.note.standalone.missing": undefined;
@@ -10469,13 +10457,11 @@ export interface Messages {
   "web.note.timeline.fork": undefined;
   "web.note.timeline.forkTitle": { readonly title: string | number };
   "web.note.timeline.forked": { readonly title: string | number };
-  "web.note.timeline.hide": undefined;
   "web.note.timeline.loading": undefined;
   "web.note.timeline.previewBanner": { readonly summary: string | number };
   "web.note.timeline.restore": undefined;
   "web.note.timeline.restored": undefined;
   "web.note.timeline.savedVersions": undefined;
-  "web.note.timeline.show": undefined;
   "web.note.timeline.title": undefined;
   "web.note.timeline.turn": { readonly n: string | number };
   "web.note.timeline.undoTurn": undefined;
