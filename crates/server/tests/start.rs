@@ -74,8 +74,10 @@ fn a_repo_is_made_by_name_and_an_issue_names_it() {
         diff.data.is_some().then_some(diff)
     });
     assert!(diff.data.is_some(), "{}", diff.message);
-    let ledger = std::fs::read_to_string(dir.path().join("ledger.jsonl")).unwrap_or_default();
-    let reviewed = ledger.lines().find(|l| l.contains("\"reviewed\"")).unwrap_or_else(|| panic!("{ledger}"));
+    let reviewed = crate::support::wait_until_transition(app.ctx(), std::time::Duration::from_secs(5), "reviewed ledger entry written", || {
+        let ledger = std::fs::read_to_string(dir.path().join("ledger.jsonl")).unwrap_or_default();
+        ledger.lines().find(|l| l.contains("\"reviewed\"")).map(str::to_owned)
+    });
     assert!(reviewed.contains(session.id.as_str()), "{reviewed}");
     std::fs::write(dir.path().join("repos/farm/Cargo.toml"), "[package]\nname = \"farm\"\n").unwrap();
     let templates = call("repo.template.list", json!({ "id": "farm" }));
