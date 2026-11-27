@@ -3,11 +3,14 @@ import { z } from "zod";
 import type { Codec } from "../codec";
 import * as T from "./shapes.gen";
 
+export const GitHubAuthMode = z.enum(T.GitHubAuthModeValues) satisfies Codec<T.GitHubAuthMode>;
+
 export const GitHubStatus = z.object({
   installed: z.boolean(),
   version: z.exactOptional(z.string()),
   loggedIn: z.boolean(),
   account: z.exactOptional(z.string()),
+  authMode: GitHubAuthMode,
   reason: z.string(),
   checkedAt: z.number(),
 }) satisfies Codec<T.GitHubStatus>;

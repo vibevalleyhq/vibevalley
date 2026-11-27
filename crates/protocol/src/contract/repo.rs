@@ -7,6 +7,31 @@ use ts_rs::TS;
 
 use crate::wire::*;
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+pub enum GitHubAuthMode {
+    #[serde(rename = "token")]
+    Token,
+    #[serde(rename = "gh")]
+    Gh,
+    #[default]
+    #[serde(rename = "none")]
+    None,
+}
+
+impl GitHubAuthMode {
+    pub const ALL: [GitHubAuthMode; 3] = [GitHubAuthMode::Token, GitHubAuthMode::Gh, GitHubAuthMode::None];
+
+    /// The string on the wire.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            GitHubAuthMode::Token => "token",
+            GitHubAuthMode::Gh => "gh",
+            GitHubAuthMode::None => "none",
+        }
+    }
+}
+
 #[skip_serializing_none]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts-gen", derive(TS))]
@@ -19,6 +44,8 @@ pub struct GitHubStatus {
     pub logged_in: bool,
     /// The logged-in account, when logged in.
     pub account: Option<String>,
+    /// Active GitHub authentication mode (`token`, `gh`, or `none`).
+    pub auth_mode: GitHubAuthMode,
     /// Why it is not usable, when it is not.
     pub reason: String,
     pub checked_at: i64,
@@ -464,7 +491,8 @@ pub struct RepoActivityGetInput {
 #[cfg(feature = "ts-gen")]
 crate::typescript::module! {
     "repo";
-    types: [GitHubStatus,
+    types: [GitHubAuthMode,
+    GitHubStatus,
     DayCount,
     Author,
     RepoActivity,

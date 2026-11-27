@@ -15,6 +15,7 @@ use super::publish::{HostRunner, HostedRepo, remote_pull_state};
 use super::service::{DEFAULT_POLL_SECONDS, Pull};
 use super::snapshot::{GitHubCheck, GitHubComment, GitHubPullSnapshot, GitHubReview, checks_fingerprint, checks_verdict, failed_job_log, fetch_snapshot};
 use crate::context::now;
+use crate::repo::GitHubRest;
 use crate::service::issue::{KnownPullEvent, PullRecord};
 
 const POLL_CONCURRENCY: usize = 4;
@@ -40,13 +41,15 @@ pub async fn refresh(pulls: &Pull) {
 
     let sem = Arc::new(Semaphore::new(POLL_CONCURRENCY));
     let mut set = JoinSet::new();
+    let github_rest = pulls.publisher.github_rest().cloned();
     for (idx, row, hosted, runner) in targets {
         let sem = sem.clone();
+        let rest = github_rest.clone();
         set.spawn(
             async move {
                 let Ok(_permit) = sem.acquire_owned().await else { return None };
                 let number = row.number;
-                let state = remote_pull_state(&hosted, number, &runner).await.ok()?;
+                let state = remote_pull_state(&hosted, number, &runner, rest.as_ref()).await.ok()?;
                 Some((idx, row, state))
             }
             .in_current_span()
@@ -100,14 +103,16 @@ pub async fn poll(pulls: &Pull) {
 
     let sem = Arc::new(Semaphore::new(POLL_CONCURRENCY));
     let mut set = JoinSet::new();
+    let github_rest = pulls.publisher.github_rest().cloned();
     for (idx, row, remote) in targets {
         let sem = sem.clone();
         let gh = pulls.gh.clone();
+        let rest = github_rest.clone();
         set.spawn(
             async move {
                 let Ok(_permit) = sem.acquire_owned().await else { return None };
                 let number = row.number;
-                let snapshot = fetch_snapshot(&gh, &remote, number).await.ok()?;
+                let snapshot = fetch_snapshot(&gh, rest.as_ref(), &remote, number).await.ok()?;
                 Some((idx, row, remote, snapshot))
             }
             .in_current_span()
@@ -127,27 +132,29 @@ pub async fn poll(pulls: &Pull) {
     }
 }
 
-async fn fetch_failed_job_logs(gh: &HostRunner, remote: &str, failed: &[&GitHubCheck]) -> Vec<String> {
+async fn fetch_failed_job_logs(gh: &HostRunner, github_rest: Option<&GitHubRest>, remote: &str, failed: &[&GitHubCheck]) -> Vec<String> {
     if failed.len() <= 1 {
         let mut out = Vec::with_capacity(failed.len());
         for check in failed {
-            out.push(failed_job_log(gh, remote, &check.url).await);
+            out.push(failed_job_log(gh, github_rest, remote, &check.url).await);
         }
         return out;
     }
     let items: Vec<(usize, String)> = failed.iter().enumerate().map(|(idx, check)| (idx, check.url.clone())).collect();
     let sem = Arc::new(Semaphore::new(POLL_CONCURRENCY));
     let mut set = JoinSet::new();
+    let github_rest = github_rest.cloned();
     for (idx, url) in items {
         let sem = sem.clone();
         let gh = gh.clone();
+        let rest = github_rest.clone();
         let remote = remote.to_string();
         set.spawn(
             async move {
                 let Ok(_permit) = sem.acquire_owned().await else {
                     return (idx, String::new());
                 };
-                let log = failed_job_log(&gh, &remote, &url).await;
+                let log = failed_job_log(&gh, rest.as_ref(), &remote, &url).await;
                 (idx, log)
             }
             .in_current_span()
@@ -172,7 +179,13 @@ fn check_status_label(check: &GitHubCheck) -> &str {
     }
 }
 
-async fn format_ci_report_async(gh: &HostRunner, remote: &str, checks: &[GitHubCheck], failed: &[&GitHubCheck]) -> String {
+async fn format_ci_report_async(
+    gh: &HostRunner,
+    github_rest: Option<&GitHubRest>,
+    remote: &str,
+    checks: &[GitHubCheck],
+    failed: &[&GitHubCheck],
+) -> String {
     if failed.is_empty() {
         return checks
             .iter()
@@ -180,7 +193,7 @@ async fn format_ci_report_async(gh: &HostRunner, remote: &str, checks: &[GitHubC
             .collect::<Vec<_>>()
             .join("\n");
     }
-    let logs = fetch_failed_job_logs(gh, remote, failed).await;
+    let logs = fetch_failed_job_logs(gh, github_rest, remote, failed).await;
     failed
         .iter()
         .zip(logs)
@@ -211,7 +224,7 @@ async fn observe_checks_async(pulls: &Pull, row: &PullRecord, remote: &str, curr
     if failed.is_empty() && !finished {
         return;
     }
-    let text = format_ci_report_async(&pulls.gh, remote, &current.checks, &failed).await;
+    let text = format_ci_report_async(&pulls.gh, pulls.publisher.github_rest(), remote, &current.checks, &failed).await;
     let key = format!("{}#{}:ci:{revision}", row.repo, row.number);
     let _ = board.tell_message_async(issue_id, &text, &key).await;
 }

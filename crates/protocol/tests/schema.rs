@@ -215,6 +215,7 @@ pub fn round_trip(name: &str, value: serde_json::Value) -> Option<Result<serde_j
         "Feature" => rt::<vibevalley_protocol::Feature>(value),
         "Finding" => rt::<vibevalley_protocol::Finding>(value),
         "GameEffect" => rt::<vibevalley_protocol::GameEffect>(value),
+        "GitHubAuthMode" => rt::<vibevalley_protocol::GitHubAuthMode>(value),
         "GitHubStatus" => rt::<vibevalley_protocol::GitHubStatus>(value),
         "Head" => rt::<vibevalley_protocol::Head>(value),
         "Health" => rt::<vibevalley_protocol::Health>(value),

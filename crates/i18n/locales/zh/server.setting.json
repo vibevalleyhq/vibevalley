@@ -1,5 +1,6 @@
 {
   "deepseekKey": "DeepSeek 的 API Key 看着不对：一串不带空格的字，通常以 sk- 开头",
+  "githubToken": "GitHub Token 里不能包含空格",
   "memory": {
     "twice": "同一种记忆来源只能接一个：{kind}",
     "noUrl": "要接上记忆来源，先填它的地址",

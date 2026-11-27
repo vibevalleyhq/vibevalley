@@ -70,6 +70,7 @@ export {
   BranchPublication,
   Changes,
   Conflict,
+  GitHubAuthMode,
   GitHubStatus,
   MountRepo,
   NewRepo,

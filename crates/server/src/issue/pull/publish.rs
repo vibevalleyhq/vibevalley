@@ -10,13 +10,15 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use parking_lot::Mutex;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use vibevalley_git::{MergeCheck, Repo};
 use vibevalley_i18n::t;
 use vibevalley_protocol::{ApiError, BizCode, BranchCheck, BranchPublication, BranchPublicationState, PublishPlatform, PullRequestState, SubmitBranch};
 
 use crate::context::error::refused as refuse;
 use crate::log::spawn_blocking_traced;
+use crate::repo::{GitHubApiError, GitHubRest, TokenSource};
+use crate::setting::Secret;
 
 /// What a `gh`/`glab` call answered: ok, its output, and whether the tool is missing.
 pub struct Answer {
@@ -181,6 +183,71 @@ fn platform_failed(stage: &str) -> ApiError {
     refuse(BizCode::RepoRefused, t("server.repo.publish.platformFailed", &[("stage", stage.into())]))
 }
 
+pub(crate) fn missing_credentials() -> ApiError {
+    refuse(BizCode::RepoRefused, t("server.repo.publish.missingCredentials", &[]))
+}
+
+fn rest_failed(stage: &str, err: GitHubApiError) -> ApiError {
+    match err {
+        GitHubApiError::MissingToken => missing_credentials(),
+        GitHubApiError::Unauthorized | GitHubApiError::Forbidden => refuse(BizCode::RepoRefused, t("server.repo.github.tokenInvalid", &[])),
+        _ => platform_failed(&format!("{stage} ({})", err.summary())),
+    }
+}
+
+#[derive(Deserialize)]
+struct WireGithubRestRepo {
+    default_branch: String,
+}
+
+#[derive(Deserialize)]
+struct WireGithubRestRepoRef {
+    #[serde(default)]
+    full_name: String,
+}
+
+#[derive(Deserialize)]
+struct WireGithubRestBranchRef {
+    #[serde(default)]
+    repo: Option<WireGithubRestRepoRef>,
+}
+
+#[derive(Deserialize)]
+struct WireGithubRestPull {
+    #[serde(default)]
+    number: i64,
+    #[serde(default)]
+    html_url: String,
+    #[serde(default)]
+    state: String,
+    #[serde(default)]
+    merged: bool,
+    #[serde(default)]
+    merged_at: Option<String>,
+    #[serde(default)]
+    head: Option<WireGithubRestBranchRef>,
+}
+
+#[derive(Serialize)]
+struct CreateGithubPullBody<'a> {
+    title: &'a str,
+    head: &'a str,
+    base: &'a str,
+    body: &'a str,
+}
+
+#[derive(Serialize)]
+struct MergeGithubPullBody<'a> {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    merge_method: Option<&'a str>,
+}
+
+#[derive(Deserialize)]
+struct WireGithubRestMerge {
+    #[serde(default)]
+    merged: bool,
+}
+
 #[derive(Deserialize)]
 struct WirePullState {
     state: String,
@@ -238,11 +305,16 @@ impl WireGitlabMr {
 struct Hosting<'a> {
     repo: &'a HostedRepo,
     run: &'a HostRunner,
+    github_rest: Option<&'a GitHubRest>,
 }
 
-impl Hosting<'_> {
+impl<'a> Hosting<'a> {
     fn github(&self) -> bool {
         self.repo.platform == PublishPlatform::Github
+    }
+
+    fn rest(&self) -> Option<&'a GitHubRest> {
+        self.github().then_some(self.github_rest).flatten().filter(|r| r.has_token())
     }
 
     fn project(&self) -> String {
@@ -256,12 +328,11 @@ impl Hosting<'_> {
         let args: Vec<String> = args.iter().map(|a| a.to_string()).collect();
         let r = self.run.run_async(args.clone()).await;
         if !r.ok {
+            if self.github() && (r.missing || args.first().map(String::as_str) == Some("auth")) {
+                return Err(missing_credentials());
+            }
             let stage = if r.missing {
-                if self.github() {
-                    "gh missing".to_string()
-                } else {
-                    "glab missing".to_string()
-                }
+                "glab missing".to_string()
             } else {
                 args.iter().take(2).cloned().collect::<Vec<_>>().join(" ")
             };
@@ -281,6 +352,18 @@ impl Hosting<'_> {
 
     /// Reads a hosted pull/merge request's remote state (`open`, `merged`, `closed`).
     pub(crate) async fn state(&self, number: i64) -> Result<PullRequestState, ApiError> {
+        if let Some(rest) = self.rest() {
+            let path = format!("/repos/{}/pulls/{number}", self.repo.name);
+            let wire: WireGithubRestPull = rest.get_json(&path, &[]).await.map_err(|e| rest_failed("pull state", e))?;
+            if wire.merged || wire.merged_at.is_some() {
+                return Ok(PullRequestState::Merged);
+            }
+            return match wire.state.to_ascii_lowercase().as_str() {
+                "open" => Ok(PullRequestState::Open),
+                "closed" => Ok(PullRequestState::Closed),
+                _ => Err(platform_failed("pull state decode")),
+            };
+        }
         let out = if self.github() {
             let num = number.to_string();
             self.request(&["pr", "view", &num, "--repo", &self.repo.name, "--json", "state"]).await?
@@ -298,6 +381,11 @@ impl Hosting<'_> {
     }
 
     async fn inspect(&self) -> Result<String, ApiError> {
+        if let Some(rest) = self.rest() {
+            let path = format!("/repos/{}", self.repo.name);
+            let wire: WireGithubRestRepo = rest.get_json(&path, &[]).await.map_err(|e| rest_failed("repository", e))?;
+            return Ok(wire.default_branch);
+        }
         self.request(&["auth", "status", "--hostname", &self.repo.host]).await?;
         if self.github() {
             let out = self.request(&["repo", "view", &self.repo.name, "--json", "defaultBranchRef"]).await?;
@@ -312,6 +400,29 @@ impl Hosting<'_> {
     }
 
     async fn find(&self, branch: &str, base: &str) -> Result<Option<(i64, String)>, ApiError> {
+        if let Some(rest) = self.rest() {
+            let owner = self.repo.name.split('/').next().unwrap_or("");
+            let head = format!("{owner}:{branch}");
+            let path = format!("/repos/{}/pulls", self.repo.name);
+            let list: Vec<WireGithubRestPull> = rest
+                .get_json(&path, &[("state", "open"), ("head", &head), ("base", base), ("per_page", "2")])
+                .await
+                .map_err(|e| rest_failed("list pulls", e))?;
+            if list.len() > 1 {
+                return Err(platform_failed("list decode"));
+            }
+            return list
+                .iter()
+                .find(|p| {
+                    p.state.eq_ignore_ascii_case("open")
+                        && p.head
+                            .as_ref()
+                            .and_then(|h| h.repo.as_ref())
+                            .is_none_or(|r| r.full_name.eq_ignore_ascii_case(&self.repo.name))
+                })
+                .map(|p| self.receipt(p.number, &p.html_url))
+                .transpose();
+        }
         if self.github() {
             let out = self
                 .request(&[
@@ -358,6 +469,17 @@ impl Hosting<'_> {
     }
 
     async fn create(&self, req: &SubmitBranch) -> Result<(i64, String), ApiError> {
+        if let Some(rest) = self.rest() {
+            let path = format!("/repos/{}/pulls", self.repo.name);
+            let body = CreateGithubPullBody {
+                title: &req.title,
+                head: &req.branch,
+                base: &req.base,
+                body: &req.body,
+            };
+            let created: WireGithubRestPull = rest.post_json(&path, &body).await.map_err(|e| rest_failed("create pull", e))?;
+            return self.receipt(created.number, &created.html_url);
+        }
         if self.github() {
             let out = self
                 .request(&[
@@ -406,6 +528,31 @@ impl Hosting<'_> {
         }
         self.receipt(m.iid, &m.web_url)
     }
+
+    async fn merge(&self, number: i64, method: Option<&str>) -> Result<(), ApiError> {
+        if let Some(rest) = self.rest() {
+            let path = format!("/repos/{}/pulls/{number}/merge", self.repo.name);
+            let body = MergeGithubPullBody { merge_method: method };
+            let res: WireGithubRestMerge = rest.put_json(&path, &body).await.map_err(|e| rest_failed("merge pull", e))?;
+            if !res.merged {
+                return Err(platform_failed("merge"));
+            }
+            return Ok(());
+        }
+        if self.github() {
+            let num = number.to_string();
+            let flag = match method {
+                Some("squash") => "--squash",
+                Some("rebase") => "--rebase",
+                _ => "--merge",
+            };
+            self.request(&["pr", "merge", &num, "--repo", &self.repo.name, flag]).await?;
+            return Ok(());
+        }
+        let path = format!("{}/merge_requests/{number}/merge", self.project());
+        self.request(&["api", &path, "--method", "PUT"]).await?;
+        Ok(())
+    }
 }
 
 /// `checkRepository`: `.vibevalley/check` at cwd: not run when there is
@@ -428,6 +575,7 @@ pub async fn check_repository(cwd: &Path, limit: Duration) -> Result<BranchCheck
 pub struct Publisher {
     gh: HostRunner,
     glab: HostRunner,
+    github_rest: Option<GitHubRest>,
     pub network: Arc<dyn Network>,
     pub check_timeout: Duration,
     serial: Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>,
@@ -438,6 +586,7 @@ impl Default for Publisher {
         Publisher {
             gh: HostRunner::Cli("gh"),
             glab: HostRunner::Cli("glab"),
+            github_rest: None,
             network: Arc::new(Git),
             check_timeout: Duration::from_secs(600),
             serial: Mutex::default(),
@@ -515,10 +664,40 @@ impl Publisher {
         Publisher {
             gh: HostRunner::Custom(gh),
             glab: HostRunner::Custom(glab),
+            github_rest: None,
             network,
             check_timeout: Duration::from_secs(600),
             serial: Mutex::default(),
         }
+    }
+
+    pub(crate) fn with_github_token(mut self, token: TokenSource) -> Self {
+        self.github_rest = Some(GitHubRest::new(token));
+        self
+    }
+
+    pub(crate) fn github_rest(&self) -> Option<&GitHubRest> {
+        self.github_rest.as_ref()
+    }
+
+    /// Configures a custom GitHub REST API base URL and optional token for offline tests.
+    #[doc(hidden)]
+    pub fn with_github_api_for_test(mut self, api_base: impl Into<String>, token: Option<String>) -> Self {
+        let token_src: TokenSource = Arc::new(move || token.clone().map(Secret::new));
+        self.github_rest = Some(GitHubRest::with_base(api_base, token_src));
+        self
+    }
+
+    /// Merges a pull/merge request via GitHub REST API (when Token is configured) or `gh`/`glab`.
+    pub async fn merge_pull_async(&self, repo: &HostedRepo, number: i64, method: Option<&str>) -> Result<(), ApiError> {
+        let run = if repo.platform == PublishPlatform::Github { &self.gh } else { &self.glab };
+        Hosting {
+            repo,
+            run,
+            github_rest: self.github_rest.as_ref(),
+        }
+        .merge(number, method)
+        .await
     }
 
     /// `submitBranch` (async).
@@ -564,7 +743,11 @@ impl Publisher {
         } else {
             &self.glab
         };
-        let host = Hosting { repo: &remote.target, run };
+        let host = Hosting {
+            repo: &remote.target,
+            run,
+            github_rest: self.github_rest.as_ref(),
+        };
         let default_branch = host.inspect().await?;
         if req.branch == req.base || req.branch == default_branch {
             return Err(refused("default / base branch"));
@@ -655,7 +838,12 @@ impl Publisher {
     }
 }
 
-/// Queries the hosted platform (`gh`/`glab`) for a pull/merge request's current state.
-pub(crate) async fn remote_pull_state(repo: &HostedRepo, number: i64, run: &HostRunner) -> Result<PullRequestState, ApiError> {
-    Hosting { repo, run }.state(number).await
+/// Queries the hosted platform (`GitHub REST` / `gh` / `glab`) for a pull/merge request's current state.
+pub(crate) async fn remote_pull_state(
+    repo: &HostedRepo,
+    number: i64,
+    run: &HostRunner,
+    github_rest: Option<&GitHubRest>,
+) -> Result<PullRequestState, ApiError> {
+    Hosting { repo, run, github_rest }.state(number).await
 }

@@ -2,10 +2,12 @@
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use vibevalley_i18n::t;
 use vibevalley_protocol::{ApiError, BizCode};
 
-use super::publish::HostRunner;
+use super::publish::{HostRunner, missing_credentials};
 use crate::context::error::refused as refuse;
+use crate::repo::{GitHubApiError, GitHubRest};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GitHubCheck {
@@ -118,10 +120,58 @@ async fn gh_call(gh: &HostRunner, args: &[&str]) -> Result<String, ApiError> {
     let owned: Vec<String> = args.iter().map(|s| (*s).to_string()).collect();
     let ans = gh.run_async(owned).await;
     if !ans.ok {
-        let stage = if ans.missing { "gh missing" } else { "gh snapshot" };
-        return Err(refuse(BizCode::RepoRefused, format!("GitHub {stage} failed")));
+        if ans.missing {
+            return Err(missing_credentials());
+        }
+        return Err(refuse(BizCode::RepoRefused, "GitHub gh snapshot failed"));
     }
     Ok(ans.out)
+}
+
+#[derive(Deserialize)]
+struct RestPullHead {
+    #[serde(default)]
+    sha: String,
+}
+
+#[derive(Deserialize)]
+struct RestPull {
+    #[serde(default)]
+    state: String,
+    #[serde(default)]
+    merged: bool,
+    #[serde(default)]
+    merged_at: Option<String>,
+    #[serde(default)]
+    head: Option<RestPullHead>,
+}
+
+#[derive(Deserialize)]
+struct RestCheckRun {
+    #[serde(default)]
+    name: String,
+    #[serde(default)]
+    status: String,
+    #[serde(default)]
+    conclusion: Option<String>,
+    #[serde(default)]
+    details_url: Option<String>,
+    #[serde(default)]
+    html_url: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct RestCheckRunsResponse {
+    #[serde(default)]
+    check_runs: Vec<RestCheckRun>,
+}
+
+fn rest_snapshot_err(stage: &str, err: GitHubApiError) -> ApiError {
+    match err {
+        GitHubApiError::MissingToken => missing_credentials(),
+        GitHubApiError::Unauthorized | GitHubApiError::Forbidden => refuse(BizCode::RepoRefused, t("server.repo.github.tokenInvalid", &[])),
+        _ => refuse(BizCode::RepoRefused, format!("GitHub {stage} failed: {}", err.summary())),
+    }
 }
 
 #[derive(Deserialize)]
@@ -212,52 +262,19 @@ fn is_bot(user: &RawUser) -> bool {
     user.kind.eq_ignore_ascii_case("Bot") || user.login.ends_with("[bot]")
 }
 
-/// Fetches a GitHub PR snapshot (`pr view`, `reviews`, `comments`, `issue comments`, `viewer`).
-pub(crate) async fn fetch_snapshot(gh: &HostRunner, remote_repo: &str, number: i64) -> Result<GitHubPullSnapshot, ApiError> {
-    let number_str = number.to_string();
-    let pr_out = gh_call(
-        gh,
-        &["pr", "view", &number_str, "--repo", remote_repo, "--json", "state,headRefOid,statusCheckRollup"],
-    )
-    .await?;
-    let pr: RawPrView = serde_json::from_str(&pr_out).map_err(|_| refuse(BizCode::RepoRefused, "GitHub PR decode failed"))?;
-
-    let reviews_path = format!("repos/{remote_repo}/pulls/{number}/reviews");
-    let review_comments_path = format!("repos/{remote_repo}/pulls/{number}/comments");
-    let issue_comments_path = format!("repos/{remote_repo}/issues/{number}/comments");
-    let reviews_args = ["api", reviews_path.as_str()];
-    let review_comments_args = ["api", review_comments_path.as_str()];
-    let issue_comments_args = ["api", issue_comments_path.as_str()];
-
-    let (viewer_res, reviews_res, review_comments_res, issue_comments_res) = tokio::join!(
-        gh_call(gh, &["api", "user"]),
-        gh_call(gh, &reviews_args),
-        gh_call(gh, &review_comments_args),
-        gh_call(gh, &issue_comments_args),
-    );
-
-    let viewer = viewer_res
-        .ok()
-        .and_then(|s| serde_json::from_str::<RawViewer>(&s).ok())
-        .map(|v| v.login)
-        .unwrap_or_default();
-
-    let mut checks: Vec<GitHubCheck> = pr
-        .status_check_rollup
-        .into_iter()
-        .map(|c| GitHubCheck {
-            name: c.name.or(c.context).unwrap_or_default(),
-            status: c.status.or(c.state).unwrap_or_default(),
-            conclusion: c.conclusion.unwrap_or_default(),
-            url: c.details_url.or(c.target_url).unwrap_or_default(),
-        })
-        .collect();
+fn build_snapshot(
+    remote_repo: &str,
+    number: i64,
+    state: String,
+    head: String,
+    viewer: String,
+    mut checks: Vec<GitHubCheck>,
+    reviews_raw: Vec<RawReview>,
+    review_comments_raw: Vec<RawReviewComment>,
+    issue_comments_raw: Vec<RawIssueComment>,
+) -> GitHubPullSnapshot {
     checks.sort_by(|a, b| a.name.cmp(&b.name).then_with(|| a.url.cmp(&b.url)));
 
-    let reviews_raw: Vec<RawReview> = reviews_res
-        .ok()
-        .and_then(|s| serde_json::from_str::<Vec<RawReview>>(&s).ok())
-        .unwrap_or_default();
     let reviews: Vec<GitHubReview> = reviews_raw
         .into_iter()
         .map(|r| {
@@ -272,15 +289,6 @@ pub(crate) async fn fetch_snapshot(gh: &HostRunner, remote_repo: &str, number: i
             }
         })
         .collect();
-
-    let review_comments_raw: Vec<RawReviewComment> = review_comments_res
-        .ok()
-        .and_then(|s| serde_json::from_str::<Vec<RawReviewComment>>(&s).ok())
-        .unwrap_or_default();
-    let issue_comments_raw: Vec<RawIssueComment> = issue_comments_res
-        .ok()
-        .and_then(|s| serde_json::from_str::<Vec<RawIssueComment>>(&s).ok())
-        .unwrap_or_default();
 
     let mut comments: Vec<GitHubComment> = Vec::with_capacity(review_comments_raw.len() + issue_comments_raw.len());
     for c in review_comments_raw {
@@ -312,26 +320,149 @@ pub(crate) async fn fetch_snapshot(gh: &HostRunner, remote_repo: &str, number: i
         });
     }
 
-    Ok(GitHubPullSnapshot {
+    GitHubPullSnapshot {
         repo: remote_repo.into(),
         number,
-        state: pr.state,
-        head: pr.head_ref_oid,
+        state,
+        head,
         viewer,
         checks,
         reviews,
         comments,
-    })
+    }
 }
 
-/// Tail of a failed GitHub Actions job log (last 40 lines, capped at 4000 bytes).
-pub(crate) async fn failed_job_log(gh: &HostRunner, remote_repo: &str, check_url: &str) -> String {
-    let Some(job) = actions_job_of(check_url) else {
-        return String::new();
-    };
-    let Ok(out) = gh_call(gh, &["run", "view", "--job", &job, "--log-failed", "--repo", remote_repo]).await else {
-        return String::new();
-    };
+/// Fetches a GitHub PR snapshot via REST API (when Token is configured) or `gh`.
+pub(crate) async fn fetch_snapshot(
+    gh: &HostRunner,
+    github_rest: Option<&GitHubRest>,
+    remote_repo: &str,
+    number: i64,
+) -> Result<GitHubPullSnapshot, ApiError> {
+    if let Some(rest) = github_rest.filter(|r| r.has_token()) {
+        let pull_path = format!("/repos/{remote_repo}/pulls/{number}");
+        let pr: RestPull = rest.get_json(&pull_path, &[]).await.map_err(|e| rest_snapshot_err("PR", e))?;
+        let state = if pr.merged || pr.merged_at.is_some() {
+            "MERGED".to_string()
+        } else if pr.state.eq_ignore_ascii_case("open") {
+            "OPEN".to_string()
+        } else {
+            "CLOSED".to_string()
+        };
+        let head = pr.head.map(|h| h.sha).unwrap_or_default();
+        let reviews_path = format!("/repos/{remote_repo}/pulls/{number}/reviews");
+        let review_comments_path = format!("/repos/{remote_repo}/pulls/{number}/comments");
+        let issue_comments_path = format!("/repos/{remote_repo}/issues/{number}/comments");
+        let checks_path = format!("/repos/{remote_repo}/commits/{head}/check-runs");
+
+        let (viewer_res, checks_res, reviews_res, review_comments_res, issue_comments_res) = tokio::join!(
+            rest.get_json::<RawViewer>("/user", &[]),
+            async {
+                if head.is_empty() {
+                    Ok(RestCheckRunsResponse { check_runs: vec![] })
+                } else {
+                    rest.get_json::<RestCheckRunsResponse>(&checks_path, &[]).await
+                }
+            },
+            rest.get_json::<Vec<RawReview>>(&reviews_path, &[]),
+            rest.get_json::<Vec<RawReviewComment>>(&review_comments_path, &[]),
+            rest.get_json::<Vec<RawIssueComment>>(&issue_comments_path, &[]),
+        );
+
+        let viewer = viewer_res.ok().map(|v| v.login).unwrap_or_default();
+        let checks = checks_res
+            .ok()
+            .map(|r| {
+                r.check_runs
+                    .into_iter()
+                    .map(|c| GitHubCheck {
+                        name: c.name,
+                        status: c.status.to_ascii_uppercase(),
+                        conclusion: c.conclusion.unwrap_or_default().to_ascii_uppercase(),
+                        url: c.details_url.filter(|u| !u.is_empty()).or(c.html_url).unwrap_or_default(),
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        return Ok(build_snapshot(
+            remote_repo,
+            number,
+            state,
+            head,
+            viewer,
+            checks,
+            reviews_res.unwrap_or_default(),
+            review_comments_res.unwrap_or_default(),
+            issue_comments_res.unwrap_or_default(),
+        ));
+    }
+
+    let number_str = number.to_string();
+    let pr_out = gh_call(
+        gh,
+        &["pr", "view", &number_str, "--repo", remote_repo, "--json", "state,headRefOid,statusCheckRollup"],
+    )
+    .await?;
+    let pr: RawPrView = serde_json::from_str(&pr_out).map_err(|_| refuse(BizCode::RepoRefused, "GitHub PR decode failed"))?;
+
+    let reviews_path = format!("repos/{remote_repo}/pulls/{number}/reviews");
+    let review_comments_path = format!("repos/{remote_repo}/pulls/{number}/comments");
+    let issue_comments_path = format!("repos/{remote_repo}/issues/{number}/comments");
+    let reviews_args = ["api", reviews_path.as_str()];
+    let review_comments_args = ["api", review_comments_path.as_str()];
+    let issue_comments_args = ["api", issue_comments_path.as_str()];
+
+    let (viewer_res, reviews_res, review_comments_res, issue_comments_res) = tokio::join!(
+        gh_call(gh, &["api", "user"]),
+        gh_call(gh, &reviews_args),
+        gh_call(gh, &review_comments_args),
+        gh_call(gh, &issue_comments_args),
+    );
+
+    let viewer = viewer_res
+        .ok()
+        .and_then(|s| serde_json::from_str::<RawViewer>(&s).ok())
+        .map(|v| v.login)
+        .unwrap_or_default();
+
+    let checks: Vec<GitHubCheck> = pr
+        .status_check_rollup
+        .into_iter()
+        .map(|c| GitHubCheck {
+            name: c.name.or(c.context).unwrap_or_default(),
+            status: c.status.or(c.state).unwrap_or_default(),
+            conclusion: c.conclusion.unwrap_or_default(),
+            url: c.details_url.or(c.target_url).unwrap_or_default(),
+        })
+        .collect();
+
+    let reviews_raw: Vec<RawReview> = reviews_res
+        .ok()
+        .and_then(|s| serde_json::from_str::<Vec<RawReview>>(&s).ok())
+        .unwrap_or_default();
+    let review_comments_raw: Vec<RawReviewComment> = review_comments_res
+        .ok()
+        .and_then(|s| serde_json::from_str::<Vec<RawReviewComment>>(&s).ok())
+        .unwrap_or_default();
+    let issue_comments_raw: Vec<RawIssueComment> = issue_comments_res
+        .ok()
+        .and_then(|s| serde_json::from_str::<Vec<RawIssueComment>>(&s).ok())
+        .unwrap_or_default();
+
+    Ok(build_snapshot(
+        remote_repo,
+        number,
+        pr.state,
+        pr.head_ref_oid,
+        viewer,
+        checks,
+        reviews_raw,
+        review_comments_raw,
+        issue_comments_raw,
+    ))
+}
+
+fn tail_job_log(out: &str) -> String {
     let lines: Vec<&str> = out.trim().lines().collect();
     let start = lines.len().saturating_sub(40);
     let joined = lines[start..].join("\n");
@@ -344,4 +475,22 @@ pub(crate) async fn failed_job_log(gh: &HostRunner, remote_repo: &str, check_url
         }
         joined[cut..].to_string()
     }
+}
+
+/// Tail of a failed GitHub Actions job log (last 40 lines, capped at 4000 bytes).
+pub(crate) async fn failed_job_log(gh: &HostRunner, github_rest: Option<&GitHubRest>, remote_repo: &str, check_url: &str) -> String {
+    let Some(job) = actions_job_of(check_url) else {
+        return String::new();
+    };
+    if let Some(rest) = github_rest.filter(|r| r.has_token()) {
+        let path = format!("/repos/{remote_repo}/actions/jobs/{job}/logs");
+        let Some(out) = rest.get_text_following_redirect_without_auth(&path).await else {
+            return String::new();
+        };
+        return tail_job_log(&out);
+    }
+    let Ok(out) = gh_call(gh, &["run", "view", "--job", &job, "--log-failed", "--repo", remote_repo]).await else {
+        return String::new();
+    };
+    tail_job_log(&out)
 }

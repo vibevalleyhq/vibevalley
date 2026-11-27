@@ -2,12 +2,6 @@
   "badName": "A repo name starts with a letter or a digit and has only letters, digits, -, _ and ., up to 64 characters",
   "badGithub": "Give a GitHub repository address, such as https://github.com/botiverse/raft-source",
   "noName": "unnamed",
-  "gh": {
-    "missing": "gh is not installed",
-    "failed": "gh could not be checked",
-    "signedOut": "not signed in to GitHub",
-    "noAccount": "the GitHub account could not be confirmed"
-  },
   "notRepoName": "\"{name}\" cannot be a repo name: use a simple English folder name, such as clock-in",
   "outside": "A repo must be inside the work folder, not linked to somewhere outside it",
   "commit": {
@@ -27,11 +21,15 @@
     "unchecked": "GitHub has not been checked",
     "notGithub": "Not a GitHub repository",
     "noPermission": "The repository's permissions could not be checked",
-    "readOnly": "No write permission"
+    "readOnly": "No write permission",
+    "noneConfigured": "Not configured: set a GitHub Token in Settings (or GITHUB_TOKEN), or install and sign in with gh",
+    "tokenInvalid": "GitHub Token is invalid or lacks permission",
+    "tokenNetwork": "Could not reach GitHub API: {why}"
   },
   "conflict": "merging into {base} conflicts",
   "publish.refused": "Branch publication refused: {detail}",
-  "publish.platformFailed": "Hosting platform failed: {stage}. Check installation and login.",
+  "publish.missingCredentials": "No GitHub credentials configured: set a GitHub Token in Settings (or GITHUB_TOKEN), or sign in with gh CLI",
+  "publish.platformFailed": "Hosting platform failed: {stage}. Check your GitHub Token or CLI login.",
   "publish.pushedWithoutLink": "SHA {sha} was pushed, but no PR/MR link was confirmed: {why}. Retry to recover an open request.",
   "publish.userOnly": "Only the user on this computer can publish an existing branch",
   "publish.pushUnconfirmed": "Push of SHA {sha} was not confirmed. No PR/MR creation was attempted; inspect the remote before retrying.",

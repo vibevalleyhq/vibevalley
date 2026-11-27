@@ -218,7 +218,7 @@ async fn pull_refresh_poll_snapshot_and_issue_fk_preservation() {
     assert_eq!(reopened.find("acme/demo", 9).unwrap().issue_id.as_deref(), Some(issue.id.as_str()));
 
     // Direct PR snapshot fetch (`snapshot::fetch_snapshot` via `HostRunner`)
-    let snap = snapshot::fetch_snapshot(&pulls.gh, "acme/demo", 9).await.unwrap();
+    let snap = snapshot::fetch_snapshot(&pulls.gh, None, "acme/demo", 9).await.unwrap();
     assert_eq!(snap.head, "deadbeef");
     let (failed, _) = checks_verdict(&snap.checks);
     assert_eq!(failed.len(), 1);
@@ -342,4 +342,76 @@ async fn pull_background_poller_preserves_pull_poll_span_and_stops_on_runtime_sh
 
     pulls.close_async().await;
     let _ = ctx.shutdown(Duration::from_secs(1)).await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn fetch_snapshot_uses_github_rest_api_for_checks_and_errors_without_credentials() {
+    use axum::Json;
+    use axum::routing::get;
+    use serde_json::json;
+    use tokio_util::sync::CancellationToken;
+
+    use super::publish::HostRunner;
+    use crate::repo::GitHubRest;
+    use crate::setting::Secret;
+
+    vibevalley_i18n::set_locale("en");
+    let router = axum::Router::new()
+        .route(
+            "/repos/acme/demo/pulls/12",
+            get(|| async {
+                Json(json!({
+                    "state": "closed",
+                    "merged": true,
+                    "merged_at": "2026-11-27T00:00:00Z",
+                    "head": { "sha": "deadbeef1234" }
+                }))
+            }),
+        )
+        .route(
+            "/repos/acme/demo/commits/deadbeef1234/check-runs",
+            get(|| async {
+                Json(json!({
+                    "check_runs": [
+                        {
+                            "name": "ci / rust",
+                            "status": "completed",
+                            "conclusion": "success",
+                            "details_url": "https://github.com/acme/demo/actions/runs/9/job/99"
+                        }
+                    ]
+                }))
+            }),
+        )
+        .route("/repos/acme/demo/pulls/12/reviews", get(|| async { Json(json!([])) }))
+        .route("/repos/acme/demo/pulls/12/comments", get(|| async { Json(json!([])) }))
+        .route("/repos/acme/demo/issues/12/comments", get(|| async { Json(json!([])) }))
+        .route("/user", get(|| async { Json(json!({ "login": "octocat" })) }));
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let cancel = CancellationToken::new();
+    let _guard = cancel.clone().drop_guard();
+    tokio::spawn(async move {
+        let _ = axum::serve(listener, router).with_graceful_shutdown(cancel.cancelled_owned()).await;
+    });
+
+    let missing_gh = HostRunner::Custom(Arc::new(|_| Answer {
+        ok: false,
+        out: String::new(),
+        missing: true,
+    }));
+    let rest = GitHubRest::with_base(format!("http://{addr}"), Arc::new(|| Some(Secret::new("ghp_snap"))));
+    let snap = snapshot::fetch_snapshot(&missing_gh, Some(&rest), "acme/demo", 12).await.unwrap();
+    assert_eq!(snap.state, "MERGED");
+    assert_eq!(snap.head, "deadbeef1234");
+    assert_eq!(snap.viewer, "octocat");
+    assert_eq!(snap.checks.len(), 1);
+    assert_eq!(snap.checks[0].name, "ci / rust");
+    assert_eq!(snap.checks[0].status, "COMPLETED");
+    assert_eq!(snap.checks[0].conclusion, "SUCCESS");
+
+    let missing_err = snapshot::fetch_snapshot(&missing_gh, None, "acme/demo", 12).await.unwrap_err();
+    assert_eq!(missing_err.biz_code, vibevalley_protocol::BizCode::RepoRefused.code());
+    assert!(missing_err.message.contains("GitHub Token"), "{}", missing_err.message);
 }

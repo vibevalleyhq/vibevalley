@@ -31,14 +31,25 @@
     "everythingHint": "不只读 VibeValley 替执行会话记的，你在里面的记忆每个执行会话都读得到"
   },
   "github": {
-    "noGh": "没装 gh",
-    "note": "能提 PR 的仓库在「仓库」里看；完成时提 PR 要在配置里打开（github.pr_repos）。",
+    "noGh": "未安装（可选）",
+    "note": "配置 GitHub Token 直连或使用本机 gh 命令行登录后，即可在项目交付时自动推送并创建或合并 PR。",
     "recheck": "重新检测",
-    "cli": "gh 命令行",
-    "cliHint": "合并时开 PR、读仓库用它",
-    "login": "登录",
-    "loginHint": "gh auth login 登录的账号",
-    "notLoggedIn": "没登录"
+    "status": "连接状态",
+    "statusHint": "优先使用 GitHub Token 直连，未配置时回退到本机 gh 登录",
+    "mode": {
+      "token": "已通过 Token 直连",
+      "gh": "已通过 gh 登录",
+      "none": "均未配置"
+    },
+    "token": "GitHub 令牌",
+    "tokenHint": "用于直接调用 GitHub REST API（创建、刷新、合并 PR 与检查状态），也可用环境变量 GITHUB_TOKEN",
+    "tokenPlaceholder": "ghp_… 或 github_pat_…（不改就空着）",
+    "tokenConfigured": "已配置 Token",
+    "cli": "gh 命令行（可选）",
+    "cliHint": "未配置 Token 时可用本机 gh 命令行开 PR 和读项目",
+    "login": "当前账号",
+    "loginHint": "当前 Token 或 gh 对应的 GitHub 账号",
+    "notLoggedIn": "未登录"
   },
   "nav": {
     "label": "设置的分区",
@@ -70,7 +81,7 @@
     "mcp": "MCP Antigravity Claude Code Codex Cursor stdio streamableHttp 接入 配置",
     "voice": "电话 通话 MOSS Live 实时 视觉 转写 语音",
     "chat": "微信 飞书 QQ 聊天通道 连接器 配对",
-    "github": "GitHub gh PR 登录",
+    "github": "GitHub Token gh PR 登录 直连",
     "remote": "远程 手机 Tailscale 配对 二维码 设备 iOS Android CLI 命令行 执行机 沙箱 监听 令牌 总控端 内嵌 远端",
     "data": "家目录 设置文件 仓库 目录 工作树 存储 后端 数据 data storage",
     "about": "版本 更新 命令行 CLI version update"

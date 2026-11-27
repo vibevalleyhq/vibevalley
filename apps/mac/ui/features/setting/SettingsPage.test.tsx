@@ -221,3 +221,75 @@ test("SettingsPage collapses duplicate voice readiness warnings, omits self-poin
   await fake.pumpUntil(app, () => app.count("id:settings-general") === 1);
   expect(app.count("id:settings-models")).toBe(0);
 });
+
+test("SettingsPage GitHub section distinguishes Token, gh, and unconfigured states and saves githubToken", async () => {
+  setLocale("zh");
+  for (const mode of ["token", "gh", "none"] as const) {
+    const fake = fakeHost(scenarios.typical, { route: "/settings/github", locale: "zh" });
+    fake.respond("github.get", {
+      installed: mode === "gh",
+      version: mode === "gh" ? "2.62.0" : null,
+      loggedIn: mode !== "none",
+      account: mode === "none" ? null : "octocat",
+      authMode: mode,
+      reason: mode === "none" ? "unconfigured" : "",
+      checkedAt: SCENARIO_NOW,
+    });
+    const app = await open("../../app/main.tsx", {
+      width: 1200,
+      height: 800,
+      colorScheme: "light",
+      platform: "macos",
+      clock: { time: SCENARIO_NOW },
+      host: fake.options,
+    });
+    await fake.pumpUntil(app, () => app.count(`id:github-mode-${mode}`) === 1);
+    expect(app.count("id:github-token-form")).toBe(1);
+    if (mode !== "none") {
+      expect(app.texts()).toContain("octocat");
+    }
+  }
+
+  const fake = fakeHost(scenarios.typical, { route: "/settings/github", locale: "zh" });
+  const baseSettings = scenarios.typical.responses["setting.get"] as Record<string, unknown>;
+  fake.respond("github.get", {
+    installed: false,
+    version: null,
+    loggedIn: false,
+    account: null,
+    authMode: "none",
+    reason: "",
+    checkedAt: SCENARIO_NOW,
+  });
+  let savedToken: string | undefined;
+  fake.respond("setting.update", (payload: unknown) => {
+    const params = payload as { githubToken?: string };
+    savedToken = params.githubToken;
+    return { ...baseSettings, githubToken: { source: "settings", hint: "…9999" } };
+  });
+  fake.respond("github.refresh", () => ({
+    installed: false,
+    version: null,
+    loggedIn: true,
+    account: "octocat",
+    authMode: "token",
+    reason: "",
+    checkedAt: SCENARIO_NOW + 1,
+  }));
+
+  const app = await open("../../app/main.tsx", {
+    width: 1200,
+    height: 800,
+    colorScheme: "light",
+    platform: "macos",
+    clock: { time: SCENARIO_NOW },
+    host: fake.options,
+  });
+  await fake.pumpUntil(app, () => app.count("id:github-mode-none") === 1 && app.count("id:github-token-form") === 1);
+
+  await app.type("id:github-token >> id:secret", "ghp_testtoken9999");
+  await fake.pumpUntil(app, () => app.count("id:github-token-form >> id:save") === 1);
+  await app.press("id:github-token-form >> id:save");
+  await fake.pumpUntil(app, () => savedToken === "ghp_testtoken9999" && app.count("id:github-mode-token") === 1);
+  expect(app.texts()).toContain("octocat");
+});
