@@ -115,6 +115,19 @@ opt-level = 2
 [profile.dev.package.vibevalley-rich]
 opt-level = 2
 
+# Keep heavy workspace crates unoptimized under `test` profile so unit test iteration skips -O2 codegen.
+[profile.test.package.vibevalley-files]
+opt-level = 0
+
+[profile.test.package.vibevalley-pele]
+opt-level = 0
+
+[profile.test.package.vibevalley-diorama]
+opt-level = 0
+
+[profile.test.package.vibevalley-rich]
+opt-level = 0
+
 [profile.release]
 # Keep default unwinding (`panic = "unwind"`): nsh-core's SVG engine relies on catch_unwind.
 lto = "thin"

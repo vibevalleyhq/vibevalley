@@ -2,3 +2,8 @@
 slow-timeout = { period = "5s", terminate-after = 12 }
 status-level = "pass"
 final-status-level = "slow"
+
+[profile.fast]
+default-filter = "not (test(/hundred_thousand_files_build_and_query_quickly|end_to_end_kill_survivor_baseline_failure_differential_cache_and_zero_live_mutation|sea_orm_postgres_storage_passes_conformance/))"
+status-level = "fail"
+final-status-level = "fail"

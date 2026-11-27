@@ -35,6 +35,7 @@ pub struct ChangedPackagesResult {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RustChangedOptions {
     pub base: String,
+    pub fast: bool,
     pub dry_run: bool,
     pub help: bool,
 }
@@ -165,13 +166,16 @@ pub fn parse_changed_packages(metadata: &CargoMetadata, changed_files: &[String]
 
 pub fn parse_changed_args(argv: &[String]) -> Result<RustChangedOptions, String> {
     let mut base = "origin/main".to_owned();
+    let mut fast = false;
     let mut dry_run = false;
     let mut help = false;
 
     let mut i = 0usize;
     while i < argv.len() {
         let arg = &argv[i];
-        if arg == "--dry-run" {
+        if arg == "--fast" {
+            fast = true;
+        } else if arg == "--dry-run" {
             dry_run = true;
         } else if arg == "--help" || arg == "-h" {
             help = true;
@@ -192,7 +196,7 @@ pub fn parse_changed_args(argv: &[String]) -> Result<RustChangedOptions, String>
         i += 1;
     }
 
-    Ok(RustChangedOptions { base, dry_run, help })
+    Ok(RustChangedOptions { base, fast, dry_run, help })
 }
 
 fn run_capture(cmd: &str, args: &[&str], cwd: &Path) -> Result<String, String> {
@@ -255,7 +259,7 @@ pub fn has_nextest() -> bool {
 pub fn run(root: &Path, argv: &[String]) -> Result<i32, String> {
     let options = parse_changed_args(argv)?;
     if options.help {
-        println!("usage: cargo xtask changed [--base <ref>] [--dry-run]");
+        println!("usage: cargo xtask changed [--base <ref>] [--fast] [--dry-run]");
         return Ok(0);
     }
 
@@ -309,6 +313,10 @@ pub fn run(root: &Path, argv: &[String]) -> Result<i32, String> {
 
     if has_nextest() {
         let mut nextest_args = vec!["nextest".to_owned(), "run".to_owned()];
+        if options.fast {
+            nextest_args.push("--profile".to_owned());
+            nextest_args.push("fast".to_owned());
+        }
         nextest_args.extend(pkg_args);
         nextest_args.push("--no-fail-fast".to_owned());
         run_step("cargo", &nextest_args, root)
@@ -463,14 +471,16 @@ mod tests {
             parse_changed_args(&[]).unwrap(),
             RustChangedOptions {
                 base: "origin/main".to_owned(),
+                fast: false,
                 dry_run: false,
                 help: false,
             }
         );
         assert_eq!(
-            parse_changed_args(&s(&["--base", "main", "--dry-run"])).unwrap(),
+            parse_changed_args(&s(&["--base", "main", "--fast", "--dry-run"])).unwrap(),
             RustChangedOptions {
                 base: "main".to_owned(),
+                fast: true,
                 dry_run: true,
                 help: false,
             }
@@ -479,6 +489,7 @@ mod tests {
             parse_changed_args(&s(&["--base=HEAD~2"])).unwrap(),
             RustChangedOptions {
                 base: "HEAD~2".to_owned(),
+                fast: false,
                 dry_run: false,
                 help: false,
             }
@@ -487,6 +498,7 @@ mod tests {
             parse_changed_args(&s(&["--help"])).unwrap(),
             RustChangedOptions {
                 base: "origin/main".to_owned(),
+                fast: false,
                 dry_run: false,
                 help: true,
             }

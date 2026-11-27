@@ -39,7 +39,7 @@ Usage: cargo xtask <command> [options]
 
 Commands:
   check                                Run fmt --check, clippy -D warnings, and nextest/test
-  changed [--base <ref>] [--dry-run]   Check affected Rust crates and transitive reverse dependents
+  changed [--base <ref>] [--fast] [--dry-run]   Check affected Rust crates and transitive reverse dependents
   loom                                 Run loom concurrency tests (runtime & server)
   goldens [--check]                    Run vibevalley-core note golden tests
   protocol [--write]                   Check (or with --write, regenerate) TS contract & goldens
