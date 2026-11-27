@@ -411,6 +411,8 @@ async function seedOld(c: Client): Promise<SeedIds> {
   await c.call("provider.update", {
     revision: 0,
     connections: [{ id: "offline", name: "Offline fixture", adapter: "moss", enabled: true, key: "local-fixture-only" }],
+    orchestrator: null,
+    polish: null,
     image: { connection: "offline", model: "moss-image-base-1.0" },
     speech: null,
     understanding: null,
@@ -419,6 +421,7 @@ async function seedOld(c: Client): Promise<SeedIds> {
     voiceDesign: null,
     transcription: null,
     vision: null,
+    scenePolicies: [],
   });
 
   const due = new Date(Date.now() + 86_400_000).toISOString().replace(/\.\d{3}Z$/u, "Z");

@@ -294,6 +294,7 @@ impl Router {
             E::VoiceAsrTranscribe => on!(p, VoiceAsrTranscribe, |r| c.voice.handle_asr_transcribe(r).await?),
             E::ProviderGet => ret!(ok_json(c.provider.status())),
             E::ProviderUpdate => on!(p, ProviderUpdate, |r| c.provider.update_async(&r).await?),
+            E::ProviderVerify => on!(p, ProviderVerify, |r| c.provider.verify_async(&r).await?),
             E::ProviderVoiceList => on!(p, ProviderVoiceList, |r| c.provider.voices_async(&r).await?),
             E::ProviderModelList => on!(p, ProviderModelList, |r| c.provider.models_async(&r.connection, r.revision).await?),
             E::SettingGet => ret!(ok_json(c.setting.status())),

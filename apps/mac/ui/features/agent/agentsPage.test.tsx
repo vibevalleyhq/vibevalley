@@ -42,18 +42,18 @@ test("localizeAgentProblem translates raw DeepSeek and generic API key errors wi
   setLocale("zh");
   expect(localizeAgentProblem("no DeepSeek API key is set")).toEqual({
     text: "还没填 DeepSeek 的钥匙",
-    fixHref: "/settings/models",
+    fixHref: "/settings/providers",
   });
   expect(localizeAgentProblem("no API key is set for the model")).toEqual({
     text: "还没填模型 API 密钥",
-    fixHref: "/settings/models",
+    fixHref: "/settings/providers",
   });
   expect(localizeAgentProblem("custom error")).toEqual({ text: "custom error" });
 
   setLocale("en");
   expect(localizeAgentProblem("no DeepSeek API key is set")).toEqual({
     text: "No DeepSeek key yet",
-    fixHref: "/settings/models",
+    fixHref: "/settings/providers",
   });
 });
 
@@ -99,10 +99,10 @@ test("AgentsPage uses unified top bar, localizes API-key readiness errors with c
   expect(app.texts()).toContain("跑在内置环境");
   expect(app.texts().some((line) => line.includes("跑在 VibeValley 自己的 agent"))).toBe(false);
 
-  // Clicking 去设置 navigates directly to /settings/models.
+  // Clicking 去设置 navigates directly to /settings/providers.
   await app.press("id:agent-card-fix-laozhou");
-  await fake.pumpUntil(app, () => app.count("id:settings-models") === 1);
-  expect(app.count("id:settings-models")).toBe(1);
+  await fake.pumpUntil(app, () => app.count("id:settings-providers") === 1);
+  expect(app.count("id:settings-providers")).toBe(1);
 });
 
 test("AgentPage avatar picker has unique labels for every role avatar and Stage omits redundant name/duty pill", async () => {

@@ -411,7 +411,19 @@ export {
   VoiceSaid,
 } from "./voice/schema";
 export { MemorySourceKind, SettingsStatus, SettingsUpdate, UserProfile } from "./setting/schema";
-export { ProviderModelListing, ProviderModelRequest, ProviderStatus, ProviderUpdate, ProviderVoiceListing, ProviderVoiceRequest } from "./provider/schema";
+export {
+  ModelCapability,
+  ProviderConnectionAdapter,
+  ProviderModelListing,
+  ProviderModelRequest,
+  ProviderScene,
+  ProviderStatus,
+  ProviderUpdate,
+  ProviderVerificationStatus,
+  ProviderVerifyRequest,
+  ProviderVoiceListing,
+  ProviderVoiceRequest,
+} from "./provider/schema";
 export {
   RemoteDeviceRevokeRequest,
   RemoteDeviceSummary,

@@ -1663,6 +1663,15 @@ pub const ENDPOINTS: &[Endpoint] = &[
         result: Some("ProviderStatus"),
     },
     Endpoint {
+        op: "provider.verify",
+        module: "provider",
+        about: &[],
+        can: &[Caller::User],
+        dry_run: None,
+        input: Some("ProviderVerifyRequest"),
+        result: Some("ProviderStatus"),
+    },
+    Endpoint {
         op: "provider.voice.list",
         module: "provider",
         about: &["connection"],
@@ -3155,6 +3164,12 @@ pub mod ops {
         type Input = t::ProviderUpdate;
         type Result = t::ProviderStatus;
     }
+    pub struct ProviderVerify;
+    impl Op for ProviderVerify {
+        const NAME: &'static str = "provider.verify";
+        type Input = t::ProviderVerifyRequest;
+        type Result = t::ProviderStatus;
+    }
     pub struct ProviderVoiceList;
     impl Op for ProviderVoiceList {
         const NAME: &'static str = "provider.voice.list";
@@ -3702,6 +3717,7 @@ endpoint_ids! {
     // provider & setting
     ProviderGet => "provider.get",
     ProviderUpdate => "provider.update",
+    ProviderVerify => "provider.verify",
     ProviderVoiceList => "provider.voice.list",
     ProviderModelList => "provider.model.list",
     SettingGet => "setting.get",

@@ -2758,48 +2758,84 @@ export const catalogs = {
     "web.provider": {
       speechNotice:
         "可独立选择 Flash 或 Pro，再到媒体库的「生成」里生成单人语音。完整音频生成后可播放并保存为 WAV 或 MP3，不是流式播放；保存设置不会生成音频。",
-      title: "用途",
-      intro: "每个功能用哪个账号和模型。账号和钥匙在「账号与钥匙」里填。",
-      words: "供应商 MOSS 连接 模型 密钥 生图 快照 理解 语音 音频 AI",
-      understandingNotice: "配置独立的连接和模型。在媒体库的一张图或视频上点「理解」并明确确认上传；保存配置不会上传文件或发起推理。",
-      imageNotice: "保存默认连接和模型后，在「生图」页提交生成任务。保存配置不会发起生图。",
-      add: "添加 MOSS 连接",
+      title: "模型与模型策略",
+      intro: "按场景指定主选模型与备选回退策略；候选仅来自已配置并拉取成功的模型商。",
+      words: "模型商 DeepSeek MiniMax MOSS OpenAI Anthropic API Key 密钥 验证 拉取 能力 策略 备选 回退",
+      understandingNotice: "配置独立的视觉理解模型。在媒体库的一张图或视频上点「理解」并明确确认上传；保存配置不会上传文件或发起推理。",
+      imageNotice: "保存默认图像模型后，在「生图」页提交生成任务。保存配置不会发起生图。",
+      add: "配置模型商",
       reload: "重新加载",
       reloadAsk: "放弃未保存的修改，读取最新设置？",
-      console: "MOSS 开放平台",
-      empty: "还没有供应商连接。添加 MOSS 连接后，可以配置默认用途。",
-      name: "连接名称",
+      console: "开放平台",
+      empty: "还没有已配置并验证的模型商。请先前往「模型商」填写 API 密钥并拉取可用模型。",
+      emptyCta: "前往配置模型商",
+      emptyScene: "暂无支持 {capability} 的可用模型，请先前往模型商验证对应凭据。",
+      manageProviders: "管理模型商",
+      name: "名称",
       enabled: "启用",
-      remove: "删除连接",
-      removeAsk: "从草稿中移除这条连接？保存后生效，仍被用途引用时不能保存。",
-      discover: "查询模型",
-      saveFirst: "先保存修改，再查询账号可用模型。",
-      discoveryHint: "只查询目录，不发推理请求；模型可见不代表推理已验证。",
-      noModels: "此账号返回的模型目录为空。",
+      remove: "清除凭据",
+      removeAsk: "清除这个模型商的密钥？保存后生效，仍被场景引用时不能保存。",
+      discover: "验证并拉取模型",
+      verifying: "验证中…",
+      verifiedBadge: "已连接 · {n} 个模型",
+      failedBadge: "连接失败",
+      unverifiedBadge: "待验证",
+      notConfiguredBadge: "未配置",
+      fromConfigBadge: "来自启动参数",
+      baseUrl: "自定义接口地址（可选）",
+      baseUrlToggle: "高级地址设置",
+      baseUrlPlaceholder: "默认：{url}",
+      discoveredModels: "可用模型（{n}）",
+      saveAndVerify: "保存并验证",
+      saveFirst: "先保存修改，再拉取可用模型。",
+      discoveryHint: "只验证连通性并拉取模型目录，不发推理请求。",
+      noModels: "此模型商返回的模型目录为空。",
       unbound: "不使用",
-      liveHint: "MOSS Live 使用独立的连接和模型，用于实时语音通话。",
-      bindingHint: "删除、禁用或清除密钥前，先将引用它的用途设为「不使用」。在途请求使用发起时的配置；新请求读取新设置。",
-      manage: "管理 AI 服务连接",
-      connections: "连接",
-      uses: "用途",
-      usesIntro: "每个用途选一个连接和模型；不选就是不使用。",
-      groupImage: "图像",
-      groupVoice: "语音",
-      groupLive: "实时",
+      liveHint: "用于实时语音通话与实时交互。",
+      polishHint: "语音听写结束后用于断句、标点恢复与口语顺句润色。",
+      orchestratorHint: "主助手对话、任务拆解与频道协作使用。",
+      transcriptionHint: "频道语音输入（ASR 听写）与音频文件转写使用。",
+      bindingHint: "禁用或清除模型商密钥前，先将引用它的场景主选与备选设为「不使用」。在途请求使用发起时的配置；新请求读取新设置。",
+      manage: "管理模型商",
+      connections: "模型商凭据",
+      uses: "按场景模型策略",
+      usesIntro: "每个场景仅可从已配置模型商拉取到的能力匹配模型中选择；可按需添加备选回退链路。",
+      groupChat: "对话与文本",
+      groupImage: "视觉与生图",
+      groupVoice: "语音与听写",
+      groupLive: "实时交互",
+      fallbackTitle: "备选模型（按序回退）",
+      addFallback: "添加备选",
+      removeFallback: "移除备选",
+      moveFallbackUp: "上移",
+      moveFallbackDown: "下移",
+      fallbackEmpty: "未配置备选模型（主选失败时直接报错）",
+      fallbackSelect: "选择备选模型…",
+      unverifiedModelTag: "未在目录中",
+      capability: { chat: "Chat 对话", asr: "ASR 听写", tts: "TTS 语音", realtime: "Realtime 实时", vision: "Vision 视觉", image: "Image 生图" },
+      vendorHint: {
+        deepseek: "DeepSeek 大模型（主助手对话、文本润色）",
+        minimax: "MiniMax 文本、语音与多模态模型",
+        moss: "MOSS 语音听写（ASR）、语音合成（TTS）、实时通话、视觉与生图",
+        openai: "OpenAI GPT、Whisper、TTS 与图像模型",
+        anthropic: "Anthropic Claude 对话与视觉理解模型",
+      },
       use: {
-        image: "生图",
+        orchestrator: "主助手对话",
+        polish: "文本润色",
+        image: "图像生成",
         understanding: "媒体理解",
-        speech: "单人语音",
+        speech: "单人语音 (TTS)",
         speakers: "多人语音",
         voiceDesign: "音色设计",
-        transcription: "音频转写",
-        live: "MOSS Live",
+        transcription: "语音听写 (ASR)",
+        live: "实时语音通话",
         vision: "实时视觉",
       },
-      connectionFor: "{use}用的连接",
+      connectionFor: "{use}用的模型商",
       modelFor: "{use}用的模型",
       openSpeechShort: "去生成",
-      adapted: "能用的模型",
+      adapted: "已拉取模型",
     },
     "web.remote": {
       title: "远程访问",
@@ -3352,7 +3388,7 @@ export const catalogs = {
         en: "English",
         label: "界面语言",
       },
-      keys: { deepseekHint: "sk-…（不改就空着）", saved: "存好了，马上就用上。" },
+      keys: { saved: "存好了，马上就用上。" },
       source: {
         off: "没接",
         on: "接上了",
@@ -3396,7 +3432,8 @@ export const catalogs = {
         profile: "个人资料",
         general: "通用",
         appearance: "外观",
-        models: "模型与环境",
+        providers: "模型商",
+        models: "模型与模型策略",
         skills: "技能",
         mcp: "MCP 接入",
         voice: "语音与通话",
@@ -3414,7 +3451,8 @@ export const catalogs = {
         profile: "个人资料 头像 昵称 签名 avatar profile display name",
         general: "语言 language 启动 打开 工作台 农场",
         appearance: "主题 深色 浅色 暗色 dark light 界面大小 缩放 字体 字号 动画 无动画 动效 motion animation",
-        models: "密钥 钥匙 账号 DeepSeek MOSS API Key 模型 绑定 环境",
+        providers: "模型商 密钥 钥匙 API Key 凭据 验证 拉取 DeepSeek MiniMax MOSS OpenAI Anthropic",
+        models: "模型 策略 场景 备选 回退 主助手 润色 听写 语音 实时 视觉 生图 ASR TTS",
         skills: "技能 skill skills 内置 安装 指南 提示词",
         memory: "记忆 memory 来源 source Nowledge EverOS 外部记忆 读 写",
         mcp: "MCP Antigravity Claude Code Codex Cursor stdio streamableHttp 接入 配置",
@@ -3512,7 +3550,8 @@ export const catalogs = {
         backendS3: "对象存储 (S3)",
         backendMemory: "内存存储 (Memory)",
       },
-      models: { intro: "配置主助手、执行会话与语音功能的模型账号和 API 密钥。", deepseekHint: "主助手和 VibeValley 自研执行会话用它" },
+      providers: { intro: "统一配置 DeepSeek、MiniMax、MOSS 等模型商凭据（1 个模型商对应 1 个 API 密钥），验证连通性并自动拉取带能力标签的可用模型。" },
+      models: { intro: "按场景选择主选模型与备选回退策略；仅从已配置并拉取到可用模型的模型商中选择。" },
       memory: { intro: "执行会话还能去外面的记忆来源里查、往里记。" },
       about: {
         intro: "查看服务端版本、桌面自动更新状态与命令行工具安装情况。",
@@ -6822,50 +6861,86 @@ export const catalogs = {
     "web.provider": {
       speechNotice:
         "Choose a separate Flash or Pro binding, then generate one speaker from Generate in the Library. The completed audio can be played and saved as WAV or MP3; this is not streaming playback. Saving settings does not generate audio.",
-      title: "Uses",
-      intro: "Which account and model each feature uses. Accounts and keys are set under Accounts and keys.",
-      words: "provider MOSS connection model key image generation snapshot understanding speech audio AI",
+      title: "Models & Model Policy",
+      intro: "Assign primary models and fallback chains per scene from verified providers only.",
+      words: "provider DeepSeek MiniMax MOSS OpenAI Anthropic API key verify fetch capability policy fallback",
       understandingNotice:
-        "Configure the independent connection and model. Choose Understand on an image or video in the Library and explicitly approve the upload. Saving this configuration does not upload or run inference.",
-      imageNotice: "Save a default connection and model, then submit a task on the Images page. Saving settings does not generate an image.",
-      add: "Add MOSS connection",
+        "Configure the independent vision understanding model. Choose Understand on an image or video in the Library and explicitly approve the upload. Saving this configuration does not upload or run inference.",
+      imageNotice: "Save a default image model, then submit a task on the Images page. Saving settings does not generate an image.",
+      add: "Configure provider",
       reload: "Reload",
       reloadAsk: "Discard unsaved changes and load the latest settings?",
-      console: "MOSS platform",
-      empty: "No provider connections yet. Add a MOSS connection to configure default uses.",
-      name: "Connection name",
+      console: "Platform console",
+      empty: "No verified provider models available yet. Configure an API key under Model Providers to fetch models first.",
+      emptyCta: "Go to Model Providers",
+      emptyScene: "No discovered model supports {capability}. Verify a provider with {capability} models first.",
+      manageProviders: "Manage providers",
+      name: "Name",
       enabled: "Enabled",
-      remove: "Delete connection",
-      removeAsk: "Remove this connection from the draft? Saving applies the change and requires unbinding its uses first.",
-      discover: "Query models",
-      saveFirst: "Save changes before querying the account's available models.",
-      discoveryHint: "Catalog only, no inference. A listed model has not been verified by inference.",
-      noModels: "This account returned an empty model catalog.",
+      remove: "Clear credentials",
+      removeAsk: "Clear credentials for this provider? Saving applies the change and requires unbinding its scenes first.",
+      discover: "Verify & Fetch Models",
+      verifying: "Verifying…",
+      verifiedBadge: "Connected · {n} models",
+      failedBadge: "Connection failed",
+      unverifiedBadge: "Unverified",
+      notConfiguredBadge: "Not configured",
+      fromConfigBadge: "From startup config",
+      baseUrl: "Custom Base URL (optional)",
+      baseUrlToggle: "Base URL settings",
+      baseUrlPlaceholder: "Default: {url}",
+      discoveredModels: "Available models ({n})",
+      saveAndVerify: "Save & Verify",
+      saveFirst: "Save changes before fetching available models.",
+      discoveryHint: "Checks connectivity and fetches the model catalog only; no inference is run.",
+      noModels: "This provider returned an empty model catalog.",
       unbound: "Not in use",
-      liveHint: "MOSS Live uses its own connection and model for realtime voice calls.",
+      liveHint: "Used for realtime voice calls and interactive sessions.",
+      polishHint: "Used after voice dictation to restore punctuation and clean up phrasing.",
+      orchestratorHint: "Used by the assistant for chat, triage, and channel coordination.",
+      transcriptionHint: "Used for Composer ASR voice dictation and audio transcription.",
       bindingHint:
-        "Unbind uses before deleting, disabling or clearing a connection's key. In-flight requests keep their starting configuration; new requests use the updated settings.",
-      manage: "Manage AI service connections",
-      connections: "Connections",
-      uses: "Uses",
-      usesIntro: "Pick a connection and model for each use; none leaves it unused.",
-      groupImage: "Images",
-      groupVoice: "Voice",
-      groupLive: "Live",
+        "Unbind scenes and fallbacks before disabling or clearing a provider's key. In-flight requests keep their starting configuration; new requests use updated settings.",
+      manage: "Manage providers",
+      connections: "Provider Credentials",
+      uses: "Per-Scene Model Policy",
+      usesIntro: "Select only from models discovered from configured providers with matching capabilities, and optionally add ordered fallbacks.",
+      groupChat: "Chat & Text",
+      groupImage: "Vision & Image",
+      groupVoice: "Voice & Dictation",
+      groupLive: "Realtime",
+      fallbackTitle: "Fallback chain",
+      addFallback: "Add fallback",
+      removeFallback: "Remove fallback",
+      moveFallbackUp: "Move up",
+      moveFallbackDown: "Move down",
+      fallbackEmpty: "No fallback models configured",
+      fallbackSelect: "Choose fallback model…",
+      unverifiedModelTag: "Not in catalog",
+      capability: { chat: "Chat", asr: "ASR", tts: "TTS", realtime: "Realtime", vision: "Vision", image: "Image" },
+      vendorHint: {
+        deepseek: "DeepSeek models for assistant chat and text polish",
+        minimax: "MiniMax chat, speech, and multimodal models",
+        moss: "MOSS ASR dictation, TTS speech, realtime voice, vision, and image generation",
+        openai: "OpenAI GPT, Whisper, TTS, and image models",
+        anthropic: "Anthropic Claude chat and vision models",
+      },
       use: {
+        orchestrator: "Assistant chat",
+        polish: "Text polish",
         image: "Image generation",
         understanding: "Media understanding",
-        speech: "Speech",
+        speech: "Speech (TTS)",
         speakers: "Dialogue",
         voiceDesign: "Voice design",
-        transcription: "Transcription",
-        live: "MOSS Live",
+        transcription: "Dictation (ASR)",
+        live: "Realtime voice",
         vision: "Live vision",
       },
-      connectionFor: "Connection for {use}",
+      connectionFor: "Provider for {use}",
       modelFor: "Model for {use}",
       openSpeechShort: "Open",
-      adapted: "Models it can use",
+      adapted: "Discovered models",
     },
     "web.remote": {
       title: "Remote Access",
@@ -7444,7 +7519,7 @@ export const catalogs = {
         en: "English",
         label: "Page language",
       },
-      keys: { deepseekHint: "sk-… (leave empty to keep)", saved: "Saved, in use at once." },
+      keys: { saved: "Saved, in use at once." },
       source: {
         off: "Not set up",
         on: "On",
@@ -7488,7 +7563,8 @@ export const catalogs = {
         profile: "Profile",
         general: "General",
         appearance: "Appearance",
-        models: "Models & Environments",
+        providers: "Model Providers",
+        models: "Models & Model Policy",
         skills: "Skills",
         mcp: "MCP Integrations",
         voice: "Voice & Calls",
@@ -7506,7 +7582,8 @@ export const catalogs = {
         profile: "profile avatar display name tagline bio",
         general: "language start workbench farm startup",
         appearance: "theme dark light size zoom scale font animation motion reduce",
-        models: "keys accounts DeepSeek MOSS API key models binding environments",
+        providers: "providers credentials API key verify fetch DeepSeek MiniMax MOSS OpenAI Anthropic",
+        models: "models policy scene fallback orchestrator chat polish ASR dictation TTS speech realtime vision image",
         skills: "skills skill built-in installed library prompt",
         memory: "memory source sources Nowledge EverOS external read write",
         mcp: "MCP Antigravity Claude Code Codex Cursor stdio streamableHttp integration",
@@ -7605,7 +7682,11 @@ export const catalogs = {
         backendS3: "Object Storage (S3)",
         backendMemory: "In-Memory (Memory)",
       },
-      models: { intro: "Configure model accounts, API keys, and feature bindings.", deepseekHint: "The assistant and VibeValley's own helpers use it" },
+      providers: {
+        intro:
+          "Manage credentials for DeepSeek, MiniMax, MOSS, and other providers (1 provider = 1 API key), verify connectivity, and auto-fetch capability-tagged models.",
+      },
+      models: { intro: "Configure per-scene primary models and fallback policies from discovered provider models only." },
       memory: { intro: "Helpers can also look things up in, and write to, memory outside VibeValley." },
       about: {
         intro: "Inspect server version, desktop auto-update status, and CLI installation.",
@@ -10943,14 +11024,33 @@ export interface Messages {
   "web.orchestrator.orchestrator.trajectory": undefined;
   "web.provider.adapted": undefined;
   "web.provider.add": undefined;
+  "web.provider.addFallback": undefined;
+  "web.provider.baseUrl": undefined;
+  "web.provider.baseUrlPlaceholder": { readonly url: string | number };
+  "web.provider.baseUrlToggle": undefined;
   "web.provider.bindingHint": undefined;
+  "web.provider.capability.asr": undefined;
+  "web.provider.capability.chat": undefined;
+  "web.provider.capability.image": undefined;
+  "web.provider.capability.realtime": undefined;
+  "web.provider.capability.tts": undefined;
+  "web.provider.capability.vision": undefined;
   "web.provider.connectionFor": { readonly use: string | number };
   "web.provider.connections": undefined;
   "web.provider.console": undefined;
   "web.provider.discover": undefined;
+  "web.provider.discoveredModels": { readonly n: string | number };
   "web.provider.discoveryHint": undefined;
   "web.provider.empty": undefined;
+  "web.provider.emptyCta": undefined;
+  "web.provider.emptyScene": { readonly capability: string | number };
   "web.provider.enabled": undefined;
+  "web.provider.failedBadge": undefined;
+  "web.provider.fallbackEmpty": undefined;
+  "web.provider.fallbackSelect": undefined;
+  "web.provider.fallbackTitle": undefined;
+  "web.provider.fromConfigBadge": undefined;
+  "web.provider.groupChat": undefined;
   "web.provider.groupImage": undefined;
   "web.provider.groupLive": undefined;
   "web.provider.groupVoice": undefined;
@@ -10958,21 +11058,34 @@ export interface Messages {
   "web.provider.intro": undefined;
   "web.provider.liveHint": undefined;
   "web.provider.manage": undefined;
+  "web.provider.manageProviders": undefined;
   "web.provider.modelFor": { readonly use: string | number };
+  "web.provider.moveFallbackDown": undefined;
+  "web.provider.moveFallbackUp": undefined;
   "web.provider.name": undefined;
   "web.provider.noModels": undefined;
+  "web.provider.notConfiguredBadge": undefined;
   "web.provider.openSpeechShort": undefined;
+  "web.provider.orchestratorHint": undefined;
+  "web.provider.polishHint": undefined;
   "web.provider.reload": undefined;
   "web.provider.reloadAsk": undefined;
   "web.provider.remove": undefined;
   "web.provider.removeAsk": undefined;
+  "web.provider.removeFallback": undefined;
+  "web.provider.saveAndVerify": undefined;
   "web.provider.saveFirst": undefined;
   "web.provider.speechNotice": undefined;
   "web.provider.title": undefined;
+  "web.provider.transcriptionHint": undefined;
   "web.provider.unbound": undefined;
   "web.provider.understandingNotice": undefined;
+  "web.provider.unverifiedBadge": undefined;
+  "web.provider.unverifiedModelTag": undefined;
   "web.provider.use.image": undefined;
   "web.provider.use.live": undefined;
+  "web.provider.use.orchestrator": undefined;
+  "web.provider.use.polish": undefined;
   "web.provider.use.speakers": undefined;
   "web.provider.use.speech": undefined;
   "web.provider.use.transcription": undefined;
@@ -10981,6 +11094,13 @@ export interface Messages {
   "web.provider.use.voiceDesign": undefined;
   "web.provider.uses": undefined;
   "web.provider.usesIntro": undefined;
+  "web.provider.vendorHint.anthropic": undefined;
+  "web.provider.vendorHint.deepseek": undefined;
+  "web.provider.vendorHint.minimax": undefined;
+  "web.provider.vendorHint.moss": undefined;
+  "web.provider.vendorHint.openai": undefined;
+  "web.provider.verifiedBadge": { readonly n: string | number };
+  "web.provider.verifying": undefined;
   "web.provider.words": undefined;
   "web.remote.channel.empty": undefined;
   "web.remote.channel.replyPlaceholder": undefined;
@@ -11657,7 +11777,6 @@ export interface Messages {
   "web.setting.github.tokenConfigured": undefined;
   "web.setting.github.tokenHint": undefined;
   "web.setting.github.tokenPlaceholder": undefined;
-  "web.setting.keys.deepseekHint": undefined;
   "web.setting.keys.saved": undefined;
   "web.setting.language.en": undefined;
   "web.setting.language.label": undefined;
@@ -11690,7 +11809,6 @@ export interface Messages {
   "web.setting.missing.mossAccount": undefined;
   "web.setting.missing.mossKey": undefined;
   "web.setting.missing.mossOff": undefined;
-  "web.setting.models.deepseekHint": undefined;
   "web.setting.models.intro": undefined;
   "web.setting.nav.about": undefined;
   "web.setting.nav.appearance": undefined;
@@ -11705,6 +11823,7 @@ export interface Messages {
   "web.setting.nav.memory": undefined;
   "web.setting.nav.models": undefined;
   "web.setting.nav.profile": undefined;
+  "web.setting.nav.providers": undefined;
   "web.setting.nav.remote": undefined;
   "web.setting.nav.search": undefined;
   "web.setting.nav.skills": undefined;
@@ -11727,6 +11846,7 @@ export interface Messages {
   "web.setting.profile.taglinePlaceholder": undefined;
   "web.setting.profile.upload": undefined;
   "web.setting.profile.uploading": undefined;
+  "web.setting.providers.intro": undefined;
   "web.setting.readiness.fix": undefined;
   "web.setting.readiness.lacks": { readonly feature: string | number; readonly why: string | number };
   "web.setting.readiness.ready": { readonly feature: string | number };
@@ -11762,6 +11882,7 @@ export interface Messages {
   "web.setting.words.memory": undefined;
   "web.setting.words.models": undefined;
   "web.setting.words.profile": undefined;
+  "web.setting.words.providers": undefined;
   "web.setting.words.remote": undefined;
   "web.setting.words.skills": undefined;
   "web.setting.words.voice": undefined;

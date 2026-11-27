@@ -109,11 +109,11 @@ test("localizeIssueError maps raw English API-key failures to localized copy wit
   setLocale("zh");
   const direct = localizeIssueError("no API key is set for the model");
   expect(direct.text).toBe(t("web.issue.error.missingApiKey"));
-  expect(direct.settingsHref).toBe("/settings/models");
+  expect(direct.settingsHref).toBe("/settings/providers");
 
   const milestone = localizeIssueError("失败：no DeepSeek API key is set");
   expect(milestone.text).toBe(`失败：${t("web.issue.error.missingApiKey")}`);
-  expect(milestone.settingsHref).toBe("/settings/models");
+  expect(milestone.settingsHref).toBe("/settings/providers");
 
   const unrelated = localizeIssueError("exit status 1");
   expect(unrelated).toEqual({ text: "exit status 1" });
