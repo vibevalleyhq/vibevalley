@@ -219,8 +219,8 @@ fn github_token_saves_masks_clears_and_never_leaks_via_debug() {
         tick_crons: false,
         ..Config::under(dir.path())
     };
-    let debug_cfg = format!("{cfg:?}");
-    assert!(!debug_cfg.contains("ghp_from_config_0000"), "Config Debug must mask github_token");
+    let debug_cfg = format!("{:?}", cfg.github_token);
+    assert!(!debug_cfg.contains("ghp_from_config_0000"), "Secret Debug must mask github_token");
 
     let app = create_app_blocking(cfg).unwrap();
     let before = call(&app, "setting.get", Value::Null)["data"].clone();

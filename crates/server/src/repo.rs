@@ -92,7 +92,6 @@ struct Run {
     ok: bool,
     out: String,
     err: String,
-    missing: bool,
 }
 
 async fn run_async(program: &str, args: &[&str], cwd: Option<&Path>, env: &[(&str, &str)]) -> Run {
@@ -109,13 +108,11 @@ async fn run_async(program: &str, args: &[&str], cwd: Option<&Path>, env: &[(&st
             ok: o.status.success(),
             out: String::from_utf8_lossy(&o.stdout).into_owned(),
             err: String::from_utf8_lossy(&o.stderr).into_owned(),
-            missing: false,
         },
         Err(e) => Run {
             ok: false,
             out: String::new(),
             err: e.to_string(),
-            missing: e.kind() == std::io::ErrorKind::NotFound,
         },
     }
 }
@@ -241,7 +238,7 @@ pub(crate) enum GitHubApiError {
 }
 
 impl GitHubApiError {
-    pub(crate) fn summary(&self) -> String {
+    pub(crate) fn describe(&self) -> String {
         match self {
             Self::MissingToken => "missing token".into(),
             Self::Unauthorized => "401 unauthorized".into(),
@@ -303,7 +300,14 @@ impl GitHubRest {
         body: Option<&B>,
     ) -> Result<(u16, Vec<u8>), GitHubApiError> {
         let token = self.token().ok_or(GitHubApiError::MissingToken)?;
-        let url = format!("{}{}", self.api_base, path);
+        let base_url = format!("{}{}", self.api_base, path);
+        let url = if query.is_empty() {
+            base_url
+        } else {
+            url::Url::parse_with_params(&base_url, query)
+                .map(|u| u.to_string())
+                .map_err(|e| GitHubApiError::Network(e.to_string()))?
+        };
         let client = no_redirect_client().map_err(GitHubApiError::Network)?;
         let mut req = client
             .request(method, &url)
@@ -312,9 +316,6 @@ impl GitHubRest {
             .header("accept", "application/vnd.github+json")
             .header("user-agent", "vibevalley")
             .header("x-github-api-version", "2022-11-28");
-        if !query.is_empty() {
-            req = req.query(query);
-        }
         if let Some(payload) = body {
             req = req.json(payload);
         }
@@ -327,9 +328,7 @@ impl GitHubRest {
             403 => Err(GitHubApiError::Forbidden),
             404 => Err(GitHubApiError::NotFound),
             s => {
-                let message = serde_json::from_slice::<WireGithubError>(&bytes)
-                    .map(|e| e.message)
-                    .unwrap_or_default();
+                let message = serde_json::from_slice::<WireGithubError>(&bytes).map(|e| e.message).unwrap_or_default();
                 Err(GitHubApiError::Http(s, message))
             }
         }
@@ -375,12 +374,14 @@ impl GitHubRest {
     }
 }
 
+#[cfg(test)]
 type GhProbeFn = Arc<dyn Fn(&[&str]) -> Run + Send + Sync>;
 
 #[derive(Clone, Default)]
 enum GhProbe {
     #[default]
     Cli,
+    #[cfg(test)]
     Custom(GhProbeFn),
 }
 
@@ -388,6 +389,7 @@ impl std::fmt::Debug for GhProbe {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Cli => f.write_str("GhProbe::Cli"),
+            #[cfg(test)]
             Self::Custom(_) => f.write_str("GhProbe::Custom"),
         }
     }
@@ -397,6 +399,7 @@ impl GhProbe {
     async fn run(&self, args: &[&str]) -> Run {
         match self {
             Self::Cli => gh_async(args).await,
+            #[cfg(test)]
             Self::Custom(f) => {
                 let f = f.clone();
                 let owned: Vec<String> = args.iter().map(|s| (*s).to_string()).collect();
@@ -409,7 +412,6 @@ impl GhProbe {
                     ok: false,
                     out: String::new(),
                     err: String::new(),
-                    missing: false,
                 })
             }
         }
@@ -497,7 +499,7 @@ async fn probe_github_with_runner_async(gh: &GhProbe, rest: Option<&GitHubRest>)
                 s.reason = t("server.repo.github.tokenInvalid", &[]);
             }
             Err(err) => {
-                s.reason = t("server.repo.github.tokenNetwork", &[("why", err.summary().into())]);
+                s.reason = t("server.repo.github.tokenNetwork", &[("why", err.describe().into())]);
             }
         }
         return s;
@@ -1117,7 +1119,7 @@ impl Repo {
             init_external_git_async(&canon).await?;
             let updated = RepoFolder { git: true, ..found };
             let status = self.github_status();
-            let rest = (status.auth_mode == GitHubAuthMode::Token).then(|| self.github_rest.as_ref()).flatten();
+            let rest = (status.auth_mode == GitHubAuthMode::Token).then_some(self.github_rest.as_ref()).flatten();
             if status.logged_in
                 && let Some(cap) = probe_single_capability_async(&updated.path, true, &self.cancel, rest, &self.gh_probe).await
             {
@@ -1158,7 +1160,7 @@ impl Repo {
         *self.mounts.lock() = next;
 
         let status = self.github_status();
-        let rest = (status.auth_mode == GitHubAuthMode::Token).then(|| self.github_rest.as_ref()).flatten();
+        let rest = (status.auth_mode == GitHubAuthMode::Token).then_some(self.github_rest.as_ref()).flatten();
         if status.logged_in
             && let Some(cap) = probe_single_capability_async(&canon, true, &self.cancel, rest, &self.gh_probe).await
         {
@@ -2029,7 +2031,6 @@ mod tests {
             root,
             canon_root,
             per_repo: 3,
-            tokei: "tokei".into(),
             github_rest,
             gh_probe,
             github: Mutex::default(),
@@ -2049,14 +2050,7 @@ mod tests {
             vec!["init", "-q"],
             vec!["remote", "add", "origin", &format!("https://github.com/{remote_repo}.git")],
         ] {
-            assert!(
-                std::process::Command::new("git")
-                    .args(&args)
-                    .current_dir(dir)
-                    .status()
-                    .unwrap()
-                    .success()
-            );
+            assert!(std::process::Command::new("git").args(&args).current_dir(dir).status().unwrap().success());
         }
     }
 
@@ -2071,26 +2065,22 @@ mod tests {
             ok: false,
             out: String::new(),
             err: String::new(),
-            missing: true,
         }));
         let logged_gh = GhProbe::Custom(Arc::new(|args| match args.first().copied() {
             Some("--version") => Run {
                 ok: true,
                 out: "gh version 2.62.0 (2025-01-01)\n".into(),
                 err: String::new(),
-                missing: false,
             },
             Some("auth") => Run {
                 ok: true,
                 out: "github.com\n  ✓ Logged in to github.com account cli-user (oauth_token)\n".into(),
                 err: String::new(),
-                missing: false,
             },
             _ => Run {
                 ok: false,
                 out: String::new(),
                 err: String::new(),
-                missing: false,
             },
         }));
 

@@ -191,7 +191,7 @@ fn rest_failed(stage: &str, err: GitHubApiError) -> ApiError {
     match err {
         GitHubApiError::MissingToken => missing_credentials(),
         GitHubApiError::Unauthorized | GitHubApiError::Forbidden => refuse(BizCode::RepoRefused, t("server.repo.github.tokenInvalid", &[])),
-        _ => platform_failed(&format!("{stage} ({})", err.summary())),
+        _ => platform_failed(&format!("{stage} ({})", err.describe())),
     }
 }
 
@@ -669,6 +669,11 @@ impl Publisher {
             check_timeout: Duration::from_secs(600),
             serial: Mutex::default(),
         }
+    }
+
+    pub(crate) fn from_setting(setting: &Arc<crate::setting::Setting>) -> Self {
+        let s = setting.clone();
+        Self::default().with_github_token(Arc::new(move || s.github_token()))
     }
 
     pub(crate) fn with_github_token(mut self, token: TokenSource) -> Self {

@@ -8,8 +8,8 @@ use vibevalley_protocol::{BizCode, RemoteEnableRequest, RemotePairExchangeReques
 
 use super::lan;
 use super::service::{
-    CODE_ALPHABET, LAST_SEEN_THROTTLE_MS, MAX_ACTIVE_PAIR_CODES, NetworkProbe, PAIR_CODE_LEN, PAIR_CODE_TTL_MS, RATE_LIMIT_WINDOW_MS, Remote,
-    TOKEN_PREFIX, default_scope_for_platform, resolve_auto_bind_ip,
+    CODE_ALPHABET, LAST_SEEN_THROTTLE_MS, MAX_ACTIVE_PAIR_CODES, NetworkProbe, PAIR_CODE_LEN, PAIR_CODE_TTL_MS, RATE_LIMIT_WINDOW_MS, Remote, TOKEN_PREFIX,
+    default_scope_for_platform, resolve_auto_bind_ip,
 };
 use super::tailscale::TailscaleInfo;
 use crate::context::{Context, Http, LiveState, Outbox, PublicDownload, StateFeed, TaskGroup};
@@ -280,7 +280,14 @@ async fn enable_pair_and_token_auth_work_without_tailscale() {
     };
 
     let status = remote
-        .enable_with_probe_async(RemoteEnableRequest { bind_addr: None, port: Some(0) }, fake, probe)
+        .enable_with_probe_async(
+            RemoteEnableRequest {
+                bind_addr: None,
+                port: Some(0),
+            },
+            fake,
+            probe,
+        )
         .await
         .unwrap();
     assert!(status.enabled);

@@ -170,7 +170,7 @@ fn rest_snapshot_err(stage: &str, err: GitHubApiError) -> ApiError {
     match err {
         GitHubApiError::MissingToken => missing_credentials(),
         GitHubApiError::Unauthorized | GitHubApiError::Forbidden => refuse(BizCode::RepoRefused, t("server.repo.github.tokenInvalid", &[])),
-        _ => refuse(BizCode::RepoRefused, format!("GitHub {stage} failed: {}", err.summary())),
+        _ => refuse(BizCode::RepoRefused, format!("GitHub {stage} failed: {}", err.describe())),
     }
 }
 
@@ -262,17 +262,30 @@ fn is_bot(user: &RawUser) -> bool {
     user.kind.eq_ignore_ascii_case("Bot") || user.login.ends_with("[bot]")
 }
 
-fn build_snapshot(
-    remote_repo: &str,
+struct SnapshotRawInput<'a> {
+    remote_repo: &'a str,
     number: i64,
     state: String,
     head: String,
     viewer: String,
-    mut checks: Vec<GitHubCheck>,
+    checks: Vec<GitHubCheck>,
     reviews_raw: Vec<RawReview>,
     review_comments_raw: Vec<RawReviewComment>,
     issue_comments_raw: Vec<RawIssueComment>,
-) -> GitHubPullSnapshot {
+}
+
+fn build_snapshot(input: SnapshotRawInput<'_>) -> GitHubPullSnapshot {
+    let SnapshotRawInput {
+        remote_repo,
+        number,
+        state,
+        head,
+        viewer,
+        mut checks,
+        reviews_raw,
+        review_comments_raw,
+        issue_comments_raw,
+    } = input;
     checks.sort_by(|a, b| a.name.cmp(&b.name).then_with(|| a.url.cmp(&b.url)));
 
     let reviews: Vec<GitHubReview> = reviews_raw
@@ -333,12 +346,7 @@ fn build_snapshot(
 }
 
 /// Fetches a GitHub PR snapshot via REST API (when Token is configured) or `gh`.
-pub(crate) async fn fetch_snapshot(
-    gh: &HostRunner,
-    github_rest: Option<&GitHubRest>,
-    remote_repo: &str,
-    number: i64,
-) -> Result<GitHubPullSnapshot, ApiError> {
+pub(crate) async fn fetch_snapshot(gh: &HostRunner, github_rest: Option<&GitHubRest>, remote_repo: &str, number: i64) -> Result<GitHubPullSnapshot, ApiError> {
     if let Some(rest) = github_rest.filter(|r| r.has_token()) {
         let pull_path = format!("/repos/{remote_repo}/pulls/{number}");
         let pr: RestPull = rest.get_json(&pull_path, &[]).await.map_err(|e| rest_snapshot_err("PR", e))?;
@@ -384,17 +392,17 @@ pub(crate) async fn fetch_snapshot(
                     .collect()
             })
             .unwrap_or_default();
-        return Ok(build_snapshot(
+        return Ok(build_snapshot(SnapshotRawInput {
             remote_repo,
             number,
             state,
             head,
             viewer,
             checks,
-            reviews_res.unwrap_or_default(),
-            review_comments_res.unwrap_or_default(),
-            issue_comments_res.unwrap_or_default(),
-        ));
+            reviews_raw: reviews_res.unwrap_or_default(),
+            review_comments_raw: review_comments_res.unwrap_or_default(),
+            issue_comments_raw: issue_comments_res.unwrap_or_default(),
+        }));
     }
 
     let number_str = number.to_string();
@@ -449,17 +457,17 @@ pub(crate) async fn fetch_snapshot(
         .and_then(|s| serde_json::from_str::<Vec<RawIssueComment>>(&s).ok())
         .unwrap_or_default();
 
-    Ok(build_snapshot(
+    Ok(build_snapshot(SnapshotRawInput {
         remote_repo,
         number,
-        pr.state,
-        pr.head_ref_oid,
+        state: pr.state,
+        head: pr.head_ref_oid,
         viewer,
         checks,
         reviews_raw,
         review_comments_raw,
         issue_comments_raw,
-    ))
+    }))
 }
 
 fn tail_job_log(out: &str) -> String {

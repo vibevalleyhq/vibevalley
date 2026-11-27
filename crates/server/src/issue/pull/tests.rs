@@ -412,6 +412,6 @@ async fn fetch_snapshot_uses_github_rest_api_for_checks_and_errors_without_crede
     assert_eq!(snap.checks[0].conclusion, "SUCCESS");
 
     let missing_err = snapshot::fetch_snapshot(&missing_gh, None, "acme/demo", 12).await.unwrap_err();
-    assert_eq!(missing_err.biz_code, vibevalley_protocol::BizCode::RepoRefused.code());
+    assert_eq!(missing_err.biz_code, vibevalley_protocol::BizCode::RepoRefused);
     assert!(missing_err.message.contains("GitHub Token"), "{}", missing_err.message);
 }

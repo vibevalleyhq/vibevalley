@@ -12723,6 +12723,7 @@ dependencies = [
  "url",
  "uuid",
  "vibevalley-core",
+ "vibevalley-files",
  "vibevalley-git",
  "vibevalley-i18n",
  "vibevalley-mcp",

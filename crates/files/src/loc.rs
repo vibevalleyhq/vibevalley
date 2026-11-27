@@ -172,27 +172,73 @@ impl LangSpec {
 }
 
 const LANGUAGES: &[LangSpec] = &[
-    lang("Rust", &["rs"]).line(&["//"]).block(BLOCK_C_NESTED).quotes(true, false).char_lits().rust_raw(),
-    lang("TypeScript", &["ts", "mts", "cts"]).line(&["//"]).block(BLOCK_C).quotes(true, true).backticks(true, true),
+    lang("Rust", &["rs"])
+        .line(&["//"])
+        .block(BLOCK_C_NESTED)
+        .quotes(true, false)
+        .char_lits()
+        .rust_raw(),
+    lang("TypeScript", &["ts", "mts", "cts"])
+        .line(&["//"])
+        .block(BLOCK_C)
+        .quotes(true, true)
+        .backticks(true, true),
     lang("TSX", &["tsx"]).line(&["//"]).block(BLOCK_C).quotes(true, true).backticks(true, true),
-    lang("JavaScript", &["js", "mjs", "cjs"]).line(&["//"]).block(BLOCK_C).quotes(true, true).backticks(true, true),
+    lang("JavaScript", &["js", "mjs", "cjs"])
+        .line(&["//"])
+        .block(BLOCK_C)
+        .quotes(true, true)
+        .backticks(true, true),
     lang("JSX", &["jsx"]).line(&["//"]).block(BLOCK_C).quotes(true, true).backticks(true, true),
     lang("Python", &["py", "pyi", "pyw"]).line(&["#"]).quotes(true, true).triple(),
-    lang("Go", &["go"]).line(&["//"]).block(BLOCK_C).quotes(true, false).char_lits().backticks(true, false),
+    lang("Go", &["go"])
+        .line(&["//"])
+        .block(BLOCK_C)
+        .quotes(true, false)
+        .char_lits()
+        .backticks(true, false),
     lang("Java", &["java"]).line(&["//"]).block(BLOCK_C).quotes(true, false).char_lits(),
-    lang("Kotlin", &["kt", "kts"]).line(&["//"]).block(BLOCK_C_NESTED).quotes(true, false).char_lits(),
+    lang("Kotlin", &["kt", "kts"])
+        .line(&["//"])
+        .block(BLOCK_C_NESTED)
+        .quotes(true, false)
+        .char_lits(),
     lang("Swift", &["swift"]).line(&["//"]).block(BLOCK_C_NESTED).quotes(true, false),
     lang("C", &["c", "h"]).line(&["//"]).block(BLOCK_C).quotes(true, false).char_lits(),
-    lang("C++", &["cpp", "cc", "cxx", "c++", "hpp", "hh", "hxx", "h++", "ipp", "inl"]).line(&["//"]).block(BLOCK_C).quotes(true, false).char_lits(),
+    lang("C++", &["cpp", "cc", "cxx", "c++", "hpp", "hh", "hxx", "h++", "ipp", "inl"])
+        .line(&["//"])
+        .block(BLOCK_C)
+        .quotes(true, false)
+        .char_lits(),
     lang("Objective-C", &["m", "mm"]).line(&["//"]).block(BLOCK_C).quotes(true, false).char_lits(),
     lang("C#", &["cs", "csx"]).line(&["//"]).block(BLOCK_C).quotes(true, false).char_lits(),
-    lang("Ruby", &["rb", "rake", "gemspec"]).names(&["Rakefile", "Gemfile"]).line(&["#"]).block(BLOCK_RUBY).quotes(true, true),
-    lang("PHP", &["php", "phtml", "php3", "php4", "php5", "phps"]).line(&["//", "#"]).block(BLOCK_C).quotes(true, true),
+    lang("Ruby", &["rb", "rake", "gemspec"])
+        .names(&["Rakefile", "Gemfile"])
+        .line(&["#"])
+        .block(BLOCK_RUBY)
+        .quotes(true, true),
+    lang("PHP", &["php", "phtml", "php3", "php4", "php5", "phps"])
+        .line(&["//", "#"])
+        .block(BLOCK_C)
+        .quotes(true, true),
     lang("Shell", &["sh", "bash", "zsh", "fish", "ksh", "dash", "command"])
-        .names(&[".bashrc", ".bash_profile", ".bash_aliases", ".zshrc", ".zshenv", ".zprofile", ".profile", ".envrc", "PKGBUILD"])
+        .names(&[
+            ".bashrc",
+            ".bash_profile",
+            ".bash_aliases",
+            ".zshrc",
+            ".zshenv",
+            ".zprofile",
+            ".profile",
+            ".envrc",
+            "PKGBUILD",
+        ])
         .line(&["#"])
         .quotes(true, true),
-    lang("PowerShell", &["ps1", "psm1", "psd1"]).line(&["#"]).block(BLOCK_POWERSHELL).quotes(true, true),
+    lang("PowerShell", &["ps1", "psm1", "psd1"])
+        .line(&["#"])
+        .block(BLOCK_POWERSHELL)
+        .quotes(true, true),
     lang("SQL", &["sql", "ddl", "dml"]).line(&["--"]).block(BLOCK_C).quotes(true, true),
     lang("HTML", &["html", "htm", "xhtml"]).block(BLOCK_HTML).quotes(true, true),
     lang("XML", &["xml", "xsl", "xslt", "plist"]).block(BLOCK_HTML).quotes(true, true),
@@ -200,26 +246,56 @@ const LANGUAGES: &[LangSpec] = &[
     lang("CSS", &["css"]).block(BLOCK_C).quotes(true, true),
     lang("Sass", &["scss", "sass"]).line(&["//"]).block(BLOCK_C).quotes(true, true),
     lang("Less", &["less"]).line(&["//"]).block(BLOCK_C).quotes(true, true),
-    lang("JSON", &["json", "geojson", "webmanifest"]).names(&[".babelrc", ".eslintrc", ".prettierrc", "flake.lock"]).quotes(true, false),
+    lang("JSON", &["json", "geojson", "webmanifest"])
+        .names(&[".babelrc", ".eslintrc", ".prettierrc", "flake.lock"])
+        .quotes(true, false),
     lang("JSONC", &["jsonc", "json5"]).line(&["//"]).block(BLOCK_C).quotes(true, true),
-    lang("YAML", &["yaml", "yml"]).names(&[".clang-format", ".clang-tidy"]).line(&["#"]).quotes(true, true),
+    lang("YAML", &["yaml", "yml"])
+        .names(&[".clang-format", ".clang-tidy"])
+        .line(&["#"])
+        .quotes(true, true),
     lang("TOML", &["toml"]).names(&["Pipfile"]).line(&["#"]).quotes(true, true),
     lang("Markdown", &["md", "markdown", "mdx", "mdown", "mkd"]).block(BLOCK_HTML).prose(),
     lang("Dart", &["dart"]).line(&["//"]).block(BLOCK_C_NESTED).quotes(true, true),
     lang("Lua", &["lua", "luau"]).line(&["--"]).block(BLOCK_LUA).quotes(true, true),
-    lang("Scala", &["scala", "sc"]).line(&["//"]).block(BLOCK_C_NESTED).quotes(true, false).char_lits(),
+    lang("Scala", &["scala", "sc"])
+        .line(&["//"])
+        .block(BLOCK_C_NESTED)
+        .quotes(true, false)
+        .char_lits(),
     lang("Elixir", &["ex", "exs"]).line(&["#"]).quotes(true, true),
     lang("Erlang", &["erl", "hrl"]).line(&["%"]).quotes(true, false),
-    lang("Haskell", &["hs", "lhs"]).line(&["--"]).block(BLOCK_HASKELL).quotes(true, false).char_lits(),
+    lang("Haskell", &["hs", "lhs"])
+        .line(&["--"])
+        .block(BLOCK_HASKELL)
+        .quotes(true, false)
+        .char_lits(),
     lang("Zig", &["zig", "zon"]).line(&["//"]).quotes(true, false).char_lits(),
     lang("R", &["r", "rmd"]).line(&["#"]).quotes(true, true),
     lang("Julia", &["jl"]).line(&["#"]).block(BLOCK_JULIA).quotes(true, false),
     lang("Vue", &["vue"]).line(&["//"]).block(BLOCK_VUE).quotes(true, true).backticks(true, true),
-    lang("Svelte", &["svelte"]).line(&["//"]).block(BLOCK_VUE).quotes(true, true).backticks(true, true),
-    lang("Astro", &["astro"]).line(&["//"]).block(BLOCK_VUE).quotes(true, true).backticks(true, true),
-    lang("Dockerfile", &["dockerfile"]).names(&["Dockerfile", "dockerfile"]).line(&["#"]).quotes(true, true),
-    lang("Makefile", &["mk", "mak"]).names(&["Makefile", "makefile", "GNUmakefile"]).line(&["#"]).quotes(true, true),
-    lang("Terraform", &["tf", "tfvars", "hcl"]).line(&["#", "//"]).block(BLOCK_C).quotes(true, false),
+    lang("Svelte", &["svelte"])
+        .line(&["//"])
+        .block(BLOCK_VUE)
+        .quotes(true, true)
+        .backticks(true, true),
+    lang("Astro", &["astro"])
+        .line(&["//"])
+        .block(BLOCK_VUE)
+        .quotes(true, true)
+        .backticks(true, true),
+    lang("Dockerfile", &["dockerfile"])
+        .names(&["Dockerfile", "dockerfile"])
+        .line(&["#"])
+        .quotes(true, true),
+    lang("Makefile", &["mk", "mak"])
+        .names(&["Makefile", "makefile", "GNUmakefile"])
+        .line(&["#"])
+        .quotes(true, true),
+    lang("Terraform", &["tf", "tfvars", "hcl"])
+        .line(&["#", "//"])
+        .block(BLOCK_C)
+        .quotes(true, false),
     lang("Nix", &["nix"]).line(&["#"]).block(BLOCK_C).quotes(true, false),
     lang("Protocol Buffers", &["proto"]).line(&["//"]).block(BLOCK_C).quotes(true, true),
     lang("GraphQL", &["graphql", "gql"]).line(&["#"]).quotes(true, false),
@@ -231,7 +307,11 @@ const LANGUAGES: &[LangSpec] = &[
     lang("Solidity", &["sol"]).line(&["//"]).block(BLOCK_C).quotes(true, true),
     lang("WGSL", &["wgsl"]).line(&["//"]).block(BLOCK_C_NESTED).quotes(true, false),
     lang("GLSL", &["glsl", "vert", "frag", "comp"]).line(&["//"]).block(BLOCK_C).quotes(true, false),
-    lang("CMake", &["cmake"]).names(&["CMakeLists.txt"]).line(&["#"]).block(BLOCK_CMAKE).quotes(true, false),
+    lang("CMake", &["cmake"])
+        .names(&["CMakeLists.txt"])
+        .line(&["#"])
+        .block(BLOCK_CMAKE)
+        .quotes(true, false),
     lang("INI", &["ini", "cfg", "conf"]).line(&[";", "#"]).quotes(true, true),
     lang("Batch", &["bat", "cmd"]).line(&["::", "REM ", "rem "]).quotes(true, false),
     lang("Just", &["just"]).names(&["justfile", "Justfile"]).line(&["#"]).quotes(true, true),
@@ -266,7 +346,9 @@ fn language_index_for_path(path: &Path) -> Option<usize> {
         return Some(idx);
     }
     let ext = path.extension().and_then(|e| e.to_str())?;
-    LANGUAGES.iter().position(|spec| spec.extensions.iter().any(|cand| cand.eq_ignore_ascii_case(ext)))
+    LANGUAGES
+        .iter()
+        .position(|spec| spec.extensions.iter().any(|cand| cand.eq_ignore_ascii_case(ext)))
 }
 
 fn read_text_file(path: &Path, buf: &mut Vec<u8>) -> bool {
@@ -347,11 +429,7 @@ fn try_rust_raw_string(line: &[u8], pos: usize) -> Option<(usize, usize)> {
         hashes += 1;
         j += 1;
     }
-    if j < line.len() && line[j] == b'"' {
-        Some((j + 1, hashes))
-    } else {
-        None
-    }
+    if j < line.len() && line[j] == b'"' { Some((j + 1, hashes)) } else { None }
 }
 
 fn scan_rust_raw_string(line: &[u8], mut i: usize, hashes: usize) -> (usize, bool) {
@@ -373,14 +451,22 @@ fn parse_fence(trimmed: &[u8]) -> Option<(u8, usize)> {
     (len >= 3).then_some((ch, len))
 }
 
+fn physical_lines(bytes: &[u8]) -> impl Iterator<Item = &[u8]> {
+    let body = bytes.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(bytes);
+    let trimmed_eof = body.strip_suffix(b"\n").unwrap_or(body);
+    let take_count = if body.is_empty() { 0 } else { usize::MAX };
+    trimmed_eof
+        .split(|&b| b == b'\n')
+        .take(take_count)
+        .map(|raw| raw.strip_suffix(b"\r").unwrap_or(raw))
+}
+
 fn count_markdown_lines(bytes: &[u8]) -> FileCounts {
     let mut counts = FileCounts::default();
     let mut in_fence: Option<(u8, usize)> = None;
     let mut in_html_comment = false;
-    let body = bytes.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(bytes);
 
-    for raw_line in body.split(|&b| b == b'\n') {
-        let line = raw_line.strip_suffix(b"\r").unwrap_or(raw_line);
+    for line in physical_lines(bytes) {
         if line.iter().all(|b| b.is_ascii_whitespace()) {
             counts.blanks += 1;
             continue;
@@ -443,10 +529,7 @@ fn count_code_lines(bytes: &[u8], spec: &LangSpec) -> FileCounts {
     let mut rust_raw_hashes: Option<usize> = None;
     let mut triple_quote: Option<u8> = None;
 
-    let body = bytes.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(bytes);
-
-    for raw_line in body.split(|&b| b == b'\n') {
-        let line = raw_line.strip_suffix(b"\r").unwrap_or(raw_line);
+    for line in physical_lines(bytes) {
         if line.iter().all(|b| b.is_ascii_whitespace()) {
             counts.blanks += 1;
             continue;

@@ -1521,6 +1521,7 @@ mod tests {
             work_root: work,
             version: "0.1.0".into(),
             deepseek_api_key: String::new(),
+            github_token: None,
             storage_backend: None,
         })
         .await;
@@ -1827,6 +1828,7 @@ mod tests {
                 work_root: work,
                 version: "0.1.0".into(),
                 deepseek_api_key: String::new(),
+                github_token: None,
                 storage_backend: None,
             })
             .await;

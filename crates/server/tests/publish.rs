@@ -434,8 +434,8 @@ async fn github_token_direct_rest_creates_refreshes_merges_and_errors_without_cr
     use axum::routing::{get, post, put};
     use tokio_util::sync::CancellationToken;
     use vibevalley_protocol::{BizCode, PublishPlatform, PullRequestState};
+    use vibevalley_server::Config;
     use vibevalley_server::app::{Overrides, create_app_with_overrides_blocking};
-    use vibevalley_server::{Config, Server};
 
     #[derive(Clone, Default)]
     struct MockPrState {
@@ -458,24 +458,23 @@ async fn github_token_direct_rest_creates_refreshes_merges_and_errors_without_cr
         .route("/repos/acme/farm/pulls", get(|| async { Json(json!([])) }))
         .route(
             "/repos/acme/farm/pulls",
-            post(|State(st): State<MockPrState>, headers: HeaderMap, Json(body): Json<serde_json::Value>| async move {
-                assert_eq!(
-                    headers.get("authorization").and_then(|v| v.to_str().ok()),
-                    Some("Bearer ghp_direct_token")
-                );
-                assert_eq!(body["head"], "fix");
-                assert_eq!(body["base"], "main");
-                assert_eq!(body["title"], "fix: say two");
-                st.created.store(true, Ordering::SeqCst);
-                (
-                    StatusCode::CREATED,
-                    Json(json!({
-                        "number": 7,
-                        "html_url": "https://github.com/acme/farm/pull/7",
-                        "state": "open"
-                    })),
-                )
-            }),
+            post(
+                |State(st): State<MockPrState>, headers: HeaderMap, Json(body): Json<serde_json::Value>| async move {
+                    assert_eq!(headers.get("authorization").and_then(|v| v.to_str().ok()), Some("Bearer ghp_direct_token"));
+                    assert_eq!(body["head"], "fix");
+                    assert_eq!(body["base"], "main");
+                    assert_eq!(body["title"], "fix: say two");
+                    st.created.store(true, Ordering::SeqCst);
+                    (
+                        StatusCode::CREATED,
+                        Json(json!({
+                            "number": 7,
+                            "html_url": "https://github.com/acme/farm/pull/7",
+                            "state": "open"
+                        })),
+                    )
+                },
+            ),
         )
         .route(
             "/repos/acme/farm/pulls/7",
@@ -533,16 +532,15 @@ async fn github_token_direct_rest_creates_refreshes_merges_and_errors_without_cr
     // Missing both gh and GitHub Token returns explicit missing-credentials error.
     let no_creds_publisher = Publisher::new(missing_gh.clone(), missing_glab.clone(), Arc::new(Local(f.bare.clone())));
     let no_creds_err = no_creds_publisher.submit_async(&request(&f)).await.unwrap_err();
-    assert_eq!(no_creds_err.biz_code, BizCode::RepoRefused.code());
+    assert_eq!(no_creds_err.biz_code, BizCode::RepoRefused);
     assert!(no_creds_err.message.contains("GitHub Token"), "{}", no_creds_err.message);
     let repo_hosted = hosted_origin("https://github.com/acme/farm.git").unwrap();
     let merge_no_creds = no_creds_publisher.merge_pull_async(&repo_hosted, 7, Some("squash")).await.unwrap_err();
-    assert_eq!(merge_no_creds.biz_code, BizCode::RepoRefused.code());
+    assert_eq!(merge_no_creds.biz_code, BizCode::RepoRefused);
     assert!(merge_no_creds.message.contains("GitHub Token"), "{}", merge_no_creds.message);
 
     // With GitHub Token + missing gh: create PR, refresh state, and merge PR directly via REST API.
-    f.publisher = Publisher::new(missing_gh, missing_glab, Arc::new(Local(f.bare.clone())))
-        .with_github_api_for_test(base_url, Some("ghp_direct_token".into()));
+    f.publisher = Publisher::new(missing_gh, missing_glab, Arc::new(Local(f.bare.clone()))).with_github_api_for_test(base_url, Some("ghp_direct_token".into()));
     let app_home = tempfile::tempdir().unwrap();
     let publisher = Arc::new(f.publisher);
     let app = tokio::task::spawn_blocking({
@@ -588,10 +586,7 @@ async fn github_token_direct_rest_creates_refreshes_merges_and_errors_without_cr
     assert_eq!(created.number, Some(7));
     assert_eq!(created.url.as_deref(), Some("https://github.com/acme/farm/pull/7"));
 
-    let open_state = pull_svc
-        .pull_request_state_async("acme/farm", 7, Some(PublishPlatform::Github))
-        .await
-        .unwrap();
+    let open_state = pull_svc.pull_request_state_async("acme/farm", 7, Some(PublishPlatform::Github)).await.unwrap();
     assert_eq!(open_state, PullRequestState::Open);
 
     let merged_state = pull_svc
@@ -601,10 +596,7 @@ async fn github_token_direct_rest_creates_refreshes_merges_and_errors_without_cr
     assert_eq!(merged_state, PullRequestState::Merged);
     assert!(state.merged.load(Ordering::SeqCst));
 
-    let refreshed = pull_svc
-        .pull_request_state_async("acme/farm", 7, Some(PublishPlatform::Github))
-        .await
-        .unwrap();
+    let refreshed = pull_svc.pull_request_state_async("acme/farm", 7, Some(PublishPlatform::Github)).await.unwrap();
     assert_eq!(refreshed, PullRequestState::Merged);
 
     tokio::task::spawn_blocking(move || app.close_blocking()).await.unwrap();

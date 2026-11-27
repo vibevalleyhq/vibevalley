@@ -239,10 +239,7 @@ async fn create_app_inner(mut config: Config, storage_config: StorageConfig, ove
     .await
     .map_err(|e| failed("the board")(&e))?;
     seed_starter_issues_on_boot(&config, &setting, &board).await;
-    let publisher = overrides.publisher.unwrap_or_else(|| {
-        let s = setting.clone();
-        Arc::new(Publisher::default().with_github_token(Arc::new(move || s.github_token())))
-    });
+    let publisher = overrides.publisher.unwrap_or_else(|| Arc::new(crate::issue::Publisher::from_setting(&setting)));
     let pull = Box::pin(Pull::open_async(ctx.clone(), publisher, Some(repo.clone()), Some(board.clone()), None, None))
         .await
         .map_err(|e| failed("the pulls")(&e.message))?;

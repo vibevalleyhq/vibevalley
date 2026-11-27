@@ -8,11 +8,7 @@ const PRIVATE_ROUTE_TARGETS: &[&str] = &["192.168.1.1:80", "10.0.0.1:80", "172.1
 /// True for private RFC1918 LAN IPv4 addresses (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`),
 /// excluding loopback, link-local (`169.254.0.0/16`), unspecified, and Tailscale CGNAT (`100.64.0.0/10`).
 pub fn is_lan_ipv4(ip: Ipv4Addr) -> bool {
-    ip.is_private()
-        && !ip.is_loopback()
-        && !ip.is_link_local()
-        && !ip.is_unspecified()
-        && !super::tailscale::is_tailscale_ipv4(ip)
+    ip.is_private() && !ip.is_loopback() && !ip.is_link_local() && !ip.is_unspecified() && !super::tailscale::is_tailscale_ipv4(ip)
 }
 
 fn probe_udp_local_ipv4(target: &str) -> Option<Ipv4Addr> {

@@ -179,13 +179,7 @@ fn check_status_label(check: &GitHubCheck) -> &str {
     }
 }
 
-async fn format_ci_report_async(
-    gh: &HostRunner,
-    github_rest: Option<&GitHubRest>,
-    remote: &str,
-    checks: &[GitHubCheck],
-    failed: &[&GitHubCheck],
-) -> String {
+async fn format_ci_report_async(gh: &HostRunner, github_rest: Option<&GitHubRest>, remote: &str, checks: &[GitHubCheck], failed: &[&GitHubCheck]) -> String {
     if failed.is_empty() {
         return checks
             .iter()
