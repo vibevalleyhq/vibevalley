@@ -3229,6 +3229,17 @@ export const catalogs = {
           groupEngines: "引擎",
           noWorktree: "该会话未记录工作区目录",
         },
+        compact: { button: "压缩上下文", compacted: "已压缩上下文", skipped: "当前暂无需压缩的新内容" },
+        codemode: {
+          button: "运行 CodeMode",
+          title: "运行 CodeMode 脚本",
+          description: "在当前持久化会话沙箱中执行确定性 JavaScript，可通过 `call(tool, args)` 调用工具。",
+          scriptLabel: "JavaScript 脚本",
+          scriptPlaceholder: '// 示例：调用工具并返回结果\nconst issues = call("issue_list", {}); return { count: issues.length };',
+          run: "运行脚本",
+          outputLabel: "输出 JSON",
+          stats: "{steps} 步 · {calls} 次工具调用 · {sleeps} 次休眠",
+        },
       },
       subagents: {
         heading: "子代理任务",
@@ -7205,6 +7216,17 @@ export const catalogs = {
           groupEngines: "Engines",
           noWorktree: "No worktree directory recorded for this session",
         },
+        compact: { button: "Compact context", compacted: "Context compacted", skipped: "Nothing new to compact yet" },
+        codemode: {
+          button: "Run Code",
+          title: "Run CodeMode script",
+          description: "Execute deterministic JavaScript inside this durable session sandbox with `call(tool, args)`.",
+          scriptLabel: "JavaScript body",
+          scriptPlaceholder: 'const issues = call("issue_list", {}); return { count: issues.length };',
+          run: "Run script",
+          outputLabel: "Output JSON",
+          stats: "{steps} steps · {calls} tool calls · {sleeps} sleeps",
+        },
       },
       subagents: {
         heading: "Subtasks",
@@ -11034,6 +11056,17 @@ export interface Messages {
   "web.session.hub.back": undefined;
   "web.session.hub.clear": undefined;
   "web.session.hub.clearFilter": undefined;
+  "web.session.hub.codemode.button": undefined;
+  "web.session.hub.codemode.description": undefined;
+  "web.session.hub.codemode.outputLabel": undefined;
+  "web.session.hub.codemode.run": undefined;
+  "web.session.hub.codemode.scriptLabel": undefined;
+  "web.session.hub.codemode.scriptPlaceholder": undefined;
+  "web.session.hub.codemode.stats": { readonly calls: string | number; readonly sleeps: string | number; readonly steps: string | number };
+  "web.session.hub.codemode.title": undefined;
+  "web.session.hub.compact.button": undefined;
+  "web.session.hub.compact.compacted": undefined;
+  "web.session.hub.compact.skipped": undefined;
   "web.session.hub.empty": undefined;
   "web.session.hub.emptyFiltered": undefined;
   "web.session.hub.filterAgent": { readonly name: string | number };

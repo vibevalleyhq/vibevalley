@@ -5,11 +5,13 @@ use parking_lot::Mutex;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 use tracing::Instrument as _;
+use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    AgentRole, ApiError, NoticeLevel, OrchestratorApproval, OrchestratorApprovalListInput, OrchestratorApprovalResolveInput, OrchestratorEval,
-    OrchestratorEvalRequest, OrchestratorStopInput, Outcome,
+    AgentRole, ApiError, BizCode, NoticeLevel, OrchestratorApproval, OrchestratorApprovalListInput, OrchestratorApprovalResolveInput, OrchestratorEval,
+    OrchestratorEvalRequest, OrchestratorStopInput, Outcome, Phase, SessionCompactResult, SessionController, SessionRunCodeInput, SessionRunCodeResult,
 };
 use vibevalley_runtime::agent::Brain;
+use vibevalley_runtime::agent::durable::Error as DurableError;
 
 use super::chat::ChatIntake;
 use super::execution::{Execution, OrchestratorHost, TurnInput};
@@ -21,6 +23,7 @@ use crate::BoxFuture;
 use crate::agent::tool::{Route, RouteSource};
 use crate::artifact::Manager as ArtifactManager;
 use crate::channel::{Chat, Posting, Saying};
+use crate::context::error::{LookIn, missing};
 use crate::context::port::{CronOrchestratorPort, VoiceOrchestratorPort};
 use crate::issue::Board;
 use crate::runtime::{Runtime, Step};
@@ -431,6 +434,176 @@ impl Orchestrator {
 
     pub(crate) async fn eval_create_endpoint_async(self: &Arc<Self>, input: OrchestratorEvalRequest) -> Result<OrchestratorEval, ApiError> {
         self.mark_wrong_async(input.agent.as_deref(), input.on.0 as i64, &input.want).await
+    }
+
+    pub(crate) async fn compact_session_endpoint_async(self: &Arc<Self>, id: &str) -> Result<SessionCompactResult, ApiError> {
+        let id = id.trim();
+        if id.is_empty() {
+            return Err(ApiError::new(BizCode::InvalidInput, "session id must be nonempty"));
+        }
+        let session = self.runtime.session_async(id).await;
+        let is_orch = session.as_ref().is_some_and(|s| s.controller == SessionController::Orchestrator) || self.profile.is_orchestrator(id);
+        if is_orch {
+            let model = self.model_of(id).unwrap_or_default();
+            return match self.execution.harness.engine().compact_manual(id, &model).await {
+                Ok(Some(summary)) => {
+                    self.memory
+                        .record_compaction_episode_async(id, "manual-compact", "manual", &summary, None)
+                        .await;
+                    Ok(SessionCompactResult {
+                        id: id.into(),
+                        compacted: true,
+                        summary: Some(summary),
+                        reason: None,
+                    })
+                }
+                Ok(None) => Ok(SessionCompactResult {
+                    id: id.into(),
+                    compacted: false,
+                    summary: None,
+                    reason: Some(t("server.session.compact.notEnoughEntries", &[])),
+                }),
+                Err(DurableError::Missing(_)) => Ok(SessionCompactResult {
+                    id: id.into(),
+                    compacted: false,
+                    summary: None,
+                    reason: Some(t("server.session.compact.empty", &[])),
+                }),
+                Err(DurableError::Invalid(msg)) => Err(ApiError::new(BizCode::SessionRefused, msg)),
+                Err(err) => Err(ApiError::new(BizCode::InternalError, err.to_string())),
+            };
+        }
+        let Some(session) = session else {
+            if self.runtime.past_session_async(id).await.is_some() {
+                return Err(ApiError::new(BizCode::SessionRefused, t("server.session.compact.closed", &[])));
+            }
+            return Err(missing(t("server.helperRef", &[("id", id.into())]), LookIn::Session));
+        };
+        if matches!(session.phase, Phase::Closed(_)) {
+            return Err(ApiError::new(BizCode::SessionRefused, t("server.session.compact.closed", &[])));
+        }
+        if session.runtime != vibevalley_runtime::agent::runtime::ID {
+            self.runtime.compact_live_async(id).await?;
+            return Ok(SessionCompactResult {
+                id: id.into(),
+                compacted: true,
+                summary: None,
+                reason: None,
+            });
+        }
+        let conv = self.runtime.worker_conversation(id);
+        let prev = match conv.as_deref() {
+            Some(c) => self.execution.latest_compaction_async(c).await.ok().flatten().map(|(seq, _)| seq),
+            None => None,
+        };
+        if self.runtime.is_live_session(id) {
+            self.runtime.compact_live_async(id).await?;
+            let after = match conv.as_deref() {
+                Some(c) => self.execution.latest_compaction_async(c).await.ok().flatten(),
+                None => None,
+            };
+            if let Some((seq, summary)) = after
+                && Some(seq) != prev
+            {
+                return Ok(SessionCompactResult {
+                    id: id.into(),
+                    compacted: true,
+                    summary: Some(summary),
+                    reason: None,
+                });
+            }
+            return Ok(SessionCompactResult {
+                id: id.into(),
+                compacted: false,
+                summary: None,
+                reason: Some(t("server.session.compact.notEnoughEntries", &[])),
+            });
+        }
+        let Some(conv) = conv else {
+            return Ok(SessionCompactResult {
+                id: id.into(),
+                compacted: false,
+                summary: None,
+                reason: Some(t("server.session.compact.empty", &[])),
+            });
+        };
+        match self.execution.harness.engine().compact_manual(&conv, "").await {
+            Ok(Some(summary)) => Ok(SessionCompactResult {
+                id: id.into(),
+                compacted: true,
+                summary: Some(summary),
+                reason: None,
+            }),
+            Ok(None) => Ok(SessionCompactResult {
+                id: id.into(),
+                compacted: false,
+                summary: None,
+                reason: Some(t("server.session.compact.notEnoughEntries", &[])),
+            }),
+            Err(DurableError::Missing(_)) => Ok(SessionCompactResult {
+                id: id.into(),
+                compacted: false,
+                summary: None,
+                reason: Some(t("server.session.compact.empty", &[])),
+            }),
+            Err(DurableError::Invalid(msg)) => Err(ApiError::new(BizCode::SessionRefused, msg)),
+            Err(err) => Err(ApiError::new(BizCode::InternalError, err.to_string())),
+        }
+    }
+
+    pub(crate) async fn run_code_endpoint_async(self: &Arc<Self>, input: SessionRunCodeInput) -> Result<SessionRunCodeResult, ApiError> {
+        let id = input.id.trim();
+        if id.is_empty() {
+            return Err(ApiError::new(BizCode::InvalidInput, "session id must be nonempty"));
+        }
+        if input.script.trim().is_empty() {
+            return Err(ApiError::new(BizCode::InvalidInput, t("server.session.codemode.emptyScript", &[])));
+        }
+        let session = self.runtime.session_async(id).await;
+        let is_orch = session.as_ref().is_some_and(|s| s.controller == SessionController::Orchestrator) || self.profile.is_orchestrator(id);
+        let conv = if is_orch {
+            id.to_owned()
+        } else {
+            let Some(session) = session else {
+                if self.runtime.past_session_async(id).await.is_some() {
+                    return Err(ApiError::new(BizCode::SessionRefused, t("server.session.compact.closed", &[])));
+                }
+                return Err(missing(t("server.helperRef", &[("id", id.into())]), LookIn::Session));
+            };
+            if matches!(session.phase, Phase::Closed(_)) {
+                return Err(ApiError::new(BizCode::SessionRefused, t("server.session.compact.closed", &[])));
+            }
+            if session.runtime != vibevalley_runtime::agent::runtime::ID {
+                return Err(ApiError::new(
+                    BizCode::RuntimeRefused,
+                    t("server.session.codemode.unsupportedRuntime", &[("runtime", session.runtime.into())]),
+                ));
+            }
+            self.runtime
+                .worker_conversation(id)
+                .ok_or_else(|| ApiError::new(BizCode::SessionRefused, t("server.session.compact.empty", &[])))?
+        };
+        let seed = input.seed.map(|s| s.get().max(0.0) as u64);
+        let (task_id, res) = self
+            .execution
+            .harness
+            .engine()
+            .run_codemode_script(&conv, &input.script, seed, input.timeout_ms, input.max_steps)
+            .await
+            .map_err(|err| match err {
+                DurableError::Invalid(msg) => ApiError::new(BizCode::SessionRefused, msg),
+                other => ApiError::new(BizCode::InternalError, other.to_string()),
+            })?;
+        let output_json = serde_json::to_string(&res.value).unwrap_or_else(|_| "null".into());
+        Ok(SessionRunCodeResult {
+            id: id.to_owned(),
+            task_id,
+            output_json,
+            executed_steps: i64::try_from(res.executed_steps).unwrap_or(i64::MAX),
+            replayed_calls: i64::try_from(res.replayed_calls).unwrap_or(i64::MAX),
+            replayed_sleeps: i64::try_from(res.replayed_sleeps).unwrap_or(i64::MAX),
+            virtual_now_ms: res.virtual_now_ms,
+        })
     }
 }
 

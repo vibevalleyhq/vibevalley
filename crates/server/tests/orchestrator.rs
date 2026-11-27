@@ -757,4 +757,89 @@ fn channel_command_invokes_user_skill_on_demand_and_orchestrator_toolsets_narrow
     started.close_blocking();
 }
 
+#[test]
+fn orchestrator_manual_compact_and_run_code_work_end_to_end() {
+    vibevalley_i18n::set_locale("en");
+    let dir = tempfile::tempdir().unwrap();
+    let clock = Arc::new(ManualClock::new(1_700_000_000_000));
+    let model = SignaledScripted::new([
+        say("first ack"),
+        say("second ack"),
+        say("third ack"),
+        say("## Goal\nManual orchestrator summary"),
+    ]);
+    let mut registry = vibevalley_runtime::oar::Registry::new();
+    registry.register(Arc::new(vibevalley_runtime::oar::scripted::ScriptedRuntime::demo()));
+    let started = vibevalley_server::create_app_blocking(vibevalley_server::Config {
+        registry: Some(Arc::new(registry)),
+        probe_runtimes: false,
+        link_previews: false,
+        tick_crons: false,
+        model_client: Some(model),
+        clock,
+        ..vibevalley_server::Config::under(dir.path())
+    })
+    .unwrap();
+    let hub = started.router().clone();
+    let user = |op: &str, p: Value| hub.call_as(Caller::User, op, p);
+
+    assert_eq!(user("repo.create", json!({ "name": "demo" })).biz_code, 0);
+    assert_eq!(user("issue.create", json!({ "title": "Track #55", "repo": "demo" })).biz_code, 0);
+
+    // Run CodeMode directly on the orchestrator conversation composing a farm tool call.
+    let run_code = user(
+        "session.runCode",
+        json!({
+            "id": "orchestrator",
+            "script": r#"const text = call("issue_list", {}); return { text };"#,
+            "seed": 42,
+            "timeoutMs": 5000,
+            "maxSteps": 2000
+        }),
+    );
+    assert_eq!(run_code.biz_code, 0, "{}", run_code.message);
+    let cm_data = run_code.data.unwrap();
+    assert_eq!(cm_data["id"], "orchestrator");
+    assert_eq!(cm_data["replayedCalls"], 1);
+    let parsed_out: Value = serde_json::from_str(cm_data["outputJson"].as_str().unwrap()).unwrap();
+    assert!(parsed_out["text"].as_str().unwrap().contains("Track #55"), "{parsed_out}");
+
+    // Empty CodeMode script is rejected with InvalidInput.
+    let empty_code = user("session.runCode", json!({ "id": "orchestrator", "script": "   " }));
+    assert_eq!(empty_code.biz_code, vibevalley_protocol::BizCode::InvalidInput.code());
+
+    // Drive three turns on orchestrator so there are enough entries outside keep_recent (4) to compact.
+    let general = started.test_internals().channel.default_channel();
+    for idx in 1..=3 {
+        let key = format!("k{idx}");
+        user("channel.message.send", json!({ "id": general, "text": format!("turn {idx}"), "sendKey": key }));
+        let expected = match idx {
+            1 => "first ack",
+            2 => "second ack",
+            _ => "third ack",
+        };
+        crate::support::wait_until_channel_event(started.test_internals().channel, Duration::from_secs(30), expected, || {
+            let said = user("channel.message.list", json!({ "id": general })).data?;
+            said.as_array()?.iter().find(|m| m["from"] == "orchestrator" && m["text"] == expected).cloned()
+        });
+    }
+
+    let compacted = user("session.compact", json!({ "id": "orchestrator" }));
+    assert_eq!(compacted.biz_code, 0, "{}", compacted.message);
+    let compact_data = compacted.data.unwrap();
+    assert_eq!(compact_data["id"], "orchestrator");
+    assert_eq!(compact_data["compacted"], true);
+    assert!(
+        compact_data["summary"].as_str().unwrap_or_default().contains("Manual orchestrator summary"),
+        "{compact_data}"
+    );
+
+    // Repeating manual compact immediately reports nothing new to compact yet (`compacted: false`).
+    let second_compact = user("session.compact", json!({ "id": "orchestrator" }));
+    assert_eq!(second_compact.biz_code, 0, "{}", second_compact.message);
+    assert_eq!(second_compact.data.unwrap()["compacted"], false);
+
+    started.close_blocking();
+}
+
 mod grading;

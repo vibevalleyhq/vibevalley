@@ -171,6 +171,8 @@ impl Router {
             E::SessionRespondInteraction => void!(p, SessionRespondInteraction, |r| rt.respond_interaction_endpoint_async(r).await?),
             E::SessionSetConfig => on!(p, SessionSetConfig, |r| rt.set_config_endpoint_async(r).await?),
             E::SessionChildTranscript => on!(p, SessionChildTranscript, |r| rt.child_transcript_endpoint_async(r).await?),
+            E::SessionCompact => on!(p, SessionCompact, |r| orch.compact_session_endpoint_async(&r.id).await?),
+            E::SessionRunCode => on!(p, SessionRunCode, |r| orch.run_code_endpoint_async(r).await?),
             E::IssueConversationGet => on!(p, IssueConversationGet, |r| brd.issue_conversation_endpoint_async(&r.id).await?),
             E::IssueCommentCreate => on!(p, IssueCommentCreate, |r| glue::issue_comment(c, r).await?),
             E::IssueDiffGet => on!(p, IssueDiffGet, |r| glue::issue_diff_req_async(c, ctx.caller, &r.id, r.since_tree.as_deref())

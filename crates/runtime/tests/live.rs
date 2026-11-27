@@ -136,3 +136,45 @@ async fn live_account_usage() {
         ));
     }
 }
+
+/// Non-destructive ACP capability & handshake checks for installed external CLIs without sending any prompt.
+async fn probe_acp_without_spend(runtime_id: &str) {
+    let registry = default_runtimes();
+    let runtime = registry.require(runtime_id).unwrap();
+    let Installation::Available { version, path } = runtime.installation().await else {
+        eprintln!("skipped: {runtime_id} is not usable on this host");
+        return;
+    };
+    assert!(!path.as_os_str().is_empty());
+    let models = runtime.list_models().await.unwrap();
+    println!("{runtime_id} version={version:?} models={}", models.len());
+    let dir = tempfile::tempdir().unwrap();
+    let session = runtime
+        .open(SessionOptions {
+            cwd: dir.path().to_path_buf(),
+            permission_mode: PermissionMode::Ask,
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(session.status(), SessionStatus::Idle);
+    session.dispose().await;
+}
+
+#[tokio::test]
+#[ignore = "requires local opencode CLI binary; sends no LLM prompt"]
+async fn opencode_probes_acp_without_spend() {
+    probe_acp_without_spend("opencode").await;
+}
+
+#[tokio::test]
+#[ignore = "requires local grok CLI binary; sends no LLM prompt"]
+async fn grok_probes_acp_without_spend() {
+    probe_acp_without_spend("grok").await;
+}
+
+#[tokio::test]
+#[ignore = "requires local kimi CLI binary; sends no LLM prompt"]
+async fn kimi_probes_acp_without_spend() {
+    probe_acp_without_spend("kimi").await;
+}

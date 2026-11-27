@@ -95,7 +95,7 @@
 
 ## 还没做的
 
-- `opencode`、`grok`、`kimi`、`codebuddy`、`qwen`、`qoder` 的真实厂商 CLI 实机验证（计费、配额、插话、取消与跨版本恢复）：`#55`。
+- 已在本机对 `opencode`（`1.19.5`）、`grok`（`1.0.92`）、`kimi`（`2.3.2`）完成非付费真实二进制与 ACP 握手能力实测（`claude 2.1.322`、`codex-cli 0.170.0` 同在宿主机可用）；`codebuddy`、`qwen`、`qoder` 本机未安装，且已安装外部 CLI 的付费轮次计费与长程跨版本恢复验收尚未消费真实 API 额度验证（详表见 [session.md](docs/subsystems/session.md#一次农机执行怎样复核)）。
 - 档案配置 `toolsets`，技能库改用 Agent Skills 文件夹按需加载：`#52`。
 
 ## 怎么验证

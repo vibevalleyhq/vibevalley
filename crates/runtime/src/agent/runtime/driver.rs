@@ -362,6 +362,21 @@ impl Driver for WorkerDriver {
         })
     }
 
+    fn compact(&self) -> BoxFuture<'_, Result<()>> {
+        Box::pin(async move {
+            self.execution
+                .harness
+                .engine()
+                .compact_manual(&self.conversation, &self.brain.model)
+                .await
+                .map(|_| ())
+                .map_err(|e| match e {
+                    StoreError::Invalid(msg) => AgentError::Rejected(format!("busy: {msg}")),
+                    other => failed(other),
+                })
+        })
+    }
+
     fn respond_permission<'a>(&'a self, id: &'a str, decision: &'a PermissionDecision) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
             let conv = self.conversation.clone();

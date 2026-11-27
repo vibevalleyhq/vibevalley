@@ -379,6 +379,18 @@ impl Runtime {
         self.session.child_transcript_endpoint_async(input).await
     }
 
+    pub(crate) async fn compact_live_async(&self, id: &str) -> std::result::Result<(), ApiError> {
+        self.session.compact_live_async(id).await
+    }
+
+    pub(crate) fn worker_conversation(&self, id: &str) -> Option<String> {
+        self.session.worker_conversation(id)
+    }
+
+    pub(crate) fn is_live_session(&self, id: &str) -> bool {
+        self.session.is_live(id)
+    }
+
     pub(crate) async fn watch_session_async(&self, input: SessionWatchPayload, sink: crate::context::Sink) -> std::result::Result<(), ApiError> {
         self.session.watch_session_async(input, sink).await
     }

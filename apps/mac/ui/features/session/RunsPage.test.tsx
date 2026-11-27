@@ -466,3 +466,79 @@ test("RunsPage offers one-click recovery actions for failed, interrupted, and re
   await fake.pump(app);
   expect(app.count("id:run-detail-recovery")).toBe(0);
 });
+
+test("RunsPage exposes manual context compaction and CodeMode dialog for durable sessions", async () => {
+  const base = scenarios.typical.state;
+  const template = base.sessions.sessions.find((s) => s.role === "worker");
+  if (!template) throw new Error("typical scenario must include a worker session");
+
+  const vvWorker: SessionView = {
+    ...template,
+    id: "w-vv" as SessionView["id"],
+    name: "Durable Helper",
+    runtime: "vibevalley",
+    phase: { _tag: "resting" },
+    phaseText: "Idle",
+  };
+  const ocWorker: SessionView = {
+    ...template,
+    id: "w-oc" as SessionView["id"],
+    name: "OpenCode Helper",
+    runtime: "opencode",
+    phase: { _tag: "resting" },
+    phaseText: "Idle",
+  };
+
+  const fake = fakeHost(
+    { state: withSessions(base, [vvWorker, ocWorker]), responses: scenarios.typical.responses },
+    { route: "/runs?session=w-vv", locale: "en" },
+  );
+  fake.respond("session.compact", { id: "w-vv", compacted: true, summary: "## Goal\nCompacted via UI" });
+  fake.respond("session.runCode", {
+    id: "w-vv",
+    taskId: "cm-task-1",
+    outputJson: '{"ok":true,"count":3}',
+    executedSteps: 42,
+    replayedCalls: 1,
+    replayedSleeps: 0,
+    virtualNowMs: 1200,
+  });
+
+  const app = await open("../../app/main.tsx", {
+    width: 1200,
+    height: 800,
+    colorScheme: "light",
+    platform: "macos",
+    locale: "en-US",
+    clock: { time: SCENARIO_NOW },
+    host: fake.options,
+  });
+  await fake.pumpUntil(app, () => app.count("id:run-compact-context") === 1);
+  expect(app.count("id:run-codemode-open")).toBe(1);
+
+  // Trigger manual compaction from the RunDetail header.
+  await app.press("id:run-compact-context");
+  await fake.pumpUntil(app, () => fake.calls.some((c) => c.op === "session.compact"));
+  expect((fake.calls.find((c) => c.op === "session.compact")?.payload as { id?: string } | undefined)?.id).toBe("w-vv");
+  await app.waitUntil(() => app.count("id:toast") === 1 && app.texts().includes("Context compacted"));
+
+  // Open CodeMode dialog, enter a script, submit, and inspect output JSON + stats.
+  await app.press("id:run-codemode-open");
+  await fake.pumpUntil(app, () => app.count("id:run-codemode-dialog") === 1);
+  await app.type("id:run-codemode-script", "return { ok: true, count: 3 };");
+  await app.press("id:run-codemode-submit");
+  await fake.pumpUntil(app, () => fake.calls.some((c) => c.op === "session.runCode"));
+  const cmPayload = fake.calls.find((c) => c.op === "session.runCode")?.payload as { id?: string; script?: string } | undefined;
+  expect(cmPayload?.id).toBe("w-vv");
+  expect(cmPayload?.script).toBe("return { ok: true, count: 3 };");
+  await fake.pumpUntil(app, () => app.count("id:run-codemode-output") === 1);
+  expect(app.texts()).toContain('{"ok":true,"count":3}');
+  await app.press("id:run-codemode-cancel");
+  await fake.pumpUntil(app, () => app.count("id:run-codemode-dialog") === 0);
+
+  // Switching to an external OpenCode session hides CodeMode and manual compaction controls.
+  await app.press("id:run-row-w-oc");
+  await fake.pump(app);
+  expect(app.count("id:run-compact-context")).toBe(0);
+  expect(app.count("id:run-codemode-open")).toBe(0);
+});

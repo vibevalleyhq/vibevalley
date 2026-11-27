@@ -22,6 +22,8 @@ import {
   runsHref,
   runStatusOf,
   runTelemetryOf,
+  supportsCodeMode,
+  supportsManualCompaction,
 } from "./runsView";
 
 const sid = (id: string) => id as SessionId;
@@ -405,4 +407,67 @@ test("runTelemetryOf folds session telemetry and step events and isRecoverableRu
       active: false,
     }),
   ).toBe(false);
+});
+
+test("supportsManualCompaction and supportsCodeMode gate run actions by runtime and phase", () => {
+  const orchAgent = makeAgent(defaultOrchestrator, "orchestrator", "Orch");
+  const orchIdle: ReturnType<typeof buildRunEntries>[number] = {
+    kind: "orchestrator",
+    id: defaultOrchestrator,
+    agent: orchAgent,
+    live: undefined,
+    active: false,
+  };
+  expect(supportsManualCompaction(orchIdle)).toBe(true);
+  expect(supportsCodeMode(orchIdle)).toBe(true);
+
+  const orchBusy: ReturnType<typeof buildRunEntries>[number] = {
+    kind: "orchestrator",
+    id: defaultOrchestrator,
+    agent: orchAgent,
+    live: undefined,
+    active: true,
+  };
+  expect(supportsManualCompaction(orchBusy)).toBe(false);
+  expect(supportsCodeMode(orchBusy)).toBe(true);
+
+  const vvIdle: ReturnType<typeof buildRunEntries>[number] = {
+    kind: "worker",
+    id: "w-vv",
+    session: { ...makeSession({ id: "w-vv", name: "vv", phase: { _tag: "resting" } }), runtime: "vibevalley" },
+    live: undefined,
+    active: false,
+  };
+  expect(supportsManualCompaction(vvIdle)).toBe(true);
+  expect(supportsCodeMode(vvIdle)).toBe(true);
+
+  const claudeIdle: ReturnType<typeof buildRunEntries>[number] = {
+    kind: "worker",
+    id: "w-cc",
+    session: { ...makeSession({ id: "w-cc", name: "cc", phase: { _tag: "resting" } }), runtime: "claude" },
+    live: undefined,
+    active: false,
+  };
+  expect(supportsManualCompaction(claudeIdle)).toBe(true);
+  expect(supportsCodeMode(claudeIdle)).toBe(false);
+
+  const opencodeIdle: ReturnType<typeof buildRunEntries>[number] = {
+    kind: "worker",
+    id: "w-oc",
+    session: { ...makeSession({ id: "w-oc", name: "oc", phase: { _tag: "resting" } }), runtime: "opencode" },
+    live: undefined,
+    active: false,
+  };
+  expect(supportsManualCompaction(opencodeIdle)).toBe(false);
+  expect(supportsCodeMode(opencodeIdle)).toBe(false);
+
+  const vvClosed: ReturnType<typeof buildRunEntries>[number] = {
+    kind: "worker",
+    id: "w-vv-closed",
+    session: { ...makeSession({ id: "w-vv-closed", name: "vv", phase: { _tag: "closed", at: 12, closed: "completed" } }), runtime: "vibevalley" },
+    live: undefined,
+    active: false,
+  };
+  expect(supportsManualCompaction(vvClosed)).toBe(false);
+  expect(supportsCodeMode(vvClosed)).toBe(false);
 });

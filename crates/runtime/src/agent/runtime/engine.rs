@@ -15,6 +15,7 @@ use crate::agent::ai::models::{DEFAULT_MODEL, catalog, find_model};
 use crate::agent::ai::types::ModelClient;
 use crate::agent::core::events::Brain;
 use crate::agent::extensions::budget::BudgetExtension;
+use crate::agent::extensions::codemode::CodeModeExtension;
 use crate::agent::extensions::governance::GovernanceExtension;
 use crate::agent::extensions::grader::GraderExtension;
 use crate::agent::extensions::subagent::{SpawnAgent, SubagentExtension};
@@ -99,6 +100,7 @@ impl VibeValleyRuntime {
         harness.register_extension(Arc::new(GraderExtension::default()));
         harness.register_extension(Arc::new(TodoExtension::default().without_global_tools()));
         harness.register_extension(Arc::new(SubagentExtension::new("VibeValley").without_global_tools()));
+        harness.register_extension(Arc::new(CodeModeExtension::new()));
         harness.recover().await.map_err(|e| AgentError::Io(e.to_string()))?;
         Ok(self.execution.get_or_init(|| SharedExecution::new(harness)).clone())
     }

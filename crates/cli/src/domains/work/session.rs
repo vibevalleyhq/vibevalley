@@ -1,9 +1,14 @@
-//! `session list|show|events|stop`.
+//! `session list|show|events|stop|compact|run-code`.
+
+use std::path::PathBuf;
 
 use clap::{Args, Subcommand};
-use vibevalley_protocol::{Phase, Session, SessionEvent, SessionEventListInput, SessionGetInput, SessionListInput, SessionStopInput, ops};
+use vibevalley_protocol::{
+    JsNumber, Phase, Session, SessionCompactInput, SessionCompactResult, SessionEvent, SessionEventListInput, SessionGetInput, SessionListInput,
+    SessionRunCodeInput, SessionStopInput, ops,
+};
 
-use crate::client::{Client, Done};
+use crate::client::{Client, Done, Failure, exit};
 use crate::output::{line, one_line};
 
 #[derive(Debug, Args)]
@@ -51,6 +56,34 @@ pub enum SessionAction {
     Stop {
         /// Session id
         session: String,
+    },
+    /// Manually compact conversation context for a session
+    #[command(after_help = "Examples:\n  vibevalley session compact orchestrator\n  vibevalley session compact w3")]
+    Compact {
+        /// Session id
+        session: String,
+    },
+    /// Run a durable CodeMode JavaScript task in a session's context
+    #[command(
+        after_help = "Examples:\n  vibevalley session run-code orchestrator 'return { ok: true };'\n  vibevalley session run-code orchestrator --file ./check.js"
+    )]
+    RunCode {
+        /// Session id
+        session: String,
+        /// Inline JavaScript body (omit when passing --file)
+        script: Option<String>,
+        /// Read the JavaScript body from a local file
+        #[arg(long)]
+        file: Option<PathBuf>,
+        /// Deterministic RNG seed override
+        #[arg(long)]
+        seed: Option<u64>,
+        /// Execution timeout in milliseconds
+        #[arg(long)]
+        timeout_ms: Option<i64>,
+        /// Maximum VM step budget
+        #[arg(long)]
+        max_steps: Option<i64>,
     },
 }
 
@@ -139,6 +172,59 @@ pub async fn run(client: &Client, cmd: SessionCmd) -> Done {
             let id = session.clone();
             client
                 .mutate::<ops::SessionStop>("session stop", &SessionStopInput { id: session }, |_| format!("stopped {id}"))
+                .await
+        }
+        SessionAction::Compact { session } => {
+            client
+                .mutate::<ops::SessionCompact>("session compact", &SessionCompactInput { id: session }, |r: &SessionCompactResult| {
+                    if r.compacted {
+                        match &r.summary {
+                            Some(s) if !s.trim().is_empty() => format!("compacted {}\n{}", r.id, one_line(s)),
+                            _ => format!("compacted {}", r.id),
+                        }
+                    } else {
+                        format!("no compaction performed for {} ({})", r.id, r.reason.as_deref().unwrap_or("already compact"))
+                    }
+                })
+                .await
+        }
+        SessionAction::RunCode {
+            session,
+            script,
+            file,
+            seed,
+            timeout_ms,
+            max_steps,
+        } => {
+            let body = match (script, file) {
+                (Some(_), Some(_)) => {
+                    return Err(Failure::new(exit::USAGE, "InvalidInput", "pass either inline script or --file, not both"));
+                }
+                (Some(s), None) => s,
+                (None, Some(path)) => {
+                    std::fs::read_to_string(&path).map_err(|e| Failure::new(exit::OTHER, "Io", format!("failed to read {}: {e}", path.display())))?
+                }
+                (None, None) => {
+                    return Err(Failure::new(exit::USAGE, "MissingArgument", "provide inline script or --file"));
+                }
+            };
+            client
+                .mutate::<ops::SessionRunCode>(
+                    "session run-code",
+                    &SessionRunCodeInput {
+                        id: session,
+                        script: body,
+                        seed: seed.map(|s| JsNumber(s as f64)),
+                        timeout_ms,
+                        max_steps,
+                    },
+                    |r| {
+                        format!(
+                            "{} ({} steps, {} calls, {} sleeps)\n{}",
+                            r.task_id, r.executed_steps, r.replayed_calls, r.replayed_sleeps, r.output_json
+                        )
+                    },
+                )
                 .await
         }
     }

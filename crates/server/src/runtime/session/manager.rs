@@ -6,11 +6,12 @@ use tokio_util::sync::CancellationToken;
 use vibevalley_core::rules::session_ids_of;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    ApiError, HumanPause, HumanPauseSource, Issue, IssueGetInput, IssueStageKind, IssueWatch, LiveEvent, ResumeCondition, Session, SessionChildTranscript,
-    SessionChildTranscriptInput, SessionController, SessionEventListInput, SessionEventPage, SessionId, SessionOpenWorkspaceInput,
+    ApiError, BizCode, HumanPause, HumanPauseSource, Issue, IssueGetInput, IssueStageKind, IssueWatch, LiveEvent, ResumeCondition, Session,
+    SessionChildTranscript, SessionChildTranscriptInput, SessionController, SessionEventListInput, SessionEventPage, SessionId, SessionOpenWorkspaceInput,
     SessionRespondInteractionInput, SessionRespondPermissionInput, SessionSendInput, SessionSetConfigInput, SessionWatchEvent, SessionWatchPayload,
     SessionWorkspace, SliceKind,
 };
+use vibevalley_runtime::oar::{ControlAction, ControlStatus};
 
 use super::engine::SessionEngine;
 use super::types::{helper_ref, session_error};
@@ -117,6 +118,29 @@ impl SessionEngine {
 
     pub(crate) async fn child_transcript_endpoint_async(&self, input: SessionChildTranscriptInput) -> Result<SessionChildTranscript, ApiError> {
         self.read_child_transcript_async(input).await.map_err(session_error)
+    }
+
+    pub(crate) async fn compact_live_async(&self, id: &str) -> Result<(), ApiError> {
+        let Some(agent) = self.live_agent(id) else {
+            return Err(ApiError::new(BizCode::SessionRefused, t("server.session.workspace.notLive", &[])));
+        };
+        let key = format!("compact-{}", uuid::Uuid::now_v7());
+        let outcome = agent
+            .control(ControlAction::Compact, "", &key, &key)
+            .await
+            .map_err(|e| session_error(e.into()))?;
+        match outcome.status {
+            ControlStatus::Accepted => Ok(()),
+            ControlStatus::Unsupported => Err(ApiError::new(BizCode::RuntimeRefused, outcome.reason)),
+            ControlStatus::Rejected | ControlStatus::NotRunning => Err(ApiError::new(BizCode::SessionRefused, outcome.reason)),
+        }
+    }
+
+    pub(crate) fn worker_conversation(&self, id: &str) -> Option<String> {
+        self.extra(id)
+            .agent_session
+            .filter(|vendor| !vendor.trim().is_empty())
+            .map(|vendor| vibevalley_runtime::agent::harness::worker_conversation(&vendor))
     }
 
     pub(crate) async fn watch_session_async(&self, input: SessionWatchPayload, sink: crate::context::Sink) -> Result<(), ApiError> {

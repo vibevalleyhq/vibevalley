@@ -217,6 +217,26 @@ export type SessionChildTranscriptInput = { id: string, conversationId: string, 
 
 export type SessionChildTranscript = { conversationId: string, steps: Array<SessionChildStep>, };
 
+/**
+ * Request to manually compact conversation context for a session.
+ */
+export type SessionCompactInput = { id: string, };
+
+/**
+ * Result of manually compacting conversation context for a session.
+ */
+export type SessionCompactResult = { id: string, compacted: boolean, summary?: string, reason?: string, };
+
+/**
+ * Request to execute a durable CodeMode JavaScript task within a session's context.
+ */
+export type SessionRunCodeInput = { id: string, script: string, seed?: number, timeoutMs?: number, maxSteps?: number, };
+
+/**
+ * Result of a durable CodeMode script execution.
+ */
+export type SessionRunCodeResult = { id: string, taskId: string, outputJson: string, executedSteps: number, replayedCalls: number, replayedSleeps: number, virtualNowMs: number, };
+
 export type SessionWatchPayload = { id: string, afterSeq?: number, };
 
 export type SessionWatchEvent = { "kind": "state", session: Session, title?: string, model?: string, effort?: string, permissionMode: SessionPermissionMode, pendingPermissions: Array<SessionPermissionRequest>, pendingInteractions: Array<SessionInteractionRequest>, tokens?: EventTokens, swarm?: SessionSwarmState, } | { "kind": "history", session: SessionId, events: Array<SessionEvent>, } | { "kind": "event", session: SessionId, event: SessionEvent, } | { "kind": "missing", session: SessionId, };

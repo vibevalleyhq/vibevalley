@@ -20,8 +20,8 @@
 | Claude Code | 双向 stream-json，工具调用 ID 串起子 agent 路径。MCP 配置放在权限为 `0600` 的临时文件里。 | 开轮前通过 `get_usage` 读取基线，对照模型累计量计算本次增量。读不到基线则记录未知原因。 |
 | Codex | app-server 的 `thread/start`、`turn/start`、`turn/steer` 和 `thread/compact/start`；通知标出线程、工具、轮次，并捕获根线程标题（`thread/started`、`thread/name/updated`）。 | 从恢复响应或开轮前的 token 通知取基线；子线程用量独立归属。 |
 | Antigravity（`agy >= 1.5.0`） | ACP v1+v2 握手（关闭 `fs.readTextFile` / `fs.writeTextFile` / `terminal`），前置过滤 stdout 认证链接，`session/new` 与 `session/resume` 均透传 `_meta.antigravity.systemPrompt.append`；从 `session/{new,resume,load}` 与 `session_info_update` 捕获真实会话标题；永不发 `yolo`/`auto_edit`，客户端按权限模式裁决并将 `interaction_*` 分流为独立提问；轮中直接发 `session/prompt` 引导，跟踪后台命令/定时脱离尾流；轮末只读查本地 `conversations/<sessionId>.db` 的 `step_type = 17` 升级静默错误，并经 [antigravity_swarm.rs](crates/runtime/src/oar/acp/antigravity_swarm.rs) 只读观测 Swarm 旁路状态（总览/成员/黑板）及 `step_type = 127` 子代理的有界 `session.childTranscript` 下钻。 | 按轮上报，采用 Gemini 加法语义（`input + cachedRead`、`output + thought`）并上报 `cacheRead`/`cacheWrite`/`reasoning` 及上下文窗口占用；恢复会话同样保留每轮用量。 |
-| OpenCode、Grok、Kimi、CodeBuddy | ACP 协商会话、模型、推理强度和工具。OpenCode、Grok 支持中途插话；Kimi 和 CodeBuddy 的工作规则随首条输入发送。 | 新会话累计已报告用量；恢复会话缺少可查的历史基线，标记未知。 |
-| Qwen Code、Qoder | SDK stream-json。Qwen 首个输入帧是 `initialize`，Qoder 的提示和 MCP 配置经私有文件传入。厂商 ID 到达后写回业务会话，供下一轮续接。 | 平面用量按轮累加；Qoder 缺少用量字段时保留未知。 |
+| OpenCode、Grok、Kimi、CodeBuddy | ACP 协商会话、模型、推理强度和工具。OpenCode（实测 `1.19.5`，`opencode acp`）广告 `loadSession`/`close`/`fork`/`list`/`resume` 与 45 个 `configOptions.model`，不广告 `modes` 与 `systemPrompt`；Grok（实测 `1.0.92`，`grok agent stdio`）支持 `list`/`resume`/`close` 与 `reasoning_effort`（`xhigh/high/medium/low`），ACP 无 `modes` 数组且 `grok usage --json` 返回不支持命令行展示；Kimi（实测 `2.3.2`，`kimi acp`）支持 `list`/`resume`/`close`/`delete`/`fork`/`additionalDirectories`、`modes`（`default/plan/auto/yolo`）及 `thinking`（`low/high/max`），且首条输入携带工作规则；CodeBuddy 本机未安装（由离线回放覆盖）。 | 新会话累计已报告用量；恢复会话缺少可查的历史基线，标记未知。 |
+| Qwen Code、Qoder | SDK stream-json（两者本机均未安装，当前由离线回放覆盖）。Qwen 首个输入帧是 `initialize`，Qoder 的提示和 MCP 配置经私有文件传入；Qoder 另在 OAR 层支持 `ControlAction::Compact`。厂商 ID 到达后写回业务会话，供下一轮续接。 | 平面用量按轮累加；Qoder 缺少用量字段时保留未知。 |
 
 工单只按根轮已报告的输入与输出 token 之和结算。轮次、最后一次汇报和工单时间线共用该结果。输入或输出缺失时省略 `spent`。子线程单独归属，USD 成本留在驱动记录。累计数缺少上一轮边界时，服务等到下一对完整读数再算增量。[用量归约](crates/runtime/src/oar/accounting.rs) · [工单结算](crates/server/src/runtime/session/engine.rs)
 
@@ -47,7 +47,7 @@
 | `crates/server/src/runtime/session/workspace.rs` | 工作区直连对话会话（`open_workspace`、`close_workspace`、`send_workspace`、`respond_permission`、`respond_interaction`、`set_workspace_config`、`swarm_snapshot`、`read_child_transcript`、`session_title`）：作为 `controller: User` 的 `AgentSession` 统一落盘 `server.db` 的 `session` / `session_mailbox` / `session_event` 表，不占工单板并发上限、不进收件箱与像素农场 |
 | `crates/server/src/runtime/session/driver.rs`、`crates/server/src/agent/profile/drive.rs` | 把工单指派的档案变成农机和启动参数（规矩、人设、记性、MCP） |
 | `crates/server/src/runtime/session/journal.rs` | 游标分页轨迹：每个会话的步骤落盘 `session_event` 表（按 `(session_id, seq)` 索引，实体位于 `crates/server/src/db/entity/session.rs`），变化时每 300 毫秒推一次、每 1.5 秒刷盘；权限、交互提问与用量步骤立即刷盘 |
-| `crates/server/src/runtime/session/mod.rs` | 全部 `session.*` 端点通过 `Hub::on_async` 注册为原生异步处理器（`list`、`get`、`event.list`、`stop`、`openWorkspace`、`closeWorkspace`、`send`、`respondPermission`、`respondInteraction`、`setConfig`、`childTranscript`、`binding.attach`、`binding.detach`），并提供 `issue.watch` / `session.watch` 订阅流（按 `SessionsSlice` 与事件驱动同步 `title` 与 `swarm` 增量） |
+| `crates/server/src/runtime/session/mod.rs` | 全部 `session.*` 端点（含 `list`、`get`、`event.list`、`stop`、`openWorkspace`、`closeWorkspace`、`send`、`respondPermission`、`respondInteraction`、`setConfig`、`childTranscript`、`binding.attach`、`binding.detach`），并提供 `issue.watch` / `session.watch` 订阅流（按 `SessionsSlice` 与事件驱动同步 `title` 与 `swarm` 增量）；其中 `session.compact` 与 `session.runCode` 经 `Orchestrator` 接入持久化压缩与 CodeMode 沙箱 |
 | `crates/server/src/agent/mcp/mod.rs` | 帮工的 `/mcp` 门：JSON-RPC，令牌由工单板开帮工时签发（`Board::who` 认人），工具是农场的帮工工具（[工具](docs/subsystems/orchestrator.md)） |
 | `crates/runtime/src/oar/` | 驱动各家农机：`claude.rs`、`codex.rs`、`acp/`（`mod.rs`、`turn_state.rs` 位打包原子状态机 `AcpTurnMachine`、`antigravity.rs`、`antigravity_db.rs`、`antigravity_swarm.rs`）、`sdk.rs`、`scripted.rs`；`record.rs`、`voyage.rs` 是 `oar-voyage/3` JSONL 记录流（内置农机在 `crates/runtime/src/agent/runtime/mod.rs`），`core.rs` 预留关闭态零开销的全局 `OarObserver` 钩子并支持 `TurnOptions { trace_id }` 透传（写入 `traceId`） |
 
@@ -85,7 +85,7 @@
 ## 还没做的
 
 - MCP 连接观察：Rust 版从简，当前不在计划内。
-- `opencode`、`grok`、`kimi`、`codebuddy`、`qwen`、`qoder` 的真实厂商 CLI 实机验证：`#55`。
+- 实机已核验 `opencode 1.19.5`、`grok 1.0.92`、`kimi 2.3.2` 的零花费 ACP 握手与模型/模式协商（`claude 2.1.322`、`codex-cli 0.170.0` 同在宿主机可用）；`codebuddy`、`qwen`、`qoder` 本机未安装（仅覆盖离线回放），外部 CLI 的真实付费对话计费、配额扣减与跨版本恢复尚未在实网账户下完成。
 
 ## 怎么验证
 

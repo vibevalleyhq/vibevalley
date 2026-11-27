@@ -225,8 +225,10 @@ const COMMANDS: &[&str] = &[
     "repo pr submit",
     "runtime list",
     "runtime refresh",
+    "session compact",
     "session events",
     "session list",
+    "session run-code",
     "session show",
     "session stop",
     "setting get",
@@ -672,4 +674,34 @@ fn issue_watch_and_worker_round_trip() {
     let observed = srv.run(&["issue", "watch", &format!("#{n}"), "--json"]);
     assert_eq!(observed.code, 0, "{:?}", observed.failure);
     assert!(observed.out.lines().any(|l| l.contains("\"kind\":\"state\"")), "{}", observed.out);
+}
+
+#[test]
+fn session_compact_and_run_code_cli_work() {
+    let srv = spawn_server();
+    assert_eq!(srv.run(&["orchestrator", "open"]).code, 0);
+    assert_eq!(srv.run(&["issue", "create", "CM Probe"]).code, 0);
+
+    let run = srv.run(&[
+        "session",
+        "run-code",
+        "orchestrator",
+        r#"const text = call("issue_list", {}); return { text };"#,
+        "--json",
+    ]);
+    assert_eq!(run.code, 0, "{:?}", run.failure);
+    let run_json = run.json();
+    assert_eq!(run_json["id"], "orchestrator");
+    assert_eq!(run_json["replayedCalls"], 1);
+    let out_val: Value = serde_json::from_str(run_json["outputJson"].as_str().unwrap()).unwrap();
+    assert!(out_val["text"].as_str().unwrap().contains("CM Probe"), "{out_val}");
+
+    let compact = srv.run(&["session", "compact", "orchestrator", "--json"]);
+    assert_eq!(compact.code, 0, "{:?}", compact.failure);
+    let compact_json = compact.json();
+    assert_eq!(compact_json["id"], "orchestrator");
+    assert_eq!(compact_json["compacted"], false);
+
+    let missing = srv.run(&["session", "run-code", "orchestrator"]);
+    assert_eq!((missing.code, missing.tag()), (2, "MissingArgument"));
 }

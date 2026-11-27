@@ -566,3 +566,56 @@ async fn path3_codemode_combines_local_grep_and_oar_run_and_default_experiments_
     }
     harness.close().await;
 }
+
+#[tokio::test]
+async fn engine_manual_compact_and_run_codemode_script_work_end_to_end() {
+    let dir = TempDir::new().unwrap();
+    std::fs::write(dir.path().join("probe.txt"), "codemode_marker_42\n").unwrap();
+
+    let store = Store::memory().unwrap();
+    let harness = Harness::from_store(store, Arc::new(WorkersOnly));
+    harness.register_extension(Arc::new(GovernanceExtension::new(Permissions {
+        builtin_default: Policy::AlwaysAllow,
+        mcp_default: Policy::AlwaysAllow,
+        overrides: BTreeMap::new(),
+    })));
+    harness.recover().await.unwrap();
+
+    let client = QueueClient::new(vec![say("first"), say("second"), say("third"), say("## Goal\nCompacted summary text")]);
+    let mut brain = Brain::new(client, "deepseek-flash", "sys");
+    brain.tools = coding_tools(&Workspace::new(dir.path()));
+
+    let conv = worker_conversation("manual-cm");
+    harness.attach_worker(&conv, Arc::new(brain), Arc::new(|_| {})).await.unwrap();
+
+    for (req_id, prompt) in [("r1", "one"), ("r2", "two"), ("r3", "three")] {
+        let (_, task, _) = submit_prompt(&harness, &conv, "deepseek-flash", req_id, prompt, "sys").await.unwrap();
+        let done = harness.scheduler().wait(&task.id, WAIT).await.unwrap();
+        assert_eq!(done.terminal_reason, "completed");
+    }
+
+    let summary = harness
+        .engine()
+        .compact_manual(&conv, "deepseek-flash")
+        .await
+        .unwrap()
+        .expect("compaction summary");
+    assert!(summary.contains("Compacted summary text"), "{summary}");
+
+    let (task_id, res) = harness
+        .engine()
+        .run_codemode_script(
+            &conv,
+            r#"const found = call("grep", { pattern: "codemode_marker_42" }); return { found };"#,
+            Some(7),
+            Some(5_000),
+            Some(1_000),
+        )
+        .await
+        .unwrap();
+    assert!(!task_id.is_empty());
+    assert!(res.value["found"].as_str().unwrap().contains("codemode_marker_42"));
+    assert_eq!(res.replayed_calls, 1);
+
+    harness.close().await;
+}

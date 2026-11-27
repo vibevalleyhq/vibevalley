@@ -488,6 +488,12 @@ export class VibeValleyApi {
       this.call<T.SessionWorkspace>("session.setConfig", "/api/v1/session/setConfig", a, options),
     childTranscript: (a: T.SessionChildTranscriptInput, options?: { signal?: AbortSignal }): Promise<T.SessionChildTranscript> =>
       this.call<T.SessionChildTranscript>("session.childTranscript", "/api/v1/session/childTranscript", a, options),
+    /** Manually triggers context compaction for a durable or runtime session. */
+    compact: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<T.SessionCompactResult> =>
+      this.call<T.SessionCompactResult>("session.compact", "/api/v1/session/compact", a, options),
+    /** Executes a durable CodeMode JavaScript script in the session's tool context. */
+    runCode: (a: T.SessionRunCodeInput, options?: { signal?: AbortSignal }): Promise<T.SessionRunCodeResult> =>
+      this.call<T.SessionRunCodeResult>("session.runCode", "/api/v1/session/runCode", a, options),
     event: {
       /** Its log, oldest first. `run` narrows to one run; cursor fields page history. */
       list: (a: T.SessionEventListInput, options?: { signal?: AbortSignal }): Promise<T.SessionEventPage> =>

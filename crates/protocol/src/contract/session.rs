@@ -1306,6 +1306,59 @@ pub struct SessionChildTranscript {
     pub steps: Vec<SessionChildStep>,
 }
 
+/// Request to manually compact conversation context for a session.
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct SessionCompactInput {
+    pub id: String,
+}
+
+/// Result of manually compacting conversation context for a session.
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct SessionCompactResult {
+    pub id: String,
+    pub compacted: bool,
+    pub summary: Option<String>,
+    pub reason: Option<String>,
+}
+
+/// Request to execute a durable CodeMode JavaScript task within a session's context.
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct SessionRunCodeInput {
+    pub id: String,
+    pub script: String,
+    pub seed: Option<crate::JsNumber>,
+    pub timeout_ms: Option<i64>,
+    pub max_steps: Option<i64>,
+}
+
+/// Result of a durable CodeMode script execution.
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct SessionRunCodeResult {
+    pub id: String,
+    pub task_id: String,
+    pub output_json: String,
+    pub executed_steps: i64,
+    pub replayed_calls: i64,
+    pub replayed_sleeps: i64,
+    pub virtual_now_ms: i64,
+}
+
 #[skip_serializing_none]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts-gen", derive(TS))]
@@ -1432,6 +1485,10 @@ crate::typescript::module! {
     SessionChildStep,
     SessionChildTranscriptInput,
     SessionChildTranscript,
+    SessionCompactInput,
+    SessionCompactResult,
+    SessionRunCodeInput,
+    SessionRunCodeResult,
     SessionWatchPayload,
     SessionWatchEvent];
     aliases: [];

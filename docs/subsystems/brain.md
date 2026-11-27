@@ -20,9 +20,9 @@
 | `crates/runtime/src/agent/durable/` | 持久底座：可插拔 [`StorageBackend`](crates/runtime/src/agent/durable/storage/mod.rs)（`SeaOrmStorage` 含 SQLite `open_sqlite_read_only` 与 PostgreSQL、`MemoryStorage`、`JsonlStorage`：sidecar + commit marker + 崩溃截断 + `read_only` 快照）、合规测试套（[`conformance`](crates/runtime/src/agent/durable/conformance.rs)）、元数据遥测（[`telemetry.rs`](crates/runtime/src/agent/durable/telemetry.rs)：`pi.durable.submit/phase/entry/submission/checkpoint`）、任务树投影（[`graph.rs`](crates/runtime/src/agent/durable/graph.rs)：`TaskGraph`）、SQLite/Store → JSONL 全闭环与 `at_seq` 切片导出（[`export.rs`](crates/runtime/src/agent/durable/export.rs)）、`Scheduler`（恢复扫描、信号唤醒、级联 `abort_tree`、`restart_limit` 断路器）、分支 `fork_conversation` 与乐观并发 `tx.compact` |
 | `crates/runtime/src/agent/core/` | 持久执行内核：`engine.rs` 六阶段状态机（`prepare` → `generate` → `tool_dispatch` → `tool_join` → `yield_check` → `follow_up_check`）与 Effect Sandwich；`doc.rs` 文档契约；`inbox.rs`（`WhenBusy::{Steer, Queue, Reject}`）；`pipeline.rs`（转写转换与 `tool_call_id` 配对）；`extension.rs` |
 | `crates/runtime/src/agent/tools/` | 类型化工具：`TypedTool`、`TypedToolAdapter`、`ToolOutput`；`coding_tools`（`read`、`write`、`edit`、`bash`、`grep`、`find`、`ls`）；`read_only_tools`（`read`、`grep`、`find`、`ls`） |
-| `crates/runtime/src/agent/compaction/` | 上下文压缩：默认 `LlmSummarizer`（`Compactor::with_llm`）、CJK 感知 token 估算、文件读写摘要持久化到 `FileOpsDoc`（`pi.file_ops`）与过期 `base_head` 丢弃 |
+| `crates/runtime/src/agent/compaction/` | 上下文压缩：默认 `LlmSummarizer`（`Compactor::with_llm`）、手动触发入口 `Engine::compact_manual`（`ControlAction::Compact` 与 `session.compact` / `vibevalley session compact` / `RunsPage`）、CJK 感知 token 估算、文件读写摘要持久化到 `FileOpsDoc`（`pi.file_ops`）与过期 `base_head` 丢弃 |
 | `crates/runtime/src/agent/resources/` | 资源接入：技能（`skills.rs`：`default_skill_dirs`、`scan_skills`、`LoadSkill`）、上下文文件与提示词拼装（`prompts.rs`：`AGENTS.md` / `CLAUDE.md`）、MCP 客户端（`mcp/`：`mod.rs`、`client.rs`） |
-| `crates/runtime/src/agent/codemode/` | QuickJS 确定性沙箱引擎：步数/内存/输出限额、确定性随机与虚拟时钟、调用与睡眠 `memo` 重放 |
+| `crates/runtime/src/agent/codemode/` | QuickJS 确定性沙箱引擎：步数/内存/输出限额、确定性随机与虚拟时钟、调用与睡眠 `memo` 重放；`Engine::run_codemode_script` 与 `CodeModeExtension` 为助手及 `vibevalley` 帮工暴露 `session.runCode` / `vibevalley session run-code` / `RunsPage` 弹窗入口 |
 | `crates/runtime/src/agent/extensions/` | 业务与实验扩展：`governance.rs`（权限门禁与 `PermissionRequested`）、`budget.rs`（树级花费 `tree_spend` 与 `BudgetExtension`）、`grader.rs`（独立只读验收、`ResponseFormat::JsonObject` 与围栏清理）、`memory.rs`（`MemoryPort`、`Remember`、`RewriteMemory`）、`todo.rs`（持久化到 `TodoDoc`）、`subagent.rs`（`SpawnAgent`、`owner_task_id` 与防嵌套）、`oar.rs`（`oar_list` / `oar_run` / `oar_steer` / `oar_stop`）、`codemode.rs`（`RunCode`） |
 | `crates/runtime/src/agent/experiments/` | 实验开关：`ExperimentFlags { codemode, tree_branch, oar_delegate }`（默认全关），经 `mount_experiments` / `Harness::with_experiments` 按需挂载实验 `Extension` |
 | `crates/runtime/src/agent/harness/` | 运行时挂架：`Harness`、`SharedExecution`、`ExtensionRegistry`、`Workers` 池与 `StandIn` 崩盘替身恢复 |
@@ -45,7 +45,8 @@
   - `spawn_agent` 恢复沿用原有 `subagent:*` 对话与 `owner_task_id` 不二次派生，花费计入父对话 `tree_spend()`，取消先子后父级联。
   - `oar_run` 在 `open` 写入 `OarSessionDoc` 后崩溃恢复进 `run`；写入 `memo["turnStarted"]` 后崩溃不重发 prompt，返回 `{ interrupted: true, gitStatus, ... }`。
   - `pi.codemode` 崩溃后重放 JS，已 `memo` 的前序调用跳过不重跑，仅续跑未完成调用。
-  - `compaction` 由 `LlmSummarizer` 压缩并写 `pi.file_ops`，过期 `base_head` 并发压缩静默丢弃。
+  - `compaction` 由 `LlmSummarizer` 压缩并写 `pi.file_ops`，过期 `base_head` 并发压缩静默丢弃；空闲助手与 `vibevalley` / `claude` / `codex` / `qoder` 会话均可通过 `session.compact` 手动触发压缩。
+  - 助手与 `vibevalley` 农机默认挂载 `CodeModeExtension`，既支持模型按需调 `run_code` 工具，也支持用户从工作台 `RunsPage` 或 `vibevalley session run-code` 直接提交确定性 JS 脚本。
   - `yield_check` 已写入 `pi.verdict` 后崩溃直接复用判定不二次调 grader；`StandIn` 在重启后即使动态扩展暂未重连也保留系统提示分段与工具签名，并在调用时返回可理解的错误说明。
 - **OAR 双向对称**：外部应用与 CLI 经 `vibevalley-oar::Registry` 驱动内置 `vibevalley` 或外部农机（人 → OAR）；开启 `OarExtension` 后，内置 Agent 也可经 `oar_list` / `oar_run` / `oar_steer` / `oar_stop` 派生并级联控制外部 OAR 农机，外部 `Usage.cost_usd` 写入父任务树预算（Agent → OAR），并受 `allowed_runtimes`、`allowed_workdirs`、`max_concurrent`、`max_depth` 与同目录并发写入互斥约束。
 - **两种宿主**：
@@ -78,7 +79,7 @@
 ## 还没做的
 
 - 按档案 `toolsets` 分配工具、助手也能加载技能：`#52`。
-- 原生界面手工触发压缩、普通对话入口创建 CodeMode 脚本任务与真模型阈值验收：`#55`。
+- 真 DeepSeek 模型长对话在 `soft_tokens` / `hard_tokens` / `ContextOverflow` 阈值下的自动压缩实网额度验收。
 
 ## 怎么验证
 

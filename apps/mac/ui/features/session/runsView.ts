@@ -408,3 +408,19 @@ export function isRecoverableRun(entry: RunEntry): boolean {
   const status = runStatusOf(entry);
   return status === "failed" || status === "interrupted" || status === "resting";
 }
+
+/** Whether manual context compaction (`session.compact`) is supported in the current state. */
+export function supportsManualCompaction(entry: RunEntry): boolean {
+  if (entry.kind === "orchestrator") return !entry.active;
+  const status = runStatusOf(entry);
+  if (status === "closed" || status === "working") return false;
+  const runtime = (entry.live ?? entry.session).runtime;
+  return runtime === "vibevalley" || runtime === "claude" || runtime === "codex" || runtime === "qoder";
+}
+
+/** Whether durable CodeMode script execution (`session.runCode`) is supported for this entry. */
+export function supportsCodeMode(entry: RunEntry): boolean {
+  if (entry.kind === "orchestrator") return true;
+  if (runStatusOf(entry) === "closed") return false;
+  return (entry.live ?? entry.session).runtime === "vibevalley";
+}

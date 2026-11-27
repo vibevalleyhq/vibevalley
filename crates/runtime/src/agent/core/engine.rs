@@ -1,6 +1,9 @@
+use std::collections::hash_map::DefaultHasher;
 use std::collections::{BTreeMap, HashSet};
+use std::hash::{Hash, Hasher};
 use std::path::Path;
 use std::sync::Arc;
+use std::time::Duration;
 
 use parking_lot::{Mutex, RwLock};
 
@@ -11,6 +14,7 @@ use crate::BoxFuture;
 use crate::agent::BrainError;
 use crate::agent::ai::CancelToken;
 use crate::agent::ai::types::{ChatRequest, Delta, ToolCall, ToolSpec, Usage};
+use crate::agent::codemode::{CodeModeResult, CodeModeSpec, EXEC as CODEMODE_EXEC, KIND as CODEMODE_KIND};
 use crate::agent::compaction::{Compactor, FileOps, Level};
 use crate::agent::core::doc::{CONVERSATION_SCOPE, FileOpsDoc, StandInDoc, UsageTotals, read_doc, update_doc};
 use crate::agent::core::events::{AgentEvent, Brain, TurnOutcome};
@@ -1485,6 +1489,117 @@ impl Engine {
             Err(Error::Invalid(out.text))
         } else {
             Ok(Transition::Complete(decoded))
+        }
+    }
+
+    /// Manually triggers durable context compaction for `conv` outside a running turn.
+    pub async fn compact_manual(&self, conv: &str, fallback_model: &str) -> Result<Option<String>> {
+        let conv_read = conv.to_owned();
+        let (provider, busy) = self
+            .store
+            .read_async(move |tx| {
+                Box::pin(async move {
+                    let c = tx.conversation_async(&conv_read).await?;
+                    let busy = tx
+                        .tasks_by_conversation_async(&conv_read)
+                        .await?
+                        .into_iter()
+                        .any(|t| t.kind == KIND && t.status != TaskStatus::Terminal);
+                    Ok((c.provider_affinity, busy))
+                })
+            })
+            .await?;
+        if busy {
+            return Err(Error::Invalid("turn in progress; wait for completion before compacting".into()));
+        }
+        let compactor = if let Some(custom) = self.compactor.lock().clone() {
+            custom
+        } else {
+            let hint = if provider.trim().is_empty() { fallback_model } else { &provider };
+            match self.provider.resolve_brain(conv, hint).await? {
+                Some(brain) => self.effective_compactor(&brain),
+                None => Compactor::deterministic(self.store.clone()),
+            }
+        };
+        let Some(entry) = compactor.compact(conv, Level::Manual, None).await? else {
+            return Ok(None);
+        };
+        let summary = entry.payload["summary"].as_str().unwrap_or_default().to_owned();
+        self.emit(
+            conv,
+            "manual-compact",
+            AgentEvent::Compacted {
+                level: Level::Manual.name().into(),
+                summary: summary.clone(),
+            },
+        );
+        Ok(Some(summary))
+    }
+
+    /// Runs a standalone deterministic CodeMode JavaScript task within `conv` and awaits its output.
+    pub async fn run_codemode_script(
+        &self,
+        conv: &str,
+        script: &str,
+        seed: Option<u64>,
+        timeout_ms: Option<i64>,
+        max_steps: Option<i64>,
+    ) -> Result<(String, CodeModeResult)> {
+        if script.trim().is_empty() {
+            return Err(Error::Invalid("script must not be empty".into()));
+        }
+        let scheduler = self.scheduler().ok_or(Error::Closed)?;
+        let timeout_ms = timeout_ms.unwrap_or(10_000).clamp(100, 60_000);
+        let max_steps = max_steps.unwrap_or(10_000).clamp(1, 100_000);
+        let mut task = Task::new(CODEMODE_KIND, CODEMODE_EXEC);
+        task.conversation_id = conv.to_owned();
+        let seed = seed.unwrap_or_else(|| {
+            let mut hasher = DefaultHasher::new();
+            task.id.hash(&mut hasher);
+            let digest = hasher.finish();
+            if digest == 0 { 1 } else { digest }
+        });
+        let spec = CodeModeSpec {
+            script: script.to_owned(),
+            seed,
+            start_time_ms: self.store.now_ms(),
+            max_steps,
+            max_vars: 256,
+            max_output_bytes: 65_536,
+            max_memory_bytes: 16 * 1024 * 1024,
+            max_string_bytes: 32_768,
+            timeout_ms,
+        };
+        task.checkpoint = json!(spec);
+        let conv_write = conv.to_owned();
+        let spawned = self
+            .store
+            .write_async(move |tx| {
+                Box::pin(async move {
+                    match tx.conversation_async(&conv_write).await {
+                        Err(Error::Missing(_)) => {
+                            tx.create_conversation_async(&conv_write, "").await?;
+                        }
+                        Err(e) => return Err(e),
+                        Ok(_) => {}
+                    }
+                    let (spawned, _) = tx.create_task_async(task).await?;
+                    Ok(spawned)
+                })
+            })
+            .await?;
+        let wait_ms = u64::try_from(timeout_ms).unwrap_or(10_000).saturating_add(5_000);
+        let done = scheduler.wait(&spawned.id, Duration::from_millis(wait_ms)).await?;
+        if done.terminal_reason == "completed" {
+            let res: CodeModeResult = serde_json::from_value(done.result)?;
+            Ok((done.id, res))
+        } else {
+            let msg = if done.error_text.is_empty() {
+                format!("codemode task failed ({})", done.terminal_reason)
+            } else {
+                done.error_text
+            };
+            Err(Error::Invalid(msg))
         }
     }
 }

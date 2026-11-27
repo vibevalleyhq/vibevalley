@@ -21,5 +21,14 @@
     "notLive": "Session is not currently live",
     "interactionDecisionRequired": "Choose an option, enter custom text, or cancel"
   },
-  "writeLockHeld": "Worktree {worktree} is currently locked for writing by session {holder}; hand off or dismiss it first"
+  "writeLockHeld": "Worktree {worktree} is currently locked for writing by session {holder}; hand off or dismiss it first",
+  "compact": {
+    "empty": "Session has not started a durable conversation yet",
+    "notEnoughEntries": "Conversation does not have enough uncompacted entries yet",
+    "closed": "Closed sessions cannot be compacted or run CodeMode"
+  },
+  "codemode": {
+    "emptyScript": "Script must not be empty",
+    "unsupportedRuntime": "Runtime `{runtime}` does not support durable CodeMode scripts"
+  }
 }

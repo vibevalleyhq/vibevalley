@@ -484,6 +484,24 @@ pub const ENDPOINTS: &[Endpoint] = &[
         result: Some("SessionChildTranscript"),
     },
     Endpoint {
+        op: "session.compact",
+        module: "session",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("SessionCompactInput"),
+        result: Some("SessionCompactResult"),
+    },
+    Endpoint {
+        op: "session.runCode",
+        module: "session",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("SessionRunCodeInput"),
+        result: Some("SessionRunCodeResult"),
+    },
+    Endpoint {
         op: "issue.conversation.get",
         module: "issue",
         about: &["id"],
@@ -2190,6 +2208,20 @@ pub mod ops {
         type Input = t::SessionChildTranscriptInput;
         type Result = t::SessionChildTranscript;
     }
+    /// Manually triggers context compaction for a durable or runtime session.
+    pub struct SessionCompact;
+    impl Op for SessionCompact {
+        const NAME: &'static str = "session.compact";
+        type Input = t::SessionCompactInput;
+        type Result = t::SessionCompactResult;
+    }
+    /// Executes a durable CodeMode JavaScript script in the session's tool context.
+    pub struct SessionRunCode;
+    impl Op for SessionRunCode {
+        const NAME: &'static str = "session.runCode";
+        type Input = t::SessionRunCodeInput;
+        type Result = t::SessionRunCodeResult;
+    }
     pub struct IssueConversationGet;
     impl Op for IssueConversationGet {
         const NAME: &'static str = "issue.conversation.get";
@@ -3374,6 +3406,8 @@ endpoint_ids! {
     SessionRespondInteraction => "session.respondInteraction",
     SessionSetConfig => "session.setConfig",
     SessionChildTranscript => "session.childTranscript",
+    SessionCompact => "session.compact",
+    SessionRunCode => "session.runCode",
     // issue
     IssueConversationGet => "issue.conversation.get",
     IssueCommentCreate => "issue.comment.create",

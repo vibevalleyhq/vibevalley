@@ -1,14 +1,14 @@
 import { Clipboard, computed, Scroll, signal, Text, untracked, View, type JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";
-import type { Look, OrchestratorEval, SessionEvent, Spent } from "@vibevalley/protocol";
+import type { Look, OrchestratorEval, SessionEvent, SessionRunCodeResult, Spent } from "@vibevalley/protocol";
 import { oneLine, sessionIssueId, sessionProfile, sessionRepo, sessionWorktree } from "@vibevalley/protocol/rules";
 
 import { createAct } from "../../design/act";
 import { Button, ButtonLink } from "../../design/Button";
 import { Dialog } from "../../design/Dialog";
 import { AgentFace, OrchestratorFace } from "../../design/domain/Face";
-import { Field, SearchField, Select, TextInput } from "../../design/Field";
+import { Field, SearchField, Select, TextArea, TextInput } from "../../design/Field";
 import { Icon } from "../../design/Icon";
 import { ActiveBar, Quiet } from "../../design/layout";
 import { Segmented } from "../../design/Segmented";
@@ -44,6 +44,8 @@ import {
   runStatusOf,
   runTelemetryOf,
   type RunTelemetryRollup,
+  supportsCodeMode,
+  supportsManualCompaction,
 } from "./runsView";
 import { TrajectoryLog } from "./Trajectory";
 
@@ -703,6 +705,82 @@ function RerunDialog(props: {
   );
 }
 
+function CodeModeDialog(props: { open: boolean; sessionId: string; onClose: () => void }) {
+  const client = useQueryClient();
+  const script = signal("");
+  const result = signal<SessionRunCodeResult | undefined>(undefined);
+  const running = createAct((msg) => toast(msg));
+
+  createEffect(
+    () => [props.open, props.sessionId] as const,
+    ([open]) => {
+      if (!open) return;
+      result.set(undefined);
+    },
+  );
+
+  const submit = () => {
+    const body = script().trim();
+    if (!body || running.busy()) return;
+    void running.run(async () => {
+      const res = await api.session.runCode({ id: props.sessionId, script: body });
+      result.set(res);
+      await client.invalidate(allSessionsQuery());
+    });
+  };
+
+  return (
+    <Dialog
+      open={props.open}
+      onClose={() => props.onClose()}
+      title={t("web.session.hub.codemode.title")}
+      size="md"
+      testid="run-codemode-dialog"
+      footer={
+        <View class="flex-row items-center justify-end gap-2">
+          <Button size="compact" tone="quiet" testID="run-codemode-cancel" onPress={() => props.onClose()}>
+            {t("shared.act.close")}
+          </Button>
+          <Button size="compact" tone="primary" icon="bolt" testID="run-codemode-submit" disabled={!script().trim() || running.busy()} onPress={submit}>
+            {t("web.session.hub.codemode.run")}
+          </Button>
+        </View>
+      }
+    >
+      <View class="gap-3">
+        <Text class="text-xs text-muted">{t("web.session.hub.codemode.description")}</Text>
+        <Field label={t("web.session.hub.codemode.scriptLabel")}>
+          <TextArea
+            testID="run-codemode-script"
+            accessibilityLabel={t("web.session.hub.codemode.scriptLabel")}
+            placeholder={t("web.session.hub.codemode.scriptPlaceholder")}
+            rows={5}
+            value={script()}
+            onInput={(v) => script.set(v)}
+          />
+        </Field>
+        <If when={result()}>
+          {(res) => (
+            <View testID="run-codemode-output" class="gap-1 rounded-md border border-line bg-side p-2.5">
+              <View class="flex-row items-center justify-between gap-2">
+                <Text class="text-2xs font-medium text-muted">{t("web.session.hub.codemode.outputLabel")}</Text>
+                <Text class="font-mono text-2xs text-faint">
+                  {t("web.session.hub.codemode.stats", {
+                    steps: res().executedSteps,
+                    calls: res().replayedCalls,
+                    sleeps: res().replayedSleeps,
+                  })}
+                </Text>
+              </View>
+              <Text class="font-mono text-xs text-ink">{res().outputJson}</Text>
+            </View>
+          )}
+        </If>
+      </View>
+    </Dialog>
+  );
+}
+
 function RunDetail(props: {
   entry: RunEntry;
   look?: Look | undefined;
@@ -715,8 +793,10 @@ function RunDetail(props: {
   const client = useQueryClient();
   const copiedId = signal(false);
   const rerunOpen = signal(false);
+  const codeModeOpen = signal(false);
   const resetCopy = useTimeout();
   const resumeAct = createAct((msg) => toast(msg));
+  const compactAct = createAct((msg) => toast(msg));
   const steps = createSessionEvents(
     () => props.entry.id,
     () => true,
@@ -726,6 +806,7 @@ function RunDetail(props: {
     () => {
       copiedId.set(false);
       rerunOpen.set(false);
+      codeModeOpen.set(false);
     },
     { defer: true },
   );
@@ -753,6 +834,16 @@ function RunDetail(props: {
   const repo = () => (props.entry.kind === "worker" ? sessionRepo(props.entry.session) : undefined);
   const rollup = createMemo(() => runTelemetryOf(props.entry, steps()));
   const recoverable = createMemo(() => isRecoverableRun(props.entry));
+  const canCompact = createMemo(() => supportsManualCompaction(props.entry));
+  const canRunCode = createMemo(() => supportsCodeMode(props.entry));
+  const compactContext = () => {
+    if (compactAct.busy()) return;
+    void compactAct.run(async () => {
+      const res = await api.session.compact({ id: props.entry.id });
+      await client.invalidate(allSessionsQuery());
+      toast(res.compacted ? t("web.session.hub.compact.compacted") : (res.reason ?? t("web.session.hub.compact.skipped")));
+    });
+  };
   const terminalCwd = () => {
     if (props.entry.kind !== "worker") return undefined;
     const s = props.entry.live ?? props.entry.session;
@@ -845,6 +936,16 @@ function RunDetail(props: {
             </If>
           </View>
           <View class="shrink-0 flex-row items-center gap-1.5">
+            <If when={canCompact()}>
+              <Button size="compact" icon="collapse" testID="run-compact-context" disabled={compactAct.busy()} onPress={compactContext}>
+                {t("web.session.hub.compact.button")}
+              </Button>
+            </If>
+            <If when={canRunCode()}>
+              <Button size="compact" icon="bolt" testID="run-codemode-open" onPress={() => codeModeOpen.set(true)}>
+                {t("web.session.hub.codemode.button")}
+              </Button>
+            </If>
             <Button
               size="compact"
               testID="run-copy-id"
@@ -929,6 +1030,7 @@ function RunDetail(props: {
           </View>
         </If>
       </View>
+      <CodeModeDialog open={codeModeOpen()} sessionId={props.entry.id} onClose={() => codeModeOpen.set(false)} />
       <If when={props.entry.kind === "worker" ? props.entry : undefined}>
         {(worker) => (
           <RerunDialog

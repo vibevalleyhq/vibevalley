@@ -233,6 +233,8 @@ MOSS Live 语音通话
 | `session.respondInteraction` | 回复会话的交互式提问 | `/api/v1/session/respondInteraction` | ✓ | ✓ |   |   |
 | `session.setConfig` | 调整工作区会话的模型、推理强度或权限模式 | `/api/v1/session/setConfig` | ✓ | ✓ |   |   |
 | `session.childTranscript` | 读取子代理或协作组员最近的轨迹步骤 | `/api/v1/session/childTranscript` | ✓ | ✓ |   |   |
+| `session.compact` | cap.op.session.compact | `/api/v1/session/compact` | ✓ | ✓ |   |   |
+| `session.runCode` | cap.op.session.runCode | `/api/v1/session/runCode` | ✓ | ✓ |   |   |
 
 ## artifact
 

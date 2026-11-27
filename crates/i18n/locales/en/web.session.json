@@ -154,6 +154,21 @@
       "groupExperts": "Experts",
       "groupEngines": "Engines",
       "noWorktree": "No worktree directory recorded for this session"
+    },
+    "compact": {
+      "button": "Compact context",
+      "compacted": "Context compacted",
+      "skipped": "Nothing new to compact yet"
+    },
+    "codemode": {
+      "button": "Run Code",
+      "title": "Run CodeMode script",
+      "description": "Execute deterministic JavaScript inside this durable session sandbox with `call(tool, args)`.",
+      "scriptLabel": "JavaScript body",
+      "scriptPlaceholder": "const issues = call(\"issue_list\", {}); return { count: issues.length };",
+      "run": "Run script",
+      "outputLabel": "Output JSON",
+      "stats": "{steps} steps · {calls} tool calls · {sleeps} sleeps"
     }
   },
   "subagents": {

@@ -336,6 +336,55 @@ fn session_telemetry_rolls_up_without_migrations() {
     app2.close_blocking();
 }
 
+#[test]
+fn session_compact_and_run_code_respect_runtime_capabilities() {
+    vibevalley_i18n::set_locale("en");
+    let dir = tempfile::tempdir().unwrap();
+    let mut registry = vibevalley_runtime::oar::Registry::new();
+    registry.register(Arc::new(vibevalley_runtime::oar::scripted::ScriptedRuntime::demo()));
+    let app: App = create_app_blocking(Config {
+        registry: Some(Arc::new(registry)),
+        probe_runtimes: false,
+        ..Config::under(dir.path())
+    })
+    .unwrap();
+    let router = app.router().clone();
+    let call = |op: &str, p| router.call_as(Caller::User, op, p);
+
+    let mut helper = vibevalley_runtime::rt::block_on(app.test_internals().agent.profile.store.install_template_async("reviewer")).unwrap();
+    helper.runtime = "scripted".into();
+    let helper = vibevalley_runtime::rt::block_on(app.test_internals().agent.profile.store.save_async(helper)).unwrap();
+    call("repo.create", json!({ "name": "farm" })).data.unwrap();
+    let issue = call(
+        "issue.create",
+        json!({ "title": "check compact capability", "repo": "farm", "agent": helper.id }),
+    )
+    .data
+    .unwrap();
+    let id = issue["id"].as_str().unwrap().to_string();
+    call("issue.status.update", json!({ "id": id, "status": "todo" })).data.unwrap();
+
+    let session = crate::support::wait_until_live(app.ctx(), Duration::from_secs(20), "scripted helper to finish", || {
+        let s = crate::support::board_sessions(app.test_internals().board)
+            .into_iter()
+            .find(|x| x.issue_id() == Some(id.as_str()))?;
+        let page = call("session.event.list", json!({ "id": s.id })).data?;
+        page["events"].as_array()?.iter().any(|e| e["type"] == "run/end").then_some(s)
+    });
+
+    // External non-compacting / non-durable OAR runtime (`scripted`) returns RuntimeRefused on both.
+    let compact_refused = call("session.compact", json!({ "id": session.id }));
+    assert_eq!(compact_refused.biz_code, vibevalley_protocol::BizCode::RuntimeRefused.code());
+    let code_refused = call("session.runCode", json!({ "id": session.id, "script": "return 1;" }));
+    assert_eq!(code_refused.biz_code, vibevalley_protocol::BizCode::RuntimeRefused.code());
+
+    // Missing session returns SessionNotFound.
+    let missing = call("session.compact", json!({ "id": "w404" }));
+    assert_eq!(missing.biz_code, vibevalley_protocol::BizCode::SessionNotFound.code());
+
+    app.close_blocking();
+}
+
 #[path = "session/subagent_progress.rs"]
 mod subagent_progress;
 

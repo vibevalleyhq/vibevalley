@@ -329,6 +329,23 @@ export const SessionChildTranscript = z.object({
   steps: z.array(SessionChildStep),
 }) satisfies Codec<T.SessionChildTranscript>;
 
+export const SessionCompactResult = z.object({
+  id: z.string(),
+  compacted: z.boolean(),
+  summary: z.exactOptional(z.string()),
+  reason: z.exactOptional(z.string()),
+}) satisfies Codec<T.SessionCompactResult>;
+
+export const SessionRunCodeResult = z.object({
+  id: z.string(),
+  taskId: z.string(),
+  outputJson: z.string(),
+  executedSteps: z.number(),
+  replayedCalls: z.number(),
+  replayedSleeps: z.number(),
+  virtualNowMs: z.number(),
+}) satisfies Codec<T.SessionRunCodeResult>;
+
 export const SessionWatchEvent = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("state"),

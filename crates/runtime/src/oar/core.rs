@@ -938,7 +938,7 @@ impl<D: Driver> CoreSession<D> {
                     Err(rejected("not_found", "input is not queued"))
                 }
             }
-            A::Compact if !matches!(self.runtime_id(), "claude" | "codex" | "qoder") => Err(AgentError::Unsupported {
+            A::Compact if !matches!(self.runtime_id(), "claude" | "codex" | "qoder" | "vibevalley") => Err(AgentError::Unsupported {
                 option: "compact".into(),
                 reason: "no manual compaction".into(),
             }),
@@ -966,11 +966,12 @@ impl<D: Driver> CoreSession<D> {
                     Err(e) => Err(e),
                     Ok(()) if action == A::Compact => {
                         let result = self.driver.compact().await;
-                        if result.is_err() {
+                        if result.is_err() || self.runtime_id() == "vibevalley" {
                             let mut state = self.core.lock();
                             state.compacting = false;
                             state.manual_compaction = false;
-                            self.core.compact_event(&mut state, false, "failed");
+                            let outcome = if result.is_ok() { "completed" } else { "failed" };
+                            self.core.compact_event(&mut state, false, outcome);
                             state.span_id.clear();
                             state.trace_id = None;
                         }
