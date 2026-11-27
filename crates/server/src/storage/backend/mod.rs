@@ -215,15 +215,9 @@ pub fn normalize_prefix(prefix: &str) -> Result<String, StorageError> {
     if had_slash { Ok(format!("{body}/")) } else { Ok(body.to_owned()) }
 }
 
-/// Encodes `bytes` as lowercase hexadecimal without extra crate dependencies.
+/// Encodes `bytes` as lowercase hexadecimal.
 pub(crate) fn hex_lower(bytes: &[u8]) -> String {
-    const TABLE: &[u8; 16] = b"0123456789abcdef";
-    let mut out = String::with_capacity(bytes.len() * 2);
-    for &b in bytes {
-        out.push(TABLE[(b >> 4) as usize] as char);
-        out.push(TABLE[(b & 0x0f) as usize] as char);
-    }
-    out
+    hex::encode(bytes)
 }
 
 /// Computes lowercase hex SHA-256 of `bytes`.

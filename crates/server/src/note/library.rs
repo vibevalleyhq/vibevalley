@@ -286,7 +286,10 @@ fn map_download_err(address: &str, err: PublicDownloadError) -> ApiError {
 fn downloaded_tuple(fetched: PublicBytes) -> (Vec<u8>, String, String) {
     let host = fetched.url.host_str().unwrap_or("").to_string();
     let segment = fetched.url.path().rsplit('/').next().unwrap_or("");
-    let named = percent_decoded(segment).unwrap_or_else(|| segment.to_string());
+    let named = percent_encoding::percent_decode_str(segment)
+        .decode_utf8()
+        .map(std::borrow::Cow::into_owned)
+        .unwrap_or_else(|_| segment.to_string());
     (fetched.bytes, if named.is_empty() { host } else { named }, fetched.media_type)
 }
 
@@ -295,23 +298,6 @@ async fn download_async(address: &str) -> Result<(Vec<u8>, String, String), ApiE
         .await
         .map_err(|e| map_download_err(address, e))?;
     Ok(downloaded_tuple(fetched))
-}
-
-fn percent_decoded(s: &str) -> Option<String> {
-    let bytes = s.as_bytes();
-    let mut out = Vec::with_capacity(bytes.len());
-    let mut i = 0;
-    while i < bytes.len() {
-        if bytes[i] == b'%' {
-            let hex = s.get(i + 1..i + 3)?;
-            out.push(u8::from_str_radix(hex, 16).ok()?);
-            i += 3;
-        } else {
-            out.push(bytes[i]);
-            i += 1;
-        }
-    }
-    String::from_utf8(out).ok()
 }
 
 /// Reads a regular file inside `dir` (after symlink/path canonicalization), up to `ATTACHMENT_MAX`.

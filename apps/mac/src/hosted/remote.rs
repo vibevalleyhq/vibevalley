@@ -27,7 +27,8 @@ use vibevalley_server::{SliceFeed, SliceSubscription};
 use crate::hosted::connection::{Secret, is_loopback_url, normalize_url};
 
 const REMOTE_CLIENT_HEADER: &str = "remote";
-const BACKOFF_MS: &[u64] = &[500, 1_000, 2_000, 4_000, 8_000];
+const SSE_MIN_BACKOFF: Duration = Duration::from_millis(500);
+const SSE_MAX_BACKOFF: Duration = Duration::from_millis(8_000);
 const CALL_TIMEOUT: Duration = Duration::from_secs(60);
 const SNAPSHOT_TIMEOUT: Duration = Duration::from_secs(15);
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
@@ -158,7 +159,7 @@ where
     F: FnMut(SseMessage) -> Fut,
     Fut: Future<Output = SseStep>,
 {
-    let mut attempt = 0usize;
+    let mut backoff = sse_backoff();
     while !cancel.is_cancelled() && !is_closed() {
         let mut req = attach_headers(client.get(&url).header("accept", "text/event-stream"), &token);
         if let Some(seq) = *last_seq {
@@ -175,7 +176,7 @@ where
                 return LoopExit::AuthRefused;
             }
             Ok(res) if res.status().is_success() => {
-                attempt = 0;
+                backoff = sse_backoff();
                 if drain_sse_response(res, &cancel, last_seq, &mut is_closed, &mut on_message).await == SseStop::Stopped {
                     return if cancel.is_cancelled() { LoopExit::Cancelled } else { LoopExit::Closed };
                 }
@@ -189,8 +190,7 @@ where
         if is_closed() {
             return LoopExit::Closed;
         }
-        let delay = backoff_delay(attempt);
-        attempt = attempt.saturating_add(1);
+        let delay = backoff.next().unwrap_or(SSE_MAX_BACKOFF);
         tokio::select! {
             biased;
             _ = cancel.cancelled() => return LoopExit::Cancelled,
@@ -254,9 +254,14 @@ fn op_url(base_url: &str, op: &str) -> String {
     format!("{base_url}/api/v1/{path}")
 }
 
-fn backoff_delay(attempt: usize) -> Duration {
-    let idx = attempt.min(BACKOFF_MS.len() - 1);
-    Duration::from_millis(BACKOFF_MS[idx])
+fn sse_backoff() -> backon::ExponentialBackoff {
+    use backon::{BackoffBuilder as _, ExponentialBuilder};
+    ExponentialBuilder::new()
+        .with_factor(2.0)
+        .with_min_delay(SSE_MIN_BACKOFF)
+        .with_max_delay(SSE_MAX_BACKOFF)
+        .without_max_times()
+        .build()
 }
 
 struct RemoteSlice {

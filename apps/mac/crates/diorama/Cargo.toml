@@ -5,6 +5,7 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+vibevalley-core = { version = "0.1.0", path = "../../../../crates/core", default-features = false }
 bytemuck = { workspace = true }
 image = { workspace = true }
 serde = { workspace = true }

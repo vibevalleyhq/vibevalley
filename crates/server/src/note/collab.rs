@@ -251,15 +251,7 @@ fn history_entry_to_wire(e: &HistoryEntry) -> NoteHistoryEntry {
 }
 
 pub(super) fn sha256_hex_bytes(bytes: &[u8]) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(bytes);
-    let digest = hasher.finalize();
-    let mut out = String::with_capacity(digest.len() * 2);
-    for b in digest {
-        use std::fmt::Write as _;
-        let _ = write!(&mut out, "{b:02x}");
-    }
-    out
+    hex::encode(Sha256::digest(bytes))
 }
 
 pub(super) fn guess_mime(path: &str, bytes: &[u8]) -> String {

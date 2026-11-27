@@ -1266,11 +1266,11 @@ fn extract_attr<'a>(tag: &'a str, name: &str) -> Option<&'a str> {
 }
 
 fn esc_text(raw: &str) -> String {
-    raw.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
+    quick_xml::escape::partial_escape(raw).into_owned()
 }
 
 fn esc_attr(raw: &str) -> String {
-    esc_text(raw).replace('"', "&quot;")
+    quick_xml::escape::escape(raw).into_owned()
 }
 
 pub fn export_json(doc: &BoardDoc) -> Result<String, serde_json::Error> {

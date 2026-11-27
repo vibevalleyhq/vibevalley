@@ -25,6 +25,8 @@ oxc_ast_visit = "0.159.0"
 oxc_parser = "0.159.0"
 oxc_span = "0.159.0"
 parking_lot = { workspace = true }
+percent-encoding = { workspace = true }
+quick-xml = { workspace = true }
 regex = { workspace = true }
 reqwest = { workspace = true }
 rmcp = { version = "3.9.0", default-features = false, features = ["client", "transport-child-process", "transport-streamable-http-client-reqwest", "reqwest-tls-no-provider"] }
@@ -34,6 +36,7 @@ schemars = "1.2.3"
 sea-orm = { workspace = true }
 sea-orm-migration = { workspace = true }
 sea-query = { workspace = true }
+semver = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sqlx = { workspace = true, features = ["runtime-tokio"] }
@@ -46,6 +49,7 @@ uuid = { workspace = true }
 vibevalley-git = { version = "0.1.0", path = "../git" }
 vibevalley-mcp = { path = "../mcp" }
 vibevalley-protocol = { version = "0.1.0", path = "../protocol" }
+which = { workspace = true }
 
 [dev-dependencies]
 axum = { version = "0.8.9", default-features = false, features = ["http1", "tokio"] }

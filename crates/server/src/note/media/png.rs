@@ -1,82 +1,37 @@
-//! Generated PNG validation: CRC, dimensions, zlib stream length, and scanline filter bytes.
-
-use std::io::Read;
+//! Generated PNG validation via `png` crate: CRC, dimensions, zlib stream, and trailing bytes.
 
 pub fn valid(bytes: &[u8], width: i64, height: i64) -> bool {
-    if bytes.len() < 45 || !bytes.starts_with(b"\x89PNG\r\n\x1a\n") || width <= 0 || height <= 0 {
-        return false;
-    }
-    let number = |n: usize| u32::from_be_bytes(bytes[n..n + 4].try_into().unwrap_or([0; 4])) as usize;
-    let mut compressed = Vec::new();
-    let mut stride = 0;
-    let mut ended = false;
-    let mut at = 8;
-    while at < bytes.len() {
-        if at + 12 > bytes.len() {
-            return false;
-        }
-        let length = number(at);
-        let Some(end) = at.checked_add(12 + length) else {
-            return false;
-        };
-        if end > bytes.len() {
-            return false;
-        }
-        let kind = &bytes[at + 4..at + 8];
-        if crc32fast::hash(&bytes[at + 4..end - 4]) as usize != number(end - 4) {
-            return false;
-        }
-        if at == 8 {
-            if kind != b"IHDR" || length != 13 || number(at + 8) != width as usize || number(at + 12) != height as usize {
-                return false;
-            }
-            let depth = bytes[at + 16] as usize;
-            let color = bytes[at + 17];
-            let channels = match color {
-                0 | 3 => 1,
-                2 => 3,
-                4 => 2,
-                6 => 4,
-                _ => return false,
-            };
-            if ![1, 2, 4, 8, 16].contains(&depth)
-                || ([2, 4, 6].contains(&color) && depth < 8)
-                || (color == 3 && depth > 8)
-                || bytes[at + 18..at + 21] != [0, 0, 0]
-            {
-                return false;
-            }
-            stride = (width as usize * channels * depth).div_ceil(8) + 1;
-        } else if kind == b"IHDR" {
-            return false;
-        }
-        if kind == b"IDAT" {
-            compressed.extend_from_slice(&bytes[at + 8..end - 4]);
-        }
-        if kind == b"IEND" {
-            if length != 0 || end != bytes.len() {
-                return false;
-            }
-            ended = true;
-        }
-        at = end;
-    }
-    let Some(size) = stride.checked_mul(height as usize) else {
+    let (Ok(w), Ok(h)) = (u32::try_from(width), u32::try_from(height)) else {
         return false;
     };
-    if !ended || compressed.is_empty() || size > 32 << 20 {
+    if w == 0 || h == 0 {
         return false;
     }
-    let mut decoded = Vec::new();
-    if flate2::read::ZlibDecoder::new(compressed.as_slice())
-        .take(size as u64 + 1)
-        .read_to_end(&mut decoded)
-        .is_err()
-        || decoded.len() != size
-    {
+    let mut cursor = std::io::Cursor::new(bytes);
+    let limits = png::Limits { bytes: 32 << 20 };
+    let decoder = png::Decoder::new_with_limits(&mut cursor, limits);
+    let Ok(mut reader) = decoder.read_info() else {
+        return false;
+    };
+    let info = reader.info();
+    if info.width != w || info.height != h {
         return false;
     }
-    decoded.chunks_exact(stride).all(|r| r[0] <= 4)
+    let Some(buf_len) = reader.output_buffer_size() else {
+        return false;
+    };
+    if buf_len > (32 << 20) {
+        return false;
+    }
+    let mut buf = vec![0; buf_len];
+    if reader.next_frame(&mut buf).is_err() {
+        return false;
+    }
+    if reader.finish().is_err() {
+        return false;
+    }
+    drop(reader);
+    cursor.position() == bytes.len() as u64
 }
 
 #[cfg(test)]

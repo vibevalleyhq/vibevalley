@@ -45,22 +45,7 @@ pub fn worktree_file(worktree: &Path, relative: &Path) -> Option<(PathBuf, PathB
 
 /// `%XX` escapes of a `file:` URL's path decoded (spaces, CJK names).
 pub(crate) fn percent_decode(raw: &str) -> String {
-    let bytes = raw.as_bytes();
-    let mut out = Vec::with_capacity(bytes.len());
-    let mut i = 0;
-    while i < bytes.len() {
-        if bytes[i] == b'%'
-            && let Some(hex) = raw.get(i + 1..i + 3)
-            && let Ok(byte) = u8::from_str_radix(hex, 16)
-        {
-            out.push(byte);
-            i += 3;
-            continue;
-        }
-        out.push(bytes[i]);
-        i += 1;
-    }
-    String::from_utf8_lossy(&out).into_owned()
+    percent_encoding::percent_decode_str(raw).decode_utf8_lossy().into_owned()
 }
 
 /// Whether this application is currently active in the macOS foreground.
@@ -136,21 +121,11 @@ const MAX_READ: u64 = 50 << 20;
 /// Maximum byte count `random_bytes_hex` yields in a single call.
 const MAX_RANDOM_BYTES: usize = 4096;
 
-fn encode_hex(bytes: &[u8]) -> String {
-    const HEX: &[u8; 16] = b"0123456789abcdef";
-    let mut out = String::with_capacity(bytes.len() * 2);
-    for &b in bytes {
-        out.push(HEX[(b >> 4) as usize] as char);
-        out.push(HEX[(b & 0x0f) as usize] as char);
-    }
-    out
-}
-
 /// Lowercase hex SHA-256 digest of UTF-8 `text`.
 pub fn sha256_hex(text: &str) -> String {
     use sha2::{Digest as _, Sha256};
     let digest = Sha256::digest(text.as_bytes());
-    encode_hex(&digest)
+    hex::encode(digest)
 }
 
 /// Generates `length` uniformly random bytes using OS CSPRNG entropy via `uuid::Uuid::new_v4`
@@ -171,7 +146,7 @@ pub fn random_bytes_hex(length: usize) -> Result<String, String> {
         let take = (length - bytes.len()).min(block.len());
         bytes.extend_from_slice(&block[..take]);
     }
-    Ok(encode_hex(&bytes))
+    Ok(hex::encode(&bytes))
 }
 
 /// 256-bit OS CSPRNG seed (64 lowercase hex chars) injected into each hosted view's `host.params`.

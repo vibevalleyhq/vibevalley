@@ -258,25 +258,7 @@ pub fn synthesize_wav(spec: &FoleySpec, kind: SoundKind, seed: u64) -> Vec<u8> {
         samples.push((clipped * i16::MAX as f32).round() as i16);
     }
 
-    let data_bytes = (samples.len() * 2) as u32;
-    let mut wav = Vec::with_capacity(44 + data_bytes as usize);
-    wav.extend_from_slice(b"RIFF");
-    wav.extend_from_slice(&(36 + data_bytes).to_le_bytes());
-    wav.extend_from_slice(b"WAVE");
-    wav.extend_from_slice(b"fmt ");
-    wav.extend_from_slice(&16u32.to_le_bytes()); // PCM chunk size
-    wav.extend_from_slice(&1u16.to_le_bytes()); // PCM format
-    wav.extend_from_slice(&1u16.to_le_bytes()); // Mono
-    wav.extend_from_slice(&sr.to_le_bytes());
-    wav.extend_from_slice(&(sr * 2).to_le_bytes()); // Byte rate
-    wav.extend_from_slice(&2u16.to_le_bytes()); // Block align
-    wav.extend_from_slice(&16u16.to_le_bytes()); // Bits per sample
-    wav.extend_from_slice(b"data");
-    wav.extend_from_slice(&data_bytes.to_le_bytes());
-    for s in samples {
-        wav.extend_from_slice(&s.to_le_bytes());
-    }
-    wav
+    vibevalley_core::audio::encode_wav_pcm16(sr, 1, &samples)
 }
 
 #[cfg(test)]

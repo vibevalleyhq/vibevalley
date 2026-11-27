@@ -303,11 +303,17 @@ impl Outbox {
         self.notify.notify_one();
     }
 
-    /// Computes exponential backoff delay for the given attempt count (`attempts >= 1`).
+    /// Computes exponential backoff delay for the given attempt count (`attempts >= 1`) via `backon`.
     fn backoff_delay(&self, attempts: i64) -> Duration {
-        let shift = attempts.saturating_sub(1).clamp(0, 20) as u32;
-        let factor = 1u32.checked_shl(shift).unwrap_or(u32::MAX);
-        self.config.base_backoff.saturating_mul(factor).min(self.config.max_backoff)
+        use backon::{BackoffBuilder, ExponentialBuilder};
+        let mut backoff = ExponentialBuilder::new()
+            .with_factor(2.0)
+            .with_min_delay(self.config.base_backoff)
+            .with_max_delay(self.config.max_backoff)
+            .without_max_times()
+            .build();
+        let steps = attempts.saturating_sub(1).clamp(0, 20) as usize;
+        backoff.nth(steps).unwrap_or(self.config.max_backoff)
     }
 
     /// Starts the background outbox dispatcher bound to `task`'s lifecycle.

@@ -61,53 +61,39 @@ impl Manual {
     }
 }
 
-fn rank_of(v: &str) -> Option<[u64; 5]> {
-    let digits = |s: &str| {
-        (!s.is_empty() && s.bytes().all(|b| b.is_ascii_digit()))
-            .then(|| s.parse::<u64>().ok())
-            .flatten()
-    };
-    let (numbers, pre) = match v.split_once('-') {
-        Some((numbers, pre)) => (numbers, Some(pre)),
-        None => (v, None),
-    };
-    let mut parts = numbers.split('.');
-    let (x, y, z) = (digits(parts.next()?)?, digits(parts.next()?)?, digits(parts.next()?)?);
-    if parts.next().is_some() {
+fn parse_release(v: &str) -> Option<(semver::Version, Stage)> {
+    let ver = semver::Version::parse(v).ok()?;
+    if !ver.build.is_empty() {
         return None;
     }
-    let (stage, n) = match pre {
-        None => (2, 0),
-        Some(pre) => {
-            let (name, n) = pre.split_once('.')?;
-            let stage = match name {
-                "alpha" => 0,
-                "beta" => 1,
-                _ => return None,
-            };
-            (stage, digits(n)?)
-        }
+    if ver.pre.is_empty() {
+        return Some((ver, Stage::Stable));
+    }
+    let (tag, num) = ver.pre.as_str().split_once('.')?;
+    if num.is_empty() || !num.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    let stage = match tag {
+        "alpha" => Stage::Alpha,
+        "beta" => Stage::Beta,
+        _ => return None,
     };
-    Some([x, y, z, stage, n])
+    Some((ver, stage))
 }
 
 pub fn is_version(v: &str) -> bool {
-    rank_of(v).is_some()
+    parse_release(v).is_some()
 }
 
 pub fn newer(a: &str, b: &str) -> bool {
-    match (rank_of(a), rank_of(b)) {
-        (Some(x), Some(y)) => x > y,
+    match (parse_release(a), parse_release(b)) {
+        (Some((x, _)), Some((y, _))) => x > y,
         _ => false,
     }
 }
 
 pub fn stage_of(v: &str) -> Option<Stage> {
-    Some(match rank_of(v)?[3] {
-        0 => Stage::Alpha,
-        1 => Stage::Beta,
-        _ => Stage::Stable,
-    })
+    parse_release(v).map(|(_, stage)| stage)
 }
 
 pub fn manifest_for(list: &[ListedRelease], stage: Stage) -> Option<String> {

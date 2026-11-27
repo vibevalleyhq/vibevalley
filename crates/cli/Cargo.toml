@@ -43,6 +43,7 @@ vibevalley-git = { path = "../git" }
 vibevalley-mcp = { workspace = true }
 vibevalley-protocol = { path = "../protocol" }
 vibevalley-runtime = { path = "../runtime" }
+which = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

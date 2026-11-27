@@ -251,26 +251,13 @@ pub fn build_icns(note_type: &str) -> Result<Vec<u8>, String> {
 }
 
 fn xml_escape(raw: &str) -> String {
-    let mut out = String::with_capacity(raw.len());
-    for ch in raw.chars() {
-        match ch {
-            '&' => out.push_str("&amp;"),
-            '<' => out.push_str("&lt;"),
-            '>' => out.push_str("&gt;"),
-            '"' => out.push_str("&quot;"),
-            '\'' => out.push_str("&apos;"),
-            _ => out.push(ch),
-        }
-    }
-    out
+    quick_xml::escape::escape(raw).into_owned()
 }
 
 fn xml_unescape(raw: &str) -> String {
-    raw.replace("&lt;", "<")
-        .replace("&gt;", ">")
-        .replace("&quot;", "\"")
-        .replace("&apos;", "'")
-        .replace("&amp;", "&")
+    quick_xml::escape::unescape(raw)
+        .map(std::borrow::Cow::into_owned)
+        .unwrap_or_else(|_| raw.to_owned())
 }
 
 pub struct InfoPlistParams<'a> {

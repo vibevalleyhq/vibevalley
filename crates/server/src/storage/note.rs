@@ -72,12 +72,10 @@ fn has_valid_image_magic(mime: &str, bytes: &[u8]) -> bool {
 }
 
 fn png_dimensions(bytes: &[u8]) -> Option<(u32, u32)> {
-    if bytes.len() < 24 || !bytes.starts_with(&[0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a]) || &bytes[12..16] != b"IHDR" {
-        return None;
-    }
-    let w = u32::from_be_bytes([bytes[16], bytes[17], bytes[18], bytes[19]]);
-    let h = u32::from_be_bytes([bytes[20], bytes[21], bytes[22], bytes[23]]);
-    (w > 0 && h > 0).then_some((w, h))
+    let size = imagesize::blob_size(bytes).ok()?;
+    let w = u32::try_from(size.width).ok().filter(|&v| v > 0)?;
+    let h = u32::try_from(size.height).ok().filter(|&v| v > 0)?;
+    Some((w, h))
 }
 
 fn cover_wire(note_id: &str, canonical_path: &Path, meta: &StoredCoverMeta) -> NoteCover {
@@ -108,7 +106,7 @@ fn missing_note_or_file(title: &str, path: &str) -> ApiError {
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {
-    Sha256::digest(bytes).iter().map(|b| format!("{b:02x}")).collect()
+    hex::encode(Sha256::digest(bytes))
 }
 
 fn mtime_ms(modified: std::io::Result<std::time::SystemTime>, fallback: i64) -> i64 {

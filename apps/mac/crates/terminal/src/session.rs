@@ -207,25 +207,6 @@ fn apply_theme(term: &mut Terminal<'static, 'static>, theme: &Theme) -> Result<(
     Ok(())
 }
 
-fn percent_decode(input: &[u8]) -> Vec<u8> {
-    let hex = |b: u8| (b as char).to_digit(16).map(|d| d as u8);
-    let mut out = Vec::with_capacity(input.len());
-    let mut i = 0;
-    while i < input.len() {
-        if input[i] == b'%'
-            && i + 2 < input.len()
-            && let (Some(hi), Some(lo)) = (hex(input[i + 1]), hex(input[i + 2]))
-        {
-            out.push(hi << 4 | lo);
-            i += 3;
-        } else {
-            out.push(input[i]);
-            i += 1;
-        }
-    }
-    out
-}
-
 /// Accepts what shells put in OSC 7: a `file://host/path` URL (percent
 /// encoded), kitty's unencoded `kitty-shell-cwd://host/path`, or a bare path.
 pub(crate) fn parse_pwd(raw: &[u8]) -> Option<PathBuf> {
@@ -240,7 +221,11 @@ pub(crate) fn parse_pwd(raw: &[u8]) -> Option<PathBuf> {
     };
     let start = rest.iter().position(|b| *b == b'/')?;
     let path = &rest[start..];
-    let bytes = if encoded { percent_decode(path) } else { path.to_vec() };
+    let bytes: Vec<u8> = if encoded {
+        percent_encoding::percent_decode(path).collect()
+    } else {
+        path.to_vec()
+    };
     Some(PathBuf::from(std::ffi::OsString::from_vec(bytes)))
 }
 

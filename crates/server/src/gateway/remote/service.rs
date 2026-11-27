@@ -77,13 +77,7 @@ pub struct Remote {
 }
 
 fn sha256_hex(input: &str) -> String {
-    let digest = Sha256::digest(input.as_bytes());
-    let mut out = String::with_capacity(digest.len() * 2);
-    for b in digest {
-        use std::fmt::Write as _;
-        let _ = write!(&mut out, "{b:02x}");
-    }
-    out
+    hex::encode(Sha256::digest(input.as_bytes()))
 }
 
 /// Derives 32 uniform OS-random bytes from three UUID v4 values (366 bits of CSPRNG input).
@@ -107,13 +101,7 @@ fn generate_pair_code() -> String {
 
 fn generate_device_token() -> String {
     let bytes = random_32_bytes();
-    let mut out = String::with_capacity(TOKEN_PREFIX.len() + bytes.len() * 2);
-    out.push_str(TOKEN_PREFIX);
-    for b in bytes {
-        use std::fmt::Write as _;
-        let _ = write!(&mut out, "{b:02x}");
-    }
-    out
+    format!("{TOKEN_PREFIX}{}", hex::encode(bytes))
 }
 
 fn server_name() -> String {
@@ -461,7 +449,16 @@ impl Remote {
             if state.failed_attempts.len() >= MAX_FAILED_ATTEMPTS {
                 return Err(ApiError::new(BizCode::Refused, t("server.remote.rateLimited", &[])));
             }
-            let Some(pos) = state.codes.iter().position(|entry| entry.code == submitted) else {
+            let Some(pos) = ({
+                use subtle::ConstantTimeEq as _;
+                let mut matched = None;
+                for (idx, entry) in state.codes.iter().enumerate() {
+                    if bool::from(entry.code.as_bytes().ct_eq(submitted.as_bytes())) {
+                        matched = Some(idx);
+                    }
+                }
+                matched
+            }) else {
                 state.failed_attempts.push_back(now);
                 return Err(ApiError::new(BizCode::AuthRefused, t("server.remote.invalidCode", &[])));
             };
