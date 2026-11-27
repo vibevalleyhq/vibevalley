@@ -55,10 +55,14 @@ export const Look = z.object({
 
 const AgentFrom = z.object({ template: z.string(), version: z.number() }) satisfies Codec<T.AgentFrom>;
 
+export const AgentExecutionMode = z.enum(T.AgentExecutionModeValues) satisfies Codec<T.AgentExecutionMode>;
+
 export const Agent = z.object({
   id: z.string(),
+  code: z.string(),
   name: z.string(),
   role: z.enum(T.AgentRoleValues),
+  mode: AgentExecutionMode,
   duty: z.string(),
   enabled: z.boolean(),
   runtime: z.string(),
@@ -119,3 +123,13 @@ export const Skill = z.object({
   body: z.string(),
   builtIn: z.exactOptional(z.boolean()),
 }) satisfies Codec<T.Skill>;
+
+export const AgentRegisterInput = z.object({
+  id: z.exactOptional(z.string()),
+  name: z.string(),
+  runtime: z.exactOptional(z.string()),
+  duty: z.exactOptional(z.string()),
+  avatar: z.exactOptional(z.string()),
+  code: z.exactOptional(z.string()),
+  tags: z.exactOptional(z.array(z.string())),
+}) satisfies Codec<T.AgentRegisterInput>;

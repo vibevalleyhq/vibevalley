@@ -33,7 +33,8 @@
 - **一个服务**：档案、技能、模板和农机共用 `config.json`，所以是一个模块（`profile.rs` 加 `runtime.rs`），不拆两扇门。
 - **单一配置文件与副本事务**：档案、技能库和农机设置存于 `config.json`，在副本上修改，写盘成功后才替换内存里的（删除技能时同事务清理档案引用）。
 - **损坏配置自动备份，绝不覆盖**：启动时若 `config.json` 损坏或不符合 Schema，改名为 `config.json.unreadable-<毫秒>` 保留并按新农场初始化；改名失败则拒绝开机。
-- **角色固定为 `orchestrator` 与 `worker`**：默认助手 `orchestrator` 不可删除或改为帮工；所有助手档案必须用 `vibevalley` 农机，派工候选只含 `worker` 档案。
+- **角色固定为 `orchestrator` 与 `worker`，并分配稳定编号与执行模式**：默认助手 `orchestrator` 不可删除或改为帮工；所有主助手统一分配 `O-01`、`O-02`… 编号，所有队友分配唯一 `W-01`、`W-02`… 编号。`AgentExecutionMode` 区分 `managed`（默认，VibeValley 自动 OAR 调度）与 `external`（外部编程代理，通过 `agent.register` / MCP `vv_agent_register` 幂等登记，保留 `W-XX` 编号、Papertrails 头像与运行时徽标，可作工单 `owner` 与笔记协作者 `origin`，但严禁进入自动 OAR 派工队列）。
+- **MCP 队友花名册**：`vv_agent_list` 返回含 `id`、`code`、`name`、`role`、`mode`、`runtime`、`avatar` 的紧凑花名册；`vv_agent_register` 幂等登记或更新外部队友（缺失 `avatar` 时按 `id` 经 `assign_worker_avatar` 确定性避碰分配）。
 - **跨层统一用 `Actor` 表示说话和操作的人**：`kind` 固定为 `user`、`agent`、`system`，仅 `kind: "agent"` 携带 `role`（`orchestrator` 或 `worker`）与 `forUser`。
 - **`duty` 供阅读，`tags` 供匹配，`voice` 配听汇报**：`duty` 是一句话职责说明；`tags` 是关键词数组；可选的 `voice` 存 MOSS 音色 id（可在档案「身份」页配置，严格配对频道「听汇报」串行播报队列，未配置时静默跳过）。
 - **挑档案顺序（`presets.rs`）**：依次匹配：点名的档案名或 ID → 点名的农机上首个可用档案 → 用户界面选定的档案 → 工单文字命中 `Agent.tags` 最多的可用档案。建单和起草都用它。

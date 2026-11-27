@@ -5,7 +5,7 @@ import { type Agent, defaultOrchestrator, type RuntimeInfo, TemplateCategoryValu
 
 import { createAct } from "../../design/act";
 import { Button, ButtonLink } from "../../design/Button";
-import { AgentFace, OrchestratorFace } from "../../design/domain/Face";
+import { AgentCodeBadge, AgentFace, AgentModeBadge, OrchestratorFace } from "../../design/domain/Face";
 import { SearchField } from "../../design/Field";
 import { Icon } from "../../design/Icon";
 import { Empty, Toggle } from "../../design/layout";
@@ -51,7 +51,10 @@ function showsWorkers(filter: RoleFilter): boolean {
 
 function matchesProfileQuery(agent: Agent, runtime: RuntimeInfo | undefined, needle: string): boolean {
   if (!needle) return true;
-  const hay = [agent.name, agent.duty, agent.runtime, runtime?.preset.label ?? "", agent.model, agent.effort, ...agent.tags].join(" ").toLowerCase();
+  const modeLabel = agent.mode === "external" ? t("web.agent.mode.external") : t("web.agent.mode.managed");
+  const hay = [agent.code, agent.name, agent.duty, agent.runtime, runtime?.preset.label ?? "", agent.model, agent.effort, agent.mode, modeLabel, ...agent.tags]
+    .join(" ")
+    .toLowerCase();
   return hay.includes(needle);
 }
 
@@ -390,7 +393,9 @@ function OrchestratorRow(props: { agent: Agent; first: boolean; wide: boolean })
       </View>
       <View class="min-w-0 flex-1 gap-0.5">
         <View class="flex-row items-center gap-1.5">
+          <AgentCodeBadge code={props.agent.code} compact />
           <Text class="min-w-0 shrink truncate text-sm font-medium text-ink">{props.agent.name}</Text>
+          <AgentModeBadge mode={props.agent.mode} compact />
           <If when={isDefault()}>
             <View class="shrink-0 rounded-full bg-hover px-2 py-px">
               <Text class="text-2xs font-medium text-muted">{t("web.agent.list.defaultBadge")}</Text>
@@ -427,7 +432,9 @@ function WorkerRow(props: {
   const runtimeSpec = createMemo(() => [runtimeLabel(), props.agent.model, props.agent.effort].filter(Boolean).join(" · "));
   const toggleAction = () => (props.agent.enabled ? t("web.agent.list.disable") : t("web.agent.list.enable"));
   const toggleLabel = () => t("web.agent.list.toggle", { act: toggleAction(), name: props.agent.name });
-  const fixHref = createMemo(() => props.errors.find((e) => e.fixHref !== undefined)?.fixHref);
+  const isExternal = () => props.agent.mode === "external";
+  const displayErrors = () => (isExternal() ? [] : props.errors);
+  const fixHref = createMemo(() => displayErrors().find((e) => e.fixHref !== undefined)?.fixHref);
   const displayLook = createMemo(() => withDefaultWorkerAvatar(props.agent, props.defaultAvatar));
   return (
     <RowShell
@@ -437,11 +444,20 @@ function WorkerRow(props: {
       wide={props.wide}
       muted={!props.agent.enabled}
       readiness={
-        <If when={props.errors.length > 0}>
+        <If when={displayErrors().length > 0}>
           <>
-            <View tooltip={<Bubble text={props.errors.map((e) => e.text).join("\n")} />} class="max-w-56 shrink rounded-full bg-bad-soft px-2 py-0.5">
+            <View
+              tooltip={
+                <Bubble
+                  text={displayErrors()
+                    .map((e) => e.text)
+                    .join("\n")}
+                />
+              }
+              class="max-w-56 shrink rounded-full bg-bad-soft px-2 py-0.5"
+            >
               <Text testID="agent-card-error" class="truncate text-2xs font-medium text-berry">
-                {t("web.agent.cannot") + (props.errors[0]?.text ?? "")}
+                {t("web.agent.cannot") + (displayErrors()[0]?.text ?? "")}
               </Text>
             </View>
             <If when={fixHref()}>
@@ -456,7 +472,7 @@ function WorkerRow(props: {
       }
       runtimePill={
         <View tooltip={<Bubble text={runtimeSpec()} />} class="h-6 max-w-full flex-row items-center gap-1.5 rounded-md border border-line bg-side px-2">
-          <Dot tone={available() ? "leaf" : "berry"} size={6} ring={false} />
+          <Dot tone={isExternal() ? "water" : available() ? "leaf" : "berry"} size={6} ring={false} />
           <Text class="min-w-0 truncate text-xs font-medium text-muted">{runtimeLabel()}</Text>
         </View>
       }
@@ -478,7 +494,9 @@ function WorkerRow(props: {
       </View>
       <View class="min-w-0 flex-1 gap-0.5">
         <View class="flex-row items-center gap-1.5">
+          <AgentCodeBadge code={props.agent.code} external={isExternal()} compact />
           <Text class="min-w-0 shrink truncate text-sm font-medium text-ink">{props.agent.name}</Text>
+          <AgentModeBadge mode={props.agent.mode} compact />
           <If when={!props.agent.enabled}>
             <View class="shrink-0 rounded-full bg-hover px-2 py-px">
               <Text class="text-2xs font-medium text-faint">{t("web.agent.list.disabledBadge")}</Text>

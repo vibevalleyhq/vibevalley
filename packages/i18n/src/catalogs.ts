@@ -215,6 +215,11 @@ export const catalogs = {
       unreported: "这个环境不报告这一项。",
       none: "没有。",
       role: { orchestrator: "主助手", worker: "执行角色" },
+      mode: {
+        managed: "本机调度",
+        external: "外部接入",
+        externalNotice: "这是外部接入的编码队友（{code}），不会自动派进 VibeValley 执行队列；可直接作为工单负责人或笔记协作者。",
+      },
       templates: {
         title: "模板",
         intro:
@@ -268,7 +273,7 @@ export const catalogs = {
         orchestrators: "主助手",
         helpers: "执行角色",
         search: "搜索角色",
-        searchHint: "搜名字、职责、环境、标签…",
+        searchHint: "搜编号、名字、职责、环境、标签…",
         make: "新建执行角色",
         makeOrchestrator: "新建主助手",
         orchestratorLine: "专职统筹：拆解任务、分配执行、跟踪进度、汇总结果。",
@@ -4176,6 +4181,12 @@ export const catalogs = {
       unreported: "This environment does not report this.",
       none: "None.",
       role: { orchestrator: "Assistant", worker: "Helper" },
+      mode: {
+        managed: "Managed",
+        external: "External",
+        externalNotice:
+          "Registered as an external coding teammate ({code}). It is not auto-dispatched to VibeValley's OAR queue and can serve as issue assignee or note collaborator.",
+      },
       templates: {
         title: "Templates",
         intro:
@@ -4229,7 +4240,7 @@ export const catalogs = {
         orchestrators: "Assistants",
         helpers: "Helpers",
         search: "Search profiles",
-        searchHint: "Search name, duty, environment, tags…",
+        searchHint: "Search code, name, duty, environment, tags…",
         make: "New helper",
         makeOrchestrator: "Add assistant",
         orchestratorLine: "Not a helper: sends work, watches progress, passes on results.",
@@ -8253,6 +8264,9 @@ export interface Messages {
   "web.agent.mcpName": undefined;
   "web.agent.mcpTarget": undefined;
   "web.agent.missingApiKey": undefined;
+  "web.agent.mode.external": undefined;
+  "web.agent.mode.externalNotice": { readonly code: string | number };
+  "web.agent.mode.managed": undefined;
   "web.agent.model": undefined;
   "web.agent.modelLevels": { readonly n: string | number; readonly name: string | number };
   "web.agent.name": undefined;

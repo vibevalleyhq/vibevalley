@@ -12,7 +12,7 @@ import { actionOf, perform } from "../features/issue/model/acts";
 import { approveShownChanges } from "../features/issue/model/changes";
 import { useIssueChanges } from "../features/issue/model/history";
 import { createWriteKey, writeIssue } from "../features/issue/model/write";
-import { useWorkAgents } from "../infra/agents";
+import { useManagedWorkAgents } from "../infra/agents";
 import { api, newSendKey, reasonOf } from "../infra/api";
 import { useBoardSlice, useCollabSlice, useFarmSlice, useIssue, useSession } from "../infra/frame";
 import { readFarmFormParams, readHostLocale } from "../infra/hostParams";
@@ -95,7 +95,7 @@ function FormErrorFallback(props: { readonly error: unknown; readonly reset: () 
 
 function Sow(props: { initialWords?: string }) {
   const { repo, station } = readFarmFormParams();
-  const agents = useWorkAgents(true);
+  const agents = useManagedWorkAgents(true);
   const repos = useRepos();
   const who = signal("");
   const words = signal(props.initialWords ?? "");

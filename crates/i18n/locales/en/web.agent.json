@@ -155,6 +155,11 @@
     "orchestrator": "Assistant",
     "worker": "Helper"
   },
+  "mode": {
+    "managed": "Managed",
+    "external": "External",
+    "externalNotice": "Registered as an external coding teammate ({code}). It is not auto-dispatched to VibeValley's OAR queue and can serve as issue assignee or note collaborator."
+  },
   "templates": {
     "title": "Templates",
     "intro": "Each template is a recipe for an agent: its role, duty, persona, the environment it is written for and its look. Installing one adds a profile, and one template can be installed many times; change what is installed as you like, and when the template has a new version the profile says so.",
@@ -212,7 +217,7 @@
     "orchestrators": "Assistants",
     "helpers": "Helpers",
     "search": "Search profiles",
-    "searchHint": "Search name, duty, environment, tags…",
+    "searchHint": "Search code, name, duty, environment, tags…",
     "make": "New helper",
     "makeOrchestrator": "Add assistant",
     "orchestratorLine": "Not a helper: sends work, watches progress, passes on results.",

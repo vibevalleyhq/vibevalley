@@ -5,6 +5,7 @@ export const servedEndpoints = [
   { op: "agent.validate", can: ["user", "remote"], about: [] },
   { op: "agent.create", can: ["user"], about: [] },
   { op: "agent.update", can: ["user"], about: ["id"] },
+  { op: "agent.register", can: ["user", "remote"], about: ["id"] },
   { op: "agent.delete", can: ["user"], about: ["id"], dryRun: "agent.previewDelete" },
   { op: "agent.previewDelete", can: ["user"], about: ["id"] },
   { op: "agent.template.list", can: ["user", "remote"], about: [] },

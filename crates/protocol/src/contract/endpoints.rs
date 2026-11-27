@@ -43,6 +43,15 @@ pub const ENDPOINTS: &[Endpoint] = &[
         result: Some("Agent"),
     },
     Endpoint {
+        op: "agent.register",
+        module: "agent",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("AgentRegisterInput"),
+        result: Some("Agent"),
+    },
+    Endpoint {
         op: "agent.delete",
         module: "agent",
         about: &["id"],
@@ -1992,6 +2001,13 @@ pub mod ops {
         type Input = t::Agent;
         type Result = t::Agent;
     }
+    /// Idempotently register or update an external coding agent teammate with a W-XX code.
+    pub struct AgentRegister;
+    impl Op for AgentRegister {
+        const NAME: &'static str = "agent.register";
+        type Input = t::AgentRegisterInput;
+        type Result = t::Agent;
+    }
     pub struct AgentDelete;
     impl Op for AgentDelete {
         const NAME: &'static str = "agent.delete";
@@ -3525,6 +3541,7 @@ endpoint_ids! {
     AgentValidate => "agent.validate",
     AgentCreate => "agent.create",
     AgentUpdate => "agent.update",
+    AgentRegister => "agent.register",
     AgentDelete => "agent.delete",
     AgentPreviewDelete => "agent.previewDelete",
     AgentTemplateList => "agent.template.list",

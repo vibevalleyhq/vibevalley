@@ -334,7 +334,7 @@ pub(super) fn tool_definitions() -> Vec<ToolDef> {
                     "mime": { "type": "string", "description": "Optional MIME type override for single-file write." },
                     "expectedHash": { "type": "string", "description": "Optional optimistic SHA-256 hash guard for single-file write." },
                     "deletePath": { "type": "string", "description": "Relative `structure/*` or `asset/*` path to delete instead of writing." },
-                    "origin": { "type": "string", "description": "Loro CRDT commit attribution origin (e.g. `agent:claude`, `session:<id>:turn:<n>`); defaults to `agent:mcp`." },
+                    "origin": { "type": "string", "description": "Loro CRDT commit attribution origin (e.g. `agent:<id>` from `vv_agent_list`/`vv_agent_register`, `session:<id>:turn:<n>`); defaults to `agent:mcp`." },
                     "summary": { "type": "string", "description": "Short summary recorded in collaborative change history." },
                     "announce": { "type": "boolean", "description": "Whether to announce an update card in the channel." },
                     "createVersion": { "type": "boolean", "description": "When true, cut an immutable snapshot version after writing." },

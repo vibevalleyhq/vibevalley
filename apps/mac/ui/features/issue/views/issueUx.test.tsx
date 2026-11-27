@@ -3,7 +3,7 @@ import { expect, open, test } from "nsh/test";
 
 import { setLocale, t } from "@vibevalley/i18n";
 import "@vibevalley/i18n/catalogs";
-import type { Issue, IssueId, Session, SessionId, SliceBundle } from "@vibevalley/protocol";
+import type { Agent, Issue, IssueId, Session, SessionId, SliceBundle } from "@vibevalley/protocol";
 import { issueId } from "@vibevalley/protocol/schema";
 
 import { fakeHost } from "../../../fixtures/fakeHost";
@@ -713,9 +713,9 @@ test("Searchable OwnerPicker sets owner on NewIssue, TodoDetail, and IssueDetail
   await app.press("id:issue-new-owner-trigger");
   await fake.pumpUntil(app, () => app.count("id:issue-new-owner-search") === 1);
   await app.type("id:issue-new-owner-search", "老周");
-  await fake.pumpUntil(app, () => app.count("text:老周") >= 1);
+  await fake.pumpUntil(app, () => app.count("id:issue-new-owner-option-agent:laozhou") === 1);
   expect(app.texts()).not.toContain("alice");
-  await app.press("text:老周");
+  await app.press("id:issue-new-owner-option-agent:laozhou");
   await fake.pumpUntil(app, () => app.count("id:issue-new-owner-search") === 0);
 
   await app.type("id:issue-new-text", "Owner test task");
@@ -1495,4 +1495,94 @@ test("Unified DisplayMenu toggles density, field visibility, persistence, and re
   await fake.pumpUntil(app, () => app.count("id:issue-timeline") === 1);
   expect(app.layout("id:timeline-row >> nth=0")!.height).toBe(38);
   expect(app.count("id:timeline-row >> text:#701")).toBe(1);
+});
+
+test("External teammates are searchable and selectable in OwnerPicker, shown with code/name on cards and rows, and excluded from OAR AgentSelect", async () => {
+  setLocale("zh");
+  const baseAgents = scenarios.typical.responses["agent.list"] as Agent[];
+  const externalTeammate: Agent = {
+    ...baseAgents[1],
+    id: "antigravity-ide",
+    code: "W-04",
+    name: "Antigravity",
+    role: "worker",
+    mode: "external",
+    runtime: "antigravity",
+    enabled: true,
+    look: { ...baseAgents[1].look, avatar: "avatar-architect" },
+  };
+  const externalOwned = makeIssueFixture({
+    id: "i-ext-owner",
+    number: 801,
+    title: "External teammate issue",
+    status: "todo",
+    owner: { kind: "agent", id: "antigravity-ide" },
+    stage: { state: "draft", acts: [] },
+  });
+  const base = scenarios.typical;
+  const state: SliceBundle = {
+    ...base.state,
+    board: { seq: 15, issues: [externalOwned] },
+  };
+  const fake = fakeHost({ state, responses: base.responses }, { route: "/issues", locale: "zh" });
+  fake.respond("agent.list", () => [...baseAgents, externalTeammate]);
+  fake.respond("issue.create", (payload: unknown) => {
+    const p = payload as { title?: string; owner?: Issue["owner"] };
+    return makeIssueFixture({
+      id: "i-ext-created",
+      number: 802,
+      title: p.title ?? "Created",
+      status: "backlog",
+      ...(p.owner ? { owner: p.owner } : {}),
+      stage: { state: "draft", acts: [] },
+    });
+  });
+
+  const app = await open("../../../app/main.tsx", {
+    width: 1280,
+    height: 820,
+    colorScheme: "light",
+    platform: "macos",
+    clock: { time: SCENARIO_NOW },
+    host: fake.options,
+  });
+  await fake.pumpUntil(app, () => app.count("id:issue-card") === 1);
+
+  // Kanban card owner displays teammate code + name.
+  expect(app.shows("id:card-owner >> text:W-04")).toBe(true);
+  expect(app.shows("id:card-owner >> text:Antigravity")).toBe(true);
+
+  // List row owner displays teammate code + name + External mode badge.
+  await app.press("id:issue-view-list");
+  await fake.pumpUntil(app, () => app.count("id:issue-list") === 1);
+  expect(app.shows("id:row-owner >> text:W-04")).toBe(true);
+  expect(app.shows("id:row-owner >> text:Antigravity")).toBe(true);
+  expect(app.shows("id:row-owner >> text:外部接入")).toBe(true);
+
+  // NewIssue OAR helper selector excludes External teammates, while OwnerPicker searches by code/runtime.
+  await app.press("id:issue-toolbar-new");
+  await fake.pumpUntil(app, () => app.count("id:issue-new-helper-trigger") === 1);
+  await app.press("id:issue-new-helper-trigger");
+  await fake.pumpUntil(app, () => app.count("id:issue-new-helper-search") === 1);
+  await app.type("id:issue-new-helper-search", "Antigravity");
+  await fake.pumpUntil(app, () => app.texts().includes("没有符合条件的角色。"));
+  await app.keyboard.press("escape");
+  await fake.pumpUntil(app, () => app.count("id:issue-new-helper-search") === 0);
+
+  await app.press("id:issue-new-owner-trigger");
+  await fake.pumpUntil(app, () => app.count("id:issue-new-owner-search") === 1);
+  await app.type("id:issue-new-owner-search", "W-04");
+  await fake.pumpUntil(app, () => app.count("id:issue-new-owner-option-agent:antigravity-ide") === 1);
+  expect(app.texts()).toContain("外部接入");
+  await app.press("id:issue-new-owner-option-agent:antigravity-ide");
+  await fake.pumpUntil(app, () => app.count("id:issue-new-owner-search") === 0);
+
+  await app.type("id:issue-new-text", "Assign external owner by code");
+  await app.press("id:issue-new-keep");
+  await fake.pumpUntil(app, () => app.count("id:issue-new-dialog") === 0);
+  const created = fake.calls.findLast((c) => c.op === "issue.create");
+  expect(created?.payload).toMatchObject({
+    title: "Assign external owner by code",
+    owner: { kind: "agent", id: "antigravity-ide" },
+  });
 });

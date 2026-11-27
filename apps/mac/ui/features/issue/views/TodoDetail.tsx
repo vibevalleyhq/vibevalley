@@ -27,7 +27,7 @@ import { Markdown } from "../../../design/Markdown";
 import { Bubble } from "../../../design/Tip";
 import { toast } from "../../../design/toasts";
 import { mix } from "../../../design/tone";
-import { useWorkAgentReadiness, useWorkAgents } from "../../../infra/agents";
+import { useManagedWorkAgents, useWorkAgentReadiness } from "../../../infra/agents";
 import { api, reasonOf } from "../../../infra/api";
 import { ago, shortMomentText } from "../../../infra/base/format";
 import { hostApi } from "../../../infra/bridge";
@@ -119,7 +119,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
   const repoActionCreate = signal(false);
   const editingDesc = signal(false);
   const refineOpen = signal(false);
-  const agents = useWorkAgents(true);
+  const agents = useManagedWorkAgents(true);
   const agentReadiness = useWorkAgentReadiness(true);
   const allIssues = useIssues();
   const notesQuery = useNotes(() => ({}));

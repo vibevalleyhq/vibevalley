@@ -1,12 +1,14 @@
 import { Canvas, colorScheme, Path2D, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
-import type { IssueStatus, Priority } from "@vibevalley/protocol";
+import { type Agent, defaultOrchestrator, type IssueStatus, type Priority } from "@vibevalley/protocol";
 
-import { AgentFace, OrchestratorFace } from "../../../design/domain/Face";
+import { withDefaultWorkerAvatar, assignWorkerAvatars } from "../../../design/domain/avatar";
+import { AgentCodeBadge, AgentFace, AgentModeBadge, OrchestratorFace } from "../../../design/domain/Face";
 import { Bubble } from "../../../design/Tip";
 import { mix, tone } from "../../../design/tone";
 import { useAgent } from "../../../infra/agents";
+import { ready, useAgents } from "../../../infra/query";
 import type { BoardCard, Tone } from "../model/cards";
 import { cardAgent } from "../model/cards";
 
@@ -200,20 +202,62 @@ export function FlagChip(props: { text: string; tone: Tone }) {
   );
 }
 
+function teammateTooltip(found: Agent | undefined, fallbackId: string, runtimeOverride?: string): string {
+  if (!found) return fallbackId;
+  const rt = runtimeOverride ?? found.runtime;
+  const mode = found.mode === "external" ? t("web.agent.mode.external") : t("web.agent.mode.managed");
+  return [found.code, found.name, rt, mode].filter(Boolean).join(" · ");
+}
+
 /** A helper's face, or the orchestrator's head when the profile is one. */
-export function AgentFaceOf(props: { agent: string; runtime?: string | undefined; size?: number }) {
+export function AgentFaceOf(props: {
+  agent: string;
+  runtime?: string | undefined;
+  size?: number;
+  showIdentity?: boolean | undefined;
+  showMode?: boolean | undefined;
+}) {
   const found = useAgent(() => props.agent);
+  const allAgents = useAgents();
+  const size = () => props.size ?? 18;
+  const resolvedLook = () => {
+    const a = found();
+    if (!a || a.role === "orchestrator") return a?.look;
+    const workers = ready(allAgents, []).filter((x) => x.role === "worker");
+    const assigned = assignWorkerAvatars(workers);
+    return withDefaultWorkerAvatar(a, assigned.get(a.id));
+  };
+  const tooltipText = () => teammateTooltip(found(), props.agent, props.runtime);
+  const face = () => (
+    <If when={found()?.role !== "orchestrator"} else={<OrchestratorFace size={size()} agent={props.agent} />}>
+      <AgentFace agentId={props.agent} name={found()?.name} runtime={props.runtime ?? found()?.runtime} look={resolvedLook()} size={size()} />
+    </If>
+  );
   return (
-    <If when={found()?.role !== "orchestrator"} else={<OrchestratorFace size={props.size ?? 18} agent={props.agent} />}>
-      <View accessible accessibilityLabel={found()?.name ?? props.agent} tooltip={<Bubble text={found()?.name ?? props.agent} />}>
-        <AgentFace agentId={props.agent} name={found()?.name} runtime={props.runtime ?? found()?.runtime} look={found()?.look} size={props.size ?? 18} />
-      </View>
+    <If
+      when={props.showIdentity === true ? found() : undefined}
+      else={
+        <View accessible accessibilityLabel={tooltipText()} tooltip={<Bubble text={tooltipText()} />}>
+          {face()}
+        </View>
+      }
+    >
+      {(agent) => (
+        <View accessible accessibilityLabel={tooltipText()} tooltip={<Bubble text={tooltipText()} />} class="min-w-0 flex-row items-center gap-1">
+          {face()}
+          <AgentCodeBadge code={agent().code} external={agent().mode === "external"} compact />
+          <Text class="min-w-0 shrink truncate text-2xs text-ink">{agent().name}</Text>
+          <If when={props.showMode === true}>
+            <AgentModeBadge mode={agent().mode} compact />
+          </If>
+        </View>
+      )}
     </If>
   );
 }
 
 /** Who works it: the helper's face, the orchestrator's head, or a dashed circle for nobody yet. A task has none. */
-export function CardFace(props: { card: BoardCard; size?: number }) {
+export function CardFace(props: { card: BoardCard; size?: number; showIdentity?: boolean | undefined; showMode?: boolean | undefined }) {
   const size = () => props.size ?? 18;
   return (
     <If
@@ -225,12 +269,14 @@ export function CardFace(props: { card: BoardCard; size?: number }) {
               agent={agent()}
               runtime={props.card.kind === "issue" ? (props.card.session ?? props.card.sessions.at(-1))?.runtime : undefined}
               size={size()}
+              showIdentity={props.showIdentity}
+              showMode={props.showMode}
             />
           )}
         </If>
       }
     >
-      <OrchestratorFace size={size()} />
+      <AgentFaceOf agent={defaultOrchestrator} size={size()} showIdentity={props.showIdentity} showMode={props.showMode} />
     </If>
   );
 }

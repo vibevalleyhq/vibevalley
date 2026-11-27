@@ -735,7 +735,7 @@ impl RuntimeFleet {
     }
 
     pub async fn candidates_async(&self) -> Vec<Candidate> {
-        let agents = self.profiles.agents();
+        let agents = self.profiles.managed_workers();
         let mut out = Vec::with_capacity(agents.len());
         for agent in agents {
             let usable = self.assess_async(&agent).await.usable();
@@ -745,7 +745,7 @@ impl RuntimeFleet {
     }
 
     pub async fn candidates_from_cache_async(&self) -> Vec<Candidate> {
-        let agents = self.profiles.agents();
+        let agents = self.profiles.managed_workers();
         let mut out = Vec::with_capacity(agents.len());
         for agent in agents {
             let usable = self.assess_from_cache_async(&agent).await.usable();

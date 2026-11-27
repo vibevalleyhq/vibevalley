@@ -35,7 +35,9 @@ const look = (more: Partial<Look> = {}): Look => ({
 });
 
 const agent = (more: Partial<Agent> & Pick<Agent, "id" | "name">): Agent => ({
+  code: "",
   role: "worker",
+  mode: "managed",
   duty: "",
   enabled: true,
   runtime: "claude",
@@ -61,6 +63,7 @@ const agent = (more: Partial<Agent> & Pick<Agent, "id" | "name">): Agent => ({
 const agents: Agent[] = [
   agent({
     id: "orchestrator",
+    code: "O-01",
     name: "老村长",
     role: "orchestrator",
     runtime: "vibevalley",
@@ -70,6 +73,7 @@ const agents: Agent[] = [
   }),
   agent({
     id: "laozhou",
+    code: "W-01",
     name: "老周",
     duty: "写接口、改 server、跑测试",
     model: "opus",
@@ -84,6 +88,7 @@ const agents: Agent[] = [
   }),
   agent({
     id: "xiaolin",
+    code: "W-02",
     name: "小林",
     duty: "做页面、调样式、补组件的故事",
     runtime: "codex",
@@ -92,6 +97,7 @@ const agents: Agent[] = [
   }),
   agent({
     id: "ahua",
+    code: "W-03",
     name: "阿花",
     duty: "写文档和发版说明",
     runtime: "opencode",

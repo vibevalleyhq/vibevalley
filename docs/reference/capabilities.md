@@ -344,6 +344,7 @@ GitHub 的检测：gh 装没装、登没登录
 | `agent.validate` | 看每份角色现在派活哪里不对，没存的草稿也看 | `/api/v1/agent/validate` | ✓ | ✓ |   |   |
 | `agent.create` | 新建一份角色 | `/api/v1/agent/create` | ✓ |   |   |   |
 | `agent.update` | 改一份角色（整份写入） | `/api/v1/agent/update` | ✓ |   |   |   |
+| `agent.register` | 幂等登记或更新一个外部编程队友并分配稳定 W-XX 编号 | `/api/v1/agent/register` | ✓ | ✓ |   |   |
 | `agent.delete` | 删掉一份角色 | `/api/v1/agent/delete` | ✓ |   |   |   |
 | `agent.previewDelete` | 试删一份角色：说会删掉什么，不真删 | `/api/v1/agent/previewDelete` | ✓ |   |   |   |
 | `agent.template.list` | 列出能装的角色模板：内置的，再是加进来的 | `/api/v1/agent/template/list` | ✓ | ✓ |   |   |

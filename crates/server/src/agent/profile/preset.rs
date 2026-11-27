@@ -406,6 +406,9 @@ pub fn session_options(agent: &Agent, settings: Option<&RuntimeSettings>, runtim
 }
 
 pub fn agent_problems(agent: &Agent, runtime: Option<&RuntimeInfo>) -> Vec<AgentProblem> {
+    if agent.mode == vibevalley_protocol::AgentExecutionMode::External {
+        return Vec::new();
+    }
     let mut problems = Vec::new();
     let mut add = |text: String| problems.push(problem("runtime", AgentProblemLevel::Error, text));
     match runtime {
@@ -595,8 +598,10 @@ mod tests {
         };
         let base_agent = Agent {
             id: "a1".into(),
+            code: "W-01".into(),
             name: "Worker".into(),
             role: AgentRole::Worker,
+            mode: vibevalley_protocol::AgentExecutionMode::Managed,
             duty: String::new(),
             enabled: true,
             runtime: "antigravity".into(),
@@ -721,8 +726,10 @@ mod tests {
 
         let mk_agent = |runtime: &str, model: &str| Agent {
             id: format!("agent-{model}"),
+            code: "W-01".into(),
             name: "Worker".into(),
             role: AgentRole::Worker,
+            mode: vibevalley_protocol::AgentExecutionMode::Managed,
             duty: String::new(),
             enabled: true,
             runtime: runtime.into(),

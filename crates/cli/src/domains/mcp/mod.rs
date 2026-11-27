@@ -5,6 +5,7 @@
 //! Stdout is reserved strictly for newline-delimited JSON-RPC 2.0 responses;
 //! all diagnostics go to stderr.
 
+mod agent;
 mod issue;
 mod note;
 mod note_defs;

@@ -6,7 +6,9 @@ import { messageId } from "@vibevalley/protocol/schema";
 import { isWorkerReportMessage, resolveReportVoiceTarget, sanitizeReportForSpeech, SerializedReportQueue } from "./reportPlayback";
 
 const baseAgent = (overrides: Partial<Agent> & Pick<Agent, "id" | "name">): Agent => ({
+  code: "W-01",
   role: "worker",
+  mode: "managed",
   duty: "",
   enabled: true,
   runtime: "claude",

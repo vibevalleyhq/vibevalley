@@ -736,9 +736,7 @@ impl Manager {
         }
 
         let mut effective_meta = meta.clone();
-        if let Some(origin) = req.origin.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
-            effective_meta.origin = origin.to_string();
-        }
+        apply_origin_override(&mut effective_meta, req.origin.as_deref());
         if req.summary.is_some() {
             effective_meta.summary = req.summary.clone();
         }
@@ -883,9 +881,7 @@ impl Manager {
         }
 
         let mut effective_meta = meta.clone();
-        if let Some(origin) = req.origin.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
-            effective_meta.origin = origin.to_string();
-        }
+        apply_origin_override(&mut effective_meta, req.origin.as_deref());
         if req.summary.is_some() {
             effective_meta.summary = req.summary.clone();
         }
@@ -987,9 +983,7 @@ impl Manager {
         self.storage.note.delete_file_async(&row.id, ty, &row.title, &path).await?;
         let _ = doc.entry_delete(&path);
         let mut effective_meta = meta.clone();
-        if let Some(origin) = req.origin.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
-            effective_meta.origin = origin.to_string();
-        }
+        apply_origin_override(&mut effective_meta, req.origin.as_deref());
         if req.summary.is_some() {
             effective_meta.summary = req.summary.clone();
         }
@@ -1146,6 +1140,20 @@ impl Manager {
             commit_meta = CommitMeta::session(&actor, &actor, &client.id, 1, None, at);
         }
         (maker, actor, commit_meta)
+    }
+}
+
+fn apply_origin_override(meta: &mut CommitMeta, raw_origin: Option<&str>) {
+    let Some(origin) = raw_origin.map(str::trim).filter(|s| !s.is_empty()) else {
+        return;
+    };
+    meta.origin = origin.to_string();
+    if let Some(actor) = origin.strip_prefix("agent:").map(str::trim).filter(|s| !s.is_empty()) {
+        meta.author = actor.to_string();
+        meta.agent = Some(actor.to_string());
+    } else if origin == USER_ID {
+        meta.author = USER_ID.to_string();
+        meta.agent = None;
     }
 }
 

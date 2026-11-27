@@ -376,7 +376,9 @@
   },
   "agent.list": [
     {
+      "code": "O-01",
       "role": "orchestrator",
+      "mode": "managed",
       "duty": "听你说要什么，拆成工单，派给合适的帮工",
       "enabled": true,
       "runtime": "vibevalley",
@@ -407,7 +409,9 @@
       "name": "老村长"
     },
     {
+      "code": "W-01",
       "role": "worker",
+      "mode": "managed",
       "duty": "写接口、改 server、跑测试",
       "enabled": true,
       "runtime": "claude",
@@ -451,7 +455,9 @@
       }
     },
     {
+      "code": "W-02",
       "role": "worker",
+      "mode": "managed",
       "duty": "做页面、调样式、补组件的故事",
       "enabled": true,
       "runtime": "codex",
@@ -483,7 +489,9 @@
       "name": "小林"
     },
     {
+      "code": "W-03",
       "role": "worker",
+      "mode": "managed",
       "duty": "写文档和发版说明",
       "enabled": false,
       "runtime": "opencode",

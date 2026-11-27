@@ -88,8 +88,8 @@ export const state: SliceBundle = {
   },
 };
 
-const agent = (id: string, name: string): Agent =>
-  ({ id, name, role: "worker", enabled: true, runtime: "claude", look: {}, description: "" }) as unknown as Agent;
+const agent = (id: string, name: string, code = "W-01"): Agent =>
+  ({ id, code, name, role: "worker", mode: "managed", enabled: true, runtime: "claude", look: {}, description: "" }) as unknown as Agent;
 
 /** `{ op: data }` as vibevalley_bridge::fake reads responses.json. */
 export const responses: Record<string, unknown> = {
@@ -99,7 +99,7 @@ export const responses: Record<string, unknown> = {
     missingSessions: [],
   })),
   "game.achievement.list": { items: [], standings: [] } satisfies AchievementList,
-  "agent.list": [agent("laozhou", "老周"), agent("xiaolin", "小林")],
+  "agent.list": [agent("laozhou", "老周", "W-01"), agent("xiaolin", "小林", "W-02")],
   "agent.template.list": [],
   "repo.list": [],
   "runtime.list": [],

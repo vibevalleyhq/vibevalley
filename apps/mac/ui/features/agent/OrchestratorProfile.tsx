@@ -7,7 +7,7 @@ import { same } from "@vibevalley/protocol/rules";
 import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
 import { orchestratorLooks } from "../../design/domain/cast";
-import { OrchestratorFace } from "../../design/domain/Face";
+import { AgentCodeBadge, AgentModeBadge, OrchestratorFace } from "../../design/domain/Face";
 import { Field, TextArea, TextInput } from "../../design/Field";
 import { Icon } from "../../design/Icon";
 import { IconButton } from "../../design/IconButton";
@@ -28,8 +28,10 @@ export const orchestratorHref = (agent: string, tab = "memory") =>
 export function newOrchestrator(): Agent {
   return {
     id: "",
+    code: "",
     name: t("web.agent.orchestrator.newName"),
     role: "orchestrator",
+    mode: "managed",
     duty: "",
     enabled: true,
     runtime: orchestratorRuntime,
@@ -103,8 +105,10 @@ export function OrchestratorProfile(props: { saved?: Agent | undefined; start: A
             <Text class="text-sm text-muted group-hover:text-ink">{t("web.agent.all")}</Text>
           </A>
           <Text class="text-sm text-faint">/</Text>
-          <View class="min-w-0 flex-1 flex-row items-center gap-2.5">
+          <View class="min-w-0 flex-1 flex-row items-center gap-2">
+            <AgentCodeBadge code={draft().code} />
             <Text class="truncate text-lg font-semibold text-ink">{draft().name || t("web.agent.unnamed")}</Text>
+            <AgentModeBadge mode={draft().mode} />
             <View class="shrink-0 rounded-sm bg-hover px-1.5 py-0.5">
               <Text class="text-xs font-medium text-muted">{t("web.agent.role.orchestrator")}</Text>
             </View>

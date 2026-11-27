@@ -172,3 +172,47 @@ test("AgentsPage keeps primary + New CTA unclipped at 900x720 by collapsing seco
     expect(more.x + more.width).toBeLessThanOrEqual(newAgent.x);
   }
 });
+
+test("AgentsPage renders O-XX/W-XX codes, Managed vs External mode badges, and searches by code without showing OAR errors on external teammates", async () => {
+  setLocale("zh");
+  const baseAgents = scenarios.typical.responses["agent.list"] as Agent[];
+  const externalTeammate: Agent = {
+    ...baseAgents[1],
+    id: "antigravity-ide",
+    code: "W-04",
+    name: "Antigravity",
+    role: "worker",
+    mode: "external",
+    runtime: "antigravity",
+    enabled: true,
+    look: { ...baseLook, avatar: "avatar-architect" },
+  };
+  const fake = fakeHost(scenarios.typical, { route: "/agents", locale: "zh" });
+  fake.respond("agent.list", () => [...baseAgents, externalTeammate]);
+  fake.respond("agent.validate", () => [
+    { id: "laozhou", problems: [{ field: "runtime", level: "error", text: "no DeepSeek API key is set" }] },
+    { id: "antigravity-ide", problems: [{ field: "runtime", level: "error", text: "ignored for external" }] },
+  ]);
+
+  const app = await open("../../app/main.tsx", {
+    width: 1280,
+    height: 820,
+    colorScheme: "light",
+    platform: "macos",
+    clock: { time: SCENARIO_NOW },
+    host: fake.options,
+  });
+  await fake.pumpUntil(app, () => app.texts().includes("Antigravity"));
+
+  expect(app.texts()).toContain("O-01");
+  expect(app.texts()).toContain("W-01");
+  expect(app.texts()).toContain("W-04");
+  expect(app.texts()).toContain("本机调度");
+  expect(app.texts()).toContain("外部接入");
+  expect(app.count("id:agent-card-error")).toBe(1);
+
+  await app.type("id:agents-search", "W-04");
+  await fake.pump(app);
+  expect(app.texts()).toContain("Antigravity");
+  expect(app.texts()).not.toContain("老周");
+});

@@ -321,14 +321,14 @@ test("NewIssue unified AgentSelect surfaces agent.validate readiness diagnostics
   await fake.pump(app);
   expect(app.texts()).toContain("小林");
   expect(app.texts()).toContain("Codex 未配置密钥");
-  await app.press("text:小林");
+  await app.press("id:issue-new-helper-option-xiaolin");
   await fake.pumpUntil(app, () => app.count("id:issue-new-helper-status") === 1);
   expect(app.texts()).toContain("Codex 未配置密钥");
 
   // Choose a ready agent -> shows ready status instead of problem text.
   await app.press("id:issue-new-helper");
   await fake.pump(app);
-  await app.press("text:老周");
+  await app.press("id:issue-new-helper-option-laozhou");
   await fake.pump(app);
   expect(app.texts()).toContain("就绪");
 });

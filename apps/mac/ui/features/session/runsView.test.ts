@@ -44,8 +44,10 @@ const baseLook: Agent["look"] = {
 function makeAgent(id: string, role: Agent["role"], name: string, duty = ""): Agent {
   return {
     id,
+    code: role === "orchestrator" ? "O-01" : "W-01",
     name,
     role,
+    mode: "managed",
     duty,
     enabled: true,
     runtime: role === "orchestrator" ? "vibevalley" : "claude",

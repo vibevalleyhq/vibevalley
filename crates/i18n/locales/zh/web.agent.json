@@ -155,6 +155,11 @@
     "orchestrator": "主助手",
     "worker": "执行角色"
   },
+  "mode": {
+    "managed": "本机调度",
+    "external": "外部接入",
+    "externalNotice": "这是外部接入的编码队友（{code}），不会自动派进 VibeValley 执行队列；可直接作为工单负责人或笔记协作者。"
+  },
   "templates": {
     "title": "模板",
     "intro": "每个模板是一份 agent 的配方：角色、职责、人设、推荐的环境和长相。装一份就多一份角色，同一个模板能装好几份；装好的随便改，模板出了新版本，角色页会提示更新。",
@@ -212,7 +217,7 @@
     "orchestrators": "主助手",
     "helpers": "执行角色",
     "search": "搜索角色",
-    "searchHint": "搜名字、职责、环境、标签…",
+    "searchHint": "搜编号、名字、职责、环境、标签…",
     "make": "新建执行角色",
     "makeOrchestrator": "新建主助手",
     "orchestratorLine": "专职统筹：拆解任务、分配执行、跟踪进度、汇总结果。",

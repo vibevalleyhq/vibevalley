@@ -7,8 +7,8 @@ import { issueId } from "@vibevalley/protocol/schema";
 
 import { Combobox } from "../../../design/Combobox";
 import { EpochDatePicker } from "../../../design/DatePicker";
-import { UserAvatar } from "../../../design/domain/Face";
-import { initialOf } from "../../../design/domain/RuntimeBadge";
+import { AgentCodeBadge, AgentModeBadge, UserAvatar } from "../../../design/domain/Face";
+import { initialOf, runtimeName } from "../../../design/domain/RuntimeBadge";
 import { Select } from "../../../design/Field";
 import { Icon } from "../../../design/Icon";
 import { IconButton } from "../../../design/IconButton";
@@ -16,7 +16,7 @@ import { motionDuration, motionOff } from "../../../design/motion";
 import { CountPill } from "../../../design/Tag";
 import { Bubble } from "../../../design/Tip";
 import { mix } from "../../../design/tone";
-import { ready, useAgents, useSettings } from "../../../infra/query";
+import { ready, useAgents, useRuntimes, useSettings } from "../../../infra/query";
 import { decodeActorRef, encodeActorRef, type GroupBy } from "../model/display";
 import { childIssuesOf, eligibleBlockerOptions, eligibleParentOptions, eligibleRelationOptions, issueTagPresets, normalizeTagList } from "../model/meta";
 import { AgentFaceOf, NoFaceMark, PriorityMark, StatusMark } from "./Marks";
@@ -501,7 +501,12 @@ export function SubIssuesSection(props: { issueId: string; allIssues: readonly I
 }
 
 /** Compact avatar/icon for an `ActorRef` owner (`user:self`, collaborator `user`, or `agent`). */
-export function OwnerMark(props: { owner: ActorRef | undefined; size?: number | undefined }) {
+export function OwnerMark(props: {
+  owner: ActorRef | undefined;
+  size?: number | undefined;
+  showIdentity?: boolean | undefined;
+  showMode?: boolean | undefined;
+}) {
   const size = () => props.size ?? 16;
   const owner = () => props.owner;
   return (
@@ -524,7 +529,7 @@ export function OwnerMark(props: { owner: ActorRef | undefined; size?: number | 
             </If>
           }
         >
-          <AgentFaceOf agent={ref().id} size={size()} />
+          <AgentFaceOf agent={ref().id} size={size()} showIdentity={props.showIdentity} showMode={props.showMode} />
         </If>
       )}
     </If>
@@ -583,12 +588,17 @@ export function useOwnerOptions(
       .filter((a) => a.enabled)
       .toSorted((a, b) => {
         const roleDiff = Number(a.role === "orchestrator") - Number(b.role === "orchestrator");
-        return roleDiff !== 0 ? roleDiff : a.name.localeCompare(b.name);
+        if (roleDiff !== 0) return roleDiff;
+        const modeDiff = Number(a.mode === "external") - Number(b.mode === "external");
+        if (modeDiff !== 0) return modeDiff;
+        const codeDiff = (a.code ?? "").localeCompare(b.code ?? "");
+        return codeDiff !== 0 ? codeDiff : a.name.localeCompare(b.name);
       });
     const seenAgents = new Set<string>();
     for (const a of agentList) {
       seenAgents.add(a.id);
-      items.push({ value: `agent:${a.id}`, label: a.name, group: expertsGroup });
+      const searchLabel = [a.code, a.name, a.runtime].filter(Boolean).join(" · ");
+      items.push({ value: `agent:${a.id}`, label: searchLabel, group: expertsGroup });
     }
     if (cur?.kind === "agent" && cur.id.trim() !== "" && !seenAgents.has(cur.id)) {
       items.push({ value: `agent:${cur.id}`, label: cur.id, group: expertsGroup });
@@ -597,7 +607,7 @@ export function useOwnerOptions(
   });
 }
 
-/** Searchable owner selector (`Select` with `cover={false}`) for assigning self, collaborators, or an Expert agent. */
+/** Searchable owner selector (`Select` with `cover={false}`) for assigning self, collaborators, or a teammate. */
 export function OwnerPicker(props: {
   owner: ActorRef | undefined;
   allIssues: readonly Issue[];
@@ -611,9 +621,14 @@ export function OwnerPicker(props: {
   onChange: (owner: ActorRef | undefined) => void;
 }) {
   const ownerLabel = useOwnerLabel();
+  const agents = useAgents();
+  const runtimes = useRuntimes();
   const testid = () => props.testid ?? "issue-owner-picker";
   const clearTestid = () => `${testid()}-clear`;
   const encodedValue = computed(() => encodeActorRef(props.owner));
+  const agentById = computed(() => new Map(ready(agents, []).map((a) => [a.id, a])));
+  const selectedAgent = computed(() => (props.owner?.kind === "agent" ? agentById().get(props.owner.id) : undefined));
+  const runtimeOf = (id: string) => runtimeName(ready(runtimes, []), id);
 
   const options = useOwnerOptions(
     () => props.allIssues,
@@ -640,18 +655,33 @@ export function OwnerPicker(props: {
               searchable
               searchPlaceholder={t("web.issue.owner.search")}
               emptyText={t("web.base.table.empty")}
-              renderOption={(entry) => (
-                <View class="flex-row items-center gap-2">
-                  <OwnerMark owner={decodeActorRef(entry.value)} size={16} />
-                  <Text class="min-w-0 flex-1 truncate text-sm text-ink group-selected:font-medium">{entry.title}</Text>
-                </View>
-              )}
+              renderOption={(entry) => {
+                const ref = decodeActorRef(entry.value);
+                const found = ref?.kind === "agent" ? agentById().get(ref.id) : undefined;
+                return (
+                  <View testID={`${testid()}-option-${entry.value}`} class="min-w-0 flex-1 flex-row items-center gap-1.5">
+                    <OwnerMark owner={ref} size={16} />
+                    <If when={found}>{(a) => <AgentCodeBadge code={a().code} external={a().mode === "external"} compact />}</If>
+                    <Text class="min-w-0 flex-1 truncate text-sm text-ink group-selected:font-medium">{found?.name ?? entry.title}</Text>
+                    <If when={found}>
+                      {(a) => (
+                        <>
+                          <AgentModeBadge mode={a().mode} compact />
+                          <Text class="shrink-0 text-2xs text-muted">{runtimeOf(a().runtime)}</Text>
+                        </>
+                      )}
+                    </If>
+                  </View>
+                );
+              }}
               renderValue={() => (
                 <View class="min-w-0 flex-row items-center gap-1.5">
                   <If when={props.owner}>{(o) => <OwnerMark owner={o()} size={14} />}</If>
+                  <If when={selectedAgent()}>{(a) => <AgentCodeBadge code={a().code} external={a().mode === "external"} compact />}</If>
                   <Text class={`min-w-0 shrink truncate text-sm ${props.owner ? "text-ink" : "text-faint"}`}>
                     {props.owner ? shownLabel() : t("web.issue.owner.pick")}
                   </Text>
+                  <If when={selectedAgent()}>{(a) => <AgentModeBadge mode={a().mode} compact />}</If>
                 </View>
               )}
               onChange={(raw) => props.onChange(decodeActorRef(raw))}
@@ -660,7 +690,9 @@ export function OwnerPicker(props: {
         >
           <View testID={testid()} accessibilityLabel={t("web.issue.owner.label")} class="min-h-7 flex-row items-center gap-1.5 px-2">
             <If when={props.owner}>{(o) => <OwnerMark owner={o()} size={14} />}</If>
+            <If when={selectedAgent()}>{(a) => <AgentCodeBadge code={a().code} external={a().mode === "external"} compact />}</If>
             <Text class={`min-w-0 truncate text-sm ${props.owner ? "text-ink" : "text-faint"}`}>{shownLabel()}</Text>
+            <If when={selectedAgent()}>{(a) => <AgentModeBadge mode={a().mode} compact />}</If>
           </View>
         </If>
       </View>

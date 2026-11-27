@@ -1218,17 +1218,17 @@ function CardView(props: {
               <If when={showRepo() ? repo() : undefined}>{(r) => <Text class="min-w-0 flex-1 truncate text-2xs text-faint">{r()}</Text>}</If>
             </View>
             <If when={loud() || hasFace() || showOwner()}>
-              <View class="shrink-0 flex-row items-center gap-1.5">
+              <View class="max-w-[65%] shrink flex-row items-center gap-1.5">
                 <If when={loud()}>{(pr) => <PriorityMark priority={pr()} size={12} />}</If>
                 <If when={showOwner() ? props.card.issue.owner : undefined}>
                   {(owner) => (
-                    <View testID="card-owner">
-                      <OwnerMark owner={owner()} size={16} />
+                    <View testID="card-owner" class="min-w-0 shrink">
+                      <OwnerMark owner={owner()} size={16} showIdentity={owner().kind === "agent"} />
                     </View>
                   )}
                 </If>
                 <If when={hasFace()}>
-                  <CardFace card={props.card} size={18} />
+                  <CardFace card={props.card} size={18} showIdentity />
                 </If>
               </View>
             </If>

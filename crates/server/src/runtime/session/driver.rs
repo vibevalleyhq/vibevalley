@@ -87,9 +87,11 @@ pub enum Persona {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AgentProfileInfo {
     pub id: String,
+    pub code: String,
     pub name: String,
     pub enabled: bool,
     pub is_orchestrator: bool,
+    pub is_external: bool,
 }
 
 /// What a session on an agent opens with.
