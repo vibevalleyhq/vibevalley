@@ -19,7 +19,7 @@
 | 工单、父子工单 | 图纸桌卡片、一块地 | `/issues`（`features/issue`、`FamilyDetail.tsx`） | `Issue`（`assignments`、`parent`、`blockedBy`）、`Changes`、`Landing` | `/api/v1/issue/…` |
 | 帮工、一轮 | 地里干活的小动物、一季庄稼 | `features/session/WorkLog.tsx`、`Trajectory.tsx` | `Session`、`Run`、`RunTrigger`、`SessionEvent` | `/api/v1/session/…`、`/api/v1/issue/run/list` |
 | 频道、私聊、工单串 | 田头、频道、工单串 | `/chat`（`features/channel`） | `Channel`（`type`：`channel`、`direct`、`thread`）、`ChatMessage`（`actor: Actor`）、`Attachment` | `/api/v1/channel/…`、`/api/v1/attachment/…` |
-| Artifact | — | `/artifacts`（`features/artifact`） | `Artifact`、`Block`、`Suggestion` | `/api/v1/artifact/…` |
+| Note（笔记） | — | `/notes`（`features/note`） | `Note`、`DocBlock`、`BaseSheet`、`Suggestion` | `/api/v1/note/…` |
 | 记性 | 记性 | 档案页与助手页（`features/memory/Memory.tsx`） | `Memory`、`MemoryList` | `/api/v1/memory/…` |
 | 定时任务 | 定时任务 | 频道菜单、看板带「定时任务」标签的工单 | `Cron`（`Issue.cron`） | `/api/v1/cron/…` |
 
@@ -37,7 +37,7 @@
 | 工单、父子工单 | `Board`（`crates/server/src/issue/board.rs`），接口在 `issue/mod.rs` | `server.db`、`issues/` | — |
 | 帮工、一轮 | `Sessions`（`session/engine.rs`、`mailbox.rs`）与 `runs.rs`，农机经 `drivers.rs` 开会话；轨迹在 `session/journal.rs` | `server.db`（`session*`、`session_mailbox`、`session_event`）、`records/` | 一个帮工是一个 oar `Session`，一轮对应一个 turn |
 | 频道、附件 | `Chat`（`channel/mod.rs`）、`dispatch.rs`（纯受众与刹车）、`Attachments`（`attachment.rs`） | `server.db` 的 `channel*`、`channel_delivery`、`attachment` 表 | 异步投递成帮工会话里的一段话 |
-| Artifact | `Artifacts`（`artifact/mod.rs`） | `server.db` 的 `artifact*` 表 | — |
+| Note（笔记） | `note::Manager`（`note/mod.rs`、`note/manager.rs`） | `server.db` 的 `note*` 表与 `<storage>/note/` | — |
 | 记性 | `Memories`（`team/memory/`） | `memory` 表 | — |
 | 定时任务 | `Crons`（`cron/mod.rs`，什么时候跑在 `crates/core/src/cron`） | `server.db` 的 `cron` 表 | — |
 | PR 与分支发布 | `Pulls`（`pull/mod.rs`、`publish.rs`、`store.rs`、`poll.rs`、`snapshot.rs`） | `server.db` 的 `pull`、`pull_event` 表 | — |

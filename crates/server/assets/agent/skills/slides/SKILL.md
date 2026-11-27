@@ -6,7 +6,7 @@ description: 用户要一份演示提纲、汇报结构或分节展示时用：�
 演示文稿可通过两种笔记方式交付：
 
 1. **块级演示文档（推荐，`noteType: "doc"`）**：先调 `note_type_read`（`type: "doc"`）读规范，用 `note_create` 创建笔记后，用 `note_doc_append_block` 按页追加 `heading`、`bulletList`、`chart`、`genui` 与 `divider`（分屏界标）。
-2. **空间视觉画布（`noteType: "canvas"`）**：需要自定义自由排版或独立视觉展板时，用 `note_file_write` 写入 `structure/canvas.json` 或章节 HTML 与 `asset/` 配图。
+2. **空间视觉画布（`noteType: "canvas"`）**：需要自定义自由排版或独立视觉展板时，用 `note_file_write` 写入 `structure/board.json` 或章节 HTML 与 `asset/` 配图。
 
 **先定讲什么，再动手。**
 

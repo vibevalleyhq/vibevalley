@@ -2623,7 +2623,7 @@ mod tests {
             analysis
                 .relations
                 .iter()
-                .any(|r| r.kind == RelationKind::Dependency && r.to_namespace == "features.artifact.client")
+                .any(|r| r.kind == RelationKind::Dependency && r.to_namespace == "features.note.client")
         );
     }
 

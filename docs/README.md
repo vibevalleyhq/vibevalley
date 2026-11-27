@@ -21,7 +21,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着 Papertrails 纸�
 | [session.md](docs/subsystems/session.md) | 帮工：Session 和 Run、工作目录、经 oar 开会话、`/mcp`、规矩和汇报、轨迹、额度和上限 |
 | [runtime.md](docs/subsystems/runtime.md) | 执行层与运行机器：`Machine`、`LocalMachine`、`RemoteMachine`、无锁 `MachineRegistry`、`/api/v1/machine/ws`、`vibevalley machine up` 与容器沙箱 `SandboxMachine` |
 | [repo.md](docs/subsystems/repo.md) | 仓库：工作目录、worktree、检查、本地合并、GitHub 检测、提交统计 |
-| [artifact.md](docs/subsystems/artifact.md) | Artifact：八种 `ArtifactType`（含大纲笔记 `outline` 与 `.md` 导入）、结构化多条目作品（`store`）、协作块文档（`blocks`）与单页网页（`html`）；乐观并发、双语指南、全出血原生白板与统一内容中心 |
+| [note.md](docs/subsystems/note.md) | Note：3+1 原语（`doc`、`base`、`canvas`、`media`）、目录化存储、`PageTree` 层级树、24 块协作文档、多维数据库 `Base`、双向图谱与 Loro 实时协同 |
 | [channel.md](docs/subsystems/channel.md) | 频道：默认频道、私聊、消息和事件、工单串、纯受众与环路刹车、持久投递 |
 | [brain.md](docs/subsystems/brain.md) | VibeValley 自己的 agent（`vibevalley-runtime::agent`）：模型请求、循环、对话文件、压缩、工具、技能、记性、自己的任务 |
 | [orchestrator.md](docs/subsystems/orchestrator.md) | 助手：收什么话、现状、工具与 `vv://` 资源读取、谁能让它合并、巡查、评测 |
@@ -57,7 +57,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着 Papertrails 纸�
 | [02-atomic-components.md](docs/design/02-atomic-components.md) | 基础原子组件与交互控件：按钮、表单、开关、状态标签、弹窗表格分栏、领域原子与外壳组件对照 |
 | [03-conversation-and-work-streams.md](docs/design/03-conversation-and-work-streams.md) | 会话核心流、工单板与运行轨迹引擎：频道排版、Composer 斜杠与提及、`/runs` 瀑布图、看板与档案额度 |
 | [04-motion-and-pixel-rendering.md](docs/design/04-motion-and-pixel-rendering.md) | 动效物理学、3D 纸雕渲染与光影系统：`wgpu` + WGSL 纸雕管线、昼夜光影、掀顶切面、寻路与行为防抖物理 |
-| [05-audiovisual-and-artifacts.md](docs/design/05-audiovisual-and-artifacts.md) | 视听多媒体、Artifact 与终端交互物理：独占音频、程序化音效、素材库灯箱、双轨分栏、Diff/文件/终端链接 |
+| [05-audiovisual-and-artifacts.md](docs/design/05-audiovisual-and-artifacts.md) | 视听多媒体、Note 笔记与终端交互物理：独占音频、程序化音效、素材库灯箱、双轨分栏、Diff/文件/终端链接 |
 | [06-desktop-architecture-and-topology.md](docs/design/06-desktop-architecture-and-topology.md) | 桌面架构、全页面清单与状态机拓扑：macOS 多载体宿主、角色与全路由清单、显式 FSM、响应式、快捷键与容灾 |
 | [07-engineering-config-and-assets.md](docs/design/07-engineering-config-and-assets.md) | 工程配置、跨平台接口与 Papertrails 资产管线：`nsh` Solid 适配、桌面桥接、素材同步管线与 6 档密级测试报告 |
 | [08-agent-ui-guide.md](docs/design/08-agent-ui-guide.md) | AI Agent UI 开发与审查指南：载体判别、样式与状态约束及提交前核对清单 |
@@ -87,7 +87,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着 Papertrails 纸�
 | 角色 | profile | agent（`Agent`） | 帮工档案、档案（中文界面） |
 | 引擎 | engine | runtime（`RuntimeInfo`） | harness、runtime（中文界面）、农机（中文界面） |
 | 工单 | ticket | issue（`Issue`） | job、ticket（中文界面）、任务（中文界面，指工单时） |
-| 作品 | artifact | artifact（`Artifact`，正文 `blocks`、`store` 或 `html`） | 稿子、草稿（指作品时）、产出、文档（指作品时）、doc（指作品时）、Artifact（中文界面） |
+| 笔记 | note | note（`Note`，原语 `doc`、`base`、`canvas`、`media`） | 稿子、草稿（指笔记时）、产出、Artifact（中文界面） |
 | 仓库 | repo | repo（`RepoSummary`） | 一块地 |
 | 空间 | space | `SpaceState`；目录是 `work_root`（`VIBEVALLEY_WORK_ROOT`） | 世界、全图 |
 | 宿主 | host | `ServerConfig.home`（`$VIBEVALLEY_HOME`） |  |

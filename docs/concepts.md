@@ -16,10 +16,10 @@ Host（~/.vibevalley：密钥、引擎、全局角色模板）
     ├── Issue（任务，可以指一个 Repo）
     │   ├── Assignment → Agent 角色
     │   └── IssueThread → Channel
-    └── Artifact（作品，含 outline 大纲笔记）
+    └── Note（笔记，3+1 原语：doc、base、canvas、media）
 ```
 
-一个 Space 有若干个 **Repo**、若干个 **Issue** 和若干份 **Artifact**。Repo 是仓库本身；Issue 归 Space，用 `repo` 指向它要改的仓库，也可以不指（只调研、只写大纲或文档）；指了仓库且角色开了 worktree 时，才为它切出 **Worktree**。Agent、Session、Run 是在这个 Space 里运行与协同的实体。
+一个 Space 有若干个 **Repo**、若干个 **Issue** 和若干份 **Note**。Repo 是仓库本身；Issue 归 Space，用 `repo` 指向它要改的仓库，也可以不指（只调研、只写文档或方案）；指了仓库且角色开了 worktree 时，才为它切出 **Worktree**。Agent、Session、Run 是在这个 Space 里运行与协同的实体。
 
 现在任务、频道这些状态仍在 Host 的库里（`$VIBEVALLEY_HOME/server.db`），切换 Space 目前只切 `repos/` 和 `worktrees/`；原拟由每个 Space 单独持有本地 `server.db` 的方案已退役，后续按 `#36`（Hub/Machine 解耦与按空间隔离）推进。
 
@@ -60,7 +60,7 @@ Host（~/.vibevalley：密钥、引擎、全局角色模板）
 | 父子任务 | `Issue.parent`、`blockedBy`（拆单输入 `IssueChildDraft`） | 一件大活拆成有先后的子任务：每个子任务是普通任务，前置做完后派发，过了检查先合进父任务分支，最后由父任务统一验收、合进主分支 |
 | 频道 | `Channel`（`type: channel`、`direct`、`thread`） | 说话的地方，照 Discord：频道、私聊和话题都是 channel；有一个默认频道（`default`，农场画成田头），用户和主助手有一个私聊（`peer`），话题挂在一个频道（`parent`）的一条消息（`root`）下面；外面的聊天软件经连接器接到一个频道上 |
 | 任务话题 | `type: thread`、`subjectKind: issue` | 一个任务下的对话，相当于 Linear 的评论 |
-| 作品 | `Artifact`（正文 `blocks`、`store` 或 `html`） | 留下来要人看的作品：协作块文档（含 `outline` 树状大纲与 `.md` 导入）、结构化多条目作品（幻灯片、看板、短片、白板、界面画板、设计体系）或按稿保存的单页网页 |
+| 笔记 | `Note`（原语 `doc`、`base`、`canvas`、`media`） | 留下来给人看和协作的结构化知识载体：24 块协作文档（`doc`）、多维结构化数据库（`base`）、空间画布白板（`canvas`）与多媒体转写工程（`media`） |
 | 定时任务 | `Cron` | 一个任务的一种触发：一个定时任务对应一个任务，派给一个角色或主助手，每次到点是它的一次 run |
 | 收件箱 | `InboxItem` | 要你处理的事，从核心状态现算（[核心状态的收件箱](docs/subsystems/core.md#收件箱)） |
 | 记忆 | `Memory` | 一个角色记得的事 |

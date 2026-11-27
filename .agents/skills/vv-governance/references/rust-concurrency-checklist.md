@@ -11,7 +11,7 @@
 
 ## 2. `Hub::on_async` 与 `spawn_blocking_traced`
 
-- [ ] **I/O 型 RPC 与订阅默认走异步**：`Hub` 命令注册优先用 `Hub::on_async`（收 owned `AsyncCtx`），长订阅优先用 `Hub::on_subscription_async`（如 `crates/server/src/runtime/session/mod.rs`、`crates/server/src/channel/mod.rs`、`crates/server/src/artifact/mod.rs`），避免每次 RPC 都无谓占用一个阻塞线程。
+- [ ] **I/O 型 RPC 与订阅默认走异步**：`Hub` 命令注册优先用 `Hub::on_async`（收 owned `AsyncCtx`），长订阅优先用 `Hub::on_subscription_async`（如 `crates/server/src/runtime/session/mod.rs`、`crates/server/src/channel/mod.rs`、`crates/server/src/note/mod.rs`），避免每次 RPC 都无谓占用一个阻塞线程。
 - [ ] **阻塞工作只经 `spawn_blocking_traced`**：SQLite 同步查询、git 子进程、文件扫描或 CPU 密集计算需要离开异步 executor 时，必须通过 `crate::spawn_blocking_traced`（`crates/server/src/router.rs`）派发，禁止裸调 `tokio::task::spawn_blocking` 或 `std::thread::spawn`，以免丢失 `tracing::Span::current()` 与 `trace_id`。
 - [ ] **不跨 `.await` 持同步锁**：检查所有 `std::sync::Mutex` / `RwLock` 守卫作用域，确保在任何 `.await` 之前已经 drop。
 

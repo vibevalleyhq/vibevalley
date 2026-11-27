@@ -63,9 +63,9 @@ const RULES: readonly Rule[] = [
     dirs: DIRS,
   },
   {
-    name: "产出 or 稿子 for a work artifact",
+    name: "产出 or 稿子 for a note",
     pattern: /产出|稿子/u,
-    says: "the page and the prompts call an artifact 作品, and an html one's versions 第 N 稿 (a block's revisions are 第 N 版) (docs/README.md 用语)",
+    says: "the page and the prompts call a note 笔记, and its versions 第 N 稿 (docs/README.md 用语)",
     dirs: DIRS,
   },
   {
@@ -91,10 +91,10 @@ const RULES: readonly Rule[] = [
     says: "a retried toggle undoes itself; send the value the user asked for: channel.reaction.set, channel.pin.set, channel.archive.set ({ on })",
   },
   {
-    name: "a document, now an artifact",
+    name: "a document under its retired doc endpoint/page names",
     pattern:
       /\bdoc_(get|block_\w+)\b|\bdoc\.(list|create|import|get|submit|block|markdown|demo)\b|\bDoc(Op|Submit|Ack|Span|Marks|Snapshot|Shape|Editor|sPage|BlockCreate|BlockUpdate|Request|Import)\w*\b|\bdocOwner\b|\/doc\/doc\b|features\/doc\b|["'`]\/docs\b/u,
-    says: "documents are artifacts with a blocks body (Artifact, artifact.block.list, artifact_block_create, BlockOp, BlockSubmit, /artifacts)",
+    says: "documents are Note doc primitives (Note, note.doc.view, note_doc_append_block, DocBlock, /notes)",
   },
   {
     name: "a cron under its old name",

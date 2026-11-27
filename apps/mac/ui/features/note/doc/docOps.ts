@@ -278,7 +278,7 @@ export const SLASH_COMMANDS: readonly SlashCommandItem[] = [
     label: "Issue Card",
     description: "Embed a live Issue card",
     icon: "issues",
-    keywords: ["issue", "card", "ticket", "gongdan"],
+    keywords: ["issue", "card", "gongdan"],
   },
   {
     key: "issueList",

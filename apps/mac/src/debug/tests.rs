@@ -211,6 +211,7 @@ fn resolve_loopback_ws_url_rejects_non_loopback_and_non_ws_schemes() {
 
 #[tokio::test]
 async fn vdp_server_enforces_auth_writes_0600_debug_json_and_handles_http_ws_roundtrip() {
+    vibevalley_server::install_tls();
     let dir = tempfile::tempdir().unwrap();
     let dispatcher = Arc::new(MockDispatcher::new());
     let server = VdpServer::start_for_test(0, dir.path().to_path_buf(), dispatcher.clone()).expect("start VDP server");

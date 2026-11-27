@@ -6,9 +6,7 @@ import { spelled } from "../../infra/base/search";
 import type { QueryClient } from "../../infra/query";
 import type { RouterController } from "../../infra/router/context";
 import type { TemplateCategory } from "../../infra/state/contentNav";
-import { buildDocFromMarkdown } from "../note/html";
-import { noteHref, noteTypeIcon, noteTypeLabel } from "../note/NoteCard";
-import { createTypedNote } from "../note/store";
+import { buildDocFromMarkdown, createTypedNote, noteHref, noteTypeIcon, noteTypeLabel } from "../note";
 import {
   buildDeliverableSeedFiles,
   buildWhiteboardDocument,

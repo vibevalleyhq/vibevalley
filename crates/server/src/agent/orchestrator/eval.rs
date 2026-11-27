@@ -121,6 +121,7 @@ impl Orchestrator {
         out.write_all(format!("{}\n", serde_json::to_string_pretty(&case).unwrap_or_default()).as_bytes())
             .await
             .map_err(|e| refused(BizCode::Refused, e.to_string()))?;
+        out.flush().await.map_err(|e| refused(BizCode::Refused, e.to_string()))?;
         Ok(OrchestratorEval {
             id: case_id,
             file: file.to_string_lossy().into_owned(),

@@ -472,11 +472,13 @@ fn collect_links_rec(blocks: &[DocBlock], out: &mut Vec<NoteLinkRef>) {
                 relation: LinkRelation::Embed,
                 title: None,
             }),
-            BlockKind::Prose { text }
-            | BlockKind::Heading { text, .. }
-            | BlockKind::Todo { text, .. }
-            | BlockKind::Callout { text, .. }
-            | BlockKind::Quote { text, .. } => {
+            BlockKind::Prose { text } | BlockKind::Heading { text, .. } | BlockKind::Todo { text, .. } | BlockKind::Quote { text, .. } => {
+                out.extend(extract_markdown_links(text));
+            }
+            BlockKind::Callout { title, text, .. } => {
+                if let Some(title_text) = title {
+                    out.extend(extract_markdown_links(title_text));
+                }
                 out.extend(extract_markdown_links(text));
             }
             BlockKind::Toggle { title, text } => {
@@ -773,6 +775,16 @@ mod tests {
             collapsed: None,
             children: None,
         });
+        blocks.push(DocBlock {
+            id: "b_callout".to_owned(),
+            kind: BlockKind::Callout {
+                tone: "info".to_owned(),
+                title: Some("See [[note:n11]]".to_owned()),
+                text: "Follow up on #12".to_owned(),
+            },
+            collapsed: None,
+            children: None,
+        });
 
         let rendered = blocks_to_markdown(&blocks);
         assert!(rendered.contains("> — Design Guild"));
@@ -781,9 +793,12 @@ mod tests {
         assert!(rendered.contains("<details>\n<summary>Details [[note:n10]]</summary>"));
         assert!(rendered.contains("[VibeValley](https://vibevalley.dev) — Home"));
         assert!(rendered.contains("<!-- toc -->"));
+        assert!(rendered.contains("> **See [[note:n11]]**\n> Follow up on #12"));
 
         let links = extract_doc_links(&blocks);
-        assert_eq!(links.len(), 3);
+        assert_eq!(links.len(), 5);
+        assert!(links.iter().any(|l| l.kind == LinkEntityKind::Note && l.id == "n11"));
+        assert!(links.iter().any(|l| l.kind == LinkEntityKind::Issue && l.id == "12"));
         let (words, _) = count_words(&blocks);
         assert!(words >= 12);
     }

@@ -38,15 +38,11 @@ export interface SeededWorkspaceIds {
   readonly issueIds: readonly string[];
   readonly agentIds: readonly string[];
   readonly channelIds: readonly string[];
-  readonly artifacts: {
-    readonly docs: string;
-    readonly outline: string;
-    readonly dashboard: string;
-    readonly designSystem: string;
-    readonly whiteboard: string;
-    readonly slides: string;
-    readonly sheet: string;
-    readonly prototype: string;
+  readonly notes: {
+    readonly doc: string;
+    readonly base: string;
+    readonly canvas: string;
+    readonly media: string;
   };
 }
 
@@ -101,15 +97,11 @@ export const ReviewManifestSchema = z.object({
     issueIds: z.array(z.string()),
     agentIds: z.array(z.string()),
     channelIds: z.array(z.string()),
-    artifacts: z.object({
-      docs: z.string(),
-      outline: z.string(),
-      dashboard: z.string(),
-      designSystem: z.string(),
-      whiteboard: z.string(),
-      slides: z.string(),
-      sheet: z.string(),
-      prototype: z.string(),
+    notes: z.object({
+      doc: z.string(),
+      base: z.string(),
+      canvas: z.string(),
+      media: z.string(),
     }),
   }),
   screens: z.array(ScreenCaptureSchema),
@@ -200,31 +192,11 @@ export function buildScreenMatrix(ids: SeededWorkspaceIds, themes: readonly Revi
     { id: "runs", label: "Runs & Trajectories", route: "/runs", waitTestId: "runs-page", settleMs: 500 },
     { id: "agents", label: "Agents Roster", route: "/agents", settleMs: 500 },
     { id: "runtimes", label: "Runtimes & Engines", route: "/runtimes", waitTestId: "runtimes-page", settleMs: 500 },
-    { id: "library", label: "Library & Artifacts", route: "/library", waitTestId: "library-page", settleMs: 650 },
-    { id: "artifact-outline", label: "Artifact · Outline", route: `/artifacts/${ids.artifacts.outline}`, waitTestId: "artifact-outline-view", settleMs: 650 },
-    {
-      id: "artifact-dashboard",
-      label: "Artifact · Dashboard",
-      route: `/artifacts/${ids.artifacts.dashboard}`,
-      waitTestId: "artifact-dashboard-view",
-      settleMs: 700,
-    },
-    {
-      id: "artifact-design-system",
-      label: "Artifact · Design System",
-      route: `/artifacts/${ids.artifacts.designSystem}`,
-      waitTestId: "artifact-design-system-view",
-      settleMs: 650,
-    },
-    { id: "artifact-whiteboard", label: "Artifact · Whiteboard", route: `/artifacts/${ids.artifacts.whiteboard}`, settleMs: 1200 },
-    { id: "artifact-prototype", label: "Artifact · Prototype (Shell)", route: `/artifacts/${ids.artifacts.prototype}`, settleMs: 1100 },
-    {
-      id: "artifact-prototype-webview",
-      label: "Artifact · Prototype (WKWebView)",
-      route: `/artifacts/${ids.artifacts.prototype}`,
-      target: "webview",
-      settleMs: 700,
-    },
+    { id: "library", label: "Library & Notes", route: "/library", waitTestId: "library-page", settleMs: 650 },
+    { id: "note-doc", label: "Note · Block Doc", route: `/notes/${ids.notes.doc}`, waitTestId: "note-block-doc-view", settleMs: 700 },
+    { id: "note-base", label: "Note · Base", route: `/notes/${ids.notes.base}`, waitTestId: "note-base-view", settleMs: 700 },
+    { id: "note-canvas", label: "Note · Canvas", route: `/notes/${ids.notes.canvas}`, waitTestId: "note-canvas-view", settleMs: 1200 },
+    { id: "note-media", label: "Note · Media", route: `/notes/${ids.notes.media}`, waitTestId: "note-media-view", settleMs: 700 },
     { id: "settings", label: "Settings", route: "/settings", settleMs: 550 },
     { id: "farm", label: "Papertrails Farm", route: "/farm", settleMs: 900 },
   ];
@@ -346,7 +318,7 @@ function seedRealisticWorkspace(cliBin: string, root: string, cliEnv: NodeJS.Pro
   const agentSpecs = [
     { name: "Ada", runtime: "vibevalley", role: "worker", duty: "Core Rust architecture, VDP transport, and state projections" },
     { name: "Milo", runtime: "claude", role: "worker", duty: "Desktop GPUI & nsh UI polish, Papertrails design tokens, and interaction tests" },
-    { name: "Sora", runtime: "codex", role: "worker", duty: "Collaborative artifacts, traceable SLO dashboards, and interactive prototypes" },
+    { name: "Sora", runtime: "codex", role: "worker", duty: "Collaborative notes, traceable SLO dashboards, and interactive previews" },
   ] as const;
 
   const agentIds = agentSpecs.map(
@@ -419,14 +391,14 @@ function seedRealisticWorkspace(cliBin: string, root: string, cliEnv: NodeJS.Pro
       ],
     },
     {
-      title: "Unify Papertrails light and dark surface contrast tokens across 12 artifact views",
+      title: "Unify Papertrails light and dark surface contrast tokens across 3+1 Note views",
       priority: "medium",
       status: "backlog",
       agent: miloId,
       attachments: previewImgId ? [previewImgId] : undefined,
       description:
-        "## Audit Scope\nVerify WCAG AA contrast (>= 4.5:1) across `page`, `side`, `elevated`, and `ink` tokens in both light and dark modes across Dashboard, Design System, Whiteboard, and Settings.",
-      criteria: ["All 12 artifact views use theme tokens without hardcoded hex borders", "Dark and light screenshots pass contrast checks"],
+        "## Audit Scope\nVerify WCAG AA contrast (>= 4.5:1) across `page`, `side`, `elevated`, and `ink` tokens in both light and dark modes across Block Doc, Base, Canvas, Media, and Settings.",
+      criteria: ["All 4 Note primitive views use theme tokens without hardcoded hex borders", "Dark and light screenshots pass contrast checks"],
     },
     {
       title: "Add incremental snapshot compaction for long-lived whiteboard sessions",
@@ -469,12 +441,12 @@ function seedRealisticWorkspace(cliBin: string, root: string, cliEnv: NodeJS.Pro
       criteria: ["Long wrapping outline nodes display full copy without clipping", "Todo checkbox toggle updates progress counters immediately"],
     },
     {
-      title: "Silent WKWebView auto-cover capture for HTML prototype artifacts",
+      title: "Silent WKWebView auto-cover capture for HTML preview blocks in doc notes",
       priority: "high",
       status: "in_review",
       agent: soraId,
       description:
-        "## Summary\nWhen opening a `prototype` artifact in `PrototypeView`, silently snapshot the loaded `WKWebView` into `artifact.cover.set` so `/library` cards display live thumbnails.",
+        "## Summary\nWhen opening a `preview` block in `BlockDocView`, silently snapshot the loaded `WKWebView` into `note.cover.set` so `/library` cards display live thumbnails.",
       criteria: [
         "Library card updates with captured cover PNG after visiting prototype view",
         "Capture avoids flicker and skips redundant writes when seq is unchanged",
@@ -529,31 +501,51 @@ function seedRealisticWorkspace(cliBin: string, root: string, cliEnv: NodeJS.Pro
     "channel create release-ops",
   );
 
-  const docsFile = writeTempPayload(
-    payloadDir,
-    "docs.md",
+  const docPayload = {
+    version: 1,
+    blocks: [
+      { id: "b1", type: "heading", level: 1, text: "VDP Remote Debugging Architecture RFC" },
+      {
+        id: "b2",
+        type: "prose",
+        text: "VibeValley exposes a loopback-only JSON-RPC 2.0 WebSocket protocol (VDP) so CLI tools, automated visual audits, and DevTools share one typed observation layer.",
+      },
+      {
+        id: "b3",
+        type: "kpi",
+        items: [
+          { label: "Mean Availability", value: "99.96%", delta: "+0.04%", tone: "ok" },
+          { label: "Peak P99 Latency", value: "21.4 ms", delta: "-3.2 ms", tone: "ok" },
+          { label: "Visual Coverage", value: "100%", tone: "info" },
+        ],
+      },
+      {
+        id: "b4",
+        type: "chart",
+        title: "RPC P99 Latency (ms)",
+        kind: "bar",
+        labels: ["Gateway", "Slice Feed", "Collab", "VDP"],
+        series: [{ name: "P99 ms", data: [14.2, 9.6, 21.4, 11.8] }],
+      },
+      {
+        id: "b5",
+        type: "preview",
+        entry: "structure/preview.html",
+        height: 360,
+        title: "Interactive Release Readiness Explorer",
+      },
+    ],
+  };
+  const docFile = writeTempPayload(payloadDir, "doc.json", `${JSON.stringify(docPayload, null, 2)}\n`);
+  const docNote = vvJson(
     [
-      "# VDP Remote Debugging Architecture RFC\n",
-      "## Executive Summary",
-      "VibeValley exposes a loopback-only JSON-RPC 2.0 WebSocket protocol (**VDP**) so CLI tools, automated visual audits, and the embedded DevTools inspector share one typed observation and actuation layer.\n",
-      "## Protocol Domains",
-      "- **Target**: `Target.list`, `Target.attach`, `Target.detach`",
-      "- **Shell**: `Shell.getState`, `Shell.navigate`, `Shell.resize`, `Shell.setTheme`",
-      "- **Page**: `Page.captureScreenshot` (GPUI Metal frame or active `WKWebView`), `Page.getMetrics`",
-      "- **UI**: `UI.getTree`, `UI.query`, `UI.press`, `UI.waitFor` via `vdpProbe`\n",
-      "## Security Boundary",
-      "Every VDP listener binds strictly to `127.0.0.1`, generates a per-launch bearer token persisted under `$VIBEVALLEY_HOME/debug.json` (`0600`), and never opens external ports.",
-    ].join("\n"),
-  );
-  const docsArtifact = vvJson(
-    [
-      "artifact",
+      "note",
       "create",
       "VDP Remote Debugging Architecture RFC",
       "--type",
-      "docs",
+      "doc",
       "--content",
-      `@${docsFile}`,
+      `@${docFile}`,
       "--issue",
       firstIssueId,
       "--channel",
@@ -563,217 +555,83 @@ function seedRealisticWorkspace(cliBin: string, root: string, cliEnv: NodeJS.Pro
       "Architecture RFC for VDP loopback inspection",
     ],
     CreatedEntitySchema,
-    "artifact create docs",
+    "note create doc",
   );
 
-  const outlineDoc = {
+  const baseDoc = {
     version: 1,
-    rootIds: ["n_release", "n_ux", "n_risks"],
-    nodes: {
-      n_release: {
-        id: "n_release",
-        text: "Release 0.2 — Native Workbench Polish",
-        kind: "heading",
-        children: ["n_r1", "n_r2", "n_r3"],
-        props: { owner: "Ada" },
+    sheets: [
+      {
+        id: "sheet1",
+        name: "Frame & RPC Benchmarks",
+        columns: [
+          { id: "c_title", name: "Workload", kind: "text", width: 280 },
+          {
+            id: "c_status",
+            name: "Status",
+            kind: "select",
+            width: 140,
+            options: [
+              { value: "pass", label: "Pass", color: "green" },
+              { value: "review", label: "Review", color: "amber" },
+            ],
+          },
+          { id: "c_p50", name: "P50 (ms)", kind: "number", width: 120 },
+          { id: "c_p99", name: "P99 (ms)", kind: "number", width: 120 },
+        ],
+        rows: [
+          {
+            id: "r1",
+            cells: {
+              c_title: { _tag: "text", value: "Board slice projection (200 issues)" },
+              c_status: { _tag: "text", value: "pass" },
+              c_p50: { _tag: "number", value: 1.4 },
+              c_p99: { _tag: "number", value: 3.8 },
+            },
+            createdAt: 0,
+            updatedAt: 0,
+          },
+          {
+            id: "r2",
+            cells: {
+              c_title: { _tag: "text", value: "VDP Page.captureScreenshot (1280x840)" },
+              c_status: { _tag: "text", value: "pass" },
+              c_p50: { _tag: "number", value: 42.0 },
+              c_p99: { _tag: "number", value: 68.5 },
+            },
+            createdAt: 0,
+            updatedAt: 0,
+          },
+          {
+            id: "r3",
+            cells: {
+              c_title: { _tag: "text", value: "Loro CRDT merge (500 blocks)" },
+              c_status: { _tag: "text", value: "review" },
+              c_p50: { _tag: "number", value: 2.1 },
+              c_p99: { _tag: "number", value: 6.4 },
+            },
+            createdAt: 0,
+            updatedAt: 0,
+          },
+        ],
+        views: [
+          { id: "v_table", name: "Table", kind: "table" },
+          { id: "v_board", name: "Board", kind: "board", groupBy: "c_status" },
+        ],
       },
-      n_r1: {
-        id: "n_r1",
-        text: "Verify live VDP screenshot runner captures light & dark screens at 1280×840 with zero console or hosted view errors",
-        kind: "todo",
-        checked: true,
-        children: [],
-      },
-      n_r2: {
-        id: "n_r2",
-        text: "Ensure multiline wrapping in OutlineView handles long descriptive specifications gracefully even when nested three levels deep inside a collaborative release checklist without clipping punctuation or overflowing the card boundary",
-        kind: "todo",
-        checked: false,
-        children: ["n_r2a", "n_r2b"],
-      },
-      n_r2a: { id: "n_r2a", text: "Confirm disclosure chevron stays top-aligned with the first line of wrapped text", kind: "bullet", children: [] },
-      n_r2b: { id: "n_r2b", text: "Validate keyboard Tab / Shift+Tab preserves focus while indenting subtrees", kind: "todo", checked: true, children: [] },
-      n_r3: {
-        id: "n_r3",
-        text: "Freeze Papertrails token baseline in default design-system artifact before beta cut",
-        kind: "todo",
-        checked: false,
-        children: [],
-      },
-      n_ux: { id: "n_ux", text: "Visual & Accessibility Checks", kind: "heading", children: ["n_u1", "n_u2"], props: { owner: "Milo" } },
-      n_u1: { id: "n_u1", text: "Check WCAG AA contrast across light parchment and dark charcoal surfaces", kind: "todo", checked: true, children: [] },
-      n_u2: { id: "n_u2", text: "Audit spacing rhythm across Issues board, Library masonry cards, and Settings panes", kind: "bullet", children: [] },
-      n_risks: { id: "n_risks", text: "Open Risks & Mitigations", kind: "heading", children: ["n_k1"] },
-      n_k1: {
-        id: "n_k1",
-        text: "WKWebView prototype cover capture needs initial visit settle window so library thumbnails never render stale placeholders",
-        kind: "quote",
-        children: [],
-      },
-    },
-  };
-  const outlineFile = writeTempPayload(payloadDir, "outline.json", `${JSON.stringify(outlineDoc, null, 2)}\n`);
-  const outlineArtifact = vvJson(
-    [
-      "artifact",
-      "create",
-      "Release 0.2 UX Polish & Launch Checklist",
-      "--type",
-      "outline",
-      "--content",
-      `@${outlineFile}`,
-      "--issue",
-      issueIds[1] ?? firstIssueId,
     ],
+  };
+  const baseFile = writeTempPayload(payloadDir, "base.json", `${JSON.stringify(baseDoc, null, 2)}\n`);
+  const baseNote = vvJson(
+    ["note", "create", "Native Rendering & Latency Benchmark Base", "--type", "base", "--content", `@${baseFile}`, "--issue", issueIds[1] ?? firstIssueId],
     CreatedEntitySchema,
-    "artifact create outline",
+    "note create base",
   );
-
-  const dashboardDoc = {
-    title: "Q4 Platform Reliability & SLO Dashboard",
-    filters: [],
-    panels: [
-      {
-        id: "kpi_avail",
-        kind: "kpi",
-        label: "Mean Availability",
-        source: { dataset: "structure/data/sample.json", field: "availability", agg: "avg" },
-        format: "percent",
-      },
-      {
-        id: "kpi_p99",
-        kind: "kpi",
-        label: "Peak P99 Latency (ms)",
-        source: { dataset: "structure/data/sample.json", field: "p99Ms", agg: "max" },
-        format: "number",
-      },
-      {
-        id: "kpi_budget",
-        kind: "kpi",
-        label: "Min Error Budget",
-        source: { dataset: "structure/data/sample.json", field: "budgetLeft", agg: "min" },
-        format: "percent",
-      },
-      {
-        id: "kpi_throughput",
-        kind: "kpi",
-        label: "Total Req/s",
-        source: { dataset: "structure/data/sample.json", field: "rps", agg: "sum" },
-        format: "number",
-      },
-    ],
-  };
-  const dashboardDataset = {
-    schema: [
-      { name: "service", label: "Service", type: "string" },
-      { name: "availability", label: "Availability %", type: "number" },
-      { name: "p99Ms", label: "P99 (ms)", type: "number" },
-      { name: "budgetLeft", label: "Budget Left %", type: "number" },
-      { name: "rps", label: "Req/s", type: "number" },
-    ],
-    rows: [
-      { service: "Gateway RPC", availability: 99.98, p99Ms: 14.2, budgetLeft: 94, rps: 1840 },
-      { service: "Slice Feed", availability: 99.99, p99Ms: 9.6, budgetLeft: 97, rps: 2420 },
-      { service: "Collab Loro", availability: 99.95, p99Ms: 21.4, budgetLeft: 86, rps: 1120 },
-      { service: "VDP Bridge", availability: 99.97, p99Ms: 11.8, budgetLeft: 91, rps: 640 },
-      { service: "Media Pipeline", availability: 99.92, p99Ms: 34.5, budgetLeft: 78, rps: 390 },
-    ],
-  };
-  const dashboardFile = writeTempPayload(payloadDir, "dashboard.json", `${JSON.stringify(dashboardDoc, null, 2)}\n`);
-  const dashboardDataFile = writeTempPayload(payloadDir, "sample.json", `${JSON.stringify(dashboardDataset, null, 2)}\n`);
-  const dashboardArtifact = vvJson(
-    ["artifact", "create", "Q4 Platform Reliability & SLO Dashboard", "--type", "dashboard", "--content", `@${dashboardFile}`],
-    CreatedEntitySchema,
-    "artifact create dashboard",
-  );
-  vv(["artifact", "file", "write", dashboardArtifact.id, "structure/data/sample.json", `@${dashboardDataFile}`, "--mime", "application/json"]);
-
-  const dsTokens = {
-    name: "Papertrails Fieldcraft Design System",
-    version: "1.2.0",
-    defaultTheme: "light",
-    color: [
-      { id: "surface", group: "surface", value: { light: "#fcfcfb", dark: "#151413" }, note: "Primary parchment & obsidian canvas" },
-      { id: "panel", group: "surface", value: { light: "#f4f3ef", dark: "#1f1d1b" }, note: "Secondary cards, sidebars, and callouts" },
-      { id: "ink", group: "text", value: { light: "#1c1917", dark: "#ecebe8" }, note: "Primary body & headline ink" },
-      { id: "muted", group: "text", value: { light: "#6b655e", dark: "#a69f95" }, note: "Secondary metadata & timestamps" },
-      { id: "accent", group: "brand", value: { light: "#4d7a2a", dark: "#7fae4f" }, note: "Field moss primary action" },
-      { id: "water", group: "semantic", value: { light: "#2b7a9b", dark: "#5ea8c9" }, note: "Active run & telemetry highlight" },
-      { id: "sun", group: "semantic", value: { light: "#c9851e", dark: "#e5a94c" }, note: "Review pending & warm emphasis" },
-      { id: "berry", group: "status", value: { light: "#b83a2d", dark: "#e06c5f" }, note: "Urgent priority & destructive states" },
-    ],
-    type: {
-      families: [
-        { id: "sans", value: "SF Pro Text, system-ui, -apple-system, sans-serif" },
-        { id: "mono", value: "SF Mono, ui-monospace, Menlo, monospace" },
-      ],
-      scale: [
-        { id: "xs", value: "12px" },
-        { id: "sm", value: "13px" },
-        { id: "md", value: "15px" },
-        { id: "lg", value: "18px" },
-        { id: "xl", value: "24px" },
-      ],
-      styles: [
-        { id: "display", family: "{sans}", size: "{xl}", weight: 700, lineHeight: 1.2 },
-        { id: "title", family: "{sans}", size: "{lg}", weight: 600, lineHeight: 1.3 },
-        { id: "body", family: "{sans}", size: "{md}", weight: 400, lineHeight: 1.55 },
-        { id: "caption", family: "{sans}", size: "{xs}", weight: 500, lineHeight: 1.4 },
-      ],
-    },
-    space: [
-      { id: "1", value: "4px" },
-      { id: "2", value: "8px" },
-      { id: "3", value: "12px" },
-      { id: "4", value: "16px" },
-      { id: "6", value: "24px" },
-      { id: "8", value: "32px" },
-    ],
-    radius: [
-      { id: "sm", value: "6px" },
-      { id: "md", value: "10px" },
-      { id: "lg", value: "16px" },
-      { id: "full", value: "9999px" },
-    ],
-  };
-  const dsButtonComp = {
-    id: "button",
-    title: "Action Button",
-    summary: "Tactile cardstock buttons with crisp focus rings and WCAG AA contrast.",
-    variants: [
-      { id: "primary", bg: "{color.accent}", fg: "{color.surface}" },
-      { id: "secondary", bg: "{color.panel}", fg: "{color.ink}" },
-      { id: "danger", bg: "{color.berry}", fg: "{color.surface}" },
-    ],
-    states: ["default", "hover", "active", "disabled"],
-    guidelines: { do: ["Use one primary action per toolbar or dialog footer"], dont: ["Never mix raw hex fills outside design tokens"] },
-  };
-  const dsBadgeComp = {
-    id: "badge",
-    title: "Status Pill",
-    summary: "Compact semantic indicator for issue status, theme mode, and live runtime health.",
-    variants: [
-      { id: "accent", bg: "{color.accent}", fg: "{color.surface}" },
-      { id: "water", bg: "{color.water}", fg: "{color.surface}" },
-      { id: "neutral", bg: "{color.panel}", fg: "{color.muted}" },
-    ],
-    states: ["default"],
-    guidelines: { do: ["Pair semantic color with concise 1-2 word status copy"], dont: ["Avoid using status pills as interactive primary triggers"] },
-  };
-  const dsTokensFile = writeTempPayload(payloadDir, "tokens.json", `${JSON.stringify(dsTokens, null, 2)}\n`);
-  const dsButtonFile = writeTempPayload(payloadDir, "button.json", `${JSON.stringify(dsButtonComp, null, 2)}\n`);
-  const dsBadgeFile = writeTempPayload(payloadDir, "badge.json", `${JSON.stringify(dsBadgeComp, null, 2)}\n`);
-  const dsArtifact = vvJson(
-    ["artifact", "create", "Papertrails Fieldcraft Design System", "--type", "design-system", "--default", "--content", `@${dsTokensFile}`],
-    CreatedEntitySchema,
-    "artifact create design-system",
-  );
-  vv(["artifact", "file", "write", dsArtifact.id, "structure/components/button.json", `@${dsButtonFile}`, "--mime", "application/json"]);
-  vv(["artifact", "file", "write", dsArtifact.id, "structure/components/badge.json", `@${dsBadgeFile}`, "--mime", "application/json"]);
 
   const whiteboardDoc = {
     version: 1,
     grid: "architectural",
+    theme: "warm",
     viewport: { x: 0, y: 0, zoom: 1 },
     elements: {
       t_title: { id: "t_title", type: "text", variant: "title", x: 64, y: 28, w: 760, h: 48, label: "Q4 Native Workbench & VDP Architecture" },
@@ -785,8 +643,8 @@ function seedRealisticWorkspace(cliBin: string, root: string, cliEnv: NodeJS.Pro
         y: 78,
         w: 760,
         h: 28,
-        label: "Zero-drift loopback debugging, 6-slice state feeds, and 12 collaborative artifact surfaces in 14 days",
-        highlight: "14 days",
+        label: "Zero-drift loopback debugging, 6-slice state feeds, and 3+1 collaborative Note primitives",
+        highlight: "3+1",
       },
       grp_core: { id: "grp_core", type: "container", x: 56, y: 128, w: 544, h: 292, title: "Desktop Host & VDP Loopback", fill: "side" },
       n_vdp: {
@@ -836,7 +694,7 @@ function seedRealisticWorkspace(cliBin: string, root: string, cliEnv: NodeJS.Pro
         y: 176,
         w: 214,
         h: 112,
-        title: "Loro Artifact Collab",
+        title: "Loro Note Collab",
         body: "Multi-agent CRDT sync + origin undo",
         fill: "lavender",
       },
@@ -874,128 +732,48 @@ function seedRealisticWorkspace(cliBin: string, root: string, cliEnv: NodeJS.Pro
     },
   };
   const whiteboardFile = writeTempPayload(payloadDir, "board.json", `${JSON.stringify(whiteboardDoc, null, 2)}\n`);
-  const whiteboardArtifact = vvJson(
-    ["artifact", "create", "Q4 Release Milestone & System Topology", "--type", "whiteboard", "--content", `@${whiteboardFile}`],
+  const canvasNote = vvJson(
+    ["note", "create", "Q4 Release Milestone & System Topology", "--type", "canvas", "--content", `@${whiteboardFile}`],
     CreatedEntitySchema,
-    "artifact create whiteboard",
+    "note create canvas",
   );
 
-  const slideDefs = [
-    {
-      id: "s01-cover",
-      file: "structure/slides/s01-cover.json",
-      layout: "cover",
-      title: "VibeValley Native Workbench",
-      subtitle: "Sprint Review — VDP Live Inspection & Artifact Collab",
-      blocks: [],
-      notes: "Lead with the live VDP capture loop and zero-drift native performance.",
-    },
-    {
-      id: "s02-vdp",
-      file: "structure/slides/s02-vdp.json",
-      layout: "content",
-      title: "Live VDP Remote Debugging",
-      subtitle: "Single typed executor for CLI, DevTools, and UX audits",
-      blocks: [
-        { kind: "bullet", text: "Loopback discovery via debug.json with ephemeral bearer tokens" },
-        { kind: "bullet", text: "Live Shell.navigate, Shell.setTheme, UI.getTree, and Metal screenshots" },
-        { kind: "bullet", text: "One-command vp run ui:review captures every major route in light & dark" },
-      ],
-      notes: "Show the contact sheet output after this slide.",
-    },
-    {
-      id: "s03-artifacts",
-      file: "structure/slides/s03-artifacts.json",
-      layout: "content",
-      title: "12 Collaborative Artifact Surfaces",
-      subtitle: "Directory-backed storage with per-origin history",
-      blocks: [
-        { kind: "bullet", text: "Outline multiline wrap & keyboard indent polish" },
-        { kind: "bullet", text: "Silent WKWebView cover snapshots for interactive HTML prototypes" },
-        { kind: "bullet", text: "Traceable SLO dashboards linked directly to structure/data/*.json" },
-      ],
-      notes: "Highlight how agents and humans edit concurrently.",
-    },
-  ] as const;
-  const deckDoc = {
-    title: "VibeValley Native Workbench — Sprint Review",
-    aspectRatio: "16:9",
-    designSystemId: dsArtifact.id,
-    slides: slideDefs.map((s) => ({ id: s.id, file: s.file, title: s.title })),
+  const mediaDoc = {
+    version: 1,
+    title: "Release Walkthrough Audio & Transcript",
+    mediaKind: "audio",
+    caption: "Alpha release readiness sync recording",
+    durationSec: 64,
+    posterAsset: null,
+    items: [
+      {
+        id: "m1",
+        kind: "audio",
+        src: "asset/audio/walkthrough.wav",
+        title: "Release Walkthrough",
+        durationSec: 64,
+        transcript: [{ id: "c1", startSec: 0, endSec: 12, speaker: "Ada", text: "All 3+1 Note primitives and Loro CRDT sync are verified." }],
+      },
+    ],
   };
-  const deckFile = writeTempPayload(payloadDir, "deck.json", `${JSON.stringify(deckDoc, null, 2)}\n`);
-  const slidesArtifact = vvJson(
-    ["artifact", "create", "VibeValley Native Workbench — Sprint Review", "--type", "slides", "--content", `@${deckFile}`],
+  const mediaFile = writeTempPayload(payloadDir, "media.json", `${JSON.stringify(mediaDoc, null, 2)}\n`);
+  const mediaNote = vvJson(
+    ["note", "create", "Release Walkthrough Audio & Transcript", "--type", "media", "--content", `@${mediaFile}`],
     CreatedEntitySchema,
-    "artifact create slides",
+    "note create media",
   );
-  for (const slide of slideDefs) {
-    const slideFile = writeTempPayload(payloadDir, `${slide.id}.json`, `${JSON.stringify(slide, null, 2)}\n`);
-    vv(["artifact", "file", "write", slidesArtifact.id, slide.file, `@${slideFile}`, "--mime", "application/json"]);
-  }
-
-  const workbookDoc = {
-    title: "Native Rendering & Latency Benchmark Matrix",
-    locale: "en-US",
-    currency: "USD",
-    sheets: [
-      { id: "sheet1", title: "Frame & RPC Benchmarks", file: "structure/sheets/sheet1.json" },
-      { id: "sheet2", title: "Test Harness Config", file: "structure/sheets/sheet2.json" },
-    ],
-    namedRanges: {},
-  };
-  const sheet1Doc = {
-    id: "sheet1",
-    title: "Frame & RPC Benchmarks",
-    columns: [
-      { key: "workload", title: "Workload", type: "string" },
-      { key: "p50Ms", title: "P50 (ms)", type: "number" },
-      { key: "p99Ms", title: "P99 (ms)", type: "number" },
-      { key: "rssMb", title: "Memory (MB)", type: "number" },
-      { key: "status", title: "Status", type: "string" },
-    ],
-    rows: [
-      { workload: "Board slice projection (200 issues)", p50Ms: 1.4, p99Ms: 3.8, rssMb: 74, status: "Pass" },
-      { workload: "VDP Page.captureScreenshot (1280×840)", p50Ms: 42.0, p99Ms: 68.5, rssMb: 118, status: "Pass" },
-      { workload: "Outline CRDT merge (500 nodes)", p50Ms: 2.1, p99Ms: 6.4, rssMb: 82, status: "Pass" },
-      { workload: "Whiteboard pan/zoom 60fps frame", p50Ms: 4.8, p99Ms: 11.2, rssMb: 96, status: "Pass" },
-    ],
-  };
-  const sheet2Doc = {
-    id: "sheet2",
-    title: "Test Harness Config",
-    columns: [
-      { key: "param", title: "Parameter", type: "string" },
-      { key: "value", title: "Value", type: "string" },
-    ],
-    rows: [
-      { param: "Viewport", value: "1280×840 @2x" },
-      { param: "Server Mode", value: "Embedded loopback SQLite" },
-      { param: "Theme Sweep", value: "Light + Dark" },
-    ],
-  };
-  const workbookFile = writeTempPayload(payloadDir, "workbook.json", `${JSON.stringify(workbookDoc, null, 2)}\n`);
-  const sheet1File = writeTempPayload(payloadDir, "sheet1.json", `${JSON.stringify(sheet1Doc, null, 2)}\n`);
-  const sheet2File = writeTempPayload(payloadDir, "sheet2.json", `${JSON.stringify(sheet2Doc, null, 2)}\n`);
-  const sheetArtifact = vvJson(
-    ["artifact", "create", "Native Rendering & Latency Benchmark Matrix", "--type", "sheet", "--content", `@${workbookFile}`],
-    CreatedEntitySchema,
-    "artifact create sheet",
-  );
-  vv(["artifact", "file", "write", sheetArtifact.id, "structure/sheets/sheet1.json", `@${sheet1File}`, "--mime", "application/json"]);
-  vv(["artifact", "file", "write", sheetArtifact.id, "structure/sheets/sheet2.json", `@${sheet2File}`, "--mime", "application/json"]);
 
   const protoHtml = `<!doctype html><html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Interactive Release Readiness Explorer</title><link rel="stylesheet" href="./styles.css" /></head><body><main class="canvas">
 <header class="hero"><div><span class="eyebrow">PAPERTRAILS · ALPHA 0.2</span><h1>Release Readiness Explorer</h1>
 <p class="subtitle">Interactive rollout gate monitor backed by live VDP telemetry and automated surface checks.</p></div>
-<div class="pill-group" role="tablist" aria-label="Filter release checks"><button type="button" class="pill active" data-filter="all">All Gates (6)</button>
-<button type="button" class="pill" data-filter="ready">Ready (4)</button><button type="button" class="pill" data-filter="review">In Review (2)</button></div></header>
+<div class="pill-group" role="tablist" aria-label="Filter release checks"><button type="button" class="pill active" data-filter="all">All Gates (4)</button>
+<button type="button" class="pill" data-filter="ready">Ready (3)</button><button type="button" class="pill" data-filter="review">In Review (1)</button></div></header>
 <section class="metrics">
-<article class="metric-card"><span class="m-label">Visual Coverage</span><strong class="m-val">13 / 13</strong><span class="m-hint">Light + Dark verified</span></article>
+<article class="metric-card"><span class="m-label">Visual Coverage</span><strong class="m-val">100%</strong><span class="m-hint">Light + Dark verified</span></article>
 <article class="metric-card"><span class="m-label">Mean Frame Time</span><strong class="m-val">6.4 ms</strong><span class="m-hint">Target &lt; 16.6 ms</span></article>
 <article class="metric-card"><span class="m-label">Shell Errors</span><strong class="m-val ok">0</strong><span class="m-hint">Strict zero-error gate</span></article>
-<article class="metric-card"><span class="m-label">Artifact Surfaces</span><strong class="m-val">12</strong><span class="m-hint">CRDT collab enabled</span></article>
+<article class="metric-card"><span class="m-label">Note Primitives</span><strong class="m-val">3+1</strong><span class="m-hint">CRDT collab enabled</span></article>
 </section><section class="gates" id="gate-list"></section></main><script type="module" src="./app.js"></script></body></html>`;
   const protoCss = `:root { --bg: #f8f6f1; --surface: #ffffff; --ink: #1c1917; --muted: #645e56; --line: #e4dfd5; --accent: #4d7a2a; --accent-soft: #e9f2e1; --review: #b86e18; --review-soft: #fdf2e2; }
 * { box-sizing: border-box; }
@@ -1020,10 +798,8 @@ h1 { margin: 8px 0 4px; font-size: 26px; letter-spacing: -0.02em; }
   const protoJs = `const gates = [
   { title: "VDP Loopback Protocol", status: "ready", owner: "Ada", metric: "14/14 RPCs", desc: "Authenticated WebSocket discovery, Shell controls, and UI probe queries." },
   { title: "GPUI Metal Screenshots", status: "ready", owner: "Ada", metric: "1280×840 PNG", desc: "Off-thread PNG encoding works even when the macOS display is locked." },
-  { title: "Outline Multiline Wrapping", status: "review", owner: "Milo", metric: "PR #418", desc: "Long nested checklist rows wrap cleanly under disclosure chevrons." },
-  { title: "WKWebView Auto-Cover", status: "review", owner: "Sora", metric: "Auto PNG", desc: "Silent cover capture refreshes Library cards on prototype visit." },
-  { title: "Papertrails Dual Theme", status: "ready", owner: "Milo", metric: "WCAG AA", desc: "Unified parchment light and obsidian dark semantic surfaces." },
-  { title: "CRDT Directory Storage", status: "ready", owner: "Sora", metric: "12 types", desc: "Per-origin history and collaborative presence across all views." },
+  { title: "24-Block Doc & Base", status: "review", owner: "Milo", metric: "3+1 Note", desc: "Block Doc editing, Base 4 views, and Row=Page Peek drawers." },
+  { title: "CRDT Directory Storage", status: "ready", owner: "Sora", metric: "4 primitives", desc: "Per-origin history and collaborative presence across all views." },
 ];
 const list = document.getElementById("gate-list"); let current = "all";
 function render() {
@@ -1042,40 +818,20 @@ render();`;
   const protoHtmlFile = writeTempPayload(payloadDir, "proto-index.html", protoHtml);
   const protoCssFile = writeTempPayload(payloadDir, "proto-styles.css", protoCss);
   const protoJsFile = writeTempPayload(payloadDir, "proto-app.js", protoJs);
-  const protoArtifact = vvJson(
-    [
-      "artifact",
-      "create",
-      "Interactive Release Readiness Explorer",
-      "--type",
-      "prototype",
-      "--content",
-      `@${protoHtmlFile}`,
-      "--issue",
-      issueIds[2] ?? firstIssueId,
-      "--channel",
-      "general",
-      "--announce",
-      "--note",
-      "Interactive rollout readiness explorer prototype",
-    ],
-    CreatedEntitySchema,
-    "artifact create prototype",
-  );
-  vv(["artifact", "file", "write", protoArtifact.id, "structure/styles.css", `@${protoCssFile}`, "--mime", "text/css"]);
-  vv(["artifact", "file", "write", protoArtifact.id, "structure/app.js", `@${protoJsFile}`, "--mime", "application/javascript"]);
+  vv(["note", "file", "write", docNote.id, "structure/preview.html", `@${protoHtmlFile}`, "--mime", "text/html"]);
+  vv(["note", "file", "write", docNote.id, "structure/styles.css", `@${protoCssFile}`, "--mime", "text/css"]);
+  vv(["note", "file", "write", docNote.id, "structure/app.js", `@${protoJsFile}`, "--mime", "application/javascript"]);
 
   for (const msg of [
-    `Kicked off the live VDP visual sweep — tracking architecture details in ${docsArtifact.id} ("VDP Remote Debugging Architecture RFC").`,
-    `Outline multiline wrapping fix is up for review; check the nested checklist in ${outlineArtifact.id} at 1280×840.`,
-    `Posted the interactive Release Readiness Explorer (${protoArtifact.id}) — visiting it once captures the WKWebView cover thumbnail for /library.`,
-    `Papertrails Fieldcraft tokens (${dsArtifact.id}) are set as default so Dashboard, Whiteboard, and Slides stay visually aligned in light and dark themes.`,
+    `Kicked off the live VDP visual sweep — tracking architecture details in ${docNote.id} ("VDP Remote Debugging Architecture RFC").`,
+    `Benchmark Base (${baseNote.id}) tracks P50/P99 latency across Board, Table, Gallery, and Timeline views.`,
+    `System Topology canvas (${canvasNote.id}) and Media walkthrough (${mediaNote.id}) are synced in /library.`,
   ]) {
     vv(["channel", "message", "send", "general", msg]);
   }
   for (const msg of [
-    `SLO dashboard (${dashboardArtifact.id}) shows 99.96% mean availability across Gateway RPC, Slice Feed, and VDP Bridge.`,
-    `All 6 release issues are triaged across todo, in_progress, in_review, and done — ready for the full-app VDP UX review pass.`,
+    `RFC & preview block (${docNote.id}) captures live WKWebView cover thumbnails for /library.`,
+    `All release issues are triaged across todo, in_progress, in_review, and done — ready for the full-app VDP UX review pass.`,
   ]) {
     vv(["channel", "message", "send", releaseChannel.id, msg]);
   }
@@ -1085,15 +841,11 @@ render();`;
     issueIds,
     agentIds,
     channelIds: ["general", releaseChannel.id],
-    artifacts: {
-      docs: docsArtifact.id,
-      outline: outlineArtifact.id,
-      dashboard: dashboardArtifact.id,
-      designSystem: dsArtifact.id,
-      whiteboard: whiteboardArtifact.id,
-      slides: slidesArtifact.id,
-      sheet: sheetArtifact.id,
-      prototype: protoArtifact.id,
+    notes: {
+      doc: docNote.id,
+      base: baseNote.id,
+      canvas: canvasNote.id,
+      media: mediaNote.id,
     },
   };
 }
@@ -1140,8 +892,8 @@ export async function runVdpReview(options: ReviewOptions): Promise<ReviewManife
       await driver.resize(options.width, options.height);
       await driver.settle(300);
 
-      // Visit the prototype once before capturing /library so silent WKWebView auto-cover populates its thumbnail.
-      await driver.navigate(`/artifacts/${seeded.artifacts.prototype}`);
+      // Visit the doc note with preview block once before capturing /library so silent WKWebView auto-cover populates its thumbnail.
+      await driver.navigate(`/notes/${seeded.notes.doc}`);
       await driver.settle(1400);
 
       const plan = buildScreenMatrix(seeded, options.themes);

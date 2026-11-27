@@ -33,7 +33,7 @@
     },
     "canvas": {
       "title": "画布",
-      "summary": "空间无限画布与结构图表（structure/canvas.json），支持节点连线、分区框架、视觉草图与审阅建议"
+      "summary": "空间无限画布与结构图表（structure/board.json），支持节点连线、分区框架、视觉草图与审阅建议"
     },
     "media": {
       "title": "媒体笔记",

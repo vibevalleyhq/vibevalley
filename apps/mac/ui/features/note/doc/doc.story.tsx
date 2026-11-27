@@ -213,7 +213,7 @@ const SAMPLE_LINKS: NoteLinkListResult = {
 
 const MAIN_NOTE = SAMPLE_NOTES[0];
 
-function DocEditorBench() {
+function BlockDocBench() {
   const saveCount = signal(0);
   const lastSavedBlocks = signal(0);
   const lastEvent = signal("idle");
@@ -262,4 +262,4 @@ function DocEditorBench() {
   );
 }
 
-mount(() => <DocEditorBench />);
+mount(() => <BlockDocBench />);

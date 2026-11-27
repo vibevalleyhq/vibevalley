@@ -118,7 +118,7 @@ export const en: Copy = {
       {
         icon: "home",
         title: "All on your machine",
-        text: "The server listens on 127.0.0.1 only, and the data lives in your home folder (~/.vibevalley); the helpers\u2019 memory, profiles, notes and Artifacts stay on this machine.",
+        text: "The server listens on 127.0.0.1 only, and the data lives in your home folder (~/.vibevalley); the helpers\u2019 memory, profiles, and notes stay on this machine.",
       },
     ],
   },

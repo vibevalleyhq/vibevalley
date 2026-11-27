@@ -7,8 +7,8 @@
 | 管 | 不管（谁管） |
 |---|---|
 | 脏切片掩码 `SliceMask`、统一事务性 `Outbox`、瞬态 `LiveState`、序号 `seq` 与 6 路切片（`BoardSlice`、`SessionsSlice`、`CollabSlice`、`InboxSlice`、`OpsSlice`、`FarmFrame`）的 `StateFeed` 单航班投影与推流 | 各业务表结构与具体业务规则（[工单](docs/subsystems/issue.md)、[帮工](docs/subsystems/session.md)、[频道](docs/subsystems/channel.md)、[定时任务](docs/subsystems/issue.md#定时任务)） |
-| 地块与作品外的切片聚合与收件箱纯计算（`crates/core/src/inbox.rs`） | 地块画面规则与游戏账本计算（[游戏](docs/subsystems/game.md)、[农场的皮](docs/subsystems/farm.md)） |
-| 全部路由：SSE／快照流（`/api/v1/slice/{name}`、`/live`、`/events`、工单观察流、订阅流）和其余 `GET`、`PUT` 路由 | 订阅里频道和 Artifact 协同的事件内容（[频道](docs/subsystems/channel.md)、[Artifact](docs/subsystems/artifact.md)）、工单观察流的内容（[工单](docs/subsystems/issue.md#观察执行)）、帮工 `/mcp` 的工具 |
+| 地块与笔记外的切片聚合与收件箱纯计算（`crates/core/src/inbox.rs`） | 地块画面规则与游戏账本计算（[游戏](docs/subsystems/game.md)、[农场的皮](docs/subsystems/farm.md)） |
+| 全部路由：SSE／快照流（`/api/v1/slice/{name}`、`/live`、`/events`、工单观察流、订阅流）和其余 `GET`、`PUT` 路由 | 订阅里频道和 Note 协同的事件内容（[频道](docs/subsystems/channel.md)、[Note](docs/subsystems/note.md)）、工单观察流的内容（[工单](docs/subsystems/issue.md#观察执行)）、帮工 `/mcp` 的工具 |
 | 接口表 `ENDPOINTS`（`EndpointId`）与 `NATIVE_ENDPOINTS`（`NativeEndpointId`）、`Router` 编译期穷尽分发、权限 `can`、`CallerContext`、幂等键 `requestKey`、试跑 `dryRun`、`InvokeObserver`、`FaultGate`、`HostDebugBridge`、`GatewayPorts` 与 CLI 映射 | 各接口业务实现、模型工具（[助手](docs/subsystems/orchestrator.md)） |
 
 ## 在哪
@@ -17,7 +17,7 @@
 |---|---|
 | `crates/core/src/projection.rs`、`crates/core/src/inbox.rs`、`crates/core/src/clock.rs` | 纯投影函数：6 路切片投影（含结构化领域摘要 `BoardSummary` / `MediaSummary` / `ChannelSummary`）与离线 `SliceBundle`；收件箱纯计算（`inbox`）；挂钟抽象 `Clock` / `ManualClock` |
 | `crates/server/src/`（`main.rs`、`app.rs`、`router.rs`） | `main.rs` 按 `log::init(...)` → `create_app(config).await?` → `gateway::serve(...)` 启动并写 `server.json`；`app.rs` 提供浅层不可变组合根 `App`、`create_app(config)` 与 `App::close()`；`router.rs` 提供约 200 行薄入口门 `Router`（`check_can`、`trace_id` span、`FaultGate`、`InvokeObserver`、订阅表鉴权与全部 `EndpointId` / `NativeEndpointId` 编译期穷尽分发） |
-| `crates/server/src/log/`、`crates/server/src/db/`、`crates/server/src/service/`、`crates/server/src/context/` | `log/` 收拢 `init`、`span`、`spawn_traced`、`spawn_blocking_traced` 与 `observer`（`InvokeObserver`）；`db/` 提供双后端 `Database`、`migration/` 与严格一表一文件的 `db/entity/<table_name>.rs`（共 35 表）；独立顶层 `service/` 提供业务视角持久化查询聚合 `Service`（`outbox`、`storage`、`channel`、`connector`、`artifact`、`session`、`issue`、`memory`、`cron`、`remote`），`crates/server/src/{db,service}/` 之外零 `sea_orm::` 与 `db::entity` 导入；`context/` 提供共享 `Context`（`service: Arc<Service>`、`task: TaskGroup`、`live: Arc<LiveState>`、`outbox: Arc<Outbox>`、`feed: Arc<StateFeed>`、`clock: SharedClock`）及 `error.rs`、`http.rs`、`text.rs` 与最小破环 `port.rs` |
+| `crates/server/src/log/`、`crates/server/src/db/`、`crates/server/src/service/`、`crates/server/src/context/` | `log/` 收拢 `init`、`span`、`spawn_traced`、`spawn_blocking_traced` 与 `observer`（`InvokeObserver`）；`db/` 提供双后端 `Database`、`migration/` 与严格一表一文件的 `db/entity/<table_name>.rs`（共 36 表）；独立顶层 `service/` 提供业务视角持久化查询聚合 `Service`（`outbox`、`storage`、`channel`、`connector`、`note`、`session`、`issue`、`memory`、`cron`、`remote`），`crates/server/src/{db,service}/` 之外零 `sea_orm::` 与 `db::entity` 导入；`context/` 提供共享 `Context`（`service: Arc<Service>`、`task: TaskGroup`、`live: Arc<LiveState>`、`outbox: Arc<Outbox>`、`feed: Arc<StateFeed>`、`clock: SharedClock`）及 `error.rs`、`http.rs`、`text.rs` 与最小破环 `port.rs` |
 | `crates/protocol/src/contract/`、`crates/protocol/src/native.rs`、`crates/protocol/src/envelope.rs` | 契约形状、`SliceKind`、5 域切片、`FarmFrame`、`SliceBundle`、`LiveEvent`、`DebugKit`（`debug.rs`）、远程访问契约（[remote.rs](crates/protocol/src/contract/remote.rs)）、GPUI 壳强类型协议（`host.rs`）、`EndpointId`、`NativeEndpointId`、带 `CAN` 的 `SUBSCRIPTIONS`、全信封、`BizCode` 与 `ApiError` |
 | `crates/server/src/gateway/`（`api/`、`bridge/`、`http/`、`remote/`） | `api/` 定义对外服务契约与非 RPC `GatewayPorts`；`bridge/` 为 GPUI 进程内桥；`http/` 为全 Axum 网关（`auth.rs` 四类鉴权提取器、`media.rs` 上传与 Range 下载、`machine_ws.rs` 机器连接、统一 SSE 与 `/mcp`）；`remote/` 为默认关闭的受认证远程访问控制与独立监听门 |
 | `crates/cli/src/` | 命令行 `vibevalley`：`main.rs` 入口（含全局 `--server` / `--token`）、`client.rs` HTTP/SSE 客户端（支持 `auth.json` 与 Bearer 鉴权、`Client::slice`）与退出码、`output.rs` 输出格式化、`domains/` 按业务域组织的强类型子命令（含 `auth` 与 `remote`） |
@@ -29,7 +29,7 @@
 ### 状态真源、瞬态与切片投影
 
 - **单一持久化真源与事务性 `Outbox`**：持久化状态只经顶层 `service/`（`ctx.service`）落库，不维护内存影子库或启动重放水合。每次业务写入在同一数据库事务内提交业务表与异步投递 `Outbox`（`outbox_item` 表），返回受影响的脏切片掩码 `SliceMask`；事务提交后调用 `ctx.mark_dirty(mask)` 通知 `StateFeed`。
-- **数据访问硬边界**：`crates/server/src/db/entity/` 严格一表一文件（`<table_name>.rs`，共 35 表），全部 SeaORM 查询集中在独立顶层 `crates/server/src/service/`；`crates/server/src/{db,service}/` 之外禁止出现任何 `sea_orm::` 或 `db::entity` 导入。
+- **数据访问硬边界**：`crates/server/src/db/entity/` 严格一表一文件（`<table_name>.rs`，共 36 表），全部 SeaORM 查询集中在独立顶层 `crates/server/src/service/`；`crates/server/src/{db,service}/` 之外禁止出现任何 `sea_orm::` 或 `db::entity` 导入。
 - **瞬态只进 `LiveState`**：运行中会话的实时步骤流、心跳与像素农场突发特效只写 `LiveState`（`context/` 的 `live.rs`），不入库，避免高频瞬态触发数据库写入。
 - **单航班脏合并与 6 路切片**：`StateFeed`（`context/` 的 `feed.rs`）经无堆分配原子唤醒门 `SliceWakeGate`（含 `--features loom` 并发模型检验）合并连续脏信号；仅对 `SliceMask` 命中的切片查询当域视图并调用 `crates/core/src/projection.rs` 纯投影函数，产出预编码共享 `Arc<str>` JSON 快照写入 `tokio::sync::watch`（农场特效只发往 `SliceKind::Farm`）。未变脏的切片不查库、不序列化、不唤醒下游消费者。
 - **界面文案只在投影时填充；跨视图摘要保持纯结构化枚举**：6 个纯投影函数（`board`、`sessions`、`collab`、`inbox`、`ops`、`farm`）按需在对应切片上填入 `phaseText`、`actionText`、`whenText`、任务 `stage` 与可执行动作；持久层不含界面文案。`BoardSummary`（`laneCounts`、`runningSlots`、`maxRunning`、`byIssue: BoardIssueSummary`）、`MediaSummary`（`activeCount`、`activeIds`）与 `ChannelSummary`（`unreadTotal`、`unreadUnder`）仅输出结构化枚举、计数与实体 id，绝不拼本地化自然语言句子。`SliceBundle` 仅用于离线夹具与 `export_scenarios` 导出，不对外提供聚合 HTTP 端点。
@@ -61,13 +61,13 @@
 | `GET /api/v1/slice/{name}`（`name` ∈ `board` \| `sessions` \| `collab` \| `inbox` \| `ops` \| `farm`） | `BoardSlice` / `SessionsSlice` / `CollabSlice` / `InboxSlice` / `OpsSlice` / `FarmFrame` | 带 `Accept: application/json` 或 `?once=1` 直接返回当前 JSON 快照；SSE 首帧推送最新切片（支持 `Last-Event-ID` 或 `?after=<seq>` 续读跳过已收序号） | 经 `StateFeed`（`tokio::sync::watch` + `WatchStream`）脏合并推送（`id: <seq>\ndata: <json>\n\n`），无阻塞线程开销；`farm` 携带窗口内有序 `effects` | HTTP 客户端、CLI |
 | `GET /api/v1/live`（别名 `/api/v1/events`） | `LiveEvent` | 无 | 经 `GatewayPorts` 订阅 `LiveState` 广播流推送 `SessionEvent`、`Notice`、`Runtime` | 页面 |
 | `GET /api/v1/issue/watch/:id` | `IssueWatch` | 任务状态与保留的轨迹 | 状态、轨迹和缺口（[观察执行](docs/subsystems/issue.md#观察执行)） | `issue watch` |
-| `GET /api/v1/subscribe/<名字>?payload=<JSON>` | 各订阅的 `event`（`SUBSCRIPTIONS` 与 `packages/protocol/src/api.ts` 定义，均声明 `Subscription::CAN`） | 经 `Router` 校验 `CallerContext` 与 `CAN`，通过后补齐 `after` 之后的变化 | 之后的每次变化 | 页面与远程客户端：`channel.follow`、`channel.reports`、`artifact.follow`、`artifact.suggestion.follow`、`artifact.presence.follow`、`session.watch`、`issue.watch`（移除重复的 `artifact.entry.follow`） |
+| `GET /api/v1/subscribe/<名字>?payload=<JSON>` | 各订阅的 `event`（`SUBSCRIPTIONS` 与 `packages/protocol/src/api.ts` 定义，均声明 `Subscription::CAN`） | 经 `Router` 校验 `CallerContext` 与 `CAN`，通过后补齐 `after` 之后的变化 | 之后的每次变化 | 页面与远程客户端：`channel.follow`、`channel.reports`、`note.follow`、`note.suggestion.follow`、`note.presence.follow`、`session.watch`、`issue.watch` |
 
 订阅流的调用方无权（不满足 `Subscription::CAN`）返回 `403`（`BizCode::Forbidden`），入参解不开或第一条事件之前被拒绝回普通 JSON 错误信封，不是流；开始推送以后出错只结束流。
 
 SSE 以外的路由：
 
-- `GET /api/v1/attachment/<id>`：附件流式下载（经 `storage/` 与 `NativeEndpointId::AttachmentFile` 校验 `CallerContext` 权限，接受 `Authorization: Bearer` 或 `?token=`，以 `tokio::fs::File` 支持 HTTP `Range` 分块读取）；作品沙箱视图按需经无 `allow-same-origin` 严格 CSP 提供预览。
+- `GET /api/v1/attachment/<id>`：附件流式下载（经 `storage/` 与 `NativeEndpointId::AttachmentFile` 校验 `CallerContext` 权限，接受 `Authorization: Bearer` 或 `?token=`，以 `tokio::fs::File` 支持 HTTP `Range` 分块读取）；笔记沙箱视图按需经无 `allow-same-origin` 严格 CSP 提供预览。
 - `PUT`、`GET /api/v1/media/input/<id>/content`：上传和读取媒体输入（`NativeEndpointId::MediaInputUploadFile`、`NativeEndpointId::MediaInputFile`）；`GET /api/v1/media/speech/<id>/stream`：合成语音的流（[媒体](docs/subsystems/media.md)）。
 - `/mcp`：执行会话的工具（[频道](docs/subsystems/channel.md)）。
 
@@ -106,22 +106,22 @@ SSE 以外的路由：
 **服务端启动与停机**
 
 1. `main.rs` 调用 `log::init(...)` 初始化日志与追踪，随后调用 `create_app(config).await?`（`app.rs`）。
-2. `create_app` 打开 `Database` 与顶层 `Service`，构造共享 `Context`（`service: Arc<Service>`、`TaskGroup`、`LiveState`、`Outbox`、`StateFeed`、`SharedClock`），按无环依赖顺序不可变构造基础服务（`Storage`、`Setting`、`Provider`、`Repo`）与全部扁平业务域（`runtime/`、`agent/`、`issue/`、`artifact/`、`channel/`、`connector/`、`cron/`、`voice/`、`machine/`、`debug/`、`game.rs`），组装 `Router` 与 `GatewayPorts`。
+2. `create_app` 打开 `Database` 与顶层 `Service`，构造共享 `Context`（`service: Arc<Service>`、`TaskGroup`、`LiveState`、`Outbox`、`StateFeed`、`SharedClock`），按无环依赖顺序不可变构造基础服务（`Storage`、`Setting`、`Provider`、`Repo`）与全部扁平业务域（`runtime/`、`agent/`、`issue/`、`note/`、`channel/`、`connector/`、`cron/`、`voice/`、`machine/`、`debug/`、`game.rs`），组装 `Router` 与 `GatewayPorts`。
 3. 后台任务统一挂入 `TaskGroup`，接回停机时在场的执行会话并补投未结算的 `Outbox` 条目；无需内存影子库启动水合。
 4. `gateway::serve(...)` 绑定回环监听端口（按 `VIBEVALLEY_PORT`，`0` 为随机端口；未设时取当前发布通道默认端口：`release` `8787`、`beta` `8788`、`alpha` `8789`、`dev` `8790`），按配置启停 `gateway/remote/`，写出 `server.json`，`--ready-json` 打印 `{"url","pid"}`。
 5. 停机时调用 `App::close()` 取消 `TaskGroup`、排空后台任务并关闭数据库连接池（SQLite 执行 `PRAGMA wal_checkpoint(TRUNCATE)` / `PRAGMA optimize`）。
 
 ## 和谁打交道
 
-- **写库并标脏切片的域**：`issue/`、`runtime/`、`channel/`、`artifact/`、`cron/`、`agent/`、`game.rs`。
-- **消费 `Outbox` 与 `LiveState` 的模块**：`runtime/`、`agent/`、`channel/`、`connector/`、`artifact/`、`game.rs`。
+- **写库并标脏切片的域**：`issue/`、`runtime/`、`channel/`、`note/`、`cron/`、`agent/`、`game.rs`。
+- **消费 `Outbox` 与 `LiveState` 的模块**：`runtime/`、`agent/`、`channel/`、`connector/`、`note/`、`game.rs`。
 - **外部客户端**：`apps/mac`（经 `gateway/bridge/` 按切片订阅）、`apps/mobile`（通过 `@vibevalley/protocol/remote` 的 `HttpRemoteTransport` 经 `gateway/remote/` 带 Bearer 令牌与 `Last-Event-ID` 订阅）、命令行 `vibevalley`（经 `gateway/http/` 访问 `/api/v1/slice/{name}`）。
 
 ## 为什么这样
 
 - **数据库单一真源 + 事务性 `Outbox` + 瞬态 `LiveState`**：取消内存影子库与启动水合，消除 SQL 与内存双写漂移；外部投递与业务写入同事务提交保证因果一致；运行中流与农场特效留在 `LiveState`，避免高频瞬态写库。
 - **浅层组合根 `App` + 薄 `Router` 编译期穷尽分发**：以 `app.rs` 与 `router.rs` 取代动态路由表与晚绑定槽位，新增或删除端点在编译期暴露缺口，进程内调用零 JSON 往返编解码。
-- **独立顶层 `service/` + 一表一文件 `db/entity/`**：`db/` 只管连接、迁移与 35 张表实体（`<table_name>.rs`），`service/` 统一承担业务视角持久化查询，`crates/server/src/{db,service}/` 之外零 `sea_orm::` 与 `db::entity` 导入，双后端兼容与查询优化集中治理。
+- **独立顶层 `service/` + 一表一文件 `db/entity/`**：`db/` 只管连接、迁移与 36 张表实体（`<table_name>.rs`），`service/` 统一承担业务视角持久化查询，`crates/server/src/{db,service}/` 之外零 `sea_orm::` 与 `db::entity` 导入，双后端兼容与查询优化集中治理。
 - **页面读投影好的切片，文案在投影时填入**：避免前后端维护两套状态折叠；界面文案不落盘，改措辞或切语言无历史兼容负担。
 - **命令走 `POST /api/v1/<op>`，切片和订阅走 SSE**：操作名即路径，省去 REST 参数拆分；`/api/v1/slice/{name}`、`/live`、`/events` 按职责分离，支持 `Last-Event-ID` 续读与按需 JSON 快照；能力表 `ENDPOINTS` 单源派生多端入口与 `capabilities.md`。
 

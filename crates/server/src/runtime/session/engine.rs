@@ -2259,8 +2259,6 @@ mod tests {
                 .await
                 .unwrap();
 
-            tokio::time::pause();
-
             let (tx, rx) = mpsc::unbounded_channel();
             let agent = Arc::new(StubSession {
                 id: "stub-quiet".into(),
@@ -2277,8 +2275,11 @@ mod tests {
             );
             session.phase = Phase::working(now(), SessionAction::Thinking, "");
 
-            let wall_start = std::time::Instant::now();
             sessions.go_live_async(agent, session, None).await.unwrap();
+            // Pause after `go_live_async` commits to SQLite so `sqlx` pool acquisition does not
+            // observe auto-advanced virtual time, while `pump_async` still starts under the paused clock.
+            tokio::time::pause();
+            let wall_start = std::time::Instant::now();
             tokio::task::yield_now().await;
 
             let live_phase = || ctx.live.session("w-quiet").and_then(|s| s.phase);

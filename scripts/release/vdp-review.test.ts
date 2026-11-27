@@ -16,15 +16,11 @@ const sampleIds: SeededWorkspaceIds = {
   issueIds: ["iss_01", "iss_02"],
   agentIds: ["ag_ada", "ag_milo"],
   channelIds: ["general", "ch_release"],
-  artifacts: {
-    docs: "art_docs",
-    outline: "art_outline",
-    dashboard: "art_dash",
-    designSystem: "art_ds",
-    whiteboard: "art_wb",
-    slides: "art_slides",
-    sheet: "art_sheet",
-    prototype: "art_proto",
+  notes: {
+    doc: "note_doc",
+    base: "note_base",
+    canvas: "note_canvas",
+    media: "note_media",
   },
 };
 
@@ -60,7 +56,7 @@ describe("vdp-review", () => {
 
   it("builds the full screen matrix across requested themes with seeded routes", () => {
     const entries = buildScreenMatrix(sampleIds, ["light", "dark"]);
-    expect(entries).toHaveLength(30);
+    expect(entries).toHaveLength(26);
 
     const lightRoutes = entries.filter((e) => e.theme === "light").map((e) => [e.id, e.route, e.fileName]);
     expect(lightRoutes).toEqual([
@@ -71,17 +67,15 @@ describe("vdp-review", () => {
       ["agents", "/agents", "agents-light.png"],
       ["runtimes", "/runtimes", "runtimes-light.png"],
       ["library", "/library", "library-light.png"],
-      ["artifact-outline", "/artifacts/art_outline", "artifact-outline-light.png"],
-      ["artifact-dashboard", "/artifacts/art_dash", "artifact-dashboard-light.png"],
-      ["artifact-design-system", "/artifacts/art_ds", "artifact-design-system-light.png"],
-      ["artifact-whiteboard", "/artifacts/art_wb", "artifact-whiteboard-light.png"],
-      ["artifact-prototype", "/artifacts/art_proto", "artifact-prototype-light.png"],
-      ["artifact-prototype-webview", "/artifacts/art_proto", "artifact-prototype-webview-light.png"],
+      ["note-doc", "/notes/note_doc", "note-doc-light.png"],
+      ["note-base", "/notes/note_base", "note-base-light.png"],
+      ["note-canvas", "/notes/note_canvas", "note-canvas-light.png"],
+      ["note-media", "/notes/note_media", "note-media-light.png"],
       ["settings", "/settings", "settings-light.png"],
       ["farm", "/farm", "farm-light.png"],
     ]);
 
-    expect(buildScreenMatrix(sampleIds, ["light"])).toHaveLength(15);
+    expect(buildScreenMatrix(sampleIds, ["light"])).toHaveLength(13);
   });
 
   it("counts nested UI tree nodes and extracts shell/view errors", () => {

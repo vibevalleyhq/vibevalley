@@ -27,7 +27,7 @@ Note（`Note`）是 VibeValley 统一的知识、块级文档与多维数据工�
 | `crates/server/src/db/entity/note.rs`、`crates/server/src/db/entity/note_version.rs`、`crates/server/src/db/entity/note_collab.rs`、`crates/server/src/db/entity/note_change.rs`、`crates/server/src/db/entity/note_suggestion.rs`、`crates/server/src/db/entity/note_link.rs`、`crates/server/src/service/note.rs` | 一表一文件实体定义、迁移 `crates/server/src/db/migration/m20261128_100001_replace_artifact_with_note.rs` 与统一数据服务 `NoteService`（`ctx.service.note`） |
 | `crates/server/src/agent/tool/content.rs`、`crates/server/src/agent/mcp/mode.rs`、`crates/cli/src/domains/content/note.rs`、`crates/cli/src/domains/mcp/note.rs`、`crates/cli/src/domains/mcp/note_defs.rs`、`crates/mcp/src/skills.rs` | 进程内 Agent 工具、按运行模式收窄的只读/写权限过滤、CLI `vibevalley note ...` 子命令、MCP `vv_note_*` / `vv_doc_*` / `vv_base_*` 工具与 SEP-2640 `skill://note/*` 目录 |
 | `crates/server/assets/note/types/`、`crates/rich/src/whiteboard.rs` | 4 种 `NoteType` 中英双语 `SKILL.md` / `SKILL.en.md` 与 `references/`；原生 `VvWhiteboard` 嵌入 `CollabDoc` |
-| `apps/mac/ui/features/note/`（目标 UI 目录，当前阶段部分交互仍位于 `apps/mac/ui/features/artifact/` 与 `apps/mac/ui/features/content/`） | 工作台 `/notes`、`/library`、`PageTree` 侧栏、24 块编辑器、Base 四视图、Row=Page 侧边抽屉、Presenter Mode、Backlinks 与 Channel 晋升弹窗 |
+| `apps/mac/ui/features/note/`、`apps/mac/ui/features/content/` | 工作台 `/notes`、`/library`、`PageTree` 侧栏、24 块编辑器、Base 四视图、Row=Page 侧边抽屉、Presenter Mode、Backlinks 与 Channel 晋升弹窗 |
 
 全部接口与调用方权限见 [capabilities.md](docs/reference/capabilities.md)（`note.*` 及同域 `library.*`、`media.*`）。
 
@@ -146,7 +146,7 @@ VibeValley 借鉴 Notion 工程体系的核心设计，并按本机 Rust 优先�
 | **Basic** | `quote` | `text`, `attribution?` | `> ...` + 末行 `> — <attribution>` 往返；提取 `text` 内出链；左侧 `3px` 暖线引导 |
 | **Basic** | `divider` | 无 | `---` / `***`；全宽 `1px` `border-line` 水平分隔线 |
 | **Structure** | `toggle` | `title`, `text` | `<details><summary>title</summary>...</details>` 往返；支持 `collapsed` 折叠态，展开显示 `text` 与 `children`；提取 `title` 与 `text` 出链 |
-| **Structure** | `callout` | `tone`, `title?`, `text` | `tone` 映射 `info \| ok \| warn \| bad` 语义底色与图标框；提取 `text` 出链 |
+| **Structure** | `callout` | `tone`, `title?`, `text` | `tone` 映射 `info \| ok \| warn \| bad` 语义底色与图标框；提取 `title` 与 `text` 出链 |
 | **Structure** | `code` | `language?`, `code` | 围栏代码块 ```` ```lang ````；不从代码体内提取链接；调用原生 `VvCodeBlock` 语法高亮与一键复制 |
 | **Structure** | `table` | `headers`, `rows: string[][]`, `alignments?` | GFM 管道表（支持 `:---` / `:---:` / `---:` 对齐）；提取表头与全部单元格出链；支持行列增删与内联编辑 |
 | **Structure** | `bookmark` | `url`, `title?`, `description?` | 富链接卡片 `[title](url) — description`；展示域名徽标、标题与摘要，点击经宿主 `external` 打开 |
@@ -300,7 +300,6 @@ VibeValley 借鉴 Notion 工程体系的核心设计，并按本机 Rust 优先�
 - `BaseRow.page_note_id`、`BaseColumnKind::{NoteRef, Formula}`、安全公式求值器与结构化 `Base` 外链提取收尾：`#32`、`#40`。
 - 原生工作台 `/notes`、`PageTree` 侧栏、24 块富文档编辑器（`/`、`[[`、Markdown 输入规则、悬停槽、`Turn Into`、Presenter Mode、Backlinks）与 Base 4 视图 / Row=Page Peek 抽屉落地及频道晋升切换至 `note.create`：`#31`、`#38`、`#39`、`#128`、`#131`。
 - `DocBlock` 1:1 映射到 `CollabDoc` 的 `LoroTree` + 每块独立 `LoroText`（替代整份 `"structure/doc.json"` 文本 diff）及块级增删改增量端点（如 `note.doc.updateBlock` / `moveBlock` / `deleteBlock`）：`#39`。
-- 退休旧 `docs/subsystems/artifact.md` 并更新全仓索引文档链接：`#128`。
 
 ## 怎么验证
 

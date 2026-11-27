@@ -35,5 +35,5 @@
 
 ## 9.5 静态检查覆盖边界
 
-- **工作台与工作区外壳（`apps/mac/ui/`）**：`scripts/audit/ui-tokens.ts` 对工作台（`apps/mac/ui/{app,design,features,infra}/`）及工作区外壳（`apps/mac/ui/workspace/`）下的 `.ts`/`.tsx` 执行 AST 扫描，阻断硬编码颜色（十六进制、`rgb()`/`rgba()`、hex-alpha 拼接）、任意 Tailwind 类名、裸 `<Switch` / `role="checkbox"` 以及选择/激活态几何位移（`selection-layout-shift`；`OutlineEditor.tsx` 5 态任务格、`ConnectorsPage.tsx` 第三方品牌色与 `features/artifact/shell.ts` 注入脚本配色配置了精确规则豁免）；类型检查与打包通过 `nsh check` / `nsh build`（`vp run mac:check`）执行。
+- **工作台与工作区外壳（`apps/mac/ui/`）**：`scripts/audit/ui-tokens.ts` 对工作台（`apps/mac/ui/{app,design,features,infra}/`）及工作区外壳（`apps/mac/ui/workspace/`）下的 `.ts`/`.tsx` 执行 AST 扫描，阻断硬编码颜色（十六进制、`rgb()`/`rgba()`、hex-alpha 拼接）、任意 Tailwind 类名、裸 `<Switch` / `role="checkbox"` 以及选择/激活态几何位移（`selection-layout-shift`；`ConnectorsPage.tsx` 第三方品牌色与 `features/note/shell.ts` 注入脚本配色配置了精确规则豁免）；类型检查与打包通过 `nsh check` / `nsh build`（`vp run mac:check`）执行。
 - **根级 `oxlint` 覆盖条件**：在 macOS 本机运行 `nsh check` 生成 `.nsh/tsconfig.json` 后，`apps/mac/ui/**`（含 `workspace/`、`design/`、`features/`、`app/`、`farm/`、`infra/`）会一并接入 `vp lint --deny-warnings apps/mac/ui`（Linux CI 因无 `nsh` 跳过该目录，见 `vite.config.ts`）。

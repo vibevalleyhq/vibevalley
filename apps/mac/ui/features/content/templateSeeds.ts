@@ -1,7 +1,7 @@
 import { t } from "@vibevalley/i18n";
 import type { BaseCellValue, BaseColumn, BaseRow, BaseSheet, DocBlock, NoteFileWriteItem } from "@vibevalley/protocol";
 
-import { buildDocFromMarkdown } from "../note/html";
+import { buildDocFromMarkdown } from "../note";
 import { type AppTemplateSeed, buildAppSeedFiles } from "./appSeeds";
 import { buildVisualSeedFiles, type VisualTemplateSeed } from "./visualSeeds";
 

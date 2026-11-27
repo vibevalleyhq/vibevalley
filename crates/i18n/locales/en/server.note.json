@@ -33,7 +33,7 @@
     },
     "canvas": {
       "title": "Canvas",
-      "summary": "Spatial canvas and diagrams (structure/canvas.json) with nodes, connectors, frames, and collaborative suggestions"
+      "summary": "Spatial canvas and diagrams (structure/board.json) with nodes, connectors, frames, and collaborative suggestions"
     },
     "media": {
       "title": "Media Note",

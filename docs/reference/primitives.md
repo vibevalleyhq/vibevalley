@@ -141,9 +141,9 @@
 | `orchestratorMood` | `frame.ts` |  |
 | `subscribeLive` | `frame.ts` | Listens to the live events; returns how to stop. |
 | `followChannel` | `gateway.ts` | What is said in a channel after the message numbered after, then from now on. |
-| `followArtifact` | `gateway.ts` | An artifact directory's file changes after this seq, then each committed batch from now on. |
-| `followSuggestions` | `gateway.ts` | An artifact's suggestions as they now are, then the whole list after each change. |
-| `followArtifactPresence` | `gateway.ts` | An artifact's ephemeral live presence peers as a snapshot, then incremental upserts and removals. |
+| `followNote` | `gateway.ts` | A note directory's file changes after this seq, then each committed batch from now on. |
+| `followSuggestions` | `gateway.ts` | A note's suggestions as they now are, then the whole list after each change. |
+| `followNotePresence` | `gateway.ts` | A note's ephemeral live presence peers as a snapshot, then incremental upserts and removals. |
 | `clampUpdatePercent` | `host.ts` | Clamps an update download percentage to a whole number between 0 and 100. |
 | `formatUpdateTransfer` | `host.ts` | Formats downloaded/total bytes and transfer speed for the update progress UI. |
 | `currentHost` | `host.ts` |  |
@@ -247,7 +247,7 @@
 | `useLatest` | `state/atom.ts` | The answer to the newest `key()` while the component lives; undefined while there is nothing to ask. |
 | `contentSidebarOpen` | `state/contentNav.ts` |  |
 | `contentBrowseBucket` | `state/contentNav.ts` |  |
-| `activeArtifactType` | `state/contentNav.ts` |  |
+| `activeNoteType` | `state/contentNav.ts` |  |
 | `contentPresenting` | `state/contentNav.ts` |  |
 | `contentFocusMediaId` | `state/contentNav.ts` |  |
 | `templatePickerState` | `state/contentNav.ts` |  |
@@ -260,9 +260,10 @@
 | `closeTemplatePicker` | `state/contentNav.ts` |  |
 | `openContentSearch` | `state/contentNav.ts` |  |
 | `closeContentSearch` | `state/contentNav.ts` |  |
+| `contentPrefixes` | `state/contentNav.ts` |  |
 | `recordContentPath` | `state/contentNav.ts` |  |
 | `safeLastContentPath` | `state/contentNav.ts` |  |
-| `artifactFacetOf` | `state/contentNav.ts` |  |
+| `noteFacetOf` | `state/contentNav.ts` |  |
 | `mediaKindOf` | `state/contentNav.ts` |  |
 | `countContentHub` | `state/contentNav.ts` | Single count formula shared by `ContentSidebar` badges and `LibraryPage` bucket views. |
 | `countForBucket` | `state/contentNav.ts` |  |

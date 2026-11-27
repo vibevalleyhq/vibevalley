@@ -315,7 +315,7 @@ function classifyShot(name: string): { scenarios: string[]; views: string[] } {
   if (parts.includes("issues") || parts.includes("issue")) views.push("issues");
   if (parts.includes("runs")) views.push("runs");
   if (parts.includes("chat")) views.push("chat");
-  if (parts.includes("library") || parts.includes("artifacts")) views.push("media");
+  if (parts.includes("library") || parts.includes("notes")) views.push("media");
   if (
     parts.includes("workspace") ||
     parts.includes("palette") ||
@@ -325,7 +325,7 @@ function classifyShot(name: string): { scenarios: string[]; views: string[] } {
     parts.includes("runtimes") ||
     parts.includes("settings") ||
     parts.includes("connectors") ||
-    parts.includes("artifacts")
+    parts.includes("notes")
   ) {
     views.push("workspace");
   }
@@ -386,9 +386,9 @@ const frontendFsmRows = [
   },
   {
     module: "features/media/libraryView.ts",
-    states: "LibraryScope (all | media | artifact) × LibrarySelection (none | files | artifact | lightbox)",
+    states: "ContentBucket (recent | pinned | apps | notes | media) × LibrarySelection (none | files | lightbox)",
     testSuite: "features/media/libraryView.test.ts",
-    summary: "收口素材库互斥筛选域、文件/Artifact 选区、Shift 范围多选与灯箱切换，移除清理 effect",
+    summary: "收口内容中心筛选桶、文件选区、Shift 范围多选与灯箱切换，移除清理 effect",
   },
   {
     module: "features/session/runsView.ts",

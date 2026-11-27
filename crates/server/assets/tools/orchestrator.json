@@ -1165,7 +1165,7 @@
  {
   "op": "note.content.get",
   "name": "note_content_get",
-  "description": "读取一篇笔记主入口文件（structure/doc.json、structure/base.json、structure/canvas.json 或 structure/media.json）的当前或指定版本全文；读写具体文件请用 note_file_list / note_file_get / note_file_write。",
+  "description": "读取一篇笔记主入口文件（structure/doc.json、structure/base.json、structure/board.json 或 structure/media.json）的当前或指定版本全文；读写具体文件请用 note_file_list / note_file_get / note_file_write。",
   "parameters": {
    "additionalProperties": true,
    "properties": {

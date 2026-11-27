@@ -8,7 +8,7 @@
 
 | 病 | 机理 | 处境 | 在哪 |
 |---|---|---|---|
-| 局部缝合 | 提炼要改没加载的文件，模型只在局部补，同一段控制流抄好几份 | 已有、以后做 | 工具只有一套（`crates/server/src/agent/tool/mod.rs`，宽松解析写一处），媒体各种类共用一个任务机（`artifact/media/job.rs`）；收拢见提案「扩展点高阶骨架」 |
+| 局部缝合 | 提炼要改没加载的文件，模型只在局部补，同一段控制流抄好几份 | 已有、以后做 | 工具只有一套（`crates/server/src/agent/tool/mod.rs`，宽松解析写一处），媒体各种类共用一个任务机（`note/media/job.rs`）；收拢见提案「扩展点高阶骨架」 |
 | 只加不删 | 不确定旧导出还有没有人用，只加新的 | 已有、已做 | 「内部不留兼容」（`AGENTS.md`）；`vp run deadcode`（`knip.ts`、`scripts/audit/deadcode.ts`），CI 零容忍 |
 | 绕开约束 | 类型或测试挡路时 `as any`、空 `catch`、改断言 | 已有、已做 | `no-explicit-any`、`no-unsafe-*`；`regression: ` 测试删改要点名（`scripts/release/regression.ts`）；帮工的验收先红、合入时冻结（[工单](docs/subsystems/issue.md#模型和不变量)） |
 | 温室假设 | 默认内存无限、网络秒回，N+1、每个字重写一次盘 | 已有、已做、以后做 | 贵的东西归拥有它的模块；流按任意切片测见提案 |
