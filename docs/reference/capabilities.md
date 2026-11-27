@@ -185,6 +185,9 @@ MOSS Live 语音通话
 | `voice.call.stop` | 挂断通话 | `/api/v1/voice/call/stop` | ✓ | ✓ |   |   |
 | `voice.call.hear` | 交上通话里你说的一句 | `/api/v1/voice/call/hear` | ✓ | ✓ |   |   |
 | `voice.call.say` | 交上通话里主助手说出的话 | `/api/v1/voice/call/say` | ✓ | ✓ |   |   |
+| `voice.asr.start` | cap.op.voice.asr.start | `/api/v1/voice/asr/start` | ✓ | ✓ |   |   |
+| `voice.asr.stop` | cap.op.voice.asr.stop | `/api/v1/voice/asr/stop` | ✓ | ✓ |   |   |
+| `voice.asr.transcribe` | cap.op.voice.asr.transcribe | `/api/v1/voice/asr/transcribe` | ✓ | ✓ |   |   |
 
 ## issue
 

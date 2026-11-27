@@ -279,6 +279,8 @@ export {
   HostAction,
   HostAppletIdPayload,
   HostAppletInstallPayload,
+  HostAsrPhase,
+  HostAsrState,
   HostFileTreeFrame,
   HostFontPayload,
   HostGitBranch,
@@ -287,6 +289,8 @@ export {
   HostGitPanelFrame,
   HostGitWorktree,
   HostIdPayload,
+  HostLiveVoicePhase,
+  HostLiveVoiceState,
   HostMotionChoice,
   HostNotifyPayload,
   HostOp,
@@ -325,7 +329,18 @@ export {
 } from "./host/schema";
 export { Attachment, AttachmentImportPathInput, AttachmentUpload } from "./attachment/schema";
 export { ConnectorLogin, ConnectorsChannelRequest, ConnectorStatus, VerifyRequest } from "./connector/schema";
-export { SettingsUpdateVoice, VoiceCall, VoiceCallStart, VoiceGrant, VoiceHeard, VoiceSaid } from "./voice/schema";
+export {
+  SettingsUpdateVoice,
+  VoiceAsrGrant,
+  VoiceAsrResult,
+  VoiceAsrStopInput,
+  VoiceAsrTranscribeInput,
+  VoiceCall,
+  VoiceCallStart,
+  VoiceGrant,
+  VoiceHeard,
+  VoiceSaid,
+} from "./voice/schema";
 export { MemorySourceKind, SettingsStatus, SettingsUpdate, UserProfile } from "./setting/schema";
 export { ProviderModelListing, ProviderModelRequest, ProviderStatus, ProviderUpdate, ProviderVoiceListing, ProviderVoiceRequest } from "./provider/schema";
 export {

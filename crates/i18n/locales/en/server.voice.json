@@ -8,9 +8,14 @@
   "moss": {
     "toolFailed": "The background request could not be completed.",
     "noKey": "Bind an enabled connection to MOSS Live in AI services first",
+    "noAsrKey": "Bind an enabled connection to MOSS Live or Speech Transcription in AI services first",
+    "noTranscribeKey": "Bind an enabled connection to Speech Transcription in AI services first",
     "refused": "MOSS Live refused the key: {why}",
     "unreachable": "Cannot reach MOSS Live: {why}",
     "failed": "MOSS Live did not connect: {why}",
     "silent": "MOSS Live did not answer within 8 seconds"
+  },
+  "asr": {
+    "badAudio": "Invalid WAV audio payload"
   }
 }

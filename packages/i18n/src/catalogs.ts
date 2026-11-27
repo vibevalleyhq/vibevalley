@@ -1006,6 +1006,11 @@ export const catalogs = {
         artifactSelected: "已选 {n} 个元素",
         clearContext: "移除本次附带的上下文",
         runningHint: "正在处理中，可直接补充说明或点击停止",
+        dictateStart: "语音输入（MOSS ASR）",
+        dictateStop: "停止语音输入",
+        dictateConnecting: "正在连接语音…",
+        dictateListening: "正在听写…",
+        dictateFinishing: "正在整理文字…",
       },
       manage: {
         name: "名称",
@@ -3783,14 +3788,39 @@ export const catalogs = {
         moss: { verify: "测一下能不能接通", checking: "在接…", ok: "接通了" },
       },
       moss: {
-        intro: "直接和 MOSS Live 说话，听它怎么答；连线经本机服务端，key 不出这台电脑。说的话不进默认频道。",
-        talk: "开始说话",
+        intro: "直接和 MOSS Live 说话，或者配置语音通话、合成与听写所用的 MOSS 账号与模型；连线经本机服务端，key 不出这台电脑。",
+        talk: "开始通话",
         connecting: "在接通…",
         hangUp: "挂断",
         mute: "静音",
         unmute: "取消静音",
-        nativeCall: "MOSS Live 通话",
+        mutedLabel: "麦克风已静音",
+        readyPrompt: "点击「开始通话」开启与主助手的实时语音",
+        listeningPrompt: "正在聆听，直接开口即可对话",
+        youLabel: "你",
+        orchestratorLabel: "主助手",
+        nativeCall: "MOSS Live 实时通话",
         nativeNotice: "开始后采集麦克风，音频发送到已配置的 MOSS 账号，可能产生费用；双方最终字幕记进默认频道。离开本页会挂断。",
+        configTitle: "模型与密钥配置",
+        configNote: "实时语音与播报",
+        accountLabel: "MOSS 连接",
+        accountHint: "用于实时通话、语音合成与听写的账号",
+        addConnection: "新建 MOSS 连接",
+        keyLabel: "API 密钥",
+        keyHint: "密钥仅存于本机设置，保存后生效",
+        liveModel: "实时通话模型（Live）",
+        liveModelHint: "用于 MOSS Live 对话与实时流式听写",
+        speechModel: "语音合成模型（Speech）",
+        speechModelHint: "用于角色音色与「听汇报」语音播报",
+        transcriptionModel: "语音转写模型（ASR）",
+        transcriptionModelHint: "无 Live 连接时作为输入框语音听写后备",
+        unbound: "不使用",
+        voicesTitle: "可用音色预览",
+        voicesHint: "保存语音合成连接后自动拉取可用音色",
+        voicesCount: "{n} 个可用音色",
+        voicesEmpty: "当前连接下暂无可用音色",
+        manageAll: "在「模型与引擎」中管理全部连接",
+        saved: "语音设置已保存",
       },
     },
   },
@@ -4849,6 +4879,11 @@ export const catalogs = {
         artifactSelected: "{n} selected",
         clearContext: "Remove attached context",
         runningHint: "Working — send a follow-up or click stop",
+        dictateStart: "Voice dictation (MOSS ASR)",
+        dictateStop: "Stop dictation",
+        dictateConnecting: "Connecting audio…",
+        dictateListening: "Listening…",
+        dictateFinishing: "Transcribing…",
       },
       manage: {
         name: "Name",
@@ -7772,15 +7807,40 @@ export const catalogs = {
       },
       moss: {
         intro:
-          "Talk to MOSS Live directly and hear how it answers; the line goes through this machine's server, and the key never leaves it. Nothing goes to the chat.",
-        talk: "Start talking",
+          "Talk live with MOSS Live or configure the MOSS key and models used for calls, speech, and dictation; audio runs through this machine's server and the key never leaves it.",
+        talk: "Start call",
         connecting: "Connecting…",
         hangUp: "Hang up",
         mute: "Mute",
         unmute: "Unmute",
+        mutedLabel: "Microphone muted",
+        readyPrompt: "Click Start call to begin a live voice session",
+        listeningPrompt: "Listening — speak naturally",
+        youLabel: "You",
+        orchestratorLabel: "Assistant",
         nativeCall: "MOSS Live call",
         nativeNotice:
-          "Starting captures your microphone and sends audio to the configured MOSS account; charges may apply. Final transcripts are recorded in the chat. Leaving this page hangs up.",
+          "Starting captures your microphone and sends audio to the configured MOSS account; charges may apply. Final transcripts are recorded in chat. Leaving this page hangs up.",
+        configTitle: "Models & API Key",
+        configNote: "Voice & Call",
+        accountLabel: "MOSS connection",
+        accountHint: "Connection backing live calls, speech, and dictation",
+        addConnection: "Add MOSS connection",
+        keyLabel: "API Key",
+        keyHint: "Stored locally in settings; takes effect when saved",
+        liveModel: "Live Call Model",
+        liveModelHint: "Used for MOSS Live calls and streaming dictation",
+        speechModel: "Speech Synthesis Model",
+        speechModelHint: "Used for agent voices and channel report playback",
+        transcriptionModel: "Transcription Model (ASR)",
+        transcriptionModelHint: "Fallback batch model for composer dictation",
+        unbound: "Not in use",
+        voicesTitle: "Available voices",
+        voicesHint: "Loaded from the saved Speech connection",
+        voicesCount: "{n} voices available",
+        voicesEmpty: "No voices returned by this connection",
+        manageAll: "Manage all connections in Models & Engines",
+        saved: "Voice settings saved",
       },
     },
   },
@@ -8770,6 +8830,11 @@ export interface Messages {
   "web.channel.composer.cancelReply": undefined;
   "web.channel.composer.clearContext": undefined;
   "web.channel.composer.command": undefined;
+  "web.channel.composer.dictateConnecting": undefined;
+  "web.channel.composer.dictateFinishing": undefined;
+  "web.channel.composer.dictateListening": undefined;
+  "web.channel.composer.dictateStart": undefined;
+  "web.channel.composer.dictateStop": undefined;
   "web.channel.composer.mention": undefined;
   "web.channel.composer.notSent": { readonly why: string | number };
   "web.channel.composer.replying": { readonly name: string | number };
@@ -11697,14 +11762,39 @@ export interface Messages {
   "web.shell.swarm.transcriptRefresh": undefined;
   "web.shell.swarm.transcriptThinking": undefined;
   "web.shell.swarm.transcriptTitle": undefined;
+  "web.voice.moss.accountHint": undefined;
+  "web.voice.moss.accountLabel": undefined;
+  "web.voice.moss.addConnection": undefined;
+  "web.voice.moss.configNote": undefined;
+  "web.voice.moss.configTitle": undefined;
   "web.voice.moss.connecting": undefined;
   "web.voice.moss.hangUp": undefined;
   "web.voice.moss.intro": undefined;
+  "web.voice.moss.keyHint": undefined;
+  "web.voice.moss.keyLabel": undefined;
+  "web.voice.moss.listeningPrompt": undefined;
+  "web.voice.moss.liveModel": undefined;
+  "web.voice.moss.liveModelHint": undefined;
+  "web.voice.moss.manageAll": undefined;
   "web.voice.moss.mute": undefined;
+  "web.voice.moss.mutedLabel": undefined;
   "web.voice.moss.nativeCall": undefined;
   "web.voice.moss.nativeNotice": undefined;
+  "web.voice.moss.orchestratorLabel": undefined;
+  "web.voice.moss.readyPrompt": undefined;
+  "web.voice.moss.saved": undefined;
+  "web.voice.moss.speechModel": undefined;
+  "web.voice.moss.speechModelHint": undefined;
   "web.voice.moss.talk": undefined;
+  "web.voice.moss.transcriptionModel": undefined;
+  "web.voice.moss.transcriptionModelHint": undefined;
+  "web.voice.moss.unbound": undefined;
   "web.voice.moss.unmute": undefined;
+  "web.voice.moss.voicesCount": { readonly n: string | number };
+  "web.voice.moss.voicesEmpty": undefined;
+  "web.voice.moss.voicesHint": undefined;
+  "web.voice.moss.voicesTitle": undefined;
+  "web.voice.moss.youLabel": undefined;
   "web.voice.voice.moss.checking": undefined;
   "web.voice.voice.moss.ok": undefined;
   "web.voice.voice.moss.verify": undefined;

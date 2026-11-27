@@ -70,6 +70,7 @@ impl Shell {
             this.overlays.island = None;
             this.overlays.island_client = None;
             crate::live_voice::stop(None);
+            crate::voice_asr::stop(None);
             crate::speech_audio::stop(None);
             crate::audio::stop_queued();
             let jobs = this.workspace.ws.save_jobs();

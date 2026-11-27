@@ -327,6 +327,10 @@ export {
   type VerifyRequest,
 } from "./connector/shapes.gen";
 export {
+  type VoiceAsrGrant,
+  type VoiceAsrResult,
+  type VoiceAsrStopInput,
+  type VoiceAsrTranscribeInput,
   type VoiceCall,
   type VoiceCallStart,
   type VoiceFix,
@@ -369,7 +373,17 @@ export {
   type RemoteStatus,
   type RemoteWhoami,
 } from "./remote/shapes.gen";
-export { type ConnectionSaveRequest, type DesktopConnectionSnapshot, HostSpeechAudioPhaseValues } from "./host/shapes.gen";
+export {
+  type ConnectionSaveRequest,
+  type DesktopConnectionSnapshot,
+  type HostAsrPhase,
+  HostAsrPhaseValues,
+  type HostAsrState,
+  type HostLiveVoicePhase,
+  HostLiveVoicePhaseValues,
+  type HostLiveVoiceState,
+  HostSpeechAudioPhaseValues,
+} from "./host/shapes.gen";
 export type { MachineInfo, MachinePlatform, MachineStatus } from "./machine/shapes.gen";
 export {
   type LibraryAddRequest,

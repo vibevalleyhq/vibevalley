@@ -1,10 +1,10 @@
-import { computed, effect, keymap, Picker, signal, Text, untracked, View, type InputRef, type JSX } from "nsh";
+import { cleanup, computed, effect, keymap, Picker, signal, Text, untracked, View, type InputRef, type JSX } from "nsh";
 import { Input, Progress } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
-import { userId } from "@vibevalley/protocol";
-import type { ArtifactViewContext, Channel } from "@vibevalley/protocol";
+import { type ArtifactViewContext, type Channel, type HostAsrState as AsrSnapshot, userId } from "@vibevalley/protocol";
 import { sessionProfile } from "@vibevalley/protocol/rules";
+import { HostAsrState } from "@vibevalley/protocol/schema";
 
 import { createAct } from "../../../design/act";
 import { CompareUploadDialog, type CompareUploadResult } from "../../../design/Compare";
@@ -18,11 +18,14 @@ import { toast } from "../../../design/toasts";
 import { mix } from "../../../design/tone";
 import { api, reasonOf } from "../../../infra/api";
 import { importLocalAttachment } from "../../../infra/attachmentFile";
+import { useInterval } from "../../../infra/base/timer";
 import { typedMarks } from "../../../infra/base/typedMarks";
 import { useCollabSlice, useSessionsSlice } from "../../../infra/frame";
 import { useRouter } from "../../../infra/router";
 import { useIntents } from "../../../infra/state/intent";
+import { transport } from "../../../infra/transport";
 import { activeArtifactViewContext, artifactChatFocus, clearActiveArtifactViewContext } from "../../artifact";
+import { MicWaveform } from "../../voice";
 import { attachFiles, chatMarks, chatSay, createComposer, draftOf, drafts, setEditingId, uploadsIn, useReplying, type ComposerKey } from "../model/composing";
 import { followed } from "../model/follow";
 import { EmojiPopover } from "./EmojiPicker";
@@ -82,6 +85,27 @@ function BoxButton(props: {
   );
 }
 
+const idleAsr: AsrSnapshot = { phase: "idle", micLevel: 0, text: "", partial: "", problem: null };
+
+function joinDictated(committed: string, partial: string): string {
+  const c = committed.trim();
+  const p = partial.trim();
+  if (!c) return p;
+  if (!p) return c;
+  const needSpace = /[A-Za-z0-9]$/u.test(c) && /^[A-Za-z0-9]/u.test(p);
+  return needSpace ? `${c} ${p}` : `${c}${p}`;
+}
+
+function spliceDictated(before: string, dictated: string, after: string): { next: string; caret: number } {
+  if (!dictated) {
+    return { next: `${before}${after}`, caret: before.length };
+  }
+  const needLead = before.length > 0 && !/\s$/u.test(before) && /^[A-Za-z0-9]/u.test(dictated);
+  const lead = needLead ? " " : "";
+  const prefix = `${before}${lead}${dictated}`;
+  return { next: `${prefix}${after}`, caret: prefix.length };
+}
+
 export function Composer(props: { channel: Channel | undefined; placeholder: string; replyTo?: number | undefined }) {
   const collab = useCollabSlice();
   const sessions = useSessionsSlice();
@@ -89,6 +113,11 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
   const emoji = signal(false);
   const compareOpen = signal(false);
   const focused = signal(false);
+  const asr = signal<AsrSnapshot>(idleAsr);
+  const dictateAnchor = signal<{ before: string; after: string } | undefined>(undefined);
+  const dictateId = crypto.randomUUID();
+  let dictatePolling = false;
+  let dictateClosed = false;
   // Where the caret is (and the selection's end), as the input last said; `placed` moves it.
   const selection = signal({ start: 0, end: 0 });
   const placed = signal<{ start: number; end?: number } | undefined>(undefined);
@@ -128,9 +157,92 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
       if (at) drafts.text(at, value);
     },
     sent: () => {
+      if (asr().phase !== "idle") void stopDictation(true);
       const id = props.channel?.id;
       if (id) drafts.clear(id);
     },
+  });
+
+  const applyDictationState = (next: AsrSnapshot) => {
+    asr.set(next);
+    if (next.problem) {
+      problem.set(next.problem);
+    }
+    const anchor = dictateAnchor();
+    const live = joinDictated(next.text, next.partial);
+    if (anchor && live) {
+      const merged = spliceDictated(anchor.before, live, anchor.after);
+      put(merged.next, merged.caret);
+    }
+    if (next.phase === "idle") {
+      dictateAnchor.set(undefined);
+    }
+  };
+
+  const callAsr = async (op: "host.asrStart" | "host.asrStop" | "host.asrState") => {
+    const reply = await transport().call(op, { id: dictateId });
+    if (dictateClosed && op === "host.asrStart") {
+      void transport().call("host.asrStop", { id: dictateId });
+      return;
+    }
+    if (reply.bizCode !== 0) {
+      throw new Error(reply.message);
+    }
+    if (!dictateClosed) {
+      applyDictationState(HostAsrState.parse(reply.data));
+    }
+  };
+
+  const stopDictation = async (discardAnchor = false) => {
+    if (discardAnchor) dictateAnchor.set(undefined);
+    try {
+      await callAsr("host.asrStop");
+    } catch (error) {
+      problem.set(error instanceof Error ? error.message : String(error));
+    }
+  };
+
+  const toggleDictation = async () => {
+    if (!props.channel) return;
+    if (asr().phase !== "idle") {
+      await stopDictation(false);
+      return;
+    }
+    problem.set(undefined);
+    const { start, end } = untracked(selection);
+    const current = untracked(box.text);
+    const safeStart = Math.max(0, Math.min(start, current.length));
+    const safeEnd = Math.max(safeStart, Math.min(end, current.length));
+    dictateAnchor.set({ before: current.slice(0, safeStart), after: current.slice(safeEnd) });
+    try {
+      await callAsr("host.asrStart");
+    } catch (error) {
+      dictateAnchor.set(undefined);
+      const message = error instanceof Error ? error.message : String(error);
+      problem.set(message);
+      toast(message, "bad");
+    }
+  };
+
+  useInterval(() => {
+    if (dictatePolling || asr().phase === "idle") return;
+    dictatePolling = true;
+    void callAsr("host.asrState")
+      .catch((error: unknown) => {
+        dictateAnchor.set(undefined);
+        asr.set(idleAsr);
+        problem.set(error instanceof Error ? error.message : String(error));
+      })
+      .finally(() => {
+        dictatePolling = false;
+      });
+  }, 100);
+
+  cleanup(() => {
+    dictateClosed = true;
+    if (asr().phase !== "idle") {
+      void transport().call("host.asrStop", { id: dictateId });
+    }
   });
   // The system's open panel (VibeValley's hidden file input); the picked files come with their bytes.
   const pick = async () => attach(readFiles(await Picker.pickFiles({ multiple: true })));
@@ -401,6 +513,28 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
               <Text class="min-w-0 flex-1 truncate text-xs text-muted">{t("web.channel.composer.runningHint")}</Text>
             </View>
           </If>
+          <If when={asr().phase !== "idle"}>
+            <View testID="composer-dictating" class="flex-row items-center gap-1.5 rounded-full bg-ok-soft px-2 py-0.5">
+              <MicWaveform testid="composer-waveform" compact active={asr().phase === "listening"} level={asr().micLevel} />
+              <Text class="text-2xs font-medium text-ok-ink">
+                {asr().phase === "connecting"
+                  ? t("web.channel.composer.dictateConnecting")
+                  : asr().phase === "finishing"
+                    ? t("web.channel.composer.dictateFinishing")
+                    : t("web.channel.composer.dictateListening")}
+              </Text>
+            </View>
+          </If>
+          <BoxButton
+            icon={asr().phase === "idle" ? "record" : "stop"}
+            iconSize={14}
+            testid="composer-dictate"
+            label={asr().phase === "idle" ? t("web.channel.composer.dictateStart") : t("web.channel.composer.dictateStop")}
+            tone={asr().phase === "idle" ? "muted" : "berry"}
+            class={asr().phase === "idle" ? "" : "bg-bad-soft"}
+            onPress={() => void toggleDictation()}
+            disabled={!props.channel}
+          />
           <BoxButton icon="attach" testid="attach" label={t("web.channel.composer.attach")} onPress={() => void pick()} disabled={!props.channel} />
           <BoxButton
             icon="diff"

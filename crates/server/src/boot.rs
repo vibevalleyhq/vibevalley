@@ -26,7 +26,7 @@ use crate::issue::{Board, IssueChat, Publisher, SessionChat};
 use crate::runtime::{OUTBOX_SESSION_REPORTED, OutboxSessionReported, Runtime, SessionLifecycleEvent};
 use crate::service::{DbError, Service};
 use crate::setting::Setting;
-use crate::voice::moss::Realtime;
+use crate::voice::moss::{Realtime, Transcriber};
 
 /// Domain-level test and embedding overrides supplied at server composition time.
 #[derive(Clone, Default)]
@@ -37,6 +37,8 @@ pub struct Overrides {
     pub connector: Option<ConnectorOptions>,
     /// Optional MOSS realtime probe override for offline voice tests.
     pub voice_realtime: Option<Arc<dyn Realtime>>,
+    /// Optional MOSS transcription override for offline voice tests.
+    pub voice_transcriber: Option<Arc<dyn Transcriber>>,
 }
 
 pub(crate) fn apply_env_overrides(config: &mut Config) {

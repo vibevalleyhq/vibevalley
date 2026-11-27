@@ -18,6 +18,10 @@ pub const ASK_ORCHESTRATOR: &str =
     "Consult the farm's orchestrator whenever the user asks about farm status, issues, helpers, memories, notes, or wants work dispatched.";
 pub const ASK_ORCHESTRATOR_QUESTION: &str = "The user's exact request or question for the orchestrator.";
 
+/// Dictation-only persona/instructions so MOSS Live streams input transcripts without replying aloud.
+pub const ASR_PERSONA: &str = "语音听写助手。";
+pub const ASR_INSTRUCTIONS: &str = "仅把用户的语音输入转写为文字，不要说话、不要回复、不要编造内容。";
+
 /// What the orchestrator is given to tell the user on the call: everything
 /// that waited, as one; a call that answers a ring opens with what rang.
 pub fn on_call_line(texts: &[String], ring: Option<&str>) -> String {

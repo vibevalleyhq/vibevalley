@@ -19,6 +19,10 @@ fn playback() -> &'static Mutex<Playback> {
     static PLAYBACK: OnceLock<Mutex<Playback>> = OnceLock::new();
     PLAYBACK.get_or_init(Default::default)
 }
+fn idle_watch() -> &'static tokio::sync::watch::Sender<u64> {
+    static IDLE: OnceLock<tokio::sync::watch::Sender<u64>> = OnceLock::new();
+    IDLE.get_or_init(|| tokio::sync::watch::channel(0).0)
+}
 pub fn state(owner: &str) -> State {
     let current = playback().lock();
     if current.owner == owner { current.state.clone() } else { State::default() }
@@ -51,7 +55,7 @@ pub fn start(streams: SharedSpeechStreams, id: &str) -> Result<State, String> {
     let initial = current.state.clone();
     drop(current);
     vibevalley_runtime::rt::current_or_global_handle().spawn(async move {
-        let reserved = tokio::task::spawn_blocking(crate::audio::reserve_for_call)
+        let reserved = tokio::task::spawn_blocking(crate::audio::reserve_output)
             .await
             .map_err(|e| e.to_string())
             .and_then(|r| r);
@@ -73,6 +77,8 @@ pub fn start(streams: SharedSpeechStreams, id: &str) -> Result<State, String> {
             phase: Phase::Idle,
             problem: result.err(),
         };
+        drop(current);
+        idle_watch().send_modify(|seq| *seq = seq.wrapping_add(1));
     });
     Ok(initial)
 }
@@ -87,6 +93,31 @@ pub fn stop(owner: Option<&str>) -> State {
         playback.state.phase = Phase::Stopping;
     }
     playback.state.clone()
+}
+
+/// Cancels any background TTS report playback and awaits output lease release so a MOSS Live call can start unblocked.
+pub async fn preempt_for_call() {
+    let mut rx = idle_watch().subscribe();
+    if playback().lock().state.phase == Phase::Idle {
+        return;
+    }
+    let _ = stop(None);
+    let deadline = tokio::time::sleep(Duration::from_secs(1));
+    tokio::pin!(deadline);
+    loop {
+        if playback().lock().state.phase == Phase::Idle && !crate::audio::output_reserved() {
+            break;
+        }
+        tokio::select! {
+            biased;
+            _ = &mut deadline => break,
+            res = rx.changed() => {
+                if res.is_err() {
+                    break;
+                }
+            }
+        }
+    }
 }
 
 trait Output {

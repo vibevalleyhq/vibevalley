@@ -281,6 +281,9 @@ pub trait LiveVoiceLine: Send + Sync {
 pub trait LiveVoicePort: Send + Sync {
     fn grant(&self) -> Result<vibevalley_protocol::VoiceGrant, ApiError>;
     fn moss_line(&self) -> Result<Box<dyn LiveVoiceLine>, ApiError>;
+    fn asr_line(&self) -> Result<Box<dyn LiveVoiceLine>, ApiError>;
+    fn can_transcribe(&self) -> bool;
+    fn transcribe_wav_async(&self, wav: Vec<u8>) -> BoxFuture<'static, Result<String, ApiError>>;
     fn start(&self, channel: &str, uid: &str) -> Result<vibevalley_protocol::VoiceCall, ApiError>;
     fn heard(&self, agent_id: &str, text: &str, turn: Option<&str>) -> Result<(), ApiError>;
     fn said(&self, agent_id: &str, text: &str) -> Result<(), ApiError>;

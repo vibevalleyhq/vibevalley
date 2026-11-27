@@ -382,6 +382,14 @@ export class VibeValleyApi {
       hear: (a: T.VoiceHeard, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("voice.call.hear", "/api/v1/voice/call/hear", a, options),
       say: (a: T.VoiceSaid, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("voice.call.say", "/api/v1/voice/call/say", a, options),
     },
+    asr: {
+      start: (options?: { signal?: AbortSignal }): Promise<T.VoiceAsrGrant> =>
+        this.call<T.VoiceAsrGrant>("voice.asr.start", "/api/v1/voice/asr/start", undefined, options),
+      stop: (a: T.VoiceAsrStopInput, options?: { signal?: AbortSignal }): Promise<void> =>
+        this.call<void>("voice.asr.stop", "/api/v1/voice/asr/stop", a, options),
+      transcribe: (a: T.VoiceAsrTranscribeInput, options?: { signal?: AbortSignal }): Promise<T.VoiceAsrResult> =>
+        this.call<T.VoiceAsrResult>("voice.asr.transcribe", "/api/v1/voice/asr/transcribe", a, options),
+    },
   };
 
   readonly issue = {

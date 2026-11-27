@@ -152,7 +152,12 @@
     "artifactSlide": "Slide {n}",
     "artifactSelected": "{n} selected",
     "clearContext": "Remove attached context",
-    "runningHint": "Working — send a follow-up or click stop"
+    "runningHint": "Working — send a follow-up or click stop",
+    "dictateStart": "Voice dictation (MOSS ASR)",
+    "dictateStop": "Stop dictation",
+    "dictateConnecting": "Connecting audio…",
+    "dictateListening": "Listening…",
+    "dictateFinishing": "Transcribing…"
   },
   "manage": {
     "name": "Name",

@@ -152,7 +152,12 @@
     "artifactSlide": "第 {n} 页",
     "artifactSelected": "已选 {n} 个元素",
     "clearContext": "移除本次附带的上下文",
-    "runningHint": "正在处理中，可直接补充说明或点击停止"
+    "runningHint": "正在处理中，可直接补充说明或点击停止",
+    "dictateStart": "语音输入（MOSS ASR）",
+    "dictateStop": "停止语音输入",
+    "dictateConnecting": "正在连接语音…",
+    "dictateListening": "正在听写…",
+    "dictateFinishing": "正在整理文字…"
   },
   "manage": {
     "name": "名称",

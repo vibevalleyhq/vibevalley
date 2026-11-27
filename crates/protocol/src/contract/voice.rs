@@ -132,6 +132,46 @@ pub struct VoiceHearInput {
     pub send_key: Option<String>,
 }
 
+/// Credentials identifying an active server-tracked ASR dictation session.
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct VoiceAsrGrant {
+    pub session_id: String,
+    pub model: String,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct VoiceAsrStopInput {
+    pub session_id: String,
+}
+
+/// WAV audio payload submitted for one-shot MOSS transcription (`voice.asr.transcribe`).
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct VoiceAsrTranscribeInput {
+    pub wav_base64: String,
+    pub session_id: Option<String>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct VoiceAsrResult {
+    pub text: String,
+}
+
 #[cfg(feature = "ts-gen")]
 crate::typescript::module! {
     "voice";
@@ -144,6 +184,10 @@ crate::typescript::module! {
     VoiceSaid,
     VoiceHeard,
     VoiceCallStart,
-    VoiceHearInput];
+    VoiceHearInput,
+    VoiceAsrGrant,
+    VoiceAsrStopInput,
+    VoiceAsrTranscribeInput,
+    VoiceAsrResult];
     aliases: [];
 }

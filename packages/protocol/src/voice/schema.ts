@@ -41,3 +41,21 @@ export const VoiceCallStart = z.object({
   uid: z.string(),
   about: z.exactOptional(z.string()),
 }) satisfies Codec<T.VoiceCallStart>;
+
+export const VoiceAsrGrant = z.object({
+  sessionId: z.string(),
+  model: z.string(),
+}) satisfies Codec<T.VoiceAsrGrant>;
+
+export const VoiceAsrStopInput = z.object({
+  sessionId: z.string(),
+}) satisfies Codec<T.VoiceAsrStopInput>;
+
+export const VoiceAsrTranscribeInput = z.object({
+  wavBase64: z.string(),
+  sessionId: z.exactOptional(z.string()),
+}) satisfies Codec<T.VoiceAsrTranscribeInput>;
+
+export const VoiceAsrResult = z.object({
+  text: z.string(),
+}) satisfies Codec<T.VoiceAsrResult>;

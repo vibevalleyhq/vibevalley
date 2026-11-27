@@ -365,6 +365,27 @@ const HostCaptureWebViewPayload = z.object({
   height: z.exactOptional(z.number()),
 }) satisfies Codec<T.HostCaptureWebViewPayload>;
 
+export const HostLiveVoicePhase = z.enum(T.HostLiveVoicePhaseValues) satisfies Codec<T.HostLiveVoicePhase>;
+
+export const HostLiveVoiceState = z.object({
+  phase: HostLiveVoicePhase,
+  muted: z.boolean(),
+  micLevel: z.number(),
+  problem: z.string().nullable(),
+  heard: z.string(),
+  said: z.string(),
+}) satisfies Codec<T.HostLiveVoiceState>;
+
+export const HostAsrPhase = z.enum(T.HostAsrPhaseValues) satisfies Codec<T.HostAsrPhase>;
+
+export const HostAsrState = z.object({
+  phase: HostAsrPhase,
+  micLevel: z.number(),
+  text: z.string(),
+  partial: z.string(),
+  problem: z.string().nullable(),
+}) satisfies Codec<T.HostAsrState>;
+
 export const HostOp = z.discriminatedUnion("op", [
   z.object({ op: z.literal("host.info") }),
   z.object({ op: z.literal("host.updateState") }),
@@ -390,6 +411,9 @@ export const HostOp = z.discriminatedUnion("op", [
   z.object({ op: z.literal("host.speechState"), payload: HostIdPayload }),
   z.object({ op: z.literal("host.speechStart"), payload: HostIdPayload }),
   z.object({ op: z.literal("host.speechStop"), payload: HostIdPayload }),
+  z.object({ op: z.literal("host.asrState"), payload: HostIdPayload }),
+  z.object({ op: z.literal("host.asrStart"), payload: HostIdPayload }),
+  z.object({ op: z.literal("host.asrStop"), payload: HostIdPayload }),
   z.object({ op: z.literal("host.voiceState"), payload: HostIdPayload }),
   z.object({ op: z.literal("host.voiceStart"), payload: HostIdPayload }),
   z.object({ op: z.literal("host.voiceStop"), payload: HostIdPayload }),

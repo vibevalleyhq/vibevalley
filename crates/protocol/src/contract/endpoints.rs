@@ -1303,6 +1303,33 @@ pub const ENDPOINTS: &[Endpoint] = &[
         result: None,
     },
     Endpoint {
+        op: "voice.asr.start",
+        module: "voice",
+        about: &[],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: None,
+        result: Some("VoiceAsrGrant"),
+    },
+    Endpoint {
+        op: "voice.asr.stop",
+        module: "voice",
+        about: &[],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("VoiceAsrStopInput"),
+        result: None,
+    },
+    Endpoint {
+        op: "voice.asr.transcribe",
+        module: "voice",
+        about: &[],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("VoiceAsrTranscribeInput"),
+        result: Some("VoiceAsrResult"),
+    },
+    Endpoint {
         op: "artifact.list",
         module: "artifact",
         about: &[],
@@ -2794,6 +2821,24 @@ pub mod ops {
         type Input = t::VoiceSaid;
         type Result = ();
     }
+    pub struct VoiceAsrStart;
+    impl Op for VoiceAsrStart {
+        const NAME: &'static str = "voice.asr.start";
+        type Input = ();
+        type Result = t::VoiceAsrGrant;
+    }
+    pub struct VoiceAsrStop;
+    impl Op for VoiceAsrStop {
+        const NAME: &'static str = "voice.asr.stop";
+        type Input = t::VoiceAsrStopInput;
+        type Result = ();
+    }
+    pub struct VoiceAsrTranscribe;
+    impl Op for VoiceAsrTranscribe {
+        const NAME: &'static str = "voice.asr.transcribe";
+        type Input = t::VoiceAsrTranscribeInput;
+        type Result = t::VoiceAsrResult;
+    }
     /// The artifacts announced in a channel or made for an issue, newest change first; every one the farm has when neither is given.
     pub struct ArtifactList;
     impl Op for ArtifactList {
@@ -3503,6 +3548,9 @@ endpoint_ids! {
     VoiceCallStop => "voice.call.stop",
     VoiceCallHear => "voice.call.hear",
     VoiceCallSay => "voice.call.say",
+    VoiceAsrStart => "voice.asr.start",
+    VoiceAsrStop => "voice.asr.stop",
+    VoiceAsrTranscribe => "voice.asr.transcribe",
     // artifact
     ArtifactList => "artifact.list",
     ArtifactGet => "artifact.get",

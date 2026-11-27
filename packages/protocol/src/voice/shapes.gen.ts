@@ -31,3 +31,17 @@ export type VoiceCallStart = { channel: string, uid: string,
 about?: string, };
 
 export type VoiceHearInput = { text: string, agent?: string, sendKey?: string, };
+
+/**
+ * Credentials identifying an active server-tracked ASR dictation session.
+ */
+export type VoiceAsrGrant = { sessionId: string, model: string, };
+
+export type VoiceAsrStopInput = { sessionId: string, };
+
+/**
+ * WAV audio payload submitted for one-shot MOSS transcription (`voice.asr.transcribe`).
+ */
+export type VoiceAsrTranscribeInput = { wavBase64: string, sessionId?: string, };
+
+export type VoiceAsrResult = { text: string, };

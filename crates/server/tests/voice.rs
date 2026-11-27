@@ -5,14 +5,15 @@ use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use base64::Engine as _;
 use serde_json::{Value, json};
 use vibevalley_protocol::{BizCode, Caller, Envelope, VoiceFix};
 use vibevalley_runtime::agent::{ChatRequest, Completion, Delta, FinishReason, Message, ModelClient, Role, Usage};
 use vibevalley_server::app::{Overrides, create_app_with_overrides_blocking};
-use vibevalley_server::gateway::bridge::LiveVoiceLine as _;
+use vibevalley_server::gateway::bridge::{LiveVoiceLine as _, LiveVoicePort as _};
 use vibevalley_server::setting::Secret;
 use vibevalley_server::voice::Voice;
-use vibevalley_server::voice::moss::{Realtime, Verdict};
+use vibevalley_server::voice::moss::{Realtime, Transcriber, Verdict, pcm16_to_wav};
 use vibevalley_server::{App, Config};
 
 struct Scripted {
@@ -57,6 +58,17 @@ impl Realtime for Live {
         assert_eq!((key.expose(), model), ("test-key", "moss-live-1.0"));
         let verdict = self.0.lock().unwrap().clone();
         Box::pin(async move { verdict })
+    }
+}
+
+struct StubTranscriber;
+
+impl Transcriber for StubTranscriber {
+    fn transcribe_wav_async<'a>(&'a self, key: &'a Secret, model: &'a str, wav: Vec<u8>) -> vibevalley_server::BoxFuture<'a, Result<String, String>> {
+        assert_eq!(key.expose(), "test-key");
+        assert_eq!(model, "moss-transcribe-1.0");
+        assert!(wav.starts_with(b"RIFF"));
+        Box::pin(async move { Ok("合成听写结果".into()) })
     }
 }
 
@@ -142,6 +154,7 @@ fn farm(answers: &[&'static str]) -> Farm {
         },
         Overrides {
             voice_realtime: Some(live.clone()),
+            voice_transcriber: Some(Arc::new(StubTranscriber)),
             ..Overrides::default()
         },
     )
@@ -160,6 +173,9 @@ fn every_voice_endpoint_is_served_and_retired_endpoints_are_gone() {
         "voice.call.stop",
         "voice.call.hear",
         "voice.call.say",
+        "voice.asr.start",
+        "voice.asr.stop",
+        "voice.asr.transcribe",
     ] {
         assert!(f.app.router().answers(op), "{op}");
     }
@@ -319,4 +335,45 @@ fn a_moss_call_answering_a_ring_speaks_what_rang() {
     );
     drop(seen);
     f.ok("voice.call.stop", json!({ "agentId": call["agentId"] }));
+}
+
+#[test]
+fn asr_dictation_and_transcription_endpoints_work_offline() {
+    let f = farm(&[]);
+    let missing = f.refused("voice.asr.start", json!(null), BizCode::VoiceUnavailable);
+    assert_eq!(missing.error.unwrap().settings, Some(VoiceFix::Moss));
+    assert!(!f.voice().can_transcribe());
+
+    f.ok(
+        "provider.update",
+        json!({
+            "revision": 0,
+            "connections": [{ "id": "moss", "name": "MOSS", "adapter": "moss", "enabled": true, "key": "test-key" }],
+            "live": { "connection": "moss", "model": "moss-live-1.0" },
+            "transcription": { "connection": "moss", "model": "moss-transcribe-1.0" },
+            "image": null, "understanding": null, "speech": null, "speakers": null,
+            "voiceDesign": null, "vision": null
+        }),
+    );
+    assert!(f.voice().can_transcribe());
+
+    let asr_grant = f.ok("voice.asr.start", json!(null));
+    let session_id = asr_grant["sessionId"].as_str().unwrap().to_string();
+    assert!(session_id.starts_with("asr-"));
+    assert_eq!(asr_grant["model"], "moss-live-1.0");
+
+    let line = f.voice().asr_line().unwrap();
+    assert_eq!(line.url(), "wss://api.mosi.cn/v1/realtime?model=moss-live-1.0");
+    assert_eq!(line.bearer_token(), "test-key");
+    let update: Value = serde_json::from_str(&line.session_update()).unwrap();
+    assert_eq!(update["session"]["tools"], json!([]));
+
+    let bad = f.refused("voice.asr.transcribe", json!({ "wavBase64": "bm90LXdhdg==" }), BizCode::InvalidInput);
+    assert_eq!(bad.biz_code, BizCode::InvalidInput.code());
+
+    let wav_b64 = base64::engine::general_purpose::STANDARD.encode(pcm16_to_wav(&[1, 0, 2, 0], 16_000, 1));
+    let transcribed = f.ok("voice.asr.transcribe", json!({ "wavBase64": wav_b64, "sessionId": session_id }));
+    assert_eq!(transcribed["text"], "合成听写结果");
+
+    f.ok("voice.asr.stop", json!({ "sessionId": session_id }));
 }

@@ -1,28 +1,19 @@
 import { cleanup, signal, Text, View } from "nsh";
-import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
-import { InboxSlice } from "@vibevalley/protocol/schema";
+import type { HostLiveVoicePhase, HostLiveVoiceState as LiveVoiceSnapshot } from "@vibevalley/protocol";
+import { HostLiveVoiceState } from "@vibevalley/protocol/schema";
 
 import { createAct } from "../../../design/act";
 import { Button } from "../../../design/Button";
 import { Icon } from "../../../design/Icon";
-import { Banner, Card } from "../../../design/layout";
+import { Banner } from "../../../design/layout";
 import { Dot } from "../../../design/Tag";
 import { Bubble } from "../../../design/Tip";
 import { useInterval } from "../../../infra/base/timer";
 import { transport } from "../../../infra/transport";
-
-const activeCallPhases = InboxSlice.shape.call.exclude(["ending", "error"]);
-const CallState = z.object({
-  phase: z.enum([...activeCallPhases.options, "stopping"]),
-  muted: z.boolean(),
-  problem: z.string().nullable(),
-  heard: z.string(),
-  said: z.string(),
-});
-
-type CallPhase = z.infer<typeof CallState>["phase"];
+import { MossVerify } from "./MossVerify";
+import { MicWaveform, VoiceOrb } from "./VoiceVisuals";
 
 const formatElapsed = (ms: number) => {
   const sec = Math.max(0, Math.floor(ms / 1000));
@@ -31,7 +22,7 @@ const formatElapsed = (ms: number) => {
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 };
 
-const phaseMeta = (phase: CallPhase, elapsed: string) => {
+const phaseMeta = (phase: HostLiveVoicePhase, elapsed: string) => {
   switch (phase) {
     case "idle":
       return undefined;
@@ -44,20 +35,20 @@ const phaseMeta = (phase: CallPhase, elapsed: string) => {
   }
 };
 
-function PhasePill(props: { phase: CallPhase; muted: boolean; elapsed: string }) {
+function PhasePill(props: { phase: HostLiveVoicePhase; muted: boolean; elapsed: string }) {
   const meta = () => phaseMeta(props.phase, props.elapsed);
   return (
     <View class="flex-row items-center gap-1.5">
       <If when={meta()} else={<Dot tone="idle" size={7} ring={false} />}>
         {(m) => (
-          <View class={`h-6 flex-row items-center gap-1.5 rounded-sm px-2 ${m().bgClass}`}>
+          <View class={`h-6 flex-row items-center gap-1.5 rounded-full px-2.5 ${m().bgClass}`}>
             <Dot tone={m().dot} size={6} ring={false} />
             <Text class={`text-xs font-medium ${m().mono ? "font-mono tabular-nums" : ""} ${m().textClass}`}>{m().label}</Text>
           </View>
         )}
       </If>
       <If when={props.phase === "live" && props.muted}>
-        <View class="h-6 flex-row items-center gap-1 rounded-sm bg-bad-soft px-2">
+        <View class="h-6 flex-row items-center gap-1 rounded-full bg-bad-soft px-2.5">
           <Icon name="record" size={12} tone="berry" />
           <Text class="text-xs font-medium text-berry">{t("web.voice.moss.mute")}</Text>
         </View>
@@ -66,8 +57,17 @@ function PhasePill(props: { phase: CallPhase; muted: boolean; elapsed: string })
   );
 }
 
+const initialCallState: LiveVoiceSnapshot = {
+  phase: "idle",
+  muted: false,
+  micLevel: 0,
+  problem: null,
+  heard: "",
+  said: "",
+};
+
 export function NativeCall() {
-  const state = signal<z.infer<typeof CallState>>({ phase: "idle", muted: false, problem: null, heard: "", said: "" });
+  const state = signal<LiveVoiceSnapshot>(initialCallState);
   const error = signal<string | undefined>(undefined);
   const liveSince = signal<number | undefined>(undefined);
   const now = signal(Date.now());
@@ -86,7 +86,7 @@ export function NativeCall() {
     if (op === "host.voiceStart") starting = false;
     if (result.bizCode !== 0) throw new Error(result.message);
     if (!closed) {
-      const next = CallState.parse(result.data);
+      const next = HostLiveVoiceState.parse(result.data);
       state.set(next);
       if (next.phase === "live") {
         if (liveSince() === undefined) {
@@ -108,7 +108,7 @@ export function NativeCall() {
       .finally(() => {
         polling = false;
       });
-  }, 500);
+  }, 120);
   cleanup(() => {
     closed = true;
     if (starting || state().phase !== "idle") void command("host.voiceStop").catch((why: unknown) => console.warn("voice stop:", why));
@@ -118,16 +118,43 @@ export function NativeCall() {
     const started = liveSince();
     return started === undefined ? "00:00" : formatElapsed(now() - started);
   };
+  const stagePrompt = () => {
+    switch (state().phase) {
+      case "connecting":
+        return t("web.voice.moss.connecting");
+      case "live":
+        return state().muted ? t("web.voice.moss.mutedLabel") : t("web.voice.moss.listeningPrompt");
+      case "stopping":
+        return t("web.voice.moss.hangUp");
+      case "idle":
+        return t("web.voice.moss.readyPrompt");
+    }
+  };
+
   return (
-    <Card title={t("web.voice.moss.nativeCall")} action={<PhasePill phase={state().phase} muted={state().muted} elapsed={elapsed()} />} class="max-w-4xl">
-      <View testID="native-call" class="gap-3">
-        <View class="flex-row items-start gap-2 rounded-md bg-side px-3 py-2.5">
-          <View class="mt-0.5 shrink-0">
-            <Icon name="info" size={14} tone="faint" />
-          </View>
-          <Text class="min-w-0 flex-1 text-xs leading-relaxed text-muted">{t("web.voice.moss.nativeNotice")}</Text>
+    <View testID="native-call" class="overflow-hidden rounded-xl border border-line bg-elevated">
+      <View class="flex-row flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3">
+        <View class="min-w-0 flex-row items-center gap-2.5">
+          <Text role="header" class="text-sm font-semibold text-ink">
+            {t("web.voice.moss.nativeCall")}
+          </Text>
+          <PhasePill phase={state().phase} muted={state().muted} elapsed={elapsed()} />
         </View>
-        <View class="flex-row flex-wrap items-center gap-2">
+        <MossVerify />
+      </View>
+
+      <View class="items-center gap-3.5 bg-page px-6 py-6">
+        <VoiceOrb phase={state().phase} muted={state().muted} micLevel={state().micLevel} />
+        <MicWaveform
+          testid="native-call-waveform"
+          level={state().micLevel}
+          active={state().phase === "live"}
+          muted={state().muted}
+          bars={18}
+          label={stagePrompt()}
+        />
+        <Text class="text-center text-xs font-medium text-muted">{stagePrompt()}</Text>
+        <View class="flex-row flex-wrap items-center justify-center gap-2 pt-0.5">
           <Button
             tone="primary"
             icon="call"
@@ -158,6 +185,9 @@ export function NativeCall() {
             {t("web.voice.moss.hangUp")}
           </Button>
         </View>
+      </View>
+
+      <View class="gap-2.5 border-t border-line bg-side px-4 py-3">
         <If when={error() ?? state().problem}>
           {(why) => (
             <Banner testID="native-call-error" role="alert">
@@ -167,29 +197,41 @@ export function NativeCall() {
         </If>
         <If when={state().heard}>
           {(words) => (
-            <View class="flex-row items-start gap-2 rounded-md bg-side px-3 py-2">
+            <View class="flex-row items-start gap-2 rounded-lg border border-line bg-elevated px-3 py-2">
               <View class="mt-0.5 shrink-0">
                 <Icon name="record" size={14} tone="muted" />
               </View>
-              <Text testID="native-call-heard" class="min-w-0 flex-1 text-sm leading-relaxed text-muted">
-                {words()}
-              </Text>
+              <View class="min-w-0 flex-1 gap-0.5">
+                <Text class="text-2xs font-medium text-faint">{t("web.voice.moss.youLabel")}</Text>
+                <Text testID="native-call-heard" class="text-sm leading-relaxed text-ink">
+                  {words()}
+                </Text>
+              </View>
             </View>
           )}
         </If>
         <If when={state().said}>
           {(words) => (
-            <View class="flex-row items-start gap-2 rounded-md bg-ok-soft px-3 py-2">
+            <View class="flex-row items-start gap-2 rounded-lg border border-line bg-ok-soft px-3 py-2">
               <View class="mt-0.5 shrink-0">
                 <Icon name="realtime" size={14} tone="ok-ink" />
               </View>
-              <Text testID="native-call-said" class="min-w-0 flex-1 text-sm leading-relaxed text-ink">
-                {words()}
-              </Text>
+              <View class="min-w-0 flex-1 gap-0.5">
+                <Text class="text-2xs font-medium text-ok-ink">{t("web.voice.moss.orchestratorLabel")}</Text>
+                <Text testID="native-call-said" class="text-sm leading-relaxed text-ink">
+                  {words()}
+                </Text>
+              </View>
             </View>
           )}
         </If>
+        <View class="flex-row items-start gap-2">
+          <View class="mt-0.5 shrink-0">
+            <Icon name="info" size={12} tone="faint" />
+          </View>
+          <Text class="min-w-0 flex-1 text-xs leading-relaxed text-faint">{t("web.voice.moss.nativeNotice")}</Text>
+        </View>
       </View>
-    </Card>
+    </View>
   );
 }

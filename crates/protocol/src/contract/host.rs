@@ -1133,15 +1133,42 @@ pub enum HostLiveVoicePhase {
 }
 
 /// Snapshot returned by `host.voice*` bridge operations.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts-gen", derive(TS))]
 #[serde(rename_all = "camelCase")]
 pub struct HostLiveVoiceState {
     pub phase: HostLiveVoicePhase,
     pub muted: bool,
+    #[serde(default)]
+    pub mic_level: f64,
     pub problem: Option<String>,
     pub heard: String,
     pub said: String,
+}
+
+/// Native ASR dictation phase (`host.asr*`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub enum HostAsrPhase {
+    #[default]
+    Idle,
+    Connecting,
+    Listening,
+    Finishing,
+}
+
+/// Snapshot returned by `host.asr*` bridge operations.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct HostAsrState {
+    pub phase: HostAsrPhase,
+    #[serde(default)]
+    pub mic_level: f64,
+    pub text: String,
+    pub partial: String,
+    pub problem: Option<String>,
 }
 
 /// Native speech-stream playback phase (`host.speech*`).
@@ -1227,6 +1254,12 @@ pub enum HostOp {
     SpeechStart(HostIdPayload),
     #[serde(rename = "host.speechStop")]
     SpeechStop(HostIdPayload),
+    #[serde(rename = "host.asrState")]
+    AsrState(HostIdPayload),
+    #[serde(rename = "host.asrStart")]
+    AsrStart(HostIdPayload),
+    #[serde(rename = "host.asrStop")]
+    AsrStop(HostIdPayload),
     #[serde(rename = "host.voiceState")]
     VoiceState(HostIdPayload),
     #[serde(rename = "host.voiceStart")]
@@ -1301,6 +1334,9 @@ impl HostOp {
         "host.speechState",
         "host.speechStart",
         "host.speechStop",
+        "host.asrState",
+        "host.asrStart",
+        "host.asrStop",
         "host.voiceState",
         "host.voiceStart",
         "host.voiceStop",
@@ -1356,6 +1392,9 @@ impl HostOp {
             HostOp::SpeechState(_) => "host.speechState",
             HostOp::SpeechStart(_) => "host.speechStart",
             HostOp::SpeechStop(_) => "host.speechStop",
+            HostOp::AsrState(_) => "host.asrState",
+            HostOp::AsrStart(_) => "host.asrStart",
+            HostOp::AsrStop(_) => "host.asrStop",
             HostOp::VoiceState(_) => "host.voiceState",
             HostOp::VoiceStart(_) => "host.voiceStart",
             HostOp::VoiceStop(_) => "host.voiceStop",
@@ -1436,6 +1475,15 @@ impl HostOp {
             "host.speechStop" => serde_json::from_value(optional_object(payload))
                 .map(HostOp::SpeechStop)
                 .map_err(|e| format!("speechStop: {e}")),
+            "host.asrState" => serde_json::from_value(optional_object(payload))
+                .map(HostOp::AsrState)
+                .map_err(|e| format!("asrState: {e}")),
+            "host.asrStart" => serde_json::from_value(optional_object(payload))
+                .map(HostOp::AsrStart)
+                .map_err(|e| format!("asrStart: {e}")),
+            "host.asrStop" => serde_json::from_value(optional_object(payload))
+                .map(HostOp::AsrStop)
+                .map_err(|e| format!("asrStop: {e}")),
             "host.voiceState" => serde_json::from_value(optional_object(payload))
                 .map(HostOp::VoiceState)
                 .map_err(|e| format!("voiceState: {e}")),
@@ -1549,6 +1597,8 @@ crate::typescript::module! {
     HostLocalFolder,
     HostLiveVoicePhase,
     HostLiveVoiceState,
+    HostAsrPhase,
+    HostAsrState,
     HostSpeechAudioPhase,
     HostSpeechAudioState,
     HostPhoneCallLog,
@@ -1661,6 +1711,17 @@ mod tests {
                 HostOp::SpeechStart(HostIdPayload { id: Some("s1".into()) }),
             ),
             ("host.speechStop", json!(null), HostOp::SpeechStop(HostIdPayload { id: None })),
+            (
+                "host.asrState",
+                json!({ "id": "a1" }),
+                HostOp::AsrState(HostIdPayload { id: Some("a1".into()) }),
+            ),
+            (
+                "host.asrStart",
+                json!({ "id": "a1" }),
+                HostOp::AsrStart(HostIdPayload { id: Some("a1".into()) }),
+            ),
+            ("host.asrStop", json!(null), HostOp::AsrStop(HostIdPayload { id: None })),
             (
                 "host.voiceState",
                 json!({ "id": "v1" }),

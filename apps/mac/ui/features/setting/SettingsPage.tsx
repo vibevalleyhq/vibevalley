@@ -78,7 +78,7 @@ function legacyRedirect(rest: string): string | undefined {
 
 function VoiceSettings() {
   return (
-    <Page title={t("web.setting.nav.voice")} hint={t("web.voice.moss.intro")}>
+    <Page title={t("web.setting.nav.voice")} description={t("web.voice.moss.intro")}>
       <Readiness features={FeatureValues.filter((f) => f === "live" || f === "vision" || f === "call")} />
       <VoiceForm part="line" />
     </Page>
