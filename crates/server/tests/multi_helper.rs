@@ -57,6 +57,7 @@ fn worker_profile(id: &str, name: &str, runtime: &str) -> Agent {
         tags: vec![],
         look: default_look(),
         from: None,
+        voice: None,
     }
 }
 
