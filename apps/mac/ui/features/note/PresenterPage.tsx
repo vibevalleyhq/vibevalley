@@ -10,6 +10,7 @@ import { api, reasonOf } from "../../infra/api";
 import { useNow } from "../../infra/base/dom";
 import { defineQuery, ready, useQuery } from "../../infra/query";
 import { useRouter } from "../../infra/router";
+import { useVdpNode } from "../../infra/vdpProbe";
 import { noteHref, useNote } from "./NoteCard";
 import { elapsedText, presenterOf, stepped } from "./slides";
 
@@ -111,6 +112,7 @@ function buildSlidesFromDoc(doc: DocView | undefined, fallbackTitle: string): re
 }
 
 export function PresenterPage() {
+  useVdpNode({ testId: "presenter-page", role: "region" });
   const router = useRouter();
   const asked = () => presenterOf(`?${router.path().split("?")[1] ?? ""}`);
   return (

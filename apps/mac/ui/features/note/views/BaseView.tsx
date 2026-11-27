@@ -528,135 +528,141 @@ export function BaseView(props: BaseViewProps) {
             </If>
 
             <If when={viewKind() === "gallery"}>
-              <Scroll testID="base-gallery-view" class="min-h-0 flex-1" contentClass="p-3">
-                <If when={filteredRows().length > 0} else={<Empty icon="image">{t("web.note.base.empty")}</Empty>}>
-                  <View class="flex-row flex-wrap gap-3">
-                    <Each of={filteredRows()} key={(r) => r.id}>
-                      {(row) => {
-                        const cover = () => firstMediaOfRow(row(), columns(), notesById());
-                        const selected = () => selectedRowId() === row().id;
-                        return (
-                          <View
-                            role="button"
-                            testID={`base-gallery-card-${row().id}`}
-                            onPress={() => selectedRowId.set(row().id)}
-                            class={`min-w-64 max-w-80 flex-1 overflow-hidden rounded-xl border ${
-                              selected() ? "border-accent bg-selected" : "border-line bg-page hover:bg-hover"
-                            }`}
-                          >
-                            <View class="h-28 items-center justify-center border-b border-line bg-side px-3">
-                              <If
-                                when={cover()}
-                                else={
-                                  <View class="items-center gap-1">
-                                    <Icon name={row().pageNoteId ? "notes" : "image"} size={24} tone="faint" />
-                                    <Text class="font-mono text-2xs text-faint">{row().pageNoteId ? t("web.note.types.doc") : row().id}</Text>
-                                  </View>
-                                }
-                              >
-                                {(asset) => (
-                                  <View class="items-center gap-1">
-                                    <Icon name="image" size={20} tone="accent" />
-                                    <Text class="max-w-full truncate font-mono text-2xs text-muted">{asset()}</Text>
-                                  </View>
-                                )}
-                              </If>
-                            </View>
-                            <View class="gap-2 p-3">
-                              <View class="flex-row items-center justify-between gap-2">
-                                <Text class="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{rowTitleOf(row(), columns())}</Text>
-                                <If when={row().pageNoteId}>
-                                  <Icon name="notes" size={12} tone="accent" />
-                                </If>
-                              </View>
-                              <View class="gap-1">
-                                <Each of={previewColumns()} key={(c) => c.id}>
-                                  {(col) => (
-                                    <View class="flex-row items-center justify-between gap-2">
-                                      <Text class="w-20 shrink-0 truncate text-2xs text-faint">{col().name}</Text>
-                                      <Text class="min-w-0 flex-1 truncate text-right text-2xs text-ink">{formatPreviewCell(row(), col())}</Text>
+              <>
+                <VdpAnchor testId="base-gallery-view" role="region" />
+                <Scroll testID="base-gallery-view" class="min-h-0 flex-1" contentClass="p-3">
+                  <If when={filteredRows().length > 0} else={<Empty icon="image">{t("web.note.base.empty")}</Empty>}>
+                    <View class="flex-row flex-wrap gap-3">
+                      <Each of={filteredRows()} key={(r) => r.id}>
+                        {(row) => {
+                          const cover = () => firstMediaOfRow(row(), columns(), notesById());
+                          const selected = () => selectedRowId() === row().id;
+                          return (
+                            <View
+                              role="button"
+                              testID={`base-gallery-card-${row().id}`}
+                              onPress={() => selectedRowId.set(row().id)}
+                              class={`min-w-64 max-w-80 flex-1 overflow-hidden rounded-xl border ${
+                                selected() ? "border-accent bg-selected" : "border-line bg-page hover:bg-hover"
+                              }`}
+                            >
+                              <View class="h-28 items-center justify-center border-b border-line bg-side px-3">
+                                <If
+                                  when={cover()}
+                                  else={
+                                    <View class="items-center gap-1">
+                                      <Icon name={row().pageNoteId ? "notes" : "image"} size={24} tone="faint" />
+                                      <Text class="font-mono text-2xs text-faint">{row().pageNoteId ? t("web.note.types.doc") : row().id}</Text>
+                                    </View>
+                                  }
+                                >
+                                  {(asset) => (
+                                    <View class="items-center gap-1">
+                                      <Icon name="image" size={20} tone="accent" />
+                                      <Text class="max-w-full truncate font-mono text-2xs text-muted">{asset()}</Text>
                                     </View>
                                   )}
-                                </Each>
+                                </If>
+                              </View>
+                              <View class="gap-2 p-3">
+                                <View class="flex-row items-center justify-between gap-2">
+                                  <Text class="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{rowTitleOf(row(), columns())}</Text>
+                                  <If when={row().pageNoteId}>
+                                    <Icon name="notes" size={12} tone="accent" />
+                                  </If>
+                                </View>
+                                <View class="gap-1">
+                                  <Each of={previewColumns()} key={(c) => c.id}>
+                                    {(col) => (
+                                      <View class="flex-row items-center justify-between gap-2">
+                                        <Text class="w-20 shrink-0 truncate text-2xs text-faint">{col().name}</Text>
+                                        <Text class="min-w-0 flex-1 truncate text-right text-2xs text-ink">{formatPreviewCell(row(), col())}</Text>
+                                      </View>
+                                    )}
+                                  </Each>
+                                </View>
                               </View>
                             </View>
-                          </View>
-                        );
-                      }}
-                    </Each>
-                  </View>
-                </If>
-              </Scroll>
+                          );
+                        }}
+                      </Each>
+                    </View>
+                  </If>
+                </Scroll>
+              </>
             </If>
 
             <If when={viewKind() === "timeline"}>
-              <Scroll testID="base-timeline-view" class="min-h-0 flex-1" contentClass="gap-3 p-3">
-                <View class="flex-row items-center justify-between gap-2">
-                  <Text class="text-xs font-medium text-muted">
-                    {timelineData().dateColumnId
-                      ? (columnsById().get(timelineData().dateColumnId ?? "")?.name ?? t("web.note.base.timeline"))
-                      : t("web.note.base.timeline")}
-                  </Text>
-                  <Segmented
-                    testid="base-timeline-scale"
-                    label={t("web.issue.timeline.scale.label")}
-                    value={timelineScale()}
-                    onChange={(s) => timelineScale.set(s)}
-                    options={[
-                      { value: "week", label: t("web.issue.timeline.scale.week") },
-                      { value: "month", label: t("web.issue.timeline.scale.month") },
-                    ]}
-                  />
-                </View>
+              <>
+                <VdpAnchor testId="base-timeline-view" role="region" />
+                <Scroll testID="base-timeline-view" class="min-h-0 flex-1" contentClass="gap-3 p-3">
+                  <View class="flex-row items-center justify-between gap-2">
+                    <Text class="text-xs font-medium text-muted">
+                      {timelineData().dateColumnId
+                        ? (columnsById().get(timelineData().dateColumnId ?? "")?.name ?? t("web.note.base.timeline"))
+                        : t("web.note.base.timeline")}
+                    </Text>
+                    <Segmented
+                      testid="base-timeline-scale"
+                      label={t("web.issue.timeline.scale.label")}
+                      value={timelineScale()}
+                      onChange={(s) => timelineScale.set(s)}
+                      options={[
+                        { value: "week", label: t("web.issue.timeline.scale.week") },
+                        { value: "month", label: t("web.issue.timeline.scale.month") },
+                      ]}
+                    />
+                  </View>
 
-                <If when={timelineData().bars.length > 0} else={<Empty icon="clock">{t("web.note.base.empty")}</Empty>}>
-                  <View class="overflow-hidden rounded-lg border border-line bg-page">
-                    <View class="flex-row items-center border-b border-line bg-side px-3 py-2">
-                      <View class="w-48 shrink-0">
-                        <Text class="text-xs font-semibold text-muted">{t("web.note.page.title")}</Text>
+                  <If when={timelineData().bars.length > 0} else={<Empty icon="clock">{t("web.note.base.empty")}</Empty>}>
+                    <View class="overflow-hidden rounded-lg border border-line bg-page">
+                      <View class="flex-row items-center border-b border-line bg-side px-3 py-2">
+                        <View class="w-48 shrink-0">
+                          <Text class="text-xs font-semibold text-muted">{t("web.note.page.title")}</Text>
+                        </View>
+                        <View class="relative h-5 min-w-0 flex-1 flex-row items-center">
+                          <Each of={timelineData().ticks} key={(tk) => tk.key}>
+                            {(tk) => (
+                              <Text class="absolute font-mono text-2xs text-faint tabular-nums" style={{ left: `${tk().leftPct}%` }}>
+                                {tk().label}
+                              </Text>
+                            )}
+                          </Each>
+                        </View>
                       </View>
-                      <View class="relative h-5 min-w-0 flex-1 flex-row items-center">
-                        <Each of={timelineData().ticks} key={(tk) => tk.key}>
-                          {(tk) => (
-                            <Text class="absolute font-mono text-2xs text-faint tabular-nums" style={{ left: `${tk().leftPct}%` }}>
-                              {tk().label}
-                            </Text>
-                          )}
-                        </Each>
-                      </View>
-                    </View>
 
-                    <Each of={timelineData().bars} key={(b) => b.row.id}>
-                      {(bar) => {
-                        const selected = () => selectedRowId() === bar().row.id;
-                        return (
-                          <View
-                            role="button"
-                            testID={`base-timeline-row-${bar().row.id}`}
-                            onPress={() => selectedRowId.set(bar().row.id)}
-                            class={`flex-row items-center border-t border-line px-3 py-2 ${selected() ? "bg-selected" : "bg-page hover:bg-hover"}`}
-                          >
-                            <View class="w-48 shrink-0 flex-row items-center gap-1.5 pr-3">
-                              <Text class="min-w-0 flex-1 truncate text-xs font-medium text-ink">{bar().title}</Text>
-                              <If when={bar().row.pageNoteId}>
-                                <Icon name="notes" size={11} tone="accent" />
-                              </If>
-                            </View>
-                            <View class="relative h-7 min-w-0 flex-1 justify-center rounded-sm bg-side">
-                              <View
-                                class="absolute h-5 flex-row items-center rounded-sm border border-accent bg-ok-soft px-2"
-                                style={{ left: `${bar().leftPct}%`, width: `${bar().widthPct}%` }}
-                              >
-                                <Text class="truncate font-mono text-2xs font-medium text-ok-ink tabular-nums">{bar().dateLabel}</Text>
+                      <Each of={timelineData().bars} key={(b) => b.row.id}>
+                        {(bar) => {
+                          const selected = () => selectedRowId() === bar().row.id;
+                          return (
+                            <View
+                              role="button"
+                              testID={`base-timeline-row-${bar().row.id}`}
+                              onPress={() => selectedRowId.set(bar().row.id)}
+                              class={`flex-row items-center border-t border-line px-3 py-2 ${selected() ? "bg-selected" : "bg-page hover:bg-hover"}`}
+                            >
+                              <View class="w-48 shrink-0 flex-row items-center gap-1.5 pr-3">
+                                <Text class="min-w-0 flex-1 truncate text-xs font-medium text-ink">{bar().title}</Text>
+                                <If when={bar().row.pageNoteId}>
+                                  <Icon name="notes" size={11} tone="accent" />
+                                </If>
+                              </View>
+                              <View class="relative h-7 min-w-0 flex-1 justify-center rounded-sm bg-side">
+                                <View
+                                  class="absolute h-5 flex-row items-center rounded-sm border border-accent bg-ok-soft px-2"
+                                  style={{ left: `${bar().leftPct}%`, width: `${bar().widthPct}%` }}
+                                >
+                                  <Text class="truncate font-mono text-2xs font-medium text-ok-ink tabular-nums">{bar().dateLabel}</Text>
+                                </View>
                               </View>
                             </View>
-                          </View>
-                        );
-                      }}
-                    </Each>
-                  </View>
-                </If>
-              </Scroll>
+                          );
+                        }}
+                      </Each>
+                    </View>
+                  </If>
+                </Scroll>
+              </>
             </If>
           </If>
         </View>

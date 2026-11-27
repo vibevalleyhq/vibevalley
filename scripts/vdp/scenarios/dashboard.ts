@@ -1,11 +1,11 @@
 import { defineScenario } from "../dsl.ts";
-import { seedWorkspaceCore } from "../fixtures/workspace.ts";
+import { seedNoteShowcase } from "../fixtures/note.ts";
 
 export const dashboardScenario = defineScenario({
   id: "dashboard",
-  description: "Dashboard overview, Runs & Trajectories, Agents Roster, and Runtimes in Light & Dark",
+  description: "Dashboard overview, Repositories, Runs & Trajectories, Agents Roster, and Runtimes in Light & Dark",
   async run(v) {
-    await seedWorkspaceCore(v);
+    await seedNoteShowcase(v);
     await v.resize(v.viewport.width, v.viewport.height);
 
     await v.forThemes(undefined, async (theme) => {
@@ -14,6 +14,12 @@ export const dashboardScenario = defineScenario({
       await v.wait("dashboard-page");
       await v.assertClean(`dashboard-overview-${theme}`);
       await v.shot(`dashboard-overview-${theme}`, { label: `Dashboard Overview (${theme})` });
+
+      await v.nav("/repos/papertrails-ui");
+      await v.waitRoute("/repos");
+      await v.wait("repos-page");
+      await v.assertClean(`repos-list-${theme}`);
+      await v.shot(`repos-list-${theme}`, { label: `Repositories Workspace (${theme})` });
 
       await v.nav("/runs");
       await v.waitRoute("/runs");

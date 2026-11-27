@@ -4,12 +4,14 @@ const SETTING_SECTIONS = [
   { route: "/settings/general", id: "settings-general", label: "General Settings" },
   { route: "/settings/models", id: "settings-models", label: "Model Providers & Policy" },
   { route: "/settings/appearance", id: "settings-appearance", label: "Appearance & Theme" },
+  { route: "/settings/voice", id: "settings-voice", label: "Voice & Audio" },
   { route: "/settings/remote", id: "settings-remote", label: "Remote Access & Pairing" },
+  { route: "/settings/about", id: "settings-about", label: "About & Diagnostics" },
 ] as const;
 
 export const settingsScenario = defineScenario({
   id: "settings",
-  description: "Settings navigation and key subsections (general/models/appearance/remote) in Light & Dark",
+  description: "Settings navigation and key subsections (general/models/appearance/voice/remote/about) in Light & Dark",
   async run(v) {
     await v.resize(v.viewport.width, v.viewport.height);
 

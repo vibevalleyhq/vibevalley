@@ -22,6 +22,7 @@ import { readHostParams } from "../../infra/hostParams";
 import { defineQuery, ready, retryRead, useQuery, useQueryClient, useRepos } from "../../infra/query";
 import { useRouter } from "../../infra/router";
 import { createMemo, untrack } from "../../infra/solid";
+import { useVdpNode } from "../../infra/vdpProbe";
 import { dateText, type Recency, recencyOf, recencyText, since } from "./calendar";
 import { type Asked, CommitCalendar, Hands, Languages, NewRepoForm, Stat } from "./RepoPanels";
 import { languageShares, number, sortRepos } from "./repos";
@@ -93,6 +94,7 @@ function Plot(props: { recency: Recency; size: number; label?: string }) {
 
 /** `rest` is the path after /repos/. */
 export function ReposPage(props: { rest: string }) {
+  useVdpNode({ testId: "repos-page", role: "region" });
   const router = useRouter();
   // A minute at a time: enough for "3h ago".
   const now = useNow(60_000);

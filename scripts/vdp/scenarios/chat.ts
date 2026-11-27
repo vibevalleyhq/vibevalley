@@ -1,15 +1,15 @@
 import { defineScenario } from "../dsl.ts";
-import { seedWorkspaceCore } from "../fixtures/workspace.ts";
+import { seedNoteShowcase } from "../fixtures/note.ts";
 
 export const chatScenario = defineScenario({
   id: "chat",
-  description: "Channels workbench view and composer in Light & Dark",
+  description: "Channels workbench view and composer with multi-turn messages, pins, and reactions in Light & Dark",
   async run(v) {
-    const core = await seedWorkspaceCore(v);
+    const ids = await seedNoteShowcase(v);
     await v.resize(v.viewport.width, v.viewport.height);
 
     await v.forThemes(undefined, async (theme) => {
-      const route = `/chat/${encodeURIComponent(core.channelId)}`;
+      const route = `/chat/${encodeURIComponent(ids.channelId)}`;
       await v.nav(route);
       await v.waitRoute("/chat");
       await v.wait("chat-page");

@@ -16,6 +16,7 @@ import { mix } from "../../../design/tone";
 import { useOrchestrators } from "../../../infra/agents";
 import { ago } from "../../../infra/base/format";
 import { createEffect } from "../../../infra/solid";
+import { useVdpNode } from "../../../infra/vdpProbe";
 import { type BoardCard, cardAgent, cardLook, cardRepo, closedShown, laneLabel, laneStatus } from "../model/cards";
 import {
   type BoardDensity,
@@ -74,6 +75,7 @@ export function IssueList(props: {
   onAdd: ListAdd;
   onClearFilter?: (() => void) | undefined;
 }) {
+  useVdpNode({ testId: "issue-list", role: "region" });
   const folded = signal<ReadonlySet<string>>(new Set());
   const issues = useIssues();
   const resolvedIssues = computed(() => [...(props.allIssues ?? issues())]);

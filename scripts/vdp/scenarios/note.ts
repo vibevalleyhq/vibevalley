@@ -3,12 +3,12 @@ import { seedNoteShowcase } from "../fixtures/note.ts";
 
 export const noteScenario = defineScenario({
   id: "note",
-  description: "3+1 Note editorial audit (Doc, Base table/board/drawer, Canvas, Media, IssueNotes) in Light & Dark",
+  description: "3+1 Note editorial audit (Doc, Base table/board/gallery/timeline/drawer, Canvas, Media, Presenter, IssueNotes) in Light & Dark",
   async run(v) {
     const ids = await seedNoteShowcase(v);
     await v.resize(v.viewport.width, v.viewport.height);
 
-    // Theme matrix: static layout across Doc, Base Table, and Canvas
+    // Theme matrix: static layout across Doc, Base Table, Canvas, and Media
     await v.forThemes(undefined, async (theme) => {
       await v.nav(`/notes/${ids.docId}`);
       await v.waitRoute(`/notes/${ids.docId}`);
@@ -28,6 +28,12 @@ export const noteScenario = defineScenario({
       await v.wait("note-canvas-view");
       await v.assertClean(`canvas-${theme}`);
       await v.shot(`09-canvas-${theme}`, { label: `Canvas Whiteboard (${theme})`, settleMs: 320 });
+
+      await v.nav(`/notes/${ids.mediaId}`);
+      await v.waitRoute(`/notes/${ids.mediaId}`);
+      await v.wait("note-media-view");
+      await v.assertClean(`media-${theme}`);
+      await v.shot(`10-media-${theme}`, { label: `Media Transcript & Preview View (${theme})` });
     });
 
     // Interactive checks in Light mode
@@ -47,7 +53,7 @@ export const noteScenario = defineScenario({
     await v.key("end");
     await v.shot("02-doc-embeds-backlinks-light", { label: "Doc Embeds & Backlinks" });
 
-    // Base Board switch & Row=Page Drawer
+    // Base Board / Gallery / Timeline switch & Row=Page Drawer
     await v.nav(`/notes/${ids.baseId}`);
     await v.waitRoute(`/notes/${ids.baseId}`);
     await v.wait("base-view-switcher-board");
@@ -55,18 +61,26 @@ export const noteScenario = defineScenario({
     await v.wait("base-board-view");
     await v.shot("07-base-board-light", { label: "Base Kanban Board View" });
 
+    await v.press("base-view-switcher-gallery");
+    await v.wait("base-gallery-view");
+    await v.shot("07b-base-gallery-light", { label: "Base Gallery Cards View" });
+
+    await v.press("base-view-switcher-timeline");
+    await v.wait("base-timeline-view");
+    await v.shot("07c-base-timeline-light", { label: "Base Timeline View" });
+
     await v.press("base-view-switcher-table");
     await v.wait("base-row-open-r1");
     await v.press("base-row-open-r1");
     await v.wait("base-row-drawer-title");
     await v.shot("08-base-row-drawer-light", { label: "Base Row = Page Drawer" });
 
-    // Media View
-    await v.nav(`/notes/${ids.mediaId}`);
-    await v.waitRoute(`/notes/${ids.mediaId}`);
-    await v.wait("note-media-view");
-    await v.assertClean("media-light");
-    await v.shot("10-media-light", { label: "Media Transcript & Preview View" });
+    // Presenter Mode for multi-slide Doc
+    await v.nav(`/present?note=${encodeURIComponent(ids.docId)}`);
+    await v.waitRoute("/present");
+    await v.wait("presenter-page");
+    await v.assertClean("presenter-light");
+    await v.shot("12-presenter-light", { label: "Doc Presenter Mode & Speaker Notes" });
 
     // Issue <-> Note Bidirectional Sidebar
     await v.nav(`/issues/${ids.issueIds[0]}`);

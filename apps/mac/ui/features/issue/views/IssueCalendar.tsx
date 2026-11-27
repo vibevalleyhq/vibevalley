@@ -11,6 +11,7 @@ import { Dot, type DotTone } from "../../../design/Tag";
 import { Bubble } from "../../../design/Tip";
 import { mix } from "../../../design/tone";
 import { useNow } from "../../../infra/base/dom";
+import { useVdpNode } from "../../../infra/vdpProbe";
 import type { BoardCard } from "../model/cards";
 import { type BoardDensity, defaultFields, type IssueFieldVisibility } from "../model/display";
 import { formatIsoDate } from "../model/meta";
@@ -59,6 +60,7 @@ export function IssueCalendar(props: {
   onNew: (at: NewIssueAt) => void;
   onClearFilter?: (() => void) | undefined;
 }) {
+  useVdpNode({ testId: "issue-calendar", role: "region" });
   const now = useNow(60_000);
   const compactHeight = () => windowSize().height < 780;
   const compact = computed(() => props.density === "compact");

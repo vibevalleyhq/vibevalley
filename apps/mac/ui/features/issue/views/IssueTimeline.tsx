@@ -12,6 +12,7 @@ import { CountPill } from "../../../design/Tag";
 import { Bubble } from "../../../design/Tip";
 import { mix, tone } from "../../../design/tone";
 import { useNow } from "../../../infra/base/dom";
+import { useVdpNode } from "../../../infra/vdpProbe";
 import { type BoardCard, cardAgent, type Tone } from "../model/cards";
 import { type BoardDensity, defaultFields, type IssueFieldVisibility } from "../model/display";
 import { blockerIssuesOf, formatIsoDate } from "../model/meta";
@@ -145,6 +146,7 @@ export function IssueTimeline(props: {
   onNew: (at: NewIssueAt) => void;
   onClearFilter?: (() => void) | undefined;
 }) {
+  useVdpNode({ testId: "issue-timeline", role: "region" });
   const scale = signal<TimelineScale>("month");
   const showUnscheduled = signal(false);
   const gridViewportWidth = signal(0);
