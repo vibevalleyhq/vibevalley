@@ -44,29 +44,34 @@ vp run nsh:install                                              # 把 nsh 的命
 cargo run -p vibevalley-mac                                     # 原生应用，里面带着服务端；dev 通道默认 127.0.0.1:8790 与 ~/.vibevalley-dev，VIBEVALLEY_HOME、VIBEVALLEY_STORE 改位置
 cargo run -p vibevalley-server                                  # 只跑服务端；按发布通道默认端口（dev 8790 / alpha 8789 / beta 8788 / release 8787），VIBEVALLEY_CHANNEL、VIBEVALLEY_HOME、VIBEVALLEY_WORK_ROOT、VIBEVALLEY_PORT、VIBEVALLEY_DATABASE_URL（--database-url）改位置与数据库后端
 cargo run -p vibevalley-cli -- issue list                       # 命令行：issue、session、repo、cron、agent、orchestrator、runtime、memory、channel、chat、note、library、media、attachment、state、setting、doctor（--json 输出原始 JSON）
+make fmt                                                        # 一键格式化 Rust + TS（cargo fmt + vp check --fix --deny-warnings）
+make gen                                                        # 改完契约/接口/词典后一次性重生成 protocol、api:client、capabilities 与 i18n
+make i18n                                                       # 改了 crates/i18n/locales：重写 catalogs.ts 并校验词典（i18n:gen + check）
 make rust                                                       # 或 cargo xtask check：改完 crates/、xtask/ 或 apps/mac/src，跑 fmt、clippy（-D warnings）与测试
+make rust-clippy                                                # 全仓 cargo clippy --workspace --all-targets -- -D warnings
+make rust-test [PKG=<crate>]                                    # nextest --profile fast（传 PKG 仅跑单 crate，省略跑全仓快速集）
 make rust-changed                                               # 或 cargo xtask changed --base <ref> [--fast]：按开销递增检查改到的 Rust crate 及其反向依赖
 make rust-fast [BASE=origin/main]                               # 分层 Fast-Fail：fmt --check → xtask audit → xtask changed --base $(BASE) --fast（跳过长耗时压测）
 make verify-fast [BASE=origin/main]                             # 迭代/合批快捷验证：rust-fast + protocol + ts + mac:check + mobile:check + docs:verify
+make pr-check                                                   # 提 PR 前终态门禁：make verify + vp run mobile:check
 make rust-loom                                                  # 或 cargo xtask loom：对并发状态机内核跑 loom 穷举模型检验（--features loom --profile loom）
 make rust-audit                                                 # 或 cargo xtask audit：检查 Rust 模块边界（扁平 DAG、gateway/ 隔离与 {db,service}/ 数据边界）与异步并发棘轮（xtask/src/{boundaries,ratchets}.rs）
 make protocol-write                                             # 或 cargo xtask protocol --write：改了 crates/protocol/src/contract，重写 shapes.gen.ts 和 endpoints.gen.ts
 make goldens                                                    # 或 cargo xtask goldens --check：跑 golden 测试
 make protocol                                                   # 或 cargo xtask protocol：生成的 TS 契约和 golden 是不是最新，和提交的不同就失败
-vp run mac:check                                                # 改完 apps/mac/ui：nsh 类型检查、打包和工单按钮行为测试
-vp run mobile:check                                             # 改完 apps/mobile：nsh 类型检查、打包、测试与 lint
-vp run vdp [场景...] --ui-only --out /tmp/vv-vdp                # 单条 WebSocket 跑固定 VDP 场景脚本（note/issues/chat/library/dashboard/settings/all）；纯改 UI 加 --ui-only（免编 Rust），复用现有包加 --skip-build
+vp run mac:check                                                # 或 make mac：改完 apps/mac/ui，nsh 类型检查、打包和工单按钮行为测试
+vp run mobile:check                                             # 或 make mobile：改完 apps/mobile，nsh 类型检查、打包、测试与 lint
+make vdp [SCENE=all] [VDP_OUT=/tmp/vv-vdp]                      # 重编并用单条 WebSocket 跑固定 VDP 场景（note/issues/chat/library/dashboard/settings/all）
+make vdp-ui [SCENE=note]                                        # 纯改 UI 跳过 Cargo 重编（--ui-only ~5s）；复用已有包用 make vdp-fast（--skip-build）
 vp run icons:gen                                                # 改了 crates/rich/src/icon.rs：重新生成 97 枚 reicons 矢量路径表 iconPaths.gen.ts
 vp check                                                        # 改完 apps/mac/ui 以外的 TS：格式（oxfmt）、lint（oxlint，带类型，跑在 tsrs 上）和类型；--fix 改格式
 vp run packages:check                                           # 改完 packages/：打出声明、vp check、各包的测试
 vp run scripts:test                                             # 改完 scripts/：它自己的测试
-vp run site:check && vp run site:build                          # 改完 apps/site/：素材和静态生成测试，再构建
-vp run docs:verify                                              # 改完文档或 skill：格式、目录、链接、旧名字、用语、词典和生成的参考表
-vp run i18n:gen                                                 # 改了 crates/i18n/locales：重写 catalogs.ts；vpx scripts/gen/i18n.ts check|find <文字> 查问题、找键
-vp run capabilities                                             # 改了 <概念>/api.ts 的 can：重写 docs/reference/capabilities.md
-vp run api:client                                               # 改了 <概念>/api.ts 的接口：重写 packages/protocol/src/client.ts
-vp run deadcode                                                 # knip 查 TS 里没人用的文件、导出和依赖
-vpx scripts/audit/comment-review.ts                             # 提 PR 前：模型审这个分支新加的注释（vv-comments）
+vp run site:check && vp run site:build                          # 或 make site：改完 apps/site/，素材和静态生成测试，再构建
+vp run docs:verify                                              # 或 make docs：改完文档或 skill，格式、目录、链接、旧名字、用语、词典和生成的参考表
+make deadcode                                                   # 或 vp run deadcode：knip 查 TS 里没人用的文件、导出和依赖
+make comment-review                                             # 提 PR 前：模型审这个分支新加的注释（vv-comments）
+make package-alpha-dmg                                          # 或 vp run package:mac:alpha:dmg：打出本地 Alpha .app + .dmg 安装包
 make verify                                                     # 在 Mac 上检查 Rust、边界/棘轮、契约、软件包、脚本、原生页面和文档
 vp run release alpha|beta|final                                 # beta/final 先跑 make verify；确认后推 tag，每个标签通过 CI 才打包
 ```
