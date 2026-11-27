@@ -39,13 +39,13 @@ import { HistoryPanel } from "./HistoryPanel";
 import { InstallAppletModal, useInstalledNoteApplet } from "./InstallAppletModal";
 import { kindLabel, noteHref, noteIcon, noteTypeIcon, noteTypeLabel, useNote, useNotes } from "./NoteCard";
 import { NoteDirectoryView } from "./NoteDirectoryView";
-import { PageTree } from "./PageTree";
 import { presenterHref } from "./slides";
 import {
   createBaseRowPage,
   createTypedNote,
   exportNoteDirectory,
   noteBaseQuery,
+  noteBaseSheetViewsQuery,
   noteDocQuery,
   noteLinksQuery,
   useNotePresence,
@@ -88,7 +88,6 @@ export function NotePage(props: { rest: string; chat: NoteChat }) {
   const queries = useQueryClient();
   const act = createAct((msg) => toast(msg, "bad"));
 
-  const treeOpen = signal(true);
   const notesRes = useNotes(() => ({}));
   const notesList = computed(() => ready(notesRes, []));
 
@@ -112,16 +111,6 @@ export function NotePage(props: { rest: string; chat: NoteChat }) {
 
   return (
     <View testID="notes" class="h-full min-h-0 min-w-0 flex-1 flex-row overflow-hidden bg-page">
-      <If when={treeOpen()}>
-        <PageTree
-          notes={notesList()}
-          activeId={selectedId()}
-          onSelect={(id) => router.navigate(noteHref(id))}
-          onCreated={(n) => router.navigate(noteHref(n.id))}
-          onMoved={(n) => router.navigate(noteHref(n.id))}
-        />
-      </If>
-
       <View class="min-h-0 min-w-0 flex-1">
         <If
           when={selectedId()}
@@ -137,14 +126,6 @@ export function NotePage(props: { rest: string; chat: NoteChat }) {
                     onClick={() => contentSidebarOpen.set(true)}
                   />
                 </If>
-                <IconButton
-                  icon="folder"
-                  size={16}
-                  label={t("web.note.tree.title")}
-                  testid="note-tree-toggle"
-                  pressed={treeOpen()}
-                  onClick={() => treeOpen.set(!treeOpen())}
-                />
                 <Text class="text-sm font-semibold text-ink">{t("web.note.page.all")}</Text>
               </View>
               <View class="flex-1 items-center justify-center p-8">
@@ -167,34 +148,14 @@ export function NotePage(props: { rest: string; chat: NoteChat }) {
             </View>
           }
         >
-          {(id) => (
-            <Keyed key={id()}>
-              {() => (
-                <NoteDetailSlot
-                  id={id()}
-                  versionParam={versionParam()}
-                  notes={notesList()}
-                  treeOpen={treeOpen()}
-                  onToggleTree={() => treeOpen.set(!treeOpen())}
-                  chat={props.chat}
-                />
-              )}
-            </Keyed>
-          )}
+          {(id) => <Keyed key={id()}>{() => <NoteDetailSlot id={id()} versionParam={versionParam()} notes={notesList()} chat={props.chat} />}</Keyed>}
         </If>
       </View>
     </View>
   );
 }
 
-function NoteDetailSlot(props: {
-  id: NoteId;
-  versionParam: number | undefined;
-  notes: readonly Note[];
-  treeOpen: boolean;
-  onToggleTree: () => void;
-  chat: NoteChat;
-}) {
+function NoteDetailSlot(props: { id: NoteId; versionParam: number | undefined; notes: readonly Note[]; chat: NoteChat }) {
   const router = useRouter();
   const noteRes = useNote(() => props.id);
   const busy = useDelayedBusy(() => noteRes.status() === "pending");
@@ -232,28 +193,12 @@ function NoteDetailSlot(props: {
         </If>
       }
     >
-      {(note) => (
-        <NoteDetailView
-          note={note()}
-          versionParam={props.versionParam}
-          notes={props.notes}
-          treeOpen={props.treeOpen}
-          onToggleTree={props.onToggleTree}
-          chat={props.chat}
-        />
-      )}
+      {(note) => <NoteDetailView note={note()} versionParam={props.versionParam} notes={props.notes} chat={props.chat} />}
     </If>
   );
 }
 
-function NoteDetailView(props: {
-  note: Note;
-  versionParam: number | undefined;
-  notes: readonly Note[];
-  treeOpen: boolean;
-  onToggleTree: () => void;
-  chat: NoteChat;
-}) {
+function NoteDetailView(props: { note: Note; versionParam: number | undefined; notes: readonly Note[]; chat: NoteChat }) {
   const queries = useQueryClient();
   const router = useRouter();
   const board = useBoardSlice();
@@ -316,10 +261,35 @@ function NoteDetailView(props: {
   const links = useQuery(() => noteLinksQuery(props.note.id));
   const baseSnap = useQuery(() => noteBaseQuery({ id: props.note.id, sheetId: activeSheetId(), viewId: activeViewId() }), {
     enabled: () => props.note.noteType === "base",
+    keepPrevious: true,
   });
+  const baseViewsQuery = useQuery(() => noteBaseSheetViewsQuery(props.note.id), {
+    enabled: () => props.note.noteType === "base",
+  });
+  const currentBaseSnap = computed(() => ready(baseSnap, undefined) ?? baseSnap.previous()?.value);
+  const currentBaseViews = computed(() => {
+    const sid = activeSheetId() ?? currentBaseSnap()?.activeSheetId;
+    if (!sid) return undefined;
+    return ready(baseViewsQuery, undefined)?.get(sid);
+  });
+  const baseError = computed(() => (baseSnap.error() !== undefined ? reasonOf(baseSnap.error()) : undefined));
 
   const issuesList = computed(() => board()?.issues ?? []);
   const pinned = computed(() => isPinned(`note:${props.note.id}`));
+  const breadcrumbs = computed((): readonly Note[] => {
+    const byId = new Map(props.notes.map((n) => [String(n.id), n]));
+    const chain: Note[] = [];
+    const seen = new Set<string>([props.note.id]);
+    let curId = props.note.parentId;
+    while (curId !== undefined && !seen.has(curId)) {
+      seen.add(curId);
+      const parent = byId.get(curId);
+      if (!parent) break;
+      chain.unshift(parent);
+      curId = parent.parentId;
+    }
+    return chain;
+  });
 
   const saveDoc = async (doc: { readonly version: number; readonly blocks: readonly DocBlock[] }) => {
     await act.run(async () => {
@@ -436,26 +406,32 @@ function NoteDetailView(props: {
             onClick={() => contentSidebarOpen.set(true)}
           />
         </If>
-        <IconButton
-          icon="folder"
-          size={16}
-          label={t("web.note.tree.title")}
-          testid="note-tree-toggle"
-          pressed={props.treeOpen}
-          onClick={() => props.onToggleTree()}
-        />
-        <View class="size-6 shrink-0 items-center justify-center rounded-sm bg-side">
-          <Icon name={noteIcon(props.note)} size={13} tone="muted" />
+        <View class="min-w-0 flex-1 flex-row items-center gap-1.5 overflow-hidden">
+          <View class="size-5 shrink-0 items-center justify-center rounded-sm bg-side">
+            <Icon name={noteIcon(props.note)} size={12} tone="muted" />
+          </View>
+          <Each of={breadcrumbs()} key={(anc) => anc.id}>
+            {(anc) => (
+              <>
+                <View
+                  role="button"
+                  testID={`note-breadcrumb-${anc().id}`}
+                  onPress={() => router.navigate(noteHref(anc().id))}
+                  class="min-w-0 shrink rounded-sm px-1 py-0.5 hover:bg-hover"
+                >
+                  <Text class="max-w-32 truncate text-xs text-muted hover:text-ink">{anc().title}</Text>
+                </View>
+                <Text class="shrink-0 text-xs text-faint">/</Text>
+              </>
+            )}
+          </Each>
+          <Text testID="note-title" class="min-w-0 flex-1 truncate text-sm font-semibold text-ink">
+            {props.note.title}
+          </Text>
         </View>
-        <Text testID="note-title" class="min-w-0 flex-1 truncate text-sm font-semibold text-ink">
-          {props.note.title}
-        </Text>
 
-        <View class="h-5 shrink-0 items-center justify-center rounded-sm bg-selected px-1.5">
-          <Text class="text-2xs font-medium text-ink">{kindLabel(props.note)}</Text>
-        </View>
-        <View testID="note-version-badge" class="h-5 shrink-0 items-center justify-center rounded-sm border border-line bg-side px-1.5">
-          <Text class="font-mono text-2xs font-medium text-muted tabular-nums">
+        <View testID="note-version-badge" class="h-5 shrink-0 items-center justify-center rounded-sm px-1.5">
+          <Text class="font-mono text-2xs font-medium text-faint tabular-nums">
             {displayVersion() > 0 ? t("web.note.card.version", { version: displayVersion() }) : t("web.note.page.liveVersion")}
           </Text>
         </View>
@@ -469,11 +445,22 @@ function NoteDetailView(props: {
           note={props.note}
           peers={presence.peers()}
           suggestions={suggestions.open()}
+          historyOpen={historyOpen()}
+          filesOpen={showFiles()}
           onAcceptSuggestion={(sid: SuggestionId) => void suggestions.accept(sid)}
           onRejectSuggestion={(sid: SuggestionId) => void suggestions.reject(sid)}
           onToggleHistory={() => historyOpen.set(!historyOpen())}
-          onToggleFiles={() => showFiles.set(!showFiles())}
         />
+
+        <If when={props.note.noteType === "doc" && (ready(docView, undefined)?.slideCount ?? 0) > 1}>
+          <IconButton
+            icon="present"
+            size={16}
+            label={t("web.note.doc.presenter")}
+            testid="note-header-presenter"
+            onClick={() => router.navigate(presenterHref({ id: props.note.id, version: effectiveVersion() }))}
+          />
+        </If>
 
         <If when={installedApplet()}>
           {(info) => (
@@ -486,14 +473,6 @@ function NoteDetailView(props: {
           <IconButton icon="devices" size={16} label={t("web.note.applet.button")} testid="note-install-applet" onClick={() => appletOpen.set(true)} />
         </If>
 
-        <IconButton
-          icon="clock"
-          size={16}
-          label={t("web.note.timeline.title")}
-          testid="note-history-toggle"
-          pressed={historyOpen()}
-          onClick={() => historyOpen.set(!historyOpen())}
-        />
         <IconButton
           icon="chat"
           size={16}
@@ -631,15 +610,17 @@ function NoteDetailView(props: {
                 <If when={props.note.noteType === "base"}>
                   <BaseView
                     note={props.note}
-                    snapshot={ready(baseSnap, undefined)}
+                    snapshot={currentBaseSnap()}
+                    views={currentBaseViews()}
+                    error={baseError()}
                     notes={props.notes}
                     issues={issuesList()}
                     activeSheetId={activeSheetId()}
                     activeViewId={activeViewId()}
                     busy={act.busy()}
                     onSelectView={(sid: string, vid: string | undefined) => {
-                      activeSheetId.set(sid);
-                      activeViewId.set(vid);
+                      activeSheetId.set(sid || undefined);
+                      activeViewId.set(vid || undefined);
                     }}
                     onUpsertRow={upsertRow}
                     onRunAgentColumn={runAgentColumn}

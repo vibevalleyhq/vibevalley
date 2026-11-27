@@ -1,4 +1,5 @@
-import type { BaseCellValue, BaseColumn, BaseColumnKind, BaseRow, BaseSelectOption, Note } from "@vibevalley/protocol";
+import { t } from "@vibevalley/i18n";
+import type { BaseCellValue, BaseColumn, BaseColumnKind, BaseRow, BaseSelectOption, BaseSummaryOp, Note } from "@vibevalley/protocol";
 import { issueId, noteId } from "@vibevalley/protocol/schema";
 
 import type { IconName } from "../../../design/icons";
@@ -68,6 +69,73 @@ export function formatBaseNumber(n: number): string {
     return String(Math.round(n));
   }
   return n.toFixed(4).replace(/\.?0+$/u, "");
+}
+
+export function formatSummaryValue(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed || trimmed === "—") return "—";
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed)) return trimmed;
+  if (Math.abs(parsed - Math.round(parsed)) < 1e-9 && Math.abs(parsed) < 1e15) {
+    return String(Math.round(parsed));
+  }
+  return parsed.toFixed(2).replace(/\.?0+$/u, "");
+}
+
+export function summaryOpLabel(op: BaseSummaryOp): string {
+  switch (op) {
+    case "count":
+      return t("web.note.base.summary.count");
+    case "sum":
+      return t("web.note.base.summary.sum");
+    case "avg":
+      return t("web.note.base.summary.avg");
+    case "min":
+      return t("web.note.base.summary.min");
+    case "max":
+      return t("web.note.base.summary.max");
+  }
+}
+
+export function columnWidthPx(col: BaseColumn): number {
+  if (typeof col.width === "number" && Number.isFinite(col.width) && col.width > 0) {
+    return Math.max(96, Math.min(420, Math.round(col.width)));
+  }
+  switch (col.kind) {
+    case "checkbox":
+      return 88;
+    case "number":
+      return 104;
+    case "select":
+      return 128;
+    case "date":
+      return 136;
+    case "formula":
+      return 140;
+    case "multiSelect":
+      return 160;
+    case "agentRef":
+      return 156;
+    case "media":
+      return 156;
+    case "noteRef":
+    case "issueRef":
+      return 196;
+    case "agentAction":
+      return 200;
+    case "text":
+      return 220;
+  }
+}
+
+export function cleanWikilinkText(raw: string, notesById?: ReadonlyMap<string, Note>): string {
+  return raw
+    .replace(/!?\[\[note:([^|\]]+)\|([^\]]+)\]\]/gu, (_, _id: string, label: string) => label.trim())
+    .replace(/!?\[\[note:([^\]]+)\]\]/gu, (_, id: string) => notesById?.get(id.trim())?.title ?? "")
+    .replace(/!?\[\[issue:([^|\]]+)\|([^\]]+)\]\]/gu, (_, _id: string, label: string) => label.trim())
+    .replace(/!?\[\[issue:([^\]]+)\]\]/gu, (_, id: string) => `#${id.trim()}`)
+    .replace(/\s{2,}/gu, " ")
+    .trim();
 }
 
 export function baseCellAsText(cell: BaseCellValue | undefined): string {

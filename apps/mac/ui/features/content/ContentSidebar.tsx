@@ -2,7 +2,8 @@ import { Scroll, signal, Text, View, type JSX } from "nsh";
 import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
-import { type LibraryFileKind, LibraryFileKindValues, NOTE_TYPES } from "@vibevalley/protocol";
+import { type LibraryFileKind, LibraryFileKindValues, type NoteId, NOTE_TYPES } from "@vibevalley/protocol";
+import { noteId } from "@vibevalley/protocol/schema";
 
 import { Button } from "../../design/Button";
 import { Icon } from "../../design/Icon";
@@ -28,7 +29,7 @@ import {
 } from "../../infra/state/contentNav";
 import { defineStored } from "../../infra/state/stored";
 import { libraryQuery } from "../media";
-import { noteTypeIcon, noteTypeLabel, useInstalledApplets, useNotes } from "../note";
+import { noteHref, noteTypeIcon, noteTypeLabel, PageTree, useInstalledApplets, useNotes } from "../note";
 
 const notesSectionOpen = defineStored("content.sidebar.notes", z.boolean(), true);
 const mediaSectionOpen = defineStored("content.sidebar.media", z.boolean(), true);
@@ -77,6 +78,12 @@ export function ContentSidebar() {
   );
 
   const inBrowse = createMemo(() => location().pathname === "/library" || location().pathname.startsWith("/library/"));
+  const activeNoteId = createMemo((): NoteId | undefined => {
+    const p = location().pathname;
+    if (!p.startsWith("/notes/")) return undefined;
+    const first = p.slice("/notes/".length).split("/")[0]?.trim();
+    return first ? noteId(first) : undefined;
+  });
   const bucket = () => contentBrowseBucket();
   const allNotesActive = createMemo(() => {
     const b = contentBrowseBucket();
@@ -135,7 +142,7 @@ export function ContentSidebar() {
   };
 
   return (
-    <View testID="content-sidebar" accessibilityLabel={t("web.library.content.title")} class="h-full w-58 shrink-0 border-r border-line bg-side">
+    <View testID="content-sidebar" accessibilityLabel={t("web.library.content.title")} class="h-full w-60 shrink-0 border-r border-line bg-side">
       <View desktop={{ windowDrag: true }} class="h-11 shrink-0 flex-row items-center gap-1.5 border-b border-line px-2.5">
         <IconButton
           icon="sidebar"
@@ -276,6 +283,18 @@ export function ContentSidebar() {
             />
           </If>
         </NavSection>
+
+        <View class="my-1 h-px bg-line" />
+
+        <PageTree
+          embedded
+          notes={allNotes()}
+          activeId={activeNoteId()}
+          noteTypeFilter={activeNoteFilter()}
+          onSelect={(id) => router.navigate(noteHref(id))}
+          onCreated={(n) => router.navigate(noteHref(n.id))}
+          onMoved={(n) => router.navigate(noteHref(n.id))}
+        />
       </Scroll>
     </View>
   );

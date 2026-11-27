@@ -1,4 +1,4 @@
-import { computed, effect, signal, Text, untracked, View, type InputRef, type JSX } from "nsh";
+import { computed, effect, keymap, Scroll, signal, Text, untracked, View, windowSize, type InputRef, type JSX, type ViewRef } from "nsh";
 import { Input, Menu, MenuItem, MenuSeparator } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
@@ -17,11 +17,14 @@ import {
   detectWikilinkTrigger,
   extractBlockTitle,
   formatWikilinkToken,
+  isTurnIntoActive,
   makeBlockId,
   matchMarkdownInputRule,
+  slashCommandLabel,
   stripSlashTrigger,
   TURN_INTO_OPTIONS,
   turnBlockInto,
+  wrapInlineMarkdown,
   type BlockType,
   type SlashCommandItem,
 } from "./docOps";
@@ -61,6 +64,7 @@ export interface BlockItemProps {
   readonly focusedBlockId?: string | undefined;
   readonly depth?: number | undefined;
   readonly onFocusBlock?: ((id: string) => void) | undefined;
+  readonly onFocusAdjacent?: ((id: string, dir: "prev" | "next") => void) | undefined;
   readonly onUpdateBlock: (id: string, next: DocBlock) => void;
   readonly onInsertAfter: (afterId: string, newBlock: DocBlock) => void;
   readonly onMoveBlock: (id: string, direction: "up" | "down") => void;
@@ -79,7 +83,7 @@ type ListBlockData = Extract<DocBlock, { type: "list" }>;
 type TodoBlockData = Extract<DocBlock, { type: "todo" }>;
 type QuoteBlockData = Extract<DocBlock, { type: "quote" }>;
 
-const menuPopupClass = `min-w-48 max-h-80 gap-0.5 rounded-lg border border-line-strong bg-elevated p-1 shadow-float ${motionClass("transition-opacity duration-120 ease-out")}`;
+const menuPopupClass = `min-w-52 gap-0.5 rounded-lg border border-line-strong bg-elevated p-1 shadow-float ${motionClass("transition-opacity duration-120 ease-out")}`;
 const menuItemClass = "h-7 flex-row items-center gap-2 rounded-md px-2 hover:bg-hover focus:bg-hover";
 
 function ProseBlockView(props: {
@@ -88,6 +92,7 @@ function ProseBlockView(props: {
   readonly issues: readonly Issue[];
   readonly focused: boolean;
   readonly onFocus: () => void;
+  readonly onFocusAdjacent?: ((dir: "prev" | "next") => void) | undefined;
   readonly onUpdate: (next: DocBlock) => void;
   readonly onInsertAfter: (newBlock: DocBlock) => void;
   readonly onDelete: () => void;
@@ -96,7 +101,9 @@ function ProseBlockView(props: {
 }) {
   const editing = signal(untracked(() => props.focused || props.block.text === ""));
   const menuDismissedAt = signal<string | undefined>(undefined);
+  const slashPlacement = signal<"bottom" | "top">("bottom");
   let inputRef: InputRef | undefined;
+  let anchorRef: ViewRef | undefined;
 
   effect(() => {
     if (props.focused) {
@@ -117,6 +124,37 @@ function ProseBlockView(props: {
     const hit = detectWikilinkTrigger(props.block.text);
     if (!hit || menuDismissedAt() === props.block.text) return undefined;
     return hit;
+  });
+
+  effect(() => {
+    if (slashTrigger() === undefined) {
+      slashPlacement.set("bottom");
+      return;
+    }
+    void anchorRef?.measure().then((measured) => {
+      if (!measured) return;
+      const bottom = measured.pagePosition.y + measured.bounds.size.height;
+      const spaceBelow = windowSize().height - bottom;
+      const spaceAbove = measured.pagePosition.y;
+      slashPlacement.set(spaceBelow < 340 && spaceAbove > spaceBelow ? "top" : "bottom");
+    });
+  });
+
+  const applyFormat = (marker: "**" | "*" | "`" | "~~") => {
+    props.onUpdate({ ...props.block, text: wrapInlineMarkdown(props.block.text, marker) });
+  };
+
+  const formatBarActive = computed(() => props.focused && editing() && slashTrigger() === undefined && wikiTrigger() === undefined);
+  effect(() => {
+    if (!formatBarActive()) return;
+    return keymap.bind(
+      {
+        "mod+b": () => applyFormat("**"),
+        "mod+i": () => applyFormat("*"),
+        "mod+e": () => applyFormat("`"),
+      },
+      { when: "always" },
+    );
   });
 
   const handleInput = (val: string) => {
@@ -177,7 +215,67 @@ function ProseBlockView(props: {
   const hasLinks = computed(() => props.block.text.includes("[[") || /(?:^|[\s([,:;])#\d+/u.test(props.block.text));
 
   return (
-    <View testID={`doc-prose-${props.block.id}`} class="relative">
+    <View
+      ref={(el) => {
+        anchorRef = el;
+      }}
+      testID={`doc-prose-${props.block.id}`}
+      class="relative"
+    >
+      <If when={formatBarActive() && props.block.text.trim().length > 0}>
+        <View
+          testID={`doc-format-bar-${props.block.id}`}
+          class="absolute -top-8 left-0 z-20 flex-row items-center gap-0.5 rounded-md border border-line bg-elevated px-1 py-0.5 shadow-raise"
+        >
+          <View
+            role="button"
+            testID={`doc-fmt-bold-${props.block.id}`}
+            accessibilityLabel={t("web.note.doc.bold")}
+            onPress={() => applyFormat("**")}
+            class="h-6 min-w-6 items-center justify-center rounded-xs px-1.5 hover:bg-hover"
+          >
+            <Text class="text-xs font-bold text-ink">B</Text>
+          </View>
+          <View
+            role="button"
+            testID={`doc-fmt-italic-${props.block.id}`}
+            accessibilityLabel={t("web.note.doc.italic")}
+            onPress={() => applyFormat("*")}
+            class="h-6 min-w-6 items-center justify-center rounded-xs px-1.5 hover:bg-hover"
+          >
+            <Text class="text-xs italic text-ink">I</Text>
+          </View>
+          <View
+            role="button"
+            testID={`doc-fmt-code-${props.block.id}`}
+            accessibilityLabel={t("web.note.doc.inlineCode")}
+            onPress={() => applyFormat("`")}
+            class="h-6 min-w-6 items-center justify-center rounded-xs px-1.5 hover:bg-hover"
+          >
+            <Text class="font-mono text-2xs text-ink">{"<>"}</Text>
+          </View>
+          <View
+            role="button"
+            testID={`doc-fmt-strike-${props.block.id}`}
+            accessibilityLabel={t("web.note.doc.strike")}
+            onPress={() => applyFormat("~~")}
+            class="h-6 min-w-6 items-center justify-center rounded-xs px-1.5 hover:bg-hover"
+          >
+            <Text class="text-xs text-ink line-through">S</Text>
+          </View>
+          <View class="mx-0.5 h-3.5 w-px bg-line" />
+          <View
+            role="button"
+            testID={`doc-fmt-link-${props.block.id}`}
+            accessibilityLabel={t("web.note.doc.link")}
+            onPress={() => props.onUpdate({ ...props.block, text: `${props.block.text}[[` })}
+            class="h-6 items-center justify-center rounded-xs px-1.5 hover:bg-hover"
+          >
+            <Text class="font-mono text-2xs font-medium text-accent">{"[["}</Text>
+          </View>
+        </View>
+      </If>
+
       <If
         when={editing() || !hasLinks()}
         else={
@@ -230,6 +328,9 @@ function ProseBlockView(props: {
           onKeyPress={(e) => {
             if (e.key === "Backspace" && props.block.text === "") {
               props.onDelete();
+            } else if (!untracked(slashTrigger) && !untracked(wikiTrigger)) {
+              if (e.key === "ArrowUp" && !props.block.text.includes("\n")) props.onFocusAdjacent?.("prev");
+              else if (e.key === "ArrowDown" && !props.block.text.includes("\n")) props.onFocusAdjacent?.("next");
             }
           }}
           class="min-h-6 w-full rounded-sm border border-transparent bg-transparent px-1 text-sm leading-6 text-ink placeholder:text-faint"
@@ -238,6 +339,7 @@ function ProseBlockView(props: {
       <SlashMenu
         open={slashTrigger() !== undefined}
         query={slashTrigger()?.query ?? ""}
+        placement={slashPlacement()}
         testID={`doc-slash-menu-${props.block.id}`}
         onSelect={handleSlashSelect}
         onClose={() => menuDismissedAt.set(props.block.text)}
@@ -263,7 +365,18 @@ function headingTextClass(level: number): string {
     case 2:
       return "text-xl font-semibold leading-7";
     default:
-      return "text-lg font-semibold leading-6";
+      return "text-base font-semibold leading-6";
+  }
+}
+
+function headingSpacingClass(level: number): string {
+  switch (level) {
+    case 1:
+      return "mt-6 mb-1";
+    case 2:
+      return "mt-5 mb-0.5";
+    default:
+      return "mt-3";
   }
 }
 
@@ -271,6 +384,7 @@ function HeadingBlockView(props: {
   readonly block: HeadingBlockData;
   readonly focused: boolean;
   readonly onFocus: () => void;
+  readonly onFocusAdjacent?: ((dir: "prev" | "next") => void) | undefined;
   readonly onUpdate: (next: HeadingBlockData) => void;
   readonly onInsertAfter: (newBlock: DocBlock) => void;
 }) {
@@ -280,15 +394,7 @@ function HeadingBlockView(props: {
   });
 
   return (
-    <View testID={`doc-heading-${props.block.id}`} class="mt-2 flex-row items-center gap-2">
-      <View
-        role="button"
-        testID={`doc-heading-level-${props.block.id}`}
-        onPress={() => props.onUpdate({ ...props.block, level: props.block.level >= 3 ? 1 : props.block.level + 1 })}
-        class="shrink-0 rounded-xs bg-side px-1.5 py-0.5 hover:bg-hover"
-      >
-        <Text class="font-mono text-2xs font-semibold text-faint">{`H${props.block.level}`}</Text>
-      </View>
+    <View testID={`doc-heading-${props.block.id}`} class={`flex-row items-center gap-2 ${headingSpacingClass(props.block.level)}`}>
       <Input
         ref={(el) => {
           inputRef = el;
@@ -296,39 +402,34 @@ function HeadingBlockView(props: {
         autoFocus={props.focused}
         testID={`doc-block-input-${props.block.id}`}
         value={props.block.text}
-        placeholder={`Heading ${props.block.level}`}
+        placeholder={t("web.note.doc.headingPlaceholder", { level: props.block.level })}
         submitBehavior="submit"
         onFocus={props.onFocus}
         onChange={(e) => props.onUpdate({ ...props.block, text: e.value })}
         onSubmit={() => props.onInsertAfter({ id: makeBlockId(), type: "prose", text: "" })}
+        onKeyPress={(e) => {
+          if (e.key === "ArrowUp") props.onFocusAdjacent?.("prev");
+          else if (e.key === "ArrowDown") props.onFocusAdjacent?.("next");
+        }}
         class={`min-w-0 flex-1 bg-transparent px-1 text-ink placeholder:text-faint ${headingTextClass(props.block.level)}`}
       />
+      <View
+        role="button"
+        testID={`doc-heading-level-${props.block.id}`}
+        onPress={() => props.onUpdate({ ...props.block, level: props.block.level >= 3 ? 1 : props.block.level + 1 })}
+        class={`shrink-0 rounded-xs bg-side px-1.5 py-0.5 hover:bg-hover ${
+          props.focused ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus-within:opacity-100"
+        }`}
+      >
+        <Text class="font-mono text-2xs font-semibold text-faint">{`H${props.block.level}`}</Text>
+      </View>
     </View>
   );
 }
 
 function ListBlockView(props: { readonly block: ListBlockData; readonly onUpdate: (next: ListBlockData) => void }) {
   return (
-    <View testID={`doc-list-${props.block.id}`} class="gap-1">
-      <View class="flex-row items-center justify-between gap-2">
-        <View
-          role="button"
-          testID={`doc-list-toggle-ordered-${props.block.id}`}
-          onPress={() => props.onUpdate({ ...props.block, ordered: !props.block.ordered })}
-          class="rounded-xs bg-side px-1.5 py-0.5 hover:bg-hover"
-        >
-          <Text class="font-mono text-2xs text-muted">{props.block.ordered ? "1. Ordered" : "• Bulleted"}</Text>
-        </View>
-        <Button
-          size="compact"
-          tone="quiet"
-          icon="add"
-          testID={`doc-list-add-${props.block.id}`}
-          onPress={() => props.onUpdate({ ...props.block, items: [...props.block.items, ""] })}
-        >
-          {t("web.base.chips.add")}
-        </Button>
-      </View>
+    <View testID={`doc-list-${props.block.id}`} class="relative gap-1">
       <Each of={props.block.items} key={(_, idx) => String(idx)}>
         {(item, idx) => (
           <View class="flex-row items-center gap-2">
@@ -340,7 +441,7 @@ function ListBlockView(props: { readonly block: ListBlockData; readonly onUpdate
             <Input
               testID={`doc-list-item-${props.block.id}-${idx()}`}
               value={item()}
-              placeholder="List item..."
+              placeholder={t("web.note.doc.listItemPlaceholder")}
               submitBehavior="submit"
               onChange={(e) => {
                 const next = [...props.block.items];
@@ -359,7 +460,7 @@ function ListBlockView(props: { readonly block: ListBlockData; readonly onUpdate
                 role="button"
                 testID={`doc-list-remove-${props.block.id}-${idx()}`}
                 onPress={() => props.onUpdate({ ...props.block, items: props.block.items.filter((_, i) => i !== idx()) })}
-                class="rounded-xs p-0.5 opacity-60 hover:bg-bad-soft hover:opacity-100"
+                class="rounded-xs p-0.5 opacity-0 group-hover:opacity-60 hover:bg-bad-soft hover:opacity-100"
               >
                 <Icon name="close" size={12} tone="muted" />
               </View>
@@ -367,6 +468,25 @@ function ListBlockView(props: { readonly block: ListBlockData; readonly onUpdate
           </View>
         )}
       </Each>
+      <View class="flex-row items-center justify-between gap-2 pl-7 opacity-0 group-hover:opacity-100 focus-within:opacity-100">
+        <View
+          role="button"
+          testID={`doc-list-toggle-ordered-${props.block.id}`}
+          onPress={() => props.onUpdate({ ...props.block, ordered: !props.block.ordered })}
+          class="rounded-xs bg-side px-1.5 py-0.5 hover:bg-hover"
+        >
+          <Text class="font-mono text-2xs text-muted">{props.block.ordered ? t("web.note.doc.orderedList") : t("web.note.doc.bulletedList")}</Text>
+        </View>
+        <Button
+          size="compact"
+          tone="quiet"
+          icon="add"
+          testID={`doc-list-add-${props.block.id}`}
+          onPress={() => props.onUpdate({ ...props.block, items: [...props.block.items, ""] })}
+        >
+          {t("web.note.doc.add")}
+        </Button>
+      </View>
     </View>
   );
 }
@@ -380,14 +500,14 @@ function TodoBlockView(props: {
     <View testID={`doc-todo-${props.block.id}`} class="flex-row items-center gap-2 py-0.5">
       <Checkbox
         checked={props.block.checked}
-        label={props.block.text || "Todo"}
+        label={props.block.text || t("web.note.doc.slash.todo.label")}
         testid={`doc-todo-check-${props.block.id}`}
         onChange={(checked) => props.onUpdate({ ...props.block, checked })}
       />
       <Input
         testID={`doc-block-input-${props.block.id}`}
         value={props.block.text}
-        placeholder="To-do..."
+        placeholder={t("web.note.doc.todoPlaceholder")}
         submitBehavior="submit"
         onChange={(e) => props.onUpdate({ ...props.block, text: e.value })}
         onSubmit={() => props.onInsertAfter({ id: makeBlockId(), type: "todo", checked: false, text: "" })}
@@ -414,7 +534,7 @@ function QuoteBlockView(props: {
           scrollbar={false}
           testID={`doc-quote-text-${props.block.id}`}
           value={props.block.text}
-          placeholder="Quote..."
+          placeholder={t("web.note.doc.quotePlaceholder")}
           onChange={(e) => props.onUpdate({ ...props.block, text: e.value })}
           class="min-h-6 w-full bg-transparent text-sm leading-6 text-ink placeholder:text-faint"
         />
@@ -431,9 +551,11 @@ function QuoteBlockView(props: {
         <Input
           testID={`doc-quote-attr-${props.block.id}`}
           value={props.block.attribution ?? ""}
-          placeholder="Attribution (optional)"
+          placeholder={t("web.note.doc.attributionPlaceholder")}
           onChange={(e) => props.onUpdate({ ...props.block, attribution: e.value || undefined })}
-          class="bg-transparent text-xs text-muted placeholder:text-faint"
+          class={`bg-transparent text-xs text-muted placeholder:text-faint ${
+            props.block.attribution ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus:opacity-100"
+          }`}
         />
       </View>
     </View>
@@ -452,6 +574,7 @@ function renderBlockContent(blockType: BlockType, props: BlockItemProps): JSX.El
               issues={props.issues}
               focused={props.focusedBlockId === b().id}
               onFocus={() => props.onFocusBlock?.(b().id)}
+              onFocusAdjacent={(dir) => props.onFocusAdjacent?.(b().id, dir)}
               onUpdate={(next) => props.onUpdateBlock(b().id, next)}
               onInsertAfter={(nb) => props.onInsertAfter(b().id, nb)}
               onDelete={() => props.onDeleteBlock(b().id)}
@@ -469,6 +592,7 @@ function renderBlockContent(blockType: BlockType, props: BlockItemProps): JSX.El
               block={b()}
               focused={props.focusedBlockId === b().id}
               onFocus={() => props.onFocusBlock?.(b().id)}
+              onFocusAdjacent={(dir) => props.onFocusAdjacent?.(b().id, dir)}
               onUpdate={(next) => props.onUpdateBlock(b().id, next)}
               onInsertAfter={(nb) => props.onInsertAfter(b().id, nb)}
             />
@@ -735,63 +859,65 @@ export function BlockItem(props: BlockItemProps) {
             </View>
           }
         >
-          <MenuItem testID={`doc-menu-up-${props.block.id}`} onSelect={() => props.onMoveBlock(props.block.id, "up")} class={menuItemClass}>
-            <Icon name="moveUp" size={13} tone="muted" />
-            <Text class="min-w-0 flex-1 truncate text-xs text-ink">Move up</Text>
-          </MenuItem>
-          <MenuItem testID={`doc-menu-down-${props.block.id}`} onSelect={() => props.onMoveBlock(props.block.id, "down")} class={menuItemClass}>
-            <Icon name="moveDown" size={13} tone="muted" />
-            <Text class="min-w-0 flex-1 truncate text-xs text-ink">Move down</Text>
-          </MenuItem>
-          <MenuItem testID={`doc-menu-dup-${props.block.id}`} onSelect={() => props.onDuplicateBlock(props.block.id)} class={menuItemClass}>
-            <Icon name="copy" size={13} tone="muted" />
-            <Text class="min-w-0 flex-1 truncate text-xs text-ink">Duplicate</Text>
-          </MenuItem>
-          <If when={props.onCreateIssueFromBlock !== undefined}>
-            <MenuItem
-              testID={`doc-menu-issue-${props.block.id}`}
-              onSelect={() => {
-                const title = extractBlockTitle(props.block);
-                void props.onCreateIssueFromBlock?.(title, props.block.id);
-              }}
-              class={menuItemClass}
-            >
-              <Icon name="issues" size={13} tone="accent" />
-              <Text class="min-w-0 flex-1 truncate text-xs text-ink">Convert to Issue</Text>
+          <Scroll class="max-h-96" contentClass="gap-0.5">
+            <MenuItem testID={`doc-menu-up-${props.block.id}`} onSelect={() => props.onMoveBlock(props.block.id, "up")} class={menuItemClass}>
+              <Icon name="moveUp" size={13} tone="muted" />
+              <Text class="min-w-0 flex-1 truncate text-xs text-ink">{t("web.note.doc.moveUp")}</Text>
             </MenuItem>
-          </If>
-          <MenuSeparator class="my-1 h-px bg-line" />
-          <Text class="px-2 pt-0.5 pb-0.5 text-2xs font-semibold text-faint">Turn into</Text>
-          <Each of={TURN_INTO_OPTIONS} key={(opt) => opt.key}>
-            {(opt) => (
+            <MenuItem testID={`doc-menu-down-${props.block.id}`} onSelect={() => props.onMoveBlock(props.block.id, "down")} class={menuItemClass}>
+              <Icon name="moveDown" size={13} tone="muted" />
+              <Text class="min-w-0 flex-1 truncate text-xs text-ink">{t("web.note.doc.moveDown")}</Text>
+            </MenuItem>
+            <MenuItem testID={`doc-menu-dup-${props.block.id}`} onSelect={() => props.onDuplicateBlock(props.block.id)} class={menuItemClass}>
+              <Icon name="copy" size={13} tone="muted" />
+              <Text class="min-w-0 flex-1 truncate text-xs text-ink">{t("web.note.doc.duplicate")}</Text>
+            </MenuItem>
+            <If when={props.onCreateIssueFromBlock !== undefined}>
               <MenuItem
-                testID={`doc-turn-into-${opt().key}-${props.block.id}`}
+                testID={`doc-menu-issue-${props.block.id}`}
                 onSelect={() => {
-                  const next = turnBlockInto(props.block, opt().type, {
-                    headingLevel: opt().headingLevel,
-                    listOrdered: opt().listOrdered,
-                  });
-                  props.onUpdateBlock(props.block.id, next);
+                  const title = extractBlockTitle(props.block);
+                  void props.onCreateIssueFromBlock?.(title, props.block.id);
                 }}
                 class={menuItemClass}
               >
-                <Icon name={opt().icon} size={13} tone="muted" />
-                <Text class="min-w-0 flex-1 truncate text-xs text-ink">{opt().label}</Text>
-                <If when={props.block.type === opt().type}>
-                  <Icon name="check" size={12} tone="accent" />
-                </If>
+                <Icon name="issues" size={13} tone="accent" />
+                <Text class="min-w-0 flex-1 truncate text-xs text-ink">{t("web.note.doc.convertToIssue")}</Text>
               </MenuItem>
-            )}
-          </Each>
-          <MenuSeparator class="my-1 h-px bg-line" />
-          <MenuItem
-            testID={`doc-menu-delete-${props.block.id}`}
-            onSelect={() => props.onDeleteBlock(props.block.id)}
-            class="h-7 flex-row items-center gap-2 rounded-md px-2 hover:bg-bad-soft focus:bg-bad-soft"
-          >
-            <Icon name="delete" size={13} tone="berry" />
-            <Text class="min-w-0 flex-1 truncate text-xs text-berry">{t("web.note.page.delete")}</Text>
-          </MenuItem>
+            </If>
+            <MenuSeparator class="my-1 h-px bg-line" />
+            <Text class="px-2 pt-0.5 pb-0.5 text-2xs font-semibold text-faint">{t("web.note.doc.turnInto")}</Text>
+            <Each of={TURN_INTO_OPTIONS} key={(opt) => opt.key}>
+              {(opt) => (
+                <MenuItem
+                  testID={`doc-turn-into-${opt().key}-${props.block.id}`}
+                  onSelect={() => {
+                    const next = turnBlockInto(props.block, opt().type, {
+                      headingLevel: opt().headingLevel,
+                      listOrdered: opt().listOrdered,
+                    });
+                    props.onUpdateBlock(props.block.id, next);
+                  }}
+                  class={menuItemClass}
+                >
+                  <Icon name={opt().icon} size={13} tone="muted" />
+                  <Text class="min-w-0 flex-1 truncate text-xs text-ink">{slashCommandLabel(opt().key)}</Text>
+                  <If when={isTurnIntoActive(props.block, opt())}>
+                    <Icon name="check" size={12} tone="accent" />
+                  </If>
+                </MenuItem>
+              )}
+            </Each>
+            <MenuSeparator class="my-1 h-px bg-line" />
+            <MenuItem
+              testID={`doc-menu-delete-${props.block.id}`}
+              onSelect={() => props.onDeleteBlock(props.block.id)}
+              class="h-7 flex-row items-center gap-2 rounded-md px-2 hover:bg-bad-soft focus:bg-bad-soft"
+            >
+              <Icon name="delete" size={13} tone="berry" />
+              <Text class="min-w-0 flex-1 truncate text-xs text-berry">{t("web.note.page.delete")}</Text>
+            </MenuItem>
+          </Scroll>
         </Menu>
       </View>
 

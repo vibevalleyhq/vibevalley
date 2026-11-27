@@ -3369,7 +3369,7 @@ impl WhiteboardLoroReplica {
     fn entry_for_value(path: String, val: &Value, seq: i64) -> WhiteboardEntry {
         let encoded = serde_json::to_string(val).unwrap_or_else(|_| "{}".to_owned());
         WhiteboardEntry {
-            artifact_id: String::new(),
+            note_id: String::new(),
             path,
             kind: WhiteboardEntryKind::Json,
             mime: "application/json".to_owned(),

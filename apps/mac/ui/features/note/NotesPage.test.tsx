@@ -56,9 +56,10 @@ async function mountNoteAt(width: number, height: number) {
   return { app, fake };
 }
 
-test("NotePage renders PageTree, full-width header, and toggles right chat rail cleanly", async () => {
+test("NotePage renders PageTree inside unified ContentSidebar, full-width header, and toggles sidebar and right chat rail cleanly", async () => {
   const { app, fake } = await mountNoteAt(900, 720);
 
+  expect(app.count("id:content-sidebar")).toBe(1);
   expect(app.count("id:page-tree")).toBe(1);
   expect(app.count("id:note-rail")).toBe(0);
   const headerBox = app.layout("id:note-header");
@@ -69,7 +70,11 @@ test("NotePage renders PageTree, full-width header, and toggles right chat rail 
   await fake.pumpUntil(app, () => app.count("id:note-rail") === 1);
   expect(app.count("id:note-rail")).toBe(1);
 
-  await app.press("id:note-tree-toggle");
-  await fake.pumpUntil(app, () => app.count("id:page-tree") === 0);
+  await app.press("id:content-sidebar-toggle");
+  await fake.pumpUntil(app, () => app.count("id:content-sidebar") === 0 && app.count("id:page-tree") === 0);
   expect(app.count("id:page-tree")).toBe(0);
+  expect(app.count("id:content-sidebar-toggle")).toBe(1);
+
+  await app.press("id:content-sidebar-toggle");
+  await fake.pumpUntil(app, () => app.count("id:content-sidebar") === 1 && app.count("id:page-tree") === 1);
 });

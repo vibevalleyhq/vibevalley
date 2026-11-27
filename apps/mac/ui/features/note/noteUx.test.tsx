@@ -36,7 +36,7 @@ test("NotePage opens directory files mode and history panel via header controls"
   expect(app.texts()).toContain("登录流程");
   expect(app.count("id:note-version-badge")).toBe(1);
 
-  await app.press("id:note-history-toggle");
+  await app.press("id:collab-toggle-history");
   await fake.pumpUntil(app, () => app.count("id:note-history-panel") === 1);
 
   await app.press("id:note-more");

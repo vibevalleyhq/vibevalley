@@ -110,7 +110,7 @@ export function BaseCellControl(props: BaseCellContext) {
   };
 
   return (
-    <View class="min-w-0 flex-1">
+    <View class="w-full min-w-0 flex-1 overflow-hidden">
       <If when={props.col.kind === "text"}>
         <If
           when={editing()}
@@ -277,7 +277,7 @@ export function BaseCellControl(props: BaseCellContext) {
       </If>
 
       <If when={props.col.kind === "issueRef"}>
-        <View class="flex-row items-center gap-1.5">
+        <View class={props.dense === true ? "w-full min-w-0 flex-row items-center gap-1 overflow-hidden" : "w-full min-w-0 flex-col items-stretch gap-1.5"}>
           <If when={props.cell?._tag === "issueRef" && props.cell.issueId !== "" ? props.cell.issueId : undefined}>
             {(issueId) => {
               const found = () => props.issuesById.get(issueId());
@@ -286,10 +286,16 @@ export function BaseCellControl(props: BaseCellContext) {
                   role="button"
                   testID={`base-cell-issue-link-${props.rowId}-${props.col.id}`}
                   onPress={() => props.onOpenIssue(issueId())}
-                  class="h-6 max-w-44 flex-row items-center gap-1 rounded-sm border border-line bg-side px-1.5 hover:bg-hover"
+                  class={
+                    props.dense === true
+                      ? "h-6 max-w-28 min-w-0 shrink flex-row items-center gap-1 rounded-sm border border-line bg-side px-1.5 hover:bg-hover"
+                      : "h-6 max-w-full min-w-0 flex-row items-center gap-1 self-start rounded-sm border border-line bg-side px-1.5 hover:bg-hover"
+                  }
                 >
                   <Icon name="issues" size={11} tone="accent" />
-                  <Text class="truncate font-mono text-2xs font-medium text-ink">{found() ? `#${found()?.number} ${found()?.title}` : issueId()}</Text>
+                  <Text class="min-w-0 flex-1 truncate font-mono text-2xs font-medium text-ink">
+                    {found() ? `#${found()?.number} ${found()?.title}` : issueId()}
+                  </Text>
                 </View>
               );
             }}
@@ -306,13 +312,13 @@ export function BaseCellControl(props: BaseCellContext) {
             placeholder={props.cell?._tag === "issueRef" && props.cell.issueId !== "" ? undefined : t("web.base.form.unset")}
             options={issueOptions()}
             onChange={(v) => props.onCommitCell(props.col.id, { _tag: "issueRef", issueId: toIssueId(v) })}
-            class="min-w-20 flex-1"
+            class={props.dense === true ? "min-w-14 flex-1" : "w-full min-w-0"}
           />
         </View>
       </If>
 
       <If when={props.col.kind === "noteRef"}>
-        <View class="flex-row items-center gap-1.5">
+        <View class={props.dense === true ? "w-full min-w-0 flex-row items-center gap-1 overflow-hidden" : "w-full min-w-0 flex-col items-stretch gap-1.5"}>
           <If when={props.cell?._tag === "noteRef" && props.cell.noteId !== "" ? props.cell.noteId : undefined}>
             {(noteId) => {
               const found = () => props.notesById.get(noteId());
@@ -321,10 +327,14 @@ export function BaseCellControl(props: BaseCellContext) {
                   role="button"
                   testID={`base-cell-note-link-${props.rowId}-${props.col.id}`}
                   onPress={() => props.onOpenNote(noteId())}
-                  class="h-6 max-w-44 flex-row items-center gap-1 rounded-sm border border-line bg-side px-1.5 hover:bg-hover"
+                  class={
+                    props.dense === true
+                      ? "h-6 max-w-28 min-w-0 shrink flex-row items-center gap-1 rounded-sm border border-line bg-side px-1.5 hover:bg-hover"
+                      : "h-6 max-w-full min-w-0 flex-row items-center gap-1 self-start rounded-sm border border-line bg-side px-1.5 hover:bg-hover"
+                  }
                 >
                   <Icon name="notes" size={11} tone="accent" />
-                  <Text class="truncate text-2xs font-medium text-ink">{found()?.title ?? noteId()}</Text>
+                  <Text class="min-w-0 flex-1 truncate text-2xs font-medium text-ink">{found()?.title ?? noteId()}</Text>
                 </View>
               );
             }}
@@ -341,7 +351,7 @@ export function BaseCellControl(props: BaseCellContext) {
             placeholder={props.cell?._tag === "noteRef" && props.cell.noteId !== "" ? undefined : t("web.base.form.unset")}
             options={noteOptions()}
             onChange={(v) => props.onCommitCell(props.col.id, { _tag: "noteRef", noteId: toNoteId(v) })}
-            class="min-w-20 flex-1"
+            class={props.dense === true ? "min-w-14 flex-1" : "w-full min-w-0"}
           />
         </View>
       </If>
@@ -387,7 +397,10 @@ export function BaseCellControl(props: BaseCellContext) {
       </If>
 
       <If when={props.col.kind === "agentAction"}>
-        <View testID={`base-cell-agent-action-${props.rowId}-${props.col.id}`} class="flex-row flex-wrap items-center gap-1.5">
+        <View
+          testID={`base-cell-agent-action-${props.rowId}-${props.col.id}`}
+          class={props.dense === true ? "w-full min-w-0 flex-row items-center gap-1 overflow-hidden" : "flex-row flex-wrap items-center gap-1.5"}
+        >
           <Button
             size="compact"
             tone="plain"

@@ -7,7 +7,7 @@ import { Button } from "../../../design/Button";
 import { Icon } from "../../../design/Icon";
 import { IconButton } from "../../../design/IconButton";
 import { BaseCellControl } from "./BaseCell";
-import { columnKindIcon, rowTitleOf } from "./baseModel";
+import { cleanWikilinkText, columnKindIcon, rowTitleOf } from "./baseModel";
 
 export interface BaseRowDrawerProps {
   readonly row: BaseRow | undefined;
@@ -77,10 +77,7 @@ export function BaseRowDrawer(props: BaseRowDrawerProps) {
 
           <Scroll class="min-h-0 flex-1" contentClass="gap-4 p-4">
             <View testID="base-row-page-section" class="gap-2 rounded-lg border border-line bg-page p-3">
-              <View class="flex-row items-center justify-between gap-2">
-                <Text class="text-xs font-semibold text-muted">{t("web.note.types.doc")}</Text>
-                <If when={row().pageNoteId}>{(pageId) => <Text class="font-mono text-2xs text-faint">{pageId()}</Text>}</If>
-              </View>
+              <Text class="text-xs font-semibold text-muted">{t("web.note.types.doc")}</Text>
 
               <If
                 when={row().pageNoteId}
@@ -102,22 +99,20 @@ export function BaseRowDrawer(props: BaseRowDrawerProps) {
                   </View>
                 }
               >
-                {(pageId) => (
-                  <View class="gap-2">
-                    <If when={linkedNote()}>
-                      {(page) => (
-                        <View class="gap-1">
-                          <Text class="text-sm font-medium text-ink">{page().title}</Text>
-                          <If when={docExcerptOf(page())}>{(excerpt) => <Text class="line-clamp-3 text-xs leading-relaxed text-muted">{excerpt()}</Text>}</If>
-                        </View>
-                      )}
-                    </If>
-                    <View class="flex-row items-center gap-2">
-                      <Button size="compact" tone="plain" icon="open" testID="base-row-open-page-inline" onPress={() => props.onOpenNote(pageId())}>
-                        {t("web.note.canvas.openPage")}
-                      </Button>
-                    </View>
-                  </View>
+                {() => (
+                  <If when={linkedNote()} else={<Text class="text-xs text-muted">{title()}</Text>}>
+                    {(page) => (
+                      <View class="gap-1">
+                        <Text class="text-sm font-medium text-ink">{page().title}</Text>
+                        <If when={docExcerptOf(page())}>
+                          {(excerpt) => {
+                            const cleaned = () => cleanWikilinkText(excerpt(), props.notesById);
+                            return <If when={cleaned()}>{(txt) => <Text class="line-clamp-3 text-xs leading-relaxed text-muted">{txt()}</Text>}</If>;
+                          }}
+                        </If>
+                      </View>
+                    )}
+                  </If>
                 )}
               </If>
             </View>
@@ -128,26 +123,28 @@ export function BaseRowDrawer(props: BaseRowDrawerProps) {
                 <Each of={props.columns} key={(col) => col.id}>
                   {(col) => (
                     <View testID={`base-drawer-field-${col().id}`} class="flex-row items-start gap-2.5 border-b border-line pb-2 last:border-b-0 last:pb-0">
-                      <View class="w-28 shrink-0 flex-row items-center gap-1.5 pt-1">
+                      <View class="w-24 shrink-0 flex-row items-center gap-1.5 pt-1">
                         <Icon name={columnKindIcon(col().kind)} size={12} tone="muted" />
                         <Text class="min-w-0 flex-1 truncate text-xs font-medium text-muted">{col().name}</Text>
                       </View>
-                      <BaseCellControl
-                        rowId={row().id}
-                        col={col()}
-                        cell={row().cells[col().id]}
-                        notesById={props.notesById}
-                        issuesById={props.issuesById}
-                        agentsById={props.agentsById}
-                        notes={props.notes}
-                        issues={props.issues}
-                        agents={props.agents}
-                        busy={props.busy}
-                        onCommitCell={(colId, next) => props.onCommitCell(row(), colId, next)}
-                        onRunAgentRow={props.onRunAgentRow}
-                        onOpenNote={props.onOpenNote}
-                        onOpenIssue={props.onOpenIssue}
-                      />
+                      <View class="min-w-0 flex-1 overflow-hidden">
+                        <BaseCellControl
+                          rowId={row().id}
+                          col={col()}
+                          cell={row().cells[col().id]}
+                          notesById={props.notesById}
+                          issuesById={props.issuesById}
+                          agentsById={props.agentsById}
+                          notes={props.notes}
+                          issues={props.issues}
+                          agents={props.agents}
+                          busy={props.busy}
+                          onCommitCell={(colId, next) => props.onCommitCell(row(), colId, next)}
+                          onRunAgentRow={props.onRunAgentRow}
+                          onOpenNote={props.onOpenNote}
+                          onOpenIssue={props.onOpenIssue}
+                        />
+                      </View>
                     </View>
                   )}
                 </Each>

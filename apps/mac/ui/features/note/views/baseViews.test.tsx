@@ -6,7 +6,7 @@ import "@vibevalley/i18n/catalogs";
 import { BaseColumnKindValues, type BaseColumn, type BaseRow, type NoteId } from "@vibevalley/protocol";
 
 import { boardToNativeEntries, parseBoardDocument } from "../WhiteboardView";
-import { baseCellAsText, columnKindIcon, defaultCellForColumn, projectBaseTimeline, rowTitleOf } from "./baseModel";
+import { baseCellAsText, cleanWikilinkText, columnKindIcon, defaultCellForColumn, formatSummaryValue, projectBaseTimeline, rowTitleOf } from "./baseModel";
 import { buildSandboxedHtml } from "./noteFiles";
 
 test("baseModel covers all 12 BaseColumnKinds, default cells, timeline projection, and sandboxed HTML", () => {
@@ -47,6 +47,10 @@ test("baseModel covers all 12 BaseColumnKinds, default cells, timeline projectio
 
   const html = buildSandboxedHtml(new Map([["structure/index.html", "<!doctype html><html><head></head><body>Hi</body></html>"]]));
   expect(html).toContain("connect-src 'none'");
+
+  expect(formatSummaryValue("2.33333")).toBe("2.33");
+  expect(formatSummaryValue("24")).toBe("24");
+  expect(cleanWikilinkText("Review [[note:note_123|Spec Doc]] and [[issue:iss_1|#4 Bug]]")).toBe("Review Spec Doc and #4 Bug");
 });
 
 test("BaseView switches all 4 views, renders all 12 columns, runs agentAction, and opens Row=Page drawer", async () => {
@@ -60,7 +64,9 @@ test("BaseView switches all 4 views, renders all 12 columns, runs agentAction, a
 
   await app.waitFor("id:note-base-view");
   expect(app.count("id:base-table-view")).toBe(1);
-  expect(app.count("id:base-summary-strip")).toBe(1);
+  expect(app.count("id:base-table-summary")).toBe(1);
+  expect(app.count("id:base-summary-strip")).toBe(0);
+  expect(app.texts()).toContain("Sum: 30");
   expect(app.count("id:base-cell-formula-r1-c_formula")).toBe(1);
   expect(app.texts()).toContain("42");
 

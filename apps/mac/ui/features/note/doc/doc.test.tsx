@@ -25,18 +25,23 @@ import {
   filterSlashCommands,
   formatWikilinkToken,
   insertBlockAfter,
+  isTurnIntoActive,
   matchMarkdownInputRule,
   moveBlockById,
+  neighborBlockId,
   parseInlineLinkSegments,
   removeTableColumn,
   removeTableRow,
   setColumnsCount,
   SLASH_COMMANDS,
   stripSlashTrigger,
+  TURN_INTO_OPTIONS,
   turnBlockInto,
   updateTableCell,
   updateTableHeader,
+  wrapInlineMarkdown,
 } from "./docOps";
+import { groupInlineDisplayRuns } from "./InlineRichText";
 
 const ALL_24_BLOCK_TYPES: readonly DocBlock["type"][] = [
   "prose",
@@ -155,6 +160,22 @@ describe("docOps: 24 BlockKinds, Markdown rules, Turn Into, Slash & Wikilink ops
       { kind: "issueNumber", number: 42 },
       { kind: "text", value: " at https://x.dev/#99." },
     ]);
+
+    const cjkRuns = groupInlineDisplayRuns(parseInlineLinkSegments("请看 [[note:n1|规范]]，以及 #42。"));
+    expect(cjkRuns).toEqual([
+      { kind: "text", value: "请看 " },
+      { kind: "pill", segment: { kind: "note", id: "n1", label: "规范", embed: false }, trailingPunct: "，" },
+      { kind: "text", value: "以及 " },
+      { kind: "pill", segment: { kind: "issueNumber", number: 42 }, trailingPunct: "。" },
+    ]);
+
+    const h2: DocBlock = { id: "h2", type: "heading", level: 2, text: "Sub" };
+    const activeTurnInto = TURN_INTO_OPTIONS.filter((opt) => isTurnIntoActive(h2, opt)).map((o) => o.key);
+    expect(activeTurnInto).toEqual(["heading-2"]);
+
+    expect(wrapInlineMarkdown("hello", "**")).toBe("**hello**");
+    expect(wrapInlineMarkdown("**hello**", "**")).toBe("hello");
+    expect(neighborBlockId([{ id: "a", type: "prose", text: "" }, h2], "h2", "prev")).toBe("a");
   });
 
   test("table, toggle, columns, TOC, stats, and recursive tree CRUD operations", () => {

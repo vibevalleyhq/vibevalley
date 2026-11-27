@@ -566,11 +566,43 @@ export const noteBaseQuery = defineQuery({
     api.note.base.view(
       {
         id: noteId(req.id),
-        ...(req.sheetId !== undefined ? { sheetId: req.sheetId } : {}),
-        ...(req.viewId !== undefined ? { viewId: req.viewId } : {}),
+        ...(req.sheetId !== undefined && req.sheetId !== "" ? { sheetId: req.sheetId } : {}),
+        ...(req.viewId !== undefined && req.viewId !== "" ? { viewId: req.viewId } : {}),
       },
       context,
     ),
+});
+
+const BaseViewRefStub = z.object({
+  id: z.string(),
+  name: z.string(),
+  kind: z.enum(["table", "board", "gallery", "timeline"]),
+});
+
+const BaseSheetViewsStub = z.object({
+  id: z.string(),
+  views: z.array(BaseViewRefStub).optional(),
+});
+
+const BaseViewsDocStub = z.object({
+  sheets: z.array(BaseSheetViewsStub).optional(),
+});
+
+export type BaseViewSummaryRef = z.output<typeof BaseViewRefStub>;
+
+export const noteBaseSheetViewsQuery = defineQuery({
+  key: (id: string) => ["note-base-views", id],
+  fetch: async (id, context): Promise<ReadonlyMap<string, readonly BaseViewSummaryRef[]>> => {
+    const file = await api.note.file.get({ id: noteId(id), path: "structure/base.json" }, context);
+    const parsed = BaseViewsDocStub.safeParse(JSON.parse(file.content));
+    const map = new Map<string, readonly BaseViewSummaryRef[]>();
+    if (parsed.success && Array.isArray(parsed.data.sheets)) {
+      for (const sh of parsed.data.sheets) {
+        if (sh.views) map.set(sh.id, sh.views);
+      }
+    }
+    return map;
+  },
 });
 
 const BaseRowStub = z.looseObject({

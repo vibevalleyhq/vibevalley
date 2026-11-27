@@ -5,6 +5,7 @@ import type { IssueId, Note, NoteFileMeta } from "@vibevalley/protocol";
 import { issueId as toIssueId } from "@vibevalley/protocol/schema";
 
 import { Button } from "../../../design/Button";
+import { useDesignHost } from "../../../design/host";
 import { Icon } from "../../../design/Icon";
 import { IconButton } from "../../../design/IconButton";
 import { Empty, Toggle } from "../../../design/layout";
@@ -44,6 +45,7 @@ interface MediaItemModel {
   readonly issueId: IssueId | undefined;
   readonly jobId: string | undefined;
   readonly transcript: readonly TranscriptCue[];
+  readonly transcriptExcerpt: string;
 }
 
 interface StoryboardShotModel {
@@ -155,6 +157,7 @@ function FramingGuide(props: { readonly framing: string; readonly color?: string
 
 /** Unified Media view supporting audio/transcripts, video/images, storyboard scenes, motion clips, and `asset/*` files. */
 export function MediaView(props: MediaViewProps) {
+  const host = useDesignHost();
   const { snapshot } = useNoteDirectory(
     () => props.note.id,
     () => props.version,
@@ -168,6 +171,7 @@ export function MediaView(props: MediaViewProps) {
   const motionPlaying = signal(false);
   const motionLoop = signal(true);
   const activeAudioId = signal<string | undefined>(undefined);
+  const previewVideoId = signal<string | undefined>(undefined);
 
   const mediaJson = computed(() => parseJsonObject(snapshot().contents.get("structure/media.json")?.content));
   const shotsJson = computed(() => parseJsonObject(snapshot().contents.get("structure/shots.json")?.content));
@@ -196,6 +200,13 @@ export function MediaView(props: MediaViewProps) {
         issueId: typeof item.issueId === "string" && item.issueId ? toIssueId(item.issueId) : undefined,
         jobId: typeof item.jobId === "string" && item.jobId ? item.jobId : undefined,
         transcript: cues,
+        transcriptExcerpt:
+          asString(item.transcriptExcerpt) ||
+          (typeof item.transcript === "string" ? item.transcript : "") ||
+          cues
+            .map((c) => c.text)
+            .filter(Boolean)
+            .join(" "),
       };
     });
 
@@ -216,6 +227,7 @@ export function MediaView(props: MediaViewProps) {
       issueId: typeof obj?.issueId === "string" && obj.issueId ? toIssueId(obj.issueId) : props.note.issue,
       items,
       topTranscript,
+      topTranscriptExcerpt: asString(obj?.transcriptExcerpt) || (typeof obj?.transcript === "string" ? obj.transcript : ""),
     };
   });
 
@@ -358,10 +370,10 @@ export function MediaView(props: MediaViewProps) {
       { value: "media", label: t("web.note.types.media"), count: mediaDoc().items.length },
     ];
     if (storyboardModel().shots.length > 0) {
-      opts.push({ value: "storyboard", label: "Storyboard", count: storyboardModel().shots.length });
+      opts.push({ value: "storyboard", label: t("web.note.media.storyboard"), count: storyboardModel().shots.length });
     }
     if (motionModel().scenes.length > 0) {
-      opts.push({ value: "motion", label: "Motion", count: motionModel().scenes.length });
+      opts.push({ value: "motion", label: t("web.note.media.motion"), count: motionModel().scenes.length });
     }
     opts.push({ value: "assets", label: t("web.note.page.filesTab"), count: assetFiles().length });
     return opts;
@@ -441,6 +453,20 @@ export function MediaView(props: MediaViewProps) {
                               {playing() ? t("web.base.stop") : t("web.base.play")}
                             </Button>
                           </If>
+                          <If when={item().kind === "video" && item().src !== ""}>
+                            <Button
+                              size="compact"
+                              tone="primary"
+                              icon="play"
+                              testID={`media-preview-${item().id}`}
+                              onPress={() => {
+                                previewVideoId.set(previewVideoId() === item().id ? undefined : item().id);
+                                void Promise.resolve(host.openExternal(item().src)).catch(() => {});
+                              }}
+                            >
+                              {t("web.note.media.videoPreview")}
+                            </Button>
+                          </If>
                         </View>
                       </View>
 
@@ -448,7 +474,34 @@ export function MediaView(props: MediaViewProps) {
                         <Text class="text-xs leading-relaxed text-muted">{item().caption}</Text>
                       </If>
 
-                      <If when={item().transcript.length > 0}>
+                      <If when={previewVideoId() === item().id}>
+                        <View
+                          testID={`media-video-stage-${item().id}`}
+                          class="flex-row items-center justify-between gap-2 rounded-lg border border-line bg-page px-3 py-2"
+                        >
+                          <View class="min-w-0 flex-1 flex-row items-center gap-2">
+                            <Icon name="video" size={14} tone="accent" />
+                            <Text class="truncate font-mono text-xs text-ink">{item().src}</Text>
+                          </View>
+                          <Button size="compact" tone="quiet" icon="open" onPress={() => void host.openExternal(item().src)}>
+                            {t("web.library.content.inspector.openExternal")}
+                          </Button>
+                        </View>
+                      </If>
+
+                      <If
+                        when={item().transcript.length > 0}
+                        else={
+                          <If when={item().transcriptExcerpt}>
+                            {(excerpt) => (
+                              <View testID={`media-transcript-excerpt-${item().id}`} class="gap-1 rounded-lg border border-line bg-page px-3 py-2">
+                                <Text class="text-2xs font-semibold text-muted">{t("web.note.media.transcriptPreview")}</Text>
+                                <Text class="line-clamp-3 text-xs leading-relaxed text-ink">{excerpt()}</Text>
+                              </View>
+                            )}
+                          </If>
+                        }
+                      >
                         <View testID={`media-transcript-${item().id}`} class="gap-1.5 rounded-lg border border-line bg-page p-2.5">
                           <Each of={item().transcript} key={(cue) => cue.id}>
                             {(cue) => (
@@ -485,6 +538,12 @@ export function MediaView(props: MediaViewProps) {
               </Each>
             </View>
           </If>
+          <If when={mediaDoc().topTranscript.length === 0 && mediaDoc().topTranscriptExcerpt !== ""}>
+            <View testID="media-top-transcript-excerpt" class="gap-1 rounded-xl border border-line bg-side p-3.5">
+              <Text class="text-2xs font-semibold text-muted">{t("web.note.media.transcriptPreview")}</Text>
+              <Text class="text-xs leading-relaxed text-ink">{mediaDoc().topTranscriptExcerpt}</Text>
+            </View>
+          </If>
         </Scroll>
       </If>
 
@@ -507,7 +566,7 @@ export function MediaView(props: MediaViewProps) {
                 storyboardAnimatic.set(!storyboardAnimatic());
               }}
             >
-              {storyboardAnimatic() ? "Grid" : "Animatic"}
+              {storyboardAnimatic() ? t("web.note.media.grid") : t("web.note.media.animatic")}
             </Button>
           </View>
 
@@ -574,7 +633,7 @@ export function MediaView(props: MediaViewProps) {
                       </View>
                     </View>
                     <View class="flex-row items-center justify-between gap-2">
-                      <Text class="truncate text-sm font-semibold text-ink">{sh().scene || "Shot"}</Text>
+                      <Text class="truncate text-sm font-semibold text-ink">{sh().scene || t("web.note.media.shot")}</Text>
                       <Text class="font-mono text-2xs text-muted tabular-nums">{`${sh().durationSec}s`}</Text>
                     </View>
                     <If when={sh().visual}>
@@ -653,7 +712,7 @@ export function MediaView(props: MediaViewProps) {
                 />
               </View>
               <View class="flex-row items-center gap-3">
-                <Toggle label="Loop" checked={motionLoop()} onChange={(v) => motionLoop.set(v)} />
+                <Toggle label={t("web.note.media.loop")} checked={motionLoop()} onChange={(v) => motionLoop.set(v)} />
                 <Text class="font-mono text-xs text-muted tabular-nums">
                   {`${clampedMotionHead().toFixed(1)}s / ${motionModel().duration.toFixed(1)}s · ${motionModel().width}×${motionModel().height}`}
                 </Text>

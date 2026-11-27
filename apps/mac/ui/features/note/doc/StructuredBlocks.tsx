@@ -17,6 +17,7 @@ import {
   addTableColumn,
   addTableRow,
   CALLOUT_TONES,
+  calloutToneLabel,
   calloutVisualOf,
   cycleTableAlignment,
   extractTocEntries,
@@ -52,12 +53,12 @@ export function ToggleBlockView(props: {
   const children = () => props.block.children ?? [];
 
   return (
-    <View testID={`doc-toggle-${props.block.id}`} class="rounded-md border border-line bg-page p-2">
+    <View testID={`doc-toggle-${props.block.id}`} class="py-1">
       <View class="flex-row items-center gap-1.5">
         <View
           role="button"
           testID={`doc-toggle-btn-${props.block.id}`}
-          accessibilityLabel={props.block.title || "Toggle"}
+          accessibilityLabel={props.block.title || t("web.note.doc.slash.toggle.label")}
           accessibilityState={{ expanded: !isCollapsed() }}
           onPress={() => props.onUpdate({ ...props.block, collapsed: !isCollapsed() })}
           class="size-6 shrink-0 items-center justify-center rounded-sm hover:bg-hover"
@@ -67,19 +68,19 @@ export function ToggleBlockView(props: {
         <Input
           testID={`doc-toggle-title-${props.block.id}`}
           value={props.block.title}
-          placeholder="Toggle heading..."
+          placeholder={t("web.note.doc.toggleTitlePlaceholder")}
           onChange={(e) => props.onUpdate({ ...props.block, title: e.value })}
           class="min-w-0 flex-1 rounded-sm bg-transparent px-1 py-0.5 text-sm font-semibold text-ink placeholder:text-faint"
         />
       </View>
       <If when={!isCollapsed()}>
-        <View testID={`doc-toggle-body-${props.block.id}`} class="mt-1.5 gap-2 border-l border-line pl-6">
+        <View testID={`doc-toggle-body-${props.block.id}`} class="mt-1 gap-1.5 border-l border-line pl-5">
           <Input
             multiline
             scrollbar={false}
             testID={`doc-toggle-text-${props.block.id}`}
             value={props.block.text}
-            placeholder="Toggle notes..."
+            placeholder={t("web.note.doc.toggleBodyPlaceholder")}
             onChange={(e) => props.onUpdate({ ...props.block, text: e.value })}
             class="min-h-6 w-full rounded-sm bg-transparent px-1 py-0.5 text-sm text-ink placeholder:text-faint"
           />
@@ -100,7 +101,7 @@ export function ToggleBlockView(props: {
               </Each>
             </View>
           </If>
-          <View class="flex-row">
+          <View class="flex-row opacity-0 group-hover:opacity-100 focus-within:opacity-100">
             <Button
               size="compact"
               tone="quiet"
@@ -135,7 +136,7 @@ export function CalloutBlockView(props: {
   const bgStyle = () => (visual().mixToken !== undefined ? { backgroundColor: mix(visual().mixToken ?? "water", 0.12) } : undefined);
 
   return (
-    <View testID={`doc-callout-${props.block.id}`} class={`gap-2 rounded-lg border border-line p-3 ${visual().bgClass}`} style={bgStyle()}>
+    <View testID={`doc-callout-${props.block.id}`} class={`gap-1.5 rounded-lg border border-line p-3 ${visual().bgClass}`} style={bgStyle()}>
       <View class="flex-row items-center justify-between gap-2">
         <View class="min-w-0 flex-1 flex-row items-center gap-2">
           <Icon name={visual().icon} size={16} tone={visual().iconTone} />
@@ -147,7 +148,7 @@ export function CalloutBlockView(props: {
             class={`min-w-0 flex-1 bg-transparent text-sm font-semibold placeholder:text-faint ${visual().textClass}`}
           />
         </View>
-        <View class="flex-row items-center gap-1">
+        <View class="flex-row items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100">
           <Each of={CALLOUT_TONES} key={(toneKey) => toneKey}>
             {(toneKey) => {
               const active = () => visual().tone === toneKey();
@@ -158,7 +159,7 @@ export function CalloutBlockView(props: {
                   onPress={() => props.onUpdate({ ...props.block, tone: toneKey() })}
                   class={`rounded-xs px-1.5 py-0.5 ${active() ? "bg-selected" : "hover:bg-hover"}`}
                 >
-                  <Text class={`text-2xs ${active() ? "font-semibold text-ink" : "text-muted"}`}>{toneKey()}</Text>
+                  <Text class={`text-2xs ${active() ? "font-semibold text-ink" : "text-muted"}`}>{calloutToneLabel(toneKey())}</Text>
                 </View>
               );
             }}
@@ -170,7 +171,7 @@ export function CalloutBlockView(props: {
         scrollbar={false}
         testID={`doc-callout-text-${props.block.id}`}
         value={props.block.text}
-        placeholder="Callout content..."
+        placeholder={t("web.note.doc.calloutPlaceholder")}
         onChange={(e) => props.onUpdate({ ...props.block, text: e.value })}
         class="min-h-6 w-full bg-transparent text-sm text-ink placeholder:text-faint"
       />
@@ -207,64 +208,65 @@ export function CodeBlockView(props: { readonly block: CodeBlockData; readonly o
   };
 
   return (
-    <View testID={`doc-code-${props.block.id}`} class="overflow-hidden rounded-lg border border-line bg-side">
-      <View class="flex-row items-center justify-between gap-2 border-b border-line px-3 py-1.5">
-        <View class="flex-row flex-wrap items-center gap-1">
-          <Input
-            testID={`doc-code-lang-${props.block.id}`}
-            value={props.block.language ?? ""}
-            placeholder="language"
-            onChange={(e) => props.onUpdate({ ...props.block, language: e.value.trim() || undefined })}
-            class="h-6 w-28 rounded-xs border border-line bg-page px-1.5 font-mono text-2xs text-ink"
-          />
-          <Each of={CODE_LANGUAGES.slice(0, 4)} key={(lang) => lang}>
-            {(lang) => (
-              <View
-                role="button"
-                onPress={() => props.onUpdate({ ...props.block, language: lang() })}
-                class={`rounded-xs px-1.5 py-0.5 hover:bg-hover ${(props.block.language ?? "") === lang() ? "bg-selected" : ""}`}
-              >
-                <Text class="font-mono text-2xs text-muted">{lang()}</Text>
-              </View>
-            )}
-          </Each>
-        </View>
-        <View class="flex-row items-center gap-1">
-          <Button
-            size="compact"
-            tone="quiet"
-            icon={editing() ? "show" : "edit"}
-            testID={`doc-code-mode-${props.block.id}`}
-            onPress={() => editing.set(!editing())}
-          >
-            {editing() ? "Preview" : "Edit"}
-          </Button>
-          <IconButton
-            icon={copied() ? "check" : "copy"}
-            size={14}
-            label={t("web.base.rich.copy")}
-            onClick={copyCode}
-            testid={`doc-code-copy-${props.block.id}`}
-          />
-        </View>
-      </View>
+    <View testID={`doc-code-${props.block.id}`} class="relative overflow-hidden rounded-lg">
       <If
         when={editing()}
         else={
-          <View class="p-2">
+          <View class="relative">
             <CodeBlock code={props.block.code || "// empty"} language={props.block.language} class="my-0" />
+            <View class="absolute top-1.5 right-8 flex-row items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100">
+              <Button size="compact" tone="quiet" icon="edit" testID={`doc-code-mode-${props.block.id}`} onPress={() => editing.set(true)}>
+                {t("web.note.doc.edit")}
+              </Button>
+            </View>
           </View>
         }
       >
-        <View class="p-2">
-          <TextArea
-            testID={`doc-code-input-${props.block.id}`}
-            rows={5}
-            value={props.block.code}
-            placeholder="// Write code..."
-            onInput={(v) => props.onUpdate({ ...props.block, code: v })}
-            class="font-mono text-xs leading-relaxed"
-          />
+        <View class="overflow-hidden rounded-lg border border-line bg-side">
+          <View class="flex-row items-center justify-between gap-2 border-b border-line px-3 py-1.5">
+            <View class="flex-row flex-wrap items-center gap-1">
+              <Input
+                testID={`doc-code-lang-${props.block.id}`}
+                value={props.block.language ?? ""}
+                placeholder={t("web.note.doc.codeLanguagePlaceholder")}
+                onChange={(e) => props.onUpdate({ ...props.block, language: e.value.trim() || undefined })}
+                class="h-6 w-28 rounded-xs border border-line bg-page px-1.5 font-mono text-2xs text-ink"
+              />
+              <Each of={CODE_LANGUAGES.slice(0, 4)} key={(lang) => lang}>
+                {(lang) => (
+                  <View
+                    role="button"
+                    onPress={() => props.onUpdate({ ...props.block, language: lang() })}
+                    class={`rounded-xs px-1.5 py-0.5 hover:bg-hover ${(props.block.language ?? "") === lang() ? "bg-selected" : ""}`}
+                  >
+                    <Text class="font-mono text-2xs text-muted">{lang()}</Text>
+                  </View>
+                )}
+              </Each>
+            </View>
+            <View class="flex-row items-center gap-1">
+              <Button size="compact" tone="quiet" icon="show" testID={`doc-code-mode-${props.block.id}`} onPress={() => editing.set(false)}>
+                {t("web.note.doc.preview")}
+              </Button>
+              <IconButton
+                icon={copied() ? "check" : "copy"}
+                size={14}
+                label={t("web.base.rich.copy")}
+                onClick={copyCode}
+                testid={`doc-code-copy-${props.block.id}`}
+              />
+            </View>
+          </View>
+          <View class="p-2">
+            <TextArea
+              testID={`doc-code-input-${props.block.id}`}
+              rows={5}
+              value={props.block.code}
+              placeholder={t("web.note.doc.codePlaceholder")}
+              onInput={(v) => props.onUpdate({ ...props.block, code: v })}
+              class="font-mono text-xs leading-relaxed"
+            />
+          </View>
         </View>
       </If>
     </View>
@@ -284,31 +286,8 @@ function alignTextClass(align: string | undefined): string {
 
 export function TableBlockView(props: { readonly block: TableBlockData; readonly onUpdate: (next: TableBlockData) => void }) {
   return (
-    <View testID={`doc-table-${props.block.id}`} class="overflow-hidden rounded-lg border border-line bg-page">
-      <View class="flex-row items-center justify-between gap-2 border-b border-line bg-side px-2.5 py-1.5">
-        <Text class="text-2xs font-semibold text-muted">{`${props.block.headers.length} x ${props.block.rows.length}`}</Text>
-        <View class="flex-row items-center gap-1">
-          <Button
-            size="compact"
-            tone="quiet"
-            icon="add"
-            testID={`doc-table-add-col-${props.block.id}`}
-            onPress={() => props.onUpdate(addTableColumn(props.block))}
-          >
-            +Col
-          </Button>
-          <Button
-            size="compact"
-            tone="quiet"
-            icon="add"
-            testID={`doc-table-add-row-${props.block.id}`}
-            onPress={() => props.onUpdate(addTableRow(props.block))}
-          >
-            +Row
-          </Button>
-        </View>
-      </View>
-      <View class="flex-row items-center border-b border-line bg-side px-2 py-1">
+    <View testID={`doc-table-${props.block.id}`} class="overflow-hidden rounded-md border border-line bg-page">
+      <View class="flex-row items-center border-b border-line bg-side px-2 py-1.5">
         <Each of={props.block.headers} key={(_, colIdx) => String(colIdx)}>
           {(header, colIdx) => {
             const align = () => props.block.alignments?.[colIdx()] ?? "left";
@@ -324,7 +303,7 @@ export function TableBlockView(props: { readonly block: TableBlockData; readonly
                   role="button"
                   testID={`doc-table-align-${props.block.id}-${colIdx()}`}
                   onPress={() => props.onUpdate(cycleTableAlignment(props.block, colIdx()))}
-                  class="rounded-xs px-1 py-0.5 hover:bg-hover"
+                  class="rounded-xs px-1 py-0.5 opacity-0 group-hover:opacity-100 hover:bg-hover"
                 >
                   <Text class="font-mono text-2xs text-faint">{align() === "center" ? "C" : align() === "right" ? "R" : "L"}</Text>
                 </View>
@@ -333,7 +312,7 @@ export function TableBlockView(props: { readonly block: TableBlockData; readonly
                     role="button"
                     testID={`doc-table-del-col-${props.block.id}-${colIdx()}`}
                     onPress={() => props.onUpdate(removeTableColumn(props.block, colIdx()))}
-                    class="rounded-xs p-0.5 hover:bg-bad-soft"
+                    class="rounded-xs p-0.5 opacity-0 group-hover:opacity-100 hover:bg-bad-soft"
                   >
                     <Icon name="close" size={10} tone="muted" />
                   </View>
@@ -353,14 +332,14 @@ export function TableBlockView(props: { readonly block: TableBlockData; readonly
                   <Input
                     testID={`doc-table-cell-${props.block.id}-${rowIdx()}-${colIdx()}`}
                     value={cell()}
-                    placeholder="..."
+                    placeholder="…"
                     onChange={(e) => props.onUpdate(updateTableCell(props.block, rowIdx(), colIdx(), e.value))}
                     class={`min-w-0 flex-1 bg-transparent text-xs text-ink placeholder:text-faint ${alignTextClass(props.block.alignments?.[colIdx()])}`}
                   />
                 </View>
               )}
             </Each>
-            <View class="w-6 shrink-0 items-center">
+            <View class="w-6 shrink-0 items-center opacity-0 group-hover:opacity-100">
               <If when={props.block.rows.length > 1}>
                 <View
                   role="button"
@@ -375,6 +354,20 @@ export function TableBlockView(props: { readonly block: TableBlockData; readonly
           </View>
         )}
       </Each>
+      <View class="flex-row items-center justify-end gap-1 border-t border-line bg-side px-2 py-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100">
+        <Button
+          size="compact"
+          tone="quiet"
+          icon="add"
+          testID={`doc-table-add-col-${props.block.id}`}
+          onPress={() => props.onUpdate(addTableColumn(props.block))}
+        >
+          {t("web.note.doc.addCol")}
+        </Button>
+        <Button size="compact" tone="quiet" icon="add" testID={`doc-table-add-row-${props.block.id}`} onPress={() => props.onUpdate(addTableRow(props.block))}>
+          {t("web.note.doc.addRow")}
+        </Button>
+      </View>
     </View>
   );
 }
@@ -407,15 +400,21 @@ export function BookmarkBlockView(props: { readonly block: BookmarkBlockData; re
               <If when={props.block.description}>{(desc) => <Text class="line-clamp-2 text-xs text-muted">{desc()}</Text>}</If>
               <Text class="truncate font-mono text-2xs text-faint">{domainOf(props.block.url)}</Text>
             </View>
-            <View class="flex-row items-center gap-1">
+            <View class="flex-row items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100">
               <IconButton
                 icon="open"
                 size={14}
-                label="Open URL"
+                label={t("web.note.doc.bookmarkOpen")}
                 onClick={() => void host.openExternal(props.block.url)}
                 testid={`doc-bookmark-ext-${props.block.id}`}
               />
-              <IconButton icon="edit" size={14} label="Edit bookmark" onClick={() => editing.set(true)} testid={`doc-bookmark-edit-${props.block.id}`} />
+              <IconButton
+                icon="edit"
+                size={14}
+                label={t("web.note.doc.bookmarkEdit")}
+                onClick={() => editing.set(true)}
+                testid={`doc-bookmark-edit-${props.block.id}`}
+              />
             </View>
           </View>
         }
@@ -430,13 +429,13 @@ export function BookmarkBlockView(props: { readonly block: BookmarkBlockData; re
           <TextInput
             testID={`doc-bookmark-title-${props.block.id}`}
             value={props.block.title ?? ""}
-            placeholder="Title (optional)"
+            placeholder={t("web.note.doc.titleOptional")}
             onInput={(v) => props.onUpdate({ ...props.block, title: v || undefined })}
           />
           <TextInput
             testID={`doc-bookmark-desc-${props.block.id}`}
             value={props.block.description ?? ""}
-            placeholder="Description (optional)"
+            placeholder={t("web.note.doc.descOptional")}
             onInput={(v) => props.onUpdate({ ...props.block, description: v || undefined })}
           />
           <View class="flex-row justify-end">
@@ -460,13 +459,10 @@ export function TocBlockView(props: {
   const entries = computed(() => extractTocEntries(props.allBlocks, maxLevel()));
 
   return (
-    <View testID={`doc-toc-${props.block.id}`} class="gap-2 rounded-lg border border-line bg-side p-3">
+    <View testID={`doc-toc-${props.block.id}`} class="gap-1.5 border-l-2 border-line py-1 pl-3">
       <View class="flex-row items-center justify-between gap-2">
-        <View class="flex-row items-center gap-1.5">
-          <Icon name="sidebarRight" size={14} tone="muted" />
-          <Text class="text-xs font-semibold text-muted">Table of Contents</Text>
-        </View>
-        <View class="flex-row items-center gap-1">
+        <Text class="text-2xs font-semibold text-faint">{t("web.note.doc.tocTitle")}</Text>
+        <View class="flex-row items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100">
           <Each of={[1, 2, 3] as const} key={(lvl) => String(lvl)}>
             {(lvl) => (
               <View
@@ -481,7 +477,7 @@ export function TocBlockView(props: {
           </Each>
         </View>
       </View>
-      <If when={entries().length > 0} else={<Text class="text-xs text-faint">Add headings to populate outline</Text>}>
+      <If when={entries().length > 0} else={<Text class="text-xs text-faint">{t("web.note.doc.tocEmpty")}</Text>}>
         <View class="gap-0.5">
           <Each of={entries()} key={(entry) => entry.blockId}>
             {(entry) => (
@@ -489,10 +485,10 @@ export function TocBlockView(props: {
                 role="button"
                 testID={`doc-toc-entry-${entry().blockId}`}
                 onPress={() => props.onScrollToBlock?.(entry().blockId)}
-                class="rounded-sm px-2 py-1 hover:bg-hover"
-                style={{ paddingLeft: 8 + Math.max(0, entry().level - 1) * 14 }}
+                class="rounded-sm py-0.5 pr-2 hover:bg-hover"
+                style={{ paddingLeft: 4 + Math.max(0, entry().level - 1) * 14 }}
               >
-                <Text class={`truncate text-xs ${entry().level === 1 ? "font-semibold text-ink" : "text-muted"}`}>{entry().text}</Text>
+                <Text class={`truncate text-xs ${entry().level === 1 ? "font-medium text-ink" : "text-muted"}`}>{entry().text}</Text>
               </View>
             )}
           </Each>
@@ -507,9 +503,9 @@ export function MathBlockView(props: { readonly block: MathBlockData; readonly o
   const isDisplay = () => props.block.display !== false;
 
   return (
-    <View testID={`doc-math-${props.block.id}`} class="gap-2 rounded-lg border border-line bg-side p-3">
-      <View class="flex-row items-center justify-between gap-2">
-        <Text class="font-mono text-2xs font-semibold text-muted">{isDisplay() ? "LaTeX $$...$$" : "LaTeX $...$"}</Text>
+    <View testID={`doc-math-${props.block.id}`} class="gap-2 py-1">
+      <View class={`flex-row items-center justify-between gap-2 ${editing() ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus-within:opacity-100"}`}>
+        <Text class="font-mono text-2xs font-semibold text-faint">{isDisplay() ? "LaTeX $$...$$" : "LaTeX $...$"}</Text>
         <View class="flex-row items-center gap-1">
           <Button
             size="compact"
@@ -517,7 +513,7 @@ export function MathBlockView(props: { readonly block: MathBlockData; readonly o
             testID={`doc-math-display-${props.block.id}`}
             onPress={() => props.onUpdate({ ...props.block, display: !isDisplay() })}
           >
-            {isDisplay() ? "Block" : "Inline"}
+            {isDisplay() ? t("web.note.doc.mathBlock") : t("web.note.doc.mathInline")}
           </Button>
           <Button
             size="compact"
@@ -526,7 +522,7 @@ export function MathBlockView(props: { readonly block: MathBlockData; readonly o
             testID={`doc-math-edit-${props.block.id}`}
             onPress={() => editing.set(!editing())}
           >
-            {editing() ? "Render" : "Edit"}
+            {editing() ? t("web.note.doc.render") : t("web.note.doc.edit")}
           </Button>
         </View>
       </View>
@@ -537,7 +533,7 @@ export function MathBlockView(props: { readonly block: MathBlockData; readonly o
             role="button"
             testID={`doc-math-preview-${props.block.id}`}
             onPress={() => editing.set(true)}
-            class={`rounded-md border border-line bg-page px-4 py-3 ${isDisplay() ? "items-center" : ""}`}
+            class={`rounded-md bg-side px-4 py-3 hover:bg-hover ${isDisplay() ? "items-center" : ""}`}
           >
             <Text class="font-mono text-base font-medium text-ink">{props.block.expression || "\\sum_{i=1}^n x_i"}</Text>
           </View>
@@ -564,9 +560,9 @@ export function ColumnsBlockView(props: {
   const count = () => props.block.columns.length;
 
   return (
-    <View testID={`doc-columns-${props.block.id}`} class="gap-2 rounded-lg border border-line bg-page p-2">
-      <View class="flex-row items-center justify-between gap-2 px-1">
-        <Text class="text-2xs font-semibold text-muted">{`${count()} Columns`}</Text>
+    <View testID={`doc-columns-${props.block.id}`} class="gap-1.5 py-1">
+      <View class="flex-row items-center justify-between gap-2 px-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100">
+        <Text class="text-2xs font-semibold text-muted">{t("web.note.doc.columnsCount", { n: count() })}</Text>
         <View class="flex-row items-center gap-1">
           <Button
             size="compact"
@@ -574,7 +570,7 @@ export function ColumnsBlockView(props: {
             testID={`doc-columns-2-${props.block.id}`}
             onPress={() => props.onUpdate(setColumnsCount(props.block, 2))}
           >
-            2 Col
+            {t("web.note.doc.columnsOption", { n: 2 })}
           </Button>
           <Button
             size="compact"
@@ -582,31 +578,33 @@ export function ColumnsBlockView(props: {
             testID={`doc-columns-3-${props.block.id}`}
             onPress={() => props.onUpdate(setColumnsCount(props.block, 3))}
           >
-            3 Col
+            {t("web.note.doc.columnsOption", { n: 3 })}
           </Button>
         </View>
       </View>
-      <View class="flex-row items-start gap-3">
+      <View class="flex-row items-start gap-4">
         <Each of={props.block.columns} key={(_, idx) => String(idx)}>
           {(col, colIdx) => (
-            <View testID={`doc-column-pane-${props.block.id}-${colIdx()}`} class="min-w-0 flex-1 gap-1.5 rounded-md border border-line bg-side p-2">
+            <View testID={`doc-column-pane-${props.block.id}-${colIdx()}`} class="min-w-0 flex-1 gap-1.5 border-l border-line pl-3 first:border-l-0 first:pl-0">
               <Each of={col().blocks} key={(child) => child.id}>
                 {(child) => props.renderChild(child())}
               </Each>
-              <Button
-                size="compact"
-                tone="quiet"
-                icon="add"
-                testID={`doc-column-add-${props.block.id}-${colIdx()}`}
-                onPress={() => {
-                  const nextCols = props.block.columns.map((c, i) =>
-                    i === colIdx() ? { blocks: [...c.blocks, { id: makeBlockId("col"), type: "prose" as const, text: "" }] } : c,
-                  );
-                  props.onUpdate({ ...props.block, columns: nextCols });
-                }}
-              >
-                {t("web.note.doc.addBlock")}
-              </Button>
+              <View class="opacity-0 group-hover:opacity-100 focus-within:opacity-100">
+                <Button
+                  size="compact"
+                  tone="quiet"
+                  icon="add"
+                  testID={`doc-column-add-${props.block.id}-${colIdx()}`}
+                  onPress={() => {
+                    const nextCols = props.block.columns.map((c, i) =>
+                      i === colIdx() ? { blocks: [...c.blocks, { id: makeBlockId("col"), type: "prose" as const, text: "" }] } : c,
+                    );
+                    props.onUpdate({ ...props.block, columns: nextCols });
+                  }}
+                >
+                  {t("web.note.doc.addBlock")}
+                </Button>
+              </View>
             </View>
           )}
         </Each>
@@ -621,15 +619,15 @@ export function PageBreakBlockView(props: {
   readonly onUpdate: (next: PageBreakBlockData) => void;
 }) {
   return (
-    <View testID={`doc-page-break-${props.block.id}`} class="my-1 gap-2 rounded-lg border border-line-strong bg-side p-3">
+    <View testID={`doc-page-break-${props.block.id}`} class="my-2 gap-1.5 border-t border-dashed border-line-strong pt-3">
       <View class="flex-row items-center gap-2">
-        <View class="rounded-sm bg-accent px-1.5 py-0.5">
-          <Text class="font-mono text-2xs font-semibold text-page">{`Slide ${props.slideIndex}`}</Text>
+        <View class="rounded-sm bg-side px-1.5 py-0.5">
+          <Text class="font-mono text-2xs font-semibold text-accent">{t("web.note.doc.slideLabel", { n: props.slideIndex })}</Text>
         </View>
         <Input
           testID={`doc-page-break-title-${props.block.id}`}
           value={props.block.title ?? ""}
-          placeholder="Slide title..."
+          placeholder={t("web.note.doc.slideTitlePlaceholder")}
           onChange={(e) => props.onUpdate({ ...props.block, title: e.value || undefined })}
           class="min-w-0 flex-1 bg-transparent text-sm font-semibold text-ink placeholder:text-faint"
         />
@@ -637,9 +635,11 @@ export function PageBreakBlockView(props: {
       <Input
         testID={`doc-page-break-notes-${props.block.id}`}
         value={props.block.speakerNotes ?? ""}
-        placeholder="Speaker notes..."
+        placeholder={t("web.note.doc.speakerNotesPlaceholder")}
         onChange={(e) => props.onUpdate({ ...props.block, speakerNotes: e.value || undefined })}
-        class="w-full rounded-sm border border-line bg-page px-2 py-1 text-xs text-muted placeholder:text-faint"
+        class={`w-full bg-transparent px-1 py-0.5 text-xs text-muted placeholder:text-faint ${
+          props.block.speakerNotes ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus:opacity-100"
+        }`}
       />
     </View>
   );

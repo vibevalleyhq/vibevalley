@@ -21,28 +21,34 @@ import { Button } from "../../../design/Button";
 import { TextInput } from "../../../design/Field";
 import { Icon } from "../../../design/Icon";
 import { IconButton } from "../../../design/IconButton";
-import { Empty } from "../../../design/layout";
+import { Banner, Empty } from "../../../design/layout";
 import { Segmented } from "../../../design/Segmented";
 import { CountPill } from "../../../design/Tag";
 import { toast } from "../../../design/toasts";
 import { ready, useAgents } from "../../../infra/query";
 import { createEffect } from "../../../infra/solid";
+import type { BaseViewSummaryRef } from "../store";
 import { BaseCellControl } from "./BaseCell";
 import {
   baseCellAsText,
   columnKindIcon,
+  columnWidthPx,
   defaultCellForColumn,
   findSelectOption,
   firstMediaOfRow,
+  formatSummaryValue,
   optionToneLook,
   projectBaseTimeline,
   rowTitleOf,
+  summaryOpLabel,
 } from "./baseModel";
 import { BaseRowDrawer } from "./BaseRowDrawer";
 
 export interface BaseViewProps {
   readonly note: Note;
   readonly snapshot?: BaseViewSnapshot | undefined;
+  readonly views?: readonly BaseViewSummaryRef[] | undefined;
+  readonly error?: string | undefined;
   readonly notes: readonly Note[];
   readonly issues: readonly Issue[];
   readonly activeSheetId?: string | undefined;
@@ -193,7 +199,7 @@ export function BaseView(props: BaseViewProps) {
     for (const [key, rowIds] of buckets) {
       out.push({
         key,
-        label: key === "_uncategorized" ? "Uncategorized" : (labels.get(key) ?? key),
+        label: key === "_uncategorized" ? t("web.note.base.uncategorized") : (labels.get(key) ?? key),
         rowIds,
         count: rowIds.length,
       });
@@ -209,9 +215,12 @@ export function BaseView(props: BaseViewProps) {
       .slice(0, 4),
   );
 
+  const totalTableWidth = computed(() => 40 + 64 + 16 + columns().reduce((sum, col) => sum + columnWidthPx(col), 0));
+
   const switchViewKind = (next: BaseViewKind) => {
     localViewKind.set(next);
-    props.onSelectView(sheetId(), next);
+    const matched = props.views?.find((v) => v.kind === next);
+    props.onSelectView(sheetId(), matched?.id ?? next);
   };
 
   return (
@@ -278,37 +287,34 @@ export function BaseView(props: BaseViewProps) {
         </View>
       </View>
 
-      <If when={summaries().length > 0}>
-        <View testID="base-summary-strip" class="shrink-0 flex-row flex-wrap items-center gap-2 border-b border-line bg-page px-3 py-1.5">
-          <Each of={summaries()} key={(s) => `${s.columnId}:${s.op}`}>
-            {(s) => {
-              const colName = () => columnsById().get(s().columnId)?.name ?? s().columnId;
-              return (
-                <View class="h-5 flex-row items-center gap-1 rounded-sm border border-line bg-side px-2">
-                  <Text class="text-2xs text-muted">{`${colName()} · ${s().op}`}</Text>
-                  <Text class="font-mono text-2xs font-semibold text-ink tabular-nums">{s().value}</Text>
-                </View>
-              );
-            }}
-          </Each>
-        </View>
+      <If when={props.error}>
+        {(err) => (
+          <View class="px-3 pt-2">
+            <Banner tone="bad" icon="warn" testID="base-view-error">
+              {err()}
+            </Banner>
+          </View>
+        )}
       </If>
 
       <View class="min-h-0 min-w-0 flex-1 flex-row">
         <View class="min-h-0 min-w-0 flex-1">
           <If when={props.snapshot !== undefined} else={<Empty icon="log">{t("web.note.base.empty")}</Empty>}>
             <If when={viewKind() === "table"}>
-              <Scroll testID="base-table-view" class="min-h-0 flex-1" contentClass="p-3">
+              <Scroll testID="base-table-view" class="min-h-0 flex-1" contentClass="p-3 gap-2">
                 <If when={filteredRows().length > 0} else={<Empty icon="log">{t("web.note.base.empty")}</Empty>}>
-                  <Scroll horizontal contentClass="min-w-full">
-                    <View class="min-w-full overflow-hidden rounded-lg border border-line bg-page">
+                  <Scroll horizontal testID="base-table-scroll" class="w-full" contentClass="min-w-full">
+                    <View class="overflow-hidden rounded-lg border border-line bg-page" style={{ minWidth: totalTableWidth() }}>
                       <View class="flex-row items-center border-b border-line bg-side px-2 py-2">
                         <View class="w-10 shrink-0 items-center justify-center">
                           <Text class="font-mono text-2xs font-semibold text-faint">#</Text>
                         </View>
                         <Each of={columns()} key={(col) => col.id}>
                           {(col) => (
-                            <View class="min-w-40 flex-1 flex-row items-center justify-between gap-1.5 px-2">
+                            <View
+                              class="shrink-0 grow-0 flex-row items-center justify-between gap-1.5 overflow-hidden px-2"
+                              style={{ width: columnWidthPx(col()) }}
+                            >
                               <View class="min-w-0 flex-1 flex-row items-center gap-1.5">
                                 <Icon name={columnKindIcon(col().kind)} size={12} tone="muted" />
                                 <Text class="min-w-0 truncate text-xs font-semibold text-ink">{col().name}</Text>
@@ -350,7 +356,7 @@ export function BaseView(props: BaseViewProps) {
 
                               <Each of={columns()} key={(col) => col.id}>
                                 {(col) => (
-                                  <View class="min-w-40 flex-1 px-2">
+                                  <View class="shrink-0 grow-0 overflow-hidden px-2" style={{ width: columnWidthPx(col()) }}>
                                     <BaseCellControl
                                       rowId={row().id}
                                       col={col()}
@@ -390,7 +396,7 @@ export function BaseView(props: BaseViewProps) {
                       </Each>
 
                       <If when={summaries().length > 0}>
-                        <View class="flex-row items-center border-t border-line bg-side px-2 py-1.5">
+                        <View testID="base-table-summary" class="flex-row items-center border-t border-line bg-side px-2 py-1.5">
                           <View class="w-10 shrink-0 items-center justify-center">
                             <Text class="font-mono text-2xs font-semibold text-muted">Σ</Text>
                           </View>
@@ -398,9 +404,13 @@ export function BaseView(props: BaseViewProps) {
                             {(col) => {
                               const sum = () => summaryByCol().get(col().id);
                               return (
-                                <View class="min-w-40 flex-1 px-2">
+                                <View class="shrink-0 grow-0 overflow-hidden px-2" style={{ width: columnWidthPx(col()) }}>
                                   <If when={sum()}>
-                                    {(res) => <Text class="font-mono text-xs font-semibold text-ink tabular-nums">{`${res().op}: ${res().value}`}</Text>}
+                                    {(res) => (
+                                      <Text class="truncate font-mono text-xs font-semibold text-ink tabular-nums">
+                                        {`${summaryOpLabel(res().op)}: ${formatSummaryValue(res().value)}`}
+                                      </Text>
+                                    )}
                                   </If>
                                 </View>
                               );

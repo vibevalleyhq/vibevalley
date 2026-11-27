@@ -4,11 +4,12 @@ import { t } from "@vibevalley/i18n";
 
 import { Icon } from "../../../design/Icon";
 import { Kbd } from "../../../design/layout";
-import { filterSlashCommands, groupSlashCommands, type SlashCommandItem } from "./docOps";
+import { filterSlashCommands, groupSlashCommands, slashCommandDesc, slashCommandLabel, type SlashCommandItem } from "./docOps";
 
 export interface SlashMenuProps {
   readonly open: boolean;
   readonly query: string;
+  readonly placement?: "bottom" | "top" | undefined;
   readonly testID?: string | undefined;
   readonly onSelect: (item: SlashCommandItem) => void;
   readonly onClose: () => void;
@@ -70,7 +71,14 @@ export function SlashMenu(props: SlashMenuProps) {
 
   return (
     <If when={props.open}>
-      <View testID={props.testID ?? "doc-slash-menu"} class="z-20 mt-1 w-80 overflow-hidden rounded-lg border border-line-strong bg-elevated shadow-float">
+      <View
+        testID={props.testID ?? "doc-slash-menu"}
+        class={
+          props.placement === "top"
+            ? "absolute bottom-full left-0 z-30 mb-1 w-96 overflow-hidden rounded-lg border border-line-strong bg-elevated shadow-float"
+            : "z-20 mt-1 w-96 overflow-hidden rounded-lg border border-line-strong bg-elevated shadow-float"
+        }
+      >
         <View class="flex-row items-center justify-between border-b border-line px-2.5 py-1.5">
           <Text class="text-2xs font-semibold text-muted">{t("web.note.doc.addBlock")}</Text>
           <If when={props.query.trim().length > 0}>
@@ -105,8 +113,8 @@ export function SlashMenu(props: SlashMenuProps) {
                             <Icon name={item().icon} size={14} tone={isActive() ? "accent" : "muted"} />
                           </View>
                           <View class="min-w-0 flex-1 gap-0.5">
-                            <Text class="truncate text-xs font-medium text-ink">{item().label}</Text>
-                            <Text class="truncate text-2xs text-faint">{item().description}</Text>
+                            <Text class="truncate text-xs font-medium text-ink">{slashCommandLabel(item().key)}</Text>
+                            <Text class="line-clamp-2 text-2xs text-faint">{slashCommandDesc(item().key)}</Text>
                           </View>
                           <If when={item().shortcut}>{(sc) => <Kbd size="sm">{sc()}</Kbd>}</If>
                         </View>

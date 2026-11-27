@@ -217,6 +217,16 @@ fn compute_summaries(rows: &[BaseRow], summaries: &[BaseSummaryConfig]) -> Vec<B
         .collect()
 }
 
+fn parse_view_kind(raw: &str) -> Option<BaseViewKind> {
+    match raw {
+        "table" => Some(BaseViewKind::Table),
+        "board" => Some(BaseViewKind::Board),
+        "gallery" => Some(BaseViewKind::Gallery),
+        "timeline" => Some(BaseViewKind::Timeline),
+        _ => None,
+    }
+}
+
 /// Projects `structure/base.json` into a [`BaseViewSnapshot`] with filters, sorts, groups, and summaries.
 pub fn project_base_view(note_id: &str, files: &BTreeMap<String, Vec<u8>>, req: &BaseViewRequest) -> Result<BaseViewSnapshot, String> {
     let raw = files
@@ -250,8 +260,42 @@ pub fn project_base_view(note_id: &str, files: &BTreeMap<String, Vec<u8>>, req: 
         sorts: None,
         summaries: None,
     };
-    let view = match req.view_id.as_deref() {
-        Some(vid) => sheet.views.iter().find(|v| v.id == vid).ok_or_else(|| format!("view {vid} not found"))?,
+    let resolved_owned: BaseViewConfig;
+    let view = match req.view_id.as_deref().map(str::trim).filter(|v| !v.is_empty()) {
+        Some(vid) => {
+            if let Some(exact) = sheet.views.iter().find(|v| v.id == vid) {
+                exact
+            } else if let Some(requested_kind) = parse_view_kind(vid) {
+                if let Some(by_kind) = sheet.views.iter().find(|v| v.kind == requested_kind) {
+                    by_kind
+                } else {
+                    let base_cfg = sheet.views.first().unwrap_or(&fallback_view);
+                    let default_group_by = if requested_kind == BaseViewKind::Board {
+                        sheet
+                            .views
+                            .iter()
+                            .find_map(|v| v.group_by.clone())
+                            .or_else(|| sheet.columns.iter().find(|c| c.kind == BaseColumnKind::Select).map(|c| c.id.clone()))
+                            .or_else(|| sheet.columns.iter().find(|c| c.kind == BaseColumnKind::AgentRef).map(|c| c.id.clone()))
+                    } else {
+                        base_cfg.group_by.clone()
+                    };
+                    resolved_owned = BaseViewConfig {
+                        id: vid.to_owned(),
+                        name: base_cfg.name.clone(),
+                        kind: requested_kind,
+                        group_by: default_group_by,
+                        hidden_columns: base_cfg.hidden_columns.clone(),
+                        filters: base_cfg.filters.clone(),
+                        sorts: base_cfg.sorts.clone(),
+                        summaries: base_cfg.summaries.clone(),
+                    };
+                    &resolved_owned
+                }
+            } else {
+                return Err(format!("view {vid} not found"));
+            }
+        }
         None => sheet.views.first().unwrap_or(&fallback_view),
     };
 
@@ -1213,5 +1257,124 @@ mod tests {
         let links = extract_base_links(&files);
         assert!(links.iter().any(|l| l.kind == LinkEntityKind::Note && l.id == "n_child_page"));
         assert!(links.iter().any(|l| l.kind == LinkEntityKind::Note && l.id == "n_linked"));
+    }
+
+    #[test]
+    fn regression_project_base_view_resolves_view_kinds_and_empty_view_id_without_dropping_rows() {
+        let mut cells = BTreeMap::new();
+        cells.insert("c_title".to_owned(), BaseCellValue::Text { value: "Item 1".to_owned() });
+        cells.insert("c_status".to_owned(), BaseCellValue::Text { value: "doing".to_owned() });
+
+        let doc = BaseDocument {
+            version: 1,
+            sheets: vec![BaseSheet {
+                id: "s1".to_owned(),
+                name: "Tasks".to_owned(),
+                columns: vec![
+                    BaseColumn {
+                        id: "c_title".to_owned(),
+                        name: "Title".to_owned(),
+                        kind: BaseColumnKind::Text,
+                        options: None,
+                        agent_config: None,
+                        formula: None,
+                        width: None,
+                    },
+                    BaseColumn {
+                        id: "c_status".to_owned(),
+                        name: "Status".to_owned(),
+                        kind: BaseColumnKind::Select,
+                        options: Some(vec![
+                            vibevalley_protocol::BaseSelectOption {
+                                value: "todo".to_owned(),
+                                label: Some("Todo".to_owned()),
+                                color: Some("stone".to_owned()),
+                            },
+                            vibevalley_protocol::BaseSelectOption {
+                                value: "doing".to_owned(),
+                                label: Some("Doing".to_owned()),
+                                color: Some("amber".to_owned()),
+                            },
+                        ]),
+                        agent_config: None,
+                        formula: None,
+                        width: None,
+                    },
+                ],
+                rows: vec![BaseRow {
+                    id: "r1".to_owned(),
+                    cells,
+                    page_note_id: None,
+                    created_at: 1,
+                    updated_at: 1,
+                }],
+                views: vec![
+                    BaseViewConfig {
+                        id: "v_table".to_owned(),
+                        name: "Table".to_owned(),
+                        kind: BaseViewKind::Table,
+                        group_by: None,
+                        hidden_columns: None,
+                        filters: None,
+                        sorts: None,
+                        summaries: None,
+                    },
+                    BaseViewConfig {
+                        id: "v_board".to_owned(),
+                        name: "Board".to_owned(),
+                        kind: BaseViewKind::Board,
+                        group_by: Some("c_status".to_owned()),
+                        hidden_columns: None,
+                        filters: None,
+                        sorts: None,
+                        summaries: None,
+                    },
+                ],
+            }],
+        };
+
+        let mut files = BTreeMap::new();
+        files.insert("structure/base.json".to_owned(), serialize_base_document(&doc).unwrap().into_bytes());
+
+        let board_by_kind = project_base_view(
+            "n_base",
+            &files,
+            &BaseViewRequest {
+                id: "n_base".to_owned(),
+                sheet_id: Some("s1".to_owned()),
+                view_id: Some("board".to_owned()),
+            },
+        )
+        .unwrap();
+        assert_eq!(board_by_kind.active_view_id, "v_board");
+        assert_eq!(board_by_kind.active_view_kind, BaseViewKind::Board);
+        assert_eq!(board_by_kind.rows.len(), 1);
+        assert_eq!(board_by_kind.groups.len(), 2);
+
+        let gallery_fallback = project_base_view(
+            "n_base",
+            &files,
+            &BaseViewRequest {
+                id: "n_base".to_owned(),
+                sheet_id: Some("s1".to_owned()),
+                view_id: Some("gallery".to_owned()),
+            },
+        )
+        .unwrap();
+        assert_eq!(gallery_fallback.active_view_kind, BaseViewKind::Gallery);
+        assert_eq!(gallery_fallback.rows.len(), 1);
+
+        let empty_view = project_base_view(
+            "n_base",
+            &files,
+            &BaseViewRequest {
+                id: "n_base".to_owned(),
+                sheet_id: Some("s1".to_owned()),
+                view_id: Some(String::new()),
+            },
+        )
+        .unwrap();
+        assert_eq!(empty_view.active_view_id, "v_table");
+        assert_eq!(empty_view.rows.len(), 1);
     }
 }

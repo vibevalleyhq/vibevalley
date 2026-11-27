@@ -14,10 +14,12 @@ export interface CollabToolbarProps {
   readonly note: Note;
   readonly peers: readonly NotePresence[];
   readonly suggestions: readonly Suggestion[];
+  readonly historyOpen?: boolean | undefined;
+  readonly filesOpen?: boolean | undefined;
   readonly onAcceptSuggestion: (id: SuggestionId) => Promise<void> | void;
   readonly onRejectSuggestion: (id: SuggestionId) => Promise<void> | void;
   readonly onToggleHistory: () => void;
-  readonly onToggleFiles: () => void;
+  readonly onToggleFiles?: (() => void) | undefined;
 }
 
 function peerInitial(name: string): string {
@@ -133,8 +135,26 @@ export function CollabToolbar(props: CollabToolbarProps) {
         </Popover>
       </If>
 
-      <IconButton icon="clock" size={14} label={t("web.note.timeline.title")} testid="collab-toggle-history" onClick={props.onToggleHistory} />
-      <IconButton icon="folder" size={14} label={t("web.note.page.filesTab")} testid="collab-toggle-files" onClick={props.onToggleFiles} />
+      <IconButton
+        icon="clock"
+        size={14}
+        label={t("web.note.timeline.title")}
+        testid="collab-toggle-history"
+        pressed={props.historyOpen === true}
+        onClick={props.onToggleHistory}
+      />
+      <If when={props.onToggleFiles}>
+        {(toggleFiles) => (
+          <IconButton
+            icon="folder"
+            size={14}
+            label={t("web.note.page.filesTab")}
+            testid="collab-toggle-files"
+            pressed={props.filesOpen === true}
+            onClick={() => toggleFiles()()}
+          />
+        )}
+      </If>
     </View>
   );
 }

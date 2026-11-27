@@ -20,7 +20,7 @@ import { InstallAppletModal, useInstalledNoteApplet } from "./InstallAppletModal
 import { kindLabel, noteHref, noteIcon, useNote, useNotes } from "./NoteCard";
 import { NoteDirectoryView } from "./NoteDirectoryView";
 import { presenterHref } from "./slides";
-import { createBaseRowPage, noteBaseQuery, noteDocQuery, noteLinksQuery } from "./store";
+import { createBaseRowPage, noteBaseQuery, noteBaseSheetViewsQuery, noteDocQuery, noteLinksQuery } from "./store";
 import { BaseView } from "./views/BaseView";
 import { CanvasView } from "./views/CanvasView";
 import { MediaView } from "./views/MediaView";
@@ -90,7 +90,17 @@ function CanvasBody(props: {
   });
   const baseSnap = useQuery(() => noteBaseQuery({ id: props.note.id, sheetId: activeSheetId(), viewId: activeViewId() }), {
     enabled: () => props.note.noteType === "base",
+    keepPrevious: true,
   });
+  const baseViewsQuery = useQuery(() => noteBaseSheetViewsQuery(props.note.id), {
+    enabled: () => props.note.noteType === "base",
+  });
+  const currentBaseSnap = computed(() => ready(baseSnap, undefined) ?? baseSnap.previous()?.value);
+  const currentBaseViews = computed(() => {
+    const sid = activeSheetId() ?? currentBaseSnap()?.activeSheetId;
+    return sid ? ready(baseViewsQuery, undefined)?.get(sid) : undefined;
+  });
+  const baseError = computed(() => (baseSnap.error() !== undefined ? reasonOf(baseSnap.error()) : undefined));
   const notesList = computed(() => ready(allNotes, []));
   const issuesList = computed(() => board()?.issues ?? []);
 
@@ -273,15 +283,17 @@ function CanvasBody(props: {
               <If when={props.note.noteType === "base"}>
                 <BaseView
                   note={props.note}
-                  snapshot={ready(baseSnap, undefined)}
+                  snapshot={currentBaseSnap()}
+                  views={currentBaseViews()}
+                  error={baseError()}
                   notes={notesList()}
                   issues={issuesList()}
                   activeSheetId={activeSheetId()}
                   activeViewId={activeViewId()}
                   busy={act.busy()}
                   onSelectView={(sid: string, vid: string | undefined) => {
-                    activeSheetId.set(sid);
-                    activeViewId.set(vid);
+                    activeSheetId.set(sid || undefined);
+                    activeViewId.set(vid || undefined);
                   }}
                   onUpsertRow={upsertRow}
                   onRunAgentColumn={runAgentColumn}

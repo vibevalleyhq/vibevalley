@@ -1,3 +1,4 @@
+import { t } from "@vibevalley/i18n";
 import type { DocBlock, DocColumn, DocKpiItem, Issue } from "@vibevalley/protocol";
 import { issueId, noteId } from "@vibevalley/protocol/schema";
 
@@ -392,10 +393,145 @@ export function createDefaultBlock(
   }
 }
 
+export function slashCategoryLabel(category: SlashCategory): string {
+  switch (category) {
+    case "basic":
+      return t("web.note.doc.slashCat.basic");
+    case "structure":
+      return t("web.note.doc.slashCat.structure");
+    case "data":
+      return t("web.note.doc.slashCat.data");
+  }
+}
+
+export function slashCommandLabel(key: string): string {
+  switch (key) {
+    case "prose":
+      return t("web.note.doc.slash.prose.label");
+    case "heading-1":
+      return t("web.note.doc.slash.heading1.label");
+    case "heading-2":
+      return t("web.note.doc.slash.heading2.label");
+    case "heading-3":
+      return t("web.note.doc.slash.heading3.label");
+    case "list-bullet":
+      return t("web.note.doc.slash.listBullet.label");
+    case "list-ordered":
+      return t("web.note.doc.slash.listOrdered.label");
+    case "todo":
+      return t("web.note.doc.slash.todo.label");
+    case "quote":
+      return t("web.note.doc.slash.quote.label");
+    case "divider":
+      return t("web.note.doc.slash.divider.label");
+    case "toggle":
+      return t("web.note.doc.slash.toggle.label");
+    case "callout":
+      return t("web.note.doc.slash.callout.label");
+    case "code":
+      return t("web.note.doc.slash.code.label");
+    case "table":
+      return t("web.note.doc.slash.table.label");
+    case "bookmark":
+      return t("web.note.doc.slash.bookmark.label");
+    case "toc":
+      return t("web.note.doc.slash.toc.label");
+    case "math":
+      return t("web.note.doc.slash.math.label");
+    case "columns":
+      return t("web.note.doc.slash.columns.label");
+    case "pageBreak":
+      return t("web.note.doc.slash.pageBreak.label");
+    case "kpi":
+      return t("web.note.doc.slash.kpi.label");
+    case "chart":
+      return t("web.note.doc.slash.chart.label");
+    case "diagram":
+      return t("web.note.doc.slash.diagram.label");
+    case "compare":
+      return t("web.note.doc.slash.compare.label");
+    case "media":
+      return t("web.note.doc.slash.media.label");
+    case "preview":
+      return t("web.note.doc.slash.preview.label");
+    case "baseEmbed":
+      return t("web.note.doc.slash.baseEmbed.label");
+    case "issueCard":
+      return t("web.note.doc.slash.issueCard.label");
+    case "issueList":
+      return t("web.note.doc.slash.issueList.label");
+    default:
+      return key;
+  }
+}
+
+export function slashCommandDesc(key: string): string {
+  switch (key) {
+    case "prose":
+      return t("web.note.doc.slash.prose.desc");
+    case "heading-1":
+      return t("web.note.doc.slash.heading1.desc");
+    case "heading-2":
+      return t("web.note.doc.slash.heading2.desc");
+    case "heading-3":
+      return t("web.note.doc.slash.heading3.desc");
+    case "list-bullet":
+      return t("web.note.doc.slash.listBullet.desc");
+    case "list-ordered":
+      return t("web.note.doc.slash.listOrdered.desc");
+    case "todo":
+      return t("web.note.doc.slash.todo.desc");
+    case "quote":
+      return t("web.note.doc.slash.quote.desc");
+    case "divider":
+      return t("web.note.doc.slash.divider.desc");
+    case "toggle":
+      return t("web.note.doc.slash.toggle.desc");
+    case "callout":
+      return t("web.note.doc.slash.callout.desc");
+    case "code":
+      return t("web.note.doc.slash.code.desc");
+    case "table":
+      return t("web.note.doc.slash.table.desc");
+    case "bookmark":
+      return t("web.note.doc.slash.bookmark.desc");
+    case "toc":
+      return t("web.note.doc.slash.toc.desc");
+    case "math":
+      return t("web.note.doc.slash.math.desc");
+    case "columns":
+      return t("web.note.doc.slash.columns.desc");
+    case "pageBreak":
+      return t("web.note.doc.slash.pageBreak.desc");
+    case "kpi":
+      return t("web.note.doc.slash.kpi.desc");
+    case "chart":
+      return t("web.note.doc.slash.chart.desc");
+    case "diagram":
+      return t("web.note.doc.slash.diagram.desc");
+    case "compare":
+      return t("web.note.doc.slash.compare.desc");
+    case "media":
+      return t("web.note.doc.slash.media.desc");
+    case "preview":
+      return t("web.note.doc.slash.preview.desc");
+    case "baseEmbed":
+      return t("web.note.doc.slash.baseEmbed.desc");
+    case "issueCard":
+      return t("web.note.doc.slash.issueCard.desc");
+    case "issueList":
+      return t("web.note.doc.slash.issueList.desc");
+    default:
+      return "";
+  }
+}
+
 export function filterSlashCommands(query: string): readonly SlashCommandItem[] {
   const q = query.trim().toLowerCase();
   if (!q) return SLASH_COMMANDS;
-  return SLASH_COMMANDS.filter((item) => matches(q, [item.label, item.description, item.type, item.shortcut, ...item.keywords]));
+  return SLASH_COMMANDS.filter((item) =>
+    matches(q, [slashCommandLabel(item.key), slashCommandDesc(item.key), item.label, item.description, item.type, item.shortcut, ...item.keywords]),
+  );
 }
 
 export function groupSlashCommands(
@@ -405,7 +541,7 @@ export function groupSlashCommands(
   for (const cat of SLASH_CATEGORIES) {
     const matched = items.filter((item) => item.category === cat);
     if (matched.length > 0) {
-      out.push({ category: cat, label: SLASH_CATEGORY_LABELS[cat], items: matched });
+      out.push({ category: cat, label: slashCategoryLabel(cat), items: matched });
     }
   }
   return out;
@@ -1156,16 +1292,69 @@ export function calloutVisualOf(rawTone: string): CalloutVisual {
   const tone = normalizeCalloutTone(rawTone);
   switch (tone) {
     case "tip":
-      return { tone, label: "Tip", icon: "check", iconTone: "ok-ink", bgClass: "bg-ok-soft", textClass: "text-ok-ink" };
+      return { tone, label: t("web.note.doc.calloutTones.tip"), icon: "check", iconTone: "ok-ink", bgClass: "bg-ok-soft", textClass: "text-ok-ink" };
     case "warn":
-      return { tone, label: "Warn", icon: "warn", iconTone: "warn-ink", bgClass: "bg-warn-soft", textClass: "text-warn-ink" };
+      return { tone, label: t("web.note.doc.calloutTones.warn"), icon: "warn", iconTone: "warn-ink", bgClass: "bg-warn-soft", textClass: "text-warn-ink" };
     case "danger":
-      return { tone, label: "Danger", icon: "cross", iconTone: "berry", bgClass: "bg-bad-soft", textClass: "text-berry" };
+      return { tone, label: t("web.note.doc.calloutTones.danger"), icon: "cross", iconTone: "berry", bgClass: "bg-bad-soft", textClass: "text-berry" };
     case "note":
-      return { tone, label: "Note", icon: "notes", iconTone: "muted", bgClass: "bg-side", textClass: "text-ink" };
+      return { tone, label: t("web.note.doc.calloutTones.note"), icon: "notes", iconTone: "muted", bgClass: "bg-side", textClass: "text-ink" };
     case "info":
-      return { tone, label: "Info", icon: "info", iconTone: "water", bgClass: "", textClass: "text-ink", mixToken: "water" };
+      return { tone, label: t("web.note.doc.calloutTones.info"), icon: "info", iconTone: "water", bgClass: "", textClass: "text-ink", mixToken: "water" };
   }
+}
+
+export function calloutToneLabel(rawTone: CalloutTone): string {
+  switch (rawTone) {
+    case "tip":
+      return t("web.note.doc.calloutTones.tip");
+    case "warn":
+      return t("web.note.doc.calloutTones.warn");
+    case "danger":
+      return t("web.note.doc.calloutTones.danger");
+    case "note":
+      return t("web.note.doc.calloutTones.note");
+    case "info":
+      return t("web.note.doc.calloutTones.info");
+  }
+}
+
+export function isTurnIntoActive(block: DocBlock, opt: TurnIntoOption): boolean {
+  if (block.type !== opt.type) return false;
+  if (block.type === "heading") return block.level === opt.headingLevel;
+  if (block.type === "list") return block.ordered === (opt.listOrdered === true);
+  return true;
+}
+
+export function wrapInlineMarkdown(text: string, marker: "**" | "*" | "`" | "~~"): string {
+  const trimmed = text.trimEnd();
+  const suffix = text.slice(trimmed.length);
+  if (!trimmed) return `${marker}${marker}`;
+  const m = /^(.*?)(\S+)$/su.exec(trimmed);
+  if (!m) return `${text}${marker}${marker}`;
+  const head = m[1] ?? "";
+  const tail = m[2] ?? "";
+  if (tail.startsWith(marker) && tail.endsWith(marker) && tail.length >= marker.length * 2) {
+    return `${head}${tail.slice(marker.length, tail.length - marker.length)}${suffix}`;
+  }
+  return `${head}${marker}${tail}${marker}${suffix}`;
+}
+
+export function neighborBlockId(blocks: readonly DocBlock[], currentId: string, dir: "prev" | "next"): string | undefined {
+  const flat: string[] = [];
+  const walk = (list: readonly DocBlock[]) => {
+    for (const b of list) {
+      flat.push(b.id);
+      if (b.type === "columns") {
+        for (const col of b.columns) walk(col.blocks);
+      }
+      if (b.children) walk(b.children);
+    }
+  };
+  walk(blocks);
+  const idx = flat.indexOf(currentId);
+  if (idx === -1) return undefined;
+  return dir === "prev" ? flat[idx - 1] : flat[idx + 1];
 }
 
 export function updateKpiItem(items: readonly DocKpiItem[], idx: number, patch: Partial<DocKpiItem>): DocKpiItem[] {

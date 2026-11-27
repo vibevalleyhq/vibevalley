@@ -18,6 +18,8 @@ import { noteIcon, noteTypeIcon, noteTypeLabel } from "./NoteCard";
 export interface PageTreeProps {
   readonly notes: readonly Note[];
   readonly activeId?: NoteId | undefined;
+  readonly noteTypeFilter?: NoteType | undefined;
+  readonly embedded?: boolean | undefined;
   readonly onSelect: (id: NoteId) => void;
   readonly onCreated?: ((note: Note) => void) | undefined;
   readonly onMoved?: ((note: Note) => void) | undefined;
@@ -86,11 +88,13 @@ export function PageTree(props: PageTreeProps) {
 
   const matchingIds = computed((): ReadonlySet<string> | undefined => {
     const q = search().trim().toLowerCase();
-    if (!q) return undefined;
+    const typeFilter = props.noteTypeFilter;
+    if (!q && typeFilter === undefined) return undefined;
     const known = byId();
     const keep = new Set<string>();
     for (const n of props.notes) {
-      if (!spelled(n.title, q) && !spelled(noteTypeLabel(n.noteType), q) && !n.noteType.toLowerCase().includes(q)) continue;
+      if (typeFilter !== undefined && n.noteType !== typeFilter) continue;
+      if (q && !spelled(n.title, q) && !spelled(noteTypeLabel(n.noteType), q) && !n.noteType.toLowerCase().includes(q)) continue;
       let cur: Note | undefined = n;
       const seen = new Set<string>();
       while (cur !== undefined) {
@@ -199,9 +203,17 @@ export function PageTree(props: PageTreeProps) {
     moveNote(row.note.id, pid, nextOrder);
   };
 
-  return (
-    <View testID="page-tree" accessibilityLabel={t("web.note.tree.title")} class={`h-full w-48 shrink-0 border-r border-line bg-side ${props.class ?? ""}`}>
-      <View class="h-10 shrink-0 flex-row items-center justify-between gap-1.5 border-b border-line px-2.5">
+  const embedded = () => props.embedded === true;
+
+  const treeBody = (
+    <View class={embedded() ? "gap-1" : "min-h-0 flex-1"}>
+      <View
+        class={
+          embedded()
+            ? "h-7 shrink-0 flex-row items-center justify-between gap-1.5 px-2"
+            : "h-10 shrink-0 flex-row items-center justify-between gap-1.5 border-b border-line px-2.5"
+        }
+      >
         <Text class="min-w-0 flex-1 truncate text-xs font-semibold text-muted">{t("web.note.tree.title")}</Text>
         <Menu
           open={addMenuOpen()}
@@ -238,7 +250,7 @@ export function PageTree(props: PageTreeProps) {
         </Menu>
       </View>
 
-      <View class="shrink-0 px-2 pt-2 pb-1">
+      <View class={embedded() ? "shrink-0 px-0.5 pt-0.5 pb-1" : "shrink-0 px-2 pt-2 pb-1"}>
         <SearchField
           testid="page-tree-search"
           value={search()}
@@ -249,34 +261,78 @@ export function PageTree(props: PageTreeProps) {
         />
       </View>
 
-      <Scroll class="min-h-0 flex-1" contentClass="gap-0.5 p-1.5 pb-4">
-        <If
-          when={rows().length > 0}
-          else={
-            <Text testID="page-tree-empty" class="px-2 py-4 text-center text-xs text-faint">
-              {t("web.note.tree.empty")}
-            </Text>
-          }
-        >
-          <Each of={rows()} key={(r) => r.note.id}>
-            {(row) => (
-              <PageTreeRow
-                row={row()}
-                active={row().note.id === props.activeId}
-                allNotes={props.notes}
-                byId={byId()}
-                busy={act.busy()}
-                onSelect={props.onSelect}
-                onToggleExpand={toggleExpand}
-                onCreateChild={(parentId, nt) => createPage(nt, parentId)}
-                onMoveToRoot={(id) => moveNote(id, undefined, 0)}
-                onMoveUnder={(id, targetId) => moveNote(id, targetId, 0)}
-                onReorder={(r, delta) => reorderSibling(r, delta)}
-              />
-            )}
-          </Each>
-        </If>
-      </Scroll>
+      <If
+        when={props.embedded}
+        else={
+          <Scroll class="min-h-0 flex-1" contentClass="gap-0.5 p-1.5 pb-4">
+            <If
+              when={rows().length > 0}
+              else={
+                <Text testID="page-tree-empty" class="px-2 py-4 text-center text-xs text-faint">
+                  {t("web.note.tree.empty")}
+                </Text>
+              }
+            >
+              <Each of={rows()} key={(r) => r.note.id}>
+                {(row) => (
+                  <PageTreeRow
+                    row={row()}
+                    active={row().note.id === props.activeId}
+                    allNotes={props.notes}
+                    byId={byId()}
+                    busy={act.busy()}
+                    onSelect={props.onSelect}
+                    onToggleExpand={toggleExpand}
+                    onCreateChild={(parentId, nt) => createPage(nt, parentId)}
+                    onMoveToRoot={(id) => moveNote(id, undefined, 0)}
+                    onMoveUnder={(id, targetId) => moveNote(id, targetId, 0)}
+                    onReorder={(r, delta) => reorderSibling(r, delta)}
+                  />
+                )}
+              </Each>
+            </If>
+          </Scroll>
+        }
+      >
+        <View class="gap-0.5">
+          <If
+            when={rows().length > 0}
+            else={
+              <Text testID="page-tree-empty" class="px-2 py-3 text-center text-xs text-faint">
+                {t("web.note.tree.empty")}
+              </Text>
+            }
+          >
+            <Each of={rows()} key={(r) => r.note.id}>
+              {(row) => (
+                <PageTreeRow
+                  row={row()}
+                  active={row().note.id === props.activeId}
+                  allNotes={props.notes}
+                  byId={byId()}
+                  busy={act.busy()}
+                  onSelect={props.onSelect}
+                  onToggleExpand={toggleExpand}
+                  onCreateChild={(parentId, nt) => createPage(nt, parentId)}
+                  onMoveToRoot={(id) => moveNote(id, undefined, 0)}
+                  onMoveUnder={(id, targetId) => moveNote(id, targetId, 0)}
+                  onReorder={(r, delta) => reorderSibling(r, delta)}
+                />
+              )}
+            </Each>
+          </If>
+        </View>
+      </If>
+    </View>
+  );
+
+  return (
+    <View
+      testID="page-tree"
+      accessibilityLabel={t("web.note.tree.title")}
+      class={embedded() ? `shrink-0 ${props.class ?? ""}` : `h-full w-48 shrink-0 border-r border-line bg-side ${props.class ?? ""}`}
+    >
+      {treeBody}
     </View>
   );
 }

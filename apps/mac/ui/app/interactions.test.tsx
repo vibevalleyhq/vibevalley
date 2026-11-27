@@ -493,8 +493,8 @@ test("history panel: opens on right rail, previews commit, restores, forks, save
     }));
   });
 
-  await fake.pumpUntil(app, () => app.count("id:note-history-toggle") === 1);
-  await app.press("id:note-history-toggle");
+  await fake.pumpUntil(app, () => app.count("id:collab-toggle-history") === 1);
+  await app.press("id:collab-toggle-history");
   await fake.pumpUntil(app, () => app.count("id:note-history-panel") === 1 && app.count("id:history-commit-1") === 1);
 
   fake.clearCalls();
@@ -930,11 +930,11 @@ test("content & note UX: library quick generate, history panel, and doc/base rou
         f.respond(op, handler);
       }
     });
-    await docApp.fake.pumpUntil(docApp.app, () => docApp.app.count("id:note-history-toggle") === 1);
+    await docApp.fake.pumpUntil(docApp.app, () => docApp.app.count("id:collab-toggle-history") === 1);
     expect(docApp.app.count("id:note-version-badge")).toBe(1);
     const firstVersion = docNote.versions[0];
     if (firstVersion !== undefined) {
-      await docApp.app.press("id:note-history-toggle");
+      await docApp.app.press("id:collab-toggle-history");
       await docApp.fake.pumpUntil(docApp.app, () => docApp.app.count("id:note-history-panel") === 1);
       expect(docApp.app.count(`id:note-version-${firstVersion.version}`)).toBe(1);
     }

@@ -14,7 +14,8 @@ import { toast } from "../../design/toasts";
 import { api } from "../../infra/api";
 import { defineQuery, ready, useQuery, useQueryClient } from "../../infra/query";
 import { Link as A } from "../../infra/router";
-import { NoteCard, noteHref, noteTypeIcon, noteTypeLabel, useNotes } from "./NoteCard";
+import { noteSuffixOf } from "./html";
+import { noteHref, noteIcon, noteTypeIcon, noteTypeLabel, useNotes } from "./NoteCard";
 
 const issueLinksQuery = defineQuery({
   key: (id: string) => ["note-links", "issue", id],
@@ -145,18 +146,29 @@ export function IssueNotes(props: IssueNotesProps) {
         <View class="gap-1.5">
           <Each of={linkedList()} key={(n) => n.id}>
             {(n) => (
-              <View testID={`issue-note-row-${n().id}`} class="max-w-md flex-row items-center gap-1.5">
-                <View class="min-w-0 flex-1">
-                  <NoteCard
-                    card={{
-                      id: n().id,
-                      title: n().title,
-                      noteType: n().noteType,
-                      version: n().version,
-                      note: n().versions.at(-1)?.note ?? "",
-                    }}
-                  />
-                </View>
+              <View
+                testID={`issue-note-row-${n().id}`}
+                class="w-full max-w-md flex-row items-center gap-2 rounded-lg border border-line bg-page px-3 py-2 hover:border-faint"
+              >
+                <A
+                  href={noteHref(n().id, n().version > 0 ? n().version : undefined)}
+                  class="min-w-0 flex-1 flex-row items-center gap-2.5 rounded-sm focus-visible:outline-2 focus-visible:outline-focus"
+                >
+                  <View class="size-8 shrink-0 items-center justify-center rounded-md bg-side">
+                    <Icon name={noteIcon(n())} size={16} tone="muted" />
+                  </View>
+                  <View class="min-w-0 flex-1 gap-0.5">
+                    <View class="flex-row items-center gap-1.5">
+                      <Text class="min-w-0 flex-1 truncate text-sm font-medium text-ink">{n().title}</Text>
+                      <View class="shrink-0 rounded-xs bg-side px-1.5 py-px">
+                        <Text class="text-2xs font-medium text-muted">{noteTypeLabel(n().noteType)}</Text>
+                      </View>
+                    </View>
+                    <Text class="truncate font-mono text-2xs text-faint tabular-nums">
+                      {[noteSuffixOf(n()), ...(n().version > 0 ? [t("web.note.card.version", { version: n().version })] : [])].join(" · ")}
+                    </Text>
+                  </View>
+                </A>
                 <IconButton
                   icon="close"
                   size={12}

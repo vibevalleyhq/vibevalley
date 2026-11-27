@@ -2485,14 +2485,104 @@ export const catalogs = {
         snapshotNote: "手动快照",
       },
       tree: { title: "页面树", newRoot: "新建页面", newChild: "添加子页面", moveToRoot: "移到顶层", empty: "页面树里还没有笔记" },
-      links: { outgoing: "引用去向 ({n})", backlinks: "反向链接 ({n})", empty: "暂无反向链接" },
+      links: { outgoing: "引用去向 ({n})", backlinks: "反向链接 ({n})", relation: { link: "引用", embed: "嵌入", ref: "关联" } },
       doc: {
         addBlock: "添加内容块",
         slashHint: "输入 / 插入内容块，或输入 [[ 关联笔记或工单",
-        blocksCount: "{n} 块",
-        wordsCount: "{n} 字",
         slidesCount: "{n} 页",
         empty: "空白文档——添加一个内容块开始",
+        presenter: "演示模式",
+        outline: "大纲",
+        bold: "加粗",
+        italic: "斜体",
+        inlineCode: "行内代码",
+        strike: "删除线",
+        link: "关联笔记或工单",
+        moveUp: "上移",
+        moveDown: "下移",
+        duplicate: "复制",
+        convertToIssue: "转为工单",
+        turnInto: "转换为",
+        edit: "编辑",
+        preview: "预览",
+        render: "渲染",
+        add: "添加",
+        tocTitle: "目录",
+        tocEmpty: "添加标题后自动生成目录",
+        orderedList: "1. 有序",
+        bulletedList: "• 无序",
+        listItemPlaceholder: "列表项…",
+        todoPlaceholder: "待办事项…",
+        quotePlaceholder: "引用内容…",
+        attributionPlaceholder: "出处（可选）",
+        headingPlaceholder: "{level} 级标题",
+        toggleTitlePlaceholder: "折叠标题…",
+        toggleBodyPlaceholder: "折叠内容…",
+        calloutPlaceholder: "提示正文…",
+        codePlaceholder: "// 在此输入代码…",
+        codeLanguagePlaceholder: "语言",
+        addCol: "+列",
+        addRow: "+行",
+        bookmarkOpen: "打开链接",
+        bookmarkEdit: "编辑书签",
+        titleOptional: "标题（可选）",
+        descOptional: "描述（可选）",
+        mathBlock: "块级",
+        mathInline: "行内",
+        columnsCount: "{n} 栏",
+        columnsOption: "{n} 栏",
+        slideLabel: "第 {n} 页",
+        slideTitlePlaceholder: "幻灯片标题…",
+        speakerNotesPlaceholder: "演讲者备注…",
+        kpiEdit: "编辑指标",
+        chartTitle: "图表",
+        chartEdit: "编辑图表",
+        compareEdit: "编辑对比",
+        noBeforeAsset: "暂无对比前素材",
+        noAfterAsset: "暂无对比后素材",
+        mediaEdit: "编辑媒体",
+        previewTitle: "沙箱预览",
+        previewEdit: "编辑预览",
+        selectBase: "选择多维库",
+        pickBase: "选择多维库",
+        selectIssue: "选择工单",
+        pickIssue: "选择工单",
+        issuesTitle: "工单 ({n})",
+        filterIssues: "筛选工单",
+        repoFilter: "仓库筛选",
+        statusFilter: "状态（如 todo）",
+        tagFilter: "标签",
+        calloutTones: { info: "信息", tip: "提示", warn: "注意", danger: "危险", note: "备注" },
+        slashCat: { basic: "基础块", structure: "结构与富文本", data: "数据与协作" },
+        slash: {
+          prose: { label: "正文", desc: "普通段落，支持双链与 #工单引用" },
+          heading1: { label: "一级标题", desc: "大章节标题" },
+          heading2: { label: "二级标题", desc: "中章节标题" },
+          heading3: { label: "三级标题", desc: "小节标题" },
+          listBullet: { label: "无序列表", desc: "项目符号列表" },
+          listOrdered: { label: "有序列表", desc: "数字编号列表" },
+          todo: { label: "待办事项", desc: "可勾选的任务项" },
+          quote: { label: "引用", desc: "带出处的引述块" },
+          divider: { label: "分割线", desc: "水平分隔线" },
+          toggle: { label: "折叠块", desc: "可展开收起的嵌套内容区" },
+          callout: { label: "提示框", desc: "带语义色调的高亮提示" },
+          code: { label: "代码块", desc: "支持语法高亮的代码段" },
+          table: { label: "表格", desc: "支持列对齐的可编辑表格" },
+          bookmark: { label: "网页书签", desc: "富链接卡片" },
+          toc: { label: "目录", desc: "根据标题实时生成大纲" },
+          math: { label: "数学公式", desc: "LaTeX 公式块" },
+          columns: { label: "分栏布局", desc: "并排 2–3 栏排版" },
+          pageBreak: { label: "幻灯片分页", desc: "将文档拆分为演示分页" },
+          kpi: { label: "指标卡片", desc: "核心指标与变化趋势卡" },
+          chart: { label: "图表", desc: "柱状图、折线图与面积图" },
+          diagram: { label: "架构图", desc: "Mermaid 流程图与架构图" },
+          compare: { label: "前后对比", desc: "并排或聚焦图片对比" },
+          media: { label: "媒体", desc: "嵌入图片、音频或视频" },
+          preview: { label: "原型预览", desc: "隔离沙箱 HTML 预览" },
+          baseEmbed: { label: "嵌入多维库", desc: "内嵌多维数据表" },
+          issueCard: { label: "工单卡片", desc: "内嵌实时工单状态卡" },
+          issueList: { label: "工单列表", desc: "按条件筛选的实时工单列表" },
+        },
       },
       base: {
         table: "表格",
@@ -2506,6 +2596,18 @@ export const catalogs = {
         filterPlaceholder: "筛选行…",
         empty: "暂无数据行",
         rowsCount: "{n} 行",
+        uncategorized: "未分类",
+        summary: { count: "计数", sum: "求和", avg: "平均", min: "最小", max: "最大" },
+      },
+      media: {
+        storyboard: "分镜板",
+        motion: "动效",
+        grid: "网格",
+        animatic: "动态预览",
+        loop: "循环",
+        shot: "镜头",
+        transcriptPreview: "转写预览",
+        videoPreview: "播放预览",
       },
       files: { codeMode: "源码", htmlPreviewMode: "网页预览" },
       issue: {
@@ -6419,14 +6521,104 @@ export const catalogs = {
         snapshotNote: "Snapshot",
       },
       tree: { title: "Pages", newRoot: "New page", newChild: "Add subpage", moveToRoot: "Move to top level", empty: "No pages in tree yet" },
-      links: { outgoing: "Outgoing links ({n})", backlinks: "Backlinks ({n})", empty: "No backlinks yet" },
+      links: { outgoing: "Outgoing links ({n})", backlinks: "Backlinks ({n})", relation: { link: "link", embed: "embed", ref: "ref" } },
       doc: {
         addBlock: "Add block",
         slashHint: "Type / for blocks or [[ to link a note or issue",
-        blocksCount: "{n} blocks",
-        wordsCount: "{n} words",
         slidesCount: "{n} slides",
         empty: "Empty document — add a block to start",
+        presenter: "Presenter",
+        outline: "Outline",
+        bold: "Bold",
+        italic: "Italic",
+        inlineCode: "Inline code",
+        strike: "Strikethrough",
+        link: "Link note or issue",
+        moveUp: "Move up",
+        moveDown: "Move down",
+        duplicate: "Duplicate",
+        convertToIssue: "Convert to Issue",
+        turnInto: "Turn into",
+        edit: "Edit",
+        preview: "Preview",
+        render: "Render",
+        add: "Add",
+        tocTitle: "Table of Contents",
+        tocEmpty: "Add headings to populate outline",
+        orderedList: "1. Ordered",
+        bulletedList: "• Bulleted",
+        listItemPlaceholder: "List item…",
+        todoPlaceholder: "To-do…",
+        quotePlaceholder: "Quote…",
+        attributionPlaceholder: "Attribution (optional)",
+        headingPlaceholder: "Heading {level}",
+        toggleTitlePlaceholder: "Toggle heading…",
+        toggleBodyPlaceholder: "Toggle notes…",
+        calloutPlaceholder: "Callout content…",
+        codePlaceholder: "// Write code…",
+        codeLanguagePlaceholder: "language",
+        addCol: "+Col",
+        addRow: "+Row",
+        bookmarkOpen: "Open URL",
+        bookmarkEdit: "Edit bookmark",
+        titleOptional: "Title (optional)",
+        descOptional: "Description (optional)",
+        mathBlock: "Block",
+        mathInline: "Inline",
+        columnsCount: "{n} Columns",
+        columnsOption: "{n} Col",
+        slideLabel: "Slide {n}",
+        slideTitlePlaceholder: "Slide title…",
+        speakerNotesPlaceholder: "Speaker notes…",
+        kpiEdit: "Edit KPI",
+        chartTitle: "Chart",
+        chartEdit: "Edit chart",
+        compareEdit: "Edit compare",
+        noBeforeAsset: "No before asset",
+        noAfterAsset: "No after asset",
+        mediaEdit: "Edit media",
+        previewTitle: "Sandbox Preview",
+        previewEdit: "Edit preview",
+        selectBase: "Select a Base note",
+        pickBase: "Pick Base",
+        selectIssue: "Select an issue",
+        pickIssue: "Select issue",
+        issuesTitle: "Issues ({n})",
+        filterIssues: "Filter issues",
+        repoFilter: "Repo filter",
+        statusFilter: "Status (e.g. todo)",
+        tagFilter: "Tag",
+        calloutTones: { info: "Info", tip: "Tip", warn: "Warn", danger: "Danger", note: "Note" },
+        slashCat: { basic: "Basic", structure: "Structure & Rich Writing", data: "Data & VibeValley" },
+        slash: {
+          prose: { label: "Text", desc: "Plain paragraph with wikilinks and #issue refs" },
+          heading1: { label: "Heading 1", desc: "Large section heading" },
+          heading2: { label: "Heading 2", desc: "Medium section heading" },
+          heading3: { label: "Heading 3", desc: "Small subsection heading" },
+          listBullet: { label: "Bulleted List", desc: "Unordered list of items" },
+          listOrdered: { label: "Numbered List", desc: "Ordered list with numbers" },
+          todo: { label: "To-do", desc: "Checkable task item" },
+          quote: { label: "Quote", desc: "Blockquote with optional attribution" },
+          divider: { label: "Divider", desc: "Visual horizontal separator" },
+          toggle: { label: "Toggle", desc: "Collapsible section with nested blocks" },
+          callout: { label: "Callout", desc: "Highlighted notice box with tone" },
+          code: { label: "Code", desc: "Syntax-highlighted code block" },
+          table: { label: "Table", desc: "Editable grid with column alignment" },
+          bookmark: { label: "Bookmark", desc: "Rich web link card" },
+          toc: { label: "Table of Contents", desc: "Live outline from document headings" },
+          math: { label: "Math Formula", desc: "LaTeX equation block" },
+          columns: { label: "Columns", desc: "Side-by-side 2-3 column layout" },
+          pageBreak: { label: "Slide Page Break", desc: "Split document into presentation slides" },
+          kpi: { label: "KPI Metrics", desc: "Numeric metric summary cards" },
+          chart: { label: "Chart", desc: "Bar or line chart visualization" },
+          diagram: { label: "Diagram", desc: "Mermaid flowchart or architecture diagram" },
+          compare: { label: "Before / After Compare", desc: "Visual side-by-side or slider diff" },
+          media: { label: "Media", desc: "Image, audio, or video embed" },
+          preview: { label: "Sandbox Preview", desc: "Isolated HTML prototype preview" },
+          baseEmbed: { label: "Base Embed", desc: "Embed a VibeValley Base table" },
+          issueCard: { label: "Issue Card", desc: "Embed a live Issue card" },
+          issueList: { label: "Issue List", desc: "Filtered live Issue query list" },
+        },
       },
       base: {
         table: "Table",
@@ -6440,6 +6632,18 @@ export const catalogs = {
         filterPlaceholder: "Filter rows…",
         empty: "No rows yet",
         rowsCount: "{n} rows",
+        uncategorized: "Uncategorized",
+        summary: { count: "Count", sum: "Sum", avg: "Avg", min: "Min", max: "Max" },
+      },
+      media: {
+        storyboard: "Storyboard",
+        motion: "Motion",
+        grid: "Grid",
+        animatic: "Animatic",
+        loop: "Loop",
+        shot: "Shot",
+        transcriptPreview: "Transcript",
+        videoPreview: "Preview",
       },
       files: { codeMode: "Code", htmlPreviewMode: "Preview" },
       issue: {
@@ -10379,8 +10583,14 @@ export interface Messages {
   "web.note.base.rowsCount": { readonly n: string | number };
   "web.note.base.runAgentColumn": undefined;
   "web.note.base.runningAgentColumn": undefined;
+  "web.note.base.summary.avg": undefined;
+  "web.note.base.summary.count": undefined;
+  "web.note.base.summary.max": undefined;
+  "web.note.base.summary.min": undefined;
+  "web.note.base.summary.sum": undefined;
   "web.note.base.table": undefined;
   "web.note.base.timeline": undefined;
+  "web.note.base.uncategorized": undefined;
   "web.note.blocks.saved": undefined;
   "web.note.blocks.start": undefined;
   "web.note.blocks.user": undefined;
@@ -10389,12 +10599,133 @@ export interface Messages {
   "web.note.canvas.openPage": undefined;
   "web.note.card.open": { readonly title: string | number };
   "web.note.card.version": { readonly version: string | number };
+  "web.note.doc.add": undefined;
   "web.note.doc.addBlock": undefined;
-  "web.note.doc.blocksCount": { readonly n: string | number };
+  "web.note.doc.addCol": undefined;
+  "web.note.doc.addRow": undefined;
+  "web.note.doc.attributionPlaceholder": undefined;
+  "web.note.doc.bold": undefined;
+  "web.note.doc.bookmarkEdit": undefined;
+  "web.note.doc.bookmarkOpen": undefined;
+  "web.note.doc.bulletedList": undefined;
+  "web.note.doc.calloutPlaceholder": undefined;
+  "web.note.doc.calloutTones.danger": undefined;
+  "web.note.doc.calloutTones.info": undefined;
+  "web.note.doc.calloutTones.note": undefined;
+  "web.note.doc.calloutTones.tip": undefined;
+  "web.note.doc.calloutTones.warn": undefined;
+  "web.note.doc.chartEdit": undefined;
+  "web.note.doc.chartTitle": undefined;
+  "web.note.doc.codeLanguagePlaceholder": undefined;
+  "web.note.doc.codePlaceholder": undefined;
+  "web.note.doc.columnsCount": { readonly n: string | number };
+  "web.note.doc.columnsOption": { readonly n: string | number };
+  "web.note.doc.compareEdit": undefined;
+  "web.note.doc.convertToIssue": undefined;
+  "web.note.doc.descOptional": undefined;
+  "web.note.doc.duplicate": undefined;
+  "web.note.doc.edit": undefined;
   "web.note.doc.empty": undefined;
+  "web.note.doc.filterIssues": undefined;
+  "web.note.doc.headingPlaceholder": { readonly level: string | number };
+  "web.note.doc.inlineCode": undefined;
+  "web.note.doc.issuesTitle": { readonly n: string | number };
+  "web.note.doc.italic": undefined;
+  "web.note.doc.kpiEdit": undefined;
+  "web.note.doc.link": undefined;
+  "web.note.doc.listItemPlaceholder": undefined;
+  "web.note.doc.mathBlock": undefined;
+  "web.note.doc.mathInline": undefined;
+  "web.note.doc.mediaEdit": undefined;
+  "web.note.doc.moveDown": undefined;
+  "web.note.doc.moveUp": undefined;
+  "web.note.doc.noAfterAsset": undefined;
+  "web.note.doc.noBeforeAsset": undefined;
+  "web.note.doc.orderedList": undefined;
+  "web.note.doc.outline": undefined;
+  "web.note.doc.pickBase": undefined;
+  "web.note.doc.pickIssue": undefined;
+  "web.note.doc.presenter": undefined;
+  "web.note.doc.preview": undefined;
+  "web.note.doc.previewEdit": undefined;
+  "web.note.doc.previewTitle": undefined;
+  "web.note.doc.quotePlaceholder": undefined;
+  "web.note.doc.render": undefined;
+  "web.note.doc.repoFilter": undefined;
+  "web.note.doc.selectBase": undefined;
+  "web.note.doc.selectIssue": undefined;
+  "web.note.doc.slash.baseEmbed.desc": undefined;
+  "web.note.doc.slash.baseEmbed.label": undefined;
+  "web.note.doc.slash.bookmark.desc": undefined;
+  "web.note.doc.slash.bookmark.label": undefined;
+  "web.note.doc.slash.callout.desc": undefined;
+  "web.note.doc.slash.callout.label": undefined;
+  "web.note.doc.slash.chart.desc": undefined;
+  "web.note.doc.slash.chart.label": undefined;
+  "web.note.doc.slash.code.desc": undefined;
+  "web.note.doc.slash.code.label": undefined;
+  "web.note.doc.slash.columns.desc": undefined;
+  "web.note.doc.slash.columns.label": undefined;
+  "web.note.doc.slash.compare.desc": undefined;
+  "web.note.doc.slash.compare.label": undefined;
+  "web.note.doc.slash.diagram.desc": undefined;
+  "web.note.doc.slash.diagram.label": undefined;
+  "web.note.doc.slash.divider.desc": undefined;
+  "web.note.doc.slash.divider.label": undefined;
+  "web.note.doc.slash.heading1.desc": undefined;
+  "web.note.doc.slash.heading1.label": undefined;
+  "web.note.doc.slash.heading2.desc": undefined;
+  "web.note.doc.slash.heading2.label": undefined;
+  "web.note.doc.slash.heading3.desc": undefined;
+  "web.note.doc.slash.heading3.label": undefined;
+  "web.note.doc.slash.issueCard.desc": undefined;
+  "web.note.doc.slash.issueCard.label": undefined;
+  "web.note.doc.slash.issueList.desc": undefined;
+  "web.note.doc.slash.issueList.label": undefined;
+  "web.note.doc.slash.kpi.desc": undefined;
+  "web.note.doc.slash.kpi.label": undefined;
+  "web.note.doc.slash.listBullet.desc": undefined;
+  "web.note.doc.slash.listBullet.label": undefined;
+  "web.note.doc.slash.listOrdered.desc": undefined;
+  "web.note.doc.slash.listOrdered.label": undefined;
+  "web.note.doc.slash.math.desc": undefined;
+  "web.note.doc.slash.math.label": undefined;
+  "web.note.doc.slash.media.desc": undefined;
+  "web.note.doc.slash.media.label": undefined;
+  "web.note.doc.slash.pageBreak.desc": undefined;
+  "web.note.doc.slash.pageBreak.label": undefined;
+  "web.note.doc.slash.preview.desc": undefined;
+  "web.note.doc.slash.preview.label": undefined;
+  "web.note.doc.slash.prose.desc": undefined;
+  "web.note.doc.slash.prose.label": undefined;
+  "web.note.doc.slash.quote.desc": undefined;
+  "web.note.doc.slash.quote.label": undefined;
+  "web.note.doc.slash.table.desc": undefined;
+  "web.note.doc.slash.table.label": undefined;
+  "web.note.doc.slash.toc.desc": undefined;
+  "web.note.doc.slash.toc.label": undefined;
+  "web.note.doc.slash.todo.desc": undefined;
+  "web.note.doc.slash.todo.label": undefined;
+  "web.note.doc.slash.toggle.desc": undefined;
+  "web.note.doc.slash.toggle.label": undefined;
+  "web.note.doc.slashCat.basic": undefined;
+  "web.note.doc.slashCat.data": undefined;
+  "web.note.doc.slashCat.structure": undefined;
   "web.note.doc.slashHint": undefined;
+  "web.note.doc.slideLabel": { readonly n: string | number };
+  "web.note.doc.slideTitlePlaceholder": undefined;
   "web.note.doc.slidesCount": { readonly n: string | number };
-  "web.note.doc.wordsCount": { readonly n: string | number };
+  "web.note.doc.speakerNotesPlaceholder": undefined;
+  "web.note.doc.statusFilter": undefined;
+  "web.note.doc.strike": undefined;
+  "web.note.doc.tagFilter": undefined;
+  "web.note.doc.titleOptional": undefined;
+  "web.note.doc.tocEmpty": undefined;
+  "web.note.doc.tocTitle": undefined;
+  "web.note.doc.todoPlaceholder": undefined;
+  "web.note.doc.toggleBodyPlaceholder": undefined;
+  "web.note.doc.toggleTitlePlaceholder": undefined;
+  "web.note.doc.turnInto": undefined;
   "web.note.edit.save": undefined;
   "web.note.edit.saved": { readonly version: string | number };
   "web.note.files.codeMode": undefined;
@@ -10414,8 +10745,18 @@ export interface Messages {
   "web.note.issue.unlink": { readonly title: string | number };
   "web.note.issue.unlinkedToast": { readonly title: string | number };
   "web.note.links.backlinks": { readonly n: string | number };
-  "web.note.links.empty": undefined;
   "web.note.links.outgoing": { readonly n: string | number };
+  "web.note.links.relation.embed": undefined;
+  "web.note.links.relation.link": undefined;
+  "web.note.links.relation.ref": undefined;
+  "web.note.media.animatic": undefined;
+  "web.note.media.grid": undefined;
+  "web.note.media.loop": undefined;
+  "web.note.media.motion": undefined;
+  "web.note.media.shot": undefined;
+  "web.note.media.storyboard": undefined;
+  "web.note.media.transcriptPreview": undefined;
+  "web.note.media.videoPreview": undefined;
   "web.note.page.all": undefined;
   "web.note.page.backToLibrary": undefined;
   "web.note.page.delete": undefined;
