@@ -45,13 +45,13 @@ export function IssuePeekModal(props: { card: BoardCard; blocked: () => boolean;
               <IssueNumberPill number={props.card.issue.number} />
               <If when={repo()}>
                 {(r) => (
-                  <View class="min-w-0 shrink flex-row items-center gap-1 rounded-md border border-line bg-page px-1.5 py-0.5">
+                  <View class="h-6 min-w-0 shrink flex-row items-center gap-1 rounded-md border border-line bg-page px-2">
                     <Icon name="folder" size={12} tone="muted" />
                     <Text class="min-w-0 truncate text-xs font-medium text-muted">{r()}</Text>
                   </View>
                 )}
               </If>
-              <View testID="issue-peek-status" class="shrink-0 flex-row items-center gap-1.5 rounded-full bg-hover px-2 py-0.5">
+              <View testID="issue-peek-status" class="h-6 shrink-0 flex-row items-center gap-1.5 rounded-full bg-hover px-2">
                 <StatusMark status={props.card.issue.status} size={12} />
                 <Text class="text-2xs font-medium text-muted">{cardStatusLabel(props.card)}</Text>
               </View>
@@ -67,7 +67,7 @@ export function IssuePeekModal(props: { card: BoardCard; blocked: () => boolean;
                   onClick={() => chrome.toggleInspector()}
                 />
               </If>
-              <Button size="compact" tone="plain" icon="enlarge" testID="issue-peek-expand" onPress={() => props.onExpand(props.card.id)}>
+              <Button tone="plain" icon="enlarge" testID="issue-peek-expand" onPress={() => props.onExpand(props.card.id)}>
                 {t("web.issue.peek.expand")}
               </Button>
               <IconButton testid="issue-peek-close" icon="close" size={14} label={t("web.issue.peek.close")} onClick={() => props.onClose()} />

@@ -17,7 +17,6 @@ import {
 } from "@vibevalley/protocol";
 import { noteId } from "@vibevalley/protocol/schema";
 
-import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
 import { Dialog } from "../../design/Dialog";
 import { Icon } from "../../design/Icon";
@@ -26,6 +25,7 @@ import { Banner, Empty } from "../../design/layout";
 import { motionClass, popupTransition } from "../../design/motion";
 import { SkeletonBar, SkeletonLines, useDelayedBusy } from "../../design/Skeleton";
 import { toast } from "../../design/toasts";
+import { createAct } from "../../infra/act";
 import { api, newSendKey, reasonOf } from "../../infra/api";
 import { Keyed } from "../../infra/base/dom";
 import { useBoardSlice } from "../../infra/frame";
@@ -56,7 +56,7 @@ import { BaseView } from "./views/BaseView";
 import { CanvasView } from "./views/CanvasView";
 import { MediaView } from "./views/MediaView";
 
-export type NoteChat = (props: {
+type NoteChat = (props: {
   channel?: string | undefined;
   issue?: string | undefined;
   point?: number | undefined;
@@ -430,128 +430,130 @@ function NoteDetailView(props: { note: Note; versionParam: number | undefined; n
           </Text>
         </View>
 
-        <View testID="note-version-badge" class="h-5 shrink-0 items-center justify-center rounded-sm px-1.5">
-          <Text class="font-mono text-2xs font-medium text-faint tabular-nums">
-            {displayVersion() > 0 ? t("web.note.card.version", { version: displayVersion() }) : t("web.note.page.liveVersion")}
-          </Text>
-        </View>
-        <If when={isHistorical()}>
-          <Button testID="note-version-back-live" size="compact" onPress={() => router.navigate(noteHref(props.note.id))}>
-            {t("web.note.timeline.backToLive")}
-          </Button>
-        </If>
-
-        <CollabToolbar
-          note={props.note}
-          peers={presence.peers()}
-          suggestions={suggestions.open()}
-          historyOpen={historyOpen()}
-          filesOpen={showFiles()}
-          onAcceptSuggestion={(sid: SuggestionId) => void suggestions.accept(sid)}
-          onRejectSuggestion={(sid: SuggestionId) => void suggestions.reject(sid)}
-          onToggleHistory={() => historyOpen.set(!historyOpen())}
-        />
-
-        <If when={props.note.noteType === "doc" && (ready(docView, undefined)?.slideCount ?? 0) > 1}>
-          <IconButton
-            icon="present"
-            size={16}
-            label={t("web.note.doc.presenter")}
-            testid="note-header-presenter"
-            onClick={() => router.navigate(presenterHref({ id: props.note.id, version: effectiveVersion() }))}
-          />
-        </If>
-
-        <If when={installedApplet()}>
-          {(info) => (
-            <Button testID="note-open-applet" size="compact" icon="play" onPress={() => openStandaloneApplet()}>
-              {info().appName}
+        <View class="shrink-0 flex-row items-center gap-1.5">
+          <View testID="note-version-badge" class="h-6 shrink-0 items-center justify-center rounded-sm px-1.5">
+            <Text class="font-mono text-2xs font-medium text-faint tabular-nums">
+              {displayVersion() > 0 ? t("web.note.card.version", { version: displayVersion() }) : t("web.note.page.liveVersion")}
+            </Text>
+          </View>
+          <If when={isHistorical()}>
+            <Button testID="note-version-back-live" size="control" onPress={() => router.navigate(noteHref(props.note.id))}>
+              {t("web.note.timeline.backToLive")}
             </Button>
-          )}
-        </If>
-        <If when={currentHost().applet !== undefined && !installedApplet()}>
-          <IconButton icon="devices" size={16} label={t("web.note.applet.button")} testid="note-install-applet" onClick={() => appletOpen.set(true)} />
-        </If>
+          </If>
 
-        <IconButton
-          icon="chat"
-          size={16}
-          label={railOpen() ? t("web.note.page.railHide") : t("web.note.page.railShow")}
-          testid="note-rail-toggle"
-          pressed={railOpen()}
-          onClick={() => railOpen.set(!railOpen())}
-        />
+          <CollabToolbar
+            note={props.note}
+            peers={presence.peers()}
+            suggestions={suggestions.open()}
+            historyOpen={historyOpen()}
+            filesOpen={showFiles()}
+            onAcceptSuggestion={(sid: SuggestionId) => void suggestions.accept(sid)}
+            onRejectSuggestion={(sid: SuggestionId) => void suggestions.reject(sid)}
+            onToggleHistory={() => historyOpen.set(!historyOpen())}
+          />
 
-        <Menu
-          open={menuOpen()}
-          onOpenChange={(e) => menuOpen.set(e.open)}
-          placement="bottom"
-          align="end"
-          offset={4}
-          popupClass={menuPopupClass}
-          popupStartingClass={popupTransition("opacity-0")}
-          popupEndingClass={popupTransition("opacity-0")}
-          trigger={
-            <View
-              role="button"
-              testID="note-more"
-              accessibilityLabel={t("web.note.page.more")}
-              class="size-7 shrink-0 items-center justify-center rounded-md hover:bg-hover aria-expanded:bg-selected"
-            >
-              <Icon name="more" size={16} tone="muted" />
-            </View>
-          }
-        >
-          <MenuItem testID="note-view-mode" onSelect={() => showFiles.set(!showFiles())} class={menuItemClass}>
-            <Icon name={showFiles() ? "show" : "folder"} size={14} tone="muted" />
-            <Text class="min-w-0 flex-1 truncate text-sm text-ink">{showFiles() ? t("web.note.page.previewTab") : t("web.note.page.filesTab")}</Text>
-          </MenuItem>
-          <If when={props.note.noteType === "doc"}>
+          <If when={props.note.noteType === "doc" && (ready(docView, undefined)?.slideCount ?? 0) > 1}>
+            <IconButton
+              icon="present"
+              size={16}
+              label={t("web.note.doc.presenter")}
+              testid="note-header-presenter"
+              onClick={() => router.navigate(presenterHref({ id: props.note.id, version: effectiveVersion() }))}
+            />
+          </If>
+
+          <If when={installedApplet()}>
+            {(info) => (
+              <Button testID="note-open-applet" size="control" icon="play" onPress={() => openStandaloneApplet()}>
+                {info().appName}
+              </Button>
+            )}
+          </If>
+          <If when={currentHost().applet !== undefined && !installedApplet()}>
+            <IconButton icon="devices" size={16} label={t("web.note.applet.button")} testid="note-install-applet" onClick={() => appletOpen.set(true)} />
+          </If>
+
+          <IconButton
+            icon="chat"
+            size={16}
+            label={railOpen() ? t("web.note.page.railHide") : t("web.note.page.railShow")}
+            testid="note-rail-toggle"
+            pressed={railOpen()}
+            onClick={() => railOpen.set(!railOpen())}
+          />
+
+          <Menu
+            open={menuOpen()}
+            onOpenChange={(e) => menuOpen.set(e.open)}
+            placement="bottom"
+            align="end"
+            offset={4}
+            popupClass={menuPopupClass}
+            popupStartingClass={popupTransition("opacity-0")}
+            popupEndingClass={popupTransition("opacity-0")}
+            trigger={
+              <View
+                role="button"
+                testID="note-more"
+                accessibilityLabel={t("web.note.page.more")}
+                class="size-7 shrink-0 items-center justify-center rounded-md hover:bg-hover aria-expanded:bg-selected"
+              >
+                <Icon name="more" size={16} tone="muted" />
+              </View>
+            }
+          >
+            <MenuItem testID="note-view-mode" onSelect={() => showFiles.set(!showFiles())} class={menuItemClass}>
+              <Icon name={showFiles() ? "show" : "folder"} size={14} tone="muted" />
+              <Text class="min-w-0 flex-1 truncate text-sm text-ink">{showFiles() ? t("web.note.page.previewTab") : t("web.note.page.filesTab")}</Text>
+            </MenuItem>
+            <If when={props.note.noteType === "doc"}>
+              <MenuItem
+                testID="note-open-presenter"
+                onSelect={() => router.navigate(presenterHref({ id: props.note.id, version: effectiveVersion() }))}
+                class={menuItemClass}
+              >
+                <Icon name="present" size={14} tone="muted" />
+                <Text class="min-w-0 flex-1 truncate text-sm text-ink">{t("web.note.doc.slidesCount", { n: ready(docView, undefined)?.slideCount ?? 0 })}</Text>
+              </MenuItem>
+            </If>
+            <MenuItem testID="note-save-version" onSelect={() => saveVersion()} class={menuItemClass}>
+              <Icon name="check" size={14} tone="muted" />
+              <Text class="min-w-0 flex-1 truncate text-sm text-ink">{t("web.note.edit.save")}</Text>
+            </MenuItem>
+            <MenuItem testID="note-pin" onSelect={() => togglePinned(`note:${props.note.id}`)} class={menuItemClass}>
+              <Icon name="pin" size={14} tone={pinned() ? "wheat" : "muted"} />
+              <Text class="min-w-0 flex-1 truncate text-sm text-ink">{pinned() ? t("web.library.content.unpin") : t("web.library.content.pin")}</Text>
+            </MenuItem>
             <MenuItem
-              testID="note-open-presenter"
-              onSelect={() => router.navigate(presenterHref({ id: props.note.id, version: effectiveVersion() }))}
+              testID="note-export"
+              onSelect={() => void exportNoteDirectory(props.note, effectiveVersion()).catch((e) => toast(reasonOf(e), "bad"))}
               class={menuItemClass}
             >
-              <Icon name="present" size={14} tone="muted" />
-              <Text class="min-w-0 flex-1 truncate text-sm text-ink">{t("web.note.doc.slidesCount", { n: ready(docView, undefined)?.slideCount ?? 0 })}</Text>
+              <Icon name="download" size={14} tone="muted" />
+              <Text class="min-w-0 flex-1 truncate text-sm text-ink">{t("web.library.content.exportArtifact")}</Text>
             </MenuItem>
-          </If>
-          <MenuItem testID="note-save-version" onSelect={() => saveVersion()} class={menuItemClass}>
-            <Icon name="check" size={14} tone="muted" />
-            <Text class="min-w-0 flex-1 truncate text-sm text-ink">{t("web.note.edit.save")}</Text>
-          </MenuItem>
-          <MenuItem testID="note-pin" onSelect={() => togglePinned(`note:${props.note.id}`)} class={menuItemClass}>
-            <Icon name="pin" size={14} tone={pinned() ? "wheat" : "muted"} />
-            <Text class="min-w-0 flex-1 truncate text-sm text-ink">{pinned() ? t("web.library.content.unpin") : t("web.library.content.pin")}</Text>
-          </MenuItem>
-          <MenuItem
-            testID="note-export"
-            onSelect={() => void exportNoteDirectory(props.note, effectiveVersion()).catch((e) => toast(reasonOf(e), "bad"))}
-            class={menuItemClass}
-          >
-            <Icon name="download" size={14} tone="muted" />
-            <Text class="min-w-0 flex-1 truncate text-sm text-ink">{t("web.library.content.exportArtifact")}</Text>
-          </MenuItem>
-          <MenuItem testID="note-issue" onSelect={() => createLinkedIssue()} class={menuItemClass}>
-            <Icon name="issues" size={14} tone="muted" />
-            <Text class="min-w-0 flex-1 truncate text-sm text-ink">{t("web.library.content.turnIntoIssue")}</Text>
-          </MenuItem>
-          <If when={currentHost().applet !== undefined}>
-            <MenuItem testID="note-manage-applet" onSelect={() => appletOpen.set(true)} class={menuItemClass}>
-              <Icon name="devices" size={14} tone="muted" />
-              <Text class="min-w-0 flex-1 truncate text-sm text-ink">{installedApplet() ? t("web.note.applet.manageApp") : t("web.note.applet.button")}</Text>
+            <MenuItem testID="note-issue" onSelect={() => createLinkedIssue()} class={menuItemClass}>
+              <Icon name="issues" size={14} tone="muted" />
+              <Text class="min-w-0 flex-1 truncate text-sm text-ink">{t("web.library.content.turnIntoIssue")}</Text>
             </MenuItem>
-          </If>
-          <MenuSeparator class={menuSeparatorClass} />
-          <MenuItem
-            testID="note-delete"
-            onSelect={() => deleteOpen.set(true)}
-            class="h-7 flex-row items-center gap-2 rounded-md px-2 hover:bg-bad-soft focus:bg-bad-soft"
-          >
-            <Icon name="delete" size={14} tone="berry" />
-            <Text class="min-w-0 flex-1 truncate text-sm text-berry">{t("web.note.page.delete")}</Text>
-          </MenuItem>
-        </Menu>
+            <If when={currentHost().applet !== undefined}>
+              <MenuItem testID="note-manage-applet" onSelect={() => appletOpen.set(true)} class={menuItemClass}>
+                <Icon name="devices" size={14} tone="muted" />
+                <Text class="min-w-0 flex-1 truncate text-sm text-ink">{installedApplet() ? t("web.note.applet.manageApp") : t("web.note.applet.button")}</Text>
+              </MenuItem>
+            </If>
+            <MenuSeparator class={menuSeparatorClass} />
+            <MenuItem
+              testID="note-delete"
+              onSelect={() => deleteOpen.set(true)}
+              class="h-7 flex-row items-center gap-2 rounded-md px-2 hover:bg-bad-soft focus:bg-bad-soft"
+            >
+              <Icon name="delete" size={14} tone="berry" />
+              <Text class="min-w-0 flex-1 truncate text-sm text-berry">{t("web.note.page.delete")}</Text>
+            </MenuItem>
+          </Menu>
+        </View>
       </View>
 
       <If when={isHistorical()}>

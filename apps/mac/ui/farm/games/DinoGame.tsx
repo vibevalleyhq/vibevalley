@@ -2,8 +2,8 @@ import { View, type CanvasRenderingContext2D } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 
-import { playSound } from "../../design/sound";
 import { createSignal } from "../../infra/solid";
+import { playSound } from "../../infra/sound";
 import { type Dino, dinoBox, dinoGround, dinoHeight, dinoScore, dinoWidth, duck, jump, newDino, type Obstacle, run } from "./dino";
 import { lcd, drawPattern } from "./lcd";
 import { Board, Cover, Help, Words, Stats } from "./LcdView";

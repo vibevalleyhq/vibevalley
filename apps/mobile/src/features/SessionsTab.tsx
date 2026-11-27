@@ -19,7 +19,7 @@ import {
   useTimeout,
   type TagTone,
 } from "../design/ui";
-import { hapticImpact, hapticNotification, hapticSelection, type RemoteSession } from "../infra/session";
+import { errorMessage, hapticImpact, hapticNotification, hapticSelection, type RemoteSession } from "../infra/session";
 
 interface OptimisticSessionEvent {
   readonly sessionId: string;
@@ -113,17 +113,12 @@ export function SessionsTab(props: {
   const isDual = computed(() => props.layout().mode === "dual_pane");
 
   const sessionList = computed(() => props.session.sessions()?.sessions ?? []);
-  const machineNames = computed(() => new Map((props.session.sessions()?.machines ?? []).map((m) => [m.id, m.name] as const)));
-  const machineLabelOf = (machineId: string | undefined): string | undefined => {
-    if (machineId === undefined || machineId === "") return undefined;
-    return machineNames().get(machineId) ?? machineId;
-  };
   const filteredSessions = computed(() => {
     const q = searchQuery().trim().toLowerCase();
     const list = sessionList();
     if (q === "") return list;
     return list.filter((s) => {
-      const hay = [s.id, s.name, s.runtime, s.brief, s.phaseText, machineLabelOf(s.machine) ?? ""].join(" ").toLowerCase();
+      const hay = [s.id, s.name, s.runtime, s.brief, s.phaseText, props.session.machineLabel(s.machine) ?? ""].join(" ").toLowerCase();
       return hay.includes(q);
     });
   });
@@ -246,7 +241,7 @@ export function SessionsTab(props: {
   const canSend = computed(() => props.selectedSessionId() !== undefined && !sending() && hasPromptDraft());
   const detailTitle = computed(() => selectedView()?.name ?? watchState()?.session?.name ?? props.selectedSessionId() ?? "");
   const detailSubtitle = computed(() => selectedView()?.runtime ?? watchState()?.session?.runtime);
-  const detailMachine = computed(() => machineLabelOf(selectedView()?.machine ?? watchState()?.session?.machine));
+  const detailMachine = computed(() => props.session.machineLabel(selectedView()?.machine ?? watchState()?.session?.machine));
 
   const sendPrompt = async () => {
     const id = untracked(props.selectedSessionId);
@@ -284,7 +279,7 @@ export function SessionsTab(props: {
         hapticImpact("light");
       }
     } catch (err: unknown) {
-      rollback(err instanceof Error ? err.message : String(err));
+      rollback(errorMessage(err));
     } finally {
       sending.set(false);
     }
@@ -304,7 +299,7 @@ export function SessionsTab(props: {
         hapticNotification("warning");
       }
     } catch (err: unknown) {
-      actionError.set(err instanceof Error ? err.message : String(err));
+      actionError.set(errorMessage(err));
       hapticNotification("error");
     } finally {
       stopping.set(false);
@@ -325,7 +320,7 @@ export function SessionsTab(props: {
         hapticNotification(decision === "deny" ? "warning" : "success");
       }
     } catch (err: unknown) {
-      actionError.set(err instanceof Error ? err.message : String(err));
+      actionError.set(errorMessage(err));
       hapticNotification("error");
     } finally {
       busyAction.set(undefined);
@@ -347,7 +342,7 @@ export function SessionsTab(props: {
         hapticImpact("light");
       }
     } catch (err: unknown) {
-      actionError.set(err instanceof Error ? err.message : String(err));
+      actionError.set(errorMessage(err));
       hapticNotification("error");
     } finally {
       busyAction.set(undefined);
@@ -410,7 +405,7 @@ export function SessionsTab(props: {
                       <Icon name="runtimes" size={12} tone="faint" />
                       <Text class="font-mono text-2xs text-faint">{s().runtime}</Text>
                     </View>
-                    <If when={machineLabelOf(s().machine)}>
+                    <If when={props.session.machineLabel(s().machine)}>
                       {(label) => <StatusTag testID={`session-machine-${s().id}`} label={label()} icon="devices" tone="neutral" />}
                     </If>
                   </View>

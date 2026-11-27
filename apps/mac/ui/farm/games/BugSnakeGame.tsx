@@ -2,8 +2,8 @@ import { View, type CanvasRenderingContext2D } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 
-import { playSound } from "../../design/sound";
 import { createSignal } from "../../infra/solid";
+import { playSound } from "../../infra/sound";
 import {
   type BugSnake,
   type BugSnakeEnd,

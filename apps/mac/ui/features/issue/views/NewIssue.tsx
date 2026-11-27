@@ -193,6 +193,7 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
               owner={owner()}
               allIssues={allIssues()}
               testid="issue-new-owner"
+              showLeadingMark
               clearable={false}
               class="min-w-32 shrink-0"
               onChange={(next) => owner.set(next)}

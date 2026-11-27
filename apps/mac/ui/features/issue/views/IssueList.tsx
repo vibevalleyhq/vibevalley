@@ -4,7 +4,6 @@ import { t } from "@vibevalley/i18n";
 import type { ActorRef, Issue } from "@vibevalley/protocol";
 
 import { Button } from "../../../design/Button";
-import { Checkbox } from "../../../design/Checkbox";
 import { OrchestratorFace } from "../../../design/domain/Face";
 import { Icon } from "../../../design/Icon";
 import { IconButton } from "../../../design/IconButton";
@@ -61,7 +60,6 @@ export function IssueList(props: {
   filtered?: boolean | undefined;
   loading: boolean;
   selected?: string | undefined;
-  selectedIds?: ReadonlySet<string> | undefined;
   older: boolean;
   grouping: Grouping;
   groupBy?: GroupBy | undefined;
@@ -71,7 +69,6 @@ export function IssueList(props: {
   fields?: IssueFieldVisibility | undefined;
   onOlder: () => void;
   onOpen: (id: string) => void;
-  onToggleSelect?: ((id: string, opts: { range: boolean }) => void) | undefined;
   onAdd: ListAdd;
   onClearFilter?: (() => void) | undefined;
 }) {
@@ -274,12 +271,9 @@ export function IssueList(props: {
                               wide={wide()}
                               showParentTitle={showParentTitle()}
                               selected={c().id === props.selected}
-                              checked={props.selectedIds?.has(c().id) === true}
-                              selectionActive={(props.selectedIds?.size ?? 0) > 0}
                               showRepo={activeGroupBy() !== "repo" && props.grouping !== "repo"}
                               divider={i() < rows().length - 1 || showOlder()}
                               onOpen={props.onOpen}
-                              onToggleSelect={props.onToggleSelect}
                               nameOf={nameOf()}
                             />
                           )}
@@ -311,12 +305,9 @@ function Row(props: {
   wide: boolean;
   showParentTitle: boolean;
   selected: boolean;
-  checked?: boolean | undefined;
-  selectionActive?: boolean | undefined;
   showRepo: boolean;
   divider: boolean;
   onOpen: (id: string) => void;
-  onToggleSelect?: ((id: string, opts: { range: boolean }) => void) | undefined;
   nameOf: (id: string) => string;
 }) {
   const issues = useIssues();
@@ -372,32 +363,16 @@ function Row(props: {
             });
         }}
         accessibilityLabel={look().title}
-        accessibilityState={{ selected: props.selected || props.checked === true }}
-        onPress={(e) => {
-          if (e.modifiers.shift && props.onToggleSelect) {
-            props.onToggleSelect(props.card.id, { range: true });
-            return;
-          }
+        accessibilityState={{ selected: props.selected }}
+        onPress={() => {
           props.onOpen(props.card.id);
         }}
         class={`group relative flex-row items-center ${compact() ? "min-h-7.5 gap-2 px-2 py-1" : "min-h-9.5 gap-2.5 px-2.5 py-1.5"} focus-visible:outline-2 focus-visible:outline-focus ${
-          props.checked === true || props.selected ? "bg-selected" : "hover:bg-hover"
+          props.selected ? "bg-selected" : "hover:bg-hover"
         }`}
       >
-        <If when={props.selected || props.checked === true}>
+        <If when={props.selected}>
           <ActiveBar />
-        </If>
-        <If when={props.onToggleSelect}>
-          {(onToggle) => (
-            <View class={props.checked === true || props.selectionActive === true ? "shrink-0" : "shrink-0 opacity-0 group-hover:opacity-100"}>
-              <Checkbox
-                testid={`issue-select-${props.card.id}`}
-                label={t("web.issue.triage.selectIssue", { n: props.card.issue.number })}
-                checked={props.checked === true}
-                onChange={() => onToggle()(props.card.id, { range: false })}
-              />
-            </View>
-          )}
         </If>
         <If when={fields().priority}>
           <View class="w-4 shrink-0 items-center justify-center">
@@ -416,11 +391,7 @@ function Row(props: {
           <View class="min-w-0 flex-row items-center gap-1.5 overflow-hidden">
             <Text class={`min-w-0 shrink truncate ${compact() ? "text-xs" : "text-sm"} font-medium text-ink`}>{look().title}</Text>
             <If when={parentIssue()}>
-              {(p) => (
-                <View class="min-w-0 max-w-44 shrink overflow-hidden">
-                  <ParentBadge parent={p()} showTitle={props.showParentTitle} onOpen={props.onOpen} testid="row-parent-badge" />
-                </View>
-              )}
+              {(p) => <ParentBadge parent={p()} showTitle={props.showParentTitle} onOpen={props.onOpen} testid="row-parent-badge" />}
             </If>
           </View>
           <If when={look().wait}>{(wait) => <Text class="truncate text-xs text-water">{wait()}</Text>}</If>
@@ -432,9 +403,9 @@ function Row(props: {
             <If when={showProgress()}>{(pg) => <ProgressMark done={pg().done} total={pg().total} />}</If>
             <If when={dateLabel()}>
               {(dt) => (
-                <View testID="row-date" class="flex-row items-center gap-0.5 rounded-sm bg-side px-1 py-px">
+                <View testID="row-date" class="flex-row items-center gap-1 rounded-sm border border-transparent bg-side px-1.5 py-px">
                   <Icon name="calendar" size={10} tone="muted" />
-                  <Text class="font-mono text-2xs text-faint tabular-nums">{dt()}</Text>
+                  <Text class="font-mono text-2xs leading-3.5 text-faint tabular-nums">{dt()}</Text>
                 </View>
               )}
             </If>
@@ -458,8 +429,8 @@ function Row(props: {
           <View class="w-28 shrink-0 flex-row justify-end">
             <If when={repo()}>
               {(r) => (
-                <View class="max-w-28 rounded-sm bg-side px-1.5 py-0.5">
-                  <Text class="truncate text-2xs text-muted">{r()}</Text>
+                <View class="max-w-28 rounded-sm border border-transparent bg-side px-1.5 py-px">
+                  <Text class="truncate text-2xs leading-3.5 text-muted">{r()}</Text>
                 </View>
               )}
             </If>

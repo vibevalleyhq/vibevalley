@@ -8,7 +8,7 @@ import { IconButton } from "../../../design/IconButton";
 import { useVdpNode } from "../../../infra/vdpProbe";
 import { WhiteboardView } from "../WhiteboardView";
 
-export interface CanvasViewProps {
+interface CanvasViewProps {
   readonly note: Note;
   readonly version?: number | undefined;
   readonly onRefresh?: (() => void) | undefined;
@@ -21,11 +21,13 @@ export function CanvasView(props: CanvasViewProps) {
   useVdpNode({ testId: "note-canvas-view", role: "region" });
   return (
     <View testID="note-canvas-view" class="min-h-0 min-w-0 flex-1 gap-2 p-3">
-      <View class="h-8 shrink-0 flex-row items-center justify-between gap-2 px-1">
+      <View class="h-8 shrink-0 flex-row items-center justify-between gap-2 px-0.5">
         <View class="min-w-0 flex-1 flex-row items-center gap-2">
           <Icon name="appearance" size={14} tone="muted" />
           <Text class="min-w-0 truncate text-sm font-semibold text-ink">{props.note.title}</Text>
-          <Text class="shrink-0 rounded-xs border border-line bg-side px-1.5 py-px font-mono text-2xs text-muted tabular-nums">{`seq ${props.note.seq}`}</Text>
+          <View class="h-5 shrink-0 items-center justify-center rounded-sm border border-line bg-side px-1.5">
+            <Text class="font-mono text-2xs text-muted tabular-nums">{`seq ${props.note.seq}`}</Text>
+          </View>
         </View>
         <If when={props.onRefresh}>
           <IconButton icon="refresh" size={14} label={t("web.issue.page.refresh")} testid="canvas-refresh" onClick={() => props.onRefresh?.()} />

@@ -10,7 +10,7 @@ import { VdpAnchor } from "../../../infra/vdpProbe";
 import { BaseCellControl } from "./BaseCell";
 import { cleanWikilinkText, columnKindIcon, rowTitleOf } from "./baseModel";
 
-export interface BaseRowDrawerProps {
+interface BaseRowDrawerProps {
   readonly row: BaseRow | undefined;
   readonly columns: readonly BaseColumn[];
   readonly notes: readonly Note[];
@@ -69,7 +69,7 @@ export function BaseRowDrawer(props: BaseRowDrawerProps) {
               <View class="shrink-0 flex-row items-center gap-1">
                 <If when={row().pageNoteId}>
                   {(pageId) => (
-                    <Button size="compact" tone="primary" icon="open" testID="base-row-open-page" onPress={() => props.onOpenNote(pageId())}>
+                    <Button size="control" tone="primary" icon="open" testID="base-row-open-page" onPress={() => props.onOpenNote(pageId())}>
                       {t("web.note.canvas.openPage")}
                     </Button>
                   )}
@@ -126,7 +126,7 @@ export function BaseRowDrawer(props: BaseRowDrawerProps) {
                   <Each of={props.columns} key={(col) => col.id}>
                     {(col) => (
                       <View testID={`base-drawer-field-${col().id}`} class="flex-row items-start gap-2.5 border-b border-line pb-2 last:border-b-0 last:pb-0">
-                        <View class="w-24 shrink-0 flex-row items-center gap-1.5 pt-1">
+                        <View class="h-7 w-24 shrink-0 flex-row items-center gap-1.5">
                           <Icon name={columnKindIcon(col().kind)} size={12} tone="muted" />
                           <Text class="min-w-0 flex-1 truncate text-xs font-medium text-muted">{col().name}</Text>
                         </View>

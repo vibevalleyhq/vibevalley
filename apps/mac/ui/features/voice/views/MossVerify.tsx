@@ -2,12 +2,12 @@ import { signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 
-import { createAct } from "../../../design/act";
 import { Button } from "../../../design/Button";
 import { Icon } from "../../../design/Icon";
 import { Dot } from "../../../design/Tag";
 import { Bubble, Tip } from "../../../design/Tip";
 import { mix } from "../../../design/tone";
+import { createAct } from "../../../infra/act";
 import { api } from "../../../infra/api";
 
 type MossVerifyResult = { readonly ok: true } | { readonly ok: false; readonly why: string };

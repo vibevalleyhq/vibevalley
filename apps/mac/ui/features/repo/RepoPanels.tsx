@@ -4,7 +4,6 @@ import { list, t } from "@vibevalley/i18n";
 import type { RepoActivity, RepoLanguages, RepoSummary } from "@vibevalley/protocol";
 import { githubRepository } from "@vibevalley/protocol/rules";
 
-import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
 import { Checkbox } from "../../design/Checkbox";
 import { AgentFace } from "../../design/domain/Face";
@@ -13,13 +12,14 @@ import { Card, Quiet } from "../../design/layout";
 import { Segmented } from "../../design/Segmented";
 import { Bubble } from "../../design/Tip";
 import { mix } from "../../design/tone";
+import { createAct } from "../../infra/act";
 import { useWorkAgents } from "../../infra/agents";
 import { api, reasonOf } from "../../infra/api";
 import { hostApi } from "../../infra/bridge";
 import { type QueryResult, ready, useQueryClient } from "../../infra/query";
+import { languageShares, number, percent } from "../../infra/repos";
 import { createMemo, untrack } from "../../infra/solid";
 import { calendarOf, type CalendarDay, dayText, streaksOf } from "./calendar";
-import { languageShares, number, percent } from "./repos";
 
 const tile = 12;
 const tileGap = 3;

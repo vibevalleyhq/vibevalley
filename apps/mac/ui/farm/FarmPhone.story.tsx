@@ -102,8 +102,6 @@ setTransport({
         }
         return Promise.resolve({ bizCode: 0, message: "ok", data: buildShopView() });
       }
-      case "game.daily.list":
-        return Promise.resolve({ bizCode: 0, message: "ok", data: buildShopView().daily });
       case "host.assetsDir":
         return Promise.resolve({ bizCode: 0, message: "ok", data: { path: "" } });
       default:

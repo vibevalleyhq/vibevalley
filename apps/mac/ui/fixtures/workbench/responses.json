@@ -3430,27 +3430,6 @@
     "vision": null,
     "scenePolicies": []
   },
-  "provider.model.list": {
-    "connection": "moss-main",
-    "revision": 3,
-    "models": [
-      {
-        "id": "moss-image-1",
-        "owner": "moss",
-        "capabilities": ["image"]
-      },
-      {
-        "id": "moss-vl",
-        "owner": "moss",
-        "capabilities": ["vision"]
-      },
-      {
-        "id": "moss-live",
-        "owner": "moss",
-        "capabilities": ["realtime"]
-      }
-    ]
-  },
   "voice.moss.verify": {
     "problem": ""
   },

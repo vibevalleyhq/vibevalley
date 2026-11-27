@@ -3,7 +3,6 @@ import { cleanup, Clipboard, computed, Image, signal, Text, View } from "nsh";
 import { t } from "@vibevalley/i18n";
 import type { Attachment, MediaUnderstandingAuthorizationRequest, MediaUnderstandingJob, MediaUnderstandingRequest, NoteId } from "@vibevalley/protocol";
 
-import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
 import { Checkbox } from "../../design/Checkbox";
 import { ConfirmButton } from "../../design/ConfirmButton";
@@ -14,6 +13,7 @@ import { IconButton } from "../../design/IconButton";
 import { Card, Quiet } from "../../design/layout";
 import { Dot } from "../../design/Tag";
 import { TextLink } from "../../design/TextLink";
+import { createAct } from "../../infra/act";
 import { api, reasonOf } from "../../infra/api";
 import { useAttachmentUrl } from "../../infra/attachmentFile";
 import { useTimeout } from "../../infra/base/timer";

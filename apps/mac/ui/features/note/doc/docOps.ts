@@ -1,14 +1,53 @@
 import { t } from "@vibevalley/i18n";
-import type { DocBlock, DocColumn, DocKpiItem, Issue } from "@vibevalley/protocol";
+import type { DocBlock, DocColumn, DocKpiItem, Issue, IssueStatus } from "@vibevalley/protocol";
 import { issueId, noteId } from "@vibevalley/protocol/schema";
 
 import type { IconName } from "../../../design/icons";
+import type { DotTone } from "../../../design/Tag";
 import { matches } from "../../../infra/base/search";
 
+export const ISSUE_STATUS_DOT_TONE: Record<IssueStatus, DotTone> = {
+  backlog: "faint",
+  todo: "muted",
+  in_progress: "water",
+  in_review: "wheat",
+  done: "leaf",
+  canceled: "faint",
+};
+
 export type BlockType = DocBlock["type"];
-export type SlashCategory = "basic" | "structure" | "data";
-export type CalloutTone = "info" | "tip" | "warn" | "danger" | "note";
-export type TableAlignment = "left" | "center" | "right" | "";
+type SlashCategory = "basic" | "structure" | "data";
+type CalloutTone = "info" | "tip" | "warn" | "danger" | "note";
+type TableAlignment = "left" | "center" | "right" | "";
+
+type SlashI18nId =
+  | "prose"
+  | "heading1"
+  | "heading2"
+  | "heading3"
+  | "listBullet"
+  | "listOrdered"
+  | "todo"
+  | "quote"
+  | "divider"
+  | "toggle"
+  | "callout"
+  | "code"
+  | "table"
+  | "bookmark"
+  | "toc"
+  | "math"
+  | "columns"
+  | "pageBreak"
+  | "kpi"
+  | "chart"
+  | "diagram"
+  | "compare"
+  | "media"
+  | "preview"
+  | "baseEmbed"
+  | "issueCard"
+  | "issueList";
 
 export interface SlashCommandItem {
   readonly key: string;
@@ -16,8 +55,8 @@ export interface SlashCommandItem {
   readonly headingLevel?: 1 | 2 | 3;
   readonly listOrdered?: boolean;
   readonly category: SlashCategory;
-  readonly label: string;
-  readonly description: string;
+  readonly labelKey: `web.note.doc.slash.${SlashI18nId}.label`;
+  readonly descKey: `web.note.doc.slash.${SlashI18nId}.desc`;
   readonly shortcut?: string;
   readonly icon: IconName;
   readonly keywords: readonly string[];
@@ -30,8 +69,8 @@ export const SLASH_COMMANDS: readonly SlashCommandItem[] = [
     key: "prose",
     type: "prose",
     category: "basic",
-    label: "Text",
-    description: "Plain paragraph with [[wikilinks]] and #issue refs",
+    labelKey: "web.note.doc.slash.prose.label",
+    descKey: "web.note.doc.slash.prose.desc",
     icon: "edit",
     keywords: ["paragraph", "text", "prose", "p", "wenben", "duanluo"],
   },
@@ -40,8 +79,8 @@ export const SLASH_COMMANDS: readonly SlashCommandItem[] = [
     type: "heading",
     headingLevel: 1,
     category: "basic",
-    label: "Heading 1",
-    description: "Large section heading",
+    labelKey: "web.note.doc.slash.heading1.label",
+    descKey: "web.note.doc.slash.heading1.desc",
     shortcut: "#",
     icon: "notes",
     keywords: ["h1", "heading", "title", "biaoti"],
@@ -51,8 +90,8 @@ export const SLASH_COMMANDS: readonly SlashCommandItem[] = [
     type: "heading",
     headingLevel: 2,
     category: "basic",
-    label: "Heading 2",
-    description: "Medium section heading",
+    labelKey: "web.note.doc.slash.heading2.label",
+    descKey: "web.note.doc.slash.heading2.desc",
     shortcut: "##",
     icon: "notes",
     keywords: ["h2", "heading", "subtitle", "erjibiaoti"],
@@ -62,8 +101,8 @@ export const SLASH_COMMANDS: readonly SlashCommandItem[] = [
     type: "heading",
     headingLevel: 3,
     category: "basic",
-    label: "Heading 3",
-    description: "Small subsection heading",
+    labelKey: "web.note.doc.slash.heading3.label",
+    descKey: "web.note.doc.slash.heading3.desc",
     shortcut: "###",
     icon: "notes",
     keywords: ["h3", "heading", "sanjibiaoti"],
@@ -73,8 +112,8 @@ export const SLASH_COMMANDS: readonly SlashCommandItem[] = [
     type: "list",
     listOrdered: false,
     category: "basic",
-    label: "Bulleted List",
-    description: "Unordered list of items",
+    labelKey: "web.note.doc.slash.listBullet.label",
+    descKey: "web.note.doc.slash.listBullet.desc",
     shortcut: "-",
     icon: "log",
     keywords: ["ul", "bullet", "list", "liebiao"],
@@ -84,8 +123,8 @@ export const SLASH_COMMANDS: readonly SlashCommandItem[] = [
     type: "list",
     listOrdered: true,
     category: "basic",
-    label: "Numbered List",
-    description: "Ordered list with numbers",
+    labelKey: "web.note.doc.slash.listOrdered.label",
+    descKey: "web.note.doc.slash.listOrdered.desc",
     shortcut: "1.",
     icon: "log",
     keywords: ["ol", "ordered", "numbered", "list", "youxuliebiao"],
@@ -94,8 +133,8 @@ export const SLASH_COMMANDS: readonly SlashCommandItem[] = [
     key: "todo",
     type: "todo",
     category: "basic",
-    label: "To-do",
-    description: "Checkable task item",
+    labelKey: "web.note.doc.slash.todo.label",
+    descKey: "web.note.doc.slash.todo.desc",
     shortcut: "[]",
     icon: "ticked",
     keywords: ["todo", "task", "checkbox", "daiban"],
@@ -104,8 +143,8 @@ export const SLASH_COMMANDS: readonly SlashCommandItem[] = [
     key: "quote",
     type: "quote",
     category: "basic",
-    label: "Quote",
-    description: "Blockquote with optional attribution",
+    labelKey: "web.note.doc.slash.quote.label",
+    descKey: "web.note.doc.slash.quote.desc",
     shortcut: ">",
     icon: "reply",
     keywords: ["quote", "blockquote", "citation", "yinyong"],
@@ -114,8 +153,8 @@ export const SLASH_COMMANDS: readonly SlashCommandItem[] = [
     key: "divider",
     type: "divider",
     category: "basic",
-    label: "Divider",
-    description: "Visual horizontal separator",
+    labelKey: "web.note.doc.slash.divider.label",
+    descKey: "web.note.doc.slash.divider.desc",
     shortcut: "---",
     icon: "minus",
     keywords: ["divider", "hr", "line", "separator", "fengexian"],
@@ -124,8 +163,8 @@ export const SLASH_COMMANDS: readonly SlashCommandItem[] = [
     key: "toggle",
     type: "toggle",
     category: "structure",
-    label: "Toggle",
-    description: "Collapsible section with nested blocks",
+    labelKey: "web.note.doc.slash.toggle.label",
+    descKey: "web.note.doc.slash.toggle.desc",
     icon: "expand",
     keywords: ["toggle", "collapse", "details", "zhedie"],
   },
@@ -133,8 +172,8 @@ export const SLASH_COMMANDS: readonly SlashCommandItem[] = [
     key: "callout",
     type: "callout",
     category: "structure",
-    label: "Callout",
-    description: "Highlighted notice box with tone",
+    labelKey: "web.note.doc.slash.callout.label",
+    descKey: "web.note.doc.slash.callout.desc",
     icon: "info",
     keywords: ["callout", "notice", "alert", "tip", "tishi"],
   },
@@ -142,8 +181,8 @@ export const SLASH_COMMANDS: readonly SlashCommandItem[] = [
     key: "code",
     type: "code",
     category: "structure",
-    label: "Code",
-    description: "Syntax-highlighted code block",
+    labelKey: "web.note.doc.slash.code.label",
+    descKey: "web.note.doc.slash.code.desc",
     shortcut: "```",
     icon: "terminal",
     keywords: ["code", "fence", "snippet", "daima"],
@@ -152,8 +191,8 @@ export const SLASH_COMMANDS: readonly SlashCommandItem[] = [
     key: "table",
     type: "table",
     category: "structure",
-    label: "Table",
-    description: "Editable grid with column alignment",
+    labelKey: "web.note.doc.slash.table.label",
+    descKey: "web.note.doc.slash.table.desc",
     icon: "catalog",
     keywords: ["table", "grid", "biaoge"],
   },
@@ -161,8 +200,8 @@ export const SLASH_COMMANDS: readonly SlashCommandItem[] = [
     key: "bookmark",
     type: "bookmark",
     category: "structure",
-    label: "Bookmark",
-    description: "Rich web link card",
+    labelKey: "web.note.doc.slash.bookmark.label",
+    descKey: "web.note.doc.slash.bookmark.desc",
     icon: "link",
     keywords: ["bookmark", "url", "link", "shuqian"],
   },
@@ -170,8 +209,8 @@ export const SLASH_COMMANDS: readonly SlashCommandItem[] = [
     key: "toc",
     type: "toc",
     category: "structure",
-    label: "Table of Contents",
-    description: "Live outline from document headings",
+    labelKey: "web.note.doc.slash.toc.label",
+    descKey: "web.note.doc.slash.toc.desc",
     icon: "sidebarRight",
     keywords: ["toc", "outline", "contents", "mulu"],
   },
@@ -179,8 +218,8 @@ export const SLASH_COMMANDS: readonly SlashCommandItem[] = [
     key: "math",
     type: "math",
     category: "structure",
-    label: "Math Formula",
-    description: "LaTeX equation block",
+    labelKey: "web.note.doc.slash.math.label",
+    descKey: "web.note.doc.slash.math.desc",
     shortcut: "$$",
     icon: "understand",
     keywords: ["math", "latex", "formula", "equation", "gongshi"],
@@ -189,8 +228,8 @@ export const SLASH_COMMANDS: readonly SlashCommandItem[] = [
     key: "columns",
     type: "columns",
     category: "structure",
-    label: "Columns",
-    description: "Side-by-side 2-3 column layout",
+    labelKey: "web.note.doc.slash.columns.label",
+    descKey: "web.note.doc.slash.columns.desc",
     icon: "sidebar",
     keywords: ["columns", "grid", "layout", "fenlan"],
   },
@@ -198,8 +237,8 @@ export const SLASH_COMMANDS: readonly SlashCommandItem[] = [
     key: "pageBreak",
     type: "pageBreak",
     category: "structure",
-    label: "Slide Page Break",
-    description: "Split document into presentation slides",
+    labelKey: "web.note.doc.slash.pageBreak.label",
+    descKey: "web.note.doc.slash.pageBreak.desc",
     icon: "present",
     keywords: ["pagebreak", "slide", "presenter", "fenye"],
   },
@@ -207,8 +246,8 @@ export const SLASH_COMMANDS: readonly SlashCommandItem[] = [
     key: "kpi",
     type: "kpi",
     category: "data",
-    label: "KPI Metrics",
-    description: "Numeric metric summary cards",
+    labelKey: "web.note.doc.slash.kpi.label",
+    descKey: "web.note.doc.slash.kpi.desc",
     icon: "spend",
     keywords: ["kpi", "metric", "stat", "zhibiao"],
   },
@@ -216,8 +255,8 @@ export const SLASH_COMMANDS: readonly SlashCommandItem[] = [
     key: "chart",
     type: "chart",
     category: "data",
-    label: "Chart",
-    description: "Bar or line chart visualization",
+    labelKey: "web.note.doc.slash.chart.label",
+    descKey: "web.note.doc.slash.chart.desc",
     icon: "generate",
     keywords: ["chart", "graph", "bar", "line", "tubiao"],
   },
@@ -225,8 +264,8 @@ export const SLASH_COMMANDS: readonly SlashCommandItem[] = [
     key: "diagram",
     type: "diagram",
     category: "data",
-    label: "Diagram",
-    description: "Mermaid flowchart or architecture diagram",
+    labelKey: "web.note.doc.slash.diagram.label",
+    descKey: "web.note.doc.slash.diagram.desc",
     icon: "branch",
     keywords: ["diagram", "mermaid", "flowchart", "jiagoutu"],
   },
@@ -234,8 +273,8 @@ export const SLASH_COMMANDS: readonly SlashCommandItem[] = [
     key: "compare",
     type: "compare",
     category: "data",
-    label: "Before / After Compare",
-    description: "Visual side-by-side or slider diff",
+    labelKey: "web.note.doc.slash.compare.label",
+    descKey: "web.note.doc.slash.compare.desc",
     icon: "diff",
     keywords: ["compare", "diff", "before", "after", "duibi"],
   },
@@ -243,8 +282,8 @@ export const SLASH_COMMANDS: readonly SlashCommandItem[] = [
     key: "media",
     type: "media",
     category: "data",
-    label: "Media",
-    description: "Image, audio, or video embed",
+    labelKey: "web.note.doc.slash.media.label",
+    descKey: "web.note.doc.slash.media.desc",
     icon: "image",
     keywords: ["media", "image", "audio", "video", "tupian"],
   },
@@ -252,8 +291,8 @@ export const SLASH_COMMANDS: readonly SlashCommandItem[] = [
     key: "preview",
     type: "preview",
     category: "data",
-    label: "Sandbox Preview",
-    description: "Isolated HTML prototype preview",
+    labelKey: "web.note.doc.slash.preview.label",
+    descKey: "web.note.doc.slash.preview.desc",
     icon: "web",
     keywords: ["preview", "html", "prototype", "yulan"],
   },
@@ -261,8 +300,8 @@ export const SLASH_COMMANDS: readonly SlashCommandItem[] = [
     key: "baseEmbed",
     type: "baseEmbed",
     category: "data",
-    label: "Base Embed",
-    description: "Embed a VibeValley Base table",
+    labelKey: "web.note.doc.slash.baseEmbed.label",
+    descKey: "web.note.doc.slash.baseEmbed.desc",
     icon: "folder",
     keywords: ["base", "embed", "database", "duoweiku"],
   },
@@ -270,8 +309,8 @@ export const SLASH_COMMANDS: readonly SlashCommandItem[] = [
     key: "issueCard",
     type: "issueCard",
     category: "data",
-    label: "Issue Card",
-    description: "Embed a live Issue card",
+    labelKey: "web.note.doc.slash.issueCard.label",
+    descKey: "web.note.doc.slash.issueCard.desc",
     icon: "issues",
     keywords: ["issue", "card", "gongdan"],
   },
@@ -279,12 +318,14 @@ export const SLASH_COMMANDS: readonly SlashCommandItem[] = [
     key: "issueList",
     type: "issueList",
     category: "data",
-    label: "Issue List",
-    description: "Filtered live Issue query list",
+    labelKey: "web.note.doc.slash.issueList.label",
+    descKey: "web.note.doc.slash.issueList.desc",
     icon: "filter",
     keywords: ["issue", "list", "query", "gongdanliebiao"],
   },
 ];
+
+const SLASH_COMMAND_BY_KEY = new Map(SLASH_COMMANDS.map((item) => [item.key, item]));
 
 let blockIdCounter = 0;
 
@@ -399,133 +440,19 @@ function slashCategoryLabel(category: SlashCategory): string {
 }
 
 export function slashCommandLabel(key: string): string {
-  switch (key) {
-    case "prose":
-      return t("web.note.doc.slash.prose.label");
-    case "heading-1":
-      return t("web.note.doc.slash.heading1.label");
-    case "heading-2":
-      return t("web.note.doc.slash.heading2.label");
-    case "heading-3":
-      return t("web.note.doc.slash.heading3.label");
-    case "list-bullet":
-      return t("web.note.doc.slash.listBullet.label");
-    case "list-ordered":
-      return t("web.note.doc.slash.listOrdered.label");
-    case "todo":
-      return t("web.note.doc.slash.todo.label");
-    case "quote":
-      return t("web.note.doc.slash.quote.label");
-    case "divider":
-      return t("web.note.doc.slash.divider.label");
-    case "toggle":
-      return t("web.note.doc.slash.toggle.label");
-    case "callout":
-      return t("web.note.doc.slash.callout.label");
-    case "code":
-      return t("web.note.doc.slash.code.label");
-    case "table":
-      return t("web.note.doc.slash.table.label");
-    case "bookmark":
-      return t("web.note.doc.slash.bookmark.label");
-    case "toc":
-      return t("web.note.doc.slash.toc.label");
-    case "math":
-      return t("web.note.doc.slash.math.label");
-    case "columns":
-      return t("web.note.doc.slash.columns.label");
-    case "pageBreak":
-      return t("web.note.doc.slash.pageBreak.label");
-    case "kpi":
-      return t("web.note.doc.slash.kpi.label");
-    case "chart":
-      return t("web.note.doc.slash.chart.label");
-    case "diagram":
-      return t("web.note.doc.slash.diagram.label");
-    case "compare":
-      return t("web.note.doc.slash.compare.label");
-    case "media":
-      return t("web.note.doc.slash.media.label");
-    case "preview":
-      return t("web.note.doc.slash.preview.label");
-    case "baseEmbed":
-      return t("web.note.doc.slash.baseEmbed.label");
-    case "issueCard":
-      return t("web.note.doc.slash.issueCard.label");
-    case "issueList":
-      return t("web.note.doc.slash.issueList.label");
-    default:
-      return key;
-  }
+  const item = SLASH_COMMAND_BY_KEY.get(key);
+  return item ? t(item.labelKey) : key;
 }
 
 export function slashCommandDesc(key: string): string {
-  switch (key) {
-    case "prose":
-      return t("web.note.doc.slash.prose.desc");
-    case "heading-1":
-      return t("web.note.doc.slash.heading1.desc");
-    case "heading-2":
-      return t("web.note.doc.slash.heading2.desc");
-    case "heading-3":
-      return t("web.note.doc.slash.heading3.desc");
-    case "list-bullet":
-      return t("web.note.doc.slash.listBullet.desc");
-    case "list-ordered":
-      return t("web.note.doc.slash.listOrdered.desc");
-    case "todo":
-      return t("web.note.doc.slash.todo.desc");
-    case "quote":
-      return t("web.note.doc.slash.quote.desc");
-    case "divider":
-      return t("web.note.doc.slash.divider.desc");
-    case "toggle":
-      return t("web.note.doc.slash.toggle.desc");
-    case "callout":
-      return t("web.note.doc.slash.callout.desc");
-    case "code":
-      return t("web.note.doc.slash.code.desc");
-    case "table":
-      return t("web.note.doc.slash.table.desc");
-    case "bookmark":
-      return t("web.note.doc.slash.bookmark.desc");
-    case "toc":
-      return t("web.note.doc.slash.toc.desc");
-    case "math":
-      return t("web.note.doc.slash.math.desc");
-    case "columns":
-      return t("web.note.doc.slash.columns.desc");
-    case "pageBreak":
-      return t("web.note.doc.slash.pageBreak.desc");
-    case "kpi":
-      return t("web.note.doc.slash.kpi.desc");
-    case "chart":
-      return t("web.note.doc.slash.chart.desc");
-    case "diagram":
-      return t("web.note.doc.slash.diagram.desc");
-    case "compare":
-      return t("web.note.doc.slash.compare.desc");
-    case "media":
-      return t("web.note.doc.slash.media.desc");
-    case "preview":
-      return t("web.note.doc.slash.preview.desc");
-    case "baseEmbed":
-      return t("web.note.doc.slash.baseEmbed.desc");
-    case "issueCard":
-      return t("web.note.doc.slash.issueCard.desc");
-    case "issueList":
-      return t("web.note.doc.slash.issueList.desc");
-    default:
-      return "";
-  }
+  const item = SLASH_COMMAND_BY_KEY.get(key);
+  return item ? t(item.descKey) : "";
 }
 
 export function filterSlashCommands(query: string): readonly SlashCommandItem[] {
   const q = query.trim().toLowerCase();
   if (!q) return SLASH_COMMANDS;
-  return SLASH_COMMANDS.filter((item) =>
-    matches(q, [slashCommandLabel(item.key), slashCommandDesc(item.key), item.label, item.description, item.type, item.shortcut, ...item.keywords]),
-  );
+  return SLASH_COMMANDS.filter((item) => matches(q, [t(item.labelKey), t(item.descKey), item.type, item.shortcut, ...item.keywords]));
 }
 
 export function groupSlashCommands(
@@ -541,7 +468,7 @@ export function groupSlashCommands(
   return out;
 }
 
-export interface MarkdownRuleResult {
+interface MarkdownRuleResult {
   readonly block: DocBlock;
 }
 
@@ -596,13 +523,14 @@ export function matchMarkdownInputRule(text: string, blockId: string, onEnter = 
   return undefined;
 }
 
-export interface SlashTrigger {
+interface SlashTrigger {
   readonly query: string;
   readonly triggerIndex: number;
 }
 
-export function detectSlashTrigger(text: string): SlashTrigger | undefined {
-  const m = /(?:^|\s)\/([^\s/]*)$/u.exec(text);
+export function detectSlashTrigger(text: string, caretOffset?: number): SlashTrigger | undefined {
+  const head = caretOffset !== undefined ? text.slice(0, Math.max(0, Math.min(text.length, caretOffset))) : text;
+  const m = /(?:^|\s)\/([^\s/]*)$/u.exec(head);
   if (!m) return undefined;
   const full = m[0];
   const slashOffset = full.indexOf("/");
@@ -612,28 +540,38 @@ export function detectSlashTrigger(text: string): SlashTrigger | undefined {
   };
 }
 
-export function stripSlashTrigger(text: string, triggerIndex: number): string {
-  return text.slice(0, triggerIndex).trimEnd();
+export function stripSlashTrigger(text: string, triggerIndex: number, endIndex?: number): string {
+  const before = text.slice(0, triggerIndex);
+  if (endIndex === undefined || endIndex >= text.length) {
+    return before.trimEnd();
+  }
+  const after = text.slice(Math.max(triggerIndex, endIndex));
+  if (after.length === 0) return before.trimEnd();
+  if (before.endsWith(" ") && after.startsWith(" ")) {
+    return `${before.slice(0, -1)}${after}`;
+  }
+  return `${before}${after}`.trim();
 }
 
 export type WikilinkMode = "wikilink" | "embed" | "issue";
 
-export interface WikilinkTrigger {
+interface WikilinkTrigger {
   readonly mode: WikilinkMode;
   readonly query: string;
   readonly startIndex: number;
 }
 
-export function detectWikilinkTrigger(text: string): WikilinkTrigger | undefined {
-  const embed = /!\[\[([^[\]]*)$/u.exec(text);
+export function detectWikilinkTrigger(text: string, caretOffset?: number): WikilinkTrigger | undefined {
+  const head = caretOffset !== undefined ? text.slice(0, Math.max(0, Math.min(text.length, caretOffset))) : text;
+  const embed = /!\[\[([^[\]]*)$/u.exec(head);
   if (embed) {
     return { mode: "embed", query: embed[1] ?? "", startIndex: embed.index };
   }
-  const wiki = /\[\[([^[\]]*)$/u.exec(text);
+  const wiki = /\[\[([^[\]]*)$/u.exec(head);
   if (wiki) {
     return { mode: "wikilink", query: wiki[1] ?? "", startIndex: wiki.index };
   }
-  const issue = /(?:^|[\s([,:;])#([a-zA-Z0-9_-]*)$/u.exec(text);
+  const issue = /(?:^|[\s([,:;])#([a-zA-Z0-9_-]*)$/u.exec(head);
   if (issue) {
     const hashOffset = issue[0].lastIndexOf("#");
     return { mode: "issue", query: issue[1] ?? "", startIndex: issue.index + hashOffset };
@@ -647,10 +585,25 @@ export function formatWikilinkToken(kind: "note" | "issue", id: string, label: s
   return cleanLabel ? `${prefix}${kind}:${id}|${cleanLabel}]]` : `${prefix}${kind}:${id}]]`;
 }
 
-export function applyWikilinkReplacement(text: string, startIndex: number, token: string): string {
+export function applyWikilinkReplacementWithCaret(
+  text: string,
+  startIndex: number,
+  token: string,
+  endIndex?: number,
+): { readonly text: string; readonly caret: number } {
   const before = text.slice(0, startIndex);
-  const needsSpace = before.length > 0 && !/\s$/u.test(before) && !before.endsWith("(") && !before.endsWith("[");
-  return `${before}${needsSpace ? " " : ""}${token} `;
+  const after = endIndex !== undefined ? text.slice(Math.max(startIndex, endIndex)) : "";
+  const needsLeadingSpace = before.length > 0 && !/\s$/u.test(before) && !before.endsWith("(") && !before.endsWith("[");
+  const needsTrailingSpace = after.length === 0 || (!/^\s/u.test(after) && !/^[.,!?;:)\]，。、；：！？）】」』》]/u.test(after));
+  const inserted = `${needsLeadingSpace ? " " : ""}${token}${needsTrailingSpace ? " " : ""}`;
+  return {
+    text: `${before}${inserted}${after}`,
+    caret: before.length + inserted.length,
+  };
+}
+
+export function applyWikilinkReplacement(text: string, startIndex: number, token: string, endIndex?: number): string {
+  return applyWikilinkReplacementWithCaret(text, startIndex, token, endIndex).text;
 }
 
 export type InlineSegment =
@@ -659,7 +612,49 @@ export type InlineSegment =
   | { readonly kind: "issue"; readonly id: string; readonly label: string; readonly embed: boolean }
   | { readonly kind: "issueNumber"; readonly number: number };
 
+export type InlineStyleKind = "plain" | "bold" | "italic" | "code" | "strike";
+
+interface InlineStyleRun {
+  readonly kind: InlineStyleKind;
+  readonly value: string;
+}
+
 const INLINE_TOKEN_RE = /(!?\[\[(note|issue):([^\]|]+?)(?:\|([^\]]*))?\]\])|((?:^|[\s([,:;])#(\d+)(?![a-zA-Z0-9_]))/gu;
+const INLINE_MARKDOWN_RE = /(\*\*([^*\n]+?)\*\*)|(`([^`\n]+?)`)|(~~([^~\n]+?)~~)|(\*([^*\n]+?)\*)/gu;
+
+export function hasInlineRichTokens(text: string): boolean {
+  if (!text) return false;
+  if (text.includes("[[") || /(?:^|[\s([,:;])#\d+/u.test(text)) return true;
+  return /\*\*[^*\n]+?\*\*|`[^`\n]+?`|~~[^~\n]+?~~/u.test(text);
+}
+
+export function parseInlineMarkdownRuns(text: string): readonly InlineStyleRun[] {
+  if (!text) return [];
+  const out: InlineStyleRun[] = [];
+  let cursor = 0;
+  INLINE_MARKDOWN_RE.lastIndex = 0;
+  for (;;) {
+    const m = INLINE_MARKDOWN_RE.exec(text);
+    if (!m) break;
+    if (m.index > cursor) {
+      out.push({ kind: "plain", value: text.slice(cursor, m.index) });
+    }
+    if (m[2] !== undefined) {
+      out.push({ kind: "bold", value: m[2] });
+    } else if (m[4] !== undefined) {
+      out.push({ kind: "code", value: m[4] });
+    } else if (m[6] !== undefined) {
+      out.push({ kind: "strike", value: m[6] });
+    } else if (m[8] !== undefined) {
+      out.push({ kind: "italic", value: m[8] });
+    }
+    cursor = m.index + m[0].length;
+  }
+  if (cursor < text.length) {
+    out.push({ kind: "plain", value: text.slice(cursor) });
+  }
+  return out;
+}
 
 export function parseInlineLinkSegments(text: string): readonly InlineSegment[] {
   if (!text) return [];
@@ -702,29 +697,42 @@ export function parseInlineLinkSegments(text: string): readonly InlineSegment[] 
   return out;
 }
 
-export interface TurnIntoOption {
+interface TurnIntoOption {
   readonly key: string;
   readonly type: BlockType;
   readonly headingLevel?: 1 | 2 | 3;
   readonly listOrdered?: boolean;
-  readonly label: string;
   readonly icon: IconName;
 }
 
-export const TURN_INTO_OPTIONS: readonly TurnIntoOption[] = [
-  { key: "prose", type: "prose", label: "Text", icon: "edit" },
-  { key: "heading-1", type: "heading", headingLevel: 1, label: "Heading 1", icon: "notes" },
-  { key: "heading-2", type: "heading", headingLevel: 2, label: "Heading 2", icon: "notes" },
-  { key: "heading-3", type: "heading", headingLevel: 3, label: "Heading 3", icon: "notes" },
-  { key: "list-bullet", type: "list", listOrdered: false, label: "Bulleted List", icon: "log" },
-  { key: "list-ordered", type: "list", listOrdered: true, label: "Numbered List", icon: "log" },
-  { key: "todo", type: "todo", label: "To-do", icon: "ticked" },
-  { key: "quote", type: "quote", label: "Quote", icon: "reply" },
-  { key: "toggle", type: "toggle", label: "Toggle", icon: "expand" },
-  { key: "callout", type: "callout", label: "Callout", icon: "info" },
-  { key: "code", type: "code", label: "Code", icon: "terminal" },
-  { key: "math", type: "math", label: "Math Formula", icon: "understand" },
+const TURN_INTO_KEYS: readonly string[] = [
+  "prose",
+  "heading-1",
+  "heading-2",
+  "heading-3",
+  "list-bullet",
+  "list-ordered",
+  "todo",
+  "quote",
+  "toggle",
+  "callout",
+  "code",
+  "math",
 ];
+
+export const TURN_INTO_OPTIONS: readonly TurnIntoOption[] = TURN_INTO_KEYS.flatMap((key) => {
+  const item = SLASH_COMMAND_BY_KEY.get(key);
+  if (!item) return [];
+  return [
+    {
+      key: item.key,
+      type: item.type,
+      ...(item.headingLevel !== undefined ? { headingLevel: item.headingLevel } : {}),
+      ...(item.listOrdered !== undefined ? { listOrdered: item.listOrdered } : {}),
+      icon: item.icon,
+    },
+  ];
+});
 
 function extractBlockText(block: DocBlock): string {
   switch (block.type) {
@@ -847,40 +855,8 @@ function mapColumnBlocks(columns: readonly DocColumn[], fn: (blocks: readonly Do
 
 export function insertBlockAfter(blocks: readonly DocBlock[], afterId: string | undefined, newBlock: DocBlock): DocBlock[] {
   if (afterId === undefined) return [...blocks, newBlock];
-  let inserted = false;
-  const out: DocBlock[] = [];
-  for (const b of blocks) {
-    let next = b;
-    if (!inserted) {
-      if (b.children && b.children.length > 0) {
-        const nextChildren = insertBlockAfterRec(b.children, afterId, newBlock);
-        if (nextChildren.inserted) {
-          inserted = true;
-          next = { ...b, children: nextChildren.blocks };
-        }
-      }
-      if (!inserted && b.type === "columns") {
-        const cols: DocColumn[] = [];
-        for (const col of b.columns) {
-          if (!inserted) {
-            const res = insertBlockAfterRec(col.blocks, afterId, newBlock);
-            if (res.inserted) inserted = true;
-            cols.push({ blocks: res.blocks });
-          } else {
-            cols.push(col);
-          }
-        }
-        if (inserted) next = { ...b, columns: cols };
-      }
-    }
-    out.push(next);
-    if (!inserted && b.id === afterId) {
-      out.push(newBlock);
-      inserted = true;
-    }
-  }
-  if (!inserted) out.push(newBlock);
-  return out;
+  const res = insertBlockAfterRec(blocks, afterId, newBlock);
+  return res.inserted ? res.blocks : [...res.blocks, newBlock];
 }
 
 function insertBlockAfterRec(blocks: readonly DocBlock[], afterId: string, newBlock: DocBlock): { readonly blocks: DocBlock[]; readonly inserted: boolean } {
@@ -1020,7 +996,7 @@ export function setColumnsCount(block: Extract<DocBlock, { type: "columns" }>, c
   return { ...block, columns: cols };
 }
 
-export type TableBlock = Extract<DocBlock, { type: "table" }>;
+type TableBlock = Extract<DocBlock, { type: "table" }>;
 
 export function addTableRow(block: TableBlock): TableBlock {
   const emptyRow = block.headers.map(() => "");
@@ -1076,7 +1052,7 @@ export function cycleTableAlignment(block: TableBlock, colIndex: number): TableB
   return { ...block, alignments: base };
 }
 
-export interface TocEntry {
+interface TocEntry {
   readonly blockId: string;
   readonly level: number;
   readonly text: string;
@@ -1100,7 +1076,7 @@ export function extractTocEntries(blocks: readonly DocBlock[], maxLevel = 3): re
   return out;
 }
 
-export interface DocStats {
+interface DocStats {
   readonly blockCount: number;
   readonly wordCount: number;
   readonly slideCount: number;
@@ -1262,7 +1238,7 @@ function normalizeCalloutTone(tone: string): CalloutTone {
   }
 }
 
-export interface CalloutVisual {
+interface CalloutVisual {
   readonly tone: CalloutTone;
   readonly label: string;
   readonly icon: IconName;
@@ -1289,18 +1265,7 @@ export function calloutVisualOf(rawTone: string): CalloutVisual {
 }
 
 export function calloutToneLabel(rawTone: CalloutTone): string {
-  switch (rawTone) {
-    case "tip":
-      return t("web.note.doc.calloutTones.tip");
-    case "warn":
-      return t("web.note.doc.calloutTones.warn");
-    case "danger":
-      return t("web.note.doc.calloutTones.danger");
-    case "note":
-      return t("web.note.doc.calloutTones.note");
-    case "info":
-      return t("web.note.doc.calloutTones.info");
-  }
+  return calloutVisualOf(rawTone).label;
 }
 
 export function isTurnIntoActive(block: DocBlock, opt: TurnIntoOption): boolean {
@@ -1310,7 +1275,82 @@ export function isTurnIntoActive(block: DocBlock, opt: TurnIntoOption): boolean 
   return true;
 }
 
-export function wrapInlineMarkdown(text: string, marker: "**" | "*" | "`" | "~~"): string {
+export type InlineMarkdownMarker = "**" | "*" | "`" | "~~";
+
+interface MarkdownWrapResult {
+  readonly text: string;
+  readonly start: number;
+  readonly end: number;
+}
+
+export function wrapInlineMarkdownSelection(text: string, marker: InlineMarkdownMarker, rawStart: number, rawEnd = rawStart): MarkdownWrapResult {
+  const mLen = marker.length;
+  const a = Math.max(0, Math.min(text.length, rawStart));
+  const b = Math.max(0, Math.min(text.length, rawEnd));
+  const selStart = Math.min(a, b);
+  const selEnd = Math.max(a, b);
+
+  if (selEnd > selStart) {
+    const selected = text.slice(selStart, selEnd);
+    if (selStart >= mLen && selEnd + mLen <= text.length && text.slice(selStart - mLen, selStart) === marker && text.slice(selEnd, selEnd + mLen) === marker) {
+      return {
+        text: `${text.slice(0, selStart - mLen)}${selected}${text.slice(selEnd + mLen)}`,
+        start: selStart - mLen,
+        end: selEnd - mLen,
+      };
+    }
+    if (selected.startsWith(marker) && selected.endsWith(marker) && selected.length >= mLen * 2) {
+      const inner = selected.slice(mLen, selected.length - mLen);
+      return {
+        text: `${text.slice(0, selStart)}${inner}${text.slice(selEnd)}`,
+        start: selStart,
+        end: selStart + inner.length,
+      };
+    }
+    return {
+      text: `${text.slice(0, selStart)}${marker}${selected}${marker}${text.slice(selEnd)}`,
+      start: selStart + mLen,
+      end: selEnd + mLen,
+    };
+  }
+
+  let wStart = selStart;
+  while (wStart > 0 && !/\s/u.test(text[wStart - 1] ?? "")) {
+    wStart -= 1;
+  }
+  let wEnd = selStart;
+  while (wEnd < text.length && !/\s/u.test(text[wEnd] ?? "")) {
+    wEnd += 1;
+  }
+
+  if (wStart === wEnd) {
+    return {
+      text: `${text.slice(0, selStart)}${marker}${marker}${text.slice(selStart)}`,
+      start: selStart + mLen,
+      end: selStart + mLen,
+    };
+  }
+
+  const word = text.slice(wStart, wEnd);
+  const rel = selStart - wStart;
+  if (word.startsWith(marker) && word.endsWith(marker) && word.length >= mLen * 2) {
+    const inner = word.slice(mLen, word.length - mLen);
+    const nextCaret = wStart + Math.max(0, Math.min(inner.length, rel - mLen));
+    return {
+      text: `${text.slice(0, wStart)}${inner}${text.slice(wEnd)}`,
+      start: nextCaret,
+      end: nextCaret,
+    };
+  }
+  const nextCaret = wStart + mLen + rel;
+  return {
+    text: `${text.slice(0, wStart)}${marker}${word}${marker}${text.slice(wEnd)}`,
+    start: nextCaret,
+    end: nextCaret,
+  };
+}
+
+export function wrapInlineMarkdown(text: string, marker: InlineMarkdownMarker): string {
   const trimmed = text.trimEnd();
   const suffix = text.slice(trimmed.length);
   if (!trimmed) return `${marker}${marker}`;
@@ -1322,6 +1362,293 @@ export function wrapInlineMarkdown(text: string, marker: "**" | "*" | "`" | "~~"
     return `${head}${tail.slice(marker.length, tail.length - marker.length)}${suffix}`;
   }
   return `${head}${marker}${tail}${marker}${suffix}`;
+}
+
+export interface BlockFocusTarget {
+  readonly blockId: string;
+  readonly caret?: "start" | "end" | number | undefined;
+  readonly itemIndex?: number | undefined;
+}
+
+export function isCaretOnFirstLine(text: string, caret: number): boolean {
+  const clamped = Math.max(0, Math.min(text.length, caret));
+  return !text.slice(0, clamped).includes("\n");
+}
+
+export function isCaretOnLastLine(text: string, caret: number): boolean {
+  const clamped = Math.max(0, Math.min(text.length, caret));
+  return !text.slice(clamped).includes("\n");
+}
+
+function estimateCharAdvancePx(ch: string): number {
+  const cp = ch.codePointAt(0) ?? 0;
+  if (cp >= 0x2e80) return 14;
+  return 7.6;
+}
+
+/**
+ * Estimates a UTF-16 caret offset in `text` when pressing an unfocused `<InlineRichText>` view.
+ * Accounts for `[[note:...]]` / `[[issue:...]]` pills whose raw syntax is wider than their rendered pill.
+ */
+export function estimateInlineRichTextOffset(
+  text: string,
+  relX: number,
+  relY: number,
+  contentWidth: number,
+  notesById?: ReadonlyMap<string, string>,
+  lineHeight = 24,
+): number {
+  if (!text) return 0;
+  const maxWidth = Math.max(120, contentWidth - 8);
+  const targetX = Math.max(0, relX - 4);
+  const targetLine = Math.max(0, Math.floor(Math.max(0, relY) / Math.max(12, lineHeight)));
+
+  interface VisualAtom {
+    readonly rawStart: number;
+    readonly rawEnd: number;
+    readonly widthPx: number;
+    readonly isNewline: boolean;
+  }
+
+  const atoms: VisualAtom[] = [];
+  let cursor = 0;
+  INLINE_TOKEN_RE.lastIndex = 0;
+  const pushPlainRange = (start: number, end: number) => {
+    for (let i = start; i < end; i++) {
+      const ch = text[i] ?? " ";
+      if (ch === "\n") {
+        atoms.push({ rawStart: i, rawEnd: i + 1, widthPx: 0, isNewline: true });
+      } else {
+        atoms.push({ rawStart: i, rawEnd: i + 1, widthPx: estimateCharAdvancePx(ch), isNewline: false });
+      }
+    }
+  };
+
+  for (;;) {
+    const m = INLINE_TOKEN_RE.exec(text);
+    if (!m) break;
+    if (m[1] !== undefined) {
+      if (m.index > cursor) pushPlainRange(cursor, m.index);
+      const kind = m[2] === "note" ? "note" : "issue";
+      const rawId = (m[3] ?? "").trim();
+      const alias = m[4]?.trim() ?? "";
+      const displayLabel = alias || (kind === "note" ? (notesById?.get(rawId) ?? rawId) : rawId);
+      let pillTextWidth = 24;
+      for (const ch of displayLabel) pillTextWidth += estimateCharAdvancePx(ch) * 0.88;
+      atoms.push({
+        rawStart: m.index,
+        rawEnd: m.index + m[1].length,
+        widthPx: pillTextWidth,
+        isNewline: false,
+      });
+      cursor = m.index + m[1].length;
+    } else if (m[5] !== undefined && m[6] !== undefined) {
+      const hashOffset = m[5].lastIndexOf("#");
+      const tokenStart = m.index + hashOffset;
+      if (tokenStart > cursor) pushPlainRange(cursor, tokenStart);
+      const tokenEnd = m.index + m[5].length;
+      const pillWidth = 22 + (m[6].length + 1) * 7.2;
+      atoms.push({ rawStart: tokenStart, rawEnd: tokenEnd, widthPx: pillWidth, isNewline: false });
+      cursor = tokenEnd;
+    }
+  }
+  if (cursor < text.length) pushPlainRange(cursor, text.length);
+
+  const lines: VisualAtom[][] = [[]];
+  let lineWidth = 0;
+  for (const atom of atoms) {
+    if (atom.isNewline) {
+      lines.push([]);
+      lineWidth = 0;
+      continue;
+    }
+    const currentLine = lines[lines.length - 1];
+    if (currentLine.length > 0 && lineWidth + atom.widthPx > maxWidth) {
+      lines.push([atom]);
+      lineWidth = atom.widthPx;
+    } else {
+      currentLine.push(atom);
+      lineWidth += atom.widthPx;
+    }
+  }
+
+  const chosenIdx = Math.min(lines.length - 1, targetLine);
+  const chosenLine = lines[chosenIdx] ?? [];
+  if (chosenLine.length === 0) {
+    const prevLine = chosenIdx > 0 ? lines[chosenIdx - 1] : undefined;
+    return prevLine && prevLine.length > 0 ? prevLine[prevLine.length - 1].rawEnd : 0;
+  }
+
+  let xAcc = 0;
+  for (const atom of chosenLine) {
+    const mid = xAcc + atom.widthPx / 2;
+    if (targetX <= mid) return atom.rawStart;
+    xAcc += atom.widthPx;
+  }
+  return chosenLine[chosenLine.length - 1].rawEnd;
+}
+
+function splitBlocksInList(
+  blocks: readonly DocBlock[],
+  blockId: string,
+  selStart: number,
+  selEnd: number,
+  newId: string,
+): { readonly blocks: DocBlock[]; readonly focus?: BlockFocusTarget | undefined } {
+  const out: DocBlock[] = [];
+  let focus: BlockFocusTarget | undefined;
+
+  for (const b of blocks) {
+    if (focus === undefined && b.id === blockId) {
+      if (b.type === "prose" || b.type === "heading" || b.type === "todo") {
+        const s = Math.max(0, Math.min(b.text.length, Math.min(selStart, selEnd)));
+        const e = Math.max(0, Math.min(b.text.length, Math.max(selStart, selEnd)));
+        const before = b.text.slice(0, s);
+        const after = b.text.slice(e);
+
+        if (b.type === "todo" && b.text === "") {
+          out.push({ id: b.id, type: "prose", text: "" });
+          focus = { blockId: b.id, caret: 0 };
+          continue;
+        }
+        if (b.type === "heading" && s === 0 && b.text.length > 0) {
+          out.push({ id: b.id, type: "prose", text: "" }, { ...b, id: newId, text: after });
+          focus = { blockId: newId, caret: 0 };
+          continue;
+        }
+        if (b.type === "heading") {
+          out.push({ ...b, text: before }, { id: newId, type: "prose", text: after });
+          focus = { blockId: newId, caret: 0 };
+          continue;
+        }
+        if (b.type === "todo") {
+          out.push({ ...b, text: before }, { id: newId, type: "todo", checked: false, text: after });
+          focus = { blockId: newId, caret: 0 };
+          continue;
+        }
+        out.push({ ...b, text: before }, { id: newId, type: "prose", text: after });
+        focus = { blockId: newId, caret: 0 };
+        continue;
+      }
+    }
+
+    let next = b;
+    if (focus === undefined && next.children && next.children.length > 0) {
+      const childRes = splitBlocksInList(next.children, blockId, selStart, selEnd, newId);
+      if (childRes.focus !== undefined) {
+        focus = childRes.focus;
+        next = { ...next, children: childRes.blocks };
+      }
+    }
+    if (focus === undefined && next.type === "columns") {
+      const cols: DocColumn[] = [];
+      for (const col of next.columns) {
+        if (focus === undefined) {
+          const colRes = splitBlocksInList(col.blocks, blockId, selStart, selEnd, newId);
+          if (colRes.focus !== undefined) focus = colRes.focus;
+          cols.push({ blocks: colRes.blocks });
+        } else {
+          cols.push(col);
+        }
+      }
+      if (focus !== undefined) next = { ...next, columns: cols };
+    }
+    out.push(next);
+  }
+
+  return { blocks: out, focus };
+}
+
+export function splitBlockAtSelection(
+  blocks: readonly DocBlock[],
+  blockId: string,
+  selStart: number,
+  selEnd = selStart,
+  newId = makeBlockId(),
+): { readonly blocks: DocBlock[]; readonly focus: BlockFocusTarget } | undefined {
+  const res = splitBlocksInList(blocks, blockId, selStart, selEnd, newId);
+  if (res.focus === undefined) return undefined;
+  return { blocks: res.blocks, focus: res.focus };
+}
+
+function mergeBackwardInList(blocks: readonly DocBlock[], blockId: string): { readonly blocks: DocBlock[]; readonly focus?: BlockFocusTarget | undefined } {
+  const idx = blocks.findIndex((b) => b.id === blockId);
+  if (idx !== -1) {
+    const cur = blocks[idx];
+    if (cur.type === "heading" || cur.type === "todo" || cur.type === "quote") {
+      const next = [...blocks];
+      next[idx] = {
+        id: cur.id,
+        type: "prose",
+        text: cur.text,
+        ...(cur.children !== undefined ? { children: cur.children } : {}),
+      };
+      return { blocks: next, focus: { blockId: cur.id, caret: 0 } };
+    }
+    if (cur.type === "prose" && idx > 0) {
+      const prev = blocks[idx - 1];
+      if (prev.type === "prose" || prev.type === "heading" || prev.type === "todo" || prev.type === "quote") {
+        const joinOffset = prev.text.length;
+        const mergedPrev: DocBlock = {
+          ...prev,
+          text: `${prev.text}${cur.text}`,
+          ...(cur.children !== undefined && cur.children.length > 0 ? { children: [...(prev.children ?? []), ...cur.children] } : {}),
+        };
+        const next = [...blocks.slice(0, idx - 1), mergedPrev, ...blocks.slice(idx + 1)];
+        return { blocks: next, focus: { blockId: prev.id, caret: joinOffset } };
+      }
+      if (prev.type === "list" && prev.items.length > 0) {
+        const lastIdx = prev.items.length - 1;
+        const lastItem = prev.items[lastIdx] ?? "";
+        const nextItems = [...prev.items];
+        nextItems[lastIdx] = `${lastItem}${cur.text}`;
+        const mergedPrev: DocBlock = { ...prev, items: nextItems };
+        const next = [...blocks.slice(0, idx - 1), mergedPrev, ...blocks.slice(idx + 1)];
+        return { blocks: next, focus: { blockId: prev.id, itemIndex: lastIdx, caret: lastItem.length } };
+      }
+      if (cur.text === "") {
+        const next = [...blocks.slice(0, idx), ...blocks.slice(idx + 1)];
+        return { blocks: next, focus: { blockId: prev.id, caret: "end" } };
+      }
+    }
+    return { blocks: [...blocks] };
+  }
+
+  let focus: BlockFocusTarget | undefined;
+  const out = blocks.map((b) => {
+    let next = b;
+    if (focus === undefined && next.children && next.children.length > 0) {
+      const childRes = mergeBackwardInList(next.children, blockId);
+      if (childRes.focus !== undefined) {
+        focus = childRes.focus;
+        next = { ...next, children: childRes.blocks };
+      }
+    }
+    if (focus === undefined && next.type === "columns") {
+      const cols: DocColumn[] = [];
+      for (const col of next.columns) {
+        if (focus === undefined) {
+          const colRes = mergeBackwardInList(col.blocks, blockId);
+          if (colRes.focus !== undefined) focus = colRes.focus;
+          cols.push({ blocks: colRes.blocks });
+        } else {
+          cols.push(col);
+        }
+      }
+      if (focus !== undefined) next = { ...next, columns: cols };
+    }
+    return next;
+  });
+  return { blocks: out, focus };
+}
+
+export function mergeBlockBackward(
+  blocks: readonly DocBlock[],
+  blockId: string,
+): { readonly blocks: DocBlock[]; readonly focus: BlockFocusTarget } | undefined {
+  const res = mergeBackwardInList(blocks, blockId);
+  if (res.focus === undefined) return undefined;
+  return { blocks: res.blocks, focus: res.focus };
 }
 
 export function neighborBlockId(blocks: readonly DocBlock[], currentId: string, dir: "prev" | "next"): string | undefined {

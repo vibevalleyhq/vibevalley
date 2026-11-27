@@ -1,27 +1,22 @@
 import { effect, keymap, Picker, Scroll, signal, Text, untracked, View, windowSize } from "nsh";
-import { Popover } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
-import { type LibraryItem, type LibrarySort, LibrarySortValues, type MediaJob, type Note, type NoteType } from "@vibevalley/protocol";
+import { type LibraryItem, type LibrarySort, LibrarySortValues, type MediaJob, type Note } from "@vibevalley/protocol";
 
-import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
-import { Dialog } from "../../design/Dialog";
-import { Select } from "../../design/Field";
 import { Icon } from "../../design/Icon";
-import { IconButton } from "../../design/IconButton";
 import { Empty } from "../../design/layout";
-import { Lightbox, type Picture } from "../../design/Lightbox";
 import { readFiles } from "../../design/picked";
-import { Segmented } from "../../design/Segmented";
 import { CountPill } from "../../design/Tag";
 import { toast } from "../../design/toasts";
+import { createAct } from "../../infra/act";
 import { api, reasonOf } from "../../infra/api";
 import { attachmentData, decodeBase64Utf8 } from "../../infra/attachment";
-import { fileUrl, importLocalAttachment, localPathFromUri, useAttachmentFile } from "../../infra/attachmentFile";
+import { importLocalAttachment, localPathFromUri } from "../../infra/attachmentFile";
 import { hostApi } from "../../infra/bridge";
 import { useBoardSlice, useCollabSlice, useOpsSlice, useSessionsSlice } from "../../infra/frame";
 import { currentHost } from "../../infra/host";
+import { libraryQuery } from "../../infra/libraryQuery";
 import { ready, useAgents, useQuery, useQueryClient, useRepos } from "../../infra/query";
 import { useRouter, useSearchParams } from "../../infra/router";
 import { createMemo } from "../../infra/solid";
@@ -31,17 +26,14 @@ import {
   contentFocusMediaId,
   contentSidebarOpen,
   isPinned,
-  openContentSearch,
   openTemplatePicker,
   pinnedKeys,
   templatePickerContextFor,
   togglePinned,
 } from "../../infra/state/contentNav";
-import { prefsNow, setLibraryTile } from "../../infra/state/prefs";
+import { prefsNow } from "../../infra/state/prefs";
 import { useVdpNode } from "../../infra/vdpProbe";
-import { InstallAppletModal, noteHref, noteTypeLabel, useInstalledApplets, useNotes } from "../note";
-import { AudioPanel } from "./AudioPanel";
-import { ImagePanel } from "./ImagePanel";
+import { InstallAppletModal, noteHref, useInstalledApplets, useNotes } from "../note";
 import { Inspector } from "./Inspector";
 import {
   buildCategoryFilterOptions,
@@ -55,12 +47,22 @@ import {
   making,
   type Names,
   neighbor,
-  type NoteTypeFilter,
   shownMedia,
   shownNotes,
-  textToDocJson,
   understoodText,
 } from "./items";
+import {
+  importNoteFile,
+  isMediaMakeSupported,
+  LibraryLightbox,
+  LibraryMakeDialog,
+  LibraryUnderstandDialog,
+  type MakeTab,
+  makeTabs,
+  noteFileNameRe,
+  titleOfBucket,
+} from "./LibraryDialogs";
+import { LibraryToolbar } from "./LibraryToolbar";
 import {
   activeFileId,
   askRemove,
@@ -84,66 +86,11 @@ import {
   showsMediaInBucket,
   showsNotesInBucket,
 } from "./libraryView";
-import { libraryQuery } from "./listing";
 import { publicationKey } from "./publication";
-import { SpeechPanel } from "./SpeechPanel";
 import { knows, MakingTiles, NoteTiles, ratioOf, type Seen, tileGap, Tiles } from "./Tiles";
-import { UnderstandingPanel } from "./UnderstandingPanel";
 
-type Make = "image" | "speech" | "audio";
-const makes: readonly Make[] = ["image", "speech", "audio"];
 const tileMin = 96;
-const isMediaMakeSupported = (b: ContentBucket) => showsMediaInBucket(b) && bucketFileKind(b) !== "video" && bucketFileKind(b) !== "other";
 const tileMax = 280;
-
-const noteFileNameRe = /\.(?:base\.json|canvas\.json|whiteboard\.json|media\.json|md|markdown)$/iu;
-
-function inferNoteFile(filename: string, content: string): { readonly title: string; readonly noteType: NoteType; readonly content: string } {
-  const trimmed = filename.trim();
-  if (/\.base\.json$/iu.test(trimmed)) {
-    return { title: trimmed.replace(/\.base\.json$/iu, "") || trimmed, noteType: "base", content };
-  }
-  if (/\.(?:canvas|whiteboard)\.json$/iu.test(trimmed)) {
-    return { title: trimmed.replace(/\.(?:canvas|whiteboard)\.json$/iu, "") || trimmed, noteType: "canvas", content };
-  }
-  if (/\.media\.json$/iu.test(trimmed)) {
-    return { title: trimmed.replace(/\.media\.json$/iu, "") || trimmed, noteType: "media", content };
-  }
-  return {
-    title: trimmed.replace(/\.(?:doc\.md|md|markdown)$/iu, "") || trimmed,
-    noteType: "doc",
-    content: textToDocJson(content),
-  };
-}
-
-function importNoteFile(filename: string, content: string): Promise<Note> {
-  const inferred = inferNoteFile(filename, content);
-  return api.note.create({
-    title: inferred.title,
-    noteType: inferred.noteType,
-    content: inferred.content,
-  });
-}
-
-function noteTypeTitle(type: NoteTypeFilter | undefined): string {
-  if (type === undefined) return t("web.library.content.artifactType.all");
-  return noteTypeLabel(type);
-}
-
-function titleOfBucket(bucket: ContentBucket): string {
-  switch (bucket.kind) {
-    case "recent":
-      return t("web.library.content.recent");
-    case "pinned":
-      return t("web.library.content.pinned");
-    case "apps":
-      return t("web.library.content.installedApps");
-    case "notes":
-      return noteTypeTitle(bucket.noteType);
-    case "media":
-      return bucket.fileKind === undefined ? t("web.library.content.media") : t(`web.library.kind.${bucket.fileKind}`);
-  }
-}
 
 export function LibraryPage() {
   useVdpNode({ testId: "library-page", role: "region" });
@@ -264,9 +211,7 @@ export function LibraryPage() {
 
   const inner = createMemo(() => {
     const measured = gridWidth();
-    if (measured !== undefined && measured > 0) {
-      return Math.max(220, measured - 32);
-    }
+    if (measured !== undefined && measured > 0) return Math.max(220, measured - 32);
     const w = windowSize().width;
     const appRailW = w < 640 ? 68 : 76;
     const sideW = contentSidebarOpen.get() ? 232 : 0;
@@ -337,9 +282,9 @@ export function LibraryPage() {
     if (next !== cur) selection.set(next);
   });
 
-  const make = createMemo((): Make | undefined => {
+  const make = createMemo((): MakeTab | undefined => {
     const m = search().get("make");
-    return makes.find((x) => x === m);
+    return makeTabs.find((x) => x === m);
   });
   const understanding = createMemo(() => {
     const id = search().get("understand");
@@ -493,217 +438,28 @@ export function LibraryPage() {
       }}
     >
       <View class="min-h-0 min-w-0 flex-1">
-        <View
-          role="toolbar"
-          accessibilityLabel={bucketTitle()}
-          desktop={{ windowDrag: true }}
-          class="h-11 shrink-0 flex-row items-center gap-2 border-b border-line bg-page px-3"
-        >
-          <If when={!contentSidebarOpen.get()}>
-            <IconButton
-              icon="sidebar"
-              size={16}
-              label={t("web.library.content.sidebarToggle")}
-              testid="content-sidebar-toggle"
-              pressed={false}
-              onClick={() => contentSidebarOpen.set(true)}
-            />
-          </If>
-          <View class="min-w-0 flex-row items-center gap-2">
-            <Text testID="library-bucket-title" class="truncate text-sm font-semibold text-ink">
-              {bucketTitle()}
-            </Text>
-            <CountPill count={totalCount()} />
-          </View>
-          <If when={hasCategoryOptions()}>
-            <If
-              when={!compactToolbar()}
-              else={
-                <Popover
-                  placement="bottom"
-                  align="start"
-                  offset={6}
-                  popupClass="w-72 gap-2.5 rounded-lg border border-line bg-elevated p-3 shadow-float"
-                  popupStyle={{ maxWidth: Math.max(240, windowSize().width - 24) }}
-                  trigger={
-                    <View
-                      testID="library-filter-popover"
-                      role="button"
-                      accessibilityLabel={t("web.issue.page.filter")}
-                      class={`h-7 shrink-0 flex-row items-center gap-1.5 rounded-md border border-line px-2.5 ${
-                        activeCategoryCount() > 0 ? "bg-selected" : "bg-page hover:bg-hover"
-                      }`}
-                    >
-                      <Icon name="filter" size={14} tone={activeCategoryCount() > 0 ? "accent" : "muted"} />
-                      <Text class="text-sm text-ink">{t("web.issue.page.filter")}</Text>
-                      <If when={activeCategoryCount() > 0}>
-                        <CountPill count={activeCategoryCount()} active />
-                      </If>
-                    </View>
-                  }
-                >
-                  <View testID="library-filter-popover-menu" class="gap-2.5">
-                    <If when={categoryOptions().repos.length > 0}>
-                      <View class="gap-1">
-                        <Text class="text-xs font-medium text-muted">{t("web.issue.page.byRepo")}</Text>
-                        <Select
-                          size="control"
-                          class="w-full"
-                          label={t("web.issue.page.byRepo")}
-                          testid="library-filter-repo"
-                          filter
-                          value={category().repo ?? ""}
-                          placeholder={t("web.issue.page.allRepos")}
-                          options={categoryOptions().repos}
-                          onChange={(repo) => category.set({ ...category(), repo: repo || undefined })}
-                        />
-                      </View>
-                    </If>
-                    <If when={categoryOptions().issues.length > 0}>
-                      <View class="gap-1">
-                        <Text class="text-xs font-medium text-muted">{t("web.base.place.issues.label")}</Text>
-                        <Select
-                          size="control"
-                          class="w-full"
-                          label={t("web.base.place.issues.label")}
-                          testid="library-filter-issue"
-                          filter
-                          value={category().issueId ?? ""}
-                          placeholder={t("web.issue.list.all")}
-                          options={categoryOptions().issues}
-                          onChange={(issueId) => category.set({ ...category(), issueId: issueId || undefined })}
-                        />
-                      </View>
-                    </If>
-                    <If when={categoryOptions().channels.length > 0}>
-                      <View class="gap-1">
-                        <Text class="text-xs font-medium text-muted">{t("web.channel.channelsTitle")}</Text>
-                        <Select
-                          size="control"
-                          class="w-full"
-                          label={t("web.channel.channelsTitle")}
-                          testid="library-filter-channel"
-                          filter
-                          value={category().channelId ?? ""}
-                          placeholder={t("web.channel.filter.all")}
-                          options={categoryOptions().channels}
-                          onChange={(channelId) => category.set({ ...category(), channelId: channelId || undefined })}
-                        />
-                      </View>
-                    </If>
-                    <If when={hasAnyCategoryFilter(effectiveCategory())}>
-                      <View class="flex-row justify-end border-t border-line pt-2">
-                        <Button size="compact" tone="quiet" testID="library-filter-clear" onPress={() => category.set(emptyCategoryFilter)}>
-                          {t("web.issue.page.clear")}
-                        </Button>
-                      </View>
-                    </If>
-                  </View>
-                </Popover>
-              }
-            >
-              <View testID="library-filter-bar" class="shrink-0 flex-row items-center rounded-md border border-line bg-side pl-2">
-                <Icon name="filter" size={14} tone={activeCategoryCount() > 0 ? "accent" : "faint"} />
-                <If when={categoryOptions().repos.length > 0}>
-                  <View class="mx-1.5 h-3.5 w-px bg-line" />
-                  <Select
-                    quiet
-                    size="control"
-                    class="max-w-24"
-                    label={t("web.issue.page.byRepo")}
-                    testid="library-filter-repo"
-                    filter
-                    value={category().repo ?? ""}
-                    placeholder={t("web.issue.page.allRepos")}
-                    options={categoryOptions().repos}
-                    onChange={(repo) => category.set({ ...category(), repo: repo || undefined })}
-                  />
-                </If>
-                <If when={categoryOptions().issues.length > 0}>
-                  <View class="h-3.5 w-px bg-line" />
-                  <Select
-                    quiet
-                    size="control"
-                    class="max-w-28"
-                    label={t("web.base.place.issues.label")}
-                    testid="library-filter-issue"
-                    filter
-                    value={category().issueId ?? ""}
-                    placeholder={t("web.issue.list.all")}
-                    options={categoryOptions().issues}
-                    onChange={(issueId) => category.set({ ...category(), issueId: issueId || undefined })}
-                  />
-                </If>
-                <If when={categoryOptions().channels.length > 0}>
-                  <View class="h-3.5 w-px bg-line" />
-                  <Select
-                    quiet
-                    size="control"
-                    class="max-w-24"
-                    label={t("web.channel.channelsTitle")}
-                    testid="library-filter-channel"
-                    filter
-                    value={category().channelId ?? ""}
-                    placeholder={t("web.channel.filter.all")}
-                    options={categoryOptions().channels}
-                    onChange={(channelId) => category.set({ ...category(), channelId: channelId || undefined })}
-                  />
-                </If>
-              </View>
-              <If when={hasAnyCategoryFilter(effectiveCategory())}>
-                <IconButton
-                  icon="close"
-                  size={14}
-                  testid="library-filter-clear"
-                  label={t("web.issue.page.clear")}
-                  onClick={() => category.set(emptyCategoryFilter)}
-                />
-              </If>
-            </If>
-          </If>
-          <View class="min-w-0 flex-1" />
-          <If when={!contentSidebarOpen.get()}>
-            <IconButton icon="search" size={14} label={t("web.library.content.searchAll")} testid="content-search-btn" onClick={() => openContentSearch()} />
-          </If>
-          <Select
-            label={t("web.library.sortLabel")}
-            testid="library-sort"
-            size="control"
-            quiet
-            value={effectiveSort()}
-            onChange={(v) => sort.set(v)}
-            options={sortOptions()}
-          />
-          <If when={showsMediaInBucket(bucket()) && visibleMedia().length > 0}>
-            <Segmented
-              label={t("web.library.tileSize")}
-              testid="library-tile-size"
-              value={tile() <= 128 ? "sm" : tile() >= 220 ? "lg" : "md"}
-              onChange={(v) => setLibraryTile(v === "sm" ? 112 : v === "lg" ? 240 : 160)}
-              options={[
-                { value: "sm", label: "S" },
-                { value: "md", label: "M" },
-                { value: "lg", label: "L" },
-              ]}
-            />
-          </If>
-          <If when={isMediaMakeSupported(bucket())}>
-            <Button
-              size="compact"
-              tone="quiet"
-              testID="library-make-btn"
-              icon="generate"
-              onPress={() => setSearch({ make: bucketFileKind(bucket()) === "audio" ? "audio" : "image" })}
-            >
-              {t("web.library.make")}
-            </Button>
-          </If>
-          <If when={!appsOnly() && !pinnedOnly()}>
-            <Button size="compact" tone="quiet" testID="library-upload" icon="upload" disabled={act.busy()} onPress={() => void pickFiles()}>
-              {act.busy() ? t("web.library.uploading") : t("web.library.upload")}
-            </Button>
-          </If>
-        </View>
+        <LibraryToolbar
+          bucketTitle={bucketTitle()}
+          bucket={bucket()}
+          totalCount={totalCount()}
+          hasCategoryOptions={hasCategoryOptions()}
+          compactToolbar={compactToolbar()}
+          activeCategoryCount={activeCategoryCount()}
+          category={category()}
+          effectiveCategory={effectiveCategory()}
+          categoryOptions={categoryOptions()}
+          effectiveSort={effectiveSort()}
+          sortOptions={sortOptions()}
+          tile={tile()}
+          hasVisibleMedia={visibleMedia().length > 0}
+          appsOnly={appsOnly()}
+          pinnedOnly={pinnedOnly()}
+          busy={act.busy()}
+          onCategory={(next) => category.set(next)}
+          onSort={(next) => sort.set(next)}
+          onMake={(next) => setSearch({ make: next })}
+          onPickFiles={() => void pickFiles()}
+        />
 
         <Scroll
           testID="library-grid"
@@ -896,66 +652,11 @@ export function LibraryPage() {
         onAt={(at) => selection.set(at === undefined ? closeLightbox(untracked(selection)) : openLightbox(untracked(selection), at, imageItems().length))}
       />
 
-      <Dialog
-        open={make() !== undefined}
-        onClose={() => setSearch({ make: undefined })}
-        title={t("web.library.makeTitle")}
-        size="lg"
-        height="fixed"
-        toolbar={
-          <Segmented
-            label={t("web.library.makeTitle")}
-            testid="library-make-form"
-            value={make() ?? "image"}
-            onChange={(value) => setSearch({ make: value })}
-            options={makes.map((value) => ({ value, label: t(`web.library.makeTabs.${value}`) }))}
-          />
-        }
-        testid="library-make-dialog"
-      >
-        <If when={make() === "image"}>
-          <ImagePanel />
-        </If>
-        <If when={make() === "speech"}>
-          <SpeechPanel />
-        </If>
-        <If when={make() === "audio"}>
-          <AudioPanel />
-        </If>
-      </Dialog>
+      <LibraryMakeDialog make={make()} onSelect={(value) => setSearch({ make: value })} onClose={() => setSearch({ make: undefined })} />
 
-      <If when={understanding()}>
-        {(file) => (
-          <Dialog
-            open
-            onClose={() => setSearch({ understand: undefined })}
-            title={t("web.library.understandTitle", { name: file().name })}
-            size="lg"
-            height="fixed"
-            testid="library-understand-dialog"
-          >
-            <UnderstandingPanel file={file()} />
-          </Dialog>
-        )}
-      </If>
+      <LibraryUnderstandDialog file={understanding()} onClose={() => setSearch({ understand: undefined })} />
 
       <If when={appletTarget()}>{(n) => <InstallAppletModal open note={n()} onClose={() => appletTarget.set(undefined)} />}</If>
     </View>
   );
-}
-
-function LibraryLightbox(props: { items: readonly LibraryItem[]; at: number | undefined; onAt: (at: number | undefined) => void }) {
-  const curId = createMemo(() => (props.at !== undefined ? (props.items[props.at]?.attachment.id ?? "") : ""));
-  const file = useAttachmentFile(curId);
-  const pictures = createMemo((): readonly Picture[] =>
-    props.items.map((item, i) => {
-      const f = i === props.at ? file() : undefined;
-      return {
-        src: f ? fileUrl(f.path) : "",
-        name: item.attachment.name,
-        ...(f ? { path: f.path } : {}),
-      };
-    }),
-  );
-  return <Lightbox pictures={pictures()} at={props.at} onAt={props.onAt} />;
 }

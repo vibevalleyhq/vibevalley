@@ -4,12 +4,24 @@ import { Select as Base } from "nsh/base";
 import { t } from "@vibevalley/i18n";
 import type { Agent } from "@vibevalley/protocol";
 
-import type { AgentReadinessStatus, AgentReadinessSummary } from "../../infra/agents";
 import { Button } from "../Button";
 import { Icon } from "../Icon";
 import { motionClass, popupTransition } from "../motion";
 import { TextLink } from "../TextLink";
 import { AgentCodeBadge, AgentFace } from "./Face";
+
+type AgentReadinessStatus = "ready" | "warn" | "error" | "checking";
+
+interface AgentReadinessProblem {
+  readonly text: string;
+  readonly fixHref?: string | undefined;
+}
+
+interface AgentReadinessSummary {
+  readonly status: AgentReadinessStatus;
+  readonly runtimeLabel: string;
+  readonly problems: readonly AgentReadinessProblem[];
+}
 
 const statusDotClass = (status: AgentReadinessStatus): string => {
   switch (status) {

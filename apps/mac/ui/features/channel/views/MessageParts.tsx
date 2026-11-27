@@ -5,7 +5,6 @@ import { list, t } from "@vibevalley/i18n";
 import { type Attachment, type Channel, type ChatMessage, type Embed, NOTE_TYPES, type NoteType, userId } from "@vibevalley/protocol";
 import { channelOf } from "@vibevalley/protocol/rules";
 
-import { createAct } from "../../../design/act";
 import { Button } from "../../../design/Button";
 import { Dialog } from "../../../design/Dialog";
 import { fileKind, kindIcon, sizeText } from "../../../design/domain/AttachmentTile";
@@ -19,9 +18,11 @@ import { MoreMenu } from "../../../design/MoreMenu";
 import { Bubble } from "../../../design/Tip";
 import { toast } from "../../../design/toasts";
 import { mix } from "../../../design/tone";
+import { createAct } from "../../../infra/act";
 import { api, newSendKey, reasonOf } from "../../../infra/api";
 import { fileUrl, openAttachment, playAudio, useAttachmentFile } from "../../../infra/attachmentFile";
 import { hostApi } from "../../../infra/bridge";
+import { useMessage } from "../../../infra/channelFollow";
 import { useCollabSlice } from "../../../infra/frame";
 import { useQueryClient } from "../../../infra/query";
 import { formatGenUiAction, type VvGenUiActionEvent } from "../../../infra/rich";
@@ -33,7 +34,6 @@ import { pendingNewIssue } from "../../../infra/state/issueDraft";
 import { transport } from "../../../infra/transport";
 import { noteHref, noteTypeLabel } from "../../note";
 import { drafts } from "../model/composing";
-import { useMessage } from "../model/follow";
 import { pinSet, reactionSet, sameMessage, sameReaction, setMark, markUnread, unreadMark } from "../model/marks";
 import { workbenchClock, type LinkedMessage, channelLabel, linkedMessages, messagePath } from "../model/places";
 import { buildPromotedIssueDraft, buildPromotedNoteContent, buildPromotedNoteDraft } from "../model/promote";
@@ -297,7 +297,7 @@ export function Embeds(props: { embeds: readonly Embed[] }) {
 export function Reactions(props: { m: ChatMessage; names: (id: string) => string; hovered?: boolean }) {
   const react = useReact();
   return (
-    <View class="mt-1 flex-row flex-wrap gap-1">
+    <View class="mt-1 mb-1 flex-row flex-wrap gap-1">
       <Each of={props.m.reactions} key={(r) => r.emoji}>
         {(r) => {
           const mine = () => r().by.includes(userId);

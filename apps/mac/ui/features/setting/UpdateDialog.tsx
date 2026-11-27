@@ -7,6 +7,7 @@ import { Button } from "../../design/Button";
 import { Dialog } from "../../design/Dialog";
 import { Icon } from "../../design/Icon";
 import { OutLink } from "../../design/IconButton";
+import { motionClass } from "../../design/motion";
 import { mix } from "../../design/tone";
 import { variant } from "../../infra/base/dom";
 import { clampUpdatePercent, formatUpdateTransfer } from "../../infra/host";
@@ -173,7 +174,9 @@ export function UpdateDialog(props: UpdateDialogProps) {
             <If when={verifyingState()}>
               {(v) => (
                 <View class="flex-row items-center gap-2">
-                  <Icon name="wait" size={15} tone="water" />
+                  <View class={motionClass("animate-pulse")}>
+                    <Icon name="wait" size={15} tone="water" />
+                  </View>
                   <Text class="min-w-0 flex-1 text-sm text-ink">{t("web.setting.about.verifying", { next: v().next })}</Text>
                 </View>
               )}
@@ -182,7 +185,9 @@ export function UpdateDialog(props: UpdateDialogProps) {
             <If when={installingState()}>
               {(inst) => (
                 <View class="flex-row items-center gap-2">
-                  <Icon name="wait" size={15} tone="accent" />
+                  <View class={motionClass("animate-pulse")}>
+                    <Icon name="wait" size={15} tone="accent" />
+                  </View>
                   <Text class="min-w-0 flex-1 text-sm text-ink">{t("web.setting.about.installing", { next: inst().next })}</Text>
                 </View>
               )}

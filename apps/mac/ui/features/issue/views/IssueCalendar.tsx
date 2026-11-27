@@ -100,7 +100,7 @@ export function IssueCalendar(props: {
           </View>
           <View class="flex-row items-center gap-1">
             <IconButton testid="calendar-prev" icon="previous" size={14} label={t("web.issue.calendar.prevMonth")} onClick={() => goMonth(-1)} />
-            <Button size="compact" tone="plain" testID="calendar-today" onPress={goToday}>
+            <Button tone="plain" testID="calendar-today" onPress={goToday}>
               {t("web.issue.timeline.today")}
             </Button>
             <IconButton testid="calendar-next" icon="next" size={14} label={t("web.issue.calendar.nextMonth")} onClick={() => goMonth(1)} />

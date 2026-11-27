@@ -1,16 +1,18 @@
 import { cleanup, computed, keymap, Scroll, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
-import type { DocBlock, DocView } from "@vibevalley/protocol";
+import type { DocBlock, DocView, IssueId, NoteId } from "@vibevalley/protocol";
 
 import { IconButton } from "../../design/IconButton";
 import { Empty, Kbd } from "../../design/layout";
 import { reasonOf } from "../../infra/api";
 import { useNow } from "../../infra/base/dom";
+import { useBoardSlice } from "../../infra/frame";
 import { ready, useQuery } from "../../infra/query";
 import { useRouter } from "../../infra/router";
 import { useVdpNode } from "../../infra/vdpProbe";
-import { noteHref, useNote } from "./NoteCard";
+import { InlineRichText } from "./doc/InlineRichText";
+import { noteHref, useNote, useNotes } from "./NoteCard";
 import { elapsedText, presenterOf, stepped } from "./slides";
 import { noteDocQuery } from "./store";
 
@@ -126,14 +128,20 @@ export function PresenterPage() {
 
 function Presenter(props: { id: string; version: number }) {
   const router = useRouter();
+  const board = useBoardSlice();
   const note = useNote(() => props.id);
+  const allNotes = useNotes(() => ({}));
   const docQuery = useQuery(() => noteDocQuery(props.id));
   const at = signal(0);
 
+  const notesList = computed(() => ready(allNotes, []));
+  const issuesList = computed(() => board()?.issues ?? []);
   const slides = computed((): readonly SlideItem[] => buildSlidesFromDoc(ready(docQuery, undefined), note.data()?.title ?? ""));
   const pages = () => slides().length;
   const current = () => slides()[at()];
   const nextSlide = () => slides()[at() + 1];
+  const openNote = (nid: NoteId) => router.navigate(noteHref(nid));
+  const openIssue = (iid: IssueId) => router.navigate(`/issues/${encodeURIComponent(iid)}`);
   const statusText = () => {
     const err = docQuery.error();
     if (err) return reasonOf(err);
@@ -156,12 +164,19 @@ function Presenter(props: { id: string; version: number }) {
 
   return (
     <View testID="presenter" accessibilityValue={{ now: at(), max: pages() }} class="h-full min-h-0 flex-1 bg-side">
-      <View class="h-11 shrink-0 flex-row items-center gap-2 border-b border-line bg-page px-3.5">
-        <IconButton icon="back" label={t("web.note.page.all")} testid="presenter-back" onClick={goBack} />
+      <View class="h-11 shrink-0 flex-row items-center gap-2 border-b border-line bg-page px-3">
+        <IconButton icon="back" size={16} label={t("web.note.page.all")} testid="presenter-back" onClick={goBack} />
         <View class="h-4 w-px bg-line" />
         <Text class="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{title()}</Text>
         <View class="flex-row items-center gap-1.5">
-          <IconButton icon="previous" label={t("web.base.lightbox.prev")} testid="presenter-previous" disabled={at() === 0} onClick={() => step(-1)} />
+          <IconButton
+            icon="previous"
+            size={16}
+            label={t("web.base.lightbox.prev")}
+            testid="presenter-previous"
+            disabled={at() === 0}
+            onClick={() => step(-1)}
+          />
           <If
             when={pages() > 0}
             else={
@@ -174,50 +189,73 @@ function Presenter(props: { id: string; version: number }) {
               <Text testID="presenter-at" class="font-mono text-sm font-semibold text-ink tabular-nums">{`${at() + 1} / ${pages()}`}</Text>
             </View>
           </If>
-          <IconButton icon="next" label={t("web.base.lightbox.next")} testid="presenter-next" disabled={at() >= pages() - 1} onClick={() => step(1)} />
+          <IconButton
+            icon="next"
+            size={16}
+            label={t("web.base.lightbox.next")}
+            testid="presenter-next"
+            disabled={at() >= pages() - 1}
+            onClick={() => step(1)}
+          />
         </View>
         <View class="mx-1 h-4 w-px bg-line" />
-        <View class="flex-row items-center gap-2">
+        <View class="flex-row items-center gap-1.5">
           <Text testID="presenter-clock" class="font-mono text-sm font-semibold text-ink tabular-nums">
             {elapsedText(now() - started())}
           </Text>
-          <IconButton icon="refresh" label={t("web.base.form.reset")} testid="presenter-restart" onClick={() => started.set(now())} />
+          <IconButton icon="refresh" size={16} label={t("web.base.form.reset")} testid="presenter-restart" onClick={() => started.set(now())} />
         </View>
       </View>
 
       <View class="min-h-0 flex-1 gap-4 p-4 md:flex-row">
         <View class="min-h-0 gap-3 md:flex-2">
-          <View
-            testID="presenter-current"
-            class="aspect-video w-full justify-center gap-3 overflow-hidden rounded-lg border border-line bg-page p-8 shadow-raise"
-          >
-            <If when={current()}>
-              {(slide) => (
-                <>
-                  <Text class="text-2xl font-semibold text-ink">{slide().title}</Text>
-                  <If when={slide().subtitle}>
-                    <Text class="text-base text-muted">{slide().subtitle}</Text>
-                  </If>
-                  <View class="gap-1.5 pt-2">
-                    <Each
-                      of={slide()
-                        .blocks.filter((b) => b.type !== "heading" && !(b.type === "prose" && b.text === slide().subtitle))
-                        .slice(0, 6)}
-                      key={(b) => b.id}
-                    >
-                      {(block) => {
-                        const line = () => summarizeBlock(block());
-                        return (
-                          <If when={line() !== ""}>
-                            <Text class="text-sm leading-relaxed text-ink">{line()}</Text>
-                          </If>
-                        );
-                      }}
-                    </Each>
-                  </View>
-                </>
-              )}
-            </If>
+          <View testID="presenter-current" class="aspect-video w-full overflow-hidden rounded-lg border border-line bg-page shadow-raise">
+            <Scroll class="min-h-0 flex-1" contentClass="min-h-full justify-center gap-3 p-8">
+              <If when={current()}>
+                {(slide) => (
+                  <>
+                    <Text class="text-2xl font-semibold text-ink">{slide().title}</Text>
+                    <If when={slide().subtitle}>
+                      <InlineRichText
+                        text={slide().subtitle}
+                        textClass="text-base"
+                        toneClass="text-muted"
+                        containerClass="px-0"
+                        notes={notesList()}
+                        issues={issuesList()}
+                        onOpenNote={openNote}
+                        onOpenIssue={openIssue}
+                      />
+                    </If>
+                    <View class="gap-1.5 pt-2">
+                      <Each
+                        of={slide()
+                          .blocks.filter((b) => b.type !== "heading" && !(b.type === "prose" && b.text === slide().subtitle))
+                          .slice(0, 6)}
+                        key={(b) => b.id}
+                      >
+                        {(block) => {
+                          const line = () => summarizeBlock(block());
+                          return (
+                            <If when={line() !== ""}>
+                              <InlineRichText
+                                text={line()}
+                                textClass="text-sm"
+                                containerClass="px-0"
+                                notes={notesList()}
+                                issues={issuesList()}
+                                onOpenNote={openNote}
+                                onOpenIssue={openIssue}
+                              />
+                            </If>
+                          );
+                        }}
+                      </Each>
+                    </View>
+                  </>
+                )}
+              </If>
+            </Scroll>
           </View>
           <View class="flex-row flex-wrap items-center justify-between gap-2 px-0.5">
             <View class="flex-row items-center gap-1.5">
@@ -255,9 +293,18 @@ function Presenter(props: { id: string; version: number }) {
                   testID="presenter-next-slide"
                   class="aspect-video w-full justify-center gap-1.5 overflow-hidden rounded-lg border border-line bg-page p-4 shadow-raise"
                 >
-                  <Text class="text-base font-semibold text-ink">{slide().title}</Text>
+                  <Text class="truncate text-base font-semibold text-ink">{slide().title}</Text>
                   <If when={slide().subtitle}>
-                    <Text class="text-xs text-muted">{slide().subtitle}</Text>
+                    <InlineRichText
+                      text={slide().subtitle}
+                      textClass="text-xs"
+                      toneClass="text-muted"
+                      containerClass="px-0"
+                      notes={notesList()}
+                      issues={issuesList()}
+                      onOpenNote={openNote}
+                      onOpenIssue={openIssue}
+                    />
                   </If>
                 </View>
               )}
@@ -268,8 +315,8 @@ function Presenter(props: { id: string; version: number }) {
               <Text class="text-xs font-semibold text-muted">{t("web.note.page.rail")}</Text>
             </View>
             <Scroll class="min-h-0 flex-1" contentClass="p-3.5">
-              <Text testID="presenter-notes" class={notes() ? "text-base leading-[26px] text-ink" : "text-sm text-faint"}>
-                {pages() > 0 ? notes() || t("web.note.doc.empty") : ""}
+              <Text testID="presenter-notes" class={notes() ? "text-sm leading-relaxed text-ink" : "text-sm text-faint"}>
+                {pages() > 0 ? notes() || t("web.base.form.none") : ""}
               </Text>
             </Scroll>
           </View>

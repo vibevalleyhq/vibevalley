@@ -11,17 +11,18 @@ import type {
 } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 
-import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
 import { KeyRow, SettingRow, SettingsGroup, SettingsPage } from "../../design/domain/settings";
 import { TextInput } from "../../design/Field";
 import { Icon } from "../../design/Icon";
 import { IconButton } from "../../design/IconButton";
 import { SaveBar } from "../../design/KeyField";
-import { Quiet, Toggle } from "../../design/layout";
+import { Banner, Toggle } from "../../design/layout";
+import { SkeletonLines } from "../../design/Skeleton";
 import { Tag, type TagTone } from "../../design/Tag";
 import { TextLink } from "../../design/TextLink";
 import { toast } from "../../design/toasts";
+import { createAct } from "../../infra/act";
 import { api, reasonOf } from "../../infra/api";
 import { providerQuery, ready, settingsQuery, useQuery, useQueryClient } from "../../infra/query";
 import { useVdpNode } from "../../infra/vdpProbe";
@@ -70,7 +71,27 @@ export function ModelProvidersPage() {
       action={<TextLink href="/settings/models">{t("web.setting.nav.models")}</TextLink>}
     >
       <SettingsReadiness features={["orchestrator", "call"]} selfHref="/settings/providers" />
-      <If when={ready(query, undefined)} else={<Quiet>{query.error() ? reasonOf(query.error()) : t("web.base.form.asking")}</Quiet>}>
+      <If
+        when={ready(query, undefined)}
+        else={
+          <If
+            when={query.error()}
+            else={
+              <SettingsGroup testid="providers-loading">
+                <View class="gap-3 px-4 py-4">
+                  <SkeletonLines rows={["36%", "70%", "54%"]} gap="md" accessibilityLabel={t("web.base.form.asking")} />
+                </View>
+              </SettingsGroup>
+            }
+          >
+            {(err) => (
+              <Banner tone="bad" role="alert">
+                {reasonOf(err())}
+              </Banner>
+            )}
+          </If>
+        }
+      >
         {(status) => <ProvidersForm initial={untracked(status)} />}
       </If>
     </SettingsPage>

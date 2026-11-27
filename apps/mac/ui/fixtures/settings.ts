@@ -1,7 +1,7 @@
 // The settings sections' answers: model providers (VibeValley's providers
 // spec account), MOSS Live's check, and the chat apps as the state
 // frame carries them (ConnectorsPage.stories' connected WeChat).
-import type { ConnectorStatus, ProviderModelListing, ProviderStatus } from "@vibevalley/protocol";
+import type { ConnectorStatus, ProviderStatus } from "@vibevalley/protocol";
 
 const now = Date.now();
 const min = 60_000;
@@ -54,16 +54,6 @@ const provider: ProviderStatus = {
   scenePolicies: [],
 };
 
-const models: ProviderModelListing = {
-  connection: "moss-main",
-  revision: 3,
-  models: [
-    { id: "moss-image-1", owner: "moss", capabilities: ["image"] },
-    { id: "moss-vl", owner: "moss", capabilities: ["vision"] },
-    { id: "moss-live", owner: "moss", capabilities: ["realtime"] },
-  ],
-};
-
 export const connectors: ConnectorStatus[] = [
   {
     id: "weixin",
@@ -84,7 +74,6 @@ export const responses: Record<string, unknown> = {
   "provider.get": provider,
   "provider.update": provider,
   "provider.verify": provider,
-  "provider.model.list": models,
   "voice.moss.verify": { problem: "" },
   "setting.validate": { problem: "" },
   "connector.login": connectors[0],

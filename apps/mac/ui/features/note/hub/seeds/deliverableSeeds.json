@@ -1,0 +1,1986 @@
+{
+  "diagMicroservices": [
+    {
+      "path": "structure/doc.json",
+      "json": {
+        "version": 1,
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "heading",
+            "level": 1,
+            "text": "{{TITLE}}"
+          },
+          {
+            "id": "b2",
+            "type": "diagram",
+            "title": "{{TITLE}}",
+            "source": "flowchart LR\n  gw[\"{{$t:diagMsNodeGateway}}\"]\n  auth[\"{{$t:diagMsNodeAuth}}\"]\n  core[\"{{$t:diagMsNodeCore}}\"]\n  queue[\"{{$t:diagMsNodeQueue}}\"]\n  media[\"{{$t:diagMsNodeMedia}}\"]\n  db[\"{{$t:diagMsNodeDb}}\"]\n  gw -->|{{$t:diagMsEdgeAuth}}| auth\n  gw -->|{{$t:diagMsEdgeRpc}}| core\n  core -->|{{$t:diagMsEdgeEmit}}| queue\n  queue -->|{{$t:diagMsEdgeEmit}}| media\n  core -->|{{$t:diagMsEdgeRead}}| db\n  media -->|{{$t:diagMsEdgeStore}}| db"
+          }
+        ]
+      }
+    }
+  ],
+  "diagSequence": [
+    {
+      "path": "structure/doc.json",
+      "json": {
+        "version": 1,
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "heading",
+            "level": 1,
+            "text": "{{TITLE}}"
+          },
+          {
+            "id": "b2",
+            "type": "diagram",
+            "title": "{{TITLE}}",
+            "source": "flowchart LR\n  client[\"{{$t:diagSeqClient}}\"]\n  api[\"{{$t:diagSeqApi}}\"]\n  guard[\"{{$t:diagSeqGuard}}\"]\n  domain[\"{{$t:diagSeqDomain}}\"]\n  outbox[\"{{$t:diagSeqOutbox}}\"]\n  bus[\"{{$t:diagSeqBus}}\"]\n  client -->|{{$t:diagSeqE1}}| api\n  api -->|{{$t:diagSeqE2}}| guard\n  guard -->|{{$t:diagSeqE3}}| domain\n  domain -->|{{$t:diagSeqE4}}| outbox\n  outbox -->|{{$t:diagSeqE5}}| bus"
+          }
+        ]
+      }
+    }
+  ],
+  "diagErd": [
+    {
+      "path": "structure/doc.json",
+      "json": {
+        "version": 1,
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "heading",
+            "level": 1,
+            "text": "{{TITLE}}"
+          },
+          {
+            "id": "b2",
+            "type": "diagram",
+            "title": "{{TITLE}}",
+            "source": "flowchart TB\n  repo[\"{{$t:diagErdRepo}}\"]\n  agent[\"{{$t:diagErdUser}}\"]\n  issue[\"{{$t:diagErdIssue}}\"]\n  session[\"{{$t:diagErdSession}}\"]\n  artifact[\"{{$t:diagErdArtifact}}\"]\n  version[\"{{$t:diagErdVersion}}\"]\n  issue -->|{{$t:diagErdE1}}| repo\n  issue -->|{{$t:diagErdE2}}| session\n  session -->|{{$t:diagErdE3}}| agent\n  session -->|{{$t:diagErdE4}}| artifact\n  artifact -->|{{$t:diagErdE5}}| version"
+          }
+        ]
+      }
+    }
+  ],
+  "diagCicd": [
+    {
+      "path": "structure/doc.json",
+      "json": {
+        "version": 1,
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "heading",
+            "level": 1,
+            "text": "{{TITLE}}"
+          },
+          {
+            "id": "b2",
+            "type": "diagram",
+            "title": "{{TITLE}}",
+            "source": "flowchart LR\n  lint[\"{{$t:diagCiLint}}\"]\n  unit[\"{{$t:diagCiUnit}}\"]\n  build[\"{{$t:diagCiBuild}}\"]\n  canary[\"{{$t:diagCiCanary}}\"]\n  smoke[\"{{$t:diagCiSmoke}}\"]\n  prod[\"{{$t:diagCiProd}}\"]\n  lint -->|{{$t:diagCiE1}}| unit\n  unit -->|{{$t:diagCiE2}}| build\n  build -->|{{$t:diagCiE3}}| canary\n  canary -->|{{$t:diagCiE4}}| smoke\n  smoke -->|{{$t:diagCiE5}}| prod"
+          }
+        ]
+      }
+    }
+  ],
+  "diagStateMachine": [
+    {
+      "path": "structure/doc.json",
+      "json": {
+        "version": 1,
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "heading",
+            "level": 1,
+            "text": "{{TITLE}}"
+          },
+          {
+            "id": "b2",
+            "type": "diagram",
+            "title": "{{TITLE}}",
+            "source": "flowchart LR\n  draft[\"{{$t:diagSmDraft}}\"]\n  queued[\"{{$t:diagSmQueued}}\"]\n  running[\"{{$t:diagSmRunning}}\"]\n  review[\"{{$t:diagSmReview}}\"]\n  done[\"{{$t:diagSmDone}}\"]\n  canceled[\"{{$t:diagSmCanceled}}\"]\n  draft -->|{{$t:diagSmE1}}| queued\n  queued -->|{{$t:diagSmE2}}| running\n  running -->|{{$t:diagSmE3}}| review\n  review -->|{{$t:diagSmE4}}| queued\n  review -->|{{$t:diagSmE5}}| done\n  draft -->|{{$t:diagSmE6}}| canceled"
+          }
+        ]
+      }
+    }
+  ],
+  "sheetBenchmark": [
+    {
+      "path": "structure/base.json",
+      "json": {
+        "version": 1,
+        "sheets": [
+          {
+            "id": "sheet1",
+            "name": "{{$t:sheetBenchTab1}}",
+            "columns": [
+              {
+                "id": "scenario",
+                "name": "{{$t:sheetBenchColCase}}",
+                "kind": "text",
+                "width": 200
+              },
+              {
+                "id": "baseline",
+                "name": "{{$t:sheetBenchColBaseline}}",
+                "kind": "number",
+                "width": 130
+              },
+              {
+                "id": "current",
+                "name": "{{$t:sheetBenchColCurrent}}",
+                "kind": "number",
+                "width": 130
+              },
+              {
+                "id": "p99",
+                "name": "{{$t:sheetBenchColP99}}",
+                "kind": "number",
+                "width": 130
+              },
+              {
+                "id": "mem",
+                "name": "{{$t:sheetBenchColMem}}",
+                "kind": "number",
+                "width": 130
+              },
+              {
+                "id": "status",
+                "name": "{{$t:sheetBenchColStatus}}",
+                "kind": "text",
+                "width": 200
+              }
+            ],
+            "rows": [
+              {
+                "id": "r1",
+                "cells": {
+                  "scenario": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetBenchR1Case}}"
+                  },
+                  "baseline": {
+                    "_tag": "number",
+                    "value": 1420
+                  },
+                  "current": {
+                    "_tag": "number",
+                    "value": 2385
+                  },
+                  "p99": {
+                    "_tag": "number",
+                    "value": 4.2
+                  },
+                  "mem": {
+                    "_tag": "number",
+                    "value": 68
+                  },
+                  "status": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetBenchR1Status}}"
+                  }
+                },
+                "createdAt": 0,
+                "updatedAt": 0
+              },
+              {
+                "id": "r2",
+                "cells": {
+                  "scenario": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetBenchR2Case}}"
+                  },
+                  "baseline": {
+                    "_tag": "number",
+                    "value": 890
+                  },
+                  "current": {
+                    "_tag": "number",
+                    "value": 1352
+                  },
+                  "p99": {
+                    "_tag": "number",
+                    "value": 11.8
+                  },
+                  "mem": {
+                    "_tag": "number",
+                    "value": 112
+                  },
+                  "status": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetBenchR2Status}}"
+                  }
+                },
+                "createdAt": 0,
+                "updatedAt": 0
+              },
+              {
+                "id": "r3",
+                "cells": {
+                  "scenario": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetBenchR3Case}}"
+                  },
+                  "baseline": {
+                    "_tag": "number",
+                    "value": 310
+                  },
+                  "current": {
+                    "_tag": "number",
+                    "value": 520
+                  },
+                  "p99": {
+                    "_tag": "number",
+                    "value": 16.4
+                  },
+                  "mem": {
+                    "_tag": "number",
+                    "value": 94
+                  },
+                  "status": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetBenchR3Status}}"
+                  }
+                },
+                "createdAt": 0,
+                "updatedAt": 0
+              },
+              {
+                "id": "r4",
+                "cells": {
+                  "scenario": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetBenchR4Case}}"
+                  },
+                  "baseline": {
+                    "_tag": "number",
+                    "value": 640
+                  },
+                  "current": {
+                    "_tag": "number",
+                    "value": 690
+                  },
+                  "p99": {
+                    "_tag": "number",
+                    "value": 21
+                  },
+                  "mem": {
+                    "_tag": "number",
+                    "value": 86
+                  },
+                  "status": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetBenchR4Status}}"
+                  }
+                },
+                "createdAt": 0,
+                "updatedAt": 0
+              }
+            ],
+            "views": [
+              {
+                "id": "v_sheet1_table",
+                "name": "{{$t_key:web.note.base.table}}",
+                "kind": "table"
+              }
+            ]
+          },
+          {
+            "id": "sheet2",
+            "name": "{{$t:sheetBenchTab2}}",
+            "columns": [
+              {
+                "id": "param",
+                "name": "{{$t:sheetBenchEnvKey}}",
+                "kind": "text",
+                "width": 200
+              },
+              {
+                "id": "value",
+                "name": "{{$t:sheetBenchEnvVal}}",
+                "kind": "text",
+                "width": 200
+              }
+            ],
+            "rows": [
+              {
+                "id": "r1",
+                "cells": {
+                  "param": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetBenchEnvR1}}"
+                  },
+                  "value": {
+                    "_tag": "text",
+                    "value": "64"
+                  }
+                },
+                "createdAt": 0,
+                "updatedAt": 0
+              },
+              {
+                "id": "r2",
+                "cells": {
+                  "param": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetBenchEnvR2}}"
+                  },
+                  "value": {
+                    "_tag": "text",
+                    "value": "100,000 rows"
+                  }
+                },
+                "createdAt": 0,
+                "updatedAt": 0
+              },
+              {
+                "id": "r3",
+                "cells": {
+                  "param": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetBenchEnvR3}}"
+                  },
+                  "value": {
+                    "_tag": "text",
+                    "value": "5"
+                  }
+                },
+                "createdAt": 0,
+                "updatedAt": 0
+              }
+            ],
+            "views": [
+              {
+                "id": "v_sheet2_table",
+                "name": "{{$t_key:web.note.base.table}}",
+                "kind": "table"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "sheetTechMatrix": [
+    {
+      "path": "structure/base.json",
+      "json": {
+        "version": 1,
+        "sheets": [
+          {
+            "id": "sheet1",
+            "name": "{{$t:sheetTechTab}}",
+            "columns": [
+              {
+                "id": "dim",
+                "name": "{{$t:sheetTechColDim}}",
+                "kind": "text",
+                "width": 200
+              },
+              {
+                "id": "weight",
+                "name": "{{$t:sheetTechColWeight}}",
+                "kind": "number",
+                "width": 130
+              },
+              {
+                "id": "optA",
+                "name": "{{$t:sheetTechColOptA}}",
+                "kind": "number",
+                "width": 130
+              },
+              {
+                "id": "optB",
+                "name": "{{$t:sheetTechColOptB}}",
+                "kind": "number",
+                "width": 130
+              },
+              {
+                "id": "note",
+                "name": "{{$t:sheetTechColNote}}",
+                "kind": "text",
+                "width": 200
+              }
+            ],
+            "rows": [
+              {
+                "id": "r1",
+                "cells": {
+                  "dim": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetTechR1Dim}}"
+                  },
+                  "weight": {
+                    "_tag": "number",
+                    "value": 30
+                  },
+                  "optA": {
+                    "_tag": "number",
+                    "value": 9
+                  },
+                  "optB": {
+                    "_tag": "number",
+                    "value": 6
+                  },
+                  "note": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetTechR1Note}}"
+                  }
+                },
+                "createdAt": 0,
+                "updatedAt": 0
+              },
+              {
+                "id": "r2",
+                "cells": {
+                  "dim": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetTechR2Dim}}"
+                  },
+                  "weight": {
+                    "_tag": "number",
+                    "value": 25
+                  },
+                  "optA": {
+                    "_tag": "number",
+                    "value": 9
+                  },
+                  "optB": {
+                    "_tag": "number",
+                    "value": 5
+                  },
+                  "note": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetTechR2Note}}"
+                  }
+                },
+                "createdAt": 0,
+                "updatedAt": 0
+              },
+              {
+                "id": "r3",
+                "cells": {
+                  "dim": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetTechR3Dim}}"
+                  },
+                  "weight": {
+                    "_tag": "number",
+                    "value": 15
+                  },
+                  "optA": {
+                    "_tag": "number",
+                    "value": 6
+                  },
+                  "optB": {
+                    "_tag": "number",
+                    "value": 9
+                  },
+                  "note": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetTechR3Note}}"
+                  }
+                },
+                "createdAt": 0,
+                "updatedAt": 0
+              },
+              {
+                "id": "r4",
+                "cells": {
+                  "dim": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetTechR4Dim}}"
+                  },
+                  "weight": {
+                    "_tag": "number",
+                    "value": 20
+                  },
+                  "optA": {
+                    "_tag": "number",
+                    "value": 8
+                  },
+                  "optB": {
+                    "_tag": "number",
+                    "value": 6
+                  },
+                  "note": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetTechR4Note}}"
+                  }
+                },
+                "createdAt": 0,
+                "updatedAt": 0
+              },
+              {
+                "id": "r5",
+                "cells": {
+                  "dim": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetTechR5Dim}}"
+                  },
+                  "weight": {
+                    "_tag": "number",
+                    "value": 10
+                  },
+                  "optA": {
+                    "_tag": "number",
+                    "value": 8
+                  },
+                  "optB": {
+                    "_tag": "number",
+                    "value": 8
+                  },
+                  "note": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetTechR5Note}}"
+                  }
+                },
+                "createdAt": 0,
+                "updatedAt": 0
+              }
+            ],
+            "views": [
+              {
+                "id": "v_sheet1_table",
+                "name": "{{$t_key:web.note.base.table}}",
+                "kind": "table"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "sheetTestMatrix": [
+    {
+      "path": "structure/base.json",
+      "json": {
+        "version": 1,
+        "sheets": [
+          {
+            "id": "sheet1",
+            "name": "{{$t:sheetTestTab}}",
+            "columns": [
+              {
+                "id": "id",
+                "name": "{{$t:sheetTestColId}}",
+                "kind": "text",
+                "width": 200
+              },
+              {
+                "id": "area",
+                "name": "{{$t:sheetTestColArea}}",
+                "kind": "text",
+                "width": 200
+              },
+              {
+                "id": "scenario",
+                "name": "{{$t:sheetTestColCase}}",
+                "kind": "text",
+                "width": 200
+              },
+              {
+                "id": "layer",
+                "name": "{{$t:sheetTestColEnv}}",
+                "kind": "text",
+                "width": 200
+              },
+              {
+                "id": "team",
+                "name": "{{$t:sheetTestColOwner}}",
+                "kind": "text",
+                "width": 200
+              },
+              {
+                "id": "status",
+                "name": "{{$t:sheetTestColResult}}",
+                "kind": "text",
+                "width": 200
+              }
+            ],
+            "rows": [
+              {
+                "id": "r1",
+                "cells": {
+                  "id": {
+                    "_tag": "text",
+                    "value": "TC-01"
+                  },
+                  "area": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetTestR1Area}}"
+                  },
+                  "scenario": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetTestR1Case}}"
+                  },
+                  "layer": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetTestR1Env}}"
+                  },
+                  "team": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetTestR1Owner}}"
+                  },
+                  "status": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetTestR1Res}}"
+                  }
+                },
+                "createdAt": 0,
+                "updatedAt": 0
+              },
+              {
+                "id": "r2",
+                "cells": {
+                  "id": {
+                    "_tag": "text",
+                    "value": "TC-02"
+                  },
+                  "area": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetTestR2Area}}"
+                  },
+                  "scenario": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetTestR2Case}}"
+                  },
+                  "layer": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetTestR2Env}}"
+                  },
+                  "team": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetTestR2Owner}}"
+                  },
+                  "status": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetTestR2Res}}"
+                  }
+                },
+                "createdAt": 0,
+                "updatedAt": 0
+              },
+              {
+                "id": "r3",
+                "cells": {
+                  "id": {
+                    "_tag": "text",
+                    "value": "TC-03"
+                  },
+                  "area": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetTestR3Area}}"
+                  },
+                  "scenario": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetTestR3Case}}"
+                  },
+                  "layer": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetTestR3Env}}"
+                  },
+                  "team": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetTestR3Owner}}"
+                  },
+                  "status": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetTestR3Res}}"
+                  }
+                },
+                "createdAt": 0,
+                "updatedAt": 0
+              },
+              {
+                "id": "r4",
+                "cells": {
+                  "id": {
+                    "_tag": "text",
+                    "value": "TC-04"
+                  },
+                  "area": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetTestR4Area}}"
+                  },
+                  "scenario": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetTestR4Case}}"
+                  },
+                  "layer": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetTestR4Env}}"
+                  },
+                  "team": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetTestR4Owner}}"
+                  },
+                  "status": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetTestR4Res}}"
+                  }
+                },
+                "createdAt": 0,
+                "updatedAt": 0
+              }
+            ],
+            "views": [
+              {
+                "id": "v_sheet1_table",
+                "name": "{{$t_key:web.note.base.table}}",
+                "kind": "table"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "sheetApiInventory": [
+    {
+      "path": "structure/base.json",
+      "json": {
+        "version": 1,
+        "sheets": [
+          {
+            "id": "sheet1",
+            "name": "{{$t:sheetApiTab}}",
+            "columns": [
+              {
+                "id": "method",
+                "name": "{{$t:sheetApiColMethod}}",
+                "kind": "text",
+                "width": 200
+              },
+              {
+                "id": "path",
+                "name": "{{$t:sheetApiColPath}}",
+                "kind": "text",
+                "width": 200
+              },
+              {
+                "id": "auth",
+                "name": "{{$t:sheetApiColAuth}}",
+                "kind": "text",
+                "width": 200
+              },
+              {
+                "id": "rate",
+                "name": "{{$t:sheetApiColRate}}",
+                "kind": "text",
+                "width": 200
+              },
+              {
+                "id": "team",
+                "name": "{{$t:sheetApiColOwner}}",
+                "kind": "text",
+                "width": 200
+              },
+              {
+                "id": "stability",
+                "name": "{{$t:sheetApiColStability}}",
+                "kind": "text",
+                "width": 200
+              }
+            ],
+            "rows": [
+              {
+                "id": "r1",
+                "cells": {
+                  "method": {
+                    "_tag": "text",
+                    "value": "GET"
+                  },
+                  "path": {
+                    "_tag": "text",
+                    "value": "/api/v1/slice/board"
+                  },
+                  "auth": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetApiR1Auth}}"
+                  },
+                  "rate": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetApiR1Rate}}"
+                  },
+                  "team": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetApiR1Owner}}"
+                  },
+                  "stability": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetApiR1Stab}}"
+                  }
+                },
+                "createdAt": 0,
+                "updatedAt": 0
+              },
+              {
+                "id": "r2",
+                "cells": {
+                  "method": {
+                    "_tag": "text",
+                    "value": "POST"
+                  },
+                  "path": {
+                    "_tag": "text",
+                    "value": "/api/v1/note/create"
+                  },
+                  "auth": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetApiR2Auth}}"
+                  },
+                  "rate": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetApiR2Rate}}"
+                  },
+                  "team": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetApiR2Owner}}"
+                  },
+                  "stability": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetApiR2Stab}}"
+                  }
+                },
+                "createdAt": 0,
+                "updatedAt": 0
+              },
+              {
+                "id": "r3",
+                "cells": {
+                  "method": {
+                    "_tag": "text",
+                    "value": "POST"
+                  },
+                  "path": {
+                    "_tag": "text",
+                    "value": "/api/v1/session/send"
+                  },
+                  "auth": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetApiR3Auth}}"
+                  },
+                  "rate": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetApiR3Rate}}"
+                  },
+                  "team": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetApiR3Owner}}"
+                  },
+                  "stability": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetApiR3Stab}}"
+                  }
+                },
+                "createdAt": 0,
+                "updatedAt": 0
+              },
+              {
+                "id": "r4",
+                "cells": {
+                  "method": {
+                    "_tag": "text",
+                    "value": "POST"
+                  },
+                  "path": {
+                    "_tag": "text",
+                    "value": "/api/v1/remote/pair/exchange"
+                  },
+                  "auth": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetApiR4Auth}}"
+                  },
+                  "rate": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetApiR4Rate}}"
+                  },
+                  "team": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetApiR4Owner}}"
+                  },
+                  "stability": {
+                    "_tag": "text",
+                    "value": "{{$t:sheetApiR4Stab}}"
+                  }
+                },
+                "createdAt": 0,
+                "updatedAt": 0
+              }
+            ],
+            "views": [
+              {
+                "id": "v_sheet1_table",
+                "name": "{{$t_key:web.note.base.table}}",
+                "kind": "table"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "dashSlo": [
+    {
+      "path": "structure/doc.json",
+      "json": {
+        "version": 1,
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "heading",
+            "level": 1,
+            "text": "{{TITLE}}"
+          },
+          {
+            "id": "b2",
+            "type": "kpi",
+            "items": [
+              {
+                "label": "{{$t:dashSloP1}}",
+                "value": "99.97%"
+              },
+              {
+                "label": "{{$t:dashSloP2}}",
+                "value": "28 ms"
+              },
+              {
+                "label": "{{$t:dashSloP3}}",
+                "value": "76%"
+              },
+              {
+                "label": "{{$t:dashSloP4}}",
+                "value": "3"
+              }
+            ]
+          },
+          {
+            "id": "b3",
+            "type": "chart",
+            "title": "{{$t:dashSloP2}}",
+            "kind": "bar",
+            "labels": ["{{$t:dashSloR1}}", "{{$t:dashSloR2}}", "{{$t:dashSloR3}}", "{{$t:dashSloR4}}"],
+            "series": [
+              {
+                "name": "{{$t:dashSloP99Col}}",
+                "data": [14, 19, 11, 28]
+              }
+            ]
+          },
+          {
+            "id": "b4",
+            "type": "table",
+            "headers": ["{{$t:dashSloServiceCol}}", "{{$t:dashSloAvailCol}}", "{{$t:dashSloP99Col}}", "{{$t:dashSloBudgetCol}}", "{{$t:dashSloAlertsCol}}"],
+            "rows": [
+              ["{{$t:dashSloR1}}", "99.98%", "14", "92%", "0"],
+              ["{{$t:dashSloR2}}", "99.96%", "19", "84%", "1"],
+              ["{{$t:dashSloR3}}", "99.99%", "11", "96%", "0"],
+              ["{{$t:dashSloR4}}", "99.94%", "28", "76%", "2"]
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "dashDora": [
+    {
+      "path": "structure/doc.json",
+      "json": {
+        "version": 1,
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "heading",
+            "level": 1,
+            "text": "{{TITLE}}"
+          },
+          {
+            "id": "b2",
+            "type": "kpi",
+            "items": [
+              {
+                "label": "{{$t:dashDoraP1}}",
+                "value": "23.5"
+              },
+              {
+                "label": "{{$t:dashDoraP2}}",
+                "value": "4.8 h"
+              },
+              {
+                "label": "{{$t:dashDoraP3}}",
+                "value": "2.7%"
+              },
+              {
+                "label": "{{$t:dashDoraP4}}",
+                "value": "16 min"
+              }
+            ]
+          },
+          {
+            "id": "b3",
+            "type": "chart",
+            "title": "{{$t:dashDoraP1}}",
+            "kind": "bar",
+            "labels": ["W44", "W45", "W46", "W47"],
+            "series": [
+              {
+                "name": "{{$t:dashDoraDeployCol}}",
+                "data": [18, 22, 25, 29]
+              }
+            ]
+          },
+          {
+            "id": "b4",
+            "type": "table",
+            "headers": ["{{$t:dashDoraWeekCol}}", "{{$t:dashDoraDeployCol}}", "{{$t:dashDoraLeadCol}}", "{{$t:dashDoraCfrCol}}", "{{$t:dashDoraMttrCol}}"],
+            "rows": [
+              ["W44", "18", "6.4", "4.2%", "22"],
+              ["W45", "22", "5.1", "3.1%", "17"],
+              ["W46", "25", "4.3", "2.0%", "14"],
+              ["W47", "29", "3.6", "1.5%", "11"]
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "slidesArchReview": [
+    {
+      "path": "structure/doc.json",
+      "json": {
+        "version": 1,
+        "blocks": [
+          {
+            "id": "h_1",
+            "type": "heading",
+            "level": 1,
+            "text": "{{TITLE}}"
+          },
+          {
+            "id": "p_2",
+            "type": "prose",
+            "text": "{{$t:slidesArchS1Sub}}"
+          },
+          {
+            "id": "pb_3",
+            "type": "pageBreak",
+            "title": "{{$t:slidesArchS2Title}}",
+            "speakerNotes": "{{$t:slidesArchS2Notes}}"
+          },
+          {
+            "id": "h_4",
+            "type": "heading",
+            "level": 2,
+            "text": "{{$t:slidesArchS2Title}}"
+          },
+          {
+            "id": "p_5",
+            "type": "prose",
+            "text": "{{$t:slidesArchS2Sub}}"
+          },
+          {
+            "id": "l_6",
+            "type": "list",
+            "ordered": false,
+            "items": ["{{$t:slidesArchS2B1}}", "{{$t:slidesArchS2B2}}", "{{$t:slidesArchS2B3}}"]
+          },
+          {
+            "id": "pb_7",
+            "type": "pageBreak",
+            "title": "{{$t:slidesArchS3Title}}",
+            "speakerNotes": "{{$t:slidesArchS3Notes}}"
+          },
+          {
+            "id": "h_8",
+            "type": "heading",
+            "level": 2,
+            "text": "{{$t:slidesArchS3Title}}"
+          },
+          {
+            "id": "p_9",
+            "type": "prose",
+            "text": "{{$t:slidesArchS3Sub}}"
+          },
+          {
+            "id": "l_10",
+            "type": "list",
+            "ordered": false,
+            "items": ["{{$t:slidesArchS3B1}}", "{{$t:slidesArchS3B2}}", "{{$t:slidesArchS3B3}}"]
+          },
+          {
+            "id": "pb_11",
+            "type": "pageBreak",
+            "title": "{{$t:slidesArchS4Title}}",
+            "speakerNotes": "{{$t:slidesArchS4Notes}}"
+          },
+          {
+            "id": "h_12",
+            "type": "heading",
+            "level": 2,
+            "text": "{{$t:slidesArchS4Title}}"
+          },
+          {
+            "id": "p_13",
+            "type": "prose",
+            "text": "{{$t:slidesArchS4Sub}}"
+          },
+          {
+            "id": "l_14",
+            "type": "list",
+            "ordered": false,
+            "items": ["{{$t:slidesArchS4B1}}", "{{$t:slidesArchS4B2}}", "{{$t:slidesArchS4B3}}"]
+          },
+          {
+            "id": "pb_15",
+            "type": "pageBreak",
+            "title": "{{$t:slidesArchS5Title}}",
+            "speakerNotes": "{{$t:slidesArchS5Notes}}"
+          },
+          {
+            "id": "h_16",
+            "type": "heading",
+            "level": 2,
+            "text": "{{$t:slidesArchS5Title}}"
+          },
+          {
+            "id": "p_17",
+            "type": "prose",
+            "text": "{{$t:slidesArchS5Sub}}"
+          },
+          {
+            "id": "l_18",
+            "type": "list",
+            "ordered": false,
+            "items": ["{{$t:slidesArchS5B1}}", "{{$t:slidesArchS5B2}}", "{{$t:slidesArchS5B3}}"]
+          }
+        ]
+      }
+    }
+  ],
+  "slidesReleaseDemo": [
+    {
+      "path": "structure/doc.json",
+      "json": {
+        "version": 1,
+        "blocks": [
+          {
+            "id": "h_1",
+            "type": "heading",
+            "level": 1,
+            "text": "{{TITLE}}"
+          },
+          {
+            "id": "p_2",
+            "type": "prose",
+            "text": "{{$t:slidesRelS1Sub}}"
+          },
+          {
+            "id": "pb_3",
+            "type": "pageBreak",
+            "title": "{{$t:slidesRelS2Title}}",
+            "speakerNotes": "{{$t:slidesRelS2Notes}}"
+          },
+          {
+            "id": "h_4",
+            "type": "heading",
+            "level": 2,
+            "text": "{{$t:slidesRelS2Title}}"
+          },
+          {
+            "id": "p_5",
+            "type": "prose",
+            "text": "{{$t:slidesRelS2Sub}}"
+          },
+          {
+            "id": "l_6",
+            "type": "list",
+            "ordered": false,
+            "items": ["{{$t:slidesRelS2B1}}", "{{$t:slidesRelS2B2}}", "{{$t:slidesRelS2B3}}"]
+          },
+          {
+            "id": "pb_7",
+            "type": "pageBreak",
+            "title": "{{$t:slidesRelS3Title}}",
+            "speakerNotes": "{{$t:slidesRelS3Notes}}"
+          },
+          {
+            "id": "h_8",
+            "type": "heading",
+            "level": 2,
+            "text": "{{$t:slidesRelS3Title}}"
+          },
+          {
+            "id": "p_9",
+            "type": "prose",
+            "text": "{{$t:slidesRelS3Sub}}"
+          },
+          {
+            "id": "l_10",
+            "type": "list",
+            "ordered": false,
+            "items": ["{{$t:slidesRelS3B1}}", "{{$t:slidesRelS3B2}}", "{{$t:slidesRelS3B3}}"]
+          },
+          {
+            "id": "pb_11",
+            "type": "pageBreak",
+            "title": "{{$t:slidesRelS4Title}}",
+            "speakerNotes": "{{$t:slidesRelS4Notes}}"
+          },
+          {
+            "id": "h_12",
+            "type": "heading",
+            "level": 2,
+            "text": "{{$t:slidesRelS4Title}}"
+          },
+          {
+            "id": "p_13",
+            "type": "prose",
+            "text": "{{$t:slidesRelS4Sub}}"
+          },
+          {
+            "id": "l_14",
+            "type": "list",
+            "ordered": false,
+            "items": ["{{$t:slidesRelS4B1}}", "{{$t:slidesRelS4B2}}", "{{$t:slidesRelS4B3}}"]
+          },
+          {
+            "id": "pb_15",
+            "type": "pageBreak",
+            "title": "{{$t:slidesRelS5Title}}",
+            "speakerNotes": "{{$t:slidesRelS5Notes}}"
+          },
+          {
+            "id": "h_16",
+            "type": "heading",
+            "level": 2,
+            "text": "{{$t:slidesRelS5Title}}"
+          },
+          {
+            "id": "p_17",
+            "type": "prose",
+            "text": "{{$t:slidesRelS5Sub}}"
+          },
+          {
+            "id": "l_18",
+            "type": "list",
+            "ordered": false,
+            "items": ["{{$t:slidesRelS5B1}}", "{{$t:slidesRelS5B2}}", "{{$t:slidesRelS5B3}}"]
+          }
+        ]
+      }
+    }
+  ],
+  "designWorkspaceUi": [
+    {
+      "path": "structure/board.json",
+      "json": {
+        "version": 1,
+        "grid": "architectural",
+        "theme": "warm",
+        "viewport": {
+          "x": 0,
+          "y": 0,
+          "zoom": 1
+        },
+        "elements": {
+          "t1": {
+            "id": "t1",
+            "type": "text",
+            "variant": "title",
+            "x": 60,
+            "y": 40,
+            "w": 620,
+            "h": 48,
+            "label": "{{TITLE}}"
+          },
+          "f1": {
+            "id": "f1",
+            "type": "card",
+            "x": 60,
+            "y": 120,
+            "w": 420,
+            "h": 260,
+            "label": "{{$t:designDesktopName}}",
+            "body": "{{$t:designPropCtaDefault}}",
+            "fill": "default"
+          }
+        }
+      }
+    },
+    {
+      "path": "structure/frames/main.json",
+      "json": {
+        "id": "desktop-workspace",
+        "name": "{{$t:designDesktopName}}",
+        "viewport": {
+          "x": 0,
+          "y": 0,
+          "w": 1280,
+          "h": 800
+        },
+        "theme": "light",
+        "props": [
+          {
+            "name": "density",
+            "label": "{{$t:designPropDensity}}",
+            "type": "select",
+            "options": ["comfortable", "compact"],
+            "value": "comfortable"
+          },
+          {
+            "name": "showBanner",
+            "label": "{{$t:designPropBanner}}",
+            "type": "boolean",
+            "value": true
+          },
+          {
+            "name": "ctaLabel",
+            "label": "{{$t:designPropCta}}",
+            "type": "text",
+            "value": "{{$t:designPropCtaDefault}}"
+          }
+        ],
+        "root": {
+          "id": "root",
+          "kind": "stack",
+          "direction": "vertical",
+          "gap": "{space.4}",
+          "padding": "{space.6}",
+          "fill": "{color.surface}",
+          "children": [
+            {
+              "id": "hero_banner",
+              "kind": "card",
+              "visibleWhen": "showBanner",
+              "fill": "{color.panel}",
+              "radius": "{radius.md}",
+              "children": [
+                {
+                  "id": "hero_badge",
+                  "kind": "badge",
+                  "text": "LIVE RELEASE",
+                  "fill": "{color.accent}",
+                  "color": "{color.surface}"
+                },
+                {
+                  "id": "hero_title",
+                  "kind": "text",
+                  "variant": "heading",
+                  "text": "{{TITLE}}"
+                },
+                {
+                  "id": "hero_sub",
+                  "kind": "text",
+                  "variant": "muted",
+                  "text": "{{$t:designHeroSub}}"
+                }
+              ]
+            },
+            {
+              "id": "cards_row",
+              "kind": "stack",
+              "direction": "horizontal",
+              "gap": "{space.4}",
+              "children": [
+                {
+                  "id": "metrics_card",
+                  "kind": "card",
+                  "radius": "{radius.md}",
+                  "fill": "{color.panel}",
+                  "children": [
+                    {
+                      "id": "metrics_title",
+                      "kind": "text",
+                      "variant": "heading",
+                      "text": "{{$t:designMetricsTitle}}"
+                    },
+                    {
+                      "id": "metrics_table",
+                      "kind": "table",
+                      "columns": ["Metric", "Target", "Current"],
+                      "rows": [
+                        ["P99 Latency", "< 45ms", "28ms"],
+                        ["Availability", "99.95%", "99.98%"],
+                        ["Render FPS", "60 fps", "60 fps"]
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "id": "action_card",
+                  "kind": "card",
+                  "radius": "{radius.md}",
+                  "fill": "{color.panel}",
+                  "children": [
+                    {
+                      "id": "action_title",
+                      "kind": "text",
+                      "variant": "heading",
+                      "text": "{{$t:designActionTitle}}"
+                    },
+                    {
+                      "id": "action_input",
+                      "kind": "input",
+                      "text": "dev.vibevalley.applet.workspace"
+                    },
+                    {
+                      "id": "action_btn",
+                      "kind": "button",
+                      "variant": "primary",
+                      "text": "{props.ctaLabel}"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "path": "structure/frames/mobile-companion.json",
+      "json": {
+        "id": "mobile-companion",
+        "name": "{{$t:designMobileName}}",
+        "viewport": {
+          "x": 1360,
+          "y": 0,
+          "w": 390,
+          "h": 844
+        },
+        "theme": "dark",
+        "props": [
+          {
+            "name": "ctaLabel",
+            "label": "{{$t:designPropCta}}",
+            "type": "text",
+            "value": "{{$t:designPropCtaDefault}}"
+          }
+        ],
+        "root": {
+          "id": "m_root",
+          "kind": "stack",
+          "direction": "vertical",
+          "gap": "{space.3}",
+          "padding": "{space.4}",
+          "fill": "{color.surface}",
+          "children": [
+            {
+              "id": "m_badge",
+              "kind": "badge",
+              "text": "MOBILE"
+            },
+            {
+              "id": "m_title",
+              "kind": "text",
+              "variant": "heading",
+              "text": "{{TITLE}}"
+            },
+            {
+              "id": "m_preview",
+              "kind": "image",
+              "src": "asset/mobile-preview.png",
+              "h": 110
+            },
+            {
+              "id": "m_btn",
+              "kind": "button",
+              "variant": "primary",
+              "text": "{props.ctaLabel}"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "dsPapertrails": [
+    {
+      "path": "structure/board.json",
+      "json": {
+        "version": 1,
+        "grid": "dots",
+        "theme": "warm",
+        "viewport": {
+          "x": 0,
+          "y": 0,
+          "zoom": 1
+        },
+        "elements": {
+          "t1": {
+            "id": "t1",
+            "type": "text",
+            "variant": "title",
+            "x": 60,
+            "y": 40,
+            "w": 620,
+            "h": 48,
+            "label": "{{TITLE}}"
+          },
+          "s1": {
+            "id": "s1",
+            "type": "sticky",
+            "x": 60,
+            "y": 120,
+            "w": 180,
+            "h": 120,
+            "label": "Accent #4D7A2A",
+            "fill": "leaf"
+          },
+          "s2": {
+            "id": "s2",
+            "type": "sticky",
+            "x": 260,
+            "y": 120,
+            "w": 180,
+            "h": 120,
+            "label": "Water #2B7A9B",
+            "fill": "water"
+          },
+          "s3": {
+            "id": "s3",
+            "type": "sticky",
+            "x": 460,
+            "y": 120,
+            "w": 180,
+            "h": 120,
+            "label": "Wheat #C89B3C",
+            "fill": "sun"
+          }
+        }
+      }
+    },
+    {
+      "path": "structure/tokens.json",
+      "json": {
+        "name": "{{TITLE}}",
+        "version": "1.0.0",
+        "defaultTheme": "light",
+        "color": [
+          {
+            "id": "surface",
+            "group": "surface",
+            "value": {
+              "light": "#fcfcfb",
+              "dark": "#151413"
+            },
+            "note": "Primary canvas surface"
+          },
+          {
+            "id": "panel",
+            "group": "surface",
+            "value": {
+              "light": "#f4f3ef",
+              "dark": "#1f1d1b"
+            },
+            "note": "Secondary panel & card"
+          },
+          {
+            "id": "ink",
+            "group": "text",
+            "value": {
+              "light": "#1c1917",
+              "dark": "#ecebe8"
+            },
+            "note": "Primary copy"
+          },
+          {
+            "id": "muted",
+            "group": "text",
+            "value": {
+              "light": "#6b655e",
+              "dark": "#a69f95"
+            },
+            "note": "Captions & metadata"
+          },
+          {
+            "id": "accent",
+            "group": "brand",
+            "value": {
+              "light": "#4d7a2a",
+              "dark": "#7fae4f"
+            },
+            "note": "Primary brand action"
+          },
+          {
+            "id": "danger",
+            "group": "status",
+            "value": {
+              "light": "#b83a2d",
+              "dark": "#e06c5f"
+            },
+            "note": "Destructive & alert"
+          }
+        ],
+        "type": {
+          "families": [
+            {
+              "id": "sans",
+              "value": "system-ui, -apple-system, sans-serif"
+            },
+            {
+              "id": "mono",
+              "value": "ui-monospace, SFMono-Regular, monospace"
+            }
+          ],
+          "scale": [
+            {
+              "id": "sm",
+              "value": "13px"
+            },
+            {
+              "id": "md",
+              "value": "15px"
+            },
+            {
+              "id": "xl",
+              "value": "24px"
+            }
+          ],
+          "styles": [
+            {
+              "id": "heading",
+              "family": "{sans}",
+              "size": "{xl}",
+              "weight": 700,
+              "lineHeight": 1.2
+            },
+            {
+              "id": "body",
+              "family": "{sans}",
+              "size": "{md}",
+              "weight": 400,
+              "lineHeight": 1.55
+            },
+            {
+              "id": "caption",
+              "family": "{sans}",
+              "size": "{sm}",
+              "weight": 500,
+              "lineHeight": 1.4
+            }
+          ]
+        },
+        "space": [
+          {
+            "id": "2",
+            "value": "8px"
+          },
+          {
+            "id": "4",
+            "value": "16px"
+          },
+          {
+            "id": "6",
+            "value": "24px"
+          },
+          {
+            "id": "8",
+            "value": "32px"
+          }
+        ],
+        "radius": [
+          {
+            "id": "sm",
+            "value": "6px"
+          },
+          {
+            "id": "md",
+            "value": "10px"
+          },
+          {
+            "id": "lg",
+            "value": "16px"
+          },
+          {
+            "id": "full",
+            "value": "9999px"
+          }
+        ]
+      }
+    },
+    {
+      "path": "structure/components/button.json",
+      "json": {
+        "id": "button",
+        "title": "{{$t:dsButtonTitle}}",
+        "summary": "{{$t:dsButtonSummary}}",
+        "variants": [
+          {
+            "id": "primary",
+            "bg": "{color.accent}",
+            "fg": "{color.surface}"
+          },
+          {
+            "id": "secondary",
+            "bg": "{color.panel}",
+            "fg": "{color.ink}"
+          },
+          {
+            "id": "danger",
+            "bg": "{color.danger}",
+            "fg": "{color.surface}"
+          }
+        ],
+        "states": ["default", "hover", "active", "disabled"],
+        "guidelines": {
+          "do": ["{{$t:dsButtonDo}}"],
+          "dont": ["{{$t:dsButtonDont}}"]
+        }
+      }
+    },
+    {
+      "path": "structure/components/badge.json",
+      "json": {
+        "id": "badge",
+        "title": "{{$t:dsBadgeTitle}}",
+        "summary": "{{$t:dsBadgeSummary}}",
+        "variants": [
+          {
+            "id": "accent",
+            "bg": "{color.accent}",
+            "fg": "{color.surface}"
+          },
+          {
+            "id": "neutral",
+            "bg": "{color.panel}",
+            "fg": "{color.muted}"
+          }
+        ],
+        "states": ["default"],
+        "guidelines": {
+          "do": ["{{$t:dsBadgeDo}}"],
+          "dont": []
+        }
+      }
+    }
+  ],
+  "motionLaunchReel": [
+    {
+      "path": "structure/media.json",
+      "json": {
+        "version": 1,
+        "title": "{{TITLE}}",
+        "mediaKind": "video",
+        "caption": "{{$t:motionSc2CardBody}}",
+        "durationSec": 9,
+        "posterAsset": null,
+        "items": [
+          {
+            "id": "sc01-hook",
+            "label": "{{$t:motionCh1}}",
+            "startSec": 0,
+            "endSec": 3
+          },
+          {
+            "id": "sc02-features",
+            "label": "{{$t:motionCh2}}",
+            "startSec": 3,
+            "endSec": 6
+          },
+          {
+            "id": "sc03-cta",
+            "label": "{{$t:motionCh3}}",
+            "startSec": 6,
+            "endSec": 9
+          }
+        ]
+      }
+    },
+    {
+      "path": "structure/timeline.json",
+      "json": {
+        "title": "{{TITLE}}",
+        "width": 1920,
+        "height": 1080,
+        "fps": 30,
+        "duration": 9,
+        "background": "#151413",
+        "chapters": [
+          {
+            "at": 0,
+            "label": "{{$t:motionCh1}}"
+          },
+          {
+            "at": 3,
+            "label": "{{$t:motionCh2}}"
+          },
+          {
+            "at": 6,
+            "label": "{{$t:motionCh3}}"
+          }
+        ],
+        "scenes": [
+          {
+            "id": "sc01-hook",
+            "file": "structure/scenes/sc01-hook.json",
+            "start": 0,
+            "end": 3
+          },
+          {
+            "id": "sc02-features",
+            "file": "structure/scenes/sc02-features.json",
+            "start": 3,
+            "end": 6
+          },
+          {
+            "id": "sc03-cta",
+            "file": "structure/scenes/sc03-cta.json",
+            "start": 6,
+            "end": 9
+          }
+        ],
+        "audioTracks": []
+      }
+    },
+    {
+      "path": "structure/scenes/sc01-hook.json",
+      "json": {
+        "id": "sc01-hook",
+        "title": "{{$t:motionCh1}}",
+        "layers": [
+          {
+            "id": "tag",
+            "kind": "badge",
+            "text": "PAPERTRAILS ENGINE"
+          },
+          {
+            "id": "headline",
+            "kind": "text",
+            "text": "{{TITLE}}"
+          },
+          {
+            "id": "progress",
+            "kind": "bar",
+            "opacity": 0.9
+          }
+        ]
+      }
+    },
+    {
+      "path": "structure/scenes/sc02-features.json",
+      "json": {
+        "id": "sc02-features",
+        "title": "{{$t:motionCh2}}",
+        "layers": [
+          {
+            "id": "sub",
+            "kind": "text",
+            "text": "{{$t:motionSc2Headline}}"
+          },
+          {
+            "id": "card1",
+            "kind": "card",
+            "text": "{{$t:motionSc2CardTitle}}",
+            "body": "{{$t:motionSc2CardBody}}"
+          }
+        ]
+      }
+    },
+    {
+      "path": "structure/scenes/sc03-cta.json",
+      "json": {
+        "id": "sc03-cta",
+        "title": "{{$t:motionCh3}}",
+        "layers": [
+          {
+            "id": "cta",
+            "kind": "text",
+            "text": "{{$t:motionSc3Headline}}"
+          },
+          {
+            "id": "pill",
+            "kind": "badge",
+            "text": "vibevalley.dev"
+          }
+        ]
+      }
+    }
+  ],
+  "storyboardProductFilm": [
+    {
+      "path": "structure/media.json",
+      "json": {
+        "version": 1,
+        "title": "{{TITLE}}",
+        "mediaKind": "video",
+        "caption": "{{$t:sbTone}}",
+        "durationSec": 8,
+        "posterAsset": null,
+        "items": [
+          {
+            "id": "sh01",
+            "label": "{{$t:sbS1Scene}}",
+            "durationSec": 2.5
+          },
+          {
+            "id": "sh02",
+            "label": "{{$t:sbS2Scene}}",
+            "durationSec": 3
+          },
+          {
+            "id": "sh03",
+            "label": "{{$t:sbS3Scene}}",
+            "durationSec": 2.5
+          }
+        ]
+      }
+    },
+    {
+      "path": "structure/shots.json",
+      "json": {
+        "title": "{{TITLE}}",
+        "aspectRatio": "16:9",
+        "fps": 30,
+        "styleGuide": {
+          "visualTone": "{{$t:sbTone}}",
+          "palette": ["#fcfcfb", "#1c1917", "#4d7a2a", "#2b7a9b"],
+          "continuityRefs": []
+        },
+        "shots": [
+          {
+            "id": "sh01",
+            "scene": "{{$t:sbS1Scene}}",
+            "durationSec": 2.5,
+            "framing": "wide",
+            "camera": "slow push-in",
+            "visual": "{{$t:sbS1Visual}}",
+            "dialogue": "{{$t:sbS1Dialogue}}",
+            "sfx": "soft paper fold",
+            "transitionOut": "crossfade",
+            "status": "ready"
+          },
+          {
+            "id": "sh02",
+            "scene": "{{$t:sbS2Scene}}",
+            "durationSec": 3,
+            "framing": "screen-ui",
+            "camera": "static lock",
+            "visual": "{{$t:sbS2Visual}}",
+            "dialogue": "{{$t:sbS2Dialogue}}",
+            "sfx": "crisp keyclick",
+            "transitionOut": "cut",
+            "status": "approved"
+          },
+          {
+            "id": "sh03",
+            "scene": "{{$t:sbS3Scene}}",
+            "durationSec": 2.5,
+            "framing": "close-up",
+            "camera": "rack focus",
+            "visual": "{{$t:sbS3Visual}}",
+            "dialogue": "{{$t:sbS3Dialogue}}",
+            "sfx": "chime",
+            "transitionOut": "match-cut",
+            "status": "draft"
+          }
+        ]
+      }
+    }
+  ]
+}

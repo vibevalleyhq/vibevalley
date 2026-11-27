@@ -3,11 +3,11 @@ import { computed, Text, View } from "nsh";
 import { list, t } from "@vibevalley/i18n";
 import type { BacklogTriageSuggestion, MorningDigest, RepoHealthStatus } from "@vibevalley/protocol";
 
-import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
 import { Quiet } from "../../design/layout";
 import { CountPill } from "../../design/Tag";
 import { toast } from "../../design/toasts";
+import { createAct } from "../../infra/act";
 import { api } from "../../infra/api";
 import { useRefreshSlice } from "../../infra/frame";
 import { defineQuery, ready, retryRead, useQuery, useQueryClient } from "../../infra/query";

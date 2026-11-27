@@ -1,6 +1,6 @@
 import type { BoardSchedule, BoardSummary, Issue, IssueScheduleSpan } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
-import { BoardSchedule as BoardScheduleSchema } from "@vibevalley/protocol/schema";
+import { BoardSchedule as BoardScheduleSchema, jsonString } from "@vibevalley/protocol/schema";
 
 import { coreBridge } from "../../../infra/rich";
 import type { BoardCard } from "./cards";
@@ -125,7 +125,7 @@ export interface MonthGrid {
 function projectScheduleViaNative(issues: readonly Issue[], now: number): BoardSchedule | undefined {
   const json = coreBridge()?.computeSchedule?.(JSON.stringify(issues), now);
   if (!json) return undefined;
-  const parsed = BoardScheduleSchema.safeParse(JSON.parse(json));
+  const parsed = jsonString(BoardScheduleSchema).safeParse(json);
   return parsed.success ? parsed.data : undefined;
 }
 

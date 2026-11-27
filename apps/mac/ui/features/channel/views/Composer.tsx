@@ -6,7 +6,6 @@ import { type Channel, type HostAsrState as AsrSnapshot, type NoteViewContext, u
 import { sessionProfile } from "@vibevalley/protocol/rules";
 import { HostAsrState } from "@vibevalley/protocol/schema";
 
-import { createAct } from "../../../design/act";
 import { CompareUploadDialog, type CompareUploadResult } from "../../../design/Compare";
 import { AttachmentTile } from "../../../design/domain/AttachmentTile";
 import { OrchestratorFace } from "../../../design/domain/Face";
@@ -16,10 +15,12 @@ import { readFiles } from "../../../design/picked";
 import { Bubble } from "../../../design/Tip";
 import { toast } from "../../../design/toasts";
 import { mix } from "../../../design/tone";
+import { createAct } from "../../../infra/act";
 import { api, reasonOf } from "../../../infra/api";
 import { importLocalAttachment } from "../../../infra/attachmentFile";
 import { useInterval } from "../../../infra/base/timer";
 import { typedMarks } from "../../../infra/base/typedMarks";
+import { followed } from "../../../infra/channelFollow";
 import { useCollabSlice, useSessionsSlice } from "../../../infra/frame";
 import { useRouter } from "../../../infra/router";
 import { useIntents } from "../../../infra/state/intent";
@@ -27,7 +28,6 @@ import { transport } from "../../../infra/transport";
 import { activeNoteViewContext, clearActiveNoteViewContext, noteChatFocus } from "../../note";
 import { MicWaveform } from "../../voice";
 import { attachFiles, chatMarks, chatSay, createComposer, draftOf, drafts, setEditingId, uploadsIn, useReplying, type ComposerKey } from "../model/composing";
-import { followed } from "../model/follow";
 import { EmojiPopover } from "./EmojiPicker";
 import { HelperFace } from "./presence";
 
@@ -130,6 +130,16 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
   // Built once for the channel (the page keys the box by it): it starts from the draft kept for it.
   const at = untracked(() => props.channel?.id);
   const router = useRouter();
+  const visibleNoteContext = computed(() => {
+    const ctx = activeNoteViewContext();
+    if (!ctx) return undefined;
+    const [path = "", query = ""] = router.path().split("?");
+    if (path === "/chat" || path.startsWith("/chat/")) {
+      const openNote = new URLSearchParams(query).get("note") ?? undefined;
+      return openNote === ctx.noteId ? ctx : undefined;
+    }
+    return ctx;
+  });
   const place = (caret: number) => {
     selection.set({ start: caret, end: caret });
     placed.set({ start: caret });
@@ -140,7 +150,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
     target: () => {
       const files = draftFiles();
       const replyNumber = replying()?.number ?? props.replyTo;
-      const viewContext = untracked(activeNoteViewContext);
+      const viewContext = untracked(visibleNoteContext);
       return {
         id: props.channel?.id ?? "",
         ...(replyNumber !== undefined ? { replyTo: replyNumber } : {}),
@@ -439,7 +449,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
           </View>
         )}
       </If>
-      <If when={activeNoteViewContext()}>
+      <If when={visibleNoteContext()}>
         {(ctx) => (
           <View
             testID="note-context-pill"

@@ -4,12 +4,12 @@ import { Menu, MenuItem } from "nsh/base";
 import { t } from "@vibevalley/i18n";
 import type { BaseRow, BaseRunAgentColumnRequest, BaseUpsertRowRequest, DocBlock, IssueId, Note, NoteId } from "@vibevalley/protocol";
 
-import { createAct } from "../../design/act";
 import { Icon } from "../../design/Icon";
 import { Banner, Empty } from "../../design/layout";
 import { motionClass, popupTransition } from "../../design/motion";
 import { SkeletonBar, SkeletonLines, useDelayedBusy } from "../../design/Skeleton";
 import { toast } from "../../design/toasts";
+import { createAct } from "../../infra/act";
 import { api, newSendKey, reasonOf } from "../../infra/api";
 import { useBoardSlice } from "../../infra/frame";
 import { ready, useQuery, useQueryClient } from "../../infra/query";

@@ -7,22 +7,20 @@ import { hasOpenModal } from "../design/Dialog";
 import { ToastHost } from "../design/ToastHost";
 import { AgentsRoute } from "../features/agent";
 import { ChannelSidePane, ChatPage } from "../features/channel";
-import { ContentShell } from "../features/content";
 import { DashboardPage, type DashboardTab } from "../features/dashboard";
 import { Follow } from "../features/inbox";
-import { issueSearch } from "../features/issue/model/navigation";
-import { IssuesPage } from "../features/issue/views/IssuesPage";
+import { IssuesPage, issueSearch } from "../features/issue";
 import { LibraryPage } from "../features/media";
-import { NotePage, PresenterPage, StandaloneNotePage } from "../features/note";
+import { ContentShell, NotePage, PresenterPage, StandaloneNotePage } from "../features/note";
 import { OrchestratorPage, PendingApprovals } from "../features/orchestrator";
 import { ReposPage } from "../features/repo";
-import { sortRepos } from "../features/repo/repos";
 import { RuntimesPage } from "../features/runtime";
 import { SettingsPage } from "../features/setting";
 import { Keyed } from "../infra/base/dom";
 import { act } from "../infra/bridge";
 import { readHostParams } from "../infra/hostParams";
 import { ready, useRepos } from "../infra/query";
+import { sortRepos } from "../infra/repos";
 import { Root } from "../infra/Root";
 import { Link, Navigate, Outlet, route, type RouteDefinition, type SearchCheck, Routes, useLocation, useParams } from "../infra/router";
 import type { RouterHistory } from "../infra/router/history";
@@ -51,21 +49,6 @@ function page(path: string, place: string, render: (rest: () => string) => JSX.E
     component: () => {
       const params = useParams(pattern);
       return render(() => params().rest);
-    },
-  };
-}
-
-function redirectRoute(from: string, to: string, keepRest = false): RouteDefinition {
-  const pattern = route(`${from}/*`);
-  return {
-    path: pattern,
-    component: () => {
-      const params = useParams(pattern);
-      const target = () => {
-        const rest = params().rest;
-        return keepRest && rest ? `${to}/${rest}` : to;
-      };
-      return <Navigate href={target()} />;
     },
   };
 }
@@ -159,7 +142,6 @@ const routes: readonly RouteDefinition[] = [
       </Shell>
     ),
     children: [
-      redirectRoute("/tree", "/settings/memory"),
       { path: "/farm", meta: { skin: "farm" }, component: FarmHome },
       { path: "/farm/", meta: { skin: "farm" }, component: () => <Farm repo="" /> },
       { path: farmRoute, meta: { skin: "farm" }, component: RepoFarm },
@@ -169,11 +151,6 @@ const routes: readonly RouteDefinition[] = [
       page("/runs", "dashboard", () => <DashboardPage tab="runs" approvals={PendingApprovals} />),
       page("/chat", "chat", () => <ChatPage />),
       page("/settings", "settings", (rest) => <SettingsPage rest={rest()} />),
-      { path: "/team", component: () => <Navigate href="/agents" /> },
-      redirectRoute("/team/skills", "/settings/skills", true),
-      redirectRoute("/skills", "/settings/skills", true),
-      redirectRoute("/team/memory", "/settings/memory"),
-      redirectRoute("/memory", "/settings/memory"),
       page("/orchestrator", "team", (rest) => <OrchestratorPage rest={rest()} />),
       page("/agents", "team", (rest) => <AgentsRoute rest={rest()} />),
       page("/runtimes", "runtimes", (rest) => <RuntimesPage rest={rest()} />),

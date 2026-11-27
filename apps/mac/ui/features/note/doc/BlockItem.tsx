@@ -1,33 +1,23 @@
-import { computed, effect, keymap, Scroll, signal, Text, untracked, View, windowSize, type InputRef, type JSX, type ViewRef } from "nsh";
-import { Input, Menu, MenuItem, MenuSeparator } from "nsh/base";
+import { Scroll, Text, untracked, View, type JSX } from "nsh";
+import { Menu, MenuItem, MenuSeparator } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
 import type { DocBlock, Issue, IssueId, Note, NoteId } from "@vibevalley/protocol";
 
-import { Button } from "../../../design/Button";
-import { Checkbox } from "../../../design/Checkbox";
 import { Icon } from "../../../design/Icon";
 import type { Picture } from "../../../design/Lightbox";
 import { motionClass, popupTransition } from "../../../design/motion";
 import { Keyed } from "../../../infra/base/dom";
-import { VdpAnchor } from "../../../infra/vdpProbe";
+import { type BlockEditorTelemetryPatch, type FocusRequest, outerBlockSpacingClass } from "./blockEditorShared";
 import {
-  applyWikilinkReplacement,
-  createDefaultBlock,
-  detectSlashTrigger,
-  detectWikilinkTrigger,
+  type BlockFocusTarget,
+  type BlockType,
   extractBlockTitle,
-  formatWikilinkToken,
   isTurnIntoActive,
   makeBlockId,
-  matchMarkdownInputRule,
   slashCommandLabel,
-  stripSlashTrigger,
   TURN_INTO_OPTIONS,
   turnBlockInto,
-  wrapInlineMarkdown,
-  type BlockType,
-  type SlashCommandItem,
 } from "./docOps";
 import {
   BaseEmbedBlockView,
@@ -40,8 +30,9 @@ import {
   MediaBlockView,
   PreviewBlockView,
 } from "./EmbedBlocks";
-import { InlineRichText } from "./InlineRichText";
-import { SlashMenu } from "./SlashMenu";
+import { HeadingBlockView, TodoBlockView } from "./HeadingTodoBlocks";
+import { ListBlockView, QuoteBlockView } from "./ListQuoteBlocks";
+import { ProseBlockView } from "./ProseBlockView";
 import {
   BookmarkBlockView,
   CalloutBlockView,
@@ -53,9 +44,10 @@ import {
   TocBlockView,
   ToggleBlockView,
 } from "./StructuredBlocks";
-import { WikilinkMenu, type WikilinkSuggestion } from "./WikilinkMenu";
 
-export interface BlockItemProps {
+export type { BlockEditorProbeSnapshot, BlockEditorTelemetryPatch, FocusRequest } from "./blockEditorShared";
+
+interface BlockItemProps {
   readonly block: DocBlock;
   readonly allBlocks: readonly DocBlock[];
   readonly slideIndices: ReadonlyMap<string, number>;
@@ -63,9 +55,14 @@ export interface BlockItemProps {
   readonly notes: readonly Note[];
   readonly issues: readonly Issue[];
   readonly focusedBlockId?: string | undefined;
+  readonly focusRequest?: FocusRequest | undefined;
   readonly depth?: number | undefined;
+  readonly compactGutter?: boolean | undefined;
   readonly onFocusBlock?: ((id: string) => void) | undefined;
+  readonly onRequestFocus?: ((target: BlockFocusTarget) => void) | undefined;
   readonly onFocusAdjacent?: ((id: string, dir: "prev" | "next") => void) | undefined;
+  readonly onSplitBlock?: ((id: string, selStart: number, selEnd: number) => void) | undefined;
+  readonly onMergeBackward?: ((id: string) => void) | undefined;
   readonly onUpdateBlock: (id: string, next: DocBlock) => void;
   readonly onInsertAfter: (afterId: string, newBlock: DocBlock) => void;
   readonly onMoveBlock: (id: string, direction: "up" | "down") => void;
@@ -76,504 +73,41 @@ export interface BlockItemProps {
   readonly onOpenIssue: (id: IssueId) => void;
   readonly onScrollToBlock?: ((blockId: string) => void) | undefined;
   readonly onOpenLightbox?: ((pic: Picture) => void) | undefined;
+  readonly onEditorTelemetry?: ((patch: BlockEditorTelemetryPatch) => void) | undefined;
 }
-
-type ProseBlockData = Extract<DocBlock, { type: "prose" }>;
-type HeadingBlockData = Extract<DocBlock, { type: "heading" }>;
-type ListBlockData = Extract<DocBlock, { type: "list" }>;
-type TodoBlockData = Extract<DocBlock, { type: "todo" }>;
-type QuoteBlockData = Extract<DocBlock, { type: "quote" }>;
 
 const menuPopupClass = `min-w-52 gap-0.5 rounded-lg border border-line-strong bg-elevated p-1 shadow-float ${motionClass("transition-opacity duration-120 ease-out")}`;
 const menuItemClass = "h-7 flex-row items-center gap-2 rounded-md px-2 hover:bg-hover focus:bg-hover";
 
-function ProseBlockView(props: {
-  readonly block: ProseBlockData;
-  readonly notes: readonly Note[];
-  readonly issues: readonly Issue[];
-  readonly focused: boolean;
-  readonly onFocus: () => void;
-  readonly onFocusAdjacent?: ((dir: "prev" | "next") => void) | undefined;
-  readonly onUpdate: (next: DocBlock) => void;
-  readonly onInsertAfter: (newBlock: DocBlock) => void;
-  readonly onDelete: () => void;
-  readonly onOpenNote: (id: NoteId) => void;
-  readonly onOpenIssue: (id: IssueId) => void;
-}) {
-  const editing = signal(untracked(() => props.focused || props.block.text === ""));
-  const menuDismissedAt = signal<string | undefined>(undefined);
-  const slashPlacement = signal<"bottom" | "top">("bottom");
-  let inputRef: InputRef | undefined;
-  let anchorRef: ViewRef | undefined;
-
-  effect(() => {
-    if (props.focused) {
-      editing.set(true);
-      queueMicrotask(() => inputRef?.focus());
-    }
-  });
-
-  const slashTrigger = computed(() => {
-    if (!editing()) return undefined;
-    const hit = detectSlashTrigger(props.block.text);
-    if (!hit || menuDismissedAt() === props.block.text) return undefined;
-    return hit;
-  });
-
-  const wikiTrigger = computed(() => {
-    if (!editing()) return undefined;
-    const hit = detectWikilinkTrigger(props.block.text);
-    if (!hit || menuDismissedAt() === props.block.text) return undefined;
-    return hit;
-  });
-
-  effect(() => {
-    if (slashTrigger() === undefined) {
-      slashPlacement.set("bottom");
-      return;
-    }
-    void anchorRef?.measure().then((measured) => {
-      if (!measured) return;
-      const bottom = measured.pagePosition.y + measured.bounds.size.height;
-      const spaceBelow = windowSize().height - bottom;
-      const spaceAbove = measured.pagePosition.y;
-      slashPlacement.set(spaceBelow < 340 && spaceAbove > spaceBelow ? "top" : "bottom");
-    });
-  });
-
-  const applyFormat = (marker: "**" | "*" | "`" | "~~") => {
-    props.onUpdate({ ...props.block, text: wrapInlineMarkdown(props.block.text, marker) });
-  };
-
-  const formatBarActive = computed(() => props.focused && editing() && slashTrigger() === undefined && wikiTrigger() === undefined);
-  effect(() => {
-    if (!formatBarActive()) return;
-    return keymap.bind(
-      {
-        "mod+b": () => applyFormat("**"),
-        "mod+i": () => applyFormat("*"),
-        "mod+e": () => applyFormat("`"),
-      },
-      { when: "always" },
-    );
-  });
-
-  const handleInput = (val: string) => {
-    if (untracked(menuDismissedAt) !== undefined) {
-      menuDismissedAt.set(undefined);
-    }
-    const rule = matchMarkdownInputRule(val, props.block.id, false);
-    if (rule) {
-      props.onUpdate(rule.block);
-      return;
-    }
-    props.onUpdate({ ...props.block, text: val });
-  };
-
-  const handleSlashSelect = (item: SlashCommandItem) => {
-    const trig = untracked(slashTrigger);
-    const cleaned = trig ? stripSlashTrigger(props.block.text, trig.triggerIndex) : props.block.text;
-    const created = createDefaultBlock(item.type, {
-      id: cleaned === "" ? props.block.id : makeBlockId(),
-      headingLevel: item.headingLevel,
-      listOrdered: item.listOrdered,
-    });
-    if (cleaned === "") {
-      props.onUpdate(created);
-    } else {
-      props.onUpdate({ ...props.block, text: cleaned });
-      props.onInsertAfter(created);
-    }
-  };
-
-  const handleWikilinkSelect = (item: WikilinkSuggestion) => {
-    const trig = untracked(wikiTrigger);
-    if (!trig) return;
-    if (trig.mode === "embed") {
-      const cleaned = stripSlashTrigger(props.block.text, trig.startIndex);
-      const embedBlock: DocBlock =
-        item.kind === "note"
-          ? { id: cleaned === "" ? props.block.id : makeBlockId(), type: "baseEmbed", noteId: item.note.id }
-          : { id: cleaned === "" ? props.block.id : makeBlockId(), type: "issueCard", issueId: item.issue.id };
-      if (cleaned === "") {
-        props.onUpdate(embedBlock);
-      } else {
-        props.onUpdate({ ...props.block, text: cleaned });
-        props.onInsertAfter(embedBlock);
-      }
-      return;
-    }
-    const token =
-      trig.mode === "issue" && item.kind === "issue"
-        ? `#${item.issue.number}`
-        : item.kind === "note"
-          ? formatWikilinkToken("note", item.note.id, item.note.title)
-          : formatWikilinkToken("issue", item.issue.id, `#${item.issue.number} ${item.issue.title}`);
-    const nextText = applyWikilinkReplacement(props.block.text, trig.startIndex, token);
-    props.onUpdate({ ...props.block, text: nextText });
-  };
-
-  const hasLinks = computed(() => props.block.text.includes("[[") || /(?:^|[\s([,:;])#\d+/u.test(props.block.text));
-
+function renderNestedChild(child: DocBlock, props: BlockItemProps): JSX.Element {
   return (
-    <View
-      ref={(el) => {
-        anchorRef = el;
-      }}
-      testID={`doc-prose-${props.block.id}`}
-      class="relative"
-    >
-      <If when={formatBarActive() && props.block.text.trim().length > 0}>
-        <>
-          <VdpAnchor testId={`doc-format-bar-${props.block.id}`} role="toolbar" />
-          <View
-            testID={`doc-format-bar-${props.block.id}`}
-            class="mb-1.5 flex-row items-center gap-0.5 self-start rounded-md border border-line bg-elevated px-1 py-0.5 shadow-raise"
-          >
-            <View
-              role="button"
-              testID={`doc-fmt-bold-${props.block.id}`}
-              accessibilityLabel={t("web.note.doc.bold")}
-              onPress={() => applyFormat("**")}
-              class="h-6 min-w-6 items-center justify-center rounded-xs px-1.5 hover:bg-hover"
-            >
-              <Text class="text-xs font-bold text-ink">B</Text>
-            </View>
-            <View
-              role="button"
-              testID={`doc-fmt-italic-${props.block.id}`}
-              accessibilityLabel={t("web.note.doc.italic")}
-              onPress={() => applyFormat("*")}
-              class="h-6 min-w-6 items-center justify-center rounded-xs px-1.5 hover:bg-hover"
-            >
-              <Text class="text-xs italic text-ink">I</Text>
-            </View>
-            <View
-              role="button"
-              testID={`doc-fmt-code-${props.block.id}`}
-              accessibilityLabel={t("web.note.doc.inlineCode")}
-              onPress={() => applyFormat("`")}
-              class="h-6 min-w-6 items-center justify-center rounded-xs px-1.5 hover:bg-hover"
-            >
-              <Text class="font-mono text-2xs text-ink">{"<>"}</Text>
-            </View>
-            <View
-              role="button"
-              testID={`doc-fmt-strike-${props.block.id}`}
-              accessibilityLabel={t("web.note.doc.strike")}
-              onPress={() => applyFormat("~~")}
-              class="h-6 min-w-6 items-center justify-center rounded-xs px-1.5 hover:bg-hover"
-            >
-              <Text class="text-xs text-ink line-through">S</Text>
-            </View>
-            <View class="mx-0.5 h-3.5 w-px bg-line" />
-            <View
-              role="button"
-              testID={`doc-fmt-link-${props.block.id}`}
-              accessibilityLabel={t("web.note.doc.link")}
-              onPress={() => props.onUpdate({ ...props.block, text: `${props.block.text}[[` })}
-              class="h-6 items-center justify-center rounded-xs px-1.5 hover:bg-hover"
-            >
-              <Text class="font-mono text-2xs font-medium text-accent">{"[["}</Text>
-            </View>
-          </View>
-        </>
-      </If>
-
-      <If
-        when={editing() || !hasLinks()}
-        else={
-          <>
-            <VdpAnchor
-              testId={`doc-prose-rich-${props.block.id}`}
-              role="button"
-              onPress={() => {
-                editing.set(true);
-                props.onFocus();
-              }}
-            />
-            <InlineRichText
-              testID={`doc-prose-rich-${props.block.id}`}
-              text={props.block.text}
-              placeholder={t("web.note.doc.slashHint")}
-              notes={props.notes}
-              issues={props.issues}
-              onOpenNote={props.onOpenNote}
-              onOpenIssue={props.onOpenIssue}
-              onPressText={() => {
-                editing.set(true);
-                props.onFocus();
-              }}
-            />
-          </>
-        }
-      >
-        <Input
-          ref={(el) => {
-            inputRef = el;
-          }}
-          autoFocus={props.focused}
-          multiline
-          scrollbar={false}
-          testID={`doc-block-input-${props.block.id}`}
-          accessibilityLabel={props.block.text || t("web.note.blocks.start")}
-          placeholder={props.focused ? t("web.note.doc.slashHint") : t("web.note.blocks.start")}
-          value={props.block.text}
-          submitBehavior="submit"
-          onFocus={() => {
-            editing.set(true);
-            props.onFocus();
-          }}
-          onBlur={() => {
-            if (!untracked(slashTrigger) && !untracked(wikiTrigger)) {
-              editing.set(false);
-            }
-          }}
-          onChange={(e) => handleInput(e.value)}
-          onSubmit={() => {
-            if (untracked(slashTrigger) || untracked(wikiTrigger)) return;
-            const rule = matchMarkdownInputRule(props.block.text, props.block.id, true);
-            if (rule) {
-              props.onUpdate(rule.block);
-              return;
-            }
-            props.onInsertAfter({ id: makeBlockId(), type: "prose", text: "" });
-          }}
-          onKeyPress={(e) => {
-            if (e.key === "Backspace" && props.block.text === "") {
-              props.onDelete();
-            } else if (!untracked(slashTrigger) && !untracked(wikiTrigger)) {
-              if (e.key === "ArrowUp" && !props.block.text.includes("\n")) props.onFocusAdjacent?.("prev");
-              else if (e.key === "ArrowDown" && !props.block.text.includes("\n")) props.onFocusAdjacent?.("next");
-            }
-          }}
-          class="min-h-6 w-full rounded-sm border border-transparent bg-transparent px-1 text-sm leading-6 text-ink placeholder:text-faint"
-        />
-      </If>
-      <SlashMenu
-        open={slashTrigger() !== undefined}
-        query={slashTrigger()?.query ?? ""}
-        placement={slashPlacement()}
-        testID={`doc-slash-menu-${props.block.id}`}
-        onSelect={handleSlashSelect}
-        onClose={() => menuDismissedAt.set(props.block.text)}
-      />
-      <WikilinkMenu
-        open={slashTrigger() === undefined && wikiTrigger() !== undefined}
-        mode={wikiTrigger()?.mode ?? "wikilink"}
-        query={wikiTrigger()?.query ?? ""}
-        notes={props.notes}
-        issues={props.issues}
-        testID={`doc-wikilink-menu-${props.block.id}`}
-        onSelect={handleWikilinkSelect}
-        onClose={() => menuDismissedAt.set(props.block.text)}
-      />
-    </View>
-  );
-}
-
-function headingTextClass(level: number): string {
-  switch (level) {
-    case 1:
-      return "text-2xl font-bold leading-8";
-    case 2:
-      return "text-xl font-semibold leading-7";
-    default:
-      return "text-base font-semibold leading-6";
-  }
-}
-
-function outerBlockSpacingClass(block: DocBlock): string {
-  if (block.type !== "heading") return "";
-  switch (block.level) {
-    case 1:
-      return "mt-5 mb-0.5";
-    case 2:
-      return "mt-4 mb-0.5";
-    default:
-      return "mt-2.5";
-  }
-}
-
-function HeadingBlockView(props: {
-  readonly block: HeadingBlockData;
-  readonly focused: boolean;
-  readonly onFocus: () => void;
-  readonly onFocusAdjacent?: ((dir: "prev" | "next") => void) | undefined;
-  readonly onUpdate: (next: HeadingBlockData) => void;
-  readonly onInsertAfter: (newBlock: DocBlock) => void;
-}) {
-  let inputRef: InputRef | undefined;
-  effect(() => {
-    if (props.focused) queueMicrotask(() => inputRef?.focus());
-  });
-
-  return (
-    <View testID={`doc-heading-${props.block.id}`} class="flex-row items-center gap-2 py-0.5">
-      <Input
-        ref={(el) => {
-          inputRef = el;
-        }}
-        autoFocus={props.focused}
-        testID={`doc-block-input-${props.block.id}`}
-        value={props.block.text}
-        placeholder={t("web.note.doc.headingPlaceholder", { level: props.block.level })}
-        submitBehavior="submit"
-        onFocus={props.onFocus}
-        onChange={(e) => props.onUpdate({ ...props.block, text: e.value })}
-        onSubmit={() => props.onInsertAfter({ id: makeBlockId(), type: "prose", text: "" })}
-        onKeyPress={(e) => {
-          if (e.key === "ArrowUp") props.onFocusAdjacent?.("prev");
-          else if (e.key === "ArrowDown") props.onFocusAdjacent?.("next");
-        }}
-        class={`min-w-0 flex-1 bg-transparent px-1 text-ink placeholder:text-faint ${headingTextClass(props.block.level)}`}
-      />
-      <View
-        role="button"
-        testID={`doc-heading-level-${props.block.id}`}
-        onPress={() => props.onUpdate({ ...props.block, level: props.block.level >= 3 ? 1 : props.block.level + 1 })}
-        class={`shrink-0 rounded-xs bg-side px-1.5 py-0.5 hover:bg-hover ${
-          props.focused ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus-within:opacity-100"
-        }`}
-      >
-        <Text class="font-mono text-2xs font-semibold text-faint">{`H${props.block.level}`}</Text>
-      </View>
-    </View>
-  );
-}
-
-function ListBlockView(props: { readonly block: ListBlockData; readonly onUpdate: (next: ListBlockData) => void }) {
-  return (
-    <View testID={`doc-list-${props.block.id}`} class="relative gap-1">
-      <Each of={props.block.items} key={(_, idx) => String(idx)}>
-        {(item, idx) => (
-          <View class="flex-row items-center gap-2">
-            <View class="w-5 shrink-0 items-center justify-center">
-              <If when={props.block.ordered} else={<View class="size-1.5 rounded-full bg-muted" />}>
-                <Text class="font-mono text-xs text-muted tabular-nums">{`${idx() + 1}.`}</Text>
-              </If>
-            </View>
-            <Input
-              testID={`doc-list-item-${props.block.id}-${idx()}`}
-              value={item()}
-              placeholder={t("web.note.doc.listItemPlaceholder")}
-              submitBehavior="submit"
-              onChange={(e) => {
-                const next = [...props.block.items];
-                next[idx()] = e.value;
-                props.onUpdate({ ...props.block, items: next });
-              }}
-              onSubmit={() => {
-                const next = [...props.block.items];
-                next.splice(idx() + 1, 0, "");
-                props.onUpdate({ ...props.block, items: next });
-              }}
-              class="min-w-0 flex-1 bg-transparent px-1 py-0.5 text-sm leading-6 text-ink placeholder:text-faint"
-            />
-            <If when={props.block.items.length > 1}>
-              <View
-                role="button"
-                testID={`doc-list-remove-${props.block.id}-${idx()}`}
-                onPress={() => props.onUpdate({ ...props.block, items: props.block.items.filter((_, i) => i !== idx()) })}
-                class="rounded-xs p-0.5 opacity-0 group-hover:opacity-60 hover:bg-bad-soft hover:opacity-100"
-              >
-                <Icon name="close" size={12} tone="muted" />
-              </View>
-            </If>
-          </View>
-        )}
-      </Each>
-      <View class="flex-row items-center justify-between gap-2 pl-7 opacity-0 group-hover:opacity-100 focus-within:opacity-100">
-        <View
-          role="button"
-          testID={`doc-list-toggle-ordered-${props.block.id}`}
-          onPress={() => props.onUpdate({ ...props.block, ordered: !props.block.ordered })}
-          class="rounded-xs bg-side px-1.5 py-0.5 hover:bg-hover"
-        >
-          <Text class="font-mono text-2xs text-muted">{props.block.ordered ? t("web.note.doc.orderedList") : t("web.note.doc.bulletedList")}</Text>
-        </View>
-        <Button
-          size="compact"
-          tone="quiet"
-          icon="add"
-          testID={`doc-list-add-${props.block.id}`}
-          onPress={() => props.onUpdate({ ...props.block, items: [...props.block.items, ""] })}
-        >
-          {t("web.note.doc.add")}
-        </Button>
-      </View>
-    </View>
-  );
-}
-
-function TodoBlockView(props: {
-  readonly block: TodoBlockData;
-  readonly onUpdate: (next: TodoBlockData) => void;
-  readonly onInsertAfter: (newBlock: DocBlock) => void;
-}) {
-  return (
-    <View testID={`doc-todo-${props.block.id}`} class="flex-row items-center gap-2 py-0.5">
-      <Checkbox
-        checked={props.block.checked}
-        label={props.block.text || t("web.note.doc.slash.todo.label")}
-        testid={`doc-todo-check-${props.block.id}`}
-        onChange={(checked) => props.onUpdate({ ...props.block, checked })}
-      />
-      <Input
-        testID={`doc-block-input-${props.block.id}`}
-        value={props.block.text}
-        placeholder={t("web.note.doc.todoPlaceholder")}
-        submitBehavior="submit"
-        onChange={(e) => props.onUpdate({ ...props.block, text: e.value })}
-        onSubmit={() => props.onInsertAfter({ id: makeBlockId(), type: "todo", checked: false, text: "" })}
-        class={`min-w-0 flex-1 bg-transparent px-1 text-sm leading-6 placeholder:text-faint ${props.block.checked ? "text-muted line-through" : "text-ink"}`}
-      />
-    </View>
-  );
-}
-
-function QuoteBlockView(props: {
-  readonly block: QuoteBlockData;
-  readonly notes: readonly Note[];
-  readonly issues: readonly Issue[];
-  readonly onUpdate: (next: QuoteBlockData) => void;
-  readonly onOpenNote: (id: NoteId) => void;
-  readonly onOpenIssue: (id: IssueId) => void;
-}) {
-  return (
-    <View testID={`doc-quote-${props.block.id}`} class="flex-row gap-3 py-1">
-      <View class="w-0.5 shrink-0 self-stretch rounded-full bg-accent" />
-      <View class="min-w-0 flex-1 gap-1">
-        <Input
-          multiline
-          scrollbar={false}
-          testID={`doc-quote-text-${props.block.id}`}
-          value={props.block.text}
-          placeholder={t("web.note.doc.quotePlaceholder")}
-          onChange={(e) => props.onUpdate({ ...props.block, text: e.value })}
-          class="min-h-6 w-full bg-transparent text-sm leading-6 text-ink placeholder:text-faint"
-        />
-        <If when={props.block.text.includes("[[") || props.block.text.includes("#")}>
-          <InlineRichText
-            text={props.block.text}
-            notes={props.notes}
-            issues={props.issues}
-            onOpenNote={props.onOpenNote}
-            onOpenIssue={props.onOpenIssue}
-            textClass="text-xs"
-          />
-        </If>
-        <Input
-          testID={`doc-quote-attr-${props.block.id}`}
-          value={props.block.attribution ?? ""}
-          placeholder={t("web.note.doc.attributionPlaceholder")}
-          onChange={(e) => props.onUpdate({ ...props.block, attribution: e.value || undefined })}
-          class={`bg-transparent text-xs text-muted placeholder:text-faint ${
-            props.block.attribution ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus:opacity-100"
-          }`}
-        />
-      </View>
-    </View>
+    <BlockItem
+      block={child}
+      allBlocks={props.allBlocks}
+      slideIndices={props.slideIndices}
+      note={props.note}
+      notes={props.notes}
+      issues={props.issues}
+      focusedBlockId={props.focusedBlockId}
+      focusRequest={props.focusRequest}
+      depth={(props.depth ?? 0) + 1}
+      onFocusBlock={props.onFocusBlock}
+      onRequestFocus={props.onRequestFocus}
+      onFocusAdjacent={props.onFocusAdjacent}
+      onSplitBlock={props.onSplitBlock}
+      onMergeBackward={props.onMergeBackward}
+      onUpdateBlock={props.onUpdateBlock}
+      onInsertAfter={props.onInsertAfter}
+      onMoveBlock={props.onMoveBlock}
+      onDuplicateBlock={props.onDuplicateBlock}
+      onDeleteBlock={props.onDeleteBlock}
+      onCreateIssueFromBlock={props.onCreateIssueFromBlock}
+      onOpenNote={props.onOpenNote}
+      onOpenIssue={props.onOpenIssue}
+      onScrollToBlock={props.onScrollToBlock}
+      onOpenLightbox={props.onOpenLightbox}
+      onEditorTelemetry={props.onEditorTelemetry}
+    />
   );
 }
 
@@ -588,13 +122,17 @@ function renderBlockContent(blockType: BlockType, props: BlockItemProps): JSX.El
               notes={props.notes}
               issues={props.issues}
               focused={props.focusedBlockId === b().id}
+              focusRequest={props.focusRequest}
               onFocus={() => props.onFocusBlock?.(b().id)}
               onFocusAdjacent={(dir) => props.onFocusAdjacent?.(b().id, dir)}
+              onSplit={props.onSplitBlock ? (s, e) => props.onSplitBlock?.(b().id, s, e) : undefined}
+              onMergeBackward={props.onMergeBackward ? () => props.onMergeBackward?.(b().id) : undefined}
               onUpdate={(next) => props.onUpdateBlock(b().id, next)}
               onInsertAfter={(nb) => props.onInsertAfter(b().id, nb)}
               onDelete={() => props.onDeleteBlock(b().id)}
               onOpenNote={props.onOpenNote}
               onOpenIssue={props.onOpenIssue}
+              onEditorTelemetry={props.onEditorTelemetry}
             />
           )}
         </If>
@@ -606,10 +144,14 @@ function renderBlockContent(blockType: BlockType, props: BlockItemProps): JSX.El
             <HeadingBlockView
               block={b()}
               focused={props.focusedBlockId === b().id}
+              focusRequest={props.focusRequest}
               onFocus={() => props.onFocusBlock?.(b().id)}
               onFocusAdjacent={(dir) => props.onFocusAdjacent?.(b().id, dir)}
+              onSplit={props.onSplitBlock ? (s, e) => props.onSplitBlock?.(b().id, s, e) : undefined}
+              onMergeBackward={props.onMergeBackward ? () => props.onMergeBackward?.(b().id) : undefined}
               onUpdate={(next) => props.onUpdateBlock(b().id, next)}
               onInsertAfter={(nb) => props.onInsertAfter(b().id, nb)}
+              onEditorTelemetry={props.onEditorTelemetry}
             />
           )}
         </If>
@@ -617,13 +159,35 @@ function renderBlockContent(blockType: BlockType, props: BlockItemProps): JSX.El
     case "list":
       return (
         <If when={props.block.type === "list" ? props.block : undefined}>
-          {(b) => <ListBlockView block={b()} onUpdate={(next) => props.onUpdateBlock(b().id, next)} />}
+          {(b) => (
+            <ListBlockView
+              block={b()}
+              focusRequest={props.focusRequest}
+              onFocus={() => props.onFocusBlock?.(b().id)}
+              onFocusAdjacent={(dir) => props.onFocusAdjacent?.(b().id, dir)}
+              onUpdate={(next) => props.onUpdateBlock(b().id, next)}
+              onInsertAfter={(nb) => props.onInsertAfter(b().id, nb)}
+              onEditorTelemetry={props.onEditorTelemetry}
+            />
+          )}
         </If>
       );
     case "todo":
       return (
         <If when={props.block.type === "todo" ? props.block : undefined}>
-          {(b) => <TodoBlockView block={b()} onUpdate={(next) => props.onUpdateBlock(b().id, next)} onInsertAfter={(nb) => props.onInsertAfter(b().id, nb)} />}
+          {(b) => (
+            <TodoBlockView
+              block={b()}
+              focusRequest={props.focusRequest}
+              onFocus={() => props.onFocusBlock?.(b().id)}
+              onFocusAdjacent={(dir) => props.onFocusAdjacent?.(b().id, dir)}
+              onSplit={props.onSplitBlock ? (s, e) => props.onSplitBlock?.(b().id, s, e) : undefined}
+              onMergeBackward={props.onMergeBackward ? () => props.onMergeBackward?.(b().id) : undefined}
+              onUpdate={(next) => props.onUpdateBlock(b().id, next)}
+              onInsertAfter={(nb) => props.onInsertAfter(b().id, nb)}
+              onEditorTelemetry={props.onEditorTelemetry}
+            />
+          )}
         </If>
       );
     case "quote":
@@ -634,9 +198,14 @@ function renderBlockContent(blockType: BlockType, props: BlockItemProps): JSX.El
               block={b()}
               notes={props.notes}
               issues={props.issues}
+              focusRequest={props.focusRequest}
+              onFocus={() => props.onFocusBlock?.(b().id)}
+              onFocusAdjacent={(dir) => props.onFocusAdjacent?.(b().id, dir)}
+              onMergeBackward={props.onMergeBackward ? () => props.onMergeBackward?.(b().id) : undefined}
               onUpdate={(next) => props.onUpdateBlock(b().id, next)}
               onOpenNote={props.onOpenNote}
               onOpenIssue={props.onOpenIssue}
+              onEditorTelemetry={props.onEditorTelemetry}
             />
           )}
         </If>
@@ -658,29 +227,7 @@ function renderBlockContent(blockType: BlockType, props: BlockItemProps): JSX.El
               onUpdate={(next) => props.onUpdateBlock(b().id, next)}
               onOpenNote={props.onOpenNote}
               onOpenIssue={props.onOpenIssue}
-              renderChild={(child) => (
-                <BlockItem
-                  block={child}
-                  allBlocks={props.allBlocks}
-                  slideIndices={props.slideIndices}
-                  note={props.note}
-                  notes={props.notes}
-                  issues={props.issues}
-                  focusedBlockId={props.focusedBlockId}
-                  depth={(props.depth ?? 0) + 1}
-                  onFocusBlock={props.onFocusBlock}
-                  onUpdateBlock={props.onUpdateBlock}
-                  onInsertAfter={props.onInsertAfter}
-                  onMoveBlock={props.onMoveBlock}
-                  onDuplicateBlock={props.onDuplicateBlock}
-                  onDeleteBlock={props.onDeleteBlock}
-                  onCreateIssueFromBlock={props.onCreateIssueFromBlock}
-                  onOpenNote={props.onOpenNote}
-                  onOpenIssue={props.onOpenIssue}
-                  onScrollToBlock={props.onScrollToBlock}
-                  onOpenLightbox={props.onOpenLightbox}
-                />
-              )}
+              renderChild={(child) => renderNestedChild(child, props)}
             />
           )}
         </If>
@@ -741,33 +288,7 @@ function renderBlockContent(blockType: BlockType, props: BlockItemProps): JSX.El
       return (
         <If when={props.block.type === "columns" ? props.block : undefined}>
           {(b) => (
-            <ColumnsBlockView
-              block={b()}
-              onUpdate={(next) => props.onUpdateBlock(b().id, next)}
-              renderChild={(child) => (
-                <BlockItem
-                  block={child}
-                  allBlocks={props.allBlocks}
-                  slideIndices={props.slideIndices}
-                  note={props.note}
-                  notes={props.notes}
-                  issues={props.issues}
-                  focusedBlockId={props.focusedBlockId}
-                  depth={(props.depth ?? 0) + 1}
-                  onFocusBlock={props.onFocusBlock}
-                  onUpdateBlock={props.onUpdateBlock}
-                  onInsertAfter={props.onInsertAfter}
-                  onMoveBlock={props.onMoveBlock}
-                  onDuplicateBlock={props.onDuplicateBlock}
-                  onDeleteBlock={props.onDeleteBlock}
-                  onCreateIssueFromBlock={props.onCreateIssueFromBlock}
-                  onOpenNote={props.onOpenNote}
-                  onOpenIssue={props.onOpenIssue}
-                  onScrollToBlock={props.onScrollToBlock}
-                  onOpenLightbox={props.onOpenLightbox}
-                />
-              )}
-            />
+            <ColumnsBlockView block={b()} onUpdate={(next) => props.onUpdateBlock(b().id, next)} renderChild={(child) => renderNestedChild(child, props)} />
           )}
         </If>
       );
@@ -839,20 +360,21 @@ function renderBlockContent(blockType: BlockType, props: BlockItemProps): JSX.El
 }
 
 export function BlockItem(props: BlockItemProps) {
-  const nested = () => (props.depth ?? 0) > 0;
+  const compact = () => (props.depth ?? 0) > 0 || props.compactGutter === true;
 
   return (
     <View
       testID={`doc-block-${props.block.id}`}
-      class={`group relative flex-row items-start rounded-md py-0.5 pr-1 ${nested() ? "pl-10" : "pl-14"} ${outerBlockSpacingClass(props.block)}`}
+      class={`group relative flex-row items-start rounded-md py-0.5 pr-1 ${compact() ? "pl-10" : "pl-14"} ${outerBlockSpacingClass(props.block)}`}
     >
       <View
         class={`absolute top-1 left-0 flex-row items-center justify-end gap-0.5 pr-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 ${
-          nested() ? "w-9" : "w-12"
+          compact() ? "w-9" : "w-12"
         }`}
       >
         <View
           role="button"
+          focusable={false}
           testID={`doc-gutter-add-${props.block.id}`}
           accessibilityLabel={t("web.note.doc.addBlock")}
           onPress={() => props.onInsertAfter(props.block.id, { id: makeBlockId(), type: "prose", text: "" })}

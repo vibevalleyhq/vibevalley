@@ -1,16 +1,24 @@
 // Fenced code block backed by native Rust `vibevalley/rich` (`VvCodeBlock` via
 // vibevalley-shiki + vibevalley-onig), with a lightweight `<Text>` fallback for
 // stock `nsh test` (zero `<Editor readOnly>`).
-import { Clipboard, computed, Scroll, signal, Text, View } from "nsh";
+import { cleanup, Clipboard, computed, Scroll, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 
-import { useTimeout } from "../../infra/base/timer";
-import { richNative, type VvCodeCopyEvent } from "../../infra/rich";
+import { useDesignHost, type DesignCodeCopyEvent } from "../host";
 import { Icon } from "../Icon";
 import { mix } from "../tone";
 
 const defaultFoldLines = 16;
+
+function useTimeout(): (fn: () => void, ms: number) => void {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  cleanup(() => clearTimeout(timer));
+  return (fn, ms) => {
+    clearTimeout(timer);
+    timer = setTimeout(fn, ms);
+  };
+}
 
 export interface CodeBlockProps {
   code: string;
@@ -18,12 +26,12 @@ export interface CodeBlockProps {
   foldLines?: number;
   selectable?: boolean;
   wrap?: boolean;
-  onCopy?: (event: VvCodeCopyEvent) => void;
+  onCopy?: (event: DesignCodeCopyEvent) => void;
   class?: string | undefined;
 }
 
 export function CodeBlock(props: CodeBlockProps) {
-  const native = richNative();
+  const native = useDesignHost().rich();
   if (native) {
     const VvCodeBlock = native.VvCodeBlock;
     return (

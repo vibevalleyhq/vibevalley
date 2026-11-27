@@ -4,13 +4,13 @@ import { t } from "@vibevalley/i18n";
 import { type IssueId, type Note, NOTE_TYPES, type NoteLink, type NoteType } from "@vibevalley/protocol";
 import { issueId as toIssueId, noteId } from "@vibevalley/protocol/schema";
 
-import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
 import { Dialog } from "../../design/Dialog";
 import { Field, Select, TextInput } from "../../design/Field";
 import { Icon } from "../../design/Icon";
 import { IconButton } from "../../design/IconButton";
 import { toast } from "../../design/toasts";
+import { createAct } from "../../infra/act";
 import { api } from "../../infra/api";
 import { defineQuery, ready, useQuery, useQueryClient } from "../../infra/query";
 import { Link as A } from "../../infra/router";
@@ -23,7 +23,7 @@ const issueLinksQuery = defineQuery({
   fetch: (id: string, context) => api.note.link.list({ entityKind: "issue", entityId: id }, context),
 });
 
-export interface IssueNotesProps {
+interface IssueNotesProps {
   readonly issue?: IssueId | undefined;
   readonly issueId?: IssueId | undefined;
   readonly heading?: JSX.Element | undefined;

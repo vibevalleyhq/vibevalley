@@ -1,25 +1,7 @@
 // Papertrails static asset URLs rooted at the host's `assets/` directory (`host.assetsDir`).
-import { z } from "zod";
-
 import { ConnectorIDValues, SpeciesValues } from "@vibevalley/protocol";
 
-import { readHostParams } from "../infra/hostParams";
-import { defineQuery, ready, useQuery } from "../infra/query";
-import { transport } from "../infra/transport";
-
-const AssetsDir = z.object({ path: z.string() });
-
-const assetsDirQuery = defineQuery({
-  schema: AssetsDir,
-  key: () => ["assets-dir"],
-  fetch: async (): Promise<unknown> => {
-    const envelope = await transport().call("host.assetsDir", {});
-    if (envelope.bizCode !== 0) throw new Error(envelope.message);
-    return envelope.data;
-  },
-  staleTime: Infinity,
-  retry: 0,
-});
+import { useDesignHost } from "./host";
 
 export const ROLE_AVATARS = [
   "avatar-orchestrator",
@@ -58,9 +40,7 @@ const CONNECTOR_EMBLEMS: ReadonlySet<string> = new Set<string>(ConnectorIDValues
 
 /** Root `assets/` folder on disk, undefined until the host answers (or when unavailable). */
 export function useAssetsDir(): () => string | undefined {
-  const query = useQuery(assetsDirQuery);
-  const paramDir = readHostParams().assetsDir;
-  return () => ready(query, undefined)?.path ?? paramDir;
+  return useDesignHost().useAssetsDir();
 }
 
 /** Builds a `file://` URL for `relPath` inside the host's `assets/` root. */

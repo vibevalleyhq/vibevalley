@@ -6,7 +6,17 @@ import "@vibevalley/i18n/catalogs";
 import { BaseColumnKindValues, type BaseColumn, type BaseRow, type NoteId } from "@vibevalley/protocol";
 
 import { boardToNativeEntries, parseBoardDocument } from "../WhiteboardView";
-import { baseCellAsText, cleanWikilinkText, columnKindIcon, defaultCellForColumn, formatSummaryValue, projectBaseTimeline, rowTitleOf } from "./baseModel";
+import {
+  baseCellAsText,
+  cleanWikilinkText,
+  columnKindIcon,
+  defaultCellForColumn,
+  formatCompactDateCell,
+  formatSummaryValue,
+  parseDateRangeCell,
+  projectBaseTimeline,
+  rowTitleOf,
+} from "./baseModel";
 import { buildSandboxedHtml } from "./noteFiles";
 
 test("baseModel covers all 12 BaseColumnKinds, default cells, timeline projection, and sandboxed HTML", () => {
@@ -50,6 +60,10 @@ test("baseModel covers all 12 BaseColumnKinds, default cells, timeline projectio
 
   expect(formatSummaryValue("2.33333")).toBe("2.33");
   expect(formatSummaryValue("24")).toBe("24");
+  expect(parseDateRangeCell("2026-11-23 -> 2026-11-26")).toEqual({ isRange: true, start: "2026-11-23", end: "2026-11-26" });
+  expect(formatCompactDateCell("2026-11-23 -> 2026-11-26")).toBe("11/23 → 11/26");
+  expect(formatCompactDateCell("2026-12-29 -> 2027-01-03")).toBe("26/12/29 → 27/1/3");
+  expect(formatCompactDateCell("2026-11-23")).toBe("2026-11-23");
   expect(cleanWikilinkText("Review [[note:note_123|Spec Doc]] and [[issue:iss_1|#4 Bug]]")).toBe("Review Spec Doc and #4 Bug");
 });
 

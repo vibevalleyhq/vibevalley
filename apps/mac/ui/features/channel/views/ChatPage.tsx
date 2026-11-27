@@ -1,4 +1,4 @@
-import { computed, signal, Text, untracked, View, windowSize, type JSX } from "nsh";
+import { computed, effect, signal, Text, untracked, View, windowSize, type JSX } from "nsh";
 import { Popover } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
@@ -10,12 +10,15 @@ import { Icon } from "../../../design/Icon";
 import type { IconName } from "../../../design/icons";
 import { Splitter, usePaneWidth } from "../../../design/Splitter";
 import { Tabs } from "../../../design/Tabs";
+import { TextLink } from "../../../design/TextLink";
 import { Bubble } from "../../../design/Tip";
 import { Keyed } from "../../../infra/base/dom";
+import { ready, settingsQuery, useQuery } from "../../../infra/query";
+import { fixOf } from "../../../infra/readiness";
 import { useRouter } from "../../../infra/router";
 import { createMemo } from "../../../infra/solid";
 import { useVdpNode } from "../../../infra/vdpProbe";
-import { NoteCanvas } from "../../note";
+import { activeNoteViewContext, clearActiveNoteViewContext, NoteCanvas } from "../../note";
 import { useMarkedChat } from "../model/marks";
 import { channelLabel, channelName, chatPath, pointedAt, topOf, topsOf } from "../model/places";
 import { listenToReports, setListenToReports, useChannelReportPlayback } from "../model/reportPlayback";
@@ -51,6 +54,14 @@ function Chat() {
   const point = () => pointedAt(router.path());
   // A note opened beside the talk that made it (?note=).
   const note = () => new URLSearchParams(router.path().split("?")[1] ?? "").get("note") ?? undefined;
+  // Drop stale cross-page note context (e.g. a Base viewed earlier) when /chat has no side-by-side ?note=.
+  effect(() => {
+    const openNoteId = note();
+    const ctx = untracked(activeNoteViewContext);
+    if (ctx && ctx.noteId !== openNoteId) {
+      clearActiveNoteViewContext();
+    }
+  });
   const closeNote = () => {
     const [path, query] = router.path().split("?");
     const params = new URLSearchParams(query ?? "");
@@ -169,6 +180,11 @@ export function isWideChannelHead(viewportWidth: number, mainPaneWidth: number, 
 /** Built again for each channel (Keyed): its tab and search start over in another one. */
 function ChannelMain(props: { channel: Channel | undefined; point: number | undefined; onDrawer: () => void }) {
   const router = useRouter();
+  const settingsQueryState = useQuery(settingsQuery);
+  const lacks = computed(() => {
+    const readiness = ready(settingsQueryState, undefined)?.readiness.orchestrator;
+    return readiness?.ready === false ? fixOf(readiness.missing) : undefined;
+  });
   const tab = signal<Tab>("chat");
   const overlay = signal<HeaderOverlay>("none");
   const threadsOpen = () => overlay() === "threads";
@@ -326,6 +342,17 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
               point={props.point}
               emptyText={t("web.channel.empty", { label: channelLabel(props.channel) })}
             />
+            <If when={lacks()}>
+              {(fix) => (
+                <View testID="channel-readiness-alert" class="shrink-0 flex-row items-center gap-2 border-t border-line bg-bad-soft px-4 py-2">
+                  <Icon name="warn" size={14} tone="berry" />
+                  <Text class="min-w-0 flex-1 truncate text-xs font-medium text-berry">{t("web.channel.lacks", { why: fix().words })}</Text>
+                  <TextLink href={fix().href} testid="orchestrator-fix" danger>
+                    {t("web.channel.lacksFix")}
+                  </TextLink>
+                </View>
+              )}
+            </If>
             <Composer channel={props.channel} placeholder={t("web.channel.sendTo", { label: channelLabel(props.channel) })} />
           </FileDrop>
           <If when={md() && membersOpen() ? props.channel : undefined}>{(c) => <Members channel={c()} />}</If>

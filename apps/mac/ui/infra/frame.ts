@@ -13,16 +13,14 @@ import {
   type SessionsSlice,
   type SessionView,
   type SliceKind,
-  SliceKindValues,
 } from "@vibevalley/protocol";
 import { isOrchestratorSession, sessionIssueId, sessionProfile } from "@vibevalley/protocol/rules";
+import { createSliceStore, type LinkState } from "@vibevalley/protocol/store";
 
 import { createContext, useContext } from "./solid";
 import { onTransportChange, transport, type SliceMap } from "./transport";
 
-export type Link = "connecting" | "open" | "lost";
-
-const SLICE_KINDS = SliceKindValues;
+export type Link = LinkState;
 
 export interface Slices {
   readonly slice: <K extends SliceKind>(kind: K) => Accessor<SliceMap[K] | undefined>;
@@ -41,93 +39,18 @@ export interface SlicesSource {
   readonly subscribeLink: (listener: () => void) => () => void;
 }
 
-interface SliceChannel<T> {
-  value: T | undefined;
-  readonly listeners: Set<() => void>;
-  stop: (() => void) | undefined;
-  readonly connect: () => void;
-  readonly disconnect: () => boolean;
-}
-
-let currentLink: Link = "connecting";
-const linkListeners = new Set<() => void>();
-
-function setLink(next: Link): void {
-  if (currentLink === next) return;
-  currentLink = next;
-  for (const listener of [...linkListeners]) listener();
-}
-
-function makeChannel<K extends SliceKind>(kind: K): SliceChannel<SliceMap[K]> {
-  const channel: SliceChannel<SliceMap[K]> = {
-    value: undefined,
-    listeners: new Set(),
-    stop: undefined,
-    connect: () => {
-      channel.stop?.();
-      channel.stop = transport().slice(kind, (data) => {
-        channel.value = data;
-        setLink("open");
-        for (const listener of [...channel.listeners]) listener();
-      });
-    },
-    disconnect: () => {
-      if (!channel.stop) return false;
-      channel.stop();
-      channel.stop = undefined;
-      channel.value = undefined;
-      for (const listener of [...channel.listeners]) listener();
-      return true;
-    },
-  };
-  return channel;
-}
-
-const channels: { readonly [K in SliceKind]: SliceChannel<SliceMap[K]> } = {
-  board: makeChannel("board"),
-  sessions: makeChannel("sessions"),
-  collab: makeChannel("collab"),
-  inbox: makeChannel("inbox"),
-  ops: makeChannel("ops"),
-  farm: makeChannel("farm"),
-};
+const sliceStore = createSliceStore(() => transport());
 
 onTransportChange(() => {
-  const active: SliceKind[] = [];
-  for (const kind of SLICE_KINDS) {
-    if (channels[kind].disconnect()) active.push(kind);
-  }
-  setLink("connecting");
-  for (const kind of active) channels[kind].connect();
+  sliceStore.reconnectAll();
 });
 
 export const slices: SlicesSource = {
-  get: <K extends SliceKind>(kind: K): SliceMap[K] | undefined => channels[kind].value,
-  subscribe: (kind: SliceKind, listener: () => void): (() => void) => {
-    const channel = channels[kind];
-    channel.listeners.add(listener);
-    if (!channel.stop) channel.connect();
-    return () => {
-      channel.listeners.delete(listener);
-      if (channel.listeners.size > 0) return;
-      channel.stop?.();
-      channel.stop = undefined;
-      channel.value = undefined;
-    };
-  },
-  refresh: (kind: SliceKind): void => {
-    const channel = channels[kind];
-    if (channel.listeners.size === 0) return;
-    // Re-subscribe without clearing channel.value so the bridge pushes a fresh snapshot with zero UI flash.
-    channel.connect();
-  },
-  link: (): Link => currentLink,
-  subscribeLink: (listener: () => void): (() => void) => {
-    linkListeners.add(listener);
-    return () => {
-      linkListeners.delete(listener);
-    };
-  },
+  get: sliceStore.get,
+  subscribe: sliceStore.subscribe,
+  refresh: sliceStore.refresh,
+  link: sliceStore.link,
+  subscribeLink: sliceStore.subscribeLink,
 };
 
 export const SlicesContext = createContext<Slices>();

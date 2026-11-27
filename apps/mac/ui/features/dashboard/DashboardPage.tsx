@@ -6,7 +6,7 @@ import { isFreeUserSession, isOrchestratorSession, sessionIssueId, sessionProfil
 import { AgentFace, OrchestratorFace, UserAvatar } from "../../design/domain/Face";
 import { Icon } from "../../design/Icon";
 import type { IconName } from "../../design/icons";
-import { Quiet } from "../../design/layout";
+import { Empty, Quiet } from "../../design/layout";
 import { Segmented } from "../../design/Segmented";
 import { CountPill, Dot, type DotTone } from "../../design/Tag";
 import { useOrchestrators } from "../../infra/agents";
@@ -227,8 +227,15 @@ function DashboardOverview() {
           <If
             when={hasPending()}
             else={
-              <View testID="dashboard-pending-empty" class="px-4 py-5">
-                <Quiet>{t("web.base.dashboard.pending.empty")}</Quiet>
+              <View class="p-3">
+                <Empty
+                  variant="zero"
+                  compact
+                  testid="dashboard-pending-empty"
+                  icon="check"
+                  title={t("web.base.dashboard.pending.zeroTitle")}
+                  description={t("web.base.dashboard.pending.empty")}
+                />
               </View>
             }
           >

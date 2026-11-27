@@ -1,15 +1,16 @@
 import { computed, Image, pixelRatio, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
-import { type AgentExecutionMode, defaultOrchestrator, type Look, type UserProfile } from "@vibevalley/protocol";
+import { type Agent, type AgentExecutionMode, defaultOrchestrator, type Look, type OrchestratorLook, type UserProfile } from "@vibevalley/protocol";
 
-import { orchestratorLookOf } from "../../infra/agents";
-import { useAttachmentUrl } from "../../infra/attachmentFile";
-import { ready, useAgents, useSettings } from "../../infra/query";
 import { orchestratorPortraitUrl, ownerPortraitUrl, ROLE_AVATARS, roleAvatarUrl, speciesPortraitUrl, useAssetsDir } from "../art";
+import { useDesignAttachmentUrl, useDesignHost } from "../host";
 import { mix, tone } from "../tone";
 import { castOf, hexColor, orchestratorLooks } from "./cast";
 import { initialOf, RuntimeBadge } from "./RuntimeBadge";
+
+const orchestratorLookOf = (agents: readonly Agent[], id = defaultOrchestrator): OrchestratorLook =>
+  agents.find((a) => a.id === id)?.look.orchestrator ?? "farmer";
 
 /** Compact monospace badge showing a teammate's permanent `O-XX` / `W-XX` code. */
 export function AgentCodeBadge(props: { code?: string | undefined; external?: boolean | undefined; compact?: boolean | undefined }) {
@@ -87,7 +88,7 @@ export function AgentFace(props: {
   name?: string;
 }) {
   const assetsDir = useAssetsDir();
-  const agents = useAgents();
+  const agents = useDesignHost().useAgents();
   const size = () => props.size ?? 24;
   const src = computed(() => {
     const dir = assetsDir();
@@ -97,7 +98,7 @@ export function AgentFace(props: {
     const { species } = castOf(props.look, props.agentId);
     return speciesPortraitUrl(dir, species);
   });
-  const name = computed(() => props.name ?? ready(agents, []).find((a) => a.id === props.agentId)?.name ?? props.agentId);
+  const name = computed(() => props.name ?? agents().find((a) => a.id === props.agentId)?.name ?? props.agentId);
   const ground = () => (props.look?.hat ? toward(hexColor(props.look.hat), 0.6) : tone("avatar-leaf"));
   return (
     <View class="shrink-0" style={{ width: size(), height: size() }}>
@@ -112,23 +113,22 @@ export function AgentFace(props: {
 /** An orchestrator's portrait, preferring an explicit or profile role avatar before its Papertrails manager look. */
 export function OrchestratorFace(props: { size?: number; agent?: string | undefined; look?: string; avatar?: string | undefined }) {
   const assetsDir = useAssetsDir();
-  const agents = useAgents();
+  const agents = useDesignHost().useAgents();
   const size = () => props.size ?? 24;
   const src = computed(() => {
     const dir = assetsDir();
     if (!dir) return undefined;
-    const candidate =
-      props.avatar ?? (props.look === undefined ? ready(agents, []).find((a) => a.id === (props.agent ?? defaultOrchestrator))?.look.avatar : undefined);
+    const candidate = props.avatar ?? (props.look === undefined ? agents().find((a) => a.id === (props.agent ?? defaultOrchestrator))?.look.avatar : undefined);
     const roleUrl = roleAvatarUrl(dir, candidate);
     if (roleUrl) return roleUrl;
-    const look = props.look ?? orchestratorLookOf(ready(agents, []), props.agent);
+    const look = props.look ?? orchestratorLookOf(agents(), props.agent);
     if (size() <= 40) {
       return orchestratorPortraitUrl(dir, look, pixelRatio() >= 2 ? 2 : 1);
     }
     return orchestratorPortraitUrl(dir, look);
   });
   const letter = computed(() => {
-    const agent = props.look === undefined ? ready(agents, []).find((a) => a.id === (props.agent ?? defaultOrchestrator)) : undefined;
+    const agent = props.look === undefined ? agents().find((a) => a.id === (props.agent ?? defaultOrchestrator)) : undefined;
     return initialOf(agent?.name ?? orchestratorLooks.find((l) => l.id === (props.look ?? "farmer"))?.name ?? "?");
   });
   return (
@@ -160,11 +160,11 @@ export function UserAvatar(props: {
   class?: string | undefined;
   rounded?: "sm" | "full" | undefined;
 }) {
-  const settings = useSettings();
+  const settings = useDesignHost().useSettings();
   const assetsDir = useAssetsDir();
   const size = () => props.size ?? 24;
-  const profile = computed(() => props.profile ?? ready(settings, undefined)?.profile);
-  const attachmentUrl = useAttachmentUrl(() => profile()?.avatarAttachmentId ?? "");
+  const profile = computed(() => props.profile ?? settings()?.profile);
+  const attachmentUrl = useDesignAttachmentUrl(() => profile()?.avatarAttachmentId ?? "");
   const src = computed(() => {
     const custom = attachmentUrl();
     if (custom) return custom;

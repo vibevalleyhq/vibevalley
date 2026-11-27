@@ -1,7 +1,8 @@
 import { t } from "@vibevalley/i18n";
-import type { Channel, ChatMessage, DocBlock, NoteType } from "@vibevalley/protocol";
+import type { Channel, ChatMessage, NoteType } from "@vibevalley/protocol";
 
 import type { PendingNewIssueDraft } from "../../../infra/state/issueDraft";
+import { buildDocFromMarkdown } from "../../note";
 import { channelLabel } from "./places";
 
 /** Canonical route back-link to a specific channel message. */
@@ -62,106 +63,11 @@ export function buildPromotedNoteDraft(
   };
 }
 
-/** Converts Markdown lines into a canonical `DocDocument` (`structure/doc.json`) payload. */
-function markdownToDocJson(markdown: string): string {
-  const blocks: DocBlock[] = [];
-  let seq = 1;
-  const nextId = () => `b${seq++}`;
-  const lines = markdown.split(/\r?\n/u);
-  let i = 0;
-
-  while (i < lines.length) {
-    const raw = lines[i] ?? "";
-    const trimmed = raw.trim();
-    if (trimmed === "") {
-      i += 1;
-      continue;
-    }
-    if (trimmed === "---" || trimmed === "***") {
-      blocks.push({ id: nextId(), type: "divider" });
-      i += 1;
-      continue;
-    }
-    if (trimmed.startsWith("```")) {
-      const lang = trimmed.slice(3).trim();
-      i += 1;
-      const codeLines: string[] = [];
-      while (i < lines.length && !(lines[i] ?? "").trimStart().startsWith("```")) {
-        codeLines.push(lines[i] ?? "");
-        i += 1;
-      }
-      if (i < lines.length) i += 1;
-      blocks.push({ id: nextId(), type: "code", ...(lang ? { language: lang } : {}), code: codeLines.join("\n") });
-      continue;
-    }
-    const heading = /^(#{1,3})\s+(.+)$/u.exec(trimmed);
-    if (heading) {
-      blocks.push({ id: nextId(), type: "heading", level: heading[1]?.length ?? 1, text: heading[2]?.trim() ?? "" });
-      i += 1;
-      continue;
-    }
-    const todo = /^[-*]\s+\[([ xX])\]\s*(.*)$/u.exec(trimmed);
-    if (todo) {
-      blocks.push({ id: nextId(), type: "todo", checked: todo[1]?.toLowerCase() === "x", text: todo[2]?.trim() ?? "" });
-      i += 1;
-      continue;
-    }
-    if (/^[-*]\s+/u.test(trimmed)) {
-      const items: string[] = [];
-      while (i < lines.length && /^[-*]\s+(?!\[[ xX]\])/u.test((lines[i] ?? "").trim())) {
-        items.push((lines[i] ?? "").trim().replace(/^[-*]\s+/u, ""));
-        i += 1;
-      }
-      blocks.push({ id: nextId(), type: "list", ordered: false, items });
-      continue;
-    }
-    if (/^\d+\.\s+/u.test(trimmed)) {
-      const items: string[] = [];
-      while (i < lines.length && /^\d+\.\s+/u.test((lines[i] ?? "").trim())) {
-        items.push((lines[i] ?? "").trim().replace(/^\d+\.\s+/u, ""));
-        i += 1;
-      }
-      blocks.push({ id: nextId(), type: "list", ordered: true, items });
-      continue;
-    }
-    if (trimmed.startsWith("> ") || trimmed === ">") {
-      const quoteLines: string[] = [];
-      while (i < lines.length && ((lines[i] ?? "").trim().startsWith("> ") || (lines[i] ?? "").trim() === ">")) {
-        quoteLines.push((lines[i] ?? "").trim().replace(/^>\s?/u, ""));
-        i += 1;
-      }
-      blocks.push({ id: nextId(), type: "quote", text: quoteLines.join("\n") });
-      continue;
-    }
-    const para: string[] = [];
-    while (i < lines.length) {
-      const cur = (lines[i] ?? "").trim();
-      if (
-        cur === "" ||
-        cur === "---" ||
-        cur === "***" ||
-        cur.startsWith("```") ||
-        /^#{1,3}\s+/u.test(cur) ||
-        /^[-*]\s+/u.test(cur) ||
-        /^\d+\.\s+/u.test(cur) ||
-        cur.startsWith(">")
-      ) {
-        break;
-      }
-      para.push(lines[i] ?? "");
-      i += 1;
-    }
-    blocks.push({ id: nextId(), type: "prose", text: para.join("\n") });
-  }
-
-  return `${JSON.stringify({ version: 1, blocks }, null, 2)}\n`;
-}
-
 /** Builds the canonical entry JSON payload for promoting channel text into any of the 4 `NoteType` primitives. */
 export function buildPromotedNoteContent(input: { readonly title: string; readonly noteType: NoteType; readonly content: string }): string {
   switch (input.noteType) {
     case "doc":
-      return markdownToDocJson(input.content);
+      return `${JSON.stringify(buildDocFromMarkdown(input.title, input.content, { fallbackTitle: false }), null, 2)}\n`;
     case "base":
       return `${JSON.stringify(
         {

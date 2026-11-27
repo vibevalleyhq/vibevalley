@@ -776,7 +776,7 @@ test("DevTools Remote VDP discovers instances, attaches, drives remote shell/scr
               ],
             };
           case "Shell.getState":
-            return { route: remoteRoute, dark: remoteDark, window: { width: remoteWidth, height: remoteHeight } };
+            return { route: remoteRoute, theme_dark: remoteDark, window: { width: remoteWidth, height: remoteHeight } };
           case "Page.getMetrics":
             return { width: remoteWidth, height: remoteHeight, scaleFactor: 2, themeDark: remoteDark, lastFrameMs: 3.4 };
           case "Shell.navigate":
@@ -943,7 +943,7 @@ test("DevTools Remote VDP stays accessible when local debug.snapshot is disabled
           return { bizCode: BizCode.Forbidden, message: "Unauthorized" };
         }
         if (req.method === "Target.list") return { targets: [{ id: "shell", kind: "shell", title: "Remote Shell", attached: true }] };
-        if (req.method === "Shell.getState") return { route: "/farm", dark: true };
+        if (req.method === "Shell.getState") return { route: "/farm", theme_dark: true };
         if (req.method === "Page.getMetrics") return { width: 1024, height: 768, themeDark: true };
         return { ok: true };
       },

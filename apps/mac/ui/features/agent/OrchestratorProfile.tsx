@@ -4,7 +4,6 @@ import { t } from "@vibevalley/i18n";
 import { type Agent, defaultOrchestrator, orchestratorRuntime, type OrchestratorLook } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 
-import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
 import { orchestratorLooks } from "../../design/domain/cast";
 import { AgentCodeBadge, AgentModeBadge, OrchestratorFace } from "../../design/domain/Face";
@@ -13,6 +12,7 @@ import { Icon } from "../../design/Icon";
 import { IconButton } from "../../design/IconButton";
 import { MoreMenu } from "../../design/MoreMenu";
 import { Bubble } from "../../design/Tip";
+import { createAct } from "../../infra/act";
 import { api } from "../../infra/api";
 import { useQueryClient } from "../../infra/query";
 import { Link as A, useRouter } from "../../infra/router";

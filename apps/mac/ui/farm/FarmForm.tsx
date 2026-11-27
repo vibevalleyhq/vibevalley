@@ -8,14 +8,11 @@ import { TextArea } from "../design/Field";
 import { Icon } from "../design/Icon";
 import type { IconName } from "../design/icons";
 import { SkeletonLines } from "../design/Skeleton";
-import { actionOf, perform } from "../features/issue/model/acts";
-import { approveShownChanges } from "../features/issue/model/changes";
-import { useIssueChanges } from "../features/issue/model/history";
-import { createWriteKey, writeIssue } from "../features/issue/model/write";
 import { useManagedWorkAgents } from "../infra/agents";
 import { api, newSendKey, reasonOf } from "../infra/api";
 import { useBoardSlice, useCollabSlice, useFarmSlice, useIssue, useSession } from "../infra/frame";
 import { readFarmFormParams, readHostLocale } from "../infra/hostParams";
+import { actionOf, approveShownChanges, createWriteKey, perform, useIssueChanges, writeIssue } from "../infra/issueActions";
 import { ready, useRepos } from "../infra/query";
 import { Root } from "../infra/Root";
 

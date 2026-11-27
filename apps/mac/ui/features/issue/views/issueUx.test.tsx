@@ -1070,7 +1070,7 @@ test("BlockedByPicker edits blockedBy with cycle-safe options and clickable Bloc
   });
 });
 
-test("Keyboard j/k/Enter/e navigation, x/Shift+click multi-select, and BatchTriageBar compose with Group By and Hierarchy", async () => {
+test("Keyboard j/k/Enter/e navigation composes with Hierarchy while cards and rows omit multi-select checkboxes and Shift+click opens normally", async () => {
   setLocale("en");
   const t1 = makeIssueFixture({
     id: "i-kbd-1",
@@ -1120,16 +1120,6 @@ test("Keyboard j/k/Enter/e navigation, x/Shift+click multi-select, and BatchTria
     "issue.history.list",
     all.map((issue) => ({ issue, sessions: [], missingSessions: [] })),
   );
-  fake.respond("issue.update", (payload: unknown) => {
-    const p = payload as { id: string };
-    const found = all.find((i) => i.id === p.id)!;
-    return { ...found, seq: 41 };
-  });
-  fake.respond("issue.status.update", (payload: unknown) => {
-    const p = payload as { id: string; status: Issue["status"] };
-    const found = all.find((i) => i.id === p.id)!;
-    return { ...found, status: p.status, seq: 42 };
-  });
 
   const app = await open("../../../app/main.tsx", {
     width: 1280,
@@ -1141,6 +1131,10 @@ test("Keyboard j/k/Enter/e navigation, x/Shift+click multi-select, and BatchTria
     host: fake.options,
   });
   await fake.pumpUntil(app, () => app.count("id:issue-card") === 4);
+
+  // Kanban cards render zero multi-select checkboxes (#138).
+  expect(app.count("id:issue-select-i-kbd-1")).toBe(0);
+  expect(app.count("id:batch-triage-bar")).toBe(0);
 
   // Compose with Hierarchy -> top_level via DisplayMenu (hides i-kbd-child, leaving 3 top-level cards: 501, 502, 503).
   await app.press("id:display");
@@ -1167,44 +1161,23 @@ test("Keyboard j/k/Enter/e navigation, x/Shift+click multi-select, and BatchTria
   await app.keyboard.press("escape");
   await fake.pumpUntil(app, () => app.count("id:issue-board") === 1);
 
-  // x toggles selection on #501 and opens floating BatchTriageBar ("1 selected").
+  // Pressing x does not open BatchTriageBar; Shift+click opens the card normally without multi-select.
   await app.keyboard.press("x");
-  await fake.pumpUntil(app, () => app.count("id:batch-triage-bar") === 1);
-  expect(app.shows("id:batch-triage-count >> text:1 selected")).toBe(true);
+  await fake.pump(app);
+  expect(app.count("id:batch-triage-bar")).toBe(0);
 
-  // Shift+click on #503 selects range (#501, #502, #503 -> 3 selected, excluding hidden child).
   await app.keyboard.down("shift");
   await app.press("text:Third review item");
   await app.keyboard.up("shift");
-  await fake.pumpUntil(app, () => app.shows("id:batch-triage-count >> text:3 selected"));
+  await fake.pumpUntil(app, () => app.count("id:issue-peek-modal") === 1);
+  expect(app.count("id:batch-triage-bar")).toBe(0);
+  await app.press("id:issue-peek-close");
+  await fake.pumpUntil(app, () => app.count("id:issue-peek-modal") === 0);
 
-  // Batch update priority -> urgent (fires issue.update for all 3 selected issues).
-  await app.press("id:batch-triage-priority-trigger");
-  await fake.pumpUntil(app, () => app.count(`text:${t("shared.priority.urgent")}`) >= 1);
-  await app.press(`text:${t("shared.priority.urgent")}`);
-  await fake.pumpUntil(app, () => fake.calls.filter((c) => c.op === "issue.update").length === 3);
-  expect(fake.calls.filter((c) => c.op === "issue.update").map((c) => c.payload)).toEqual([
-    { id: t1.id, priority: "urgent" },
-    { id: t2.id, priority: "urgent" },
-    { id: t3.id, priority: "urgent" },
-  ]);
-
-  // Batch update status -> done (skips nothing since none are done, fires 3 issue.status.update calls).
-  await app.press("id:batch-triage-status-trigger");
-  await fake.pumpUntil(app, () => app.count(`text:${t("shared.status.done")}`) >= 1);
-  await app.press(`text:${t("shared.status.done")}`);
-  await fake.pumpUntil(app, () => fake.calls.filter((c) => c.op === "issue.status.update").length === 3);
-
-  // Batch add tag ("UX") via tags popover.
-  await app.press("id:batch-triage-tags-trigger");
-  await fake.pumpUntil(app, () => app.count("id:batch-triage-tags-popover") === 1);
-  await app.press("id:tag-preset-UX");
-  await app.press("id:batch-triage-tags-add");
-  await fake.pumpUntil(app, () => fake.calls.filter((c) => c.op === "issue.update").length === 6);
-
-  // Clear selection closes the floating BatchTriageBar.
-  await app.press("id:batch-triage-clear");
-  await fake.pumpUntil(app, () => app.count("id:batch-triage-bar") === 0);
+  // List rows also omit multi-select checkboxes.
+  await app.press("id:issue-view-list");
+  await fake.pumpUntil(app, () => app.count("id:issue-list") === 1);
+  expect(app.count("id:issue-select-i-kbd-1")).toBe(0);
 });
 
 test("Issue detail displays and updates non-blocking relations without blocking status", async () => {

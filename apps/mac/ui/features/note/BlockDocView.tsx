@@ -10,9 +10,10 @@ import { Icon } from "../../design/Icon";
 import { Empty } from "../../design/layout";
 import { Lightbox, type Picture } from "../../design/Lightbox";
 import { useTimeout } from "../../infra/base/timer";
-import { useVdpNode, VdpAnchor } from "../../infra/vdpProbe";
-import { BlockItem } from "./doc/BlockItem";
+import { isVdpEnabled, useVdpNode, VdpAnchor } from "../../infra/vdpProbe";
+import { BlockItem, type BlockEditorProbeSnapshot, type BlockEditorTelemetryPatch, type FocusRequest } from "./doc/BlockItem";
 import {
+  type BlockFocusTarget,
   computeDocStats,
   computeSlideIndices,
   deleteBlockById,
@@ -20,12 +21,14 @@ import {
   extractTocEntries,
   insertBlockAfter,
   makeBlockId,
+  mergeBlockBackward,
   moveBlockById,
   neighborBlockId,
   replaceBlockById,
+  splitBlockAtSelection,
 } from "./doc/docOps";
 
-export interface BlockDocViewProps {
+interface BlockDocViewProps {
   readonly note: Note;
   readonly docView?: DocView | undefined;
   readonly notes: readonly Note[];
@@ -63,6 +66,23 @@ function relationLabel(rel: string): string {
   }
 }
 
+function findBlockById(blocks: readonly DocBlock[], id: string): DocBlock | undefined {
+  for (const b of blocks) {
+    if (b.id === id) return b;
+    if (b.children) {
+      const found = findBlockById(b.children, id);
+      if (found) return found;
+    }
+    if (b.type === "columns") {
+      for (const col of b.columns) {
+        const found = findBlockById(col.blocks, id);
+        if (found) return found;
+      }
+    }
+  }
+  return undefined;
+}
+
 function LinkRowItem(props: {
   readonly link: NoteLink;
   readonly idPrefix: string;
@@ -94,12 +114,52 @@ export function BlockDocView(props: BlockDocViewProps) {
   const blocks = signal<readonly DocBlock[]>(untracked(() => props.docView?.blocks ?? []));
   const titleDraft = signal(untracked(() => props.note.title));
   const focusedBlockId = signal<string | undefined>(undefined);
+  const focusRequest = signal<FocusRequest | undefined>(undefined);
   const highlightedBlockId = signal<string | undefined>(undefined);
   const dirty = signal(false);
   const saving = signal(false);
   const linksOpen = signal(true);
   const lightboxPicture = signal<Picture | undefined>(undefined);
   const scheduleSaveTimer = useTimeout();
+
+  let focusSeq = 0;
+  let probeSnapshot: BlockEditorProbeSnapshot = {
+    focusedBlockId: null,
+    activeTestId: null,
+    value: "",
+    selection: null,
+    caretBounds: null,
+    caretPageBounds: null,
+  };
+
+  const requestFocus = (target: BlockFocusTarget) => {
+    focusSeq += 1;
+    focusedBlockId.set(target.blockId);
+    focusRequest.set({
+      blockId: target.blockId,
+      caret: target.caret,
+      itemIndex: target.itemIndex,
+      seq: focusSeq,
+    });
+  };
+
+  const handleNativeFocusBlock = (id: string) => {
+    focusedBlockId.set(id);
+    probeSnapshot = { ...probeSnapshot, focusedBlockId: id };
+  };
+
+  const handleEditorTelemetry = (patch: BlockEditorTelemetryPatch) => {
+    probeSnapshot = {
+      focusedBlockId: patch.focusedBlockId ?? probeSnapshot.focusedBlockId,
+      activeTestId: patch.activeTestId ?? probeSnapshot.activeTestId,
+      value: patch.value ?? probeSnapshot.value,
+      selection: patch.selection ?? probeSnapshot.selection,
+      caretBounds: patch.caretBounds ?? probeSnapshot.caretBounds,
+      caretPageBounds: patch.caretPageBounds ?? probeSnapshot.caretPageBounds,
+    };
+  };
+
+  const telemetryHandler = isVdpEnabled() ? handleEditorTelemetry : undefined;
 
   let syncedNoteId = untracked(() => props.note.id);
   let syncedDocRef = untracked(() => props.docView?.blocks);
@@ -115,6 +175,15 @@ export function BlockDocView(props: BlockDocViewProps) {
       blocks.set(incomingBlocks ?? []);
       dirty.set(false);
       focusedBlockId.set(undefined);
+      focusRequest.set(undefined);
+      probeSnapshot = {
+        focusedBlockId: null,
+        activeTestId: null,
+        value: "",
+        selection: null,
+        caretBounds: null,
+        caretPageBounds: null,
+      };
       return;
     }
     if (incomingBlocks !== undefined && incomingBlocks !== syncedDocRef && !untracked(dirty)) {
@@ -123,9 +192,22 @@ export function BlockDocView(props: BlockDocViewProps) {
     }
   });
 
+  const redundantLeadingH1Id = computed((): string | undefined => {
+    if (props.embedded === true) return undefined;
+    const first = blocks()[0];
+    if (first?.type !== "heading" || first.level !== 1) return undefined;
+    if (focusedBlockId() === first.id) return undefined;
+    const noteTitle = props.note.title.trim();
+    if (!noteTitle) return undefined;
+    return first.text.trim() === noteTitle ? first.id : undefined;
+  });
+  const visibleBlocks = computed(() => {
+    const skipId = redundantLeadingH1Id();
+    return skipId !== undefined ? blocks().filter((b) => b.id !== skipId) : blocks();
+  });
   const stats = computed(() => computeDocStats(blocks()));
   const slideIndices = computed(() => computeSlideIndices(blocks()));
-  const outlineEntries = computed(() => extractTocEntries(blocks(), 3));
+  const outlineEntries = computed(() => extractTocEntries(visibleBlocks(), 3));
   const showOutlineRail = computed(() => outlineEntries().length >= 2 && windowSize().width >= 1100);
   const coverSrc = computed(() => coverUrlOf(props.note));
 
@@ -174,13 +256,39 @@ export function BlockDocView(props: BlockDocViewProps) {
   });
 
   const handleUpdateBlock = (id: string, next: DocBlock) => {
-    commitBlocks(replaceBlockById(untracked(blocks), id, () => next));
+    const cur = untracked(blocks);
+    const prevBlock = findBlockById(cur, id);
+    const typeChanged = prevBlock !== undefined && prevBlock.type !== next.type;
+    commitBlocks(replaceBlockById(cur, id, () => next));
+    if (typeChanged && untracked(focusedBlockId) === id) {
+      requestFocus({ blockId: next.id, caret: "end" });
+    }
   };
 
   const handleInsertAfter = (afterId: string, newBlock: DocBlock) => {
     const next = insertBlockAfter(untracked(blocks), afterId, newBlock);
-    focusedBlockId.set(newBlock.id);
     commitBlocks(next);
+    requestFocus({ blockId: newBlock.id, caret: "start" });
+  };
+
+  const handleSplitBlock = (id: string, selStart: number, selEnd: number) => {
+    const res = splitBlockAtSelection(untracked(blocks), id, selStart, selEnd);
+    if (!res) return;
+    commitBlocks(res.blocks);
+    requestFocus(res.focus);
+  };
+
+  const handleMergeBackward = (id: string) => {
+    const res = mergeBlockBackward(untracked(blocks), id);
+    if (!res) return;
+    if (res.blocks.length === 0) {
+      const fresh: DocBlock = { id: makeBlockId(), type: "prose", text: "" };
+      commitBlocks([fresh]);
+      requestFocus({ blockId: fresh.id, caret: 0 });
+      return;
+    }
+    commitBlocks(res.blocks);
+    requestFocus(res.focus);
   };
 
   const handleAppendTail = () => {
@@ -188,8 +296,8 @@ export function BlockDocView(props: BlockDocViewProps) {
     const tailId = cur.at(-1)?.id;
     const newBlock: DocBlock = { id: makeBlockId(), type: "prose", text: "" };
     const next = insertBlockAfter(cur, tailId, newBlock);
-    focusedBlockId.set(newBlock.id);
     blocks.set(next);
+    requestFocus({ blockId: newBlock.id, caret: "start" });
     if (props.onAppendBlock && !untracked(dirty)) {
       void props.onAppendBlock(newBlock, tailId);
     } else {
@@ -211,17 +319,19 @@ export function BlockDocView(props: BlockDocViewProps) {
     const next = deleteBlockById(cur, id);
     if (next.length === 0) {
       const fresh: DocBlock = { id: makeBlockId(), type: "prose", text: "" };
-      focusedBlockId.set(fresh.id);
       commitBlocks([fresh]);
+      requestFocus({ blockId: fresh.id, caret: 0 });
       return;
     }
-    if (prevId !== undefined) focusedBlockId.set(prevId);
     commitBlocks(next);
+    if (prevId !== undefined) requestFocus({ blockId: prevId, caret: "end" });
   };
 
   const handleFocusAdjacent = (id: string, dir: "prev" | "next") => {
     const target = neighborBlockId(untracked(blocks), id, dir);
-    if (target !== undefined) focusedBlockId.set(target);
+    if (target !== undefined) {
+      requestFocus({ blockId: target, caret: dir === "prev" ? "end" : "start" });
+    }
   };
 
   const commitTitleRename = () => {
@@ -234,24 +344,32 @@ export function BlockDocView(props: BlockDocViewProps) {
   const outgoingCount = () => props.links?.outgoing.length ?? 0;
   const backlinksCount = () => props.links?.backlinks.length ?? 0;
   useVdpNode({ testId: "note-block-doc-view", role: "region" });
+  useVdpNode({
+    testId: "doc-editor-probe",
+    role: "status",
+    text: () => JSON.stringify(probeSnapshot),
+  });
   const lightboxPictures = computed(() => {
     const pic = lightboxPicture();
     return pic !== undefined ? [pic] : [];
   });
 
   const embedded = () => props.embedded === true;
+  const contentInsetClass = () => (embedded() ? "pl-10" : "pl-14");
   const bodyContent = (
     <>
       <If when={!embedded()}>
         <If when={coverSrc()}>
           {(src) => (
-            <View testID="doc-cover-strip" class="mb-2 h-36 overflow-hidden rounded-xl border border-line bg-side">
-              <Image src={src()} accessibilityLabel={props.note.title} class="h-36 w-full object-cover" />
+            <View class="pl-14">
+              <View testID="doc-cover-strip" class="mb-2 h-36 overflow-hidden rounded-xl border border-line bg-side">
+                <Image src={src()} accessibilityLabel={props.note.title} class="h-36 w-full object-cover" />
+              </View>
             </View>
           )}
         </If>
 
-        <View class="mb-2 flex-row items-start justify-between gap-3">
+        <View class="mb-2 flex-row items-center justify-between gap-3 pl-14 pr-1">
           <Input
             testID="doc-title-input"
             accessibilityLabel={t("web.note.page.title")}
@@ -261,9 +379,9 @@ export function BlockDocView(props: BlockDocViewProps) {
             onChange={(e) => titleDraft.set(e.value)}
             onSubmit={commitTitleRename}
             onBlur={commitTitleRename}
-            class="min-w-0 flex-1 bg-transparent text-3xl font-bold leading-tight text-ink placeholder:text-faint"
+            class="min-w-0 flex-1 bg-transparent px-1 text-3xl font-bold leading-tight text-ink placeholder:text-faint"
           />
-          <View class="shrink-0 flex-row items-center gap-2 pt-2">
+          <View class="shrink-0 flex-row items-center gap-2">
             <If when={dirty() || saving()}>
               <Text testID="doc-save-status" class="text-2xs text-warn-ink">
                 {saving() ? t("web.base.reading") : t("web.note.page.unsaved")}
@@ -279,9 +397,9 @@ export function BlockDocView(props: BlockDocViewProps) {
       </If>
 
       <If
-        when={blocks().length > 0}
+        when={visibleBlocks().length > 0}
         else={
-          <View class="py-6">
+          <View class={`py-6 ${contentInsetClass()}`}>
             <Empty
               icon="notes"
               action={
@@ -296,19 +414,24 @@ export function BlockDocView(props: BlockDocViewProps) {
         }
       >
         <View testID="doc-blocks-list" class="gap-1">
-          <Each of={blocks()} key={(b) => b.id}>
+          <Each of={visibleBlocks()} key={(b) => b.id}>
             {(b) => (
               <View class={highlightedBlockId() === b().id ? "rounded-md bg-selected" : ""}>
                 <BlockItem
                   block={b()}
-                  allBlocks={blocks()}
+                  allBlocks={visibleBlocks()}
                   slideIndices={slideIndices()}
                   note={props.note}
                   notes={props.notes}
                   issues={props.issues}
                   focusedBlockId={focusedBlockId()}
-                  onFocusBlock={(id) => focusedBlockId.set(id)}
+                  focusRequest={focusRequest()}
+                  compactGutter={embedded()}
+                  onFocusBlock={handleNativeFocusBlock}
+                  onRequestFocus={requestFocus}
                   onFocusAdjacent={handleFocusAdjacent}
+                  onSplitBlock={handleSplitBlock}
+                  onMergeBackward={handleMergeBackward}
                   onUpdateBlock={handleUpdateBlock}
                   onInsertAfter={handleInsertAfter}
                   onMoveBlock={handleMoveBlock}
@@ -319,9 +442,10 @@ export function BlockDocView(props: BlockDocViewProps) {
                   onOpenIssue={props.onOpenIssue}
                   onScrollToBlock={(targetId) => {
                     highlightedBlockId.set(targetId);
-                    focusedBlockId.set(targetId);
+                    requestFocus({ blockId: targetId, caret: "end" });
                   }}
                   onOpenLightbox={(pic) => lightboxPicture.set(pic)}
+                  onEditorTelemetry={telemetryHandler}
                 />
               </View>
             )}
@@ -329,7 +453,7 @@ export function BlockDocView(props: BlockDocViewProps) {
         </View>
       </If>
 
-      <View class={`flex-row items-center justify-between gap-2 pt-2 opacity-70 hover:opacity-100 ${embedded() ? "" : "pl-14"}`}>
+      <View class={`flex-row items-center justify-between gap-2 pt-2 pr-1 opacity-70 hover:opacity-100 ${contentInsetClass()}`}>
         <Button size="compact" tone="quiet" icon="add" testID="doc-append-block-btn" onPress={handleAppendTail}>
           {t("web.note.doc.addBlock")}
         </Button>
@@ -346,37 +470,39 @@ export function BlockDocView(props: BlockDocViewProps) {
       <If when={backlinksCount() > 0 || outgoingCount() > 0}>
         <>
           <VdpAnchor testId="doc-links-panel" role="region" />
-          <View testID="doc-links-panel" class={`${embedded() ? "mt-5 pt-4" : "mt-10 pt-6"} gap-3 border-t border-line`}>
-            <View
-              role="button"
-              testID="doc-links-toggle"
-              accessibilityState={{ expanded: linksOpen() }}
-              onPress={() => linksOpen.set(!linksOpen())}
-              class="flex-row items-center gap-2"
-            >
-              <Icon name={linksOpen() ? "choose" : "expand"} size={12} tone="faint" />
-              <Text class="text-xs font-semibold text-muted">{t("web.note.links.backlinks", { n: backlinksCount() })}</Text>
-              <Text class="text-xs text-faint">·</Text>
-              <Text class="text-xs font-medium text-faint">{t("web.note.links.outgoing", { n: outgoingCount() })}</Text>
-            </View>
-            <If when={linksOpen()}>
-              <View class="gap-4 md:flex-row">
-                <If when={backlinksCount() > 0}>
-                  <View class="min-w-0 flex-1 gap-0.5">
-                    <Each of={props.links?.backlinks ?? []} key={(l) => l.id}>
-                      {(l) => <LinkRowItem link={l()} idPrefix="backlink" onOpenNote={props.onOpenNote} onOpenIssue={props.onOpenIssue} />}
-                    </Each>
-                  </View>
-                </If>
-                <If when={outgoingCount() > 0}>
-                  <View class="min-w-0 flex-1 gap-0.5">
-                    <Each of={props.links?.outgoing ?? []} key={(l) => l.id}>
-                      {(l) => <LinkRowItem link={l()} idPrefix="outgoing" onOpenNote={props.onOpenNote} onOpenIssue={props.onOpenIssue} />}
-                    </Each>
-                  </View>
-                </If>
+          <View class={`pr-1 ${contentInsetClass()}`}>
+            <View testID="doc-links-panel" class={`${embedded() ? "mt-5 pt-4" : "mt-10 pt-6"} gap-3 border-t border-line`}>
+              <View
+                role="button"
+                testID="doc-links-toggle"
+                accessibilityState={{ expanded: linksOpen() }}
+                onPress={() => linksOpen.set(!linksOpen())}
+                class="flex-row items-center gap-2"
+              >
+                <Icon name={linksOpen() ? "choose" : "expand"} size={12} tone="faint" />
+                <Text class="text-xs font-semibold text-muted">{t("web.note.links.backlinks", { n: backlinksCount() })}</Text>
+                <Text class="text-xs text-faint">·</Text>
+                <Text class="text-xs font-medium text-faint">{t("web.note.links.outgoing", { n: outgoingCount() })}</Text>
               </View>
-            </If>
+              <If when={linksOpen()}>
+                <View class="gap-4 md:flex-row">
+                  <If when={backlinksCount() > 0}>
+                    <View class="min-w-0 flex-1 gap-0.5">
+                      <Each of={props.links?.backlinks ?? []} key={(l) => l.id}>
+                        {(l) => <LinkRowItem link={l()} idPrefix="backlink" onOpenNote={props.onOpenNote} onOpenIssue={props.onOpenIssue} />}
+                      </Each>
+                    </View>
+                  </If>
+                  <If when={outgoingCount() > 0}>
+                    <View class="min-w-0 flex-1 gap-0.5">
+                      <Each of={props.links?.outgoing ?? []} key={(l) => l.id}>
+                        {(l) => <LinkRowItem link={l()} idPrefix="outgoing" onOpenNote={props.onOpenNote} onOpenIssue={props.onOpenIssue} />}
+                      </Each>
+                    </View>
+                  </If>
+                </View>
+              </If>
+            </View>
           </View>
         </>
       </If>
@@ -388,7 +514,7 @@ export function BlockDocView(props: BlockDocViewProps) {
       <If
         when={embedded()}
         else={
-          <Scroll class="min-h-0 flex-1" contentClass="mx-auto w-full max-w-3xl gap-3 px-8 pt-10 pb-24">
+          <Scroll class="min-h-0 flex-1" contentClass="mx-auto w-full max-w-3xl gap-3 pr-12 pl-4 pt-10 pb-24">
             {bodyContent}
           </Scroll>
         }
@@ -397,7 +523,7 @@ export function BlockDocView(props: BlockDocViewProps) {
       </If>
 
       <If when={!embedded() && showOutlineRail()}>
-        <View testID="doc-outline-rail" class="hidden w-44 shrink-0 pt-12 pr-4 lg:flex">
+        <View testID="doc-outline-rail" class="hidden w-44 shrink-0 pt-10 pr-4 lg:flex">
           <View class="w-full min-w-0 gap-1 border-l border-line pl-3">
             <Text class="mb-1 text-2xs font-semibold text-faint">{t("web.note.doc.outline")}</Text>
             <Each of={outlineEntries()} key={(entry) => entry.blockId}>
@@ -409,7 +535,7 @@ export function BlockDocView(props: BlockDocViewProps) {
                     testID={`doc-outline-item-${entry().blockId}`}
                     onPress={() => {
                       highlightedBlockId.set(entry().blockId);
-                      focusedBlockId.set(entry().blockId);
+                      requestFocus({ blockId: entry().blockId, caret: "end" });
                     }}
                     class="w-full min-w-0 rounded-sm py-0.5 pr-1 hover:bg-hover"
                     style={{ paddingLeft: Math.max(0, entry().level - 1) * 10 }}

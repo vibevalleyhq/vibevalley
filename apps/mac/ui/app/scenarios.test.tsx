@@ -552,16 +552,16 @@ test("edge scenario verifies boardSummary, mediaSummary (all 8 MediaPhase), all 
     for (const entry of list) seenConnectorStates.add(entry.state);
   };
   recordConnectors(fixture.state.collab.connectors);
-  await visit(app, fake, "/settings/connections/chat/weixin", row, () => {
+  await visit(app, fake, "/settings/chat/weixin", row, () => {
     expect(app.count("id:connectors")).toBe(1);
     expect(app.count("id:connector-weixin")).toBe(1);
     expect(app.texts()).toContain("已扫码，等手机确认");
   });
-  await visit(app, fake, "/settings/connections/chat/feishu", row, () => {
+  await visit(app, fake, "/settings/chat/feishu", row, () => {
     expect(app.count("id:connector-feishu")).toBe(1);
     expect(app.texts()).toContain("要输入手机上的数字");
   });
-  await visit(app, fake, "/settings/connections/chat/qq", row, () => {
+  await visit(app, fake, "/settings/chat/qq", row, () => {
     expect(app.count("id:connector-qq")).toBe(1);
     expect(app.texts()).toContain("等你发配对码");
   });
@@ -592,20 +592,20 @@ test("edge scenario verifies boardSummary, mediaSummary (all 8 MediaPhase), all 
   ];
   recordConnectors(extraConnectors);
   await fake.setSlice(app, "collab", { ...fixture.state.collab, connectors: extraConnectors });
-  await visit(app, fake, "/settings/connections/chat/weixin", row, () => {
+  await visit(app, fake, "/settings/chat/weixin", row, () => {
     expect(app.texts()).toContain("已连接");
   });
-  await visit(app, fake, "/settings/connections/chat/feishu", row, () => {
+  await visit(app, fake, "/settings/chat/feishu", row, () => {
     expect(app.texts()).toContain("暂停中");
   });
-  await visit(app, fake, "/settings/connections/chat/qq", row, () => {
+  await visit(app, fake, "/settings/chat/qq", row, () => {
     expect(app.texts()).toContain("等你扫码");
   });
 
   const offConnector: ConnectorStatus[] = [{ id: "weixin", state: "off", qr: "", pairCode: "", pending: 0, error: "" }];
   recordConnectors(offConnector);
   await fake.setSlice(app, "collab", { ...fixture.state.collab, connectors: offConnector });
-  await visit(app, fake, "/settings/connections/chat/weixin", row, () => {
+  await visit(app, fake, "/settings/chat/weixin", row, () => {
     expect(app.texts()).toContain("没连接");
   });
   expect(seenConnectorStates).toEqual(new Set(["off", "waiting", "scanned", "verify", "pairing", "connected", "paused"]));

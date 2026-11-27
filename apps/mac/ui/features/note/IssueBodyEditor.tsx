@@ -5,12 +5,12 @@ import { t } from "@vibevalley/i18n";
 import type { DocBlock, Issue, IssueId, Note, NoteId, Suggestion, SuggestionId } from "@vibevalley/protocol";
 import { issueId, noteId } from "@vibevalley/protocol/schema";
 
-import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
 import { Icon } from "../../design/Icon";
 import { Markdown } from "../../design/Markdown";
 import { SkeletonLines } from "../../design/Skeleton";
 import { toast } from "../../design/toasts";
+import { createAct } from "../../infra/act";
 import { api, reasonOf } from "../../infra/api";
 import { useBoardSlice } from "../../infra/frame";
 import { followNote } from "../../infra/gateway";
@@ -21,7 +21,7 @@ import { noteHref, useNote, useNotes } from "./NoteCard";
 import { NoteLinkPills, resolveDescriptionNoteLinks } from "./NoteLinkPills";
 import { noteDocQuery, noteLinksQuery, useNoteSuggestions } from "./store";
 
-export interface IssueBodyEditorProps {
+interface IssueBodyEditorProps {
   readonly issue: Issue;
   readonly editable?: boolean | undefined;
   readonly description?: string | undefined;

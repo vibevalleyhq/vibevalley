@@ -4,19 +4,19 @@ import { Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 
-import { richNative, type VvDiagramPressEvent } from "../../infra/rich";
+import { useDesignHost, type DesignDiagramPressEvent } from "../host";
 import { Icon } from "../Icon";
 
 export interface DiagramProps {
   source: string;
   maxWidth?: number;
   interactive?: boolean;
-  onPress?: (event: VvDiagramPressEvent) => void;
+  onPress?: (event: DesignDiagramPressEvent) => void;
   class?: string | undefined;
 }
 
 export function Diagram(props: DiagramProps) {
-  const native = richNative();
+  const native = useDesignHost().rich();
   if (native) {
     const VvDiagram = native.VvDiagram;
     return (

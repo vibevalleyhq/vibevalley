@@ -1,12 +1,12 @@
+export { ContentShell } from "./hub/ContentShell";
 export { InstallAppletModal, useInstalledApplets } from "./InstallAppletModal";
 export { IssueBodyEditor } from "./IssueBodyEditor";
 export { IssueNotes } from "./IssueNotes";
 export { NoteCanvas } from "./NoteCanvas";
-export { kindLabel, NoteCard, noteHref, noteIcon, noteTypeIcon, noteTypeLabel, useNotes } from "./NoteCard";
+export { kindLabel, NoteCard, noteHref, noteIcon, noteTypeLabel, useNotes } from "./NoteCard";
 export { NoteLinkPills, resolveDescriptionNoteLinks } from "./NoteLinkPills";
 export { NotePage } from "./NotePage";
-export { PageTree } from "./PageTree";
 export { PresenterPage } from "./PresenterPage";
 export { StandaloneNotePage } from "./StandaloneNotePage";
 export { buildDocFromMarkdown } from "./html";
-export { activeNoteViewContext, clearActiveNoteViewContext, createTypedNote, noteChatFocus } from "./store";
+export { activeNoteViewContext, clearActiveNoteViewContext, noteChatFocus } from "./store";

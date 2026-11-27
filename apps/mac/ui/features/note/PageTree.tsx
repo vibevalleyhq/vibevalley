@@ -4,18 +4,18 @@ import { Menu, MenuItem, MenuSeparator, Submenu } from "nsh/base";
 import { t } from "@vibevalley/i18n";
 import { type Note, NOTE_TYPES, type NoteId, type NoteType } from "@vibevalley/protocol";
 
-import { createAct } from "../../design/act";
 import { SearchField } from "../../design/Field";
 import { Icon } from "../../design/Icon";
 import { ActiveBar } from "../../design/layout";
 import { motionClass, popupTransition } from "../../design/motion";
 import { toast } from "../../design/toasts";
+import { createAct } from "../../infra/act";
 import { api, reasonOf } from "../../infra/api";
 import { spelled } from "../../infra/base/search";
 import { useQueryClient } from "../../infra/query";
 import { noteIcon, noteTypeIcon, noteTypeLabel } from "./NoteCard";
 
-export interface PageTreeProps {
+interface PageTreeProps {
   readonly notes: readonly Note[];
   readonly activeId?: NoteId | undefined;
   readonly noteTypeFilter?: NoteType | undefined;
@@ -250,16 +250,18 @@ export function PageTree(props: PageTreeProps) {
         </Menu>
       </View>
 
-      <View class={embedded() ? "shrink-0 px-0.5 pt-0.5 pb-1" : "shrink-0 px-2 pt-2 pb-1"}>
-        <SearchField
-          testid="page-tree-search"
-          value={search()}
-          onInput={(v) => search.set(v)}
-          placeholder={t("web.note.issue.linkPlaceholder")}
-          label={t("web.note.issue.linkPlaceholder")}
-          class="w-full"
-        />
-      </View>
+      <If when={!embedded()}>
+        <View class="shrink-0 px-2 pt-2 pb-1">
+          <SearchField
+            testid="page-tree-search"
+            value={search()}
+            onInput={(v) => search.set(v)}
+            placeholder={t("web.note.issue.linkPlaceholder")}
+            label={t("web.note.issue.linkPlaceholder")}
+            class="w-full"
+          />
+        </View>
+      </If>
 
       <If
         when={props.embedded}

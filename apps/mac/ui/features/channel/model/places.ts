@@ -144,8 +144,6 @@ export function threadTitle(thread: Channel, issues: Issue[] = [], sessions: Ses
   }
 }
 
-export const chatPage = 50;
-
 interface FeedItem {
   message: ChatMessage;
   thread?: Channel;
@@ -174,6 +172,8 @@ export function feedOf(chat: Chat | undefined, said: readonly ChatMessage[], fil
       continues:
         !!before &&
         m.replyTo === undefined &&
+        before.reactions.length === 0 &&
+        !threads.has(before.id) &&
         senderOf(before) === senderOf(m) &&
         senderOf(m) !== "" &&
         m.at - before.at < runMs &&

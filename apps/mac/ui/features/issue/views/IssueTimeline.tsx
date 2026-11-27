@@ -137,11 +137,9 @@ export function IssueTimeline(props: {
   filtered?: boolean | undefined;
   loading: boolean;
   selected?: string | undefined;
-  selectedIds?: ReadonlySet<string> | undefined;
   density?: BoardDensity | undefined;
   fields?: IssueFieldVisibility | undefined;
   onOpen: (id: string) => void;
-  onToggleSelect?: ((id: string, opts: { range: boolean }) => void) | undefined;
   onUpdateDates: (id: string, dates: { startAt?: number; dueAt?: number }) => Promise<void> | void;
   onNew: (at: NewIssueAt) => void;
   onClearFilter?: (() => void) | undefined;
@@ -213,7 +211,7 @@ export function IssueTimeline(props: {
               }}
               options={scaleOptions()}
             />
-            <Button size="compact" tone="plain" icon="calendar" testID="timeline-today" onPress={() => scrollToToday(true)}>
+            <Button tone="plain" icon="calendar" testID="timeline-today" onPress={() => scrollToToday(true)}>
               {t("web.issue.timeline.today")}
             </Button>
           </View>
@@ -227,7 +225,7 @@ export function IssueTimeline(props: {
                 testID="timeline-unscheduled-toggle"
                 accessibilityState={{ selected: unscheduledVisible() }}
                 onPress={() => showUnscheduled.set(!showUnscheduled())}
-                class={`h-6 flex-row items-center gap-1.5 rounded-md border px-2 ${motionClass("transition-transform duration-120 ease-out")} active:translate-y-px ${
+                class={`h-7 flex-row items-center gap-1.5 rounded-md border px-2.5 ${motionClass("transition-transform duration-120 ease-out")} active:translate-y-px ${
                   unscheduledVisible() ? "border-accent bg-selected" : "border-line bg-page hover:bg-hover"
                 }`}
               >
@@ -275,7 +273,7 @@ export function IssueTimeline(props: {
                     </View>
                     <Each of={timeline().rows} key={(r) => r.card.id}>
                       {(r) => {
-                        const selected = () => props.selected === r().card.id || props.selectedIds?.has(r().card.id) === true;
+                        const selected = () => props.selected === r().card.id;
                         const blockers = computed(() => blockerIssuesOf(r().issue, props.allIssues));
                         const showAgent = computed(() => fields().agent && (Boolean(cardAgent(r().card)) || r().card.kind === "orchestrator"));
                         const showOwner = computed(() => {
@@ -290,11 +288,7 @@ export function IssueTimeline(props: {
                             testID="timeline-row"
                             accessibilityLabel={`#${r().issue.number} ${r().issue.title}`}
                             accessibilityState={{ selected: selected() }}
-                            onPress={(e) => {
-                              if (e.modifiers.shift && props.onToggleSelect) {
-                                props.onToggleSelect(r().card.id, { range: true });
-                                return;
-                              }
+                            onPress={() => {
                               props.onOpen(r().card.id);
                             }}
                             class={`flex-row items-center gap-1.5 border-b pr-2.5 ${selected() ? "bg-selected" : "hover:bg-hover"}`}
@@ -440,10 +434,10 @@ export function IssueTimeline(props: {
                           )}
                         </Each>
 
-                        {/* Today vertical marker line */}
+                        {/* Today vertical marker line (strictly behind schedule bars so it never cuts across bar text) */}
                         <View
                           testID="timeline-today-line"
-                          class="pointer-events-none absolute top-0 bottom-0 z-10 w-0.5 bg-water"
+                          class="pointer-events-none absolute top-0 bottom-0 z-0 w-0.5 bg-water"
                           style={{ left: todayX() + Math.floor(dayWidth() / 2) }}
                         />
 
@@ -520,10 +514,12 @@ export function IssueTimeline(props: {
                             const showCompactNumber = () => barWidth() >= 36;
                             const showFullTitle = () => barWidth() >= 92;
 
+                            const barTop = () => Math.floor((rowHeight() - barHeight()) / 2);
+
                             return (
                               <View
                                 testID={`timeline-lane-${r().issue.id}`}
-                                class="absolute right-0 left-0 flex-row items-center border-b"
+                                class="absolute right-0 left-0 z-10 flex-row items-center border-b"
                                 style={{
                                   top: rowIdx() * rowHeight(),
                                   height: rowHeight(),
@@ -543,17 +539,18 @@ export function IssueTimeline(props: {
                                     }
                                     props.onOpen(r().card.id);
                                   }}
-                                  class={`group absolute flex-row items-center rounded-md border ${showFullTitle() ? "gap-1.5 px-2" : "px-1.5"} ${
+                                  class={`group absolute flex-row items-center overflow-hidden rounded-md border bg-page ${showFullTitle() ? "gap-1.5 px-2" : "justify-center px-1.5"} ${
                                     r().span.rolledUp && !r().span.hasExplicitStart && !r().span.hasExplicitDue ? "border-dashed" : ""
                                   } ${motionClass("transition-transform duration-120 ease-out")} focus-visible:outline-2 focus-visible:outline-focus`}
                                   style={{
                                     left: barLeft(),
+                                    top: barTop(),
                                     width: barWidth(),
                                     height: barHeight(),
-                                    backgroundColor: barFillColor(barTone()),
                                     borderColor: barBorderColor(barTone(), selected()),
                                   }}
                                 >
+                                  <View class="pointer-events-none absolute inset-0" style={{ backgroundColor: barFillColor(barTone()) }} />
                                   <View
                                     {...startResizePan.panHandlers}
                                     testID="timeline-resize-start"
@@ -585,6 +582,28 @@ export function IssueTimeline(props: {
                                     />
                                   </View>
                                 </View>
+
+                                <If when={!showFullTitle() && !preview()}>
+                                  <View
+                                    role="button"
+                                    testID="timeline-bar-external-label"
+                                    accessibilityLabel={`#${r().issue.number} ${r().issue.title}`}
+                                    tooltip={<Bubble text={barTooltipText(r())} />}
+                                    onPress={() => props.onOpen(r().card.id)}
+                                    class="absolute flex-row items-center gap-1 rounded-sm bg-page px-1.5 hover:bg-hover"
+                                    style={{
+                                      left: barLeft() + barWidth() + 6,
+                                      top: barTop(),
+                                      height: barHeight(),
+                                      maxWidth: Math.max(96, totalGridWidth() - (barLeft() + barWidth() + 14)),
+                                    }}
+                                  >
+                                    <If when={!showCompactNumber() && fields().number}>
+                                      <Text class="shrink-0 font-mono text-2xs font-medium text-faint tabular-nums">{`#${r().issue.number}`}</Text>
+                                    </If>
+                                    <Text class="min-w-0 shrink truncate text-2xs font-medium text-ink">{r().issue.title}</Text>
+                                  </View>
+                                </If>
 
                                 <If when={preview()}>
                                   {(p) => (

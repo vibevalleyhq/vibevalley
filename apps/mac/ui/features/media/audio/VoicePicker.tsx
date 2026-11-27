@@ -2,10 +2,10 @@ import { computed, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 
-import { createAct } from "../../../design/act";
 import { Button } from "../../../design/Button";
 import { Field, Select, TextInput } from "../../../design/Field";
 import { Quiet } from "../../../design/layout";
+import { createAct } from "../../../infra/act";
 import { reasonOf } from "../../../infra/api";
 import { providerVoicesQuery, ready, useQuery } from "../../../infra/query";
 import { Refusal } from "../JobFacts";

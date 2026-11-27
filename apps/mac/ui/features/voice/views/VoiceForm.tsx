@@ -4,7 +4,6 @@ import { t } from "@vibevalley/i18n";
 import type { ProviderConnectionUpdate, ProviderStatus, SettingsStatus, SettingsUpdate, VoiceSettings } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 
-import { createAct } from "../../../design/act";
 import { Button } from "../../../design/Button";
 import { KeyRow, SettingRow, SettingsGroup } from "../../../design/domain/settings";
 import { Select, TextArea, TextInput } from "../../../design/Field";
@@ -13,6 +12,7 @@ import { SaveBar } from "../../../design/KeyField";
 import { Quiet } from "../../../design/layout";
 import { TextLink } from "../../../design/TextLink";
 import { toast } from "../../../design/toasts";
+import { createAct } from "../../../infra/act";
 import { api, reasonOf } from "../../../infra/api";
 import { createSettled, Keyed } from "../../../infra/base/dom";
 import { defineQuery, providerQuery, providerVoicesQuery, ready, settingsQuery, useQuery, useQueryClient, useSettings } from "../../../infra/query";

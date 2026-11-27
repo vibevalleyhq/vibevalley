@@ -7,7 +7,7 @@ import { NOTE_TYPE_SPECS, NOTE_TYPES, NoteTypeValues, userId } from "@vibevalley
 
 import { tone } from "../../design/tone";
 import { decodeBase64Utf8 } from "../../infra/attachment";
-import { formatGenUiAction } from "../../infra/rich";
+import { formatGenUiAction, setCoreBridgeForTest } from "../../infra/rich";
 import { buildDocFromMarkdown, entryPathOf, inferNoteFromName, noteSuffixOf } from "./html";
 import { noteTypeIcon, noteTypeLabel } from "./NoteCard";
 import { presenceHighlightCommand } from "./shell";
@@ -44,29 +44,58 @@ test("regression: all 3+1 NoteType labels render localized Chinese without Engli
   }
 });
 
-test("infers all 3+1 note primitives from legacy and canonical filenames", () => {
-  expect(inferNoteFromName("q3-deck.slides.json")).toEqual({ title: "q3-deck", noteType: "doc" });
-  expect(inferNoteFromName("kpi.dashboard.json")).toEqual({ title: "kpi", noteType: "doc" });
-  expect(inferNoteFromName("weekly.outline.json")).toEqual({ title: "weekly", noteType: "doc" });
-  expect(inferNoteFromName("demo.html")).toEqual({ title: "demo", noteType: "doc" });
+test("infers all 3+1 note primitives from canonical filenames and standard formats", () => {
   expect(inferNoteFromName("notes.doc.md")).toEqual({ title: "notes", noteType: "doc" });
-  expect(inferNoteFromName("budget.sheet.json")).toEqual({ title: "budget", noteType: "base" });
+  expect(inferNoteFromName("notes.md")).toEqual({ title: "notes", noteType: "doc" });
+  expect(inferNoteFromName("spec.markdown")).toEqual({ title: "spec", noteType: "doc" });
+  expect(inferNoteFromName("demo.html")).toEqual({ title: "demo", noteType: "doc" });
   expect(inferNoteFromName("tracker.base.json")).toEqual({ title: "tracker", noteType: "base" });
-  expect(inferNoteFromName("pipeline.whiteboard.json")).toEqual({ title: "pipeline", noteType: "canvas" });
-  expect(inferNoteFromName("poster.design.json")).toEqual({ title: "poster", noteType: "canvas" });
-  expect(inferNoteFromName("brand.tokens.json")).toEqual({ title: "brand", noteType: "canvas" });
-  expect(inferNoteFromName("intro.motion.json")).toEqual({ title: "intro", noteType: "media" });
-  expect(inferNoteFromName("launch.storyboard.json")).toEqual({ title: "launch", noteType: "media" });
+  expect(inferNoteFromName("budget.csv")).toEqual({ title: "budget", noteType: "base" });
+  expect(inferNoteFromName("pipeline.canvas.json")).toEqual({ title: "pipeline", noteType: "canvas" });
+  expect(inferNoteFromName("launch.media.json")).toEqual({ title: "launch", noteType: "media" });
+  expect(inferNoteFromName("plain-title")).toEqual({ title: "plain-title", noteType: "doc" });
 });
 
-test("buildDocFromMarkdown creates canonical structure/doc.json blocks", () => {
-  const doc = buildDocFromMarkdown("Launch", "## Roadmap\n- Ship UI\n- [x] Run checks\n> Ship small\n---\n");
-  expect(doc.version).toBe(1);
-  expect(doc.blocks.some((b) => b.type === "heading" && b.text === "Roadmap")).toBe(true);
-  expect(doc.blocks.some((b) => b.type === "list" && b.items.includes("Ship UI"))).toBe(true);
-  expect(doc.blocks.some((b) => b.type === "todo" && b.checked && b.text === "Run checks")).toBe(true);
-  expect(doc.blocks.some((b) => b.type === "quote" && b.text === "Ship small")).toBe(true);
-  expect(doc.blocks.some((b) => b.type === "divider")).toBe(true);
+test("buildDocFromMarkdown delegates to Rust VvCore bridge with headless fallback", () => {
+  const stubBlocks = [
+    { id: "b1", type: "heading", level: 2, text: "Roadmap" },
+    { id: "b2", type: "list", ordered: false, items: ["Ship UI"] },
+    { id: "b3", type: "todo", checked: true, text: "Run checks" },
+    { id: "b4", type: "quote", text: "Ship small" },
+    { id: "b5", type: "divider" },
+  ];
+  let forwarded = "";
+  const restore = setCoreBridgeForTest({
+    markdownToBlocks: (md) => {
+      forwarded = md;
+      return JSON.stringify(stubBlocks);
+    },
+  });
+  try {
+    const md = "## Roadmap\n- Ship UI\n- [x] Run checks\n> Ship small\n---\n";
+    const doc = buildDocFromMarkdown("Launch", md);
+    expect(forwarded).toBe(md);
+    expect(doc.version).toBe(1);
+    expect(doc.blocks.some((b) => b.type === "heading" && b.text === "Roadmap")).toBe(true);
+    expect(doc.blocks.some((b) => b.type === "list" && b.items.includes("Ship UI"))).toBe(true);
+    expect(doc.blocks.some((b) => b.type === "todo" && b.checked && b.text === "Run checks")).toBe(true);
+    expect(doc.blocks.some((b) => b.type === "quote" && b.text === "Ship small")).toBe(true);
+    expect(doc.blocks.some((b) => b.type === "divider")).toBe(true);
+  } finally {
+    restore();
+  }
+
+  expect(buildDocFromMarkdown("Launch", "")).toEqual({
+    version: 1,
+    blocks: [
+      { id: "b1", type: "heading", level: 1, text: "Launch" },
+      { id: "b2", type: "prose", text: "" },
+    ],
+  });
+  expect(buildDocFromMarkdown("Launch", "Hello", { fallbackTitle: false })).toEqual({
+    version: 1,
+    blocks: [{ id: "b1", type: "prose", text: "Hello" }],
+  });
 });
 
 test("presenceHighlightCommand filters local user, scopes by path, and normalizes highlight colors", () => {

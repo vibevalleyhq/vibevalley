@@ -54,30 +54,6 @@ const allSections = (): readonly Section[] => [
   { id: "about", group: "about", icon: "info", label: t("web.setting.nav.about"), words: t("web.setting.words.about") },
 ];
 
-function legacyRedirect(rest: string): string | undefined {
-  const [first, sub, ...more] = rest.split("/");
-  switch (first) {
-    case "accounts":
-      return "/settings/providers";
-    case "call":
-    case "moss":
-      return "/settings/voice";
-    case "connections": {
-      if (sub === "github") return "/settings/github";
-      if (sub === "remote") return "/settings/remote";
-      if (sub === "chat") {
-        const restId = more.filter(Boolean).join("/");
-        return restId ? `/settings/chat/${restId}` : "/settings/chat";
-      }
-      return "/settings/chat";
-    }
-    case "tree":
-      return "/settings/memory";
-    default:
-      return undefined;
-  }
-}
-
 function VoiceSettings() {
   return (
     <Page title={t("web.setting.nav.voice")} description={t("web.voice.moss.intro")}>
@@ -149,7 +125,6 @@ export function SettingsPage(props: { rest: string }) {
   const query = signal("");
   const q = computed(() => query().trim().toLowerCase());
   const parts = computed(() => props.rest.split("/"));
-  const redirect = computed(() => legacyRedirect(props.rest));
   const sections = allSections();
   const section = computed(() => sections.find((s) => s.id === parts()[0]));
   const skillId = computed(() => (parts().length > 1 ? decodeURIComponent(parts().slice(1).join("/")) : undefined));
@@ -159,80 +134,73 @@ export function SettingsPage(props: { rest: string }) {
   const aboutShown = computed(() => sections.filter((s) => s.group === "about" && matches(q(), [s.label, s.words])));
   const navWidth = usePaneWidth("settingsNav", 224, 184, 320);
   return (
-    <If
-      when={redirect()}
-      else={
-        <If when={section()} else={<Navigate href="/settings/general" />}>
-          {(current) => (
-            <SettingsSearch.Provider value={q}>
-              <View class={`h-full min-h-0 flex-1 ${md() ? "flex-row" : ""}`}>
-                <View
-                  testID="settings-nav"
-                  accessibilityLabel={t("web.setting.nav.label")}
-                  class={`shrink-0 border-line bg-side ${md() ? "h-full min-h-0 border-r" : "max-h-60 border-b"}`}
-                  style={md() ? { width: navWidth() } : undefined}
-                >
-                  <If when={md()}>
-                    <Splitter pane="settingsNav" side="right" width={navWidth()} min={184} max={320} label={t("web.setting.nav.width")} />
-                  </If>
-                  <View class="shrink-0 px-2.5 pt-3 pb-2.5">
-                    <SearchField
-                      testid="settings-search"
-                      clearTestid="settings-search-clear"
-                      value={query()}
-                      onInput={(v) => query.set(v)}
-                      placeholder={t("web.setting.nav.search")}
-                      label={t("web.setting.nav.search")}
-                    />
-                  </View>
-                  <Scroll class={md() ? "min-h-0 flex-1" : "shrink"} contentClass="gap-4 px-2.5 pb-3">
-                    <If when={workspaceShown().length > 0}>
-                      <NavGroup title={t("web.setting.nav.groupWorkspace")}>
-                        <Each of={workspaceShown()} key={(s) => s.id}>
-                          {(s) => <SectionLink section={s()} current={s().id === current().id} />}
-                        </Each>
-                      </NavGroup>
-                    </If>
-                    <If when={connectShown().length > 0}>
-                      <NavGroup title={t("web.setting.nav.groupConnect")}>
-                        <Each of={connectShown()} key={(s) => s.id}>
-                          {(s) => <SectionLink section={s()} current={s().id === current().id} />}
-                        </Each>
-                      </NavGroup>
-                    </If>
-                  </Scroll>
-                  <If when={aboutShown().length > 0}>
-                    <View class="shrink-0 border-t border-line px-2.5 py-2.5">
-                      <Text class="px-2.5 pt-0.5 pb-1 text-2xs font-semibold text-faint">{t("web.setting.nav.groupAbout")}</Text>
-                      <View class="gap-0.5">
-                        <Each of={aboutShown()} key={(s) => s.id}>
-                          {(s) => <SectionLink section={s()} current={s().id === current().id} />}
-                        </Each>
-                      </View>
-                    </View>
-                  </If>
-                </View>
-                <If
-                  when={current().id === "skills"}
-                  else={
-                    <Scroll testID={`settings-${current().id}`} class="min-h-0 min-w-0 flex-1 bg-page" contentClass={md() ? "px-8 py-7" : "px-5 py-5"}>
-                      <Each of={[current()]} key={(s) => s.id}>
-                        {(s) => <SectionBody id={s().id} connectorId={connectorId()} />}
-                      </Each>
-                    </Scroll>
-                  }
-                >
-                  <View testID="settings-skills" class={`min-h-0 min-w-0 flex-1 bg-page ${md() ? "px-8 py-7" : "px-5 py-5"}`}>
-                    <SkillsPage id={skillId()} />
-                  </View>
-                </If>
+    <If when={section()} else={<Navigate href="/settings/general" />}>
+      {(current) => (
+        <SettingsSearch.Provider value={q}>
+          <View class={`h-full min-h-0 flex-1 ${md() ? "flex-row" : ""}`}>
+            <View
+              testID="settings-nav"
+              accessibilityLabel={t("web.setting.nav.label")}
+              class={`shrink-0 border-line bg-side ${md() ? "h-full min-h-0 border-r" : "max-h-60 border-b"}`}
+              style={md() ? { width: navWidth() } : undefined}
+            >
+              <If when={md()}>
+                <Splitter pane="settingsNav" side="right" width={navWidth()} min={184} max={320} label={t("web.setting.nav.width")} />
+              </If>
+              <View class="shrink-0 px-2.5 pt-3 pb-2.5">
+                <SearchField
+                  testid="settings-search"
+                  clearTestid="settings-search-clear"
+                  value={query()}
+                  onInput={(v) => query.set(v)}
+                  placeholder={t("web.setting.nav.search")}
+                  label={t("web.setting.nav.search")}
+                />
               </View>
-            </SettingsSearch.Provider>
-          )}
-        </If>
-      }
-    >
-      {(target) => <Navigate href={target()} />}
+              <Scroll class={md() ? "min-h-0 flex-1" : "shrink"} contentClass="gap-4 px-2.5 pb-3">
+                <If when={workspaceShown().length > 0}>
+                  <NavGroup title={t("web.setting.nav.groupWorkspace")}>
+                    <Each of={workspaceShown()} key={(s) => s.id}>
+                      {(s) => <SectionLink section={s()} current={s().id === current().id} />}
+                    </Each>
+                  </NavGroup>
+                </If>
+                <If when={connectShown().length > 0}>
+                  <NavGroup title={t("web.setting.nav.groupConnect")}>
+                    <Each of={connectShown()} key={(s) => s.id}>
+                      {(s) => <SectionLink section={s()} current={s().id === current().id} />}
+                    </Each>
+                  </NavGroup>
+                </If>
+              </Scroll>
+              <If when={aboutShown().length > 0}>
+                <View class="shrink-0 border-t border-line px-2.5 py-2.5">
+                  <Text class="px-2.5 pt-0.5 pb-1 text-2xs font-semibold text-faint">{t("web.setting.nav.groupAbout")}</Text>
+                  <View class="gap-0.5">
+                    <Each of={aboutShown()} key={(s) => s.id}>
+                      {(s) => <SectionLink section={s()} current={s().id === current().id} />}
+                    </Each>
+                  </View>
+                </View>
+              </If>
+            </View>
+            <If
+              when={current().id === "skills"}
+              else={
+                <Scroll testID={`settings-${current().id}`} class="min-h-0 min-w-0 flex-1 bg-page" contentClass={md() ? "px-8 py-7" : "px-5 py-5"}>
+                  <Each of={[current()]} key={(s) => s.id}>
+                    {(s) => <SectionBody id={s().id} connectorId={connectorId()} />}
+                  </Each>
+                </Scroll>
+              }
+            >
+              <View testID="settings-skills" class={`min-h-0 min-w-0 flex-1 bg-page ${md() ? "px-8 py-7" : "px-5 py-5"}`}>
+                <SkillsPage id={skillId()} />
+              </View>
+            </If>
+          </View>
+        </SettingsSearch.Provider>
+      )}
     </If>
   );
 }

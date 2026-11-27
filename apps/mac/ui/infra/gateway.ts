@@ -46,8 +46,12 @@ function subscribe<E>(name: SubscriptionName, payload: unknown, event: z.ZodType
       (raw) => {
         if (done || stopped) return;
         const parsed = event.safeParse(raw);
-        if (parsed.success) on(parsed.data);
-        else finish(false);
+        if (parsed.success) {
+          on(parsed.data);
+        } else {
+          console.error(`[gateway] dropped malformed subscription event (${name})`, { issues: parsed.error.issues });
+          finish(false);
+        }
       },
       (why) => finish(why?.bizCode === unreachable),
     );

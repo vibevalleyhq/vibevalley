@@ -5,7 +5,6 @@ import { t } from "@vibevalley/i18n";
 import { type Channel, type ChatMessage, type MessageHit, userId } from "@vibevalley/protocol";
 import { channelOf, defaultOf, isFreeUserSession, sessionChannelId, sessionProfile } from "@vibevalley/protocol/rules";
 
-import { createAct } from "../../../design/act";
 import { Dialog } from "../../../design/Dialog";
 import { OrchestratorFace, UserFace } from "../../../design/domain/Face";
 import { Select, TextInput } from "../../../design/Field";
@@ -13,6 +12,7 @@ import { Icon } from "../../../design/Icon";
 import { CountPill } from "../../../design/Tag";
 import { Bubble } from "../../../design/Tip";
 import { toast } from "../../../design/toasts";
+import { createAct } from "../../../infra/act";
 import { useOrchestrators } from "../../../infra/agents";
 import { api } from "../../../infra/api";
 import { Keyed, useNow } from "../../../infra/base/dom";

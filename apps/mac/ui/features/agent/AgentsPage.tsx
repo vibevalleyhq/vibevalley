@@ -3,7 +3,6 @@ import { Scroll, signal, Text, View, windowSize, type JSX } from "nsh";
 import { t } from "@vibevalley/i18n";
 import { type Agent, defaultOrchestrator, type RuntimeInfo, TemplateCategoryValues } from "@vibevalley/protocol";
 
-import { createAct } from "../../design/act";
 import { Button, ButtonLink } from "../../design/Button";
 import { AgentCodeBadge, AgentFace, AgentModeBadge, OrchestratorFace } from "../../design/domain/Face";
 import { SearchField } from "../../design/Field";
@@ -14,6 +13,7 @@ import { Segmented } from "../../design/Segmented";
 import { CountPill, Dot } from "../../design/Tag";
 import { TextLink } from "../../design/TextLink";
 import { Bubble } from "../../design/Tip";
+import { createAct } from "../../infra/act";
 import { useAgentProblems, useOrchestrators, useWorkAgents } from "../../infra/agents";
 import { api } from "../../infra/api";
 import { ready, useAgentTemplates, useQueryClient, useRuntimes } from "../../infra/query";
@@ -218,6 +218,7 @@ function AgentsPage() {
             when={!noMatches()}
             else={
               <Empty
+                variant="filtered"
                 compact
                 testid="agents-empty-search"
                 icon="search"

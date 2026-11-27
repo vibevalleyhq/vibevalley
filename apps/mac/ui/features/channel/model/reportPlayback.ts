@@ -3,10 +3,10 @@ import { cleanup, signal } from "nsh";
 import type { Agent, ChatMessage, MediaSpeechRequest, ProviderStatus } from "@vibevalley/protocol";
 
 import { api } from "../../../infra/api";
+import { followed } from "../../../infra/channelFollow";
 import { providerQuery, ready, useAgents, useQuery } from "../../../infra/query";
 import { createEffect } from "../../../infra/solid";
 import { playSpeech } from "../../media";
-import { followed } from "./follow";
 
 export const listenToReports = signal(false);
 

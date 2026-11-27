@@ -2,11 +2,15 @@ import { cleanup, computed, openUrl, safeArea, Text, untracked, View, type JSX }
 import { Input, TextView, type TextViewClasses } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
+import { TACTILE_PRESS_CLASS } from "@vibevalley/protocol/ui";
 
 import type { IconName } from "../../design/icons";
+import { motionClass } from "../infra/motion";
 import { Icon } from "./Icon";
 import type { MobileLayout } from "./layout";
 import { mix } from "./tone";
+
+const TACTILE_PRESS = TACTILE_PRESS_CLASS;
 
 export function useTimeout(): (fn: () => void, ms: number) => void {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -107,7 +111,7 @@ export function TopBar(props: {
             testID={props.backTestID ?? "topbar-back"}
             accessibilityLabel="Back"
             onPress={() => onBack()()}
-            class="size-8 shrink-0 items-center justify-center rounded-lg border border-line bg-page active:bg-hover"
+            class={`size-8 shrink-0 items-center justify-center rounded-lg border border-line bg-page active:bg-hover ${motionClass(TACTILE_PRESS)}`}
           >
             <Icon name="back" size={16} tone="ink" />
           </View>
@@ -135,7 +139,7 @@ export function SectionCard(props: {
       role={props.onPress ? "button" : undefined}
       accessibilityLabel={props.accessibilityLabel}
       onPress={props.onPress}
-      class={`rounded-xl border border-line bg-elevated p-3.5 shadow-raise ${props.onPress ? "active:bg-hover" : ""} ${props.class ?? ""}`}
+      class={`rounded-xl border border-line bg-elevated p-3.5 shadow-raise ${props.onPress ? `active:bg-hover ${motionClass(TACTILE_PRESS)}` : ""} ${props.class ?? ""}`}
     >
       {props.children}
     </View>
@@ -194,7 +198,7 @@ export function PillButton(props: {
         "flex-row items-center justify-center gap-1.5 rounded-full border",
         small() ? "h-8 px-3" : "h-10 px-4",
         buttonSurface[tone()],
-        disabled() ? "opacity-50" : "",
+        disabled() ? "opacity-50" : motionClass(TACTILE_PRESS),
         props.class ?? "",
       ].join(" ")}
     >
@@ -292,7 +296,7 @@ export function SearchInput(props: {
           testID={props.clearTestID}
           accessibilityLabel={props.clearLabel ?? t("web.session.hub.clear")}
           onPress={() => props.onInput("")}
-          class="size-6 shrink-0 items-center justify-center rounded-full active:bg-hover"
+          class={`size-6 shrink-0 items-center justify-center rounded-full active:bg-hover ${motionClass(TACTILE_PRESS)}`}
         >
           <Icon name="close" size={12} tone="muted" />
         </View>

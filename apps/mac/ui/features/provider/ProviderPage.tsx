@@ -1,4 +1,12 @@
-import type { ModelCapability, ProviderBinding, ProviderConnectionAdapter, ProviderScene, ProviderStatus, ProviderUpdate } from "@vibevalley/protocol";
+import {
+  type ModelCapability,
+  ModelCapabilityValues,
+  type ProviderBinding,
+  type ProviderConnectionAdapter,
+  type ProviderScene,
+  type ProviderStatus,
+  type ProviderUpdate,
+} from "@vibevalley/protocol";
 
 export interface ProviderVendorMeta {
   readonly adapter: ProviderConnectionAdapter;
@@ -30,7 +38,7 @@ export const PROVIDER_CATALOG: readonly [ProviderVendorMeta, ...ProviderVendorMe
     consoleUrl: "https://platform.minimaxi.com/",
     consoleLabel: "platform.minimaxi.com",
     keyPlaceholder: "eyJ… / sk-…",
-    capabilities: ["chat", "tts", "asr", "vision"],
+    capabilities: ModelCapabilityValues.filter((c) => c !== "realtime" && c !== "image"),
   },
   {
     adapter: "moss",
@@ -40,7 +48,7 @@ export const PROVIDER_CATALOG: readonly [ProviderVendorMeta, ...ProviderVendorMe
     consoleUrl: "https://platform.moss.cn/",
     consoleLabel: "platform.moss.cn",
     keyPlaceholder: "sk-…",
-    capabilities: ["asr", "tts", "realtime", "vision", "image"],
+    capabilities: ModelCapabilityValues.filter((c) => c !== "chat"),
   },
   {
     adapter: "openai",
@@ -50,7 +58,7 @@ export const PROVIDER_CATALOG: readonly [ProviderVendorMeta, ...ProviderVendorMe
     consoleUrl: "https://platform.openai.com/api-keys",
     consoleLabel: "platform.openai.com",
     keyPlaceholder: "sk-…",
-    capabilities: ["chat", "vision", "asr", "tts", "realtime", "image"],
+    capabilities: [...ModelCapabilityValues],
   },
   {
     adapter: "anthropic",

@@ -3,7 +3,6 @@ import { Clipboard, computed, signal, Text, View } from "nsh";
 import { t } from "@vibevalley/i18n";
 import type { McpHostId, McpHostInfo, McpInstallStatus, McpTransportKind } from "@vibevalley/protocol";
 
-import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
 import { RuntimeIcon } from "../../design/domain/RuntimeIcon";
 import { SettingRow, SettingsGroup, SettingsPage } from "../../design/domain/settings";
@@ -13,6 +12,7 @@ import { Banner, Quiet } from "../../design/layout";
 import { Segmented } from "../../design/Segmented";
 import { Tag, type TagTone } from "../../design/Tag";
 import { toast } from "../../design/toasts";
+import { createAct } from "../../infra/act";
 import { api, reasonOf } from "../../infra/api";
 import { defineQuery, ready, retryRead, useQuery, useQueryClient } from "../../infra/query";
 
@@ -132,8 +132,8 @@ function McpHostCard(props: {
       <If when={props.host.configPath}>
         {(path) => (
           <SettingRow label={t("web.setting.mcp.configPath")}>
-            <View class="max-w-96 rounded-md border border-line bg-side px-2 py-0.5">
-              <Text class="select-text truncate font-mono text-xs text-muted">{path()}</Text>
+            <View class="min-w-0 max-w-full rounded-md border border-line bg-side px-2 py-0.5">
+              <Text class="min-w-0 select-text truncate font-mono text-xs text-muted">{path()}</Text>
             </View>
           </SettingRow>
         )}

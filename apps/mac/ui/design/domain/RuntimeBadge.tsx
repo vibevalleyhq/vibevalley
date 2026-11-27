@@ -3,8 +3,8 @@ import { Image, View } from "nsh";
 import { t } from "@vibevalley/i18n";
 import type { RuntimeInfo } from "@vibevalley/protocol";
 
-import { ready, useRuntimes } from "../../infra/query";
 import { engineLogoUrl, useAssetsDir } from "../art";
+import { useDesignHost } from "../host";
 import { Icon } from "../Icon";
 import { Bubble } from "../Tip";
 
@@ -16,9 +16,9 @@ export const initialOf = (name: string) => ([...name.trim()][0] ?? "?").toUpperC
 
 /** The execution engine badge stamped on a profile or session portrait. */
 export function RuntimeBadge(props: { runtime: string; size: number }) {
-  const runtimes = useRuntimes();
+  const runtimes = useDesignHost().useRuntimes();
   const assetsDir = useAssetsDir();
-  const name = () => runtimeName(ready(runtimes, []), props.runtime);
+  const name = () => runtimeName(runtimes(), props.runtime);
   const label = () => t("web.base.runtime", { name: name() });
   const logo = () => {
     const dir = assetsDir();

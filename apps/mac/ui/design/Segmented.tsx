@@ -1,6 +1,6 @@
 import { Text, untracked, View, type ViewRef } from "nsh";
 
-import { isVdpEnabled, useVdpNode } from "../infra/vdpProbe";
+import { useDesignHost } from "./host";
 import { Icon } from "./Icon";
 import type { IconName } from "./icons";
 import { Bubble } from "./Tip";
@@ -48,11 +48,12 @@ export function Segmented<T extends string>(props: {
           const disabled = () => o().disabled === true;
           const title = () => o().title;
           let optRef: ViewRef | undefined;
-          const vdpId = isVdpEnabled()
+          const designHost = useDesignHost();
+          const vdpId = designHost.isProbeEnabled()
             ? untracked(() => (props.testid !== undefined && props.testid !== "" ? `${props.testid}-${o().value}` : undefined))
             : undefined;
           if (vdpId !== undefined) {
-            useVdpNode({
+            designHost.useProbe({
               testId: vdpId,
               role: "radio",
               text: () => o().label,

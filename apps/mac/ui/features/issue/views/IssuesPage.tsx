@@ -1,140 +1,52 @@
-import { cleanup, keymap, Scroll, signal, Text, untracked, View, windowSize, type JSX } from "nsh";
-import { Popover } from "nsh/base";
+import { cleanup, keymap, signal, Text, untracked, View } from "nsh";
 
-import { list, t } from "@vibevalley/i18n";
-import type { Issue, Session } from "@vibevalley/protocol";
+import { t } from "@vibevalley/i18n";
 import { assignedAgentOf, omitUndefined } from "@vibevalley/protocol/rules";
-import { IssueStatus as IssueStatusSchema } from "@vibevalley/protocol/schema";
 
-import { createAct } from "../../../design/act";
-import { Button } from "../../../design/Button";
-import { SearchField, Select } from "../../../design/Field";
-import { Icon } from "../../../design/Icon";
-import { IconButton } from "../../../design/IconButton";
-import { motionClass, motionDuration } from "../../../design/motion";
-import { Segmented } from "../../../design/Segmented";
-import { CountPill } from "../../../design/Tag";
-import { Bubble } from "../../../design/Tip";
+import { motionDuration } from "../../../design/motion";
 import { toast } from "../../../design/toasts";
+import { createAct } from "../../../infra/act";
 import { useOrchestrators } from "../../../infra/agents";
 import { api, reasonOf } from "../../../infra/api";
-import { variant } from "../../../infra/base/dom";
 import { useBoardSlice, useRefreshSlice, useSessionsSlice } from "../../../infra/frame";
+import { writeIssue } from "../../../infra/issueActions";
 import { useQueryClient } from "../../../infra/query";
 import { useRouter, useSearchValues } from "../../../infra/router";
-import { createMemo, createEffect } from "../../../infra/solid";
+import { createEffect, createMemo } from "../../../infra/solid";
 import { useIntents } from "../../../infra/state/intent";
 import { pendingNewIssue } from "../../../infra/state/issueDraft";
 import { rememberPick } from "../../../infra/state/prefs";
 import { useVdpNode } from "../../../infra/vdpProbe";
 import { BacklogTriagePanel } from "../../dashboard";
-import {
-  type BoardCard,
-  type BoardFilter,
-  buildCards,
-  cardAgent,
-  cardMove,
-  cardRepo,
-  cardTags,
-  filterAny,
-  filterShows,
-  type Lane,
-  noFilter,
-} from "../model/cards";
-import { type BoardLook, boardLook, boardViews, type GroupBy, type HierarchyMode, hierarchyShows, viewLabel } from "../model/display";
-import { useIssueHistory, useNameOf } from "../model/history";
+import { type BoardCard, type BoardFilter, buildCards, cardMove, cardRepo, filterAny, filterShows, type Lane, noFilter } from "../model/cards";
+import { boardLook, type GroupBy, type HierarchyMode, hierarchyShows } from "../model/display";
+import { useIssueHistory } from "../model/history";
 import { issueIs } from "../model/issue";
-import { type IssueScope, issueScopes, issueTagPresets } from "../model/meta";
-import { issueMove, movedCards, sendMove } from "../model/moves";
+import type { IssueScope } from "../model/meta";
+import { issueMove, movedCards, type PendingPlacement, placedCards, sendMove } from "../model/moves";
 import { issueSearch } from "../model/navigation";
-import { orderedVisibleCardIds, selectRange, stepFocusId, toggleSelection } from "../model/triage";
-import { issueSet, labeledIssue, sendLabel, writeIssue } from "../model/write";
-import { BatchTriageBar } from "./BatchTriageBar";
+import { orderedVisibleCardIds, stepFocusId } from "../model/triage";
+import { issueSet, labeledIssue, sendLabel } from "../model/write";
 import { IssueBoard } from "./Board";
 import { CloseIssueDialog, ReopenDialog } from "./CloseDialog";
-import { DisplayMenu } from "./DisplayMenu";
-import { FamilyDetail } from "./FamilyDetail";
 import { IssueCalendar } from "./IssueCalendar";
-import { IssueDetail, OrchestratorIssueDetail } from "./IssueDetail";
 import { IssueList, type ListAdd } from "./IssueList";
 import { IssuePeekModal } from "./IssuePeekModal";
+import { Detail, IssueView } from "./issues/IssueDetailView";
+import { IssuesToolbar } from "./issues/IssuesToolbar";
+import {
+  effectiveIssueOverlay,
+  initialIssueOverlay,
+  isIssueOverlayBlocking,
+  type IssueOverlay,
+  type IssueOverlayEvent,
+  issueOverlayTransition,
+} from "./issues/overlay";
 import { IssueTimeline } from "./IssueTimeline";
 import { NewIssue, type NewIssueAt } from "./NewIssue";
-import { createIssueChrome, IssueChromeContext, IssueNumberPill } from "./Sheet";
-import { dispatchedNotice, TodoDetail } from "./TodoDetail";
+import { dispatchedNotice } from "./TodoDetail";
 
-export type IssueOverlay =
-  | { readonly kind: "none" }
-  | { readonly kind: "peeking"; readonly id: string }
-  | { readonly kind: "new"; readonly at: NewIssueAt }
-  | {
-      readonly kind: "closing";
-      readonly issue: Issue;
-      readonly session: Session | undefined;
-      readonly review: boolean;
-      readonly lane?: Lane;
-      readonly returnPeekId?: string;
-    }
-  | { readonly kind: "reopening"; readonly issue: Issue; readonly lane: Lane };
-
-export type IssueOverlayEvent =
-  | { readonly kind: "peek"; readonly id: string }
-  | { readonly kind: "openNew"; readonly at: NewIssueAt }
-  | { readonly kind: "openClose"; readonly issue: Issue; readonly session: Session | undefined; readonly review: boolean; readonly lane?: Lane }
-  | { readonly kind: "openReopen"; readonly issue: Issue; readonly lane: Lane }
-  | { readonly kind: "dismiss" }
-  | { readonly kind: "clear" };
-
-export function initialIssueOverlay(): IssueOverlay {
-  return { kind: "none" };
-}
-
-export function issueOverlayTransition(state: IssueOverlay, event: IssueOverlayEvent): IssueOverlay {
-  switch (event.kind) {
-    case "peek":
-      return { kind: "peeking", id: event.id };
-    case "openNew":
-      return { kind: "new", at: event.at };
-    case "openClose": {
-      const returnPeekId = state.kind === "peeking" ? state.id : state.kind === "closing" ? state.returnPeekId : undefined;
-      return {
-        kind: "closing",
-        issue: event.issue,
-        session: event.session,
-        review: event.review,
-        ...(event.lane !== undefined ? { lane: event.lane } : {}),
-        ...(returnPeekId !== undefined ? { returnPeekId } : {}),
-      };
-    }
-    case "openReopen":
-      return { kind: "reopening", issue: event.issue, lane: event.lane };
-    case "dismiss":
-      if (state.kind === "closing" && state.returnPeekId !== undefined) {
-        return { kind: "peeking", id: state.returnPeekId };
-      }
-      return { kind: "none" };
-    case "clear":
-      return { kind: "none" };
-  }
-}
-
-export function effectiveIssueOverlay(state: IssueOverlay, rest: string, routeDefaults: NewIssueAt, openId: string | undefined): IssueOverlay {
-  if (rest === "new") return { kind: "new", at: routeDefaults };
-  if (openId !== undefined && state.kind === "peeking") return { kind: "none" };
-  return state;
-}
-
-export function isIssueOverlayBlocking(state: IssueOverlay): boolean {
-  switch (state.kind) {
-    case "none":
-      return false;
-    case "peeking":
-    case "new":
-    case "closing":
-    case "reopening":
-      return true;
-  }
-}
+export { effectiveIssueOverlay, initialIssueOverlay, isIssueOverlayBlocking, type IssueOverlay, type IssueOverlayEvent, issueOverlayTransition };
 
 /** `rest` is the path after /issues/. */
 export function IssuesPage(props: { rest: string }) {
@@ -252,10 +164,12 @@ export function IssuesPage(props: { rest: string }) {
   const orchestrators = useOrchestrators();
   const orchestratorIds = createMemo(() => new Set(orchestrators().map((a) => a.id)));
   const moves = useIntents(issueMove);
+  const pendingPlacements = signal<readonly PendingPlacement[]>([]);
   const labelSets = useIntents(issueSet);
   const act = createAct();
   const all = createMemo(() => {
-    const cards = movedCards(buildCards(history.rows() ?? [], board(), sessions()?.sessions, orchestratorIds()), moves.list());
+    const base = buildCards(history.rows() ?? [], board(), sessions()?.sessions, orchestratorIds());
+    const cards = placedCards(movedCards(base, moves.list()), pendingPlacements());
     const pendingLabels = labelSets.list();
     if (pendingLabels.length === 0) return cards;
     return cards.map((c) => ({ ...c, issue: labeledIssue(c.issue, pendingLabels).issue }));
@@ -267,12 +181,6 @@ export function IssuesPage(props: { rest: string }) {
   const visibleCards = createMemo(() => shown().filter((c) => hierarchyShows(effectiveHierarchy(), c, allIssues())));
   const orderedIds = createMemo(() => orderedVisibleCardIds(visibleCards(), look(), allIssues(), older(), Date.now(), board()?.boardSummary));
   const focusedId = signal<string | undefined>(undefined);
-  const selectedIds = signal<ReadonlySet<string>>(new Set());
-  const selectionAnchor = signal<string | undefined>(undefined);
-  const clearSelection = () => {
-    selectedIds.set(new Set());
-    selectionAnchor.set(undefined);
-  };
   createEffect(
     () =>
       allIssues()
@@ -280,10 +188,6 @@ export function IssuesPage(props: { rest: string }) {
         .join("\0"),
     () => {
       const known = new Set<string>(allIssues().map((i) => i.id));
-      const cur = untracked(selectedIds);
-      if (cur.size > 0 && [...cur].some((item) => !known.has(item))) {
-        selectedIds.set(new Set([...cur].filter((item) => known.has(item))));
-      }
       const focus = untracked(focusedId);
       if (focus !== undefined && !known.has(focus)) {
         focusedId.set(undefined);
@@ -295,23 +199,6 @@ export function IssuesPage(props: { rest: string }) {
     const cur = focusedId();
     if (cur !== undefined && orderedIds().includes(cur)) return cur;
     return returnTo();
-  };
-  const selectedIssues = createMemo(() => {
-    const ids = selectedIds();
-    if (ids.size === 0) return [];
-    return allIssues().filter((item) => ids.has(item.id));
-  });
-  const handleToggleSelect = (targetId: string, opts: { range: boolean }) => {
-    if (opts.range) {
-      const next = selectRange(untracked(selectedIds), orderedIds(), untracked(selectionAnchor) ?? untracked(focusedId), targetId);
-      selectedIds.set(next);
-      if (untracked(selectionAnchor) === undefined) selectionAnchor.set(targetId);
-    } else {
-      const next = toggleSelection(untracked(selectedIds), targetId);
-      selectedIds.set(next);
-      selectionAnchor.set(next.has(targetId) ? targetId : undefined);
-    }
-    focusedId.set(targetId);
   };
   const card = createMemo(() => {
     const at = id();
@@ -347,26 +234,55 @@ export function IssuesPage(props: { rest: string }) {
 
   const place = async (c: BoardCard, before: string | undefined) => {
     if (c.id === before) return;
-    await act.run(() => api.issue.update(omitUndefined({ id: c.id, before })));
+    const laneCards = visibleCards().filter((item) => item.lane === c.lane);
+    const curIdx = laneCards.findIndex((item) => item.id === c.id);
+    if (curIdx !== -1) {
+      if (before === undefined && curIdx === laneCards.length - 1) return;
+      if (before !== undefined && laneCards[curIdx + 1]?.id === before) return;
+    }
+    const targetBefore = before ?? "";
+    const entry: PendingPlacement = { id: c.id, before: targetBefore };
+    pendingPlacements.set([...untracked(pendingPlacements).filter((p) => p.id !== c.id), entry]);
+    try {
+      await act.run(() => api.issue.update({ id: c.id, before: targetBefore }));
+    } finally {
+      pendingPlacements.set(untracked(pendingPlacements).filter((p) => p !== entry));
+    }
   };
 
-  /** Asked about first where it cannot be undone. A backlog/todo dropped back on its own lane goes last. */
-  const drop = async (c: BoardCard, to: Lane) => {
-    if (c.kind === "todo" && (c.lane === "backlog" || c.lane === "todo") && to === c.lane) return place(c, undefined);
+  /** Asked about first where it cannot be undone. Cross-lane drops forward `before` so rank persists with status. */
+  const drop = async (c: BoardCard, to: Lane, before?: string) => {
+    if (c.kind === "todo" && c.lane === to) return place(c, before === "" ? undefined : before);
     const move = cardMove(c, to);
+    const rankEdit = c.kind === "todo" && before !== undefined ? { before } : undefined;
     if (move === "start" && (c.kind === "todo" || c.kind === "family")) {
       if (!assignedAgentOf(c.issue) || !c.issue.repo) {
         toast(t("web.issue.page.pickFirst"));
         return;
       }
-      const done = await sendMove(moves, { id: c.id, status: "todo", lane: to }).done;
+      const done = await sendMove(moves, {
+        id: c.id,
+        status: "todo",
+        lane: to,
+        ...(rankEdit ? { before: rankEdit.before, edit: rankEdit } : {}),
+      }).done;
       if (done?.replied) notice(done.replied.reply);
     } else if (move === "track") {
-      await sendMove(moves, { id: c.id, status: to, lane: to }).done;
+      await sendMove(moves, {
+        id: c.id,
+        status: to,
+        lane: to,
+        ...(rankEdit ? { before: rankEdit.before, edit: rankEdit } : {}),
+      }).done;
     } else if (move === "close" && c.kind === "todo") {
       await sendMove(moves, { id: c.id, status: to, lane: to }).done;
     } else if (move === "revive") {
-      await sendMove(moves, { id: c.id, status: "backlog", lane: to }).done;
+      await sendMove(moves, {
+        id: c.id,
+        status: "backlog",
+        lane: to,
+        ...(rankEdit ? { before: rankEdit.before, edit: rankEdit } : {}),
+      }).done;
     } else if (move === "close" && c.kind === "issue" && c.session) {
       dispatchOverlay({ kind: "openClose", issue: c.issue, session: c.session, review: false, lane: to });
     } else if (move === "close" && c.kind === "family") {
@@ -439,17 +355,9 @@ export function IssuesPage(props: { rest: string }) {
           const target = untracked(focusedId);
           if (target !== undefined && orderedIds().includes(target)) open(target);
         },
-        x: () => {
-          const target = untracked(focusedId);
-          if (target !== undefined && orderedIds().includes(target)) handleToggleSelect(target, { range: false });
-        },
       },
       { when: "notEditing" },
     );
-  });
-  createEffect(() => {
-    if (selectedIds().size === 0 || !canNavigateBoard()) return;
-    return keymap.bind("escape", clearSelection, { when: "notEditing" });
   });
   const keepNew = async (words: string, where: NewIssueAt, requestKey: string) => {
     const made = await act.run(() =>
@@ -483,7 +391,7 @@ export function IssuesPage(props: { rest: string }) {
                 {reasonOf(history.error())}
               </Text>
             </If>
-            <Toolbar
+            <IssuesToolbar
               filter={filter()}
               cards={all()}
               shown={visibleCards().length}
@@ -528,11 +436,9 @@ export function IssuesPage(props: { rest: string }) {
                         filtered={filterAny(filter()) || effectiveHierarchy() !== "all"}
                         loading={history.loading()}
                         selected={activeFocusId()}
-                        selectedIds={selectedIds()}
                         density={look().density}
                         fields={look().fields}
                         onOpen={peek}
-                        onToggleSelect={handleToggleSelect}
                         onUpdateDates={updateScheduleDates}
                         onNew={startNew}
                         onClearFilter={() => setFilter(noFilter)}
@@ -546,7 +452,6 @@ export function IssuesPage(props: { rest: string }) {
                     filtered={filterAny(filter()) || effectiveHierarchy() !== "all"}
                     loading={history.loading()}
                     selected={activeFocusId()}
-                    selectedIds={selectedIds()}
                     older={older()}
                     grouping={look().grouping}
                     groupBy={effectiveGroupBy()}
@@ -556,7 +461,6 @@ export function IssuesPage(props: { rest: string }) {
                     fields={look().fields}
                     onOlder={() => older.set(!older())}
                     onOpen={peek}
-                    onToggleSelect={handleToggleSelect}
                     onAdd={addInList}
                     onClearFilter={() => setFilter(noFilter)}
                   />
@@ -570,7 +474,6 @@ export function IssuesPage(props: { rest: string }) {
                 filtered={filterAny(filter()) || effectiveHierarchy() !== "all"}
                 loading={history.loading()}
                 selected={activeFocusId()}
-                selectedIds={selectedIds()}
                 older={older()}
                 ordering={look().ordering}
                 groupBy={effectiveGroupBy()}
@@ -579,17 +482,13 @@ export function IssuesPage(props: { rest: string }) {
                 fields={look().fields}
                 onOlder={() => older.set(!older())}
                 onOpen={peek}
-                onToggleSelect={handleToggleSelect}
-                onDrop={(c, to) => void drop(c, to)}
+                onDrop={(c, to, before) => void drop(c, to, before)}
                 onRetry={(c) => void retry(c)}
                 onPutBack={(c) => c.move && moves.drop(c.move.key)}
                 onPlace={(c, before) => void place(c, before)}
                 onNew={() => startNew({})}
                 onClearFilter={() => setFilter(noFilter)}
               />
-            </If>
-            <If when={selectedIssues().length > 0}>
-              <BatchTriageBar selectedIssues={selectedIssues()} allIssues={allIssues()} onClear={clearSelection} />
             </If>
           </>
         }
@@ -650,449 +549,6 @@ export function IssuesPage(props: { rest: string }) {
       <If when={reopeningOverlay()}>
         {(r) => <ReopenDialog issue={r().issue} lane={r().lane} onClose={() => dispatchOverlay({ kind: "dismiss" })} onReopened={() => open(r().issue.id)} />}
       </If>
-    </View>
-  );
-}
-
-/** The open card. */
-function Detail(props: {
-  id: string;
-  cards: () => BoardCard[];
-  known: boolean;
-  open: (id: string | undefined) => void;
-  onClose: (issue: Issue, session: Session | undefined, review: boolean) => void;
-}) {
-  const card = createMemo<BoardCard | undefined>(
-    // By its id, a session of it, or its number (#12 in a message links to /issues/12).
-    (last) => props.cards().find((c) => c.id === props.id || issueIs(c.issue, props.id) || String(c.issue.number) === props.id) ?? last,
-  );
-  /** Only read inside that kind's panel: it throws once the card is another kind. */
-  const cardOf = <const K extends BoardCard["kind"]>(kind: K) => {
-    const c = card();
-    const of = c && variant(c, "kind", kind);
-    if (!of) throw new Error(`the card is no longer a ${kind}`);
-    return of;
-  };
-  /** What a panel is keyed by (a one-row Each, as VibeValley's keyed Match): the card's kind and the thing it shows. */
-  const shows = (kind: BoardCard["kind"]): string[] => {
-    const c = card();
-    if (c?.kind !== kind) return [];
-    return [c.kind === "issue" ? `issue:${c.sessions.at(-1)?.id ?? ""}` : `${c.kind}:${c.id}`];
-  };
-  return (
-    <If
-      when={card()}
-      else={
-        <Scroll class="min-h-0 flex-1">
-          <View class="w-full max-w-200 self-center px-6 py-8">
-            <If when={props.known} else={<Text class="text-sm text-muted">{t("web.issue.reading")}</Text>}>
-              <View testID="issue-not-found">
-                <Text role="header" class="text-lg font-semibold text-ink">
-                  {t("web.issue.page.notFound")}
-                </Text>
-                <Text class="mt-3 text-sm text-muted">{t("web.issue.page.notFoundLine", { id: props.id })}</Text>
-              </View>
-            </If>
-          </View>
-        </Scroll>
-      }
-    >
-      <Each of={shows("todo")} key={(k) => k}>
-        {() => <TodoDetail item={cardOf("todo").issue} onDone={props.open} />}
-      </Each>
-      <Each of={shows("issue")} key={(k) => k}>
-        {() => (
-          <IssueDetail
-            issue={cardOf("issue").issue}
-            sessions={cardOf("issue").sessions}
-            session={cardOf("issue").session}
-            onClose={(session, review) => props.onClose(cardOf("issue").issue, session, review)}
-            onOpen={props.open}
-            onParent={cardOf("issue").issue.parent ? () => props.open(cardOf("issue").issue.parent) : undefined}
-          />
-        )}
-      </Each>
-      <Each of={shows("orchestrator")} key={(k) => k}>
-        {() => <OrchestratorIssueDetail issue={cardOf("orchestrator").issue} />}
-      </Each>
-      <Each of={shows("missing")} key={(k) => k}>
-        {() => (
-          <Scroll class="min-h-0 flex-1">
-            <View class="w-full max-w-200 self-center px-6 py-8">
-              <Text role="header" class="text-xl font-semibold text-ink">
-                {cardOf("missing").issue.title}
-              </Text>
-              <Text class="mt-3 text-sm text-ink">{t("web.issue.page.missing", { what: list(cardOf("missing").missing) })}</Text>
-            </View>
-          </Scroll>
-        )}
-      </Each>
-      <Each of={shows("family")} key={(k) => k}>
-        {() => (
-          <FamilyDetail
-            issue={cardOf("family").issue}
-            children={cardOf("family").children}
-            onOpen={props.open}
-            onClose={(review) => props.onClose(cardOf("family").issue, undefined, review)}
-          />
-        )}
-      </Each>
-    </If>
-  );
-}
-
-/** An issue's own page, at its URL: Issues or Escape goes back to the board as it was left. */
-function IssueView(props: {
-  onBack: () => void;
-  backLabel: string;
-  issueNumber?: number | undefined;
-  repo?: string | undefined;
-  blocked: () => boolean;
-  children: JSX.Element;
-}) {
-  const chrome = createIssueChrome();
-  // A dialog over the issue takes Escape first (blocked); on narrow screens the drawer closes before the page goes back.
-  keymap.bind(
-    "escape",
-    () => {
-      if (props.blocked()) return;
-      if (!chrome.wide() && chrome.drawerOpen()) {
-        chrome.closeDrawer();
-        return;
-      }
-      props.onBack();
-    },
-    { when: "notEditing" },
-  );
-  return (
-    <IssueChromeContext.Provider value={chrome}>
-      <View testID="issue" class="min-h-0 flex-1">
-        <View
-          testID="issue-topbar"
-          desktop={{ windowDrag: true }}
-          class="h-11 shrink-0 flex-row items-center justify-between gap-2 border-b border-line bg-page px-4"
-        >
-          <View class="min-w-0 flex-1 flex-row items-center gap-2">
-            <View
-              role="button"
-              testID="issue-close"
-              onPress={() => props.onBack()}
-              class={`-ml-2 h-7 shrink-0 flex-row items-center gap-1 rounded-md px-2 ${motionClass("transition-transform duration-120 ease-out")} hover:bg-hover active:translate-y-px`}
-            >
-              <Icon name="back" size={14} tone="muted" />
-              <Text class="text-sm font-medium text-muted">{props.backLabel}</Text>
-            </View>
-            <If when={props.issueNumber !== undefined}>{() => <IssueNumberPill number={props.issueNumber!} />}</If>
-            <If when={props.repo}>
-              {(r) => (
-                <View class="min-w-0 shrink flex-row items-center gap-1 rounded-md border border-line bg-side px-1.5 py-0.5">
-                  <Icon name="folder" size={12} tone="muted" />
-                  <Text class="min-w-0 truncate text-xs font-medium text-muted">{r()}</Text>
-                </View>
-              )}
-            </If>
-          </View>
-          <If when={chrome.hasSheet()}>
-            <IconButton
-              testid="issue-inspector-toggle"
-              icon="sidebarRight"
-              size={14}
-              pressed={chrome.inspectorVisible()}
-              label={t("web.issue.detail.properties")}
-              onClick={() => chrome.toggleInspector()}
-            />
-          </If>
-        </View>
-        <View class="min-h-0 flex-1">{props.children}</View>
-      </View>
-    </IssueChromeContext.Provider>
-  );
-}
-
-function Toolbar(props: {
-  filter: BoardFilter;
-  cards: BoardCard[];
-  shown: number;
-  onFilter: (f: BoardFilter) => void;
-  look: BoardLook;
-  onLook: (l: BoardLook) => void;
-  refreshing: boolean;
-  onRefresh: () => void;
-  onNew: () => void;
-}) {
-  const nameOf = useNameOf();
-  const repos = createMemo(() => [...new Set(props.cards.map(cardRepo).filter((p): p is string => !!p))].toSorted());
-  const agents = createMemo(() =>
-    [...new Set(props.cards.map(cardAgent).filter((a): a is string => !!a))].toSorted((a, b) => nameOf()(a).localeCompare(nameOf()(b))),
-  );
-  const tags = createMemo(() => {
-    const present = props.cards.flatMap(cardTags);
-    return [...new Set([...issueTagPresets(), ...present])];
-  });
-  const repoOptions = createMemo(() => repos().map((p) => ({ value: p, label: p })));
-  const agentOptions = createMemo(() => agents().map((a) => ({ value: a, label: nameOf()(a) })));
-  const tagOptions = createMemo(() => tags().map((tag) => ({ value: tag, label: tag })));
-  const statusOptions = createMemo(() => {
-    const base: { value: string; label: string }[] = IssueStatusSchema.options.map((s) => ({ value: s, label: t(`shared.status.${s}`) }));
-    if (props.filter.status === "todo,in_progress") {
-      return [{ value: "todo,in_progress", label: t("web.issue.page.todoAndInProgress") }, ...base];
-    }
-    return base;
-  });
-  const scopeOptions = createMemo(() =>
-    issueScopes.map((s) => ({
-      value: s,
-      label: t(`web.issue.scope.${s}`),
-    })),
-  );
-  const isFiltered = createMemo(() => filterAny(props.filter));
-  const hasFacetFilter = createMemo(() => props.filter.repo !== "" || props.filter.agent !== "" || props.filter.tag !== "" || props.filter.status !== "");
-  const compactToolbar = () => windowSize().width < 1100;
-  const popoverFilterCount = createMemo(
-    () =>
-      Number(props.filter.scope !== "all") +
-      Number(props.filter.repo !== "") +
-      Number(props.filter.agent !== "") +
-      Number(props.filter.tag !== "") +
-      Number(props.filter.status !== ""),
-  );
-  return (
-    <View testID="issues-toolbar" desktop={{ windowDrag: true }} class="h-11 shrink-0 flex-row items-center gap-2 border-b border-line bg-page px-4">
-      <View class="min-w-0 flex-1 flex-row items-center gap-2">
-        <If when={!compactToolbar()}>
-          <Segmented
-            label={t("web.issue.scope.label")}
-            testid="issue-scope"
-            value={props.filter.scope}
-            onChange={(scope) => props.onFilter({ ...props.filter, scope })}
-            options={scopeOptions()}
-          />
-        </If>
-        <SearchField
-          testid="issue-search"
-          clearTestid="issue-search-clear"
-          value={props.filter.query}
-          onInput={(query) => props.onFilter({ ...props.filter, query })}
-          placeholder={t("web.issue.page.find")}
-          label={t("web.issue.page.findLabel")}
-          class={compactToolbar() ? "w-36 min-w-20 shrink" : "w-32 min-w-16 shrink"}
-        />
-        <If
-          when={!compactToolbar()}
-          else={
-            <Popover
-              placement="bottom"
-              align="start"
-              offset={6}
-              popupClass="w-72 gap-2.5 rounded-lg border border-line bg-elevated p-3 shadow-float"
-              popupStyle={{ maxWidth: Math.max(240, windowSize().width - 24) }}
-              trigger={
-                <View
-                  testID="issue-filter-popover"
-                  role="button"
-                  accessibilityLabel={t("web.issue.page.filter")}
-                  tooltip={<Bubble text={t("web.issue.page.filter")} />}
-                  class={`h-7 shrink-0 flex-row items-center gap-1.5 rounded-md border border-line px-2.5 ${
-                    popoverFilterCount() > 0 ? "bg-selected" : "bg-page hover:bg-hover"
-                  } ${motionClass("transition-transform duration-120 ease-out")} active:translate-y-px`}
-                >
-                  <Icon name="filter" size={14} tone={popoverFilterCount() > 0 ? "accent" : "muted"} />
-                  <Text class="text-sm text-ink">{t("web.issue.page.filter")}</Text>
-                  <If when={popoverFilterCount() > 0}>
-                    <CountPill count={popoverFilterCount()} active />
-                  </If>
-                </View>
-              }
-            >
-              <View testID="issue-filter-popover-menu" accessibilityLabel={t("web.issue.page.filter")} class="gap-2.5">
-                <View class="gap-1">
-                  <Text class="text-xs font-medium text-muted">{t("web.issue.scope.label")}</Text>
-                  <Segmented
-                    label={t("web.issue.scope.label")}
-                    testid="issue-scope"
-                    block
-                    value={props.filter.scope}
-                    onChange={(scope) => props.onFilter({ ...props.filter, scope })}
-                    options={scopeOptions()}
-                  />
-                </View>
-                <View class="gap-1">
-                  <Text class="text-xs font-medium text-muted">{t("web.issue.page.byRepo")}</Text>
-                  <Select
-                    size="control"
-                    class="w-full"
-                    label={t("web.issue.page.byRepo")}
-                    testid="filter-repo"
-                    filter
-                    value={props.filter.repo}
-                    placeholder={t("web.issue.page.allRepos")}
-                    options={repoOptions()}
-                    onChange={(repo) => props.onFilter({ ...props.filter, repo })}
-                  />
-                </View>
-                <View class="gap-1">
-                  <Text class="text-xs font-medium text-muted">{t("web.issue.page.byHelper")}</Text>
-                  <Select
-                    size="control"
-                    class="w-full"
-                    label={t("web.issue.page.byHelper")}
-                    testid="filter-agent"
-                    filter
-                    value={props.filter.agent}
-                    placeholder={t("web.issue.page.allHelpers")}
-                    options={agentOptions()}
-                    onChange={(agent) => props.onFilter({ ...props.filter, agent })}
-                  />
-                </View>
-                <View class="gap-1">
-                  <Text class="text-xs font-medium text-muted">{t("web.issue.tags.byTag")}</Text>
-                  <Select
-                    size="control"
-                    class="w-full"
-                    label={t("web.issue.tags.byTag")}
-                    testid="filter-tag"
-                    filter
-                    value={props.filter.tag}
-                    placeholder={t("web.issue.tags.allTags")}
-                    options={tagOptions()}
-                    onChange={(tag) => props.onFilter({ ...props.filter, tag })}
-                  />
-                </View>
-                <View class="gap-1">
-                  <Text class="text-xs font-medium text-muted">{t("web.issue.page.byStatus")}</Text>
-                  <Select
-                    size="control"
-                    class="w-full"
-                    label={t("web.issue.page.byStatus")}
-                    testid="filter-status"
-                    filter
-                    value={props.filter.status}
-                    placeholder={t("web.issue.page.allStatuses")}
-                    options={statusOptions()}
-                    onChange={(status) => props.onFilter({ ...props.filter, status })}
-                  />
-                </View>
-                <If when={isFiltered()}>
-                  <View class="flex-row items-center justify-between gap-2 border-t border-line pt-2">
-                    <Text class="text-xs text-muted tabular-nums">{t("web.issue.page.shown", { shown: props.shown, of: props.cards.length })}</Text>
-                    <Button size="compact" tone="quiet" testID="filter-clear" onPress={() => props.onFilter(noFilter)}>
-                      {t("web.issue.page.clear")}
-                    </Button>
-                  </View>
-                </If>
-              </View>
-            </Popover>
-          }
-        >
-          <View
-            testID="issue-filter-bar"
-            accessibilityLabel={t("web.issue.page.filter")}
-            class="flex-row items-center rounded-md border border-line bg-side pl-2"
-          >
-            <Icon name="filter" size={14} tone={hasFacetFilter() ? "accent" : "faint"} />
-            <View class="mx-1.5 h-3.5 w-px bg-line" />
-            <Select
-              quiet
-              size="control"
-              class="max-w-24"
-              label={t("web.issue.page.byRepo")}
-              testid="filter-repo"
-              filter
-              value={props.filter.repo}
-              placeholder={t("web.issue.page.allRepos")}
-              options={repoOptions()}
-              onChange={(repo) => props.onFilter({ ...props.filter, repo })}
-            />
-            <View class="h-3.5 w-px bg-line" />
-            <Select
-              quiet
-              size="control"
-              class="max-w-24"
-              label={t("web.issue.page.byHelper")}
-              testid="filter-agent"
-              filter
-              value={props.filter.agent}
-              placeholder={t("web.issue.page.allHelpers")}
-              options={agentOptions()}
-              onChange={(agent) => props.onFilter({ ...props.filter, agent })}
-            />
-            <View class="h-3.5 w-px bg-line" />
-            <Select
-              quiet
-              size="control"
-              class="max-w-22"
-              label={t("web.issue.tags.byTag")}
-              testid="filter-tag"
-              filter
-              value={props.filter.tag}
-              placeholder={t("web.issue.tags.allTags")}
-              options={tagOptions()}
-              onChange={(tag) => props.onFilter({ ...props.filter, tag })}
-            />
-            <View class="h-3.5 w-px bg-line" />
-            <Select
-              quiet
-              size="control"
-              class="max-w-24"
-              label={t("web.issue.page.byStatus")}
-              testid="filter-status"
-              filter
-              value={props.filter.status}
-              placeholder={t("web.issue.page.allStatuses")}
-              options={statusOptions()}
-              onChange={(status) => props.onFilter({ ...props.filter, status })}
-            />
-          </View>
-          <If when={isFiltered()}>
-            <Text class="shrink-0 text-xs text-muted" style={{ fontVariant: ["tabular-nums"] }}>
-              {t("web.issue.page.shown", { shown: props.shown, of: props.cards.length })}
-            </Text>
-            <View
-              role="button"
-              testID="filter-clear"
-              onPress={() => props.onFilter(noFilter)}
-              class={`h-7 shrink-0 flex-row items-center rounded-md px-2 ${motionClass("transition-transform duration-120 ease-out")} hover:bg-hover active:translate-y-px`}
-            >
-              <Text class="text-xs font-medium text-water">{t("web.issue.page.clear")}</Text>
-            </View>
-          </If>
-        </If>
-      </View>
-      <View class="ml-auto shrink-0 flex-row items-center gap-1.5">
-        <Segmented
-          label={t("web.issue.page.view")}
-          testid="issue-view"
-          value={props.look.view}
-          onChange={(view) => props.onLook({ ...props.look, view })}
-          options={boardViews.map((v) => ({ value: v, label: viewLabel[v] }))}
-        />
-        <DisplayMenu look={props.look} onChange={props.onLook} />
-        <View
-          role="button"
-          testID="issue-refresh"
-          accessibilityLabel={props.refreshing ? t("web.issue.page.refreshing") : t("web.issue.page.refresh")}
-          accessibilityState={{ busy: props.refreshing }}
-          tooltip={<Bubble text={props.refreshing ? t("web.issue.page.refreshing") : t("web.issue.page.refresh")} />}
-          onPress={() => props.onRefresh()}
-          class={`h-7 shrink-0 flex-row items-center justify-center gap-1 rounded-md ${
-            props.refreshing ? "bg-selected px-2" : "w-7 hover:bg-hover"
-          } ${motionClass("transition-transform duration-120 ease-out")} active:translate-y-px focus-visible:outline-2 focus-visible:outline-focus`}
-        >
-          <View class={props.refreshing ? motionClass("animate-spin") : ""}>
-            <Icon name="refresh" size={14} tone={props.refreshing ? "water" : "muted"} />
-          </View>
-          <If when={props.refreshing}>
-            <Text testID="issue-syncing" class="text-xs font-medium text-water">
-              {t("web.issue.page.refreshing")}
-            </Text>
-          </If>
-        </View>
-        <View tooltip={<Bubble text={`${t("web.issue.new.title")} (C)`} />}>
-          <Button tone="primary" icon="add" testID="issue-toolbar-new" onPress={props.onNew}>
-            {t("web.issue.new.card")}
-          </Button>
-        </View>
-      </View>
     </View>
   );
 }

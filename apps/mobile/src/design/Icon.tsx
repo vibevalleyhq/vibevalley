@@ -1,24 +1,18 @@
 import { Canvas, colorScheme, Path2D } from "nsh";
 
+import { resolveIconColorHex } from "@vibevalley/protocol/ui";
+
 import { createIconPathCache, drawIconShapes, ICON_PATHS } from "../../design/iconPaths.gen";
 import type { IconName } from "../../design/icons";
 import { tone as toneOf } from "./tone";
 
-const iconTone: Partial<Record<IconName, string>> = {
-  check: "leaf",
-  cross: "berry",
-  warn: "wheat",
-};
-
 const cachedPath = createIconPathCache((d) => new Path2D(d));
 
-/** Resolves an icon's hex color: explicit `color`, explicit `tone`, status fallback (`iconTone`), or `"ink"`. */
+/** Resolves an icon's hex color: explicit `color`, explicit `tone`, status fallback, or `"ink"`. */
 function resolveIconColor(props: { readonly name: IconName; readonly color?: string; readonly tone?: string }): string {
   // Track colorScheme so light/dark switches redraw the canvas with the updated token hex.
   colorScheme();
-  if (props.color !== undefined) return props.color;
-  if (props.tone !== undefined) return toneOf(props.tone);
-  return toneOf(iconTone[props.name] ?? "ink");
+  return resolveIconColorHex(props, toneOf);
 }
 
 export function Icon(props: {

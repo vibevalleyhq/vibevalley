@@ -15,14 +15,13 @@ import type {
   SuggestionCreate,
   SuggestionId,
 } from "@vibevalley/protocol";
-import { noteId } from "@vibevalley/protocol/schema";
+import { BaseViewKind, jsonString, noteId } from "@vibevalley/protocol/schema";
 
 import { api } from "../../infra/api";
-import { saveFile } from "../../infra/attachmentFile";
 import { followNotePresence, followSuggestions } from "../../infra/gateway";
 import { defineQuery } from "../../infra/query";
-import { transport } from "../../infra/transport";
 import { noteSuffixOf } from "./html";
+import { saveTextFile } from "./views/noteFiles";
 
 /** Live state of whichever note viewer is currently mounted, attached to outgoing chat/reply messages. */
 export const activeNoteViewContext = signal<NoteViewContext | undefined>(undefined);
@@ -47,7 +46,7 @@ export function useReportViewContext(id: () => NoteId, compute: () => Omit<NoteV
   });
 }
 
-export interface NoteSuggestionsHandle {
+interface NoteSuggestionsHandle {
   readonly suggestions: Accessor<readonly Suggestion[]>;
   readonly open: Accessor<readonly Suggestion[]>;
   readonly accept: (suggestion: SuggestionId) => Promise<Suggestion>;
@@ -100,28 +99,6 @@ export function useNoteSuggestions(id: () => NoteId): NoteSuggestionsHandle {
   return { suggestions, open, accept, reject, create };
 }
 
-function utf8ToBase64(text: string): string {
-  const bytes = new TextEncoder().encode(text);
-  const pieces = Array.from({ length: Math.ceil(bytes.length / 0x8000) }, (_, i) => String.fromCharCode(...bytes.subarray(i * 0x8000, (i + 1) * 0x8000)));
-  return btoa(pieces.join(""));
-}
-
-const AttachmentPathData = z.object({ path: z.string() });
-
-// Native save dialog via temp attachment; nsh has no browser download.
-async function saveBase64File(filename: string, mime: string, base64: string): Promise<boolean> {
-  const att = await api.attachment.create({ name: filename, type: mime, data: base64 });
-  const env = await transport().call("attachment.file", { id: att.id });
-  if (env.bizCode !== 0) throw new Error(env.message);
-  const file = AttachmentPathData.parse(env.data);
-  const res = await saveFile(file.path, filename);
-  return res.saved;
-}
-
-async function saveTextFile(filename: string, mime: string, text: string): Promise<boolean> {
-  return saveBase64File(filename, mime, utf8ToBase64(text));
-}
-
 export async function exportNoteDirectory(note: Note, activeVersion?: number): Promise<boolean> {
   const safeName = (note.title.trim() || "note").replace(/[\\/:*?"<>|]/gu, "-");
   const suffix = noteSuffixOf(note);
@@ -158,7 +135,7 @@ export async function exportNoteDirectory(note: Note, activeVersion?: number): P
 
 const presenceThrottleMs = 100;
 
-export interface NotePresenceHandle {
+interface NotePresenceHandle {
   readonly peers: Accessor<readonly NotePresence[]>;
   readonly publish: (presence: Omit<NotePresence, "updatedAt">) => void;
   readonly clear: (peerId?: string) => void;
@@ -193,7 +170,9 @@ export function useNotePresence(id: () => NoteId, opts?: { readonly enabled?: ()
   const sendUpdate = (targetId: NoteId, presence: Omit<NotePresence, "updatedAt">) => {
     lastSentAt = Date.now();
     publishedPeerId = presence.id;
-    void api.note.presence.update({ id: targetId, presence: { ...presence, updatedAt: lastSentAt } }).catch(() => {});
+    void api.note.presence.update({ id: targetId, presence: { ...presence, updatedAt: lastSentAt } }).catch((err: unknown) => {
+      console.warn("[note] presence update failed", err);
+    });
   };
 
   const flushPending = () => {
@@ -211,7 +190,9 @@ export function useNotePresence(id: () => NoteId, opts?: { readonly enabled?: ()
     const targetPeer = peerId ?? publishedPeerId;
     if (!targetPeer) return;
     if (targetPeer === publishedPeerId) publishedPeerId = undefined;
-    void api.note.presence.update({ id: activeNoteId, peerId: targetPeer }).catch(() => {});
+    void api.note.presence.update({ id: activeNoteId, peerId: targetPeer }).catch((err: unknown) => {
+      console.warn("[note] presence clear failed", err);
+    });
   };
 
   const publish = (presence: Omit<NotePresence, "updatedAt">) => {
@@ -240,6 +221,10 @@ export function useNotePresence(id: () => NoteId, opts?: { readonly enabled?: ()
       stop();
       clear();
     };
+  });
+
+  cleanup(() => {
+    clearTimeout(throttleTimer);
   });
 
   return { peers, publish, clear };
@@ -279,7 +264,7 @@ export const noteLinksQuery = defineQuery({
   fetch: (id, context) => api.note.link.list({ entityKind: "note", entityId: id }, context),
 });
 
-export interface NoteBaseQueryInput {
+interface NoteBaseQueryInput {
   readonly id: string;
   readonly sheetId?: string | undefined;
   readonly viewId?: string | undefined;
@@ -301,7 +286,7 @@ export const noteBaseQuery = defineQuery({
 const BaseViewRefStub = z.object({
   id: z.string(),
   name: z.string(),
-  kind: z.enum(["table", "board", "gallery", "timeline"]),
+  kind: BaseViewKind,
 });
 
 const BaseSheetViewsStub = z.object({
@@ -313,13 +298,15 @@ const BaseViewsDocStub = z.object({
   sheets: z.array(BaseSheetViewsStub).optional(),
 });
 
+const BaseViewsDocJsonStub = jsonString(BaseViewsDocStub);
+
 export type BaseViewSummaryRef = z.output<typeof BaseViewRefStub>;
 
 export const noteBaseSheetViewsQuery = defineQuery({
   key: (id: string) => ["note-base-views", id],
   fetch: async (id, context): Promise<ReadonlyMap<string, readonly BaseViewSummaryRef[]>> => {
     const file = await api.note.file.get({ id: noteId(id), path: "structure/base.json" }, context);
-    const parsed = BaseViewsDocStub.safeParse(JSON.parse(file.content));
+    const parsed = BaseViewsDocJsonStub.safeParse(file.content);
     const map = new Map<string, readonly BaseViewSummaryRef[]>();
     if (parsed.success && Array.isArray(parsed.data.sheets)) {
       for (const sh of parsed.data.sheets) {
@@ -340,10 +327,12 @@ const BaseSheetStub = z.looseObject({
   rows: z.array(BaseRowStub).optional(),
 });
 
-const BaseFileStub = z.looseObject({
-  version: z.number().optional(),
-  sheets: z.array(BaseSheetStub).optional(),
-});
+const BaseFileJsonStub = jsonString(
+  z.looseObject({
+    version: z.number().optional(),
+    sheets: z.array(BaseSheetStub).optional(),
+  }),
+);
 
 /** Creates a child `doc` subpage for a `base` row and records its `pageNoteId` in `structure/base.json`. */
 export async function createBaseRowPage(baseNote: Note, row: BaseRow, activeSheetId?: string): Promise<NoteId> {
@@ -352,7 +341,7 @@ export async function createBaseRowPage(baseNote: Note, row: BaseRow, activeShee
   const made = await api.note.create({ title, noteType: "doc", parentId: baseNote.id });
   try {
     const file = await api.note.file.get({ id: baseNote.id, path: "structure/base.json" });
-    const parsed = BaseFileStub.safeParse(JSON.parse(file.content));
+    const parsed = BaseFileJsonStub.safeParse(file.content);
     if (parsed.success && Array.isArray(parsed.data.sheets)) {
       const targetSheet = parsed.data.sheets.find((s) => s.id === activeSheetId) ?? parsed.data.sheets[0];
       const targetRow = targetSheet?.rows?.find((r) => r.id === row.id);

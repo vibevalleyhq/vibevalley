@@ -2,8 +2,16 @@ import { Text, View, type JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 
-import type { FormField as Binding } from "../infra/form";
 import { Hint } from "./Tip";
+
+interface FormFieldControl {
+  readonly blur: () => void;
+}
+
+interface FormFieldMeta {
+  readonly id: string;
+  readonly messages: () => readonly string[];
+}
 
 export const formMessages = {
   issue: () => t("web.base.form.invalid"),
@@ -34,11 +42,11 @@ export function Form(props: { form: Controls; children: (submit: () => void) => 
 }
 
 /** What a field's input takes from its binding: leaving it marks it touched. */
-export function formControl<V>(field: Binding<V>) {
+export function formControl(field: FormFieldControl) {
   return { onBlur: field.blur };
 }
 
-export function FormField(props: { field: Pick<Binding<unknown>, "id" | "messages">; label: string; hint?: string; children: JSX.Element }) {
+export function FormField(props: { field: FormFieldMeta; label: string; hint?: string; children: JSX.Element }) {
   return (
     <View class="gap-1">
       <View class="flex-row items-center gap-1.5">

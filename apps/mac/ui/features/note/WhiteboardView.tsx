@@ -1,16 +1,18 @@
-import { computed, effect, Scroll, signal, Text, untracked, View, type Accessor } from "nsh";
+import { colorScheme, computed, effect, Scroll, signal, Text, untracked, View, type Accessor } from "nsh";
 import { z } from "zod";
 
 import { currentLocale, t } from "@vibevalley/i18n";
 import { type Note, type NotePresenceKind, userId, type ViewportRect } from "@vibevalley/protocol";
 import { isFreeUserSession, sessionProfile } from "@vibevalley/protocol/rules";
+import { jsonString } from "@vibevalley/protocol/schema";
 
-import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
 import { TextInput } from "../../design/Field";
 import { IconButton } from "../../design/IconButton";
 import { toast } from "../../design/toasts";
 import { tone } from "../../design/tone";
+import { createAct } from "../../infra/act";
+import { Keyed } from "../../infra/base/dom";
 import { useSessionsSlice } from "../../infra/frame";
 import {
   richNative,
@@ -20,11 +22,12 @@ import {
   type VvWhiteboardSelectionEvent,
   type VvWhiteboardViewportEvent,
 } from "../../infra/rich";
-import { type NoteDirectoryClient, saveBase64File, saveTextFile, useNoteDirectory, useNotePresence } from "./views/noteFiles";
+import { useNotePresence } from "./store";
+import { type NoteDirectoryClient, saveBase64File, saveTextFile, useNoteDirectory } from "./views/noteFiles";
 
 const BOARD_FILE_PATH = "structure/board.json";
 
-export interface WhiteboardViewerProps {
+interface WhiteboardViewerProps {
   readonly note: Note;
   readonly version?: number | undefined;
   readonly onOpenChat?: (() => void) | undefined;
@@ -69,7 +72,7 @@ function parseBoardElement(elKey: string, rawEl: unknown, context: string): Boar
   return parsed.data;
 }
 
-export interface BoardDocument {
+interface BoardDocument {
   readonly version: number;
   readonly grid: string | boolean;
   readonly viewport: { readonly x: number; readonly y: number; readonly zoom: number };
@@ -91,37 +94,50 @@ interface PresenceWire {
   readonly updatedAt?: number | undefined;
 }
 
-function parseJsonSafe(raw: string): unknown {
-  try {
-    return JSON.parse(raw);
-  } catch (e) {
-    if (e instanceof SyntaxError) return undefined;
-    throw e;
-  }
-}
-
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return typeof v === "object" && v !== null && !Array.isArray(v);
-}
+const JsonRecordSchema = z.record(z.string(), z.unknown());
+const JsonRecordJsonSchema = jsonString(JsonRecordSchema);
+const BoardViewportRawSchema = z.looseObject({
+  x: z.number().optional().catch(undefined),
+  y: z.number().optional().catch(undefined),
+  zoom: z.number().optional().catch(undefined),
+});
+const BoardDocJsonSchema = jsonString(
+  z.looseObject({
+    version: z.number().optional().catch(undefined),
+    grid: z.union([z.string(), z.boolean()]).optional().catch(undefined),
+    viewport: BoardViewportRawSchema.optional().catch(undefined),
+    elements: JsonRecordSchema.optional().catch(undefined),
+  }),
+);
+const BoardMetaJsonSchema = jsonString(
+  z.looseObject({
+    grid: z.union([z.string(), z.boolean()]).optional().catch(undefined),
+    viewport: BoardViewportRawSchema.optional().catch(undefined),
+  }),
+);
+const WhiteboardBatchJsonSchema = jsonString(z.array(WhiteboardWriteSchema));
+const StringArrayJsonSchema = jsonString(z.array(z.string()));
 
 export function parseBoardDocument(raw: string | undefined): BoardDocument {
   const empty: BoardDocument = { version: 1, grid: "architectural", viewport: { x: 0, y: 0, zoom: 1 }, elements: {} };
   if (!raw) return empty;
-  const parsed = parseJsonSafe(raw);
-  if (!isRecord(parsed)) return empty;
-  const rawElements = isRecord(parsed.elements) ? parsed.elements : {};
+  const parsed = BoardDocJsonSchema.safeParse(raw);
+  if (!parsed.success) return empty;
+  const data = parsed.data;
   const elements: Record<string, Record<string, unknown>> = {};
-  for (const [k, v] of Object.entries(rawElements)) {
-    if (isRecord(v)) elements[k] = v;
+  if (data.elements) {
+    for (const [k, v] of Object.entries(data.elements)) {
+      const el = JsonRecordSchema.safeParse(v);
+      if (el.success) elements[k] = el.data;
+    }
   }
-  const rawVp = isRecord(parsed.viewport) ? parsed.viewport : {};
   return {
-    version: typeof parsed.version === "number" ? parsed.version : 1,
-    grid: typeof parsed.grid === "string" || typeof parsed.grid === "boolean" ? parsed.grid : "architectural",
+    version: data.version ?? 1,
+    grid: data.grid ?? "architectural",
     viewport: {
-      x: typeof rawVp.x === "number" ? rawVp.x : 0,
-      y: typeof rawVp.y === "number" ? rawVp.y : 0,
-      zoom: typeof rawVp.zoom === "number" ? rawVp.zoom : 1,
+      x: data.viewport?.x ?? 0,
+      y: data.viewport?.y ?? 0,
+      zoom: data.viewport?.zoom ?? 1,
     },
     elements,
   };
@@ -288,7 +304,7 @@ export function WhiteboardView(props: WhiteboardViewerProps) {
     // Presence is strictly ephemeral via `note.presence.update`; never persist `presence/*`.
     const handleNativeBatch = (ev: VvWhiteboardBatchEvent) => {
       if (props.version !== undefined) return;
-      const parsed = z.array(WhiteboardWriteSchema).safeParse(parseJsonSafe(ev.writesJson));
+      const parsed = WhiteboardBatchJsonSchema.safeParse(ev.writesJson);
       if (!parsed.success) {
         console.error("[WhiteboardView] dropped malformed native whiteboard batch", { issues: parsed.error.issues });
         return;
@@ -303,14 +319,14 @@ export function WhiteboardView(props: WhiteboardViewerProps) {
 
       for (const w of writes) {
         if (w.path === "board/meta" && w.value) {
-          const meta = parseJsonSafe(w.value);
-          if (isRecord(meta)) {
-            if (typeof meta.grid === "string" || typeof meta.grid === "boolean") nextGrid = meta.grid;
-            if (isRecord(meta.viewport)) {
+          const meta = BoardMetaJsonSchema.safeParse(w.value);
+          if (meta.success) {
+            if (meta.data.grid !== undefined) nextGrid = meta.data.grid;
+            if (meta.data.viewport) {
               nextViewport = {
-                x: typeof meta.viewport.x === "number" ? meta.viewport.x : nextViewport.x,
-                y: typeof meta.viewport.y === "number" ? meta.viewport.y : nextViewport.y,
-                zoom: typeof meta.viewport.zoom === "number" ? meta.viewport.zoom : nextViewport.zoom,
+                x: meta.data.viewport.x ?? nextViewport.x,
+                y: meta.data.viewport.y ?? nextViewport.y,
+                zoom: meta.data.viewport.zoom ?? nextViewport.zoom,
               };
             }
           }
@@ -321,13 +337,13 @@ export function WhiteboardView(props: WhiteboardViewerProps) {
         if (w.op === "delete") {
           delete nextElements[elId];
         } else if (w.op === "set" && w.value) {
-          const val = parseJsonSafe(w.value);
-          if (isRecord(val)) nextElements[elId] = val;
+          const val = JsonRecordJsonSchema.safeParse(w.value);
+          if (val.success) nextElements[elId] = val.data;
         } else if (w.op === "patch" && w.value) {
-          const patch = parseJsonSafe(w.value);
-          if (isRecord(patch)) {
+          const patch = JsonRecordJsonSchema.safeParse(w.value);
+          if (patch.success) {
             const prev = { ...(nextElements[elId] ?? { id: elId }) };
-            for (const [k, v] of Object.entries(patch)) {
+            for (const [k, v] of Object.entries(patch.data)) {
               if (v === null) delete prev[k];
               else prev[k] = v;
             }
@@ -340,7 +356,7 @@ export function WhiteboardView(props: WhiteboardViewerProps) {
     };
 
     const handleNativeSelection = (ev: VvWhiteboardSelectionEvent) => {
-      const parsed = z.array(z.string()).safeParse(parseJsonSafe(ev.idsJson));
+      const parsed = StringArrayJsonSchema.safeParse(ev.idsJson);
       if (!parsed.success) {
         console.warn("[WhiteboardView] dropped malformed native selection payload", { issues: parsed.error.issues });
         return;
@@ -392,23 +408,32 @@ export function WhiteboardView(props: WhiteboardViewerProps) {
       });
     };
 
+    const boardReady = computed(() => !snapshot().loading || boardRaw() !== undefined);
+    const nativeMountKey = computed(() => `${props.note.id}:${colorScheme()}`);
+
     return (
       <View testID="whiteboard-view" class="min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border border-line bg-side">
-        <VvWhiteboard
-          entriesJson={entriesJson()}
-          presencesJson={presencesJson()}
-          seq={seq()}
-          readOnly={props.version !== undefined}
-          title={props.note.title}
-          locale={currentLocale()}
-          onBatch={handleNativeBatch}
-          onSelectionChange={handleNativeSelection}
-          onCursorMove={handleNativeCursorMove}
-          onViewportChange={handleNativeViewportChange}
-          onOpenChat={() => props.onOpenChat?.()}
-          onExport={handleNativeExport}
-          class={`min-h-0 min-w-0 flex-1 ${props.frameClass ?? ""}`}
-        />
+        <If when={boardReady()} else={<View testID="wb-loading" class="min-h-0 min-w-0 flex-1 bg-side" />}>
+          <Keyed key={nativeMountKey()}>
+            {() => (
+              <VvWhiteboard
+                entriesJson={entriesJson()}
+                presencesJson={presencesJson()}
+                seq={seq()}
+                readOnly={props.version !== undefined}
+                title={props.note.title}
+                locale={currentLocale()}
+                onBatch={handleNativeBatch}
+                onSelectionChange={handleNativeSelection}
+                onCursorMove={handleNativeCursorMove}
+                onViewportChange={handleNativeViewportChange}
+                onOpenChat={() => props.onOpenChat?.()}
+                onExport={handleNativeExport}
+                class={`min-h-0 min-w-0 flex-1 ${props.frameClass ?? ""}`}
+              />
+            )}
+          </Keyed>
+        </If>
       </View>
     );
   }

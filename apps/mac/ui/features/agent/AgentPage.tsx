@@ -4,7 +4,6 @@ import { t } from "@vibevalley/i18n";
 import { type Agent, type AgentProblem, type RuntimeInfo, sessionAppendSystemPrompt } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 
-import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
 import { type Pose, randomLook, stagePoses } from "../../design/domain/cast";
 import { AgentCodeBadge, AgentModeBadge } from "../../design/domain/Face";
@@ -14,6 +13,7 @@ import { Icon } from "../../design/Icon";
 import { IconButton } from "../../design/IconButton";
 import { MoreMenu } from "../../design/MoreMenu";
 import { TextLink } from "../../design/TextLink";
+import { createAct } from "../../infra/act";
 import { useAgentProblems } from "../../infra/agents";
 import { api, reasonOf } from "../../infra/api";
 import { agentsQuery, ready, useAgents, useQueryClient, useRuntimes } from "../../infra/query";

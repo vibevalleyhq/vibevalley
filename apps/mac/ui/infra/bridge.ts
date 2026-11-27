@@ -135,7 +135,10 @@ function ensureEntry(name: string): TopicEntry {
 function attachTopicListener(name: string, entry: TopicEntry): () => void {
   return listenDetached(`frame:${name}`, (payload) => {
     const parsed = FrameEnvelopeSchema.safeParse(payload);
-    if (!parsed.success) return;
+    if (!parsed.success) {
+      console.error(`[bridge] dropped malformed frame envelope (${name})`, { issues: parsed.error.issues });
+      return;
+    }
     entry.latest = parsed.data;
     entry.store.set(parsed.data);
     // A slice receipt releases the next snapshot. Other non-live receipts feed the debug dump.
@@ -206,6 +209,9 @@ function cachedDecode<T>(readRaw: () => unknown, decoder: Decoder<T>): () => T |
       return null;
     }
     const parsed = decoder.safeParse(raw);
+    if (!parsed.success) {
+      console.error("[bridge] dropped malformed decoded frame payload");
+    }
     lastDecoded = parsed.success ? parsed.data : null;
     return lastDecoded;
   };
@@ -262,8 +268,15 @@ export function subscribe(name: string, payload: unknown, on: (event: unknown) =
     if ("end" in message) {
       open = false;
       off();
-      const parsedEnd = EndEnvelopeSchema.safeParse(message.end);
-      ended?.(parsedEnd.success ? parsedEnd.data : null);
+      if (message.end === null || message.end === undefined) {
+        ended?.(null);
+      } else {
+        const parsedEnd = EndEnvelopeSchema.safeParse(message.end);
+        if (!parsedEnd.success) {
+          console.error(`[bridge] malformed subscription end envelope (${name})`, { issues: parsedEnd.error.issues });
+        }
+        ended?.(parsedEnd.success ? parsedEnd.data : null);
+      }
     } else if ("event" in message) {
       on(message.event);
     } else {

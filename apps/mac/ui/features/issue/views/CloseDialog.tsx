@@ -5,24 +5,24 @@ import { t } from "@vibevalley/i18n";
 import { type ChangedFile, type Changes, type Issue, type IssueAct, type Session, VibeValleyApiError } from "@vibevalley/protocol";
 import { sessionWorktree } from "@vibevalley/protocol/rules";
 
-import { createAct } from "../../../design/act";
 import { Button } from "../../../design/Button";
 import { Dialog } from "../../../design/Dialog";
 import { TextArea } from "../../../design/Field";
 import { Icon } from "../../../design/Icon";
 import { motionClass } from "../../../design/motion";
 import { mix } from "../../../design/tone";
+import { createAct } from "../../../infra/act";
 import { reasonOf } from "../../../infra/api";
 import { variant } from "../../../infra/base/dom";
 import { ago } from "../../../infra/base/format";
 import { hostApi } from "../../../infra/bridge";
 import { useIssue } from "../../../infra/frame";
+import { actionOf, approveShownChanges, perform, useIssueChanges } from "../../../infra/issueActions";
 import { ready } from "../../../infra/query";
 import { linkIn, useRegistry } from "../../../infra/state/atom";
 import { useIntents } from "../../../infra/state/intent";
-import { actionOf, perform } from "../model/acts";
 import { type Lane } from "../model/cards";
-import { approveShownChanges, changeKind, lineCounts, nothingChanged, patchLines, patchMarkOf } from "../model/changes";
+import { changeKind, lineCounts, nothingChanged, patchLines, patchMarkOf } from "../model/changes";
 import {
   closeDialogSurface,
   type CloseFlowEvent,
@@ -34,7 +34,6 @@ import {
   shouldSyncCloseDiff,
   sinceTreeOf,
 } from "../model/closeFlow";
-import { useIssueChanges } from "../model/history";
 import { issueTitle } from "../model/issue";
 import { issueMove, sendMove } from "../model/moves";
 import { Note, SheetLabel } from "./Sheet";
@@ -195,7 +194,9 @@ export function CloseIssueDialog(props: { issue: Issue; session?: Session | unde
       </If>
       <If when={variant(surface(), "kind", "loading")}>
         <View class="flex-row items-center justify-center gap-2 py-10">
-          <Icon name="wait" size={14} tone="muted" />
+          <View class={`shrink-0 ${motionClass("animate-spin")}`}>
+            <Icon name="wait" size={14} tone="muted" />
+          </View>
           <Text class="text-sm text-muted">{t("web.issue.changes.reading")}</Text>
         </View>
       </If>

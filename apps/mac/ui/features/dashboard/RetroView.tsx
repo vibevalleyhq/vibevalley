@@ -6,7 +6,7 @@ import { type IssueRetroReport, type IssueStatus, type RetroBreakdownBucket, typ
 import { Button } from "../../design/Button";
 import { Icon } from "../../design/Icon";
 import type { IconName } from "../../design/icons";
-import { Banner, Quiet } from "../../design/layout";
+import { Banner, Empty, Quiet } from "../../design/layout";
 import { Segmented } from "../../design/Segmented";
 import { CountPill, Tag, type TagTone } from "../../design/Tag";
 import { toast } from "../../design/toasts";
@@ -303,9 +303,9 @@ export function RetroView() {
             <If
               when={r().totalIssues > 0}
               else={
-                <View testID="retro-empty" class="rounded-xl border border-line bg-elevated px-4 py-6">
-                  <Quiet>{t("web.base.dashboard.retro.empty")}</Quiet>
-                </View>
+                <Empty variant="filtered" compact testid="retro-empty" icon="clock">
+                  {t("web.base.dashboard.retro.empty")}
+                </Empty>
               }
             >
               <>

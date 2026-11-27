@@ -4,7 +4,7 @@ import { issueId, noteId } from "@vibevalley/protocol/schema";
 
 import type { IconName } from "../../../design/icons";
 
-export interface OptionToneLook {
+interface OptionToneLook {
   readonly bgClass: string;
   readonly textClass: string;
   readonly mixToken?: string;
@@ -98,18 +98,19 @@ export function summaryOpLabel(op: BaseSummaryOp): string {
 }
 
 export function columnWidthPx(col: BaseColumn): number {
+  const minForKind = col.kind === "checkbox" ? 72 : col.kind === "number" ? 112 : col.kind === "date" ? 136 : 96;
   if (typeof col.width === "number" && Number.isFinite(col.width) && col.width > 0) {
-    return Math.max(96, Math.min(420, Math.round(col.width)));
+    return Math.max(minForKind, Math.min(420, Math.round(col.width)));
   }
   switch (col.kind) {
     case "checkbox":
       return 88;
     case "number":
-      return 104;
+      return 112;
     case "select":
       return 128;
     case "date":
-      return 136;
+      return 140;
     case "formula":
       return 140;
     case "multiSelect":
@@ -126,6 +127,62 @@ export function columnWidthPx(col: BaseColumn): number {
     case "text":
       return 220;
   }
+}
+
+const ISO_DAY_EXACT_RE = /^(\d{4})-(\d{2})-(\d{2})$/u;
+
+interface ParsedDateCell {
+  readonly isRange: boolean;
+  readonly start: string | undefined;
+  readonly end: string | undefined;
+}
+
+function extractIsoDay(raw: string | undefined): string | undefined {
+  if (!raw) return undefined;
+  const trimmed = raw.trim().split("T")[0] ?? "";
+  return ISO_DAY_EXACT_RE.test(trimmed) ? trimmed : undefined;
+}
+
+export function parseDateRangeCell(raw: string): ParsedDateCell {
+  const trimmed = raw.trim();
+  if (!trimmed) return { isRange: false, start: undefined, end: undefined };
+  if (/(?:->|→|\.\.|\s+to\s+)/iu.test(trimmed)) {
+    const parts = trimmed.split(/\s*(?:->|→|\.\.|\s+to\s+)\s*/iu);
+    return {
+      isRange: true,
+      start: extractIsoDay(parts[0]),
+      end: extractIsoDay(parts[1]),
+    };
+  }
+  return { isRange: false, start: extractIsoDay(trimmed), end: undefined };
+}
+
+function shortIsoDay(iso: string, includeYear: boolean): string {
+  const m = ISO_DAY_EXACT_RE.exec(iso);
+  if (!m) return iso;
+  const year = m[1] ?? "";
+  const month = String(Number(m[2]));
+  const day = String(Number(m[3]));
+  return includeYear ? `${year.slice(2)}/${month}/${day}` : `${month}/${day}`;
+}
+
+/** Formats ISO date or `YYYY-MM-DD -> YYYY-MM-DD` range into compact `11/23 → 11/26` display text. */
+export function formatCompactDateCell(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+  const parsed = parseDateRangeCell(trimmed);
+  if (parsed.isRange) {
+    const { start, end } = parsed;
+    if (start && end) {
+      if (start === end) return shortIsoDay(start, false);
+      const crossYear = start.slice(0, 4) !== end.slice(0, 4);
+      return `${shortIsoDay(start, crossYear)} → ${shortIsoDay(end, crossYear)}`;
+    }
+    if (start) return `${shortIsoDay(start, false)} → …`;
+    if (end) return `… → ${shortIsoDay(end, false)}`;
+    return trimmed;
+  }
+  return parsed.start ?? trimmed;
 }
 
 export function cleanWikilinkText(raw: string, notesById?: ReadonlyMap<string, Note>): string {
@@ -275,7 +332,7 @@ export function firstMediaOfRow(row: BaseRow, columns: readonly BaseColumn[], no
   return undefined;
 }
 
-export interface TimelineBarItem {
+interface TimelineBarItem {
   readonly row: BaseRow;
   readonly title: string;
   readonly startMs: number;
@@ -285,7 +342,7 @@ export interface TimelineBarItem {
   readonly widthPct: number;
 }
 
-export interface TimelineProjection {
+interface TimelineProjection {
   readonly dateColumnId: string | undefined;
   readonly minMs: number;
   readonly maxMs: number;
@@ -330,7 +387,7 @@ export function projectBaseTimeline(rows: readonly BaseRow[], columns: readonly 
       title,
       startMs: s,
       endMs: e,
-      dateLabel: rawDate || formatShortUtcDate(s),
+      dateLabel: rawDate ? formatCompactDateCell(rawDate) : formatShortUtcDate(s),
     };
   });
 

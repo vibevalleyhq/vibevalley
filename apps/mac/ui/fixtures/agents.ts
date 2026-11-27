@@ -15,6 +15,7 @@ import {
   RuntimeCapabilityValues,
   type RuntimeInfo,
   type Skill,
+  ToolsetValues,
 } from "@vibevalley/protocol";
 
 const now = Date.now();
@@ -46,10 +47,7 @@ const agent = (more: Partial<Agent> & Pick<Agent, "id" | "name">): Agent => ({
   persona: "",
   personaMode: "append",
   skills: [],
-  toolsets:
-    more.role === "orchestrator"
-      ? ["issue", "session", "channel", "repo", "cron", "resource", "memory", "media", "library", "note"]
-      : ["issue", "session", "channel", "resource", "memory", "library", "note"],
+  toolsets: more.role === "orchestrator" ? [...ToolsetValues] : ToolsetValues.filter((ts) => ts !== "repo" && ts !== "cron" && ts !== "media"),
   mcpServers: [],
   disallowedTools: [],
   env: {},

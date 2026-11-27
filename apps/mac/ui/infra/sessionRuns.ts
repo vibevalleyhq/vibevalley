@@ -1,7 +1,12 @@
 import { z } from "zod";
 
 import type { ChatTelemetry, EventTokens, SessionEvent, ToolTarget } from "@vibevalley/protocol";
-import { ChatTelemetry as ChatTelemetrySchema, SessionEvent as SessionEventSchema, ToolTarget as ToolTargetSchema } from "@vibevalley/protocol/schema";
+import {
+  ChatTelemetry as ChatTelemetrySchema,
+  jsonString,
+  SessionEvent as SessionEventSchema,
+  ToolTarget as ToolTargetSchema,
+} from "@vibevalley/protocol/schema";
 
 import { coreBridge } from "./rich";
 
@@ -11,6 +16,10 @@ export type { ChatTelemetry, ToolTarget };
 export const stepLimit = 240;
 
 const EventArraySchema = z.array(SessionEventSchema);
+const EventArrayJsonSchema = jsonString(EventArraySchema);
+const ShownEventsJsonSchema = jsonString(z.object({ shown: EventArraySchema }));
+const ToolTargetJsonSchema = jsonString(ToolTargetSchema);
+const TelemetryWrapJsonSchema = jsonString(z.object({ telemetry: ChatTelemetrySchema }));
 
 const emptyChatTelemetry = (defaultWindow = 200_000): ChatTelemetry => ({
   cachedRead: 0,
@@ -38,7 +47,7 @@ export function mergeSteps(
   const replaceSameRevision = options?.replaceSameRevision ?? false;
   const json = coreBridge()?.mergeSteps?.(JSON.stringify(log), JSON.stringify(incoming), limit, replaceSameRevision);
   if (json !== undefined) {
-    const parsed = EventArraySchema.safeParse(JSON.parse(json));
+    const parsed = EventArrayJsonSchema.safeParse(json);
     if (parsed.success) return parsed.data;
   }
   const combined = [...log, ...incoming];
@@ -49,7 +58,7 @@ export function mergeSteps(
 export function shownEvents(log: readonly SessionEvent[]): SessionEvent[] {
   const json = coreBridge()?.projectTrajectory?.(JSON.stringify(log), log.at(-1)?.time ?? 0);
   if (!json) return [];
-  const parsed = z.object({ shown: EventArraySchema }).safeParse(JSON.parse(json));
+  const parsed = ShownEventsJsonSchema.safeParse(json);
   return parsed.success ? parsed.data.shown : [];
 }
 
@@ -65,7 +74,7 @@ export function extractToolTarget(step: Pick<SessionEvent, "action" | "tool" | "
     }),
   );
   if (!json) return undefined;
-  const parsed = ToolTargetSchema.safeParse(JSON.parse(json));
+  const parsed = ToolTargetJsonSchema.safeParse(json);
   return parsed.success ? parsed.data : undefined;
 }
 
@@ -73,7 +82,7 @@ export function extractToolTarget(step: Pick<SessionEvent, "action" | "tool" | "
 export function computeTelemetry(steps: readonly SessionEvent[], latestTokens?: EventTokens, defaultWindow = 200_000): ChatTelemetry {
   const json = coreBridge()?.projectChatSession?.(JSON.stringify(steps), latestTokens !== undefined ? JSON.stringify(latestTokens) : null, defaultWindow);
   if (!json) return emptyChatTelemetry(defaultWindow);
-  const parsed = z.object({ telemetry: ChatTelemetrySchema }).safeParse(JSON.parse(json));
+  const parsed = TelemetryWrapJsonSchema.safeParse(json);
   return parsed.success ? parsed.data.telemetry : emptyChatTelemetry(defaultWindow);
 }
 

@@ -1,15 +1,15 @@
-import { computed, keymap, signal, Text, View } from "nsh";
+import { computed, effect, keymap, signal, Text, View } from "nsh";
 import { Input } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
 
-import { createAct } from "../../../design/act";
 import { Button } from "../../../design/Button";
-import { TextArea, TextInput } from "../../../design/Field";
+import { TextInput } from "../../../design/Field";
 import { Icon } from "../../../design/Icon";
 import { CountPill } from "../../../design/Tag";
 import { Bubble } from "../../../design/Tip";
 import { mix } from "../../../design/tone";
+import { createAct } from "../../../infra/act";
 import { api } from "../../../infra/api";
 import { useQueryClient } from "../../../infra/query";
 import { untrack } from "../../../infra/solid";
@@ -31,7 +31,7 @@ export const toggleCriterionLine = (line: string): string => {
   return checked ? text : `[x] ${text}`;
 };
 
-/** Interactive acceptance-criteria checklist with inline multiline markdown-list editing. */
+/** Interactive acceptance-criteria checklist with isomorphic inline multiline editing (0px header/box jump). */
 export function TodoCriteriaSection(props: {
   value: string;
   criteria: readonly string[];
@@ -41,8 +41,12 @@ export function TodoCriteriaSection(props: {
   onToggle: (index: number) => void;
 }) {
   const editing = signal(false);
+  const editorMinHeight = computed(() => Math.max(76, props.criteria.length * 40));
+  effect(() => {
+    if (editing()) return keymap.bind("escape", () => editing.set(false), { when: "always" });
+  });
   return (
-    <View class="mt-5">
+    <View class="mt-6 border-t border-line pt-5">
       <If
         when={editing()}
         else={
@@ -57,7 +61,7 @@ export function TodoCriteriaSection(props: {
             }
           >
             <View testID="issue-criteria-preview">
-              <View class="mb-2 flex-row items-center justify-between gap-2">
+              <View class="mb-2.5 h-6 flex-row items-center justify-between gap-2">
                 <View class="flex-row items-center gap-1.5">
                   <Text class="text-xs font-semibold text-muted">{t("web.issue.todo.criteria")}</Text>
                   <CountPill count={props.criteria.length} />
@@ -102,27 +106,35 @@ export function TodoCriteriaSection(props: {
           </If>
         }
       >
-        <View class="mb-2 flex-row items-center justify-between gap-2">
-          <Text class="text-xs font-semibold text-muted">{t("web.issue.todo.criteria")}</Text>
+        <View class="mb-2.5 h-6 flex-row items-center justify-between gap-2">
+          <View class="flex-row items-center gap-1.5">
+            <Text class="text-xs font-semibold text-muted">{t("web.issue.todo.criteria")}</Text>
+            <If when={props.criteria.length > 0}>
+              <CountPill count={props.criteria.length} />
+            </If>
+          </View>
           <Button size="compact" tone="quiet" icon="check" testID="issue-edit-criteria-done" onPress={() => editing.set(false)}>
             {t("web.issue.todo.doneEditing")}
           </Button>
         </View>
-        <TextArea
+        <Input
+          multiline
+          submitBehavior="newline"
           testID="issue-criteria-input"
           autoFocus
-          rows={3}
           value={props.value}
-          onInput={(v) => props.onInput(v)}
+          onChange={(e) => props.onInput(e.value)}
           placeholder={t("web.issue.todo.criteriaHint")}
           accessibilityLabel={t("web.issue.todo.criteria")}
+          style={{ minHeight: editorMinHeight() }}
+          class="w-full rounded-lg border border-focus bg-page px-3.5 py-2.5 text-sm leading-snug text-ink placeholder:text-faint"
         />
       </If>
     </View>
   );
 }
 
-/** Preview-first wrapping draft title: click toggles inline multiline input; Return/blur commits, Escape cancels. */
+/** Preview-first wrapping draft title with isomorphic view/edit box model (0px vertical shift). */
 export function TodoTitle(props: { value: string; editable: boolean; onCommit: (title: string) => void }) {
   const editing = signal(false);
   let typed = "";
@@ -139,9 +151,11 @@ export function TodoTitle(props: { value: string; editable: boolean; onCommit: (
         <If
           when={props.editable}
           else={
-            <Text role="header" testID="issue-title" class="text-2xl leading-snug font-semibold text-ink">
-              {props.value}
-            </Text>
+            <View class="-mx-2 w-full rounded-md border border-transparent px-2 py-1">
+              <Text role="header" testID="issue-title" class="text-2xl leading-snug font-semibold text-ink">
+                {props.value}
+              </Text>
+            </View>
           }
         >
           <View
@@ -153,7 +167,7 @@ export function TodoTitle(props: { value: string; editable: boolean; onCommit: (
               typed = props.value;
               editing.set(true);
             }}
-            class="-mx-1 max-w-full self-start rounded-sm px-1 hover:bg-hover"
+            class="-mx-2 w-full rounded-md border border-transparent px-2 py-1 hover:border-line hover:bg-hover"
           >
             <Text role="header" testID="issue-title" class="text-2xl leading-snug font-semibold text-ink">
               {props.value || t("web.issue.todo.titleHint")}

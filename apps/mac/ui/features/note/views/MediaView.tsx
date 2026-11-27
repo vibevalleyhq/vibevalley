@@ -1,8 +1,9 @@
 import { computed, effect, Scroll, signal, Text, untracked, View } from "nsh";
+import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
 import type { IssueId, Note, NoteFileMeta } from "@vibevalley/protocol";
-import { issueId as toIssueId } from "@vibevalley/protocol/schema";
+import { issueId as toIssueId, jsonString } from "@vibevalley/protocol/schema";
 
 import { Button } from "../../../design/Button";
 import { useDesignHost } from "../../../design/host";
@@ -20,7 +21,7 @@ import { transport } from "../../../infra/transport";
 import { useVdpNode } from "../../../infra/vdpProbe";
 import { saveBase64File, saveTextFile, useNoteDirectory } from "./noteFiles";
 
-export interface MediaViewProps {
+interface MediaViewProps {
   readonly note: Note;
   readonly version?: number | undefined;
   readonly onOpenIssue?: ((id: IssueId) => void) | undefined;
@@ -62,47 +63,146 @@ interface StoryboardShotModel {
   readonly status: string;
 }
 
+const optStr = z.string().optional().catch(undefined);
+const optNum = z.number().optional().catch(undefined);
+
+const TranscriptCueRawSchema = z.looseObject({
+  id: optStr,
+  startSec: optNum,
+  start: optNum,
+  endSec: optNum,
+  end: optNum,
+  speaker: optStr,
+  text: optStr,
+});
+
+const MediaItemRawSchema = z.looseObject({
+  id: optStr,
+  kind: optStr,
+  src: optStr,
+  title: optStr,
+  caption: optStr,
+  durationSec: optNum,
+  issueId: optStr,
+  jobId: optStr,
+  transcript: z
+    .union([z.string(), z.array(z.unknown())])
+    .optional()
+    .catch(undefined),
+  transcriptExcerpt: optStr,
+});
+
+const StoryboardStyleGuideRawSchema = z.looseObject({
+  visualTone: optStr,
+  palette: z.array(z.unknown()).optional().catch(undefined),
+});
+
+const StoryboardShotRawSchema = z.looseObject({
+  id: optStr,
+  scene: optStr,
+  durationSec: optNum,
+  framing: optStr,
+  camera: optStr,
+  visual: optStr,
+  dialogue: optStr,
+  sfx: optStr,
+  transitionOut: optStr,
+  status: optStr,
+});
+
+const MotionLayerRawSchema = z.looseObject({
+  id: optStr,
+  text: optStr,
+  label: optStr,
+  opacity: optNum,
+});
+
+type MotionLayer = z.output<typeof MotionLayerRawSchema>;
+
+const MotionSceneRawSchema = z.looseObject({
+  id: optStr,
+  file: optStr,
+  start: optNum,
+  end: optNum,
+  title: optStr,
+  layers: z.array(z.unknown()).optional().catch(undefined),
+});
+
+const MotionSceneDetailJsonSchema = jsonString(
+  z.looseObject({
+    title: optStr,
+    layers: z.array(z.unknown()).optional().catch(undefined),
+  }),
+);
+
+const MediaDocJsonSchema = jsonString(
+  z.looseObject({
+    title: optStr,
+    mediaKind: optStr,
+    caption: optStr,
+    durationSec: optNum,
+    posterAsset: optStr,
+    issueId: optStr,
+    items: z.array(z.unknown()).optional().catch(undefined),
+    transcript: z
+      .union([z.string(), z.array(z.unknown())])
+      .optional()
+      .catch(undefined),
+    transcriptExcerpt: optStr,
+    aspectRatio: optStr,
+    fps: optNum,
+    styleGuide: StoryboardStyleGuideRawSchema.optional().catch(undefined),
+    shots: z.array(z.unknown()).optional().catch(undefined),
+    width: optNum,
+    height: optNum,
+    duration: optNum,
+    background: optStr,
+    chapters: z.array(z.record(z.string(), z.unknown())).optional().catch(undefined),
+    scenes: z.array(z.unknown()).optional().catch(undefined),
+  }),
+);
+
+type MediaDocPayload = z.output<typeof MediaDocJsonSchema>;
+
 interface MotionSceneModel {
   readonly id: string;
   readonly file: string;
   readonly start: number;
   readonly end: number;
   readonly title: string;
-  readonly layers: readonly Record<string, unknown>[];
+  readonly layers: readonly MotionLayer[];
 }
 
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return typeof v === "object" && v !== null && !Array.isArray(v);
-}
-
-function parseJsonObject(raw: string | undefined): Record<string, unknown> | undefined {
+function parseOptionalJson<T>(raw: string | undefined, schema: z.ZodType<T, string>): T | undefined {
   if (!raw) return undefined;
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    return isRecord(parsed) ? parsed : undefined;
-  } catch {
-    return undefined;
+  const parsed = schema.safeParse(raw);
+  return parsed.success ? parsed.data : undefined;
+}
+
+function parseArrayItems<T>(raw: readonly unknown[] | undefined, schema: z.ZodType<T>): T[] {
+  if (!raw) return [];
+  const out: T[] = [];
+  for (const item of raw) {
+    const parsed = schema.safeParse(item);
+    if (parsed.success) out.push(parsed.data);
   }
+  return out;
 }
 
-function asString(v: unknown, fallback = ""): string {
-  return typeof v === "string" ? v : fallback;
+function parseTranscriptCues(raw: string | readonly unknown[] | undefined, prefix: string): TranscriptCue[] {
+  if (!Array.isArray(raw)) return [];
+  return parseArrayItems(raw, TranscriptCueRawSchema).map((c, idx) => ({
+    id: c.id ?? `${prefix}-${idx}`,
+    startSec: c.startSec ?? c.start ?? 0,
+    endSec: c.endSec ?? c.end ?? 0,
+    speaker: c.speaker ?? "",
+    text: c.text ?? "",
+  }));
 }
 
-function asNumber(v: unknown, fallback = 0): number {
-  return typeof v === "number" && Number.isFinite(v) ? v : fallback;
-}
-
-function asRecordArray(v: unknown): Record<string, unknown>[] {
-  return Array.isArray(v) ? v.filter(isRecord) : [];
-}
-
-function evaluateMotionLayer(
-  layer: Record<string, unknown>,
-  localProgress: number,
-): { readonly opacity: number; readonly offsetY: number; readonly scale: number } {
+function evaluateMotionLayer(layer: MotionLayer, localProgress: number): { readonly opacity: number; readonly offsetY: number; readonly scale: number } {
   const clamped = Math.max(0, Math.min(1, localProgress));
-  const baseOpacity = asNumber(layer.opacity, 1);
+  const baseOpacity = layer.opacity ?? 1;
   const enterEnd = 0.22;
   const enterT = Math.min(1, clamped / enterEnd);
   const eased = 1 - Math.pow(1 - enterT, 3);
@@ -174,35 +274,34 @@ export function MediaView(props: MediaViewProps) {
   const activeAudioId = signal<string | undefined>(undefined);
   const previewVideoId = signal<string | undefined>(undefined);
 
-  const mediaJson = computed(() => parseJsonObject(snapshot().contents.get("structure/media.json")?.content));
-  const shotsJson = computed(() => parseJsonObject(snapshot().contents.get("structure/shots.json")?.content));
+  const mediaJson = computed((): MediaDocPayload | undefined =>
+    parseOptionalJson(snapshot().contents.get("structure/media.json")?.content, MediaDocJsonSchema),
+  );
+  const shotsJson = computed((): MediaDocPayload | undefined =>
+    parseOptionalJson(snapshot().contents.get("structure/shots.json")?.content, MediaDocJsonSchema),
+  );
   const assetFiles = computed((): readonly NoteFileMeta[] =>
     [...snapshot().files.values()].filter((f) => f.path.startsWith("asset/")).toSorted((a, b) => a.path.localeCompare(b.path)),
   );
 
   const mediaDoc = computed(() => {
     const obj = mediaJson();
-    const defaultKind = asString(obj?.mediaKind, "audio");
-    const items: MediaItemModel[] = asRecordArray(obj?.items).map((item, idx) => {
-      const cues: TranscriptCue[] = asRecordArray(item.transcript).map((c, cIdx) => ({
-        id: asString(c.id, `cue-${idx}-${cIdx}`),
-        startSec: asNumber(c.startSec ?? c.start, 0),
-        endSec: asNumber(c.endSec ?? c.end, 0),
-        speaker: asString(c.speaker),
-        text: asString(c.text),
-      }));
+    const defaultKind = obj?.mediaKind ?? "audio";
+    const items: MediaItemModel[] = parseArrayItems(obj?.items, MediaItemRawSchema).map((item, idx) => {
+      const cues = parseTranscriptCues(item.transcript, `cue-${idx}`);
+      const src = item.src ?? "";
       return {
-        id: asString(item.id, `m-${idx + 1}`),
-        kind: asString(item.kind, defaultKind),
-        src: asString(item.src),
-        title: asString(item.title, asString(item.src, `Item ${idx + 1}`)),
-        caption: asString(item.caption),
-        durationSec: typeof item.durationSec === "number" ? item.durationSec : undefined,
-        issueId: typeof item.issueId === "string" && item.issueId ? toIssueId(item.issueId) : undefined,
-        jobId: typeof item.jobId === "string" && item.jobId ? item.jobId : undefined,
+        id: item.id ?? `m-${idx + 1}`,
+        kind: item.kind ?? defaultKind,
+        src,
+        title: item.title ?? item.src ?? `Item ${idx + 1}`,
+        caption: item.caption ?? "",
+        durationSec: item.durationSec,
+        issueId: item.issueId ? toIssueId(item.issueId) : undefined,
+        jobId: item.jobId ? item.jobId : undefined,
         transcript: cues,
         transcriptExcerpt:
-          asString(item.transcriptExcerpt) ||
+          (item.transcriptExcerpt ?? "") ||
           (typeof item.transcript === "string" ? item.transcript : "") ||
           cues
             .map((c) => c.text)
@@ -211,47 +310,41 @@ export function MediaView(props: MediaViewProps) {
       };
     });
 
-    const topTranscript: TranscriptCue[] = asRecordArray(obj?.transcript).map((c, cIdx) => ({
-      id: asString(c.id, `top-cue-${cIdx}`),
-      startSec: asNumber(c.startSec ?? c.start, 0),
-      endSec: asNumber(c.endSec ?? c.end, 0),
-      speaker: asString(c.speaker),
-      text: asString(c.text),
-    }));
+    const topTranscript = parseTranscriptCues(obj?.transcript, "top-cue");
 
     return {
-      title: asString(obj?.title, props.note.title),
+      title: obj?.title ?? props.note.title,
       mediaKind: defaultKind,
-      caption: asString(obj?.caption),
-      durationSec: typeof obj?.durationSec === "number" ? obj.durationSec : undefined,
-      posterAsset: typeof obj?.posterAsset === "string" ? obj.posterAsset : undefined,
-      issueId: typeof obj?.issueId === "string" && obj.issueId ? toIssueId(obj.issueId) : props.note.issue,
+      caption: obj?.caption ?? "",
+      durationSec: obj?.durationSec,
+      posterAsset: obj?.posterAsset,
+      issueId: obj?.issueId ? toIssueId(obj.issueId) : props.note.issue,
       items,
       topTranscript,
-      topTranscriptExcerpt: asString(obj?.transcriptExcerpt) || (typeof obj?.transcript === "string" ? obj.transcript : ""),
+      topTranscriptExcerpt: (obj?.transcriptExcerpt ?? "") || (typeof obj?.transcript === "string" ? obj.transcript : ""),
     };
   });
 
   const storyboardModel = computed(() => {
     const src = shotsJson() ?? mediaJson();
-    const styleGuide = isRecord(src?.styleGuide) ? src.styleGuide : undefined;
-    const palette = Array.isArray(styleGuide?.palette) ? styleGuide.palette.filter((x): x is string => typeof x === "string") : [];
-    const shots: StoryboardShotModel[] = asRecordArray(src?.shots).map((s, idx) => ({
-      id: asString(s.id, `sh${String(idx + 1).padStart(2, "0")}`),
-      scene: asString(s.scene),
-      durationSec: asNumber(s.durationSec, 3),
-      framing: asString(s.framing, "wide"),
-      camera: asString(s.camera, "static"),
-      visual: asString(s.visual),
-      dialogue: asString(s.dialogue),
-      sfx: asString(s.sfx),
-      transitionOut: asString(s.transitionOut, "cut"),
-      status: asString(s.status, "draft"),
+    const styleGuide = src?.styleGuide;
+    const palette = (styleGuide?.palette ?? []).filter((x): x is string => typeof x === "string");
+    const shots: StoryboardShotModel[] = parseArrayItems(src?.shots, StoryboardShotRawSchema).map((s, idx) => ({
+      id: s.id ?? `sh${String(idx + 1).padStart(2, "0")}`,
+      scene: s.scene ?? "",
+      durationSec: s.durationSec ?? 3,
+      framing: s.framing ?? "wide",
+      camera: s.camera ?? "static",
+      visual: s.visual ?? "",
+      dialogue: s.dialogue ?? "",
+      sfx: s.sfx ?? "",
+      transitionOut: s.transitionOut ?? "cut",
+      status: s.status ?? "draft",
     }));
     return {
-      aspectRatio: asString(src?.aspectRatio, "16:9"),
-      fps: asNumber(src?.fps, 30),
-      visualTone: asString(styleGuide?.visualTone),
+      aspectRatio: src?.aspectRatio ?? "16:9",
+      fps: src?.fps ?? 30,
+      visualTone: styleGuide?.visualTone ?? "",
       palette,
       shots,
     };
@@ -260,27 +353,27 @@ export function MediaView(props: MediaViewProps) {
   const motionModel = computed(() => {
     const obj = mediaJson();
     const contents = snapshot().contents;
-    const scenes: MotionSceneModel[] = asRecordArray(obj?.scenes).map((sc, idx) => {
-      const file = asString(sc.file);
-      const detail = parseJsonObject(file ? contents.get(file)?.content : undefined);
-      const directLayers = asRecordArray(sc.layers);
-      const detailLayers = asRecordArray(detail?.layers);
+    const scenes: MotionSceneModel[] = parseArrayItems(obj?.scenes, MotionSceneRawSchema).map((sc, idx) => {
+      const file = sc.file ?? "";
+      const detail = parseOptionalJson(file ? contents.get(file)?.content : undefined, MotionSceneDetailJsonSchema);
+      const directLayers = parseArrayItems(sc.layers, MotionLayerRawSchema);
+      const detailLayers = parseArrayItems(detail?.layers, MotionLayerRawSchema);
       return {
-        id: asString(sc.id, `sc-${idx + 1}`),
+        id: sc.id ?? `sc-${idx + 1}`,
         file,
-        start: asNumber(sc.start, 0),
-        end: asNumber(sc.end, 2),
-        title: asString(detail?.title, asString(sc.title, asString(sc.id, `Scene ${idx + 1}`))),
+        start: sc.start ?? 0,
+        end: sc.end ?? 2,
+        title: detail?.title ?? sc.title ?? sc.id ?? `Scene ${idx + 1}`,
         layers: detailLayers.length > 0 ? detailLayers : directLayers,
       };
     });
     return {
-      width: asNumber(obj?.width, 1920),
-      height: asNumber(obj?.height, 1080),
-      fps: asNumber(obj?.fps, 30),
-      duration: Math.max(0.1, asNumber(obj?.duration, 6)),
-      background: asString(obj?.background) || tone("side"),
-      chapters: asRecordArray(obj?.chapters),
+      width: obj?.width ?? 1920,
+      height: obj?.height ?? 1080,
+      fps: obj?.fps ?? 30,
+      duration: Math.max(0.1, obj?.duration ?? 6),
+      background: obj?.background || tone("side"),
+      chapters: obj?.chapters ?? [],
       scenes,
     };
   });
@@ -398,7 +491,7 @@ export function MediaView(props: MediaViewProps) {
         <View class="shrink-0 flex-row items-center gap-2">
           <If when={mediaDoc().issueId && props.onOpenIssue !== undefined ? mediaDoc().issueId : undefined}>
             {(issId) => (
-              <Button size="compact" tone="plain" icon="issues" testID="media-open-issue" onPress={() => props.onOpenIssue?.(issId())}>
+              <Button size="control" tone="plain" icon="issues" testID="media-open-issue" onPress={() => props.onOpenIssue?.(issId())}>
                 {issId()}
               </Button>
             )}
@@ -508,12 +601,12 @@ export function MediaView(props: MediaViewProps) {
                         <View testID={`media-transcript-${item().id}`} class="gap-1.5 rounded-lg border border-line bg-page p-2.5">
                           <Each of={item().transcript} key={(cue) => cue.id}>
                             {(cue) => (
-                              <View class="flex-row items-start gap-2">
-                                <Text class="w-16 shrink-0 font-mono text-2xs text-faint tabular-nums">{`${cue().startSec.toFixed(1)}s`}</Text>
+                              <View class="flex-row items-start gap-2.5">
+                                <Text class="w-12 shrink-0 font-mono text-2xs leading-5 text-faint tabular-nums">{`${cue().startSec.toFixed(1)}s`}</Text>
                                 <If when={cue().speaker}>
-                                  <Text class="shrink-0 text-2xs font-semibold text-accent">{cue().speaker}</Text>
+                                  <Text class="w-14 shrink-0 truncate text-2xs leading-5 font-semibold text-accent">{cue().speaker}</Text>
                                 </If>
-                                <Text class="min-w-0 flex-1 text-xs leading-relaxed text-ink">{cue().text}</Text>
+                                <Text class="min-w-0 flex-1 text-xs leading-5 text-ink">{cue().text}</Text>
                               </View>
                             )}
                           </Each>
@@ -530,12 +623,12 @@ export function MediaView(props: MediaViewProps) {
             <View testID="media-top-transcript" class="gap-1.5 rounded-xl border border-line bg-side p-3.5">
               <Each of={mediaDoc().topTranscript} key={(cue) => cue.id}>
                 {(cue) => (
-                  <View class="flex-row items-start gap-2">
-                    <Text class="w-16 shrink-0 font-mono text-2xs text-faint tabular-nums">{`${cue().startSec.toFixed(1)}s`}</Text>
+                  <View class="flex-row items-start gap-2.5">
+                    <Text class="w-12 shrink-0 font-mono text-2xs leading-5 text-faint tabular-nums">{`${cue().startSec.toFixed(1)}s`}</Text>
                     <If when={cue().speaker}>
-                      <Text class="shrink-0 text-2xs font-semibold text-accent">{cue().speaker}</Text>
+                      <Text class="w-14 shrink-0 truncate text-2xs leading-5 font-semibold text-accent">{cue().speaker}</Text>
                     </If>
-                    <Text class="min-w-0 flex-1 text-xs leading-relaxed text-ink">{cue().text}</Text>
+                    <Text class="min-w-0 flex-1 text-xs leading-5 text-ink">{cue().text}</Text>
                   </View>
                 )}
               </Each>
@@ -663,11 +756,11 @@ export function MediaView(props: MediaViewProps) {
             <If when={activeMotionScene()}>
               {(sc) => (
                 <View class="w-full max-w-xl items-center gap-3">
-                  <Each of={sc().layers} key={(l, idx) => asString(l.id, String(idx))}>
+                  <Each of={sc().layers} key={(l, idx) => l.id ?? String(idx)}>
                     {(layer, idx) => {
                       const staggered = () => Math.max(0, Math.min(1, motionProgress() - idx() * 0.08));
                       const anim = () => evaluateMotionLayer(layer(), staggered());
-                      const text = () => asString(layer().text, asString(layer().label, sc().title));
+                      const text = () => layer().text ?? layer().label ?? sc().title;
                       return (
                         <View
                           class="rounded-lg border border-line bg-page px-4 py-2"

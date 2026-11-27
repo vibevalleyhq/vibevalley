@@ -8,6 +8,7 @@ import { issueId, messageId, noteId } from "@vibevalley/protocol/schema";
 
 import { fakeHost } from "../../../fixtures/fakeHost";
 import { SCENARIO_NOW, scenarios } from "../../../fixtures/scenarios";
+import { setCoreBridgeForTest } from "../../../infra/rich";
 import { buildPromotedIssueDraft, buildPromotedNoteContent, buildPromotedNoteDraft, messageSourcePath } from "../model/promote";
 
 const sampleNote: Note = {
@@ -97,10 +98,28 @@ test("promote helpers carry /chat/<channel>?m=<seq> back-links, body, attachment
   expect(noteDraft.content).toContain("[spec.pdf](/api/v1/attachment/att-pdf)");
   expect(noteDraft.content).toContain("/chat/design?m=42");
 
-  const docJson = JSON.parse(buildPromotedNoteContent({ title: noteDraft.title, noteType: "doc", content: noteDraft.content })) as {
-    version: number;
-    blocks: { type: string; text?: string }[];
-  };
+  const restore = setCoreBridgeForTest({
+    markdownToBlocks: (md) => {
+      const blocks = md
+        .split(/\n\n+/u)
+        .filter((s) => s.trim().length > 0)
+        .map((chunk, i) =>
+          chunk.trim().startsWith(">")
+            ? { id: `b${i + 1}`, type: "quote", text: chunk.trim().replace(/^>\s?/u, "") }
+            : { id: `b${i + 1}`, type: "prose", text: chunk.trim() },
+        );
+      return JSON.stringify(blocks);
+    },
+  });
+  let docJson: { version: number; blocks: { type: string; text?: string }[] };
+  try {
+    docJson = JSON.parse(buildPromotedNoteContent({ title: noteDraft.title, noteType: "doc", content: noteDraft.content })) as {
+      version: number;
+      blocks: { type: string; text?: string }[];
+    };
+  } finally {
+    restore();
+  }
   expect(docJson.version).toBe(1);
   expect(docJson.blocks.some((b) => b.type === "prose" && (b.text ?? "").includes("Fix login redirect loop"))).toBe(true);
   expect(docJson.blocks.some((b) => b.type === "quote" && (b.text ?? "").includes("/chat/design?m=42"))).toBe(true);

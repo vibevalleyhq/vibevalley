@@ -1,0 +1,274 @@
+import { computed, keymap, Scroll, signal, Text, View } from "nsh";
+import { Input } from "nsh/base";
+
+import { t } from "@vibevalley/i18n";
+import type { LibraryFileKind } from "@vibevalley/protocol";
+
+import { Button } from "../../../design/Button";
+import { Dialog } from "../../../design/Dialog";
+import { Icon } from "../../../design/Icon";
+import type { IconName } from "../../../design/icons";
+import { Empty, Kbd } from "../../../design/layout";
+import { Segmented } from "../../../design/Segmented";
+import { useNow } from "../../../infra/base/dom";
+import { ago } from "../../../infra/base/format";
+import { spelled } from "../../../infra/base/search";
+import { libraryQuery } from "../../../infra/libraryQuery";
+import { ready, useQuery } from "../../../infra/query";
+import { useRouter } from "../../../infra/router";
+import { createMemo } from "../../../infra/solid";
+import { closeContentSearch, contentBrowseBucket, contentFocusMediaId, contentSearchOpen, isPinned, mediaKindOf } from "../../../infra/state/contentNav";
+import { kindLabel, noteHref, noteIcon, useNotes } from "../NoteCard";
+
+export function ContentSearchModal() {
+  return (
+    <Dialog
+      open={contentSearchOpen.get()}
+      onClose={closeContentSearch}
+      title={t("web.library.content.search.title")}
+      size="md"
+      height="fixed"
+      scroll={false}
+      testid="content-search-modal"
+    >
+      <If when={contentSearchOpen.get()}>
+        <SearchBody />
+      </If>
+    </Dialog>
+  );
+}
+
+type SearchHit =
+  | {
+      readonly key: string;
+      readonly kind: "note";
+      readonly id: string;
+      readonly title: string;
+      readonly subtitle: string;
+      readonly badge: string;
+      readonly icon: IconName;
+      readonly updated: number;
+    }
+  | {
+      readonly key: string;
+      readonly kind: "media";
+      readonly id: string;
+      readonly fileKind: LibraryFileKind;
+      readonly title: string;
+      readonly subtitle: string;
+      readonly badge: string;
+      readonly icon: IconName;
+      readonly updated: number;
+    };
+
+const mediaIcon: Record<LibraryFileKind, IconName> = {
+  image: "image",
+  audio: "audio",
+  video: "video",
+  other: "file",
+};
+
+function SearchBody() {
+  const router = useRouter();
+  const now = useNow();
+  const notes = useNotes(() => ({}));
+  const media = useQuery(() => libraryQuery({ text: "", sort: "recent" }), { interval: () => 10_000, keepPrevious: true });
+
+  const query = signal("");
+  const scope = signal<"all" | "notes" | "media">("all");
+  const active = signal(0);
+
+  const hits = createMemo((): readonly SearchHit[] => {
+    const q = query().trim().toLowerCase();
+    const curScope = scope();
+    const allNotes = curScope === "media" ? [] : (ready(notes, undefined) ?? []);
+    const allMedia = curScope === "notes" ? [] : (ready(media, undefined) ?? []);
+    const currentNow = now();
+
+    const noteHits: SearchHit[] = allNotes
+      .filter((n) => !q || spelled(n.title, q) || spelled(kindLabel(n), q) || spelled(n.byName, q) || n.noteType.toLowerCase().includes(q))
+      .map((n) => ({
+        key: `note:${n.id}`,
+        kind: "note",
+        id: n.id,
+        title: n.title,
+        subtitle: `${n.byName} · ${ago(n.updated, currentNow)}`,
+        badge: kindLabel(n),
+        icon: noteIcon(n),
+        updated: n.updated,
+      }));
+
+    const mediaHits: SearchHit[] = allMedia
+      .filter((m) => !q || spelled(m.attachment.name, q))
+      .map((m) => {
+        const fk = mediaKindOf(m.attachment.type);
+        return {
+          key: `media:${m.attachment.id}`,
+          kind: "media",
+          id: m.attachment.id,
+          fileKind: fk,
+          title: m.attachment.name,
+          subtitle: ago(m.lastAt, currentNow),
+          badge: `${t("web.library.content.search.typeMedia")} · ${t(`web.library.kind.${fk}`)}`,
+          icon: mediaIcon[fk],
+          updated: m.lastAt,
+        };
+      });
+
+    if (!q) {
+      return [...noteHits, ...mediaHits].toSorted((a, b) => b.updated - a.updated).slice(0, 14);
+    }
+
+    return [...noteHits.slice(0, 16), ...mediaHits.slice(0, 8)].slice(0, 24);
+  });
+
+  const openHit = (hit: SearchHit) => {
+    closeContentSearch();
+    switch (hit.kind) {
+      case "note":
+        router.navigate(noteHref(hit.id));
+        return;
+      case "media":
+        contentBrowseBucket.set({ kind: "media" });
+        contentFocusMediaId.set(hit.id);
+        router.navigate("/library");
+        return;
+    }
+  };
+
+  const clampedIndex = computed(() => {
+    const n = hits().length;
+    if (n === 0) return -1;
+    return Math.min(active(), n - 1);
+  });
+
+  const move = (delta: number) => {
+    const n = hits().length;
+    if (n === 0) return;
+    active.set((clampedIndex() + delta + n) % n);
+  };
+
+  keymap.bind({ up: () => move(-1), down: () => move(1) }, { when: "always" });
+
+  return (
+    <View class="min-h-0 flex-1">
+      <View class="shrink-0 gap-2.5 border-b border-line px-5 py-3">
+        <View class="h-10 flex-row items-center gap-2 rounded-md border border-line bg-page px-3 hover:border-faint focus-within:border-focus">
+          <Icon name="search" size={16} tone="muted" />
+          <Input
+            autoFocus
+            testID="content-search-input"
+            value={query()}
+            placeholder={t("web.library.content.search.placeholder")}
+            accessibilityLabel={t("web.library.content.search.title")}
+            submitBehavior="submit"
+            onChange={(e) => {
+              query.set(e.value);
+              active.set(0);
+            }}
+            onSubmit={() => {
+              const idx = clampedIndex();
+              const chosen = idx >= 0 ? hits()[idx] : undefined;
+              if (chosen) openHit(chosen);
+            }}
+            class="min-w-0 flex-1 text-base text-ink placeholder:text-faint"
+          />
+          <If when={query().length > 0}>
+            <View
+              role="button"
+              accessibilityLabel={t("web.issue.page.clear")}
+              onPress={() => {
+                query.set("");
+                active.set(0);
+              }}
+              class="size-5 shrink-0 items-center justify-center rounded-sm hover:bg-hover"
+            >
+              <Icon name="close" size={12} tone="muted" />
+            </View>
+          </If>
+        </View>
+
+        <View class="flex-row items-center justify-between gap-2">
+          <Segmented
+            testid="content-search-scope"
+            label={t("web.library.content.search.title")}
+            value={scope()}
+            onChange={(v) => {
+              scope.set(v);
+              active.set(0);
+            }}
+            options={[
+              { value: "all", label: t("web.library.content.search.scopeAll") },
+              { value: "notes", label: t("web.library.content.search.scopeArtifacts") },
+              { value: "media", label: t("web.library.content.search.scopeMedia") },
+            ]}
+          />
+        </View>
+      </View>
+
+      <Scroll accessibilityLabel={t("web.library.content.search.title")} class="min-h-0 flex-1" contentClass="gap-1 px-5 py-3">
+        <If when={hits().length === 0}>
+          <View class="py-4">
+            <Empty
+              variant="filtered"
+              compact
+              icon="search"
+              action={
+                <If when={query().trim().length > 0}>
+                  <Button size="compact" onPress={() => query.set("")}>
+                    {t("web.agent.list.clearFilter")}
+                  </Button>
+                </If>
+              }
+            >
+              {t("web.library.content.search.empty")}
+            </Empty>
+          </View>
+        </If>
+        <Each of={hits()} key={(h) => h.key}>
+          {(hit, idx) => {
+            const selected = () => idx() === clampedIndex();
+            return (
+              <View
+                role="button"
+                testID="content-search-hit"
+                accessibilityLabel={hit().title}
+                accessibilityState={{ selected: selected() }}
+                onMouseEnter={() => active.set(idx())}
+                onPress={() => openHit(hit())}
+                class={`flex-row items-center gap-2.5 rounded-md px-2.5 py-2 ${selected() ? "bg-selected" : "hover:bg-hover"}`}
+              >
+                <Icon name={hit().icon} size={16} tone={selected() ? "ink" : "muted"} />
+                <View class="min-w-0 flex-1 gap-0.5">
+                  <Text class="truncate text-sm font-medium text-ink">{hit().title}</Text>
+                  <Text class="truncate text-xs text-muted">{hit().subtitle}</Text>
+                </View>
+                <If when={isPinned(hit().key)}>
+                  <Icon name="pin" size={11} tone="wheat" />
+                </If>
+                <View class="shrink-0 rounded-sm border border-line bg-side px-1.5 py-0.5">
+                  <Text class="text-2xs font-medium text-muted">{hit().badge}</Text>
+                </View>
+              </View>
+            );
+          }}
+        </Each>
+      </Scroll>
+
+      <View class="shrink-0 flex-row items-center gap-3 border-t border-line bg-side px-5 py-2.5">
+        <View class="flex-row items-center gap-1">
+          <Kbd>↑↓</Kbd>
+          <Text class="text-2xs text-faint">{t("web.base.shortcuts.say.move")}</Text>
+        </View>
+        <View class="flex-row items-center gap-1">
+          <Kbd>⏎</Kbd>
+          <Text class="text-2xs text-faint">{t("web.base.shortcuts.say.pick")}</Text>
+        </View>
+        <View class="flex-row items-center gap-1">
+          <Kbd>Esc</Kbd>
+          <Text class="text-2xs text-faint">{t("web.base.lightbox.close")}</Text>
+        </View>
+      </View>
+    </View>
+  );
+}

@@ -154,6 +154,7 @@ test("FamilyDetail renders collaborative body editor, IssueNotes, and IssueActiv
     title: "Epic unified body parity",
     description: "Family scope overview",
     status: "in_progress",
+    owner: { kind: "user", id: "user" },
     parent: undefined,
     stage: { state: "working", acts: [] },
   };
@@ -185,4 +186,6 @@ test("FamilyDetail renders collaborative body editor, IssueNotes, and IssueActiv
   });
   await fake.pumpUntil(app, () => app.count("id:issue-family") === 1 && app.count("id:issue-requirement") === 1 && app.count("id:issue-activity") === 1);
   expect(app.count("id:issue-comment-fallback-composer")).toBe(1);
+  expect(app.count("id:issue-notes")).toBe(1);
+  expect(app.texts()).not.toContain("user");
 });

@@ -2,7 +2,7 @@ import { createExternal } from "./base/external";
 import { createForm, type FormOptions } from "./form/form";
 import type { FormValue, Path } from "./form/paths";
 import { onCleanup } from "./solid";
-export type { FormOptions, FormField, Submission } from "./form/form";
+export type { FormOptions, Submission } from "./form/form";
 
 export function useForm<T, E extends FormValue, R>(options: FormOptions<T, E, R>) {
   const form = createForm(options);

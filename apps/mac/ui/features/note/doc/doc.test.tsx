@@ -20,26 +20,34 @@ import {
   detectSlashTrigger,
   detectWikilinkTrigger,
   duplicateBlockById,
+  estimateInlineRichTextOffset,
   extractTocEntries,
   filterIssuesForList,
   filterSlashCommands,
   formatWikilinkToken,
+  hasInlineRichTokens,
   insertBlockAfter,
+  isCaretOnFirstLine,
+  isCaretOnLastLine,
   isTurnIntoActive,
   matchMarkdownInputRule,
+  mergeBlockBackward,
   moveBlockById,
   neighborBlockId,
   parseInlineLinkSegments,
+  parseInlineMarkdownRuns,
   removeTableColumn,
   removeTableRow,
   setColumnsCount,
   SLASH_COMMANDS,
+  splitBlockAtSelection,
   stripSlashTrigger,
   TURN_INTO_OPTIONS,
   turnBlockInto,
   updateTableCell,
   updateTableHeader,
   wrapInlineMarkdown,
+  wrapInlineMarkdownSelection,
 } from "./docOps";
 import { groupInlineDisplayRuns } from "./InlineRichText";
 
@@ -169,6 +177,17 @@ describe("docOps: 24 BlockKinds, Markdown rules, Turn Into, Slash & Wikilink ops
       { kind: "pill", segment: { kind: "issueNumber", number: 42 }, trailingPunct: "。" },
     ]);
 
+    expect(hasInlineRichTokens("plain text")).toBe(false);
+    expect(hasInlineRichTokens("unified **Block Doc** and `bg-page`")).toBe(true);
+    expect(parseInlineMarkdownRuns("统一 **Block Doc** 与 `bg-page` 及 ~~旧版~~")).toEqual([
+      { kind: "plain", value: "统一 " },
+      { kind: "bold", value: "Block Doc" },
+      { kind: "plain", value: " 与 " },
+      { kind: "code", value: "bg-page" },
+      { kind: "plain", value: " 及 " },
+      { kind: "strike", value: "旧版" },
+    ]);
+
     const h2: DocBlock = { id: "h2", type: "heading", level: 2, text: "Sub" };
     const activeTurnInto = TURN_INTO_OPTIONS.filter((opt) => isTurnIntoActive(h2, opt)).map((o) => o.key);
     expect(activeTurnInto).toEqual(["heading-2"]);
@@ -176,6 +195,74 @@ describe("docOps: 24 BlockKinds, Markdown rules, Turn Into, Slash & Wikilink ops
     expect(wrapInlineMarkdown("hello", "**")).toBe("**hello**");
     expect(wrapInlineMarkdown("**hello**", "**")).toBe("hello");
     expect(neighborBlockId([{ id: "a", type: "prose", text: "" }, h2], "h2", "prev")).toBe("a");
+  });
+
+  test("supports selection-aware inline formatting, mid-text triggers, split at caret, merge backward, and inline offset estimation", () => {
+    // Selection-aware wrap & unwrap
+    expect(wrapInlineMarkdownSelection("Hello world!", "**", 6, 11)).toEqual({
+      text: "Hello **world**!",
+      start: 8,
+      end: 13,
+    });
+    expect(wrapInlineMarkdownSelection("Hello **world**!", "**", 8, 13)).toEqual({
+      text: "Hello world!",
+      start: 6,
+      end: 11,
+    });
+    expect(wrapInlineMarkdownSelection("alpha beta gamma", "`", 8, 8)).toEqual({
+      text: "alpha `beta` gamma",
+      start: 9,
+      end: 9,
+    });
+    expect(wrapInlineMarkdownSelection("alpha `beta` gamma", "`", 9, 9)).toEqual({
+      text: "alpha beta gamma",
+      start: 8,
+      end: 8,
+    });
+
+    // Mid-text slash & wikilink triggers preserve suffix after caret
+    const midSlash = detectSlashTrigger("Before /cal after", 11);
+    expect(midSlash).toEqual({ query: "cal", triggerIndex: 7 });
+    expect(stripSlashTrigger("Before /cal after", midSlash!.triggerIndex, 11)).toBe("Before after");
+
+    const midWiki = detectWikilinkTrigger("Read [[spec before shipping", 11);
+    expect(midWiki).toEqual({ mode: "wikilink", query: "spec", startIndex: 5 });
+    const token = formatWikilinkToken("note", "n1", "Spec");
+    expect(applyWikilinkReplacement("Read [[spec before shipping", midWiki!.startIndex, token, 11)).toBe("Read [[note:n1|Spec]] before shipping");
+
+    // Caret line boundary checks
+    expect(isCaretOnFirstLine("line1\nline2", 3)).toBe(true);
+    expect(isCaretOnFirstLine("line1\nline2", 7)).toBe(false);
+    expect(isCaretOnLastLine("line1\nline2", 3)).toBe(false);
+    expect(isCaretOnLastLine("line1\nline2", 7)).toBe(true);
+
+    // Split prose, heading, and todo at arbitrary selection
+    const initial: DocBlock[] = [
+      { id: "h1", type: "heading", level: 2, text: "Section Title" },
+      { id: "p1", type: "prose", text: "First halfSecond half" },
+      { id: "t1", type: "todo", checked: true, text: "Buy milk" },
+    ];
+    const splitProse = splitBlockAtSelection(initial, "p1", 10, 10, "p2")!;
+    expect(splitProse.focus).toEqual({ blockId: "p2", caret: 0 });
+    expect(splitProse.blocks[1]).toEqual({ id: "p1", type: "prose", text: "First half" });
+    expect(splitProse.blocks[2]).toEqual({ id: "p2", type: "prose", text: "Second half" });
+
+    // Merge p2 backward into p1 restores exact join offset
+    const mergedProse = mergeBlockBackward(splitProse.blocks, "p2")!;
+    expect(mergedProse.focus).toEqual({ blockId: "p1", caret: 10 });
+    expect(mergedProse.blocks[1]).toEqual({ id: "p1", type: "prose", text: "First halfSecond half" });
+
+    // Merge heading at 0 unwraps heading to prose first
+    const unwrappedHeading = mergeBlockBackward(initial, "h1")!;
+    expect(unwrappedHeading.focus).toEqual({ blockId: "h1", caret: 0 });
+    expect(unwrappedHeading.blocks[0]).toEqual({ id: "h1", type: "prose", text: "Section Title" });
+
+    // Inline rich text click offset accounts for [[note:...]] pill token length
+    const rich = "See [[note:note_long_uuid_1234567890|Spec]] end";
+    const leftOff = estimateInlineRichTextOffset(rich, 6, 8, 500);
+    const rightOff = estimateInlineRichTextOffset(rich, 260, 8, 500);
+    expect(leftOff).toBeLessThan(4);
+    expect(rightOff).toBeGreaterThanOrEqual(rich.indexOf(" end"));
   });
 
   test("table, toggle, columns, TOC, stats, and recursive tree CRUD operations", () => {

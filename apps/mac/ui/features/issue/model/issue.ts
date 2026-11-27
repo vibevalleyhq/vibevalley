@@ -47,8 +47,6 @@ export function issueTitle(issue: Issue, issues: Issue[] = []) {
   return (title.split("\n")[0] ?? title).trim();
 }
 
-export const newIssueTitle = t("web.issue.boardLabels.newIssue");
-
 function runTriggerText(trigger: RunTrigger) {
   switch (trigger.kind) {
     case "issue":

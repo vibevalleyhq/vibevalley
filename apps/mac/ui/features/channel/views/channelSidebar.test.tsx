@@ -7,7 +7,7 @@ import type { Channel, Chat, MessageId, SettingsStatus, SliceBundle } from "@vib
 
 import { fakeHost, type FakeHost } from "../../../fixtures/fakeHost";
 import { SCENARIO_NOW, type ScenarioDensity, scenarios } from "../../../fixtures/scenarios";
-import { channelTime, sidebarChannelsOf } from "../model/places";
+import { channelTime, feedOf, sidebarChannelsOf } from "../model/places";
 
 const min = 60_000;
 const day = 24 * 60 * min;
@@ -190,7 +190,10 @@ test("Sidebar only renders channel-readiness-alert when orchestrator readiness i
   );
   await missingChat.fake.pumpUntil(missingChat.app, () => missingChat.app.count("id:channel-readiness-alert") === 1);
   expect(missingChat.app.count("id:orchestrator-fix")).toBe(1);
-  // Warning is shown once in the bottom alert banner, not duplicated in the orchestrator DM preview row.
+  // Readiness alert lives inside the main conversation area rather than cramped in the narrow sidebar.
+  expect(missingChat.app.count("id:channel-main >> id:channel-readiness-alert")).toBe(1);
+  expect(missingChat.app.count("id:channels-side >> id:channel-readiness-alert")).toBe(0);
+  // Warning is shown once in the conversation alert banner, not duplicated in the orchestrator DM preview row.
   const warnText = "回不了话：还没填 DeepSeek 的钥匙";
   expect(missingChat.app.texts().filter((line) => line === warnText).length).toBe(1);
   expect(missingChat.app.shows("id:channel-row-d-orchestrator >> text:我随时待命")).toBe(true);
@@ -264,4 +267,49 @@ test("Chat localizes raw runtime API-key error in channel sidebar preview, threa
   await fake.pumpUntil(app, () => app.count("id:thread-general:1") === 1);
   expect(app.texts().join("\n")).not.toContain("no API key is set");
   expect(app.shows(`id:thread-general:1 >> text:${t("shared.join.labeled", { label: "Ada #4", text: localized })}`)).toBe(true);
+});
+
+test("feedOf does not fold a follow-up message directly under a reacted message", () => {
+  setLocale("zh");
+  const first = {
+    id: "m1" as MessageId,
+    channel: "general",
+    number: 1,
+    from: "user",
+    name: "你",
+    actor: { kind: "user" as const, id: "user", name: "你" },
+    kind: "chat" as const,
+    text: "第一段",
+    at: SCENARIO_NOW - 2 * min,
+    revision: 1,
+    mentions: [],
+    spoken: false,
+    reactions: [{ emoji: "👍", by: ["orchestrator"] }],
+    attachments: [],
+    embeds: [],
+    outcome: null,
+  };
+  const second = { ...first, id: "m2" as MessageId, number: 2, text: "第二段", at: SCENARIO_NOW - min, reactions: [] };
+  const third = { ...second, id: "m3" as MessageId, number: 3, text: "第三段", at: SCENARIO_NOW - 30_000 };
+  const items = feedOf(undefined, [first, second, third], "", new Date(SCENARIO_NOW));
+  expect(items[0]?.continues).toBe(false);
+  expect(items[1]?.continues).toBe(false);
+  expect(items[2]?.continues).toBe(true);
+});
+
+test("Chat does not carry stale cross-page note context pill when navigating from /notes to /chat", async () => {
+  setLocale("zh");
+  const fake = fakeHost(scenarios.typical, { route: "/notes", locale: "zh" });
+  const app = await open("../../../app/main.tsx", {
+    width: 1280,
+    height: 820,
+    colorScheme: "light",
+    platform: "macos",
+    clock: { time: SCENARIO_NOW },
+    host: fake.options,
+  });
+  await fake.pump(app);
+  await app.press("text:频道");
+  await fake.pumpUntil(app, () => app.count("id:composer") === 1);
+  expect(app.count("id:note-context-pill")).toBe(0);
 });

@@ -30,6 +30,7 @@ import { PriorityValues } from "@vibevalley/protocol";
 import {
   BoardTextToken as BoardTextTokenSchema,
   ChatSessionProjection as ChatSessionProjectionSchema,
+  jsonString,
   RuntimeInfo as RuntimeInfoSchema,
   SessionChildTranscript as SessionChildTranscriptSchema,
   SessionWatchEvent as SessionWatchEventSchema,
@@ -184,11 +185,15 @@ export function mergeChatSteps(existing: readonly SessionEvent[], incoming: read
   return mergeSteps([...existing], incoming, { limit: null, replaceSameRevision: true });
 }
 
+const ChatSessionProjectionJsonSchema = jsonString(ChatSessionProjectionSchema);
+const TodoChecklistJsonSchema = jsonString(TodoChecklistSchema);
+const ToolDetailsJsonSchema = jsonString(ToolDetailsSchema);
+
 /** Projects the full workspace chat state (`visibleSteps`, `feedItems`, `latestTodos`, `telemetry`, `toolEntries`) via Rust `VvCore`. */
 export function projectChatSession(steps: readonly SessionEvent[], latestTokens?: EventTokens, defaultWindow = 200_000): ChatSessionProjection | undefined {
   const json = coreBridge()?.projectChatSession?.(JSON.stringify(steps), latestTokens !== undefined ? JSON.stringify(latestTokens) : null, defaultWindow);
   if (!json) return undefined;
-  const parsed = ChatSessionProjectionSchema.safeParse(JSON.parse(json));
+  const parsed = ChatSessionProjectionJsonSchema.safeParse(json);
   return parsed.success ? parsed.data : undefined;
 }
 
@@ -203,7 +208,7 @@ export function parseTodoChecklist(step: Pick<SessionEvent, "seq" | "type" | "to
     }),
   );
   if (!json) return undefined;
-  const parsed = TodoChecklistSchema.safeParse(JSON.parse(json));
+  const parsed = TodoChecklistJsonSchema.safeParse(json);
   return parsed.success ? parsed.data : undefined;
 }
 
@@ -230,7 +235,7 @@ export function thinkingPreview(text: string, maxChars = 96): string {
 export function formatToolDetails(step: SessionEvent): ToolDetails {
   const json = coreBridge()?.formatToolDetails?.(JSON.stringify(step));
   if (json !== undefined) {
-    const parsed = ToolDetailsSchema.safeParse(JSON.parse(json));
+    const parsed = ToolDetailsJsonSchema.safeParse(json);
     if (parsed.success) return parsed.data;
   }
   const output = step.output ?? "";
@@ -308,11 +313,13 @@ export async function fetchChildTranscript(
   return { ok: true, steps: parsed.data.steps };
 }
 
+const BoardTokenArrayJsonSchema = jsonString(BoardTokenArraySchema);
+
 /** Splits swarm board message tokens (`@mention`, `#seq`, `[done]`/`[stall]`) via Rust `VvCore`. */
 export function parseBoardTokens(text: string): BoardTextToken[] {
   const json = coreBridge()?.parseBoardTokens?.(text);
   if (json !== undefined) {
-    const parsed = BoardTokenArraySchema.safeParse(JSON.parse(json));
+    const parsed = BoardTokenArrayJsonSchema.safeParse(json);
     if (parsed.success && parsed.data.length > 0) return parsed.data;
   }
   return [{ kind: "text", value: text }];

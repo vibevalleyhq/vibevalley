@@ -7,7 +7,7 @@ import { issueId } from "@vibevalley/protocol/schema";
 
 import type { BoardCard } from "./cards";
 import { defaultLook, hierarchyShows } from "./display";
-import { orderedVisibleCardIds, selectRange, stepFocusId, toggleSelection } from "./triage";
+import { orderedVisibleCardIds, stepFocusId } from "./triage";
 
 function makeCard(id: string, number: number, status: Issue["status"], priority: Priority, parent?: string): BoardCard {
   const issue: Issue = {
@@ -33,7 +33,7 @@ function makeCard(id: string, number: number, status: Issue["status"], priority:
   return { kind: "todo", id: issue.id, lane: status, issue };
 }
 
-test("orderedVisibleCardIds respects Board lanes, GroupBy, HierarchyMode, and stepFocusId/selectRange", () => {
+test("orderedVisibleCardIds respects Board lanes, GroupBy, HierarchyMode, and stepFocusId", () => {
   const p1 = makeCard("i1", 1, "todo", "high");
   const c1 = makeCard("i2", 2, "backlog", "urgent", "i1");
   const solo = makeCard("i3", 3, "in_progress", "low");
@@ -56,11 +56,4 @@ test("orderedVisibleCardIds respects Board lanes, GroupBy, HierarchyMode, and st
   expect(stepFocusId(topIds, "i3", 1)).toBe("i3");
   expect(stepFocusId(topIds, "i3", -1)).toBe("i1");
   expect(stepFocusId(topIds, undefined, -1)).toBe("i3");
-
-  const toggled = toggleSelection(new Set<string>(), "i1");
-  expect([...toggled]).toEqual(["i1"]);
-  expect([...toggleSelection(toggled, "i1")]).toEqual([]);
-
-  const ranged = selectRange(new Set<string>(), ["i2", "i1", "i3"], "i3", "i2");
-  expect([...ranged]).toEqual(["i2", "i1", "i3"]);
 });

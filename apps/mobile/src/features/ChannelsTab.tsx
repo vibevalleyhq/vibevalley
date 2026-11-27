@@ -2,13 +2,14 @@ import { computed, effect, List, signal, Text, untracked, View } from "nsh";
 import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
-import type { Channel, ChatMessage } from "@vibevalley/protocol";
+import type { ChatMessage } from "@vibevalley/protocol";
+import { channelLabel } from "@vibevalley/protocol/rules";
 import { ChannelEvent as ChannelEventSchema, ChatMessage as ChatMessageSchema, messageId } from "@vibevalley/protocol/schema";
 
 import { Icon } from "../design/Icon";
 import type { MobileLayout } from "../design/layout";
 import { EmptyPanel, FieldInput, MarkdownText, PillButton, SectionCard, SplitPane, StatusTag, TopBar } from "../design/ui";
-import { hapticImpact, hapticNotification, type RemoteSession } from "../infra/session";
+import { errorMessage, hapticImpact, hapticNotification, type RemoteSession } from "../infra/session";
 
 const ChatMessageListSchema = z.array(ChatMessageSchema);
 
@@ -28,17 +29,6 @@ function mergeMessages(existing: readonly ChatMessage[], incoming: readonly Chat
     }
   }
   return [...byId.values()].toSorted((a, b) => a.number - b.number);
-}
-
-function channelLabel(channel: Channel): string {
-  const name = channel.name ?? channel.title;
-  switch (channel.type) {
-    case "direct":
-      return `@${name}`;
-    case "channel":
-    case "thread":
-      return `#${name}`;
-  }
 }
 
 export function ChannelsTab(props: {
@@ -89,7 +79,7 @@ export function ChannelsTab(props: {
   });
 
   const isEmptyFeed = computed(() => !loading() && displayedMessages().length === 0);
-  const detailTitle = computed(() => (selectedChannel() ? channelLabel(selectedChannel()!) : (props.selectedChannelId() ?? "")));
+  const detailTitle = computed(() => (selectedChannel() ? channelLabel(selectedChannel()) : (props.selectedChannelId() ?? "")));
 
   effect(() => {
     if (!isDual()) return;
@@ -136,7 +126,7 @@ export function ChannelsTab(props: {
       } catch (err: unknown) {
         if (controller.signal.aborted) return;
         loading.set(false);
-        sendError.set(err instanceof Error ? err.message : String(err));
+        sendError.set(errorMessage(err));
         return;
       }
       if (controller.signal.aborted) return;
@@ -203,7 +193,7 @@ export function ChannelsTab(props: {
                 })
                 .catch((err: unknown) => {
                   if (controller.signal.aborted) return;
-                  const message = err instanceof Error ? err.message : String(err);
+                  const message = errorMessage(err);
                   console.error("[ChannelsTab] channel reset reload error", { channelId, error: message });
                   sendError.set(message);
                 });
@@ -283,7 +273,7 @@ export function ChannelsTab(props: {
         hapticImpact("light");
       }
     } catch (err: unknown) {
-      rollback(err instanceof Error ? err.message : String(err));
+      rollback(errorMessage(err));
     } finally {
       sending.set(false);
     }

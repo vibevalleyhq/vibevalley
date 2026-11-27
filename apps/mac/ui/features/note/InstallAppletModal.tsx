@@ -4,7 +4,6 @@ import { t } from "@vibevalley/i18n";
 import type { Note } from "@vibevalley/protocol";
 import type { NoteAppletInfo } from "@vibevalley/protocol/host";
 
-import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
 import { Dialog } from "../../design/Dialog";
 import { Field, TextInput } from "../../design/Field";
@@ -12,6 +11,7 @@ import { Icon } from "../../design/Icon";
 import { Banner, Toggle } from "../../design/layout";
 import { Tag } from "../../design/Tag";
 import { toast } from "../../design/toasts";
+import { createAct } from "../../infra/act";
 import { currentHost } from "../../infra/host";
 import { defineQuery, ready, useQuery, useQueryClient } from "../../infra/query";
 import { kindLabel, noteIcon } from "./NoteCard";

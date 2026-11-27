@@ -15,7 +15,6 @@ import {
   type ProviderStatus,
 } from "@vibevalley/protocol";
 
-import { createAct } from "../../../design/act";
 import { Button } from "../../../design/Button";
 import { Checkbox } from "../../../design/Checkbox";
 import { ConfirmButton } from "../../../design/ConfirmButton";
@@ -26,6 +25,7 @@ import { IconButton } from "../../../design/IconButton";
 import type { IconName } from "../../../design/icons";
 import { Card } from "../../../design/layout";
 import { CountPill, Dot } from "../../../design/Tag";
+import { createAct } from "../../../infra/act";
 import { api } from "../../../infra/api";
 import { type LocalFile, pickFile, uploadAudio } from "../../../infra/attachmentFile";
 import { dialogueComplete, supportsStreamingTranscription } from "../audio";

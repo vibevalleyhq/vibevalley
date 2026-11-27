@@ -3,7 +3,7 @@ import { type NotePresence, userId } from "@vibevalley/protocol";
 import { tone } from "../../design/tone";
 
 /** One live collaborator highlight rendered inside a sandboxed preview WebView without relaxing CSP. */
-export interface PresenceHighlightItem {
+interface PresenceHighlightItem {
   readonly id: string;
   readonly name: string;
   readonly color: string;
@@ -15,7 +15,7 @@ export interface PresenceHighlightItem {
   readonly h?: number;
 }
 
-export interface PresenceHighlightCommand {
+interface PresenceHighlightCommand {
   readonly vibevalley: "presence-highlight";
   readonly items: readonly PresenceHighlightItem[];
 }

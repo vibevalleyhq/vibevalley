@@ -91,7 +91,7 @@ test("RemoteAccessPage: disabled -> enable -> pair/QR/copy -> revoke device -> d
     devices,
   };
 
-  const { app, fake } = await mountSettings("/settings/connections/remote", (f) => {
+  const { app, fake } = await mountSettings("/settings/remote", (f) => {
     f.respond("remote.status", () => ({ ...state, devices: [...devices] }));
     f.respond("remote.enable", (payload: unknown) => {
       const bindAddr = (payload as { bindAddr?: string } | undefined)?.bindAddr ?? "100.64.1.23";
@@ -213,7 +213,7 @@ test("RemoteAccessPage: disabled -> enable -> pair/QR/copy -> revoke device -> d
   expect(app.count("id:remote-url-row")).toBe(0);
 });
 
-test("SettingsPage: legacy /settings/remote redirect, search words, sub-tab navigation, and action error banner", async () => {
+test("SettingsPage: /settings/remote, search words, sub-tab navigation, and action error banner", async () => {
   setLocale("en");
   const { app, fake } = await mountSettings("/settings/remote", (f) => {
     f.respond("remote.status", () => ({
@@ -253,7 +253,7 @@ test("RemoteAccessPage: Control Plane Connection switches via pair code & bearer
     restartRequired: false,
   } as Record<string, unknown>;
 
-  const { app, fake } = await mountSettings("/settings/connections/remote", (f) => {
+  const { app, fake } = await mountSettings("/settings/remote", (f) => {
     f.respond("remote.status", () => ({
       enabled: false,
       listening: false,
@@ -331,7 +331,7 @@ test("RemoteAccessPage: Control Plane Connection switches via pair code & bearer
 
 test("RemoteAccessPage: Control Plane Connection stays operable when remote server is unreachable and locks edits under env override", async () => {
   setLocale("en");
-  const { app, fake } = await mountSettings("/settings/connections/remote", (f) => {
+  const { app, fake } = await mountSettings("/settings/remote", (f) => {
     f.respond("remote.status", () => ({ bizCode: BizCode.ServiceUnavailable, message: "control plane unreachable" }));
     f.respond("host.connectionState", () => ({
       activeMode: "remote",
@@ -362,7 +362,7 @@ test("RemoteAccessPage: Control Plane Connection stays operable when remote serv
   await fake.pumpUntil(app, () => app.count("id:control-plane-restart") === 1);
   expect(app.texts()).toContain(t("web.remote.controlPlane.restartToEmbedded"));
 
-  const envMounted = await mountSettings("/settings/connections/remote", (f) => {
+  const envMounted = await mountSettings("/settings/remote", (f) => {
     f.respond("remote.status", () => ({
       enabled: false,
       listening: false,

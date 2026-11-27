@@ -4,16 +4,17 @@ import { t } from "@vibevalley/i18n";
 import type { ConnectionSaveRequest, DesktopConnectionSnapshot, RemoteDeviceSummary, RemotePairCode, RemotePlatform, RemoteStatus } from "@vibevalley/protocol";
 import { BizCode } from "@vibevalley/protocol/api";
 
-import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
 import { SettingRow, SettingsGroup, SettingsPage } from "../../design/domain/settings";
 import { Field, TextInput } from "../../design/Field";
 import { Icon } from "../../design/Icon";
 import type { IconName } from "../../design/icons";
-import { Banner, Quiet, SecretInput } from "../../design/layout";
+import { Banner, SecretInput } from "../../design/layout";
 import { Qr } from "../../design/Qr";
 import { Segmented } from "../../design/Segmented";
+import { SkeletonLines } from "../../design/Skeleton";
 import { Tag } from "../../design/Tag";
+import { createAct } from "../../infra/act";
 import { api, reasonOf } from "../../infra/api";
 import { shortMomentText } from "../../infra/base/format";
 import { useTimeout } from "../../infra/base/timer";
@@ -461,8 +462,21 @@ export function RemoteAccessPage() {
       <If
         when={status()}
         else={
-          <If when={loadError()} else={<Quiet>{t("web.base.form.asking")}</Quiet>}>
-            {(err) => <Quiet>{t("web.base.form.unreachable", { why: err() })}</Quiet>}
+          <If
+            when={loadError()}
+            else={
+              <SettingsGroup testid="remote-loading" title={t("web.setting.remote.toggleLabel")}>
+                <View class="gap-3 px-4 py-4">
+                  <SkeletonLines rows={["38%", "68%", "52%"]} gap="md" accessibilityLabel={t("web.base.form.asking")} />
+                </View>
+              </SettingsGroup>
+            }
+          >
+            {(err) => (
+              <Banner tone="bad" role="alert" testID="remote-load-error">
+                {t("web.base.form.unreachable", { why: err() })}
+              </Banner>
+            )}
           </If>
         }
       >

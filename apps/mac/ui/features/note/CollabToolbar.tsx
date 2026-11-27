@@ -10,7 +10,7 @@ import { IconButton } from "../../design/IconButton";
 import { motionClass, popupTransition } from "../../design/motion";
 import { CountPill } from "../../design/Tag";
 
-export interface CollabToolbarProps {
+interface CollabToolbarProps {
   readonly note: Note;
   readonly peers: readonly NotePresence[];
   readonly suggestions: readonly Suggestion[];
@@ -137,7 +137,7 @@ export function CollabToolbar(props: CollabToolbarProps) {
 
       <IconButton
         icon="clock"
-        size={14}
+        size={16}
         label={t("web.note.timeline.title")}
         testid="collab-toggle-history"
         pressed={props.historyOpen === true}
@@ -147,7 +147,7 @@ export function CollabToolbar(props: CollabToolbarProps) {
         {(toggleFiles) => (
           <IconButton
             icon="folder"
-            size={14}
+            size={16}
             label={t("web.note.page.filesTab")}
             testid="collab-toggle-files"
             pressed={props.filesOpen === true}

@@ -53,12 +53,13 @@ test("UpdateRow: idle with checkedAt transitions cleanly through instant push ev
   expect(app.texts()).toContain(t("web.setting.about.lastChecked", { time: ago(checkedAt, SCENARIO_NOW) }));
   expect(app.count("id:update-check")).toBe(1);
 
-  // Trigger non-blocking check -> transitions to checking without showing an "Up to date" toast.
+  // Trigger non-blocking check -> transitions to checking with animated busy indicator without showing an "Up to date" toast.
   await app.press("id:update-check");
   await fake.pumpUntil(app, () => app.texts().includes(t("web.setting.about.checking")));
   expect(app.count("id:update-check")).toBe(0);
+  expect(app.count("id:update-busy-indicator")).toBe(1);
 
-  // Instant host push: downloading with bytes & speed stays single-line until opening Details modal.
+  // Instant host push: downloading renders the embedded active card with inline progress & transfer details, plus modal Details.
   await fake.pushUpdateState(app, {
     _tag: "downloading",
     version: "0.4.0",
@@ -68,24 +69,26 @@ test("UpdateRow: idle with checkedAt transitions cleanly through instant push ev
     totalBytes: Math.round(86.4 * 1024 * 1024),
     speedBps: Math.round(3.2 * 1024 * 1024),
   });
-  await fake.pumpUntil(app, () => app.count("id:update-details") === 1);
-  expect(app.count("id:update-progress")).toBe(0);
+  await fake.pumpUntil(app, () => app.count("id:update-active-card") === 1 && app.count("id:update-details") === 1);
+  expect(app.count("id:update-inline-progress")).toBe(1);
+  expect(app.count("id:update-inline-transfer")).toBe(1);
   expect(app.texts()).toContain(t("web.setting.about.downloading", { next: "0.5.0", percent: 49 }));
+  expect(app.texts()).toContain("42.1 / 86.4 MB · 3.2 MB/s");
   await app.press("id:update-details");
   await fake.pumpUntil(app, () => app.count("id:update-dialog") === 1 && app.count("id:update-progress") === 1);
   expect(app.count("id:update-transfer")).toBe(1);
-  expect(app.texts()).toContain("42.1 / 86.4 MB · 3.2 MB/s");
 
-  // Instant host push: verifying (prevents 100% freeze perception).
+  // Instant host push: verifying returns to single-row busy indicator (prevents 100% freeze perception).
   await fake.pushUpdateState(app, {
     _tag: "verifying",
     version: "0.4.0",
     next: "0.5.0",
   });
   await fake.pumpUntil(app, () => app.texts().includes(t("web.setting.about.verifying", { next: "0.5.0" })));
-  expect(app.count("id:update-progress")).toBe(0);
+  expect(app.count("id:update-inline-progress")).toBe(0);
+  expect(app.count("id:update-busy-indicator")).toBe(1);
 
-  // Instant host push: ready keeps notes inside the UpdateDialog modal when pressing Restart.
+  // Instant host push: ready renders embedded update card with inline notes preview and opens UpdateDialog on Restart.
   await fake.pushUpdateState(app, {
     _tag: "ready",
     version: "0.4.0",
@@ -94,17 +97,18 @@ test("UpdateRow: idle with checkedAt transitions cleanly through instant push ev
     newFarm: false,
     page: "https://github.com/vibevalleyhq/vibevalley/releases/tag/v0.5.0",
   });
-  await fake.pumpUntil(app, () => app.count("id:update-install") === 1);
+  await fake.pumpUntil(app, () => app.count("id:update-active-card") === 1 && app.count("id:update-install") === 1);
+  expect(app.count("id:update-inline-notes")).toBe(1);
   expect(app.texts()).toContain(t("web.setting.about.ready", { next: "0.5.0" }));
   expect(app.texts()).toContain(t("web.setting.about.releaseNotesLink"));
+  expect(app.texts()).toContain("Instant push updates");
+  expect(app.texts()).toContain("Resumable HTTP Range downloads");
 
-  // Pressing update-install opens the shared UpdateDialog modal with release notes & confirm button.
+  // Pressing update-install opens the shared UpdateDialog modal with release notes & confirm button (no inline horizontal squeeze).
   fake.clearCalls();
   await app.press("id:update-install");
   await fake.pumpUntil(app, () => app.count("id:update-dialog") === 1 && app.count("id:update-install-sure") === 1);
   expect(app.count("id:update-notes")).toBe(1);
-  expect(app.texts()).toContain("Instant push updates");
-  expect(app.texts()).toContain("Resumable HTTP Range downloads");
   await app.press("id:update-install-sure");
   await fake.pumpUntil(app, () => fake.calls.some((c) => c.op === "host.updateInstall"));
 
@@ -114,6 +118,7 @@ test("UpdateRow: idle with checkedAt transitions cleanly through instant push ev
     next: "0.5.0",
   });
   await fake.pumpUntil(app, () => app.count("id:update-installing-btn") === 1);
+  expect(app.count("id:update-busy-indicator")).toBe(1);
   expect(app.texts()).toContain(t("web.setting.about.installing", { next: "0.5.0" }));
 });
 

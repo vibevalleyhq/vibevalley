@@ -9,8 +9,6 @@ import type {
   InboxItem,
   InboxSlice,
   RemotePlatform,
-  Session,
-  SessionEvent,
   SessionInteractionRequest,
   SessionPermissionRequest,
   SessionsSlice,
@@ -27,6 +25,7 @@ import {
   type RemoteEnvelope,
 } from "@vibevalley/protocol/remote";
 import { SessionWatchEvent as SessionWatchEventSchema } from "@vibevalley/protocol/schema";
+import { applySessionWatchEvent, EMPTY_SESSION_WATCH_STATE, type SessionWatchState } from "@vibevalley/protocol/store";
 
 import {
   clearAllNotifications,
@@ -40,13 +39,7 @@ import {
 } from "./notifications";
 import { clearCredentials, createSecureTokenStore, loadCredentials, saveCredentials, type SecureTokenStore, type StoredCredentials } from "./storage";
 
-export interface SessionWatchState {
-  readonly session?: Session;
-  readonly events: readonly SessionEvent[];
-  readonly pendingPermissions: readonly SessionPermissionRequest[];
-  readonly pendingInteractions: readonly SessionInteractionRequest[];
-  readonly missing: boolean;
-}
+export type { SessionWatchState };
 
 export interface PendingPermissionItem {
   readonly sessionId: string;
@@ -78,6 +71,7 @@ export interface RemoteSession {
   readonly pendingPermissions: Accessor<readonly PendingPermissionItem[]>;
   readonly pendingInteractions: Accessor<readonly PendingInteractionItem[]>;
   readonly unreadInboxCount: Accessor<number>;
+  readonly machineLabel: (machineId: string | undefined) => string | undefined;
   readonly sessionWatchState: (sessionId: string) => SessionWatchState;
   readonly ensureSessionWatch: (sessionId: string) => () => void;
   readonly pair: (rawUrl: string, code: string, deviceName: string) => Promise<boolean>;
@@ -88,12 +82,9 @@ export interface RemoteSession {
   readonly dispose: () => void;
 }
 
-const EMPTY_WATCH_STATE: SessionWatchState = {
-  events: [],
-  pendingPermissions: [],
-  pendingInteractions: [],
-  missing: false,
-};
+const EMPTY_WATCH_STATE: SessionWatchState = EMPTY_SESSION_WATCH_STATE;
+
+export const errorMessage = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 
 export function hapticNotification(kind: HapticNotification): void {
   try {
@@ -154,69 +145,6 @@ function isValidHttpUrl(url: string): boolean {
     return (parsed.protocol === "http:" || parsed.protocol === "https:") && parsed.host !== "";
   } catch {
     return false;
-  }
-}
-
-function mergeSessionEvents(existing: readonly SessionEvent[], incoming: readonly SessionEvent[]): SessionEvent[] {
-  const bySeq = new Map<number, SessionEvent>();
-  for (const event of existing) bySeq.set(event.seq, event);
-  for (const event of incoming) {
-    const prev = bySeq.get(event.seq);
-    if (!prev || event.revision >= prev.revision) {
-      bySeq.set(event.seq, event);
-    }
-  }
-  return [...bySeq.values()].toSorted((a, b) => a.seq - b.seq);
-}
-
-function upsertByRequestId<T extends { readonly requestId: string }>(list: readonly T[], req: T): T[] {
-  const next = list.filter((item) => item.requestId !== req.requestId);
-  next.push(req);
-  return next;
-}
-
-function applySessionWatchEvent(prev: SessionWatchState, event: SessionWatchEvent): SessionWatchState {
-  switch (event.kind) {
-    case "state":
-      return {
-        ...prev,
-        session: event.session,
-        pendingPermissions: event.pendingPermissions,
-        pendingInteractions: event.pendingInteractions,
-        missing: false,
-      };
-    case "history":
-      return {
-        ...prev,
-        events: mergeSessionEvents(prev.events, event.events),
-      };
-    case "event": {
-      const nextEvents = mergeSessionEvents(prev.events, [event.event]);
-      let nextPermissions = prev.pendingPermissions;
-      let nextInteractions = prev.pendingInteractions;
-      if (event.event.type === "permission/request" && event.event.permission) {
-        nextPermissions = upsertByRequestId(nextPermissions, event.event.permission);
-      } else if (event.event.type === "permission/resolved" && event.event.permission) {
-        const resolvedId = event.event.permission.requestId;
-        nextPermissions = nextPermissions.filter((item) => item.requestId !== resolvedId);
-      } else if (event.event.type === "interaction/request" && event.event.interaction) {
-        nextInteractions = upsertByRequestId(nextInteractions, event.event.interaction);
-      } else if (event.event.type === "interaction/resolved" && event.event.interactionResolution) {
-        const resolvedId = event.event.interactionResolution.requestId;
-        nextInteractions = nextInteractions.filter((item) => item.requestId !== resolvedId);
-      }
-      return {
-        ...prev,
-        events: nextEvents,
-        pendingPermissions: nextPermissions,
-        pendingInteractions: nextInteractions,
-      };
-    }
-    case "missing":
-      return {
-        ...prev,
-        missing: true,
-      };
   }
 }
 
@@ -452,6 +380,9 @@ export function createRemoteSession(options?: RemoteSessionOptions): RemoteSessi
       onConnectionChange: (state) => {
         if (!disposed) connectionState.set(state);
       },
+      onDecodeError: (error) => {
+        console.warn(`[mobile/session] remote decode error (${error.stream}:${error.topic}): ${error.reason}`);
+      },
     });
     if (lifecycle() === "background") {
       transportSuspended = true;
@@ -533,7 +464,7 @@ export function createRemoteSession(options?: RemoteSessionOptions): RemoteSessi
       return true;
     } catch (err: unknown) {
       if (!disposed && !controller.signal.aborted) {
-        pairError.set(err instanceof Error ? err.message : String(err));
+        pairError.set(errorMessage(err));
         hapticNotification("error");
       }
       return false;
@@ -614,6 +545,11 @@ export function createRemoteSession(options?: RemoteSessionOptions): RemoteSessi
   };
 
   const sessionNames = computed(() => new Map<string, string>((sessions()?.sessions ?? []).map((s) => [s.id, s.name] as const)));
+  const machineNames = computed(() => new Map<string, string>((sessions()?.machines ?? []).map((m) => [m.id, m.name] as const)));
+  const machineLabel = (machineId: string | undefined): string | undefined => {
+    if (machineId === undefined || machineId === "") return undefined;
+    return machineNames().get(machineId) ?? machineId;
+  };
 
   const pendingPermissions = computed<readonly PendingPermissionItem[]>(() => {
     const map = watchMap();
@@ -698,7 +634,8 @@ export function createRemoteSession(options?: RemoteSessionOptions): RemoteSessi
         }
         ready.set(true);
       })
-      .catch(() => {
+      .catch((err: unknown) => {
+        console.warn("[mobile/session] failed to load stored credentials", err);
         if (!disposed) ready.set(true);
       }),
   );
@@ -724,6 +661,7 @@ export function createRemoteSession(options?: RemoteSessionOptions): RemoteSessi
     pendingPermissions,
     pendingInteractions,
     unreadInboxCount,
+    machineLabel,
     sessionWatchState,
     ensureSessionWatch,
     pair,

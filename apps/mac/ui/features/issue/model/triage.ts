@@ -63,33 +63,3 @@ export function stepFocusId(orderedIds: readonly string[], current: string | und
   const next = Math.max(0, Math.min(orderedIds.length - 1, idx + delta));
   return orderedIds[next];
 }
-
-/** Toggles `id` inside a multi-selection set. */
-export function toggleSelection(selected: ReadonlySet<string>, id: string): Set<string> {
-  const next = new Set(selected);
-  if (next.has(id)) next.delete(id);
-  else next.add(id);
-  return next;
-}
-
-/** Selects the inclusive range from `anchor` to `target` in `orderedIds`, merging into `selected`. */
-export function selectRange(selected: ReadonlySet<string>, orderedIds: readonly string[], anchor: string | undefined, target: string): Set<string> {
-  const next = new Set(selected);
-  const targetIdx = orderedIds.indexOf(target);
-  const anchorIdx = anchor !== undefined ? orderedIds.indexOf(anchor) : -1;
-  if (targetIdx === -1) {
-    next.add(target);
-    return next;
-  }
-  if (anchorIdx === -1) {
-    next.add(target);
-    return next;
-  }
-  const start = Math.min(anchorIdx, targetIdx);
-  const end = Math.max(anchorIdx, targetIdx);
-  for (let i = start; i <= end; i++) {
-    const id = orderedIds[i];
-    if (id !== undefined) next.add(id);
-  }
-  return next;
-}

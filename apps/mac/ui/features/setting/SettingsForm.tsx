@@ -14,7 +14,6 @@ import {
 } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
-import { createAct } from "../../design/act";
 import { KeyRow, SettingRow, SettingsGroup } from "../../design/domain/settings";
 import { TextInput } from "../../design/Field";
 import { Form, formControl, formMessages } from "../../design/Form";
@@ -25,6 +24,7 @@ import { Quiet, SecretInput, Toggle } from "../../design/layout";
 import { Segmented } from "../../design/Segmented";
 import { Hint, Tip } from "../../design/Tip";
 import { toast } from "../../design/toasts";
+import { createAct } from "../../infra/act";
 import { api, reasonOf } from "../../infra/api";
 import { useForm, type Submission } from "../../infra/form";
 import { currentHost } from "../../infra/host";

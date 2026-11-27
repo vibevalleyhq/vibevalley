@@ -18,7 +18,7 @@ import type {
 } from "@vibevalley/protocol";
 
 import { Button } from "../../../design/Button";
-import { TextInput } from "../../../design/Field";
+import { SearchField } from "../../../design/Field";
 import { Icon } from "../../../design/Icon";
 import { IconButton } from "../../../design/IconButton";
 import { Banner, Empty } from "../../../design/layout";
@@ -37,6 +37,7 @@ import {
   defaultCellForColumn,
   findSelectOption,
   firstMediaOfRow,
+  formatCompactDateCell,
   formatSummaryValue,
   optionToneLook,
   projectBaseTimeline,
@@ -45,7 +46,7 @@ import {
 } from "./baseModel";
 import { BaseRowDrawer } from "./BaseRowDrawer";
 
-export interface BaseViewProps {
+interface BaseViewProps {
   readonly note: Note;
   readonly snapshot?: BaseViewSnapshot | undefined;
   readonly views?: readonly BaseViewSummaryRef[] | undefined;
@@ -238,6 +239,9 @@ export function BaseView(props: BaseViewProps) {
         if (col.kind === "select") {
           return findSelectOption(col, cell.value)?.label ?? cell.value;
         }
+        if (col.kind === "date") {
+          return formatCompactDateCell(cell.value) || "—";
+        }
         return cell.value || "—";
       }
       default:
@@ -300,20 +304,19 @@ export function BaseView(props: BaseViewProps) {
           />
         </View>
 
-        <View class="flex-row flex-wrap items-center gap-1.5">
-          <TextInput
-            testID="base-filter-input"
+        <View class="flex-row flex-wrap items-center gap-2">
+          <SearchField
+            testid="base-filter-input"
             value={filterText()}
             onInput={(v) => filterText.set(v)}
             placeholder={t("web.note.base.filterPlaceholder")}
-            accessibilityLabel={t("web.note.base.filterPlaceholder")}
-            wide={false}
-            class="h-7 w-40 py-1 text-xs"
+            label={t("web.note.base.filterPlaceholder")}
+            class="w-44"
           />
           <Text testID="base-rows-count" class="font-mono text-2xs text-muted tabular-nums">
             {t("web.note.base.rowsCount", { n: filteredRows().length })}
           </Text>
-          <Button size="compact" tone="primary" icon="add" testID="base-add-row" disabled={isBusy()} onPress={addRow}>
+          <Button size="control" tone="primary" icon="add" testID="base-add-row" disabled={isBusy()} onPress={addRow}>
             {t("web.note.base.addRow")}
           </Button>
         </View>
@@ -337,7 +340,7 @@ export function BaseView(props: BaseViewProps) {
                 <VdpAnchor testId="base-table-view" role="region" />
                 <Scroll testID="base-table-view" class="min-h-0 flex-1" contentClass="p-3 gap-2">
                   <If when={filteredRows().length > 0} else={<Empty icon="log">{t("web.note.base.empty")}</Empty>}>
-                    <Scroll horizontal testID="base-table-scroll" class="w-full" contentClass="min-w-full">
+                    <Scroll horizontal testID="base-table-scroll" class="w-full" contentClass="min-w-full flex-row">
                       <View class="overflow-hidden rounded-lg border border-line bg-page" style={{ minWidth: totalTableWidth() }}>
                         <View class="flex-row items-center border-b border-line bg-side px-2 py-2">
                           <View class="w-10 shrink-0 items-center justify-center">
@@ -442,7 +445,9 @@ export function BaseView(props: BaseViewProps) {
                                   <View class="shrink-0 grow-0 overflow-hidden px-2" style={{ width: columnWidthPx(col()) }}>
                                     <If when={sum()}>
                                       {(res) => (
-                                        <Text class="truncate font-mono text-xs font-semibold text-ink tabular-nums">
+                                        <Text
+                                          class={`truncate font-mono text-xs font-semibold text-ink tabular-nums ${col().kind === "number" ? "text-right" : ""}`}
+                                        >
                                           {`${summaryOpLabel(res().op)}: ${formatSummaryValue(res().value)}`}
                                         </Text>
                                       )}
@@ -537,12 +542,20 @@ export function BaseView(props: BaseViewProps) {
                         {(row) => {
                           const cover = () => firstMediaOfRow(row(), columns(), notesById());
                           const selected = () => selectedRowId() === row().id;
+                          const statusBadge = () => {
+                            const gCol = groupColumn();
+                            if (!gCol || gCol.kind !== "select") return undefined;
+                            const rawVal = baseCellAsText(row().cells[gCol.id]).trim();
+                            if (!rawVal) return undefined;
+                            const opt = findSelectOption(gCol, rawVal);
+                            return { label: opt?.label ?? rawVal, look: optionToneLook(opt?.color) };
+                          };
                           return (
                             <View
                               role="button"
                               testID={`base-gallery-card-${row().id}`}
                               onPress={() => selectedRowId.set(row().id)}
-                              class={`min-w-64 max-w-80 flex-1 overflow-hidden rounded-xl border ${
+                              class={`w-64 shrink-0 overflow-hidden rounded-xl border ${
                                 selected() ? "border-accent bg-selected" : "border-line bg-page hover:bg-hover"
                               }`}
                             >
@@ -550,9 +563,22 @@ export function BaseView(props: BaseViewProps) {
                                 <If
                                   when={cover()}
                                   else={
-                                    <View class="items-center gap-1">
-                                      <Icon name={row().pageNoteId ? "notes" : "image"} size={24} tone="faint" />
-                                      <Text class="font-mono text-2xs text-faint">{row().pageNoteId ? t("web.note.types.doc") : row().id}</Text>
+                                    <View class="items-center gap-1.5">
+                                      <Icon name={row().pageNoteId ? "notes" : "image"} size={22} tone="faint" />
+                                      <If
+                                        when={row().pageNoteId}
+                                        else={
+                                          <If when={statusBadge()}>
+                                            {(badge) => (
+                                              <View class={`h-5 items-center justify-center rounded-sm px-2 ${badge().look.bgClass}`}>
+                                                <Text class={`truncate text-2xs font-medium ${badge().look.textClass}`}>{badge().label}</Text>
+                                              </View>
+                                            )}
+                                          </If>
+                                        }
+                                      >
+                                        <Text class="text-2xs font-medium text-muted">{t("web.note.types.doc")}</Text>
+                                      </If>
                                     </View>
                                   }
                                 >
@@ -617,7 +643,7 @@ export function BaseView(props: BaseViewProps) {
                   <If when={timelineData().bars.length > 0} else={<Empty icon="clock">{t("web.note.base.empty")}</Empty>}>
                     <View class="overflow-hidden rounded-lg border border-line bg-page">
                       <View class="flex-row items-center border-b border-line bg-side px-3 py-2">
-                        <View class="w-48 shrink-0">
+                        <View class="w-56 shrink-0">
                           <Text class="text-xs font-semibold text-muted">{t("web.note.page.title")}</Text>
                         </View>
                         <View class="relative h-5 min-w-0 flex-1 flex-row items-center">
@@ -641,7 +667,7 @@ export function BaseView(props: BaseViewProps) {
                               onPress={() => selectedRowId.set(bar().row.id)}
                               class={`flex-row items-center border-t border-line px-3 py-2 ${selected() ? "bg-selected" : "bg-page hover:bg-hover"}`}
                             >
-                              <View class="w-48 shrink-0 flex-row items-center gap-1.5 pr-3">
+                              <View class="w-56 shrink-0 flex-row items-center gap-1.5 pr-3">
                                 <Text class="min-w-0 flex-1 truncate text-xs font-medium text-ink">{bar().title}</Text>
                                 <If when={bar().row.pageNoteId}>
                                   <Icon name="notes" size={11} tone="accent" />

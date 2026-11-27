@@ -2,8 +2,8 @@ import { Canvas, View, type CanvasRenderingContext2D } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 
-import { playSound } from "../../design/sound";
 import { createSignal } from "../../infra/solid";
+import { playSound } from "../../infra/sound";
 import { type Blocks, blocksHeight, blocksWidth, cellsOf, fall, fallMs, landingOf, newBlocks, pieceKinds, shift, slam, turn } from "./blocks";
 import { lcd } from "./lcd";
 import { Board, Cover, Help, Words, Stats } from "./LcdView";

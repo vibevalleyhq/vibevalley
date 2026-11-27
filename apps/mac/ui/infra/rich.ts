@@ -179,6 +179,7 @@ export interface VvCoreBridge {
   collapsedStepSummary?: (stepType: string, body: string) => string;
   readableInput?: (stepJson: string) => string;
   mergeSteps?: (logJson: string, incomingJson: string, limit: number | null | undefined, replaceSameRevision: boolean) => string;
+  markdownToBlocks?: (markdown: string) => string;
 }
 
 export interface VvRichModule extends VvCoreBridge {

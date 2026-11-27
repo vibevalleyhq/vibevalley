@@ -2,7 +2,7 @@ import { Canvas, View, type CanvasRenderingContext2D } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 
-import { playSound } from "../../design/sound";
+import { playSound } from "../../infra/sound";
 import { lcd } from "./lcd";
 import { Words, Stats } from "./LcdView";
 import { kept, usePad } from "./pad";

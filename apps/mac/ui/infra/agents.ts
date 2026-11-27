@@ -1,5 +1,5 @@
 import { t } from "@vibevalley/i18n";
-import { type Agent, type AgentProblem, defaultOrchestrator, type OrchestratorLook, type RuntimeInfo } from "@vibevalley/protocol";
+import { type Agent, type AgentProblem, defaultOrchestrator, type RuntimeInfo } from "@vibevalley/protocol";
 
 import { api } from "./api";
 import { createSettled } from "./base/dom";
@@ -68,10 +68,6 @@ export function useOrchestrators() {
       .filter((a) => a.role === "orchestrator")
       .toSorted((a, b) => (a.id === defaultOrchestrator ? -1 : b.id === defaultOrchestrator ? 1 : 0));
 }
-
-/** An orchestrator's look (its sprites are manager-<look>); the plain farmer until the profiles are read. */
-export const orchestratorLookOf = (agents: readonly Agent[], id = defaultOrchestrator): OrchestratorLook =>
-  agents.find((a) => a.id === id)?.look.orchestrator ?? "farmer";
 
 /** A profile by its id, once the profiles are read; undefined for none or one gone. */
 export function useAgent(id: () => string | undefined) {

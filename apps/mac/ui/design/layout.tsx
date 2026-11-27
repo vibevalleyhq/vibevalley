@@ -1,4 +1,4 @@
-import { signal, Scroll, Text, untracked, View, type JSX } from "nsh";
+import { computed, effect, signal, Scroll, Text, untracked, View, type JSX } from "nsh";
 import { Switch } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
@@ -7,7 +7,7 @@ import { TextInput, type TextInputProps } from "./Field";
 import { followDesignHref, useDesignHost } from "./host";
 import { Icon } from "./Icon";
 import type { IconName } from "./icons";
-import { motionClass } from "./motion";
+import { motionClass, motionEnter } from "./motion";
 import { CountPill } from "./Tag";
 import { Bubble, Hint } from "./Tip";
 import { mix } from "./tone";
@@ -244,22 +244,131 @@ export function Quiet(props: { children: JSX.Element }) {
   return <Text class="text-sm leading-relaxed text-muted">{props.children}</Text>;
 }
 
-/** `children`: why it is empty; `action`: the next step, if there is one. */
-export function Empty(props: { icon: IconName; children: JSX.Element; action?: JSX.Element; testid?: string; compact?: boolean | undefined }) {
+type EmptyVariant = "firstRun" | "filtered" | "unselected" | "zero" | "error";
+
+const emptyMedallion: Record<EmptyVariant, { box: string; iconTone: string; iconSize: 16 | 20 | 24 }> = {
+  firstRun: { box: "size-12 rounded-xl border border-line bg-page shadow-raise", iconTone: "accent", iconSize: 24 },
+  filtered: { box: "size-9 rounded-lg border border-line bg-page", iconTone: "muted", iconSize: 16 },
+  unselected: { box: "size-9 rounded-lg bg-hover", iconTone: "faint", iconSize: 16 },
+  zero: { box: "size-10 rounded-xl bg-ok-soft", iconTone: "leaf", iconSize: 20 },
+  error: { box: "size-10 rounded-xl bg-page border border-line", iconTone: "berry", iconSize: 20 },
+};
+
+/**
+ * Semantic empty state across 4+ tiers (`firstRun`, `filtered`, `unselected`, `zero`, `error`):
+ * dual-layer microcopy (`title` + `description`/`children`), Papertrails medallion backdrop,
+ * optional `<Kbd>` shortcut cap, primary/secondary actions, and 200ms anti-flash gate when `pending`/`delayMs` is set.
+ */
+export function Empty(props: {
+  icon: IconName;
+  variant?: EmptyVariant | undefined;
+  title?: string | undefined;
+  description?: JSX.Element | undefined;
+  children?: JSX.Element | undefined;
+  action?: JSX.Element | undefined;
+  secondaryAction?: JSX.Element | undefined;
+  shortcut?: string | undefined;
+  illustration?: JSX.Element | undefined;
+  /** Suppresses empty-state flash while an upstream query is still fetching; reveals after `delayMs` (default 200ms). */
+  pending?: boolean | undefined;
+  delayMs?: number | undefined;
+  testid?: string | undefined;
+  compact?: boolean | undefined;
+}) {
+  const effectiveDelay = computed(() => props.delayMs ?? (props.pending !== undefined ? 200 : 0));
+  const revealed = signal(untracked(() => props.pending !== true && effectiveDelay() <= 0));
+
+  effect(() => {
+    if (props.pending === true) {
+      revealed.set(false);
+      return;
+    }
+    const wait = effectiveDelay();
+    if (wait <= 0) {
+      revealed.set(true);
+      return;
+    }
+    const timer = setTimeout(() => revealed.set(true), wait);
+    return () => clearTimeout(timer);
+  });
+
+  const variant = () => props.variant;
   const compact = () => props.compact === true;
+  const body = () => props.description ?? props.children;
+  const containerClass = () => {
+    const v = variant();
+    const enter = motionEnter("normal");
+    if (v === "error") {
+      return `${compact() ? "px-5 py-5" : "px-6 py-7"} items-center justify-center rounded-xl border border-line bg-bad-soft ${enter}`;
+    }
+    if (v === "unselected") {
+      return `${compact() ? "px-4 py-5" : "min-h-40 flex-1 p-6"} items-center justify-center ${enter}`;
+    }
+    if (v === "zero") {
+      return `${compact() ? "px-4 py-5" : "px-6 py-7"} items-center justify-center rounded-xl border border-line bg-side ${enter}`;
+    }
+    if (v === "filtered") {
+      return `${compact() ? "px-5 py-5" : "px-6 py-7"} items-center justify-center rounded-lg border border-line bg-side ${enter}`;
+    }
+    if (v === "firstRun") {
+      return `${compact() ? "px-5 py-6" : "min-h-48 flex-1 px-6 py-8"} items-center justify-center rounded-xl border border-line bg-side ${enter}`;
+    }
+    return compact()
+      ? `items-center justify-center rounded-lg border border-line bg-side px-6 py-8 ${enter}`
+      : `min-h-48 flex-1 items-center justify-center p-6 ${enter}`;
+  };
+  const medallion = () => {
+    const v = variant();
+    if (v !== undefined) return emptyMedallion[v];
+    return compact()
+      ? { box: "size-9 rounded-lg border border-line bg-page", iconTone: "faint", iconSize: 16 as const }
+      : { box: "size-12 rounded-xl border border-line bg-side shadow-raise", iconTone: "faint", iconSize: 24 as const };
+  };
+  const titleClass = () => {
+    const v = variant();
+    if (v === "error") return "text-center text-sm font-semibold text-berry";
+    if (v === "firstRun") return "text-center text-base font-semibold text-ink";
+    return "text-center text-sm font-medium text-ink";
+  };
+  const descClass = () =>
+    compact() || variant() === "filtered" || variant() === "zero"
+      ? "text-center text-xs leading-relaxed text-muted"
+      : "text-center text-sm leading-relaxed text-muted";
+
   return (
-    <View
-      testID={props.testid ?? "empty"}
-      class={compact() ? "items-center justify-center rounded-lg border border-line bg-side px-6 py-8" : "min-h-48 flex-1 items-center justify-center p-6"}
-    >
-      <View class="max-w-sm items-center gap-3.5">
-        <Icon name={props.icon} size={compact() ? 24 : 48} tone="faint" />
-        <Text class="text-center text-sm leading-relaxed text-muted">{props.children}</Text>
-        <If when={props.action}>
-          <View class="pt-0.5">{props.action}</View>
-        </If>
+    <If when={revealed()}>
+      <View testID={props.testid ?? "empty"} class={containerClass()}>
+        <View class={`max-w-sm items-center ${compact() ? "gap-2.5" : "gap-3"}`}>
+          <If
+            when={props.illustration !== undefined}
+            else={
+              <View class={`items-center justify-center ${medallion().box}`}>
+                <Icon name={props.icon} size={medallion().iconSize} tone={medallion().iconTone} />
+              </View>
+            }
+          >
+            {props.illustration}
+          </If>
+          <View class="items-center gap-1">
+            <If when={props.title}>{(heading) => <Text class={titleClass()}>{heading()}</Text>}</If>
+            <If when={body()}>
+              {(text) => (
+                <If when={typeof text() === "string"} else={text()}>
+                  <Text class={descClass()}>{text()}</Text>
+                </If>
+              )}
+            </If>
+          </View>
+          <If when={props.shortcut}>{(keys) => <Kbd size="md">{keys()}</Kbd>}</If>
+          <If when={props.action !== undefined || props.secondaryAction !== undefined}>
+            <View class="flex-row flex-wrap items-center justify-center gap-2 pt-0.5">
+              {props.action}
+              {props.secondaryAction}
+            </View>
+          </If>
+        </View>
       </View>
-    </View>
+    </If>
   );
 }
 

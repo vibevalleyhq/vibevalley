@@ -4,17 +4,18 @@ import { t } from "@vibevalley/i18n";
 import type { ProviderBinding, ProviderScene, ProviderScenePolicy, ProviderStatus, ProviderUpdate } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 
-import { createAct } from "../../design/act";
 import { Button, ButtonLink } from "../../design/Button";
 import { SettingRow, SettingsGroup, SettingsPage } from "../../design/domain/settings";
 import { Select } from "../../design/Field";
 import { Icon } from "../../design/Icon";
 import { IconButton } from "../../design/IconButton";
 import { SaveBar } from "../../design/KeyField";
-import { Quiet } from "../../design/layout";
+import { Banner, Quiet } from "../../design/layout";
+import { SkeletonLines } from "../../design/Skeleton";
 import { Tag } from "../../design/Tag";
 import { TextLink } from "../../design/TextLink";
 import { toast } from "../../design/toasts";
+import { createAct } from "../../infra/act";
 import { api, reasonOf } from "../../infra/api";
 import { providerQuery, ready, settingsQuery, useQuery, useQueryClient } from "../../infra/query";
 import { Link } from "../../infra/router";
@@ -70,7 +71,27 @@ export function ModelsPage() {
       action={<TextLink href="/settings/providers">{t("web.provider.manageProviders")}</TextLink>}
     >
       <SettingsReadiness features={["orchestrator", "call"]} selfHref="/settings/models" />
-      <If when={ready(query, undefined)} else={<Quiet>{query.error() ? reasonOf(query.error()) : t("web.base.form.asking")}</Quiet>}>
+      <If
+        when={ready(query, undefined)}
+        else={
+          <If
+            when={query.error()}
+            else={
+              <SettingsGroup testid="models-loading">
+                <View class="gap-3 px-4 py-4">
+                  <SkeletonLines rows={["40%", "72%", "56%"]} gap="md" accessibilityLabel={t("web.base.form.asking")} />
+                </View>
+              </SettingsGroup>
+            }
+          >
+            {(err) => (
+              <Banner tone="bad" role="alert">
+                {reasonOf(err())}
+              </Banner>
+            )}
+          </If>
+        }
+      >
         {(status) => <ModelsPolicyForm initial={untracked(status)} />}
       </If>
     </SettingsPage>
@@ -209,18 +230,20 @@ function ModelsPolicyForm(props: { initial: ProviderStatus }) {
 
                 return (
                   <View testID={`scene-row-${scene()}`} class={isLastRow() ? "" : "border-b border-line"}>
-                    <SettingRow label={label()} hint={hintText()} tip={capLabel()} last>
-                      <Tag label={capLabel()} tone="neutral" />
-                      <If when={scene() === "speech"}>
-                        <Link
-                          href="/library?make=speech"
-                          testID="provider-speech-open"
-                          class="rounded-sm px-1.5 py-0.5 hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
-                        >
-                          <Text class="text-xs font-medium text-water underline">{t("web.provider.openSpeechShort")}</Text>
-                        </Link>
-                      </If>
-                      <View class="w-60 max-w-full">
+                    <SettingRow label={label()} hint={hintText()} last>
+                      <View class="shrink-0 flex-row items-center gap-2">
+                        <Tag label={capLabel()} tone="neutral" />
+                        <If when={scene() === "speech"}>
+                          <Link
+                            href="/library?make=speech"
+                            testID="provider-speech-open"
+                            class="shrink-0 rounded-sm px-1.5 py-0.5 hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
+                          >
+                            <Text class="text-xs font-medium text-water underline">{t("web.provider.openSpeechShort")}</Text>
+                          </Link>
+                        </If>
+                      </View>
+                      <View class="w-56 max-w-full">
                         <Select
                           testid={`scene-select-${scene()}`}
                           label={t("web.provider.modelFor", { use: label() })}

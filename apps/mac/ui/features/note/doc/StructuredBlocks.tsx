@@ -30,15 +30,15 @@ import {
 } from "./docOps";
 import { InlineRichText } from "./InlineRichText";
 
-export type ToggleBlockData = Extract<DocBlock, { type: "toggle" }>;
-export type CalloutBlockData = Extract<DocBlock, { type: "callout" }>;
-export type CodeBlockData = Extract<DocBlock, { type: "code" }>;
-export type TableBlockData = Extract<DocBlock, { type: "table" }>;
-export type BookmarkBlockData = Extract<DocBlock, { type: "bookmark" }>;
-export type TocBlockData = Extract<DocBlock, { type: "toc" }>;
-export type MathBlockData = Extract<DocBlock, { type: "math" }>;
-export type ColumnsBlockData = Extract<DocBlock, { type: "columns" }>;
-export type PageBreakBlockData = Extract<DocBlock, { type: "pageBreak" }>;
+type ToggleBlockData = Extract<DocBlock, { type: "toggle" }>;
+type CalloutBlockData = Extract<DocBlock, { type: "callout" }>;
+type CodeBlockData = Extract<DocBlock, { type: "code" }>;
+type TableBlockData = Extract<DocBlock, { type: "table" }>;
+type BookmarkBlockData = Extract<DocBlock, { type: "bookmark" }>;
+type TocBlockData = Extract<DocBlock, { type: "toc" }>;
+type MathBlockData = Extract<DocBlock, { type: "math" }>;
+type ColumnsBlockData = Extract<DocBlock, { type: "columns" }>;
+type PageBreakBlockData = Extract<DocBlock, { type: "pageBreak" }>;
 
 export function ToggleBlockView(props: {
   readonly block: ToggleBlockData;
@@ -74,7 +74,7 @@ export function ToggleBlockView(props: {
         />
       </View>
       <If when={!isCollapsed()}>
-        <View testID={`doc-toggle-body-${props.block.id}`} class="mt-1 gap-1.5 border-l border-line pl-5">
+        <View testID={`doc-toggle-body-${props.block.id}`} class="mt-1 ml-3 gap-1.5 border-l border-line pl-4">
           <Input
             multiline
             scrollbar={false}
@@ -82,7 +82,7 @@ export function ToggleBlockView(props: {
             value={props.block.text}
             placeholder={t("web.note.doc.toggleBodyPlaceholder")}
             onChange={(e) => props.onUpdate({ ...props.block, text: e.value })}
-            class="min-h-6 w-full rounded-sm bg-transparent px-1 py-0.5 text-sm text-ink placeholder:text-faint"
+            class="min-h-6 w-full rounded-sm bg-transparent px-1 py-0 text-sm leading-6 text-ink placeholder:text-faint"
           />
           <If when={props.block.text.includes("[[") || props.block.text.includes("#")}>
             <InlineRichText
@@ -145,7 +145,7 @@ export function CalloutBlockView(props: {
             value={props.block.title ?? ""}
             placeholder={visual().label}
             onChange={(e) => props.onUpdate({ ...props.block, title: e.value || undefined })}
-            class={`min-w-0 flex-1 bg-transparent text-sm font-semibold placeholder:text-faint ${visual().textClass}`}
+            class={`min-w-0 flex-1 bg-transparent px-1 py-0 text-sm leading-6 font-semibold placeholder:text-faint ${visual().textClass}`}
           />
         </View>
         <View class="flex-row items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100">
@@ -155,6 +155,7 @@ export function CalloutBlockView(props: {
               return (
                 <View
                   role="button"
+                  focusable={false}
                   testID={`doc-callout-tone-${toneKey()}-${props.block.id}`}
                   onPress={() => props.onUpdate({ ...props.block, tone: toneKey() })}
                   class={`rounded-xs px-1.5 py-0.5 ${active() ? "bg-selected" : "hover:bg-hover"}`}
@@ -173,7 +174,7 @@ export function CalloutBlockView(props: {
         value={props.block.text}
         placeholder={t("web.note.doc.calloutPlaceholder")}
         onChange={(e) => props.onUpdate({ ...props.block, text: e.value })}
-        class="min-h-6 w-full bg-transparent text-sm text-ink placeholder:text-faint"
+        class="min-h-6 w-full bg-transparent px-1 py-0 text-sm leading-6 text-ink placeholder:text-faint"
       />
       <If when={props.block.text.includes("[[") || props.block.text.includes("#")}>
         <InlineRichText
@@ -340,7 +341,7 @@ export function TableBlockView(props: { readonly block: TableBlockData; readonly
                           role="button"
                           testID={`doc-table-cell-${props.block.id}-${rowIdx()}-${colIdx()}`}
                           onPress={() => activeCell.set(cellKey())}
-                          class="min-h-5 justify-center rounded-xs px-1 py-0.5 hover:bg-hover"
+                          class="min-h-6 justify-center rounded-xs border border-transparent px-1 py-0.5 hover:bg-hover"
                         >
                           <Text class={`text-xs leading-relaxed ${cell() ? "text-ink" : "text-faint"} ${alignTextClass(props.block.alignments?.[colIdx()])}`}>
                             {cell() || "…"}
@@ -356,7 +357,7 @@ export function TableBlockView(props: { readonly block: TableBlockData; readonly
                         onChange={(e) => props.onUpdate(updateTableCell(props.block, rowIdx(), colIdx(), e.value))}
                         onSubmit={() => activeCell.set(undefined)}
                         onBlur={() => activeCell.set(undefined)}
-                        class={`w-full min-w-0 rounded-xs border border-focus bg-page px-1 py-0.5 text-xs text-ink placeholder:text-faint ${alignTextClass(props.block.alignments?.[colIdx()])}`}
+                        class={`min-h-6 w-full min-w-0 rounded-xs border border-focus bg-page px-1 py-0.5 text-xs leading-relaxed text-ink placeholder:text-faint ${alignTextClass(props.block.alignments?.[colIdx()])}`}
                       />
                     </If>
                   </View>

@@ -4,7 +4,6 @@ import { t } from "@vibevalley/i18n";
 import type { ChatMessage, Issue, IssueTimeline, Milestone, Note, Run } from "@vibevalley/protocol";
 import { channelOf, plainText } from "@vibevalley/protocol/rules";
 
-import { createAct } from "../../../design/act";
 import { Button } from "../../../design/Button";
 import { TextArea } from "../../../design/Field";
 import { Icon } from "../../../design/Icon";
@@ -15,6 +14,7 @@ import { CountPill, Dot } from "../../../design/Tag";
 import { TextLink } from "../../../design/TextLink";
 import { Bubble } from "../../../design/Tip";
 import { toast } from "../../../design/toasts";
+import { createAct } from "../../../infra/act";
 import { api } from "../../../infra/api";
 import { useNow } from "../../../infra/base/dom";
 import { momentText, shortMomentText, tookText } from "../../../infra/base/format";
@@ -197,7 +197,7 @@ export function IssueActivity(props: {
 
   return (
     <View testID="issue-activity" accessibilityLabel={t("web.issue.activity.title")} class="mt-7 border-t border-line pt-5">
-      <View class="mb-2.5 flex-row items-center justify-between gap-2">
+      <View class="mb-2.5 min-h-6 flex-row items-center justify-between gap-2">
         <View class="flex-row items-center gap-2">
           <Text class="text-xs font-semibold text-muted">{t("web.issue.activity.title")}</Text>
           <If when={items().length > 0}>

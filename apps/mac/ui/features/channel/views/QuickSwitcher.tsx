@@ -4,13 +4,13 @@ import { Command } from "nsh/base";
 import { t } from "@vibevalley/i18n";
 import { channelOf } from "@vibevalley/protocol/rules";
 
-import { createAct } from "../../../design/act";
 import { Dialog } from "../../../design/Dialog";
 import { OrchestratorFace } from "../../../design/domain/Face";
 import { Icon } from "../../../design/Icon";
 import { Kbd } from "../../../design/layout";
 import { motionClass } from "../../../design/motion";
 import { Bubble } from "../../../design/Tip";
+import { createAct } from "../../../infra/act";
 import { useOrchestrators, useWorkAgents } from "../../../infra/agents";
 import { api } from "../../../infra/api";
 import { useBoardSlice, useCollabSlice, useSessionsSlice } from "../../../infra/frame";

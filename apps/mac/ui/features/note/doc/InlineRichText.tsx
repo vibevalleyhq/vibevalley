@@ -1,22 +1,22 @@
-import { computed, Text, View } from "nsh";
+import { computed, Text, untracked, View, type PressEvent, type ViewRef } from "nsh";
 
-import type { Issue, IssueId, IssueStatus, Note, NoteId } from "@vibevalley/protocol";
+import type { Issue, IssueId, Note, NoteId } from "@vibevalley/protocol";
 import { issueId, noteId } from "@vibevalley/protocol/schema";
 
 import { Icon } from "../../../design/Icon";
-import { Dot, type DotTone } from "../../../design/Tag";
-import { type InlineSegment, parseInlineLinkSegments, resolveIssueRef } from "./docOps";
+import { Dot } from "../../../design/Tag";
+import { VdpAnchor } from "../../../infra/vdpProbe";
+import {
+  estimateInlineRichTextOffset,
+  type InlineSegment,
+  type InlineStyleKind,
+  ISSUE_STATUS_DOT_TONE,
+  parseInlineLinkSegments,
+  parseInlineMarkdownRuns,
+  resolveIssueRef,
+} from "./docOps";
 
-const statusDotTone: Record<IssueStatus, DotTone> = {
-  backlog: "faint",
-  todo: "muted",
-  in_progress: "water",
-  in_review: "wheat",
-  done: "leaf",
-  canceled: "faint",
-};
-
-export type InlineDisplayItem =
+type InlineDisplayItem =
   | { readonly kind: "text"; readonly value: string }
   | { readonly kind: "pill"; readonly segment: Exclude<InlineSegment, { readonly kind: "text" }>; readonly trailingPunct: string };
 
@@ -50,37 +50,108 @@ export function groupInlineDisplayRuns(segments: readonly InlineSegment[]): read
   return out;
 }
 
-export interface InlineRichTextProps {
+interface InlineRichTextProps {
   readonly text: string;
   readonly placeholder?: string | undefined;
   readonly textClass?: string | undefined;
+  readonly toneClass?: string | undefined;
+  readonly containerClass?: string | undefined;
   readonly notes: readonly Note[];
   readonly issues: readonly Issue[];
   readonly onOpenNote: (id: NoteId) => void;
   readonly onOpenIssue: (id: IssueId) => void;
-  readonly onPressText?: (() => void) | undefined;
+  readonly onPressText?: ((estimatedCaret?: number) => void) | undefined;
   readonly testID?: string | undefined;
+}
+
+function styleRunClass(kind: InlineStyleKind, baseSizeClass: string, toneClass: string): string {
+  switch (kind) {
+    case "bold":
+      return `leading-6 font-semibold ${toneClass} ${baseSizeClass}`;
+    case "italic":
+      return `leading-6 italic ${toneClass} ${baseSizeClass}`;
+    case "strike":
+      return `leading-6 text-muted line-through ${baseSizeClass}`;
+    case "code":
+      return "mx-0.5 rounded-xs bg-side px-1 py-px font-mono text-xs leading-5 text-ink";
+    case "plain":
+      return `leading-6 ${toneClass} ${baseSizeClass}`;
+  }
 }
 
 export function InlineRichText(props: InlineRichTextProps) {
   const runs = computed(() => groupInlineDisplayRuns(parseInlineLinkSegments(props.text)));
   const notesById = computed(() => new Map(props.notes.map((n) => [n.id, n])));
+  const noteTitlesByRawId = computed(() => new Map<string, string>(props.notes.map((n) => [String(n.id), n.title])));
+  let containerRef: ViewRef | undefined;
+  let lastWidth = 620;
+
+  const handlePressContainer = (e?: PressEvent) => {
+    if (!props.onPressText) return;
+    if (!e) {
+      props.onPressText(undefined);
+      return;
+    }
+    const textSnap = untracked(() => props.text);
+    const titlesSnap = untracked(noteTitlesByRawId);
+    const offset = estimateInlineRichTextOffset(textSnap, e.position.x, e.position.y, lastWidth, titlesSnap, 24);
+    props.onPressText(offset);
+  };
 
   return (
     <If
       when={props.text.length > 0}
       else={
-        <View role="button" testID={props.testID} onPress={() => props.onPressText?.()} class="min-h-6 justify-center">
+        <View
+          ref={(el) => {
+            containerRef = el;
+          }}
+          role="button"
+          testID={props.testID}
+          onLayout={(e) => {
+            if (e.bounds.size.width > 0) lastWidth = e.bounds.size.width;
+          }}
+          onPress={() => props.onPressText?.(0)}
+          class="min-h-6 w-full justify-center px-1"
+        >
+          <If when={props.testID}>
+            {(tid) => (
+              <VdpAnchor
+                testId={tid()}
+                role="button"
+                text={() => props.text}
+                getRef={() => containerRef}
+                onPress={props.onPressText ? () => props.onPressText?.(0) : undefined}
+              />
+            )}
+          </If>
           <Text class={`leading-6 text-faint ${props.textClass ?? "text-sm"}`}>{props.placeholder ?? ""}</Text>
         </View>
       }
     >
       <View
+        ref={(el) => {
+          containerRef = el;
+        }}
         role={props.onPressText ? "button" : undefined}
         testID={props.testID}
-        onPress={() => props.onPressText?.()}
-        class="min-h-6 flex-row flex-wrap items-center gap-y-0.5"
+        onLayout={(e) => {
+          if (e.bounds.size.width > 0) lastWidth = e.bounds.size.width;
+        }}
+        onPress={(e) => handlePressContainer(e)}
+        class={`min-h-6 w-full flex-row flex-wrap items-center gap-y-0.5 ${props.containerClass ?? "px-1"}`}
       >
+        <If when={props.testID}>
+          {(tid) => (
+            <VdpAnchor
+              testId={tid()}
+              role={props.onPressText ? "button" : "text"}
+              text={() => props.text}
+              getRef={() => containerRef}
+              onPress={props.onPressText ? () => props.onPressText?.(undefined) : undefined}
+            />
+          )}
+        </If>
         <Each of={runs()} key={(_, idx) => String(idx)}>
           {(run) => (
             <If
@@ -130,7 +201,7 @@ export function InlineRichText(props: InlineRichTextProps) {
                                   })()}
                                   else={<Icon name="issues" size={11} tone="accent" />}
                                 >
-                                  {(found) => <Dot tone={statusDotTone[found().status]} size={8} ring={false} />}
+                                  {(found) => <Dot tone={ISSUE_STATUS_DOT_TONE[found().status]} size={8} ring={false} />}
                                 </If>
                                 <Text class="text-xs font-medium text-ink">
                                   {(() => {
@@ -174,7 +245,7 @@ export function InlineRichText(props: InlineRichTextProps) {
                           </View>
                         </If>
                         <If when={punct().length > 0}>
-                          <Text class={`leading-6 text-ink ${props.textClass ?? "text-sm"}`}>{punct()}</Text>
+                          <Text class={`leading-6 ${props.toneClass ?? "text-ink"} ${props.textClass ?? "text-sm"}`}>{punct()}</Text>
                         </If>
                       </View>
                     );
@@ -182,12 +253,15 @@ export function InlineRichText(props: InlineRichTextProps) {
                 </If>
               }
             >
-              <Text class={`leading-6 text-ink ${props.textClass ?? "text-sm"}`}>
-                {(() => {
+              <Each
+                of={(() => {
                   const r = run();
-                  return r.kind === "text" ? r.value : "";
+                  return r.kind === "text" ? parseInlineMarkdownRuns(r.value) : [];
                 })()}
-              </Text>
+                key={(_, sIdx) => String(sIdx)}
+              >
+                {(span) => <Text class={styleRunClass(span().kind, props.textClass ?? "text-sm", props.toneClass ?? "text-ink")}>{span().value}</Text>}
+              </Each>
             </If>
           )}
         </Each>

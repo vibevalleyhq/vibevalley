@@ -6,7 +6,7 @@ import { Icon } from "../../../design/Icon";
 import { Kbd } from "../../../design/layout";
 import { filterSlashCommands, groupSlashCommands, slashCommandDesc, slashCommandLabel, type SlashCommandItem } from "./docOps";
 
-export interface SlashMenuProps {
+interface SlashMenuProps {
   readonly open: boolean;
   readonly query: string;
   readonly placement?: "bottom" | "top" | undefined;
@@ -76,7 +76,7 @@ export function SlashMenu(props: SlashMenuProps) {
         class={
           props.placement === "top"
             ? "absolute bottom-full left-0 z-30 mb-1 w-96 overflow-hidden rounded-lg border border-line-strong bg-elevated shadow-float"
-            : "z-20 mt-1 w-96 overflow-hidden rounded-lg border border-line-strong bg-elevated shadow-float"
+            : "absolute top-full left-0 z-30 mt-1 w-96 overflow-hidden rounded-lg border border-line-strong bg-elevated shadow-float"
         }
       >
         <View class="flex-row items-center justify-between border-b border-line px-2.5 py-1.5">
@@ -104,6 +104,7 @@ export function SlashMenu(props: SlashMenuProps) {
                       return (
                         <View
                           role="button"
+                          focusable={false}
                           testID={`doc-slash-item-${item().key}`}
                           accessibilityState={{ selected: isActive() }}
                           onPress={() => props.onSelect(item())}

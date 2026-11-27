@@ -3,13 +3,13 @@ import { Scroll, signal, Text, View } from "nsh";
 import { t } from "@vibevalley/i18n";
 import type { OrchestratorApproval } from "@vibevalley/protocol";
 
-import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
 import { Icon } from "../../design/Icon";
 import { Banner } from "../../design/layout";
 import { motionClass } from "../../design/motion";
 import { Bubble } from "../../design/Tip";
 import { mix } from "../../design/tone";
+import { createAct } from "../../infra/act";
 import { api, reasonOf } from "../../infra/api";
 import { momentText, wallClockText } from "../../infra/base/format";
 import { defineQuery, retryRead, useQuery, useQueryClient } from "../../infra/query";

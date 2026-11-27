@@ -3,7 +3,6 @@ import { effect, Scroll, signal, Text, untracked, View } from "nsh";
 import { t } from "@vibevalley/i18n";
 import { type Agent, type Note, type NoteHistoryEntry, type NoteHistoryPreviewResult, type NoteId, userId } from "@vibevalley/protocol";
 
-import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
 import { hexColor, swatches } from "../../design/domain/cast";
 import { Icon } from "../../design/Icon";
@@ -11,13 +10,14 @@ import { IconButton } from "../../design/IconButton";
 import { CountPill } from "../../design/Tag";
 import { toast } from "../../design/toasts";
 import { tone } from "../../design/tone";
+import { createAct } from "../../infra/act";
 import { api, reasonOf } from "../../infra/api";
 import { useNow } from "../../infra/base/dom";
 import { ago } from "../../infra/base/format";
 import { ready, useAgents, useQueryClient } from "../../infra/query";
 import { createMemo } from "../../infra/solid";
 
-export interface HistoryPanelProps {
+interface HistoryPanelProps {
   readonly noteId: NoteId;
   readonly open: boolean;
   readonly onClose: () => void;

@@ -85,11 +85,6 @@ test("all workbench controls, overlays, rich blocks, virtual-clock hooks, and do
   await clock.fastForward(4_100);
   expect(app.count("id:toast")).toBe(0);
 
-  expect(app.count("id:comp-table >> id:table-row")).toBe(2);
-  await app.press("id:comp-table >> id:table-sort-score");
-  await app.press("id:comp-table >> id:table-select-page");
-  expect(app.texts()).toContain("暂无数据");
-
   expect(app.texts()).toContain("组件 Markdown");
   expect(app.count("id:long-code-section >> id:code-block")).toBe(1);
   await app.press("id:long-code-section >> text:展开");

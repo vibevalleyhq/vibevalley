@@ -10,9 +10,10 @@ import { OrchestratorFace } from "../design/domain/Face";
 import { TextArea } from "../design/Field";
 import { Icon } from "../design/Icon";
 import type { IconName } from "../design/icons";
-import { useFollowed } from "../features/channel/model/follow";
+import { motionClass, motionEnter } from "../design/motion";
 import { api, newSendKey, reasonOf } from "../infra/api";
 import { callDecoded, frame } from "../infra/bridge";
+import { useFollowed } from "../infra/channelFollow";
 import { useCollabSlice } from "../infra/frame";
 import { farmCallsSchema, readFarmPhoneParams, readHostLocale, type FarmCalls } from "../infra/hostParams";
 import { Root } from "../infra/Root";
@@ -58,9 +59,9 @@ function Press(props: { children: JSX.Element; run: () => void; id?: string; sel
       onPress={() => {
         if (props.disabled !== true) props.run();
       }}
-      class={`items-center justify-center rounded-md border px-2.5 py-1.5 ${
+      class={`items-center justify-center rounded-md border px-2.5 py-1.5 ${motionEnter("fast")} ${
         props.selected === true ? "border-accent bg-accent" : "border-line bg-elevated hover:bg-hover"
-      } ${props.disabled === true ? "opacity-50" : ""} ${props.class ?? ""}`}
+      } ${props.disabled === true ? "opacity-50" : "active:translate-y-px"} ${props.class ?? ""}`}
     >
       <Label tone={props.selected === true ? "onAccent" : "ink"}>{props.children}</Label>
     </View>
@@ -70,7 +71,9 @@ function Press(props: { children: JSX.Element; run: () => void; id?: string; sel
 function IconKey(props: { label: string; run: () => void; children: JSX.Element; id: string }) {
   return (
     <View testID={props.id} role="button" accessibilityLabel={props.label} onPress={props.run} class="group items-center gap-1.5">
-      <View class="h-11 w-11 items-center justify-center rounded-xl border border-line bg-elevated shadow-raise group-hover:border-line-strong group-hover:bg-hover">
+      <View
+        class={`h-11 w-11 items-center justify-center rounded-xl border border-line bg-elevated shadow-raise ${motionEnter("fast")} group-hover:border-line-strong group-hover:bg-hover active:translate-y-px`}
+      >
         {props.children}
       </View>
       <Label tone="muted" class="text-center">
@@ -449,7 +452,9 @@ function Handset(props: { calls: () => Calls }) {
                   {(item) => (
                     <View class="flex-1 items-center justify-center gap-3 p-4">
                       <Label tone="accent">{t("web.farm.phone.ringing")}</Label>
-                      <OrchestratorFace size={60} />
+                      <View testID="farm-phone-ringing-pulse" class={`rounded-full border border-accent bg-ok-soft p-2 ${motionClass("animate-pulse")}`}>
+                        <OrchestratorFace size={60} />
+                      </View>
                       <Label size={20}>{item().who}</Label>
                       <Label tone="muted">{item().words.label}</Label>
                       <Label class="text-center">{item().text}</Label>
@@ -467,14 +472,16 @@ function Handset(props: { calls: () => Calls }) {
               </View>
             </If>
             <If when={unfolded()}>
-              <Chat
-                fold={() => unfolded.set(false)}
-                large={large}
-                resize={() => large.set(!large())}
-                chatOnly={chatOnly}
-                heard={() => activeCall().heard}
-                said={() => activeCall().said}
-              />
+              <View class={`min-w-0 flex-1 ${motionEnter("normal")}`}>
+                <Chat
+                  fold={() => unfolded.set(false)}
+                  large={large}
+                  resize={() => large.set(!large())}
+                  chatOnly={chatOnly}
+                  heard={() => activeCall().heard}
+                  said={() => activeCall().said}
+                />
+              </View>
             </If>
           </View>
         </View>
@@ -488,7 +495,7 @@ function Handset(props: { calls: () => Calls }) {
           accessibilityLabel={t("web.farm.phone.openChat")}
           testID="phone-chat"
           onPress={() => unfolded.set(true)}
-          class="mt-14 w-8 items-center self-start rounded-r-xl border border-l-0 border-line-strong bg-elevated px-1.5 py-2.5 shadow-raise hover:bg-hover"
+          class={`mt-14 w-8 items-center self-start rounded-r-xl border border-l-0 border-line-strong bg-elevated px-1.5 py-2.5 shadow-raise ${motionEnter("fast")} hover:bg-hover active:translate-y-px`}
         >
           <Label tone="ink" size={14}>
             {[...t("web.farm.phone.chatTab")].join("\n")}

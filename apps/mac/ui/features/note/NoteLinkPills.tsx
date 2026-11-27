@@ -6,7 +6,7 @@ import { Icon } from "../../design/Icon";
 import { Link as A } from "../../infra/router";
 import { noteHref, noteTypeIcon } from "./NoteCard";
 
-export interface ResolvedNoteLink {
+interface ResolvedNoteLink {
   readonly id: string;
   readonly label: string;
   readonly noteType?: NoteType | undefined;

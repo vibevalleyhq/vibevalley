@@ -4,7 +4,6 @@ import { t } from "@vibevalley/i18n";
 import { type NoteFileContent, type NoteFileMeta, type NoteId } from "@vibevalley/protocol";
 import { noteId as toNoteId } from "@vibevalley/protocol/schema";
 
-import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
 import { TextArea, TextInput } from "../../design/Field";
 import { Icon } from "../../design/Icon";
@@ -12,10 +11,11 @@ import { IconButton } from "../../design/IconButton";
 import { Banner } from "../../design/layout";
 import { Segmented } from "../../design/Segmented";
 import { toast } from "../../design/toasts";
+import { createAct } from "../../infra/act";
 import { useQueryClient } from "../../infra/query";
 import { buildSandboxedHtml, useNoteDirectory } from "./views/noteFiles";
 
-export interface NoteDirectoryViewProps {
+interface NoteDirectoryViewProps {
   readonly noteId: NoteId;
   readonly version?: number | undefined;
   readonly onOpenNote?: ((id: NoteId) => void) | undefined;

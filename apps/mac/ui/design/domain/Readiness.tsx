@@ -3,16 +3,16 @@ import { Text, View } from "nsh";
 import { t } from "@vibevalley/i18n";
 import type { Feature } from "@vibevalley/protocol";
 
-import { ready, settingsQuery, useQuery } from "../../infra/query";
-import { fixOf } from "../../infra/readiness";
+import { useDesignHost } from "../host";
 import { Icon } from "../Icon";
 import { TextLink } from "../TextLink";
 
 /** Whether the features a page sets up can be used now, as the server says (SettingsStatus.readiness), and where to
  * fix the ones that cannot. Says nothing while the settings are on their way. */
 export function Readiness(props: { features: readonly Feature[] }) {
-  const settings = useQuery(settingsQuery);
-  const readiness = () => ready(settings, undefined)?.readiness;
+  const designHost = useDesignHost();
+  const settings = designHost.useSettings();
+  const readiness = () => settings()?.readiness;
   return (
     <If when={readiness()}>
       {(all) => (
@@ -39,8 +39,10 @@ export function Readiness(props: { features: readonly Feature[] }) {
                     {(missing) => (
                       <>
                         <Icon name="warn" size={14} />
-                        <Text class="text-sm text-ink">{t("web.setting.readiness.lacks", { feature: name(), why: fixOf(missing()).words })}</Text>
-                        <TextLink href={fixOf(missing()).href}>{t("web.setting.readiness.fix")}</TextLink>
+                        <Text class="text-sm text-ink">
+                          {t("web.setting.readiness.lacks", { feature: name(), why: designHost.readinessFix(missing()).words })}
+                        </Text>
+                        <TextLink href={designHost.readinessFix(missing()).href}>{t("web.setting.readiness.fix")}</TextLink>
                       </>
                     )}
                   </If>

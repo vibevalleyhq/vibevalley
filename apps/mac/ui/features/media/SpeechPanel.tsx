@@ -3,13 +3,13 @@ import { cleanup, computed, signal, Text, View } from "nsh";
 import { t } from "@vibevalley/i18n";
 import { MediaAudioFormatValues, type MediaAudioFormat, type MediaSpeechJob, type MediaSpeechRequest } from "@vibevalley/protocol";
 
-import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
 import { ConfirmButton } from "../../design/ConfirmButton";
 import { Field, Select, TextArea } from "../../design/Field";
 import { IconButton } from "../../design/IconButton";
 import { Card, Quiet } from "../../design/layout";
 import { Dot } from "../../design/Tag";
+import { createAct } from "../../infra/act";
 import { api, reasonOf } from "../../infra/api";
 import { useCollabSlice, useOpsSlice } from "../../infra/frame";
 import { providerQuery, providerVoicesQuery, ready, useQuery } from "../../infra/query";

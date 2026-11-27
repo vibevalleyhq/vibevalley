@@ -14,9 +14,19 @@ import { Select, TextInput } from "../../../design/Field";
 import { Icon } from "../../../design/Icon";
 import { Bubble } from "../../../design/Tip";
 import { mix } from "../../../design/tone";
-import { baseCellAsBool, baseCellAsNumber, baseCellAsStrings, baseCellAsText, findSelectOption, formatBaseNumber, optionToneLook } from "./baseModel";
+import {
+  baseCellAsBool,
+  baseCellAsNumber,
+  baseCellAsStrings,
+  baseCellAsText,
+  findSelectOption,
+  formatBaseNumber,
+  formatCompactDateCell,
+  optionToneLook,
+  parseDateRangeCell,
+} from "./baseModel";
 
-export interface BaseCellContext {
+interface BaseCellContext {
   readonly rowId: string;
   readonly col: BaseColumn;
   readonly cell: BaseCellValue | undefined;
@@ -72,6 +82,8 @@ export function BaseCellControl(props: BaseCellContext) {
   const numVal = computed(() => (props.cell?._tag === "number" ? formatBaseNumber(props.cell.value) : textVal()));
   const boolVal = computed(() => baseCellAsBool(props.cell));
   const stringsVal = computed(() => baseCellAsStrings(props.cell));
+  const parsedDate = computed(() => parseDateRangeCell(textVal()));
+  const compactDateLabel = computed(() => formatCompactDateCell(textVal()));
 
   const issueOptions = computed(() =>
     props.issues.map((iss) => ({
@@ -119,7 +131,7 @@ export function BaseCellControl(props: BaseCellContext) {
               role="button"
               testID={`base-cell-${props.rowId}-${props.col.id}`}
               onPress={startTextEdit}
-              class="min-h-6 justify-center rounded-xs px-1.5 py-0.5 hover:bg-hover"
+              class="h-7 justify-center rounded-sm px-1.5 hover:bg-hover"
             >
               <Text class={`truncate text-xs ${textVal() ? "text-ink" : "text-faint"}`}>{textVal() || "—"}</Text>
             </View>
@@ -149,7 +161,7 @@ export function BaseCellControl(props: BaseCellContext) {
               role="button"
               testID={`base-cell-${props.rowId}-${props.col.id}`}
               onPress={startTextEdit}
-              class="min-h-6 justify-center rounded-xs px-1.5 py-0.5 hover:bg-hover"
+              class="h-7 justify-center rounded-sm px-1.5 hover:bg-hover"
             >
               <Text class={`truncate font-mono text-xs tabular-nums ${props.dense === true ? "text-right" : ""} ${props.cell ? "text-ink" : "text-faint"}`}>
                 {props.cell ? numVal() : "—"}
@@ -205,38 +217,106 @@ export function BaseCellControl(props: BaseCellContext) {
       </If>
 
       <If when={props.col.kind === "multiSelect"}>
-        <Combobox
-          multiple
-          testid={`base-cell-multi-${props.rowId}-${props.col.id}`}
-          label={props.col.name}
-          size="control"
-          text="xs"
-          quiet={props.dense === true}
-          disabled={props.busy}
-          value={stringsVal()}
-          placeholder={t("web.base.form.unset")}
-          options={(props.col.options ?? []).map((opt) => ({ value: opt.value, label: opt.label ?? opt.value }))}
-          onChange={(next) => props.onCommitCell(props.col.id, { _tag: "strings", items: next })}
-        />
+        <If
+          when={props.dense === true && !editing()}
+          else={
+            <Combobox
+              multiple
+              testid={`base-cell-multi-${props.rowId}-${props.col.id}`}
+              label={props.col.name}
+              size="control"
+              text="xs"
+              quiet={props.dense === true}
+              disabled={props.busy}
+              value={stringsVal()}
+              placeholder={stringsVal().length > 0 ? "" : t("web.base.form.unset")}
+              options={(props.col.options ?? []).map((opt) => ({ value: opt.value, label: opt.label ?? opt.value }))}
+              onChange={(next) => props.onCommitCell(props.col.id, { _tag: "strings", items: next })}
+              onOpenChange={(open) => {
+                if (!open && props.dense === true) editing.set(false);
+              }}
+            />
+          }
+        >
+          <View
+            role="button"
+            testID={`base-cell-multi-${props.rowId}-${props.col.id}`}
+            onPress={() => {
+              if (!props.busy) editing.set(true);
+            }}
+            class="h-7 w-full min-w-0 flex-row items-center gap-1 overflow-hidden rounded-md px-1.5 hover:bg-hover"
+          >
+            <If when={stringsVal().length > 0} else={<Text class="truncate text-xs text-faint">—</Text>}>
+              <Each of={stringsVal().slice(0, 2)} key={(val) => val}>
+                {(val) => {
+                  const opt = () => findSelectOption(props.col, val());
+                  return <SelectPill label={opt()?.label ?? val()} color={opt()?.color} />;
+                }}
+              </Each>
+              <If when={stringsVal().length > 2}>
+                <View class="h-5 shrink-0 items-center justify-center rounded-sm bg-hover px-1">
+                  <Text class="font-mono text-2xs text-muted tabular-nums">{`+${stringsVal().length - 2}`}</Text>
+                </View>
+              </If>
+            </If>
+          </View>
+        </If>
       </If>
 
       <If when={props.col.kind === "date"}>
-        <DatePicker
-          testid={`base-cell-date-${props.rowId}-${props.col.id}`}
-          label={props.col.name}
-          size="control"
-          quiet={props.dense === true}
-          disabled={props.busy}
-          value={textVal() || undefined}
-          onChange={(next) => {
-            const iso = typeof next === "string" ? next : Array.isArray(next) ? (next[0] ?? "") : "";
-            props.onCommitCell(props.col.id, { _tag: "text", value: iso });
-          }}
-        />
+        <If
+          when={editing()}
+          else={
+            <View
+              role="button"
+              testID={`base-cell-date-${props.rowId}-${props.col.id}`}
+              onPress={() => {
+                if (!props.busy) editing.set(true);
+              }}
+              class={`h-7 w-full min-w-0 flex-row items-center gap-1.5 rounded-md border px-2 ${
+                props.dense === true
+                  ? "border-transparent bg-transparent hover:border-line hover:bg-page"
+                  : "border-line bg-page hover:border-faint hover:bg-hover"
+              }`}
+            >
+              <Icon name="calendar" size={12} tone={compactDateLabel() ? "muted" : "faint"} />
+              <Text class={`min-w-0 flex-1 truncate text-xs ${compactDateLabel() ? "font-mono text-ink tabular-nums" : "text-faint"}`}>
+                {compactDateLabel() || t("web.base.form.unset")}
+              </Text>
+              <Icon name="choose" size={12} tone="muted" />
+            </View>
+          }
+        >
+          <DatePicker
+            defaultOpen
+            testid={`base-cell-date-${props.rowId}-${props.col.id}`}
+            label={props.col.name}
+            size="control"
+            quiet={props.dense === true}
+            disabled={props.busy}
+            range={parsedDate().isRange}
+            value={parsedDate().isRange ? [parsedDate().start, parsedDate().end] : parsedDate().start}
+            onOpenChange={(open) => {
+              if (!open) editing.set(false);
+            }}
+            onChange={(next) => {
+              let serialized = "";
+              if (typeof next === "string") {
+                serialized = next;
+              } else if (Array.isArray(next)) {
+                const [s, e] = next;
+                if (s && e) serialized = s === e ? s : `${s} -> ${e}`;
+                else serialized = s ?? e ?? "";
+              }
+              props.onCommitCell(props.col.id, { _tag: "text", value: serialized });
+              editing.set(false);
+            }}
+          />
+        </If>
       </If>
 
       <If when={props.col.kind === "checkbox"}>
-        <View class="h-6 flex-row items-center px-1">
+        <View class="h-7 flex-row items-center px-1">
           <Checkbox
             testid={`base-cell-check-${props.rowId}-${props.col.id}`}
             label={props.col.name}
@@ -268,7 +348,7 @@ export function BaseCellControl(props: BaseCellContext) {
             role="button"
             testID={`base-cell-media-${props.rowId}-${props.col.id}`}
             onPress={startTextEdit}
-            class="min-h-6 flex-row items-center gap-1.5 rounded-xs px-1.5 py-0.5 hover:bg-hover"
+            class="h-7 flex-row items-center gap-1.5 rounded-sm px-1.5 hover:bg-hover"
           >
             <Icon name="image" size={12} tone={textVal() ? "accent" : "faint"} />
             <Text class={`min-w-0 flex-1 truncate font-mono text-2xs ${textVal() ? "text-ink" : "text-faint"}`}>{textVal() || "—"}</Text>
@@ -280,7 +360,7 @@ export function BaseCellControl(props: BaseCellContext) {
         {(() => {
           const linkedIssueId = () => (props.cell?._tag === "issueRef" && props.cell.issueId !== "" ? props.cell.issueId : undefined);
           return (
-            <View class={props.dense === true ? "w-full min-w-0 flex-row items-center gap-1 overflow-hidden" : "w-full min-w-0 flex-col items-stretch gap-1.5"}>
+            <View class="w-full min-w-0 flex-row items-center gap-1 overflow-hidden">
               <If when={linkedIssueId()}>
                 {(issueId) => {
                   const found = () => props.issuesById.get(issueId());
@@ -289,13 +369,9 @@ export function BaseCellControl(props: BaseCellContext) {
                       role="button"
                       testID={`base-cell-issue-link-${props.rowId}-${props.col.id}`}
                       onPress={() => props.onOpenIssue(issueId())}
-                      class={
-                        props.dense === true
-                          ? "h-6 min-w-0 flex-1 flex-row items-center gap-1 rounded-sm border border-line bg-side px-1.5 hover:bg-hover"
-                          : "h-6 max-w-full min-w-0 flex-row items-center gap-1 self-start rounded-sm border border-line bg-side px-1.5 hover:bg-hover"
-                      }
+                      class="h-7 min-w-0 flex-1 flex-row items-center gap-1.5 rounded-md border border-line bg-side px-2 hover:bg-hover"
                     >
-                      <Icon name="issues" size={11} tone="accent" />
+                      <Icon name="issues" size={12} tone="accent" />
                       <Text class="min-w-0 flex-1 truncate font-mono text-2xs font-medium text-ink">
                         {found() ? `#${found()?.number} ${found()?.title}` : issueId()}
                       </Text>
@@ -308,15 +384,15 @@ export function BaseCellControl(props: BaseCellContext) {
                 label={props.col.name}
                 size="control"
                 text="xs"
-                quiet={props.dense === true}
+                quiet={props.dense === true || linkedIssueId() !== undefined}
                 searchable
                 disabled={props.busy}
                 value={props.cell?._tag === "issueRef" ? String(props.cell.issueId) : ""}
                 placeholder={linkedIssueId() ? undefined : t("web.base.form.unset")}
                 options={issueOptions()}
                 onChange={(v) => props.onCommitCell(props.col.id, { _tag: "issueRef", issueId: toIssueId(v) })}
-                renderValue={props.dense === true && linkedIssueId() ? () => null : undefined}
-                class={props.dense === true && linkedIssueId() ? "w-7 shrink-0" : "w-full min-w-0"}
+                renderValue={linkedIssueId() ? () => null : undefined}
+                class={linkedIssueId() ? "w-7 shrink-0" : "w-full min-w-0"}
               />
             </View>
           );
@@ -327,7 +403,7 @@ export function BaseCellControl(props: BaseCellContext) {
         {(() => {
           const linkedNoteId = () => (props.cell?._tag === "noteRef" && props.cell.noteId !== "" ? props.cell.noteId : undefined);
           return (
-            <View class={props.dense === true ? "w-full min-w-0 flex-row items-center gap-1 overflow-hidden" : "w-full min-w-0 flex-col items-stretch gap-1.5"}>
+            <View class="w-full min-w-0 flex-row items-center gap-1 overflow-hidden">
               <If when={linkedNoteId()}>
                 {(noteId) => {
                   const found = () => props.notesById.get(noteId());
@@ -336,13 +412,9 @@ export function BaseCellControl(props: BaseCellContext) {
                       role="button"
                       testID={`base-cell-note-link-${props.rowId}-${props.col.id}`}
                       onPress={() => props.onOpenNote(noteId())}
-                      class={
-                        props.dense === true
-                          ? "h-6 min-w-0 flex-1 flex-row items-center gap-1 rounded-sm border border-line bg-side px-1.5 hover:bg-hover"
-                          : "h-6 max-w-full min-w-0 flex-row items-center gap-1 self-start rounded-sm border border-line bg-side px-1.5 hover:bg-hover"
-                      }
+                      class="h-7 min-w-0 flex-1 flex-row items-center gap-1.5 rounded-md border border-line bg-side px-2 hover:bg-hover"
                     >
-                      <Icon name="notes" size={11} tone="accent" />
+                      <Icon name="notes" size={12} tone="accent" />
                       <Text class="min-w-0 flex-1 truncate text-2xs font-medium text-ink">{found()?.title ?? noteId()}</Text>
                     </View>
                   );
@@ -353,15 +425,15 @@ export function BaseCellControl(props: BaseCellContext) {
                 label={props.col.name}
                 size="control"
                 text="xs"
-                quiet={props.dense === true}
+                quiet={props.dense === true || linkedNoteId() !== undefined}
                 searchable
                 disabled={props.busy}
                 value={props.cell?._tag === "noteRef" ? String(props.cell.noteId) : ""}
                 placeholder={linkedNoteId() ? undefined : t("web.base.form.unset")}
                 options={noteOptions()}
                 onChange={(v) => props.onCommitCell(props.col.id, { _tag: "noteRef", noteId: toNoteId(v) })}
-                renderValue={props.dense === true && linkedNoteId() ? () => null : undefined}
-                class={props.dense === true && linkedNoteId() ? "w-7 shrink-0" : "w-full min-w-0"}
+                renderValue={linkedNoteId() ? () => null : undefined}
+                class={linkedNoteId() ? "w-7 shrink-0" : "w-full min-w-0"}
               />
             </View>
           );
@@ -401,7 +473,7 @@ export function BaseCellControl(props: BaseCellContext) {
         <View
           testID={`base-cell-formula-${props.rowId}-${props.col.id}`}
           tooltip={<If when={props.col.formula}>{(expr) => <Bubble text={`fx: ${expr()}`} />}</If>}
-          class="min-h-6 flex-row items-center gap-1.5 rounded-sm border border-line bg-side px-2 py-0.5"
+          class="h-7 flex-row items-center gap-1.5 rounded-md border border-line bg-side px-2"
         >
           <Text class="font-mono text-2xs font-semibold text-accent">fx</Text>
           <Text class="min-w-0 flex-1 truncate font-mono text-xs text-ink tabular-nums">{baseCellAsText(props.cell) || "—"}</Text>

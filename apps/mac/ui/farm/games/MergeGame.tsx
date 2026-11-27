@@ -2,8 +2,8 @@ import { Canvas, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 
-import { playSound } from "../../design/sound";
 import { createSignal } from "../../infra/solid";
+import { playSound } from "../../infra/sound";
 import { lcd } from "./lcd";
 import { Cover, Help, Words, Stats } from "./LcdView";
 import { type Merge, type MergeDirection, mergeGoal, mergeSize, mergeStageName, mergeStages, mergeTop, newMerge, slideMerge, undoMerge } from "./merge";

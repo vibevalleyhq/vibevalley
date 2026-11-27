@@ -2,7 +2,18 @@ import { computed, effect, Image, signal, untracked, View, WebView, Text } from 
 import { Input } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
-import type { BaseCellValue, BaseColumn, DocBlock, DocKpiItem, Issue, IssueId, IssueStatus, Note, NoteId } from "@vibevalley/protocol";
+import {
+  type BaseCellValue,
+  type BaseColumn,
+  type DocBlock,
+  type DocKpiItem,
+  type Issue,
+  type IssueId,
+  type IssueStatus,
+  MediaInputKindValues,
+  type Note,
+  type NoteId,
+} from "@vibevalley/protocol";
 import { noteId } from "@vibevalley/protocol/schema";
 
 import { Button } from "../../../design/Button";
@@ -14,36 +25,25 @@ import { Icon } from "../../../design/Icon";
 import { IconButton } from "../../../design/IconButton";
 import type { Picture } from "../../../design/Lightbox";
 import { Segmented } from "../../../design/Segmented";
-import { Dot, type DotTone } from "../../../design/Tag";
+import { Dot } from "../../../design/Tag";
 import { mix } from "../../../design/tone";
 import { api } from "../../../infra/api";
 import { currentHost } from "../../../infra/host";
 import { ready, useQuery, useQueryClient } from "../../../infra/query";
 import { noteBaseQuery } from "../store";
 import { baseCellAsStrings, baseCellAsText, findSelectOption, optionToneLook } from "../views/baseModel";
-import { buildChartSpecJson, filterIssuesForList, resolveIssueRef, updateKpiItem } from "./docOps";
+import { SANDBOX_CSP } from "../views/noteFiles";
+import { buildChartSpecJson, filterIssuesForList, ISSUE_STATUS_DOT_TONE, resolveIssueRef, updateKpiItem } from "./docOps";
 
-export type KpiBlockData = Extract<DocBlock, { type: "kpi" }>;
-export type ChartBlockData = Extract<DocBlock, { type: "chart" }>;
-export type DiagramBlockData = Extract<DocBlock, { type: "diagram" }>;
-export type CompareBlockData = Extract<DocBlock, { type: "compare" }>;
-export type MediaBlockData = Extract<DocBlock, { type: "media" }>;
-export type PreviewBlockData = Extract<DocBlock, { type: "preview" }>;
-export type BaseEmbedBlockData = Extract<DocBlock, { type: "baseEmbed" }>;
-export type IssueCardBlockData = Extract<DocBlock, { type: "issueCard" }>;
-export type IssueListBlockData = Extract<DocBlock, { type: "issueList" }>;
-
-const SANDBOX_CSP =
-  "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; connect-src 'none'; form-action 'none'; base-uri 'none'";
-
-const statusDotTone: Record<IssueStatus, DotTone> = {
-  backlog: "faint",
-  todo: "muted",
-  in_progress: "water",
-  in_review: "wheat",
-  done: "leaf",
-  canceled: "faint",
-};
+type KpiBlockData = Extract<DocBlock, { type: "kpi" }>;
+type ChartBlockData = Extract<DocBlock, { type: "chart" }>;
+type DiagramBlockData = Extract<DocBlock, { type: "diagram" }>;
+type CompareBlockData = Extract<DocBlock, { type: "compare" }>;
+type MediaBlockData = Extract<DocBlock, { type: "media" }>;
+type PreviewBlockData = Extract<DocBlock, { type: "preview" }>;
+type BaseEmbedBlockData = Extract<DocBlock, { type: "baseEmbed" }>;
+type IssueCardBlockData = Extract<DocBlock, { type: "issueCard" }>;
+type IssueListBlockData = Extract<DocBlock, { type: "issueList" }>;
 
 function sandboxHtmlForPreview(entry: string, title?: string): string {
   const safeEntry = entry.replaceAll("<", "&lt;").replaceAll(">", "&gt;");
@@ -51,22 +51,7 @@ function sandboxHtmlForPreview(entry: string, title?: string): string {
   return `<!doctype html><html><head><meta charset="utf-8" /><meta http-equiv="Content-Security-Policy" content="${SANDBOX_CSP}" /></head><body style="font-family:system-ui;padding:16px;margin:0;"><div style="font-weight:600;margin-bottom:6px;">${safeTitle}</div><div style="font-family:monospace;font-size:12px;opacity:0.75;">${safeEntry}</div></body></html>`;
 }
 
-function statusLabel(status: IssueStatus): string {
-  switch (status) {
-    case "backlog":
-      return t("shared.status.backlog");
-    case "todo":
-      return t("shared.status.todo");
-    case "in_progress":
-      return t("shared.status.in_progress");
-    case "in_review":
-      return t("shared.status.in_review");
-    case "done":
-      return t("shared.status.done");
-    case "canceled":
-      return t("shared.status.canceled");
-  }
-}
+const statusLabel = (status: IssueStatus): string => t(`shared.status.${status}`);
 
 function kpiToneLook(tone: string | undefined): { readonly bg: string; readonly text: string } {
   switch (tone) {
@@ -350,7 +335,7 @@ export function MediaBlockView(props: {
       <If when={editing()}>
         <View class="gap-2 rounded-md border border-line bg-page p-2">
           <View class="flex-row gap-1">
-            <Each of={["image", "audio", "video"] as const} key={(mk) => mk}>
+            <Each of={MediaInputKindValues} key={(mk) => mk}>
               {(mk) => (
                 <Button
                   size="compact"
@@ -658,7 +643,7 @@ export function IssueCardBlockView(props: {
               onPress={() => props.onOpenIssue(issue().id)}
               class="min-w-0 flex-1 flex-row items-center gap-2 rounded-sm hover:opacity-80"
             >
-              <Dot tone={statusDotTone[issue().status]} size={9} ring={false} />
+              <Dot tone={ISSUE_STATUS_DOT_TONE[issue().status]} size={9} ring={false} />
               <Text class="shrink-0 font-mono text-xs text-muted tabular-nums">{`#${issue().number}`}</Text>
               <Text class="min-w-0 flex-1 truncate text-sm font-medium text-ink">{issue().title}</Text>
               <View class="shrink-0 rounded-sm bg-side px-1.5 py-0.5">
@@ -683,7 +668,7 @@ export function IssueCardBlockView(props: {
                 }}
                 class="flex-row items-center gap-2 rounded-sm px-2 py-1 hover:bg-hover"
               >
-                <Dot tone={statusDotTone[iss().status]} size={8} ring={false} />
+                <Dot tone={ISSUE_STATUS_DOT_TONE[iss().status]} size={8} ring={false} />
                 <Text class="font-mono text-2xs text-muted">{`#${iss().number}`}</Text>
                 <Text class="min-w-0 flex-1 truncate text-xs text-ink">{iss().title}</Text>
               </View>
@@ -760,7 +745,7 @@ export function IssueListBlockView(props: {
                 onPress={() => props.onOpenIssue(iss().id)}
                 class="flex-row items-center gap-2 border-b border-line px-2.5 py-1.5 last:border-b-0 hover:bg-hover"
               >
-                <Dot tone={statusDotTone[iss().status]} size={8} ring={false} />
+                <Dot tone={ISSUE_STATUS_DOT_TONE[iss().status]} size={8} ring={false} />
                 <Text class="shrink-0 font-mono text-2xs text-muted tabular-nums">{`#${iss().number}`}</Text>
                 <Text class="min-w-0 flex-1 truncate text-xs font-medium text-ink">{iss().title}</Text>
                 <Text class="shrink-0 text-2xs text-faint">{statusLabel(iss().status)}</Text>

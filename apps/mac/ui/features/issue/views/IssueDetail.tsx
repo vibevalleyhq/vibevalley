@@ -1,34 +1,38 @@
 import { Clipboard, computed, keymap, signal, Text, View, type ViewRef } from "nsh";
+import { Input } from "nsh/base";
 
 import { list, t } from "@vibevalley/i18n";
 import { type Attachment, DeliverableValues, type Issue, type IssueAct, PriorityValues, type Session, type SessionView } from "@vibevalley/protocol";
 import { closedText, plainText, sessionBranch, sessionProfile, sessionWorktree } from "@vibevalley/protocol/rules";
 
-import { createAct } from "../../../design/act";
 import { Button } from "../../../design/Button";
 import { OpenTerminal } from "../../../design/domain/OpenTerminal";
-import { TextArea, TextInput } from "../../../design/Field";
+import { TextArea } from "../../../design/Field";
 import { Icon } from "../../../design/Icon";
 import { IconButton } from "../../../design/IconButton";
 import type { IconName } from "../../../design/icons";
+import { motionClass } from "../../../design/motion";
 import { TextLink } from "../../../design/TextLink";
 import { Bubble } from "../../../design/Tip";
 import { toast } from "../../../design/toasts";
 import { mix } from "../../../design/tone";
+import { createAct } from "../../../infra/act";
 import { useAgent } from "../../../infra/agents";
 import { useNow } from "../../../infra/base/dom";
 import { shortMomentText } from "../../../infra/base/format";
+import { useTimeout } from "../../../infra/base/timer";
 import { hostApi } from "../../../infra/bridge";
 import { useBoardSlice } from "../../../infra/frame";
+import { useIssueChanges } from "../../../infra/issueActions";
 import { ready } from "../../../infra/query";
-import { createMemo } from "../../../infra/solid";
+import { createEffect, createMemo, untrack } from "../../../infra/solid";
 import { useIntents } from "../../../infra/state/intent";
 import { IssueBodyEditor, IssueNotes, useNotes } from "../../note";
 import { SubagentProgress } from "../../session";
 import { createIssueActs } from "../model/acts";
 import type { Tone } from "../model/cards";
 import { changesLine } from "../model/changes";
-import { useIssueChanges, useIssues, useIssueTimeline } from "../model/history";
+import { useIssues, useIssueTimeline } from "../model/history";
 import { blockerIssuesOf, relationIssuesOf } from "../model/meta";
 import { issueMove, movedIssue } from "../model/moves";
 import { issueState, stageTone } from "../model/overview";
@@ -335,7 +339,7 @@ export function IssueDetail(props: {
       <SubIssuesSection issueId={props.issue.id} allIssues={issues()} onOpen={openIssue} />
 
       <View accessibilityLabel={t("web.issue.detail.progress")} testID="issue-progress" class={hasAboveProgress() ? "mt-7 border-t border-line pt-5" : ""}>
-        <View class="mb-2.5 flex-row items-center justify-between gap-2">
+        <View class="mb-2.5 min-h-6 flex-row items-center justify-between gap-2">
           <Text class="text-xs font-semibold text-muted">{t("web.issue.detail.progress")}</Text>
           <If when={s().criteria.length > 0}>
             <View class="flex-row items-center gap-2">
@@ -466,7 +470,7 @@ export function IssueDetail(props: {
         issue={props.issue.id}
         heading={
           <View class="mt-7 border-t border-line pt-5">
-            <SheetLabel first>{t("web.note.issue.title")}</SheetLabel>
+            <Text class="text-xs font-semibold text-muted">{t("web.note.issue.title")}</Text>
           </View>
         }
       />
@@ -630,29 +634,29 @@ export function IssueDetail(props: {
           onCommit={(dueAt) => setLabel({ dueAt })}
         />
       </Property>
-      <Property label={t("web.issue.detail.opened")}>
+      <Property label={t("web.issue.detail.opened")} icon={<Icon name="clock" size={13} tone="muted" />}>
         <Text class="text-sm text-ink tabular-nums">{shortMomentText(props.issue.createdAt, now())}</Text>
       </Property>
-      <Property label={t("web.issue.detail.started")}>
+      <Property label={t("web.issue.detail.started")} icon={<Icon name="play" size={13} tone="muted" />}>
         <Text class="text-sm text-ink tabular-nums">{shortMomentText((props.sessions[0] ?? head()).hiredAt, now())}</Text>
       </Property>
       <If when={s().ask && s().stage.since}>
         {(at) => (
-          <Property label={t("web.issue.detail.waiting")}>
+          <Property label={t("web.issue.detail.waiting")} icon={<Icon name="wait" size={13} tone="muted" />}>
             <Text class="text-sm text-ink tabular-nums">{t("web.issue.detail.since", { clock: shortMomentText(at(), now()) })}</Text>
           </Property>
         )}
       </If>
       <If when={live().deliveryEvidence?.reviews.at(-1)}>
         {(review) => (
-          <Property label={t("web.issue.changes.reviewVersion")}>
+          <Property label={t("web.issue.changes.reviewVersion")} icon={<Icon name="diff" size={13} tone="muted" />}>
             <Text class="font-mono text-xs text-ink">{`${review().revision.baseCommit.slice(0, 8)} → ${review().revision.tree.slice(0, 12)}`}</Text>
           </Property>
         )}
       </If>
       <If when={!failedCheck() ? live().deliveryEvidence?.check : undefined}>
         {(check) => (
-          <Property label={t("web.issue.changes.projectCheck")}>
+          <Property label={t("web.issue.changes.projectCheck")} icon={<Icon name="check" size={13} tone="muted" />}>
             {`${t(`web.issue.changes.check.${check().status}`)} · ${check().candidateCommit.slice(0, 12)}`}
           </Property>
         )}
@@ -666,21 +670,21 @@ export function IssueDetail(props: {
       </If>
       <If when={live().deliveryEvidence?.mergedCommit}>
         {(commit) => (
-          <Property label={t("web.issue.changes.mergedCommit")}>
+          <Property label={t("web.issue.changes.mergedCommit")} icon={<Icon name="branch" size={13} tone="muted" />}>
             <Text class="font-mono text-xs text-ink">{commit().slice(0, 12)}</Text>
           </Property>
         )}
       </If>
       <If when={props.issue.reviewedAt}>
         {(at) => (
-          <Property label={t("web.issue.detail.reviewed")}>
+          <Property label={t("web.issue.detail.reviewed")} icon={<Icon name="check" size={13} tone="accent" />}>
             <Text class="text-sm text-accent tabular-nums">{shortMomentText(at(), now())}</Text>
           </Property>
         )}
       </If>
       <If when={props.issue.closedAt}>
         {(at) => (
-          <Property label={t("web.issue.detail.closedAt")}>
+          <Property label={t("web.issue.detail.closedAt")} icon={<Icon name="clock" size={13} tone="muted" />}>
             <Text class="text-sm text-ink tabular-nums">{shortMomentText(at(), now())}</Text>
           </Property>
         )}
@@ -738,64 +742,112 @@ export function IssueDetail(props: {
   return <IssueSheet heading={heading} main={main} side={side} />;
 }
 
-/** The issue's title, renamed in place while the issue is open: Return or leaving the field keeps it, Escape lets it go. */
+/** The issue's title, renamed in place while the issue is open with isomorphic view/edit box model (0px jump). */
 function IssueTitle(props: { shown: string; full: string; editable: boolean; state: "pending" | "failed" | undefined; onSave: (title: string) => void }) {
   const editing = signal(false);
+  const savedBadge = signal(false);
+  const clearSaved = useTimeout();
+  let wasPending = false;
+  createEffect(
+    () => props.state,
+    (next) => {
+      if (next === "pending") {
+        wasPending = true;
+        savedBadge.set(false);
+      } else if (wasPending && next === undefined) {
+        wasPending = false;
+        savedBadge.set(true);
+        clearSaved(() => savedBadge.set(false), 1800);
+      } else if (next === "failed") {
+        wasPending = false;
+      }
+    },
+    { defer: true },
+  );
   let typed = "";
   const finish = (keep: boolean) => {
     if (!editing()) return;
     editing.set(false);
-    const title = typed.trim();
+    const title = typed.replace(/[\r\n]+/gu, " ").trim();
     if (keep && title !== "" && title !== props.full) props.onSave(title);
   };
   return (
-    <If
-      when={editing()}
-      else={
-        <View class="min-w-0 flex-1" style={props.state === "pending" ? { opacity: 0.7 } : undefined}>
+    <View class="min-w-0 flex-1">
+      <If
+        when={editing()}
+        else={
+          <View style={props.state === "pending" ? { opacity: 0.72 } : undefined}>
+            <If
+              when={props.editable}
+              else={
+                <View class="-mx-2 w-full rounded-md border border-transparent px-2 py-1">
+                  <Text role="header" testID="issue-title" class="text-2xl leading-snug font-semibold text-ink">
+                    {props.shown}
+                  </Text>
+                </View>
+              }
+            >
+              <View
+                role="button"
+                testID="issue-title-trigger"
+                accessibilityLabel={t("web.issue.detail.rename")}
+                tooltip={<Bubble text={t("web.issue.detail.rename")} />}
+                onPress={() => {
+                  typed = props.full;
+                  editing.set(true);
+                }}
+                class="-mx-2 w-full rounded-md border border-transparent px-2 py-1 hover:border-line hover:bg-hover"
+              >
+                <Text role="header" testID="issue-title" class="text-2xl leading-snug font-semibold text-ink">
+                  {props.shown}
+                </Text>
+              </View>
+            </If>
+          </View>
+        }
+      >
+        <TitleInput full={props.full} onInput={(v) => (typed = v)} onFinish={finish} />
+      </If>
+      <If when={props.state === "pending" || savedBadge()}>
+        <View testID="issue-title-save-status" class="mt-1 flex-row items-center gap-1">
           <If
-            when={props.editable}
+            when={props.state === "pending"}
             else={
-              <Text role="header" testID="issue-title" class="text-2xl leading-snug font-semibold text-ink">
-                {props.shown}
-              </Text>
+              <>
+                <Icon name="check" size={11} tone="leaf" />
+                <Text class="text-2xs text-leaf">{t("web.agent.saved")}</Text>
+              </>
             }
           >
-            <View
-              role="button"
-              accessibilityLabel={t("web.issue.detail.rename")}
-              tooltip={<Bubble text={t("web.issue.detail.rename")} />}
-              onPress={() => {
-                typed = props.full;
-                editing.set(true);
-              }}
-              class="-mx-1 max-w-full self-start rounded-sm px-1 hover:bg-hover"
-            >
-              <Text role="header" testID="issue-title" class="text-2xl leading-snug font-semibold text-ink">
-                {props.shown}
-              </Text>
+            <View class={motionClass("animate-spin")}>
+              <Icon name="wait" size={11} tone="muted" />
             </View>
+            <Text class="text-2xs text-muted">{t("web.agent.saving")}</Text>
           </If>
         </View>
-      }
-    >
-      <TitleInput full={props.full} onInput={(v) => (typed = v)} onFinish={finish} />
-    </If>
+      </If>
+    </View>
   );
 }
 
 function TitleInput(props: { full: string; onInput: (v: string) => void; onFinish: (keep: boolean) => void }) {
+  const draft = signal(untrack(() => props.full));
   // Bound while the field is up: Escape lets the new title go.
   keymap.bind("escape", () => props.onFinish(false), { when: "always" });
   return (
-    <TextInput
+    <Input
+      multiline
+      submitBehavior="submit"
       testID="issue-title-input"
       accessibilityLabel={t("web.issue.detail.rename")}
-      value={props.full}
-      text="lg"
+      value={draft()}
       autoFocus
-      class="min-w-0 flex-1"
-      onInput={props.onInput}
+      class="-mx-2 w-full rounded-md border border-focus bg-page px-2 py-1 text-2xl leading-snug font-semibold text-ink placeholder:text-faint"
+      onChange={(e) => {
+        const clean = e.value.replace(/[\r\n]+/gu, " ");
+        draft.set(clean);
+        props.onInput(clean);
+      }}
       onSubmit={() => props.onFinish(true)}
       onBlur={() => props.onFinish(true)}
     />

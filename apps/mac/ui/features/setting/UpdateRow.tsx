@@ -7,14 +7,18 @@ import { Button } from "../../design/Button";
 import { SettingRow } from "../../design/domain/settings";
 import { Icon } from "../../design/Icon";
 import { OutLink } from "../../design/IconButton";
+import { motionClass } from "../../design/motion";
 import { toast } from "../../design/toasts";
+import { mix } from "../../design/tone";
 import { reasonOf } from "../../infra/api";
 import { useNow, variant } from "../../infra/base/dom";
 import { ago } from "../../infra/base/format";
 import { useSessionsSlice } from "../../infra/frame";
-import { clampUpdatePercent, currentHost } from "../../infra/host";
+import { clampUpdatePercent, currentHost, formatUpdateTransfer } from "../../infra/host";
 import { type Accessor, createSignal, onSettled } from "../../infra/solid";
 import { failedUpdateMessage, UpdateDialog } from "./UpdateDialog";
+
+const stripVersionPrefix = (version: string) => version.replace(/^v/u, "");
 
 function updateWords(state: UpdateState): string {
   switch (state._tag) {
@@ -131,9 +135,14 @@ export function UpdateRow(props: { state: Accessor<UpdateState | undefined>; las
     <If when={props.state()}>
       {(s) => {
         const idleState = computed(() => variant(s(), "_tag", "idle"));
+        const downloadingState = computed(() => variant(s(), "_tag", "downloading"));
         const readyState = computed(() => variant(s(), "_tag", "ready"));
         const manualState = computed(() => variant(s(), "_tag", "manual"));
         const failedState = computed(() => variant(s(), "_tag", "failed"));
+        const isActiveCard = computed(() => {
+          const tag = s()._tag;
+          return tag === "downloading" || tag === "ready" || tag === "failed";
+        });
         const busyIcon = computed(() => {
           const tag = s()._tag;
           return tag === "checking" || tag === "verifying" || tag === "installing" || (requesting() && tag === "idle");
@@ -147,62 +156,158 @@ export function UpdateRow(props: { state: Accessor<UpdateState | undefined>; las
         };
         return (
           <View>
-            <SettingRow label={t("web.setting.about.update")} hint={t("web.setting.about.updateHint")} last={props.last}>
-              <View class="flex-row items-center gap-1.5">
-                <If when={busyIcon()}>
-                  <Icon name="wait" size={14} tone="water" />
-                </If>
-                <If when={s()._tag === "failed"}>
-                  <Icon name="warn" size={14} tone="berry" />
-                </If>
-                <Text testID="update-state" class={`text-sm tabular-nums ${statusToneClass()}`}>
-                  {requesting() && s()._tag === "idle" ? t("web.setting.about.checking") : updateWords(s())}
-                </Text>
-              </View>
-              <If when={idleState()?.checkedAt}>
-                {(checkedAt) => (
-                  <Text testID="update-last-checked" class="text-xs text-faint">
-                    {t("web.setting.about.lastChecked", { time: ago(checkedAt(), now()) })}
+            <If
+              when={isActiveCard()}
+              else={
+                <SettingRow label={t("web.setting.about.update")} hint={t("web.setting.about.updateHint")} last={props.last}>
+                  <View class="flex-row items-center gap-1.5">
+                    <If when={busyIcon()}>
+                      <View testID="update-busy-indicator" class={motionClass("animate-pulse")}>
+                        <Icon name="wait" size={14} tone="water" />
+                      </View>
+                    </If>
+                    <Text testID="update-state" class={`text-sm tabular-nums ${statusToneClass()}`}>
+                      {requesting() && s()._tag === "idle" ? t("web.setting.about.checking") : updateWords(s())}
+                    </Text>
+                  </View>
+                  <If when={idleState()?.checkedAt}>
+                    {(checkedAt) => (
+                      <Text testID="update-last-checked" class="text-xs text-faint">
+                        {t("web.setting.about.lastChecked", { time: ago(checkedAt(), now()) })}
+                      </Text>
+                    )}
+                  </If>
+                  <If when={s()._tag === "idle"}>
+                    <Button icon="refresh" testID="update-check" disabled={requesting()} onPress={check}>
+                      {requesting() ? t("web.setting.about.checking") : t("web.setting.about.check")}
+                    </Button>
+                  </If>
+                  <If when={s()._tag === "installing"}>
+                    <Button icon="wait" testID="update-installing-btn" disabled>
+                      {t("web.base.updateInstalling")}
+                    </Button>
+                  </If>
+                  <If when={manualState()?.page.trim()}>{(page) => <OutLink href={page()} label={t("web.setting.about.download")} />}</If>
+                </SettingRow>
+              }
+            >
+              <View testID="update-active-card" class={`px-4 py-3.5 ${props.last === true ? "" : "border-b border-line"}`}>
+                <View class="gap-3 rounded-lg border border-line bg-side p-3.5">
+                  <View class="flex-row flex-wrap items-center justify-between gap-2">
+                    <View class="min-w-0 flex-1 flex-row items-center gap-2">
+                      <If when={s()._tag === "failed"} else={<Icon name="update" size={14} tone={s()._tag === "ready" ? "accent" : "water"} />}>
+                        <Icon name="warn" size={14} tone="berry" />
+                      </If>
+                      <Text class="text-sm font-medium text-ink">{t("web.setting.about.update")}</Text>
+                      <If when={downloadingState()}>
+                        {(d) => (
+                          <View class="rounded-sm border border-line bg-page px-1.5 py-0.5">
+                            <Text class="font-mono text-2xs text-muted tabular-nums">{`v${stripVersionPrefix(d().version)} → v${stripVersionPrefix(d().next)}`}</Text>
+                          </View>
+                        )}
+                      </If>
+                      <If when={readyState()}>
+                        {(r) => (
+                          <View class="rounded-sm border border-line bg-page px-1.5 py-0.5">
+                            <Text class="font-mono text-2xs text-muted tabular-nums">{`v${stripVersionPrefix(r().version)} → v${stripVersionPrefix(r().next)}`}</Text>
+                          </View>
+                        )}
+                      </If>
+                    </View>
+                    <View class="shrink-0 flex-row items-center gap-2">
+                      <If when={hasDetail()}>
+                        <Button size="compact" tone="quiet" testID="update-details" onPress={() => dialogOpen.set(true)}>
+                          {t("web.setting.about.details")}
+                        </Button>
+                      </If>
+                      <If when={failedState()}>
+                        {(f) => (
+                          <>
+                            <If when={f().page?.trim()}>{(page) => <OutLink href={page()} label={t("web.setting.about.manualDownload")} />}</If>
+                            <Button size="compact" icon="retry" testID="update-retry" disabled={requesting()} onPress={check}>
+                              {requesting() ? t("web.setting.about.checking") : t("web.setting.about.retry")}
+                            </Button>
+                          </>
+                        )}
+                      </If>
+                      <If when={readyState()}>
+                        {(r) => (
+                          <>
+                            <If when={r().page.trim()}>{(page) => <OutLink href={page()} label={t("web.setting.about.releaseNotesLink")} />}</If>
+                            <Button
+                              size="compact"
+                              icon="update"
+                              tone="primary"
+                              testID="update-install"
+                              disabled={installing()}
+                              onPress={() => dialogOpen.set(true)}
+                            >
+                              {installing() ? t("web.base.updateInstalling") : t("web.setting.about.restart")}
+                            </Button>
+                          </>
+                        )}
+                      </If>
+                    </View>
+                  </View>
+
+                  <Text testID="update-state" class={`text-xs leading-relaxed tabular-nums ${statusToneClass()}`}>
+                    {updateWords(s())}
                   </Text>
-                )}
-              </If>
-              <If when={s()._tag === "idle"}>
-                <Button icon="refresh" testID="update-check" disabled={requesting()} onPress={check}>
-                  {requesting() ? t("web.setting.about.checking") : t("web.setting.about.check")}
-                </Button>
-              </If>
-              <If when={hasDetail()}>
-                <Button size="compact" tone="quiet" testID="update-details" onPress={() => dialogOpen.set(true)}>
-                  {t("web.setting.about.details")}
-                </Button>
-              </If>
-              <If when={failedState()}>
-                {(f) => (
-                  <>
-                    <Button icon="retry" testID="update-retry" disabled={requesting()} onPress={check}>
-                      {requesting() ? t("web.setting.about.checking") : t("web.setting.about.retry")}
-                    </Button>
-                    <If when={f().page?.trim()}>{(page) => <OutLink href={page()} label={t("web.setting.about.manualDownload")} />}</If>
-                  </>
-                )}
-              </If>
-              <If when={readyState()}>
-                {(r) => (
-                  <>
-                    <If when={r().page.trim()}>{(page) => <OutLink href={page()} label={t("web.setting.about.releaseNotesLink")} />}</If>
-                    <Button icon="update" tone="primary" testID="update-install" disabled={installing()} onPress={() => dialogOpen.set(true)}>
-                      {installing() ? t("web.base.updateInstalling") : t("web.setting.about.restart")}
-                    </Button>
-                  </>
-                )}
-              </If>
-              <If when={s()._tag === "installing"}>
-                <Button icon="wait" testID="update-installing-btn" disabled>
-                  {t("web.base.updateInstalling")}
-                </Button>
-              </If>
-              <If when={manualState()?.page.trim()}>{(page) => <OutLink href={page()} label={t("web.setting.about.download")} />}</If>
-            </SettingRow>
+
+                  <If when={downloadingState()}>
+                    {(d) => {
+                      const percent = () => clampUpdatePercent(d().percent);
+                      const transfer = () => formatUpdateTransfer(d());
+                      return (
+                        <View class="gap-1.5">
+                          <View testID="update-inline-progress" class="h-1.5 w-full overflow-hidden rounded-full bg-hover">
+                            <View class="h-full rounded-full bg-accent" style={{ width: `${percent()}%` }} />
+                          </View>
+                          <If when={transfer()}>
+                            {(detail) => (
+                              <Text testID="update-inline-transfer" class="font-mono text-2xs text-muted tabular-nums">
+                                {detail()}
+                              </Text>
+                            )}
+                          </If>
+                        </View>
+                      );
+                    }}
+                  </If>
+
+                  <If when={readyState()}>
+                    {(r) => (
+                      <View class="gap-2">
+                        <If when={working() > 0 || r().newFarm}>
+                          <View
+                            testID="update-inline-warning"
+                            class="flex-row items-start gap-2 rounded-md border bg-warn-soft px-2.5 py-1.5"
+                            style={{ borderColor: mix("wheat", 0.4) }}
+                          >
+                            <Icon name="warn" size={12} tone="wheat" />
+                            <Text class="min-w-0 flex-1 text-xs leading-relaxed font-medium text-warn-ink">
+                              {r().newFarm ? t("web.setting.about.newFarmQuestion") : t("web.setting.about.workingQuestion", { n: working() })}
+                            </Text>
+                          </View>
+                        </If>
+                        <If when={r().notes.length > 0}>
+                          <View testID="update-inline-notes" class="gap-1 rounded-md border border-line bg-page px-3 py-2">
+                            <Each of={r().notes.slice(0, 3)} key={(_, i) => String(i)}>
+                              {(note) => (
+                                <View class="flex-row items-start gap-2">
+                                  <View class="mt-1.5 size-1 shrink-0 rounded-full bg-accent" />
+                                  <Text class="min-w-0 flex-1 text-xs leading-relaxed text-muted">{note()}</Text>
+                                </View>
+                              )}
+                            </Each>
+                          </View>
+                        </If>
+                      </View>
+                    )}
+                  </If>
+                </View>
+              </View>
+            </If>
             <UpdateDialog
               open={dialogOpen()}
               onClose={() => dialogOpen.set(false)}

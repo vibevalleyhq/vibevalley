@@ -134,7 +134,10 @@ const desktop: Host = (() => {
             pushOff = host.on("update_state", (payload) => {
               if (stopped) return;
               const decoded = UpdateState.safeParse(payload);
-              if (!decoded.success) return;
+              if (!decoded.success) {
+                console.error("[host] dropped malformed update_state payload", { issues: decoded.error.issues });
+                return;
+              }
               pushSeq += 1;
               listener(decoded.data);
               scheduleRefresh();
