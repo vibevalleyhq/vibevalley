@@ -1,5 +1,6 @@
-import { Text, View } from "nsh";
+import { Text, untracked, View, type ViewRef } from "nsh";
 
+import { isVdpEnabled, useVdpNode } from "../infra/vdpProbe";
 import { Icon } from "./Icon";
 import type { IconName } from "./icons";
 import { Bubble } from "./Tip";
@@ -46,10 +47,32 @@ export function Segmented<T extends string>(props: {
           const on = () => o().value === props.value;
           const disabled = () => o().disabled === true;
           const title = () => o().title;
+          let optRef: ViewRef | undefined;
+          const vdpId = isVdpEnabled()
+            ? untracked(() => (props.testid !== undefined && props.testid !== "" ? `${props.testid}-${o().value}` : undefined))
+            : undefined;
+          if (vdpId !== undefined) {
+            useVdpNode({
+              testId: vdpId,
+              role: "radio",
+              text: () => o().label,
+              getRef: () => optRef,
+              onPress: () => {
+                if (!disabled()) props.onChange(o().value);
+              },
+            });
+          }
           return (
             <View
               role="radio"
               testID={props.testid ? `${props.testid}-${o().value}` : undefined}
+              ref={
+                vdpId !== undefined
+                  ? (el) => {
+                      optRef = el;
+                    }
+                  : undefined
+              }
               accessibilityLabel={o().label}
               accessibilityState={{ selected: on(), disabled: disabled() }}
               tooltip={<If when={title()}>{(txt) => <Bubble text={txt()} />}</If>}

@@ -17,6 +17,7 @@ import { api, reasonOf } from "../../../infra/api";
 import { playAudio } from "../../../infra/attachmentFile";
 import { useInterval } from "../../../infra/base/timer";
 import { transport } from "../../../infra/transport";
+import { useVdpNode } from "../../../infra/vdpProbe";
 import { saveBase64File, saveTextFile, useNoteDirectory } from "./noteFiles";
 
 export interface MediaViewProps {
@@ -378,6 +379,8 @@ export function MediaView(props: MediaViewProps) {
     opts.push({ value: "assets", label: t("web.note.page.filesTab"), count: assetFiles().length });
     return opts;
   });
+
+  useVdpNode({ testId: "note-media-view", role: "region" });
 
   return (
     <View testID="note-media-view" class="min-h-0 min-w-0 flex-1 bg-page">

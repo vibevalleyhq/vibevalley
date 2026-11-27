@@ -14,6 +14,7 @@ import { matches } from "../../infra/base/search";
 import { ready, settingsQuery, useQuery } from "../../infra/query";
 import { fixOf } from "../../infra/readiness";
 import { Link as A, Navigate } from "../../infra/router";
+import { useVdpNode } from "../../infra/vdpProbe";
 import { ConnectorsPage } from "../connector";
 import { ProviderModels } from "../provider";
 import { SkillsPage } from "../runtime";
@@ -260,6 +261,7 @@ function SectionBody(props: { id: string; connectorId: string | undefined }) {
 
 /** `rest` is the path after /settings/. */
 export function SettingsPage(props: { rest: string }) {
+  useVdpNode({ testId: "settings-nav", role: "navigation" });
   /** Tailwind's md (48rem): narrower, the list sits over the section. */
   const md = computed(() => windowSize().width >= 768);
   const query = signal("");

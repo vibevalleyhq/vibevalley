@@ -10,6 +10,7 @@ import { Icon } from "../../../design/Icon";
 import type { Picture } from "../../../design/Lightbox";
 import { motionClass, popupTransition } from "../../../design/motion";
 import { Keyed } from "../../../infra/base/dom";
+import { VdpAnchor } from "../../../infra/vdpProbe";
 import {
   applyWikilinkReplacement,
   createDefaultBlock,
@@ -223,75 +224,88 @@ function ProseBlockView(props: {
       class="relative"
     >
       <If when={formatBarActive() && props.block.text.trim().length > 0}>
-        <View
-          testID={`doc-format-bar-${props.block.id}`}
-          class="absolute -top-8 left-0 z-20 flex-row items-center gap-0.5 rounded-md border border-line bg-elevated px-1 py-0.5 shadow-raise"
-        >
+        <>
+          <VdpAnchor testId={`doc-format-bar-${props.block.id}`} role="toolbar" />
           <View
-            role="button"
-            testID={`doc-fmt-bold-${props.block.id}`}
-            accessibilityLabel={t("web.note.doc.bold")}
-            onPress={() => applyFormat("**")}
-            class="h-6 min-w-6 items-center justify-center rounded-xs px-1.5 hover:bg-hover"
+            testID={`doc-format-bar-${props.block.id}`}
+            class="absolute -top-8 left-0 z-20 flex-row items-center gap-0.5 rounded-md border border-line bg-elevated px-1 py-0.5 shadow-raise"
           >
-            <Text class="text-xs font-bold text-ink">B</Text>
+            <View
+              role="button"
+              testID={`doc-fmt-bold-${props.block.id}`}
+              accessibilityLabel={t("web.note.doc.bold")}
+              onPress={() => applyFormat("**")}
+              class="h-6 min-w-6 items-center justify-center rounded-xs px-1.5 hover:bg-hover"
+            >
+              <Text class="text-xs font-bold text-ink">B</Text>
+            </View>
+            <View
+              role="button"
+              testID={`doc-fmt-italic-${props.block.id}`}
+              accessibilityLabel={t("web.note.doc.italic")}
+              onPress={() => applyFormat("*")}
+              class="h-6 min-w-6 items-center justify-center rounded-xs px-1.5 hover:bg-hover"
+            >
+              <Text class="text-xs italic text-ink">I</Text>
+            </View>
+            <View
+              role="button"
+              testID={`doc-fmt-code-${props.block.id}`}
+              accessibilityLabel={t("web.note.doc.inlineCode")}
+              onPress={() => applyFormat("`")}
+              class="h-6 min-w-6 items-center justify-center rounded-xs px-1.5 hover:bg-hover"
+            >
+              <Text class="font-mono text-2xs text-ink">{"<>"}</Text>
+            </View>
+            <View
+              role="button"
+              testID={`doc-fmt-strike-${props.block.id}`}
+              accessibilityLabel={t("web.note.doc.strike")}
+              onPress={() => applyFormat("~~")}
+              class="h-6 min-w-6 items-center justify-center rounded-xs px-1.5 hover:bg-hover"
+            >
+              <Text class="text-xs text-ink line-through">S</Text>
+            </View>
+            <View class="mx-0.5 h-3.5 w-px bg-line" />
+            <View
+              role="button"
+              testID={`doc-fmt-link-${props.block.id}`}
+              accessibilityLabel={t("web.note.doc.link")}
+              onPress={() => props.onUpdate({ ...props.block, text: `${props.block.text}[[` })}
+              class="h-6 items-center justify-center rounded-xs px-1.5 hover:bg-hover"
+            >
+              <Text class="font-mono text-2xs font-medium text-accent">{"[["}</Text>
+            </View>
           </View>
-          <View
-            role="button"
-            testID={`doc-fmt-italic-${props.block.id}`}
-            accessibilityLabel={t("web.note.doc.italic")}
-            onPress={() => applyFormat("*")}
-            class="h-6 min-w-6 items-center justify-center rounded-xs px-1.5 hover:bg-hover"
-          >
-            <Text class="text-xs italic text-ink">I</Text>
-          </View>
-          <View
-            role="button"
-            testID={`doc-fmt-code-${props.block.id}`}
-            accessibilityLabel={t("web.note.doc.inlineCode")}
-            onPress={() => applyFormat("`")}
-            class="h-6 min-w-6 items-center justify-center rounded-xs px-1.5 hover:bg-hover"
-          >
-            <Text class="font-mono text-2xs text-ink">{"<>"}</Text>
-          </View>
-          <View
-            role="button"
-            testID={`doc-fmt-strike-${props.block.id}`}
-            accessibilityLabel={t("web.note.doc.strike")}
-            onPress={() => applyFormat("~~")}
-            class="h-6 min-w-6 items-center justify-center rounded-xs px-1.5 hover:bg-hover"
-          >
-            <Text class="text-xs text-ink line-through">S</Text>
-          </View>
-          <View class="mx-0.5 h-3.5 w-px bg-line" />
-          <View
-            role="button"
-            testID={`doc-fmt-link-${props.block.id}`}
-            accessibilityLabel={t("web.note.doc.link")}
-            onPress={() => props.onUpdate({ ...props.block, text: `${props.block.text}[[` })}
-            class="h-6 items-center justify-center rounded-xs px-1.5 hover:bg-hover"
-          >
-            <Text class="font-mono text-2xs font-medium text-accent">{"[["}</Text>
-          </View>
-        </View>
+        </>
       </If>
 
       <If
         when={editing() || !hasLinks()}
         else={
-          <InlineRichText
-            testID={`doc-prose-rich-${props.block.id}`}
-            text={props.block.text}
-            placeholder={t("web.note.doc.slashHint")}
-            notes={props.notes}
-            issues={props.issues}
-            onOpenNote={props.onOpenNote}
-            onOpenIssue={props.onOpenIssue}
-            onPressText={() => {
-              editing.set(true);
-              props.onFocus();
-            }}
-          />
+          <>
+            <VdpAnchor
+              testId={`doc-prose-rich-${props.block.id}`}
+              role="button"
+              onPress={() => {
+                editing.set(true);
+                props.onFocus();
+              }}
+            />
+            <InlineRichText
+              testID={`doc-prose-rich-${props.block.id}`}
+              text={props.block.text}
+              placeholder={t("web.note.doc.slashHint")}
+              notes={props.notes}
+              issues={props.issues}
+              onOpenNote={props.onOpenNote}
+              onOpenIssue={props.onOpenIssue}
+              onPressText={() => {
+                editing.set(true);
+                props.onFocus();
+              }}
+            />
+          </>
         }
       >
         <Input

@@ -10,6 +10,7 @@ import { Icon } from "../../design/Icon";
 import { Empty } from "../../design/layout";
 import { Lightbox, type Picture } from "../../design/Lightbox";
 import { useTimeout } from "../../infra/base/timer";
+import { useVdpNode, VdpAnchor } from "../../infra/vdpProbe";
 import { BlockItem } from "./doc/BlockItem";
 import {
   computeDocStats,
@@ -231,6 +232,7 @@ export function BlockDocView(props: BlockDocViewProps) {
 
   const outgoingCount = () => props.links?.outgoing.length ?? 0;
   const backlinksCount = () => props.links?.backlinks.length ?? 0;
+  useVdpNode({ testId: "note-block-doc-view", role: "region" });
   const lightboxPictures = computed(() => {
     const pic = lightboxPicture();
     return pic !== undefined ? [pic] : [];
@@ -332,38 +334,41 @@ export function BlockDocView(props: BlockDocViewProps) {
         </View>
 
         <If when={backlinksCount() > 0 || outgoingCount() > 0}>
-          <View testID="doc-links-panel" class="mt-10 gap-3 border-t border-line pt-6">
-            <View
-              role="button"
-              testID="doc-links-toggle"
-              accessibilityState={{ expanded: linksOpen() }}
-              onPress={() => linksOpen.set(!linksOpen())}
-              class="flex-row items-center gap-2"
-            >
-              <Icon name={linksOpen() ? "choose" : "expand"} size={12} tone="faint" />
-              <Text class="text-xs font-semibold text-muted">{t("web.note.links.backlinks", { n: backlinksCount() })}</Text>
-              <Text class="text-xs text-faint">·</Text>
-              <Text class="text-xs font-medium text-faint">{t("web.note.links.outgoing", { n: outgoingCount() })}</Text>
-            </View>
-            <If when={linksOpen()}>
-              <View class="gap-4 md:flex-row">
-                <If when={backlinksCount() > 0}>
-                  <View class="min-w-0 flex-1 gap-0.5">
-                    <Each of={props.links?.backlinks ?? []} key={(l) => l.id}>
-                      {(l) => <LinkRowItem link={l()} idPrefix="backlink" onOpenNote={props.onOpenNote} onOpenIssue={props.onOpenIssue} />}
-                    </Each>
-                  </View>
-                </If>
-                <If when={outgoingCount() > 0}>
-                  <View class="min-w-0 flex-1 gap-0.5">
-                    <Each of={props.links?.outgoing ?? []} key={(l) => l.id}>
-                      {(l) => <LinkRowItem link={l()} idPrefix="outgoing" onOpenNote={props.onOpenNote} onOpenIssue={props.onOpenIssue} />}
-                    </Each>
-                  </View>
-                </If>
+          <>
+            <VdpAnchor testId="doc-links-panel" role="region" />
+            <View testID="doc-links-panel" class="mt-10 gap-3 border-t border-line pt-6">
+              <View
+                role="button"
+                testID="doc-links-toggle"
+                accessibilityState={{ expanded: linksOpen() }}
+                onPress={() => linksOpen.set(!linksOpen())}
+                class="flex-row items-center gap-2"
+              >
+                <Icon name={linksOpen() ? "choose" : "expand"} size={12} tone="faint" />
+                <Text class="text-xs font-semibold text-muted">{t("web.note.links.backlinks", { n: backlinksCount() })}</Text>
+                <Text class="text-xs text-faint">·</Text>
+                <Text class="text-xs font-medium text-faint">{t("web.note.links.outgoing", { n: outgoingCount() })}</Text>
               </View>
-            </If>
-          </View>
+              <If when={linksOpen()}>
+                <View class="gap-4 md:flex-row">
+                  <If when={backlinksCount() > 0}>
+                    <View class="min-w-0 flex-1 gap-0.5">
+                      <Each of={props.links?.backlinks ?? []} key={(l) => l.id}>
+                        {(l) => <LinkRowItem link={l()} idPrefix="backlink" onOpenNote={props.onOpenNote} onOpenIssue={props.onOpenIssue} />}
+                      </Each>
+                    </View>
+                  </If>
+                  <If when={outgoingCount() > 0}>
+                    <View class="min-w-0 flex-1 gap-0.5">
+                      <Each of={props.links?.outgoing ?? []} key={(l) => l.id}>
+                        {(l) => <LinkRowItem link={l()} idPrefix="outgoing" onOpenNote={props.onOpenNote} onOpenIssue={props.onOpenIssue} />}
+                      </Each>
+                    </View>
+                  </If>
+                </View>
+              </If>
+            </View>
+          </>
         </If>
       </Scroll>
 

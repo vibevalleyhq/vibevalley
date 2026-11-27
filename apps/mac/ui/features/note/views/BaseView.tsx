@@ -27,6 +27,7 @@ import { CountPill } from "../../../design/Tag";
 import { toast } from "../../../design/toasts";
 import { ready, useAgents } from "../../../infra/query";
 import { createEffect } from "../../../infra/solid";
+import { useVdpNode, VdpAnchor } from "../../../infra/vdpProbe";
 import type { BaseViewSummaryRef } from "../store";
 import { BaseCellControl } from "./BaseCell";
 import {
@@ -223,6 +224,8 @@ export function BaseView(props: BaseViewProps) {
     props.onSelectView(sheetId(), matched?.id ?? next);
   };
 
+  useVdpNode({ testId: "note-base-view", role: "region" });
+
   return (
     <View testID="note-base-view" class="min-h-0 min-w-0 flex-1 bg-page">
       <View class="shrink-0 flex-row flex-wrap items-center justify-between gap-2 border-b border-line bg-side px-3 py-2">
@@ -301,193 +304,200 @@ export function BaseView(props: BaseViewProps) {
         <View class="min-h-0 min-w-0 flex-1">
           <If when={props.snapshot !== undefined} else={<Empty icon="log">{t("web.note.base.empty")}</Empty>}>
             <If when={viewKind() === "table"}>
-              <Scroll testID="base-table-view" class="min-h-0 flex-1" contentClass="p-3 gap-2">
-                <If when={filteredRows().length > 0} else={<Empty icon="log">{t("web.note.base.empty")}</Empty>}>
-                  <Scroll horizontal testID="base-table-scroll" class="w-full" contentClass="min-w-full">
-                    <View class="overflow-hidden rounded-lg border border-line bg-page" style={{ minWidth: totalTableWidth() }}>
-                      <View class="flex-row items-center border-b border-line bg-side px-2 py-2">
-                        <View class="w-10 shrink-0 items-center justify-center">
-                          <Text class="font-mono text-2xs font-semibold text-faint">#</Text>
-                        </View>
-                        <Each of={columns()} key={(col) => col.id}>
-                          {(col) => (
-                            <View
-                              class="shrink-0 grow-0 flex-row items-center justify-between gap-1.5 overflow-hidden px-2"
-                              style={{ width: columnWidthPx(col()) }}
-                            >
-                              <View class="min-w-0 flex-1 flex-row items-center gap-1.5">
-                                <Icon name={columnKindIcon(col().kind)} size={12} tone="muted" />
-                                <Text class="min-w-0 truncate text-xs font-semibold text-ink">{col().name}</Text>
-                              </View>
-                              <If when={col().kind === "agentAction"}>
-                                <Button
-                                  size="compact"
-                                  tone="plain"
-                                  icon="play"
-                                  testID={`base-run-column-${col().id}`}
-                                  disabled={isBusy()}
-                                  onPress={() => runAgentColumn(col().id)}
-                                >
-                                  {runningColumnId() === col().id ? t("web.note.base.runningAgentColumn") : t("web.note.base.runAgentColumn")}
-                                </Button>
-                              </If>
-                            </View>
-                          )}
-                        </Each>
-                        <View class="w-16 shrink-0" />
-                      </View>
-
-                      <Each of={filteredRows()} key={(r) => r.id}>
-                        {(row, idx) => {
-                          const selected = () => selectedRowId() === row().id;
-                          return (
-                            <View
-                              testID={`base-table-row-${row().id}`}
-                              class={`flex-row items-center border-t border-line px-2 py-1.5 ${selected() ? "bg-selected" : "bg-page hover:bg-hover"}`}
-                            >
-                              <View
-                                role="button"
-                                testID={`base-row-open-${row().id}`}
-                                onPress={() => selectedRowId.set(row().id)}
-                                class="w-10 shrink-0 items-center justify-center rounded-xs py-1 hover:bg-selected"
-                              >
-                                <Text class="font-mono text-2xs text-faint tabular-nums">{String(idx() + 1)}</Text>
-                              </View>
-
-                              <Each of={columns()} key={(col) => col.id}>
-                                {(col) => (
-                                  <View class="shrink-0 grow-0 overflow-hidden px-2" style={{ width: columnWidthPx(col()) }}>
-                                    <BaseCellControl
-                                      rowId={row().id}
-                                      col={col()}
-                                      cell={row().cells[col().id]}
-                                      notesById={notesById()}
-                                      issuesById={issuesById()}
-                                      agentsById={agentsById()}
-                                      notes={props.notes}
-                                      issues={props.issues}
-                                      agents={agents()}
-                                      busy={isBusy()}
-                                      dense
-                                      onCommitCell={(colId, next) => commitCell(row(), colId, next)}
-                                      onRunAgentRow={(colId, rId) => runAgentColumn(colId, [rId])}
-                                      onOpenNote={props.onOpenNote}
-                                      onOpenIssue={props.onOpenIssue}
-                                    />
-                                  </View>
-                                )}
-                              </Each>
-
-                              <View class="w-16 shrink-0 flex-row items-center justify-end gap-1">
-                                <If when={row().pageNoteId}>
-                                  <Icon name="notes" size={12} tone="accent" />
-                                </If>
-                                <IconButton
-                                  icon="open"
-                                  size={12}
-                                  label={t("web.issue.peek.expand")}
-                                  testid={`base-row-peek-${row().id}`}
-                                  onClick={() => selectedRowId.set(row().id)}
-                                />
-                              </View>
-                            </View>
-                          );
-                        }}
-                      </Each>
-
-                      <If when={summaries().length > 0}>
-                        <View testID="base-table-summary" class="flex-row items-center border-t border-line bg-side px-2 py-1.5">
+              <>
+                <VdpAnchor testId="base-table-view" role="region" />
+                <Scroll testID="base-table-view" class="min-h-0 flex-1" contentClass="p-3 gap-2">
+                  <If when={filteredRows().length > 0} else={<Empty icon="log">{t("web.note.base.empty")}</Empty>}>
+                    <Scroll horizontal testID="base-table-scroll" class="w-full" contentClass="min-w-full">
+                      <View class="overflow-hidden rounded-lg border border-line bg-page" style={{ minWidth: totalTableWidth() }}>
+                        <View class="flex-row items-center border-b border-line bg-side px-2 py-2">
                           <View class="w-10 shrink-0 items-center justify-center">
-                            <Text class="font-mono text-2xs font-semibold text-muted">Σ</Text>
+                            <Text class="font-mono text-2xs font-semibold text-faint">#</Text>
                           </View>
                           <Each of={columns()} key={(col) => col.id}>
-                            {(col) => {
-                              const sum = () => summaryByCol().get(col().id);
-                              return (
-                                <View class="shrink-0 grow-0 overflow-hidden px-2" style={{ width: columnWidthPx(col()) }}>
-                                  <If when={sum()}>
-                                    {(res) => (
-                                      <Text class="truncate font-mono text-xs font-semibold text-ink tabular-nums">
-                                        {`${summaryOpLabel(res().op)}: ${formatSummaryValue(res().value)}`}
-                                      </Text>
-                                    )}
-                                  </If>
+                            {(col) => (
+                              <View
+                                class="shrink-0 grow-0 flex-row items-center justify-between gap-1.5 overflow-hidden px-2"
+                                style={{ width: columnWidthPx(col()) }}
+                              >
+                                <View class="min-w-0 flex-1 flex-row items-center gap-1.5">
+                                  <Icon name={columnKindIcon(col().kind)} size={12} tone="muted" />
+                                  <Text class="min-w-0 truncate text-xs font-semibold text-ink">{col().name}</Text>
                                 </View>
-                              );
-                            }}
+                                <If when={col().kind === "agentAction"}>
+                                  <Button
+                                    size="compact"
+                                    tone="plain"
+                                    icon="play"
+                                    testID={`base-run-column-${col().id}`}
+                                    disabled={isBusy()}
+                                    onPress={() => runAgentColumn(col().id)}
+                                  >
+                                    {runningColumnId() === col().id ? t("web.note.base.runningAgentColumn") : t("web.note.base.runAgentColumn")}
+                                  </Button>
+                                </If>
+                              </View>
+                            )}
                           </Each>
                           <View class="w-16 shrink-0" />
                         </View>
-                      </If>
-                    </View>
-                  </Scroll>
-                </If>
-              </Scroll>
+
+                        <Each of={filteredRows()} key={(r) => r.id}>
+                          {(row, idx) => {
+                            const selected = () => selectedRowId() === row().id;
+                            return (
+                              <View
+                                testID={`base-table-row-${row().id}`}
+                                class={`flex-row items-center border-t border-line px-2 py-1.5 ${selected() ? "bg-selected" : "bg-page hover:bg-hover"}`}
+                              >
+                                <View
+                                  role="button"
+                                  testID={`base-row-open-${row().id}`}
+                                  onPress={() => selectedRowId.set(row().id)}
+                                  class="w-10 shrink-0 items-center justify-center rounded-xs py-1 hover:bg-selected"
+                                >
+                                  <VdpAnchor testId={`base-row-open-${row().id}`} role="button" onPress={() => selectedRowId.set(row().id)} />
+                                  <Text class="font-mono text-2xs text-faint tabular-nums">{String(idx() + 1)}</Text>
+                                </View>
+
+                                <Each of={columns()} key={(col) => col.id}>
+                                  {(col) => (
+                                    <View class="shrink-0 grow-0 overflow-hidden px-2" style={{ width: columnWidthPx(col()) }}>
+                                      <BaseCellControl
+                                        rowId={row().id}
+                                        col={col()}
+                                        cell={row().cells[col().id]}
+                                        notesById={notesById()}
+                                        issuesById={issuesById()}
+                                        agentsById={agentsById()}
+                                        notes={props.notes}
+                                        issues={props.issues}
+                                        agents={agents()}
+                                        busy={isBusy()}
+                                        dense
+                                        onCommitCell={(colId, next) => commitCell(row(), colId, next)}
+                                        onRunAgentRow={(colId, rId) => runAgentColumn(colId, [rId])}
+                                        onOpenNote={props.onOpenNote}
+                                        onOpenIssue={props.onOpenIssue}
+                                      />
+                                    </View>
+                                  )}
+                                </Each>
+
+                                <View class="w-16 shrink-0 flex-row items-center justify-end gap-1">
+                                  <If when={row().pageNoteId}>
+                                    <Icon name="notes" size={12} tone="accent" />
+                                  </If>
+                                  <IconButton
+                                    icon="open"
+                                    size={12}
+                                    label={t("web.issue.peek.expand")}
+                                    testid={`base-row-peek-${row().id}`}
+                                    onClick={() => selectedRowId.set(row().id)}
+                                  />
+                                </View>
+                              </View>
+                            );
+                          }}
+                        </Each>
+
+                        <If when={summaries().length > 0}>
+                          <View testID="base-table-summary" class="flex-row items-center border-t border-line bg-side px-2 py-1.5">
+                            <View class="w-10 shrink-0 items-center justify-center">
+                              <Text class="font-mono text-2xs font-semibold text-muted">Σ</Text>
+                            </View>
+                            <Each of={columns()} key={(col) => col.id}>
+                              {(col) => {
+                                const sum = () => summaryByCol().get(col().id);
+                                return (
+                                  <View class="shrink-0 grow-0 overflow-hidden px-2" style={{ width: columnWidthPx(col()) }}>
+                                    <If when={sum()}>
+                                      {(res) => (
+                                        <Text class="truncate font-mono text-xs font-semibold text-ink tabular-nums">
+                                          {`${summaryOpLabel(res().op)}: ${formatSummaryValue(res().value)}`}
+                                        </Text>
+                                      )}
+                                    </If>
+                                  </View>
+                                );
+                              }}
+                            </Each>
+                            <View class="w-16 shrink-0" />
+                          </View>
+                        </If>
+                      </View>
+                    </Scroll>
+                  </If>
+                </Scroll>
+              </>
             </If>
 
             <If when={viewKind() === "board"}>
-              <Scroll horizontal testID="base-board-view" class="min-h-0 flex-1" contentClass="gap-3 p-3 items-start">
-                <Each of={boardGroups()} key={(g) => g.key}>
-                  {(group) => {
-                    const gCol = () => groupColumn();
-                    const opt = () => (gCol() ? findSelectOption(gCol()!, group().key) : undefined);
-                    const toneLook = () => optionToneLook(opt()?.color);
-                    return (
-                      <View testID={`base-board-lane-${group().key}`} class="w-72 shrink-0 gap-2 rounded-xl border border-line bg-side p-2.5">
-                        <View class="flex-row items-center justify-between gap-2 px-1">
-                          <View class="min-w-0 flex-1 flex-row items-center gap-1.5">
-                            <View class={`h-5 items-center justify-center rounded-sm px-2 ${toneLook().bgClass}`}>
-                              <Text class={`truncate text-xs font-semibold ${toneLook().textClass}`}>{group().label}</Text>
+              <>
+                <VdpAnchor testId="base-board-view" role="region" />
+                <Scroll horizontal testID="base-board-view" class="min-h-0 flex-1" contentClass="gap-3 p-3 items-start">
+                  <Each of={boardGroups()} key={(g) => g.key}>
+                    {(group) => {
+                      const gCol = () => groupColumn();
+                      const opt = () => (gCol() ? findSelectOption(gCol()!, group().key) : undefined);
+                      const toneLook = () => optionToneLook(opt()?.color);
+                      return (
+                        <View testID={`base-board-lane-${group().key}`} class="w-72 shrink-0 gap-2 rounded-xl border border-line bg-side p-2.5">
+                          <View class="flex-row items-center justify-between gap-2 px-1">
+                            <View class="min-w-0 flex-1 flex-row items-center gap-1.5">
+                              <View class={`h-5 items-center justify-center rounded-sm px-2 ${toneLook().bgClass}`}>
+                                <Text class={`truncate text-xs font-semibold ${toneLook().textClass}`}>{group().label}</Text>
+                              </View>
                             </View>
+                            <CountPill count={group().count} />
                           </View>
-                          <CountPill count={group().count} />
-                        </View>
 
-                        <View class="gap-2">
-                          <Each of={group().rowIds} key={(id) => id}>
-                            {(rowId) => {
-                              const row = () => rowsById().get(rowId());
-                              return (
-                                <If when={row()}>
-                                  {(r) => (
-                                    <View
-                                      role="button"
-                                      testID={`base-board-card-${r().id}`}
-                                      onPress={() => selectedRowId.set(r().id)}
-                                      class={`gap-2 rounded-lg border p-2.5 ${
-                                        selectedRowId() === r().id ? "border-accent bg-selected" : "border-line bg-page hover:bg-hover"
-                                      }`}
-                                    >
-                                      <View class="flex-row items-center justify-between gap-2">
-                                        <Text class="min-w-0 flex-1 truncate text-sm font-medium text-ink">{rowTitleOf(r(), columns())}</Text>
-                                        <If when={r().pageNoteId}>
-                                          <Icon name="notes" size={12} tone="accent" />
-                                        </If>
+                          <View class="gap-2">
+                            <Each of={group().rowIds} key={(id) => id}>
+                              {(rowId) => {
+                                const row = () => rowsById().get(rowId());
+                                return (
+                                  <If when={row()}>
+                                    {(r) => (
+                                      <View
+                                        role="button"
+                                        testID={`base-board-card-${r().id}`}
+                                        onPress={() => selectedRowId.set(r().id)}
+                                        class={`gap-2 rounded-lg border p-2.5 ${
+                                          selectedRowId() === r().id ? "border-accent bg-selected" : "border-line bg-page hover:bg-hover"
+                                        }`}
+                                      >
+                                        <View class="flex-row items-center justify-between gap-2">
+                                          <Text class="min-w-0 flex-1 truncate text-sm font-medium text-ink">{rowTitleOf(r(), columns())}</Text>
+                                          <If when={r().pageNoteId}>
+                                            <Icon name="notes" size={12} tone="accent" />
+                                          </If>
+                                        </View>
+                                        <View class="gap-1">
+                                          <Each of={previewColumns()} key={(c) => c.id}>
+                                            {(col) => (
+                                              <View class="flex-row items-center justify-between gap-2">
+                                                <Text class="w-20 shrink-0 truncate text-2xs text-faint">{col().name}</Text>
+                                                <Text class="min-w-0 flex-1 truncate text-right text-2xs text-muted">
+                                                  {baseCellAsText(r().cells[col().id]) || "—"}
+                                                </Text>
+                                              </View>
+                                            )}
+                                          </Each>
+                                        </View>
                                       </View>
-                                      <View class="gap-1">
-                                        <Each of={previewColumns()} key={(c) => c.id}>
-                                          {(col) => (
-                                            <View class="flex-row items-center justify-between gap-2">
-                                              <Text class="w-20 shrink-0 truncate text-2xs text-faint">{col().name}</Text>
-                                              <Text class="min-w-0 flex-1 truncate text-right text-2xs text-muted">
-                                                {baseCellAsText(r().cells[col().id]) || "—"}
-                                              </Text>
-                                            </View>
-                                          )}
-                                        </Each>
-                                      </View>
-                                    </View>
-                                  )}
-                                </If>
-                              );
-                            }}
-                          </Each>
+                                    )}
+                                  </If>
+                                );
+                              }}
+                            </Each>
+                          </View>
                         </View>
-                      </View>
-                    );
-                  }}
-                </Each>
-              </Scroll>
+                      );
+                    }}
+                  </Each>
+                </Scroll>
+              </>
             </If>
 
             <If when={viewKind() === "gallery"}>

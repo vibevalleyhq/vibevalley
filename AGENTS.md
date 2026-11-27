@@ -53,6 +53,7 @@ make goldens                                                    # 或 cargo xtas
 make protocol                                                   # 或 cargo xtask protocol：生成的 TS 契约和 golden 是不是最新，和提交的不同就失败
 vp run mac:check                                                # 改完 apps/mac/ui：nsh 类型检查、打包和工单按钮行为测试
 vp run mobile:check                                             # 改完 apps/mobile：nsh 类型检查、打包、测试与 lint
+vp run vdp [场景...] --ui-only --out /tmp/vv-vdp                # 单条 WebSocket 跑固定 VDP 场景脚本（note/issues/chat/library/dashboard/settings/all）；纯改 UI 加 --ui-only（免编 Rust），复用现有包加 --skip-build
 vp run icons:gen                                                # 改了 crates/rich/src/icon.rs：重新生成 97 枚 reicons 矢量路径表 iconPaths.gen.ts
 vp check                                                        # 改完 apps/mac/ui 以外的 TS：格式（oxfmt）、lint（oxlint，带类型，跑在 tsrs 上）和类型；--fix 改格式
 vp run packages:check                                           # 改完 packages/：打出声明、vp check、各包的测试
@@ -104,6 +105,7 @@ agent 照着已有的代码抄，走最短的路，所以要让容易的写法�
 - **包之间只经包名**：TS 跨包只经 `package.json` 的 `exports` 写 `@vibevalley/*`（`no-cross-package-path` 查）；Rust 跨 crate 只经 `Cargo.toml` 的依赖。
 - **图标分两套**：工作台用 `crates/rich/src/icon.rs` 原生 `VvIcon` 渲染的 97 枚 reicon 线条图标（TS 侧由 `apps/mac/ui/design/icons.ts` 声明 `IconName`，经 `<Icon name>` 使用；无原生 `VvIcon` 的载体及 `apps/mobile` 使用 `scripts/gen/icons.ts` 单源生成的 `iconPaths.gen.ts` 与 `<Canvas>` + `Path2D` 矢量回退），角色头像、引擎标识与品牌图标使用从 `vibevalley-assets` 经 `design/sync-assets.sh` 同步到 `assets/{avatars,engines,brand,icons}/` 的 Papertrails 纸雕产物，都不用字符符号代替（[图标与令牌](docs/design/01-philosophy-and-tokens.md)）。
 - **界面照田间工作台**：工作台、工作区外壳、移动端和原生壳面的颜色、圆角、字号、阴影和缓动一律走 `design/tokens.json`（由 `vp run tokens:gen` 同步写出 `apps/mac/ui/design/theme.json`、`apps/mac/ui/nsh.json`、`apps/mac/src/theme_tokens.rs` 及 `apps/mobile` 令牌）；照 [设计系统](docs/design/README.md) 与 [Agent UI 指南](docs/design/08-agent-ui-guide.md)，class 写法照 [vv-tailwind](.agents/skills/vv-tailwind/SKILL.md)。
+- **UI 迭代克制与两层 VDP 验收**：页面与编辑器遵循「克制、无冗余框线」原则（不画盒套盒与常驻装饰框、编辑/切换控件 hover 或激活才浮现、浮层不遮挡前序内容、`<Scroll horizontal>` 的 `contentClass` 显式带 `flex-row`、双主题下原生画布适配深色表面、表格密排单元格避免双控件重叠截断）；高频页面与交互节点通过零开销 `useVdpNode` / `<VdpAnchor>` 暴露 `testID` 供 VDP 探针定位。做页面验收默认复用 `scripts/vdp/` 固定 TS 场景（`vp run vdp <场景...> --ui-only`），纯改 UI 时跳过 Cargo 重编，只靠看 `manifest.json`、`index.html` 与截图 pick 问题，禁止每轮从零手搓一次性采图脚本。
 - **密钥**：家目录的 `settings.json` 不进仓库；日志、快照和文档里不出现真实密钥。
 - **话放在哪**：对用户的话进 `crates/i18n/locales/{zh,en}/<宿主.模块>.json`，Rust 调 `vibevalley_i18n::t`，TS 调 `t("key")`（`vpx scripts/gen/i18n.ts check` 查漏翻）；对模型的话用中文写进 `crates/server/assets`（[话放在哪](docs/subsystems/foundation.md)）。
 - **代码风格**：代码和接口用实际业务概念，种地双关只留在农场的皮里（`stale-names.ts` 查，[用语表](docs/README.md#用语)）；命名站在领域视角说管什么事，不用 `utils`、`state` 一类泛词和自造架构黑话，服务端顶层业务域与结构体一律用单数（顶层持久化服务层为 `service::Service`，深业务域为 `<domain>::Service`，基础模块为 `Storage`/`Setting`/`Provider`/`Repo`/`Game`，依赖字段为 `app.issue`/`ctx.service`），复数只用于集合、计数与列表接口（[命名](docs/style/naming.md)）；英文注释只写不看就会改错的约束与原因（[代码风格](docs/style/code.md)）。

@@ -9,6 +9,13 @@ import { z } from "zod";
 export const REVIEW_THEMES = ["light", "dark"] as const;
 export type ReviewTheme = (typeof REVIEW_THEMES)[number];
 
+export interface VdpUiBounds {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
 export interface VdpUiNode {
   readonly testId?: string | null | undefined;
   readonly role?: string | null | undefined;
@@ -16,6 +23,7 @@ export interface VdpUiNode {
   readonly route?: string | null | undefined;
   readonly source?: string | null | undefined;
   readonly pressable?: boolean | undefined;
+  readonly bounds?: VdpUiBounds | null | undefined;
   readonly children?: readonly VdpUiNode[] | null | undefined;
 }
 
@@ -105,6 +113,13 @@ export const PageMetricsSchema: z.ZodType<VdpPageMetrics> = z.object({
   lastFrameMs: z.number().nullable().optional(),
 });
 
+export const VdpUiBoundsSchema: z.ZodType<VdpUiBounds> = z.object({
+  x: z.number(),
+  y: z.number(),
+  width: z.number(),
+  height: z.number(),
+});
+
 export const UiNodeSchema: z.ZodType<VdpUiNode> = z.lazy(() =>
   z.object({
     testId: z.string().nullable().optional(),
@@ -113,6 +128,7 @@ export const UiNodeSchema: z.ZodType<VdpUiNode> = z.lazy(() =>
     route: z.string().nullable().optional(),
     source: z.string().nullable().optional(),
     pressable: z.boolean().optional(),
+    bounds: VdpUiBoundsSchema.nullable().optional(),
     children: z.array(UiNodeSchema).nullable().optional(),
   }),
 );
@@ -130,10 +146,16 @@ export const UiPressResultSchema: z.ZodType<VdpUiPressResult> = z.object({
   testId: z.string().optional(),
 });
 
-export const UiWaitForResultSchema: z.ZodType<VdpUiWaitForResult> = z.object({
-  found: z.boolean().default(false),
-  node: UiNodeSchema.nullable().optional(),
-});
+export const UiWaitForResultSchema: z.ZodType<VdpUiWaitForResult> = z
+  .object({
+    matched: z.boolean().optional(),
+    found: z.boolean().optional(),
+    node: UiNodeSchema.nullable().optional(),
+  })
+  .transform((val) => ({
+    found: val.matched ?? val.found ?? false,
+    ...(val.node !== undefined ? { node: val.node } : {}),
+  }));
 
 export const UiTreeResultSchema: z.ZodType<VdpUiTreeResult> = z.object({
   view: z.string().default("workbench"),
@@ -798,14 +820,19 @@ export function resolveVdpWorkspacePaths(root: string): VdpWorkspacePaths {
   };
 }
 
+export function ensureUiBundlesBuilt(paths: VdpWorkspacePaths): void {
+  const uiDir = resolve(paths.root, "apps/mac/ui");
+  runChecked(paths.nshBin, ["build", "App.tsx", "-o", "build"], { cwd: uiDir, timeoutMs: 180_000 });
+  runChecked(paths.nshBin, ["build", "ShellApp.tsx", "-o", "build-shell"], { cwd: uiDir, timeoutMs: 180_000 });
+}
+
 export function ensureVdpArtifactsBuilt(paths: VdpWorkspacePaths, opts: { readonly skipBuild: boolean; readonly cliOnly?: boolean }): void {
   if (!opts.skipBuild || !existsSync(paths.cliBin)) {
     runChecked("cargo", ["build", "-p", "vibevalley-cli"], { cwd: paths.root, timeoutMs: 300_000 });
   }
   if (opts.cliOnly === true) return;
   if (!opts.skipBuild || !existsSync(paths.uiBundle) || !existsSync(paths.uiShellBundle)) {
-    runChecked(paths.nshBin, ["build", "App.tsx", "-o", "build"], { cwd: resolve(paths.root, "apps/mac/ui"), timeoutMs: 180_000 });
-    runChecked(paths.nshBin, ["build", "ShellApp.tsx", "-o", "build-shell"], { cwd: resolve(paths.root, "apps/mac/ui"), timeoutMs: 180_000 });
+    ensureUiBundlesBuilt(paths);
   }
   if (!opts.skipBuild || !existsSync(paths.macBin)) {
     runChecked("cargo", ["build", "-p", "vibevalley-mac", "--features", "shot"], { cwd: paths.root, timeoutMs: 600_000 });
@@ -972,6 +999,163 @@ export async function withVdpSandbox<T>(
     if (child && exitCode === null) {
       signalGroup(child.pid, "SIGTERM");
       const termDeadline = Date.now() + 6_000;
+      while (groupAlive(child.pid) && Date.now() < termDeadline) {
+        await sleep(100);
+      }
+      if (groupAlive(child.pid)) {
+        signalGroup(child.pid, "SIGKILL");
+      }
+      await exitedPromise;
+    }
+
+    if (existsSync(sandboxLogPath)) {
+      copyFileSync(sandboxLogPath, outLogPath);
+    }
+    if (!options.keepSandbox) {
+      rmSync(sandboxDir, { recursive: true, force: true });
+    } else {
+      console.log(`${options.logTag}: kept sandbox at ${sandboxDir}`);
+    }
+  }
+}
+
+export async function waitForVdpWorkbenchWs(
+  client: VdpWsClient,
+  opts: {
+    readonly homeDir: string;
+    readonly logPath: string;
+    readonly appExited?: () => number | null;
+    readonly requireWorkbenchReady?: boolean;
+    readonly timeoutMs?: number;
+  },
+): Promise<void> {
+  const deadline = Date.now() + (opts.timeoutMs ?? 60_000);
+  while (Date.now() < deadline) {
+    const code = opts.appExited?.();
+    if (code !== null && code !== undefined) {
+      throw new Error(`vibevalley-mac exited early with code ${code} (see ${opts.logPath})`);
+    }
+    try {
+      const raw = await client.call("Shell.getState", {}, { timeoutMs: 5_000 });
+      if (opts.requireWorkbenchReady === true) {
+        const parsed = ShellStateSchema.safeParse(raw);
+        if (parsed.success && parsed.data.loaded && parsed.data.workbench?.ready === true) return;
+      } else if (extractShellErrors(raw).loaded) {
+        return;
+      }
+    } catch {
+      // Retry while shell finishes hydrating its initial state snapshot.
+    }
+    await sleep(120);
+  }
+  throw new Error(`timed out waiting for VDP workbench readiness in ${opts.homeDir} (see ${opts.logPath})`);
+}
+
+/** Spawns an isolated `vibevalley-mac` sandbox and connects a single persistent `VdpWsClient` without spawning CLI helpers. */
+export async function withVdpWsSandbox<T>(
+  options: {
+    readonly prefix: string;
+    readonly logTag: string;
+    readonly paths: VdpWorkspacePaths;
+    readonly outDir: string;
+    readonly keepSandbox: boolean;
+    readonly requireWorkbenchReady?: boolean;
+  },
+  fn: (ctx: {
+    readonly homeDir: string;
+    readonly workDir: string;
+    readonly payloadDir: string;
+    readonly appEnv: Record<string, string>;
+    readonly client: VdpWsClient;
+    readonly driver: VdpDriver;
+  }) => Promise<T>,
+): Promise<T> {
+  if (!existsSync(options.paths.macBin)) {
+    throw new Error(`missing desktop binary at ${options.paths.macBin} (build vibevalley-mac --features shot first)`);
+  }
+  const sandboxDir = mkdtempSync(join(tmpdir(), options.prefix));
+  const homeDir = join(sandboxDir, "home");
+  const workDir = join(sandboxDir, "work");
+  const payloadDir = join(sandboxDir, "payloads");
+  const storeDb = join(sandboxDir, "state.db");
+  const sandboxLogPath = join(sandboxDir, "app.log");
+  const outLogPath = resolve(options.outDir, "app.log");
+  for (const dir of [homeDir, workDir, payloadDir]) mkdirSync(dir, { recursive: true });
+  mkdirSync(options.outDir, { recursive: true });
+
+  const appEnv = isolatedEnv(options.paths.root, homeDir, workDir, storeDb);
+  const logFd = openSync(sandboxLogPath, "w");
+  let child: ChildProcess | undefined;
+  let exitCode: number | null = null;
+  let exitedPromise: Promise<number> = Promise.resolve(0);
+  let client: VdpWsClient | undefined;
+
+  const onSignal = () => {
+    signalGroup(child?.pid, "SIGTERM");
+  };
+  process.on("SIGINT", onSignal);
+  process.on("SIGTERM", onSignal);
+
+  try {
+    child = spawn(options.paths.macBin, [], {
+      cwd: options.paths.root,
+      env: appEnv,
+      detached: true,
+      stdio: ["ignore", logFd, logFd],
+    });
+    closeSync(logFd);
+
+    exitedPromise = new Promise<number>((done) => {
+      child?.once("exit", (code, sig) => {
+        exitCode = code ?? (sig ? 128 : 1);
+        done(exitCode);
+      });
+      child?.once("error", () => {
+        exitCode = 1;
+        done(1);
+      });
+    });
+
+    const endpoint = await waitForVdpEndpoint({
+      homeDir,
+      ...(child.pid !== undefined ? { expectedPid: child.pid } : {}),
+      timeoutMs: 30_000,
+      appExited: () => exitCode,
+      logPath: sandboxLogPath,
+    });
+    client = await VdpWsClient.connect(endpoint, 10_000);
+    await waitForVdpWorkbenchWs(client, {
+      homeDir,
+      logPath: sandboxLogPath,
+      appExited: () => exitCode,
+      ...(options.requireWorkbenchReady !== undefined ? { requireWorkbenchReady: options.requireWorkbenchReady } : {}),
+    });
+
+    const driver = createWsVdpDriver(client);
+    const result = await fn({ homeDir, workDir, payloadDir, appEnv, client, driver });
+
+    try {
+      await client.call("Shell.quit", {}, { timeoutMs: 2_000 });
+    } catch {
+      // Shutdown cleanup proceeds to signal termination if Shell.quit disconnects immediately.
+    }
+    client.close();
+    client = undefined;
+
+    const quitDeadline = Date.now() + 5_000;
+    while (exitCode === null && Date.now() < quitDeadline) {
+      await sleep(100);
+    }
+
+    return result;
+  } finally {
+    process.off("SIGINT", onSignal);
+    process.off("SIGTERM", onSignal);
+    client?.close();
+
+    if (child && exitCode === null) {
+      signalGroup(child.pid, "SIGTERM");
+      const termDeadline = Date.now() + 5_000;
       while (groupAlive(child.pid) && Date.now() < termDeadline) {
         await sleep(100);
       }

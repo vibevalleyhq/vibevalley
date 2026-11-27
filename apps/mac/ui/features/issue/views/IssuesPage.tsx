@@ -26,6 +26,7 @@ import { createMemo, createEffect } from "../../../infra/solid";
 import { useIntents } from "../../../infra/state/intent";
 import { pendingNewIssue } from "../../../infra/state/issueDraft";
 import { rememberPick } from "../../../infra/state/prefs";
+import { useVdpNode } from "../../../infra/vdpProbe";
 import { BacklogTriagePanel } from "../../dashboard";
 import {
   type BoardCard,
@@ -137,6 +138,7 @@ export function isIssueOverlayBlocking(state: IssueOverlay): boolean {
 
 /** `rest` is the path after /issues/. */
 export function IssuesPage(props: { rest: string }) {
+  useVdpNode({ testId: "issues-page", role: "region" });
   const router = useRouter();
   const board = useBoardSlice();
   const refreshBoard = useRefreshSlice("board");

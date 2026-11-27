@@ -373,16 +373,16 @@ describe("vdp-flow", () => {
 
     const okSelect = checkSelectPopupDownward({
       triggerTestId: "issue-new-repo-trigger",
-      triggerNodes: [{ testId: "issue-new-repo-trigger", bounds: { x: 200, y: 240, width: 160, height: 28 } } as FlowUiNode],
-      popupNodes: [{ testId: "issue-new-repo-search", bounds: { x: 200, y: 272, width: 180, height: 32 } } as FlowUiNode],
+      triggerNodes: [{ testId: "issue-new-repo-trigger", bounds: { x: 200, y: 240, width: 160, height: 28 } }],
+      popupNodes: [{ testId: "issue-new-repo-search", bounds: { x: 200, y: 272, width: 180, height: 32 } }],
       viewportHeight: 720,
     });
     expect(okSelect.every((c) => c.passed)).toBe(true);
 
     const badCoveringSelect = checkSelectPopupDownward({
       triggerTestId: "issue-new-repo-trigger",
-      triggerNodes: [{ testId: "issue-new-repo-trigger", bounds: { x: 200, y: 240, width: 160, height: 28 } } as FlowUiNode],
-      popupNodes: [{ testId: "issue-new-repo-search", bounds: { x: 200, y: 250, width: 180, height: 32 } } as FlowUiNode],
+      triggerNodes: [{ testId: "issue-new-repo-trigger", bounds: { x: 200, y: 240, width: 160, height: 28 } }],
+      popupNodes: [{ testId: "issue-new-repo-search", bounds: { x: 200, y: 250, width: 180, height: 32 } }],
       viewportHeight: 720,
     });
     expect(badCoveringSelect.find((c) => c.name === "select-popup-downward-cover-false")?.passed).toBe(false);
@@ -416,7 +416,7 @@ describe("vdp-flow", () => {
       shellRoute: "/farm/vibevalley",
       diorama: { kind: "farm", placed: { w: 828, h: 720, scale: 2 } },
       farmViewCount: 1,
-      phoneNodes: [{ testId: "farm-phone", bounds: { x: 590, y: 376, width: 296, height: 330 } } as FlowUiNode],
+      phoneNodes: [{ testId: "farm-phone", bounds: { x: 590, y: 376, width: 296, height: 330 } }],
       viewport: { width: 900, height: 720 },
     });
     expect(okFarm.every((c) => c.passed)).toBe(true);
@@ -425,7 +425,7 @@ describe("vdp-flow", () => {
       shellRoute: "/farm",
       diorama: { kind: "farm", placed: { w: 828, h: 720, scale: 2 } },
       farmViewCount: 1,
-      phoneNodes: [{ testId: "farm-phone", bounds: { x: 700, y: 376, width: 296, height: 330 } } as FlowUiNode],
+      phoneNodes: [{ testId: "farm-phone", bounds: { x: 700, y: 376, width: 296, height: 330 } }],
       viewport: { width: 900, height: 720 },
     });
     expect(overflowFarm.find((c) => c.name === "farm-phone-overlay")?.passed).toBe(false);

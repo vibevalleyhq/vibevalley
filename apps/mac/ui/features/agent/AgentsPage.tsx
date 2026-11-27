@@ -19,6 +19,7 @@ import { api } from "../../infra/api";
 import { ready, useAgentTemplates, useQueryClient, useRuntimes } from "../../infra/query";
 import { Link as A, useRouter } from "../../infra/router";
 import { createMemo } from "../../infra/solid";
+import { useVdpNode } from "../../infra/vdpProbe";
 import { assignWorkerAvatars, withDefaultWorkerAvatar } from "./AgentLook";
 import { AgentPage } from "./AgentPage";
 import { orchestratorHref } from "./OrchestratorProfile";
@@ -72,6 +73,7 @@ export function AgentsRoute(props: { rest: string }) {
 }
 
 function AgentsPage() {
+  useVdpNode({ testId: "agents-page", role: "region" });
   const router = useRouter();
   const agents = useWorkAgents();
   const orchestrators = useOrchestrators();

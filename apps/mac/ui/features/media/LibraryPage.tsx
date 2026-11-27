@@ -38,6 +38,7 @@ import {
   togglePinned,
 } from "../../infra/state/contentNav";
 import { prefsNow, setLibraryTile } from "../../infra/state/prefs";
+import { useVdpNode } from "../../infra/vdpProbe";
 import { InstallAppletModal, noteHref, noteTypeLabel, useInstalledApplets, useNotes } from "../note";
 import { AudioPanel } from "./AudioPanel";
 import { ImagePanel } from "./ImagePanel";
@@ -145,6 +146,7 @@ function titleOfBucket(bucket: ContentBucket): string {
 }
 
 export function LibraryPage() {
+  useVdpNode({ testId: "library-page", role: "region" });
   const ops = useOpsSlice();
   const board = useBoardSlice();
   const collab = useCollabSlice();

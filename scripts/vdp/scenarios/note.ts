@@ -1,0 +1,78 @@
+import { defineScenario } from "../dsl.ts";
+import { seedNoteShowcase } from "../fixtures/note.ts";
+
+export const noteScenario = defineScenario({
+  id: "note",
+  description: "3+1 Note editorial audit (Doc, Base table/board/drawer, Canvas, Media, IssueNotes) in Light & Dark",
+  async run(v) {
+    const ids = await seedNoteShowcase(v);
+    await v.resize(v.viewport.width, v.viewport.height);
+
+    // Theme matrix: static layout across Doc, Base Table, and Canvas
+    await v.forThemes(undefined, async (theme) => {
+      await v.nav(`/notes/${ids.docId}`);
+      await v.waitRoute(`/notes/${ids.docId}`);
+      await v.wait("note-block-doc-view");
+      await v.assertClean(`doc-top-${theme}`);
+      await v.shot(`01-doc-top-${theme}`, { label: `Block Doc Editorial View (${theme})` });
+
+      await v.nav(`/notes/${ids.baseId}`);
+      await v.waitRoute(`/notes/${ids.baseId}`);
+      await v.wait("note-base-view");
+      await v.wait("base-table-view");
+      await v.assertClean(`base-table-${theme}`);
+      await v.shot(`06-base-table-${theme}`, { label: `Base Table View (${theme})` });
+
+      await v.nav(`/notes/${ids.canvasId}`);
+      await v.waitRoute(`/notes/${ids.canvasId}`);
+      await v.wait("note-canvas-view");
+      await v.assertClean(`canvas-${theme}`);
+      await v.shot(`09-canvas-${theme}`, { label: `Canvas Whiteboard (${theme})`, settleMs: 320 });
+    });
+
+    // Interactive checks in Light mode
+    await v.theme("light");
+
+    await v.nav(`/notes/${ids.docId}`);
+    await v.waitRoute(`/notes/${ids.docId}`);
+    await v.wait("doc-prose-rich-b2");
+    await v.press("doc-prose-rich-b2");
+    await v.wait("doc-format-bar-b2");
+    await v.shot("03-doc-active-format-light", { label: "Doc Active Block & Inline Format Bar" });
+
+    // Jump to lower section embeds & backlinks
+    await v.nav(`/notes/${ids.docId}`);
+    await v.waitRoute(`/notes/${ids.docId}`);
+    await v.wait("doc-links-panel");
+    await v.key("end");
+    await v.shot("02-doc-embeds-backlinks-light", { label: "Doc Embeds & Backlinks" });
+
+    // Base Board switch & Row=Page Drawer
+    await v.nav(`/notes/${ids.baseId}`);
+    await v.waitRoute(`/notes/${ids.baseId}`);
+    await v.wait("base-view-switcher-board");
+    await v.press("base-view-switcher-board");
+    await v.wait("base-board-view");
+    await v.shot("07-base-board-light", { label: "Base Kanban Board View" });
+
+    await v.press("base-view-switcher-table");
+    await v.wait("base-row-open-r1");
+    await v.press("base-row-open-r1");
+    await v.wait("base-row-drawer-title");
+    await v.shot("08-base-row-drawer-light", { label: "Base Row = Page Drawer" });
+
+    // Media View
+    await v.nav(`/notes/${ids.mediaId}`);
+    await v.waitRoute(`/notes/${ids.mediaId}`);
+    await v.wait("note-media-view");
+    await v.assertClean("media-light");
+    await v.shot("10-media-light", { label: "Media Transcript & Preview View" });
+
+    // Issue <-> Note Bidirectional Sidebar
+    await v.nav(`/issues/${ids.issueIds[0]}`);
+    await v.waitRoute(`/issues/${ids.issueIds[0]}`);
+    await v.wait("issue-notes");
+    await v.assertClean("issue-notes-light");
+    await v.shot("11-issue-notes-light", { label: "Issue Linked Notes Panel" });
+  },
+});

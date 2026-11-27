@@ -14,6 +14,7 @@ import { toast } from "../../design/toasts";
 import { api } from "../../infra/api";
 import { defineQuery, ready, useQuery, useQueryClient } from "../../infra/query";
 import { Link as A } from "../../infra/router";
+import { useVdpNode } from "../../infra/vdpProbe";
 import { noteSuffixOf } from "./html";
 import { noteHref, noteIcon, noteTypeIcon, noteTypeLabel, useNotes } from "./NoteCard";
 
@@ -122,6 +123,8 @@ export function IssueNotes(props: IssueNotesProps) {
       toast(t("web.note.issue.linkedToast", { title: made.title }));
     });
   };
+
+  useVdpNode({ testId: "issue-notes", role: "region" });
 
   return (
     <View accessibilityLabel={t("web.note.issue.title")} testID="issue-notes" class="gap-2">

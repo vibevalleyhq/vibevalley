@@ -18,7 +18,20 @@
 
 改宿主项目加载或终端恢复时，运行 `vpx scripts/release/verify-workspace-store.ts target/debug/vibevalley-mac`。脚本从窗口动作打开新目录，并保持另一个 SQLite 写事务到下一次绘制。两个入口都应成功保存新项目。脚本只使用临时目录。
 
-## 一键验收画廊（推荐先跑）
+## 推荐：TS 场景脚本一键采图（vp run vdp）
+
+按「执行采图（Layer 1）+ 视觉评审（Layer 2）」分层，日常改 UI 一律直接调用固定 TS 场景脚本（复用单条 WebSocket 长连接与 `scripts/vdp/fixtures/`，无需手动拼脚本或反复启 CLI）：
+
+```bash
+vp run vdp --list                                     # 查看全部内置场景
+vp run vdp note --ui-only --out /tmp/vv-vdp-note      # 纯改 apps/mac/ui（仅跑 ~3s nsh build，免编 Rust）
+vp run vdp all --skip-build --out /tmp/vv-vdp-all     # 一次起 App 连续扫完 note/issues/chat/library/dashboard/settings
+vp run vdp note --attach /tmp/vv-sandbox --out /tmp/r # 复连已启动的隔离沙箱
+```
+
+内置场景位于 `scripts/vdp/scenarios/`（`note` / `issues` / `chat` / `library` / `dashboard` / `settings`），产出全套 Light/Dark PNG、`manifest.json`（零 Error 硬断言 + 每步耗时/节点数）与可交互对比画廊 `index.html`。新功能或高频页面需要回归时，在 `scripts/vdp/scenarios/` 新增模块并在 `scripts/vdp/scenarios/index.ts` 注册即可。
+
+## 一键验收画廊（静态场景矩阵）
 
 需要核对一组固定高频页面（`/issues`、`/chat`、`/runs`、`/agents`、`/settings`、`/library`、`/workspace` 与 `/farm`，含 Light/Dark 与窄窗）并生成汇总报告时，直接运行：
 

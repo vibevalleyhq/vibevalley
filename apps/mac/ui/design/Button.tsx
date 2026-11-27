@@ -1,6 +1,7 @@
 // nsh's text styles do not come down from a View, so the words are a Text of their own in the tone's ink.
-import { Text, View, type JSX } from "nsh";
+import { Text, untracked, View, type JSX, type ViewRef } from "nsh";
 
+import { isVdpEnabled, useVdpNode } from "../infra/vdpProbe";
 import { followDesignHref, useDesignHost } from "./host";
 import { Icon } from "./Icon";
 import type { IconName } from "./icons";
@@ -75,10 +76,30 @@ export function Button(props: {
   const tone = () => props.tone ?? "plain";
   const compact = () => props.size === "compact";
   const disabled = () => props.disabled === true;
+  let btnRef: ViewRef | undefined;
+  const vdpTestId = isVdpEnabled() ? untracked(() => props.testID) : undefined;
+  if (vdpTestId !== undefined && vdpTestId !== "") {
+    useVdpNode({
+      testId: vdpTestId,
+      role: "button",
+      text: () => (typeof props.children === "string" || typeof props.children === "number" ? String(props.children) : undefined),
+      getRef: () => btnRef,
+      onPress: () => {
+        if (!disabled()) props.onPress?.();
+      },
+    });
+  }
   return (
     <View
       role="button"
       testID={props.testID}
+      ref={
+        vdpTestId !== undefined && vdpTestId !== ""
+          ? (el) => {
+              btnRef = el;
+            }
+          : undefined
+      }
       accessibilityLabel={props.accessibilityLabel}
       tooltip={props.tooltip}
       disabled={props.disabled}

@@ -32,6 +32,7 @@ import { momentText, wallClockText } from "../../infra/base/format";
 import { useSessionsSlice } from "../../infra/frame";
 import { ready, runtimesQuery, useQueryClient, useRuntimes } from "../../infra/query";
 import { Link as A } from "../../infra/router";
+import { useVdpNode } from "../../infra/vdpProbe";
 import {
   buildMachineRuntimeGroups,
   type DisplayMachine,
@@ -173,6 +174,7 @@ function matchesAgentForEntry(agent: Agent, machine: DisplayMachine, entry: Mach
 
 /** `rest` is the path after /runtimes/ (`<machine>/<runtime>` or legacy `<runtime>`). */
 export function RuntimesPage(props: { rest: string }) {
+  useVdpNode({ testId: "runtimes-page", role: "region" });
   const client = useQueryClient();
   const runtimes = useRuntimes();
   const agents = useWorkAgents();

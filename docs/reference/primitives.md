@@ -298,4 +298,5 @@
 | `isVdpEnabled` | `vdpProbe.ts` | Returns whether VDP probing is active in the current hosted view. |
 | `registerVdpNode` | `vdpProbe.ts` | Registers an inspectable/pressable UI node when VDP is enabled; instant no-op when off. |
 | `useVdpNode` | `vdpProbe.ts` | Registers an inspectable UI node tied to the current nsh reactive owner lifetime. |
+| `VdpAnchor` | `vdpProbe.ts` | Non-visual reactive anchor that registers a VDP node while mounted inside JSX branches. |
 | `installVdpProbe` | `vdpProbe.ts` | Installs the VDP UI probe on the current hosted view. |

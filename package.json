@@ -17,6 +17,7 @@
     "ui:gallery": "vpx scripts/audit/ui-gallery.ts",
     "ui:review": "vpx scripts/release/vdp-review.ts",
     "ui:flow": "vpx scripts/release/vdp-flow.ts",
+    "vdp": "vpx scripts/vdp/run.ts",
     "api:client": "vpx scripts/gen/api-client.ts",
     "i18n:gen": "vpx scripts/gen/i18n.ts gen",
     "nsh:install": "sh scripts/release/install-nsh.sh 0.7.1",

@@ -28,6 +28,7 @@ import { useLocation, useRouter, useSearch } from "../../infra/router";
 import { localizeRuntimeError } from "../../infra/runtimeError";
 import { formatTokens } from "../../infra/sessionRuns";
 import { createEffect, createMemo } from "../../infra/solid";
+import { useVdpNode } from "../../infra/vdpProbe";
 import { createSessionProjection } from "./events";
 import {
   buildRunEntries,
@@ -175,6 +176,7 @@ function entryTiming(entry: RunEntry, now: number): string {
 export type RunApprovals = (props: { readonly conversationId: string }) => JSX.Element;
 
 export function RunsPage(props: { approvals?: RunApprovals }) {
+  useVdpNode({ testId: "runs-page", role: "region" });
   const board = useBoardSlice();
   const sessionsSlice = useSessionsSlice();
   const router = useRouter();

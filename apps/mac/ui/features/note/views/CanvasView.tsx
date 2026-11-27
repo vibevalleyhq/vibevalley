@@ -5,6 +5,7 @@ import type { Note } from "@vibevalley/protocol";
 
 import { Icon } from "../../../design/Icon";
 import { IconButton } from "../../../design/IconButton";
+import { useVdpNode } from "../../../infra/vdpProbe";
 import { WhiteboardView } from "../WhiteboardView";
 
 export interface CanvasViewProps {
@@ -17,6 +18,7 @@ export interface CanvasViewProps {
 
 /** Spatial canvas view backed by `structure/board.json` via `note.file.*` APIs. */
 export function CanvasView(props: CanvasViewProps) {
+  useVdpNode({ testId: "note-canvas-view", role: "region" });
   return (
     <View testID="note-canvas-view" class="min-h-0 min-w-0 flex-1 gap-2 p-3">
       <View class="h-8 shrink-0 flex-row items-center justify-between gap-2 px-1">

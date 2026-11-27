@@ -14,6 +14,7 @@ import { Bubble } from "../../../design/Tip";
 import { Keyed } from "../../../infra/base/dom";
 import { useRouter } from "../../../infra/router";
 import { createMemo } from "../../../infra/solid";
+import { useVdpNode } from "../../../infra/vdpProbe";
 import { NoteCanvas } from "../../note";
 import { useMarkedChat } from "../model/marks";
 import { channelLabel, channelName, chatPath, pointedAt, topOf, topsOf } from "../model/places";
@@ -35,6 +36,7 @@ export function ChatPage() {
 }
 
 function Chat() {
+  useVdpNode({ testId: "chat-page", role: "region" });
   const router = useRouter();
   const id = () => decodeURIComponent((router.path().split("?")[0] ?? "").replace(/^\/chat\/?/u, "")) || undefined;
   const chat = useMarkedChat();

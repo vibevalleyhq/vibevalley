@@ -15,6 +15,7 @@ import { ago } from "../../infra/base/format";
 import { useBoardSlice, useInboxSlice, useSessionsSlice } from "../../infra/frame";
 import { ready, useAgents, useQuery } from "../../infra/query";
 import { Link as A, useRouter } from "../../infra/router";
+import { useVdpNode } from "../../infra/vdpProbe";
 import { waitingOnUser } from "../inbox";
 import { allSessionsQuery, buildRunEntries, runActivityAt, type RunApprovals, type RunEntry, RunsPage, type RunStatusBadge, runStatusOf } from "../session";
 import { MorningDigestPanel } from "./MorningDigestPanel";
@@ -326,6 +327,7 @@ function DashboardOverview() {
 }
 
 export function DashboardPage(props: { tab?: DashboardTab | undefined; approvals?: RunApprovals }) {
+  useVdpNode({ testId: "dashboard-page", role: "region" });
   const router = useRouter();
   const sessionsSlice = useSessionsSlice();
   const tab = () => props.tab ?? "overview";
