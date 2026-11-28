@@ -32,6 +32,7 @@ import { ActLines } from "./ActLines";
 import { IssueAttachments } from "./IssueAttachments";
 import { StatusMark } from "./Marks";
 import { IssueSheet, Note, Property, SheetLabel, StagePill } from "./Sheet";
+import { parseCriterion } from "./TodoSections";
 
 /** A question of the helper's: its options are replies as they are, one click each. */
 export function Question(props: { ask: QuestionItem; busy: boolean; onPick: (words: string) => void }) {
@@ -53,14 +54,12 @@ export function Question(props: { ask: QuestionItem; busy: boolean; onPick: (wor
   );
 }
 
-const resultMark: Record<NonNullable<CriterionRow["result"]>, { icon: IconName; label: string }> = {
-  met: { icon: "check", label: t("web.issue.detail.result.met") },
-  unmet: { icon: "cross", label: t("web.issue.detail.result.unmet") },
-  unsure: { icon: "warn", label: t("web.issue.detail.result.unsure") },
+const resultMark: Record<NonNullable<CriterionRow["result"]>, { icon: IconName; tone: TagTone; label: string }> = {
+  met: { icon: "check", tone: "ok", label: t("web.issue.detail.result.met") },
+  unmet: { icon: "cross", tone: "bad", label: t("web.issue.detail.result.unmet") },
+  unsure: { icon: "warn", tone: "wait", label: t("web.issue.detail.result.unsure") },
 };
 
-/** The criteria with the helper's word on each; while it is judged, each can be ticked off as the user checks it (on
- * this page only). */
 export function Criteria(props: { rows: CriterionRow[]; checking: boolean }) {
   const ticked = signal<ReadonlySet<number>>(new Set());
   const tick = (i: number) => {
@@ -71,46 +70,76 @@ export function Criteria(props: { rows: CriterionRow[]; checking: boolean }) {
   };
   return (
     <View class="overflow-hidden rounded-lg border border-line bg-page">
+      <View class="flex-row items-center border-b border-line bg-side">
+        <View
+          accessibilityLabel={t("web.issue.todo.criteriaTable.colCheck")}
+          class="w-9 shrink-0 items-center justify-center border-r border-line py-1.5"
+          style={{ borderColor: mix("line", 0.55) }}
+        >
+          <If when={props.checking} else={<Text class="font-mono text-2xs text-muted">#</Text>}>
+            <Icon name="ticked" size={11} tone="muted" />
+          </If>
+        </View>
+        <View class="min-w-0 flex-1 flex-row items-center gap-1.5 border-r border-line px-3 py-1.5" style={{ borderColor: mix("line", 0.55) }}>
+          <Icon name="issues" size={11} tone="muted" />
+          <Text class="text-2xs font-medium text-muted">{t("web.issue.todo.criteriaTable.colItem")}</Text>
+        </View>
+        <View class="w-28 shrink-0 flex-row items-center gap-1 border-r border-line px-2.5 py-1.5" style={{ borderColor: mix("line", 0.55) }}>
+          <Icon name="check" size={11} tone="muted" />
+          <Text class="text-2xs font-medium text-muted">{t("web.issue.todo.criteriaTable.colStatus")}</Text>
+        </View>
+        <View class="w-44 shrink-0 flex-row items-center gap-1 px-3 py-1.5">
+          <Icon name="notes" size={11} tone="muted" />
+          <Text class="text-2xs font-medium text-muted">{t("web.issue.todo.criteriaTable.colProof")}</Text>
+        </View>
+      </View>
       <Each of={props.rows} key={(r) => r.text}>
-        {(r, i) => (
-          <View
-            testID="criterion"
-            class={`flex-row items-start gap-2.5 px-3.5 py-2.5 ${i() < props.rows.length - 1 ? "border-b" : ""}`}
-            style={i() < props.rows.length - 1 ? { borderColor: mix("line", 0.55) } : undefined}
-          >
-            <If when={props.checking}>
-              <Checkbox
-                testid="criterion-tick"
-                label={t("web.issue.detail.ticked", { criterion: r().text })}
-                checked={ticked().has(i())}
-                onChange={() => tick(i())}
-                class="mt-0.5"
-              />
-            </If>
-            <If
-              when={r().result}
-              else={
-                <View
-                  testID="criterion-unsaid"
-                  accessibilityLabel={t("web.issue.detail.unsaid")}
-                  class="mt-1 h-3 w-3 shrink-0 rounded-full border border-idle"
-                />
-              }
+        {(r, i) => {
+          const parsed = () => parseCriterion(r().text);
+          const basisText = () => r().proof || parsed().proof;
+          return (
+            <View
+              testID="criterion"
+              class={`flex-row items-stretch ${i() < props.rows.length - 1 ? "border-b" : ""}`}
+              style={i() < props.rows.length - 1 ? { borderColor: mix("line", 0.55) } : undefined}
             >
-              {(res) => (
-                <View class="mt-0.5 shrink-0">
-                  <Icon name={resultMark[res()].icon} size={14} label={resultMark[res()].label} />
-                </View>
-              )}
-            </If>
-            <View class="min-w-0 flex-1">
-              <Text class={`text-sm leading-snug ${ticked().has(i()) ? "text-muted" : "text-ink"}`}>{r().text}</Text>
-              <If when={r().proof}>
-                <Text class="mt-0.5 text-xs text-muted">{r().proof}</Text>
-              </If>
+              <View class="w-9 shrink-0 items-center justify-center border-r border-line py-2" style={{ borderColor: mix("line", 0.55) }}>
+                <If when={props.checking} else={<Text class="font-mono text-2xs text-muted tabular-nums">{i() + 1}</Text>}>
+                  <Checkbox
+                    testid="criterion-tick"
+                    label={t("web.issue.detail.ticked", { criterion: parsed().text })}
+                    checked={ticked().has(i())}
+                    onChange={() => tick(i())}
+                  />
+                </If>
+              </View>
+              <View class="min-w-0 flex-1 justify-center border-r border-line px-3 py-2" style={{ borderColor: mix("line", 0.55) }}>
+                <Text class={`text-sm leading-snug ${ticked().has(i()) ? "text-muted line-through" : "text-ink"}`}>{parsed().text}</Text>
+              </View>
+              <View class="w-28 shrink-0 justify-center border-r border-line px-2.5 py-2" style={{ borderColor: mix("line", 0.55) }}>
+                <If
+                  when={r().result}
+                  else={
+                    <View testID="criterion-unsaid" accessibilityLabel={t("web.issue.detail.unsaid")}>
+                      <Tag
+                        tone={ticked().has(i()) || parsed().checked ? "ok" : "neutral"}
+                        icon={ticked().has(i()) || parsed().checked ? "check" : undefined}
+                        label={ticked().has(i()) || parsed().checked ? t("web.issue.todo.criteriaTable.statusDone") : t("web.issue.detail.unsaid")}
+                      />
+                    </View>
+                  }
+                >
+                  {(res) => <Tag icon={resultMark[res()].icon} tone={resultMark[res()].tone} label={resultMark[res()].label} />}
+                </If>
+              </View>
+              <View class="w-44 shrink-0 justify-center px-3 py-2">
+                <Text class={`text-xs leading-snug ${basisText() ? "text-muted" : "text-faint"}`}>
+                  {basisText() || t("web.issue.todo.criteriaTable.proofEmpty")}
+                </Text>
+              </View>
             </View>
-          </View>
-        )}
+          );
+        }}
       </Each>
     </View>
   );
@@ -129,7 +158,6 @@ function receiptKindMeta(kind: DeliveryReceipt["kind"]): { readonly icon: IconNa
   }
 }
 
-/** Renders a polymorphic `DeliveryReceipt` (`pull_request`, `commit`, `note`, or `answer`). */
 export function DeliveryReceiptCard(props: { receipt: DeliveryReceipt; class?: string }) {
   const meta = computed(() => receiptKindMeta(props.receipt.kind));
   const copySha = (sha: string) => {

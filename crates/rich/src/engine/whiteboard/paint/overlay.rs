@@ -371,6 +371,10 @@ fn paint_presence_region(mut painter: Painter, rect: Rect2, p: &Presence, color:
         .stroke()
         .restore();
 
+    if p.hide_label {
+        return painter;
+    }
+
     let status_opt = p.status.as_deref().map(str::trim).filter(|s| !s.is_empty());
     let badge = match status_opt {
         Some(st) => format!("{} · {st}", p.name),
@@ -431,8 +435,10 @@ fn paint_presence_cursor(
     dismissed_notes: &BTreeSet<String>,
     fast_shadows: bool,
 ) -> Painter {
-    // Viewport-only presences or highlight/claim regions with an explicit box already render their own badge.
-    if !p.has_cursor || (matches!(p.kind, PresenceKind::Highlight | PresenceKind::Claim) && pose.region_rect(p.kind).is_some()) {
+    if p.hide_label
+        || !p.has_cursor
+        || (matches!(p.kind, PresenceKind::Selection | PresenceKind::Highlight | PresenceKind::Claim) && pose.region_rect(p.kind).is_some())
+    {
         return painter;
     }
 

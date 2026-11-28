@@ -9,6 +9,7 @@ import { Button } from "../../design/Button";
 import { Icon } from "../../design/Icon";
 import { Empty } from "../../design/layout";
 import { Lightbox, type Picture } from "../../design/Lightbox";
+import { motionClass, motionOff } from "../../design/motion";
 import { useTimeout } from "../../infra/base/timer";
 import { isVdpEnabled, useVdpNode, VdpAnchor } from "../../infra/vdpProbe";
 import { BlockItem, type BlockEditorProbeSnapshot, type BlockEditorTelemetryPatch, type FocusRequest } from "./doc/BlockItem";
@@ -29,6 +30,12 @@ import {
 } from "./doc/docOps";
 import { buildDocAnnotationIndex, type DocAnnotationRef } from "./doc/mediaAnnotationModel";
 import { MediaAnnotationOverlay } from "./doc/MediaAnnotationOverlay";
+import { CollaboratorCursor, filterRemotePresences } from "./PresenceBadges";
+
+interface BlockBoxLayout {
+  readonly y: number;
+  readonly height: number;
+}
 
 interface BlockDocViewProps {
   readonly note: Note;
@@ -119,6 +126,8 @@ export function BlockDocView(props: BlockDocViewProps) {
   const focusedBlockId = signal<string | undefined>(undefined);
   const focusRequest = signal<FocusRequest | undefined>(undefined);
   const highlightedBlockId = signal<string | undefined>(undefined);
+  const enteringStartIds = signal<ReadonlySet<string>>(new Set());
+  const blockLayouts = signal<ReadonlyMap<string, BlockBoxLayout>>(new Map());
   const dirty = signal(false);
   const saving = signal(false);
   const linksOpen = signal(true);
@@ -128,6 +137,25 @@ export function BlockDocView(props: BlockDocViewProps) {
     { readonly annotationId?: string | undefined; readonly baseRowId?: string | undefined; readonly mediaBlockId?: string | undefined } | undefined
   >(undefined);
   const scheduleSaveTimer = useTimeout();
+  const entranceTimers = new Set<ReturnType<typeof setTimeout>>();
+
+  cleanup(() => {
+    for (const timer of entranceTimers) clearTimeout(timer);
+    entranceTimers.clear();
+  });
+
+  const triggerEntrance = (addedIds: readonly string[]) => {
+    if (addedIds.length === 0 || motionOff()) return;
+    enteringStartIds.set(new Set([...untracked(enteringStartIds), ...addedIds]));
+
+    const t1 = setTimeout(() => {
+      entranceTimers.delete(t1);
+      const next = new Set(untracked(enteringStartIds));
+      for (const id of addedIds) next.delete(id);
+      enteringStartIds.set(next);
+    }, 60);
+    entranceTimers.add(t1);
+  };
 
   let focusSeq = 0;
   let probeSnapshot: BlockEditorProbeSnapshot = {
@@ -170,6 +198,7 @@ export function BlockDocView(props: BlockDocViewProps) {
 
   let syncedNoteId = untracked(() => props.note.id);
   let syncedDocRef = untracked(() => props.docView?.blocks);
+  let knownBlockIds = new Set<string>(untracked(() => (props.docView?.blocks ?? []).map((b) => b.id)));
 
   effect(() => {
     const incomingNoteId = props.note.id;
@@ -178,6 +207,9 @@ export function BlockDocView(props: BlockDocViewProps) {
     if (incomingNoteId !== syncedNoteId) {
       syncedNoteId = incomingNoteId;
       syncedDocRef = incomingBlocks;
+      knownBlockIds = new Set((incomingBlocks ?? []).map((b) => b.id));
+      enteringStartIds.set(new Set());
+      blockLayouts.set(new Map());
       titleDraft.set(incomingTitle);
       blocks.set(incomingBlocks ?? []);
       dirty.set(false);
@@ -194,8 +226,12 @@ export function BlockDocView(props: BlockDocViewProps) {
       return;
     }
     if (incomingBlocks !== undefined && incomingBlocks !== syncedDocRef && !untracked(dirty)) {
+      const hadPrevDoc = syncedDocRef !== undefined;
+      const addedIds = hadPrevDoc ? incomingBlocks.filter((b) => !knownBlockIds.has(b.id)).map((b) => b.id) : [];
+      knownBlockIds = new Set(incomingBlocks.map((b) => b.id));
       syncedDocRef = incomingBlocks;
       blocks.set(incomingBlocks);
+      if (addedIds.length > 0) triggerEntrance(addedIds);
     }
   });
 
@@ -513,70 +549,112 @@ export function BlockDocView(props: BlockDocViewProps) {
           </View>
         }
       >
-        <View
-          ref={
-            isVdpEnabled()
-              ? (el) => {
-                  blocksListRef = el;
-                }
-              : undefined
-          }
-          testID="doc-blocks-list"
-          class="w-full min-w-0 gap-0"
-        >
-          <Each of={visibleBlocks()} key={(b) => b.id}>
-            {(b, idx) => (
-              <View class={`min-w-0 ${highlightedBlockId() === b().id ? "rounded-md bg-selected" : ""}`}>
-                <BlockItem
-                  block={b()}
-                  prevBlock={visibleBlocks()[idx() - 1]}
-                  allBlocks={visibleBlocks()}
-                  slideIndices={slideIndices()}
-                  note={props.note}
-                  notes={props.notes}
-                  issues={props.issues}
-                  focusedBlockId={focusedBlockId()}
-                  focusRequest={focusRequest()}
-                  presences={props.presences}
-                  embedded={embedded()}
-                  compactGutter={embedded()}
-                  onFocusBlock={handleNativeFocusBlock}
-                  onRequestFocus={requestFocus}
-                  onFocusAdjacent={handleFocusAdjacent}
-                  onSplitBlock={handleSplitBlock}
-                  onMergeBackward={handleMergeBackward}
-                  onUpdateBlock={handleUpdateBlock}
-                  onInsertAfter={handleInsertAfter}
-                  onMoveBlock={handleMoveBlock}
-                  onDuplicateBlock={handleDuplicateBlock}
-                  onDeleteBlock={handleDeleteBlock}
-                  onCreateIssueFromBlock={props.onCreateIssueFromBlock}
-                  onOpenNote={props.onOpenNote}
-                  onOpenIssue={props.onOpenIssue}
-                  onScrollToBlock={(targetId) => {
-                    highlightedBlockId.set(targetId);
-                    requestFocus({ blockId: targetId, caret: "end" });
-                  }}
-                  onOpenLightbox={(pic) => {
-                    lightboxMediaBlockId.set(undefined);
-                    lightboxPicture.set(pic);
-                  }}
-                  onOpenMediaLightbox={(blockId) => {
-                    lightboxPicture.set(undefined);
-                    lightboxMediaBlockId.set(blockId);
-                  }}
-                  annotationIndex={annotationIndex()}
-                  selectedAnnotationId={activeAnnotationLink()?.annotationId}
-                  highlightedBaseRowId={activeAnnotationLink()?.baseRowId}
-                  onSelectAnnotation={handleSelectAnnotation}
-                  onJumpToBaseRow={handleJumpToBaseRow}
-                  onSelectReviewRow={handleSelectReviewRow}
-                  onCreateIssueFromAnnotation={props.onCreateIssueFromBlock ? handleCreateIssueFromAnnotation : undefined}
-                  onEditorTelemetry={telemetryHandler}
-                />
-              </View>
-            )}
-          </Each>
+        <View class="relative w-full min-w-0">
+          <View
+            ref={
+              isVdpEnabled()
+                ? (el) => {
+                    blocksListRef = el;
+                  }
+                : undefined
+            }
+            testID="doc-blocks-list"
+            class="w-full min-w-0 gap-0"
+          >
+            <Each of={visibleBlocks()} key={(b) => b.id}>
+              {(b, idx) => {
+                const isEnteringStart = () => enteringStartIds().has(b().id);
+                const wrapperTransform = () => (isEnteringStart() ? "translate-y-1 opacity-0" : "translate-y-0 opacity-100");
+                return (
+                  <View
+                    onLayout={(e) => {
+                      const id = b().id;
+                      const y = e.bounds.origin.y;
+                      const height = e.bounds.size.height;
+                      const prev = untracked(blockLayouts).get(id);
+                      if (prev && Math.abs(prev.y - y) <= 0.5 && Math.abs(prev.height - height) <= 0.5) return;
+                      const next = new Map(untracked(blockLayouts));
+                      next.set(id, { y, height });
+                      blockLayouts.set(next);
+                    }}
+                    class={`min-w-0 ${motionClass("transition-opacity duration-200 ease-out")} ${wrapperTransform()}`}
+                  >
+                    <BlockItem
+                      block={b()}
+                      prevBlock={visibleBlocks()[idx() - 1]}
+                      allBlocks={visibleBlocks()}
+                      slideIndices={slideIndices()}
+                      note={props.note}
+                      notes={props.notes}
+                      issues={props.issues}
+                      focusedBlockId={focusedBlockId()}
+                      focusRequest={focusRequest()}
+                      highlighted={highlightedBlockId() === b().id}
+                      presences={props.presences}
+                      embedded={embedded()}
+                      compactGutter={embedded()}
+                      onFocusBlock={handleNativeFocusBlock}
+                      onRequestFocus={requestFocus}
+                      onFocusAdjacent={handleFocusAdjacent}
+                      onSplitBlock={handleSplitBlock}
+                      onMergeBackward={handleMergeBackward}
+                      onUpdateBlock={handleUpdateBlock}
+                      onInsertAfter={handleInsertAfter}
+                      onMoveBlock={handleMoveBlock}
+                      onDuplicateBlock={handleDuplicateBlock}
+                      onDeleteBlock={handleDeleteBlock}
+                      onCreateIssueFromBlock={props.onCreateIssueFromBlock}
+                      onOpenNote={props.onOpenNote}
+                      onOpenIssue={props.onOpenIssue}
+                      onScrollToBlock={(targetId) => {
+                        highlightedBlockId.set(targetId);
+                        requestFocus({ blockId: targetId, caret: "end" });
+                      }}
+                      onOpenLightbox={(pic) => {
+                        lightboxMediaBlockId.set(undefined);
+                        lightboxPicture.set(pic);
+                      }}
+                      onOpenMediaLightbox={(blockId) => {
+                        lightboxPicture.set(undefined);
+                        lightboxMediaBlockId.set(blockId);
+                      }}
+                      annotationIndex={annotationIndex()}
+                      selectedAnnotationId={activeAnnotationLink()?.annotationId}
+                      highlightedBaseRowId={activeAnnotationLink()?.baseRowId}
+                      onSelectAnnotation={handleSelectAnnotation}
+                      onJumpToBaseRow={handleJumpToBaseRow}
+                      onSelectReviewRow={handleSelectReviewRow}
+                      onCreateIssueFromAnnotation={props.onCreateIssueFromBlock ? handleCreateIssueFromAnnotation : undefined}
+                      onEditorTelemetry={telemetryHandler}
+                    />
+                  </View>
+                );
+              }}
+            </Each>
+          </View>
+          <View class="pointer-events-none absolute inset-0 overflow-visible">
+            <Each
+              of={filterRemotePresences(props.presences ?? []).filter((p) => {
+                const targetId = p.nodeId ?? p.selector;
+                return targetId !== undefined && visibleBlocks().some((b) => b.id === targetId);
+              })}
+              key={(p) => p.id}
+            >
+              {(p) => {
+                const cursorStyle = () => {
+                  const targetId = p().nodeId ?? p().selector ?? "";
+                  const box = blockLayouts().get(targetId);
+                  const top = box ? Math.round(box.y + Math.min(22, Math.max(12, box.height * 0.55))) : 16;
+                  const off = p().offset;
+                  if (off !== undefined) {
+                    return { top, left: Math.min(440, Math.max(96, Math.round(58 + off * 7.2))) };
+                  }
+                  return { top, right: 16 };
+                };
+                return <CollaboratorCursor peer={p()} testIdPrefix="doc-presence-badge" class="pointer-events-none absolute" style={cursorStyle()} />;
+              }}
+            </Each>
+          </View>
         </View>
       </If>
 

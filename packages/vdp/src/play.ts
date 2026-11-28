@@ -16,6 +16,7 @@ export interface AgentDocPlayStep {
   readonly status?: string | undefined;
   readonly offset?: number | undefined;
   readonly expectStableTargetId?: string | undefined;
+  readonly animateEntrance?: boolean | undefined;
   readonly settleMs?: number | undefined;
 }
 
@@ -27,6 +28,7 @@ export interface AgentCanvasPlayStep {
   readonly w?: number | undefined;
   readonly h?: number | undefined;
   readonly boardJson: string;
+  readonly animateEntrance?: boolean | undefined;
   readonly settleMs?: number | undefined;
 }
 
@@ -95,7 +97,9 @@ export async function playAgentDocSession(
           files: [{ path: "structure/doc.json", content: step.blocksJson }],
           summary: `${opts.actor.name} edit step ${i + 1}`,
         });
-        await v.settle(step.settleMs ?? 80);
+        await v.wait(`doc-block-${step.blockId}`);
+        await v.wait(`doc-presence-badge-${opts.actor.id}`);
+        await v.settle(step.animateEntrance === true ? 20 : (step.settleMs ?? 80));
       };
 
       if (step.expectStableTargetId !== undefined) {
@@ -105,6 +109,10 @@ export async function playAgentDocSession(
       }
 
       if (opts.recorder !== undefined) {
+        if (step.animateEntrance === true) {
+          await opts.recorder.captureFrame(0);
+          await v.settle(step.settleMs ?? 140);
+        }
         await opts.recorder.captureFrame(40);
       }
       if (opts.onStep !== undefined) {
@@ -132,6 +140,14 @@ export async function playAgentCanvasSession(
 ): Promise<void> {
   try {
     for (const [i, step] of opts.steps.entries()) {
+      await v.rpc("note.file.write", {
+        id: opts.noteId,
+        files: [{ path: "structure/board.json", content: step.boardJson }],
+        summary: `${opts.actor.name} board step ${i + 1}`,
+      });
+      if (step.nodeId !== undefined) {
+        await v.wait(`wb-el-${step.nodeId}`);
+      }
       await publishAgentPresence(v, {
         noteId: opts.noteId,
         actor: opts.actor,
@@ -144,14 +160,14 @@ export async function playAgentCanvasSession(
         h: step.h,
         status: step.status ?? "drawing",
       });
-      await v.rpc("note.file.write", {
-        id: opts.noteId,
-        files: [{ path: "structure/board.json", content: step.boardJson }],
-        summary: `${opts.actor.name} board step ${i + 1}`,
-      });
-      await v.settle(step.settleMs ?? 80);
+      await v.wait(`whiteboard-presence-badge-${opts.actor.id}`);
+      if (step.animateEntrance === true && opts.recorder !== undefined) {
+        await v.settle(65);
+        await opts.recorder.captureFrame(0);
+      }
+      await v.settle(step.settleMs ?? 200);
       if (opts.recorder !== undefined) {
-        await opts.recorder.captureFrame(40);
+        await opts.recorder.captureFrame(100);
       }
       if (opts.onStep !== undefined) {
         await opts.onStep(i);

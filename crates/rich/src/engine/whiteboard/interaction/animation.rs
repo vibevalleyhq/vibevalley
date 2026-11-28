@@ -78,7 +78,7 @@ impl WhiteboardController {
     }
 
     pub fn needs_animation(&self) -> bool {
-        if self.camera_target.is_some() {
+        if self.camera_target.is_some() || !self.element_appear.is_empty() {
             return true;
         }
         for p in &self.doc.presences {
@@ -97,6 +97,20 @@ impl WhiteboardController {
         let alpha_cam = if instant { 1.0 } else { (1.0 - (-dt / 0.10).exp()).clamp(0.08, 1.0) };
 
         let mut presence_moved = false;
+        if instant {
+            if !self.element_appear.is_empty() {
+                self.element_appear.clear();
+                presence_moved = true;
+            }
+        } else if !self.element_appear.is_empty() {
+            let step = (dt / 0.34) as f32;
+            for prog in self.element_appear.values_mut() {
+                *prog = (*prog + step).min(1.0);
+            }
+            self.element_appear.retain(|_, prog| *prog < 0.999);
+            presence_moved = true;
+        }
+
         for p in &self.doc.presences {
             let target = AnimatedPresencePose::from_presence(p);
             let entry = self.presence_poses.entry(p.id.clone()).or_insert(target);
@@ -211,14 +225,35 @@ impl WhiteboardController {
     }
 
     pub fn apply_remote_delta(&mut self, updated: &[WhiteboardEntry], deleted: &[String], seq: i64) -> Vec<ControllerEffect> {
+        let prev_ids: BTreeSet<ElementId> = self.doc.elements.iter().map(|e| e.id.clone()).collect();
         let removed = apply_remote_entries(&mut self.doc, updated, deleted, seq);
         if !removed.is_empty() {
             let rem_set: BTreeSet<ElementId> = removed.into_iter().collect();
             self.selection.retain(|id| !rem_set.contains(id));
+            self.element_appear.retain(|id, _| !rem_set.contains(id));
+        }
+        if self.smooth_animations {
+            for el in &self.doc.elements {
+                if !prev_ids.contains(&el.id) {
+                    self.element_appear.insert(el.id.clone(), 0.24);
+                }
+            }
         }
         self.rebuild_index();
         self.sync_presence_targets(!self.smooth_animations);
         let mut effects = Vec::new();
+        if !self.user_moved_camera
+            && self.follow_actor.is_none()
+            && !self.doc.elements.is_empty()
+            && let Some(bounds) = self.doc.content_bounds()
+        {
+            let mut fitted = self.camera;
+            fitted.fit_bounds(bounds, self.viewport_size.0, self.viewport_size.1, 68.0, 1.0);
+            if !camera_close(self.camera, fitted) {
+                self.camera = fitted;
+                effects.push(ControllerEffect::ViewportChanged { zoom: self.camera.zoom });
+            }
+        }
         self.sync_follow_camera(&mut effects);
         effects
     }

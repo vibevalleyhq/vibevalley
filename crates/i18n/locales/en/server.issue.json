@@ -66,7 +66,7 @@
     "done": "{title}\nDone when: {done}"
   },
   "timeline": {
-    "opened": "Opened",
+    "opened": "Created",
     "refine": "Started drafting",
     "told": "You told it something; another round",
     "start": "Started",

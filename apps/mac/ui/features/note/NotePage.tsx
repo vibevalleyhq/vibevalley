@@ -29,6 +29,7 @@ import { createAct } from "../../infra/act";
 import { api, newSendKey, reasonOf } from "../../infra/api";
 import { Keyed } from "../../infra/base/dom";
 import { useBoardSlice } from "../../infra/frame";
+import { followNote } from "../../infra/gateway";
 import { currentHost } from "../../infra/host";
 import { ready, useQuery, useQueryClient } from "../../infra/query";
 import { useRouter, useSearch } from "../../infra/router";
@@ -257,6 +258,16 @@ function NoteDetailView(props: { note: Note; versionParam: number | undefined; n
 
   const docView = useQuery(() => noteDocQuery(props.note.id), {
     enabled: () => props.note.noteType === "doc",
+  });
+  effect(() => {
+    const id = props.note.id;
+    if (props.note.noteType !== "doc" || isHistorical()) return;
+    return followNote(String(id), 0, (ev) => {
+      if (ev._tag === "Reset" || ev.files.some((f) => f.path === "structure/doc.json")) {
+        void queries.invalidate({ prefix: ["note-doc", id] });
+        void queries.invalidate({ prefix: ["note-links", "note", id] });
+      }
+    });
   });
   const links = useQuery(() => noteLinksQuery(props.note.id));
   const baseSnap = useQuery(() => noteBaseQuery({ id: props.note.id, sheetId: activeSheetId(), viewId: activeViewId() }), {

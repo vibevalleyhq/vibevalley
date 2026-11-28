@@ -22,7 +22,8 @@ import {
   type VvWhiteboardSelectionEvent,
   type VvWhiteboardViewportEvent,
 } from "../../infra/rich";
-import { filterRemotePresences, NotePresenceBadges } from "./PresenceBadges";
+import { isVdpEnabled, VdpAnchor } from "../../infra/vdpProbe";
+import { CollaboratorCursor, filterRemotePresences } from "./PresenceBadges";
 import { useNotePresence } from "./store";
 import { type NoteDirectoryClient, saveBase64File, saveTextFile, useNoteDirectory } from "./views/noteFiles";
 
@@ -94,6 +95,7 @@ interface PresenceWire {
   readonly selector?: string | undefined;
   readonly viewport?: ViewportRect | undefined;
   readonly updatedAt?: number | undefined;
+  readonly hideLabel?: boolean | undefined;
 }
 
 const JsonRecordSchema = z.record(z.string(), z.unknown());
@@ -119,6 +121,55 @@ const BoardMetaJsonSchema = jsonString(
 );
 const WhiteboardBatchJsonSchema = jsonString(z.array(WhiteboardWriteSchema));
 const StringArrayJsonSchema = jsonString(z.array(z.string()));
+
+function computeFittedCamera(doc: BoardDocument, vw: number, vh: number): { readonly panX: number; readonly panY: number; readonly zoom: number } {
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  for (const [elId, raw] of Object.entries(doc.elements)) {
+    const el = parseBoardElement(elId, raw, "camera");
+    if (el?.x === undefined || el.y === undefined) continue;
+    const w = Math.max(12, el.w ?? 188);
+    const h = Math.max(12, el.h ?? 92);
+    minX = Math.min(minX, el.x);
+    minY = Math.min(minY, el.y);
+    maxX = Math.max(maxX, el.x + w);
+    maxY = Math.max(maxY, el.y + h);
+  }
+  if (!Number.isFinite(minX)) {
+    return { panX: 36, panY: 64, zoom: 1 };
+  }
+  const pad = 68;
+  const bw = Math.max(40, maxX - minX);
+  const bh = Math.max(40, maxY - minY);
+  const zoom = Math.max(0.1, Math.min(1, Math.max(40, vw - pad * 2) / bw, Math.max(40, vh - pad * 2) / bh));
+  const cx = (minX + maxX) * 0.5;
+  const cy = (minY + maxY) * 0.5;
+  return { panX: vw * 0.5 - cx * zoom, panY: vh * 0.5 - cy * zoom, zoom };
+}
+
+function boardPeerCursorPosition(
+  peer: PresenceWire,
+  doc: BoardDocument,
+  cam: { readonly panX: number; readonly panY: number; readonly zoom: number },
+  stage: { readonly w: number; readonly h: number },
+): { readonly left: number; readonly top: number } {
+  const rawEl = peer.selector !== undefined ? doc.elements[peer.selector] : undefined;
+  const el = rawEl !== undefined && peer.selector !== undefined ? parseBoardElement(peer.selector, rawEl, "cursor") : undefined;
+  const x = el?.x ?? peer.x ?? 120;
+  const y = el?.y ?? peer.y ?? 120;
+  const w = el?.w ?? peer.w ?? 200;
+  const h = el?.h ?? peer.h ?? 100;
+  const wx = x + w * 0.58;
+  const wy = y + h - 10;
+  const sx = wx * cam.zoom + cam.panX;
+  const sy = wy * cam.zoom + cam.panY;
+  return {
+    left: Math.round(Math.max(16, Math.min(stage.w - 260, sx))),
+    top: Math.round(Math.max(52, Math.min(stage.h - 76, sy))),
+  };
+}
 
 export function parseBoardDocument(raw: string | undefined): BoardDocument {
   const empty: BoardDocument = { version: 1, grid: "architectural", viewport: { x: 0, y: 0, zoom: 1 }, elements: {} };
@@ -238,6 +289,7 @@ export function WhiteboardView(props: WhiteboardViewerProps) {
         selector: peer.selector ?? peer.nodeId,
         viewport: peer.viewport,
         updatedAt: peer.updatedAt,
+        hideLabel: true,
       });
       seen.add(peer.id);
     }
@@ -262,6 +314,7 @@ export function WhiteboardView(props: WhiteboardViewerProps) {
         kind: "cursor",
         x: ownClaim ? (ownClaim.x ?? 80) + (ownClaim.w ?? 200) - 18 : 120,
         y: ownClaim ? (ownClaim.y ?? 80) + (ownClaim.h ?? 100) - 12 : 120,
+        hideLabel: true,
       });
       seen.add(id);
     }
@@ -381,7 +434,15 @@ export function WhiteboardView(props: WhiteboardViewerProps) {
       });
     };
 
+    const stageSize = signal({ w: 1180, h: 740 });
+    const liveCam = signal<{ readonly panX: number; readonly panY: number; readonly zoom: number } | undefined>(undefined);
+    effect(() => {
+      void props.note.id;
+      liveCam.set(undefined);
+    });
+
     const handleNativeViewportChange = (ev: VvWhiteboardViewportEvent) => {
+      liveCam.set({ panX: -ev.x * ev.zoom, panY: -ev.y * ev.zoom, zoom: ev.zoom });
       presence.publish({
         id: localUserParticipant,
         name: t("web.note.blocks.user"),
@@ -414,9 +475,20 @@ export function WhiteboardView(props: WhiteboardViewerProps) {
     const boardReady = computed(() => !snapshot().loading || boardRaw() !== undefined);
     const nativeMountKey = computed(() => `${props.note.id}:${colorScheme()}`);
     const badgePeers = computed(() => filterRemotePresences(presences(), localUserParticipant));
+    const elementIds = computed(() => Object.keys(boardDoc().elements));
+    const activeCamera = computed(() => liveCam() ?? computeFittedCamera(boardDoc(), stageSize().w, stageSize().h));
 
     return (
-      <View testID="whiteboard-view" class="relative min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border border-line bg-side">
+      <View
+        testID="whiteboard-view"
+        onLayout={(e) => {
+          const { width, height } = e.bounds.size;
+          if (width > 120 && height > 120) {
+            stageSize.set({ w: width, h: height });
+          }
+        }}
+        class="relative min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border border-line bg-side"
+      >
         <If when={boardReady()} else={<View testID="wb-loading" class="min-h-0 min-w-0 flex-1 bg-side" />}>
           <Keyed key={nativeMountKey()}>
             {() => (
@@ -439,7 +511,24 @@ export function WhiteboardView(props: WhiteboardViewerProps) {
           </Keyed>
         </If>
         <If when={badgePeers().length > 0}>
-          <NotePresenceBadges peers={badgePeers()} testIdPrefix="whiteboard-presence-badge" class="pointer-events-none absolute top-14 right-3 z-20" />
+          <Each of={badgePeers()} key={(peer) => peer.id}>
+            {(peer) => {
+              const pos = () => boardPeerCursorPosition(peer(), boardDoc(), activeCamera(), stageSize());
+              return (
+                <CollaboratorCursor
+                  peer={peer()}
+                  testIdPrefix="whiteboard-presence-badge"
+                  class="pointer-events-none absolute z-30"
+                  style={{ left: pos().left, top: pos().top }}
+                />
+              );
+            }}
+          </Each>
+        </If>
+        <If when={isVdpEnabled()}>
+          <Each of={elementIds()} key={(id) => id}>
+            {(id) => <VdpAnchor testId={`wb-el-${id()}`} role="graphics-object" />}
+          </Each>
         </If>
       </View>
     );

@@ -955,6 +955,8 @@ pub struct Presence {
     pub updated_at: Option<i64>,
     #[serde(default = "default_true")]
     pub has_cursor: bool,
+    #[serde(default)]
+    pub hide_label: bool,
     pub rev: i64,
 }
 
@@ -975,6 +977,7 @@ impl Default for Presence {
             viewport: None,
             updated_at: None,
             has_cursor: true,
+            hide_label: false,
             rev: 0,
         }
     }

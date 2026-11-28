@@ -65,6 +65,10 @@ const CARD_LIKE_BLOCKS: ReadonlySet<DocBlock["type"]> = new Set([
   "pageBreak",
 ]);
 
+export function isCardLikeBlock(type: DocBlock["type"]): boolean {
+  return CARD_LIKE_BLOCKS.has(type);
+}
+
 export function outerBlockSpacingClass(block: DocBlock, prevBlock?: DocBlock): string {
   if (prevBlock === undefined) {
     return block.type === "heading" ? "mt-1 mb-0.5" : "";

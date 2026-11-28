@@ -14,7 +14,7 @@ use crate::engine::whiteboard::interaction::WhiteboardController;
 use crate::engine::whiteboard::model::{BoardDoc, ElementId, ElementKind, Point2, Rect2};
 use crate::engine::whiteboard::spatial::SpatialIndex;
 
-pub use elements::{paint_board_into_painter, paint_board_into_painter_ex};
+pub use elements::{paint_board_into_painter, paint_board_into_painter_animated, paint_board_into_painter_ex};
 pub use overlay::{
     paint_minimap, paint_minimap_painter, paint_overlay_layer, paint_overlay_layer_painter, paint_overlay_layer_painter_filtered, paint_presences_into_painter,
 };
@@ -128,7 +128,7 @@ pub fn paint_board_frame_painter(input: &FramePaintInput<'_>) -> Painter {
     let pal = WhiteboardPalette::for_mode(input.dark);
     let (mut painter, visible) = paint_world_backdrop(&ctrl.doc, &ctrl.spatial, &ctrl.lookup, camera, input.viewport_size, &pal);
 
-    painter = paint_board_into_painter_ex(
+    painter = paint_board_into_painter_animated(
         painter,
         &ctrl.doc,
         &ctrl.lookup,
@@ -138,6 +138,7 @@ pub fn paint_board_frame_painter(input: &FramePaintInput<'_>) -> Painter {
         input.editing_milestone,
         input.anim_hidden_ids,
         input.fast_shadows,
+        (!ctrl.element_appear.is_empty()).then_some(&ctrl.element_appear),
     );
     painter = paint_overlay_world_contents(painter, ctrl, &pal, camera.zoom, input.dismissed_notes, input.fast_shadows);
     painter = painter.restore();

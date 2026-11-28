@@ -8,16 +8,16 @@ use super::state::{WbState, animations_disabled, map_mods, map_mouse_btn};
 
 pub(super) fn build_stage(st: &WbState) -> View {
     // Single atomic canvas painting background, grid, world elements, selection chrome, and presences in one pass.
-    let board_canvas: CanvasView = {
-        let st_paint = st.clone();
-        let st_layout = st.clone();
-        canvas(move || {
-            let _ = st_paint.canvas_tick.get();
-            let active_edit = st_paint.inline_edit.get();
-            let dismissed = st_paint.dismissed_notes.get();
-            let is_dark = dark();
-            let vw_vh = st_paint.viewport_size.get();
-            let fast_shadows = !animations_disabled() && st_paint.navigating.get();
+    let st_paint = st.clone();
+    let st_layout = st.clone();
+    let board_canvas = dynamic(move || {
+        let _ = st_paint.canvas_tick.get();
+        let active_edit = st_paint.inline_edit.get();
+        let dismissed = st_paint.dismissed_notes.get();
+        let is_dark = dark();
+        let vw_vh = st_paint.viewport_size.get();
+        let fast_shadows = !animations_disabled() && st_paint.navigating.get();
+        let drawing = {
             let ctrl = st_paint.controller.borrow();
             paint_board_frame_painter(&FramePaintInput {
                 controller: &ctrl,
@@ -29,10 +29,23 @@ pub(super) fn build_stage(st: &WbState) -> View {
                 dismissed_notes: &dismissed,
                 fast_shadows,
             })
-        })
-        .test_id("wb-canvas")
-        .absolute()
-        .inset(px(0.0))
+        };
+        canvas(drawing).test_id("wb-canvas").absolute().inset(px(0.0)).into_element()
+    });
+
+    let st_down = st.clone();
+    let st_move = st.clone();
+    let st_up = st.clone();
+    let st_wheel = st.clone();
+    let st_pinch = st.clone();
+    let st_ctx = st.clone();
+
+    view()
+        .test_id("wb-stage")
+        .relative()
+        .flex_1()
+        .h_full()
+        .overflow_hidden()
         .on_layout(move |b: &Bounds<Points>| {
             let w = b.size.width.0.max(120.0);
             let h = b.size.height.0.max(120.0);
@@ -51,21 +64,6 @@ pub(super) fn build_stage(st: &WbState) -> View {
                 st_layout.maybe_emit_viewport(true);
             }
         })
-    };
-
-    let st_down = st.clone();
-    let st_move = st.clone();
-    let st_up = st.clone();
-    let st_wheel = st.clone();
-    let st_pinch = st.clone();
-    let st_ctx = st.clone();
-
-    view()
-        .test_id("wb-stage")
-        .relative()
-        .flex_1()
-        .h_full()
-        .overflow_hidden()
         .child(board_canvas)
         .on_press_down(move |e: &PressEvent| {
             st_down.context_menu.set(None);

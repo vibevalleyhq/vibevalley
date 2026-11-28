@@ -738,7 +738,7 @@
         "phase": {
           "_tag": "resting"
         },
-        "phaseText": "歇着（上一轮做完了）"
+        "phaseText": "歇着（上一轮已完成）"
       },
       {
         "id": "w3",

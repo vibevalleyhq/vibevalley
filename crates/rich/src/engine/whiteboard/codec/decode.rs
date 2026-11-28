@@ -126,6 +126,7 @@ fn presence_from_wire(fallback_id: &str, rev: i64, wire: WirePresence, default_x
         viewport,
         updated_at: wire.updated_at,
         has_cursor,
+        hide_label: wire.hide_label,
         rev,
     })
 }

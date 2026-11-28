@@ -66,18 +66,18 @@
     "done": "{title}\n做到什么程度算完：{done}"
   },
   "timeline": {
-    "opened": "开单",
+    "opened": "创建工单",
     "refine": "开始起草",
-    "told": "你带了话，接着做一轮",
-    "start": "开工",
-    "restart": "重开，接着做",
-    "cron": "{missed, select, true {定时开工（补跑）} other {定时开工}}",
-    "runtime": "环境自己接着做",
-    "refined": "起草好了",
-    "reported": "交回来了",
+    "told": "发送补充说明，继续处理",
+    "start": "开始执行",
+    "restart": "重开并继续执行",
+    "cron": "{missed, select, true {定时触发（补跑）} other {定时触发}}",
+    "runtime": "执行环境继续处理",
+    "refined": "起草完成",
+    "reported": "提交结果",
     "accepted": "验收通过",
-    "asked": "问你：{questions}",
-    "rejected": "打回：{lines}",
+    "asked": "向你提问：{questions}",
+    "rejected": "打回修改：{lines}",
     "rejectedSeparator": "；"
   },
   "refinement": {

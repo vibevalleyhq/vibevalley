@@ -100,6 +100,8 @@ pub(super) struct WirePresence {
     pub(super) selected_ids: Vec<String>,
     pub(super) viewport: Option<PresenceViewport>,
     pub(super) updated_at: Option<i64>,
+    #[serde(default)]
+    pub(super) hide_label: bool,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

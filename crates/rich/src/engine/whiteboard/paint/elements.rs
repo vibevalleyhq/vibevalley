@@ -30,7 +30,7 @@ pub fn paint_board_into_painter(
 
 #[allow(clippy::too_many_arguments)]
 pub fn paint_board_into_painter_ex(
-    mut painter: Painter,
+    painter: Painter,
     doc: &BoardDoc,
     lookup: &HashMap<ElementId, Rect2>,
     pal: &WhiteboardPalette,
@@ -40,12 +40,40 @@ pub fn paint_board_into_painter_ex(
     anim_hidden_ids: &BTreeSet<ElementId>,
     fast_shadows: bool,
 ) -> Painter {
+    paint_board_into_painter_animated(
+        painter,
+        doc,
+        lookup,
+        pal,
+        visible_indices,
+        editing_id,
+        editing_milestone,
+        anim_hidden_ids,
+        fast_shadows,
+        None,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn paint_board_into_painter_animated(
+    mut painter: Painter,
+    doc: &BoardDoc,
+    lookup: &HashMap<ElementId, Rect2>,
+    pal: &WhiteboardPalette,
+    visible_indices: Option<&BTreeSet<usize>>,
+    editing_id: Option<&ElementId>,
+    editing_milestone: Option<usize>,
+    anim_hidden_ids: &BTreeSet<ElementId>,
+    fast_shadows: bool,
+    element_appear: Option<&HashMap<ElementId, f32>>,
+) -> Painter {
     let should_draw = |idx: usize, el: &ElementRecord| -> bool {
         if anim_hidden_ids.contains(&el.id) {
             return false;
         }
         visible_indices.is_none_or(|vis| vis.contains(&idx))
     };
+    let appear_of = |id: &ElementId| -> f32 { element_appear.and_then(|m| m.get(id).copied()).unwrap_or(1.0) };
 
     // Pass 1: Containers & Claims
     for (idx, el) in doc.elements.iter().enumerate() {
@@ -54,7 +82,7 @@ pub fn paint_board_into_painter_ex(
         }
         if matches!(el.kind, ElementKind::Container { .. } | ElementKind::Claim { .. }) {
             let hide_text = editing_id == Some(&el.id);
-            painter = paint_element(painter, el, lookup, pal, hide_text, None, fast_shadows);
+            painter = paint_element(painter, el, lookup, pal, hide_text, None, fast_shadows, appear_of(&el.id));
         }
     }
 
@@ -65,7 +93,7 @@ pub fn paint_board_into_painter_ex(
         }
         if matches!(el.kind, ElementKind::Arrow { .. }) {
             let hide_text = editing_id == Some(&el.id);
-            painter = paint_element(painter, el, lookup, pal, hide_text, None, fast_shadows);
+            painter = paint_element(painter, el, lookup, pal, hide_text, None, fast_shadows, appear_of(&el.id));
         }
     }
 
@@ -77,7 +105,16 @@ pub fn paint_board_into_painter_ex(
         if matches!(el.kind, ElementKind::Timeline { .. }) {
             let is_editing = editing_id == Some(&el.id);
             let hide_ms = if is_editing { editing_milestone } else { None };
-            painter = paint_element(painter, el, lookup, pal, is_editing && editing_milestone.is_none(), hide_ms, fast_shadows);
+            painter = paint_element(
+                painter,
+                el,
+                lookup,
+                pal,
+                is_editing && editing_milestone.is_none(),
+                hide_ms,
+                fast_shadows,
+                appear_of(&el.id),
+            );
         }
     }
 
@@ -91,7 +128,7 @@ pub fn paint_board_into_painter_ex(
             ElementKind::Shape { .. } | ElementKind::Table { .. } | ElementKind::Image { .. } | ElementKind::HtmlEmbed { .. }
         ) {
             let hide_text = editing_id == Some(&el.id);
-            painter = paint_element(painter, el, lookup, pal, hide_text, None, fast_shadows);
+            painter = paint_element(painter, el, lookup, pal, hide_text, None, fast_shadows, appear_of(&el.id));
         }
     }
 
@@ -102,7 +139,7 @@ pub fn paint_board_into_painter_ex(
         }
         if matches!(el.kind, ElementKind::Text { .. }) {
             let hide_text = editing_id == Some(&el.id);
-            painter = paint_element(painter, el, lookup, pal, hide_text, None, fast_shadows);
+            painter = paint_element(painter, el, lookup, pal, hide_text, None, fast_shadows, appear_of(&el.id));
         }
     }
 
@@ -112,7 +149,7 @@ pub fn paint_board_into_painter_ex(
             continue;
         }
         if matches!(el.kind, ElementKind::Sticker { .. } | ElementKind::Svg { .. }) {
-            painter = paint_element(painter, el, lookup, pal, false, None, fast_shadows);
+            painter = paint_element(painter, el, lookup, pal, false, None, fast_shadows, appear_of(&el.id));
         }
     }
 
@@ -122,13 +159,14 @@ pub fn paint_board_into_painter_ex(
             continue;
         }
         if matches!(el.kind, ElementKind::Path { .. }) {
-            painter = paint_element(painter, el, lookup, pal, false, None, fast_shadows);
+            painter = paint_element(painter, el, lookup, pal, false, None, fast_shadows, appear_of(&el.id));
         }
     }
 
     painter
 }
 
+#[allow(clippy::too_many_arguments)]
 fn paint_element(
     mut painter: Painter,
     el: &ElementRecord,
@@ -137,15 +175,36 @@ fn paint_element(
     hide_text: bool,
     hide_milestone: Option<usize>,
     fast_shadows: bool,
+    appear_prog: f32,
 ) -> Painter {
     let has_rot = el.rotation_deg.abs() > 1e-4 && !el.is_arrow();
-    let has_alpha = el.opacity < 0.995;
+    let is_entering = appear_prog < 0.999;
+    let appear_ease = if is_entering {
+        let t = appear_prog.clamp(0.0, 1.0);
+        1.0 - (1.0 - t).powi(3)
+    } else {
+        1.0
+    };
+    let alpha = if is_entering {
+        el.opacity.clamp(0.05, 1.0) * (0.32 + 0.68 * appear_ease)
+    } else {
+        el.opacity
+    };
+    let has_alpha = alpha < 0.995;
     let center = el.bbox(lookup).center();
 
-    if has_rot || has_alpha {
+    if has_rot || has_alpha || is_entering {
         painter = painter.save();
         if has_alpha {
-            painter = painter.global_alpha(el.opacity.clamp(0.05, 1.0));
+            painter = painter.global_alpha(alpha.clamp(0.05, 1.0));
+        }
+        if is_entering && !el.is_arrow() {
+            let s = 0.86 + 0.14 * appear_ease;
+            let lift = (1.0 - appear_ease) * 10.0;
+            painter = painter
+                .translate(center.x as f32, (center.y as f32) + lift)
+                .scale(s, s)
+                .translate(-(center.x as f32), -(center.y as f32));
         }
         if has_rot {
             painter = painter
@@ -318,7 +377,25 @@ fn paint_element(
         } => paint_ink_stroke(painter, points, stroke, *stroke_width, *mode, pal),
     };
 
-    if has_rot || has_alpha {
+    if is_entering && !el.is_arrow() {
+        let glow_rect = el.bbox(lookup).expand(f64::from((1.0 - appear_ease) * 6.0));
+        let glow_bounds = Bounds::new(
+            point(px(glow_rect.x as f32), px(glow_rect.y as f32)),
+            size(px(glow_rect.w as f32), px(glow_rect.h as f32)),
+        );
+        let ring = Hsla {
+            a: (1.0 - appear_ease) * 0.65,
+            ..pal.selection
+        };
+        painter = painter
+            .begin_path()
+            .stroke_color(ring)
+            .line_width(2.0)
+            .round_rect(glow_bounds, px(12.0))
+            .stroke();
+    }
+
+    if has_rot || has_alpha || is_entering {
         painter = painter.restore();
     }
     painter

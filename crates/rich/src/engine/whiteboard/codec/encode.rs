@@ -403,6 +403,7 @@ pub fn encode_presence_write(presence: &Presence) -> WhiteboardWriteInput {
         selected_ids: presence.selected_ids.iter().map(|i| i.0.clone()).collect(),
         viewport: presence.viewport,
         updated_at: presence.updated_at,
+        hide_label: presence.hide_label,
     };
     WhiteboardWriteInput {
         op: WhiteboardEntryOp::Set,

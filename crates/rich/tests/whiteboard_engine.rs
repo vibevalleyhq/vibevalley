@@ -1161,3 +1161,150 @@ fn regression_whiteboard_entry_deserializes_note_id_and_artifact_id_wire_shapes(
     let legacy_entries: Vec<WhiteboardEntry> = serde_json::from_str(&legacy_json).expect("artifactId alias should deserialize");
     assert_eq!(legacy_entries[0].note_id, "art_01");
 }
+
+#[test]
+fn regression_remote_delta_refits_untouched_camera_and_selection_region_dedups_cursor_pill() {
+    use nsh_core::canvas::CanvasOp;
+    use std::collections::BTreeSet;
+    use vibevalley_rich::engine::whiteboard::{FramePaintInput, paint_board_frame};
+
+    let make_card = |id: &str, x: f64, y: f64, w: f64, h: f64| {
+        ElementRecord::new(
+            id,
+            ElementKind::Shape {
+                x,
+                y,
+                w,
+                h,
+                shape: ShapeKind::Card,
+                title: id.to_owned(),
+                body: String::new(),
+                fill: WbFill::Water,
+                stroke: None,
+                stroke_style: StrokeStyle::Solid,
+                corner_radius: None,
+                sticker: None,
+                sticker_svg: None,
+                badge: None,
+                align: TextAlign::Center,
+            },
+        )
+    };
+
+    let mut initial = BoardDoc::new("Delta AutoFit");
+    initial.elements.push(make_card("c1", 48.0, 40.0, 220.0, 110.0));
+    initial.elements.push(make_card("c2", 340.0, 40.0, 220.0, 110.0));
+
+    let mut ctrl = WhiteboardController::new(initial);
+    ctrl.set_viewport_size(900.0, 620.0);
+    let cam_initial = ctrl.camera;
+
+    // Adding lower-row elements via remote delta refits an untouched camera so new lanes stay visible.
+    let c3 = make_card("c3", 48.0, 360.0, 220.0, 110.0);
+    let c3_write = encode_element_write(&c3, false);
+    let delta_effs = ctrl.apply_remote_delta(&[make_entry(&c3_write.path, 2, c3_write.value.as_deref().unwrap())], &[], 2);
+    assert_ne!(ctrl.camera, cam_initial, "untouched camera should refit when remote delta expands bounds");
+    assert!(
+        delta_effs.iter().any(|e| matches!(e, ControllerEffect::ViewportChanged { .. })),
+        "refitting camera on remote delta should emit ViewportChanged"
+    );
+
+    // Once user moves the camera, subsequent remote deltas must preserve the user's viewport.
+    ctrl.mark_user_moved_camera();
+    let cam_locked = ctrl.camera;
+    let c4 = make_card("c4", 48.0, 720.0, 220.0, 110.0);
+    let c4_write = encode_element_write(&c4, false);
+    let locked_effs = ctrl.apply_remote_delta(&[make_entry(&c4_write.path, 3, c4_write.value.as_deref().unwrap())], &[], 3);
+    assert_eq!(ctrl.camera, cam_locked, "remote delta must not override user-moved camera");
+    assert!(
+        !locked_effs.iter().any(|e| matches!(e, ControllerEffect::ViewportChanged { .. })),
+        "user-moved camera should not emit ViewportChanged on remote delta"
+    );
+
+    // Selection presence with explicit region box renders its collaborator pill exactly once.
+    ctrl.doc.presences.push(Presence {
+        id: "agent:hr".to_owned(),
+        name: "苏晴".to_owned(),
+        kind: PresenceKind::Selection,
+        x: 100.0,
+        y: 120.0,
+        w: Some(220.0),
+        h: Some(100.0),
+        status: Some("绘制节点".to_owned()),
+        has_cursor: true,
+        ..Presence::default()
+    });
+    let hidden = BTreeSet::new();
+    let dismissed = BTreeSet::new();
+    let drawing = paint_board_frame(&FramePaintInput {
+        controller: &ctrl,
+        viewport_size: (900.0, 620.0),
+        editing_id: None,
+        editing_milestone: None,
+        dark: false,
+        anim_hidden_ids: &hidden,
+        dismissed_notes: &dismissed,
+        fast_shadows: false,
+    });
+    let badge_count = drawing
+        .ops
+        .iter()
+        .filter(|op| matches!(op, CanvasOp::FillText { text, .. } if text.as_ref() == "苏晴 · 绘制节点"))
+        .count();
+    assert_eq!(badge_count, 1, "Selection region presence must render collaborator pill once");
+
+    // Entrance animation (`element_appear`) populates when `smooth_animations = true`, steps down, and clears.
+    ctrl.smooth_animations = true;
+    let c5 = make_card("c5", 340.0, 360.0, 220.0, 110.0);
+    let c5_write = encode_element_write(&c5, false);
+    let _ = ctrl.apply_remote_delta(&[make_entry(&c5_write.path, 4, c5_write.value.as_deref().unwrap())], &[], 4);
+    assert!(ctrl.element_appear.contains_key(&ElementId::new("c5")));
+    assert!(ctrl.needs_animation());
+    let mid_drawing = paint_board_frame(&FramePaintInput {
+        controller: &ctrl,
+        viewport_size: (900.0, 620.0),
+        editing_id: None,
+        editing_milestone: None,
+        dark: false,
+        anim_hidden_ids: &hidden,
+        dismissed_notes: &dismissed,
+        fast_shadows: false,
+    });
+    assert!(!mid_drawing.ops.is_empty());
+    for _ in 0..12 {
+        let _ = ctrl.step_animations(0.05, false);
+    }
+    assert!(ctrl.element_appear.is_empty(), "entrance animation should settle cleanly");
+
+    // `hide_label: true` keeps dashed region box but suppresses the duplicate canvas text chip.
+    ctrl.doc.presences.clear();
+    ctrl.doc.presences.push(Presence {
+        id: "agent:collector".to_owned(),
+        name: "顾言".to_owned(),
+        kind: PresenceKind::Selection,
+        x: 100.0,
+        y: 120.0,
+        w: Some(220.0),
+        h: Some(100.0),
+        status: Some("绘制卡片".to_owned()),
+        has_cursor: true,
+        hide_label: true,
+        ..Presence::default()
+    });
+    let hidden_label_drawing = paint_board_frame(&FramePaintInput {
+        controller: &ctrl,
+        viewport_size: (900.0, 620.0),
+        editing_id: None,
+        editing_milestone: None,
+        dark: false,
+        anim_hidden_ids: &hidden,
+        dismissed_notes: &dismissed,
+        fast_shadows: false,
+    });
+    let suppressed_count = hidden_label_drawing
+        .ops
+        .iter()
+        .filter(|op| matches!(op, CanvasOp::FillText { text, .. } if text.as_ref().contains("顾言")))
+        .count();
+    assert_eq!(suppressed_count, 0, "hide_label: true must suppress canvas text chip");
+}

@@ -677,7 +677,7 @@ export function RichInlineField(props: {
           content: props.contentClass ?? "px-0 py-0",
           placeholder: "text-faint",
           caret: "bg-accent",
-          selection: "bg-accent/20",
+          selection: "bg-water/15",
           nodes: {
             paragraph: props.textClass ?? "w-full min-w-0 text-sm leading-6 text-ink",
           },

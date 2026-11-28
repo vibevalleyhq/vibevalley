@@ -9,8 +9,8 @@ import type { Picture } from "../../../design/Lightbox";
 import { motionClass, popupTransition } from "../../../design/motion";
 import { Keyed } from "../../../infra/base/dom";
 import { useVdpNode } from "../../../infra/vdpProbe";
-import { filterRemotePresences, NotePresenceBadges } from "../PresenceBadges";
-import { type BlockEditorTelemetryPatch, type FocusRequest, outerBlockSpacingClass } from "./blockEditorShared";
+import { filterRemotePresences } from "../PresenceBadges";
+import { type BlockEditorTelemetryPatch, type FocusRequest, isCardLikeBlock, outerBlockSpacingClass } from "./blockEditorShared";
 import {
   type BlockFocusTarget,
   type BlockType,
@@ -60,6 +60,7 @@ interface BlockItemProps {
   readonly issues: readonly Issue[];
   readonly focusedBlockId?: string | undefined;
   readonly focusRequest?: FocusRequest | undefined;
+  readonly highlighted?: boolean | undefined;
   readonly presences?: readonly NotePresence[] | undefined;
   readonly depth?: number | undefined;
   readonly embedded?: boolean | undefined;
@@ -453,6 +454,8 @@ export function BlockItem(props: BlockItemProps) {
   const compact = () => (props.depth ?? 0) > 0 || props.compactGutter === true;
   const compactLine = () => props.block.type === "todo" || props.block.type === "list";
   const blockPresences = () => filterRemotePresences(props.presences ?? []).filter((p) => p.nodeId === props.block.id || p.selector === props.block.id);
+  const isSelectedSubtle = () =>
+    !isCardLikeBlock(props.block.type) && (props.focusedBlockId === props.block.id || props.highlighted === true || blockPresences().length > 0);
 
   let blockRef: ViewRef | undefined;
   useVdpNode({
@@ -467,11 +470,8 @@ export function BlockItem(props: BlockItemProps) {
         blockRef = el;
       }}
       testID={`doc-block-${props.block.id}`}
-      class={`group relative flex-row items-start rounded-md pr-1 ${blockPresences().length > 0 ? "ring-1 ring-accent/35" : ""} ${compactLine() ? "py-0" : "py-0.5"} ${rootEmbedded() ? "pl-0" : compact() ? "pl-9" : "pl-14"} ${outerBlockSpacingClass(props.block, props.prevBlock)}`}
+      class={`group relative flex-row items-start rounded-md pr-1 ${compactLine() ? "py-0" : "py-0.5"} ${rootEmbedded() ? "pl-0" : compact() ? "pl-9" : "pl-14"} ${outerBlockSpacingClass(props.block, props.prevBlock)}`}
     >
-      <If when={blockPresences().length > 0}>
-        <NotePresenceBadges peers={blockPresences()} testIdPrefix="doc-presence-badge" class="pointer-events-none absolute -top-5 right-1 z-20" />
-      </If>
       <View
         class={`absolute flex-row items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 ${
           compactLine() ? "top-0.5" : "top-1"
@@ -718,7 +718,7 @@ export function BlockItem(props: BlockItemProps) {
         </Menu>
       </View>
 
-      <View class="min-w-0 flex-1">
+      <View class={`min-w-0 flex-1 rounded-sm ${isSelectedSubtle() ? "bg-hover" : ""}`}>
         <Keyed key={props.block.type}>
           {() =>
             renderBlockContent(

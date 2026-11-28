@@ -564,7 +564,6 @@ export function createWsVdpDriver(client: VdpWsClient): VdpDriver {
     },
     async uiWaitFor(wait): Promise<VdpUiWaitForResult> {
       try {
-        await client.call("Page.draw", {}).catch(() => {});
         const res = await client.callDecoded("UI.waitFor", { ...wait }, UiWaitForResultSchema, {
           timeoutMs: (wait.timeoutMs ?? 4_000) + 4_000,
         });
@@ -590,11 +589,14 @@ export function createWsVdpDriver(client: VdpWsClient): VdpDriver {
     },
     async settle(ms: number): Promise<void> {
       await client.call("Page.draw", {}).catch(() => {});
-      const half = Math.max(0, Math.floor(ms / 2));
-      if (half > 0) await sleep(half);
-      await client.call("Page.draw", {}).catch(() => {});
-      const rest = Math.max(0, ms - half);
-      if (rest > 0) await sleep(rest);
+      if (ms <= 0) return;
+      let remaining = ms;
+      while (remaining > 0) {
+        const slice = Math.min(60, remaining);
+        await sleep(slice);
+        remaining -= slice;
+        await client.call("Page.draw", {}).catch(() => {});
+      }
     },
   };
 }

@@ -415,6 +415,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
       <TodoCriteriaSection
         value={d().criteria}
         criteria={criteria()}
+        checks={props.item.checks}
         editable={!closed()}
         busy={busy()}
         onInput={(v) => edit({ criteria: v })}
