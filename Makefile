@@ -3,7 +3,7 @@ PKG ?=
 SCENE ?= all
 VDP_OUT ?= /tmp/vv-vdp
 
-.PHONY: help fmt i18n gen rust rust-clippy rust-test rust-changed rust-fast rust-audit rust-loom protocol protocol-write goldens ts mac mobile site docs check verify verify-fast pr-check vdp vdp-ui vdp-fast dev-server dev-mac package-alpha package-alpha-dmg deadcode comment-review bump build-alpha build-beta build-release
+.PHONY: help fmt i18n gen rust rust-clippy rust-test rust-changed rust-fast rust-audit rust-loom protocol protocol-write goldens ts mac mobile site docs check verify verify-fast pr-check vdp vdp-ui vdp-fast dev-server dev-mac package-alpha package-alpha-dmg deadcode patrol comment-review bump build-alpha build-beta build-release
 
 help:
 	@printf '%s\n' \
@@ -37,6 +37,7 @@ help:
 		'  package-alpha    vp run package:mac:alpha' \
 		'  package-alpha-dmg vp run package:mac:alpha:dmg' \
 		'  deadcode         vp run deadcode' \
+		'  patrol           vp run patrol -- scan' \
 		'  comment-review   vpx scripts/audit/comment-review.ts' \
 		'  bump             vp run bump' \
 		'  build-alpha      vp run build:alpha' \
@@ -103,6 +104,8 @@ package-alpha-dmg:
 	vp run package:mac:alpha:dmg
 deadcode:
 	vp run deadcode
+patrol:
+	vp run patrol -- scan
 comment-review:
 	vpx scripts/audit/comment-review.ts
 bump:

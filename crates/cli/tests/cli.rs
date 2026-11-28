@@ -41,9 +41,7 @@ fn spawn_server() -> TestServer {
         "reviewer",
     ];
     let work = dir.path().join("work");
-    for subdir in ["repos", "worktrees"] {
-        std::fs::create_dir_all(work.join(subdir)).unwrap();
-    }
+    std::fs::create_dir_all(work.join("repos")).unwrap();
     let app = vibevalley_server::create_app_blocking(vibevalley_server::Config {
         registry: Some(Arc::new(registry)),
         starters: starters.iter().map(|s| s.to_string()).collect(),
@@ -219,10 +217,6 @@ const COMMANDS: &[&str] = &[
     "memory delete",
     "memory list",
     "memory search",
-    "orchestrator approval list",
-    "orchestrator approval resolve",
-    "orchestrator open",
-    "orchestrator stop",
     "remote code",
     "remote disable",
     "remote enable",
@@ -233,6 +227,8 @@ const COMMANDS: &[&str] = &[
     "repo pr submit",
     "runtime list",
     "runtime refresh",
+    "session approval list",
+    "session approval resolve",
     "session compact",
     "session events",
     "session list",
@@ -266,21 +262,18 @@ fn bare_invocation_and_group_invocations_show_help() {
 }
 
 #[test]
-fn orchestrator_commands_and_approvals_use_http() {
+fn session_approvals_and_stop_use_http() {
     let srv = spawn_server();
-    let opened = srv.run(&["orchestrator", "open"]);
-    assert_eq!(opened.code, 0, "{:?}", opened.failure);
-
-    let listed = srv.run(&["orchestrator", "approval", "list", "--conversation", "orchestrator", "--json"]);
+    let listed = srv.run(&["session", "approval", "list", "--session", "orchestrator", "--json"]);
     assert_eq!((listed.code, listed.out.as_str()), (0, "[]"), "{:?}", listed.failure);
 
-    let missing = srv.run(&["orchestrator", "approval", "resolve", "orchestrator", "missing", "call-1", "approve", "--json"]);
+    let missing = srv.run(&["session", "approval", "resolve", "orchestrator", "missing", "call-1", "approve", "--json"]);
     assert_eq!((missing.code, missing.tag()), (4, "Missing"), "{:?}", missing.failure);
 
-    let incomplete = srv.run(&["orchestrator", "approval", "resolve", "orchestrator", "missing", "approve"]);
+    let incomplete = srv.run(&["session", "approval", "resolve", "orchestrator", "missing", "approve"]);
     assert_eq!((incomplete.code, incomplete.tag()), (2, "MissingArgument"));
 
-    let stopped = srv.run(&["orchestrator", "stop"]);
+    let stopped = srv.run(&["session", "stop", "orchestrator"]);
     assert_eq!(stopped.code, 0, "{:?}", stopped.failure);
 }
 
@@ -687,7 +680,6 @@ fn issue_watch_and_worker_round_trip() {
 #[test]
 fn session_compact_and_run_code_cli_work() {
     let srv = spawn_server();
-    assert_eq!(srv.run(&["orchestrator", "open"]).code, 0);
     assert_eq!(srv.run(&["issue", "create", "CM Probe"]).code, 0);
 
     let run = srv.run(&[

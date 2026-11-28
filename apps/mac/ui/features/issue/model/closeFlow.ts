@@ -1,4 +1,133 @@
-import type { Changes } from "@vibevalley/protocol";
+import type { Changes, DeliveryReceipt } from "@vibevalley/protocol";
+import { noteId } from "@vibevalley/protocol/schema";
+
+export type DeliveryReceiptKind = "none" | DeliveryReceipt["kind"];
+
+export interface DeliveryReceiptDraft {
+  readonly kind: DeliveryReceiptKind;
+  readonly url: string;
+  readonly number: string;
+  readonly sha: string;
+  readonly branch: string;
+  readonly noteId: string;
+  readonly title: string;
+  readonly summary: string;
+}
+
+export type DeliveryReceiptMissingField = "url" | "sha" | "noteId" | "summary";
+
+export type BuiltDeliveryReceipt =
+  | { readonly ok: true; readonly receipt?: DeliveryReceipt }
+  | { readonly ok: false; readonly missing: DeliveryReceiptMissingField };
+
+export function initialReceiptDraft(existing?: DeliveryReceipt): DeliveryReceiptDraft {
+  const empty: DeliveryReceiptDraft = {
+    kind: "none",
+    url: "",
+    number: "",
+    sha: "",
+    branch: "",
+    noteId: "",
+    title: "",
+    summary: "",
+  };
+  if (!existing) return empty;
+  switch (existing.kind) {
+    case "pull_request":
+      return {
+        ...empty,
+        kind: "pull_request",
+        url: existing.url,
+        number: existing.number !== undefined ? String(existing.number) : "",
+        branch: existing.branch ?? "",
+        summary: existing.summary ?? "",
+      };
+    case "commit":
+      return {
+        ...empty,
+        kind: "commit",
+        sha: existing.sha,
+        branch: existing.branch ?? "",
+        summary: existing.summary ?? "",
+      };
+    case "note":
+      return {
+        ...empty,
+        kind: "note",
+        noteId: existing.noteId,
+        title: existing.title ?? "",
+        summary: existing.summary ?? "",
+      };
+    case "answer":
+      return {
+        ...empty,
+        kind: "answer",
+        summary: existing.summary,
+      };
+  }
+}
+
+export function buildDeliveryReceipt(draft: DeliveryReceiptDraft): BuiltDeliveryReceipt {
+  const trim = (value: string) => value.trim();
+  switch (draft.kind) {
+    case "none":
+      return { ok: true };
+    case "pull_request": {
+      const url = trim(draft.url);
+      if (!url) return { ok: false, missing: "url" };
+      const rawNum = trim(draft.number);
+      const parsedNum = rawNum !== "" ? Number(rawNum) : Number.NaN;
+      const num = Number.isInteger(parsedNum) && parsedNum > 0 ? parsedNum : undefined;
+      const branch = trim(draft.branch) || undefined;
+      const summary = trim(draft.summary) || undefined;
+      return {
+        ok: true,
+        receipt: {
+          kind: "pull_request",
+          url,
+          ...(num !== undefined ? { number: num } : {}),
+          ...(branch !== undefined ? { branch } : {}),
+          ...(summary !== undefined ? { summary } : {}),
+        },
+      };
+    }
+    case "commit": {
+      const sha = trim(draft.sha);
+      if (!sha) return { ok: false, missing: "sha" };
+      const branch = trim(draft.branch) || undefined;
+      const summary = trim(draft.summary) || undefined;
+      return {
+        ok: true,
+        receipt: {
+          kind: "commit",
+          sha,
+          ...(branch !== undefined ? { branch } : {}),
+          ...(summary !== undefined ? { summary } : {}),
+        },
+      };
+    }
+    case "note": {
+      const id = trim(draft.noteId);
+      if (!id) return { ok: false, missing: "noteId" };
+      const title = trim(draft.title) || undefined;
+      const summary = trim(draft.summary) || undefined;
+      return {
+        ok: true,
+        receipt: {
+          kind: "note",
+          noteId: noteId(id),
+          ...(title !== undefined ? { title } : {}),
+          ...(summary !== undefined ? { summary } : {}),
+        },
+      };
+    }
+    case "answer": {
+      const summary = trim(draft.summary);
+      if (!summary) return { ok: false, missing: "summary" };
+      return { ok: true, receipt: { kind: "answer", summary } };
+    }
+  }
+}
 
 export type CloseOperation =
   | { readonly kind: "cancel" }

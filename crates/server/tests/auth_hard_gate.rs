@@ -270,7 +270,7 @@ fn patrol_and_cron_turns_obey_four_tier_issue_authorization_hard_gates() {
     );
     assert_eq!(cron_res.biz_code, 0, "{}", cron_res.message);
     clock.advance(Duration::from_millis(1_500));
-    block_on(app.test_internals().cron.tick_async());
+    block_on(app.test_internals().orchestration.cron.tick_async());
 
     crate::support::wait_until_channel_event(app.test_internals().channel, Duration::from_secs(10), "cron reply", || {
         let msgs = app
@@ -477,7 +477,7 @@ fn three_run_modes_narrow_prompts_in_chinese_and_mcp_write_tools() {
 #[test]
 fn human_pause_persists_across_restart_blocks_auto_wake_and_clears_on_user_resume() {
     let dir = tempfile::tempdir().unwrap();
-    let main = repo(dir.path(), "app");
+    let main = repo(&dir.path().join("repos"), "app");
     assert!(main.exists());
 
     let mut reg1 = Registry::new();

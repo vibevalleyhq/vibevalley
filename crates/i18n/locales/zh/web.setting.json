@@ -84,7 +84,7 @@
     "chat": "微信 飞书 QQ 聊天通道 连接器 配对",
     "github": "GitHub Token gh PR 登录 直连",
     "remote": "远程 手机 局域网 LAN Wi-Fi 直连 Tailscale 配对 二维码 设备 iOS Android CLI 命令行 执行机 沙箱 监听 令牌 总控端 内嵌 远端",
-    "data": "家目录 设置文件 仓库 目录 工作树 存储 后端 数据 data storage",
+    "data": "家目录 设置文件 仓库 目录 存储 后端 数据 data storage",
     "about": "版本 更新 命令行 CLI version update"
   },
   "scope": {
@@ -180,7 +180,7 @@
     "refresh": "重新检测"
   },
   "data": {
-    "intro": "查看本机数据目录、Git 仓库与工作树路径，以及当前存储后端。",
+    "intro": "查看本机数据目录、Git 仓库路径以及当前存储后端。",
     "storageTitle": "存储后端",
     "backend": "当前后端",
     "backendHint": "附件、媒体输入与笔记目录的底层存储后端",
@@ -189,7 +189,7 @@
     "backendMemory": "内存存储 (Memory)"
   },
   "providers": {
-    "intro": "统一配置 DeepSeek、MiniMax、MOSS 等模型商凭据（1 个模型商对应 1 个 API 密钥），验证连通性并自动拉取带能力标签的可用模型。"
+    "intro": "统一配置 DeepSeek 与 MOSS 模型商凭据（1 个模型商对应 1 个 API 密钥），验证连通性并自动拉取带能力标签的可用模型。"
   },
   "models": {
     "intro": "按场景选择主选模型与备选回退策略；仅从已配置并拉取到可用模型的模型商中选择。"
@@ -208,8 +208,6 @@
     "settingsHint": "钥匙和这几页的设置",
     "repos": "仓库目录",
     "reposHint": "这个空间的仓库，每个文件夹都是一个 git 仓库",
-    "worktrees": "工作树目录",
-    "worktreesHint": "执行会话运行时每个工单自己的检出",
     "copy": "复制路径",
     "copied": "路径复制好了",
     "reveal": "在访达里显示",

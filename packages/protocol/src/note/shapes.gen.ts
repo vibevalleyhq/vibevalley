@@ -275,7 +275,7 @@ export type NotePresence = {
 /**
  * Stable actor/peer identifier (e.g. "user" or "session:<id>").
  */
-id: string, name: string, color?: string, kind: NotePresenceKind, x?: number, y?: number, w?: number, h?: number, status?: string,
+id: string, name: string, color?: string, avatar?: string, kind: NotePresenceKind, x?: number, y?: number, w?: number, h?: number, status?: string,
 /**
  * Focused block, canvas node, or cell identifier inside `path`.
  */
@@ -366,17 +366,84 @@ export type NoteLinkListRequest = { entityKind: LinkEntityKind, entityId: string
 
 export type NoteLinkListResult = { outgoing: Array<NoteLink>, backlinks: Array<NoteLink>, };
 
+export const MediaAnnotationKindValues = ["pin", "rect", "arrow", "callout"] as const;
+export type MediaAnnotationKind = (typeof MediaAnnotationKindValues)[number];
+
+export const MediaAnnotationSeverityValues = ["p0", "p1", "p2", "ux"] as const;
+export type MediaAnnotationSeverity = (typeof MediaAnnotationSeverityValues)[number];
+
+export const MediaAnnotationStatusValues = ["open", "resolved"] as const;
+export type MediaAnnotationStatus = (typeof MediaAnnotationStatusValues)[number];
+
+export const MediaAnnotationSideValues = ["before", "after"] as const;
+export type MediaAnnotationSide = (typeof MediaAnnotationSideValues)[number];
+
+/**
+ * Normalized `0..=1` bounding rectangle over an image, immune to Retina 2x and viewport scaling.
+ */
+export type MediaAnnotationRect = { x: number, y: number, w: number, h: number, };
+
+/**
+ * Normalized `0..=1` coordinate point (used for arrow endpoints or pin anchors).
+ */
+export type MediaAnnotationPoint = { x: number, y: number, };
+
+/**
+ * Non-destructive interactive image annotation stored cleanly in JSON/CRDT without touching image pixels.
+ */
+export type MediaAnnotation = { id: string, number: number, kind?: MediaAnnotationKind, rect: MediaAnnotationRect, to?: MediaAnnotationPoint, side?: MediaAnnotationSide, severity: MediaAnnotationSeverity, title: string, body?: string, status: MediaAnnotationStatus, issueId?: IssueId, baseRowId?: string, author?: string, createdAt?: number, updatedAt?: number, };
+
+/**
+ * Aggregate review rollup across all [`MediaAnnotation`]s in a block or note.
+ */
+export type MediaAnnotationSummary = { total: number, open: number, resolved: number, p0: number, p1: number, p2: number, ux: number, linkedRows: number, linkedIssues: number, };
+
+/**
+ * Back-reference from a `BaseRow` to a specific `MediaAnnotation` in a `doc` or `media` note.
+ */
+export type BaseAnnotationRef = { noteId: NoteId, blockId: string, annotationId: string, number?: number, };
+
+export const ReviewSyncDirectionValues = ["docToBase", "baseToDoc"] as const;
+export type ReviewSyncDirection = (typeof ReviewSyncDirectionValues)[number];
+
+export type NoteAnnotationUpsertRequest = { id: NoteId,
+/**
+ * Target `DocBlock.id` for `doc` notes (`media` or `compare` block),
+ * or optional `media.json` item id for `media` notes.
+ */
+blockId?: string, annotation: MediaAnnotation,
+/**
+ * Optional linked `base` note id to keep `BaseRow.annotationRef` and review status in sync.
+ */
+baseNoteId?: NoteId, baseSheetId?: string, origin?: string, };
+
+export type NoteAnnotationDeleteRequest = { id: NoteId, blockId?: string, annotationId: string, baseNoteId?: NoteId, baseSheetId?: string, origin?: string, };
+
+export type NoteAnnotationMutationResult = { noteId: NoteId, blockId?: string, annotations: Array<MediaAnnotation>, summary: MediaAnnotationSummary, syncedBaseNoteId?: NoteId, syncedBaseRowId?: string, };
+
+export type NoteReviewSyncRequest = {
+/**
+ * The `doc` note whose `media`/`compare` annotations sync with an embedded `base` review checklist.
+ */
+id: NoteId,
+/**
+ * Optional target `base` note id; omit to reuse the first `baseEmbed` in `id` or create a built-in review checklist Base.
+ */
+baseNoteId?: NoteId, sheetId?: string, spawnIssueRepo?: string, direction?: ReviewSyncDirection, origin?: string, };
+
+export type NoteReviewSyncResult = { docNoteId: NoteId, baseNoteId: NoteId, sheetId: string, createdBase: boolean, linkedCount: number, updatedAnnotations: number, updatedRows: number, summary: MediaAnnotationSummary, baseSnapshot: BaseViewSnapshot, };
+
 export type DocKpiItem = { label: string, value: string, delta?: string, tone?: string, };
 
 export type DocChartSeries = { name: string, data: Array<number>, };
 
 export type DocColumn = { blocks: Array<DocBlock>, };
 
-export type BlockKind = { "type": "prose", text: string, } | { "type": "heading", level: number, text: string, } | { "type": "list", ordered: boolean, items: Array<string>, } | { "type": "todo", checked: boolean, text: string, } | { "type": "callout", tone: string, title?: string, text: string, } | { "type": "code", language?: string, code: string, } | { "type": "kpi", items: Array<DocKpiItem>, } | { "type": "chart", title?: string, kind: string, labels: Array<string>, series: Array<DocChartSeries>, } | { "type": "diagram", title?: string, source: string, } | { "type": "compare", title?: string, beforeLabel: string, afterLabel: string, beforeAsset: string, afterAsset: string, } | { "type": "media", mediaKind: string, src: string, caption?: string, } | { "type": "preview", entry: string, height?: number, title?: string, } | { "type": "baseEmbed", noteId: NoteId, sheetId?: string, viewId?: string, } | { "type": "issueCard", issueId: IssueId, } | { "type": "issueList", repo?: string, status?: string, tag?: string, limit?: number, } | { "type": "columns", columns: Array<DocColumn>, } | { "type": "pageBreak", title?: string, speakerNotes?: string, } | { "type": "divider" } | { "type": "quote", text: string, attribution?: string, } | { "type": "toggle", title: string, text: string, } | { "type": "table", headers: Array<string>, rows: Array<Array<string>>, alignments?: Array<string>, } | { "type": "bookmark", url: string, title?: string, description?: string, } | { "type": "toc", maxLevel?: number, } | { "type": "math", expression: string, display?: boolean, };
+export type BlockKind = { "type": "prose", text: string, } | { "type": "heading", level: number, text: string, } | { "type": "list", ordered: boolean, items: Array<string>, } | { "type": "todo", checked: boolean, text: string, } | { "type": "callout", tone: string, title?: string, text: string, } | { "type": "code", language?: string, code: string, } | { "type": "kpi", items: Array<DocKpiItem>, } | { "type": "chart", title?: string, kind: string, labels: Array<string>, series: Array<DocChartSeries>, } | { "type": "diagram", title?: string, source: string, } | { "type": "compare", title?: string, beforeLabel: string, afterLabel: string, beforeAsset: string, afterAsset: string, annotations?: Array<MediaAnnotation>, } | { "type": "media", mediaKind: string, src: string, caption?: string, annotations?: Array<MediaAnnotation>, } | { "type": "preview", entry: string, height?: number, title?: string, } | { "type": "baseEmbed", noteId: NoteId, sheetId?: string, viewId?: string, } | { "type": "issueCard", issueId: IssueId, } | { "type": "issueList", repo?: string, status?: string, tag?: string, limit?: number, } | { "type": "columns", columns: Array<DocColumn>, } | { "type": "pageBreak", title?: string, speakerNotes?: string, } | { "type": "divider" } | { "type": "quote", text: string, attribution?: string, } | { "type": "toggle", title: string, text: string, } | { "type": "table", headers: Array<string>, rows: Array<Array<string>>, alignments?: Array<string>, columnWidths?: Array<number>, } | { "type": "bookmark", url: string, title?: string, description?: string, } | { "type": "toc", maxLevel?: number, } | { "type": "math", expression: string, display?: boolean, };
 
-export type DocBlock = { id: string, collapsed?: boolean, children?: Array<DocBlock>, } & ({ "type": "prose", text: string, } | { "type": "heading", level: number, text: string, } | { "type": "list", ordered: boolean, items: Array<string>, } | { "type": "todo", checked: boolean, text: string, } | { "type": "callout", tone: string, title?: string, text: string, } | { "type": "code", language?: string, code: string, } | { "type": "kpi", items: Array<DocKpiItem>, } | { "type": "chart", title?: string, kind: string, labels: Array<string>, series: Array<DocChartSeries>, } | { "type": "diagram", title?: string, source: string, } | { "type": "compare", title?: string, beforeLabel: string, afterLabel: string, beforeAsset: string, afterAsset: string, } | { "type": "media", mediaKind: string, src: string, caption?: string, } | { "type": "preview", entry: string, height?: number, title?: string, } | { "type": "baseEmbed", noteId: NoteId, sheetId?: string, viewId?: string, } | { "type": "issueCard", issueId: IssueId, } | { "type": "issueList", repo?: string, status?: string, tag?: string, limit?: number, } | { "type": "columns", columns: Array<DocColumn>, } | { "type": "pageBreak", title?: string, speakerNotes?: string, } | { "type": "divider" } | { "type": "quote", text: string, attribution?: string, } | { "type": "toggle", title: string, text: string, } | { "type": "table", headers: Array<string>, rows: Array<Array<string>>, alignments?: Array<string>, } | { "type": "bookmark", url: string, title?: string, description?: string, } | { "type": "toc", maxLevel?: number, } | { "type": "math", expression: string, display?: boolean, });
+export type DocBlock = { id: string, collapsed?: boolean, children?: Array<DocBlock>, } & ({ "type": "prose", text: string, } | { "type": "heading", level: number, text: string, } | { "type": "list", ordered: boolean, items: Array<string>, } | { "type": "todo", checked: boolean, text: string, } | { "type": "callout", tone: string, title?: string, text: string, } | { "type": "code", language?: string, code: string, } | { "type": "kpi", items: Array<DocKpiItem>, } | { "type": "chart", title?: string, kind: string, labels: Array<string>, series: Array<DocChartSeries>, } | { "type": "diagram", title?: string, source: string, } | { "type": "compare", title?: string, beforeLabel: string, afterLabel: string, beforeAsset: string, afterAsset: string, annotations?: Array<MediaAnnotation>, } | { "type": "media", mediaKind: string, src: string, caption?: string, annotations?: Array<MediaAnnotation>, } | { "type": "preview", entry: string, height?: number, title?: string, } | { "type": "baseEmbed", noteId: NoteId, sheetId?: string, viewId?: string, } | { "type": "issueCard", issueId: IssueId, } | { "type": "issueList", repo?: string, status?: string, tag?: string, limit?: number, } | { "type": "columns", columns: Array<DocColumn>, } | { "type": "pageBreak", title?: string, speakerNotes?: string, } | { "type": "divider" } | { "type": "quote", text: string, attribution?: string, } | { "type": "toggle", title: string, text: string, } | { "type": "table", headers: Array<string>, rows: Array<Array<string>>, alignments?: Array<string>, columnWidths?: Array<number>, } | { "type": "bookmark", url: string, title?: string, description?: string, } | { "type": "toc", maxLevel?: number, } | { "type": "math", expression: string, display?: boolean, });
 
-export type DocView = { noteId: NoteId, title: string, blocks: Array<DocBlock>, slideCount: number, wordCount: number, extractedLinks: Array<NoteLinkRef>, };
+export type DocView = { noteId: NoteId, title: string, blocks: Array<DocBlock>, slideCount: number, wordCount: number, extractedLinks: Array<NoteLinkRef>, annotationSummary?: MediaAnnotationSummary, };
 
 export type NoteDocViewRequest = { id: NoteId, };
 
@@ -402,7 +469,7 @@ export type BaseColumn = { id: string, name: string, kind: BaseColumnKind, optio
 
 export type BaseCellValue = { "_tag": "text", value: string, } | { "_tag": "number", value: number, } | { "_tag": "bool", value: boolean, } | { "_tag": "strings", items: Array<string>, } | { "_tag": "issueRef", issueId: IssueId, } | { "_tag": "noteRef", noteId: NoteId, } | { "_tag": "agentRef", agentId: string, } | { "_tag": "agentRun", status: string, summary?: string, sessionId?: SessionId, spawnedIssueId?: IssueId, updatedAt: number, };
 
-export type BaseRow = { id: string, cells: { [key in string]: BaseCellValue }, pageNoteId?: NoteId, createdAt: number, updatedAt: number, };
+export type BaseRow = { id: string, cells: { [key in string]: BaseCellValue }, pageNoteId?: NoteId, annotationRef?: BaseAnnotationRef, createdAt: number, updatedAt: number, };
 
 export type BaseFilterRule = { columnId: string, op: BaseFilterOp, value?: string, };
 

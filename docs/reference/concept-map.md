@@ -31,7 +31,7 @@
 |---|---|---|---|
 | Host、空间 | `ServerConfig`（`home`、`work_root`，`crates/server/src/app.rs` 照次序打开全部模块） | `$VIBEVALLEY_HOME`、`$VIBEVALLEY_WORK_ROOT` | — |
 | 仓库 | `Repos`（`repo.rs`），git 经 `crates/git` | Space 的 `repos/` 与工单检出 `worktrees/` | 会话的 `cwd` |
-| 助手 | `Orchestrator`（`orchestrator/mod.rs`） | `agent/<档案 id>/conversation.jsonl` | 不经 oar：跑在 `crates/runtime/src/agent` 的对话循环上（[VibeValley 自己的 agent](docs/subsystems/brain.md)） |
+| 助手 | `Orchestrator`（`orchestrator/mod.rs`） | `agent/<档案 id>/conversation.jsonl` | 不经 oar：跑在 `crates/agent/src` 的对话循环上（[VibeValley 自己的 agent](docs/subsystems/brain.md)） |
 | 档案、技能 | `Agents`（`agent/profile/profile.rs`、`presets.rs`） | `config.json`、`agent-templates/` | — |
 | 农机 | `Agents` 的农机部分（`agent/profile/runtime.rs`；接口仍是 `runtime.*`） | `config.json` 农机设置 | `Runtime`、`Registry` |
 | 工单、父子工单 | `Board`（`crates/server/src/issue/board.rs`），接口在 `issue/mod.rs` | `server.db`、`issues/` | — |
@@ -40,11 +40,11 @@
 | Note（笔记） | `note::Manager`（`note/mod.rs`、`note/manager.rs`） | `server.db` 的 `note*` 表与 `<storage>/note/` | — |
 | 记性 | `Memories`（`team/memory/`） | `memory` 表 | — |
 | 定时任务 | `Crons`（`cron/mod.rs`，什么时候跑在 `crates/core/src/cron`） | `server.db` 的 `cron` 表 | — |
-| PR 与分支发布 | `Pulls`（`pull/mod.rs`、`publish.rs`、`store.rs`、`poll.rs`、`snapshot.rs`） | `server.db` 的 `pull`、`pull_event` 表 | — |
+| PR 与分支发布 | `Pull`（`pull/{mod,service,poll,snapshot}.rs`、`repo/publish.rs`） | `server.db` 的 `pull` 表（含 `known_events` JSON 列） | — |
 
 ## oar 那一层
 
-oar 是驱动各家编码 agent 的运行时；VibeValley 用的是它的 Rust 实现 `crates/runtime/src/oar`（Claude Code、Codex、ACP、scripted 和自研的 `vibevalley`）。它的术语和 VibeValley 的用法对照：
+oar 是驱动各家编码 agent 的运行时；VibeValley 用的是它的 Rust 实现 `crates/oar/src`（Claude Code、Codex、ACP、scripted 和自研的 `vibevalley`）。它的术语和 VibeValley 的用法对照：
 
 | oar | 是什么 | 我们这边用在哪 |
 |---|---|---|

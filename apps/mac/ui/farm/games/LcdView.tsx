@@ -1,9 +1,13 @@
 import { Canvas, Text, View, type CanvasRenderingContext2D, type JSX, type ViewStyle } from "nsh";
 
 export function Words(props: { children: JSX.Element; align?: "center" | "right"; dim?: boolean; style?: ViewStyle }) {
-  const alignClass = props.align === "center" ? "text-center" : props.align === "right" ? "text-right" : "";
   return (
-    <Text class={`font-mono text-xs leading-[18px] ${props.dim === true ? "text-lcd-dark" : "text-lcd-ink"} ${alignClass}`} style={props.style}>
+    <Text
+      class={`font-mono text-xs leading-[18px] ${props.dim === true ? "text-lcd-dark" : "text-lcd-ink"} ${
+        props.align === "center" ? "text-center" : props.align === "right" ? "text-right" : ""
+      }`}
+      style={props.style}
+    >
       {props.children}
     </Text>
   );

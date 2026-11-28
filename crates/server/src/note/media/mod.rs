@@ -1,14 +1,27 @@
 //! Media generation, transcription, and understanding jobs under `note/`.
 
 mod audio;
+mod codec;
 pub mod job;
 pub mod png;
 mod remote;
+mod state;
 mod understanding;
 pub mod validate;
 pub mod vendor;
 
 pub use job::Media;
+
+/// Ready media job announcement emitted by [`Media`] for application orchestration
+/// to post into the originating channel.
+#[derive(Debug, Clone)]
+pub struct MediaAnnouncement {
+    pub from: String,
+    pub channel: String,
+    pub text: String,
+    pub attachments: Vec<String>,
+    pub send_key: String,
+}
 
 use std::sync::Arc;
 use std::time::Duration;

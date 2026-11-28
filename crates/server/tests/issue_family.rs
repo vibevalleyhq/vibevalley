@@ -1,126 +1,23 @@
-//! Parent and child issues, splits and drafts. The acceptance test is
-//! translated from VibeValley `apps/server/src/flows/acceptance.test.ts`.
+//! Parent and child issues: pure DAG decomposition, dependency blocking,
+//! directoryless splits, and draft refinement without server-side worktree babysitting.
 
 use std::path::Path;
 
 use crate::support::*;
-use vibevalley_protocol::{IssueConstraints, IssueStageKind as StageKind, IssueStatus, Landing};
+use vibevalley_protocol::{DeliveryReceipt, IssueStageKind as StageKind, IssueStatus};
 use vibevalley_server::issue::{ChildDraft, NewIssue};
 
-fn issue(title: &str, repo: &Path) -> NewIssue {
+fn issue(title: &str, repo: Option<&Path>) -> NewIssue {
     NewIssue {
         title: title.into(),
-        repo: Some(repo.to_path_buf()),
+        repo: repo.map(Path::to_path_buf),
         agent: "t".into(),
         ..Default::default()
     }
 }
 
-fn read_on(repo: &Path, branch: &str, file: &str) -> Option<String> {
-    let out = std::process::Command::new("git")
-        .arg("-C")
-        .arg(repo)
-        .args(["show", &format!("{branch}:{file}")])
-        .output()
-        .unwrap();
-    out.status.success().then(|| String::from_utf8_lossy(&out.stdout).into_owned())
-}
-
-#[derive(Clone, Copy, PartialEq, Debug)]
-enum Mode {
-    Pass,
-    Frozen,
-    Failed,
-}
-
-fn acceptance(mode: Mode) {
-    let rt = HookRuntime::new("t", quick(), move |turn| {
-        if !turn.cwd.join("check.sh").exists() {
-            turn.write("check.sh", "test -f result.txt\n");
-        } else {
-            if mode != Mode::Failed {
-                turn.write("result.txt", "implementation");
-            } else {
-                turn.write("unrelated.txt", "not implemented");
-            }
-            if mode == Mode::Frozen {
-                turn.write("check.sh", "true\n");
-            }
-        }
-        git(&turn.cwd, &["add", "."]);
-        git(&turn.cwd, &["commit", "-q", "-m", "Implement assigned child"]);
-        turn.done("finished");
-    });
-    let w = world(vec![rt], |_| {});
-    let main = repo(w.dir.path(), "acceptance");
-    let parent = block_on(w.board.create_async(issue("parent", &main))).unwrap();
-    let mut seed = issue("seed-red-test", &main);
-    seed.parent = Some(parent.id.clone());
-    seed.constraints = Some(IssueConstraints {
-        acceptance: true,
-        check: Some("sh check.sh".into()),
-        scope: vec!["check.sh".into()],
-        frozen: vec![],
-    });
-    let seed = block_on(w.board.create_async(seed)).unwrap();
-    let mut implementation = issue("implement", &main);
-    implementation.parent = Some(parent.id.clone());
-    implementation.blocked_by = vec![seed.id.clone()];
-    let implementation = block_on(w.board.create_async(implementation)).unwrap();
-
-    block_on(w.board.move_to_async(&seed.id, IssueStatus::Todo, None)).unwrap();
-    let red = wait_issue(&w.board, &seed.id, "the red acceptance test merged", |t| t.status == IssueStatus::Done);
-    assert_eq!(red.delivered, Some(Landing::MergedIntoParent));
-    assert_eq!(red.constraints.unwrap().frozen, vec!["check.sh"]);
-
-    block_on(w.board.move_to_async(&implementation.id, IssueStatus::Todo, None)).unwrap();
-    let result = wait_issue(&w.board, &implementation.id, "the implementation verified", |t| match mode {
-        Mode::Pass => t.status == IssueStatus::Done,
-        _ => !t.questions.is_empty(),
-    });
-    assert_eq!(read_on(&main, "vibevalley/issue-1", "check.sh").as_deref(), Some("test -f result.txt\n"));
-    if mode == Mode::Pass {
-        assert_eq!(result.delivered, Some(Landing::MergedIntoParent));
-        assert_eq!(read_on(&main, "vibevalley/issue-1", "result.txt").as_deref(), Some("implementation"));
-        // The parent waits for its final acceptance, then merges into main.
-        let parent = wait_stage(&w.board, &parent.id, StageKind::Reviewing);
-        assert_eq!(parent.status, IssueStatus::InReview);
-        assert!(
-            board_bundle(&w.board)
-                .inbox
-                .items
-                .iter()
-                .any(|i| matches!(&i.target, vibevalley_protocol::InboxTarget::Issue(t) if t.id == parent.id))
-        );
-        block_on(w.board.move_to_async(&parent.id, IssueStatus::Done, None)).unwrap();
-        assert_eq!(board_issue(&w.board, &parent.id).unwrap().delivered, Some(Landing::Merged));
-        assert_eq!(read_on(&main, "main", "result.txt").as_deref(), Some("implementation"));
-        assert!(read_on(&main, "vibevalley/issue-1", "check.sh").is_none(), "the parent's merged branch is gone");
-    } else {
-        assert_eq!(result.delivered, None);
-        let want = if mode == Mode::Frozen { "check.sh" } else { "sh check.sh" };
-        assert!(result.questions[0].question.contains(want), "{}", result.questions[0].question);
-        assert_eq!(result.stage.state, StageKind::Asking);
-    }
-}
-
 #[test]
-fn regression_native_child_acceptance_passes_before_merging_into_the_parent() {
-    acceptance(Mode::Pass);
-}
-
-#[test]
-fn regression_native_child_acceptance_rejects_changes_to_frozen_tests() {
-    acceptance(Mode::Frozen);
-}
-
-#[test]
-fn regression_native_child_acceptance_rejects_an_implementation_that_fails_the_inherited_check() {
-    acceptance(Mode::Failed);
-}
-
-#[test]
-fn a_split_queues_its_children_in_dependency_order() {
+fn a_split_queues_its_children_in_dependency_order_without_server_branch_merging() {
     let gate = TurnGate::new();
     let rt = HookRuntime::new("t", gate.script("done"), |turn| {
         let name = if turn.prompt.contains("Part A") { "a.txt" } else { "b.txt" };
@@ -130,7 +27,7 @@ fn a_split_queues_its_children_in_dependency_order() {
     let prompts = rt.prompts.clone();
     let w = world(vec![rt], |_| {});
     let main = repo(w.dir.path(), "app");
-    let parent = block_on(w.board.create_async(issue("Big", &main))).unwrap();
+    let parent = block_on(w.board.create_async(issue("Big", Some(&main)))).unwrap();
     let drafts = vec![
         ChildDraft {
             id: "a".into(),
@@ -170,14 +67,94 @@ fn a_split_queues_its_children_in_dependency_order() {
     assert_eq!(first.stage.state, StageKind::Working);
     assert_eq!(board_issue(&w.board, &children[1].id).unwrap().stage.state, StageKind::Queued);
     assert_eq!(board_issue(&w.board, &parent.id).unwrap().status, IssueStatus::InProgress);
-    gate.release_n(2);
-    wait_issue(&w.board, &children[1].id, "B merged", |t| t.status == IssueStatus::Done);
+
+    // Child A finishes into InReview; child B stays queued until child A is explicitly closed.
+    gate.release();
+    wait_stage(&w.board, &children[0].id, StageKind::Reviewing);
+    assert_eq!(board_issue(&w.board, &children[1].id).unwrap().stage.state, StageKind::Queued);
+    block_on(w.board.move_with_receipt_async(
+        &children[0].id,
+        IssueStatus::Done,
+        None,
+        None,
+        Some(DeliveryReceipt::Commit {
+            sha: git(&main, &["rev-parse", "HEAD"]),
+            branch: Some("main".into()),
+            summary: Some("Part A committed".into()),
+        }),
+    ))
+    .unwrap();
+
+    // Closing child A releases child B via DAG blocking.
+    wait_stage(&w.board, &children[1].id, StageKind::Working);
+    gate.release();
+    wait_stage(&w.board, &children[1].id, StageKind::Reviewing);
     let b_prompt = prompts.lock().unwrap().iter().find(|p| p.contains("Part B")).cloned().unwrap();
     assert!(b_prompt.contains("检查命令：test -f a.txt"), "{b_prompt}");
+    block_on(w.board.move_to_async(&children[1].id, IssueStatus::Done, None)).unwrap();
+
+    // Once all children are closed, parent is ready for review and can be closed cleanly.
     wait_stage(&w.board, &parent.id, StageKind::Reviewing);
-    // Canceling a parent cancels its open children; here all are done.
     block_on(w.board.move_to_async(&parent.id, IssueStatus::Done, None)).unwrap();
-    assert!(read_on(&main, "main", "a.txt").is_some() && read_on(&main, "main", "b.txt").is_some());
+    assert_eq!(board_issue(&w.board, &parent.id).unwrap().status, IssueStatus::Done);
+    assert!(!w.dir.path().join("worktrees").exists(), "server must not create worktrees dir");
+}
+
+#[test]
+fn directoryless_parent_can_split_and_complete_with_note_and_answer_receipts() {
+    let rt = HookRuntime::new("t", quick(), |turn| {
+        if turn.prompt.contains("Research") {
+            turn.report(r#"{"status":"done","summary":"Research done","deliveryReceipt":{"kind":"answer","summary":"Use SQLite WAL"}}"#);
+        } else {
+            turn.report(r#"{"status":"done","summary":"Doc drafted","deliveryReceipt":{"kind":"note","noteId":"n-arch","title":"Architecture RFC"}}"#);
+        }
+    });
+    let w = world(vec![rt], |_| {});
+    let parent = block_on(w.board.create_async(issue("Write RFC", None))).unwrap();
+    assert!(parent.repo.is_none());
+    let children = block_on(w.board.split_async(
+        &parent.id,
+        vec![
+            ChildDraft {
+                id: "research".into(),
+                title: "Research".into(),
+                brief: "Compare storage options".into(),
+                ..Default::default()
+            },
+            ChildDraft {
+                id: "draft".into(),
+                title: "Draft note".into(),
+                brief: "Write RFC note".into(),
+                needs: vec!["research".into()],
+                ..Default::default()
+            },
+        ],
+    ))
+    .unwrap();
+    assert!(children.iter().all(|c| c.repo.is_none()));
+    wait_stage(&w.board, &children[0].id, StageKind::Reviewing);
+    let c0 = board_issue(&w.board, &children[0].id).unwrap();
+    assert_eq!(
+        c0.delivery_receipt,
+        Some(DeliveryReceipt::Answer {
+            summary: "Use SQLite WAL".into(),
+        })
+    );
+    block_on(w.board.move_to_async(&children[0].id, IssueStatus::Done, None)).unwrap();
+    wait_stage(&w.board, &children[1].id, StageKind::Reviewing);
+    let c1 = board_issue(&w.board, &children[1].id).unwrap();
+    assert_eq!(
+        c1.delivery_receipt,
+        Some(DeliveryReceipt::Note {
+            note_id: "n-arch".into(),
+            title: Some("Architecture RFC".into()),
+            summary: None,
+        })
+    );
+    block_on(w.board.move_to_async(&children[1].id, IssueStatus::Done, None)).unwrap();
+    wait_stage(&w.board, &parent.id, StageKind::Reviewing);
+    block_on(w.board.move_to_async(&parent.id, IssueStatus::Done, None)).unwrap();
+    assert_eq!(board_issue(&w.board, &parent.id).unwrap().status, IssueStatus::Done);
 }
 
 #[test]
@@ -188,11 +165,10 @@ fn a_draft_writes_the_issue_up_and_leaves_no_trace() {
     let gate = TurnGate::new();
     let rt = HookRuntime::new("t", gate.script(said), |turn| {
         assert!(turn.prompt.contains("用户想做的：it should listen somewhere"), "{}", turn.prompt);
-        turn.write("scratch.txt", "drafts leave no files");
     });
     let w = world(vec![rt], |_| {});
     let main = repo(w.dir.path(), "app");
-    block_on(w.board.create_async(issue("Port", &main))).unwrap();
+    block_on(w.board.create_async(issue("Port", Some(&main)))).unwrap();
     block_on(w.board.refine_async(&vibevalley_protocol::IssueRefineInput {
         id: "1".into(),
         text: Some("it should listen somewhere".into()),
@@ -213,6 +189,6 @@ fn a_draft_writes_the_issue_up_and_leaves_no_trace() {
     assert_eq!(drafted.questions[0].options, vec!["8080", "9090"]);
     assert_eq!((drafted.status, drafted.was_sent()), (IssueStatus::Backlog, false));
     assert!(board_bundle(&w.board).sessions.sessions.is_empty());
-    assert!(!w.dir.path().join("vibevalley/worktrees/app.1").exists());
+    assert!(!w.dir.path().join("worktrees").exists());
     assert!(git(&main, &["branch", "--list", "vibevalley/issue-1"]).is_empty());
 }

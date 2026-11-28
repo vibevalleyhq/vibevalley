@@ -1,4 +1,4 @@
-import { Text, View } from "nsh";
+import { Text, untracked, View, type ViewRef } from "nsh";
 
 import { useDesignHost } from "./host";
 import { Icon, type IconSize } from "./Icon";
@@ -17,11 +17,28 @@ export function IconButton(props: {
   disabled?: boolean;
   testid?: string;
 }) {
+  const designHost = useDesignHost();
   const disabled = () => props.disabled === true;
   const hover = () => (props.tone === "danger" ? "hover:bg-bad-soft" : props.pressed === true ? "" : "hover:bg-hover");
   const iconTone = () => (props.tone === "danger" ? "berry" : props.pressed === true ? "ink" : "muted");
+  let btnRef: ViewRef | undefined;
+  const probeId = untracked(() => props.testid);
+  if (probeId !== undefined && designHost.isProbeEnabled()) {
+    designHost.useProbe({
+      testId: probeId,
+      role: "button",
+      text: () => props.label,
+      getRef: () => btnRef,
+      onPress: () => {
+        if (!disabled()) props.onClick();
+      },
+    });
+  }
   return (
     <View
+      ref={(el) => {
+        btnRef = el;
+      }}
       role="button"
       testID={props.testid}
       accessibilityLabel={props.label}

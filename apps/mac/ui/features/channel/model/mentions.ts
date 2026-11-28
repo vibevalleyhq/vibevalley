@@ -1,12 +1,12 @@
 import { t } from "@vibevalley/i18n";
-import { type Agent, everyone, defaultOrchestrator, userId, type Session, type SessionView } from "@vibevalley/protocol";
+import { type Agent, everyone, defaultOrchestrator, localUserParticipant, type Session, type SessionView } from "@vibevalley/protocol";
 import { isFreeUserSession, mentionLead } from "@vibevalley/protocol/rules";
 
 import { spelled } from "../../../infra/base/search";
 import { phaseText } from "../views/presence";
 const mentionOf: Record<string, string> = {
   [defaultOrchestrator]: t("web.channel.names.mention.orchestrator"),
-  [userId]: t("web.channel.names.mention.user"),
+  [localUserParticipant]: t("web.channel.names.mention.user"),
   [everyone]: t("web.channel.names.mention.everyone"),
 };
 

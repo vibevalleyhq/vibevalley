@@ -24,7 +24,7 @@ pub(super) struct Run<'a> {
     calls: u64,
     pub(super) durable: bool,
     /// The live answers this turn's words also go to, read out as they are.
-    pub(super) ports: Vec<mpsc::UnboundedSender<String>>,
+    pub(super) ports: Vec<mpsc::Sender<String>>,
     /// Per-turn `oar-voyage/3` JSONL recorder (`<home>/records/<id>.jsonl`).
     recorder: Option<vibevalley_runtime::oar::record::Recorder>,
     record_seq: u64,
@@ -153,7 +153,7 @@ impl<'a> Run<'a> {
             return;
         }
         for port in &self.ports {
-            let _ = port.send(text.clone());
+            let _ = port.try_send(text.clone());
         }
         if self.durable {
             return;

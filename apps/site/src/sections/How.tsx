@@ -265,12 +265,11 @@ function Caption(props: { copy: Copy["how"]; now: Moment }) {
 
 /** A layer of the field passing the camera at its pace (the field itself at 1). */
 function Pass(props: { camera: MotionValue<number>; pace: number; children: JSX.Element }) {
-  const value = readMotion(props.camera);
   return (
     <div
       class="absolute inset-0"
       style={{
-        transform: `translateX(${-value() * props.pace}px)`,
+        transform: `translateX(${-readMotion(props.camera)() * props.pace}px)`,
       }}
     >
       {props.children}

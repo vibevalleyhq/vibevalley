@@ -5,7 +5,7 @@
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
-use vibevalley_protocol::{CriterionCheck, Deliverable, IssueAnswer, IssueReportMemory, Question};
+use vibevalley_protocol::{CriterionCheck, Deliverable, DeliveryReceipt, IssueAnswer, IssueReportMemory, Question};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -56,6 +56,8 @@ pub struct Report {
     pub answer: Option<IssueAnswer>,
     pub checks: Vec<CriterionCheck>,
     pub remember: Vec<IssueReportMemory>,
+    #[serde(rename = "deliveryReceipt", alias = "delivery_receipt", default, skip_serializing_if = "Option::is_none")]
+    pub delivery_receipt: Option<DeliveryReceipt>,
 }
 
 /// An answer as the agent writes it: only `conclusion` is required, the
@@ -92,13 +94,13 @@ impl Report {
 pub fn instructions(deliver: Deliverable) -> String {
     let work = match deliver {
         Deliverable::Change | Deliverable::Branch | Deliverable::PullRequest => {
-            "你在工单自己的 git worktree 分支上干活。提交清晰的 git commit；不要切换分支、不要 push、也不要合并。"
+            "你自主管理分支、本地 `git worktree add`（如需要隔离并发改动）、测试验证与提交/PR。完成交付后在 `issue_report` 的 `deliveryReceipt` 中附带结构化交付凭据（`pull_request` / `commit` / `note` / `answer`）。"
         }
         Deliverable::Answer => ANSWER_ONLY,
     };
     format!(
         "你正在处理 VibeValley 工单板上的任务。{work}\n\n\
-         完成本轮后，调用 vibevalley MCP 服务的 issue_report 工具交回一两句结果摘要、待用户回答的问题，并在只读问答任务中填写 answer。"
+         完成本轮后，调用 vibevalley MCP 服务的 issue_report 工具交回一两句结果摘要、交付凭据（deliveryReceipt）或待用户回答的问题，并在只读问答任务中填写 answer。"
     )
 }
 

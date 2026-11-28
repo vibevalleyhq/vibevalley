@@ -57,8 +57,6 @@ pub enum Command {
 
     /// Manage worker and orchestrator agent profiles
     Agent(team::agent::AgentCmd),
-    /// Control the orchestrator and tool approvals
-    Orchestrator(team::orchestrator::OrchestratorCmd),
     /// Inspect and refresh coding runtimes
     Runtime(team::runtime::RuntimeCmd),
     /// Manage agent memories
@@ -104,7 +102,6 @@ pub async fn run(client: &Client, command: Command) -> Done {
         Command::Cron(cmd) => work::cron::run(client, cmd).await,
 
         Command::Agent(cmd) => team::agent::run(client, cmd).await,
-        Command::Orchestrator(cmd) => team::orchestrator::run(client, cmd).await,
         Command::Runtime(cmd) => team::runtime::run(client, cmd).await,
         Command::Memory(cmd) => team::memory::run(client, cmd).await,
 

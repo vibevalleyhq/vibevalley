@@ -25,6 +25,7 @@ import {
   contentBrowseBucket,
   contentFocusMediaId,
   contentSidebarOpen,
+  countContentHub,
   isPinned,
   openTemplatePicker,
   pinnedKeys,
@@ -140,6 +141,17 @@ export function LibraryPage() {
   const pinnedSet = createMemo(() => new Set(pinnedKeys()));
   const pinnedOnly = () => isPinnedBucket(bucket());
   const appsOnly = () => isAppsBucket(bucket());
+  const installedIds = createMemo(() => new Set(installedMap().keys()));
+  const hubCounts = createMemo(() =>
+    countContentHub({
+      notes: allNotes(),
+      media: allMedia(),
+      pinned: pinnedSet(),
+      installedNoteIds: installedIds(),
+    }),
+  );
+  const notesById = createMemo(() => new Map(allNotes().map((n) => [String(n.id), n])));
+  const issuesById = createMemo(() => new Map((board()?.issues ?? []).map((issue) => [String(issue.id), issue])));
 
   const contextLookup = createMemo((): ContentContextLookup => ({
     issuesById: new Map((board()?.issues ?? []).map((issue) => [issue.id, issue])),
@@ -441,6 +453,8 @@ export function LibraryPage() {
         <LibraryToolbar
           bucketTitle={bucketTitle()}
           bucket={bucket()}
+          counts={hubCounts()}
+          showAppsChip={currentHost().applet !== undefined}
           totalCount={totalCount()}
           hasCategoryOptions={hasCategoryOptions()}
           compactToolbar={compactToolbar()}
@@ -455,6 +469,7 @@ export function LibraryPage() {
           appsOnly={appsOnly()}
           pinnedOnly={pinnedOnly()}
           busy={act.busy()}
+          onBucket={(next) => contentBrowseBucket.set(next)}
           onCategory={(next) => category.set(next)}
           onSort={(next) => sort.set(next)}
           onMake={(next) => setSearch({ make: next })}
@@ -555,6 +570,8 @@ export function LibraryPage() {
                   </If>
                   <NoteTiles
                     notes={visibleNotes()}
+                    notesById={notesById()}
+                    issuesById={issuesById()}
                     width={inner()}
                     onOpen={(id) => openNote(id)}
                     isPinned={(id) => isPinned(`note:${id}`)}

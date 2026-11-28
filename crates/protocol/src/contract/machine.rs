@@ -210,7 +210,6 @@ pub struct MachineInfo {
     pub status: MachineStatus,
     pub here: bool,
     pub ephemeral: bool,
-    pub worktree_supported: bool,
     pub joined_at: Millis,
     pub last_seen_at: Option<Millis>,
     pub runtimes: Vec<MachineRuntimeSummary>,
@@ -282,7 +281,6 @@ pub struct MachineHello {
     pub name: String,
     pub platform: MachinePlatform,
     pub ephemeral: bool,
-    pub worktree_supported: bool,
     pub runtimes: Vec<MachineRuntimeSummary>,
 }
 
@@ -335,8 +333,6 @@ pub struct MachineSessionOpen {
     pub session_id: String,
     pub runtime_id: String,
     pub repo_ref: Option<String>,
-    pub branch: Option<String>,
-    pub base_ref: Option<String>,
     pub workdir: Option<String>,
     pub system_prompt: Option<String>,
     pub model: Option<String>,
@@ -489,43 +485,6 @@ pub struct MachineAttachmentData {
 #[cfg_attr(feature = "ts-gen", derive(TS))]
 #[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
-pub struct MachineWorktreePrepare {
-    pub request_id: String,
-    pub task_id: String,
-    pub repo_ref: String,
-    pub branch: Option<String>,
-    pub base_ref: Option<String>,
-}
-
-#[skip_serializing_none]
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts-gen", derive(TS))]
-#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
-#[serde(rename_all = "camelCase")]
-pub struct MachineWorktreeResult {
-    pub request_id: String,
-    pub ok: bool,
-    pub workdir: Option<String>,
-    pub branch: Option<String>,
-    pub error: Option<String>,
-}
-
-#[skip_serializing_none]
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts-gen", derive(TS))]
-#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
-#[serde(rename_all = "camelCase")]
-pub struct MachineWorktreeCleanup {
-    pub request_id: String,
-    pub task_id: String,
-    pub workdir: String,
-}
-
-#[skip_serializing_none]
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts-gen", derive(TS))]
-#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
-#[serde(rename_all = "camelCase")]
 pub struct MachineWireError {
     pub request_id: Option<String>,
     pub code: String,
@@ -573,12 +532,6 @@ pub enum MachineWireFrame {
     MachineAttachmentFetch(MachineAttachmentFetch),
     #[serde(rename = "attachment.data")]
     MachineAttachmentData(MachineAttachmentData),
-    #[serde(rename = "worktree.prepare")]
-    MachineWorktreePrepare(MachineWorktreePrepare),
-    #[serde(rename = "worktree.result")]
-    MachineWorktreeResult(MachineWorktreeResult),
-    #[serde(rename = "worktree.cleanup")]
-    MachineWorktreeCleanup(MachineWorktreeCleanup),
     #[serde(rename = "error")]
     MachineWireError(MachineWireError),
 }
@@ -610,9 +563,6 @@ crate::typescript::module! {
         MachineMcpResponse,
         MachineAttachmentFetch,
         MachineAttachmentData,
-        MachineWorktreePrepare,
-        MachineWorktreeResult,
-        MachineWorktreeCleanup,
         MachineWireError,
         MachineWireFrame,
     ];

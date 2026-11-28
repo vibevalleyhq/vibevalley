@@ -105,9 +105,7 @@ async fn issue_attachments_create_update_closed_rejection_and_brief_paths() {
     let (runtime, opened) = crate::runtime::Runtime::open_with_registry_async(ctx.clone(), Arc::new(Registry::new()), BoardConfig::under(dir.path()))
         .await
         .unwrap();
-    let board = Board::with_storage(ctx.clone(), runtime, opened, None, None, Some(storage.clone()))
-        .await
-        .unwrap();
+    let board = Board::with_storage(ctx.clone(), runtime, opened, None, Some(storage.clone())).await.unwrap();
 
     let att1 = storage
         .keep_async(b"spec document bytes".to_vec(), "spec.md".into(), "text/markdown".into())
@@ -467,6 +465,7 @@ async fn unsent_issue_workflow_tracks_in_progress_in_review_and_criteria_persist
             agent: None,
             edit: None,
             request_key: None,
+            delivery_receipt: None,
         })
         .await
         .unwrap();
@@ -504,6 +503,7 @@ async fn unsent_issue_workflow_tracks_in_progress_in_review_and_criteria_persist
             agent: None,
             edit: None,
             request_key: None,
+            delivery_receipt: None,
         })
         .await
         .unwrap();
@@ -547,6 +547,7 @@ async fn unsent_issue_workflow_tracks_in_progress_in_review_and_criteria_persist
             agent: None,
             edit: None,
             request_key: None,
+            delivery_receipt: None,
         })
         .await
         .unwrap();
@@ -562,6 +563,7 @@ async fn unsent_issue_workflow_tracks_in_progress_in_review_and_criteria_persist
             agent: None,
             edit: None,
             request_key: None,
+            delivery_receipt: None,
         })
         .await
         .unwrap();
@@ -578,6 +580,7 @@ async fn unsent_issue_workflow_tracks_in_progress_in_review_and_criteria_persist
             agent: None,
             edit: None,
             request_key: None,
+            delivery_receipt: None,
         })
         .await
         .unwrap();
@@ -1066,4 +1069,138 @@ async fn issue_state_decoupled_from_runtime_write_lock_and_uses_targeted_derivat
     drop(_held_session_lock);
     board.close_async().await;
     let _ = ctx.shutdown(Duration::from_secs(1)).await;
+}
+
+#[tokio::test]
+async fn delivery_receipt_polymorphic_persists_via_update_and_done_across_reopen() {
+    use vibevalley_protocol::{Deliverable, DeliveryReceipt, IssueStatus, IssueStatusUpdateInput, Landing};
+
+    let dir = tempfile::tempdir().unwrap();
+    let open_board = || async {
+        let service = Service::open(dir.path()).await.unwrap();
+        let outbox = Arc::new(Outbox::new(service.clone()));
+        let http: Arc<dyn crate::context::Fetch> = Arc::new(Http);
+        let ctx = Arc::new(Context::new(
+            service,
+            TaskGroup::new(),
+            Arc::new(LiveState::new()),
+            outbox,
+            Arc::new(StateFeed::new()),
+            vibevalley_core::system_clock(),
+            http.clone(),
+            http,
+        ));
+        let board = Board::open_standalone_async(ctx.clone(), Arc::new(Registry::new()), BoardConfig::under(dir.path()))
+            .await
+            .unwrap();
+        (ctx, board)
+    };
+
+    let (ctx, board) = open_board().await;
+    let pr_issue = board
+        .create_from_request_async(&IssueRequest {
+            title: "Ship autonomous PR".into(),
+            deliver: Some(Deliverable::PullRequest),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    let pr_receipt = DeliveryReceipt::PullRequest {
+        url: "https://github.com/acme/repo/pull/42".into(),
+        number: Some(42),
+        branch: Some("feat/autonomous-pr".into()),
+        summary: Some("All checks green".into()),
+    };
+    let done_pr = board
+        .status_from_input_async(&IssueStatusUpdateInput {
+            id: pr_issue.id.clone(),
+            status: IssueStatus::Done,
+            text: None,
+            agent: None,
+            edit: None,
+            delivery_receipt: Some(pr_receipt.clone()),
+            request_key: None,
+            revision: None,
+        })
+        .await
+        .unwrap();
+    assert_eq!(done_pr.status, IssueStatus::Done);
+    assert_eq!(done_pr.delivered, Some(Landing::Submitted));
+    assert_eq!(done_pr.delivery_receipt, Some(pr_receipt.clone()));
+
+    let commit_issue = board
+        .create_from_request_async(&IssueRequest {
+            title: "Ship commit receipt".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    let commit_receipt = DeliveryReceipt::Commit {
+        sha: "abc123def".into(),
+        branch: Some("main".into()),
+        summary: Some("Refactored module".into()),
+    };
+    let updated_commit = board
+        .update_from_input_async(IssueUpdateInput {
+            id: commit_issue.id.clone(),
+            delivery_receipt: Some(commit_receipt.clone()),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(updated_commit.delivery_receipt, Some(commit_receipt.clone()));
+    let done_commit = board
+        .status_from_input_async(&IssueStatusUpdateInput {
+            id: commit_issue.id.clone(),
+            status: IssueStatus::Done,
+            text: None,
+            agent: None,
+            edit: None,
+            delivery_receipt: None,
+            request_key: None,
+            revision: None,
+        })
+        .await
+        .unwrap();
+    assert_eq!(done_commit.delivered, Some(Landing::Merged));
+    assert_eq!(done_commit.delivery_receipt, Some(commit_receipt.clone()));
+
+    let note_issue = board
+        .create_from_request_async(&IssueRequest {
+            title: "Deliver architecture note".into(),
+            deliver: Some(Deliverable::Answer),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    let note_receipt = DeliveryReceipt::Note {
+        note_id: "n-arch-36".into(),
+        title: Some("RFC #36".into()),
+        summary: Some("Documented autonomous delivery".into()),
+    };
+    let done_note = board
+        .status_from_input_async(&IssueStatusUpdateInput {
+            id: note_issue.id.clone(),
+            status: IssueStatus::Done,
+            text: None,
+            agent: None,
+            edit: None,
+            delivery_receipt: Some(note_receipt.clone()),
+            request_key: None,
+            revision: None,
+        })
+        .await
+        .unwrap();
+    assert_eq!(done_note.delivered, Some(Landing::None));
+    assert_eq!(done_note.delivery_receipt, Some(note_receipt.clone()));
+
+    board.close_async().await;
+    let _ = ctx.shutdown(Duration::from_secs(1)).await;
+
+    let (ctx2, board2) = open_board().await;
+    assert_eq!(board2.get_async(&pr_issue.id).await.unwrap().delivery_receipt, Some(pr_receipt));
+    assert_eq!(board2.get_async(&commit_issue.id).await.unwrap().delivery_receipt, Some(commit_receipt));
+    assert_eq!(board2.get_async(&note_issue.id).await.unwrap().delivery_receipt, Some(note_receipt));
+    board2.close_async().await;
+    let _ = ctx2.shutdown(Duration::from_secs(1)).await;
 }

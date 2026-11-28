@@ -2,7 +2,7 @@ import { computed, effect, Scroll, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import type { Channel, CronView } from "@vibevalley/protocol";
-import { isFreeUserSession, sessionBranch, sessionChannelId, sessionProfile, sessionRepo } from "@vibevalley/protocol/rules";
+import { isFreeUserSession, sessionChannelId, sessionProfile, sessionRepo } from "@vibevalley/protocol/rules";
 
 import { Button, ButtonLink } from "../../../design/Button";
 import { Icon } from "../../../design/Icon";
@@ -53,7 +53,7 @@ export function Sessions(props: { channel: Channel }) {
         <Each of={sessions()} key={(h) => h.id}>
           {(h) => {
             const thread = () => sessionThreadOf(collab()?.chat, h());
-            const meta = () => [`@${h().id}`, sessionRepo(h()), sessionBranch(h())].filter(Boolean).join(" · ");
+            const meta = () => [`@${h().id}`, sessionRepo(h())].filter(Boolean).join(" · ");
             return (
               <View testID={`channel-session-${h().id}`} class="flex-row items-center gap-3 rounded-lg border border-line bg-page px-3.5 py-3 hover:bg-hover">
                 <View class="relative shrink-0">

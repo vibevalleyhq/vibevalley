@@ -17,34 +17,27 @@ export const catalogs = {
         speaking_text: "写汇报",
         none: "",
       },
-      outcome: { completed: "做完了", failed: "没做成", interrupted: "停在半路" },
+      outcome: { completed: "已完成", failed: "未通过", interrupted: "已中断" },
       status: { backlog: "备选", todo: "待办", in_progress: "处理中", in_review: "待验收", done: "已完成", canceled: "已取消" },
       priority: { urgent: "紧急", high: "高", medium: "普通", low: "低" },
       deliverable: { change: "改动，合进仓库", branch: "改动，分支留着不合", answer: "结论，只查不改代码", pull_request: "提交 PR/MR" },
-      delivered: {
-        merged: "合进了主分支",
-        merged_into_parent: "合进了计划的分支",
-        pull_request: "PR 合进去了",
-        kept: "分支留着没合",
-        none: "没有改动要合",
-        submitted: "已提交 PR/MR",
-      },
+      delivered: { merged: "合进了主分支", pull_request: "PR 合进去了", kept: "分支留着没合", none: "没有改动要合", submitted: "已提交 PR/MR" },
       canceled: { dismissed: "取消了", lost: "干活的目录丢了" },
       doneWith: "已完成，{what}",
       canceledFor: "已取消，{why}",
       stage: { draft: "草稿", queued: "排队", working: "在做", asking: "等你回答", reviewing: "等你验收", stuck: "卡住了", done: "已完成", canceled: "已取消" },
       stuck: { conflict: "有冲突", failed: "没做成", interrupted: "停在半路", quiet: "没动静" },
       act: {
-        start: "开工",
-        answer: "回答",
+        start: "开始执行",
+        answer: "回复",
         reject: "打回",
         complete: "完成",
-        acknowledge: "知道了",
-        resolve: "让它解决冲突",
-        resume: "接着做",
-        cure: "接着修",
-        tell: "带话",
-        stop: "叫停这一轮",
+        acknowledge: "确认已知",
+        resolve: "解决冲突",
+        resume: "继续执行",
+        cure: "继续修复",
+        tell: "补充说明",
+        stop: "停止本轮",
         close: "取消",
         reopen: "重开",
       },
@@ -148,8 +141,6 @@ export const catalogs = {
       workdir: "默认仓库",
       workdirTip: "项目根目录（VIBEVALLEY_WORK_ROOT）下的一个文件夹。主助手派活没说仓库时用它；留空时派活必须说在哪个仓库。",
       workdirHint: "比如 clock-in",
-      worktree: "每个执行会话一个 git worktree",
-      worktreeHint: "每个执行会话在自己的分支上改，几个执行会话不会互相覆盖；完成时合进仓库。关掉就直接在仓库里改，没有分支可合。",
       env: "环境变量",
       envHint: "叠加在环境设置的环境变量之上。",
       machine: "环境",
@@ -1327,34 +1318,34 @@ export const catalogs = {
       },
       dates: { startAt: "计划开始", dueAt: "目标截止", notSet: "未设置", clearDate: "清除日期" },
       scope: { label: "工单范围", all: "全部", active: "活跃", backlog: "需求池", canceled: "已废弃" },
-      reading: "在读……",
-      never: "算了",
-      later: "先放着",
+      reading: "读取中…",
+      never: "取消",
+      later: "稍后处理",
       orchestrator: "主助手",
-      noHelper: "还没选角色",
+      noHelper: "未指定角色",
       board: {
         earlier: "更早的 {n} 张",
         recent: "只看最近的",
         empty: {
-          backlog: "需求池里的工单：先理清需求，再拖到「待办」派发开工；上下拖排先后。",
-          todo: "待办工单：选好仓库和角色即可开工，拖到「进行中」直接跟踪进度。",
-          in_progress: "进行中的工单（自动执行或手动跟踪）。",
-          in_review: "待验收的工单：确认改动与标准后一键验收通过或完成。",
-          done: "已完成的工单；可随时拖回其他列重开或继续。",
-          canceled: "已废弃的工单；需要时可拖回恢复。",
+          backlog: "需求池里的工单：先理清需求，再移至「待办」开始执行；支持上下拖拽排序。",
+          todo: "待办工单：选好仓库和角色即可开始执行，移至「处理中」直接跟踪进度。",
+          in_progress: "处理中的工单（自动执行或手动跟踪）。",
+          in_review: "待验收的工单：核对改动与验收标准后一键验收通过或完成。",
+          done: "已完成的工单；可随时移回其他列重开或继续。",
+          canceled: "已取消的工单；需要时可拖回恢复。",
         },
         emptyGuide: {
           backlogTitle: "需求池还是空的",
           backlogBody: "先把想法记入需求池，慢慢完善说明和验收标准。",
           todoTitle: "待办还是空的",
           todoBody: "选好仓库和角色就能派发，或由外部 Agent 认领推进。",
-          in_progressTitle: "暂无进行中工单",
+          in_progressTitle: "暂无处理中工单",
           in_progressBody: "把工单拖到这里开始跟踪或派发独立 worktree 会话。",
           in_reviewTitle: "暂无待验收改动",
-          in_reviewBody: "执行会话跑完或外部推进到这里，方便看改动、勾选标准与验收通过。",
+          in_reviewBody: "执行会话提交结果或外部推进到这里，方便查看改动、核对验收标准并完成验收。",
           doneTitle: "还没有已完成工单",
           doneBody: "已完成的工单会留在这里，也可随时拖回其他状态。",
-          canceledTitle: "没有已废弃工单",
+          canceledTitle: "没有已取消工单",
           canceledBody: "暂不推进或取消的工单会归档在这里，拖回即可恢复。",
           filtered: "当前筛选条件下此列没有工单。",
         },
@@ -1396,25 +1387,25 @@ export const catalogs = {
         emptyFiltered: "当前筛选条件下没有匹配的工单。",
       },
       page: {
-        pickFirst: "还差一点：选好派哪个执行会话、在哪个仓库里做，再点「开工」。",
-        notDrafted: "先没起草：{why}",
-        historyUnread: "工单记录没读到：",
+        pickFirst: "请先选择执行会话与目标仓库，再点击「开始执行」。",
+        notDrafted: "暂未起草：{why}",
+        historyUnread: "无法读取工单记录：",
         notFound: "找不到这个工单",
         notFoundLine: "没有 {id} 这个工单：可能已经删掉了，或者链接写错了。",
-        find: "找工单：标题、执行会话、仓库",
-        findLabel: "找工单",
+        find: "搜索工单：标题、执行会话、仓库",
+        findLabel: "搜索工单",
         filter: "筛选",
-        byRepo: "按仓库看",
-        allRepos: "所有仓库",
-        byHelper: "按角色看",
+        byRepo: "按仓库查看",
+        allRepos: "全部仓库",
+        byHelper: "按角色查看",
         allHelpers: "全部角色",
-        byStatus: "按状态看",
+        byStatus: "按状态查看",
         allStatuses: "全部状态",
-        todoAndInProgress: "待办与进行中",
+        todoAndInProgress: "待办与处理中",
         shown: "{shown} / {of} 张",
-        clear: "清掉筛选",
-        view: "看法",
-        missing: "这一轮的记录缺失：{what}。对它的操作暂不可用。",
+        clear: "清除筛选",
+        view: "视图",
+        missing: "本轮记录缺失：{what}，相关操作暂不可用。",
         backToBoard: "工单",
         refresh: "刷新工单",
         refreshing: "正在同步…",
@@ -1422,24 +1413,25 @@ export const catalogs = {
       marks: { priority: "优先级：{word}" },
       sheet: { less: "收起", more: "更多" },
       acts: {
-        reopened: "工单重开了",
-        goesOn: "{helper} 接着做。",
-        rejectWith: "打回，照上面修",
-        carry: "带过去",
-        moving: "正在改状态…",
+        reopened: "已重开工单",
+        goesOn: "{helper} 继续处理。",
+        rejectWith: "打回修改",
+        carry: "发送",
+        moving: "正在更新状态…",
         sending: "发送中…",
-        sayAgain: "再说一次",
-        takeBack: "放回输入框",
-        notSaid: "没说出去",
+        sayAgain: "重新发送",
+        takeBack: "退回输入框",
+        notSaid: "发送失败",
       },
       close: {
-        title: "关上「{issue}」",
-        working: "{who} 还在干这个工单。取消就是叫停它、让它收工，分支上的改动不合进主分支。",
-        completable: "完成就是把 {who} 的分支合进仓库的主分支，先看一遍改动；取消就是让它收工，改动不合进去。",
-        notCompletable: "这个工单现在不能完成。取消会让 {who} 离开，改动不合进主分支。",
-        review: "看改动，完成",
-        stopAndCancel: "叫停并取消",
+        title: "关闭「{issue}」",
+        working: "{who} 还在处理这个工单。取消将停止执行会话并将工单标为已取消。",
+        completable: "可以查看改动或附上交付回执来完成工单，也可以直接取消。",
+        notCompletable: "当前无法直接完成此工单。取消将停止 {who} 并关闭工单。",
+        review: "查看并完成",
+        stopAndCancel: "停止并取消",
         cancel: "取消工单",
+        completeWithoutDiff: "附回执完成",
       },
       changes: {
         checkOutput: "检查输出",
@@ -1448,140 +1440,154 @@ export const catalogs = {
         projectCheck: "项目检查",
         check: { passed: "通过", failed: "失败", not_configured: "未配置检查" },
         mergedCommit: "合入提交",
-        reading: "正在看它改了什么…",
-        unreadable: "看不了改动：",
-        none: "这个工单没有改动。完成就是请它收工。",
-        conflict: "合进 {base} 会冲突，先没法完成",
-        resolveHow: "让它在自己的分支上把 {base} 合进来、解决冲突、跑一遍测试再提交；解决了再来完成。",
-        behind: "它干活这段时间，{base} 上多了 {n} 个提交；完成时会合在一起（多一个合并提交）。",
-        uncommitted: "还有 {n} 个文件没提交，完成时会先帮它提交：",
+        reading: "正在读取代码改动…",
+        unreadable: "无法读取改动：",
+        none: "当前工单无代码改动，确认完成即可结单。",
+        conflict: "合入 {base} 会冲突，暂无法完成",
+        resolveHow: "请让它在自己分支上合入 {base}、解决冲突、运行测试并提交，随后再完成。",
+        behind: "执行期间，{base} 新增了 {n} 个提交；完成时将合并这些提交（新增一个合并提交）。",
+        uncommitted: "还有 {n} 个文件未提交，完成时会先协助提交：",
         resolve: "让它解决冲突",
-        moved: "工单状态变了，先回到工单看看要你做的事。",
+        moved: "工单状态已变更，请返回工单确认待处理事项。",
         counts: "{commits} 个提交 · {files} 个文件",
         commits: "提交 {n}",
-        files: "改了的文件 {n}",
+        files: "变更文件 {n}",
         conflictMark: "冲突",
         binary: "二进制",
       },
       reopen: {
-        title: "重开这个工单",
-        line: "「{issue}」由同一份角色的新执行会话接着做，它会知道这个工单原来要做什么、上一次是怎么关的。",
-        what: "这次要它做什么（不填就是接着做完）",
-        whatLabel: "这次要做什么",
+        title: "重开工单",
+        line: "将由同一角色的新执行会话继续处理「{issue}」，并继承原有工单目标与上次关闭记录。",
+        what: "补充说明（留空则继续未完成工作）",
+        whatLabel: "补充说明",
         reopen: "重开",
       },
       detail: {
-        now: "现在怎样",
-        yours: "要你做的",
-        rejectWhere: "哪里没过，一行一条",
-        rejectLabel: "哪里没过",
-        sayIt: "自己说……",
-        answer: "回答",
-        tell: "给{who}带句话",
-        tellSection: "带话",
-        tellWorking: "干着活也能收到这句话",
-        tellIdle: "说一句，它接着做一轮",
-        progress: "做到哪了",
-        met: "{met} / {of} 条做到了",
-        noCriteria: "{answer, select, true {这个工单没写做完的标准：交回来时看结论判断。} other {这个工单没写做完的标准：交回来时看改动判断。}}",
-        rejected: "上次打回的",
-        made: "做出了什么",
-        nothingToSee: "没有可看的改动。",
-        noAnswer: "还没有结论。",
-        noChanges: "还没有改动。",
-        changedFiles: "改了哪些文件",
+        now: "当前进展",
+        yours: "待你处理",
+        rejectWhere: "填写打回原因（每行一条）",
+        rejectLabel: "打回原因",
+        sayIt: "自定义回复…",
+        answer: "回复",
+        tell: "给 {who} 留言",
+        tellSection: "补充说明",
+        tellWorking: "运行中也会实时收到这条说明",
+        tellIdle: "发送后将继续新的一轮",
+        progress: "验收标准",
+        met: "已达成 {met} / {of}",
+        noCriteria: "{answer, select, true {暂未设置验收标准，交回后按结论验收。} other {暂未设置验收标准，交回后按改动验收。}}",
+        rejected: "上次打回意见",
+        made: "交付结果",
+        nothingToSee: "暂无可查看的改动。",
+        noAnswer: "暂无结论。",
+        noChanges: "暂无改动。",
+        changedFiles: "变更文件",
         fileCount: "{n} 个",
-        changesUnread: "读不到改动。",
-        full: "要做的（完整说明）",
+        changesUnread: "无法读取改动。",
+        full: "工单说明",
         openTrajectory: "完整轨迹",
-        runs: "每一轮",
-        time: "时间",
-        opened: "开单",
-        started: "开工",
-        waiting: "在等你",
-        since: "{clock} 起",
-        reviewed: "验收过",
-        closedAt: "关单",
-        who: "谁在做",
+        runs: "运行轮次",
+        time: "时间信息",
+        opened: "创建时间",
+        started: "开始时间",
+        waiting: "等待响应",
+        since: "自 {clock}",
+        reviewed: "验收时间",
+        closedAt: "关闭时间",
+        who: "执行方",
         helper: "执行会话",
         model: "模型",
-        deliver: "交付",
-        crew: "一起干活的",
+        deliver: "交付方式",
+        crew: "协作会话",
         profile: "角色",
-        branch: "分支",
+        cwd: "工作区",
         copyPath: "复制路径",
-        took: "用时",
+        took: "耗时",
         resolved: "已解决的验收意见",
         answerTo: "回答：{question}",
-        result: { met: "它说做到了", unmet: "它说没做到", unsure: "它说不确定" },
-        ticked: "看过了：{criterion}",
-        unsaid: "它还没说",
-        noRuns: "还没有干过活。",
-        runCount: "{n} 次",
-        orchestratorStuck: "主助手这一轮没答成：在频道里看它说了什么",
-        job: "要做的",
-        from: "来自",
-        fromCron: "定时任务：每次到点交给主助手，答完等你看",
-        answered: "在它的频道里",
+        result: { met: "已达成", unmet: "未达成", unsure: "待确认" },
+        ticked: "已核对：{criterion}",
+        unsaid: "待验证",
+        noRuns: "暂无运行记录。",
+        runCount: "{n} 轮",
+        orchestratorStuck: "主助手这一轮未完成回复：请在频道中查看详情",
+        job: "工单说明",
+        from: "来源",
+        fromCron: "定时任务：每次到点由主助手执行并等待你查看",
+        answered: "见对应频道",
         evidence: "依据",
-        unsure: "拿不准的",
-        next: "建议接着做",
-        conflict: "合进 {base} 会冲突：{files}",
+        unsure: "待确认项",
+        next: "后续建议",
+        conflict: "合入 {base} 会冲突：{files}",
         properties: "属性",
         status: "状态",
         priority: "优先级",
         repo: "仓库",
-        noRepo: "没有仓库",
-        rename: "改标题",
-        trail: "工单在哪",
+        noRepo: "无仓库",
+        rename: "编辑标题",
+        trail: "所属层级",
       },
-      task: { repo: "仓库", written: "写于" },
+      task: { repo: "仓库", written: "创建时间" },
       todo: {
-        queued: "排上队了：并发上限都满了，有并发上限就自动开工。",
-        refining: "{who}在起草",
-        refiningLine: "它在读代码，写好了会填进下面各栏。",
-        questions: "草稿写好了，它有 {n} 个问题要问你",
-        questionsLine: "在下面回答，它照你的回答再起草一版。",
-        titleHint: "比如：给登录页加上记住我",
+        queued: "排队中：并发上限已满，释放后将自动开始。",
+        refining: "{who} 正在起草",
+        refiningLine: "正在阅读代码库，完成后会自动填充下方字段。",
+        questions: "草稿已生成，有 {n} 个问题待确认",
+        questionsLine: "在下方回复后，将依据你的意见重新起草。",
+        titleHint: "例如：为登录页添加记住登录状态功能",
         title: "标题",
-        descriptionHint: "说明：为什么、要做的、不做的、可能涉及哪些文件（起草会写好）",
+        descriptionHint: "工单说明：背景动机、实现范围、排除边界及涉及文件（起草时自动生成）",
         description: "说明",
         criteria: "验收标准",
-        criteriaHint: "一行一条：你验收时照着看的点",
-        talk: "和执行会话聊清楚",
+        criteriaHint: "每行一条验收标准（支持「验收项 | 验证依据」）",
+        criteriaTable: {
+          colCheck: "核对",
+          colItem: "验收项",
+          colStatus: "状态",
+          colProof: "验证依据",
+          statusDone: "已勾选",
+          statusPending: "待核对",
+          proofEmpty: "—",
+          addRow: "添加一行",
+          removeRow: "删除行",
+          itemPlaceholder: "输入一条验收标准后按回车…",
+          proofPlaceholder: "补充验证依据或预期结果…",
+          batchEdit: "批量编辑",
+        },
+        talk: "与执行会话沟通",
         answerTo: "回答：{question}",
-        answerHint: "回答它的问题",
-        againHint: "再起草时要它改什么（可以不写）",
-        whatHint: "想做什么，一句话就行",
-        whatLabel: "想做什么",
-        redraft: "再起草",
+        answerHint: "填写问题回复",
+        againHint: "再次起草时的补充要求（可选）",
+        whatHint: "简要描述需要完成的工作",
+        whatLabel: "需求描述",
+        redraft: "重新起草",
         draft: "起草",
         status: "状态",
-        draftStatus: "草稿",
+        draftStatus: "需求池",
         todoStatus: "待办",
-        pickForMe: "起草时替你挑",
-        whichRepo: "在哪个仓库里做",
-        firstRepo: "还没有仓库：新建一个",
+        pickForMe: "起草时自动选择",
+        whichRepo: "选择目标仓库",
+        firstRepo: "暂无仓库，先新建一个",
         newRepoLink: "新建仓库",
         mountLocalLink: "关联本地仓库",
         repoActions: "新建或关联仓库",
         priority: "优先级",
-        inQueue: "排队中：{ago}排上的，有并发上限就按看板上的先后自动开工。",
-        unqueue: "不排了",
-        pickHelper: "先选好角色",
-        save: "存下改动",
-        remove: "删掉",
+        inQueue: "排队中（{ago}加入）：并发上限释放后按看板顺序自动开始。",
+        unqueue: "取消排队",
+        pickHelper: "请先选择角色",
+        save: "保存更改",
+        remove: "删除",
         newRepo: "新建仓库",
-        repoHint: "仓库名，也是项目根目录下的文件夹名",
+        repoHint: "仓库名称，同时作为项目根目录下的文件夹名",
         repoName: "仓库名",
         create: "新建",
         edit: "编辑",
         doneEditing: "完成编辑",
         addDescription: "添加说明…",
         addCriteria: "添加验收标准",
-        polish: "让角色再润色",
-        markReady: "标为待开发",
-        revive: "恢复到需求池",
+        polish: "让角色继续润色",
+        markReady: "标为待办",
+        revive: "移回需求池",
         criterionToggle: "切换验收标准「{criterion}」",
       },
       peek: { expand: "展开全屏", close: "关闭预览", compareBadge: "对比" },
@@ -1601,11 +1607,34 @@ export const catalogs = {
         refine: "起草",
         runtime: "环境自己",
       },
-      run: { working: "正在干", heard: "中途听到 {n} 句", reconcile: "需要核对工作区", currentChanges: "查看工单当前改动" },
+      run: { working: "正在干", heard: "中途听到 {n} 句" },
+      receipt: {
+        title: "交付回执",
+        hint: "可选附上交付凭证（PR、提交、笔记或结论）。",
+        kind: "回执类型",
+        kinds: { none: "无", pull_request: "拉取请求", commit: "提交", note: "笔记", answer: "结论" },
+        url: "PR 链接",
+        urlPlaceholder: "例如 https://github.com/org/repo/pull/123",
+        number: "PR 编号（可选）",
+        numberPlaceholder: "123",
+        sha: "提交 SHA",
+        shaPlaceholder: "例如 a1b2c3d4…",
+        branch: "分支（可选）",
+        branchPlaceholder: "例如 feat/my-branch",
+        noteId: "笔记 ID",
+        noteIdPlaceholder: "输入笔记 ID",
+        noteTitle: "笔记标题（可选）",
+        noteTitlePlaceholder: "设计方案",
+        summary: "交付摘要",
+        summaryOptional: "摘要（可选）",
+        summaryPlaceholder: "关键结果或验证说明…",
+        openNote: "打开笔记",
+        openPr: "打开 PR",
+        missing: { url: "请填写 PR 链接。", sha: "请填写提交 SHA。", noteId: "请填写笔记 ID。", summary: "请填写结论摘要。" },
+      },
       card: {
         orchestrator: "主助手",
         refining: "{name}在起草",
-        draft: "草稿",
         queued: "排队中",
         cron: "定时任务",
         noHelper: "还没选角色",
@@ -1799,8 +1828,6 @@ export const catalogs = {
         unpinnedToast: "已取消置顶",
         artifacts: "笔记",
         media: "素材",
-        moreTypes: "更多类型 ({n})",
-        fewerTypes: "收起空类型",
         exportArtifact: "导出",
         turnIntoIssue: "转为工单",
         issueCreated: "已创建工单",
@@ -1883,6 +1910,7 @@ export const catalogs = {
             sheetTechMatrix: { name: "技术方案评估矩阵", desc: "分维度加权打分、改造成本与运维复杂度对比" },
             sheetTestMatrix: { name: "测试与回归矩阵", desc: "核心用例、环境覆盖、预期结果与最近通过状态" },
             sheetApiInventory: { name: "接口与依赖台账", desc: "端点清单、鉴权方式、限流策略与负责人记录" },
+            sheetUiReview: { name: "UI / 产品走查清单", desc: "严重度、状态、模块、关联工单与 Agent 诊断转单的交互走查台账" },
             artDiagram: { name: "结构图表", desc: "节点、连线与架构流程表达" },
             diagMicroservices: { name: "微服务拓扑图", desc: "边缘网关、业务服务、事件总线与存储依赖" },
             diagSequence: { name: "调用时序图", desc: "客户端、认证、核心服务与持久化请求链路" },
@@ -2147,6 +2175,26 @@ export const catalogs = {
             sheetApiR4Rate: "10 次/分钟",
             sheetApiR4Owner: "远程门",
             sheetApiR4Stab: "稳定 v1",
+            sheetUiReviewTab: "UI 走查清单",
+            sheetUiReviewColTitle: "标题",
+            sheetUiReviewColSeverity: "严重度",
+            sheetUiReviewColStatus: "状态",
+            sheetUiReviewColModule: "模块",
+            sheetUiReviewColIssue: "关联工单",
+            sheetUiReviewColAgent: "Agent 转工单与诊断",
+            sheetUiReviewSevP0: "P0 阻塞",
+            sheetUiReviewSevP1: "P1 体验",
+            sheetUiReviewSevP2: "P2 润色",
+            sheetUiReviewSevUx: "UX 建议",
+            sheetUiReviewStOpen: "待处理",
+            sheetUiReviewStFixing: "修复中",
+            sheetUiReviewStResolved: "已解决",
+            sheetUiReviewR1Title: "深色模式下侧栏边框对比度偏硬",
+            sheetUiReviewR1Mod: "笔记 / 侧栏",
+            sheetUiReviewR2Title: "表格末格 Tab 未自动追加新行",
+            sheetUiReviewR2Mod: "笔记 / 文档编辑器",
+            sheetUiReviewR3Title: "灯箱标注圆标在窄图边缘轻微裁切",
+            sheetUiReviewR3Mod: "笔记 / 媒体层",
             dashSloP1: "核心可用性 (%)",
             dashSloP2: "P99 延迟 (ms)",
             dashSloP3: "错误预算剩余 (%)",
@@ -2475,7 +2523,6 @@ export const catalogs = {
       links: { outgoing: "引用去向 ({n})", backlinks: "反向链接 ({n})", relation: { link: "引用", embed: "嵌入", ref: "关联" } },
       doc: {
         addBlock: "添加内容块",
-        slashHint: "输入 / 插入内容块，或输入 [[ 关联笔记或工单",
         slidesCount: "{n} 页",
         empty: "空白文档——添加一个内容块开始",
         presenter: "演示模式",
@@ -2490,9 +2537,6 @@ export const catalogs = {
         duplicate: "复制",
         convertToIssue: "转为工单",
         turnInto: "转换为",
-        edit: "编辑",
-        preview: "预览",
-        render: "渲染",
         add: "添加",
         tocTitle: "目录",
         tocEmpty: "添加标题后自动生成目录",
@@ -2506,36 +2550,29 @@ export const catalogs = {
         toggleTitlePlaceholder: "折叠标题…",
         toggleBodyPlaceholder: "折叠内容…",
         calloutPlaceholder: "提示正文…",
-        codePlaceholder: "// 在此输入代码…",
-        codeLanguagePlaceholder: "语言",
         addCol: "+列",
         addRow: "+行",
+        tableAlign: "切换列对齐",
+        tableMoveColLeft: "列左移",
+        tableMoveColRight: "列右移",
+        tableInsertColAfter: "右侧插入列",
+        tableDeleteCol: "删除列",
+        tableInsertRowBelow: "下方插入行",
+        tableDeleteRow: "删除行",
         bookmarkOpen: "打开链接",
         bookmarkEdit: "编辑书签",
         titleOptional: "标题（可选）",
         descOptional: "描述（可选）",
-        mathBlock: "块级",
-        mathInline: "行内",
         columnsCount: "{n} 栏",
-        columnsOption: "{n} 栏",
         slideLabel: "第 {n} 页",
         slideTitlePlaceholder: "幻灯片标题…",
         speakerNotesPlaceholder: "演讲者备注…",
-        kpiEdit: "编辑指标",
-        chartTitle: "图表",
-        chartEdit: "编辑图表",
-        compareEdit: "编辑对比",
         noBeforeAsset: "暂无对比前素材",
         noAfterAsset: "暂无对比后素材",
-        mediaEdit: "编辑媒体",
         previewTitle: "沙箱预览",
-        previewEdit: "编辑预览",
         selectBase: "选择多维库",
-        pickBase: "选择多维库",
         selectIssue: "选择工单",
-        pickIssue: "选择工单",
         issuesTitle: "工单 ({n})",
-        filterIssues: "筛选工单",
         repoFilter: "仓库筛选",
         statusFilter: "状态（如 todo）",
         tagFilter: "标签",
@@ -2595,6 +2632,29 @@ export const catalogs = {
         shot: "镜头",
         transcriptPreview: "转写预览",
         videoPreview: "播放预览",
+      },
+      annotation: {
+        show: "显示标注",
+        hide: "隐藏标注",
+        unresolvedOnly: "仅看未解决",
+        addMode: "框选标注",
+        addModeHint: "在图片上点击或拖拽框选新增标注",
+        openCount: "未解决 {open}/{total}",
+        defaultTitle: "走查项 #{n}",
+        titlePlaceholder: "标注标题…",
+        bodyPlaceholder: "评审说明或期望修改…",
+        resolve: "标为已解决",
+        reopen: "重新打开",
+        edit: "编辑标注",
+        save: "完成",
+        delete: "删除标注",
+        createIssue: "转为工单",
+        openIssue: "查看工单",
+        jumpToRow: "对应清单行",
+        jumpToPin: "标注 #{n}",
+        zoom: "灯箱放大查看",
+        severity: { p0: "P0 阻塞", p1: "P1 体验", p2: "P2 润色", ux: "UX 建议" },
+        status: { open: "未解决", resolved: "已解决" },
       },
       files: { codeMode: "源码", htmlPreviewMode: "网页预览" },
       issue: {
@@ -3150,9 +3210,6 @@ export const catalogs = {
         platform: { macos: "macOS", linux: "Linux", container: "容器", other: "其他" },
         status: { online: "在线", offline: "离线", draining: "排空中" },
         machineId: "机器 ID",
-        worktree: "工作树",
-        worktreeYes: "支持",
-        worktreeNo: "不支持",
         installedCount: "已装环境",
         lastSeen: "最近在线",
       },
@@ -3281,7 +3338,6 @@ export const catalogs = {
         contextUpdate: "状态上下文更新",
         expandAll: "全部展开",
         collapseAll: "全部收起",
-        inspect: "查看详情",
         hideDetail: "收起详情",
         copyRawError: "复制原始错误",
         openSettings: "前往设置",
@@ -3446,7 +3502,7 @@ export const catalogs = {
         chat: "微信 飞书 QQ 聊天通道 连接器 配对",
         github: "GitHub Token gh PR 登录 直连",
         remote: "远程 手机 局域网 LAN Wi-Fi 直连 Tailscale 配对 二维码 设备 iOS Android CLI 命令行 执行机 沙箱 监听 令牌 总控端 内嵌 远端",
-        data: "家目录 设置文件 仓库 目录 工作树 存储 后端 数据 data storage",
+        data: "家目录 设置文件 仓库 目录 存储 后端 数据 data storage",
         about: "版本 更新 命令行 CLI version update",
       },
       scope: { farm: "对整个 VibeValley", device: "只对这台设备" },
@@ -3528,7 +3584,7 @@ export const catalogs = {
         refresh: "重新检测",
       },
       data: {
-        intro: "查看本机数据目录、Git 仓库与工作树路径，以及当前存储后端。",
+        intro: "查看本机数据目录、Git 仓库路径以及当前存储后端。",
         storageTitle: "存储后端",
         backend: "当前后端",
         backendHint: "附件、媒体输入与笔记目录的底层存储后端",
@@ -3536,7 +3592,7 @@ export const catalogs = {
         backendS3: "对象存储 (S3)",
         backendMemory: "内存存储 (Memory)",
       },
-      providers: { intro: "统一配置 DeepSeek、MiniMax、MOSS 等模型商凭据（1 个模型商对应 1 个 API 密钥），验证连通性并自动拉取带能力标签的可用模型。" },
+      providers: { intro: "统一配置 DeepSeek 与 MOSS 模型商凭据（1 个模型商对应 1 个 API 密钥），验证连通性并自动拉取带能力标签的可用模型。" },
       models: { intro: "按场景选择主选模型与备选回退策略；仅从已配置并拉取到可用模型的模型商中选择。" },
       memory: { intro: "执行会话还能去外面的记忆来源里查、往里记。" },
       about: {
@@ -3550,8 +3606,6 @@ export const catalogs = {
         settingsHint: "钥匙和这几页的设置",
         repos: "仓库目录",
         reposHint: "这个空间的仓库，每个文件夹都是一个 git 仓库",
-        worktrees: "工作树目录",
-        worktreesHint: "执行会话运行时每个工单自己的检出",
         copy: "复制路径",
         copied: "路径复制好了",
         reveal: "在访达里显示",
@@ -3650,8 +3704,6 @@ export const catalogs = {
         collapseAllTooltip: "折叠全部仓库与工作树",
         expandCurrent: "展开当前",
         expandCurrentTooltip: "展开当前仓库与活动工作树",
-        collapseItem: "折叠 {name}",
-        expandItem: "展开 {name}",
         newTerminalHere: "在此新建终端",
         newChatHere: "在此新建对话",
         chatWaiting: "等待确认回复",
@@ -3957,7 +4009,6 @@ export const catalogs = {
       },
       delivered: {
         merged: "merged into main",
-        merged_into_parent: "merged into the plan's branch",
         pull_request: "its PR was merged",
         kept: "branch kept, not merged",
         none: "nothing to merge",
@@ -4092,9 +4143,6 @@ export const catalogs = {
       workdirTip:
         "A folder under the projects root (VIBEVALLEY_WORK_ROOT). Used when the assistant sends work without naming a repo; when empty, the repo must be named.",
       workdirHint: "such as clock-in",
-      worktree: "A git worktree for each helper",
-      worktreeHint:
-        "Each helper changes its own branch, so helpers do not overwrite each other; completing merges it into the repo. Off, it changes the repo directly, with no branch to merge.",
       env: "Environment variables",
       envHint: "On top of the environment's own variables.",
       machine: "Environment",
@@ -5477,13 +5525,13 @@ export const catalogs = {
       },
       close: {
         title: 'Close "{issue}"',
-        working: "{who} is still working on this ticket. Canceling stops it and lets it go; the changes on its branch are not merged into main.",
-        completable:
-          "Completing merges {who}'s branch into the repo's main branch, after you look over the changes; canceling lets it go without merging them.",
-        notCompletable: "This ticket cannot be completed now. Canceling lets {who} go, and its changes are not merged into main.",
-        review: "See the changes, complete",
+        working: "{who} is still working on this ticket. Canceling stops it and discards the ticket.",
+        completable: "Review the changes or attach a delivery receipt to mark this ticket done, or cancel it.",
+        notCompletable: "This ticket cannot be completed now. Canceling stops {who} and marks the ticket canceled.",
+        review: "Review and complete",
         stopAndCancel: "Stop and cancel",
         cancel: "Cancel the ticket",
+        completeWithoutDiff: "Complete with receipt",
       },
       changes: {
         checkOutput: "Check output",
@@ -5515,61 +5563,61 @@ export const catalogs = {
         reopen: "Reopen",
       },
       detail: {
-        now: "Where it is",
-        yours: "For you to do",
+        now: "Progress",
+        yours: "Action required",
         rejectWhere: "What did not pass, one per line",
         rejectLabel: "What did not pass",
-        sayIt: "Say it yourself…",
+        sayIt: "Custom reply…",
         answer: "Answer",
-        tell: "Tell {who}",
-        tellSection: "Tell it",
-        tellWorking: "It hears this even while it works",
-        tellIdle: "Say something and it works another round",
-        progress: "How far it got",
+        tell: "Message {who}",
+        tellSection: "Note",
+        tellWorking: "Delivered to the helper while running",
+        tellIdle: "Sends a follow-up round",
+        progress: "Acceptance criteria",
         met: "{met} / {of} met",
         noCriteria:
-          "{answer, select, true {This ticket has no criteria for done: judge by its answer when it comes back.} other {This ticket has no criteria for done: judge by its changes when it comes back.}}",
+          "{answer, select, true {No criteria configured yet; evaluate by the final answer.} other {No criteria configured yet; evaluate by the delivered changes.}}",
         rejected: "Sent back last time",
-        made: "What it made",
-        nothingToSee: "No changes to see.",
+        made: "Deliverables",
+        nothingToSee: "No changes to show.",
         noAnswer: "No answer yet.",
         noChanges: "No changes yet.",
         changedFiles: "Changed files",
         fileCount: "{n}",
         changesUnread: "The changes cannot be read.",
-        full: "What to do (in full)",
+        full: "Description",
         openTrajectory: "Full trajectory",
-        runs: "Every round of work",
-        time: "Time",
-        opened: "Opened",
+        runs: "Runs",
+        time: "Timestamps",
+        opened: "Created",
         started: "Started",
         waiting: "Waiting for you",
         since: "since {clock}",
-        reviewed: "Accepted",
+        reviewed: "Reviewed",
         closedAt: "Closed",
-        who: "Who",
+        who: "Assignee",
         helper: "Helper",
         model: "Model",
-        deliver: "Delivers",
-        crew: "Worked on by",
+        deliver: "Delivery",
+        crew: "Collaborators",
         profile: "Profile",
-        branch: "Branch",
-        copyPath: "Copy the path",
-        took: "Took",
+        cwd: "Working folder",
+        copyPath: "Copy path",
+        took: "Duration",
         resolved: "Resolved review notes",
         answerTo: "Answer: {question}",
-        result: { met: "It says this is met", unmet: "It says this is not met", unsure: "It is not sure" },
+        result: { met: "Met", unmet: "Unmet", unsure: "Unsure" },
         ticked: "Checked: {criterion}",
-        unsaid: "It has not said yet",
-        noRuns: "No work yet.",
+        unsaid: "Pending",
+        noRuns: "No runs yet.",
         runCount: "{n, plural, one {# round} other {# rounds}}",
-        orchestratorStuck: "The assistant did not finish answering this round: see what it said in its channel",
-        job: "To do",
-        from: "From",
-        fromCron: "A scheduled task: each time it is due it goes to the assistant, and its answer waits for you",
+        orchestratorStuck: "The assistant did not finish answering this round: check its channel",
+        job: "Description",
+        from: "Source",
+        fromCron: "Scheduled task: dispatched to the assistant when due",
         answered: "In its channel",
         evidence: "Evidence",
-        unsure: "Not sure about",
+        unsure: "Uncertain items",
         next: "Suggested next",
         conflict: "Merging into {base} would conflict: {files}",
         properties: "Properties",
@@ -5578,21 +5626,35 @@ export const catalogs = {
         repo: "Repo",
         noRepo: "No repo",
         rename: "Rename",
-        trail: "Where the issue is",
+        trail: "Hierarchy",
       },
-      task: { repo: "Repo", written: "Written" },
+      task: { repo: "Repo", written: "Created" },
       todo: {
-        queued: "Queued: every spot is taken, and it starts by itself when one frees up.",
+        queued: "Queued: concurrency limit reached; starts automatically when free.",
         refining: "{who} is drafting",
-        refiningLine: "It is reading the code, and will fill in the fields below.",
-        questions: "{n, plural, one {The draft is written, and it has a question for you} other {The draft is written, and it has # questions for you}}",
-        questionsLine: "Answer below, and it drafts again by your answers.",
-        titleHint: "Such as: add Remember me to the sign-in page",
+        refiningLine: "Reading the codebase to populate the fields below.",
+        questions: "{n, plural, one {Draft ready with # question} other {Draft ready with # questions}}",
+        questionsLine: "Reply below to refine another pass.",
+        titleHint: "e.g. Add Remember me to sign-in page",
         title: "Title",
-        descriptionHint: "Description: why, what to do, what not to do, which files it may touch (drafting writes it)",
+        descriptionHint: "Description: motivation, scope, non-goals, and target files",
         description: "Description",
         criteria: "Acceptance criteria",
-        criteriaHint: "One per line: the points you check when you review",
+        criteriaHint: 'One per line (supports "Criterion | Verification basis")',
+        criteriaTable: {
+          colCheck: "Done",
+          colItem: "Criterion",
+          colStatus: "Status",
+          colProof: "Basis",
+          statusDone: "Checked",
+          statusPending: "Pending",
+          proofEmpty: "—",
+          addRow: "Add row",
+          removeRow: "Remove row",
+          itemPlaceholder: "Add acceptance criterion and press Enter…",
+          proofPlaceholder: "Add verification basis…",
+          batchEdit: "Bulk edit",
+        },
         talk: "Talk it through with the helper",
         answerTo: "Answer: {question}",
         answerHint: "Answer its questions",
@@ -5646,16 +5708,34 @@ export const catalogs = {
         refine: "drafting",
         runtime: "the environment itself",
       },
-      run: {
-        working: "working",
-        heard: "{n, plural, one {heard # word on the way} other {heard # words on the way}}",
-        reconcile: "Verify the working directory",
-        currentChanges: "View current issue changes",
+      run: { working: "working", heard: "{n, plural, one {heard # word on the way} other {heard # words on the way}}" },
+      receipt: {
+        title: "Delivery receipt",
+        hint: "Record proof of delivery (PR, commit, note, or answer).",
+        kind: "Receipt type",
+        kinds: { none: "None", pull_request: "Pull Request", commit: "Commit", note: "Note", answer: "Answer" },
+        url: "PR URL",
+        urlPlaceholder: "https://github.com/org/repo/pull/123",
+        number: "PR number (optional)",
+        numberPlaceholder: "123",
+        sha: "Commit SHA",
+        shaPlaceholder: "a1b2c3d4…",
+        branch: "Branch (optional)",
+        branchPlaceholder: "feat/my-branch",
+        noteId: "Note ID",
+        noteIdPlaceholder: "note-id",
+        noteTitle: "Note title (optional)",
+        noteTitlePlaceholder: "Design spec",
+        summary: "Summary",
+        summaryOptional: "Summary (optional)",
+        summaryPlaceholder: "Key outcome or verification notes…",
+        openNote: "Open note",
+        openPr: "Open PR",
+        missing: { url: "Enter a pull request URL.", sha: "Enter a commit SHA.", noteId: "Enter a note ID.", summary: "Enter an answer summary." },
       },
       card: {
         orchestrator: "Assistant",
         refining: "{name} is drafting",
-        draft: "Draft",
         queued: "Queued",
         cron: "Scheduled task",
         noHelper: "No helper yet",
@@ -5850,8 +5930,6 @@ export const catalogs = {
         unpinnedToast: "Unpinned",
         artifacts: "Notes",
         media: "Media",
-        moreTypes: "More types ({n})",
-        fewerTypes: "Hide empty types",
         exportArtifact: "Export",
         turnIntoIssue: "Turn into ticket",
         issueCreated: "Ticket created",
@@ -5955,6 +6033,10 @@ export const catalogs = {
             sheetTechMatrix: { name: "Tech Evaluation Matrix", desc: "Weighted criteria scoring, effort, and operational complexity" },
             sheetTestMatrix: { name: "QA & Regression Matrix", desc: "Core test cases, layer coverage, expected behavior, and status" },
             sheetApiInventory: { name: "API & Dependency Inventory", desc: "Endpoint registry, auth mode, rate limits, and owning module" },
+            sheetUiReview: {
+              name: "UI & Product Review Checklist",
+              desc: "Severity, status, module, linked issue & Agent triage for annotated UI walkthroughs",
+            },
             artDiagram: { name: "Architecture diagram", desc: "Nodes, edges, and architecture flows" },
             diagMicroservices: { name: "Microservices Topology", desc: "Edge gateway, domain services, event bus, and storage links" },
             diagSequence: { name: "Request Sequence Flow", desc: "Client, auth guard, core service, outbox, and live stream flow" },
@@ -6222,6 +6304,26 @@ export const catalogs = {
             sheetApiR4Rate: "10 req/min",
             sheetApiR4Owner: "Remote",
             sheetApiR4Stab: "Stable v1",
+            sheetUiReviewTab: "UI Walkthrough Checklist",
+            sheetUiReviewColTitle: "Finding",
+            sheetUiReviewColSeverity: "Severity",
+            sheetUiReviewColStatus: "Status",
+            sheetUiReviewColModule: "Module",
+            sheetUiReviewColIssue: "Linked Issue",
+            sheetUiReviewColAgent: "Agent Triage & Spawn",
+            sheetUiReviewSevP0: "P0 Blocker",
+            sheetUiReviewSevP1: "P1 Experience",
+            sheetUiReviewSevP2: "P2 Polish",
+            sheetUiReviewSevUx: "UX Suggestion",
+            sheetUiReviewStOpen: "Open",
+            sheetUiReviewStFixing: "Fixing",
+            sheetUiReviewStResolved: "Resolved",
+            sheetUiReviewR1Title: "Dark theme sidebar border contrast too sharp",
+            sheetUiReviewR1Mod: "Note / Sidebar",
+            sheetUiReviewR2Title: "Table cell Tab navigation skips last row append",
+            sheetUiReviewR2Mod: "Note / Doc Editor",
+            sheetUiReviewR3Title: "Lightbox pin badge overlaps narrow caption edge",
+            sheetUiReviewR3Mod: "Note / Media",
             dashSloP1: "Availability (%)",
             dashSloP2: "P99 Latency (ms)",
             dashSloP3: "Error Budget Left (%)",
@@ -6558,7 +6660,6 @@ export const catalogs = {
       links: { outgoing: "Outgoing links ({n})", backlinks: "Backlinks ({n})", relation: { link: "link", embed: "embed", ref: "ref" } },
       doc: {
         addBlock: "Add block",
-        slashHint: "Type / for blocks or [[ to link a note or issue",
         slidesCount: "{n} slides",
         empty: "Empty document — add a block to start",
         presenter: "Presenter",
@@ -6573,9 +6674,6 @@ export const catalogs = {
         duplicate: "Duplicate",
         convertToIssue: "Convert to Issue",
         turnInto: "Turn into",
-        edit: "Edit",
-        preview: "Preview",
-        render: "Render",
         add: "Add",
         tocTitle: "Table of Contents",
         tocEmpty: "Add headings to populate outline",
@@ -6589,36 +6687,29 @@ export const catalogs = {
         toggleTitlePlaceholder: "Toggle heading…",
         toggleBodyPlaceholder: "Toggle notes…",
         calloutPlaceholder: "Callout content…",
-        codePlaceholder: "// Write code…",
-        codeLanguagePlaceholder: "language",
         addCol: "+Col",
         addRow: "+Row",
+        tableAlign: "Cycle alignment",
+        tableMoveColLeft: "Move column left",
+        tableMoveColRight: "Move column right",
+        tableInsertColAfter: "Insert column after",
+        tableDeleteCol: "Delete column",
+        tableInsertRowBelow: "Insert row below",
+        tableDeleteRow: "Delete row",
         bookmarkOpen: "Open URL",
         bookmarkEdit: "Edit bookmark",
         titleOptional: "Title (optional)",
         descOptional: "Description (optional)",
-        mathBlock: "Block",
-        mathInline: "Inline",
         columnsCount: "{n} Columns",
-        columnsOption: "{n} Col",
         slideLabel: "Slide {n}",
         slideTitlePlaceholder: "Slide title…",
         speakerNotesPlaceholder: "Speaker notes…",
-        kpiEdit: "Edit KPI",
-        chartTitle: "Chart",
-        chartEdit: "Edit chart",
-        compareEdit: "Edit compare",
         noBeforeAsset: "No before asset",
         noAfterAsset: "No after asset",
-        mediaEdit: "Edit media",
         previewTitle: "Sandbox Preview",
-        previewEdit: "Edit preview",
         selectBase: "Select a Base note",
-        pickBase: "Pick Base",
         selectIssue: "Select an issue",
-        pickIssue: "Select issue",
         issuesTitle: "Issues ({n})",
-        filterIssues: "Filter issues",
         repoFilter: "Repo filter",
         statusFilter: "Status (e.g. todo)",
         tagFilter: "Tag",
@@ -6678,6 +6769,29 @@ export const catalogs = {
         shot: "Shot",
         transcriptPreview: "Transcript",
         videoPreview: "Preview",
+      },
+      annotation: {
+        show: "Show pins",
+        hide: "Hide pins",
+        unresolvedOnly: "Open only",
+        addMode: "Annotate",
+        addModeHint: "Click or drag on image to place an annotation",
+        openCount: "{open}/{total} open",
+        defaultTitle: "Finding #{n}",
+        titlePlaceholder: "Annotation title…",
+        bodyPlaceholder: "Review note or expected fix…",
+        resolve: "Resolve",
+        reopen: "Reopen",
+        edit: "Edit annotation",
+        save: "Done",
+        delete: "Delete annotation",
+        createIssue: "Create Issue",
+        openIssue: "Open Issue",
+        jumpToRow: "Review row",
+        jumpToPin: "Pin #{n}",
+        zoom: "Inspect in Lightbox",
+        severity: { p0: "P0", p1: "P1", p2: "P2", ux: "UX" },
+        status: { open: "Open", resolved: "Resolved" },
       },
       files: { codeMode: "Code", htmlPreviewMode: "Preview" },
       issue: {
@@ -7255,9 +7369,6 @@ export const catalogs = {
         platform: { macos: "macOS", linux: "Linux", container: "Container", other: "Other" },
         status: { online: "Online", offline: "Offline", draining: "Draining" },
         machineId: "Machine ID",
-        worktree: "Worktree",
-        worktreeYes: "Supported",
-        worktreeNo: "Unavailable",
         installedCount: "Installed",
         lastSeen: "Last seen",
       },
@@ -7396,7 +7507,6 @@ export const catalogs = {
         contextUpdate: "Context snapshot",
         expandAll: "Expand all",
         collapseAll: "Collapse all",
-        inspect: "Inspect",
         hideDetail: "Collapse",
         copyRawError: "Copy raw error",
         openSettings: "Open settings",
@@ -7562,7 +7672,7 @@ export const catalogs = {
         github: "GitHub Token gh PR login",
         remote:
           "remote mobile phone lan wifi local direct Tailscale pair pairing QR device iOS Android CLI machine sandbox listener token control plane embedded",
-        data: "home folder settings repos worktrees data storage backend",
+        data: "home folder settings repos data storage backend",
         about: "version update cli command line",
       },
       scope: { farm: "For all of VibeValley", device: "This device only" },
@@ -7644,7 +7754,7 @@ export const catalogs = {
         refresh: "Recheck",
       },
       data: {
-        intro: "Inspect local data paths, repository and worktree folders, and the active storage backend.",
+        intro: "Inspect local data paths, repository folders, and the active storage backend.",
         storageTitle: "Storage Backend",
         backend: "Active backend",
         backendHint: "Storage backend for attachments, media inputs, and notes",
@@ -7653,8 +7763,7 @@ export const catalogs = {
         backendMemory: "In-Memory (Memory)",
       },
       providers: {
-        intro:
-          "Manage credentials for DeepSeek, MiniMax, MOSS, and other providers (1 provider = 1 API key), verify connectivity, and auto-fetch capability-tagged models.",
+        intro: "Manage credentials for DeepSeek and MOSS providers (1 provider = 1 API key), verify connectivity, and auto-fetch capability-tagged models.",
       },
       models: { intro: "Configure per-scene primary models and fallback policies from discovered provider models only." },
       memory: { intro: "Helpers can also look things up in, and write to, memory outside VibeValley." },
@@ -7669,8 +7778,6 @@ export const catalogs = {
         settingsHint: "The keys and these pages' settings",
         repos: "Repositories",
         reposHint: "The space's repos; each folder is a git repository",
-        worktrees: "Worktrees",
-        worktreesHint: "Each issue's own checkout while a helper works",
         copy: "Copy the path",
         copied: "Path copied",
         reveal: "Show in Finder",
@@ -7769,8 +7876,6 @@ export const catalogs = {
         collapseAllTooltip: "Collapse all repositories and worktrees",
         expandCurrent: "Expand current",
         expandCurrentTooltip: "Expand active repositories and worktrees",
-        collapseItem: "Collapse {name}",
-        expandItem: "Expand {name}",
         newTerminalHere: "New terminal here",
         newChatHere: "New chat here",
         chatWaiting: "Waiting for confirmation",
@@ -8089,7 +8194,6 @@ export interface Messages {
   "shared.deliverable.pull_request": undefined;
   "shared.delivered.kept": undefined;
   "shared.delivered.merged": undefined;
-  "shared.delivered.merged_into_parent": undefined;
   "shared.delivered.none": undefined;
   "shared.delivered.pull_request": undefined;
   "shared.delivered.submitted": undefined;
@@ -8367,8 +8471,6 @@ export interface Messages {
   "web.agent.workdir": undefined;
   "web.agent.workdirHint": undefined;
   "web.agent.workdirTip": undefined;
-  "web.agent.worktree": undefined;
-  "web.agent.worktreeHint": undefined;
   "web.audio.account": undefined;
   "web.audio.addSpeaker": undefined;
   "web.audio.addTurn": undefined;
@@ -9495,7 +9597,6 @@ export interface Messages {
   "web.issue.calendar.prevMonth": undefined;
   "web.issue.card.assignHelper": undefined;
   "web.issue.card.cron": undefined;
-  "web.issue.card.draft": undefined;
   "web.issue.card.lost": undefined;
   "web.issue.card.missing": { readonly what: string | number };
   "web.issue.card.missingFlag": undefined;
@@ -9536,7 +9637,8 @@ export interface Messages {
   "web.issue.changes.uncommitted": { readonly n: string | number };
   "web.issue.changes.unreadable": undefined;
   "web.issue.close.cancel": undefined;
-  "web.issue.close.completable": { readonly who: string | number };
+  "web.issue.close.completable": undefined;
+  "web.issue.close.completeWithoutDiff": undefined;
   "web.issue.close.notCompletable": { readonly who: string | number };
   "web.issue.close.review": undefined;
   "web.issue.close.stopAndCancel": undefined;
@@ -9557,13 +9659,13 @@ export interface Messages {
   "web.issue.detail.answer": undefined;
   "web.issue.detail.answerTo": { readonly question: string | number };
   "web.issue.detail.answered": undefined;
-  "web.issue.detail.branch": undefined;
   "web.issue.detail.changedFiles": undefined;
   "web.issue.detail.changesUnread": undefined;
   "web.issue.detail.closedAt": undefined;
   "web.issue.detail.conflict": { readonly base: string | number; readonly files: string | number };
   "web.issue.detail.copyPath": undefined;
   "web.issue.detail.crew": undefined;
+  "web.issue.detail.cwd": undefined;
   "web.issue.detail.deliver": undefined;
   "web.issue.detail.evidence": undefined;
   "web.issue.detail.fileCount": { readonly n: string | number };
@@ -9784,6 +9886,35 @@ export interface Messages {
   "web.issue.peek.compareBadge": undefined;
   "web.issue.peek.expand": undefined;
   "web.issue.reading": undefined;
+  "web.issue.receipt.branch": undefined;
+  "web.issue.receipt.branchPlaceholder": undefined;
+  "web.issue.receipt.hint": undefined;
+  "web.issue.receipt.kind": undefined;
+  "web.issue.receipt.kinds.answer": undefined;
+  "web.issue.receipt.kinds.commit": undefined;
+  "web.issue.receipt.kinds.none": undefined;
+  "web.issue.receipt.kinds.note": undefined;
+  "web.issue.receipt.kinds.pull_request": undefined;
+  "web.issue.receipt.missing.noteId": undefined;
+  "web.issue.receipt.missing.sha": undefined;
+  "web.issue.receipt.missing.summary": undefined;
+  "web.issue.receipt.missing.url": undefined;
+  "web.issue.receipt.noteId": undefined;
+  "web.issue.receipt.noteIdPlaceholder": undefined;
+  "web.issue.receipt.noteTitle": undefined;
+  "web.issue.receipt.noteTitlePlaceholder": undefined;
+  "web.issue.receipt.number": undefined;
+  "web.issue.receipt.numberPlaceholder": undefined;
+  "web.issue.receipt.openNote": undefined;
+  "web.issue.receipt.openPr": undefined;
+  "web.issue.receipt.sha": undefined;
+  "web.issue.receipt.shaPlaceholder": undefined;
+  "web.issue.receipt.summary": undefined;
+  "web.issue.receipt.summaryOptional": undefined;
+  "web.issue.receipt.summaryPlaceholder": undefined;
+  "web.issue.receipt.title": undefined;
+  "web.issue.receipt.url": undefined;
+  "web.issue.receipt.urlPlaceholder": undefined;
   "web.issue.relations.clear": undefined;
   "web.issue.relations.duplicate": undefined;
   "web.issue.relations.duplicateChip": { readonly n: string | number };
@@ -9797,9 +9928,7 @@ export interface Messages {
   "web.issue.reopen.title": undefined;
   "web.issue.reopen.what": undefined;
   "web.issue.reopen.whatLabel": undefined;
-  "web.issue.run.currentChanges": undefined;
   "web.issue.run.heard": { readonly n: number };
-  "web.issue.run.reconcile": undefined;
   "web.issue.run.working": undefined;
   "web.issue.scope.active": undefined;
   "web.issue.scope.all": undefined;
@@ -9850,6 +9979,18 @@ export interface Messages {
   "web.issue.todo.create": undefined;
   "web.issue.todo.criteria": undefined;
   "web.issue.todo.criteriaHint": undefined;
+  "web.issue.todo.criteriaTable.addRow": undefined;
+  "web.issue.todo.criteriaTable.batchEdit": undefined;
+  "web.issue.todo.criteriaTable.colCheck": undefined;
+  "web.issue.todo.criteriaTable.colItem": undefined;
+  "web.issue.todo.criteriaTable.colProof": undefined;
+  "web.issue.todo.criteriaTable.colStatus": undefined;
+  "web.issue.todo.criteriaTable.itemPlaceholder": undefined;
+  "web.issue.todo.criteriaTable.proofEmpty": undefined;
+  "web.issue.todo.criteriaTable.proofPlaceholder": undefined;
+  "web.issue.todo.criteriaTable.removeRow": undefined;
+  "web.issue.todo.criteriaTable.statusDone": undefined;
+  "web.issue.todo.criteriaTable.statusPending": undefined;
   "web.issue.todo.criterionToggle": { readonly criterion: string | number };
   "web.issue.todo.description": undefined;
   "web.issue.todo.descriptionHint": undefined;
@@ -9898,7 +10039,6 @@ export interface Messages {
   "web.library.content.artifactType.all": undefined;
   "web.library.content.artifacts": undefined;
   "web.library.content.exportArtifact": undefined;
-  "web.library.content.fewerTypes": undefined;
   "web.library.content.inspector.copiedPath": undefined;
   "web.library.content.inspector.copyPath": undefined;
   "web.library.content.inspector.openExternal": undefined;
@@ -9909,7 +10049,6 @@ export interface Messages {
   "web.library.content.installedAppsEmpty": undefined;
   "web.library.content.issueCreated": undefined;
   "web.library.content.media": undefined;
-  "web.library.content.moreTypes": { readonly n: string | number };
   "web.library.content.new": undefined;
   "web.library.content.pin": undefined;
   "web.library.content.pinned": undefined;
@@ -10039,6 +10178,8 @@ export interface Messages {
   "web.library.content.templates.items.sheetTechMatrix.name": undefined;
   "web.library.content.templates.items.sheetTestMatrix.desc": undefined;
   "web.library.content.templates.items.sheetTestMatrix.name": undefined;
+  "web.library.content.templates.items.sheetUiReview.desc": undefined;
+  "web.library.content.templates.items.sheetUiReview.name": undefined;
   "web.library.content.templates.items.slidesArchReview.desc": undefined;
   "web.library.content.templates.items.slidesArchReview.name": undefined;
   "web.library.content.templates.items.slidesReleaseDemo.desc": undefined;
@@ -10305,6 +10446,26 @@ export interface Messages {
   "web.library.content.templates.seed.sheetTestR4Owner": undefined;
   "web.library.content.templates.seed.sheetTestR4Res": undefined;
   "web.library.content.templates.seed.sheetTestTab": undefined;
+  "web.library.content.templates.seed.sheetUiReviewColAgent": undefined;
+  "web.library.content.templates.seed.sheetUiReviewColIssue": undefined;
+  "web.library.content.templates.seed.sheetUiReviewColModule": undefined;
+  "web.library.content.templates.seed.sheetUiReviewColSeverity": undefined;
+  "web.library.content.templates.seed.sheetUiReviewColStatus": undefined;
+  "web.library.content.templates.seed.sheetUiReviewColTitle": undefined;
+  "web.library.content.templates.seed.sheetUiReviewR1Mod": undefined;
+  "web.library.content.templates.seed.sheetUiReviewR1Title": undefined;
+  "web.library.content.templates.seed.sheetUiReviewR2Mod": undefined;
+  "web.library.content.templates.seed.sheetUiReviewR2Title": undefined;
+  "web.library.content.templates.seed.sheetUiReviewR3Mod": undefined;
+  "web.library.content.templates.seed.sheetUiReviewR3Title": undefined;
+  "web.library.content.templates.seed.sheetUiReviewSevP0": undefined;
+  "web.library.content.templates.seed.sheetUiReviewSevP1": undefined;
+  "web.library.content.templates.seed.sheetUiReviewSevP2": undefined;
+  "web.library.content.templates.seed.sheetUiReviewSevUx": undefined;
+  "web.library.content.templates.seed.sheetUiReviewStFixing": undefined;
+  "web.library.content.templates.seed.sheetUiReviewStOpen": undefined;
+  "web.library.content.templates.seed.sheetUiReviewStResolved": undefined;
+  "web.library.content.templates.seed.sheetUiReviewTab": undefined;
   "web.library.content.templates.seed.slidesArchS1Notes": undefined;
   "web.library.content.templates.seed.slidesArchS1Sub": undefined;
   "web.library.content.templates.seed.slidesArchS2B1": undefined;
@@ -10636,6 +10797,31 @@ export interface Messages {
   "web.memory.memory.words": undefined;
   "web.memory.memory.wordsHint": undefined;
   "web.memory.memory.yours": undefined;
+  "web.note.annotation.addMode": undefined;
+  "web.note.annotation.addModeHint": undefined;
+  "web.note.annotation.bodyPlaceholder": undefined;
+  "web.note.annotation.createIssue": undefined;
+  "web.note.annotation.defaultTitle": { readonly n: string | number };
+  "web.note.annotation.delete": undefined;
+  "web.note.annotation.edit": undefined;
+  "web.note.annotation.hide": undefined;
+  "web.note.annotation.jumpToPin": { readonly n: string | number };
+  "web.note.annotation.jumpToRow": undefined;
+  "web.note.annotation.openCount": { readonly open: string | number; readonly total: string | number };
+  "web.note.annotation.openIssue": undefined;
+  "web.note.annotation.reopen": undefined;
+  "web.note.annotation.resolve": undefined;
+  "web.note.annotation.save": undefined;
+  "web.note.annotation.severity.p0": undefined;
+  "web.note.annotation.severity.p1": undefined;
+  "web.note.annotation.severity.p2": undefined;
+  "web.note.annotation.severity.ux": undefined;
+  "web.note.annotation.show": undefined;
+  "web.note.annotation.status.open": undefined;
+  "web.note.annotation.status.resolved": undefined;
+  "web.note.annotation.titlePlaceholder": undefined;
+  "web.note.annotation.unresolvedOnly": undefined;
+  "web.note.annotation.zoom": undefined;
   "web.note.applet.alwaysOnTopHint": undefined;
   "web.note.applet.alwaysOnTopLabel": undefined;
   "web.note.applet.appNameLabel": undefined;
@@ -10700,43 +10886,26 @@ export interface Messages {
   "web.note.doc.calloutTones.note": undefined;
   "web.note.doc.calloutTones.tip": undefined;
   "web.note.doc.calloutTones.warn": undefined;
-  "web.note.doc.chartEdit": undefined;
-  "web.note.doc.chartTitle": undefined;
-  "web.note.doc.codeLanguagePlaceholder": undefined;
-  "web.note.doc.codePlaceholder": undefined;
   "web.note.doc.columnsCount": { readonly n: string | number };
-  "web.note.doc.columnsOption": { readonly n: string | number };
-  "web.note.doc.compareEdit": undefined;
   "web.note.doc.convertToIssue": undefined;
   "web.note.doc.descOptional": undefined;
   "web.note.doc.duplicate": undefined;
-  "web.note.doc.edit": undefined;
   "web.note.doc.empty": undefined;
-  "web.note.doc.filterIssues": undefined;
   "web.note.doc.headingPlaceholder": { readonly level: string | number };
   "web.note.doc.inlineCode": undefined;
   "web.note.doc.issuesTitle": { readonly n: string | number };
   "web.note.doc.italic": undefined;
-  "web.note.doc.kpiEdit": undefined;
   "web.note.doc.link": undefined;
   "web.note.doc.listItemPlaceholder": undefined;
-  "web.note.doc.mathBlock": undefined;
-  "web.note.doc.mathInline": undefined;
-  "web.note.doc.mediaEdit": undefined;
   "web.note.doc.moveDown": undefined;
   "web.note.doc.moveUp": undefined;
   "web.note.doc.noAfterAsset": undefined;
   "web.note.doc.noBeforeAsset": undefined;
   "web.note.doc.orderedList": undefined;
   "web.note.doc.outline": undefined;
-  "web.note.doc.pickBase": undefined;
-  "web.note.doc.pickIssue": undefined;
   "web.note.doc.presenter": undefined;
-  "web.note.doc.preview": undefined;
-  "web.note.doc.previewEdit": undefined;
   "web.note.doc.previewTitle": undefined;
   "web.note.doc.quotePlaceholder": undefined;
-  "web.note.doc.render": undefined;
   "web.note.doc.repoFilter": undefined;
   "web.note.doc.selectBase": undefined;
   "web.note.doc.selectIssue": undefined;
@@ -10797,13 +10966,19 @@ export interface Messages {
   "web.note.doc.slashCat.basic": undefined;
   "web.note.doc.slashCat.data": undefined;
   "web.note.doc.slashCat.structure": undefined;
-  "web.note.doc.slashHint": undefined;
   "web.note.doc.slideLabel": { readonly n: string | number };
   "web.note.doc.slideTitlePlaceholder": undefined;
   "web.note.doc.slidesCount": { readonly n: string | number };
   "web.note.doc.speakerNotesPlaceholder": undefined;
   "web.note.doc.statusFilter": undefined;
   "web.note.doc.strike": undefined;
+  "web.note.doc.tableAlign": undefined;
+  "web.note.doc.tableDeleteCol": undefined;
+  "web.note.doc.tableDeleteRow": undefined;
+  "web.note.doc.tableInsertColAfter": undefined;
+  "web.note.doc.tableInsertRowBelow": undefined;
+  "web.note.doc.tableMoveColLeft": undefined;
+  "web.note.doc.tableMoveColRight": undefined;
   "web.note.doc.tagFilter": undefined;
   "web.note.doc.titleOptional": undefined;
   "web.note.doc.tocEmpty": undefined;
@@ -11356,9 +11531,6 @@ export interface Messages {
   "web.runtime.machines.status.offline": undefined;
   "web.runtime.machines.status.online": undefined;
   "web.runtime.machines.title": undefined;
-  "web.runtime.machines.worktree": undefined;
-  "web.runtime.machines.worktreeNo": undefined;
-  "web.runtime.machines.worktreeYes": undefined;
   "web.runtime.makeAgent": undefined;
   "web.runtime.maxWorking": undefined;
   "web.runtime.maxWorkingHint": undefined;
@@ -11586,7 +11758,6 @@ export interface Messages {
   "web.session.trajectory.hired": { readonly ago: string | number };
   "web.session.trajectory.hiredAndLeft": { readonly hired: string | number; readonly left: string | number };
   "web.session.trajectory.input": undefined;
-  "web.session.trajectory.inspect": undefined;
   "web.session.trajectory.lane.asked": undefined;
   "web.session.trajectory.lane.model": undefined;
   "web.session.trajectory.lane.tool": undefined;
@@ -11663,8 +11834,6 @@ export interface Messages {
   "web.setting.about.version": undefined;
   "web.setting.about.versionHint": undefined;
   "web.setting.about.workingQuestion": { readonly n: string | number };
-  "web.setting.about.worktrees": undefined;
-  "web.setting.about.worktreesHint": undefined;
   "web.setting.appearance.fontApplyFailed": undefined;
   "web.setting.appearance.fontEmpty": undefined;
   "web.setting.appearance.fontFallbackBadge": undefined;
@@ -12041,11 +12210,9 @@ export interface Messages {
   "web.shell.sidebar.closeTab": undefined;
   "web.shell.sidebar.collapseAll": undefined;
   "web.shell.sidebar.collapseAllTooltip": undefined;
-  "web.shell.sidebar.collapseItem": { readonly name: string | number };
   "web.shell.sidebar.copyPath": undefined;
   "web.shell.sidebar.expandCurrent": undefined;
   "web.shell.sidebar.expandCurrentTooltip": undefined;
-  "web.shell.sidebar.expandItem": { readonly name: string | number };
   "web.shell.sidebar.files": undefined;
   "web.shell.sidebar.filesTip": undefined;
   "web.shell.sidebar.gitBranches": undefined;

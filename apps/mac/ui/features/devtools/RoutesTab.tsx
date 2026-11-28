@@ -51,7 +51,7 @@ export function RoutesTab(props: { routes: () => unknown }) {
       <View class="gap-2">
         <SectionHeader title={t("web.devtools.tabs.routes")} count={quickRoutes().length} />
         <View class="flex-row flex-wrap gap-1.5">
-          <Each of={quickRoutes()}>
+          <Each of={quickRoutes()} key={(path) => path}>
             {(path) => (
               <Button
                 size="compact"

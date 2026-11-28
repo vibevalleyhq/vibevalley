@@ -1,9 +1,9 @@
-import { Clipboard, computed, keymap, signal, Text, View, type ViewRef } from "nsh";
+import { Clipboard, computed, keymap, signal, Text, View } from "nsh";
 import { Input } from "nsh/base";
 
 import { list, t } from "@vibevalley/i18n";
 import { type Attachment, DeliverableValues, type Issue, type IssueAct, PriorityValues, type Session, type SessionView } from "@vibevalley/protocol";
-import { closedText, plainText, sessionBranch, sessionProfile, sessionWorktree } from "@vibevalley/protocol/rules";
+import { closedText, plainText, sessionProfile } from "@vibevalley/protocol/rules";
 
 import { Button } from "../../../design/Button";
 import { OpenTerminal } from "../../../design/domain/OpenTerminal";
@@ -53,7 +53,7 @@ import {
   SubIssuesSection,
   TagEditor,
 } from "./IssueMetaControls";
-import { AnswerView, Criteria, OrchestratorIssueDetail, Question, ReconcileWorktree } from "./IssueSections";
+import { AnswerView, Criteria, DeliveryReceiptCard, OrchestratorIssueDetail, Question } from "./IssueSections";
 import { AgentFaceOf, PriorityMark, StatusMark } from "./Marks";
 import { Fold, IssueSheet, IssueTrail, More, Note, Pick, Property, SheetLabel, StagePill } from "./Sheet";
 
@@ -106,12 +106,6 @@ export function IssueDetail(props: {
   );
   const changes = computed(() => ready(changesQuery, undefined));
   const filesOpen = signal(false);
-  let changesSection: ViewRef | undefined;
-  const reviewChanges = () => {
-    filesOpen.set(true);
-    requestAnimationFrame(() => changesSection?.reveal({ vertical: "nearest" }));
-  };
-  const changesAction = computed(() => (live().deliver !== "answer" && s().showsChanges ? reviewChanges : undefined));
   const timelineQuery = useIssueTimeline(
     () => props.issue,
     () => head().runs,
@@ -223,7 +217,7 @@ export function IssueDetail(props: {
               when={live().conflict}
               else={<If when={ask().line}>{(line) => <Text class="mt-1.5 line-clamp-4 text-sm leading-relaxed text-ink">{plainText(line())}</Text>}</If>}
             >
-              {(conflict) => <ConflictFiles files={conflict().files} worktree={sessionWorktree(head())} />}
+              {(conflict) => <ConflictFiles files={conflict().files} worktree={head().cwd} />}
             </If>
             <If when={ask().settingsHref}>
               {(href) => (
@@ -289,9 +283,6 @@ export function IssueDetail(props: {
             </Fold>
           </Note>
         )}
-      </If>
-      <If when={s().needsWorktreeCheck}>
-        <ReconcileWorktree onChanges={changesAction()} />
       </If>
       <If when={head().subagents}>{(progress) => <SubagentProgress session={head().id} progress={progress()} now={now()} />}</If>
       <ActLines issue={props.issue.id} words={acts.words()} onSayAgain={acts.sayAgain} onTakeBack={acts.takeBack} />
@@ -372,46 +363,44 @@ export function IssueDetail(props: {
         </If>
       </View>
 
-      <View
-        accessibilityLabel={t("web.issue.detail.made")}
-        testID="issue-made"
-        class="mt-7 border-t border-line pt-5"
-        ref={(node) => {
-          changesSection = node;
-        }}
-      >
+      <View accessibilityLabel={t("web.issue.detail.made")} testID="issue-made" class="mt-7 border-t border-line pt-5">
         <SheetLabel first>{t("web.issue.detail.made")}</SheetLabel>
+        <If when={live().deliveryReceipt}>{(receipt) => <DeliveryReceiptCard receipt={receipt()} class="mb-2.5" />}</If>
         <If
           when={live().deliver === "answer"}
           else={
             <If
               when={s().showsChanges ? changes() : undefined}
               else={
-                <View class="flex-row items-center gap-2 rounded-lg border border-line bg-side px-3.5 py-2.5">
-                  <Icon name="diff" size={14} tone="faint" />
-                  <If
-                    when={s().showsChanges}
-                    else={
+                <If when={!live().deliveryReceipt}>
+                  <View class="flex-row items-center gap-2 rounded-lg border border-line bg-side px-3.5 py-2.5">
+                    <Icon name="diff" size={14} tone="faint" />
+                    <If
+                      when={s().showsChanges}
+                      else={
+                        <Text class="min-w-0 flex-1 text-xs text-muted">
+                          {s().stage.state === "done" ? t("shared.join.sentence", { text: closedText(props.issue) }) : t("web.issue.detail.nothingToSee")}
+                        </Text>
+                      }
+                    >
                       <Text class="min-w-0 flex-1 text-xs text-muted">
-                        {s().stage.state === "done" ? t("shared.join.sentence", { text: closedText(props.issue) }) : t("web.issue.detail.nothingToSee")}
+                        {changesQuery.status() === "pending" ? t("web.issue.reading") : t("web.issue.detail.changesUnread")}
                       </Text>
-                    }
-                  >
-                    <Text class="min-w-0 flex-1 text-xs text-muted">
-                      {changesQuery.status() === "pending" ? t("web.issue.reading") : t("web.issue.detail.changesUnread")}
-                    </Text>
-                  </If>
-                </View>
+                    </If>
+                  </View>
+                </If>
               }
             >
               {(c) => (
                 <If
                   when={c().commits.length > 0 || c().uncommitted.length > 0 || c().files.length > 0}
                   else={
-                    <View class="flex-row items-center gap-2 rounded-lg border border-line bg-side px-3.5 py-2.5">
-                      <Icon name="diff" size={14} tone="faint" />
-                      <Text class="min-w-0 flex-1 text-xs text-muted">{t("web.issue.detail.noChanges")}</Text>
-                    </View>
+                    <If when={!live().deliveryReceipt}>
+                      <View class="flex-row items-center gap-2 rounded-lg border border-line bg-side px-3.5 py-2.5">
+                        <Icon name="diff" size={14} tone="faint" />
+                        <Text class="min-w-0 flex-1 text-xs text-muted">{t("web.issue.detail.noChanges")}</Text>
+                      </View>
+                    </If>
                   }
                 >
                   <View class="gap-2 rounded-lg border border-line bg-page p-3.5">
@@ -439,10 +428,12 @@ export function IssueDetail(props: {
           <If
             when={props.issue.answer}
             else={
-              <View class="flex-row items-center gap-2 rounded-lg border border-line bg-side px-3.5 py-2.5">
-                <Icon name="chat" size={14} tone="faint" />
-                <Text class="min-w-0 flex-1 text-xs text-muted">{t("web.issue.detail.noAnswer")}</Text>
-              </View>
+              <If when={!live().deliveryReceipt}>
+                <View class="flex-row items-center gap-2 rounded-lg border border-line bg-side px-3.5 py-2.5">
+                  <Icon name="chat" size={14} tone="faint" />
+                  <Text class="min-w-0 flex-1 text-xs text-muted">{t("web.issue.detail.noAnswer")}</Text>
+                </View>
+              </If>
             }
           >
             {(a) => (
@@ -481,7 +472,6 @@ export function IssueDetail(props: {
         timeline={timeline()}
         timelinePending={timelineQuery.status() === "pending"}
         runsVersion={`${props.issue.stage.state}:${props.session?.runs}:${props.session?.phase._tag}:${props.issue.findings.length}:${props.issue.closedAt ?? ""}`}
-        onChanges={changesAction()}
       />
     </>
   );
@@ -694,22 +684,12 @@ export function IssueDetail(props: {
           <Property label={t("web.issue.detail.crew")}>{s().crewLine}</Property>
         </If>
         <If when={distinctProfile()}>{(profile) => <Property label={t("web.issue.detail.profile")}>{profile()}</Property>}</If>
-        <If when={sessionBranch(head())}>
-          {(branch) => (
-            <Property align="start" label={t("web.issue.detail.branch")}>
+        <If when={head().cwd}>
+          {(cwd) => (
+            <Property align="start" label={t("web.issue.detail.cwd")}>
               <View class="flex-row items-start gap-1">
-                <Text class="min-w-0 flex-1 pt-1 font-mono text-xs text-ink select-text">{branch()}</Text>
-                <IconButton icon="copy" size={14} label={t("web.base.rich.copy")} onClick={() => copyText(branch())} />
-              </View>
-            </Property>
-          )}
-        </If>
-        <If when={sessionWorktree(head())}>
-          {(worktree) => (
-            <Property align="start" label="worktree">
-              <View class="flex-row items-start gap-1">
-                <Text class="min-w-0 flex-1 pt-1 font-mono text-xs text-ink select-text">{worktree()}</Text>
-                <IconButton icon="copy" size={14} label={t("web.issue.detail.copyPath")} onClick={() => copyText(worktree())} />
+                <Text class="min-w-0 flex-1 pt-1 font-mono text-xs text-ink select-text">{cwd()}</Text>
+                <IconButton icon="copy" size={14} label={t("web.issue.detail.copyPath")} onClick={() => copyText(cwd())} />
               </View>
             </Property>
           )}
@@ -727,14 +707,12 @@ export function IssueDetail(props: {
           </Property>
         </If>
       </More>
-      <If when={sideActs().length > 0 || sessionWorktree(head())}>
+      <If when={sideActs().length > 0 || head().cwd}>
         <View testID="issue-side-actions" class="mt-4 flex-row flex-wrap items-center gap-2 border-t border-line pt-4">
           <Each of={sideActs()} key={(a) => a}>
             {(a) => <ActButton act={a()} lead={!s().ask && a() === s().lead} />}
           </Each>
-          <If when={sessionWorktree(head())}>
-            {(worktree) => <OpenTerminal cwd={worktree()} title={`#${props.issue.number}`} testid="issue-open-workspace" />}
-          </If>
+          <If when={head().cwd}>{(cwd) => <OpenTerminal cwd={cwd()} title={`#${props.issue.number}`} testid="issue-open-workspace" />}</If>
         </View>
       </If>
     </>
@@ -808,8 +786,8 @@ function IssueTitle(props: { shown: string; full: string; editable: boolean; sta
       >
         <TitleInput full={props.full} onInput={(v) => (typed = v)} onFinish={finish} />
       </If>
-      <If when={props.state === "pending" || savedBadge()}>
-        <View testID="issue-title-save-status" class="mt-1 flex-row items-center gap-1">
+      <View testID="issue-title-save-status" class="mt-1 h-4 flex-row items-center gap-1">
+        <If when={props.state === "pending" || savedBadge()}>
           <If
             when={props.state === "pending"}
             else={
@@ -824,8 +802,8 @@ function IssueTitle(props: { shown: string; full: string; editable: boolean; sta
             </View>
             <Text class="text-2xs text-muted">{t("web.agent.saving")}</Text>
           </If>
-        </View>
-      </If>
+        </If>
+      </View>
     </View>
   );
 }

@@ -5,6 +5,7 @@ import { issueId, noteId } from "@vibevalley/protocol/schema";
 import type { IconName } from "../../../design/icons";
 import type { DotTone } from "../../../design/Tag";
 import { matches } from "../../../infra/base/search";
+import { isValidHashIssueBoundary } from "./richInlineCodec";
 
 export const ISSUE_STATUS_DOT_TONE: Record<IssueStatus, DotTone> = {
   backlog: "faint",
@@ -585,7 +586,7 @@ export function formatWikilinkToken(kind: "note" | "issue", id: string, label: s
   return cleanLabel ? `${prefix}${kind}:${id}|${cleanLabel}]]` : `${prefix}${kind}:${id}]]`;
 }
 
-export function applyWikilinkReplacementWithCaret(
+function applyWikilinkReplacementWithCaret(
   text: string,
   startIndex: number,
   token: string,
@@ -619,12 +620,13 @@ interface InlineStyleRun {
   readonly value: string;
 }
 
-const INLINE_TOKEN_RE = /(!?\[\[(note|issue):([^\]|]+?)(?:\|([^\]]*))?\]\])|((?:^|[\s([,:;])#(\d+)(?![a-zA-Z0-9_]))/gu;
+const INLINE_TOKEN_RE = /(!?\[\[(?:(note|issue):([^\]|]+?)|#(\d+))(?:\|([^\]]*))?\]\])|((?:^|[\s([,:;/，。、；：！？（【「『《])#(\d+)(?![a-zA-Z0-9_]))/gu;
 const INLINE_MARKDOWN_RE = /(\*\*([^*\n]+?)\*\*)|(`([^`\n]+?)`)|(~~([^~\n]+?)~~)|(\*([^*\n]+?)\*)/gu;
 
 export function hasInlineRichTokens(text: string): boolean {
   if (!text) return false;
-  if (text.includes("[[") || /(?:^|[\s([,:;])#\d+/u.test(text)) return true;
+  if (text.includes("[[")) return true;
+  if (/(?:^|[\s([,:;，。、；：！？（【「『《])#\d+/u.test(text) || /#\d+\/#\d+/u.test(text)) return true;
   return /\*\*[^*\n]+?\*\*|`[^`\n]+?`|~~[^~\n]+?~~/u.test(text);
 }
 
@@ -669,26 +671,33 @@ export function parseInlineLinkSegments(text: string): readonly InlineSegment[] 
         out.push({ kind: "text", value: text.slice(cursor, m.index) });
       }
       const embed = m[1].startsWith("!");
-      const kind = m[2] === "note" ? "note" : "issue";
-      const rawId = (m[3] ?? "").trim();
-      const id = kind === "issue" ? rawId.replace(/^#/u, "") : rawId;
-      const alias = m[4]?.trim() ?? "";
-      out.push({
-        kind,
-        id,
-        label: alias || (kind === "issue" ? `#${id}` : id),
-        embed,
-      });
+      const alias = m[5]?.trim() ?? "";
+      if (m[4] !== undefined) {
+        out.push({ kind: "issueNumber", number: Number.parseInt(m[4], 10) });
+      } else {
+        const kind = m[2] === "note" ? "note" : "issue";
+        const rawId = (m[3] ?? "").trim();
+        const id = kind === "issue" ? rawId.replace(/^#/u, "") : rawId;
+        out.push({
+          kind,
+          id,
+          label: alias || (kind === "issue" ? `#${id}` : id),
+          embed,
+        });
+      }
       cursor = m.index + m[1].length;
-    } else if (m[5] !== undefined && m[6] !== undefined) {
-      const hashPos = m[5].lastIndexOf("#");
+    } else if (m[6] !== undefined && m[7] !== undefined) {
+      const hashPos = m[6].lastIndexOf("#");
       const tokenStart = m.index + hashPos;
+      if (!isValidHashIssueBoundary(text.slice(0, tokenStart), true)) {
+        continue;
+      }
       if (tokenStart > cursor) {
         out.push({ kind: "text", value: text.slice(cursor, tokenStart) });
       }
-      const num = Number.parseInt(m[6], 10);
+      const num = Number.parseInt(m[7], 10);
       out.push({ kind: "issueNumber", number: num });
-      cursor = tokenStart + 1 + m[6].length;
+      cursor = tokenStart + 1 + m[7].length;
     }
   }
   if (cursor < text.length) {
@@ -1003,6 +1012,23 @@ export function addTableRow(block: TableBlock): TableBlock {
   return { ...block, rows: [...block.rows, emptyRow] };
 }
 
+export function insertTableRowAt(block: TableBlock, index: number): TableBlock {
+  const clamped = Math.max(0, Math.min(block.rows.length, index));
+  const emptyRow = block.headers.map(() => "");
+  return { ...block, rows: [...block.rows.slice(0, clamped), emptyRow, ...block.rows.slice(clamped)] };
+}
+
+export function moveTableRow(block: TableBlock, fromIndex: number, toIndex: number): TableBlock {
+  if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || fromIndex >= block.rows.length || toIndex >= block.rows.length) {
+    return block;
+  }
+  const next = [...block.rows];
+  const [moved] = next.splice(fromIndex, 1);
+  if (moved === undefined) return block;
+  next.splice(toIndex, 0, moved);
+  return { ...block, rows: next };
+}
+
 export function removeTableRow(block: TableBlock, rowIndex: number): TableBlock {
   if (block.rows.length <= 1) return block;
   return { ...block, rows: block.rows.filter((_, idx) => idx !== rowIndex) };
@@ -1016,6 +1042,72 @@ export function addTableColumn(block: TableBlock): TableBlock {
     rows: block.rows.map((row) => [...row, ""]),
     alignments: [...(block.alignments ?? block.headers.map(() => "left")), "left"],
   };
+}
+
+export function insertTableColumnAt(block: TableBlock, index: number): TableBlock {
+  const clamped = Math.max(0, Math.min(block.headers.length, index));
+  const colNum = block.headers.length + 1;
+  const baseAligns = block.headers.map((_, idx) => block.alignments?.[idx] ?? "left");
+  return {
+    ...block,
+    headers: [...block.headers.slice(0, clamped), `Column ${colNum}`, ...block.headers.slice(clamped)],
+    rows: block.rows.map((row) => [...row.slice(0, clamped), "", ...row.slice(clamped)]),
+    alignments: [...baseAligns.slice(0, clamped), "left", ...baseAligns.slice(clamped)],
+  };
+}
+
+export function moveTableColumn(block: TableBlock, fromIndex: number, toIndex: number): TableBlock {
+  const count = block.headers.length;
+  if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || fromIndex >= count || toIndex >= count) {
+    return block;
+  }
+  const reorder = <T>(arr: readonly T[]): T[] => {
+    const next = [...arr];
+    const [moved] = next.splice(fromIndex, 1);
+    if (moved === undefined) return [...arr];
+    next.splice(toIndex, 0, moved);
+    return next;
+  };
+  const baseAligns = block.headers.map((_, idx) => block.alignments?.[idx] ?? "left");
+  return {
+    ...block,
+    headers: reorder(block.headers),
+    rows: block.rows.map((row) => reorder(row)),
+    alignments: reorder(baseAligns),
+  };
+}
+
+export interface TableCellNavTarget {
+  readonly row: number;
+  readonly col: number;
+  readonly addRow?: boolean;
+}
+
+/** Computes next table cell target for Tab / Shift+Tab / Enter navigation (`row === -1` denotes header row). */
+export function nextTableCellTarget(
+  rowCount: number,
+  colCount: number,
+  row: number,
+  col: number,
+  dir: "next" | "prev" | "down" | "up",
+): TableCellNavTarget | undefined {
+  if (colCount <= 0 || rowCount <= 0) return undefined;
+  if (dir === "next") {
+    if (col + 1 < colCount) return { row, col: col + 1 };
+    if (row + 1 < rowCount) return { row: row + 1, col: 0 };
+    return { row: rowCount, col: 0, addRow: true };
+  }
+  if (dir === "prev") {
+    if (col - 1 >= 0) return { row, col: col - 1 };
+    if (row - 1 >= 0) return { row: row - 1, col: colCount - 1 };
+    return undefined;
+  }
+  if (dir === "down") {
+    if (row + 1 < rowCount) return { row: row + 1, col };
+    return { row: rowCount, col, addRow: true };
+  }
+  if (row - 1 >= 0) return { row: row - 1, col };
+  return undefined;
 }
 
 export function removeTableColumn(block: TableBlock, colIndex: number): TableBlock {
@@ -1194,8 +1286,9 @@ export function resolveIssueRef(issues: readonly Issue[], idOrNumber: string): I
   if (!clean) return undefined;
   const direct = issues.find((i) => i.id === idOrNumber || i.id === clean);
   if (direct) return direct;
-  if (/^\d+$/u.test(clean)) {
-    const num = Number.parseInt(clean, 10);
+  const match = /^(?:i|issue[-_:]?)?(\d+)$/iu.exec(clean);
+  if (match?.[1]) {
+    const num = Number.parseInt(match[1], 10);
     return issues.find((i) => i.number === num);
   }
   return undefined;

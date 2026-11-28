@@ -1,9 +1,9 @@
 //! Structured Block Doc view projection and block-append endpoints (#38, #39).
 
 use vibevalley_core::note::doc::{DocDocument, append_block, parse_doc_document, project_doc_view, serialize_doc_document};
-use vibevalley_protocol::{ApiError, DocView, NoteDocAppendBlockRequest, NoteFileEncoding, NoteFileWriteItem, NoteFileWriteRequest, NoteType, USER_ID};
+use vibevalley_protocol::{ApiError, DocView, NoteDocAppendBlockRequest, NoteFileEncoding, NoteFileWriteItem, NoteFileWriteRequest, NoteType};
 
-use super::{Maker, Manager, note_type_of, refused};
+use super::{Maker, Manager, NOTE_USER_ORIGIN, note_type_of, refused};
 
 impl Manager {
     /// Projects `structure/doc.json` of a note into [`DocView`].
@@ -50,7 +50,7 @@ impl Manager {
                     mime: Some("application/json".to_owned()),
                     expected_hash: None,
                 }],
-                origin: req.origin.clone().or_else(|| Some(USER_ID.to_owned())),
+                origin: req.origin.clone().or_else(|| Some(NOTE_USER_ORIGIN.to_owned())),
                 summary: Some("Append doc block".to_owned()),
                 announce: Some(false),
             },

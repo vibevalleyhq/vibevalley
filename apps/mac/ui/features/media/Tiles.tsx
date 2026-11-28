@@ -2,7 +2,7 @@ import { computed, effect, Image, signal, Text, View } from "nsh";
 import { Popover } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
-import { type LibraryItem, type MediaJob, type Note, userId } from "@vibevalley/protocol";
+import { isHumanParticipant, type Issue, type LibraryItem, type MediaJob, type Note } from "@vibevalley/protocol";
 import type { NoteAppletInfo } from "@vibevalley/protocol/host";
 
 import { Button } from "../../design/Button";
@@ -58,12 +58,12 @@ function CardPinButton(props: { testid: string; pinned: boolean; elevated?: bool
       accessibilityState={{ selected: props.pinned }}
       tooltip={<Bubble text={label()} />}
       onPress={() => props.onToggle()}
-      class={`size-6 shrink-0 items-center justify-center rounded-sm border focus-visible:outline-2 focus-visible:outline-focus ${
+      class={`size-6 shrink-0 items-center justify-center rounded-sm focus-visible:outline-2 focus-visible:outline-focus ${
         props.pinned
-          ? "border-line bg-warn-soft opacity-100"
+          ? "border border-line bg-warn-soft"
           : props.elevated === true
-            ? "border-line bg-elevated opacity-0 shadow-raise group-hover:opacity-100 hover:bg-selected focus:opacity-100"
-            : "border-transparent bg-transparent opacity-0 group-hover:opacity-100 hover:bg-selected focus:opacity-100"
+            ? "border border-line bg-elevated shadow-raise hover:bg-selected"
+            : "border border-transparent bg-transparent hover:bg-selected"
       }`}
     >
       <Icon name="pin" size={12} tone={props.pinned ? "warn-ink" : "muted"} />
@@ -75,10 +75,10 @@ export function MakingTiles(props: { jobs: readonly MediaJob[]; width: number; h
   const rows = computed(() => justify({ ratios: props.jobs.map(() => 1), width: props.width, height: props.height, gap: tileGap }));
   return (
     <View class="gap-3">
-      <Each of={rows()}>
+      <Each of={rows()} key={(_, i) => String(i)}>
         {(row) => (
           <View class="flex-row gap-3">
-            <Each of={row()}>
+            <Each of={row()} key={(p) => p.index}>
               {(p) => (
                 <If when={props.jobs[p().index]}>
                   {(job) => (
@@ -236,8 +236,8 @@ function Tile(props: {
           }
         >
           {(toggle) => (
-            <View class="absolute top-1.5 right-1.5">
-              <CardPinButton testid={`library-media-pin-${file().id}`} pinned={props.pinned} onToggle={() => toggle()()} />
+            <View class={`absolute top-1.5 right-1.5 ${props.pinned ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus-within:opacity-100"}`}>
+              <CardPinButton testid={`library-media-pin-${file().id}`} pinned={props.pinned} elevated onToggle={() => toggle()()} />
             </View>
           )}
         </If>
@@ -254,7 +254,7 @@ const noteCardMinWidth = 256;
 
 export function noteMetaLine(note: Note, nowMs: number): string {
   const parts: string[] = [kindLabel(note)];
-  if (note.by !== userId && note.byName.trim() !== "") parts.push(note.byName);
+  if (!isHumanParticipant(note.by) && note.byName.trim() !== "") parts.push(note.byName);
   if (note.version > 0) parts.push(t("web.library.inspector.versionBadge", { version: note.version }));
   parts.push(ago(note.updated, nowMs));
   return parts.join(" · ");
@@ -262,6 +262,8 @@ export function noteMetaLine(note: Note, nowMs: number): string {
 
 export function NoteTiles(props: {
   notes: readonly Note[];
+  notesById?: ReadonlyMap<string, Pick<Note, "title">> | undefined;
+  issuesById?: ReadonlyMap<string, Pick<Issue, "number" | "title">> | undefined;
   width?: number | undefined;
   onOpen: (id: string) => void;
   isPinned: (id: string) => boolean;
@@ -298,8 +300,10 @@ export function NoteTiles(props: {
               class="group relative shrink-0 overflow-hidden rounded-lg border border-line bg-page hover:border-faint focus-visible:outline-2 focus-visible:outline-focus"
             >
               <View class="relative overflow-hidden border-b border-line bg-side" style={{ width: stageWidth(), height: stageHeight() }}>
-                <NotePreview note={n()} width={stageWidth()} height={stageHeight()} />
-                <View class="absolute top-2 right-2 flex-row items-center gap-1">
+                <NotePreview note={n()} width={stageWidth()} height={stageHeight()} notesById={props.notesById} issuesById={props.issuesById} />
+                <View
+                  class={`absolute top-2 right-2 flex-row items-center gap-0.5 rounded-md border border-line bg-elevated p-0.5 shadow-raise ${pinned() ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus-within:opacity-100"}`}
+                >
                   <If
                     when={installed()}
                     else={
@@ -310,7 +314,7 @@ export function NoteTiles(props: {
                           accessibilityLabel={t("web.note.applet.button")}
                           tooltip={<Bubble text={t("web.note.applet.button")} />}
                           onPress={() => props.onInstallApplet?.(n())}
-                          class="size-6 shrink-0 items-center justify-center rounded-sm border border-line bg-elevated opacity-0 shadow-raise group-hover:opacity-100 hover:bg-selected focus:opacity-100 focus-visible:outline-2 focus-visible:outline-focus"
+                          class="size-6 shrink-0 items-center justify-center rounded-xs hover:bg-selected focus-visible:outline-2 focus-visible:outline-focus"
                         >
                           <Icon name="devices" size={12} tone="muted" />
                         </View>
@@ -324,13 +328,13 @@ export function NoteTiles(props: {
                         accessibilityLabel={t("web.note.applet.manageApp")}
                         tooltip={<Bubble text={`${info().appName} · ${t("web.note.applet.manageApp")}`} />}
                         onPress={() => props.onInstallApplet?.(n())}
-                        class="size-6 shrink-0 items-center justify-center rounded-sm border border-line bg-elevated opacity-0 shadow-raise group-hover:opacity-100 hover:bg-selected focus:opacity-100 focus-visible:outline-2 focus-visible:outline-focus"
+                        class="size-6 shrink-0 items-center justify-center rounded-xs hover:bg-selected focus-visible:outline-2 focus-visible:outline-focus"
                       >
                         <Icon name="devices" size={12} tone="ok-ink" />
                       </View>
                     )}
                   </If>
-                  <CardPinButton testid={`library-note-pin-${n().id}`} pinned={pinned()} elevated onToggle={() => props.onTogglePin(n().id)} />
+                  <CardPinButton testid={`library-note-pin-${n().id}`} pinned={pinned()} onToggle={() => props.onTogglePin(n().id)} />
                   <If when={props.onDelete}>{(onDel) => <DeleteNoteButton note={n()} onDelete={onDel()} />}</If>
                 </View>
               </View>
@@ -381,7 +385,7 @@ function DeleteNoteButton(props: { note: Note; onDelete: (note: Note) => void })
           tooltip={<Bubble text={t("web.note.page.delete")} />}
           onPress={() => open.set(true)}
           class={`size-6 shrink-0 items-center justify-center rounded-sm border border-line shadow-raise focus-visible:outline-2 focus-visible:outline-focus ${
-            open() ? "bg-bad-soft opacity-100" : "bg-elevated opacity-0 group-hover:opacity-100 hover:bg-bad-soft focus:opacity-100"
+            open() ? "bg-bad-soft" : "bg-elevated hover:bg-bad-soft"
           }`}
         >
           <Icon name="delete" size={12} tone="berry" />

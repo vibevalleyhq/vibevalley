@@ -17,6 +17,8 @@ pub struct Model {
     pub by_name: String,
     pub version: i64,
     pub seq: i64,
+    #[sea_orm(column_type = "Text")]
+    pub human_touched_paths: String,
     pub created_at: i64,
     pub updated_at: i64,
 }

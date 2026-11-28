@@ -396,10 +396,10 @@ function Row(props: {
           </View>
           <If when={look().wait}>{(wait) => <Text class="truncate text-xs text-water">{wait()}</Text>}</If>
         </View>
-        <If when={hasTrailingMarks()}>
+        <If when={props.wide && hasTrailingMarks()}>
           <View class="shrink-0 flex-row items-center gap-1.5">
-            <BlockedByChips blockers={blockerIssues()} max={props.wide ? 2 : 1} onOpen={props.onOpen} testid="row-blocked-by" />
-            <TagPills tags={tags()} max={props.wide ? 3 : 1} testid="row-tags" />
+            <BlockedByChips blockers={blockerIssues()} max={2} onOpen={props.onOpen} testid="row-blocked-by" />
+            <TagPills tags={tags()} max={3} testid="row-tags" />
             <If when={showProgress()}>{(pg) => <ProgressMark done={pg().done} total={pg().total} />}</If>
             <If when={dateLabel()}>
               {(dt) => (
@@ -450,7 +450,7 @@ function Row(props: {
             </If>
           </View>
         </If>
-        <If when={fields().dates}>
+        <If when={props.wide && fields().dates}>
           <Text testID="row-updated-at" class="w-14 shrink-0 text-right text-2xs text-faint tabular-nums">
             {ago(rowKeys(props.card).updatedAt, now())}
           </Text>

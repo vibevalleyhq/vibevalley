@@ -4,7 +4,7 @@
 
 ## 跑起来
 
-需要 macOS、Rust（`rust-toolchain.toml`）、Zig（终端用的 libghostty-vt 靠它构建）和 Vite+（`vp`：按 `.node-version` 安装 Node 24，按 `packageManager` 使用 pnpm）。帮工使用本机已安装并登录的农机（Claude Code、codex、ACP 农机）；VibeValley 自己的农机和助手只需 DeepSeek 密钥。
+需要 macOS、Rust（`rust-toolchain.toml`）和 Vite+（`vp`：按 `.node-version` 安装 Node 24，按 `packageManager` 使用 pnpm）。帮工使用本机已安装并登录的农机（Claude Code、codex、ACP 农机）；VibeValley 自己的农机和助手只需 DeepSeek 密钥。
 
 ```bash
 vp install                                   # 根目录：安装 TS 依赖，打出各包的声明
@@ -133,4 +133,4 @@ design/sync-assets.sh --with-avatars    # 同步品牌、图标、引擎、官�
 design/diorama.sh                       # 单独编译并同步 3D 纸雕场景产物到 assets/diorama/
 ```
 
-素材管线见[工程流程](docs/subsystems/process.md#怎么走)。应用图标位于 `assets/icons/` 与 `apps/mac/resources/icon*.icns`。音效触发在 `apps/mac/ui/infra/sound.ts`，合成器在 `apps/mac/src/audio.rs`（[农场的皮](docs/subsystems/farm.md#模型和不变量)）。官网位于 [apps/site/README.md](apps/site/README.md)，通过 `vp run site:deploy` 部署。
+素材管线见[工程流程](docs/subsystems/process.md#怎么走)。应用图标位于 `assets/icons/` 与 `apps/mac/resources/icon*.icns`。音效触发在 `apps/mac/ui/infra/sound.ts`，合成器在 `apps/mac/src/audio/`（[农场的皮](docs/subsystems/farm.md#模型和不变量)）。官网位于 [apps/site/README.md](apps/site/README.md)，通过 `vp run site:deploy` 部署。

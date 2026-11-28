@@ -26,10 +26,10 @@ fn starter_specs(locale: Locale) -> [StarterSpec; 3] {
             StarterSpec {
                 title: "快速上手：挂仓库、建任务、派给编码角色",
                 description: "欢迎来到 VibeValley！任务是这里推进开发的基本单位，主流程只有四步：\n\n\
-1. **挂载仓库**：在侧栏「仓库」中添加本地 Git 仓库，执行会话会自动在独立 worktree 里改动代码。\n\
+1. **挂载仓库**：在侧栏「仓库」中添加本地 Git 仓库，作为任务的上下文提示；编码角色会自主管理分支或 `git worktree`。\n\
 2. **创建任务**：按 `C` 或点右上角「新任务」写下需求，可附带截图、文档等附件。\n\
 3. **派发开工**：在任务详情里选择仓库与编码角色，点「确认需求并派发」，或把卡片拖到「处理中」。\n\
-4. **验收合并**：执行会话完成后任务进入「等你看」，查看 diff 与提交，满意后点击完成并合入主分支。\n\n\
+4. **验收关单**：执行会话完成后会回报结构化交付凭据（PR、提交、笔记或结论），任务进入「等你看」，满意后点击完成关单。\n\n\
 > 这是一张新手引导示例卡，随时可以关闭或删除。",
                 criteria: &[
                     "在「仓库」页添加或新建至少一个本地 Git 仓库",
@@ -63,10 +63,10 @@ fn starter_specs(locale: Locale) -> [StarterSpec; 3] {
             StarterSpec {
                 title: "Quick start: add a repo, create an issue, assign an agent",
                 description: "Welcome to VibeValley! Issues drive every coding workflow in four steps:\n\n\
-1. **Add a repository**: Open Repos in the sidebar to connect a local Git repository. Coding sessions work in isolated git worktrees.\n\
+1. **Add a repository**: Open Repos in the sidebar to connect a local Git repository as an optional context hint. Coding agents autonomously manage branches or `git worktree` checkouts.\n\
 2. **Create an issue**: Press `C` or click **New issue** to describe what to build, with optional screenshots or spec attachments.\n\
 3. **Assign & start**: Pick a repository and coding agent, then click **Confirm and dispatch** (or drag the card to **In progress**).\n\
-4. **Review & merge**: When a round finishes, inspect the diff and commits under **For you to see**, then complete to merge into your base branch.\n\n\
+4. **Review & close**: When a round finishes, inspect the agent's delivery receipt (PR, commit, note, or answer) under **For you to see**, then mark the issue done.\n\n\
 > This is a starter example card — feel free to close or delete it anytime.",
                 criteria: &[
                     "Add or create at least one local Git repository in Repos",

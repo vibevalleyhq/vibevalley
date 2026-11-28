@@ -471,7 +471,7 @@ fn run_full_stack_e2e(home: &Path, database_url: Option<String>) {
     assert_eq!(whoami["data"]["device"]["id"], device_id);
 
     // 13. durable store sharing the same Database backend
-    let durable = vibevalley_runtime::rt::block_on(started.test_internals().service.database().durable()).unwrap();
+    let durable = vibevalley_runtime::rt::block_on(started.test_internals().service.durable()).unwrap();
     vibevalley_runtime::rt::block_on(durable.write_async(|tx| {
         Box::pin(async move {
             tx.create_conversation_async("dual-conv", "deepseek-flash").await?;
@@ -502,7 +502,7 @@ fn run_full_stack_e2e(home: &Path, database_url: Option<String>) {
     let crons = ok(&reopened, "cron.list", json!({}));
     assert!(crons.as_array().unwrap().iter().any(|c| c["id"] == cron_id && c["enabled"] == false));
 
-    let pull_reloaded = reopened.test_internals().pull.find("acme/dual", 88).expect("pull persisted");
+    let pull_reloaded = vibevalley_runtime::rt::block_on(reopened.test_internals().pull.find_async("acme/dual", 88)).expect("pull persisted");
     assert_eq!(pull_reloaded.issue_id.as_deref(), Some(issue_id.as_str()));
     assert_eq!(
         vibevalley_runtime::rt::block_on(reopened.test_internals().pull.known_events_async(&pull_reloaded.id))
@@ -550,7 +550,7 @@ fn run_full_stack_e2e(home: &Path, database_url: Option<String>) {
             .any(|d| d["id"] == device_id && d["name"] == "DualDB CLI")
     );
 
-    let durable2 = vibevalley_runtime::rt::block_on(reopened.test_internals().service.database().durable()).unwrap();
+    let durable2 = vibevalley_runtime::rt::block_on(reopened.test_internals().service.durable()).unwrap();
     let doc = vibevalley_runtime::rt::block_on(durable2.read_async(|rd| Box::pin(rd.document_async("dual", "e2e", "state"))))
         .unwrap()
         .unwrap();

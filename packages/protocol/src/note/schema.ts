@@ -346,6 +346,7 @@ export const NotePresence = z.object({
   id: z.string(),
   name: z.string(),
   color: z.exactOptional(z.string()),
+  avatar: z.exactOptional(z.string()),
   kind: NotePresenceKind,
   x: z.exactOptional(z.number()),
   y: z.exactOptional(z.number()),
@@ -501,6 +502,101 @@ export const NoteLinkListResult = z.object({
   backlinks: z.array(NoteLink),
 }) satisfies Codec<T.NoteLinkListResult>;
 
+export const MediaAnnotationKind = z.enum(T.MediaAnnotationKindValues) satisfies Codec<T.MediaAnnotationKind>;
+
+export const MediaAnnotationSeverity = z.enum(T.MediaAnnotationSeverityValues) satisfies Codec<T.MediaAnnotationSeverity>;
+
+export const MediaAnnotationStatus = z.enum(T.MediaAnnotationStatusValues) satisfies Codec<T.MediaAnnotationStatus>;
+
+export const MediaAnnotationSide = z.enum(T.MediaAnnotationSideValues) satisfies Codec<T.MediaAnnotationSide>;
+
+export const MediaAnnotationRect = z.object({
+  x: z.number().min(0).max(1),
+  y: z.number().min(0).max(1),
+  w: z.number().min(0).max(1),
+  h: z.number().min(0).max(1),
+}) satisfies Codec<T.MediaAnnotationRect>;
+
+export const MediaAnnotationPoint = z.object({
+  x: z.number().min(0).max(1),
+  y: z.number().min(0).max(1),
+}) satisfies Codec<T.MediaAnnotationPoint>;
+
+export const MediaAnnotation = z.object({
+  id: z.string(),
+  number: z.number().int().min(0),
+  kind: z.exactOptional(MediaAnnotationKind),
+  rect: MediaAnnotationRect,
+  to: z.exactOptional(MediaAnnotationPoint),
+  side: z.exactOptional(MediaAnnotationSide),
+  severity: MediaAnnotationSeverity,
+  title: z.string(),
+  body: z.exactOptional(z.string()),
+  status: MediaAnnotationStatus,
+  issueId: z.exactOptional(IssueId),
+  baseRowId: z.exactOptional(z.string()),
+  author: z.exactOptional(z.string()),
+  createdAt: z.exactOptional(z.number()),
+  updatedAt: z.exactOptional(z.number()),
+}) satisfies Codec<T.MediaAnnotation>;
+
+export const MediaAnnotationSummary = z.object({
+  total: z.number().int().min(0),
+  open: z.number().int().min(0),
+  resolved: z.number().int().min(0),
+  p0: z.number().int().min(0),
+  p1: z.number().int().min(0),
+  p2: z.number().int().min(0),
+  ux: z.number().int().min(0),
+  linkedRows: z.number().int().min(0),
+  linkedIssues: z.number().int().min(0),
+}) satisfies Codec<T.MediaAnnotationSummary>;
+
+export const BaseAnnotationRef = z.object({
+  noteId: NoteId,
+  blockId: z.string(),
+  annotationId: z.string(),
+  number: z.exactOptional(z.number().int().min(0)),
+}) satisfies Codec<T.BaseAnnotationRef>;
+
+export const ReviewSyncDirection = z.enum(T.ReviewSyncDirectionValues) satisfies Codec<T.ReviewSyncDirection>;
+
+export const NoteAnnotationUpsertRequest = z.object({
+  id: NoteId,
+  blockId: z.exactOptional(z.string()),
+  annotation: MediaAnnotation,
+  baseNoteId: z.exactOptional(NoteId),
+  baseSheetId: z.exactOptional(z.string()),
+  origin: z.exactOptional(z.string()),
+}) satisfies Codec<T.NoteAnnotationUpsertRequest>;
+
+export const NoteAnnotationDeleteRequest = z.object({
+  id: NoteId,
+  blockId: z.exactOptional(z.string()),
+  annotationId: z.string(),
+  baseNoteId: z.exactOptional(NoteId),
+  baseSheetId: z.exactOptional(z.string()),
+  origin: z.exactOptional(z.string()),
+}) satisfies Codec<T.NoteAnnotationDeleteRequest>;
+
+export const NoteAnnotationMutationResult = z.object({
+  noteId: NoteId,
+  blockId: z.exactOptional(z.string()),
+  annotations: z.array(MediaAnnotation),
+  summary: MediaAnnotationSummary,
+  syncedBaseNoteId: z.exactOptional(NoteId),
+  syncedBaseRowId: z.exactOptional(z.string()),
+}) satisfies Codec<T.NoteAnnotationMutationResult>;
+
+export const NoteReviewSyncRequest = z.object({
+  id: NoteId,
+  baseNoteId: z.exactOptional(NoteId),
+  sheetId: z.exactOptional(z.string()),
+  spawnIssueRepo: z.exactOptional(z.string()),
+  direction: z.exactOptional(ReviewSyncDirection),
+  origin: z.exactOptional(z.string()),
+}) satisfies Codec<T.NoteReviewSyncRequest>;
+
 export const DocKpiItem = z.object({
   label: z.string(),
   value: z.string(),
@@ -538,8 +634,15 @@ const BlockKind: Codec<T.BlockKind> = z.discriminatedUnion("type", [
     afterLabel: z.string(),
     beforeAsset: z.string(),
     afterAsset: z.string(),
+    annotations: z.exactOptional(z.array(MediaAnnotation)),
   }),
-  z.object({ type: z.literal("media"), mediaKind: z.string(), src: z.string(), caption: z.exactOptional(z.string()) }),
+  z.object({
+    type: z.literal("media"),
+    mediaKind: z.string(),
+    src: z.string(),
+    caption: z.exactOptional(z.string()),
+    annotations: z.exactOptional(z.array(MediaAnnotation)),
+  }),
   z.object({ type: z.literal("preview"), entry: z.string(), height: z.exactOptional(z.number()), title: z.exactOptional(z.string()) }),
   z.object({
     type: z.literal("baseEmbed"),
@@ -565,6 +668,7 @@ const BlockKind: Codec<T.BlockKind> = z.discriminatedUnion("type", [
     headers: z.array(z.string()),
     rows: z.array(z.array(z.string())),
     alignments: z.exactOptional(z.array(z.string())),
+    columnWidths: z.exactOptional(z.array(z.number().int().min(1))),
   }),
   z.object({
     type: z.literal("bookmark"),
@@ -594,6 +698,7 @@ export const DocView = z.object({
   slideCount: z.number().int().min(0),
   wordCount: z.number().int().min(0),
   extractedLinks: z.array(NoteLinkRef),
+  annotationSummary: z.exactOptional(MediaAnnotationSummary),
 }) satisfies Codec<T.DocView>;
 
 export const NoteDocViewRequest = z.object({
@@ -660,6 +765,7 @@ export const BaseRow = z.object({
   id: z.string(),
   cells: z.record(z.string(), BaseCellValue),
   pageNoteId: z.exactOptional(NoteId),
+  annotationRef: z.exactOptional(BaseAnnotationRef),
   createdAt: z.number(),
   updatedAt: z.number(),
 }) satisfies Codec<T.BaseRow>;
@@ -753,3 +859,15 @@ export const BaseRunAgentColumnResult = z.object({
   updatedRowIds: z.array(z.string()),
   spawnedIssueIds: z.array(z.string()),
 }) satisfies Codec<T.BaseRunAgentColumnResult>;
+
+export const NoteReviewSyncResult = z.object({
+  docNoteId: NoteId,
+  baseNoteId: NoteId,
+  sheetId: z.string(),
+  createdBase: z.boolean(),
+  linkedCount: z.number().int().min(0),
+  updatedAnnotations: z.number().int().min(0),
+  updatedRows: z.number().int().min(0),
+  summary: MediaAnnotationSummary,
+  baseSnapshot: BaseViewSnapshot,
+}) satisfies Codec<T.NoteReviewSyncResult>;

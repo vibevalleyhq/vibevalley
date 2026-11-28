@@ -34,6 +34,7 @@ type StructuredDeliverableSeed =
   | "sheetTechMatrix"
   | "sheetTestMatrix"
   | "sheetApiInventory"
+  | "sheetUiReview"
   | "dashSlo"
   | "dashDora"
   | "slidesArchReview"
@@ -82,6 +83,9 @@ function seedMessage(suffix: string): string {
 
 function knownExternalMessage(key: string): string {
   if (key === "web.note.base.table") return t("web.note.base.table");
+  if (key === "web.note.base.board") return t("web.note.base.board");
+  if (key === "web.note.base.gallery") return t("web.note.base.gallery");
+  if (key === "web.note.types.media") return t("web.note.types.media");
   return key;
 }
 
@@ -205,6 +209,7 @@ export function buildDeliverableSeedFiles(seed: DeliverableTemplateSeed, title: 
     case "sheetTechMatrix":
     case "sheetTestMatrix":
     case "sheetApiInventory":
+    case "sheetUiReview":
     case "dashSlo":
     case "dashDora":
     case "slidesArchReview":

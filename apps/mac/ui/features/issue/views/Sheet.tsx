@@ -90,10 +90,10 @@ export function IssueSheet(props: { heading: JSX.Element; main: JSX.Element; sid
   const drawerOpen = () => (chrome ? chrome.drawerOpen() : false);
   return (
     <View onLayout={box.onLayout} class="relative min-h-0 flex-1 flex-row">
-      <Scroll testID="issue-scroll" class="min-h-0 min-w-0 flex-1">
-        <View class={`w-full max-w-4xl self-center ${wide() ? "px-8 pt-6 pb-14" : "px-4 pt-4 pb-10"}`}>
+      <Scroll testID="issue-scroll" class="min-h-0 min-w-0 flex-1" contentClass="w-full min-w-0">
+        <View class={`w-full min-w-0 max-w-4xl self-center ${wide() ? "px-8 pt-6 pb-14" : "px-4 pt-4 pb-10"}`}>
           {props.heading}
-          <View class="mt-6">{props.main}</View>
+          <View class="mt-6 min-w-0">{props.main}</View>
         </View>
       </Scroll>
       <If when={wide() && desktopOpen()}>
@@ -152,7 +152,7 @@ export function Fold(props: {
   onToggle?: (open: boolean) => void;
   children: JSX.Element;
 }) {
-  const localOpen = signal(props.defaultOpen ?? false);
+  const localOpen = signal(untracked(() => props.defaultOpen ?? false));
   const open = () => props.open ?? localOpen();
   const toggle = () => {
     const next = !open();

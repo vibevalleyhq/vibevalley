@@ -9,18 +9,19 @@ use parking_lot::Mutex;
 use tokio::sync::broadcast;
 use vibevalley_core::SliceMask;
 use vibevalley_core::collab::{CommitMeta, encode_frontiers};
+use vibevalley_core::note::annotation::{extract_annotation_links, extract_media_doc_annotations};
 use vibevalley_core::note::base::extract_base_links;
 use vibevalley_core::note::doc::{blocks_to_markdown, parse_doc_document, project_doc_view};
 use vibevalley_core::note::links::{dedup_links, extract_markdown_links};
 use vibevalley_core::note::{type_spec, validate_deletable_path, validate_note_path};
 use vibevalley_i18n::{list, t};
 use vibevalley_protocol::{
-    ApiError, BizCode, Caller, ChatMessage, LinkEntityKind, Note as Wire, NoteCard, NoteCollabImportRequest, NoteCollabImportResult, NoteContent, NoteCover,
-    NoteCoverSetRequest, NoteDocAppendBlockRequest, NoteEvent, NoteFileContent, NoteFileDeleteRequest, NoteFileDeleteResult, NoteFileEncoding,
-    NoteFileGetRequest, NoteFileListRequest, NoteFileListResult, NoteFileWriteItem, NoteFileWriteRequest, NoteFileWriteResult, NoteHistoryForkRequest,
-    NoteHistoryRestoreRequest, NoteHistoryUndoOriginRequest, NoteLinkListRequest, NoteLinkListResult, NoteLinkRef, NoteListRequest, NotePresenceEvent,
-    NoteRequest, NoteSaid, NoteSuggestionAcceptInput, NoteSuggestionCreateInput, NoteTreeMoveRequest, NoteType, NoteUpdateRequest, NoteVersion,
-    NoteVersionRequest, Preview, Suggestion, SuggestionChange, SuggestionEvent, USER_ID,
+    ApiError, BizCode, Caller, LinkEntityKind, Note as Wire, NoteCollabImportRequest, NoteCollabImportResult, NoteContent, NoteCover, NoteCoverSetRequest,
+    NoteDocAppendBlockRequest, NoteEvent, NoteFileContent, NoteFileDeleteRequest, NoteFileDeleteResult, NoteFileEncoding, NoteFileGetRequest,
+    NoteFileListRequest, NoteFileListResult, NoteFileWriteItem, NoteFileWriteRequest, NoteFileWriteResult, NoteHistoryForkRequest, NoteHistoryRestoreRequest,
+    NoteHistoryUndoOriginRequest, NoteLinkListRequest, NoteLinkListResult, NoteLinkRef, NoteListRequest, NotePresenceEvent, NoteRequest, NoteSaid,
+    NoteSuggestionAcceptInput, NoteSuggestionCreateInput, NoteTreeMoveRequest, NoteType, NoteUpdateRequest, NoteVersion, NoteVersionRequest, Preview,
+    Suggestion, SuggestionChange, SuggestionEvent,
 };
 
 use super::collab::{
@@ -28,9 +29,9 @@ use super::collab::{
     sync_manifest_title_raw, upsert_file_for_write,
 };
 use super::library::{AddedBy, Library};
-use super::media::Media;
+use super::media::{Media, MediaAnnouncement};
+use super::{NOTE_USER_ORIGIN, is_user_actor};
 use crate::context::api::{CallerContext, media::SharedSpeechStreams};
-use crate::context::port::ChannelAnnounce;
 use crate::context::{Context, LookIn, missing};
 use crate::service::DbError;
 use crate::service::note::{NewNote, NewVersion, NoteRow, StoredSuggestion, VersionRow};
@@ -85,25 +86,18 @@ pub struct Manager {
     pub(crate) storage: Arc<Storage>,
     pub library: Arc<Library>,
     pub media: Arc<Media>,
-    announce: Arc<dyn ChannelAnnounce>,
     pub(super) changes: broadcast::Sender<(String, NoteEvent)>,
     pub(super) suggestion_events: broadcast::Sender<(String, SuggestionEvent)>,
     pub(super) presence_events: broadcast::Sender<(String, NotePresenceEvent)>,
     pub(super) presence_rooms: Mutex<HashMap<String, Arc<PresenceRoom>>>,
     pub(super) write_batcher: OriginWriteBatcher,
-    doc_locks: Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>,
+    doc_locks: vibevalley_kit::sync::KeyLock<String>,
 }
 
 impl Manager {
-    pub async fn open_async(
-        ctx: Arc<Context>,
-        setting: Arc<Setting>,
-        storage: Arc<Storage>,
-        announce: Arc<dyn ChannelAnnounce>,
-        chat_messages: Option<broadcast::Receiver<ChatMessage>>,
-    ) -> Result<Arc<Self>, ApiError> {
-        let media = Media::open_async(ctx.clone(), setting, storage.clone(), announce.clone()).await?;
-        let library = Library::open(ctx.clone(), storage.clone(), chat_messages, Some(media.subscribe_job_updates()));
+    pub async fn open_async(ctx: Arc<Context>, setting: Arc<Setting>, storage: Arc<Storage>) -> Result<Arc<Self>, ApiError> {
+        let media = Media::open_async(ctx.clone(), setting, storage.clone()).await?;
+        let library = Library::open(ctx.clone(), storage.clone(), Some(media.subscribe_job_updates()));
         let (changes, _) = broadcast::channel(512);
         let (suggestion_events, _) = broadcast::channel(512);
         let (presence_events, _) = broadcast::channel(512);
@@ -113,13 +107,12 @@ impl Manager {
             storage,
             library,
             media,
-            announce,
             changes,
             suggestion_events,
             presence_events,
             presence_rooms: Mutex::new(HashMap::new()),
             write_batcher: OriginWriteBatcher::default(),
-            doc_locks: Mutex::new(HashMap::new()),
+            doc_locks: vibevalley_kit::sync::KeyLock::new(),
         }))
     }
 
@@ -136,9 +129,41 @@ impl Manager {
         self.media.clone()
     }
 
-    pub(super) fn note_lock(&self, id: &str) -> Arc<tokio::sync::Mutex<()>> {
-        let mut map = self.doc_locks.lock();
-        map.entry(id.to_string()).or_insert_with(|| Arc::new(tokio::sync::Mutex::new(()))).clone()
+    pub fn subscribe_media_announcements(&self) -> broadcast::Receiver<MediaAnnouncement> {
+        self.media.subscribe_announcements()
+    }
+
+    pub async fn record_announced_message_async(&self, note_id: &str, version: Option<i64>, message_number: &str) {
+        if version == Some(1)
+            && let Err(err) = self.ctx.service.note.set_message_id(note_id, message_number).await
+        {
+            tracing::warn!(note_id = %note_id, message_id = %message_number, error = %err, "note.set_message_id backlink failed");
+        }
+        if let Some(v) = version
+            && let Err(err) = self.ctx.service.note.set_version_message_id(note_id, v, message_number).await
+        {
+            tracing::warn!(
+                note_id = %note_id,
+                version = v,
+                message_id = %message_number,
+                error = %err,
+                "note.set_version_message_id backlink failed"
+            );
+        }
+    }
+
+    pub fn say_for_note_event(key: &str, title: &str, note: &str) -> String {
+        let base = t(key, &[("title", title.into())]);
+        let trimmed = note.trim();
+        if trimmed.is_empty() {
+            base
+        } else {
+            t("server.note.withNote", &[("said", base.into()), ("note", trimmed.into())])
+        }
+    }
+
+    pub(super) async fn note_lock(&self, id: &str) -> vibevalley_kit::sync::KeyLockGuard<'_, String> {
+        self.doc_locks.lock(id.to_string()).await
     }
 
     pub(super) async fn row_async(&self, id: &str) -> Result<NoteRow, ApiError> {
@@ -152,14 +177,10 @@ impl Manager {
     }
 
     pub(super) fn actor_name(&self, by_id: &str) -> String {
-        if by_id == USER_ID {
+        if is_user_actor(by_id) {
             return t("server.channel.name.user", &[]);
         }
         by_id.to_string()
-    }
-
-    pub(super) async fn resolve_channel_async(&self, who: &str, name: &str) -> Result<String, ApiError> {
-        self.announce.place_of_async(who, name.trim()).await
     }
 
     async fn issue_id_for_ref_async(&self, issue_ref: &str) -> Result<String, ApiError> {
@@ -201,6 +222,13 @@ impl Manager {
             }
             NoteType::Canvas | NoteType::Media => {
                 let mut acc = Vec::new();
+                if ty == NoteType::Media
+                    && let Some(bytes) = files.get("structure/media.json")
+                    && let Ok(text) = std::str::from_utf8(bytes)
+                {
+                    let anns = extract_media_doc_annotations(text);
+                    acc.extend(extract_annotation_links(&anns));
+                }
                 for (path, bytes) in files {
                     if path.starts_with("structure/")
                         && (path.ends_with(".md") || path.ends_with(".txt") || path.ends_with(".json"))
@@ -298,23 +326,9 @@ impl Manager {
         self.storage.note.write_cover_async(&row.id, req).await
     }
 
-    async fn announce_card_async(&self, channel_id: Option<&str>, maker: &Maker, say: String, card: NoteCard, send_key: String) -> Option<NoteSaid> {
-        let ch = channel_id?;
-        let msg = self
-            .announce
-            .post_card_async(&maker.from, ch, &say, card, maker.run.clone(), send_key)
-            .await
-            .ok()?;
-        Some(NoteSaid {
-            channel: msg.channel,
-            number: msg.number,
-        })
-    }
-
     pub async fn list_async(&self, req: &NoteListRequest) -> Result<Vec<Wire>, ApiError> {
         let rows = if let Some(ch) = req.channel.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
-            let channel_id = self.resolve_channel_async(USER_ID, ch).await?;
-            self.ctx.service.note.list_in_channel(&channel_id).await.map_err(q)?
+            self.ctx.service.note.list_in_channel(ch).await.map_err(q)?
         } else if let Some(iss) = req.issue.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
             let issue_id = self.issue_id_for_ref_async(iss).await?;
             self.ctx.service.note.list_for_issue(&issue_id).await.map_err(q)?
@@ -403,10 +417,7 @@ impl Manager {
             }
         }
 
-        let channel_id = match req.channel.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
-            Some(ch) => Some(self.resolve_channel_async(&maker.from, ch).await?),
-            None => None,
-        };
+        let channel_id = req.channel.as_deref().map(str::trim).filter(|s| !s.is_empty()).map(str::to_string);
         let issue = match req.issue.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
             Some(iss) => Some(self.issue_id_for_ref_async(iss).await?),
             None => None,
@@ -427,7 +438,7 @@ impl Manager {
         let doc_bytes = export_doc_snapshot(&doc)?;
 
         let by_name = self.actor_name(&maker.by);
-        let note = req.note.clone().unwrap_or_default();
+        let note = req.note.clone().filter(|s| !s.is_empty());
         let paths_list: Vec<String> = metas.iter().map(|m| m.path.clone()).collect();
         let new_row = NewNote {
             id: id.clone(),
@@ -435,7 +446,7 @@ impl Manager {
             note_type: ty.as_str().to_string(),
             parent_id,
             sort_order,
-            channel_id: channel_id.clone(),
+            channel_id,
             issue,
             by_id: maker.by.clone(),
             by_name: by_name.clone(),
@@ -447,7 +458,7 @@ impl Manager {
             version: 1,
             storage_id,
             size,
-            note: Some(note.clone()).filter(|s| !s.is_empty()),
+            note,
             by_id: maker.by.clone(),
             by_name,
             created_at: at,
@@ -481,32 +492,6 @@ impl Manager {
 
         self.sync_note_links_async(&id, &title, ty, &raw_files, at).await;
 
-        if req.announce.unwrap_or(true)
-            && let Some(said) = self
-                .announce_card_async(
-                    channel_id.as_deref(),
-                    maker,
-                    say_of("server.note.made", &title, &note),
-                    NoteCard {
-                        id: id.clone(),
-                        title: title.clone(),
-                        note_type: ty,
-                        version: 1,
-                        note,
-                    },
-                    format!("note:{id}:v1"),
-                )
-                .await
-        {
-            let num_str = said.number.to_string();
-            if let Err(err) = self.ctx.service.note.set_message_id(&id, &num_str).await {
-                tracing::warn!(note_id = %id, message_id = %num_str, error = %err, "note.set_message_id backlink failed");
-            }
-            if let Err(err) = self.ctx.service.note.set_version_message_id(&id, 1, &num_str).await {
-                tracing::warn!(note_id = %id, version = 1, message_id = %num_str, error = %err, "note.set_version_message_id backlink failed");
-            }
-        }
-
         self.get_async(&id).await
     }
 
@@ -537,20 +522,19 @@ impl Manager {
             self.write_files_with_meta_async(maker, &write_req, meta).await?;
         }
 
-        let lock = self.note_lock(&req.id);
-        let _guard = lock.lock().await;
+        let _guard = self.note_lock(&req.id).await;
         let fresh = self.row_async(&req.id).await?;
         let next_ver = fresh.version + 1;
         let (storage_id, size) = self.storage.note.snapshot_version_async(&fresh.id).await?;
         let at = self.ctx.now();
         let by_name = self.actor_name(&maker.by);
-        let note = req.note.clone().unwrap_or_default();
+        let note = req.note.clone().filter(|s| !s.is_empty());
         let ver = NewVersion {
             note_id: fresh.id.clone(),
             version: next_ver,
             storage_id,
             size,
-            note: Some(note.clone()).filter(|s| !s.is_empty()),
+            note,
             by_id: maker.by.clone(),
             by_name,
             created_at: at,
@@ -567,40 +551,12 @@ impl Manager {
         .await
         .map_err(q)?;
 
-        if let Some(said) = self
-            .announce_card_async(
-                fresh.channel_id.as_deref(),
-                maker,
-                say_of("server.note.versioned", &fresh.title, &note),
-                NoteCard {
-                    id: fresh.id.clone(),
-                    title: fresh.title.clone(),
-                    note_type: ty,
-                    version: next_ver,
-                    note,
-                },
-                format!("note:{}:v{next_ver}", fresh.id),
-            )
-            .await
-        {
-            let num_str = said.number.to_string();
-            if let Err(err) = self.ctx.service.note.set_version_message_id(&fresh.id, next_ver, &num_str).await {
-                tracing::warn!(
-                    note_id = %fresh.id,
-                    version = next_ver,
-                    message_id = %num_str,
-                    error = %err,
-                    "note.set_version_message_id backlink failed"
-                );
-            }
-        }
         self.get_async(&fresh.id).await
     }
 
     pub async fn update_async(&self, req: &NoteUpdateRequest) -> Result<Wire, ApiError> {
         self.flush_pending_writes_async(&req.id).await;
-        let lock = self.note_lock(&req.id);
-        let _guard = lock.lock().await;
+        let _guard = self.note_lock(&req.id).await;
 
         let row = self.row_async(&req.id).await?;
         let ty = note_type_of(&row.note_type)?;
@@ -658,7 +614,7 @@ impl Manager {
                     seq,
                     files: meta,
                     deleted: vec![],
-                    origin: Some(USER_ID.into()),
+                    origin: Some(NOTE_USER_ORIGIN.into()),
                     frontiers: None,
                 },
             );
@@ -697,8 +653,7 @@ impl Manager {
 
     pub async fn remove_async(&self, id: &str) -> Result<(), ApiError> {
         self.flush_pending_writes_async(id).await;
-        let lock = self.note_lock(id);
-        let _guard = lock.lock().await;
+        let _guard = self.note_lock(id).await;
         let _ = self.row_async(id).await?;
         self.ctx.service.note.delete(id).await.map_err(q)?;
         self.storage.note.delete_directory_async(id).await?;
@@ -809,8 +764,7 @@ impl Manager {
         req: &NoteFileWriteRequest,
         meta: &CommitMeta,
     ) -> Result<NoteFileWriteResult, ApiError> {
-        let lock = self.note_lock(&req.id);
-        let _guard = lock.lock().await;
+        let _guard = self.note_lock(&req.id).await;
 
         let row = self.row_async(&req.id).await?;
         let ty = note_type_of(&row.note_type)?;
@@ -831,7 +785,7 @@ impl Manager {
         let (doc, _) = self.load_or_bootstrap_doc_async(&row, &disk_files).await?;
         let at = self.ctx.now();
 
-        let is_agent = maker.by != USER_ID && req.origin.as_deref() != Some(USER_ID);
+        let is_agent = !is_user_actor(&maker.by) && !req.origin.as_deref().is_some_and(is_user_actor);
         let mut direct_items = Vec::new();
         let mut diverted_suggestions = Vec::new();
 
@@ -947,6 +901,9 @@ impl Manager {
                     svc_tx.note.rename_in_tx(tx, &id_tx, &updated_title_tx, at).await?;
                 }
                 svc_tx.note.set_seq_in_tx(tx, &id_tx, new_seq, at).await?;
+                if is_user_actor(&actor) {
+                    svc_tx.note.record_human_touched_paths_in_tx(tx, &id_tx, &written_paths_tx).await?;
+                }
                 svc_tx
                     .note
                     .add_file_change_in_tx(tx, &id_tx, new_seq, &actor, Some(&frontiers_b64_tx), &written_paths_tx, &[], at)
@@ -969,25 +926,6 @@ impl Manager {
             },
         );
 
-        if req.announce.unwrap_or(false) {
-            let note = req.summary.clone().unwrap_or_default();
-            let _ = self
-                .announce_card_async(
-                    row.channel_id.as_deref(),
-                    maker,
-                    say_of("server.note.versioned", &updated_title, &note),
-                    NoteCard {
-                        id: row.id.clone(),
-                        title: updated_title,
-                        note_type: ty,
-                        version: row.version,
-                        note,
-                    },
-                    format!("note:{}:seq{new_seq}", row.id),
-                )
-                .await;
-        }
-
         Ok(NoteFileWriteResult {
             note_id: row.id,
             seq: new_seq,
@@ -999,8 +937,7 @@ impl Manager {
 
     pub async fn delete_file_with_meta_async(&self, _maker: &Maker, req: &NoteFileDeleteRequest, meta: &CommitMeta) -> Result<NoteFileDeleteResult, ApiError> {
         self.flush_pending_writes_async(&req.id).await;
-        let lock = self.note_lock(&req.id);
-        let _guard = lock.lock().await;
+        let _guard = self.note_lock(&req.id).await;
 
         let row = self.row_async(&req.id).await?;
         let ty = note_type_of(&row.note_type)?;
@@ -1130,6 +1067,30 @@ impl Manager {
         self.base_upsert_row_async(&self.caller_meta(ctx).0, req).await
     }
 
+    pub(crate) async fn annotation_upsert_for_caller_async(
+        &self,
+        ctx: &CallerContext,
+        req: &vibevalley_protocol::NoteAnnotationUpsertRequest,
+    ) -> Result<vibevalley_protocol::NoteAnnotationMutationResult, ApiError> {
+        self.annotation_upsert_async(&self.caller_meta(ctx).0, req).await
+    }
+
+    pub(crate) async fn annotation_delete_for_caller_async(
+        &self,
+        ctx: &CallerContext,
+        req: &vibevalley_protocol::NoteAnnotationDeleteRequest,
+    ) -> Result<vibevalley_protocol::NoteAnnotationMutationResult, ApiError> {
+        self.annotation_delete_async(&self.caller_meta(ctx).0, req).await
+    }
+
+    pub(crate) async fn base_sync_review_for_caller_async(
+        &self,
+        ctx: &CallerContext,
+        req: &vibevalley_protocol::NoteReviewSyncRequest,
+    ) -> Result<vibevalley_protocol::NoteReviewSyncResult, ApiError> {
+        self.base_sync_review_async(&self.caller_meta(ctx).0, req).await
+    }
+
     pub(crate) async fn added_by_for_caller_async(&self, caller: &CallerContext) -> AddedBy {
         match caller.caller {
             Caller::User | Caller::Remote => AddedBy::User,
@@ -1180,8 +1141,8 @@ fn apply_origin_override(meta: &mut CommitMeta, raw_origin: Option<&str>) {
     if let Some(actor) = origin.strip_prefix("agent:").map(str::trim).filter(|s| !s.is_empty()) {
         meta.author = actor.to_string();
         meta.agent = Some(actor.to_string());
-    } else if origin == USER_ID {
-        meta.author = USER_ID.to_string();
+    } else if is_user_actor(origin) {
+        meta.author = NOTE_USER_ORIGIN.to_string();
         meta.agent = None;
     }
 }
@@ -1224,22 +1185,12 @@ fn caller_identity(caller: &CallerContext) -> (Maker, String, Option<String>) {
         }
         Caller::User | Caller::Remote => (
             Maker {
-                from: USER_ID.into(),
-                by: USER_ID.into(),
+                from: NOTE_USER_ORIGIN.into(),
+                by: NOTE_USER_ORIGIN.into(),
                 run: None,
             },
-            USER_ID.into(),
+            NOTE_USER_ORIGIN.into(),
             None,
         ),
-    }
-}
-
-fn say_of(key: &str, title: &str, note: &str) -> String {
-    let base = t(key, &[("title", title.into())]);
-    let trimmed = note.trim();
-    if trimmed.is_empty() {
-        base
-    } else {
-        t("server.note.withNote", &[("said", base.into()), ("note", trimmed.into())])
     }
 }

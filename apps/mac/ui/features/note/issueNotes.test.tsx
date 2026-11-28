@@ -3,7 +3,7 @@ import { expect, open, test } from "nsh/test";
 
 import { setLocale } from "@vibevalley/i18n";
 import "@vibevalley/i18n/catalogs";
-import { type Issue, type IssueId, type Note, type NoteId, type NoteType, userId } from "@vibevalley/protocol";
+import { type Issue, type IssueId, localUserParticipant, type Note, type NoteId, type NoteType } from "@vibevalley/protocol";
 import { noteId } from "@vibevalley/protocol/schema";
 
 import { fakeHost } from "../../fixtures/fakeHost";
@@ -17,7 +17,7 @@ function makeNote(id: string, title: string, noteType: NoteType = "doc", issue?:
     noteType,
     sortOrder: 1,
     ...(issue ? { issue } : {}),
-    by: userId,
+    by: localUserParticipant,
     byName: "You",
     version: 1,
     seq: 1,
@@ -153,6 +153,8 @@ test("IssueNotes in IssueDetail links and unlinks notes", async () => {
 
   await fake.pumpUntil(app, () => app.count("id:issue-note-row-note-pool-1") === 1);
   expect(updateCalls).toContainEqual({ id: "note-pool-1", issue: activeIssue.id });
+  const rowTexts = app.texts();
+  expect(rowTexts.some((txt) => txt.includes(".base.json") || txt.includes(".md"))).toBe(false);
 
   await app.press("id:issue-note-unlink-note-linked-1");
   await fake.pumpUntil(app, () => app.count("id:issue-note-row-note-linked-1") === 0);

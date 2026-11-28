@@ -1,6 +1,8 @@
 import { t } from "@vibevalley/i18n";
 import {
+  agentParticipant,
   defaultOrchestrator,
+  participantRawId,
   type Channel,
   type ChannelSummary,
   type Chat,
@@ -23,7 +25,8 @@ export const archivedOf = (chat: Chat | undefined): Channel[] =>
 
 export type ChatFilter = "all" | "group" | "direct";
 
-export const directPeerOf = (c: Channel | undefined): string | undefined => (c?.type === "direct" ? c.peer?.replace(/^profile:/u, "") : undefined);
+export const directPeerOf = (c: Channel | undefined): string | undefined =>
+  c?.type === "direct" && c.peer !== undefined ? participantRawId(c.peer) : undefined;
 
 export function sidebarChannelsOf(chat: Chat | undefined, filter: ChatFilter = "all"): Channel[] {
   const list = (chat?.channels ?? []).filter((c) => {
@@ -280,7 +283,7 @@ export function switchTargets(
       }
     }),
     ...(named.profiles ?? [])
-      .filter((p) => !peers.has(`profile:${p.id}`))
+      .filter((p) => !peers.has(agentParticipant(p.id)))
       .map((p): SwitchTarget => ({ kind: "profile", id: p.id, label: `@${p.name}`, hint: t("web.channel.switcher.newDirect"), unread: 0, at: 0 })),
   ];
   // Normalize full-width Chinese IME `#` and `@` prefixes.

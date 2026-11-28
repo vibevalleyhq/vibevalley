@@ -144,9 +144,8 @@ fn every_contract_endpoint_and_subscription_is_registered_and_hub_drops_cleanly(
     })
     .unwrap();
 
-    for sub in ["repos", "worktrees"] {
-        assert!(work.join(sub).is_dir(), "{sub}");
-    }
+    assert!(work.join("repos").is_dir(), "repos");
+    assert!(!work.join("worktrees").exists(), "server must not create worktrees dir");
     assert!(reqwest::Client::builder().build().is_ok());
 
     let health = app.router().call_as(Caller::User, "server.health.get", json!({})).data.unwrap();
@@ -169,9 +168,14 @@ fn every_contract_endpoint_and_subscription_is_registered_and_hub_drops_cleanly(
     let missing_cron = app.router().call_as(Caller::User, "cron.update", json!({ "id": "missing" }));
     assert_eq!(missing_cron.biz_code, vibevalley_protocol::BizCode::CronNotFound.code());
 
-    let opened = app.router().call_as(Caller::User, "orchestrator.open", json!({}));
-    assert_eq!(opened.biz_code, 0, "{}", opened.message);
-    assert!(crate::support::board_sessions(app.test_internals().board).iter().any(|h| h.is_orchestrator()));
+    assert!(
+        !app.router().answers("orchestrator.open"),
+        "removed orchestrator.open endpoint must not be registered"
+    );
+    assert!(
+        crate::support::board_sessions(app.test_internals().board).iter().any(|h| h.is_daemon()),
+        "daemon orchestrator AgentSession must be active on boot without orchestrator.open"
+    );
 
     let weak = Arc::downgrade(app.router());
     app.close_blocking();

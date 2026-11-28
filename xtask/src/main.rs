@@ -110,43 +110,37 @@ fn cmd_check(root: &Path, args: &[String]) -> Result<i32, String> {
 }
 
 fn cmd_loom(root: &Path, args: &[String]) -> Result<i32, String> {
-    if let Some(code) = handle_no_extra_args(args, "Usage: cargo xtask loom", false) {
-        return Ok(code);
-    }
+    const ALL_PACKAGES: [&str; 5] = [
+        "vibevalley-kit",
+        "vibevalley-oar",
+        "vibevalley-machine",
+        "vibevalley-runtime",
+        "vibevalley-server",
+    ];
+    let packages: Vec<&str> = match args {
+        [] => ALL_PACKAGES.to_vec(),
+        [flag] if flag == "--help" || flag == "-h" => {
+            println!("Usage: cargo xtask loom [-p <package>]");
+            return Ok(0);
+        }
+        [flag, pkg] if flag == "-p" || flag == "--package" => vec![pkg.as_str()],
+        _ => {
+            eprintln!("Usage: cargo xtask loom [-p <package>]");
+            return Ok(2);
+        }
+    };
 
-    let runtime_code = run_cargo(
-        root,
-        &[
-            "test",
-            "--profile",
-            "loom",
-            "-p",
-            "vibevalley-runtime",
-            "--features",
-            "loom",
-            "--lib",
-            "loom_models",
-        ],
-        &[],
-    )?;
-    if runtime_code != 0 {
-        return Ok(runtime_code);
+    for pkg in packages {
+        let code = run_cargo(
+            root,
+            &["test", "--profile", "loom", "-p", pkg, "--features", "loom", "--lib", "loom_models"],
+            &[],
+        )?;
+        if code != 0 {
+            return Ok(code);
+        }
     }
-    run_cargo(
-        root,
-        &[
-            "test",
-            "--profile",
-            "loom",
-            "-p",
-            "vibevalley-server",
-            "--features",
-            "loom",
-            "--lib",
-            "loom_models",
-        ],
-        &[],
-    )
+    Ok(0)
 }
 
 fn cmd_goldens(root: &Path, args: &[String]) -> Result<i32, String> {

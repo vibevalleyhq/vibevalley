@@ -606,8 +606,7 @@ fn flood_stays_responsive_and_coalesces_dirty() {
     assert!(slowest < Duration::from_millis(250), "round trip took {slowest:?}");
     let s = h.session.snapshot();
     assert!(screen_text(&s).contains("FLOOD-DONE"));
-    // libghostty prunes whole pages of rows, so the retained count sits
-    // within about a page of the 5000-line limit on either side.
+    // Retained scrollback count sits near the 5000-line limit.
     assert!((4000..6000).contains(&s.scrollback_len), "{}", s.scrollback_len);
     eprintln!(
         "flood: {:?}, {round_trips} round trips, slowest {slowest:?}, final seq {}",

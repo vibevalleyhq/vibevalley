@@ -2,17 +2,24 @@
 //!
 //! Ensures forward-only SeaORM migrations cannot silently skip an older
 //! un-migrated database (via `CREATE TABLE IF NOT EXISTS`) or allow column
-//! drift between [`crate::db::entity`] and the live database schema.
+//! drift between [`crate::db::entity`] (31 business tables) + `vibevalley-kit`
+//! mechanism tables (`outbox_item`, `seq_counter`) and the live database schema.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::fmt;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use sea_orm::{ConnectionTrait, DatabaseBackend, DatabaseConnection, EntityName, Iden, Iterable, Statement};
+use vibevalley_kit::db::schema::{
+    ActualColumn, ExpectedTable, collect_drifts, is_sqlite_fts_auxiliary_table, list_tables_sql, postgres_columns_sql, sqlite_table_info_sql,
+};
+pub use vibevalley_kit::db::schema::{SchemaMismatchReport, TableDrift};
 
 use crate::db::{DbBackend, DbError, DbResult};
 
 const SERVER_MIGRATIONS_TABLE: &str = "seaql_server_migrations";
+
+#[cfg(test)]
+const EXPECTED_KIT_TABLES: &[&str] = &["outbox_item", "seq_counter"];
 
 const EXPECTED_DURABLE_TABLES: &[&str] = &[
     "durable_conversation",
@@ -23,125 +30,18 @@ const EXPECTED_DURABLE_TABLES: &[&str] = &[
     "durable_task",
 ];
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TableDrift {
-    pub table: String,
-    pub missing_table: bool,
-    pub missing_columns: Vec<String>,
-    pub extra_required_columns: Vec<String>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SchemaMismatchReport {
-    pub backend: DbBackend,
-    pub db_path: Option<PathBuf>,
-    pub legacy_untracked: bool,
-    pub applied_migrations: Vec<String>,
-    pub drifts: Vec<TableDrift>,
-}
-
-impl SchemaMismatchReport {
-    /// Multi-line diagnostic report suitable for logs and startup recovery UI.
-    pub fn format_detail(&self) -> String {
-        let mut lines = Vec::new();
-        let backend_name = match self.backend {
-            DbBackend::Sqlite => "SQLite",
-            DbBackend::Postgres => "PostgreSQL",
-        };
-        lines.push(format!("Database backend: {backend_name}"));
-        if let Some(path) = &self.db_path {
-            lines.push(format!("Database path: {}", path.display()));
-        }
-        if self.legacy_untracked {
-            lines.push(format!(
-                "Migration table ({SERVER_MIGRATIONS_TABLE}): missing on an existing database (pre-migration legacy schema)"
-            ));
-        } else if self.applied_migrations.is_empty() {
-            lines.push(format!("Applied migrations ({SERVER_MIGRATIONS_TABLE}): (none)"));
-        } else {
-            lines.push(format!(
-                "Applied migrations ({SERVER_MIGRATIONS_TABLE}): {}",
-                self.applied_migrations.join(", ")
-            ));
-        }
-        lines.push(String::new());
-        lines.push(format!("Detected schema drift ({} table(s)):", self.drifts.len()));
-        for drift in &self.drifts {
-            if drift.missing_table {
-                lines.push(format!("  - {}: missing table", drift.table));
-                continue;
-            }
-            let mut parts = Vec::new();
-            if !drift.missing_columns.is_empty() {
-                parts.push(format!("missing columns: {}", drift.missing_columns.join(", ")));
-            }
-            if !drift.extra_required_columns.is_empty() {
-                parts.push(format!("extra NOT NULL columns without default: {}", drift.extra_required_columns.join(", ")));
-            }
-            lines.push(format!("  - {}: {}", drift.table, parts.join("; ")));
-        }
-        lines.push(String::new());
-        match self.backend {
-            DbBackend::Sqlite => {
-                lines.push("Recovery: back up or move server.db (and any -wal/-shm files), then restart VibeValley to recreate a clean schema.".to_string());
-            }
-            DbBackend::Postgres => {
-                lines.push("Recovery: run or reset the PostgreSQL database schema to match the current release before restarting VibeValley.".to_string());
-            }
-        }
-        lines.join("\n")
-    }
-}
-
-impl fmt::Display for SchemaMismatchReport {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let preview: Vec<&str> = self.drifts.iter().take(5).map(|d| d.table.as_str()).collect();
-        let suffix = if self.drifts.len() > 5 {
-            format!(", +{} more", self.drifts.len() - 5)
-        } else {
-            String::new()
-        };
-        if self.legacy_untracked {
-            write!(
-                f,
-                "legacy database without migration tracking ({} drifted tables: {}{})",
-                self.drifts.len(),
-                preview.join(", "),
-                suffix
-            )
-        } else {
-            write!(
-                f,
-                "database schema mismatch ({} drifted tables: {}{})",
-                self.drifts.len(),
-                preview.join(", "),
-                suffix
-            )
-        }
-    }
-}
-
-struct ExpectedTable {
-    name: &'static str,
-    columns: Vec<String>,
-}
-
 macro_rules! entity_table {
     ($mod_name:ident) => {{
         use crate::db::entity::$mod_name::{Column, Entity};
-        ExpectedTable {
-            name: Entity.table_name(),
-            columns: Column::iter().map(|col| Iden::to_string(&col)).collect(),
-        }
+        ExpectedTable::new(Entity.table_name(), Column::iter().map(|col| Iden::to_string(&col)))
     }};
 }
 
-fn expected_server_schema() -> Vec<ExpectedTable> {
+fn expected_server_entity_schema() -> Vec<ExpectedTable> {
     vec![
         entity_table!(attachment),
         entity_table!(channel),
         entity_table!(channel_delivery),
-        entity_table!(channel_event),
         entity_table!(channel_member),
         entity_table!(channel_mention),
         entity_table!(channel_message),
@@ -164,12 +64,8 @@ fn expected_server_schema() -> Vec<ExpectedTable> {
         entity_table!(note_link),
         entity_table!(note_suggestion),
         entity_table!(note_version),
-        entity_table!(outbox_item),
         entity_table!(pull),
-        entity_table!(pull_event),
-        entity_table!(remote_config),
         entity_table!(remote_device),
-        entity_table!(seq_counter),
         entity_table!(session),
         entity_table!(session_event),
         entity_table!(session_mailbox),
@@ -177,30 +73,38 @@ fn expected_server_schema() -> Vec<ExpectedTable> {
     ]
 }
 
-#[derive(Debug, Clone)]
-struct ActualColumn {
-    name: String,
-    required_without_default: bool,
+fn expected_kit_schema() -> Vec<ExpectedTable> {
+    vec![
+        ExpectedTable::new(
+            "outbox_item",
+            ["id", "topic", "payload_json", "status", "attempts", "available_at", "created_at", "last_error"],
+        ),
+        ExpectedTable::new("seq_counter", ["name", "last_number"]),
+    ]
+}
+
+fn expected_full_schema() -> Vec<ExpectedTable> {
+    let mut all = expected_server_entity_schema();
+    all.extend(expected_kit_schema());
+    all
 }
 
 const SQLITE_FTS_PREFIXES: &[&str] = &["channel_message_fts", "memory_fts", "attachment_fts"];
 
-fn is_sqlite_fts_auxiliary_table(name: &str) -> bool {
-    SQLITE_FTS_PREFIXES
-        .iter()
-        .any(|prefix| name == *prefix || name.starts_with(&format!("{prefix}_")))
+fn to_kit_backend(backend: DatabaseBackend) -> DbBackend {
+    match backend {
+        DatabaseBackend::Postgres => DbBackend::Postgres,
+        _ => DbBackend::Sqlite,
+    }
 }
 
 async fn list_existing_tables(conn: &DatabaseConnection, backend: DatabaseBackend) -> DbResult<BTreeSet<String>> {
-    let sql = match backend {
-        DatabaseBackend::Postgres => "SELECT table_name FROM information_schema.tables WHERE table_schema = current_schema() AND table_type = 'BASE TABLE'",
-        _ => "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
-    };
+    let sql = list_tables_sql(to_kit_backend(backend));
     let rows = conn.query_all_raw(Statement::from_string(backend, sql)).await?;
     let mut tables = BTreeSet::new();
     for row in rows {
         let name: String = row.try_get_by_index(0)?;
-        if backend == DatabaseBackend::Sqlite && is_sqlite_fts_auxiliary_table(&name) {
+        if backend == DatabaseBackend::Sqlite && is_sqlite_fts_auxiliary_table(&name, SQLITE_FTS_PREFIXES) {
             continue;
         }
         tables.insert(name);
@@ -230,8 +134,7 @@ async fn load_actual_columns(
     let mut out: BTreeMap<String, Vec<ActualColumn>> = BTreeMap::new();
     match backend {
         DatabaseBackend::Postgres => {
-            let sql = "SELECT table_name, column_name, is_nullable, column_default FROM information_schema.columns WHERE table_schema = current_schema()";
-            let rows = conn.query_all_raw(Statement::from_string(backend, sql)).await?;
+            let rows = conn.query_all_raw(Statement::from_string(backend, postgres_columns_sql())).await?;
             for row in rows {
                 let table_name: String = row.try_get_by_index(0)?;
                 let column_name: String = row.try_get_by_index(1)?;
@@ -246,8 +149,7 @@ async fn load_actual_columns(
         }
         _ => {
             for table in existing_tables {
-                let escaped = table.replace('"', "\"\"");
-                let sql = format!("PRAGMA table_info(\"{escaped}\")");
+                let sql = sqlite_table_info_sql(table);
                 let rows = conn.query_all_raw(Statement::from_string(backend, sql)).await?;
                 let mut cols = Vec::with_capacity(rows.len());
                 for row in rows {
@@ -267,65 +169,14 @@ async fn load_actual_columns(
     Ok(out)
 }
 
-fn collect_drifts(
-    expected: &[ExpectedTable],
-    durable_tables: &[&str],
-    existing_tables: &BTreeSet<String>,
-    actual_columns: &BTreeMap<String, Vec<ActualColumn>>,
-) -> Vec<TableDrift> {
-    let mut drifts = Vec::new();
-    for table in expected {
-        if !existing_tables.contains(table.name) {
-            drifts.push(TableDrift {
-                table: table.name.to_owned(),
-                missing_table: true,
-                missing_columns: Vec::new(),
-                extra_required_columns: Vec::new(),
-            });
-            continue;
-        }
-        let actual = actual_columns.get(table.name).map(Vec::as_slice).unwrap_or(&[]);
-        let actual_names: BTreeSet<&str> = actual.iter().map(|c| c.name.as_str()).collect();
-        let expected_names: BTreeSet<&str> = table.columns.iter().map(String::as_str).collect();
-
-        let missing_columns: Vec<String> = table.columns.iter().filter(|col| !actual_names.contains(col.as_str())).cloned().collect();
-        let extra_required_columns: Vec<String> = actual
-            .iter()
-            .filter(|col| col.required_without_default && !expected_names.contains(col.name.as_str()))
-            .map(|col| col.name.clone())
-            .collect();
-
-        if !missing_columns.is_empty() || !extra_required_columns.is_empty() {
-            drifts.push(TableDrift {
-                table: table.name.to_owned(),
-                missing_table: false,
-                missing_columns,
-                extra_required_columns,
-            });
-        }
-    }
-
-    for &durable_table in durable_tables {
-        if !existing_tables.contains(durable_table) {
-            drifts.push(TableDrift {
-                table: durable_table.to_owned(),
-                missing_table: true,
-                missing_columns: Vec::new(),
-                extra_required_columns: Vec::new(),
-            });
-        }
-    }
-    drifts
-}
-
-/// Verifies after running migrations that every server entity table and durable
-/// execution table exists with all expected columns and no blocking legacy columns.
+/// Verifies after running migrations that every business entity table (31), kit mechanism table (2),
+/// and durable execution table (6) exists with all expected columns and no blocking legacy columns.
 pub(crate) async fn verify_schema(conn: &DatabaseConnection, backend: DbBackend, db_path: Option<&Path>) -> DbResult<()> {
     let raw_backend = conn.get_database_backend();
     let existing_tables = list_existing_tables(conn, raw_backend).await?;
     let applied_migrations = list_applied_migrations(conn, raw_backend, &existing_tables).await?;
     let actual_columns = load_actual_columns(conn, raw_backend, &existing_tables).await?;
-    let expected = expected_server_schema();
+    let expected = expected_full_schema();
     let drifts = collect_drifts(&expected, EXPECTED_DURABLE_TABLES, &existing_tables, &actual_columns);
     if drifts.is_empty() {
         return Ok(());
@@ -333,6 +184,7 @@ pub(crate) async fn verify_schema(conn: &DatabaseConnection, backend: DbBackend,
     let report = SchemaMismatchReport {
         backend,
         db_path: db_path.map(Path::to_path_buf),
+        migrations_table: SERVER_MIGRATIONS_TABLE.to_owned(),
         legacy_untracked: false,
         applied_migrations,
         drifts,
@@ -356,7 +208,8 @@ mod tests {
         let db = Database::open(dir.path()).await.unwrap();
 
         let existing = list_existing_tables(db.write_conn(), DatabaseBackend::Sqlite).await.unwrap();
-        let expected_names: BTreeSet<&str> = expected_server_schema().into_iter().map(|t| t.name).collect();
+        let expected_entity_names: BTreeSet<String> = expected_server_entity_schema().into_iter().map(|t| t.name).collect();
+        let kit_names: BTreeSet<&str> = EXPECTED_KIT_TABLES.iter().copied().collect();
         let durable_names: BTreeSet<&str> = EXPECTED_DURABLE_TABLES.iter().copied().collect();
 
         let entity_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/db/entity");
@@ -369,14 +222,29 @@ mod tests {
             }
         }
 
-        let expected_owned: BTreeSet<String> = expected_names.iter().map(|s| (*s).to_owned()).collect();
-        assert_eq!(expected_owned, entity_files, "expected_server_schema must list every db/entity/*.rs file");
+        assert_eq!(
+            entity_files.len(),
+            31,
+            "expected 31 business ORM entity files (outbox_item & seq_counter retired to kit; channel_event/remote_config/pull_event removed)"
+        );
+        assert_eq!(
+            expected_entity_names, entity_files,
+            "expected_server_entity_schema must list every db/entity/*.rs file"
+        );
+        for kit_table in EXPECTED_KIT_TABLES {
+            assert!(existing.contains(*kit_table), "kit mechanism table `{kit_table}` must exist in migrated DB");
+        }
 
         let server_tables: BTreeSet<String> = existing
             .into_iter()
-            .filter(|name| name != "seaql_migrations" && name != SERVER_MIGRATIONS_TABLE && !durable_names.contains(name.as_str()))
+            .filter(|name| {
+                name != "seaql_migrations" && name != SERVER_MIGRATIONS_TABLE && !durable_names.contains(name.as_str()) && !kit_names.contains(name.as_str())
+            })
             .collect();
-        assert_eq!(server_tables, expected_owned, "migrations must create exact same tables as entities");
+        assert_eq!(
+            server_tables, expected_entity_names,
+            "migrations must create exact same business tables as entities"
+        );
 
         db.close().await;
     }
@@ -483,7 +351,7 @@ mod tests {
         assert_eq!(session_row.try_get_by_index::<String>(0).unwrap(), "issueBoard");
         assert_eq!(session_row.try_get_by_index::<Option<String>>(1).unwrap().as_deref(), Some("agent-1"));
         assert_eq!(session_row.try_get_by_index::<Option<String>>(2).unwrap().as_deref(), Some("/tmp/wt"));
-        assert!(session_row.try_get_by_index::<String>(3).unwrap().contains("managedWorktree"));
+        assert!(session_row.try_get_by_index::<String>(3).unwrap().contains("directCwd"));
         assert!(session_row.try_get_by_index::<String>(4).unwrap().contains("issue"));
         assert_eq!(session_row.try_get_by_index::<Option<String>>(5).unwrap().as_deref(), Some("main"));
 
@@ -551,7 +419,156 @@ mod tests {
         assert!(ev_cols.contains("event_type"), "session_event table must include event_type column");
 
         let migrations = list_applied_migrations(db.read_conn(), DatabaseBackend::Sqlite, &existing).await.unwrap();
-        assert_eq!(migrations.len(), 12);
+        assert_eq!(migrations.len(), 14);
+        assert!(!existing.contains("channel_event"));
+        assert!(!existing.contains("remote_config"));
+        assert!(!existing.contains("pull_event"));
+        db.close().await;
+    }
+
+    #[tokio::test]
+    async fn pre_unified_session_and_participants_db_upgrades_cleanly() {
+        use sea_orm_migration::MigratorTrait;
+        use vibevalley_protocol::{ExecutionPolicy, Landing, SessionController, SessionPermissionMode};
+
+        let dir = tempfile::tempdir().unwrap();
+        let db_path = dir.path().join("server.db");
+        let url = format!("sqlite://{}?mode=rwc", db_path.display());
+
+        let conn = SeaDatabase::connect(&url).await.unwrap();
+        // Apply migrations 1..=12 (before m20261128_100004) and recreate pre-9db84ff51 legacy state.
+        crate::db::migration::Migrator::up(&conn, Some(12)).await.unwrap();
+        conn.execute_unprepared(
+            "DROP TABLE channel_delivery;
+             CREATE TABLE channel_delivery (
+               id INTEGER PRIMARY KEY AUTOINCREMENT,
+               message_id TEXT NOT NULL REFERENCES channel_message (id) ON DELETE CASCADE,
+               channel_id TEXT NOT NULL REFERENCES channel (id) ON DELETE CASCADE,
+               recipient_kind TEXT NOT NULL CHECK (recipient_kind IN ('session', 'issue', 'orchestrator', 'direct')),
+               recipient_id TEXT NOT NULL,
+               reason TEXT NOT NULL CHECK (reason IN ('mention', 'everyone', 'own_thread', 'member', 'channel', 'direct', 'addressed')),
+               wakes INTEGER NOT NULL DEFAULT 0,
+               held_by TEXT CHECK (held_by IN ('hop_limit', 'cooldown')),
+               status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'delivered', 'withdrawn', 'failed')),
+               created_at INTEGER NOT NULL,
+               settled_at INTEGER,
+               UNIQUE (message_id, recipient_kind, recipient_id)
+             );
+             INSERT INTO session (id, controller, role, name, runtime, brief, policy, bindings, hired_at, runs, phase, departed)
+             VALUES
+               ('orchestrator', 'orchestrator', 'orchestrator', 'Orchestrator', 'vibevalley', '', '{\"kind\":\"sandboxDir\"}', '[]', 100, 1, '{\"_tag\":\"resting\"}', 0),
+               ('w-wt', 'issueBoard', 'worker', 'Worker', 'codex', 'ship it', '{\"kind\":\"managedWorktree\",\"repo\":\"vibevalley\",\"branch\":\"feat/x\"}', '[]', 110, 1, '{\"_tag\":\"done\"}', 0);
+             INSERT INTO issue (id, number, title, description, priority, deliver, delivered, created_at, mandate, blocked_by, criteria, checks, findings, questions, assignments)
+             VALUES ('i1', 1, 'Subtask', '', 'medium', 'change', 'merged_into_parent', 100, '{}', '[]', '[]', '[]', '[]', '[]', '[]');
+             INSERT INTO channel_participant (id, kind, name, agent_id, joined_at)
+             VALUES
+               ('user', 'user', '用户', NULL, 100),
+               ('user:self', 'user', '用户', NULL, 200),
+               ('orchestrator', 'agent', 'Orchestrator', NULL, 100),
+               ('profile:reviewer', 'agent', 'Reviewer', 'reviewer', 105);
+             INSERT INTO channel (id, type, is_default, created_at, name)
+             VALUES ('general', 'channel', 1, 100, 'general');
+             INSERT INTO channel (id, type, is_default, created_at, peer_id)
+             VALUES ('dm-rev', 'direct', 0, 106, 'profile:reviewer');
+             INSERT INTO channel_member (channel_id, participant_id, reason, from_number)
+             VALUES ('general', 'user', 'user', 1), ('general', 'orchestrator', 'manual', 0);
+             INSERT INTO channel_read_cursor (participant_id, channel_id, read_number, updated_at)
+             VALUES ('user', 'general', 5, 150);
+             INSERT INTO channel_message (id, channel_id, number, sender_id, kind, body, created_at, revision, reactions)
+             VALUES ('msg-1', 'general', 1, 'user', 'chat', 'hello @Orchestrator', 120, 1, '{\"👀\":[\"orchestrator\",\"user\",\"profile:reviewer\"]}');
+             INSERT INTO channel_delivery (message_id, channel_id, recipient_kind, recipient_id, reason, wakes, status, created_at, settled_at)
+             VALUES
+               ('msg-1', 'general', 'orchestrator', 'orchestrator', 'addressed', 1, 'delivered', 120, 121),
+               ('msg-1', 'general', 'issue', 'i1', 'own_thread', 1, 'delivered', 120, 121),
+               ('msg-1', 'general', 'direct', 'profile:reviewer', 'direct', 1, 'delivered', 120, 121);",
+        )
+        .await
+        .unwrap();
+        conn.close().await.unwrap();
+
+        let db = Database::open_at(&db_path)
+            .await
+            .expect("pre-unified alpha DB must migrate cleanly through m20261128_100004");
+
+        let orch_row = db
+            .read_conn()
+            .query_one_raw(Statement::from_string(
+                DatabaseBackend::Sqlite,
+                "SELECT controller, policy FROM session WHERE id = 'orchestrator'",
+            ))
+            .await
+            .unwrap()
+            .unwrap();
+        let ctrl: SessionController = serde_json::from_value(serde_json::Value::String(orch_row.try_get_by_index(0).unwrap())).unwrap();
+        assert_eq!(ctrl, SessionController::Daemon);
+
+        let wt_row = db
+            .read_conn()
+            .query_one_raw(Statement::from_string(DatabaseBackend::Sqlite, "SELECT policy FROM session WHERE id = 'w-wt'"))
+            .await
+            .unwrap()
+            .unwrap();
+        let wt_policy: ExecutionPolicy = serde_json::from_str(&wt_row.try_get_by_index::<String>(0).unwrap()).unwrap();
+        assert_eq!(
+            wt_policy,
+            ExecutionPolicy::DirectCwd {
+                repo: Some("vibevalley".into()),
+                permission_mode: SessionPermissionMode::Bypass,
+            }
+        );
+
+        let issue_row = db
+            .read_conn()
+            .query_one_raw(Statement::from_string(DatabaseBackend::Sqlite, "SELECT delivered FROM issue WHERE id = 'i1'"))
+            .await
+            .unwrap()
+            .unwrap();
+        let landing: Landing = serde_json::from_value(serde_json::Value::String(issue_row.try_get_by_index(0).unwrap())).unwrap();
+        assert_eq!(landing, Landing::Merged);
+
+        let cursor_row = db
+            .read_conn()
+            .query_one_raw(Statement::from_string(
+                DatabaseBackend::Sqlite,
+                "SELECT read_number FROM channel_read_cursor WHERE participant_id = 'user:self' AND channel_id = 'general'",
+            ))
+            .await
+            .unwrap()
+            .expect("legacy user read cursor migrated to user:self");
+        assert_eq!(cursor_row.try_get_by_index::<i64>(0).unwrap(), 5);
+
+        let legacy_participants = db
+            .read_conn()
+            .query_all_raw(Statement::from_string(
+                DatabaseBackend::Sqlite,
+                "SELECT id FROM channel_participant WHERE id = 'user' OR id LIKE 'profile:%'",
+            ))
+            .await
+            .unwrap();
+        assert!(legacy_participants.is_empty(), "legacy participant ids must be removed after migration");
+
+        let msg_row = db
+            .read_conn()
+            .query_one_raw(Statement::from_string(
+                DatabaseBackend::Sqlite,
+                "SELECT sender_id, reactions FROM channel_message WHERE id = 'msg-1'",
+            ))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(msg_row.try_get_by_index::<String>(0).unwrap(), "user:self");
+        let reactions = msg_row.try_get_by_index::<String>(1).unwrap();
+        assert!(reactions.contains("user:self") && reactions.contains("agent:reviewer"));
+
+        // Verify the rebuilt channel_delivery CHECK constraint accepts canonical ('user', 'agent', 'session') rows.
+        db.write_conn()
+            .execute_unprepared(
+                "INSERT INTO channel_delivery (message_id, channel_id, recipient_kind, recipient_id, reason, wakes, status, created_at)
+                 VALUES ('msg-1', 'general', 'user', 'self', 'mention', 1, 'pending', 300)",
+            )
+            .await
+            .expect("rebuilt channel_delivery table must accept recipient_kind = 'user'");
+
         db.close().await;
     }
 

@@ -78,8 +78,7 @@
           "lane": "in_progress",
           "cardKind": "issue",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         }
       },
       "schedule": {
@@ -101,9 +100,9 @@
         "runtime": "claude",
         "brief": "",
         "policy": {
-          "kind": "managedWorktree",
+          "kind": "directCwd",
           "repo": "~/vibevalley",
-          "branch": "issue-1-init"
+          "permissionMode": "bypass"
         },
         "bindings": [
           {

@@ -76,7 +76,6 @@ function Farm(props: { repo: string }) {
 function FarmHome() {
   const repos = useRepos();
   const list = () => ready(repos, undefined);
-  const enter = (name: string) => <Navigate href={farmRoute.build({ repo: name })} />;
   const known = () => {
     const last = lastFarm.get() ?? undefined;
     return last !== undefined && (list()?.some((p) => p.name === last) ?? true) ? last : undefined;
@@ -88,13 +87,13 @@ function FarmHome() {
         else={
           <If
             when={list()?.length === 0 || repos.status() === "error"}
-            else={<If when={list()}>{(all) => enter(untracked(() => sortRepos(all())[0]?.name ?? ""))}</If>}
+            else={<If when={list()}>{(all) => <Navigate href={farmRoute.build({ repo: sortRepos(all())[0]?.name ?? "" })} />}</If>}
           >
             <Farm repo="" />
           </If>
         }
       >
-        {(name) => enter(name())}
+        {(name) => <Navigate href={farmRoute.build({ repo: name() })} />}
       </If>
     </If>
   );

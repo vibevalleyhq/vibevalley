@@ -35,6 +35,12 @@ export interface NoteHandlers {
   readonly "note.base.upsertRow": (a: T.BaseUpsertRowRequest) => Promise<T.BaseViewSnapshot>;
   /** Runs an Agent Action column across selected or pending rows of a `base` note sheet. */
   readonly "note.base.runAgentColumn": (a: T.BaseRunAgentColumnRequest) => Promise<T.BaseRunAgentColumnResult>;
+  /** Upserts a non-destructive `MediaAnnotation` on a `doc` media/compare block or `media` note and optionally syncs its linked `base` row. */
+  readonly "note.annotation.upsert": (a: T.NoteAnnotationUpsertRequest) => Promise<T.NoteAnnotationMutationResult>;
+  /** Deletes a non-destructive `MediaAnnotation` from a `doc` media/compare block or `media` note. */
+  readonly "note.annotation.delete": (a: T.NoteAnnotationDeleteRequest) => Promise<T.NoteAnnotationMutationResult>;
+  /** Bidirectionally syncs `MediaAnnotation` pins in a `doc` note with an embedded `base` review checklist (creating one when absent). */
+  readonly "note.base.syncReview": (a: T.NoteReviewSyncRequest) => Promise<T.NoteReviewSyncResult>;
   /** All 4 consolidated note primitives (`doc`, `base`, `canvas`, `media`). */
   readonly "note.type.list": () => Promise<T.NoteTypeInfo[]>;
   /** A note primitive's SKILL.md guide or one of its named reference chapters. */
@@ -182,6 +188,27 @@ export const noteEndpoints: readonly Endpoint[] = [
     input: S.BaseRunAgentColumnRequest,
     result: S.BaseRunAgentColumnResult,
     can: ["user", "remote", "orchestrator"],
+  },
+  {
+    op: "note.annotation.upsert",
+    about: ["id"],
+    input: S.NoteAnnotationUpsertRequest,
+    result: S.NoteAnnotationMutationResult,
+    can: ["user", "remote", "orchestrator", "session"],
+  },
+  {
+    op: "note.annotation.delete",
+    about: ["id"],
+    input: S.NoteAnnotationDeleteRequest,
+    result: S.NoteAnnotationMutationResult,
+    can: ["user", "remote", "orchestrator", "session"],
+  },
+  {
+    op: "note.base.syncReview",
+    about: ["id"],
+    input: S.NoteReviewSyncRequest,
+    result: S.NoteReviewSyncResult,
+    can: ["user", "remote", "orchestrator", "session"],
   },
   {
     op: "note.type.list",

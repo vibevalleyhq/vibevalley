@@ -55,8 +55,8 @@
    "repo": "demo"
   },
   {
-   "branch": "main",
-   "kind": "managedWorktree",
+   "kind": "directCwd",
+   "permissionMode": "bypass",
    "repo": "demo"
   },
   {
@@ -294,7 +294,7 @@
     }
    ],
    "brief": "s748",
-   "controller": "orchestrator",
+   "controller": "daemon",
    "cwd": "s751",
    "hiredAt": 752,
    "id": "s744",
@@ -335,8 +335,8 @@
     "since": 770
    },
    "policy": {
-    "branch": "s750",
-    "kind": "managedWorktree",
+    "kind": "directCwd",
+    "permissionMode": "bypass",
     "repo": "s749"
    },
    "profile": "s746",
@@ -358,7 +358,7 @@
   {
    "bindings": [],
    "brief": "s779",
-   "controller": "orchestrator",
+   "controller": "daemon",
    "hiredAt": 780,
    "id": "s775",
    "name": "s776",
@@ -419,7 +419,7 @@
   "user",
   "issueBoard",
   "channel",
-  "orchestrator"
+  "daemon"
  ],
  "SessionEvent": [
   {
@@ -529,7 +529,7 @@
     }
    ],
    "brief": "s789",
-   "controller": "orchestrator",
+   "controller": "daemon",
    "cwd": "s792",
    "hiredAt": 793,
    "id": "s785",
@@ -572,8 +572,8 @@
    },
    "phaseText": "s817",
    "policy": {
-    "branch": "s791",
-    "kind": "managedWorktree",
+    "kind": "directCwd",
+    "permissionMode": "bypass",
     "repo": "s790"
    },
    "profile": "s787",
@@ -595,7 +595,7 @@
   {
    "bindings": [],
    "brief": "s822",
-   "controller": "orchestrator",
+   "controller": "daemon",
    "hiredAt": 823,
    "id": "s818",
    "name": "s819",

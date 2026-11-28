@@ -104,7 +104,7 @@ function MaterializedIssueBody(props: {
   };
 
   return (
-    <View testID="issue-body-collaborative" class="gap-1.5">
+    <View testID="issue-body-collaborative" class="w-full min-w-0 gap-1.5">
       <View class="flex-row items-center justify-between gap-2">
         <Text class="text-xs font-semibold text-muted">{props.sectionTitle}</Text>
         <A
@@ -234,7 +234,7 @@ export function IssueBodyEditor(props: IssueBodyEditorProps) {
   };
 
   return (
-    <View testID={props.testid} class={props.bordered === true ? "mt-5 border-t border-line pt-5" : undefined}>
+    <View testID={props.testid} class={`w-full min-w-0 ${props.bordered === true ? "mt-5 border-t border-line pt-5" : ""}`}>
       <If
         when={effectiveNoteId()}
         else={

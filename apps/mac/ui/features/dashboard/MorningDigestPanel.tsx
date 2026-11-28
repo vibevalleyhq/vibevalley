@@ -25,14 +25,14 @@ const backlogTriageQuery = defineQuery({
   ...retryRead,
 });
 
-function healthToneClasses(status: RepoHealthStatus): string {
+function healthToneClasses(status: RepoHealthStatus): { readonly box: string; readonly ink: string } {
   switch (status) {
     case "on_track":
-      return "bg-ok-soft text-ok-ink";
+      return { box: "bg-ok-soft", ink: "text-ok-ink" };
     case "at_risk":
-      return "bg-warn-soft text-warn-ink";
+      return { box: "bg-warn-soft", ink: "text-warn-ink" };
     case "off_track":
-      return "bg-bad-soft text-berry";
+      return { box: "bg-bad-soft", ink: "text-berry" };
   }
 }
 
@@ -70,10 +70,7 @@ function TriageSuggestionList(props: { suggestions: readonly BacklogTriageSugges
       <View class="gap-2">
         <Each of={props.suggestions} key={(s) => s.id}>
           {(s) => (
-            <View
-              testID={`triage-item-${s().id}`}
-              class="flex-row flex-wrap items-center justify-between gap-3 rounded-lg border border-line bg-page px-3 py-2.5"
-            >
+            <View testID={`triage-item-${s().id}`} class="flex-row flex-wrap items-center justify-between gap-3 rounded-lg bg-side px-3 py-2.5">
               <View class="min-w-0 flex-1 gap-0.5">
                 <A href={`/issues/${encodeURIComponent(s().issueId)}`} class="text-sm font-medium text-ink hover:underline">
                   {`#${s().issueNumber} ${s().issueTitle}`}
@@ -103,7 +100,7 @@ export function MorningDigestPanel() {
   const digest = computed<MorningDigest | undefined>(() => ready(query, undefined));
 
   return (
-    <View testID="dashboard-morning-digest" class="rounded-xl border border-line bg-elevated">
+    <View testID="dashboard-morning-digest" class="rounded-xl border border-line bg-page">
       <View class="flex-row flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-2.5">
         <View class="min-w-0 flex-1 gap-0.5">
           <View class="flex-row items-center gap-2">
@@ -160,24 +157,29 @@ export function MorningDigestPanel() {
               <View testID="digest-part-health" class="gap-1.5 border-t border-line pt-3">
                 <Text class="text-xs font-semibold text-ink">{t("web.issue.digest.healthTitle")}</Text>
                 <If when={d().repoHealth.length > 0} else={<Quiet>{t("web.issue.digest.emptyHealth")}</Quiet>}>
-                  <View class="gap-1.5">
+                  <View testID="digest-health-list">
                     <Each of={d().repoHealth} key={(h) => h.repo}>
-                      {(h) => (
-                        <A
-                          href={`/repos/${encodeURIComponent(h().repo)}`}
-                          class="flex-row flex-wrap items-center justify-between gap-2 rounded-lg border border-line bg-page px-3 py-2 hover:bg-hover"
-                        >
-                          <View class="min-w-0 flex-1 flex-row items-center gap-2">
-                            <Text class="text-sm font-medium text-ink">{h().repo}</Text>
-                            <View class={`rounded-sm px-1.5 py-0.5 ${healthToneClasses(h().status)}`}>
-                              <Text class="text-2xs font-medium">{t(`shared.repoHealth.${h().status}`)}</Text>
-                            </View>
+                      {(h, i) => {
+                        const tone = () => healthToneClasses(h().status);
+                        return (
+                          <View class={i() > 0 ? "border-t border-line" : ""}>
+                            <A
+                              href={`/repos/${encodeURIComponent(h().repo)}`}
+                              class="-mx-2 flex-row flex-wrap items-center justify-between gap-2 rounded-md px-2 py-2 hover:bg-hover"
+                            >
+                              <View class="min-w-0 flex-1 flex-row items-center gap-2">
+                                <Text class="text-sm font-medium text-ink">{h().repo}</Text>
+                                <View class={`rounded-sm px-1.5 py-0.5 ${tone().box}`}>
+                                  <Text class={`text-2xs font-medium ${tone().ink}`}>{t(`shared.repoHealth.${h().status}`)}</Text>
+                                </View>
+                              </View>
+                              <If when={h().status !== "on_track" && h().reasons.length > 0}>
+                                <Text class="truncate text-xs text-muted">{list(h().reasons.map((r) => t(`shared.repoHealthReason.${r}`)))}</Text>
+                              </If>
+                            </A>
                           </View>
-                          <If when={h().status !== "on_track" && h().reasons.length > 0}>
-                            <Text class="truncate text-xs text-muted">{list(h().reasons.map((r) => t(`shared.repoHealthReason.${r}`)))}</Text>
-                          </If>
-                        </A>
-                      )}
+                        );
+                      }}
                     </Each>
                   </View>
                 </If>

@@ -1,20 +1,20 @@
 //! Shallow composition root (`create_app`, `App`) assembling the
-//! server bottom-up from [`Context`] + [`Service`] and flat domain modules.
+//! server bottom-up from [`Context`] + [`Service`], deep domain capability modules,
+//! and the L4 [`Orchestration`] workflow layer.
 
+use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
-use std::sync::{Arc, OnceLock};
 
-use crate::agent::{Agent, AgentDriver, Mcp, Memory, Orchestrator, OrchestratorParts, PendingExecution, Profile, Resource, ToolRegistry};
+use crate::agent::{Agent, AgentAssemblyParts, AgentDriver, Memory, PendingExecution, Profile};
 pub use crate::boot::Overrides;
 use crate::boot::{
-    LazyCronOrchestrator, apply_env_overrides, build_runtimes, open_context, register_session_reported_outbox, seat_orchestrators_and_watch,
-    seed_starter_issues_on_boot, spawn_chat_note_bridge, spawn_skin_event_bridge,
+    apply_env_overrides, build_runtimes, open_context, register_session_reported_outbox, seat_orchestrators_and_watch, seed_starter_issues_on_boot,
+    spawn_skin_event_bridge,
 };
 use crate::channel::Chat;
 use crate::config::failed;
 pub use crate::config::{Config, StartError, StartErrorKind};
 use crate::connector::Connector;
-use crate::context::port::{CronOrchestratorPort, MemoryRecallPort};
 use crate::context::{Context, install_tls};
 use crate::cron::Scheduler as CronScheduler;
 use crate::debug::DebugKit;
@@ -22,9 +22,10 @@ use crate::debug_sources::build_debug_kit;
 use crate::game::Game;
 use crate::gateway::api::{GatewayMeta, GatewayPorts, Server};
 use crate::gateway::remote::Remote;
-use crate::issue::{Board, IssueChat, Pull, SessionChat};
+use crate::issue::{Board, Pull};
 use crate::machine::Machine;
 use crate::note::Manager as NoteManager;
+use crate::orchestration::{IssueChat, Orchestration, OrchestrationParts, SessionChat};
 use crate::projection::finish_boot_and_start_feeds;
 use crate::provider::Provider;
 use crate::repo::Repo;
@@ -56,6 +57,7 @@ pub struct TestInternals<'a> {
     pub connector: &'a Arc<Connector>,
     pub cron: &'a Arc<CronScheduler>,
     pub voice: &'a Arc<Voice>,
+    pub orchestration: &'a Arc<Orchestration>,
     pub machine: &'a Arc<Machine>,
     pub remote: &'a Arc<Remote>,
     pub debug: &'a Arc<DebugKit>,
@@ -98,14 +100,15 @@ impl App {
             runtime: &c.runtime,
             board: &c.board,
             pull: &c.pull,
-            issue_chat: &c.issue_chat,
-            session_chat: &c.session_chat,
+            issue_chat: &c.orchestration.issue_chat,
+            session_chat: &c.orchestration.session_chat,
             agent: &c.agent,
             note: &c.note,
             channel: &c.channel,
             connector: &c.connector,
             cron: &c.cron,
             voice: &c.voice,
+            orchestration: &c.orchestration,
             machine: &c.machine,
             remote: &self.router.remote,
             debug: &c.debug,
@@ -183,7 +186,7 @@ async fn create_app_inner(mut config: Config, storage_config: StorageConfig, ove
     ))
     .await
     .map_err(|e| failed("the profiles")(&e))?;
-    let remote = Box::pin(Remote::open(ctx.clone(), config.version.clone()))
+    let remote = Box::pin(Remote::open(ctx.clone(), setting.clone(), config.version.clone()))
         .await
         .map_err(|e| failed("remote access")(&e.message))?;
 
@@ -195,16 +198,9 @@ async fn create_app_inner(mut config: Config, storage_config: StorageConfig, ove
         .map_err(|e| failed("the chat")(&e.message))?;
     Box::pin(seat_orchestrators_and_watch(&ctx, &profile, &channel)).await;
 
-    let chat_msg_rx = spawn_chat_note_bridge(&ctx, &channel);
-    let note = Box::pin(NoteManager::open_async(
-        ctx.clone(),
-        setting.clone(),
-        storage.clone(),
-        channel.clone(),
-        Some(chat_msg_rx),
-    ))
-    .await
-    .map_err(|e| failed("notes")(&e.message))?;
+    let note = Box::pin(NoteManager::open_async(ctx.clone(), setting.clone(), storage.clone()))
+        .await
+        .map_err(|e| failed("notes")(&e.message))?;
 
     let repo = Box::pin(Repo::open_with_setting_async(
         &config.work_root,
@@ -217,15 +213,15 @@ async fn create_app_inner(mut config: Config, storage_config: StorageConfig, ove
         repo.probe_in_context(&ctx);
     }
     let board_config = RuntimeConfig {
-        worktrees_dir: config.work_root.join("worktrees"),
         data_dir: config.home.join("issues"),
         repos_dir: Some(config.work_root.join("repos")),
         repo: Some(repo.clone()),
         ..RuntimeConfig::under(&config.home)
     };
 
-    let drivers: Arc<dyn SessionDriver> = Arc::new(AgentDriver::new(profile.clone(), Some(memory.clone() as Arc<dyn MemoryRecallPort>)));
-    let (runtime, opened) = Box::pin(Runtime::open_async(ctx.clone(), drivers, board_config))
+    let drivers: Arc<dyn SessionDriver> = Arc::new(AgentDriver::new(profile.clone(), Some(memory.clone())));
+    let paused_issues = Board::paused_issue_ids_async(&ctx).await.map_err(|e| failed("the board")(&e))?;
+    let (runtime, opened) = Box::pin(Runtime::open_with_paused_async(ctx.clone(), drivers, board_config, &paused_issues))
         .await
         .map_err(|e| failed("the runtime")(&e))?;
     let board = Box::pin(Board::with_storage(
@@ -233,7 +229,6 @@ async fn create_app_inner(mut config: Config, storage_config: StorageConfig, ove
         runtime.clone(),
         opened,
         Some(repo.clone()),
-        Some(channel.clone()),
         Some(storage.clone()),
     ))
     .await
@@ -245,79 +240,68 @@ async fn create_app_inner(mut config: Config, storage_config: StorageConfig, ove
         .map_err(|e| failed("the pulls")(&e.message))?;
     pull.start_poller(config.poll_pulls);
 
-    let issue_chat = IssueChat::start(ctx.clone(), board.clone(), channel.clone());
-    let session_chat = SessionChat::start(ctx.clone(), board.clone(), channel.clone(), Some(issue_chat.clone()));
-
-    let cron_orch_slot = Arc::new(OnceLock::<Arc<dyn CronOrchestratorPort>>::new());
-    let cron_orchestrator = config
-        .orchestrator_listens
-        .then(|| Arc::new(LazyCronOrchestrator(cron_orch_slot.clone())) as Arc<dyn CronOrchestratorPort>);
-    let cron = CronScheduler::open_async(ctx.clone(), board.clone(), profile.clone(), Some(channel.clone()), cron_orchestrator)
-        .await
-        .map_err(|e| failed("the crons")(&e.message))?;
-
-    let resource = Resource::with_pull(ctx.clone(), channel.clone(), runtime.clone(), pull.clone());
-    let tool = Arc::new(ToolRegistry {
-        ctx: ctx.clone(),
-        resource: resource.clone(),
-        cron: cron.clone(),
-        profile: profile.clone(),
-        memory: memory.clone(),
-        issue: board.clone(),
-        runtime: runtime.clone(),
-        repo: repo.clone(),
-        chat: channel.clone(),
-        pull: pull.clone(),
-        note: note.clone(),
-        storage: storage.clone(),
-        repos_root: repo.root().to_path_buf(),
-    });
-    let mcp = Mcp::with_home(tool.clone(), config.version.clone(), config.home.clone());
-
-    let key = setting.clone();
-    let orchestrator = Box::pin(Orchestrator::open_async(OrchestratorParts {
-        ctx: ctx.clone(),
-        pending_execution: Some(pending_execution),
-        permissions: config.tool_permissions.clone(),
-        tool: tool.clone(),
-        profile: profile.clone(),
-        chat: channel.clone(),
-        issue: board.clone(),
-        runtime: runtime.clone(),
-        repo: repo.clone(),
-        memory: memory.clone(),
-        note: note.clone(),
-        home: config.home.clone(),
-        key: Arc::new(move || key.deepseek_api_key()),
-        client: config.model_client.clone(),
-        listen_chat: config.orchestrator_listens,
-    }))
-    .await
-    .map_err(|e| failed("durable execution")(&e))?;
-    orchestrator.start_inbox_observer().await.map_err(|e| failed("durable projection")(&e))?;
-    if config.orchestrator_listens {
-        let _ = cron_orch_slot.set(orchestrator.clone() as Arc<dyn CronOrchestratorPort>);
-    }
-    cron.start_ticker(config.tick_crons);
-
-    let agent = Agent::new(profile, memory, mcp.clone(), resource, tool, orchestrator);
+    let cron = CronScheduler::open_async(ctx.clone()).await.map_err(|e| failed("the crons")(&e.message))?;
     let voice = Voice::open(VoiceParts {
         ctx: ctx.clone(),
         setting: setting.clone(),
-        chat: channel.clone(),
-        orchestrator: agent.orchestrator.clone(),
         realtime: overrides.voice_realtime,
         transcriber: overrides.voice_transcriber,
     });
-    let connector = Connector::open_async(ctx.clone(), setting.clone(), channel.clone(), overrides.connector.unwrap_or_default())
-        .await
-        .map_err(|e| failed("the connectors")(&e.message))?;
-    connector.attach_actions(board.clone(), runtime.clone());
+
+    let agent = Box::pin(Agent::assemble_async(AgentAssemblyParts {
+        ctx: ctx.clone(),
+        setting: setting.clone(),
+        profile: profile.clone(),
+        memory,
+        channel: channel.clone(),
+        board: board.clone(),
+        runtime: runtime.clone(),
+        repo: repo.clone(),
+        pull: pull.clone(),
+        cron: cron.clone(),
+        note: note.clone(),
+        storage: storage.clone(),
+        pending_execution,
+        permissions: config.tool_permissions.clone(),
+        home: config.home.clone(),
+        version: config.version.clone(),
+        model_client: config.model_client.clone(),
+    }))
+    .await
+    .map_err(|(what, e)| failed(what)(&e))?;
+
+    let (orchestration, connector) = Box::pin(Orchestration::start_async(OrchestrationParts {
+        ctx: ctx.clone(),
+        setting: setting.clone(),
+        channel: channel.clone(),
+        board: board.clone(),
+        runtime: runtime.clone(),
+        cron: cron.clone(),
+        pull: pull.clone(),
+        note: note.clone(),
+        voice: voice.clone(),
+        profile,
+        orchestrator: agent.orchestrator.clone(),
+        orchestrator_listens: config.orchestrator_listens,
+        tick_crons: config.tick_crons,
+        connector_options: overrides.connector.unwrap_or_default(),
+        connector_notify: overrides.connector_notify.unwrap_or_default(),
+    }))
+    .await
+    .map_err(|e| failed("the connectors")(&e.message))?;
 
     let game = Game::open_async(&config.home, ctx.clone(), repo.clone()).await;
     game.count_commits(config.git_emails.clone());
     spawn_skin_event_bridge(&ctx, &game, &runtime, &channel).await;
-    register_session_reported_outbox(&ctx, &issue_chat, &session_chat, &agent, &game, &runtime, &connector, &cron);
+    register_session_reported_outbox(
+        &ctx,
+        &orchestration.issue_chat,
+        &orchestration.session_chat,
+        &agent,
+        &game,
+        &runtime,
+        &orchestration.connector,
+    );
 
     let debug = build_debug_kit(
         &ctx,
@@ -339,11 +323,11 @@ async fn create_app_inner(mut config: Config, storage_config: StorageConfig, ove
     );
 
     let ports = GatewayPorts {
-        mcp: Some(mcp),
+        mcp: Some(agent.mcp.clone()),
         remote: Some(remote.clone()),
         machine: Some(machine.bus()),
         media_input: Some(storage.clone()),
-        voice: Some(voice.clone()),
+        voice: Some(orchestration.voice.clone()),
         speech: Some(note.speech_streams()),
     };
     let core = Arc::new(AppCore {
@@ -357,14 +341,13 @@ async fn create_app_inner(mut config: Config, storage_config: StorageConfig, ove
         runtime,
         board,
         pull,
-        issue_chat,
-        session_chat,
         agent,
         note,
         channel,
         connector,
         cron,
         voice,
+        orchestration,
         machine,
         debug,
         game,
@@ -375,7 +358,7 @@ async fn create_app_inner(mut config: Config, storage_config: StorageConfig, ove
     let router = Router::new(core.clone(), remote.clone(), gw);
 
     finish_boot_and_start_feeds(&core.ctx, &core.board, &core.channel, &core.cron, &core.note, &core.game, &core.repo);
-    crate::router::note::backfill_issue_bodies_async(&core).await;
+    core.orchestration.note.backfill_issue_bodies_async().await;
     core.ctx.feed.flush().await;
     core.board.refresh_queue_async().await.map_err(|e| failed("the queue")(&e))?;
     remote.restore_if_enabled_async(router.clone()).await;

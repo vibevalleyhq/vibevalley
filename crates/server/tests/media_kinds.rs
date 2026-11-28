@@ -171,11 +171,11 @@ fn understanding(id: &str, revision: i64, input: &str, prompt: &str) -> Value {
 }
 type Tools = (
     Vec<Box<dyn vibevalley_runtime::agent::Tool>>,
-    Arc<parking_lot::Mutex<vibevalley_server::agent::tool::Route>>,
+    Arc<arc_swap::ArcSwap<vibevalley_server::agent::tool::Route>>,
 );
 fn tools(s: &App, channel: &str) -> Tools {
     use vibevalley_server::agent::tool::{Route, held};
-    let route = Arc::new(parking_lot::Mutex::new(Route {
+    let route = Arc::new(arc_swap::ArcSwap::from_pointee(Route {
         agent: "orchestrator".into(),
         channel: channel.into(),
         ..Route::default()
@@ -505,10 +505,18 @@ fn an_orchestrator_makes_audio_and_starts_understanding_only_with_the_users_word
     let tool = |name: &str| tools.iter().find(|t| t.spec().name == name).unwrap();
     let start = tool("media_understanding_start");
     assert!(vibevalley_runtime::rt::block_on(start.execute(&json!({"id":"look"}))).is_error);
-    route.lock().user = true;
+    route.rcu(|r| {
+        let mut next = (**r).clone();
+        next.user = true;
+        next
+    });
     assert!(vibevalley_runtime::rt::block_on(start.execute(&json!({"id":"look"}))).is_error);
     assert_eq!(ok(&s, "media.job.get", json!({"id":"look"}))["phase"], "authorized");
-    route.lock().channel = channel.clone();
+    route.rcu(|r| {
+        let mut next = (**r).clone();
+        next.channel = channel.clone();
+        next
+    });
     let started = vibevalley_runtime::rt::block_on(start.execute(&json!({"id":"look"})));
     assert!(!started.is_error, "{}", started.text);
     let done = until(&s, "look", "ready and cleaned", |j| j["phase"] == "ready" && j["cleanup"] == "done");
@@ -527,9 +535,17 @@ fn an_orchestrator_makes_audio_and_starts_understanding_only_with_the_users_word
     assert_eq!(ok(&s, "media.job.get", json!({"id":"withdrawn"}))["phase"], "canceled");
 
     let talk = tool("media_dialogue_create");
-    route.lock().user = false;
+    route.rcu(|r| {
+        let mut next = (**r).clone();
+        next.user = false;
+        next
+    });
     assert!(vibevalley_runtime::rt::block_on(talk.execute(&dialogue("talk", revision, "Hello there."))).is_error);
-    route.lock().user = true;
+    route.rcu(|r| {
+        let mut next = (**r).clone();
+        next.user = true;
+        next
+    });
     let asked = vibevalley_runtime::rt::block_on(talk.execute(&dialogue("talk", revision, "Hello there.")));
     assert!(!asked.is_error, "{}", asked.text);
     assert_eq!(wait(&s, "talk", "ready")["source"]["kind"], "orchestrator");

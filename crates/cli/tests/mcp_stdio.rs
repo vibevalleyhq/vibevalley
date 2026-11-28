@@ -166,6 +166,7 @@ impl MockIssueState {
             deliver: req.deliver.unwrap_or(Deliverable::Change),
             reviewed_at: None,
             delivery_evidence: None,
+            delivery_receipt: None,
             findings: Vec::new(),
             questions: Vec::new(),
             criteria: req.criteria.unwrap_or_default(),
@@ -268,6 +269,9 @@ async fn handle_issue_update(State(state): State<MockIssueState>, axum::Json(inp
     if let Some(owner) = input.owner {
         issue.owner = if owner.id().trim().is_empty() { None } else { Some(owner) };
     }
+    if let Some(receipt) = input.delivery_receipt {
+        issue.delivery_receipt = Some(receipt);
+    }
     ok_envelope(AppliedIssue::from_issue(issue.clone(), 2)).into_response()
 }
 
@@ -290,6 +294,12 @@ async fn handle_issue_status_update(State(state): State<MockIssueState>, axum::J
         if let Some(owner) = edit.owner {
             issue.owner = if owner.id().trim().is_empty() { None } else { Some(owner) };
         }
+        if let Some(receipt) = edit.delivery_receipt {
+            issue.delivery_receipt = Some(receipt);
+        }
+    }
+    if let Some(receipt) = input.delivery_receipt {
+        issue.delivery_receipt = Some(receipt);
     }
     issue.status = input.status;
     ok_envelope(AppliedIssue::from_issue(issue.clone(), 3)).into_response()

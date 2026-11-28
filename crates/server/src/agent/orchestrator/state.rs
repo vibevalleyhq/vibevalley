@@ -6,8 +6,6 @@ use std::sync::{Arc, Weak};
 use arc_swap::ArcSwap;
 use parking_lot::Mutex;
 use tokio::sync::{Notify, mpsc};
-use tokio::task::JoinHandle as TaskHandle;
-use tokio_util::sync::CancellationToken;
 use vibevalley_core::SliceMask;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{ExecutionPolicy, NoticeLevel, ORCHESTRATOR_RUNTIME, Session, SessionController};
@@ -31,11 +29,13 @@ use crate::runtime::Runtime;
 const DEFAULT_MODEL: &str = "deepseek-flash";
 const SKILLS: include_dir::Dir = include_dir::include_dir!("$CARGO_MANIFEST_DIR/assets/orchestrator/skills");
 
+const REPLY_PORT_CAPACITY: usize = 64;
+
 /// A live answer: the turn's words as they are said, ending with the turn.
 /// Dropped, it stops waiting.
 pub struct Reply {
     pub(super) id: String,
-    pub(super) words: mpsc::UnboundedReceiver<String>,
+    pub(super) words: mpsc::Receiver<String>,
     pub(super) orchestrator: Weak<Orchestrator>,
 }
 
@@ -58,9 +58,16 @@ impl Reply {
 impl Drop for Reply {
     fn drop(&mut self) {
         if let Some(o) = self.orchestrator.upgrade() {
-            o.ports.lock().remove(&self.id);
+            o.state.lock().ports.remove(&self.id);
         }
     }
+}
+
+#[derive(Default)]
+pub(super) struct OrchestratorState {
+    pub(super) instances: HashMap<String, Arc<Instance>>,
+    /// The live answers not yet taken by a turn.
+    pub(super) ports: HashMap<String, mpsc::Sender<String>>,
 }
 
 pub struct Orchestrator {
@@ -77,12 +84,9 @@ pub struct Orchestrator {
     pub(super) home: PathBuf,
     pub(super) key: Arc<dyn Fn() -> Option<String> + Send + Sync>,
     pub(super) client: Option<Arc<dyn ModelClient>>,
-    pub(super) instances: Mutex<HashMap<String, Arc<Instance>>>,
+    pub(super) state: Mutex<OrchestratorState>,
     pub execution: Execution,
     pub(super) mcp: mcp::ProfileServers,
-    /// The live answers not yet taken by a turn.
-    pub(super) ports: Mutex<HashMap<String, mpsc::UnboundedSender<String>>>,
-    pub(super) chat_listener: Mutex<Option<(CancellationToken, TaskHandle<()>)>>,
     pub(super) closed: AtomicBool,
 }
 
@@ -104,8 +108,6 @@ pub struct Parts {
     pub key: Arc<dyn Fn() -> Option<String> + Send + Sync>,
     /// Talks to this model instead of DeepSeek (tests).
     pub client: Option<Arc<dyn ModelClient>>,
-    /// Whether to start listening to orchestrator-targeted dispatches from `chat` on open.
-    pub listen_chat: bool,
 }
 
 impl Orchestrator {
@@ -145,16 +147,10 @@ impl Orchestrator {
         let session = match kept {
             Some(k) => Session { name, ..k },
             None => {
-                let mut s = Session::new(
-                    &a.id,
-                    SessionController::Orchestrator,
-                    name,
-                    ORCHESTRATOR_RUNTIME,
-                    ExecutionPolicy::SandboxDir,
-                    at,
-                );
+                let mut s = Session::new(&a.id, SessionController::Daemon, name, ORCHESTRATOR_RUNTIME, ExecutionPolicy::SandboxDir, at);
                 s.profile = Some(a.id.clone());
                 s.brief = a.duty.clone();
+                s.cwd = None;
                 s
             }
         };
@@ -173,41 +169,40 @@ impl Orchestrator {
         }
     }
 
-    pub(super) fn route_of(&self, id: &str) -> Arc<Mutex<Route>> {
-        if let Some(i) = self.instances.lock().get(id) {
+    pub(super) fn route_of(&self, id: &str) -> Arc<ArcSwap<Route>> {
+        if let Some(i) = self.state.lock().instances.get(id) {
             return i.route.clone();
         }
-        Arc::new(Mutex::new(Route {
+        Arc::new(ArcSwap::from_pointee(Route {
             channel: self.chat.default_channel(),
             ..Route::default()
         }))
     }
 
     pub(super) fn get_or_insert_instance(&self, id: &str) -> (Arc<Instance>, bool) {
-        let mut all = self.instances.lock();
-        if let Some(i) = all.get(id) {
+        let mut state = self.state.lock();
+        if let Some(i) = state.instances.get(id) {
             return (i.clone(), false);
         }
         let me = Arc::new(Instance {
             id: id.to_string(),
             pending: AtomicBool::new(false),
             more: Arc::new(Notify::new()),
-            route: Arc::new(Mutex::new(Route {
+            route: Arc::new(ArcSwap::from_pointee(Route {
                 channel: self.chat.default_channel(),
                 ..Route::default()
             })),
             shown: ArcSwap::from_pointee(String::new()),
-            cannot: Default::default(),
-            news: Default::default(),
+            state: Mutex::default(),
         });
-        all.insert(id.to_string(), me.clone());
+        state.instances.insert(id.to_string(), me.clone());
         (me, true)
     }
 
     pub(super) fn open_port(self: &Arc<Self>) -> Reply {
         let id = uuid::Uuid::new_v4().to_string();
-        let (tx, words) = mpsc::unbounded_channel();
-        self.ports.lock().insert(id.clone(), tx);
+        let (tx, words) = mpsc::channel(REPLY_PORT_CAPACITY);
+        self.state.lock().ports.insert(id.clone(), tx);
         Reply {
             id,
             words,
@@ -218,7 +213,7 @@ impl Orchestrator {
     /// `stop`: ends its turn under way and drops what waits for it.
     pub async fn stop_async(&self, agent: Option<&str>) {
         let id = self.target(agent);
-        let Some(me) = self.instances.lock().get(&id).cloned() else { return };
+        let Some(me) = self.state.lock().instances.get(&id).cloned() else { return };
         me.pending.store(false, Ordering::SeqCst);
         let _ = self.execution.stop_async(&id).await;
     }

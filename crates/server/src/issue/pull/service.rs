@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -12,108 +11,15 @@ use super::publish::{self, HostRun, HostRunner, HostedRepo, Publisher, hosted_or
 use super::snapshot::{self, GitHubPullSnapshot};
 use crate::context::error::refused as refuse;
 use crate::context::{Context, now};
-use crate::log::spawn_blocking_traced;
 use crate::repo::Repo;
 use crate::service::internal_db;
 use crate::service::issue::{KnownPullEvent, PullRecord, UpsertPullInput};
 
 pub(super) const DEFAULT_POLL_SECONDS: u64 = 180;
 
-fn prefers_for_issue(candidate: &PullRecord, current: &PullRecord) -> bool {
-    let cand_open = candidate.state == PullRequestState::Open;
-    let curr_open = current.state == PullRequestState::Open;
-    if cand_open != curr_open {
-        return cand_open;
-    }
-    if candidate.updated_at != current.updated_at {
-        return candidate.updated_at > current.updated_at;
-    }
-    candidate.number >= current.number
-}
-
-/// Synchronous in-memory index of tracked pull requests for fast issue projection.
-#[derive(Default)]
-pub struct PullIndex {
-    by_id: HashMap<String, PullRecord>,
-    by_repo_number: HashMap<(String, i64), PullRecord>,
-    by_issue: HashMap<String, PullRecord>,
-}
-
-impl PullIndex {
-    pub fn load(&mut self, rows: Vec<PullRecord>) {
-        self.by_id.clear();
-        self.by_repo_number.clear();
-        self.by_issue.clear();
-        for row in rows {
-            self.put(row);
-        }
-    }
-
-    pub fn put(&mut self, next: PullRecord) -> PullRecord {
-        let previous = self.by_id.get(&next.id).cloned();
-        if let Some(prev) = &previous {
-            self.by_repo_number.remove(&(prev.repo.clone(), prev.number));
-        }
-        self.by_id.insert(next.id.clone(), next.clone());
-        self.by_repo_number.insert((next.repo.clone(), next.number), next.clone());
-        if let Some(prev_issue) = previous.as_ref().and_then(|p| p.issue_id.as_deref())
-            && next.issue_id.as_deref() != Some(prev_issue)
-        {
-            self.recompute_issue(prev_issue);
-        }
-        if let Some(issue_id) = next.issue_id.as_deref() {
-            self.recompute_issue(issue_id);
-        }
-        next
-    }
-
-    fn recompute_issue(&mut self, issue_id: &str) {
-        let mut best: Option<&PullRecord> = None;
-        for item in self.by_id.values() {
-            if item.issue_id.as_deref() != Some(issue_id) {
-                continue;
-            }
-            if best.is_none_or(|curr| prefers_for_issue(item, curr)) {
-                best = Some(item);
-            }
-        }
-        if let Some(best) = best.cloned() {
-            self.by_issue.insert(issue_id.into(), best);
-        } else {
-            self.by_issue.remove(issue_id);
-        }
-    }
-
-    pub fn of_issue(&self, issue_id: &str) -> Option<PullRequest> {
-        let found = self.by_issue.get(issue_id)?;
-        Some(PullRequest {
-            url: found.url.clone(),
-            number: found.number,
-            state: found.state,
-        })
-    }
-
-    pub fn find(&self, repo: &str, number: i64) -> Option<PullRecord> {
-        self.by_repo_number.get(&(repo.into(), number)).cloned()
-    }
-
-    pub fn all(&self) -> Vec<PullRecord> {
-        let mut items: Vec<PullRecord> = self.by_id.values().cloned().collect();
-        items.sort_by(|a, b| a.created_at.cmp(&b.created_at).then_with(|| a.id.cmp(&b.id)));
-        items
-    }
-
-    pub fn active(&self) -> Vec<PullRecord> {
-        let mut items: Vec<PullRecord> = self.by_id.values().filter(|item| item.state == PullRequestState::Open).cloned().collect();
-        items.sort_by(|a, b| a.created_at.cmp(&b.created_at).then_with(|| a.id.cmp(&b.id)));
-        items
-    }
-}
-
 /// Pull request tracking, publishing, and polling service.
 pub struct Pull {
     pub(super) ctx: Arc<Context>,
-    index: Arc<Mutex<PullIndex>>,
     pub(crate) publisher: Arc<Publisher>,
     pub(crate) repos: Option<Arc<Repo>>,
     pub(crate) board: Option<Arc<Board>>,
@@ -126,8 +32,7 @@ pub struct Pull {
 }
 
 impl Pull {
-    /// Loads tracked pull requests from `ctx.service.issue` and wires
-    /// `Issue.pull_request` projection onto `board` when present.
+    /// Constructs a pull request tracking service backed by `ctx.service.issue`.
     pub async fn open_async(
         ctx: Arc<Context>,
         publisher: Arc<Publisher>,
@@ -136,17 +41,8 @@ impl Pull {
         gh: Option<HostRun>,
         glab: Option<HostRun>,
     ) -> Result<Arc<Pull>, ApiError> {
-        let rows = ctx.service.issue.list_pulls().await.map_err(internal_db)?;
-        let mut idx = PullIndex::default();
-        idx.load(rows);
-        let index = Arc::new(Mutex::new(idx));
-        if let Some(board) = &board {
-            let idx = index.clone();
-            board.use_pull_of_issue_async(Arc::new(move |issue_id| idx.lock().of_issue(issue_id))).await;
-        }
         Ok(Arc::new(Pull {
             ctx,
-            index,
             publisher,
             repos,
             board,
@@ -168,41 +64,37 @@ impl Pull {
         }
     }
 
-    pub fn of_issue(&self, issue_id: &str) -> Option<PullRequest> {
-        self.index.lock().of_issue(issue_id)
+    pub async fn of_issue_async(&self, issue_id: &str) -> Result<Option<PullRequest>, ApiError> {
+        self.ctx.service.issue.pull_of_issue(issue_id).await.map_err(internal_db)
     }
 
-    pub fn find(&self, repo: &str, number: i64) -> Option<PullRecord> {
-        self.index.lock().find(repo, number)
+    pub async fn find_async(&self, repo: &str, number: i64) -> Option<PullRecord> {
+        self.ctx.service.issue.find_pull(repo, number).await.ok().flatten()
     }
 
-    pub fn list(&self) -> Vec<PullRecord> {
-        self.index.lock().all()
+    pub async fn list_async(&self) -> Result<Vec<PullRecord>, ApiError> {
+        self.ctx.service.issue.list_pulls().await.map_err(internal_db)
     }
 
-    pub fn open_pulls(&self) -> Vec<PullRecord> {
-        self.index.lock().active()
+    pub async fn open_pulls_async(&self) -> Vec<PullRecord> {
+        self.ctx.service.issue.open_pulls().await.unwrap_or_default()
     }
 
     pub async fn upsert_async(&self, input: UpsertPullInput) -> Result<PullRecord, ApiError> {
-        let record = self.ctx.service.issue.upsert_pull(input).await.map_err(internal_db)?;
-        Ok(self.index.lock().put(record))
+        self.ctx.service.issue.upsert_pull(input).await.map_err(internal_db)
     }
 
     pub async fn set_state_async(&self, id: &str, state: PullRequestState, at: i64) -> Result<PullRecord, ApiError> {
-        let record = self.ctx.service.issue.set_pull_state(id, state, at).await.map_err(internal_db)?;
-        Ok(self.index.lock().put(record))
+        self.ctx.service.issue.set_pull_state(id, state, at).await.map_err(internal_db)
     }
 
     pub async fn observe_checks_async(&self, id: &str, fingerprint: &str, revision: i64, at: i64) -> Result<PullRecord, ApiError> {
-        let record = self
-            .ctx
+        self.ctx
             .service
             .issue
             .observe_pull_checks(id, fingerprint, revision, at)
             .await
-            .map_err(internal_db)?;
-        Ok(self.index.lock().put(record))
+            .map_err(internal_db)
     }
 
     pub async fn known_events_async(&self, pull_id: &str) -> Result<Vec<KnownPullEvent>, ApiError> {
@@ -220,19 +112,7 @@ impl Pull {
 
     async fn infer_farm_repo_async(&self, cwd: &str) -> Option<String> {
         let repos = self.repos.clone()?;
-        let discovered_root = vibevalley_git::Repo::discover_async(Path::new(cwd))
-            .await
-            .ok()
-            .flatten()
-            .map(|r| r.root().to_path_buf())?;
-        let root_real = tokio::fs::canonicalize(&discovered_root).await.ok()?;
-        let listed = repos.list_async().await;
-        for p in listed {
-            if tokio::fs::canonicalize(&p.path).await.ok().as_ref() == Some(&root_real) {
-                return Some(p.name);
-            }
-        }
-        None
+        repos.infer_name_for_dir_async(Path::new(cwd)).await
     }
 
     pub(crate) async fn hosted_repo_of_async(&self, name: &str, platform: Option<PublishPlatform>) -> Result<HostedRepo, ApiError> {
@@ -248,24 +128,17 @@ impl Pull {
             .repos
             .clone()
             .ok_or_else(|| refuse(BizCode::RepoRefused, t("server.repo.github.notGithub", &[])))?;
-        let listed = repos.list_async().await;
-        let name = name.to_string();
-        spawn_blocking_traced(move || {
-            let found = listed
-                .into_iter()
-                .find(|p| p.name == name)
-                .ok_or_else(|| refuse(BizCode::RepoRefused, t("server.repo.github.notGithub", &[])))?;
-            let origin = vibevalley_git::read::remote_url(&found.path, "origin").ok().flatten().unwrap_or_default();
-            let hosted = hosted_origin(&origin).ok_or_else(|| refuse(BizCode::RepoRefused, t("server.repo.github.notGithub", &[])))?;
-            if let Some(want) = platform
-                && hosted.platform != want
-            {
-                return Err(refuse(BizCode::RepoRefused, t("server.repo.github.notGithub", &[])));
-            }
-            Ok(hosted)
-        })
-        .await
-        .map_err(|_| refuse(BizCode::RepoRefused, t("server.repo.github.notGithub", &[])))?
+        let origin = repos
+            .origin_url_async(name)
+            .await
+            .ok_or_else(|| refuse(BizCode::RepoRefused, t("server.repo.github.notGithub", &[])))?;
+        let hosted = hosted_origin(&origin).ok_or_else(|| refuse(BizCode::RepoRefused, t("server.repo.github.notGithub", &[])))?;
+        if let Some(want) = platform
+            && hosted.platform != want
+        {
+            return Err(refuse(BizCode::RepoRefused, t("server.repo.github.notGithub", &[])));
+        }
+        Ok(hosted)
     }
 
     pub(crate) async fn github_remote_async(&self, name: &str) -> Result<String, ApiError> {
@@ -291,7 +164,10 @@ impl Pull {
     ) -> Result<PullRequestState, ApiError> {
         let hosted = self.hosted_repo_of_async(repo, platform).await?;
         self.publisher.merge_pull_async(&hosted, number, method).await?;
-        let existing = self.find(repo, number).or_else(|| self.find(&hosted.name, number));
+        let existing = match self.find_async(repo, number).await {
+            Some(row) => Some(row),
+            None => self.find_async(&hosted.name, number).await,
+        };
         if let Some(row) = existing {
             if let Err(err) = self.set_state_async(&row.id, PullRequestState::Merged, now()).await {
                 tracing::warn!(pull_id = %row.id, error = %err, "pull.merge failed to persist merged PR state");

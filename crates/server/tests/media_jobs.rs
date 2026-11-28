@@ -318,13 +318,12 @@ fn image_request_refinements_prevent_submission() {
 
 #[test]
 fn orchestrator_image_tool_requires_user_intent_and_posts_once_to_its_channel() {
-    use parking_lot::Mutex;
     use vibevalley_server::agent::tool::{Route, held};
     let dir = tempfile::tempdir().unwrap();
     let backend = Backend::new("ok");
     let s = start(dir.path(), backend);
     let channel = s.test_internals().channel.default_channel();
-    let route = Arc::new(Mutex::new(Route {
+    let route = Arc::new(arc_swap::ArcSwap::from_pointee(Route {
         agent: "orchestrator".into(),
         channel: channel.clone(),
         ..Route::default()
@@ -333,7 +332,12 @@ fn orchestrator_image_tool_requires_user_intent_and_posts_once_to_its_channel() 
     let tool = tools.iter().find(|t| t.spec().name == "media_image_create").unwrap();
     assert!(vibevalley_runtime::rt::block_on(tool.execute(&request("asked"))).is_error);
     assert_eq!(ok(&s, "media.job.list", Value::Null), json!([]));
-    route.lock().user = true;
+    route.store(Arc::new(Route {
+        agent: "orchestrator".into(),
+        channel: channel.clone(),
+        user: true,
+        ..Route::default()
+    }));
     let result = vibevalley_runtime::rt::block_on(tool.execute(&request("asked")));
     assert!(!result.is_error, "{}", result.text);
     let ready = wait(&s, "asked", "ready");

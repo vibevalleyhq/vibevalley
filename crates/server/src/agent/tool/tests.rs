@@ -97,7 +97,6 @@ fn every_tool_maps_to_a_toolset_and_respects_role_can_narrowing() {
         disallowed_tools: vec!["issue_report".into()],
         env: Default::default(),
         workdir: String::new(),
-        worktree: false,
         tags: vec![],
         look: Look {
             species: None,
@@ -258,7 +257,7 @@ async fn four_tier_issue_authorization_hard_gates_enforce_user_patrol_and_cron_r
 
     // Unapproved agent-created Once lookback cron MUST be denied for start/update/done.
     let lookback_cron = crons
-        .add_async(
+        .add_resolved_async(
             CronRequest {
                 name: "lookback".into(),
                 text: "check".into(),
@@ -269,6 +268,10 @@ async fn four_tier_issue_authorization_hard_gates_enforce_user_patrol_and_cron_r
                 tz: None,
             },
             ActorKind::Agent,
+            channel.clone(),
+            String::new(),
+            String::new(),
+            None,
         )
         .await
         .unwrap();
@@ -297,7 +300,7 @@ async fn four_tier_issue_authorization_hard_gates_enforce_user_patrol_and_cron_r
 
     // User-approved recurring cron permits Tier 1 (create+start) & Tier 3 (update), but still denies Tier 4 (done)!
     let pending_cron = crons
-        .add_async(
+        .add_resolved_async(
             CronRequest {
                 name: "recurring".into(),
                 text: "nightly check".into(),
@@ -308,6 +311,10 @@ async fn four_tier_issue_authorization_hard_gates_enforce_user_patrol_and_cron_r
                 tz: None,
             },
             ActorKind::Agent,
+            channel.clone(),
+            String::new(),
+            String::new(),
+            None,
         )
         .await
         .unwrap();

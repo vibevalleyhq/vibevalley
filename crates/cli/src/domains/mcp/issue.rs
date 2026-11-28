@@ -471,6 +471,7 @@ impl McpServer {
                 text: None,
                 agent: None,
                 edit: None,
+                delivery_receipt: None,
                 request_key: None,
             };
             match client.ask::<ops::IssueStatusUpdate>(&status_req).await {
@@ -568,6 +569,7 @@ impl McpServer {
                 text: comment,
                 agent: None,
                 edit,
+                delivery_receipt: None,
                 request_key: None,
             };
             match client.ask::<ops::IssueStatusUpdate>(&req).await {

@@ -1,29 +1,46 @@
 import { defineScenario } from "../dsl.ts";
 
 const SETTING_SECTIONS = [
-  { route: "/settings/general", id: "settings-general", label: "General Settings" },
-  { route: "/settings/providers", id: "settings-providers", label: "Model Providers" },
-  { route: "/settings/models", id: "settings-models", label: "Models & Model Policy" },
-  { route: "/settings/appearance", id: "settings-appearance", label: "Appearance & Theme" },
-  { route: "/settings/voice", id: "settings-voice", label: "Voice & Audio" },
-  { route: "/settings/remote", id: "settings-remote", label: "Remote Access & Pairing" },
-  { route: "/settings/about", id: "settings-about", label: "About & Diagnostics" },
+  { id: "profile", label: "Profile" },
+  { id: "general", label: "General Settings" },
+  { id: "appearance", label: "Appearance & Theme" },
+  { id: "providers", label: "Model Providers" },
+  { id: "models", label: "Models & Model Policy" },
+  { id: "voice", label: "Voice & Audio" },
+  { id: "remote", label: "Remote Access & Pairing" },
+  { id: "about", label: "About & Diagnostics" },
 ] as const;
 
 export const settingsScenario = defineScenario({
   id: "settings",
-  description: "Settings navigation and key subsections (general/providers/models/appearance/voice/remote/about) in Light & Dark",
+  description: "Settings navigation via left rail button and top-to-bottom section clicks with single Dark Appearance sample",
   async run(v) {
-    await v.resize(v.viewport.width, v.viewport.height);
+    const primaryTheme = v.defaultThemes[0] ?? "light";
+    const includeDarkSample = v.defaultThemes.length > 1 && v.defaultThemes.includes("dark");
 
-    await v.forThemes(undefined, async (theme) => {
-      for (const sec of SETTING_SECTIONS) {
-        await v.nav(sec.route);
-        await v.waitRoute(sec.route);
-        await v.wait("settings-nav");
-        await v.assertClean(`${sec.id}-${theme}`);
-        await v.shot(`${sec.id}-${theme}`, { label: `${sec.label} (${theme})` });
+    await v.resize(v.viewport.width, v.viewport.height);
+    await v.theme(primaryTheme);
+    await v.nav("/issues");
+    await v.waitRoute("/issues");
+    await v.wait("place-settings");
+    await v.press("place-settings");
+    await v.waitRoute("/settings");
+
+    for (const sec of SETTING_SECTIONS) {
+      const route = `/settings/${sec.id}`;
+      await v.wait(`settings-section-${sec.id}`);
+      await v.press(`settings-section-${sec.id}`);
+      await v.waitRoute(route);
+      await v.wait("settings-nav");
+      await v.assertClean(`settings-${sec.id}-${primaryTheme}`);
+      await v.shot(`settings-${sec.id}-${primaryTheme}`, { label: `${sec.label} (${primaryTheme})`, settleMs: 60 });
+
+      if (sec.id === "appearance" && includeDarkSample) {
+        await v.theme("dark");
+        await v.assertClean("settings-appearance-dark");
+        await v.shot("settings-appearance-dark", { label: `${sec.label} (dark)`, settleMs: 80 });
+        await v.theme(primaryTheme);
       }
-    });
+    }
   },
 });

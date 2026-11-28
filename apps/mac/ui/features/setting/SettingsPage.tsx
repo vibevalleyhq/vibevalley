@@ -1,4 +1,4 @@
-import { computed, Scroll, signal, Text, View, windowSize, type JSX } from "nsh";
+import { computed, Scroll, signal, Text, View, windowSize, type JSX, type ViewRef } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import { FeatureValues } from "@vibevalley/protocol";
@@ -10,7 +10,7 @@ import type { IconName } from "../../design/icons";
 import { ActiveBar } from "../../design/layout";
 import { Splitter, usePaneWidth } from "../../design/Splitter";
 import { matches } from "../../infra/base/search";
-import { Link as A, Navigate } from "../../infra/router";
+import { Link as A, Navigate, useRouter } from "../../infra/router";
 import { useVdpNode } from "../../infra/vdpProbe";
 import { ConnectorsPage } from "../connector";
 import { SkillsPage } from "../runtime";
@@ -144,10 +144,11 @@ export function SettingsPage(props: { rest: string }) {
               class={`shrink-0 border-line bg-side ${md() ? "h-full min-h-0 border-r" : "max-h-60 border-b"}`}
               style={md() ? { width: navWidth() } : undefined}
             >
+              <View desktop={{ windowDrag: true }} class="h-3 shrink-0" />
               <If when={md()}>
                 <Splitter pane="settingsNav" side="right" width={navWidth()} min={184} max={320} label={t("web.setting.nav.width")} />
               </If>
-              <View class="shrink-0 px-2.5 pt-3 pb-2.5">
+              <View class="shrink-0 px-2.5 pt-1 pb-2.5">
                 <SearchField
                   testid="settings-search"
                   clearTestid="settings-search-clear"
@@ -187,7 +188,7 @@ export function SettingsPage(props: { rest: string }) {
             <If
               when={current().id === "skills"}
               else={
-                <Scroll testID={`settings-${current().id}`} class="min-h-0 min-w-0 flex-1 bg-page" contentClass={md() ? "px-8 py-7" : "px-5 py-5"}>
+                <Scroll testID={`settings-${current().id}`} class="min-h-0 min-w-0 flex-1 bg-page" contentClass={md() ? "px-8 pt-7 pb-10" : "px-5 pt-5 pb-10"}>
                   <Each of={[current()]} key={(s) => s.id}>
                     {(s) => <SectionBody id={s().id} connectorId={connectorId()} />}
                   </Each>
@@ -215,8 +216,21 @@ function NavGroup(props: { title: string; children: JSX.Element }) {
 }
 
 function SectionLink(props: { section: Section; current: boolean }) {
+  const router = useRouter();
+  let linkRef: ViewRef | undefined;
+  useVdpNode({
+    testId: `settings-section-${props.section.id}`,
+    role: "tab",
+    text: () => props.section.label,
+    getRef: () => linkRef,
+    onPress: () => router.navigate(`/settings/${props.section.id}`),
+  });
+
   return (
     <A
+      ref={(el) => {
+        linkRef = el;
+      }}
       href={`/settings/${props.section.id}`}
       testID={`settings-section-${props.section.id}`}
       accessibilityLabel={props.section.label}
@@ -231,7 +245,7 @@ function SectionLink(props: { section: Section; current: boolean }) {
       <View class="w-4 shrink-0 items-center justify-center">
         <Icon name={props.section.icon} size={14} tone={props.current ? "ink" : "muted"} />
       </View>
-      <Text class={`min-w-0 flex-1 truncate text-sm ${props.current ? "font-medium text-ink" : "text-muted group-hover:text-ink"}`}>{props.section.label}</Text>
+      <Text class={`min-w-0 flex-1 truncate text-sm font-medium ${props.current ? "text-ink" : "text-muted group-hover:text-ink"}`}>{props.section.label}</Text>
     </A>
   );
 }

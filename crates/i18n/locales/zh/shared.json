@@ -13,9 +13,9 @@
     "none": ""
   },
   "outcome": {
-    "completed": "做完了",
-    "failed": "没做成",
-    "interrupted": "停在半路"
+    "completed": "已完成",
+    "failed": "未通过",
+    "interrupted": "已中断"
   },
   "status": {
     "backlog": "备选",
@@ -39,7 +39,6 @@
   },
   "delivered": {
     "merged": "合进了主分支",
-    "merged_into_parent": "合进了计划的分支",
     "pull_request": "PR 合进去了",
     "kept": "分支留着没合",
     "none": "没有改动要合",
@@ -68,16 +67,16 @@
     "quiet": "没动静"
   },
   "act": {
-    "start": "开工",
-    "answer": "回答",
+    "start": "开始执行",
+    "answer": "回复",
     "reject": "打回",
     "complete": "完成",
-    "acknowledge": "知道了",
-    "resolve": "让它解决冲突",
-    "resume": "接着做",
-    "cure": "接着修",
-    "tell": "带话",
-    "stop": "叫停这一轮",
+    "acknowledge": "确认已知",
+    "resolve": "解决冲突",
+    "resume": "继续执行",
+    "cure": "继续修复",
+    "tell": "补充说明",
+    "stop": "停止本轮",
     "close": "取消",
     "reopen": "重开"
   },

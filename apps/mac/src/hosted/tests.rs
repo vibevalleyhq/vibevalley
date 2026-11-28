@@ -138,7 +138,7 @@ fn route_to_bridge_watches_slices_forwards_applied_slice_and_unwatches() {
         }
 
         fn wait_for(&self, what: &str, mut f: impl FnMut(&Self) -> bool) {
-            vibevalley_rt::block_on(async {
+            vibevalley_kit::rt::block_on(async {
                 tokio::time::timeout(Duration::from_secs(3), async {
                     loop {
                         let notified = self.notify.notified();
@@ -188,7 +188,7 @@ fn route_to_bridge_watches_slices_forwards_applied_slice_and_unwatches() {
     assert_eq!(rec.named("frame:slice:board").last().unwrap()["data"]["issues"][0]["id"], "i-1");
 
     assert!(route_to_bridge(&client, &json!({ "type": "unwatch", "topic": "slice:board" })));
-    vibevalley_rt::block_on(async {
+    vibevalley_kit::rt::block_on(async {
         tokio::time::timeout(Duration::from_secs(3), async {
             let mut yields = 0usize;
             while fake.slice_watchers(SliceKind::Board) != 0 {
@@ -367,7 +367,7 @@ fn failed_server_reports_service_unavailable_with_root_cause_and_empty_slices() 
     let root_cause = "vibevalley server: no such column: source_job_id";
     let server = Arc::new(FailedServer::new(root_cause));
 
-    let env = vibevalley_rt::block_on(Arc::clone(&server).call_with_async(CallerContext::local(), "session.openWorkspace".into(), json!({})));
+    let env = vibevalley_kit::rt::block_on(Arc::clone(&server).call_with_async(CallerContext::local(), "session.openWorkspace".into(), json!({})));
     assert_eq!(env.biz_code, BizCode::ServiceUnavailable.code());
     assert!(env.message.contains(root_cause), "unexpected message: {}", env.message);
     assert!(
@@ -376,7 +376,7 @@ fn failed_server_reports_service_unavailable_with_root_cause_and_empty_slices() 
         env.message
     );
 
-    let sub_err = vibevalley_rt::block_on(Arc::clone(&server).subscribe_with_async(CallerContext::local(), "channel.follow".into(), json!({})))
+    let sub_err = vibevalley_kit::rt::block_on(Arc::clone(&server).subscribe_with_async(CallerContext::local(), "channel.follow".into(), json!({})))
         .expect_err("FailedServer must refuse subscriptions");
     assert_eq!(sub_err.biz_code, BizCode::ServiceUnavailable.code());
     assert!(sub_err.message.contains(root_cause));
@@ -498,7 +498,7 @@ fn bridge_concurrency_does_not_starve_fast_rpcs_behind_four_slow_session_opens()
         );
     }
 
-    vibevalley_rt::block_on(async {
+    vibevalley_kit::rt::block_on(async {
         tokio::time::timeout(Duration::from_secs(3), async {
             loop {
                 let entered = server.open_entered.notified();

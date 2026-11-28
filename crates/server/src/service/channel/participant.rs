@@ -231,9 +231,9 @@ async fn read_cursors_of_impl<C: ConnectionTrait>(conn: &C, participant: &str) -
         .collect())
 }
 
-async fn mark_unread_impl<C: ConnectionTrait>(conn: &C, channel_id: &str, upto: i64, at: i64) -> DbResult<()> {
+async fn mark_unread_impl<C: ConnectionTrait>(conn: &C, participant: &str, channel_id: &str, upto: i64, at: i64) -> DbResult<()> {
     let model = channel_read_cursor::ActiveModel {
-        participant_id: Set("user".to_owned()),
+        participant_id: Set(participant.to_owned()),
         channel_id: Set(channel_id.to_owned()),
         read_number: Set(upto),
         updated_at: Set(at),
@@ -313,7 +313,7 @@ impl ChannelService {
         read_cursors_of_impl(self.db.read_conn(), participant).await
     }
 
-    pub(crate) async fn mark_unread_in_tx(&self, tx: &Tx, channel_id: &str, upto: i64, at: i64) -> DbResult<()> {
-        mark_unread_impl(tx, channel_id, upto, at).await
+    pub(crate) async fn mark_unread_in_tx(&self, tx: &Tx, participant: &str, channel_id: &str, upto: i64, at: i64) -> DbResult<()> {
+        mark_unread_impl(tx, participant, channel_id, upto, at).await
     }
 }

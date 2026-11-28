@@ -44,10 +44,10 @@ pub struct MachineUpArgs {
     /// Stable machine identifier (defaults to paired device id or a generated id)
     #[arg(long)]
     pub machine_id: Option<String>,
-    /// Run as an ephemeral sandbox machine (does not persist machine-auth.json; cleans up worktrees on exit)
+    /// Run as an ephemeral sandbox machine (does not persist machine-auth.json; cleans up session workspaces on exit)
     #[arg(long)]
     pub ephemeral: bool,
-    /// Base directory for isolated git worktrees and session workspaces
+    /// Base directory for session workspaces
     #[arg(long, value_name = "DIR")]
     pub workdir: Option<PathBuf>,
     /// Restrict advertised local OAR runtimes to these ids (repeatable)

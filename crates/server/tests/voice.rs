@@ -10,9 +10,8 @@ use serde_json::{Value, json};
 use vibevalley_protocol::{BizCode, Caller, Envelope, VoiceFix};
 use vibevalley_runtime::agent::{ChatRequest, Completion, Delta, FinishReason, Message, ModelClient, Role, Usage};
 use vibevalley_server::app::{Overrides, create_app_with_overrides_blocking};
-use vibevalley_server::gateway::bridge::{LiveVoiceLine as _, LiveVoicePort as _};
+use vibevalley_server::gateway::bridge::LiveVoiceLine as _;
 use vibevalley_server::setting::Secret;
-use vibevalley_server::voice::Voice;
 use vibevalley_server::voice::moss::{Realtime, Transcriber, Verdict, pcm16_to_wav};
 use vibevalley_server::{App, Config};
 
@@ -80,8 +79,8 @@ struct Farm {
 }
 
 impl Farm {
-    fn voice(&self) -> &Arc<Voice> {
-        self.app.test_internals().voice
+    fn voice(&self) -> &Arc<vibevalley_server::orchestration::VoiceWorkflow> {
+        &self.app.test_internals().orchestration.voice
     }
 
     fn call(&self, op: &str, payload: Value) -> Envelope {
@@ -210,15 +209,15 @@ fn a_farm_call_runs_over_moss_live() {
 
     // Unknown grant is refused.
     assert_eq!(
-        f.voice().start("vibevalley-0-nobody", "1000", None).unwrap_err().biz_code,
+        f.voice().start_with_about("vibevalley-0-nobody", "1000", None).unwrap_err().biz_code,
         BizCode::VoiceUnavailable
     );
 
-    let call = f.voice().start(&channel, &uid, None).unwrap();
+    let call = f.voice().start_with_about(&channel, &uid, None).unwrap();
     let agent = format!("moss-{channel}");
     assert_eq!(call.agent_id, agent);
     // A grant starts only one call.
-    let again = f.voice().start(&channel, &uid, None).unwrap_err();
+    let again = f.voice().start_with_about(&channel, &uid, None).unwrap_err();
     assert_eq!(again.biz_code, BizCode::VoiceUnavailable);
     assert_eq!(again.message, "这通电话已经在接通");
 
@@ -230,7 +229,7 @@ fn a_farm_call_runs_over_moss_live() {
     );
     assert!(f.voice().moss_line().is_err());
     let mut outgoing = line.take_outgoing().unwrap();
-    let recv_timeout = |rx: &mut tokio::sync::mpsc::UnboundedReceiver<String>, wait: Duration| -> Option<String> {
+    let recv_timeout = |rx: &mut tokio::sync::mpsc::Receiver<String>, wait: Duration| -> Option<String> {
         vibevalley_runtime::rt::block_on(async { tokio::time::timeout(wait, rx.recv()).await.ok().flatten() })
     };
     let update: Value = serde_json::from_str(&line.session_update()).unwrap();
@@ -309,7 +308,7 @@ fn a_moss_call_answering_a_ring_speaks_what_rang() {
     line.heard(r#"{"action":"session.updated","data":{"error":""}}"#);
 
     let grant = f.voice().grant().unwrap();
-    let call = f.voice().start(&grant.channel, &grant.uid, Some("#3 等你验收")).unwrap();
+    let call = f.voice().start_with_about(&grant.channel, &grant.uid, Some("#3 等你验收")).unwrap();
     let raw = vibevalley_runtime::rt::block_on(async { tokio::time::timeout(Duration::from_secs(30), outgoing.recv()).await })
         .ok()
         .flatten()

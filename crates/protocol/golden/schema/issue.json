@@ -65,9 +65,6 @@
    "constraints": {
     "acceptance": true,
     "check": "s1054",
-    "frozen": [
-     "s1057"
-    ],
     "scope": [
      "s1055"
     ]
@@ -368,9 +365,6 @@
    "constraints": {
     "acceptance": false,
     "check": "s979",
-    "frozen": [
-     "s982"
-    ],
     "scope": [
      "s980"
     ]
@@ -590,18 +584,12 @@
   {
    "acceptance": true,
    "check": "s972",
-   "frozen": [
-    "s975"
-   ],
    "scope": [
     "s973"
    ]
   },
   {
    "acceptance": false,
-   "frozen": [
-    "s978"
-   ],
    "scope": [
     "s976"
    ]
@@ -702,9 +690,6 @@
     "constraints": {
      "acceptance": true,
      "check": "s1134",
-     "frozen": [
-      "s1137"
-     ],
      "scope": [
       "s1135"
      ]
@@ -797,7 +782,7 @@
       }
      ],
      "brief": "s1187",
-     "controller": "orchestrator",
+     "controller": "daemon",
      "cwd": "s1190",
      "hiredAt": 1191,
      "id": "s1183",
@@ -830,8 +815,8 @@
       "since": 1204
      },
      "policy": {
-      "branch": "s1189",
-      "kind": "managedWorktree",
+      "kind": "directCwd",
+      "permissionMode": "bypass",
       "repo": "s1188"
      },
      "profile": "s1185",
@@ -932,7 +917,7 @@
     {
      "bindings": [],
      "brief": "s1236",
-     "controller": "orchestrator",
+     "controller": "daemon",
      "hiredAt": 1237,
      "id": "s1232",
      "name": "s1233",
@@ -1115,9 +1100,6 @@
    "constraints": {
     "acceptance": true,
     "check": "s1250",
-    "frozen": [
-     "s1253"
-    ],
     "scope": [
      "s1251"
     ]
@@ -1487,9 +1469,6 @@
     "constraints": {
      "acceptance": false,
      "check": "s1329",
-     "frozen": [
-      "s1332"
-     ],
      "scope": [
       "s1330"
      ]
@@ -1500,7 +1479,7 @@
     ],
     "cron": "s1356",
     "deliver": "branch",
-    "delivered": "merged_into_parent",
+    "delivered": "merged",
     "description": "s1336",
     "findings": [
      {
@@ -1607,8 +1586,8 @@
       "_tag": "done"
      },
      "policy": {
-      "branch": "s1384",
-      "kind": "managedWorktree",
+      "kind": "directCwd",
+      "permissionMode": "bypass",
       "repo": "s1383"
      },
      "profile": "s1380",
@@ -1789,7 +1768,6 @@
  ],
  "Landing": [
   "merged",
-  "merged_into_parent",
   "pull_request",
   "submitted",
   "kept",
@@ -1868,5 +1846,30 @@
   "conflict",
   "interrupted",
   "quiet"
+ ],
+ "DeliveryReceipt": [
+  {
+   "kind": "pull_request",
+   "url": "https://github.com/acme/repo/pull/1",
+   "number": 1,
+   "branch": "feat/x",
+   "summary": "PR summary"
+  },
+  {
+   "kind": "commit",
+   "sha": "abc1234",
+   "branch": "main",
+   "summary": "Commit summary"
+  },
+  {
+   "kind": "note",
+   "noteId": "n1",
+   "title": "Spec",
+   "summary": "Note summary"
+  },
+  {
+   "kind": "answer",
+   "summary": "Direct answer"
+  }
  ]
 }

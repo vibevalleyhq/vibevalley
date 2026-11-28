@@ -3,7 +3,7 @@ import { expect, open, test } from "nsh/test";
 
 import { setLocale, t } from "@vibevalley/i18n";
 import "@vibevalley/i18n/catalogs";
-import type { Channel, Chat, MessageId, SettingsStatus, SliceBundle } from "@vibevalley/protocol";
+import { agentParticipant, type Channel, type Chat, localUserParticipant, type MessageId, type SettingsStatus, type SliceBundle } from "@vibevalley/protocol";
 
 import { fakeHost, type FakeHost } from "../../../fixtures/fakeHost";
 import { SCENARIO_NOW, type ScenarioDensity, scenarios } from "../../../fixtures/scenarios";
@@ -65,7 +65,7 @@ test("sidebarChannelsOf pins the default channel first and sorts channels and di
         last: { from: "orchestrator", name: "全能主助手", text: "你好", at: SCENARIO_NOW - 2 * min },
       }),
       makeChannel("general", { default: true, at: SCENARIO_NOW - 200 * min }),
-      makeDirect("dm-worker", "小林", "profile:xiaolin", { at: SCENARIO_NOW - 10 * min }),
+      makeDirect("dm-worker", "小林", agentParticipant("xiaolin"), { at: SCENARIO_NOW - 10 * min }),
       makeChannel("archived-group", { archived: SCENARIO_NOW - 5 * min, at: SCENARIO_NOW - 1 * min }),
       makeChannel("t1", { type: "thread", parent: "general", at: SCENARIO_NOW - 1 * min }),
     ],
@@ -99,13 +99,13 @@ test("Sidebar renders a unified chat list without session section, filters chann
         orchestrator: "orchestrator",
         members: ["orchestrator"],
         unread: 3,
-        last: { from: "user", name: "你", text: "看看今日进展", at: SCENARIO_NOW - 3 * min },
+        last: { from: localUserParticipant, name: "你", text: "看看今日进展", at: SCENARIO_NOW - 3 * min },
       }),
       makeDirect("d-orchestrator", "全能主助手", "orchestrator", {
         at: SCENARIO_NOW - 2 * min,
         last: { from: "orchestrator", name: "全能主助手", text: "我随时待命", at: SCENARIO_NOW - 1 * min },
       }),
-      makeDirect("d-xiaolin", "小林", "profile:xiaolin", {
+      makeDirect("d-xiaolin", "小林", agentParticipant("xiaolin"), {
         at: SCENARIO_NOW - day,
       }),
     ],
@@ -263,7 +263,9 @@ test("Chat localizes raw runtime API-key error in channel sidebar preview, threa
   expect(app.shows(`id:channel-row-general >> text:Ada #4: ${localized}`)).toBe(true);
   expect(app.shows(`id:thread-preview-general:1 >> text:${localized}`)).toBe(true);
 
-  await app.press("id:threads-toggle");
+  await app.press("id:channel-more-menu");
+  await fake.pumpUntil(app, () => app.count("id:more-threads") === 1);
+  await app.press("id:more-threads");
   await fake.pumpUntil(app, () => app.count("id:thread-general:1") === 1);
   expect(app.texts().join("\n")).not.toContain("no API key is set");
   expect(app.shows(`id:thread-general:1 >> text:${t("shared.join.labeled", { label: "Ada #4", text: localized })}`)).toBe(true);
@@ -275,9 +277,9 @@ test("feedOf does not fold a follow-up message directly under a reacted message"
     id: "m1" as MessageId,
     channel: "general",
     number: 1,
-    from: "user",
+    from: localUserParticipant,
     name: "你",
-    actor: { kind: "user" as const, id: "user", name: "你" },
+    actor: { kind: "user" as const, id: localUserParticipant, name: "你" },
     kind: "chat" as const,
     text: "第一段",
     at: SCENARIO_NOW - 2 * min,

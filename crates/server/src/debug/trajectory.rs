@@ -69,7 +69,7 @@ pub(crate) fn phase_status_str(phase: &Phase) -> &'static str {
 }
 
 pub(crate) fn classify_live_session(session: &Session, orchestrator_ids: &[String], in_issue_history: bool) -> DebugTrajectoryKind {
-    if session.is_orchestrator() || session.controller == SessionController::Orchestrator || orchestrator_ids.iter().any(|o| o == &session.id) {
+    if session.is_orchestrator() || session.controller == SessionController::Daemon || orchestrator_ids.iter().any(|o| o == &session.id) {
         return DebugTrajectoryKind::Orchestrator;
     }
     if session.is_board_worker() || session.issue_id().is_some() || in_issue_history {
@@ -109,7 +109,7 @@ pub(crate) fn extract_session_meta(issues: &[Issue], sessions: &[Session], id: &
     };
     Some(SessionStateMeta {
         exists: session.is_some(),
-        is_orchestrator: session.is_some_and(|s| s.is_orchestrator() || s.controller == SessionController::Orchestrator),
+        is_orchestrator: session.is_some_and(|s| s.is_orchestrator() || s.controller == SessionController::Daemon),
         is_issue_session: session.is_some_and(|s| s.is_board_worker() || s.issue_id().is_some()),
         in_issue_history: exec_issue.is_some(),
         runtime: session.map(|s| s.runtime.clone()),
@@ -148,7 +148,7 @@ pub(crate) fn extract_trajectory_index(issues: &[Issue], sessions: &[Session]) -
             s.id.clone(),
             SessionStateMeta {
                 exists: true,
-                is_orchestrator: s.is_orchestrator() || s.controller == SessionController::Orchestrator,
+                is_orchestrator: s.is_orchestrator() || s.controller == SessionController::Daemon,
                 is_issue_session: s.is_board_worker() || s.issue_id().is_some(),
                 in_issue_history: linked_exec.is_some(),
                 runtime: Some(s.runtime.clone()),

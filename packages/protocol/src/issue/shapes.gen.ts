@@ -25,8 +25,13 @@ export type IssueRelationKind = (typeof IssueRelationKindValues)[number];
  */
 export type IssueRelation = { kind: IssueRelationKind, issue: IssueId, };
 
-export const LandingValues = ["merged", "merged_into_parent", "pull_request", "submitted", "kept", "none"] as const;
+export const LandingValues = ["merged", "pull_request", "submitted", "kept", "none"] as const;
 export type Landing = (typeof LandingValues)[number];
+
+/**
+ * Polymorphic delivery proof recorded by an autonomous agent or user.
+ */
+export type DeliveryReceipt = { "kind": "pull_request", url: string, number?: number, branch?: string, summary?: string, } | { "kind": "commit", sha: string, branch?: string, summary?: string, } | { "kind": "note", noteId: NoteId, title?: string, summary?: string, } | { "kind": "answer", summary: string, };
 
 export const IssueCanceledValues = ["dismissed", "lost"] as const;
 export type IssueCanceled = (typeof IssueCanceledValues)[number];
@@ -56,7 +61,7 @@ export type BoardScheduleEntry = { issueId: IssueId, span: IssueScheduleSpan, de
 
 export type BoardSchedule = { todayDayMs: number, scheduled: Array<BoardScheduleEntry>, unscheduledIds: Array<IssueId>, };
 
-export type BoardIssueSummary = { lane: IssueLane, cardKind: IssueCardKind, familyDone: number, familyTotal: number, needsWorktreeCheck: boolean, prompt?: IssuePromptKind, preview?: BoardCardPreview, schedule?: IssueScheduleSpan, };
+export type BoardIssueSummary = { lane: IssueLane, cardKind: IssueCardKind, familyDone: number, familyTotal: number, prompt?: IssuePromptKind, preview?: BoardCardPreview, schedule?: IssueScheduleSpan, };
 
 export type BoardSummary = { laneCounts: BoardLaneCounts, runningSlots: number, maxRunning: number, byIssue: { [key in string]: BoardIssueSummary }, schedule?: BoardSchedule, };
 
@@ -159,9 +164,9 @@ export type IssueReportMemoryScope = (typeof IssueReportMemoryScopeValues)[numbe
 
 export type IssueReportMemory = { text: string, scope: IssueReportMemoryScope, };
 
-export type IssueReport = { summary: string, questions: Array<Question>, checks: Array<CriterionCheck>, remember: Array<IssueReportMemory>, prSubmit: boolean, answer?: IssueAnswer, };
+export type IssueReport = { summary: string, questions: Array<Question>, checks: Array<CriterionCheck>, remember: Array<IssueReportMemory>, prSubmit: boolean, answer?: IssueAnswer, deliveryReceipt?: DeliveryReceipt, };
 
-export type IssueConstraints = { check?: string, scope: Array<string>, acceptance: boolean, frozen: Array<string>, };
+export type IssueConstraints = { check?: string, scope: Array<string>, acceptance: boolean, };
 
 export type IssueLastRun = { startedAt: number, endedAt?: number, outcome?: Outcome, };
 
@@ -169,7 +174,7 @@ export type Issue = { constraints?: IssueConstraints, id: IssueId, number: numbe
 /**
  * Target execution host id when pinned to a specific machine; omitted lets the control plane route.
  */
-machineId?: string, assignments: Array<Assignment>, priority: Priority, rank?: number, createdAt: number, queuedAt?: number, closedAt?: number, delivered?: Landing, canceled?: IssueCanceled, parent?: IssueId, blockedBy: Array<IssueId>, cron?: string, status: IssueStatus, moves: Array<IssueStatus>, pullRequest?: PullRequest, deliver: Deliverable, reviewedAt?: number, deliveryEvidence?: DeliveryEvidence, findings: Array<Finding>, questions: Array<Question>, criteria: Array<string>, checks: Array<CriterionCheck>, refining?: IssueRefining,
+machineId?: string, assignments: Array<Assignment>, priority: Priority, rank?: number, createdAt: number, queuedAt?: number, closedAt?: number, delivered?: Landing, canceled?: IssueCanceled, parent?: IssueId, blockedBy: Array<IssueId>, cron?: string, status: IssueStatus, moves: Array<IssueStatus>, pullRequest?: PullRequest, deliver: Deliverable, reviewedAt?: number, deliveryEvidence?: DeliveryEvidence, deliveryReceipt?: DeliveryReceipt, findings: Array<Finding>, questions: Array<Question>, criteria: Array<string>, checks: Array<CriterionCheck>, refining?: IssueRefining,
 /**
  * Tracks runs executed without a worker session (e.g. in-process orchestrator); active while `endedAt` is absent.
  */
@@ -182,7 +187,7 @@ export type AppliedIssue = { constraints?: IssueConstraints, id: IssueId, number
 /**
  * Target execution host id when pinned to a specific machine; omitted lets the control plane route.
  */
-machineId?: string, assignments: Array<Assignment>, priority: Priority, rank?: number, createdAt: number, queuedAt?: number, closedAt?: number, delivered?: Landing, canceled?: IssueCanceled, parent?: IssueId, blockedBy: Array<IssueId>, cron?: string, status: IssueStatus, moves: Array<IssueStatus>, pullRequest?: PullRequest, deliver: Deliverable, reviewedAt?: number, deliveryEvidence?: DeliveryEvidence, findings: Array<Finding>, questions: Array<Question>, criteria: Array<string>, checks: Array<CriterionCheck>, refining?: IssueRefining, lastRun?: IssueLastRun, answer?: IssueAnswer, stage: IssueStage, attachments?: Array<Attachment>, tags?: Array<string>, startAt?: number, dueAt?: number, owner?: ActorRef, relations?: Array<IssueRelation>, bodyNoteId?: NoteId, seq: number, };
+machineId?: string, assignments: Array<Assignment>, priority: Priority, rank?: number, createdAt: number, queuedAt?: number, closedAt?: number, delivered?: Landing, canceled?: IssueCanceled, parent?: IssueId, blockedBy: Array<IssueId>, cron?: string, status: IssueStatus, moves: Array<IssueStatus>, pullRequest?: PullRequest, deliver: Deliverable, reviewedAt?: number, deliveryEvidence?: DeliveryEvidence, deliveryReceipt?: DeliveryReceipt, findings: Array<Finding>, questions: Array<Question>, criteria: Array<string>, checks: Array<CriterionCheck>, refining?: IssueRefining, lastRun?: IssueLastRun, answer?: IssueAnswer, stage: IssueStage, attachments?: Array<Attachment>, tags?: Array<string>, startAt?: number, dueAt?: number, owner?: ActorRef, relations?: Array<IssueRelation>, bodyNoteId?: NoteId, seq: number, };
 
 export type IssueUpdate = { title?: string, description?: string, repo?: string, agent?: string, machineId?: string, priority?: Priority, criteria?: Array<string>, deliver?: Deliverable,
 /**
@@ -212,7 +217,11 @@ owner?: ActorRef,
 /**
  * Non-blocking links (`duplicate` / `related`) maintained bidirectionally; `[]` clears all relations.
  */
-relations?: Array<IssueRelation>, };
+relations?: Array<IssueRelation>,
+/**
+ * Polymorphic delivery receipt recorded by an agent or user.
+ */
+deliveryReceipt?: DeliveryReceipt, };
 
 export type IssueHistory = { issue: Issue, sessions: Array<Session>, missingSessions: Array<SessionId>, };
 
@@ -259,6 +268,10 @@ text?: string, agent?: string,
  * Unsaved field edits applied atomically before the status transition.
  */
 edit?: IssueUpdate,
+/**
+ * Optional polymorphic delivery proof recorded when moving an issue to `done`.
+ */
+deliveryReceipt?: DeliveryReceipt,
 /**
  * Idempotency key deduplicating retries after a lost response.
  */
@@ -316,11 +329,15 @@ owner?: ActorRef,
 /**
  * Non-blocking links (`duplicate` / `related`) maintained bidirectionally; `[]` clears all relations.
  */
-relations?: Array<IssueRelation>, };
+relations?: Array<IssueRelation>,
+/**
+ * Polymorphic delivery receipt recorded by an agent or user.
+ */
+deliveryReceipt?: DeliveryReceipt, };
 
 export type IssueDeleteInput = { id: string, };
 
-export type IssueStatusUpdateInput = { revision?: ReviewRevision, id: string, status: IssueStatus, text?: string, agent?: string, edit?: IssueUpdate, requestKey?: string, };
+export type IssueStatusUpdateInput = { revision?: ReviewRevision, id: string, status: IssueStatus, text?: string, agent?: string, edit?: IssueUpdate, deliveryReceipt?: DeliveryReceipt, requestKey?: string, };
 
 export type IssueRefineInput = { id: string, text?: string, edit?: IssueUpdate, };
 

@@ -14,7 +14,7 @@ import { connectors, responses as settingsResponses } from "./settings";
 
 const w = session("w1", "laozhou", working(now - 3 * min), {
   name: "老周",
-  policy: { kind: "managedWorktree", repo: "vibevalley" },
+  policy: { kind: "directCwd", repo: "vibevalley", permissionMode: "bypass" },
   bindings: [{ kind: "issue", id: issueId("i18") }],
   spent: { tokens: 182_400, cny: 0.42 },
 });
@@ -24,7 +24,7 @@ const r = session(
   { _tag: "resting" },
   {
     name: "小林",
-    policy: { kind: "managedWorktree", repo: "vibevalley" },
+    policy: { kind: "directCwd", repo: "vibevalley", permissionMode: "bypass" },
     bindings: [{ kind: "issue", id: issueId("i17") }],
     lastRun: { outcome: "completed", summary: "登录过期回到登录页，加了两条测试。", at: now - 8 * min },
   },
@@ -35,7 +35,7 @@ const d = session(
   { _tag: "done" },
   {
     name: "老周",
-    policy: { kind: "managedWorktree", repo: "vibevalley" },
+    policy: { kind: "directCwd", repo: "vibevalley", permissionMode: "bypass" },
     bindings: [{ kind: "issue", id: issueId("i12") }],
     hiredAt: now - 300 * min,
   },

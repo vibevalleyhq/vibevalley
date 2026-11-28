@@ -43,7 +43,7 @@
 
 ## 怎么走
 
-1. **新回合召回**：开会话（`crates/server/src/agent/profile/drive.rs`）时传入任务文本，召回的拼入 `【你记得的】`。
+1. **新回合召回**：开会话（`crates/server/src/agent/drive.rs`）时传入任务文本，召回的拼入 `【你记得的】`。
 2. **回合结束记下**：正常结束的回合写入 `note` 与 `issue`。
 
 ## 和谁打交道

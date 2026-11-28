@@ -61,7 +61,6 @@
    "status": "online",
    "here": true,
    "ephemeral": false,
-   "worktreeSupported": true,
    "joinedAt": 1700000000000,
    "lastSeenAt": 1700000060000,
    "runtimes": [
@@ -83,7 +82,6 @@
    "status": "draining",
    "here": false,
    "ephemeral": true,
-   "worktreeSupported": false,
    "joinedAt": 1700000100000,
    "runtimes": []
   }
@@ -103,7 +101,6 @@
    "name": "Linux GPU Box",
    "platform": "linux",
    "ephemeral": false,
-   "worktreeSupported": true,
    "runtimes": [
     {
      "id": "claude",
@@ -141,8 +138,6 @@
    "sessionId": "w1",
    "runtimeId": "claude",
    "repoRef": "vibevalley",
-   "branch": "feat/machine",
-   "baseRef": "main",
    "workdir": "/work/w1",
    "systemPrompt": "Be concise.",
    "model": "claude-sonnet-4-5",
@@ -238,27 +233,6 @@
    "ok": true,
    "mime": "image/png",
    "bytesB64": "iVBORw0KGgo="
-  },
-  {
-   "type": "worktree.prepare",
-   "requestId": "req-8",
-   "taskId": "i1",
-   "repoRef": "vibevalley",
-   "branch": "feat/issue-1",
-   "baseRef": "main"
-  },
-  {
-   "type": "worktree.result",
-   "requestId": "req-8",
-   "ok": true,
-   "workdir": "/work/i1",
-   "branch": "feat/issue-1"
-  },
-  {
-   "type": "worktree.cleanup",
-   "requestId": "req-9",
-   "taskId": "i1",
-   "workdir": "/work/i1"
   },
   {
    "type": "error",

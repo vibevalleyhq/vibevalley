@@ -51,12 +51,10 @@
  ],
  "SpacePaths": [
   {
-   "repos": "s4635",
-   "worktrees": "s4636"
+   "repos": "s4635"
   },
   {
-   "repos": "s4638",
-   "worktrees": "s4639"
+   "repos": "s4638"
   }
  ],
  "Readiness": [
@@ -80,8 +78,7 @@
    "file": "s4641",
    "home": "s4642",
    "paths": {
-    "repos": "s4643",
-    "worktrees": "s4644"
+    "repos": "s4643"
    },
    "version": "s4646",
    "locale": "zh",
@@ -153,8 +150,7 @@
    "file": "s4677",
    "home": "s4678",
    "paths": {
-    "repos": "s4679",
-    "worktrees": "s4680"
+    "repos": "s4679"
    },
    "version": "s4682",
    "locale": "zh",

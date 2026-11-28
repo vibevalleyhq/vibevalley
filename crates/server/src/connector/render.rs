@@ -1,21 +1,211 @@
-//! Per-channel notification and missed-batch digest rendering across
-//! WeChat (`Weixin`), Feishu (`Feishu`), and QQ (`Qq`).
+//! Per-channel notification formatting, text chunking, pairing helpers, and
+//! missed-batch digest rendering across WeChat (`Weixin`), Feishu (`Feishu`), and QQ (`Qq`).
 
+use std::sync::LazyLock;
+
+use regex::Regex;
 use vibevalley_i18n::{locale as current_locale, t_in};
 use vibevalley_protocol::ConnectorID;
 
-use super::digest::{DigestEntry, PersonalEvent, format_personal_event_in, parse_digest_entry};
-use crate::context::text::clip_plain;
+use crate::context::text::{clip_plain, within};
 
-/// Renders a single [`PersonalEvent`] adapted for `channel` in the active locale.
-pub fn render_personal_event(channel: ConnectorID, event: &PersonalEvent) -> String {
-    render_personal_event_in(channel, &current_locale(), event)
+/// More than this many waiting go out as one digest.
+pub const DIGEST_OVER: usize = 3;
+
+static PAIR_WORD: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^(?i:配对|pair)").expect("a pattern"));
+
+/// Spaces and the pairing word in front (配对, or pair) allowed, whatever the locale.
+pub fn is_pairing(text: &str, code: &str) -> bool {
+    let flat: String = text.chars().filter(|c| !c.is_whitespace()).collect();
+    PAIR_WORD.replace(&flat, "") == code
 }
 
-/// Renders a single [`PersonalEvent`] adapted for `channel` in an explicit `locale`.
-pub fn render_personal_event_in(channel: ConnectorID, locale: &str, event: &PersonalEvent) -> String {
-    let canonical = format_personal_event_in(locale, event);
-    adapt_notification(channel, &canonical)
+/// Enough to recognise, not to copy.
+pub fn short_id(id: &str) -> String {
+    let chars: Vec<char> = id.chars().collect();
+    if chars.len() <= 10 {
+        return id.to_string();
+    }
+    let head: String = chars[..4].iter().collect();
+    let tail: String = chars[chars.len() - 4..].iter().collect();
+    format!("{head}…{tail}")
+}
+
+/// `text` in pieces of at most `max` UTF-16 units, preferring paragraph (`\n\n`) then line (`\n`) boundaries.
+pub fn split_text(text: &str, max: usize) -> Vec<String> {
+    if text.is_empty() {
+        return vec![];
+    }
+    let max = max.max(1);
+    let mut pieces = vec![];
+    let mut rest = text;
+    while rest.encode_utf16().count() > max {
+        let window_end = within(rest, max);
+        let window = &rest[..window_end];
+        let para_cut = window
+            .rfind("\n\n")
+            .filter(|&cut| window[..cut].encode_utf16().count() * 3 >= max && !rest[..cut].trim_end().is_empty());
+        let line_cut = window
+            .rfind('\n')
+            .filter(|&cut| window[..cut].encode_utf16().count() * 2 > max && !rest[..cut].trim_end().is_empty());
+        let at = para_cut.or(line_cut).unwrap_or_else(|| {
+            if window_end > 0 {
+                window_end
+            } else {
+                rest.chars().next().map_or(0, char::len_utf8)
+            }
+        });
+        pieces.push(rest[..at].trim_end().to_string());
+        rest = rest[at..].trim_start();
+    }
+    if !rest.is_empty() {
+        pieces.push(rest.to_string());
+    }
+    pieces
+}
+
+/// Structured notification item parsed for grouped digest rendering.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DigestEntry {
+    pub category_label: String,
+    pub target: Option<String>,
+    pub summary: String,
+}
+
+/// Parses an outbox notification body into a deduplicated [`DigestEntry`].
+pub fn parse_digest_entry(message_id: &str, body: &str) -> DigestEntry {
+    let trimmed = body.trim();
+    if trimmed.is_empty() {
+        return DigestEntry {
+            category_label: String::new(),
+            target: None,
+            summary: String::new(),
+        };
+    }
+    let (raw_head, rest) = match trimmed.split_once('\n') {
+        Some((h, r)) => (h.trim(), r),
+        None => (trimmed, ""),
+    };
+    let head = strip_heading_wrappers(raw_head);
+    let inner = strip_outer_brackets(head);
+
+    let Some(inner) = inner else {
+        return DigestEntry {
+            category_label: String::new(),
+            target: None,
+            summary: clip_plain(trimmed, 90),
+        };
+    };
+
+    let (category_label, mut target) = match inner.split_once(" · ") {
+        Some((cat, tgt)) => {
+            let tgt = tgt.trim();
+            (cat.trim().to_string(), (!tgt.is_empty()).then(|| tgt.to_string()))
+        }
+        None => (inner.trim().to_string(), None),
+    };
+
+    let first_para_lines = first_paragraph_lines(rest);
+    let is_perm = message_id.starts_with("push:perm:") || first_para_lines.first().is_some_and(|l| l.starts_with("工具：") || l.starts_with("Tool: "));
+    let raw_summary = if is_perm {
+        first_para_lines.into_iter().take(2).collect::<Vec<_>>().join(" · ")
+    } else {
+        first_para_lines.into_iter().next().unwrap_or("").to_string()
+    };
+
+    let summary = dedupe_summary_against_target(&mut target, &raw_summary);
+    DigestEntry {
+        category_label,
+        target,
+        summary,
+    }
+}
+
+fn strip_heading_wrappers(s: &str) -> &str {
+    let s = s.trim();
+    let s = s.strip_prefix("### ").map(str::trim).unwrap_or(s);
+    s.strip_prefix("**").and_then(|inner| inner.strip_suffix("**")).map(str::trim).unwrap_or(s)
+}
+
+fn strip_outer_brackets(s: &str) -> Option<&str> {
+    let s = s.trim();
+    if let Some(inner) = s.strip_prefix('【').and_then(|rest| rest.strip_suffix('】')) {
+        return Some(inner);
+    }
+    if let Some(inner) = s.strip_prefix('[').and_then(|rest| rest.strip_suffix(']')) {
+        return Some(inner);
+    }
+    None
+}
+
+fn first_paragraph_lines(rest: &str) -> Vec<&str> {
+    if rest.starts_with('\n') || rest.starts_with("\r\n") {
+        let after_blank = rest.trim_start_matches(['\r', '\n']);
+        if after_blank.trim_start().starts_with("---") || !after_blank.contains("\n\n") {
+            return Vec::new();
+        }
+    }
+    let mut lines = Vec::new();
+    for line in rest.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed == "---" {
+            if !lines.is_empty() {
+                break;
+            }
+            continue;
+        }
+        lines.push(trimmed);
+    }
+    lines
+}
+
+fn issue_number_prefix(target: &str) -> Option<&str> {
+    let after_hash = target.strip_prefix('#')?;
+    let digits_len = after_hash.bytes().take_while(|b| b.is_ascii_digit()).count();
+    if digits_len == 0 {
+        return None;
+    }
+    let end = 1 + digits_len;
+    if target.as_bytes().get(end) == Some(&b' ') {
+        Some(&target[..end])
+    } else {
+        None
+    }
+}
+
+fn strip_issue_prefix(target: &str) -> &str {
+    match issue_number_prefix(target) {
+        Some(prefix) => target[prefix.len()..].trim_start(),
+        None => target,
+    }
+}
+
+fn dedupe_summary_against_target(target: &mut Option<String>, raw_summary: &str) -> String {
+    let clean_summary = clip_plain(raw_summary, 240);
+    if clean_summary.is_empty() {
+        return String::new();
+    }
+    if let Some(tgt) = target.as_deref() {
+        let clean_tgt = clip_plain(tgt, 240);
+        let title_part = strip_issue_prefix(&clean_tgt);
+        if clean_summary == clean_tgt || (!title_part.is_empty() && clean_summary == title_part) {
+            return String::new();
+        }
+        if title_part.ends_with('…') {
+            let prefix = title_part.trim_end_matches('…').trim_end();
+            if !prefix.is_empty() && clean_summary.starts_with(prefix) {
+                let tail = &clean_summary[prefix.len()..];
+                if !tail.starts_with([':', '：']) {
+                    *target = Some(match issue_number_prefix(&clean_tgt) {
+                        Some(num) => format!("{num} {}", clip_plain(&clean_summary, 72)),
+                        None => clip_plain(&clean_summary, 72),
+                    });
+                    return String::new();
+                }
+            }
+        }
+    }
+    clip_plain(&clean_summary, 100)
 }
 
 /// Adapts a canonical single push notification body for `channel`.
@@ -79,7 +269,7 @@ pub fn render_digest_in(channel: ConnectorID, locale: &str, entries: &[DigestEnt
     t_in(locale, wrapper_key, &[("n", total.into()), ("lines", body.into())])
 }
 
-/// Convenience helper for raw message lines (used by `digest::digest`).
+/// Convenience helper for raw message lines.
 pub fn render_digest_lines(channel: ConnectorID, locale: &str, lines: &[String]) -> String {
     let entries: Vec<DigestEntry> = lines.iter().map(|line| parse_digest_entry("", line)).collect();
     render_digest_in(channel, locale, &entries)
@@ -186,129 +376,6 @@ fn format_digest_item(channel: ConnectorID, index: usize, entry: &DigestEntry, s
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::connector::digest::{personal_event_for_issue, split_text};
-    use vibevalley_protocol::{Issue, IssueStage, IssueStageKind};
-
-    fn review_issue(number: i64, title: &str) -> Issue {
-        let mut issue = Issue::new(format!("iss-{number}"), number, title, 1_000);
-        issue.stage = IssueStage {
-            state: IssueStageKind::Reviewing,
-            since: Some(2_000 + number),
-            stuck: None,
-            lead: None,
-            acts: vec![],
-        };
-        issue
-    }
-
-    #[test]
-    fn single_notifications_adapt_per_channel_in_zh_and_en_without_title_duplication() {
-        let issue = review_issue(83, "[UX/工作区] 优化标签页切换动画");
-        let ev_no_summary = personal_event_for_issue(&issue, None, 2_000, None).unwrap();
-        let ev_with_summary = personal_event_for_issue(&issue, Some("已补充快捷键与测试"), 2_000, None).unwrap();
-
-        // Weixin: plain mobile text, no raw markdown, no repeated title.
-        let wx_zh = render_personal_event_in(ConnectorID::Weixin, "zh", &ev_no_summary);
-        assert_eq!(wx_zh, "【待你验收 · #83 [UX/工作区] 优化标签页切换动画】\n\n请在工作台验收或回复意见。");
-        assert!(!wx_zh.contains("**") && !wx_zh.contains("###") && !wx_zh.contains("---"));
-        assert_eq!(wx_zh.matches("优化标签页切换动画").count(), 1);
-
-        let wx_en = render_personal_event_in(ConnectorID::Weixin, "en", &ev_with_summary);
-        assert_eq!(
-            wx_en,
-            "[Ready for Review · #83 [UX/工作区] 优化标签页切换动画]\n已补充快捷键与测试\n\nReview in VibeValley or reply with feedback."
-        );
-
-        // Feishu: structured markdown heading, blank-line breaks, and visual divider.
-        let fs_zh = render_personal_event_in(ConnectorID::Feishu, "zh", &ev_with_summary);
-        assert_eq!(
-            fs_zh,
-            "**【待你验收 · #83 [UX/工作区] 优化标签页切换动画】**\n\n已补充快捷键与测试\n\n---\n请在工作台验收或回复意见。"
-        );
-        let fs_en = render_personal_event_in(ConnectorID::Feishu, "en", &ev_no_summary);
-        assert_eq!(
-            fs_en,
-            "**[Ready for Review · #83 [UX/工作区] 优化标签页切换动画]**\n\n---\nReview in VibeValley or reply with feedback."
-        );
-
-        // QQ: platform-safe plain text with blank-line paragraph separation and no markdown.
-        let qq_zh = render_personal_event_in(ConnectorID::Qq, "zh", &ev_with_summary);
-        assert_eq!(
-            qq_zh,
-            "【待你验收 · #83 [UX/工作区] 优化标签页切换动画】\n\n已补充快捷键与测试\n\n请在工作台验收或回复意见。"
-        );
-        assert!(!qq_zh.contains("**") && !qq_zh.contains("###"));
-        let qq_en = render_personal_event_in(ConnectorID::Qq, "en", &ev_no_summary);
-        assert_eq!(
-            qq_en,
-            "[Ready for Review · #83 [UX/工作区] 优化标签页切换动画]\n\nReview in VibeValley or reply with feedback."
-        );
-    }
-
-    #[test]
-    fn nineteen_item_review_digest_groups_deduplicates_and_adapts_across_channels_in_zh_and_en() {
-        let issues: Vec<Issue> = (83..102).map(|n| review_issue(n, &format!("[UX/工作区] 第 {n} 项任务卡片打磨"))).collect();
-
-        for locale in ["zh", "en"] {
-            let entries: Vec<DigestEntry> = issues
-                .iter()
-                .map(|issue| {
-                    let ev = personal_event_for_issue(issue, None, 2_000, None).unwrap();
-                    DigestEntry::from_event(locale, &ev)
-                })
-                .collect();
-
-            for channel in ConnectorID::ALL {
-                let rendered = render_digest_in(channel, locale, &entries);
-                let paragraphs: Vec<&str> = rendered.split("\n\n").collect();
-                assert_eq!(paragraphs.len(), 3, "{channel:?}/{locale}: expected header, 1 group, footer: {rendered}");
-
-                for n in 83..102 {
-                    let idx = (n - 83) + 1;
-                    let title = format!("[UX/工作区] 第 {n} 项任务卡片打磨");
-                    assert!(
-                        rendered.contains(&format!("{idx}. #{n} {title}")),
-                        "{channel:?}/{locale}: missing item #{n}: {rendered}"
-                    );
-                    assert_eq!(rendered.matches(&title).count(), 1, "{channel:?}/{locale}: duplicated title #{n}: {rendered}");
-                }
-
-                match channel {
-                    ConnectorID::Weixin => {
-                        assert!(!rendered.contains("**") && !rendered.contains("###") && !rendered.contains("---"));
-                        if locale == "zh" {
-                            assert!(rendered.contains("你不在的时候有 19 条消息：\n\n【待你验收 (19)】\n1. #83 "));
-                            assert!(rendered.ends_with("\n\n完整的在默认频道里。"));
-                        } else {
-                            assert!(rendered.contains("19 messages while you were away:\n\n[Ready for Review (19)]\n1. #83 "));
-                            assert!(rendered.ends_with("\n\nThe whole of them is in the default channel."));
-                        }
-                    }
-                    ConnectorID::Feishu => {
-                        if locale == "zh" {
-                            assert!(rendered.contains("**你不在的时候有 19 条消息**\n\n### 【待你验收 (19)】\n1. #83 "));
-                            assert!(rendered.ends_with("\n\n---\n完整的在默认频道里。"));
-                        } else {
-                            assert!(rendered.contains("**19 messages while you were away**\n\n### [Ready for Review (19)]\n1. #83 "));
-                            assert!(rendered.ends_with("\n\n---\nThe whole of them is in the default channel."));
-                        }
-                    }
-                    ConnectorID::Qq => {
-                        assert!(!rendered.contains("**") && !rendered.contains("###") && !rendered.contains("---"));
-                        if locale == "zh" {
-                            assert!(rendered.contains("你不在的时候有 19 条消息：\n\n【待你验收 (19)】\n1. #83 "));
-                            assert!(rendered.ends_with("\n\n完整的在默认频道里。"));
-                        } else {
-                            assert!(rendered.contains("19 messages while you were away:\n\n[Ready for Review (19)]\n1. #83 "));
-                            assert!(rendered.ends_with("\n\nThe whole of them is in the default channel."));
-                        }
-                        let pieces = split_text(&rendered, 2000);
-                        assert!(pieces.iter().all(|p| p.encode_utf16().count() <= 2000));
-                    }
-                }
-            }
-        }
-    }
 
     #[test]
     fn mixed_category_digest_separates_groups_and_splits_on_paragraph_boundaries() {
@@ -343,7 +410,6 @@ mod tests {
         assert!(pieces.len() >= 2);
         for piece in &pieces {
             assert!(piece.encode_utf16().count() <= 110);
-            // Every piece keeps group headers intact without orphan splits mid-entry.
             for line in piece.lines() {
                 if line.starts_with("1. ") || line.starts_with("2. ") {
                     assert!(line.contains('#') || line.contains("构建已通过"), "unexpected split inside item: {line}");

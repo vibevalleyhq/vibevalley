@@ -1,31 +1,18 @@
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 
-use parking_lot::Mutex;
-use tokio::sync::{broadcast, watch};
-use tokio::task::JoinHandle;
-use tokio_util::sync::CancellationToken;
-use vibevalley_core::channel::for_user;
 use vibevalley_i18n::t;
-use vibevalley_protocol::{
-    ApiError, BizCode, BoardSlice, ConnectorID, ConnectorLogin, ConnectorStatus, Issue, Millis, Notify, Op, Outcome, Session, SliceKind, ops,
-};
+use vibevalley_protocol::{ApiError, BizCode, ConnectorID, ConnectorLogin, ConnectorStatus, Op, ops};
 
-use super::adapter::App;
-use super::bridge::{self, Bridge, Env, Handoff};
-use super::digest::{PersonalEvent, PersonalEventKind, personal_event_for_issue, personal_event_for_run};
-use super::notify::{NotifyDecision, NotifyOptions, NotifyRouter};
+use super::adapter::{App, ConnectorHost};
+use super::bridge::{Bridge, Env};
 use super::{feishu, qq, weixin};
-use crate::channel::{ChannelEvent, Chat, to_message};
-use crate::context::port::{ConnectorIssuePort, DigestDeliveryPort, DigestTargets};
-use crate::context::{Context, OUTBOX_CONNECTOR_NOTIFY, OutboxConnectorNotify, OutboxEvent, OutboxSessionReported, now};
-use crate::runtime::{PermissionEvent, Runtime};
+use crate::context::{Context, now};
 use crate::setting::Setting;
 
 /// How long a message in or out is kept after it went through, for a reply to point at.
 const KEPT_MS: i64 = 30 * 24 * 60 * 60_000;
-const DAY: Duration = Duration::from_secs(24 * 60 * 60);
 
 /// Where each app is reached.
 #[derive(Debug, Clone)]
@@ -65,8 +52,6 @@ pub struct Options {
     pub moment: Duration,
     /// Feishu's registration is asked about no more often than this.
     pub poll_floor: Duration,
-    /// Personal push & scheduled digest routing rules.
-    pub notify: NotifyOptions,
 }
 
 impl Default for Options {
@@ -78,7 +63,6 @@ impl Default for Options {
             reconnect: Duration::from_secs(2),
             moment: Duration::from_millis(1500),
             poll_floor: Duration::from_secs(2),
-            notify: NotifyOptions::default(),
         }
     }
 }
@@ -105,24 +89,18 @@ fn refused(text: String) -> ApiError {
     ApiError::new(BizCode::ConnectorRefused, text)
 }
 
+/// Pure external IM protocol coordinator owning WeChat, Feishu, and QQ bridges.
 pub struct Connector {
     env: Arc<Env>,
     bridges: Vec<Arc<Bridge>>,
-    notify: Arc<NotifyRouter>,
-    cancel: CancellationToken,
-    /// Awaited on close to end background feed/board/permission tasks.
-    feed: Mutex<Option<Vec<JoinHandle<()>>>>,
 }
 
 impl Connector {
-    pub async fn open_async(ctx: Arc<Context>, setting: Arc<Setting>, chat: Arc<Chat>, options: Options) -> Result<Arc<Connector>, ApiError> {
-        let notify = Arc::new(NotifyRouter::new(options.notify.clone()));
+    pub async fn open_async(ctx: Arc<Context>, setting: Arc<Setting>, options: Options, host: Arc<dyn ConnectorHost>) -> Result<Arc<Connector>, ApiError> {
         let env = Arc::new(Env {
             ctx: ctx.clone(),
             setting,
-            chat: chat.clone(),
-            issue: OnceLock::new(),
-            runtime: OnceLock::new(),
+            host,
             retry_first: options.retry_first,
             retry_most: options.retry_most,
             reconnect: options.reconnect,
@@ -133,78 +111,40 @@ impl Connector {
         for b in &bridges {
             b.load_async().await;
         }
-        if let (Ok(raw_issues), Ok(sessions)) = (ctx.service.issue.all().await, ctx.service.session.all().await) {
-            let derived = vibevalley_core::derive_issues(&raw_issues, &sessions);
-            notify.seed_issues(&derived, &sessions, ctx.now());
-        }
-        {
-            let outbox_bridges = bridges.clone();
-            let outbox_env = env.clone();
-            let push_targets = options.notify.push_targets.clone();
-            ctx.outbox.register(OUTBOX_CONNECTOR_NOTIFY, move |delivery| {
-                let bridges = outbox_bridges.clone();
-                let env = outbox_env.clone();
-                let push_targets = push_targets.clone();
-                async move {
-                    let payload: OutboxConnectorNotify = delivery.decode().map_err(|e| format!("invalid {OUTBOX_CONNECTOR_NOTIFY} payload: {e}"))?;
-                    let at = env.ctx.now();
-                    for b in &bridges {
-                        let targeted = match payload.connector {
-                            Some(id) => b.id() == id,
-                            None => push_targets.contains(&b.id()),
-                        };
-                        if targeted && b.is_paired() {
-                            b.offer_notification_async(&payload.message_id, &payload.body, at).await;
-                        }
-                    }
-                    Ok::<(), String>(())
-                }
-            });
-        }
-        let cancel = ctx.task.child_token();
-        let feed_cancel = cancel.clone();
-        let events = chat.subscribe_events();
-        let (feed_bridges, feed_env) = (bridges.clone(), env.clone());
-        let feed_handle = ctx.spawn("connector.feed", feed(feed_env, feed_bridges, events, feed_cancel));
-        let board_rx = ctx.feed.subscribe_json(SliceKind::Board);
-        let board_handle = ctx.spawn(
-            "connector.board_events",
-            watch_board_events(env.clone(), bridges.clone(), notify.clone(), board_rx, cancel.clone()),
-        );
         for b in &bridges {
             if b.has_account() {
                 b.resume();
             }
         }
-        Ok(Arc::new(Connector {
-            env,
-            bridges,
-            notify,
-            cancel,
-            feed: Mutex::new(Some(vec![feed_handle, board_handle])),
-        }))
+        Ok(Arc::new(Connector { env, bridges }))
     }
 
-    /// Attaches issue board and runtime handles so quote-replies execute actions and permission requests push live.
-    pub fn attach_actions(&self, issue: Arc<dyn ConnectorIssuePort>, runtime: Arc<Runtime>) {
-        let _ = self.env.issue.set(issue);
-        let _ = self.env.runtime.set(runtime.clone());
-        let perm_rx = runtime.subscribe_permissions();
-        let handle = self.env.ctx.spawn(
-            "connector.permission_events",
-            watch_permission_events(self.env.clone(), self.bridges.clone(), self.notify.clone(), perm_rx, self.cancel.clone()),
-        );
-        if let Some(handles) = self.feed.lock().as_mut() {
-            handles.push(handle);
-        }
+    pub fn is_closing(&self) -> bool {
+        self.env.closing.load(Ordering::SeqCst)
     }
 
     pub fn setting(&self) -> &Arc<Setting> {
         &self.env.setting
     }
 
-    fn bridge(&self, id: ConnectorID) -> &Arc<Bridge> {
+    pub(crate) fn bridge(&self, id: ConnectorID) -> &Arc<Bridge> {
         self.bridges.iter().find(|b| b.id() == id).expect("every chat app has its bridge")
+    }
+
+    pub fn is_paired(&self, id: ConnectorID) -> bool {
+        self.bridge(id).is_paired()
+    }
+
+    pub fn has_account(&self, id: ConnectorID) -> bool {
+        self.bridge(id).has_account()
+    }
+
+    pub fn paired_ids(&self) -> Vec<ConnectorID> {
+        self.bridges.iter().filter(|b| b.is_paired()).map(|b| b.id()).collect()
+    }
+
+    pub fn bound_channel_id(&self, id: ConnectorID) -> Option<String> {
+        self.bridge(id).bound_channel_id()
     }
 
     pub async fn list_async(&self) -> Vec<ConnectorStatus> {
@@ -229,14 +169,65 @@ impl Connector {
         self.bridge(id).logout_async().await
     }
 
-    /// Ties the app to the channel called `name`.
-    pub async fn set_channel_async(&self, id: ConnectorID, name: &str) -> Result<ConnectorStatus, ApiError> {
-        let chat = &self.env.chat;
-        let channel = chat
-            .channel_by_name(name)
-            .ok_or_else(|| refused(t("server.connector.noChannel", &[("name", name.into())])))?;
-        let bound = (!channel.default).then_some(channel.id.as_str());
+    /// Persists the bound channel id (`None` means default channel) for `id`.
+    pub async fn set_channel_id_async(&self, id: ConnectorID, bound: Option<&str>) -> Result<ConnectorStatus, ApiError> {
         self.bridge(id).set_channel_async(bound).await.map_err(|e| refused(e.to_string()))
+    }
+
+    /// Offers a pre-formatted channel message to any paired bridge bound to `top_channel_id`.
+    pub async fn offer_channel_text_async(&self, message_id: &str, top_channel_id: &str, default_channel_id: &str, text: &str) {
+        for b in &self.bridges {
+            if !b.is_paired() {
+                continue;
+            }
+            let target = b.bound_channel_id();
+            let effective = target.as_deref().unwrap_or(default_channel_id);
+            if effective == top_channel_id {
+                b.offer_text_async(message_id, text).await;
+            }
+        }
+    }
+
+    /// Offers a notification/digest body to a specific paired connector.
+    pub async fn offer_notification_async(&self, id: ConnectorID, message_id: &str, body: &str, at: i64) {
+        let b = self.bridge(id);
+        if b.is_paired() {
+            b.offer_notification_async(message_id, body, at).await;
+        }
+    }
+
+    /// Wakes every connected bridge to re-evaluate pending outgoing messages.
+    pub async fn notify_changed_all_async(&self) {
+        for b in &self.bridges {
+            if b.has_account() {
+                b.changed_async().await;
+            }
+        }
+    }
+
+    /// Withdraws one exact push message id from every paired bridge.
+    pub async fn withdraw_push_message_all_async(&self, message_id: &str) {
+        for b in &self.bridges {
+            if b.is_paired() {
+                b.withdraw_push_message_async(message_id).await;
+            }
+        }
+    }
+
+    /// Withdraws all pending outgoing rows whose message id starts with `prefix` from every paired bridge.
+    pub async fn withdraw_prefix_all_async(&self, prefix: &str) {
+        for b in &self.bridges {
+            if b.is_paired() {
+                b.withdraw_prefix_async(prefix).await;
+            }
+        }
+    }
+
+    /// Prunes delivered connector history older than the retention window.
+    pub async fn prune_history_async(&self) {
+        if let Err(e) = self.env.ctx.service.connector.prune(now() - KEPT_MS).await {
+            eprintln!("vibevalley-server: connector: history was not pruned: {e}");
+        }
     }
 
     /// Every account's work stopped, and waited for.
@@ -245,127 +236,6 @@ impl Connector {
         for b in &self.bridges {
             b.stop_async().await;
         }
-        self.cancel.cancel();
-        let feed = self.feed.lock().take();
-        if let Some(handles) = feed {
-            for handle in handles {
-                let _ = handle.await;
-            }
-        }
-    }
-
-    fn has_paired_target(&self, target: Option<ConnectorID>) -> bool {
-        match target {
-            Some(id) => self.bridge(id).is_paired(),
-            None => self.notify.options().push_targets.iter().any(|id| self.bridge(*id).is_paired()),
-        }
-    }
-
-    /// Evaluates quiet/dedupe/rate-limit policy and durably enqueues a personal notification
-    /// if at least one targeted connector account is paired.
-    pub async fn push_personal_event_async(&self, event: PersonalEvent) -> Result<Option<NotifyDecision>, ApiError> {
-        if self.env.closing.load(Ordering::SeqCst) || !self.has_paired_target(None) {
-            return Ok(None);
-        }
-        let channel_notify = event.channel_id.as_deref().map(|cid| self.env.chat.notify_of(cid)).unwrap_or(Notify::All);
-        let decision = self.notify.submit_event_async(&self.env.ctx, None, &event, channel_notify).await?;
-        Ok(Some(decision))
-    }
-
-    /// Handles a durable [`OutboxSessionReported`] event from [`Outbox`], routing actionable
-    /// issue/run notifications through [`NotifyRouter`] without blocking the caller transaction.
-    pub async fn on_session_reported_async(&self, report: &OutboxSessionReported) {
-        if self.env.closing.load(Ordering::SeqCst) || !self.has_paired_target(None) {
-            return;
-        }
-        let session = match self.env.ctx.service.session.get(&report.id).await {
-            Ok(Some(s)) => s,
-            Ok(None) => match self.env.ctx.service.session.past(&report.id).await {
-                Ok(Some(s)) => s,
-                _ => return,
-            },
-            Err(_) => return,
-        };
-        let event = if let Some(issue_id) = session.issue_id() {
-            let Ok(Some(raw_issue)) = self.env.ctx.service.issue.get(issue_id).await else {
-                return;
-            };
-            let Ok(sessions) = self.env.ctx.service.session.all().await else {
-                return;
-            };
-            let derived = vibevalley_core::derive_issues(&[raw_issue], &sessions);
-            let Some(issue) = derived.into_iter().next() else {
-                return;
-            };
-            let channel_id = issue_top_channel(&self.env.chat, &issue, &sessions);
-            let session_summary = (!report.summary.trim().is_empty())
-                .then_some(report.summary.as_str())
-                .or_else(|| session.last_run.as_ref().map(|r| r.summary.as_str()));
-            personal_event_for_issue(&issue, session_summary, report.at, channel_id)
-        } else {
-            let already_forwarded_in_bound_channel = session.is_direct_talker()
-                && report.outcome == Outcome::Completed
-                && session.channel_id().is_some_and(|cid| {
-                    let top = self.env.chat.top_of(cid).id;
-                    let bound = self
-                        .notify
-                        .options()
-                        .push_targets
-                        .iter()
-                        .any(|id| self.bridge(*id).status_channel_id(&self.env.chat) == top);
-                    bound && self.env.chat.notify_of(cid) != Notify::None
-                });
-            if already_forwarded_in_bound_channel {
-                None
-            } else {
-                personal_event_for_run(
-                    &session,
-                    report.run.as_deref(),
-                    report.outcome,
-                    &report.summary,
-                    report.spent.as_ref(),
-                    report.at,
-                )
-            }
-        };
-        if let Some(ev) = event {
-            let _ = self.push_personal_event_async(ev).await;
-        }
-    }
-
-    /// Enqueues a scheduled progress digest to configured / requested connector targets via Outbox.
-    pub async fn deliver_digest_async(&self, cron_id: &str, at: Millis, targets: DigestTargets, text: &str) -> Result<usize, ApiError> {
-        if self.env.closing.load(Ordering::SeqCst) || text.trim().is_empty() {
-            return Ok(0);
-        }
-        let target_ids: Vec<ConnectorID> = match targets {
-            DigestTargets::Default => self.notify.options().digest_targets,
-            DigestTargets::Connectors(ids) => ids,
-            DigestTargets::AllConnected => self.bridges.iter().filter(|b| b.is_paired()).map(|b| b.id()).collect(),
-        };
-        let mut delivered = 0usize;
-        let now_ms = self.env.ctx.now();
-        for id in target_ids {
-            if !self.bridge(id).is_paired() {
-                continue;
-            }
-            let payload = OutboxEvent::ConnectorNotify(OutboxConnectorNotify {
-                connector: Some(id),
-                dedupe_key: format!("digest:{cron_id}:{at}:{}", id.as_str()),
-                message_id: format!("digest:{cron_id}:{at}"),
-                issue_id: None,
-                channel_id: None,
-                body: text.to_string(),
-                created_at: now_ms,
-                urgent: true,
-            });
-            self.env.ctx.outbox.enqueue_event(&payload).await?;
-            delivered += 1;
-        }
-        if delivered > 0 {
-            self.env.ctx.outbox.wake();
-        }
-        Ok(delivered)
     }
 
     pub(crate) async fn handle_login(&self, req: <ops::ConnectorLogin as Op>::Input) -> Result<ConnectorStatus, ApiError> {
@@ -391,205 +261,6 @@ impl Connector {
         let id = app_of(&req.id)?;
         Ok(self.logout_async(id).await)
     }
-
-    pub(crate) async fn handle_channel_set(&self, req: <ops::ConnectorChannelSet as Op>::Input) -> Result<ConnectorStatus, ApiError> {
-        let id = app_of(&req.id)?;
-        self.set_channel_async(id, &req.channel).await
-    }
-}
-
-/// What the farm says for the user goes to every app (each checks it is its channel's); a read or newer words
-/// make them look again at what waits; what went through long ago is dropped, at start and daily.
-async fn feed(env: Arc<Env>, bridges: Vec<Arc<Bridge>>, mut events: broadcast::Receiver<ChannelEvent>, cancel: CancellationToken) {
-    loop {
-        if let Err(e) = env.ctx.service.connector.prune(now() - KEPT_MS).await {
-            eprintln!("vibevalley-server: connector: history was not pruned: {e}");
-        }
-        let day = tokio::time::sleep(DAY);
-        tokio::pin!(day);
-        loop {
-            enum Fed {
-                Event(Box<ChannelEvent>),
-                Lagged,
-                Day,
-                Over,
-            }
-            let fed = tokio::select! {
-                biased;
-                _ = cancel.cancelled() => Fed::Over,
-                res = events.recv() => match res {
-                    Ok(ev) => Fed::Event(Box::new(ev)),
-                    Err(broadcast::error::RecvError::Lagged(_)) => Fed::Lagged,
-                    Err(broadcast::error::RecvError::Closed) => Fed::Over,
-                },
-                _ = &mut day => Fed::Day,
-            };
-            match fed {
-                Fed::Event(event) => {
-                    let wake = match *event {
-                        ChannelEvent::Posted(c) => {
-                            let m = to_message(&c.row);
-                            if for_user(&m, env.chat.notify_of(&m.channel)) && matches!(bridge::handoff_async(&env.chat, &m.id).await, Ok(Handoff::Unseen)) {
-                                for b in &bridges {
-                                    b.offer_async(&m).await;
-                                }
-                            }
-                            true
-                        }
-                        ChannelEvent::Removed { .. } | ChannelEvent::UserRead { .. } => true,
-                        ChannelEvent::Edited(_) | ChannelEvent::Reacted(_) | ChannelEvent::Pinned(_) => false,
-                    };
-                    if wake {
-                        for b in &bridges {
-                            if b.has_account() {
-                                b.changed_async().await;
-                            }
-                        }
-                    }
-                }
-                Fed::Lagged => {
-                    for b in &bridges {
-                        if b.has_account() {
-                            b.changed_async().await;
-                        }
-                    }
-                }
-                Fed::Day => break,
-                Fed::Over => return,
-            }
-        }
-    }
-}
-
-fn issue_top_channel(chat: &Chat, issue: &Issue, sessions: &[Session]) -> Option<String> {
-    let sid = issue.latest_session_id()?;
-    let ch = sessions.iter().find(|s| &s.id == sid).and_then(|s| s.channel_id())?;
-    Some(chat.top_of(ch).id)
-}
-
-async fn watch_board_events(
-    env: Arc<Env>,
-    bridges: Vec<Arc<Bridge>>,
-    notify: Arc<NotifyRouter>,
-    mut board_rx: watch::Receiver<Arc<str>>,
-    cancel: CancellationToken,
-) {
-    let _ = board_rx.borrow_and_update();
-    loop {
-        tokio::select! {
-            biased;
-            _ = cancel.cancelled() => return,
-            changed = board_rx.changed() => {
-                if changed.is_err() {
-                    return;
-                }
-            }
-        }
-        if env.closing.load(Ordering::SeqCst) {
-            return;
-        }
-        let json = board_rx.borrow_and_update().clone();
-        let Ok(board) = serde_json::from_str::<BoardSlice>(&json) else {
-            continue;
-        };
-        let sessions = env.ctx.service.session.all().await.unwrap_or_default();
-        let now_ms = env.ctx.now();
-        let (events, settled) = notify.diff_board_issues(&board.issues, &sessions, now_ms, |issue| issue_top_channel(&env.chat, issue, &sessions));
-        for settled_msg_id in settled {
-            for b in &bridges {
-                if b.is_paired() {
-                    b.withdraw_push_message_async(&settled_msg_id).await;
-                }
-            }
-        }
-        let has_paired = notify
-            .options()
-            .push_targets
-            .iter()
-            .any(|id| bridges.iter().any(|b| b.id() == *id && b.is_paired()));
-        if !has_paired {
-            continue;
-        }
-        for event in events {
-            let channel_notify = event.channel_id.as_deref().map(|cid| env.chat.notify_of(cid)).unwrap_or(Notify::All);
-            let _ = notify.submit_event_async(&env.ctx, None, &event, channel_notify).await;
-        }
-    }
-}
-
-async fn watch_permission_events(
-    env: Arc<Env>,
-    bridges: Vec<Arc<Bridge>>,
-    notify: Arc<NotifyRouter>,
-    mut perm_rx: broadcast::Receiver<PermissionEvent>,
-    cancel: CancellationToken,
-) {
-    loop {
-        let ev = tokio::select! {
-            biased;
-            _ = cancel.cancelled() => return,
-            res = perm_rx.recv() => match res {
-                Ok(ev) => ev,
-                Err(broadcast::error::RecvError::Lagged(_)) => continue,
-                Err(broadcast::error::RecvError::Closed) => return,
-            },
-        };
-        if env.closing.load(Ordering::SeqCst) {
-            return;
-        }
-        match ev {
-            PermissionEvent::Requested {
-                session_id,
-                session_name,
-                channel_id,
-                request,
-                at,
-            } => {
-                let has_paired = notify
-                    .options()
-                    .push_targets
-                    .iter()
-                    .any(|id| bridges.iter().any(|b| b.id() == *id && b.is_paired()));
-                if !has_paired {
-                    continue;
-                }
-                let top_channel = channel_id.as_deref().map(|cid| env.chat.top_of(cid).id);
-                let channel_notify = top_channel.as_deref().map(|cid| env.chat.notify_of(cid)).unwrap_or(Notify::All);
-                let event = PersonalEvent {
-                    dedupe_key: format!("perm:{session_id}:{}", request.request_id),
-                    issue_id: None,
-                    issue_number: None,
-                    issue_title: None,
-                    session_id: Some(session_id),
-                    channel_id: top_channel,
-                    is_child_review: false,
-                    at,
-                    kind: PersonalEventKind::PermissionRequest {
-                        request_id: request.request_id,
-                        session_name,
-                        tool: request.tool,
-                        summary: request.summary,
-                        input: request.input,
-                    },
-                };
-                let _ = notify.submit_event_async(&env.ctx, None, &event, channel_notify).await;
-            }
-            PermissionEvent::Resolved { session_id, request_id } => {
-                for b in &bridges {
-                    if b.is_paired() {
-                        b.withdraw_perm_push_async(&session_id, &request_id).await;
-                    }
-                }
-            }
-            PermissionEvent::ClearedSession { session_id } => {
-                for b in &bridges {
-                    if b.is_paired() {
-                        b.withdraw_session_perm_pushes_async(&session_id).await;
-                    }
-                }
-            }
-        }
-    }
 }
 
 pub fn app_of(id: &str) -> Result<ConnectorID, ApiError> {
@@ -597,16 +268,4 @@ pub fn app_of(id: &str) -> Result<ConnectorID, ApiError> {
         .into_iter()
         .find(|c| c.as_str() == id)
         .ok_or_else(|| refused(t("server.connector.noConnector", &[("id", id.into())])))
-}
-
-impl DigestDeliveryPort for Connector {
-    fn deliver_digest_async<'a>(
-        &'a self,
-        cron_id: &'a str,
-        at: Millis,
-        targets: DigestTargets,
-        text: &'a str,
-    ) -> crate::BoxFuture<'a, Result<usize, ApiError>> {
-        Box::pin(async move { Self::deliver_digest_async(self, cron_id, at, targets, text).await })
-    }
 }

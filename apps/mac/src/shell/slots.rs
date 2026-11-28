@@ -184,7 +184,7 @@ impl Shell {
         F: std::future::Future<Output = R> + Send + 'static,
         T: FnOnce(&mut Self, R, &mut Context<Self>) + 'static,
     {
-        let task = vibevalley_rt::current_or_global_handle().spawn(fut);
+        let task = vibevalley_kit::rt::current_or_global_handle().spawn(fut);
         cx.spawn(async move |this, cx| {
             if let Ok(result) = task.await {
                 let _ = this.update(cx, |shell, cx| then(shell, result, cx));

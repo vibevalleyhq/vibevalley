@@ -3,7 +3,7 @@ import { expect, open, test } from "nsh/test";
 
 import { setLocale } from "@vibevalley/i18n";
 import "@vibevalley/i18n/catalogs";
-import { type Note, type NoteId, userId } from "@vibevalley/protocol";
+import { localUserParticipant, type Note, type NoteId } from "@vibevalley/protocol";
 
 import { fakeHost, type FakeHost } from "../../fixtures/fakeHost";
 import { responses as noteResponses } from "../../fixtures/notes";
@@ -52,7 +52,7 @@ test("PageTree lists hierarchy and triggers note.create for root notes", async (
     title: "Engineering Hub",
     noteType: "doc",
     sortOrder: 1,
-    by: userId,
+    by: localUserParticipant,
     byName: "You",
     version: 0,
     seq: 1,
@@ -75,4 +75,60 @@ test("PageTree lists hierarchy and triggers note.create for root notes", async (
   await app.press("id:page-tree-add-root-doc");
   await fake.pumpUntil(app, () => fake.calls.some((c) => c.op === "note.create"));
   expect(fake.calls.find((c) => c.op === "note.create")?.payload).toMatchObject({ noteType: "doc" });
+});
+
+test("PresenterPage renders styled callout, quote, todo, toggle, and code blocks", async () => {
+  setLocale("en");
+  const richNote: Note = {
+    id: "note-pres-rich" as NoteId,
+    title: "Architecture Deck",
+    noteType: "doc",
+    sortOrder: 1,
+    by: localUserParticipant,
+    byName: "You",
+    version: 1,
+    seq: 1,
+    versions: [],
+    at: SCENARIO_NOW - 60_000,
+    updated: SCENARIO_NOW - 60_000,
+  };
+  const fake = fakeHost(scenarios.typical, { route: `/present?note=${richNote.id}&v=1`, locale: "en" });
+  for (const [op, answer] of Object.entries(noteResponses)) {
+    fake.respond(op, answer);
+  }
+  fake.respond("note.get", () => richNote);
+  fake.respond("note.list", () => [richNote]);
+  fake.respond("note.doc.view", () => ({
+    noteId: richNote.id,
+    title: richNote.title,
+    slideCount: 1,
+    wordCount: 20,
+    extractedLinks: [],
+    blocks: [
+      { id: "h1", type: "heading", level: 1, text: "Architecture Deck" },
+      { id: "c1", type: "callout", tone: "tip", title: "Key Win", text: "Single persistence boundary." },
+      { id: "q1", type: "quote", text: "Simplicity is prerequisite for reliability.", attribution: "Dijkstra" },
+      { id: "t1", type: "todo", checked: true, text: "Verify rich presenter blocks" },
+      { id: "tg1", type: "toggle", title: "Migration Notes", text: "Zero downtime rollout." },
+      { id: "cd1", type: "code", language: "rust", code: "fn main() {}" },
+    ],
+  }));
+
+  const app = await open("../../app/main.tsx", {
+    width: 1280,
+    height: 800,
+    colorScheme: "light",
+    platform: "macos",
+    clock: { time: SCENARIO_NOW },
+    host: fake.options,
+  });
+  await fake.pumpUntil(app, () => app.count("id:presenter-block-callout-c1") === 1);
+  expect(app.count("id:presenter-block-quote-q1")).toBe(1);
+  expect(app.count("id:presenter-block-todo-t1")).toBe(1);
+  expect(app.count("id:presenter-block-toggle-tg1")).toBe(1);
+  expect(app.count("id:presenter-block-code-cd1")).toBe(1);
+  const texts = app.texts();
+  expect(texts).toContain("Key Win");
+  expect(texts).toContain("— Dijkstra");
+  expect(texts).toContain("fn main() {}");
 });

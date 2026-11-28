@@ -1,6 +1,6 @@
 # 验收应用
 
-[验收](.agents/skills/vv-acceptance/SKILL.md)的一份分册：起一个和用户的数据隔开的原生应用（`apps/mac`），通过 VDP 回环调试门（`VIBEVALLEY_DEBUG_PORT=0` + `vibevalley debug` / 类型化 JSON-RPC）一步一步驱动它，把要看的页面和纸雕农场场景截成 PNG，拿眼睛看。不用看屏幕，锁屏时也能跑。命令以 `crates/protocol/src/vdp.rs` 与 `apps/mac/src/debug/executor.rs` 为准。
+[验收](.agents/skills/vv-acceptance/SKILL.md)的一份分册：起一个和用户的数据隔开的原生应用（`apps/mac`），通过 VDP 回环调试门（`VIBEVALLEY_DEBUG_PORT=0` + `vibevalley debug` / 类型化 JSON-RPC）一步一步驱动它，把要看的页面和纸雕农场场景截成 PNG，拿眼睛看。不用看屏幕，锁屏时也能跑。命令以 `crates/protocol/src/vdp.rs` 与 `apps/mac/src/debug/executor/` 为准。
 
 ## 什么时候用
 

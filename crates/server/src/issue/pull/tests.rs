@@ -7,9 +7,10 @@ use vibevalley_protocol::{Deliverable, IssueCanceled, IssueStatus, Landing, Publ
 use vibevalley_runtime::oar::Registry;
 
 use super::publish::{Answer, HostRun, Publisher};
-use super::service::{Pull, PullIndex};
+use super::service::Pull;
 use super::snapshot::{self, GitHubCheck, actions_job_of, checks_fingerprint, checks_verdict};
 use crate::context::{Context, Http, LiveState, Outbox, StateFeed, TaskGroup};
+use crate::issue::types::best_pull_for_issue;
 use crate::issue::{Board, BoardConfig, NewIssue};
 use crate::service::Service;
 use crate::service::issue::{PullRecord, UpsertPullInput};
@@ -49,19 +50,27 @@ fn fake_record(id: &str, number: i64, state: PullRequestState, issue_id: Option<
 }
 
 #[test]
-fn pull_index_prefers_open_then_newest_then_highest_number() {
-    let mut idx = PullIndex::default();
-    idx.put(fake_record("p1", 1, PullRequestState::Closed, Some("i1"), 200));
-    idx.put(fake_record("p2", 2, PullRequestState::Open, Some("i1"), 150));
-    assert_eq!(idx.of_issue("i1").map(|p| p.number), Some(2));
+fn best_pull_for_issue_prefers_open_then_newest_then_highest_number() {
+    let rows = vec![
+        fake_record("p1", 1, PullRequestState::Closed, Some("i1"), 200),
+        fake_record("p2", 2, PullRequestState::Open, Some("i1"), 150),
+    ];
+    assert_eq!(best_pull_for_issue(&rows, "i1").map(|p| p.number), Some(2));
 
     // Closing #2 promotes the newer closed #1 (updated_at 200 > 150)
-    idx.put(fake_record("p2", 2, PullRequestState::Closed, Some("i1"), 150));
-    assert_eq!(idx.of_issue("i1").map(|p| p.number), Some(1));
+    let rows = vec![
+        fake_record("p1", 1, PullRequestState::Closed, Some("i1"), 200),
+        fake_record("p2", 2, PullRequestState::Closed, Some("i1"), 150),
+    ];
+    assert_eq!(best_pull_for_issue(&rows, "i1").map(|p| p.number), Some(1));
 
     // Tie on state + updated_at picks highest number
-    idx.put(fake_record("p3", 5, PullRequestState::Closed, Some("i1"), 200));
-    assert_eq!(idx.of_issue("i1").map(|p| p.number), Some(5));
+    let rows = vec![
+        fake_record("p1", 1, PullRequestState::Closed, Some("i1"), 200),
+        fake_record("p2", 2, PullRequestState::Closed, Some("i1"), 150),
+        fake_record("p3", 5, PullRequestState::Closed, Some("i1"), 200),
+    ];
+    assert_eq!(best_pull_for_issue(&rows, "i1").map(|p| p.number), Some(5));
 }
 
 #[test]
@@ -205,17 +214,14 @@ async fn pull_refresh_poll_snapshot_and_issue_fk_preservation() {
         .unwrap();
     assert_eq!(standalone.issue_id, None);
     board.refresh_issue_async(&issue.id).await;
-    assert_eq!(
-        board.issue_async(&issue.id).await.unwrap().unwrap().pull_request.as_ref().map(|p| p.number),
-        Some(9)
-    );
+    assert_eq!(pulls.of_issue_async(&issue.id).await.unwrap().as_ref().map(|p| p.number), Some(9));
 
     // Updating the issue MUST NOT null pull.issue_id (regression test for PutIssue ON CONFLICT DO UPDATE)
     board.move_to_async(&issue.id, IssueStatus::Todo, None).await.unwrap();
     let reopened = Pull::open_async(ctx.clone(), Arc::new(Publisher::default()), None, None, None, None)
         .await
         .unwrap();
-    assert_eq!(reopened.find("acme/demo", 9).unwrap().issue_id.as_deref(), Some(issue.id.as_str()));
+    assert_eq!(reopened.find_async("acme/demo", 9).await.unwrap().issue_id.as_deref(), Some(issue.id.as_str()));
 
     // Direct PR snapshot fetch (`snapshot::fetch_snapshot` via `HostRunner`)
     let snap = snapshot::fetch_snapshot(&pulls.gh, None, "acme/demo", 9).await.unwrap();
@@ -225,7 +231,7 @@ async fn pull_refresh_poll_snapshot_and_issue_fk_preservation() {
 
     // Poll CI + reviews/comments: viewer skipped, review+inline comment share bot_round 1, standalone bot comment gets bot_round 2
     pulls.poll_async().await;
-    let after_poll = pulls.find("acme/demo", 9).unwrap();
+    let after_poll = pulls.find_async("acme/demo", 9).await.unwrap();
     assert_eq!(after_poll.check_revision, 1);
     assert!(!after_poll.check_fingerprint.is_empty());
     let events = pulls.known_events_async(&linked.id).await.unwrap();
@@ -239,12 +245,13 @@ async fn pull_refresh_poll_snapshot_and_issue_fk_preservation() {
 
     // Second poll with unchanged snapshot does not increment check_revision
     pulls.poll_async().await;
-    assert_eq!(pulls.find("acme/demo", 9).unwrap().check_revision, 1);
+    assert_eq!(pulls.find_async("acme/demo", 9).await.unwrap().check_revision, 1);
 
-    // Refresh transitions PR to MERGED -> settles issue as Landing::PullRequest
+    // Refresh transitions PR to MERGED -> settles issue as Landing::PullRequest and clears known_events
     *pr_state.lock() = "MERGED".into();
     pulls.refresh_async().await;
-    assert_eq!(pulls.find("acme/demo", 9).unwrap().state, PullRequestState::Merged);
+    assert_eq!(pulls.find_async("acme/demo", 9).await.unwrap().state, PullRequestState::Merged);
+    assert!(pulls.known_events_async(&linked.id).await.unwrap().is_empty(), "known_events cleared on merge");
     let settled = board.issue_async(&issue.id).await.unwrap().unwrap();
     assert_eq!(settled.delivered, Some(Landing::PullRequest));
 

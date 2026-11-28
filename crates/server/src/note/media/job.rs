@@ -3,35 +3,35 @@
 //! gates, and handles cancel, download retry, resume, release, and restart recovery.
 
 use std::collections::HashMap;
+use std::num::NonZeroUsize;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, OnceLock, Weak};
 use std::time::Duration;
 
 use parking_lot::{Mutex, MutexGuard};
-use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::Value;
 use tokio::sync::{Mutex as AsyncMutex, OwnedSemaphorePermit, Semaphore, broadcast};
 use tokio_util::sync::CancellationToken;
 use vibevalley_core::SliceMask;
 use vibevalley_i18n::t;
+use vibevalley_kit::cache::LruCache;
 use vibevalley_protocol::{
     ApiError, Attachment, BizCode, Caller, JsNumber, MediaAudioFormat, MediaAudioJob, MediaAudioMetadata, MediaAudioMetadataSource, MediaAudioResult,
-    MediaAudioUsage, MediaCleanup, MediaCloneRequest, MediaImageJob, MediaImageJobKind, MediaImageRequest, MediaImageUsage, MediaInputKind,
-    MediaInputReference, MediaInputRequest, MediaJob, MediaPhase, MediaSource, MediaSpeakersRequest, MediaSpeechJob, MediaSpeechJobKind, MediaSpeechRequest,
-    MediaTranscriptionRequest, MediaUnderstandingJob, MediaUnderstandingPhase, MediaUnderstandingRequest, MediaUnderstandingResult, MediaVoiceDesignRequest,
-    Millis, Preview,
+    MediaCleanup, MediaImageJob, MediaImageRequest, MediaInputKind, MediaInputReference, MediaInputRequest, MediaJob, MediaSource, MediaSpeakersRequest,
+    MediaSpeechJob, MediaSpeechRequest, MediaUnderstandingJob, MediaVoiceDesignRequest, Millis, Preview,
 };
 
-use super::Stop;
-use super::remote::{RemoteFile, RemoteState};
-use super::understanding::Authorization;
+use super::codec::{
+    decode_row, decode_rows, image_announcement, keyed, speech_audio_event, speech_done_event, speech_failed_event, speech_format_event, storage_err,
+};
+use super::remote::RemoteState;
+use super::state::{ACTIVE_PHASES, Ask, Held, Phase, Record, RecordUsage, WAITING_PHASES, active, image_view, refused, speech_view};
 use super::vendor::{self, Account, Moss, MossBody, Outcome, Task, TaskKind};
+use super::{MediaAnnouncement, Stop};
 use crate::context::http::{Fetch, Request, public_https};
-use crate::context::port::ChannelAnnounce;
 use crate::context::{Context, Ticker};
 use crate::log::spawn_blocking_traced;
 use crate::service::Tx;
-use crate::service::note::MediaJobRow;
 use crate::setting::{IMAGE_MODELS, Setting, Use};
 use crate::storage::{ATTACHMENT_MAX, Storage};
 
@@ -41,418 +41,7 @@ const STREAM_MAX: usize = 128 * 1024 * 1024 - 44;
 const POLL: Duration = Duration::from_secs(3);
 const POLLS: usize = 600;
 const DOWNLOAD_TIME: Duration = Duration::from_secs(300);
-
-const ACTIVE_PHASES: &[&str] = &["queued", "generating", "downloading", "authorized", "uploading"];
-const WAITING_PHASES: &[&str] = &["queued", "generating", "downloading"];
-
-pub(super) fn refused(key: &str) -> ApiError {
-    ApiError::new(BizCode::MediaRefused, t(&format!("server.media.{key}"), &[]))
-}
-
-fn storage_err(e: impl std::fmt::Display) -> ApiError {
-    ApiError::new(BizCode::InternalError, format!("media job storage: {e}"))
-}
-
-pub(super) fn id_ok(id: &str) -> bool {
-    (1..=80).contains(&id.len()) && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub(super) enum Phase {
-    Authorized,
-    Queued,
-    Uploading,
-    Generating,
-    Downloading,
-    Ready,
-    Incomplete,
-    Failed,
-    Unknown,
-    Canceled,
-    DownloadFailed,
-}
-
-impl Phase {
-    pub(super) const ALL: [Phase; 11] = [
-        Phase::Authorized,
-        Phase::Queued,
-        Phase::Uploading,
-        Phase::Generating,
-        Phase::Downloading,
-        Phase::Ready,
-        Phase::Incomplete,
-        Phase::Failed,
-        Phase::Unknown,
-        Phase::Canceled,
-        Phase::DownloadFailed,
-    ];
-    pub(super) const ENDED: [Phase; 6] = [
-        Phase::Ready,
-        Phase::Incomplete,
-        Phase::Failed,
-        Phase::Unknown,
-        Phase::Canceled,
-        Phase::DownloadFailed,
-    ];
-
-    fn as_str(self) -> &'static str {
-        match self {
-            Phase::Authorized => "authorized",
-            Phase::Queued => "queued",
-            Phase::Uploading => "uploading",
-            Phase::Generating => "generating",
-            Phase::Downloading => "downloading",
-            Phase::Ready => "ready",
-            Phase::Incomplete => "incomplete",
-            Phase::Failed => "failed",
-            Phase::Unknown => "unknown",
-            Phase::Canceled => "canceled",
-            Phase::DownloadFailed => "download_failed",
-        }
-    }
-
-    pub(super) fn shown(self) -> MediaPhase {
-        match self {
-            Phase::Authorized | Phase::Queued => MediaPhase::Queued,
-            Phase::Uploading | Phase::Generating => MediaPhase::Generating,
-            Phase::Downloading => MediaPhase::Downloading,
-            Phase::Ready | Phase::Incomplete => MediaPhase::Ready,
-            Phase::Failed => MediaPhase::Failed,
-            Phase::Unknown => MediaPhase::Unknown,
-            Phase::Canceled => MediaPhase::Canceled,
-            Phase::DownloadFailed => MediaPhase::DownloadFailed,
-        }
-    }
-
-    pub(super) fn understanding(self) -> MediaUnderstandingPhase {
-        match self {
-            Phase::Authorized => MediaUnderstandingPhase::Authorized,
-            Phase::Queued => MediaUnderstandingPhase::Queued,
-            Phase::Uploading => MediaUnderstandingPhase::Uploading,
-            Phase::Generating | Phase::Downloading => MediaUnderstandingPhase::Generating,
-            Phase::Ready => MediaUnderstandingPhase::Ready,
-            Phase::Incomplete => MediaUnderstandingPhase::Incomplete,
-            Phase::Failed | Phase::DownloadFailed => MediaUnderstandingPhase::Failed,
-            Phase::Unknown => MediaUnderstandingPhase::Unknown,
-            Phase::Canceled => MediaUnderstandingPhase::Canceled,
-        }
-    }
-}
-
-pub(super) fn active(p: Phase) -> bool {
-    matches!(p, Phase::Authorized | Phase::Queued | Phase::Uploading | Phase::Generating | Phase::Downloading)
-}
-
-pub(super) struct Words {
-    rejected: &'static str,
-    unknown: &'static str,
-    paused: &'static str,
-    no_resume: &'static str,
-    account_changed: &'static str,
-}
-
-#[derive(Clone, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "kind", content = "request", rename_all = "camelCase")]
-pub(super) enum Ask {
-    Image(MediaImageRequest),
-    Speech(MediaSpeechRequest),
-    Speakers(MediaSpeakersRequest),
-    VoiceDesign(MediaVoiceDesignRequest),
-    Clone(MediaCloneRequest),
-    Transcription(MediaTranscriptionRequest),
-    Understanding(MediaUnderstandingRequest),
-}
-
-impl Ask {
-    pub(super) fn id(&self) -> &str {
-        match self {
-            Ask::Image(r) => &r.id,
-            Ask::Speech(r) => &r.id,
-            Ask::Speakers(r) => &r.id,
-            Ask::VoiceDesign(r) => &r.id,
-            Ask::Clone(r) => &r.id,
-            Ask::Transcription(r) => &r.id,
-            Ask::Understanding(r) => &r.id,
-        }
-    }
-
-    fn kind(&self) -> &'static str {
-        match self {
-            Ask::Image(_) => "image",
-            Ask::Speech(_) => "speech",
-            Ask::Speakers(_) => "speakers",
-            Ask::VoiceDesign(_) => "voiceDesign",
-            Ask::Clone(_) => "clone",
-            Ask::Transcription(_) => "transcription",
-            Ask::Understanding(_) => "understanding",
-        }
-    }
-
-    pub(super) fn streamed(&self) -> bool {
-        match self {
-            Ask::Speech(r) => r.streaming == Some(true),
-            Ask::Transcription(r) => r.streaming == Some(true),
-            _ => false,
-        }
-    }
-
-    fn task(&self) -> Option<TaskKind> {
-        match self {
-            Ask::Speech(_) | Ask::Speakers(_) => Some(TaskKind::Speech),
-            Ask::VoiceDesign(_) => Some(TaskKind::VoiceGeneration),
-            Ask::Transcription(_) => Some(TaskKind::Transcription),
-            Ask::Image(_) | Ask::Clone(_) | Ask::Understanding(_) => None,
-        }
-    }
-
-    fn audio(&self) -> Option<MediaAudioFormat> {
-        match self {
-            Ask::Speech(r) => Some(r.format),
-            Ask::Speakers(r) => Some(r.format),
-            Ask::VoiceDesign(r) => Some(r.format),
-            Ask::Image(_) | Ask::Clone(_) | Ask::Transcription(_) | Ask::Understanding(_) => None,
-        }
-    }
-
-    pub(super) fn is_audio(&self) -> bool {
-        matches!(self, Ask::Speakers(_) | Ask::VoiceDesign(_) | Ask::Clone(_) | Ask::Transcription(_))
-    }
-
-    fn words(&self) -> Words {
-        match self {
-            Ask::Image(_) => Words {
-                rejected: "rejected",
-                unknown: "unknown",
-                paused: "unknown",
-                no_resume: "noDownload",
-                account_changed: "remoteAccountChanged",
-            },
-            Ask::Speech(_) => Words {
-                rejected: "speechRejected",
-                unknown: "speechUnknown",
-                paused: "speechPollPaused",
-                no_resume: "speechNoResume",
-                account_changed: "remoteAccountChanged",
-            },
-            Ask::Speakers(_) | Ask::VoiceDesign(_) | Ask::Clone(_) | Ask::Transcription(_) => Words {
-                rejected: "audioRejected",
-                unknown: "audioUnknown",
-                paused: "audioPollingPaused",
-                no_resume: "audioPollingPaused",
-                account_changed: "audioAccountChanged",
-            },
-            Ask::Understanding(_) => Words {
-                rejected: "understandingRejected",
-                unknown: "understandingUnknown",
-                paused: "understandingUnknown",
-                no_resume: "noDownload",
-                account_changed: "consentChanged",
-            },
-        }
-    }
-}
-
-pub(super) enum Held {
-    Image { account: Account, body: MossBody },
-    Speech { account: Account, body: MossBody },
-    Account(Account),
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(untagged)]
-pub(super) enum RecordUsage {
-    Image(MediaImageUsage),
-    Audio(MediaAudioUsage),
-}
-
-impl RecordUsage {
-    fn as_image(&self) -> Option<MediaImageUsage> {
-        match self {
-            RecordUsage::Image(u) => Some(u.clone()),
-            RecordUsage::Audio(_) => None,
-        }
-    }
-
-    pub(super) fn as_audio(&self) -> Option<MediaAudioUsage> {
-        match self {
-            RecordUsage::Audio(u) => Some(u.clone()),
-            RecordUsage::Image(_) => None,
-        }
-    }
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(super) struct Record {
-    pub(super) ask: Ask,
-    pub(super) source: MediaSource,
-    pub(super) model: String,
-    pub(super) connection: String,
-    pub(super) revision: i64,
-    #[serde(default)]
-    pub(super) fingerprint: String,
-    pub(super) phase: Phase,
-    #[serde(default)]
-    pub(super) problem: String,
-    pub(super) remote_task: Option<String>,
-    pub(super) url: Option<String>,
-    pub(super) usage: Option<RecordUsage>,
-    pub(super) metadata: Option<MediaAudioMetadata>,
-    pub(super) result_format: Option<MediaAudioFormat>,
-    pub(super) content_type: Option<String>,
-    pub(super) attachment: Option<Attachment>,
-    pub(super) result_input: Option<MediaInputReference>,
-    #[serde(default)]
-    pub(super) released: bool,
-    #[serde(default)]
-    pub(super) input: Option<MediaInputReference>,
-    #[serde(default)]
-    pub(super) inputs: Vec<MediaInputReference>,
-    #[serde(default)]
-    pub(super) preview_input: Option<String>,
-    #[serde(default)]
-    pub(super) made: Option<MediaAudioResult>,
-    #[serde(default)]
-    pub(super) understood: Option<MediaUnderstandingResult>,
-    #[serde(default)]
-    pub(super) authorization: Option<Authorization>,
-    #[serde(default)]
-    pub(super) remote: Vec<RemoteFile>,
-    #[serde(default)]
-    pub(super) cleanup: Option<MediaCleanup>,
-    pub(super) created_at: i64,
-    pub(super) updated_at: i64,
-}
-
-impl Record {
-    pub(super) fn new(ask: Ask, source: MediaSource, connection: String, revision: i64, model: String, fingerprint: String, at: Millis) -> Record {
-        Record {
-            ask,
-            source,
-            model,
-            connection,
-            revision,
-            fingerprint,
-            phase: Phase::Queued,
-            problem: String::new(),
-            remote_task: None,
-            url: None,
-            usage: None,
-            metadata: None,
-            result_format: None,
-            content_type: None,
-            attachment: None,
-            result_input: None,
-            released: false,
-            input: None,
-            inputs: vec![],
-            preview_input: None,
-            made: None,
-            understood: None,
-            authorization: None,
-            remote: vec![],
-            cleanup: None,
-            created_at: at,
-            updated_at: at,
-        }
-    }
-
-    pub(super) fn id(&self) -> &str {
-        self.ask.id()
-    }
-
-    pub(super) fn can_retry_download(&self) -> bool {
-        !self.released && self.url.is_some() && matches!(self.phase, Phase::DownloadFailed | Phase::Canceled)
-    }
-
-    pub(super) fn can_resume(&self) -> bool {
-        self.ask.task().is_some()
-            && !self.released
-            && !self.ask.streamed()
-            && self.remote_task.is_some()
-            && matches!(self.phase, Phase::Unknown | Phase::Canceled)
-            && self.url.is_none()
-            && self.made.is_none()
-    }
-
-    fn releasable(&self) -> bool {
-        !matches!(self.ask, Ask::Image(_) | Ask::Understanding(_))
-    }
-
-    pub(super) fn can_release(&self) -> bool {
-        self.releasable() && !active(self.phase) && !self.released
-    }
-
-    pub(super) fn phase_text(&self) -> String {
-        t(&format!("server.media.phase.{}", self.phase.shown().as_str()), &[])
-    }
-
-    fn view(&self) -> MediaJob {
-        let phase_text = self.phase_text();
-        match &self.ask {
-            Ask::Speakers(_) | Ask::VoiceDesign(_) | Ask::Clone(_) | Ask::Transcription(_) => match self.audio_view() {
-                Some(job) => MediaJob::MediaAudioJob(job),
-                None => unreachable!("an audio job's view"),
-            },
-            Ask::Understanding(request) => MediaJob::MediaUnderstandingJob(self.understanding_view(request)),
-            Ask::Image(r) => MediaJob::MediaImageJob(MediaImageJob {
-                kind: MediaImageJobKind::Image,
-                id: r.id.clone(),
-                prompt: r.prompt.clone(),
-                model: self.model.clone(),
-                connection: self.connection.clone(),
-                revision: self.revision,
-                source: self.source.clone(),
-                usage: self.usage.as_ref().and_then(RecordUsage::as_image),
-                phase: self.phase.shown(),
-                phase_text,
-                problem: self.problem.clone(),
-                attachment: self.attachment.clone(),
-                can_cancel: active(self.phase),
-                can_retry_download: self.can_retry_download(),
-                created_at: self.created_at,
-                updated_at: self.updated_at,
-            }),
-            Ask::Speech(r) => MediaJob::MediaSpeechJob(MediaSpeechJob {
-                kind: MediaSpeechJobKind::Speech,
-                id: r.id.clone(),
-                prompt: r.text.clone(),
-                model: self.model.clone(),
-                connection: self.connection.clone(),
-                revision: self.revision,
-                source: self.source.clone(),
-                voice: r.voice.clone(),
-                format: self.result_format.unwrap_or(r.format),
-                content_type: self.content_type.clone(),
-                metadata: self.metadata.clone(),
-                usage: self.usage.as_ref().and_then(RecordUsage::as_audio),
-                can_resume: Some(self.can_resume()),
-                can_release: self.can_release(),
-                phase: self.phase.shown(),
-                phase_text,
-                problem: self.problem.clone(),
-                attachment: self.attachment.clone(),
-                result_input: self.result_input.clone(),
-                can_cancel: active(self.phase),
-                can_retry_download: self.can_retry_download(),
-                created_at: self.created_at,
-                updated_at: self.updated_at,
-            }),
-        }
-    }
-
-    fn to_row(&self) -> Result<MediaJobRow, ApiError> {
-        Ok(MediaJobRow {
-            id: self.id().to_string(),
-            kind: self.ask.kind().to_string(),
-            phase: self.phase.as_str().to_string(),
-            data: serde_json::to_string(self).map_err(storage_err)?,
-            created_at: self.created_at,
-            updated_at: self.updated_at,
-        })
-    }
-}
+const HELD_CACHE_CAP: NonZeroUsize = NonZeroUsize::new(256).unwrap();
 
 type Kept = (Option<Attachment>, Option<MediaInputReference>, Option<MediaAudioMetadata>);
 
@@ -505,7 +94,7 @@ struct Running {
 /// Manages media generation, transcription, and understanding jobs.
 pub struct Media {
     pub(super) ctx: Arc<Context>,
-    held: Mutex<HashMap<String, Held>>,
+    held: Mutex<LruCache<String, Held>>,
     runs: Mutex<HashMap<String, Running>>,
     semaphores: KindSemaphores,
     scheduling: AsyncMutex<()>,
@@ -514,8 +103,8 @@ pub struct Media {
     download: Arc<dyn Fetch>,
     setting: Arc<Setting>,
     pub(super) storage: Arc<Storage>,
-    pub(super) channel: Arc<dyn ChannelAnnounce>,
     job_updates: broadcast::Sender<Vec<MediaJob>>,
+    announcements: broadcast::Sender<MediaAnnouncement>,
     closed: AtomicBool,
     me: OnceLock<Weak<Media>>,
     streams: Mutex<HashMap<String, Stream>>,
@@ -524,27 +113,23 @@ pub struct Media {
 }
 
 impl Media {
-    pub async fn open_async(
-        ctx: Arc<Context>,
-        setting: Arc<Setting>,
-        storage: Arc<Storage>,
-        channel: Arc<dyn ChannelAnnounce>,
-    ) -> Result<Arc<Media>, ApiError> {
+    pub async fn open_async(ctx: Arc<Context>, setting: Arc<Setting>, storage: Arc<Storage>) -> Result<Arc<Media>, ApiError> {
         let cancel = ctx.task.child_token();
         let (job_updates, _) = broadcast::channel(64);
+        let (announcements, _) = broadcast::channel(128);
         let jobs = Arc::new(Media {
             moss: Moss { fetch: ctx.http.clone() },
             download: ctx.download.clone(),
             ctx: ctx.clone(),
-            held: Mutex::default(),
+            held: Mutex::new(LruCache::new(HELD_CACHE_CAP)),
             runs: Mutex::default(),
             semaphores: KindSemaphores::new(),
             scheduling: AsyncMutex::new(()),
             cleaning: AsyncMutex::new(()),
             setting,
             storage,
-            channel,
             job_updates,
+            announcements,
             closed: AtomicBool::new(false),
             me: OnceLock::new(),
             streams: Mutex::default(),
@@ -557,7 +142,7 @@ impl Media {
         jobs.publish_async().await;
         jobs.schedule_async().await;
         for r in recent {
-            jobs.post_back_async(&r).await;
+            jobs.post_back(&r);
         }
         jobs.sweep_each_minute();
         Ok(jobs)
@@ -565,6 +150,10 @@ impl Media {
 
     pub fn subscribe_job_updates(&self) -> broadcast::Receiver<Vec<MediaJob>> {
         self.job_updates.subscribe()
+    }
+
+    pub fn subscribe_announcements(&self) -> broadcast::Receiver<MediaAnnouncement> {
+        self.announcements.subscribe()
     }
 
     fn sweep_each_minute(self: &Arc<Self>) {
@@ -584,23 +173,8 @@ impl Media {
         self.runs.lock()
     }
 
-    fn decode_row(row: MediaJobRow) -> Result<Record, ApiError> {
-        serde_json::from_str(&row.data).map_err(storage_err)
-    }
-
-    fn decode_rows(rows: Vec<MediaJobRow>) -> Result<Vec<Record>, ApiError> {
-        rows.into_iter().map(Self::decode_row).collect()
-    }
-
     async fn read_job(&self, id: &str) -> Result<Option<Record>, ApiError> {
-        self.ctx
-            .service
-            .note
-            .find_media_job(id)
-            .await
-            .map_err(storage_err)?
-            .map(Self::decode_row)
-            .transpose()
+        self.ctx.service.note.find_media_job(id).await.map_err(storage_err)?.map(decode_row).transpose()
     }
 
     async fn read_job_in_tx(&self, tx: &Tx, id: &str) -> Result<Option<Record>, ApiError> {
@@ -610,7 +184,7 @@ impl Media {
             .find_media_job_in_tx(tx, id)
             .await
             .map_err(storage_err)?
-            .map(Self::decode_row)
+            .map(decode_row)
             .transpose()
     }
 
@@ -620,7 +194,7 @@ impl Media {
 
     async fn recent_async(&self) -> Result<Vec<Record>, ApiError> {
         let rows = self.ctx.service.note.list_recent_media_jobs(100).await.map_err(storage_err)?;
-        Self::decode_rows(rows)
+        decode_rows(rows)
     }
 
     async fn waiting_jobs_async(&self) -> Result<Vec<Record>, ApiError> {
@@ -631,7 +205,7 @@ impl Media {
             .list_media_jobs_by_phases(WAITING_PHASES, true)
             .await
             .map_err(storage_err)?;
-        Self::decode_rows(rows)
+        decode_rows(rows)
     }
 
     async fn active_jobs_async(&self) -> Result<Vec<Record>, ApiError> {
@@ -642,7 +216,7 @@ impl Media {
             .list_media_jobs_by_phases(ACTIVE_PHASES, false)
             .await
             .map_err(storage_err)?;
-        Self::decode_rows(rows)
+        decode_rows(rows)
     }
 
     pub(super) async fn authorized_jobs_async(&self) -> Result<Vec<Record>, ApiError> {
@@ -653,7 +227,7 @@ impl Media {
             .list_media_jobs_by_phases(&["authorized"], false)
             .await
             .map_err(storage_err)?;
-        Self::decode_rows(rows)
+        decode_rows(rows)
     }
 
     pub(super) fn now_ms(&self) -> Millis {
@@ -901,12 +475,7 @@ impl Media {
                 Err(e) => return eprintln!("media: {}", e.message),
             };
             for r in waiting {
-                let ready = match r.phase {
-                    Phase::Queued | Phase::Downloading => true,
-                    Phase::Generating => r.remote_task.is_some(),
-                    _ => false,
-                };
-                if !ready {
+                if !r.is_schedulable() {
                     continue;
                 }
                 let stop = {
@@ -966,11 +535,7 @@ impl Media {
     async fn generate_async(self: &Arc<Self>, r: Record, stop: &Stop) {
         let id = r.id().to_string();
         let held = self.held.lock().remove(&id);
-        let first = if matches!(r.ask, Ask::Understanding(_)) {
-            Phase::Uploading
-        } else {
-            Phase::Generating
-        };
+        let first = r.initial_work_phase();
         if !matches!(self.change_async(&id, &[Phase::Queued], |r| r.phase = first).await, Ok(true)) {
             return;
         }
@@ -1174,7 +739,7 @@ impl Media {
             eprintln!("media {id}: {}", e.message);
         }
         if let Ok(r) = self.found_async(id).await {
-            self.post_back_async(&r).await;
+            self.post_back(&r);
         }
     }
 
@@ -1373,12 +938,7 @@ impl Media {
                         break;
                     }
                     format = Some((sample_rate, channels));
-                    self.emit_async(
-                        id,
-                        json!({ "type": "format", "sampleRate": sample_rate, "channels": channels, "bitDepth": 16 }),
-                        stop,
-                    )
-                    .await;
+                    self.emit_async(id, speech_format_event(sample_rate, channels), stop).await;
                 }
                 vendor::SpeechEvent::Delta(audio) => {
                     let Some((_, channels)) = format else {
@@ -1395,9 +955,7 @@ impl Media {
                     let available = pending.len() - pending.len() % block;
                     let step = 32768 / block * block;
                     for part in pending[..available].chunks(step) {
-                        let audio = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, part);
-                        self.emit_async(id, json!({ "type": "audio", "sequence": sequence, "audio": audio }), stop)
-                            .await;
+                        self.emit_async(id, speech_audio_event(sequence, part), stop).await;
                         sequence += 1;
                     }
                     pending.drain(..available);
@@ -1427,9 +985,9 @@ impl Media {
             (_, Some(Ok(()))) if !stop.aborted() || complete => {
                 if complete {
                     let _ = self.change_async(id, &[Phase::Ready], |r| r.usage = usage.take().map(RecordUsage::Audio)).await;
-                    self.emit_async(id, json!({ "type": "done" }), stop).await;
+                    self.emit_async(id, speech_done_event(), stop).await;
                 } else {
-                    self.emit_async(id, json!({ "type": "failed" }), stop).await;
+                    self.emit_async(id, speech_failed_event(), stop).await;
                 }
             }
             (Err(_), _) | (_, Some(Err(_))) | (_, None) => {
@@ -1439,7 +997,7 @@ impl Media {
                         r.problem = t("server.media.speechUnknown", &[]);
                     })
                     .await;
-                self.emit_async(id, json!({ "type": "failed" }), stop).await;
+                self.emit_async(id, speech_failed_event(), stop).await;
             }
             _ => {}
         }
@@ -1509,21 +1067,9 @@ impl Media {
         Ok(())
     }
 
-    async fn post_back_async(&self, r: &Record) {
-        let (Ask::Image(request), Phase::Ready, MediaSource::Orchestrator { agent, channel }, Some(attachment)) = (&r.ask, r.phase, &r.source, &r.attachment)
-        else {
-            return;
-        };
-        let text = t(
-            "server.media.imageMade",
-            &[("prompt", request.prompt.chars().take(80).collect::<String>().into())],
-        );
-        if let Err(e) = self
-            .channel
-            .post_attachments_async(agent, channel, &text, vec![attachment.id.clone()], format!("media:{}", r.id()))
-            .await
-        {
-            eprintln!("media image post: {}", e.message);
+    fn post_back(&self, r: &Record) {
+        if let Some(announcement) = image_announcement(r) {
+            let _ = self.announcements.send(announcement);
         }
     }
 
@@ -1722,35 +1268,16 @@ impl Media {
         self.voice_design_async(request, MediaSource::User {}).await
     }
 
-    pub(crate) async fn start_understanding_for_caller_async(&self, caller: Caller, id: &str) -> Result<MediaUnderstandingJob, ApiError> {
+    pub async fn start_understanding_for_caller_with_agent_async(
+        &self,
+        caller: Caller,
+        id: &str,
+        resolve_agent: impl FnOnce(&str) -> String,
+    ) -> Result<MediaUnderstandingJob, ApiError> {
         if caller != Caller::Orchestrator {
             return Err(refused("authorizationRequired"));
         }
-        self.start_understanding_by_id_async(id).await
-    }
-}
-
-fn keyed(a: crate::setting::Account) -> Account {
-    Account {
-        fingerprint: vendor::fingerprint(a.key.expose()),
-        key: a.key.expose().to_string(),
-        connection: a.connection,
-        revision: a.revision,
-        model: a.model,
-    }
-}
-
-fn image_view(r: &Record) -> MediaImageJob {
-    match r.view() {
-        MediaJob::MediaImageJob(j) => j,
-        _ => unreachable!("an image's view"),
-    }
-}
-
-fn speech_view(r: &Record) -> MediaSpeechJob {
-    match r.view() {
-        MediaJob::MediaSpeechJob(j) => j,
-        _ => unreachable!("a speech's view"),
+        self.start_understanding_with_agent_async(id, resolve_agent).await
     }
 }
 
@@ -1788,53 +1315,11 @@ impl crate::context::api::media::SpeechStreams for Media {
 
 #[cfg(test)]
 mod tests {
-    use vibevalley_protocol::{ChatMessage, NoteCard};
-
     use super::*;
     use crate::context::api::media::SpeechStreams;
     use crate::context::{LiveState, Outbox, StateFeed, TaskGroup};
     use crate::service::Service;
     use crate::setting::SettingConfig;
-
-    struct DummyAnnounce;
-
-    impl ChannelAnnounce for DummyAnnounce {
-        fn place_exists(&self, _: &str) -> bool {
-            true
-        }
-
-        fn orchestrator_in(&self, _: &str) -> String {
-            "orchestrator".into()
-        }
-
-        fn place_of_async<'a>(&'a self, _: &'a str, target: &'a str) -> crate::BoxFuture<'a, Result<String, ApiError>> {
-            let out = target.to_string();
-            Box::pin(async move { Ok(out) })
-        }
-
-        fn post_card_async<'a>(
-            &'a self,
-            _: &'a str,
-            _: &'a str,
-            _: &'a str,
-            _: NoteCard,
-            _: Option<String>,
-            _: String,
-        ) -> crate::BoxFuture<'a, Result<ChatMessage, ApiError>> {
-            unimplemented!()
-        }
-
-        fn post_attachments_async<'a>(
-            &'a self,
-            _: &'a str,
-            _: &'a str,
-            _: &'a str,
-            _: Vec<String>,
-            _: String,
-        ) -> crate::BoxFuture<'a, Result<ChatMessage, ApiError>> {
-            unimplemented!()
-        }
-    }
 
     #[tokio::test]
     async fn regression_speech_claim_gone_does_not_block_tokio_worker_on_drop() {
@@ -1860,7 +1345,7 @@ mod tests {
         })
         .await;
         let storage = Storage::open_async(dir.path(), ctx.clone()).await.unwrap();
-        let jobs = Media::open_async(ctx.clone(), setting, storage.clone(), Arc::new(DummyAnnounce)).await.unwrap();
+        let jobs = Media::open_async(ctx.clone(), setting, storage.clone()).await.unwrap();
 
         let job_id = "speech-drop-1";
         let req = MediaSpeechRequest {

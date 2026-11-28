@@ -52,7 +52,6 @@ function summaryForSpan(issue: Issue, startMs: number, endMs: number, todayDayMs
         cardKind: "todo",
         familyDone: 0,
         familyTotal: 0,
-        needsWorktreeCheck: false,
         schedule: span,
       },
     },

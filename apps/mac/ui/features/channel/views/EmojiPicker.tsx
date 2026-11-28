@@ -2,13 +2,14 @@ import { Scroll, Text, View, windowSize, type JSX } from "nsh";
 import { Popover } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
-import { type ChatMessage, userId } from "@vibevalley/protocol";
+import { type ChatMessage, localUserParticipant } from "@vibevalley/protocol";
 import { isOneOf } from "@vibevalley/protocol/rules";
 
 import { Bubble } from "../../../design/Tip";
 
 /** What pressing an emoji on a message asks for: the user's reaction off when it is on the message now, else on. */
-export const reactionOn = (m: Pick<ChatMessage, "reactions">, emoji: string) => !(m.reactions.find((r) => r.emoji === emoji)?.by.includes(userId) ?? false);
+export const reactionOn = (m: Pick<ChatMessage, "reactions">, emoji: string) =>
+  !(m.reactions.find((r) => r.emoji === emoji)?.by.includes(localUserParticipant) ?? false);
 
 /** What a reaction offers first; an agent can still react with any other. */
 export const quickReactions = ["👍", "❤️", "😂", "🎉", "👀", "✅", "🙏", "🤔"];

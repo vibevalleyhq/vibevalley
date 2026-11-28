@@ -1,5 +1,2 @@
-[env]
-LIBGHOSTTY_VT_SYS_OPTIMIZE = "ReleaseSafe"
-
 [alias]
 xtask = "run --package xtask --"

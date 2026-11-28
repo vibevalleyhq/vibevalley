@@ -18,7 +18,7 @@ import { IssueLane as IssueLaneSchema } from "@vibevalley/protocol/schema";
 import { ago, tookText } from "../../../infra/base/format";
 import { matches } from "../../../infra/base/search";
 import { describeSubagents } from "../../session";
-import { endedAt, assignedOnDuty, issueSession, issueTag, needsWorktreeCheck, type IssueTag, issueTitle, tagOpen, tagText } from "./issue";
+import { endedAt, assignedOnDuty, issueSession, issueTag, type IssueTag, issueTitle, tagOpen, tagText } from "./issue";
 import { localizeIssueError } from "./issueError";
 import { type IssueScope, scopeMatches, statusMatches } from "./meta";
 import type { CardMove } from "./moves";
@@ -123,7 +123,7 @@ export type Tone = "berry" | "wheat" | "water" | "leaf" | "faint" | "muted";
 export type BoardCard = (
   | { kind: "todo"; id: string; lane: Lane; issue: Issue }
   /** `sessions` are the real live and ended ones, oldest first; `session` the one on the farm now. */
-  | { kind: "issue"; id: string; lane: Lane; issue: Issue; sessions: Session[]; tag: IssueTag; session?: SessionView; needsWorktreeCheck?: boolean }
+  | { kind: "issue"; id: string; lane: Lane; issue: Issue; sessions: Session[]; tag: IssueTag; session?: SessionView }
   | { kind: "missing"; id: string; lane: Lane; issue: Issue; missing: string[] }
   /** An issue for the orchestrator: open while the orchestrator works on it, closed once it has answered; never dragged. */
   | { kind: "orchestrator"; id: string; lane: Lane; issue: Issue }
@@ -180,7 +180,6 @@ export function buildCards(
                 sessions: row.sessions,
                 tag: issueTag(issue),
                 session: issueSession(sessions, issue),
-                needsWorktreeCheck: summary.needsWorktreeCheck,
               }),
             );
           break;
@@ -292,14 +291,13 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, issues
         title: c.issue.title,
         status: c.issue.status,
         priority: c.issue.priority,
-        flags: [{ text: t(`shared.stage.${c.issue.stage.state}`), tone: stageTone[c.issue.stage.state] }],
+        flags: c.issue.stage.state === "draft" ? [] : [{ text: t(`shared.stage.${c.issue.stage.state}`), tone: stageTone[c.issue.stage.state] }],
         detail: c.issue.description,
         progress: c.progress ?? { done: c.children.filter((child) => child.status === "done" || child.status === "canceled").length, total: c.children.length },
       };
     case "todo": {
       const item = c.issue;
       if (item.refining) flags.push({ text: t("web.issue.card.refining", { name: item.refining.name }), tone: "water" });
-      else if (item.status === "backlog") flags.push({ text: t("web.issue.card.draft"), tone: "faint" });
       if (item.queuedAt !== undefined) flags.push({ text: t("web.issue.card.queued"), tone: "water" });
       if (item.cron !== undefined) flags.push({ text: t("web.issue.card.cron"), tone: "faint" });
       const agent = assignedAgentOf(item);
@@ -331,9 +329,6 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, issues
             : t(`shared.stage.${st.state}`),
           tone: stageTone[st.state],
         });
-      if (c.needsWorktreeCheck ?? (tagOpen(tag) && needsWorktreeCheck(now0))) {
-        flags.unshift({ text: t("web.issue.run.reconcile"), tone: "wheat" });
-      }
       if (issue.canceled === "lost") flags.push({ text: t("web.issue.card.lost"), tone: "berry" });
       if (issue.cron !== undefined) flags.push({ text: t("web.issue.card.cron"), tone: "faint" });
       lines.push(head.name);

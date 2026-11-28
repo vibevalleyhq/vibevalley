@@ -170,7 +170,7 @@
      "type": "array"
     },
     "deliver": {
-     "description": "交付方式：change（合进仓库）、branch（分支留着不合）、answer（只交结论）",
+     "description": "交付方式：change（代码变更）、branch（保留分支）、pull_request（PR 交付）、answer（只交结论）",
      "enum": [
       "change",
       "branch",
@@ -178,6 +178,30 @@
       "pull_request"
      ],
      "type": "string"
+    },
+    "deliveryReceipt": {
+     "description": "多态交付凭据：pull_request（url/number/branch/summary）、commit（sha/branch/summary）、note（noteId/title/summary）或 answer（summary）",
+     "additionalProperties": true,
+     "properties": {
+      "kind": {
+       "enum": [
+        "pull_request",
+        "commit",
+        "note",
+        "answer"
+       ],
+       "type": "string"
+      },
+      "url": { "type": "string" },
+      "number": { "type": "integer" },
+      "branch": { "type": "string" },
+      "sha": { "type": "string" },
+      "noteId": { "type": "string" },
+      "title": { "type": "string" },
+      "summary": { "type": "string" }
+     },
+     "required": ["kind"],
+     "type": "object"
     },
     "description": {
      "description": "说明（派出去以前才能改）",
@@ -230,13 +254,37 @@
  {
   "op": "issue.status.update",
   "name": "issue_status_update",
-  "description": "挪一个任务的状态，和用户在看板上拖卡片一样：备选挪到待办就是开工（没并发上限就排队）；排着队的挪回备选是先别开工；等你看挪回待办是带一句话再干一轮，卡住了不带话就照原因接着修、解决冲突、接着做；已完成、已取消挪回待办是带一句话重开；挪到待办时 agent 填另一个执行会话就是换人接手（在干的要先 session_stop）；等你看挪到已完成是完成，也就是验收通过：照任务的交付方式，有提交就合进主分支或开 PR，branch 的分支留着不合，没有改动不碰 git（用户要分支留着，先用 issue_update 把 deliver 改成 branch）；挪到已取消是不做了、执行会话回家、改动不收。只在用户叫你挪时用；挪不了时照回答里的原因跟用户说。",
+  "description": "挪一个任务的状态，和用户在看板上拖卡片一样：备选挪到待办就是开工（没并发上限就排队）；排着队的挪回备选是先别开工；等你看挪回待办是带一句话再干一轮；已完成、已取消挪回待办是带一句话重开；挪到待办时 agent 填另一个执行会话就是换人接手（在干的要先 session_stop）；等你看挪到已完成是收尾关单，可附带结构化 deliveryReceipt（pull_request / commit / note / answer），服务端不再代管 git worktree 或自动合并分支；挪到已取消是不做了、执行会话回家。只在用户叫你挪时用；挪不了时照回答里的原因跟用户说。",
   "parameters": {
    "additionalProperties": true,
    "properties": {
     "agent": {
-     "description": "挪到待办时谁来做：填另一个执行会话的名字、id 或 runtime 就是换人接手，上一个收工、分支留着",
+     "description": "挪到待办时谁来做：填另一个执行会话的名字、id 或 runtime 就是换人接手",
      "type": "string"
+    },
+    "deliveryReceipt": {
+     "description": "可选：收尾为已完成时附带的多态交付凭据（pull_request / commit / note / answer）",
+     "additionalProperties": true,
+     "properties": {
+      "kind": {
+       "enum": [
+        "pull_request",
+        "commit",
+        "note",
+        "answer"
+       ],
+       "type": "string"
+      },
+      "url": { "type": "string" },
+      "number": { "type": "integer" },
+      "branch": { "type": "string" },
+      "sha": { "type": "string" },
+      "noteId": { "type": "string" },
+      "title": { "type": "string" },
+      "summary": { "type": "string" }
+     },
+     "required": ["kind"],
+     "type": "object"
     },
     "id": {
      "description": "任务编号（#41 或 41）",

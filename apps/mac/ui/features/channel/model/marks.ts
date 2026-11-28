@@ -1,4 +1,4 @@
-import { type Channel, type Chat, type ChatMessage, type CollabSlice, type Notify, userId } from "@vibevalley/protocol";
+import { type Channel, type Chat, type ChatMessage, type CollabSlice, localUserParticipant, type Notify } from "@vibevalley/protocol";
 
 import { api } from "../../../infra/api";
 import { type Followed, followed, useFollowed } from "../../../infra/channelFollow";
@@ -24,7 +24,7 @@ export interface PinMark {
 
 const copyOf = (channel: string, id: string) => followed.get(channel).messages.find((m) => m.id === id);
 
-const reacted = (m: Pick<ChatMessage, "reactions">, emoji: string) => m.reactions.some((r) => r.emoji === emoji && r.by.includes(userId));
+const reacted = (m: Pick<ChatMessage, "reactions">, emoji: string) => m.reactions.some((r) => r.emoji === emoji && r.by.includes(localUserParticipant));
 
 export const reactionSet = defineIntent<ReactionMark, ChatMessage>({
   send: (r) => api.channel.reaction.set({ id: r.id, emoji: r.emoji, on: r.on }),
@@ -165,9 +165,9 @@ function withReaction(m: ChatMessage, emoji: string, on: boolean): ChatMessage {
   const had = m.reactions.some((r) => r.emoji === emoji);
   const reactions = on
     ? had
-      ? m.reactions.map((r) => (r.emoji === emoji ? { ...r, by: [...r.by, userId] } : r))
-      : [...m.reactions, { emoji, by: [userId] }]
-    : m.reactions.flatMap((r) => (r.emoji !== emoji ? [r] : r.by.length > 1 ? [{ ...r, by: r.by.filter((b) => b !== userId) }] : []));
+      ? m.reactions.map((r) => (r.emoji === emoji ? { ...r, by: [...r.by, localUserParticipant] } : r))
+      : [...m.reactions, { emoji, by: [localUserParticipant] }]
+    : m.reactions.flatMap((r) => (r.emoji !== emoji ? [r] : r.by.length > 1 ? [{ ...r, by: r.by.filter((b) => b !== localUserParticipant) }] : []));
   return { ...m, reactions };
 }
 

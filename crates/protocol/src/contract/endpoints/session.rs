@@ -118,6 +118,33 @@ pub(super) const ENDPOINTS: &[Endpoint] = &[
         input: Some("SessionRunCodeInput"),
         result: Some("SessionRunCodeResult"),
     },
+    Endpoint {
+        op: "session.eval.create",
+        module: "session",
+        about: &[],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("SessionEvalRequest"),
+        result: Some("SessionEval"),
+    },
+    Endpoint {
+        op: "session.approval.list",
+        module: "session",
+        about: &["id"],
+        can: &[Caller::User],
+        dry_run: None,
+        input: Some("SessionApprovalListInput"),
+        result: Some("Vec<SessionApproval>"),
+    },
+    Endpoint {
+        op: "session.approval.resolve",
+        module: "session",
+        about: &["id", "taskId", "toolCallId"],
+        can: &[Caller::User],
+        dry_run: None,
+        input: Some("SessionApprovalResolveInput"),
+        result: None,
+    },
 ];
 
 pub mod ops {
@@ -212,5 +239,26 @@ pub mod ops {
         const NAME: &'static str = "session.runCode";
         type Input = t::SessionRunCodeInput;
         type Result = t::SessionRunCodeResult;
+    }
+    /// Saves the turn begun at a step of a session's log as an eval case with expected behavior.
+    pub struct SessionEvalCreate;
+    impl Op for SessionEvalCreate {
+        const NAME: &'static str = "session.eval.create";
+        type Input = t::SessionEvalRequest;
+        type Result = t::SessionEval;
+    }
+    /// Lists pending durable tool approvals for a session (or across all sessions when `id` is omitted).
+    pub struct SessionApprovalList;
+    impl Op for SessionApprovalList {
+        const NAME: &'static str = "session.approval.list";
+        type Input = t::SessionApprovalListInput;
+        type Result = Vec<t::SessionApproval>;
+    }
+    /// Approves or rejects a pending durable tool approval for a session.
+    pub struct SessionApprovalResolve;
+    impl Op for SessionApprovalResolve {
+        const NAME: &'static str = "session.approval.resolve";
+        type Input = t::SessionApprovalResolveInput;
+        type Result = ();
     }
 }

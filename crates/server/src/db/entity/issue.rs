@@ -63,6 +63,8 @@ pub struct Model {
     #[sea_orm(column_type = "Text")]
     pub relations: String,
     pub body_note_id: Option<String>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub auto_review: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

@@ -56,18 +56,6 @@
 |---|---|---|---|---|---|---|
 | `machine.list` | 列出当前可见的本机与远程执行设备 | `/api/v1/machine/list` | ✓ | ✓ |   |   |
 
-## orchestrator
-
-主助手：上线、停下、评测
-
-| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 主助手 | 执行会话 |
-|---|---|---|---|---|---|---|
-| `orchestrator.open` | 让主助手上线，可以说话了 | `/api/v1/orchestrator/open` | ✓ | ✓ |   |   |
-| `orchestrator.stop` | 停下主助手这一轮，派出去的执行会话接着干 | `/api/v1/orchestrator/stop` | ✓ | ✓ |   |   |
-| `orchestrator.eval.create` | 把主助手做错的一轮存成评测样例，写上该怎么做 | `/api/v1/orchestrator/eval/create` | ✓ | ✓ |   |   |
-| `orchestrator.approval.list` | 列出主助手等待审批的工具调用 | `/api/v1/orchestrator/approval/list` | ✓ |   |   |   |
-| `orchestrator.approval.resolve` | 批准或拒绝主助手的工具调用 | `/api/v1/orchestrator/approval/resolve` | ✓ |   |   |   |
-
 ## setting
 
 设置：模型、钥匙、目录和别的
@@ -230,6 +218,9 @@ MOSS Live 语音通话
 | `session.childTranscript` | 读取子代理或协作组员最近的轨迹步骤 | `/api/v1/session/childTranscript` | ✓ | ✓ |   |   |
 | `session.compact` | cap.op.session.compact | `/api/v1/session/compact` | ✓ | ✓ |   |   |
 | `session.runCode` | cap.op.session.runCode | `/api/v1/session/runCode` | ✓ | ✓ |   |   |
+| `session.eval.create` | cap.op.session.eval.create | `/api/v1/session/eval/create` | ✓ | ✓ |   |   |
+| `session.approval.list` | cap.op.session.approval.list | `/api/v1/session/approval/list` | ✓ |   |   |   |
+| `session.approval.resolve` | cap.op.session.approval.resolve | `/api/v1/session/approval/resolve` | ✓ |   |   |   |
 
 ## note
 
@@ -252,6 +243,9 @@ MOSS Live 语音通话
 | `note.base.view` | 读取多维库（Base）指定工作表与视图经过筛选、排序、分组和汇总后的投影 | `/api/v1/note/base/view` | ✓ | ✓ | ✓ | ✓ |
 | `note.base.upsertRow` | 在多维库（Base）工作表中新增或更新一行数据 | `/api/v1/note/base/upsertRow` | ✓ | ✓ | ✓ | ✓ |
 | `note.base.runAgentColumn` | 在多维库（Base）指定行上触发 Agent 动作列执行并回写结果或生成工单 | `/api/v1/note/base/runAgentColumn` | ✓ | ✓ | ✓ |   |
+| `note.annotation.upsert` | cap.op.note.annotation.upsert | `/api/v1/note/annotation/upsert` | ✓ | ✓ | ✓ | ✓ |
+| `note.annotation.delete` | cap.op.note.annotation.delete | `/api/v1/note/annotation/delete` | ✓ | ✓ | ✓ | ✓ |
+| `note.base.syncReview` | cap.op.note.base.syncReview | `/api/v1/note/base/syncReview` | ✓ | ✓ | ✓ | ✓ |
 | `note.type.list` | 列出全部 4 类笔记基元（块文档、多维库、自由画布、媒体记录） | `/api/v1/note/type/list` | ✓ | ✓ | ✓ | ✓ |
 | `note.type.read` | 读取一种笔记基元的规范或参考分册 | `/api/v1/note/type/read` | ✓ | ✓ | ✓ | ✓ |
 | `note.file.list` | 列出笔记目录中的文件（manifest.json、structure/* 与 asset/*） | `/api/v1/note/file/list` | ✓ | ✓ | ✓ | ✓ |

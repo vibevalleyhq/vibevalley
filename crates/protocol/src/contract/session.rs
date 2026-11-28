@@ -6,6 +6,7 @@ use serde_with::skip_serializing_none;
 use ts_rs::TS;
 
 use super::*;
+use crate::wire::JsNumber;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts-gen", derive(TS))]
@@ -363,7 +364,7 @@ pub enum SessionController {
     User,
     IssueBoard,
     Channel,
-    Orchestrator,
+    Daemon,
 }
 
 impl SessionController {
@@ -371,7 +372,7 @@ impl SessionController {
         SessionController::User,
         SessionController::IssueBoard,
         SessionController::Channel,
-        SessionController::Orchestrator,
+        SessionController::Daemon,
     ];
 
     /// The string on the wire.
@@ -380,7 +381,7 @@ impl SessionController {
             SessionController::User => "user",
             SessionController::IssueBoard => "issueBoard",
             SessionController::Channel => "channel",
-            SessionController::Orchestrator => "orchestrator",
+            SessionController::Daemon => "daemon",
         }
     }
 }
@@ -395,11 +396,6 @@ pub enum ExecutionPolicy {
     DirectCwd {
         repo: Option<String>,
         permission_mode: SessionPermissionMode,
-    },
-    #[serde(rename_all = "camelCase")]
-    ManagedWorktree {
-        repo: String,
-        branch: Option<String>,
     },
     SandboxDir,
 }
@@ -1413,7 +1409,8 @@ pub struct SessionContextFile {
 pub struct SessionOpenWorkspaceInput {
     pub session_id: Option<String>,
     pub runtime: String,
-    pub cwd: String,
+    #[serde(default)]
+    pub cwd: Option<String>,
     pub repo: Option<String>,
     pub model: Option<String>,
     pub effort: Option<String>,
@@ -1721,6 +1718,63 @@ pub struct SessionRunCodeResult {
 #[cfg_attr(feature = "ts-gen", derive(TS))]
 #[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
+pub struct SessionEvalRequest {
+    /// Target session or daemon profile id; defaults to the built-in daemon assistant when omitted.
+    pub id: Option<String>,
+    pub on: JsNumber,
+    pub want: String,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct SessionEval {
+    pub id: String,
+    pub file: String,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct SessionApprovalListInput {
+    pub id: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct SessionApproval {
+    pub id: String,
+    pub task_id: String,
+    pub tool_call_id: String,
+    pub tool_name: String,
+    pub arguments_json: String,
+    pub reason: String,
+    pub requested_at_ms: i64,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct SessionApprovalResolveInput {
+    pub id: String,
+    pub task_id: String,
+    pub tool_call_id: String,
+    pub approved: bool,
+    pub reason: Option<String>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
 pub struct SessionWatchPayload {
     pub id: String,
     pub after_seq: Option<i64>,
@@ -1871,6 +1925,11 @@ crate::typescript::module! {
     SessionCompactResult,
     SessionRunCodeInput,
     SessionRunCodeResult,
+    SessionEvalRequest,
+    SessionEval,
+    SessionApprovalListInput,
+    SessionApproval,
+    SessionApprovalResolveInput,
     SessionWatchPayload,
     SessionWatchEvent];
     aliases: [];

@@ -364,7 +364,7 @@ function PageTreeRow(props: {
   return (
     <View
       testID={`page-tree-row-${props.row.note.id}`}
-      class={`group relative h-7 flex-row items-center gap-1 rounded-md pr-1 ${props.active ? "bg-selected" : "hover:bg-hover"}`}
+      class={`group relative h-7 flex-row items-center gap-1 rounded-md pr-7 ${props.active ? "bg-selected" : "hover:bg-hover"}`}
       style={{ paddingLeft: 6 + props.row.depth * 14 }}
     >
       <If when={props.active}>
@@ -392,7 +392,7 @@ function PageTreeRow(props: {
         class="min-w-0 flex-1 flex-row items-center gap-1.5 py-0.5 focus-visible:outline-2 focus-visible:outline-focus"
       >
         <Icon name={noteIcon(props.row.note)} size={13} tone={props.active ? "ink" : "muted"} />
-        <Text class={`min-w-0 flex-1 truncate text-xs ${props.active ? "font-semibold text-ink" : "font-medium text-muted"}`}>{props.row.note.title}</Text>
+        <Text class={`min-w-0 flex-1 truncate text-xs font-medium ${props.active ? "text-ink" : "text-muted"}`}>{props.row.note.title}</Text>
       </View>
 
       <Menu
@@ -409,7 +409,7 @@ function PageTreeRow(props: {
             role="button"
             testID={`page-tree-more-${props.row.note.id}`}
             accessibilityLabel={t("web.note.page.more")}
-            class="size-5 shrink-0 items-center justify-center rounded-sm opacity-0 group-hover:opacity-100 aria-expanded:bg-selected aria-expanded:opacity-100 hover:bg-selected"
+            class="absolute top-1 right-1 size-5 shrink-0 items-center justify-center rounded-sm opacity-0 group-hover:opacity-100 aria-expanded:bg-selected aria-expanded:opacity-100 hover:bg-selected"
           >
             <Icon name="more" size={12} tone="muted" />
           </View>

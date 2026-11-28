@@ -50,8 +50,6 @@ pub enum ActorRef {
 pub enum Landing {
     #[serde(rename = "merged")]
     Merged,
-    #[serde(rename = "merged_into_parent")]
-    MergedIntoParent,
     #[serde(rename = "pull_request")]
     PullRequest,
     #[serde(rename = "submitted")]
@@ -63,26 +61,49 @@ pub enum Landing {
 }
 
 impl Landing {
-    pub const ALL: [Landing; 6] = [
-        Landing::Merged,
-        Landing::MergedIntoParent,
-        Landing::PullRequest,
-        Landing::Submitted,
-        Landing::Kept,
-        Landing::None,
-    ];
+    pub const ALL: [Landing; 5] = [Landing::Merged, Landing::PullRequest, Landing::Submitted, Landing::Kept, Landing::None];
 
     /// The string on the wire.
     pub fn as_str(self) -> &'static str {
         match self {
             Landing::Merged => "merged",
-            Landing::MergedIntoParent => "merged_into_parent",
             Landing::PullRequest => "pull_request",
             Landing::Submitted => "submitted",
             Landing::Kept => "kept",
             Landing::None => "none",
         }
     }
+}
+
+/// Polymorphic delivery proof recorded by an autonomous agent or user.
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum DeliveryReceipt {
+    #[serde(rename_all = "camelCase")]
+    PullRequest {
+        url: String,
+        number: Option<i64>,
+        branch: Option<String>,
+        summary: Option<String>,
+    },
+    #[serde(rename_all = "camelCase")]
+    Commit {
+        sha: String,
+        branch: Option<String>,
+        summary: Option<String>,
+    },
+    #[serde(rename_all = "camelCase")]
+    Note {
+        #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::NoteId"))]
+        note_id: NoteId,
+        title: Option<String>,
+        summary: Option<String>,
+    },
+    #[serde(rename_all = "camelCase")]
+    Answer { summary: String },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
@@ -741,6 +762,8 @@ pub struct IssueReport {
     pub remember: Vec<IssueReportMemory>,
     pub pr_submit: bool,
     pub answer: Option<IssueAnswer>,
+    #[serde(default)]
+    pub delivery_receipt: Option<DeliveryReceipt>,
 }
 
 #[skip_serializing_none]
@@ -752,7 +775,6 @@ pub struct IssueConstraints {
     pub check: Option<String>,
     pub scope: Vec<String>,
     pub acceptance: bool,
-    pub frozen: Vec<String>,
 }
 
 #[skip_serializing_none]
@@ -849,6 +871,8 @@ pub struct Issue {
     pub deliver: Deliverable,
     pub reviewed_at: Option<i64>,
     pub delivery_evidence: Option<DeliveryEvidence>,
+    #[serde(default)]
+    pub delivery_receipt: Option<DeliveryReceipt>,
     pub findings: Vec<Finding>,
     pub questions: Vec<Question>,
     pub criteria: Vec<String>,
@@ -916,6 +940,8 @@ pub struct AppliedIssue {
     pub deliver: Deliverable,
     pub reviewed_at: Option<i64>,
     pub delivery_evidence: Option<DeliveryEvidence>,
+    #[serde(default)]
+    pub delivery_receipt: Option<DeliveryReceipt>,
     pub findings: Vec<Finding>,
     pub questions: Vec<Question>,
     pub criteria: Vec<String>,
@@ -974,6 +1000,7 @@ impl AppliedIssue {
             deliver: issue.deliver,
             reviewed_at: issue.reviewed_at,
             delivery_evidence: issue.delivery_evidence,
+            delivery_receipt: issue.delivery_receipt,
             findings: issue.findings,
             questions: issue.questions,
             criteria: issue.criteria,
@@ -1033,6 +1060,9 @@ pub struct IssueUpdate {
     /// Non-blocking links (`duplicate` / `related`) maintained bidirectionally; `[]` clears all relations.
     #[serde(default)]
     pub relations: Option<Vec<IssueRelation>>,
+    /// Polymorphic delivery receipt recorded by an agent or user.
+    #[serde(default)]
+    pub delivery_receipt: Option<DeliveryReceipt>,
 }
 
 #[skip_serializing_none]
@@ -1173,6 +1203,9 @@ pub struct IssueStatusRequest {
     pub agent: Option<String>,
     /// Unsaved field edits applied atomically before the status transition.
     pub edit: Option<IssueUpdate>,
+    /// Optional polymorphic delivery proof recorded when moving an issue to `done`.
+    #[serde(default)]
+    pub delivery_receipt: Option<DeliveryReceipt>,
     /// Idempotency key deduplicating retries after a lost response.
     pub request_key: Option<String>,
 }
@@ -1379,6 +1412,9 @@ pub struct IssueUpdateInput {
     /// Non-blocking links (`duplicate` / `related`) maintained bidirectionally; `[]` clears all relations.
     #[serde(default)]
     pub relations: Option<Vec<IssueRelation>>,
+    /// Polymorphic delivery receipt recorded by an agent or user.
+    #[serde(default)]
+    pub delivery_receipt: Option<DeliveryReceipt>,
 }
 
 #[skip_serializing_none]
@@ -1402,6 +1438,8 @@ pub struct IssueStatusUpdateInput {
     pub text: Option<String>,
     pub agent: Option<String>,
     pub edit: Option<IssueUpdate>,
+    #[serde(default)]
+    pub delivery_receipt: Option<DeliveryReceipt>,
     pub request_key: Option<String>,
 }
 
@@ -1615,7 +1653,6 @@ pub struct BoardIssueSummary {
     pub card_kind: IssueCardKind,
     pub family_done: i64,
     pub family_total: i64,
-    pub needs_worktree_check: bool,
     pub prompt: Option<IssuePromptKind>,
     pub preview: Option<BoardCardPreview>,
     pub schedule: Option<IssueScheduleSpan>,
@@ -1785,6 +1822,7 @@ crate::typescript::module! {
     IssueRelationKind,
     IssueRelation,
     Landing,
+    DeliveryReceipt,
     IssueCanceled,
     Priority,
     IssueStatus,

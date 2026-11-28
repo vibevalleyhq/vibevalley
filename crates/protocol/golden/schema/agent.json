@@ -171,7 +171,6 @@
     "k85": "s86"
    },
    "workdir": "s87",
-   "worktree": true,
    "tags": [
     "s89"
    ],
@@ -228,7 +227,6 @@
     "k111": "s112"
    },
    "workdir": "s113",
-   "worktree": true,
    "tags": [
     "s115"
    ],
@@ -259,7 +257,6 @@
    "model": "s126",
    "effort": "s127",
    "personaMode": "append",
-   "worktree": true,
    "look": {
     "species": "bear",
     "outfit": "farmer",
@@ -293,7 +290,6 @@
    "model": "s142",
    "effort": "s143",
    "personaMode": "append",
-   "worktree": true,
    "look": {
     "species": null,
     "outfit": null,
@@ -357,7 +353,6 @@
       "k164": "s165"
      },
      "workdir": "s166",
-     "worktree": false,
      "tags": [
       "s168"
      ],
@@ -414,7 +409,6 @@
       "k187": "s188"
      },
      "workdir": "s189",
-     "worktree": true,
      "tags": [
       "s191"
      ],

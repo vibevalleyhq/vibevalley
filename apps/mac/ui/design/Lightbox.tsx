@@ -1,4 +1,4 @@
-import { colorScheme, computed, effect, Image, keymap, signal, Text, View, windowSize } from "nsh";
+import { colorScheme, computed, effect, Image, keymap, signal, Text, View, windowSize, type JSX } from "nsh";
 import { Dialog } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
@@ -9,11 +9,20 @@ import { IconButton } from "./IconButton";
 import { fadeAnimation } from "./motion";
 import { mix } from "./tone";
 
+export interface PictureOverlayFrame {
+  readonly width: number;
+  readonly height: number;
+  readonly naturalWidth?: number | undefined;
+  readonly naturalHeight?: number | undefined;
+}
+
 export interface Picture {
   readonly src: string;
   readonly name: string;
   /** The file on disk, for "open the original". */
   readonly path?: string;
+  /** Optional non-destructive overlay (e.g. interactive image annotations) rendered cleanly over the zoomed picture. */
+  readonly renderOverlay?: ((frame: () => PictureOverlayFrame) => JSX.Element) | undefined;
 }
 
 export function Lightbox(props: { pictures: readonly Picture[]; at: number | undefined; onAt: (at: number | undefined) => void }) {
@@ -55,6 +64,16 @@ export function Lightbox(props: { pictures: readonly Picture[]; at: number | und
     const n = natural();
     return n && n.src === shown()?.src ? `${n.width}×${n.height}` : undefined;
   });
+  const overlayFrame = computed((): PictureOverlayFrame => {
+    const f = fit();
+    const n = natural();
+    const same = n !== undefined && n.src === shown()?.src;
+    return {
+      width: f.width,
+      height: f.height,
+      ...(same ? { naturalWidth: n.width, naturalHeight: n.height } : {}),
+    };
+  });
   return (
     <Dialog
       open={props.at !== undefined}
@@ -68,8 +87,13 @@ export function Lightbox(props: { pictures: readonly Picture[]; at: number | und
       <If when={shown()}>
         {(p) => (
           <>
-            <View class="overflow-hidden rounded-lg border shadow-float" style={{ borderColor: mix("white", 0.14), backgroundColor: mix("ink-950", 0.45) }}>
+            <View
+              testID="lightbox-stage"
+              class="relative overflow-hidden rounded-lg border shadow-float"
+              style={{ borderColor: mix("white", 0.14), backgroundColor: mix("ink-950", 0.45) }}
+            >
               <Image src={p().src} accessibilityLabel={p().name} style={{ ...fit(), objectFit: "contain" }} />
+              <If when={p().renderOverlay !== undefined}>{p().renderOverlay?.(overlayFrame)}</If>
             </View>
             <View class="flex-row items-center gap-1 rounded-lg border border-line bg-elevated px-2.5 py-1.5 shadow-float">
               <If when={count() > 1}>

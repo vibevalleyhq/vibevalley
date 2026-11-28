@@ -1,7 +1,7 @@
 import "../infra/polyfill";
 import { expect, open, test } from "nsh/test";
 
-import type { ChatMessage, Note, NoteHistoryEntry, NoteId, NoteType, OrchestratorApproval, Suggestion, SuggestionId } from "@vibevalley/protocol";
+import type { ChatMessage, Note, NoteHistoryEntry, NoteId, NoteType, SessionApproval, Suggestion, SuggestionId } from "@vibevalley/protocol";
 
 import { sampleChanges } from "../features/issue/model/issue.samples";
 import { fakeHost, type FakeHost } from "../fixtures/fakeHost";
@@ -163,10 +163,10 @@ test("chat: composer IME composition, send, live stream, image fallback, and str
 });
 
 test("orchestrator trajectory: polled approval can be granted", async () => {
-  let pendingApprovals: OrchestratorApproval[] = [];
+  let pendingApprovals: SessionApproval[] = [];
   const { app, fake } = await mountApp("/orchestrator/trajectory", (f) => {
-    f.respond("orchestrator.approval.list", () => pendingApprovals);
-    f.respond("orchestrator.approval.resolve", () => {
+    f.respond("session.approval.list", () => pendingApprovals);
+    f.respond("session.approval.resolve", () => {
       pendingApprovals = [];
       return null;
     });
@@ -180,7 +180,7 @@ test("orchestrator trajectory: polled approval can be granted", async () => {
   fake.clearCalls();
   pendingApprovals = [
     {
-      conversationId: "orchestrator",
+      id: "orchestrator",
       taskId: "task-1",
       toolCallId: "tc-allow-1",
       toolName: "issue_create",
@@ -194,8 +194,8 @@ test("orchestrator trajectory: polled approval can be granted", async () => {
   expect(app.count("id:approval-allow-tc-allow-1")).toBe(1);
   await app.press("id:approval-allow-tc-allow-1");
   await fake.pump(app);
-  expect(fake.calls.find((c) => c.op === "orchestrator.approval.resolve")?.payload).toEqual({
-    conversationId: "orchestrator",
+  expect(fake.calls.find((c) => c.op === "session.approval.resolve")?.payload).toEqual({
+    id: "orchestrator",
     taskId: "task-1",
     toolCallId: "tc-allow-1",
     approved: true,

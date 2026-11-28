@@ -1,14 +1,15 @@
-import type {
-  ChatMessage,
-  IssueHistory,
-  IssueRetroReport,
-  MorningDigest,
-  RetroWindow,
-  SessionEvent,
-  SessionEventPage,
-  SessionTrajectoryProjection,
-  SliceBundle,
-  TrajectoryRunView,
+import {
+  type ChatMessage,
+  type IssueHistory,
+  type IssueRetroReport,
+  localUserParticipant,
+  type MorningDigest,
+  type RetroWindow,
+  type SessionEvent,
+  type SessionEventPage,
+  type SessionTrajectoryProjection,
+  type SliceBundle,
+  type TrajectoryRunView,
 } from "@vibevalley/protocol";
 import { SliceBundle as SliceBundleSchema } from "@vibevalley/protocol/schema";
 
@@ -160,8 +161,11 @@ function buildMessages(density: ScenarioDensity, now: number): ChatMessage[] {
       id: `m-dense-${n}` as ChatMessage["id"],
       number: n,
       channel: "general",
-      from: i % 2 === 0 ? "user" : "w1",
-      actor: i % 2 === 0 ? ({ kind: "user", id: "user", name: "你" } as const) : ({ kind: "agent", id: "laozhou", role: "worker", name: "老周" } as const),
+      from: i % 2 === 0 ? localUserParticipant : "w1",
+      actor:
+        i % 2 === 0
+          ? ({ kind: "user", id: localUserParticipant, name: "你" } as const)
+          : ({ kind: "agent", id: "laozhou", role: "worker", name: "老周" } as const),
       name: i % 2 === 0 ? "你" : "老周",
       kind: i % 5 === 0 ? ("report" as const) : ("chat" as const),
       text: i % 4 === 0 ? `第 ${n} 条消息：\n\`\`\`ts\nexport const step${n} = () => ${n};\n\`\`\`` : `第 ${n} 条高密压测消息：核对工单状态与增量帧同步 #18`,
@@ -265,7 +269,7 @@ function responsesFor(density: ScenarioDensity, bundle: SliceBundle): Record<str
       "issue.answer": null,
       "issue.status.update": { seq: bundle.seq + 1 },
       "issue.comment.create": { seq: bundle.seq + 1 },
-      "orchestrator.approval.list": [],
+      "session.approval.list": [],
       "channel.message.list": [],
       "channel.pin.list": [],
       "channel.message.search": [],
@@ -282,7 +286,7 @@ function responsesFor(density: ScenarioDensity, bundle: SliceBundle): Record<str
   return {
     ...baseResponses,
     "host.assetsDir": assetsDir,
-    "orchestrator.approval.list": [],
+    "session.approval.list": [],
     "issue.history.list": buildHistory(bundle),
     "issue.retro.get": emptyRetro("7d"),
     "issue.digest.get": emptyDigest(),

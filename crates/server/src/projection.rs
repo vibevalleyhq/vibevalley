@@ -47,7 +47,18 @@ pub(crate) async fn project_slices_batch_json(sources: &SliceSources, batch: &[(
 
     let shared_bundle = if needs_core_snapshot {
         match sources.board.projection_snapshot_async().await {
-            Ok((raw_sessions, raw_issues)) => {
+            Ok((raw_sessions, mut raw_issues)) => {
+                let issue_ids: Vec<String> = raw_issues.iter().map(|i| i.id.clone()).collect();
+                let (crons_res, pulls_res) = tokio::join!(
+                    sources.ctx.service.cron.cron_by_issue_map(),
+                    sources.ctx.service.issue.pulls_by_issue_map(&issue_ids),
+                );
+                let crons_by_issue = crons_res.unwrap_or_default();
+                let pulls_by_issue = pulls_res.unwrap_or_default();
+                for issue in &mut raw_issues {
+                    issue.cron = crons_by_issue.get(&issue.id).cloned();
+                    issue.pull_request = pulls_by_issue.get(&issue.id).cloned();
+                }
                 let mut live = sources.ctx.live.to_core_snapshot(needs_farm);
                 if needs_farm {
                     live.plays = sources.game.plays_snapshot();
@@ -155,6 +166,7 @@ pub(crate) async fn project_slices_batch_json(sources: &SliceSources, batch: &[(
     out
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn finish_boot_and_start_feeds(
     ctx: &Arc<Context>,
     board: &Arc<Board>,

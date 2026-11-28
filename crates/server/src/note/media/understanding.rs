@@ -11,7 +11,8 @@ use vibevalley_protocol::{
 };
 
 use super::Stop;
-use super::job::{Ask, Held, Media, Phase, Record, active, id_ok, refused};
+use super::job::Media;
+use super::state::{Ask, Held, Phase, Record, active, id_ok, refused};
 use super::vendor::{Account, Moss, Outcome};
 use crate::setting::Use;
 
@@ -76,7 +77,7 @@ impl Media {
     }
 
     pub async fn authorize_understanding_async(&self, r: MediaUnderstandingAuthorizationRequest) -> Result<MediaUnderstandingJob, ApiError> {
-        if !self.channel.place_exists(&r.channel) {
+        if r.channel.trim().is_empty() {
             return Err(invalid());
         }
         let request = MediaUnderstandingRequest {
@@ -197,14 +198,14 @@ impl Media {
         shown(&self.found_async(id).await?)
     }
 
-    pub async fn start_understanding_by_id_async(&self, id: &str) -> Result<MediaUnderstandingJob, ApiError> {
+    pub async fn start_understanding_with_agent_async(&self, id: &str, resolve_agent: impl FnOnce(&str) -> String) -> Result<MediaUnderstandingJob, ApiError> {
         let r = self.found_async(id).await?;
         let channel = r
             .authorization
             .as_ref()
             .map(|a| a.channel.clone())
             .ok_or_else(|| refused("authorizationRequired"))?;
-        let agent = self.channel.orchestrator_in(&channel);
+        let agent = resolve_agent(&channel);
         self.start_understanding_async(id, &agent, &channel).await
     }
 
@@ -360,11 +361,10 @@ mod tests {
     use serde_json::json;
     use tokio_util::sync::CancellationToken;
     use vibevalley_core::ManualClock;
-    use vibevalley_protocol::{ChatMessage, MediaInputRequest, MediaUnderstandingPhase, NoteCard, ProviderUpdate};
+    use vibevalley_protocol::{MediaInputRequest, MediaUnderstandingPhase, ProviderUpdate};
 
     use super::*;
     use crate::context::http::{Fetch, FetchError, Request, Response};
-    use crate::context::port::ChannelAnnounce;
     use crate::context::{Context, LiveState, Outbox, StateFeed, TaskGroup};
     use crate::provider::connections_over;
     use crate::service::Service;
@@ -376,50 +376,6 @@ mod tests {
     impl Fetch for UnusedFetch {
         fn fetch_async(self: Arc<Self>, _request: Request, _cancel: CancellationToken) -> crate::BoxFuture<'static, Result<Response, FetchError>> {
             Box::pin(async { Err(FetchError::Network("unused in approval expiry test".into())) })
-        }
-    }
-
-    struct MockAnnounce;
-
-    impl ChannelAnnounce for MockAnnounce {
-        fn place_exists(&self, id: &str) -> bool {
-            id == "general"
-        }
-
-        fn orchestrator_in(&self, _channel: &str) -> String {
-            "orchestrator".into()
-        }
-
-        fn place_of_async<'a>(&'a self, _who: &'a str, target: &'a str) -> crate::BoxFuture<'a, Result<String, ApiError>> {
-            let out = if target.trim().is_empty() {
-                "general".to_string()
-            } else {
-                target.trim().to_string()
-            };
-            Box::pin(async move { Ok(out) })
-        }
-
-        fn post_card_async<'a>(
-            &'a self,
-            _from: &'a str,
-            _channel: &'a str,
-            _text: &'a str,
-            _card: NoteCard,
-            _run: Option<String>,
-            _send_key: String,
-        ) -> crate::BoxFuture<'a, Result<ChatMessage, ApiError>> {
-            unimplemented!()
-        }
-
-        fn post_attachments_async<'a>(
-            &'a self,
-            _from: &'a str,
-            _channel: &'a str,
-            _text: &'a str,
-            _attachments: Vec<String>,
-            _send_key: String,
-        ) -> crate::BoxFuture<'a, Result<ChatMessage, ApiError>> {
-            unimplemented!()
         }
     }
 
@@ -460,7 +416,7 @@ mod tests {
         let revision = updated.revision;
 
         let storage = Storage::open_async(dir.path(), ctx.clone()).await.unwrap();
-        let jobs = Media::open_async(ctx.clone(), setting, storage.clone(), Arc::new(MockAnnounce)).await.unwrap();
+        let jobs = Media::open_async(ctx.clone(), setting, storage.clone()).await.unwrap();
 
         let mut png = b"\x89PNG\r\n\x1a\n".to_vec();
         png.resize(24, 0);

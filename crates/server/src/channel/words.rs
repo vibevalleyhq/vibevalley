@@ -5,14 +5,16 @@ use std::sync::LazyLock;
 
 use regex::Regex;
 use vibevalley_i18n::{maybe, t};
-use vibevalley_protocol::{DEFAULT_ORCHESTRATOR, EVERYONE, Embed, USER_ID};
+use vibevalley_protocol::{DEFAULT_ORCHESTRATOR, EVERYONE, Embed};
+
+const LOCAL_USER_WIRE: &str = "user:self";
 
 /// The chat's names for who is not a helper; the orchestrator's is filled
 /// in where the place is known.
 pub fn chat_named(token: &str) -> Option<&'static str> {
     Some(match token {
         "主助手" | "助手" | "manager" => DEFAULT_ORCHESTRATOR,
-        "用户" | "user" => USER_ID,
+        "用户" | "user" => LOCAL_USER_WIRE,
         "所有人" | "everyone" => EVERYONE,
         _ => return None,
     })
@@ -22,6 +24,9 @@ const CHAT_NAMES: [&str; 7] = ["主助手", "助手", "用户", "所有人", "ma
 
 /// `mentionOf`: how the page writes a mention of one of the chat's names.
 pub fn mention_of(id: &str) -> Option<String> {
+    if id == LOCAL_USER_WIRE {
+        return maybe("server.channel.mention.user");
+    }
     maybe(&format!("server.channel.mention.{id}"))
 }
 
@@ -30,6 +35,8 @@ pub struct Nameable<'a> {
     /// The place's own orchestrator (@助手).
     pub here: &'a str,
     pub orchestrators: &'a [String],
+    /// Registered human participants as `(canonical_id, display_name)` pairs (e.g. `("user:alice", "Alice")`).
+    pub humans: &'a [(String, String)],
 }
 
 static FENCE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?s)```.*?```").expect("fence"));
@@ -54,12 +61,62 @@ fn match_worker_mention(rest: &str) -> Option<&str> {
     (digits_end > 1).then_some(&rest[..digits_end])
 }
 
+fn match_canonical_participant(rest: &str) -> Option<&str> {
+    for prefix in ["user:", "agent:", "session:"] {
+        if let Some(after) = rest.strip_prefix(prefix) {
+            let end = after
+                .char_indices()
+                .find(|&(_, c)| {
+                    c.is_whitespace()
+                        || matches!(
+                            c,
+                            '@' | ',' | '，' | '.' | '。' | ';' | '；' | '!' | '！' | '?' | '？' | ')' | '）' | ']' | '】' | '>' | '"' | '\'' | '`'
+                        )
+                })
+                .map(|(i, _)| i)
+                .unwrap_or(after.len());
+            if end > 0 {
+                return Some(&rest[..prefix.len() + end]);
+            }
+        }
+    }
+    None
+}
+
 /// `mentionsIn`: who some words name, once each, in order. Code names no
 /// one; the longest name is tried first, and a name ends where its token
 /// ends (`@w3你看` names w3).
 pub fn mentions_in(text: &str, names: &Nameable) -> Vec<String> {
-    let mut alts: Vec<&str> = names.orchestrators.iter().map(String::as_str).chain(CHAT_NAMES).collect();
-    alts.sort_by_key(|a| std::cmp::Reverse(a.encode_utf16().count()));
+    let mut alts: Vec<(&str, String)> = Vec::new();
+    for orch in names.orchestrators {
+        if !orch.is_empty() {
+            alts.push((orch.as_str(), orch.clone()));
+        }
+    }
+    for (canonical, display) in names.humans {
+        if !canonical.is_empty() {
+            alts.push((canonical.as_str(), canonical.clone()));
+            if let Some(raw) = canonical.strip_prefix("user:")
+                && !raw.is_empty()
+                && raw != "self"
+            {
+                alts.push((raw, canonical.clone()));
+            }
+        }
+        if !display.is_empty() && chat_named(display).is_none() {
+            alts.push((display.as_str(), canonical.clone()));
+        }
+    }
+    for &chat_name in &CHAT_NAMES {
+        let resolved = match chat_named(chat_name) {
+            Some(DEFAULT_ORCHESTRATOR) => names.here.to_string(),
+            Some(other) => other.to_string(),
+            None => chat_name.to_string(),
+        };
+        alts.push((chat_name, resolved));
+    }
+    alts.sort_by_key(|(a, _)| std::cmp::Reverse(a.encode_utf16().count()));
+
     let prose = FENCE.replace_all(text, " ");
     let prose = TICK.replace_all(&prose, " ");
     let mut found: Vec<String> = vec![];
@@ -67,8 +124,15 @@ pub fn mentions_in(text: &str, names: &Nameable) -> Vec<String> {
     while let Some(rel) = prose[cursor..].find('@') {
         let at_idx = cursor + rel;
         let rest = &prose[at_idx + 1..];
-        let matched = match_worker_mention(rest).or_else(|| alts.iter().copied().find(|alt| !alt.is_empty() && rest.starts_with(alt)));
-        let Some(token) = matched else {
+        let matched: Option<(&str, String)> = match_canonical_participant(rest)
+            .map(|tok| (tok, tok.to_string()))
+            .or_else(|| match_worker_mention(rest).map(|tok| (tok, tok.to_string())))
+            .or_else(|| {
+                alts.iter()
+                    .find(|(alt, _)| !alt.is_empty() && rest.starts_with(alt))
+                    .map(|(alt, resolved)| (*alt, resolved.clone()))
+            });
+        let Some((token, id)) = matched else {
             cursor = at_idx + 1;
             continue;
         };
@@ -76,11 +140,6 @@ pub fn mentions_in(text: &str, names: &Nameable) -> Vec<String> {
         if !leads(prose[..at_idx].chars().next_back()) {
             continue;
         }
-        let id = match chat_named(token) {
-            Some(DEFAULT_ORCHESTRATOR) => names.here.to_string(),
-            Some(named) => named.to_string(),
-            None => token.to_string(),
-        };
         if !found.contains(&id) {
             found.push(id);
         }
@@ -104,7 +163,7 @@ pub fn extract_at_tokens(text: &str) -> Vec<String> {
                 c.is_whitespace()
                     || matches!(
                         c,
-                        '@' | ':' | ',' | '，' | '.' | '。' | ';' | '；' | '!' | '！' | '?' | '？' | ')' | '）' | ']' | '】' | '>' | '"' | '\'' | '`'
+                        '@' | ',' | '，' | '.' | '。' | ';' | '；' | '!' | '！' | '?' | '？' | ')' | '）' | ']' | '】' | '>' | '"' | '\'' | '`'
                     )
             })
             .map(|(i, _)| i)
@@ -171,7 +230,7 @@ pub fn parse_chat_target(target: &str) -> Option<ChatTarget> {
 /// `targetOf`: a place's address as an agent writes it.
 pub fn target_of(kind: &str, root_number: Option<i64>, name: Option<&str>, channel_name: &str) -> String {
     match (kind, root_number) {
-        ("direct", _) => format!("@{USER_ID}"),
+        ("direct", _) => format!("@{}", name.filter(|n| !n.is_empty()).unwrap_or(LOCAL_USER_WIRE)),
         ("thread", Some(n)) => format!("#{channel_name}:{n}"),
         _ => format!("#{}", name.unwrap_or(channel_name)),
     }
@@ -461,6 +520,8 @@ pub async fn read_embed_async(link: &str) -> Option<Embed> {
 
 #[cfg(test)]
 mod tests {
+    use vibevalley_protocol::ParticipantId;
+
     use super::*;
 
     fn named(text: &str) -> Vec<String> {
@@ -469,6 +530,7 @@ mod tests {
             &Nameable {
                 here: DEFAULT_ORCHESTRATOR,
                 orchestrators: &[DEFAULT_ORCHESTRATOR.into()],
+                humans: &[],
             },
         )
     }
@@ -481,11 +543,30 @@ mod tests {
     }
 
     #[test]
+    fn multi_human_and_canonical_participant_mentions_resolve() {
+        let humans = vec![
+            (ParticipantId::user("alice").to_string(), "Alice".into()),
+            (ParticipantId::user("bob").to_string(), "Bob".into()),
+        ];
+        let names = Nameable {
+            here: DEFAULT_ORCHESTRATOR,
+            orchestrators: &[DEFAULT_ORCHESTRATOR.into()],
+            humans: &humans,
+        };
+        assert_eq!(
+            mentions_in("请 @alice 和 @Bob 看看 @user:charlie", &names),
+            ["user:alice", "user:bob", "user:charlie"]
+        );
+        assert_eq!(mentions_in("hi @用户", &names), ["user:self"]);
+    }
+
+    #[test]
     fn with_several_orchestrators() {
         let orchestrators: Vec<String> = ["orchestrator", "lead", "agent-1", "agent-12"].iter().map(|s| s.to_string()).collect();
         let names = Nameable {
             here: "lead",
             orchestrators: &orchestrators,
+            humans: &[],
         };
         assert_eq!(mentions_in("@助手 看看，@agent-12 也看看，@agent-1", &names), ["lead", "agent-12", "agent-1"]);
         assert_eq!(mentions_in("@orchestrator 你呢 `@lead`", &names), ["orchestrator"]);
@@ -508,7 +589,7 @@ mod tests {
                 ..Default::default()
             }
         );
-        assert_eq!(parse_search("from:@用户 来了").from.as_deref(), Some(USER_ID));
+        assert_eq!(parse_search("from:@用户 来了").from.as_deref(), Some(LOCAL_USER_WIRE));
         assert_eq!(parse_search("from:w3").from.as_deref(), Some("w3"));
         let day = parse_search("before:2026-10-28 after:2026-10-01 has:pdf");
         assert_eq!(day.before, midnight("2026-10-28"));
@@ -522,7 +603,7 @@ mod tests {
     fn targets_read_back() {
         assert_eq!(parse_chat_target("#general"), Some(ChatTarget::Channel("general".into())));
         assert_eq!(parse_chat_target("general:12"), Some(ChatTarget::Thread(12)));
-        assert_eq!(parse_chat_target("@用户"), Some(ChatTarget::Direct(USER_ID.into())));
+        assert_eq!(parse_chat_target("@用户"), Some(ChatTarget::Direct(LOCAL_USER_WIRE.into())));
         assert_eq!(parse_chat_target("no spaces here"), None);
     }
 

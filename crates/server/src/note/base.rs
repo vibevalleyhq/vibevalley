@@ -5,10 +5,10 @@ use vibevalley_core::note::base::{
 };
 use vibevalley_protocol::{
     ApiError, BaseCellValue, BaseColumnKind, BaseRunAgentColumnRequest, BaseRunAgentColumnResult, BaseUpsertRowRequest, BaseViewRequest, BaseViewSnapshot,
-    NoteFileEncoding, NoteFileWriteItem, NoteFileWriteRequest, NoteType, USER_ID,
+    NoteFileEncoding, NoteFileWriteItem, NoteFileWriteRequest, NoteType,
 };
 
-use super::{Maker, Manager, new_id, note_type_of, refused};
+use super::{Maker, Manager, NOTE_USER_ORIGIN, new_id, note_type_of, refused};
 
 /// Prepared Agent Action target item passed to the issue/agent execution coordinator in `router/glue.rs`.
 #[derive(Debug, Clone)]
@@ -44,7 +44,7 @@ pub(crate) struct ExecutedAgentCellOutcome {
 }
 
 impl Manager {
-    async fn load_base_doc_async(&self, id: &str) -> Result<BaseDocument, ApiError> {
+    pub(super) async fn load_base_doc_async(&self, id: &str) -> Result<BaseDocument, ApiError> {
         let row = self.row_async(id).await?;
         let ty = note_type_of(&row.note_type)?;
         if ty != NoteType::Base {
@@ -74,7 +74,7 @@ impl Manager {
         let mut doc = self.load_base_doc_async(&req.id).await?;
         let now = self.ctx.now();
         let gen_id = new_id("row");
-        let (sheet_id, _) = upsert_row(&mut doc, req, now, &gen_id).map_err(refused)?;
+        let (sheet_id, row_id) = upsert_row(&mut doc, req, now, &gen_id).map_err(refused)?;
         let encoded = serialize_base_document(&doc).map_err(refused)?;
         let meta = super::collab::commit_meta_for_maker(maker, Some("Update base row".to_owned()), now);
         self.write_files_with_meta_async(
@@ -88,13 +88,16 @@ impl Manager {
                     mime: Some("application/json".to_owned()),
                     expected_hash: None,
                 }],
-                origin: req.origin.clone().or_else(|| Some(USER_ID.to_owned())),
+                origin: req.origin.clone().or_else(|| Some(NOTE_USER_ORIGIN.to_owned())),
                 summary: Some("Upsert base row".to_owned()),
                 announce: Some(false),
             },
             &meta,
         )
         .await?;
+
+        self.sync_base_row_to_doc_annotation_async(maker, &doc, &sheet_id, &row_id, req.origin.as_deref())
+            .await;
 
         self.base_view_async(&BaseViewRequest {
             id: req.id.clone(),

@@ -43,7 +43,6 @@ pub async fn run(client: &Client, cmd: ChatCmd) -> Done {
 }
 
 async fn orchestrator_turn(client: &Client, channel: &str, prompt: &str, timeout_secs: u64) -> Done {
-    client.ask::<ops::OrchestratorOpen>(&()).await?;
     let before = client
         .ask::<ops::ChannelMessageList>(&ChannelMessageListInput {
             id: channel.to_string(),

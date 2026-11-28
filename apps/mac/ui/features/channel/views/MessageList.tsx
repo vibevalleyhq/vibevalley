@@ -1,7 +1,7 @@
 import { computed, List, signal, Text, untracked, View, type JSX, type ListRef } from "nsh";
 
 import { t } from "@vibevalley/i18n";
-import { type ChatMessage, type Channel, type MessageHit, defaultOrchestrator, type Outcome, userId } from "@vibevalley/protocol";
+import { type ChatMessage, type Channel, type MessageHit, defaultOrchestrator, isHumanParticipant, type Outcome, participantRawId } from "@vibevalley/protocol";
 import { actorRoleOf, channelOf, plainText, sessionIssueId } from "@vibevalley/protocol/rules";
 
 import { OrchestratorFace, UserFace } from "../../../design/domain/Face";
@@ -110,7 +110,7 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
       : feedOf(collab()?.chat, said().messages),
   );
   const addressOf = (m: ChatMessage) => (m.channel === id() ? undefined : hits()?.find((h) => h.message.id === m.id)?.address);
-  const firstNew = computed(() => (searching() ? undefined : said().messages.find((m) => m.number > readTo && m.from !== userId)?.id));
+  const firstNew = computed(() => (searching() ? undefined : said().messages.find((m) => m.number > readTo && !isHumanParticipant(m.from))?.id));
   const parent = useMessage(() => (props.channel ? parentAt(collab()?.chat, props.channel) : undefined));
   const hasOlder = computed(() => !!id() && said().messages.length > 0 && !said().complete);
   const typing = computed(() => orchestratorTyping(sessions()?.sessions, props.channel));
@@ -126,7 +126,7 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
   const newest = computed(() => said().messages.at(-1)?.number ?? 0);
   const unseen = computed(() => {
     const from = awayFrom();
-    return from === undefined ? 0 : said().messages.filter((m) => m.number > from && m.from !== userId).length;
+    return from === undefined ? 0 : said().messages.filter((m) => m.number > from && !isHumanParticipant(m.from)).length;
   });
   const onScroll = (e: { offset: { y: number }; contentSize: { height: number }; size: { height: number } }) => {
     const away = e.contentSize.height - e.size.height - e.offset.y > awayPx;
@@ -483,13 +483,17 @@ function MessageRow(props: {
   const editing = computed(() => editingId() === props.m.id);
   const setEditing = (on: boolean) => setEditingId(on ? props.m.id : undefined);
   const orchestrators = useOrchestrators();
-  const nameOf = (who: string) =>
-    who === userId
-      ? t("web.channel.messages.user")
-      : (orchestrators().find((a) => a.id === who)?.name ??
-        (who === defaultOrchestrator ? t("web.channel.orchestrator") : undefined) ??
-        sessionsById().get(who)?.name ??
-        who);
+  const nameOf = (who: string) => {
+    if (isHumanParticipant(who)) return t("web.channel.messages.user");
+    const raw = participantRawId(who);
+    return (
+      orchestrators().find((a) => a.id === who || a.id === raw)?.name ??
+      (who === defaultOrchestrator || raw === defaultOrchestrator ? t("web.channel.orchestrator") : undefined) ??
+      sessionsById().get(who)?.name ??
+      sessionsById().get(raw)?.name ??
+      who
+    );
+  };
   const meta = computed(() =>
     [props.where ? t("web.channel.messages.inThread", { address: props.where }) : "", props.m.pinned !== undefined ? t("web.channel.messages.pinned") : ""]
       .filter(Boolean)
@@ -624,7 +628,7 @@ function ThreadPreview(props: { thread: Channel }) {
       <If when={last()}>
         {(m) => (
           <View class="w-full flex-row items-center gap-2">
-            <Text class="shrink-0 text-sm font-medium text-ink">{m().from === userId ? t("web.channel.messages.user") : m().name}</Text>
+            <Text class="shrink-0 text-sm font-medium text-ink">{isHumanParticipant(m().from) ? t("web.channel.messages.user") : m().name}</Text>
             <Text class="min-w-0 flex-1 truncate text-sm text-muted">{localizeRuntimeError(plainText(m().text)).text}</Text>
             <Text class="shrink-0 text-xs text-muted">{workbenchClock(m().at)}</Text>
           </View>

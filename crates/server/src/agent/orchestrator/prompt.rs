@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use parking_lot::Mutex;
+use arc_swap::ArcSwap;
 use vibevalley_runtime::agent::extensions::memory::{MemoryPort, Remember, RewriteMemory};
 use vibevalley_runtime::agent::resources::skills::{LoadSkill, SkillInfo, scan_skills, skill_index};
 use vibevalley_runtime::agent::{Brain, Tool, TypedToolAdapter};
@@ -69,7 +69,7 @@ impl Orchestrator {
     }
 
     /// Everything it can call: the farm's tools for where it is, its skills and its memory.
-    pub(super) async fn tools_for_async(&self, id: &str, route: &Arc<Mutex<Route>>, skills_dir: PathBuf, memory: Arc<dyn MemoryPort>) -> Vec<Box<dyn Tool>> {
+    pub(super) async fn tools_for_async(&self, id: &str, route: &Arc<ArcSwap<Route>>, skills_dir: PathBuf, memory: Arc<dyn MemoryPort>) -> Vec<Box<dyn Tool>> {
         let profile = self.profile.agent(id);
         let mut tools = held_for(&self.tool, route, profile.as_ref());
         if let Some(profile) = profile {
@@ -85,7 +85,7 @@ impl Orchestrator {
         tools
     }
 
-    pub(super) async fn brain_at_async(&self, id: &str, route: &Arc<Mutex<Route>>, model: &str) -> Brain {
+    pub(super) async fn brain_at_async(&self, id: &str, route: &Arc<ArcSwap<Route>>, model: &str) -> Brain {
         let home = self.home.join("agent").join(id);
         let skills_dir = home.join("skills");
         let memory = self.memory.port_async(id, By::Orchestrator).await;
@@ -183,7 +183,14 @@ impl Orchestrator {
         } else {
             words::situation_delta(&prev, &situation)
         };
-        let heard: Vec<String> = std::mem::take(&mut me.news.lock().lines);
+        let heard: Vec<String> = self
+            .runtime
+            .drain_passive_context_async(&me.id)
+            .await
+            .unwrap_or_default()
+            .into_iter()
+            .map(|entry| entry.payload)
+            .collect();
         let news = if heard.is_empty() { String::new() } else { words::news(&heard.join("\n")) };
         let at = jiff::Timestamp::from_millisecond(self.ctx.now())
             .unwrap_or_default()

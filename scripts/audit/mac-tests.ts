@@ -22,7 +22,7 @@ interface MacTestReport {
 const root = resolve(import.meta.dirname, "../..");
 const uiDir = resolve(root, "apps/mac/ui");
 const nsh = resolve(root, ".tools/bin/nsh");
-const defaultConcurrency = Math.min(8, Math.max(4, availableParallelism()));
+const defaultConcurrency = Math.min(12, Math.max(4, availableParallelism()));
 
 // Schedule the slowest suites first (LPT) so the tail is bounded by the longest suite rather than starting it last.
 const SLOW_SUITES: readonly string[] = ["workspace/workspace.test.tsx", "app/interactions.test.tsx", "app/scenarios.test.tsx", "app/theme.test.tsx"];
@@ -108,8 +108,43 @@ function runSuite(file: string): Promise<SuiteResult> {
   });
 }
 
+function runBatchSuites(concurrency: number): Promise<{ passed: number; failed: number; durationMs: number; ok: boolean; output: string }> {
+  return new Promise((resolveBatch) => {
+    const startedAt = Date.now();
+    const child = spawn(nsh, ["test", ".", "-j", String(concurrency)], { cwd: uiDir, stdio: ["ignore", "pipe", "pipe"], shell: false });
+    let combined = "";
+    child.stdout.on("data", (chunk: Buffer) => {
+      const text = chunk.toString("utf8");
+      combined += text;
+      process.stdout.write(text);
+    });
+    child.stderr.on("data", (chunk: Buffer) => {
+      const text = chunk.toString("utf8");
+      combined += text;
+      process.stderr.write(text);
+    });
+    child.on("error", (err) => {
+      resolveBatch({ passed: 0, failed: 1, durationMs: Date.now() - startedAt, ok: false, output: err.message });
+    });
+    child.on("close", (code) => {
+      const durationMs = Date.now() - startedAt;
+      const ok = code === 0;
+      const counts = parseCounts(combined, ok);
+      resolveBatch({ passed: counts.passed, failed: counts.failed, durationMs, ok, output: combined });
+    });
+  });
+}
+
 async function main() {
   const { concurrency, filter, reportPath } = parseArgs(process.argv.slice(2));
+  if (!filter && !reportPath) {
+    const batch = await runBatchSuites(concurrency);
+    console.log(`mac-tests: batch (${batch.passed} passed, ${batch.failed} failed) in ${(batch.durationMs / 1000).toFixed(2)}s`);
+    if (!batch.ok) {
+      process.exit(1);
+    }
+    return;
+  }
   const all = globSync(["**/*.test.ts", "**/*.test.tsx"], {
     cwd: uiDir,
     exclude: [".nsh/**", "build/**", "node_modules/**"],

@@ -2,10 +2,10 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use vibevalley_core::system_clock;
-use vibevalley_protocol::{SayRequest, USER_ID};
+use vibevalley_protocol::SayRequest;
 
 use super::service::Chat;
-use super::types::{DeliveryTargetKind, Saying};
+use super::types::{Saying, local_user_id};
 use crate::context::{Context, Http, LiveState, Outbox, PublicDownload, StateFeed, TaskGroup};
 use crate::service::Service;
 use crate::storage::Storage;
@@ -64,8 +64,8 @@ async fn read_paths_bypass_write_mutex_and_use_wal_read_pool() {
         assert_eq!(pins.len(), 1);
         let recent = reader_chat.recent_rows_async(&reader_gid, 10).await.unwrap();
         assert_eq!(recent.len(), 1);
-        let _unread = reader_chat.unread_async(USER_ID, None).await;
-        let _pending = reader_chat.pending_deliveries_async(DeliveryTargetKind::Orchestrator).await.unwrap();
+        let _unread = reader_chat.unread_async(&local_user_id(), None).await;
+        let _pending = reader_chat.pending_deliveries_all_async().await.unwrap();
         assert_eq!(reader_chat.default_channel(), reader_gid);
     });
 
@@ -94,14 +94,7 @@ async fn async_channel_operations_and_thread_idempotency() {
             id: cid.clone(),
             text: "hello async flat channel".into(),
             send_key: Some("async-send-1".into()),
-            agent: None,
-            repo: None,
-            station: None,
-            reply_to: None,
-            attachments: None,
-            to: None,
-            view_context: None,
-            command: None,
+            ..Default::default()
         },
         None,
         None,

@@ -2,7 +2,7 @@ import { computed, keymap, Scroll, signal, Text, untracked, View } from "nsh";
 import { Input } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
-import { type Channel, type ChatMessage, type MessageHit, userId } from "@vibevalley/protocol";
+import { type Channel, type ChatMessage, isHumanParticipant, type MessageHit } from "@vibevalley/protocol";
 import { channelOf, defaultOf, isFreeUserSession, sessionChannelId, sessionProfile } from "@vibevalley/protocol/rules";
 
 import { Dialog } from "../../../design/Dialog";
@@ -23,7 +23,18 @@ import { useLatest } from "../../../infra/state/atom";
 import { useIntents } from "../../../infra/state/intent";
 import { NoteCard } from "../../note";
 import { archiveSet, markState, notifySet, sameMessage, setMark, useMarkedChat } from "../model/marks";
-import { channelLabel, chatPath, issueThreadOf, messagePath, threadOwnerOf, threadsIn, threadTitle, topsOf, workbenchClock } from "../model/places";
+import {
+  channelLabel,
+  chatPath,
+  directPeerOf,
+  issueThreadOf,
+  messagePath,
+  threadOwnerOf,
+  threadsIn,
+  threadTitle,
+  topsOf,
+  workbenchClock,
+} from "../model/places";
 import { BarButton, orchestratorMoodLabels } from "./ChannelSidebar";
 import { Composer, FileDrop } from "./Composer";
 import { notifyOptions } from "./Dialogs";
@@ -79,7 +90,9 @@ export function Pins(props: { channel: Channel; onPick: () => void }) {
               }}
             >
               <View class="flex-row items-baseline justify-between gap-2">
-                <Text class="min-w-0 flex-1 truncate text-xs font-semibold text-ink">{m().from === userId ? t("web.channel.messages.user") : m().name}</Text>
+                <Text class="min-w-0 flex-1 truncate text-xs font-semibold text-ink">
+                  {isHumanParticipant(m().from) ? t("web.channel.messages.user") : m().name}
+                </Text>
                 <Text class="shrink-0 text-2xs text-faint tabular-nums">{workbenchClock(m().at)}</Text>
               </View>
               <Text class="line-clamp-3 text-sm text-ink">{localizeRuntimeError(m().text).text}</Text>
@@ -101,12 +114,13 @@ export function Members(props: { channel: Channel }) {
   const orchestrators = useOrchestrators();
   const isOrchestrator = (id: string) => orchestrators().some((a) => a.id === id);
   // The orchestrators in the place: a direct channel's other one, or those the user put in the channel.
-  const inside = () =>
-    props.channel.type === "direct"
-      ? props.channel.peer !== undefined && isOrchestrator(props.channel.peer)
-        ? [props.channel.peer]
-        : []
-      : (props.channel.members ?? []).filter(isOrchestrator);
+  const inside = () => {
+    if (props.channel.type === "direct") {
+      const peer = directPeerOf(props.channel);
+      return peer !== undefined && isOrchestrator(peer) ? [peer] : [];
+    }
+    return (props.channel.members ?? []).filter(isOrchestrator);
+  };
   const nameOf = (id: string) => orchestrators().find((a) => a.id === id)?.name || t("web.channel.orchestrator");
   const helpers = () => {
     if (props.channel.type === "direct") return [];
@@ -388,7 +402,7 @@ function ThreadItem(props: { thread: Channel; title: string; onOpen: () => void 
               {(m) => (
                 <Text class="truncate text-xs text-muted">
                   {t("shared.join.labeled", {
-                    label: m().from === userId ? t("web.channel.messages.user") : m().name,
+                    label: isHumanParticipant(m().from) ? t("web.channel.messages.user") : m().name,
                     text: localizeRuntimeError(m().text).text,
                   })}
                 </Text>
@@ -405,7 +419,10 @@ function ThreadItem(props: { thread: Channel; title: string; onOpen: () => void 
           onCancel={() => renaming.set(false)}
         />
       </If>
-      <View class="flex-row items-center gap-0.5" style={{ opacity: hovered() ? 1 : 0 }}>
+      <View
+        class="absolute top-1.5 right-2 flex-row items-center gap-0.5 rounded-md bg-elevated px-0.5 opacity-0 shadow-float group-hover:opacity-100 focus-within:opacity-100"
+        style={{ opacity: hovered() ? 1 : 0 }}
+      >
         <BarButton
           icon="edit"
           size={14}
@@ -531,7 +548,7 @@ function FarmSearchBody(props: { onClose: () => void }) {
               >
                 <View class="flex-row items-baseline gap-2">
                   <Text class="text-xs font-semibold text-accent">{h().address}</Text>
-                  <Text class="text-xs font-semibold text-ink">{h().message.from === userId ? t("web.channel.messages.user") : h().message.name}</Text>
+                  <Text class="text-xs font-semibold text-ink">{isHumanParticipant(h().message.from) ? t("web.channel.messages.user") : h().message.name}</Text>
                   <Text class="text-xs text-muted tabular-nums">{workbenchClock(h().message.at)}</Text>
                 </View>
                 <Text class="line-clamp-2 text-sm text-ink">{localizeRuntimeError(h().message.text).text}</Text>

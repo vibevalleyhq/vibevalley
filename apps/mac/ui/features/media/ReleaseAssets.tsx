@@ -55,7 +55,7 @@ export function ReleaseAssets(props: { id: string }) {
             </View>
             <If when={open()}>
               <View testID="media-release-preview" class="gap-1 pl-5.5">
-                <Each of={value().does}>
+                <Each of={value().does} key="index">
                   {(step) => (
                     <View class="flex-row items-start gap-2 rounded-sm bg-page px-2.5 py-1.5">
                       <View class="mt-1.5 shrink-0">

@@ -94,7 +94,6 @@
     "contextUpdate": "状态上下文更新",
     "expandAll": "全部展开",
     "collapseAll": "全部收起",
-    "inspect": "查看详情",
     "hideDetail": "收起详情",
     "copyRawError": "复制原始错误",
     "openSettings": "前往设置"

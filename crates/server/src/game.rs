@@ -4,11 +4,12 @@
 //! [`StateFeed`](crate::context::StateFeed).
 
 use std::collections::BTreeMap;
+use std::num::NonZeroUsize;
 use std::path::Path;
 use std::sync::Arc;
 
 use parking_lot::{Mutex, RwLock};
-use tokio::sync::{Notify, mpsc};
+use tokio::sync::Notify;
 use tokio::task::JoinHandle as TaskHandle;
 use tokio_util::sync::CancellationToken;
 use vibevalley_core::SliceMask;
@@ -18,6 +19,7 @@ use vibevalley_core::game::{
 };
 use vibevalley_core::rules::farm_of;
 use vibevalley_i18n::t;
+use vibevalley_kit::queue::{BoundedSink, OverflowPolicy, bounded_stream};
 use vibevalley_protocol::{
     AchievementList, Actor, AgentRole, ApiError, BizCode, CheckResult, ChooseTitleRequest, Doing, FarmShopView, Issue, IssueTemplate, LedgerEntry,
     LedgerEntryCalled, LedgerEntryCheckPassed, LedgerEntryConflicted, LedgerEntryDailySettled, LedgerEntryDelivered, LedgerEntryFailed, LedgerEntryHandoff,
@@ -33,6 +35,7 @@ const COUNT_AFTER_RUN: std::time::Duration = std::time::Duration::from_secs(15);
 
 /// The next session hired within this long goes to the planted station.
 const WANT_STATION_FOR_MS: i64 = 10_000;
+const LEDGER_QUEUE_CAP: NonZeroUsize = NonZeroUsize::new(4096).unwrap();
 
 pub struct Game {
     ctx: Arc<Context>,
@@ -43,7 +46,7 @@ pub struct Game {
     /// Asks the counting task for a count soon.
     soon: Arc<Notify>,
     counter: Mutex<Option<(CancellationToken, TaskHandle<()>)>>,
-    writer_tx: Mutex<Option<mpsc::UnboundedSender<String>>>,
+    writer_tx: Mutex<Option<BoundedSink<String>>>,
     writer_handle: Mutex<Option<TaskHandle<()>>>,
     asked: std::sync::atomic::AtomicU64,
 }
@@ -122,9 +125,9 @@ impl Game {
         folded.progress.daily = Some(daily_board_for(&folded.seen.daily, &day));
         ctx.live.set_progress(Some(folded.progress.clone()));
         ctx.mark_dirty(SliceMask::FARM);
-        let (writer_tx, mut writer_rx) = mpsc::unbounded_channel::<String>();
+        let (writer_tx, mut writer_rx) = bounded_stream::<String>(LEDGER_QUEUE_CAP, OverflowPolicy::DropNewest);
         for line in pending_lines {
-            let _ = writer_tx.send(line);
+            let _ = writer_tx.try_send(line);
         }
         let writer_handle = ctx.task.spawn_named("game.ledger", async move {
             use tokio::io::AsyncWriteExt;
@@ -191,7 +194,9 @@ impl Game {
             cancel.cancel();
             let _ = handle.await;
         }
-        drop(self.writer_tx.lock().take());
+        if let Some(tx) = self.writer_tx.lock().take() {
+            tx.close();
+        }
         let handle = self.writer_handle.lock().take();
         if let Some(handle) = handle {
             let _ = handle.await;
@@ -249,7 +254,7 @@ impl Game {
             let Some(tx) = guard.as_ref() else {
                 return;
             };
-            if tx.send(line).is_err() {
+            if !tx.try_send(line) {
                 return;
             }
             let (mut next, mut news) = progress_step(&folded, &entry);
@@ -262,7 +267,7 @@ impl Game {
                     coins: task.reward_coins,
                 });
                 if let Ok(settled_line) = serde_json::to_string(&settled)
-                    && tx.send(settled_line).is_ok()
+                    && tx.try_send(settled_line)
                 {
                     let (after, settled_news) = progress_step(&next, &settled);
                     next = after;
@@ -708,8 +713,9 @@ impl Game {
             let Some(tx) = guard.as_ref() else {
                 return Err(ApiError::new(BizCode::ServiceUnavailable, "game ledger closed"));
             };
-            tx.send(line)
-                .map_err(|e| ApiError::new(BizCode::InternalError, format!("ledger write failed: {e}")))?;
+            if !tx.try_send(line) {
+                return Err(ApiError::new(BizCode::InternalError, "ledger write failed: queue full or closed"));
+            }
             let (mut next, _) = progress_step(&folded, &entry);
             let daily = daily_board_for(&next.seen.daily, &day);
             next.progress.daily = Some(daily.clone());
@@ -791,9 +797,9 @@ mod tests {
             SessionController::IssueBoard,
             format!("worker-{id}"),
             "scripted",
-            ExecutionPolicy::ManagedWorktree {
-                repo: "demo".into(),
-                branch: None,
+            ExecutionPolicy::DirectCwd {
+                repo: Some("demo".into()),
+                permission_mode: SessionPermissionMode::Bypass,
             },
             at,
         );

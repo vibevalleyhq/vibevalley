@@ -24,7 +24,6 @@ use super::engine::{PermissionEvent, SessionEngine};
 use super::mailbox::MailboxSource;
 use crate::context::error::{LookIn, missing};
 use crate::context::now;
-use crate::runtime::worktree::Leave;
 use crate::runtime::{Result, RuntimeError, Step};
 use crate::service::session::SessionConfig;
 use crate::storage::Storage;
@@ -233,7 +232,7 @@ impl SessionEngine {
             }
             self.finish_workspace_async(session, StopReason::Aborted, None, "", None).await;
         }
-        if let Err(e) = self.dismiss_async(session_id, Leave::Keep).await {
+        if let Err(e) = self.dismiss_async(session_id).await {
             eprintln!("vibevalley: closing workspace session {session_id}: {e}");
             self.remove_workspace_meta(session_id);
         }
@@ -434,7 +433,7 @@ impl SessionEngine {
 
     /// Opens a new user workspace session or reconnects an existing one.
     pub async fn open_workspace_async(&self, input: SessionOpenWorkspaceInput) -> Result<SessionWorkspace> {
-        let cwd = input.cwd.trim().to_string();
+        let cwd = input.cwd.as_deref().unwrap_or("").trim().to_string();
         if let Some(existing_id) = input.session_id.as_deref().map(str::trim).filter(|s| !s.is_empty()).map(String::from) {
             return self.reconnect_workspace_async(&existing_id, cwd, input).await;
         }
@@ -446,7 +445,7 @@ impl SessionEngine {
         if session.controller != SessionController::User {
             return Err(refused_session(t("server.session.workspace.notWorkspace", &[])));
         }
-        if session.machine.is_none() && (cwd.is_empty() || !Path::new(&cwd).is_dir()) {
+        if session.machine.is_none() && !cwd.is_empty() && !Path::new(&cwd).is_dir() {
             return Err(invalid_input(t("server.session.workspace.badCwd", &[("cwd", cwd.into())])));
         }
         let snap = self.workspace_snapshot(&session.id);
@@ -472,7 +471,7 @@ impl SessionEngine {
             .drivers
             .drive_runtime(runtime_id, input.model.as_deref(), input.effort.as_deref())
             .await?;
-        if drive.is_local && (cwd.is_empty() || !Path::new(&cwd).is_dir()) {
+        if drive.is_local && !cwd.is_empty() && !Path::new(&cwd).is_dir() {
             return Err(invalid_input(t("server.session.workspace.badCwd", &[("cwd", cwd.into())])));
         }
         let number = {
@@ -487,16 +486,21 @@ impl SessionEngine {
             .filter(|_| !drive.runtime.refused_options().contains(&RefusableOption::Effort));
         let title = input.title.as_deref().map(str::trim).filter(|t| !t.is_empty()).map(String::from);
         let repo_name = input.repo.filter(|r| !r.trim().is_empty());
+        let policy = if !cwd.is_empty() || repo_name.is_some() {
+            ExecutionPolicy::DirectCwd {
+                repo: repo_name.clone(),
+                permission_mode,
+            }
+        } else {
+            ExecutionPolicy::SandboxDir
+        };
 
         let mut session = Session::new(
             &id,
             SessionController::User,
             title.clone().unwrap_or_else(|| drive.name.clone()),
             drive.runtime_id.clone(),
-            ExecutionPolicy::DirectCwd {
-                repo: repo_name.clone(),
-                permission_mode,
-            },
+            policy,
             now(),
         );
         session.machine = (!drive.is_local).then(|| drive.machine_id.clone());
@@ -513,9 +517,16 @@ impl SessionEngine {
         let mut mcp_servers: Vec<_> = self.door_for(&id).into_iter().collect();
         mcp_servers.extend(drive.mcp_servers.iter().cloned());
         let env = drive.env.clone();
-        let remote_dispatch = self.build_workspace_dispatch_meta(&id, &drive, repo_name.as_deref());
+        let remote_dispatch = self.build_workspace_dispatch_meta_async(&id, &drive, repo_name.as_deref()).await;
+        let spawn_cwd = if !cwd.is_empty() {
+            PathBuf::from(&cwd)
+        } else if drive.is_local {
+            std::env::temp_dir()
+        } else {
+            PathBuf::new()
+        };
         let opts = SessionOptions {
-            cwd: PathBuf::from(&cwd),
+            cwd: spawn_cwd,
             model: drive.model.clone(),
             resume: None,
             permission_mode: to_oar_permission(permission_mode),
@@ -533,7 +544,7 @@ impl SessionEngine {
         Ok(self.workspace_reply_async(self.session_async(&id).await.unwrap_or(session)).await)
     }
 
-    fn build_workspace_dispatch_meta(
+    async fn build_workspace_dispatch_meta_async(
         &self,
         id: &str,
         drive: &super::driver::Drive,
@@ -542,7 +553,10 @@ impl SessionEngine {
         if drive.is_local {
             return None;
         }
-        let repo_ref = repo_name.map(|r| self.0.worktree.repo_remote_url(r).unwrap_or_else(|| r.to_string()));
+        let repo_ref = match repo_name {
+            Some(r) => Some(self.resolve_remote_repo_ref_async(r).await),
+            None => None,
+        };
         Some(vibevalley_runtime::oar::RemoteDispatchMeta {
             session_id: Some(id.to_string()),
             repo_ref,
@@ -570,7 +584,7 @@ impl SessionEngine {
             .drivers
             .drive_runtime(&runtime_target, meta.model.as_deref(), meta.effort.as_deref())
             .await?;
-        if drive.is_local && (cwd.is_empty() || !Path::new(&cwd).is_dir()) {
+        if drive.is_local && !cwd.is_empty() && !Path::new(&cwd).is_dir() {
             return Err(invalid_input(t("server.session.workspace.badCwd", &[("cwd", cwd.into())])));
         }
         meta.model = drive.model.clone();
@@ -586,9 +600,16 @@ impl SessionEngine {
         let mut mcp_servers: Vec<_> = self.door_for(&session.id).into_iter().collect();
         mcp_servers.extend(drive.mcp_servers.iter().cloned());
         let env = drive.env.clone();
-        let remote_dispatch = self.build_workspace_dispatch_meta(&session.id, &drive, session.repo_name());
+        let remote_dispatch = self.build_workspace_dispatch_meta_async(&session.id, &drive, session.repo_name()).await;
+        let spawn_cwd = if !cwd.is_empty() {
+            PathBuf::from(&cwd)
+        } else if drive.is_local {
+            std::env::temp_dir()
+        } else {
+            PathBuf::new()
+        };
         let opts = SessionOptions {
-            cwd: PathBuf::from(&cwd),
+            cwd: spawn_cwd,
             model: meta.model.clone(),
             resume,
             permission_mode: to_oar_permission(meta.permission_mode),
@@ -1022,7 +1043,6 @@ mod tests {
     use super::*;
     use crate::context::{Context, Http, LiveState, Outbox, PublicDownload, StateFeed, TaskGroup};
     use crate::runtime::session::{RuntimeDriver, SessionLifecycleEvent};
-    use crate::runtime::worktree::Worktree;
     use crate::runtime::{RuntimeConfig, reopen_sessions_async};
     use crate::service::Service;
 
@@ -1182,9 +1202,8 @@ mod tests {
     async fn sqlite_session_config_persists_without_workspace_json_files() {
         let dir = tempfile::tempdir().unwrap();
         let ctx = test_context(dir.path()).await;
-        let _opened = reopen_sessions_async(&ctx).await.unwrap();
+        let _opened = reopen_sessions_async(&ctx, &std::collections::HashSet::new()).await.unwrap();
         let config = Arc::new(RuntimeConfig::under(dir.path()));
-        let worktree = Arc::new(Worktree::new(config.worktrees_dir.clone(), config.repos_dir.clone(), config.data_dir.clone()));
         let mut registry = Registry::new();
         registry.register(Arc::new(StubRuntime {
             aborts: Arc::new(AtomicUsize::new(0)),
@@ -1194,7 +1213,7 @@ mod tests {
             registry: Arc::new(registry),
             model: None,
         });
-        let sessions = SessionEngine::new_async(ctx.clone(), Arc::new(tokio::sync::Mutex::new(())), drivers, worktree, config.clone(), None)
+        let sessions = SessionEngine::new_async(ctx.clone(), Arc::new(tokio::sync::Mutex::new(())), drivers, config.clone(), None)
             .await
             .unwrap();
 
@@ -1238,9 +1257,8 @@ mod tests {
         std::fs::write(&sentinel, "precious").unwrap();
 
         let ctx = test_context(dir.path()).await;
-        let _opened = reopen_sessions_async(&ctx).await.unwrap();
+        let _opened = reopen_sessions_async(&ctx, &std::collections::HashSet::new()).await.unwrap();
         let config = Arc::new(RuntimeConfig::under(dir.path()));
-        let worktree = Arc::new(Worktree::new(config.worktrees_dir.clone(), config.repos_dir.clone(), config.data_dir.clone()));
 
         let aborts = Arc::new(AtomicUsize::new(0));
         let disposes = Arc::new(AtomicUsize::new(0));
@@ -1253,7 +1271,7 @@ mod tests {
             registry: Arc::new(registry),
             model: None,
         });
-        let sessions = SessionEngine::new_async(ctx.clone(), Arc::new(tokio::sync::Mutex::new(())), drivers, worktree, config.clone(), None)
+        let sessions = SessionEngine::new_async(ctx.clone(), Arc::new(tokio::sync::Mutex::new(())), drivers, config.clone(), None)
             .await
             .unwrap();
         let mut events_rx = sessions.subscribe_events();
@@ -1261,7 +1279,7 @@ mod tests {
         let opened = sessions
             .open_workspace_async(SessionOpenWorkspaceInput {
                 runtime: "stub".into(),
-                cwd: project_dir.to_string_lossy().into_owned(),
+                cwd: Some(project_dir.to_string_lossy().into_owned()),
                 repo: None,
                 model: None,
                 effort: None,
@@ -1348,7 +1366,7 @@ mod tests {
         };
         let input = SessionOpenWorkspaceInput {
             runtime: "claude".into(),
-            cwd: "/tmp".into(),
+            cwd: Some("/tmp".into()),
             repo: None,
             model: Some("opus".into()),
             effort: None,

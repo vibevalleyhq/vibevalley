@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
 import type { SliceMap } from "@vibevalley/protocol";
-import { isFreeUserSession, isOrchestratorSession, sessionBranch, sessionIssueId, sessionRepo, sessionWorktree } from "@vibevalley/protocol/rules";
+import { isFreeUserSession, isOrchestratorSession, sessionIssueId, sessionRepo } from "@vibevalley/protocol/rules";
 import { HostRailRunningState as HostRailRunningStateSchema } from "@vibevalley/protocol/schema";
 
 import type { GitWorktree } from "../GitPanel";
@@ -282,10 +282,6 @@ export function buildRepoTree(args: {
   }
 
   const worktreePaths = new Set<string>();
-  for (const s of sessions) {
-    const wt = sessionWorktree(s);
-    if (wt) worktreePaths.add(normPath(wt));
-  }
   for (const proj of projects) {
     for (const w of proj.worktrees ?? []) {
       if (!w.main && w.path) worktreePaths.add(normPath(w.path));
@@ -322,8 +318,8 @@ export function buildRepoTree(args: {
     const mainSession = sessions.find((s) => {
       if (isFreeUserSession(s) || isOrchestratorSession(s) || s.phase._tag === "closed") return false;
       if (sessionRepo(s) !== root.name) return false;
-      const wt = sessionWorktree(s);
-      return !wt || normPath(wt) === root.path;
+      const cwd = normPath(s.cwd);
+      return !cwd || cwd === root.path;
     });
     const defaultTabs: RailTab[] = mainProj?.tabs ?? [];
     const defaultGroup: WorktreeGroup = {
@@ -343,15 +339,13 @@ export function buildRepoTree(args: {
 
     for (const s of sessions) {
       if (s.phase._tag === "closed" || sessionRepo(s) !== root.name) continue;
-      const wt = sessionWorktree(s);
-      if (!wt) continue;
-      const wp = normPath(wt);
+      const wp = normPath(s.cwd);
       if (!wp || seenGroupPaths.has(wp)) continue;
       seenGroupPaths.add(wp);
       const wtProj = byPath.get(wp);
       const iid = sessionIssueId(s);
       const issue = iid ? issueMap.get(iid) : undefined;
-      const branch = sessionBranch(s);
+      const branch = wtProj?.branch;
       const label = issue ? `#${issue.number} ${issue.title}` : branch || s.brief || s.name;
       const tabs: RailTab[] = wtProj?.tabs ?? [];
       extraGroups.push({

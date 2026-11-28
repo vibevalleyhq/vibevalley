@@ -8,16 +8,16 @@ use serde::Deserialize;
 use vibevalley_core::collab::CommitMeta;
 use vibevalley_protocol::{
     BaseRunAgentColumnRequest, BaseUpsertRowRequest, BaseViewRequest, LibraryAddRequest, LibraryListRequest, MediaImageRequest, MediaSource,
-    MediaSpeakersRequest, MediaSpeechRequest, MediaVoiceDesignRequest, NoteDocAppendBlockRequest, NoteFileDeleteRequest, NoteFileGetRequest,
-    NoteFileListRequest, NoteFileWriteRequest, NoteLinkListRequest, NoteListRequest, NoteRequest, NoteSuggestionCreateInput, NoteTreeMoveRequest, NoteType,
-    NoteTypeReadRequest, NoteVersionRequest, Session,
+    MediaSpeakersRequest, MediaSpeechRequest, MediaVoiceDesignRequest, NoteCard, NoteDocAppendBlockRequest, NoteFileDeleteRequest, NoteFileGetRequest,
+    NoteFileListRequest, NoteFileWriteRequest, NoteFileWriteResult, NoteLinkListRequest, NoteListRequest, NoteRequest, NoteSuggestionCreateInput,
+    NoteTreeMoveRequest, NoteType, NoteTypeReadRequest, NoteVersionRequest, Session,
 };
 
 use super::registry::{ToolRegistry, Who, given};
 use crate::agent::mcp::ResourceReadArgs as McpResourceReadArgs;
 use crate::issue::NewIssue;
 use crate::note::base::ExecutedAgentCellOutcome;
-use crate::note::{AddedBy, Maker};
+use crate::note::{AddedBy, Maker, Manager as NoteManager};
 
 fn text<T: serde::Serialize>(v: &T) -> Result<String, String> {
     serde_json::to_string(v).map_err(|e| e.to_string())
@@ -149,7 +149,10 @@ pub struct NoteListArgs {
 }
 
 pub async fn note_list(f: &ToolRegistry, who: &Who, a: NoteListArgs) -> Result<String, String> {
-    let channel = given(&a.channel).map(String::from);
+    let channel = match given(&a.channel) {
+        Some(ch) => Some(f.chat.place_of_async(&crate::channel::local_user_id(), ch).await.map_err(|e| e.message)?),
+        None => None,
+    };
     let mut issue = match given(&a.issue) {
         Some(r) => Some(f.issue_async(r).await?.id),
         None => None,
@@ -242,7 +245,36 @@ pub async fn note_create(f: &ToolRegistry, who: &Who, mut a: NoteCreateArgs) -> 
             }
         }
     }
-    text(&f.note.create_async(&maker_of(who), &a.req).await.map_err(|e| e.message)?)
+    let maker = maker_of(who);
+    if let Some(ch) = given(&a.req.channel) {
+        let resolved = f.chat.place_of_async(&maker.from, ch).await.map_err(|e| e.message)?;
+        a.req.channel = Some(resolved);
+    }
+    let created = f.note.create_async(&maker, &a.req).await.map_err(|e| e.message)?;
+    let mut out = created;
+    if a.req.announce != Some(false)
+        && let Some(ch) = out.channel.as_deref()
+    {
+        let say = NoteManager::say_for_note_event("server.note.created", &out.title, a.req.note.as_deref().unwrap_or(""));
+        let card = NoteCard {
+            id: out.id.clone(),
+            title: out.title.clone(),
+            note_type: out.note_type,
+            version: 1,
+            note: a.req.note.clone().unwrap_or_default(),
+        };
+        if let Ok(msg) = f
+            .chat
+            .post_card_async(&maker.from, ch, &say, card, maker.run.clone(), format!("note:{}:v1", out.id))
+            .await
+        {
+            f.note.record_announced_message_async(&out.id, Some(1), &msg.number.to_string()).await;
+            if let Ok(refreshed) = f.note.get_async(&out.id).await {
+                out = refreshed;
+            }
+        }
+    }
+    text(&out)
 }
 
 #[derive(Deserialize)]
@@ -274,8 +306,30 @@ pub async fn note_version(f: &ToolRegistry, who: &Who, mut a: NoteVersionArgs) -
     {
         a.req.content = Some(content);
     }
+    let maker = maker_of(who);
     let meta = commit_meta_for_who(f, who, a.req.note.clone());
-    text(&f.note.version_with_meta_async(&maker_of(who), &a.req, &meta).await.map_err(|e| e.message)?)
+    let mut out = f.note.version_with_meta_async(&maker, &a.req, &meta).await.map_err(|e| e.message)?;
+    if let Some(ch) = out.channel.as_deref() {
+        let say = NoteManager::say_for_note_event("server.note.revised", &out.title, a.req.note.as_deref().unwrap_or(""));
+        let card = NoteCard {
+            id: out.id.clone(),
+            title: out.title.clone(),
+            note_type: out.note_type,
+            version: out.version,
+            note: a.req.note.clone().unwrap_or_default(),
+        };
+        if let Ok(msg) = f
+            .chat
+            .post_card_async(&maker.from, ch, &say, card, maker.run.clone(), format!("note:{}:v{}", out.id, out.version))
+            .await
+        {
+            f.note.record_announced_message_async(&out.id, Some(out.version), &msg.number.to_string()).await;
+            if let Ok(refreshed) = f.note.get_async(&out.id).await {
+                out = refreshed;
+            }
+        }
+    }
+    text(&out)
 }
 
 pub async fn note_tree_move(f: &ToolRegistry, _who: &Who, req: NoteTreeMoveRequest) -> Result<String, String> {
@@ -368,8 +422,27 @@ pub async fn note_file_get(f: &ToolRegistry, _who: &Who, mut req: NoteFileGetReq
 
 pub async fn note_file_write(f: &ToolRegistry, who: &Who, mut req: NoteFileWriteRequest) -> Result<String, String> {
     req.id = req.id.trim().to_string();
+    let maker = maker_of(who);
     let meta = commit_meta_for_who(f, who, req.summary.clone());
-    text(&f.note.write_files_with_meta_async(&maker_of(who), &req, &meta).await.map_err(|e| e.message)?)
+    let res: NoteFileWriteResult = f.note.write_files_with_meta_async(&maker, &req, &meta).await.map_err(|e| e.message)?;
+    if req.announce == Some(true)
+        && let Ok(note) = f.note.get_async(&req.id).await
+        && let Some(ch) = note.channel.as_deref()
+    {
+        let say = NoteManager::say_for_note_event("server.note.revised", &note.title, req.summary.as_deref().unwrap_or(""));
+        let card = NoteCard {
+            id: note.id.clone(),
+            title: note.title.clone(),
+            note_type: note.note_type,
+            version: note.version,
+            note: req.summary.clone().unwrap_or_default(),
+        };
+        let _ = f
+            .chat
+            .post_card_async(&maker.from, ch, &say, card, maker.run.clone(), format!("note:{}:seq{}", note.id, res.seq))
+            .await;
+    }
+    text(&res)
 }
 
 pub async fn note_file_delete(f: &ToolRegistry, who: &Who, mut req: NoteFileDeleteRequest) -> Result<String, String> {

@@ -83,22 +83,13 @@ pub struct Library {
 }
 
 impl Library {
-    pub fn open(
-        ctx: Arc<Context>,
-        storage: Arc<Storage>,
-        channel_messages: Option<broadcast::Receiver<ChatMessage>>,
-        media_jobs: Option<broadcast::Receiver<Vec<MediaJob>>>,
-    ) -> Arc<Self> {
+    pub fn open(ctx: Arc<Context>, storage: Arc<Storage>, media_jobs: Option<broadcast::Receiver<Vec<MediaJob>>>) -> Arc<Self> {
         let cancel = ctx.task.child_token();
         let store = Arc::new(Self {
             ctx: ctx.clone(),
             storage,
             cancel: cancel.clone(),
         });
-
-        if let Some(rx) = channel_messages {
-            store.spawn_message_listener(rx);
-        }
 
         if let Some(mut rx) = media_jobs {
             let weak = Arc::downgrade(&store);
@@ -123,29 +114,6 @@ impl Library {
         }
 
         store
-    }
-
-    /// Attaches a chat message stream so user-uploaded attachments are indexed asynchronously.
-    pub fn spawn_message_listener(self: &Arc<Self>, mut rx: broadcast::Receiver<ChatMessage>) {
-        let weak = Arc::downgrade(self);
-        let task_cancel = self.cancel.clone();
-        self.ctx.spawn("library.channel_messages", async move {
-            loop {
-                let message = tokio::select! {
-                    biased;
-                    _ = task_cancel.cancelled() => return,
-                    res = rx.recv() => match res {
-                        Ok(msg) => msg,
-                        Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
-                        Err(tokio::sync::broadcast::error::RecvError::Closed) => return,
-                    },
-                };
-                let Some(l) = weak.upgrade() else { return };
-                if let Err(e) = l.record_said_async(&message).await {
-                    eprintln!("vibevalley-server: library: recording: {}", e.message);
-                }
-            }
-        });
     }
 
     pub fn close(&self) {
@@ -393,7 +361,7 @@ mod tests {
         }))
         .unwrap();
 
-        let library = Library::open(ctx.clone(), storage.clone(), None, None);
+        let library = Library::open(ctx.clone(), storage.clone(), None);
         library.record_made_async(std::slice::from_ref(&job)).await.unwrap();
         library.record_made_async(std::slice::from_ref(&job)).await.unwrap();
         let stored = library.found_async(&attachment.id).await.unwrap();
@@ -404,7 +372,7 @@ mod tests {
         library.close();
         drop(library);
 
-        let library = Library::open(ctx.clone(), storage.clone(), None, None);
+        let library = Library::open(ctx.clone(), storage.clone(), None);
         library.record_made_async(&[job]).await.unwrap();
         assert_eq!(library.found_async(&attachment.id).await.unwrap_err().biz_code, BizCode::LibraryNotFound);
         assert_eq!(std::fs::read(storage.file_async(&attachment.id).await.unwrap().path).unwrap(), b"image");

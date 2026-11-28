@@ -13,7 +13,8 @@ use vibevalley_protocol::{
 };
 
 use super::Stop;
-use super::job::{Ask, Held, Media, Phase, Record, RecordUsage, active, id_ok, refused};
+use super::job::Media;
+use super::state::{Ask, Held, Phase, Record, RecordUsage, active, id_ok, refused};
 use super::vendor::{Account, Moss, MossBody, Outcome, StreamError, TranscriptionEvent, VendorError};
 use crate::log::spawn_blocking_traced;
 use crate::setting::Use;

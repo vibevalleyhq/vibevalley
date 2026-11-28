@@ -139,6 +139,7 @@ pub fn starter_files_for_type(note_type: NoteType, title: &str) -> Vec<StarterFi
                         id: "r1".to_owned(),
                         cells: starter_cells,
                         page_note_id: None,
+                        annotation_ref: None,
                         created_at: 0,
                         updated_at: 0,
                     }],

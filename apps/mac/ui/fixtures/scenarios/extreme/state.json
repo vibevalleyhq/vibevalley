@@ -128,11 +128,11 @@
         "priority": "medium",
         "createdAt": 1795162043624,
         "closedAt": 1795190843624,
-        "delivered": "merged_into_parent",
+        "delivered": "merged",
         "parent": "i40",
         "blockedBy": [],
         "status": "done",
-        "moves": [],
+        "moves": ["backlog", "todo", "in_progress", "in_review", "canceled"],
         "deliver": "change",
         "findings": [],
         "questions": [],
@@ -141,7 +141,14 @@
         "stage": {
           "state": "done",
           "since": 1795190843624,
-          "acts": []
+          "acts": [
+            {
+              "does": "move",
+              "act": "reopen",
+              "status": "backlog",
+              "words": "none"
+            }
+          ]
         }
       },
       {
@@ -654,58 +661,50 @@
           "cardKind": "issue",
           "familyDone": 0,
           "familyTotal": 0,
-          "needsWorktreeCheck": false,
           "prompt": "stuck_conflict"
         },
         "i-ext-en": {
           "lane": "todo",
           "cardKind": "todo",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i10": {
           "lane": "canceled",
           "cardKind": "todo",
           "familyDone": 0,
           "familyTotal": 0,
-          "needsWorktreeCheck": false,
           "prompt": "canceled_reopenable"
         },
         "i12": {
           "lane": "done",
           "cardKind": "todo",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i18": {
           "lane": "in_progress",
           "cardKind": "issue",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i21": {
           "lane": "backlog",
           "cardKind": "todo",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i22": {
           "lane": "todo",
           "cardKind": "todo",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i31": {
           "lane": "in_review",
           "cardKind": "issue",
           "familyDone": 0,
           "familyTotal": 0,
-          "needsWorktreeCheck": false,
           "prompt": "handed_back"
         },
         "i33": {
@@ -713,7 +712,6 @@
           "cardKind": "issue",
           "familyDone": 0,
           "familyTotal": 0,
-          "needsWorktreeCheck": false,
           "prompt": "asking"
         },
         "i34": {
@@ -721,29 +719,25 @@
           "cardKind": "issue",
           "familyDone": 0,
           "familyTotal": 0,
-          "needsWorktreeCheck": false,
           "prompt": "stuck_failed"
         },
         "i40": {
           "lane": "in_progress",
           "cardKind": "family",
           "familyDone": 1,
-          "familyTotal": 2,
-          "needsWorktreeCheck": false
+          "familyTotal": 2
         },
         "i41": {
           "lane": "done",
           "cardKind": "todo",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i42": {
           "lane": "todo",
           "cardKind": "todo",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         }
       },
       "schedule": {
@@ -770,9 +764,9 @@
         "brief": "",
         "cwd": "/tmp/vibevalley/.worktrees/i18",
         "policy": {
-          "kind": "managedWorktree",
+          "kind": "directCwd",
           "repo": "vibevalley",
-          "branch": "issue-18-login"
+          "permissionMode": "bypass"
         },
         "bindings": [
           {
@@ -855,9 +849,9 @@
         "runtime": "claude",
         "brief": "",
         "policy": {
-          "kind": "managedWorktree",
+          "kind": "directCwd",
           "repo": "vibevalley",
-          "branch": "issue-33-shell"
+          "permissionMode": "bypass"
         },
         "bindings": [
           {
@@ -879,7 +873,7 @@
         "phase": {
           "_tag": "resting"
         },
-        "phaseText": "歇着（上一轮做完了）"
+        "phaseText": "歇着（上一轮已完成）"
       },
       {
         "id": "w3",
@@ -890,9 +884,9 @@
         "runtime": "claude",
         "brief": "",
         "policy": {
-          "kind": "managedWorktree",
+          "kind": "directCwd",
           "repo": "vibevalley",
-          "branch": "issue-31-board"
+          "permissionMode": "bypass"
         },
         "bindings": [
           {
@@ -925,8 +919,9 @@
         "runtime": "claude",
         "brief": "",
         "policy": {
-          "kind": "managedWorktree",
-          "repo": "vibevalley"
+          "kind": "directCwd",
+          "repo": "vibevalley",
+          "permissionMode": "bypass"
         },
         "bindings": [
           {
@@ -959,8 +954,9 @@
         "runtime": "claude",
         "brief": "",
         "policy": {
-          "kind": "managedWorktree",
-          "repo": "vibevalley"
+          "kind": "directCwd",
+          "repo": "vibevalley",
+          "permissionMode": "bypass"
         },
         "bindings": [
           {
@@ -992,8 +988,9 @@
         "brief": "",
         "cwd": "/tmp/vibevalley/.worktrees/i-ext-conflict",
         "policy": {
-          "kind": "managedWorktree",
-          "repo": "vibevalley"
+          "kind": "directCwd",
+          "repo": "vibevalley",
+          "permissionMode": "bypass"
         },
         "bindings": [
           {

@@ -31,48 +31,60 @@ fn prod_lines(text: &str) -> Vec<(usize, &str)> {
 #[test]
 fn server_modules_respect_layer_and_skin_boundaries() {
     let src_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src");
+    assert!(
+        !src_dir.join("context/port.rs").exists(),
+        "cycle-breaking `context/port.rs` must not exist; lift cross-domain workflows into `orchestration/`"
+    );
+
     let l1_dirs = [
         "setting.rs",
         "provider.rs",
-        "repo.rs",
+        "repo",
         "storage",
         "debug",
         "machine",
         "runtime",
         "channel",
+        "cron",
+        "voice",
+        "connector",
+        "note",
         "agent/profile",
     ];
-    let l2_dirs = ["issue", "note", "agent/memory", "connector", "voice"];
+    let l2_dirs = ["issue", "agent/memory", "game"];
+    let l3_dirs = ["agent/drive.rs", "agent/tool", "agent/mcp", "agent/orchestrator"];
     let l3_targets = [
-        "crate::cron::",
-        "crate::game::",
         "crate::agent::orchestrator::",
         "crate::agent::tool::",
         "crate::agent::mcp::",
+        "crate::agent::drive::",
     ];
+    let l4_targets = ["crate::orchestration::"];
     let mut violations = Vec::new();
 
-    for entry in l1_dirs.iter().chain(l2_dirs.iter()) {
+    for entry in l1_dirs.iter().chain(l2_dirs.iter()).chain(l3_dirs.iter()) {
         let full = src_dir.join(entry);
         let paths = if full.is_file() { vec![full] } else { rs_files(&full) };
+        let is_l1 = l1_dirs.contains(entry);
+        let is_l2 = l2_dirs.contains(entry);
         for path in paths {
             let rel = path.strip_prefix(&src_dir).unwrap().to_string_lossy().replace('\\', "/");
             let text = std::fs::read_to_string(&path).unwrap();
-            let is_l1 = l1_dirs.contains(entry);
             for (line_no, line) in prod_lines(&text) {
-                for target in l3_targets {
+                for target in l4_targets {
                     if line.contains(target) {
-                        violations.push(format!("{rel}:{line_no} imports L3 `{target}` from `{entry}`"));
+                        violations.push(format!("{rel}:{line_no} imports L4 `{target}` from `{entry}`"));
+                    }
+                }
+                if is_l1 || is_l2 {
+                    for target in l3_targets {
+                        if line.contains(target) {
+                            violations.push(format!("{rel}:{line_no} imports L3 `{target}` from `{entry}`"));
+                        }
                     }
                 }
                 if is_l1 {
-                    for l2 in [
-                        "crate::issue::",
-                        "crate::note::",
-                        "crate::agent::memory::",
-                        "crate::connector::",
-                        "crate::voice::",
-                    ] {
+                    for l2 in ["crate::issue::", "crate::agent::memory::", "crate::game::"] {
                         if line.contains(l2) {
                             violations.push(format!("{rel}:{line_no} imports L2 `{l2}` from L1 `{entry}`"));
                         }
@@ -129,6 +141,7 @@ fn server_spine_and_gateway_never_import_domain_modules() {
         "crate::agent::",
         "crate::cron::",
         "crate::game::",
+        "crate::orchestration::",
     ];
     let mut violations = Vec::new();
 

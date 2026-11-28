@@ -162,18 +162,20 @@ test("CanvasView, MediaView, CollabToolbar, HistoryPanel, and NoteDirectoryView 
   await app.waitFor("id:history-preview-files");
   await app.press("id:history-close");
 
-  // CanvasView / WhiteboardView.
+  // CanvasView / WhiteboardView (no redundant header or internal seq badge).
   await app.press("id:bench-tab-canvas");
   await app.waitFor("id:note-canvas-view");
   await app.waitFor("id:wb-node-t1");
+  expect(app.texts().some((txt) => /^seq \d+$/u.test(txt))).toBe(false);
   await app.press("id:wb-add-node");
   await app.waitFor("text:2 elements");
 
-  // MediaView: audio + transcript + storyboard + motion + assets.
+  // MediaView: audio + transcript + storyboard + motion + assets (no raw data URI or duplicate header).
   await app.press("id:bench-tab-media");
   await app.waitFor("id:note-media-view");
   await app.waitFor("id:media-item-m1");
   await app.waitFor("id:media-transcript-m1");
+  expect(app.texts().some((txt) => txt.startsWith("data:"))).toBe(false);
   await app.press("id:media-mode-tabs-storyboard");
   await app.waitFor("id:media-storyboard-panel");
   await app.press("id:media-mode-tabs-motion");

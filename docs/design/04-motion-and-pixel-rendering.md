@@ -15,7 +15,7 @@ VibeValley 在工作台微交互上保持克制，而在原生 Papertrails 纸�
 ### 纸雕网格、纸纹与离屏帧缓冲（`apps/mac/crates/diorama/` & `apps/mac/src/diorama/scene.rs`）
 
 - **单源精简编译产物（`assets/diorama/`）**：由同级 `vibevalley-assets` 仓经 `design/diorama.sh` 编译并同步 `manifest.json`、`meshes.bin`（VVM2 网格）、`lights.json`、`foley.json` 与 `print/`、`stock/` 棉纸纤维/切边贴图。
-- **离屏 `wgpu` 渲染与 GPUI 上传（`apps/mac/src/diorama/view.rs`）**：`DioramaScene` 在后台 `spawn_blocking` 线程执行 `wgpu` + WGSL 阴影贴图、主体着色与移轴景深合成。合成着色器输出 GPUI 使用的 BGRA 像素，`FrameSurface::paint_bgra_frame` 按帧号去重上传。镜头运动时上限为 1280 × 832 px，停稳 300 ms 后按窗口密度绘制，上限为 2048 × 1312 px。渲染在交互（`16ms`）、空闲（`66ms`）与切离失活（`0 FPS`）之间按需节流。关闭动效时，镜头、纸页合页和昼夜光照直接取目标状态。
+- **离屏 `wgpu` 渲染与 GPUI 上传（`apps/mac/src/diorama/view/`）**：`DioramaScene` 在后台 `spawn_blocking` 线程执行 `wgpu` + WGSL 阴影贴图、主体着色与移轴景深合成。合成着色器输出 GPUI 使用的 BGRA 像素，`FrameSurface::paint_bgra_frame` 按帧号去重上传。镜头运动时上限为 1280 × 832 px，停稳 300 ms 后按窗口密度绘制，上限为 2048 × 1312 px。渲染在交互（`16ms`）、空闲（`66ms`）与切离失活（`0 FPS`）之间按需节流。关闭动效时，镜头、纸页合页和昼夜光照直接取目标状态。
 
 ## 4.3 昼夜光影与开场氛围
 

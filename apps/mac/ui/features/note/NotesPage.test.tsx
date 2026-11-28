@@ -3,7 +3,7 @@ import { expect, open, test } from "nsh/test";
 
 import { setLocale } from "@vibevalley/i18n";
 import "@vibevalley/i18n/catalogs";
-import { type Note, type NoteId, userId } from "@vibevalley/protocol";
+import { localUserParticipant, type Note, type NoteId } from "@vibevalley/protocol";
 
 import { fakeHost } from "../../fixtures/fakeHost";
 import { responses as noteResponses } from "../../fixtures/notes";
@@ -15,7 +15,7 @@ function makeDocNote(id: string): Note {
     title: "Responsive Doc Note",
     noteType: "doc",
     sortOrder: 1,
-    by: userId,
+    by: localUserParticipant,
     byName: "You",
     version: 0,
     seq: 1,

@@ -4,7 +4,8 @@
 //! `takeSnapshotWithConfiguration:completionHandler:` API, completely outside
 //! JS origin/CSP boundaries and without requiring Screen Recording permission.
 
-use std::ffi::{CStr, c_char, c_void};
+#![forbid(unsafe_code)]
+
 use std::time::Duration;
 
 use base64::Engine as _;
@@ -13,8 +14,9 @@ use image::ImageEncoder as _;
 use image::codecs::jpeg::JpegEncoder;
 use image::codecs::png::{CompressionType, FilterType as PngFilterType, PngEncoder};
 use image::imageops::{self, FilterType};
-use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use vibevalley_protocol::HostCapturedImage;
+
+pub use crate::platform::capture_ffi::RawRgba;
 
 pub const DEFAULT_COVER_WIDTH: u32 = 640;
 pub const DEFAULT_COVER_HEIGHT: u32 = 400;
@@ -25,46 +27,6 @@ const MAX_COVER_HEIGHT: u32 = 800;
 const SNAPSHOT_TIMEOUT: Duration = Duration::from_secs(5);
 const MAX_PNG_BYTES: usize = 300 * 1024;
 const JPEG_FALLBACK_QUALITY: u8 = 85;
-
-#[derive(Debug)]
-pub struct RawRgba {
-    pub rgba: Vec<u8>,
-    pub width: u32,
-    pub height: u32,
-}
-
-type SnapshotCb = extern "C" fn(ctx: *mut c_void, rgba: *const u8, width: u32, height: u32, error: *const c_char);
-
-unsafe extern "C" {
-    fn vv_capture_webview_snapshot(parent_ns_view: *mut c_void, target_width: f64, target_height: f64, callback: SnapshotCb, ctx: *mut c_void);
-}
-
-extern "C" fn on_webview_snapshot(ctx: *mut c_void, rgba: *const u8, width: u32, height: u32, error: *const c_char) {
-    // SAFETY: `ctx` was allocated with `Box::into_raw` in `start_webview_capture` and
-    // WebKit / `vv_capture_webview_snapshot` invokes this callback exactly once.
-    let tx = unsafe { Box::from_raw(ctx.cast::<tokio::sync::oneshot::Sender<Result<RawRgba, String>>>()) };
-    let result = if !error.is_null() {
-        // SAFETY: `vv_capture_webview_snapshot` passes a valid NUL-terminated UTF-8 string.
-        let msg = unsafe { CStr::from_ptr(error) }.to_string_lossy().into_owned();
-        Err(msg)
-    } else if rgba.is_null() || width == 0 || height == 0 {
-        Err("empty webview snapshot".into())
-    } else {
-        match (width as usize).checked_mul(height as usize).and_then(|n| n.checked_mul(4)) {
-            Some(len) => {
-                // SAFETY: Objective-C buffer is valid for `width * height * 4` bytes for the duration of this callback.
-                let slice = unsafe { std::slice::from_raw_parts(rgba, len) };
-                Ok(RawRgba {
-                    rgba: slice.to_vec(),
-                    width,
-                    height,
-                })
-            }
-            None => Err("snapshot byte length overflow".into()),
-        }
-    };
-    let _ = tx.send(result);
-}
 
 pub fn normalize_dimensions(width: Option<u32>, height: Option<u32>) -> (u32, u32) {
     let w = width.unwrap_or(DEFAULT_COVER_WIDTH).clamp(MIN_COVER_DIM, MAX_COVER_WIDTH);
@@ -162,19 +124,7 @@ struct PendingCapture {
 
 fn start_webview_capture(window: &gpui::Window, width: Option<u32>, height: Option<u32>) -> Result<PendingCapture, String> {
     let (dst_w, dst_h) = normalize_dimensions(width, height);
-    let handle = HasWindowHandle::window_handle(window).map_err(|e| format!("window handle unavailable: {e}"))?;
-    let ns_view = match handle.as_raw() {
-        RawWindowHandle::AppKit(appkit) => appkit.ns_view.as_ptr(),
-        _ => return Err("webview capture is only supported on AppKit windows".into()),
-    };
-
-    let (tx, rx) = tokio::sync::oneshot::channel::<Result<RawRgba, String>>();
-    let ctx = Box::into_raw(Box::new(tx)).cast::<c_void>();
-    // SAFETY: `ns_view` is a live `NSView *` owned by GPUI's window on the main thread,
-    // and `on_webview_snapshot` reclaims `ctx` exactly once.
-    unsafe {
-        vv_capture_webview_snapshot(ns_view, f64::from(dst_w), f64::from(dst_h), on_webview_snapshot, ctx);
-    }
+    let rx = crate::platform::capture_ffi::start_webview_snapshot(window, dst_w, dst_h)?;
     Ok(PendingCapture { rx, dst_w, dst_h })
 }
 
@@ -289,17 +239,13 @@ mod tests {
 
     #[test]
     fn top_cover_crop_anchors_top_for_tall_and_centers_for_wide() {
-        // Tall mobile viewport (390x800) cropped to 16:10 keeps top header (y = 0).
         assert_eq!(top_cover_crop_rect(390, 800, 640, 400), (0, 0, 390, 243));
-        // Wide desktop viewport (1600x500) cropped to 16:10 centers horizontally.
         assert_eq!(top_cover_crop_rect(1600, 500, 640, 400), (400, 0, 800, 500));
-        // Exact 16:10 needs no crop.
         assert_eq!(top_cover_crop_rect(1280, 800, 640, 400), (0, 0, 1280, 800));
     }
 
     #[test]
     fn unpremultiply_rgba_restores_straight_color() {
-        // Straight (200, 100, 50) at alpha 128 -> premultiplied ~(100, 50, 25, 128).
         let mut buf = vec![100, 50, 25, 128, 10, 20, 30, 255, 0, 0, 0, 0];
         unpremultiply_rgba(&mut buf);
         assert_eq!(&buf[0..4], &[199, 100, 50, 128]);
@@ -309,8 +255,6 @@ mod tests {
 
     #[test]
     fn encode_cover_produces_valid_png_with_top_aligned_crop() {
-        // 400x500 image: top half red, bottom half blue.
-        // Cropping to 640x400 (aspect 1.6 -> top 400x250) should stay purely red!
         let (w, h) = (400u32, 500u32);
         let mut rgba = vec![0u8; (w * h * 4) as usize];
         for y in 0..h {
@@ -334,7 +278,6 @@ mod tests {
 
     #[test]
     fn encode_cover_falls_back_to_jpeg_for_noisy_large_frames() {
-        // High-entropy noise image at 640x400 produces PNG > 300 KiB, triggering JPEG fallback.
         let (w, h) = (640u32, 400u32);
         let mut rgba = vec![0u8; (w * h * 4) as usize];
         let mut state: u64 = 0x9e37_79b9_7f4a_7c15;

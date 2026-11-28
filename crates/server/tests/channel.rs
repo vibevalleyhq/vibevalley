@@ -6,8 +6,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use serde_json::{Value, json};
-use vibevalley_protocol::{BizCode, Caller, CollabSlice, Envelope, InboxSlice, SliceKind};
-use vibevalley_server::channel::{DeliveryTargetKind, Posting};
+use vibevalley_protocol::{BizCode, Caller, CollabSlice, DEFAULT_ORCHESTRATOR, Envelope, InboxSlice, ParticipantId, SliceKind};
+use vibevalley_server::channel::Posting;
 use vibevalley_server::{App, Config, Server, create_app_blocking};
 
 fn start(dir: &std::path::Path) -> App {
@@ -74,7 +74,7 @@ fn the_chat_through_its_endpoints() {
     let first = &said[0];
     assert_eq!((first["number"].as_i64(), first["text"].as_str()), (Some(1), Some("hello @助手")));
     assert_eq!((first["mentions"].clone(), first["sendKey"].clone()), (json!(["orchestrator"]), json!("k1")));
-    assert_eq!(first["actor"], json!({ "kind": "user", "id": "user", "name": "用户" }));
+    assert_eq!(first["actor"], json!({ "kind": "user", "id": "user:self", "name": "用户" }));
     let first_id = first["id"].as_str().unwrap().to_string();
 
     let event: Value = vibevalley_runtime::rt::block_on(async { tokio::time::timeout(Duration::from_secs(2), follow.1.recv()).await })
@@ -124,7 +124,7 @@ fn the_chat_through_its_endpoints() {
 
     // Reactions, pins, edits, search, deletion.
     let m = ok(call("channel.reaction.set", json!({ "id": first_id, "emoji": "👍", "on": true })));
-    assert_eq!(m["reactions"], json!([{ "emoji": "👍", "by": ["user"] }]));
+    assert_eq!(m["reactions"], json!([{ "emoji": "👍", "by": ["user:self"] }]));
     assert_eq!(
         call("channel.reaction.set", json!({ "id": first_id, "emoji": "a b", "on": true })).biz_code,
         BizCode::ChannelRefused.code()
@@ -228,7 +228,7 @@ fn the_chat_through_its_endpoints() {
     let d = listed.as_array().unwrap().iter().find(|c| c["id"] == direct).unwrap();
     assert_eq!(
         (d["peer"].as_str(), d["title"].as_str()),
-        (Some(format!("profile:{}", helper.id).as_str()), Some("小帮手"))
+        (Some(format!("agent:{}", helper.id).as_str()), Some("小帮手"))
     );
     app.close_blocking();
 
@@ -237,16 +237,9 @@ fn the_chat_through_its_endpoints() {
     let chat = app2.test_internals().channel;
     let list = vibevalley_runtime::rt::block_on(chat.list_async()).unwrap();
     assert_eq!(list[0].id, dev);
-    assert_eq!(vibevalley_runtime::rt::block_on(chat.history_async(&dev, None, None)).unwrap().len(), 1);
-    assert!(collab_slice(&app2).chat.unwrap().channels.iter().any(|c| c.id == dev));
-    assert_eq!(
-        vibevalley_runtime::rt::block_on(chat.events_async(0, 1000))
-            .unwrap()
-            .iter()
-            .filter(|e| e.kind == "removed")
-            .count(),
-        1
-    );
+    let dev_history = vibevalley_runtime::rt::block_on(chat.history_async(&dev, None, None)).unwrap();
+    assert_eq!(dev_history.len(), 1);
+    assert_eq!(dev_history[0].attachments[0].name, "a.txt");
     app2.close_blocking();
 }
 
@@ -271,12 +264,13 @@ fn regression_send_key_thread_pages_and_observer_cursor_survive_sigkill() {
             .clone();
         let thread = call("channel.thread.create", json!({"id":root}));
         call("channel.message.send", json!({"id":thread,"text":"first reply","sendKey":"thread-first"}));
-        let checkpoint = vibevalley_runtime::rt::block_on(server.test_internals().channel.events_async(0, 100))
+        let first_id = vibevalley_runtime::rt::block_on(server.test_internals().channel.history_async(thread.as_str().unwrap(), None, Some(10)))
             .unwrap()
             .last()
             .unwrap()
-            .seq;
-        std::fs::write(home.join("checkpoint"), checkpoint.to_string()).unwrap();
+            .id
+            .clone();
+        std::fs::write(home.join("checkpoint"), first_id).unwrap();
         call(
             "channel.message.send",
             json!({"id":thread,"text":"second reply @助手","sendKey":"thread-second"}),
@@ -292,7 +286,7 @@ fn regression_send_key_thread_pages_and_observer_cursor_survive_sigkill() {
         .status()
         .unwrap();
     assert_eq!(result.signal(), Some(9));
-    let checkpoint: i64 = std::fs::read_to_string(dir.path().join("checkpoint")).unwrap().trim().parse().unwrap();
+    let first_reply_id = std::fs::read_to_string(dir.path().join("checkpoint")).unwrap().trim().to_owned();
     let server = start(dir.path());
     let call = |op, params| ok(server.router().call_as(Caller::User, op, params));
     let channel = server.test_internals().channel.default_channel();
@@ -306,13 +300,12 @@ fn regression_send_key_thread_pages_and_observer_cursor_survive_sigkill() {
         replies.iter().map(|m| m.text.as_str()).collect::<Vec<_>>(),
         ["first reply", "second reply @助手"]
     );
-    let unseen = vibevalley_runtime::rt::block_on(server.test_internals().channel.events_async(checkpoint, 10)).unwrap();
-    assert_eq!(unseen.len(), 1);
-    assert_eq!(unseen[0].message_id, replies[1].id);
-    let pending: Vec<_> = vibevalley_runtime::rt::block_on(server.test_internals().channel.pending_deliveries_async(DeliveryTargetKind::Orchestrator))
+    assert_eq!(replies[0].id, first_reply_id);
+    let orch_pid = ParticipantId::agent(DEFAULT_ORCHESTRATOR);
+    let pending: Vec<_> = vibevalley_runtime::rt::block_on(server.test_internals().channel.pending_deliveries_all_async())
         .unwrap()
         .into_iter()
-        .filter(|d| d.message_id == replies[1].id)
+        .filter(|d| d.recipient == orch_pid && d.message_id == replies[1].id)
         .collect();
     assert_eq!(pending.len(), 1, "durable pending delivery must survive SIGKILL");
     call(
@@ -320,28 +313,23 @@ fn regression_send_key_thread_pages_and_observer_cursor_survive_sigkill() {
         json!({"id":thread,"text":"second reply @助手","sendKey":"thread-second"}),
     );
     assert_eq!(
-        vibevalley_runtime::rt::block_on(server.test_internals().channel.events_async(checkpoint, 10)).unwrap(),
-        unseen
-    );
-    assert_eq!(
         vibevalley_runtime::rt::block_on(server.test_internals().channel.history_async(&thread, None, Some(5)))
             .unwrap()
             .len(),
         2
     );
-    let pending_after_retry: Vec<_> =
-        vibevalley_runtime::rt::block_on(server.test_internals().channel.pending_deliveries_async(DeliveryTargetKind::Orchestrator))
-            .unwrap()
-            .into_iter()
-            .filter(|d| d.message_id == replies[1].id)
-            .collect();
+    let pending_after_retry: Vec<_> = vibevalley_runtime::rt::block_on(server.test_internals().channel.pending_deliveries_all_async())
+        .unwrap()
+        .into_iter()
+        .filter(|d| d.recipient == orch_pid && d.message_id == replies[1].id)
+        .collect();
     assert_eq!(pending_after_retry.len(), 1, "sendKey retry must not duplicate deliveries");
     vibevalley_runtime::rt::block_on(server.test_internals().channel.settle_delivery_async(pending[0].id, true)).unwrap();
     assert!(
-        vibevalley_runtime::rt::block_on(server.test_internals().channel.pending_deliveries_async(DeliveryTargetKind::Orchestrator))
+        vibevalley_runtime::rt::block_on(server.test_internals().channel.pending_deliveries_all_async())
             .unwrap()
             .iter()
-            .all(|d| d.message_id != replies[1].id)
+            .all(|d| d.recipient != orch_pid || d.message_id != replies[1].id)
     );
     server.close_blocking();
 }

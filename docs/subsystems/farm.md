@@ -17,13 +17,13 @@
 |---|---|
 | `apps/mac/crates/diorama/` | 跨平台纯 Rust `vibevalley-diorama`（`wgpu` + WGSL）：VVM2 网格、BC1/BC3 `.vvtex`、`DioramaWorld` 领域同步、弹簧偶人骨骼、河道/拱桥寻路、阴影/DoF 合成与射线拾取 |
 | `apps/mac/src/diorama/scene.rs` | `DioramaScene`：把服务端切片映射到 `YardSnapshotSync`，管理帧缓冲池与按需节流（交互 `16ms` / 空闲 `66ms` / 切走或失活 `0 FPS`） |
-| `apps/mac/src/diorama/view.rs` | `DioramaView`：场景窗格容器，异步加载场景、订阅切片、`call_with_async` 调服务端，经 `FrameSurface::paint_bgra_frame` 与 `frame_gen` 去重上传至 GPUI `DynamicTexture`，并叠放暖羊皮纸浮层控件、紧急徽章与内景聚焦栏 |
+| `apps/mac/src/diorama/view/` | `DioramaView`：场景窗格容器，异步加载场景、订阅切片、`call_with_async` 调服务端，经 `FrameSurface::paint_bgra_frame` 与 `frame_gen` 去重上传至 GPUI `DynamicTexture`，并叠放暖羊皮纸浮层控件、紧急徽章与内景聚焦栏 |
 | `apps/mac/src/diorama/frame.rs` | 合并 `FarmFrame`、`BoardSlice`、`SessionsSlice`、`InboxSlice` 与 `CollabSlice` 为场景消费视图，定义 9 块地 `BEDS` 与动作去处 `place_of_action` |
 | `apps/mac/src/diorama/phone.rs`、`apps/mac/ui/farm/PhoneGames.tsx` | 农场手机与 5 款内置小游戏（共用 `Phone` 状态与 `farm-phone` 浮层） |
 | `apps/mac/src/diorama/opening.rs` | `OpeningView`：按本机时段解码 `assets/brand/opening-{morning,day,night}.webp` 的 Papertrails 开场欢迎画 |
 | `apps/mac/src/assets.rs` | 定位应用运行时的 `assets/` 与 `assets/diorama/` 目录 |
 | `design/sync-assets.sh`、`design/diorama.sh`、`assets/diorama/` | 从同级 `vibevalley-assets` 仓打包并仅同步轻量运行产物（`manifest.json`、`meshes.bin`、`lights.json`、`foley.json` 与 `print/`、`stock/` 贴图）到代码仓 |
-| `apps/mac/ui/infra/sound.ts`、`apps/mac/src/audio.rs` | 程序化音效触发与 Rust 侧 32 kHz 实时 WAV 合成器 |
+| `apps/mac/ui/infra/sound.ts`、`apps/mac/src/audio/` | 程序化音效触发与 Rust 侧 32 kHz 实时 WAV 合成器 |
 
 ## 模型和不变量
 
@@ -44,7 +44,7 @@
 - **昼夜光影与掀顶交互**：支持 `Dawn` / `Noon` / `Dusk` / `Night` 四档时光（快捷键 `1..4` 或 `diorama_clock` 调试命令）；点击院内建筑可聚焦并触发屋顶掀顶切面，展示内景并弹出对应入口。
 - **农场面板与交互**：点有工单的地块查看详情或执行回答、重试、收获与关闭，点空地块创建工单；有工作目录的地块可右击打开终端进入帮工 worktree。点院内小摊建筑（`panel:shop`）或左上角金币/每日任务徽章打开田头小摊面板（`kind: "shop"`），查看今日轻量任务自动结算、用金币购入庭院摆件或工单模板；已购摆件经 `FarmView.decorations` 实时同步进 `DioramaWorld` 作为纸雕景物呈现。
 - **农场手机**：点手机或按 P 开合。从「游戏」打开方块、推箱子、小恐龙、贪吃虫或种田 2048。方向键对应十字键，空格、Enter 或 Z 对应 A，X 对应 B。点屏幕上沿的「农场通」返回游戏目录。棋盘与最高分按各游戏规则保留在本次农场页面内。
-- **音效没有音频文件**：触发入口在 `apps/mac/ui/infra/sound.ts`，每次播放由原生 `apps/mac/src/audio.rs` 合成器实时生成 WAV 并缓存播放（`host.playSound`）。
+- **音效没有音频文件**：触发入口在 `apps/mac/ui/infra/sound.ts`，每次播放由原生 `apps/mac/src/audio/` 合成器实时生成 WAV 并缓存播放（`host.playSound`）。
 
 ## 怎么走
 

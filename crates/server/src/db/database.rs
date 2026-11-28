@@ -5,17 +5,23 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use parking_lot::Mutex;
-use sea_orm::sqlx::ConnectOptions as _;
-use sea_orm::sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous};
 use sea_orm::{
-    ConnectOptions, ConnectionTrait, Database as SeaDatabase, DatabaseBackend, DatabaseConnection, DatabaseTransaction, DbErr, SqliteTransactionMode,
-    SqlxSqliteConnector, TransactionOptions, TransactionTrait,
+    ConnectionTrait, DatabaseBackend, DatabaseConnection, DatabaseTransaction, SqliteTransactionMode, SqlxSqliteConnector, Statement, TransactionOptions,
+    TransactionTrait,
 };
 use sea_orm_migration::MigratorTrait;
 use tokio_util::sync::CancellationToken;
 use vibevalley_core::SliceMask;
+pub use vibevalley_kit::db::engine::{
+    DEFAULT_POSTGRES_ACQUIRE_TIMEOUT, DEFAULT_POSTGRES_IDLE_TIMEOUT, DEFAULT_POSTGRES_MAX_CONNECTIONS, DEFAULT_POSTGRES_MAX_LIFETIME,
+    DEFAULT_POSTGRES_MIN_CONNECTIONS, DatabaseConfig,
+};
+use vibevalley_kit::db::engine::{SqlPool, SqlitePoolConfig, connect_sqlite_pool, redact_db_url};
+use vibevalley_kit::db::seq::{DEFAULT_SEQ_TABLE, SeqAllocator, next_seq_sql};
+use vibevalley_kit::db::tx::PostCommitHooks;
+use vibevalley_kit::queue::outbox::{DEFAULT_OUTBOX_TABLE, OutboxLeaseMode, SqlOutbox};
 
-use super::{DEFAULT_SLOW_QUERY_THRESHOLD, DbBackend, DbError, DbResult, QueryMetrics, entity, migration, verify};
+use super::{DbBackend, DbError, DbResult, QueryMetrics, migration, verify};
 
 /// Active database write transaction passed to `*_in_tx` methods on `crate::service::Service` sub-services.
 pub type Tx = DatabaseTransaction;
@@ -24,154 +30,29 @@ pub type Tx = DatabaseTransaction;
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
 const READ_POOL_MAX_CONNECTIONS: u32 = 6;
-const WRITE_POOL_MAX_CONNECTIONS: u32 = 1;
-const SQLITE_ACQUIRE_TIMEOUT: Duration = Duration::from_secs(10);
-const SQLITE_CACHE_SIZE_KIB: &str = "-32000";
-const SQLITE_TEMP_STORE: &str = "MEMORY";
-const SQLITE_MMAP_SIZE_BYTES: &str = "134217728";
 const SQLITE_OPTIMIZE_INTERVAL: Duration = Duration::from_secs(4 * 60 * 60);
 
-pub const DEFAULT_POSTGRES_MAX_CONNECTIONS: u32 = 16;
-pub const DEFAULT_POSTGRES_MIN_CONNECTIONS: u32 = 2;
-pub const DEFAULT_POSTGRES_ACQUIRE_TIMEOUT: Duration = Duration::from_secs(10);
-pub const DEFAULT_POSTGRES_IDLE_TIMEOUT: Duration = Duration::from_secs(300);
-pub const DEFAULT_POSTGRES_MAX_LIFETIME: Duration = Duration::from_secs(1800);
-
-fn redact_db_url(raw: &str) -> String {
-    if let Ok(mut parsed) = url::Url::parse(raw) {
-        if parsed.password().is_some() {
-            let _ = parsed.set_password(Some("***"));
-        }
-        return parsed.to_string();
-    }
-    if let Some((scheme_user, rest)) = raw.split_once('@')
-        && let Some((prefix, _)) = scheme_user.rsplit_once(':')
-        && prefix.contains("://")
-    {
-        return format!("{prefix}:***@{rest}");
-    }
-    raw.to_owned()
-}
-
-fn parse_sqlite_url(url: &str) -> DbResult<PathBuf> {
-    let raw = url
-        .strip_prefix("sqlite://")
-        .or_else(|| url.strip_prefix("sqlite:"))
-        .ok_or_else(|| DbError::custom("expected sqlite: database URL"))?;
-    let path_part = raw.split('?').next().unwrap_or(raw);
-    if path_part.is_empty() || path_part == ":memory:" {
-        return Err(DbError::custom("sqlite URL must reference a database file path"));
-    }
-    Ok(PathBuf::from(path_part))
-}
-
-#[derive(Clone, PartialEq, Eq)]
-pub enum DatabaseConfig {
+enum DbBackendState {
     Sqlite {
         path: PathBuf,
     },
-    Postgres {
-        url: String,
-        max_connections: u32,
-        min_connections: u32,
-        acquire_timeout: Duration,
-        idle_timeout: Duration,
-        max_lifetime: Duration,
-    },
-}
-
-impl std::fmt::Debug for DatabaseConfig {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Sqlite { path } => f.debug_struct("Sqlite").field("path", path).finish(),
-            Self::Postgres {
-                url,
-                max_connections,
-                min_connections,
-                acquire_timeout,
-                idle_timeout,
-                max_lifetime,
-            } => f
-                .debug_struct("Postgres")
-                .field("url", &redact_db_url(url))
-                .field("max_connections", max_connections)
-                .field("min_connections", min_connections)
-                .field("acquire_timeout", acquire_timeout)
-                .field("idle_timeout", idle_timeout)
-                .field("max_lifetime", max_lifetime)
-                .finish(),
-        }
-    }
-}
-
-impl DatabaseConfig {
-    pub fn from_url(url: &str) -> DbResult<Self> {
-        let trimmed = url.trim();
-        if trimmed.starts_with("postgres://") || trimmed.starts_with("postgresql://") {
-            let _ = url::Url::parse(trimmed).map_err(|e| DbError::custom(format!("invalid postgres URL ({}): {e}", redact_db_url(trimmed))))?;
-            return Ok(Self::Postgres {
-                url: trimmed.to_owned(),
-                max_connections: DEFAULT_POSTGRES_MAX_CONNECTIONS,
-                min_connections: DEFAULT_POSTGRES_MIN_CONNECTIONS,
-                acquire_timeout: DEFAULT_POSTGRES_ACQUIRE_TIMEOUT,
-                idle_timeout: DEFAULT_POSTGRES_IDLE_TIMEOUT,
-                max_lifetime: DEFAULT_POSTGRES_MAX_LIFETIME,
-            });
-        }
-        if trimmed.starts_with("sqlite:") {
-            return Ok(Self::Sqlite {
-                path: parse_sqlite_url(trimmed)?,
-            });
-        }
-        Err(DbError::custom(format!("unsupported database URL scheme: {}", redact_db_url(trimmed))))
-    }
-}
-
-fn postgres_connect_options(
-    url: &str,
-    max_connections: u32,
-    min_connections: u32,
-    acquire_timeout: Duration,
-    idle_timeout: Duration,
-    max_lifetime: Duration,
-) -> ConnectOptions {
-    let max_conns = max_connections.max(1);
-    let min_conns = min_connections.min(max_conns);
-    let mut opts = ConnectOptions::new(url);
-    opts.max_connections(max_conns)
-        .min_connections(min_conns)
-        .acquire_timeout(acquire_timeout)
-        .idle_timeout(idle_timeout)
-        .max_lifetime(max_lifetime)
-        .sqlx_logging(false)
-        .sqlx_slow_statements_logging_settings(tracing::log::LevelFilter::Warn, DEFAULT_SLOW_QUERY_THRESHOLD);
-    opts
-}
-
-fn sqlite_base_options(path: &Path) -> SqliteConnectOptions {
-    SqliteConnectOptions::new()
-        .filename(path)
-        .busy_timeout(Duration::from_secs(5))
-        .pragma("cache_size", SQLITE_CACHE_SIZE_KIB)
-        .pragma("temp_store", SQLITE_TEMP_STORE)
-        .pragma("mmap_size", SQLITE_MMAP_SIZE_BYTES)
-        .log_slow_statements(tracing::log::LevelFilter::Warn, DEFAULT_SLOW_QUERY_THRESHOLD)
-}
-
-enum DbBackendState {
-    Sqlite { path: PathBuf },
+    #[cfg(feature = "postgres")]
     Postgres,
 }
 
 /// Single shared dual-backend database handle:
-/// - On SQLite: split WAL-mode pools (`write_pool` max=1, `read_pool` max=6 read-only)
-///   wrapped into SeaORM `DatabaseConnection`s via `SqlxSqliteConnector`.
-/// - On PostgreSQL: pooled SeaORM `DatabaseConnection` shared by readers and writers.
+/// - On SQLite: split WAL-mode pools built by `vibevalley_kit::db::engine` (`write_pool` max=1,
+///   `read_pool` max=6 read-only) wrapped into SeaORM `DatabaseConnection`s via `SqlxSqliteConnector`.
+/// - On PostgreSQL: pooled connection built by `vibevalley_kit::db::engine` wrapped via `SqlxPostgresConnector`.
+/// - Mechanism tables (`seq_counter`, `outbox_item`) run directly on `kit::db::seq::SeqAllocator`
+///   and `kit::queue::outbox::SqlOutbox` with zero ORM entities.
 pub struct Database {
     config: DatabaseConfig,
     backend_state: DbBackendState,
     read_conn: DatabaseConnection,
     write_conn: DatabaseConnection,
+    seq: SeqAllocator,
+    sql_outbox: SqlOutbox,
     durable: Mutex<Option<vibevalley_runtime::agent::durable::Store>>,
     metrics: Arc<QueryMetrics>,
     optimize_cancel: CancellationToken,
@@ -212,42 +93,28 @@ impl Database {
     /// Opens a SQLite or PostgreSQL database from [`DatabaseConfig`] and runs server and durable migrations.
     pub async fn open_config(config: &DatabaseConfig) -> DbResult<Arc<Self>> {
         let config_owned = config.clone();
-        if let DatabaseConfig::Sqlite { path } = &config_owned
-            && let Some(parent) = path.parent()
-            && !parent.as_os_str().is_empty()
-        {
-            let _ = tokio::fs::create_dir_all(parent).await;
-        }
 
-        let (backend_state, read_conn, write_conn) = match &config_owned {
+        let (backend_state, read_conn, write_conn, write_sql_pool, read_sql_pool) = match &config_owned {
             DatabaseConfig::Sqlite { path } => {
-                let write_options = sqlite_base_options(path)
-                    .create_if_missing(true)
-                    .journal_mode(SqliteJournalMode::Wal)
-                    .synchronous(SqliteSynchronous::Normal)
-                    .foreign_keys(true);
-                let write_pool = SqlitePoolOptions::new()
-                    .max_connections(WRITE_POOL_MAX_CONNECTIONS)
-                    .min_connections(1)
-                    .acquire_timeout(SQLITE_ACQUIRE_TIMEOUT)
-                    .connect_with(write_options)
-                    .await
-                    .map_err(|e| DbErr::Conn(sea_orm::RuntimeErr::SqlxError(Arc::new(e))))?;
+                let write_cfg = SqlitePoolConfig::writer(path).with_server_pragmas();
+                let write_pool = connect_sqlite_pool(&write_cfg).await?;
+                let write_sql_pool = SqlPool::Sqlite(write_pool.clone());
                 let write_conn = SqlxSqliteConnector::from_sqlx_sqlite_pool(write_pool);
                 run_migrations_and_verify(&write_conn, DbBackend::Sqlite, Some(path.as_path())).await?;
                 let _ = write_conn.execute_unprepared("PRAGMA optimize(0x10002);").await;
 
-                let read_options = sqlite_base_options(path).read_only(true);
-                let read_pool = SqlitePoolOptions::new()
-                    .max_connections(READ_POOL_MAX_CONNECTIONS)
-                    .min_connections(1)
-                    .acquire_timeout(SQLITE_ACQUIRE_TIMEOUT)
-                    .connect_with(read_options)
-                    .await
-                    .map_err(|e| DbErr::Conn(sea_orm::RuntimeErr::SqlxError(Arc::new(e))))?;
+                let read_cfg = SqlitePoolConfig::reader(path, READ_POOL_MAX_CONNECTIONS).with_server_pragmas();
+                let read_pool = connect_sqlite_pool(&read_cfg).await?;
+                let read_sql_pool = SqlPool::Sqlite(read_pool.clone());
                 let read_conn = SqlxSqliteConnector::from_sqlx_sqlite_pool(read_pool);
 
-                (DbBackendState::Sqlite { path: path.clone() }, read_conn, write_conn)
+                (
+                    DbBackendState::Sqlite { path: path.clone() },
+                    read_conn,
+                    write_conn,
+                    write_sql_pool,
+                    read_sql_pool,
+                )
             }
             DatabaseConfig::Postgres {
                 url,
@@ -257,23 +124,45 @@ impl Database {
                 idle_timeout,
                 max_lifetime,
             } => {
-                let opts = postgres_connect_options(url, *max_connections, *min_connections, *acquire_timeout, *idle_timeout, *max_lifetime);
-                let conn = SeaDatabase::connect(opts).await.inspect_err(|err| {
-                    tracing::error!(url = %redact_db_url(url), error = %err, "failed to connect to postgres database");
-                })?;
-                run_migrations_and_verify(&conn, DbBackend::Postgres, None).await?;
-                (DbBackendState::Postgres, conn.clone(), conn)
+                #[cfg(feature = "postgres")]
+                {
+                    use vibevalley_kit::db::engine::{PostgresPoolConfig, connect_postgres_pool};
+                    use vibevalley_kit::db::telemetry::DEFAULT_SLOW_QUERY_THRESHOLD;
+
+                    let pg_cfg = PostgresPoolConfig {
+                        url: url.clone(),
+                        max_connections: *max_connections,
+                        min_connections: *min_connections,
+                        acquire_timeout: *acquire_timeout,
+                        idle_timeout: *idle_timeout,
+                        max_lifetime: *max_lifetime,
+                        slow_query_threshold: Some(DEFAULT_SLOW_QUERY_THRESHOLD),
+                    };
+                    let pg_pool = connect_postgres_pool(&pg_cfg).await.inspect_err(|err| {
+                        tracing::error!(url = %redact_db_url(url), error = %err, "failed to connect to postgres database");
+                    })?;
+                    let sql_pool = SqlPool::Postgres(pg_pool.clone());
+                    let conn = sea_orm::SqlxPostgresConnector::from_sqlx_postgres_pool(pg_pool);
+                    run_migrations_and_verify(&conn, DbBackend::Postgres, None).await?;
+                    (DbBackendState::Postgres, conn.clone(), conn, sql_pool.clone(), sql_pool)
+                }
+                #[cfg(not(feature = "postgres"))]
+                {
+                    let _ = (max_connections, min_connections, acquire_timeout, idle_timeout, max_lifetime);
+                    return Err(DbError::custom(format!("postgres feature is not enabled for {}", redact_db_url(url))));
+                }
             }
         };
+
+        let seq = SeqAllocator::new(write_sql_pool.clone());
+        let sql_outbox = SqlOutbox::with_options(write_sql_pool, read_sql_pool, DEFAULT_OUTBOX_TABLE, OutboxLeaseMode::AvailableAtColumn)?;
 
         let optimize_cancel = CancellationToken::new();
         let optimize_task = if matches!(backend_state, DbBackendState::Sqlite { .. }) {
             let conn = write_conn.clone();
             let cancel = optimize_cancel.clone();
             Some(tokio::spawn(async move {
-                let mut ticker = tokio::time::interval(SQLITE_OPTIMIZE_INTERVAL);
-                ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
-                ticker.tick().await;
+                let mut ticker = vibevalley_kit::task::Ticker::periodic_delayed(SQLITE_OPTIMIZE_INTERVAL).with_delay_behavior();
                 loop {
                     tokio::select! {
                         () = cancel.cancelled() => break,
@@ -294,6 +183,8 @@ impl Database {
             backend_state,
             read_conn,
             write_conn,
+            seq,
+            sql_outbox,
             durable: Mutex::new(None),
             metrics: Arc::new(QueryMetrics::default()),
             optimize_cancel,
@@ -307,6 +198,10 @@ impl Database {
 
     pub(crate) fn read_conn(&self) -> &DatabaseConnection {
         &self.read_conn
+    }
+
+    pub(crate) fn sql_outbox(&self) -> &SqlOutbox {
+        &self.sql_outbox
     }
 
     pub fn backend(&self) -> DbBackend {
@@ -339,6 +234,7 @@ impl Database {
     pub fn path(&self) -> Option<&Path> {
         match &self.backend_state {
             DbBackendState::Sqlite { path } => Some(path.as_path()),
+            #[cfg(feature = "postgres")]
             DbBackendState::Postgres => None,
         }
     }
@@ -358,6 +254,7 @@ impl Database {
                 )
                 .await?
             }
+            #[cfg(feature = "postgres")]
             DbBackendState::Postgres => {
                 vibevalley_runtime::agent::durable::Store::from_sea_orm_conns(self.write_conn.clone(), None, vibevalley_runtime::agent::durable::now_ms).await?
             }
@@ -388,6 +285,7 @@ impl Database {
                 let _ = self.write_conn.execute_unprepared("PRAGMA wal_checkpoint(TRUNCATE); PRAGMA optimize;").await;
                 let _ = self.write_conn.clone().close().await;
             }
+            #[cfg(feature = "postgres")]
             DbBackendState::Postgres => {
                 let _ = self.write_conn.clone().close().await;
             }
@@ -460,14 +358,56 @@ impl Database {
         }
     }
 
-    /// Atomically allocates the next monotonic counter value strictly above `at_least`.
+    /// Runs an async write transaction with an attached [`PostCommitHooks`] collector whose
+    /// `on_commit` callbacks (e.g. `outbox.wake()`) fire ONLY after commit succeeds.
+    pub async fn write_with_hooks<T, E>(
+        &self,
+        f: impl for<'a> FnOnce(&'a Tx, &'a mut PostCommitHooks) -> BoxFuture<'a, Result<T, E>> + Send,
+    ) -> Result<(T, vibevalley_kit::core::DirtyMask), E>
+    where
+        E: From<DbError>,
+    {
+        let tx = begin_write_tx(&self.write_conn).await.map_err(E::from)?;
+        let mut hooks = PostCommitHooks::new();
+        match f(&tx, &mut hooks).await {
+            Ok(val) => {
+                if let Err(err) = commit_tx(tx).await {
+                    hooks.discard();
+                    return Err(E::from(err));
+                }
+                let dirty = hooks.fire();
+                Ok((val, dirty))
+            }
+            Err(err) => {
+                hooks.discard();
+                let _ = rollback_tx(tx).await;
+                Err(err)
+            }
+        }
+    }
+
+    /// Atomically allocates the next monotonic counter value strictly above `at_least`
+    /// via `vibevalley_kit::db::seq::SeqAllocator`.
     pub async fn next_seq(&self, name: &str, at_least: i64) -> DbResult<i64> {
-        next_seq_impl(&self.write_conn, name, at_least).await
+        Ok(self.seq.next_seq(name, at_least).await?)
     }
 
     /// Atomically allocates the next monotonic counter value strictly above `at_least` inside `tx`.
     pub async fn next_seq_in_tx(&self, tx: &Tx, name: &str, at_least: i64) -> DbResult<i64> {
-        next_seq_impl(tx, name, at_least).await
+        let raw_backend = tx.get_database_backend();
+        let kit_backend = match raw_backend {
+            DatabaseBackend::Postgres => DbBackend::Postgres,
+            _ => DbBackend::Sqlite,
+        };
+        let sql = next_seq_sql(kit_backend, DEFAULT_SEQ_TABLE)?;
+        let initial = at_least.saturating_add(1);
+        let stmt = Statement::from_sql_and_values(raw_backend, sql, [name.into(), initial.into(), at_least.into()]);
+        let row = tx
+            .query_one_raw(stmt)
+            .await?
+            .ok_or_else(|| DbError::custom("seq_counter upsert returned no row"))?;
+        let next: i64 = row.try_get_by_index(0)?;
+        Ok(next)
     }
 }
 
@@ -479,26 +419,6 @@ pub async fn commit_tx(tx: Tx) -> DbResult<()> {
 /// Rolls back an explicit [`Tx`] opened via [`Database::begin_tx`].
 pub async fn rollback_tx(tx: Tx) -> DbResult<()> {
     tx.rollback().await.map_err(DbError::from)
-}
-
-async fn next_seq_impl(db: &impl ConnectionTrait, name: &str, at_least: i64) -> DbResult<i64> {
-    use sea_orm::sea_query::{Expr, OnConflict};
-    use sea_orm::{ActiveValue::Set, EntityTrait, ExprTrait};
-
-    let model = entity::seq_counter::ActiveModel {
-        name: Set(name.to_owned()),
-        last_number: Set(at_least + 1),
-    };
-    let current = Expr::col((entity::seq_counter::Entity, entity::seq_counter::Column::LastNumber));
-    let next_expr = Expr::expr(Expr::case(current.clone().gt(at_least), current).finally(at_least)).add(1);
-    let on_conflict = OnConflict::column(entity::seq_counter::Column::Name)
-        .value(entity::seq_counter::Column::LastNumber, next_expr)
-        .to_owned();
-    let saved = entity::seq_counter::Entity::insert(model)
-        .on_conflict(on_conflict)
-        .exec_with_returning(db)
-        .await?;
-    Ok(saved.last_number)
 }
 
 /// Opens a read transaction pinning a single consistent snapshot across multiple queries
@@ -635,6 +555,7 @@ mod tests {
     use sea_orm::{ActiveModelTrait, ActiveValue::Set, EntityTrait, PaginatorTrait};
 
     use super::*;
+    use crate::db::entity;
 
     fn make_channel(id: &str, name: &str, default: bool, created_at: i64) -> entity::channel::ActiveModel {
         entity::channel::ActiveModel {
@@ -723,42 +644,6 @@ mod tests {
         assert!(DatabaseConfig::from_url("mysql://localhost/db").is_err());
     }
 
-    #[test]
-    fn postgres_config_defaults_and_connect_options_clamp_bounds() {
-        let cfg = DatabaseConfig::from_url("postgres://postgres@127.0.0.1:5432/vibevalley").unwrap();
-        let DatabaseConfig::Postgres {
-            url,
-            max_connections,
-            min_connections,
-            acquire_timeout,
-            idle_timeout,
-            max_lifetime,
-        } = cfg
-        else {
-            panic!("expected postgres config");
-        };
-        assert_eq!(max_connections, DEFAULT_POSTGRES_MAX_CONNECTIONS);
-        assert_eq!(min_connections, DEFAULT_POSTGRES_MIN_CONNECTIONS);
-        assert_eq!(acquire_timeout, DEFAULT_POSTGRES_ACQUIRE_TIMEOUT);
-        assert_eq!(idle_timeout, DEFAULT_POSTGRES_IDLE_TIMEOUT);
-        assert_eq!(max_lifetime, DEFAULT_POSTGRES_MAX_LIFETIME);
-
-        let opts = postgres_connect_options(&url, max_connections, min_connections, acquire_timeout, idle_timeout, max_lifetime);
-        assert_eq!(opts.get_max_connections(), Some(DEFAULT_POSTGRES_MAX_CONNECTIONS));
-        assert_eq!(opts.get_min_connections(), Some(DEFAULT_POSTGRES_MIN_CONNECTIONS));
-        assert_eq!(opts.get_acquire_timeout(), Some(DEFAULT_POSTGRES_ACQUIRE_TIMEOUT));
-        assert_eq!(opts.get_idle_timeout(), Some(Some(DEFAULT_POSTGRES_IDLE_TIMEOUT)));
-        assert_eq!(opts.get_max_lifetime(), Some(Some(DEFAULT_POSTGRES_MAX_LIFETIME)));
-        assert!(!opts.get_sqlx_logging());
-
-        let clamped = postgres_connect_options(&url, 0, 8, Duration::from_secs(3), Duration::from_secs(60), Duration::from_secs(600));
-        assert_eq!(clamped.get_max_connections(), Some(1));
-        assert_eq!(clamped.get_min_connections(), Some(1));
-        assert_eq!(clamped.get_acquire_timeout(), Some(Duration::from_secs(3)));
-        assert_eq!(clamped.get_idle_timeout(), Some(Some(Duration::from_secs(60))));
-        assert_eq!(clamped.get_max_lifetime(), Some(Some(Duration::from_secs(600))));
-    }
-
     #[tokio::test]
     async fn sqlite_open_url_migrates_and_allocates_monotonic_sequences() {
         let dir = tempfile::tempdir().unwrap();
@@ -775,18 +660,22 @@ mod tests {
         assert_eq!(db.next_seq("issue", 10).await.unwrap(), 11);
         assert_eq!(db.next_seq("issue", 5).await.unwrap(), 12);
 
+        // Also exercise next_seq_in_tx on an open SeaORM write transaction.
+        let tx = db.begin_tx().await.unwrap();
+        assert_eq!(db.next_seq_in_tx(&tx, "issue", 0).await.unwrap(), 13);
+        rollback_tx(tx).await.unwrap();
+        assert_eq!(db.next_seq("issue", 0).await.unwrap(), 13);
+
         db.close().await;
         drop(db);
 
         let reopened = Database::open_config(&DatabaseConfig::Sqlite { path: db_path }).await.unwrap();
-        assert_eq!(reopened.next_seq("issue", 0).await.unwrap(), 13);
+        assert_eq!(reopened.next_seq("issue", 0).await.unwrap(), 14);
         reopened.close().await;
     }
 
     #[tokio::test]
     async fn sqlite_pools_apply_engine_pragmas_and_optimize() {
-        use sea_orm::Statement;
-
         let dir = tempfile::tempdir().unwrap();
         let db = Database::open(dir.path()).await.unwrap();
 

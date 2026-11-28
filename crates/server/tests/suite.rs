@@ -26,6 +26,7 @@ mod module_boundaries;
 mod multi_helper;
 mod note;
 mod orchestrator;
+mod participant_delivery;
 mod provider;
 mod remote;
 mod runtime_mcp;

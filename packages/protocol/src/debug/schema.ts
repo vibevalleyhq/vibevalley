@@ -158,7 +158,7 @@ export const DebugGraphSession = z.object({
   title: z.string(),
   runtime: z.string(),
   status: z.string(),
-  worktree: z.exactOptional(z.string()),
+  cwd: z.exactOptional(z.string()),
   kind: DebugTrajectoryKind,
 }) satisfies Codec<T.DebugGraphSession>;
 

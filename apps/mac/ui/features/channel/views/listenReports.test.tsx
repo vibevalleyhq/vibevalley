@@ -67,9 +67,11 @@ test("Channel Listen to reports queues concurrent worker reports with Agent.voic
     clock: { time: SCENARIO_NOW },
     host: fake.options,
   });
-  await fake.pumpUntil(app, () => app.count("id:listen-reports-toggle") === 1);
+  await fake.pumpUntil(app, () => app.count("id:channel-more-menu") === 1);
 
-  await app.press("id:listen-reports-toggle");
+  await app.press("id:channel-more-menu");
+  await fake.pumpUntil(app, () => app.count("id:more-listen-reports") === 1);
+  await app.press("id:more-listen-reports");
   await fake.pump(app);
 
   // Two worker reports arrive concurrently: second must wait until first finishes.
@@ -129,7 +131,9 @@ test("Channel Listen to reports queues concurrent worker reports with Agent.voic
   expect(activeHostIds).toEqual(["speech-job-1", "speech-job-2"]);
 
   // Turn toggle OFF and ensure cleanup stops cleanly.
-  await app.press("id:listen-reports-toggle");
+  await app.press("id:channel-more-menu");
+  await fake.pumpUntil(app, () => app.count("id:more-listen-reports") === 1);
+  await app.press("id:more-listen-reports");
   await fake.pump(app);
 });
 

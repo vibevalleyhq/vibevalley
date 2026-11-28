@@ -12,6 +12,26 @@ pub use vibevalley_protocol::{ApiError, BizCode, Caller, Envelope, LiveEvent, Sl
 /// Heap-allocated `Send` future returned by async trait methods across server domains.
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
+/// Persisted remote access listener settings stored under `settings.json`.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoteAccessConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bind_addr: Option<String>,
+    #[serde(default)]
+    pub port: u16,
+    #[serde(default)]
+    pub updated_at: vibevalley_protocol::Millis,
+}
+
+/// Narrow port allowing remote listener state persistence in `settings.json` without cross-layer imports.
+pub trait RemoteConfigStore: Send + Sync {
+    fn get_remote_config(&self) -> Option<RemoteAccessConfig>;
+    fn save_remote_config<'a>(&'a self, cfg: RemoteAccessConfig) -> BoxFuture<'a, Result<(), ApiError>>;
+}
+
 pub mod media {
     //! Binary media transport contracts, separate from JSON RPC.
     use std::{io::Read, sync::Arc};
@@ -273,7 +293,7 @@ pub trait LiveVoiceLine: Send + Sync {
     fn url(&self) -> &str;
     fn bearer_token(&self) -> &str;
     fn session_update(&self) -> String;
-    fn take_outgoing(&self) -> Option<tokio::sync::mpsc::UnboundedReceiver<String>>;
+    fn take_outgoing(&self) -> Option<tokio::sync::mpsc::Receiver<String>>;
     fn heard(&self, raw: &str);
 }
 

@@ -97,22 +97,22 @@ fn interpolates_strings_numbers_booleans_plurals_and_handles_fallbacks() {
     // ICU plural branches (`one` vs `other`) in English and plain count in Chinese.
     assert_eq!(translate_json("en", "web.issue.detail.runCount", Some(r#"{"n":1}"#)), "1 round");
     assert_eq!(translate_json("en", "web.issue.detail.runCount", Some(r#"{"n":4}"#)), "4 rounds");
-    assert_eq!(translate_json("zh", "web.issue.detail.runCount", Some(r#"{"n":4}"#)), "4 次");
+    assert_eq!(translate_json("zh", "web.issue.detail.runCount", Some(r#"{"n":4}"#)), "4 轮");
     assert_eq!(translate_json("en", "web.channel.replies", Some(r#"{"n":1}"#)), "1 reply");
     assert_eq!(translate_json("en", "web.channel.replies", Some(r#"{"n":5}"#)), "5 replies");
 
     // ICU boolean `select` branches.
     assert_eq!(
         translate_json("en", "web.issue.detail.noCriteria", Some(r#"{"answer":true}"#)),
-        "This ticket has no criteria for done: judge by its answer when it comes back."
+        "No criteria configured yet; evaluate by the final answer."
     );
     assert_eq!(
         translate_json("en", "web.issue.detail.noCriteria", Some(r#"{"answer":false}"#)),
-        "This ticket has no criteria for done: judge by its changes when it comes back."
+        "No criteria configured yet; evaluate by the delivered changes."
     );
     assert_eq!(
         translate_json("zh", "web.issue.detail.noCriteria", Some(r#"{"answer":true}"#)),
-        "这个工单没写做完的标准：交回来时看结论判断。"
+        "暂未设置验收标准，交回后按结论验收。"
     );
 
     // Null values are skipped without discarding sibling params; empty / malformed JSON and
@@ -155,8 +155,8 @@ fn quickjs_native_module_calls_translate_synchronously() {
             [rich.translate("en", "web.channel.replies", JSON.stringify({ n: 1 })), "1 reply"],
             [rich.translate("en", "web.channel.replies", JSON.stringify({ n: 7 })), "7 replies"],
             [rich.translate("zh", "web.farm.panel.sow", JSON.stringify({ plot: 4 })), "播种 · 第 4 块地"],
-            [rich.translate("en", "web.issue.detail.noCriteria", JSON.stringify({ answer: true })), "This ticket has no criteria for done: judge by its answer when it comes back."],
-            [rich.translate("en", "web.issue.detail.noCriteria", JSON.stringify({ answer: false })), "This ticket has no criteria for done: judge by its changes when it comes back."],
+            [rich.translate("en", "web.issue.detail.noCriteria", JSON.stringify({ answer: true })), "No criteria configured yet; evaluate by the final answer."],
+            [rich.translate("en", "web.issue.detail.noCriteria", JSON.stringify({ answer: false })), "No criteria configured yet; evaluate by the delivered changes."],
             // Fallbacks: unknown locale -> zh, malformed JSON -> no params, unknown key -> key
             [rich.translate("de", "web.farm.hud.workbench"), "工作台"],
             [rich.translate("en", "web.note.page.delete", "{broken"), "Delete"],

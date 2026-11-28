@@ -88,10 +88,38 @@ pub const MOD_RS_NON_TEST_LINE_CEILING: usize = 200;
 /// Legacy shrink-only grandfather list (now emptied — all `mod.rs` files across the repo must stay `<= MOD_RS_NON_TEST_LINE_CEILING`).
 pub const LEGACY_FAT_MOD_RS_CEILINGS: &[(&str, usize)] = &[];
 
+/// Non-test code line ceilings per crate family to prevent mega single-file regressions (Issue #110).
+/// Shrink-only ceilings; lower as modules decompose further and never raise.
+pub const RICH_FILE_NON_TEST_LINE_CEILING: usize = 1000;
+pub const ENGINES_FILE_NON_TEST_LINE_CEILING: usize = 1200;
+pub const TERMINAL_FILE_NON_TEST_LINE_CEILING: usize = 800;
+pub const DIORAMA_FILE_NON_TEST_LINE_CEILING: usize = 800;
+
+/// Generated static lookup-table files exempt from the per-file size ratchet.
+const FILE_SIZE_RATCHET_EXEMPT_DATA_FILES: &[&str] = &[
+    "crates/rich/src/engine/pinyin/table.rs",
+    "crates/engines/onig/src/unicode/props_data.rs",
+    "crates/engines/onig/src/unicode/fold_data.rs",
+    "crates/engines/onig/src/unicode/segment_data.rs",
+];
+
 const GATEWAY_ALLOWED_ROOT_FILES: &[&str] = &["router.rs", "app.rs", "main.rs", "lib.rs"];
 const DAG_IGNORED_BASE_MODULES: &[&str] = &["context", "log", "db", "service", "setting", "provider", "fake"];
 const DAG_ROOT_MODULES: &[&str] = &["app", "router", "boot", "projection", "debug_sources", "main", "lib"];
-const RUNTIME_FORBIDDEN_TARGETS: &[&str] = &["agent", "issue", "cron", "note", "connector", "voice", "game", "gateway", "app", "router"];
+const RUNTIME_FORBIDDEN_TARGETS: &[&str] = &[
+    "agent",
+    "issue",
+    "cron",
+    "note",
+    "connector",
+    "voice",
+    "game",
+    "orchestration",
+    "gateway",
+    "app",
+    "router",
+];
+const CHANNEL_FORBIDDEN_DOMAINS: &[&str] = &["issue", "note", "connector", "voice", "cron"];
 const SERVICE_ALLOWED_TARGETS: &[&str] = &["db", "context", "log"];
 const GAME_ALLOWED_TARGETS: &[&str] = &["context", "repo"];
 const LEGACY_SERVER_DIRS: &[&str] = &["app", "infra", "content", "collab", "team", "work", "skin", "transport"];
@@ -102,6 +130,10 @@ const LATE_BIND_HOOK_METHODS: &[&str] = &[
     "attach_orchestrator",
     "attach_remote_auth",
     "attach_machine_bus",
+    "set_digest_delivery",
+    "attach_actions",
+    "use_cron_of_issue_async",
+    "use_pull_of_issue_async",
 ];
 const WELL_KNOWN_MODULES: &[&str] = &[
     "gateway",
@@ -109,6 +141,14 @@ const WELL_KNOWN_MODULES: &[&str] = &[
     "agent",
     "issue",
     "cron",
+    "note",
+    "channel",
+    "connector",
+    "voice",
+    "storage",
+    "debug",
+    "machine",
+    "orchestration",
     "service",
     "game",
     "db",
@@ -146,10 +186,11 @@ pub enum ArchAuditRule {
     NoSyncProcessInServer,
     NoBlockingReqwest,
     ThinModRs,
+    FileSizeRatchet,
 }
 
 impl ArchAuditRule {
-    pub const ALL: [Self; 15] = [
+    pub const ALL: [Self; 16] = [
         Self::NoGatewayReverseImport,
         Self::ServerDomainDag,
         Self::NoSeaOrmOutsideService,
@@ -165,6 +206,7 @@ impl ArchAuditRule {
         Self::NoSyncProcessInServer,
         Self::NoBlockingReqwest,
         Self::ThinModRs,
+        Self::FileSizeRatchet,
     ];
 
     pub fn as_str(self) -> &'static str {
@@ -184,6 +226,7 @@ impl ArchAuditRule {
             Self::NoSyncProcessInServer => "no-sync-process-in-server",
             Self::NoBlockingReqwest => "no-blocking-reqwest",
             Self::ThinModRs => "thin-mod-rs",
+            Self::FileSizeRatchet => "file-size-ratchet",
         }
     }
 }
@@ -667,12 +710,23 @@ fn is_server_fake_rel(rel: &str) -> bool {
     rel == "fake.rs" || rel.starts_with("fake/") || rel == "gateway/bridge/fake.rs"
 }
 
+fn is_runtime_family_src(path: &str) -> bool {
+    path.starts_with("crates/runtime/src/")
+        || path.starts_with("crates/oar/src/")
+        || path.starts_with("crates/machine/src/")
+        || path.starts_with("crates/agent/src/")
+}
+
 fn is_raw_git_exempt_file(path: &str) -> bool {
-    path.starts_with("crates/git/src/") || path.starts_with("crates/runtime/src/bin/") || path.contains("/fake/") || path.ends_with("/fake.rs")
+    path.starts_with("crates/git/src/")
+        || path.starts_with("crates/runtime/src/bin/")
+        || path.starts_with("crates/oar/src/bin/")
+        || path.contains("/fake/")
+        || path.ends_with("/fake.rs")
 }
 
 fn is_blocking_reqwest_exempt_file(path: &str) -> bool {
-    path.starts_with("crates/runtime/src/bin/")
+    path.starts_with("crates/runtime/src/bin/") || path.starts_with("crates/oar/src/bin/")
 }
 
 fn is_internal_value_sig_exempt_file(rel: &str) -> bool {
@@ -1097,6 +1151,43 @@ fn check_thin_mod_rs(file_path: &str, non_test_code: &str, out: &mut Vec<ArchVio
             message: format!("`{file_path}` has {count} non-test code lines, exceeding shrink-only `mod.rs` ceiling {ceiling}"),
             fix: format!(
                 "Keep `mod.rs` a thin module facade (<= {ceiling} non-test code lines) by moving cohesive implementation bodies into sibling modules and keeping essential leaf complexity in leaf `.rs` files."
+            ),
+            see: MODULE_DESIGN_DOC,
+            details: Vec::new(),
+        });
+    }
+}
+
+fn file_size_ceiling_for(path: &str) -> Option<usize> {
+    if FILE_SIZE_RATCHET_EXEMPT_DATA_FILES.contains(&path) {
+        return None;
+    }
+    if path.starts_with("crates/rich/src/") {
+        Some(RICH_FILE_NON_TEST_LINE_CEILING)
+    } else if path.starts_with("crates/engines/") && path.contains("/src/") {
+        Some(ENGINES_FILE_NON_TEST_LINE_CEILING)
+    } else if path.starts_with("apps/mac/crates/terminal/src/") {
+        Some(TERMINAL_FILE_NON_TEST_LINE_CEILING)
+    } else if path.starts_with("apps/mac/crates/diorama/src/") {
+        Some(DIORAMA_FILE_NON_TEST_LINE_CEILING)
+    } else {
+        None
+    }
+}
+
+fn check_file_size_ratchet(file_path: &str, non_test_code: &str, out: &mut Vec<ArchViolation>) {
+    let Some(ceiling) = file_size_ceiling_for(file_path) else {
+        return;
+    };
+    let count = count_non_test_code_lines(non_test_code);
+    if count > ceiling {
+        out.push(ArchViolation {
+            rule: ArchAuditRule::FileSizeRatchet,
+            file: file_path.to_owned(),
+            line: 1,
+            message: format!("`{file_path}` has {count} non-test code lines, exceeding shrink-only file-size ceiling {ceiling}"),
+            fix: format!(
+                "Split `{file_path}` into cohesive semantic submodules (keep `mod.rs` <= {MOD_RS_NON_TEST_LINE_CEILING} and each leaf file <= {ceiling} non-test code lines)."
             ),
             see: MODULE_DESIGN_DOC,
             details: Vec::new(),
@@ -1745,9 +1836,12 @@ fn run_arch_audit_on_files(files: &[SourceFile], existing_legacy_dirs: &BTreeSet
         // Rule 15: thin-mod-rs (applies across crates/**/src/** and apps/mac/src/**)
         check_thin_mod_rs(&file.path, &non_test_code, &mut violations);
 
-        if file.path.starts_with("crates/runtime/src/") {
-            // Standalone test fixture binaries under `crates/runtime/src/bin/` are excluded from production runtime ceilings.
-            if !file.path.starts_with("crates/runtime/src/bin/") {
+        // Rule 16: file-size-ratchet (prevents mega single-file regressions across rich/engines/terminal/diorama)
+        check_file_size_ratchet(&file.path, &non_test_code, &mut violations);
+
+        if is_runtime_family_src(&file.path) {
+            // Standalone test fixture binaries under `crates/{runtime,oar}/src/bin/` are excluded from production runtime ceilings.
+            if !file.path.starts_with("crates/runtime/src/bin/") && !file.path.starts_with("crates/oar/src/bin/") {
                 collect_flume_sites(&file.path, &tokens, &index, &mut runtime_flume_sites);
                 // `crates/runtime/src/rt.rs` implements the `rt::block_on` boundary helper itself.
                 if file.path != "crates/runtime/src/rt.rs" {
@@ -1847,8 +1941,19 @@ fn run_arch_audit_on_files(files: &[SourceFile], existing_legacy_dirs: &BTreeSet
         collect_flume_sites(&file.path, &tokens, &index, &mut flume_sites);
         collect_sync_async_dup_sites(&file.path, &tokens, &index, &mut sync_async_dup_sites);
 
-        // Rule 8 file-level checks: ChannelQuotePort & gateway/bridge/hub.rs Hub
+        // Rule 8 file-level checks: ChannelQuotePort, gateway/bridge/hub.rs Hub, and forbidden context/port.rs
         check_legacy_items_in_file(&file.path, rel, &tokens, &index, &mut violations);
+        if rel == "context/port.rs" {
+            violations.push(ArchViolation {
+                rule: ArchAuditRule::NoLegacyServerLayout,
+                file: file.path.clone(),
+                line: 1,
+                message: "cycle-breaking `crates/server/src/context/port.rs` is forbidden".to_owned(),
+                fix: "Delete `crates/server/src/context/port.rs` and lift cross-domain orchestration into `crates/server/src/orchestration/`.".to_owned(),
+                see: ARCH_DOC,
+                details: Vec::new(),
+            });
+        }
 
         // Rule 9 input: std::fs:: calls in server (excluding `fake/` test-runtime sync fixture)
         if !is_server_fake_rel(rel) {
@@ -1864,7 +1969,23 @@ fn run_arch_audit_on_files(files: &[SourceFile], existing_legacy_dirs: &BTreeSet
         };
         collect_lock_sites(&file.path, &source_mod, &tokens, &index, &mut locks_by_domain);
 
-        // Rule 2: server-domain-dag
+        // Rule 2: server-domain-dag (including runtime zero-issue-service guard)
+        if source_mod == "runtime" {
+            for w in tokens.windows(3) {
+                if w[0].kind == TokenKind::Ident && w[0].text == "service" && w[1].text == "." && w[2].kind == TokenKind::Ident && w[2].text == "issue" {
+                    let line = index.line_at(w[0].offset);
+                    violations.push(ArchViolation {
+                        rule: ArchAuditRule::ServerDomainDag,
+                        file: file.path.clone(),
+                        line,
+                        message: format!("`runtime` accesses `service.issue` directly ({})", index.snippet_at(line)),
+                        fix: "Keep `runtime` strictly decoupled from the `issue` domain; inject transaction hooks (`AtomicTxHook`) or pass paused issue ids from `issue`/`orchestration`.".to_owned(),
+                        see: ARCH_DOC,
+                        details: Vec::new(),
+                    });
+                }
+            }
+        }
         if !is_dag_ignored_module(&source_mod) {
             graph.entry(source_mod.clone()).or_default();
         }
@@ -1900,7 +2021,30 @@ fn run_arch_audit_on_files(files: &[SourceFile], existing_legacy_dirs: &BTreeSet
                     file: file.path.clone(),
                     line,
                     message: format!("`runtime` depends on forbidden module `{target_mod}` ({snippet})"),
-                    fix: "Keep `runtime` independent of `{agent, issue, cron}` by inverting orchestration or passing narrow inputs from callers.".to_owned(),
+                    fix:
+                        "Keep `runtime` independent of `{agent, issue, cron, orchestration}` by inverting orchestration or passing narrow inputs from callers."
+                            .to_owned(),
+                    see: ARCH_DOC,
+                    details: Vec::new(),
+                });
+            } else if CHANNEL_FORBIDDEN_DOMAINS.contains(&source_mod.as_str()) && target_mod == "channel" {
+                violations.push(ArchViolation {
+                    rule: ArchAuditRule::ServerDomainDag,
+                    file: file.path.clone(),
+                    line,
+                    message: format!("deep domain `{source_mod}` imports `channel` directly ({snippet})"),
+                    fix: "Keep deep domains (`issue`, `note`, `connector`, `voice`, `cron`) free of `channel` bridging; lift channel workflows into `orchestration/`.".to_owned(),
+                    see: ARCH_DOC,
+                    details: Vec::new(),
+                });
+            } else if !DAG_ROOT_MODULES.contains(&source_mod.as_str()) && source_mod != "orchestration" && target_mod == "orchestration" {
+                violations.push(ArchViolation {
+                    rule: ArchAuditRule::ServerDomainDag,
+                    file: file.path.clone(),
+                    line,
+                    message: format!("deep domain `{source_mod}` reverse-imports `orchestration` ({snippet})"),
+                    fix: "Keep `orchestration/` strictly above deep domains; pass narrow callbacks/data down instead of importing `crate::orchestration`."
+                        .to_owned(),
                     see: ARCH_DOC,
                     details: Vec::new(),
                 });
@@ -2200,13 +2344,13 @@ pub fn audit_server_architecture_with_config(repo_root: &Path, config: ArchAudit
     Ok(run_arch_audit_on_files(&files, &existing_legacy_dirs, config))
 }
 
-/// Runs all 15 deterministic architecture & full-stack concurrency rules and returns
+/// Runs all 16 deterministic architecture & full-stack concurrency rules and returns
 /// the full structured report (per-rule violation lists, counts, ratchet metrics, and lock inventory).
 pub fn audit_server_architecture_report(repo_root: &Path) -> Result<ArchAuditReport, String> {
     audit_server_architecture_with_config(repo_root, ArchAuditConfig::strict())
 }
 
-/// Strict architecture gate (all 15 rules using exported shrink-only ceilings).
+/// Strict architecture gate (all 16 rules using exported shrink-only ceilings).
 pub fn audit_server_architecture_strict(repo_root: &Path) -> Result<ArchAuditReport, String> {
     audit_server_architecture_with_config(repo_root, ArchAuditConfig::strict())
 }
@@ -2434,18 +2578,18 @@ mod tests {
         assert!(clean.violations.is_empty(), "expected 0 violations, got: {:?}", clean.violations);
 
         let two_cycle_dir = TempDir::new("vv-arch-r2-two");
-        two_cycle_dir.write("crates/server/src/issue/mod.rs", "pub struct Issue;\nuse crate::channel::Channel;\n");
-        two_cycle_dir.write("crates/server/src/channel/mod.rs", "pub struct Channel;\nuse crate::issue::Issue;\n");
+        two_cycle_dir.write("crates/server/src/foo/mod.rs", "pub struct Foo;\nuse crate::bar::Bar;\n");
+        two_cycle_dir.write("crates/server/src/bar/mod.rs", "pub struct Bar;\nuse crate::foo::Foo;\n");
 
         let two = audit_server_architecture_strict(&two_cycle_dir.0).unwrap();
         assert_eq!(two.violations.len(), 1);
         assert_eq!(two.violations[0].rule, ArchAuditRule::ServerDomainDag);
-        assert_eq!(two.violations[0].file, "crates/server/src/channel/mod.rs");
+        assert_eq!(two.violations[0].file, "crates/server/src/bar/mod.rs");
         assert_eq!(two.violations[0].line, 2);
-        assert!(two.violations[0].message.contains("channel -> issue -> channel"));
+        assert!(two.violations[0].message.contains("bar -> foo -> bar"));
         let formatted = format_violations(&two.violations);
-        assert!(formatted.contains("crates/server/src/channel/mod.rs:2"));
-        assert!(formatted.contains("crates/server/src/issue/mod.rs:2"));
+        assert!(formatted.contains("crates/server/src/bar/mod.rs:2"));
+        assert!(formatted.contains("crates/server/src/foo/mod.rs:2"));
 
         let three_cycle_dir = TempDir::new("vv-arch-r2-three");
         three_cycle_dir.write("crates/server/src/alpha/mod.rs", "use crate::beta::B;\n");
@@ -2457,6 +2601,34 @@ mod tests {
         assert_eq!(three.violations[0].rule, ArchAuditRule::ServerDomainDag);
         assert!(three.violations[0].message.contains("alpha -> beta -> gamma -> alpha"));
         assert_eq!(three.violations[0].details.len(), 3);
+    }
+
+    #[test]
+    fn rule2_enforces_orchestration_purified_domains_and_zero_context_port() {
+        let dir = TempDir::new("vv-arch-r2-orch");
+        dir.write("crates/server/src/context/port.rs", "pub trait LegacyPort {}\n");
+        dir.write(
+            "crates/server/src/issue/mod.rs",
+            "use crate::channel::Chat;\nuse crate::orchestration::IssueWorkflow;\n",
+        );
+        dir.write(
+            "crates/server/src/runtime/session/engine.rs",
+            "fn bad(ctx: &Ctx) { let _ = &ctx.service.issue; }\n",
+        );
+        dir.write(
+            "crates/server/src/orchestration/mod.rs",
+            "use crate::issue::Board;\nuse crate::channel::Chat;\n",
+        );
+
+        let report = audit_server_architecture_strict(&dir.0).unwrap();
+        let files_and_rules: Vec<String> = report.violations.iter().map(|v| format!("{}@{}", v.rule.as_str(), v.file)).collect();
+        assert!(files_and_rules.contains(&format!("{}@crates/server/src/context/port.rs", ArchAuditRule::NoLegacyServerLayout.as_str())));
+        assert!(files_and_rules.contains(&format!("{}@crates/server/src/issue/mod.rs", ArchAuditRule::ServerDomainDag.as_str())));
+        assert!(files_and_rules.contains(&format!(
+            "{}@crates/server/src/runtime/session/engine.rs",
+            ArchAuditRule::ServerDomainDag.as_str()
+        )));
+        assert!(!files_and_rules.iter().any(|s| s.contains("orchestration/mod.rs")));
     }
 
     #[test]
@@ -2887,7 +3059,7 @@ mod tests {
         );
         dir.write(
             "apps/mac/crates/workspace/src/store/sqlite.rs",
-            "pub fn bad() {\n    vibevalley_rt::block_on(async {});\n    std::thread::spawn(|| {});\n}\n",
+            "pub fn bad() {\n    vibevalley_kit::rt::block_on(async {});\n    std::thread::spawn(|| {});\n}\n",
         );
 
         let dirty = audit_server_architecture_with_config(&dir.0, zero_cfg).unwrap();
@@ -3158,5 +3330,65 @@ mod tests {
 
         let dirty = audit_server_architecture_strict(&dir.0).unwrap();
         assert_eq!(tags(&dirty.violations), vec!["thin-mod-rs@crates/server/src/issue/mod.rs:1"]);
+    }
+
+    #[test]
+    fn rule16_file_size_ratchet_enforces_crate_ceilings_and_exempts_data_tables_and_tests() {
+        let dir = TempDir::new("vv-arch-r16");
+        let make_lines = |n: usize| -> String { (0..n).map(|i| format!("pub fn f_{i}() -> usize {{ {i} }}\n")).collect() };
+
+        // At ceiling + large #[cfg(test)] block passes cleanly across all four guarded crate families.
+        let mut rich_at_ceiling = make_lines(RICH_FILE_NON_TEST_LINE_CEILING);
+        rich_at_ceiling.push_str("#[cfg(test)]\nmod tests {\n");
+        rich_at_ceiling.push_str(&make_lines(300));
+        rich_at_ceiling.push_str("}\n");
+        dir.write("crates/rich/src/whiteboard/state.rs", &rich_at_ceiling);
+        dir.write(
+            "crates/engines/pele/src/layout/layered/pipeline.rs",
+            &make_lines(ENGINES_FILE_NON_TEST_LINE_CEILING),
+        );
+        dir.write(
+            "apps/mac/crates/terminal/src/session/engine.rs",
+            &make_lines(TERMINAL_FILE_NON_TEST_LINE_CEILING),
+        );
+        dir.write(
+            "apps/mac/crates/diorama/src/world/domain_sync.rs",
+            &make_lines(DIORAMA_FILE_NON_TEST_LINE_CEILING),
+        );
+        // Generated lookup tables remain exempt even when larger than the code ceiling.
+        dir.write("crates/rich/src/engine/pinyin/table.rs", &make_lines(RICH_FILE_NON_TEST_LINE_CEILING + 500));
+        dir.write(
+            "crates/engines/onig/src/unicode/props_data.rs",
+            &make_lines(ENGINES_FILE_NON_TEST_LINE_CEILING + 500),
+        );
+
+        let clean = audit_server_architecture_strict(&dir.0).unwrap();
+        assert!(clean.violations.is_empty(), "expected 0 violations, got: {:?}", clean.violations);
+
+        // Exceeding each crate family ceiling by 1 line triggers `file-size-ratchet`.
+        dir.write("crates/rich/src/whiteboard/state.rs", &make_lines(RICH_FILE_NON_TEST_LINE_CEILING + 1));
+        dir.write(
+            "crates/engines/shiki/src/highlighter/engine.rs",
+            &make_lines(ENGINES_FILE_NON_TEST_LINE_CEILING + 1),
+        );
+        dir.write(
+            "apps/mac/crates/terminal/src/links/file.rs",
+            &make_lines(TERMINAL_FILE_NON_TEST_LINE_CEILING + 1),
+        );
+        dir.write(
+            "apps/mac/crates/diorama/src/metal/passes.rs",
+            &make_lines(DIORAMA_FILE_NON_TEST_LINE_CEILING + 1),
+        );
+
+        let dirty = audit_server_architecture_strict(&dir.0).unwrap();
+        assert_eq!(
+            tags(&dirty.violations),
+            vec![
+                "file-size-ratchet@apps/mac/crates/diorama/src/metal/passes.rs:1",
+                "file-size-ratchet@apps/mac/crates/terminal/src/links/file.rs:1",
+                "file-size-ratchet@crates/engines/shiki/src/highlighter/engine.rs:1",
+                "file-size-ratchet@crates/rich/src/whiteboard/state.rs:1",
+            ]
+        );
     }
 }

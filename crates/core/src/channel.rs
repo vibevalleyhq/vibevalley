@@ -55,8 +55,11 @@ pub(crate) fn with_channel(chat: &mut Option<Chat>, c: Channel) {
 
 /// `forUser`: whether a message is for the user to read.
 pub fn for_user(m: &ChatMessage, notify: Notify) -> bool {
-    let mentions_user = m.mentions.iter().any(|x| x == USER_ID || x == EVERYONE);
-    if m.from == USER_ID || notify == Notify::None {
+    let mentions_user = m
+        .mentions
+        .iter()
+        .any(|x| x == EVERYONE || ParticipantId::parse(x).is_some_and(|p| p.is_human()));
+    if m.actor.is_human() || notify == Notify::None {
         return false;
     }
     if notify == Notify::Mentions {

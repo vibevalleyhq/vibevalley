@@ -4,7 +4,7 @@
 
 ## 5.1 原生音频管线与程序化音效合成
 
-### 独占租约与单队列音频驱动（`apps/mac/src/audio.rs`）
+### 独占租约与单队列音频驱动（`apps/mac/src/audio/`）
 
 原生音频驱动（基于 macOS AVFoundation C 桥接 `vv_audio_*` / `vv_pcm_*` / `vv_capture_*`）由一条容量为 `64` 的 `audio-commands` 后台线程串行处理，并通过原子布尔锁 `CALL_RESERVED` 与 `CallAudio` RAII 租约实现独占互斥：
 
@@ -13,11 +13,11 @@
 - **语音朗读状态机（`apps/mac/src/speech_audio.rs`）**：围绕四态枚举 `Phase` 运转：`Idle` → `Playing` → `Draining` → `Stopping`，并通过 `Claim` 句柄绑定服务端 `SharedSpeechStreams` 的生命周期回收通知。
 - **实时双工通话（`apps/mac/src/live_voice.rs`）**：独立 `moss-live` 线程建立 WebSocket 语音流，维护四态 `Phase`（`Idle` / `Connecting` / `Live` / `Stopping`）、静音开关 `muted` 以及实时识别双轨字幕 `heard` / `said`。
 
-### 程序化音效合成器（`apps/mac/src/audio.rs` 与 `apps/mac/ui/infra/sound.ts`）
+### 程序化音效合成器（`apps/mac/src/audio/` 与 `apps/mac/ui/infra/sound.ts`）
 
 纸雕农场的界面动作与帮工提示音由原生合成器实时计算 PCM 波形并缓存标准 WAV 字节序列：
 
-- `apps/mac/src/audio.rs` 中的 `synth` 模块提供 `Pen` 音轨画笔（音调、白噪声与滤波原语）与 `compose()` 作曲配方，按 `32 kHz` 采样率渲染并缓存全部音效，通过 `play_sound()` 直接播放，无需磁盘 I/O。
+- `apps/mac/src/audio/synth.rs` 提供 `Pen` 音轨画笔（音调、白噪声与滤波原语）与 `compose()` 作曲配方，按 `32 kHz` 采样率渲染并缓存全部音效，通过 `play_sound()` 直接播放，无需磁盘 I/O。
 - `sound.ts` 经 `hostApi.playSound` 将具名音效请求交由原生音频驱动执行。
 
 ## 5.2 多模态媒体查看与素材库
@@ -62,12 +62,12 @@ Note 工作台页面实现于 `apps/mac/ui/features/note/`（`NotePage.tsx`、`B
 - 依托 `vibevalley_git::DiffLine::emphasis` 高亮行内精确字符改动片段；单文件头行 `Row::File` 支持按文件折叠与二进制文件提示。
 - 直接在原生端支持逐个 hunk 块执行 `stage` / `unstage` / `discard` 操作，变更完成后发出 `DiffChanged` 刷新侧栏 Git 状态。
 
-### 只读文件查看器（`apps/mac/src/viewer.rs`）
+### 只读文件查看器（`apps/mac/src/viewer/`）
 
 - 设定 `MAX_BYTES = 8 * 1024 * 1024`（8MB）硬阈值，超过阈值或二进制文件直接呈现体量提示而不拖垮 UI 线程。
 - 语法高亮与分行切分（`prepare()`）放于后台线程执行，通过 `clip_spans` 对字符边界做安全裁剪防止多字节 UTF-8 越界崩溃；支持跳转行定位（`scroll_to_line`）、图片预览、Markdown 触发宿主渲染预览及系统 `$EDITOR` 打开。
 
-### GPU 终端与可点击链接引擎（`apps/mac/src/terminal/` & `apps/mac/crates/terminal/src/links.rs`）
+### GPU 终端与可点击链接引擎（`apps/mac/src/terminal/` & `apps/mac/crates/terminal/src/links/`）
 
 - **逐列锁定排版（`terminal/element.rs`）**：窄字符按批量合并并强制每字步进 1 列宽；宽字符（CJK 与 Emoji）独立塑形并严格定位到 `col * cell_width`，彻底杜绝回退字体把同一行后续竖线和光标挤歪。
 - **行缓存与平滑滚动**：`RowCache` 以行 `Arc<Row>` 身份做增量缓存，单帧仅重塑真正变化的行；滚轮追踪像素余数 `scroll_remainder`，按 `line_height` 精确折算整行滚动步长；内边距固定 `PADDING = 6.0`。

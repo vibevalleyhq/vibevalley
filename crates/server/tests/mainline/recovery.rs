@@ -185,15 +185,12 @@ fn regression_replies_and_reports_across_process_exit() {
             .unwrap();
             assert_eq!(sub.status, SubmissionStatus::Done);
             assert_eq!(sub.result["runId"], run.id);
-            let run_id = run.id.clone();
-            assert!(
-                vibevalley_runtime::rt::block_on(store.read_async(|tx| {
-                    let run_id = run_id.clone();
-                    Box::pin(async move { tx.document_async("run", &run_id, "issue.report").await })
-                }),)
-                .unwrap()
-                .is_some()
-            );
+            let mut db = inspect_db(&Path::new(&home).join("server.db"));
+            let unsettled_reports: i64 = vibevalley_runtime::rt::block_on(
+                sqlx::query_scalar("SELECT COUNT(*) FROM outbox_item WHERE topic = 'work.session.reported' AND status != 'done'").fetch_one(&mut db),
+            )
+            .unwrap();
+            assert!(unsettled_reports > 0);
             if window == "posted" {
                 until(&server, "report posted before outbox acknowledgement", || {
                     (count_notes(&server, &thread, FOLLOW_UP) == 1).then_some(())
@@ -227,14 +224,20 @@ fn regression_replies_and_reports_across_process_exit() {
     execute_sql(
         &mut db,
         "DROP TRIGGER hold_report;
-                      CREATE TRIGGER hold_ack BEFORE DELETE ON durable_document WHEN OLD.doc_kind='issue.report' BEGIN SELECT RAISE(ABORT,'ack held'); END;",
+                      UPDATE outbox_item SET available_at = 0 WHERE status != 'done';
+                      CREATE TRIGGER hold_ack BEFORE UPDATE ON outbox_item WHEN NEW.topic='work.session.reported' AND NEW.status='done' BEGIN SELECT RAISE(ABORT,'ack held'); END;",
     );
     crash_scenario(home.path(), "posted", 84);
-    execute_sql(&mut db, "DROP TRIGGER hold_ack");
+    execute_sql(
+        &mut db,
+        "DROP TRIGGER hold_ack;
+         UPDATE outbox_item SET status = 'pending', available_at = 0 WHERE topic = 'work.session.reported' AND status != 'done';",
+    );
     crash_scenario(home.path(), "git", 83);
     execute_sql(
         &mut db,
-        "CREATE TRIGGER hold_recovery BEFORE INSERT ON durable_document WHEN NEW.doc_kind='workspace.reconciliation' BEGIN SELECT RAISE(ABORT,'recovery held'); END;",
+        "CREATE TRIGGER hold_recovery_ins BEFORE INSERT ON session_run WHEN NEW.needs_reconciliation=1 BEGIN SELECT RAISE(ABORT,'recovery held'); END;
+         CREATE TRIGGER hold_recovery_upd BEFORE UPDATE ON session_run WHEN NEW.needs_reconciliation=1 BEGIN SELECT RAISE(ABORT,'recovery held'); END;",
     );
     let failed = create_app_blocking(Config {
         probe_runtimes: false,
@@ -244,7 +247,7 @@ fn regression_replies_and_reports_across_process_exit() {
         ..Config::under(home.path())
     });
     assert!(failed.err().expect("interrupted recovery should fail").to_string().contains("recovery held"));
-    execute_sql(&mut db, "DROP TRIGGER hold_recovery");
+    execute_sql(&mut db, "DROP TRIGGER hold_recovery_ins; DROP TRIGGER hold_recovery_upd;");
     let (server, listener) = launch(home.path(), "verify");
     let (issue, thread) = issue_thread(&server);
     let url = listener.url();

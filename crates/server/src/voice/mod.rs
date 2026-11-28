@@ -1,14 +1,12 @@
-//! `voice`: MOSS Live voice calls and ASR dictation.
+//! `voice`: pure MOSS Live voice call state machine, WebSocket framing, key verification,
+//! and ASR dictation transcription.
 //!
-//! The server never touches audio: the host (the native app, in process)
-//! drives live calls and dictation via [`crate::context::api::LiveVoicePort`]
-//! and [`Voice::moss_line`]. What the model heard and said is kept in chat
-//! through [`Voice::heard_async`] / [`Voice::said_async`]; the orchestrator
-//! answers through the MOSS tool and pushes commentary through [`Voice::speak`].
-//! The only RPC endpoint is `voice.moss.verify`.
+//! Zero direct dependency on `channel/` or `agent/orchestrator`: cross-domain transcript
+//! persistence and orchestrator briefing live in [`crate::orchestration::voice`].
 
 pub mod moss;
 pub mod prompt;
 mod service;
 
-pub use service::{MossLine, Parts, Voice};
+pub(crate) use service::failed;
+pub use service::{MossAsrLine, MossLine, MossToolRequest, Parts, Voice};

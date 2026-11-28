@@ -185,11 +185,17 @@ test("TodoDetail defaults to preview-first Markdown, Compare, visual criteria ch
   await app.press("id:issue-edit-description-done");
   await fake.pumpUntil(app, () => app.count("id:issue-description-preview") === 1 && app.count("id:compare-card") === 1);
 
-  // Clicking Edit on criteria switches to isomorphic textarea and Done returns to visual checklist.
+  expect(app.count("id:todo-criterion-new-input")).toBe(1);
+  await app.type("id:todo-criterion-new-input", "Third criterion | Verified by unit tests");
+  await app.press("id:todo-criterion-add-row");
+  await fake.pumpUntil(app, () => app.count("id:todo-criterion") === 3);
+  expect(app.texts()).toContain("Third criterion");
+  expect(app.texts()).toContain("Verified by unit tests");
+
   await app.press("id:issue-edit-criteria");
   await fake.pumpUntil(app, () => app.count("id:issue-criteria-input") === 1);
   await app.press("id:issue-edit-criteria-done");
-  await fake.pumpUntil(app, () => app.count("id:issue-criteria-preview") === 1 && app.count("id:todo-criterion") === 2);
+  await fake.pumpUntil(app, () => app.count("id:issue-criteria-preview") === 1 && app.count("id:todo-criterion") === 3);
 
   // Inspector TagEditor collapses 8 preset tags behind click-to-edit toggle in resting state (#143).
   expect(app.count("id:issue-tag-toggle")).toBe(1);

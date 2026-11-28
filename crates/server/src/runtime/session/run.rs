@@ -121,9 +121,4 @@ impl SessionEngine {
         self.record_async(session, Step::RunEnded { run: id, outcome }).await;
         Ok(())
     }
-
-    /// The issue's runs, oldest first.
-    pub async fn runs_async(&self, issue: &str) -> Result<Vec<Run>> {
-        Ok(self.0.ctx.service.session.runs(issue).await?)
-    }
 }

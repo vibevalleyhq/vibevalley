@@ -1,8 +1,17 @@
-import { Clipboard, Image, keymap, signal, Text, untracked, Video, View } from "nsh";
+import { Clipboard, Image, keymap, signal, Text, untracked, View } from "nsh";
 import { Input } from "nsh/base";
 
 import { list, t } from "@vibevalley/i18n";
-import { type Attachment, type Channel, type ChatMessage, type Embed, NOTE_TYPES, type NoteType, userId } from "@vibevalley/protocol";
+import {
+  type Attachment,
+  type Channel,
+  type ChatMessage,
+  type Embed,
+  isHumanParticipant,
+  localUserParticipant,
+  NOTE_TYPES,
+  type NoteType,
+} from "@vibevalley/protocol";
 import { channelOf } from "@vibevalley/protocol/rules";
 
 import { Button } from "../../../design/Button";
@@ -39,7 +48,7 @@ import { workbenchClock, type LinkedMessage, channelLabel, linkedMessages, messa
 import { buildPromotedIssueDraft, buildPromotedNoteContent, buildPromotedNoteDraft } from "../model/promote";
 import { quickReactions, reactionOn, EmojiPopover } from "./EmojiPicker";
 
-const nameOf = (m: ChatMessage) => (m.from === userId ? t("web.channel.messages.user") : m.name);
+const nameOf = (m: ChatMessage) => (isHumanParticipant(m.from) ? t("web.channel.messages.user") : m.name);
 
 const bad = (reason: string) => toast(reason, "bad");
 
@@ -237,15 +246,25 @@ function AttachmentPart(props: { file: Attachment; onKnown: (path: string) => vo
                 </If>
               }
             >
-              <Video
+              <View
+                role="button"
                 testID={`attachment-${props.file.name}`}
                 accessibilityLabel={props.file.name}
-                src={fileUrl(f().path)}
-                controls
-                paused
-                class="rounded-md border border-line bg-ink"
-                style={{ width: 384, height: 216 }}
-              />
+                onPress={open}
+                class="w-full max-w-sm flex-row items-center gap-3 rounded-lg border border-line bg-side px-3.5 py-3 hover:border-line-strong hover:bg-hover"
+              >
+                <View class="size-10 shrink-0 items-center justify-center rounded-md border border-line bg-page">
+                  <Icon name="video" size={18} tone="muted" />
+                </View>
+                <View class="min-w-0 flex-1 gap-0.5">
+                  <Text class="truncate text-sm font-medium text-ink">{props.file.name}</Text>
+                  <Text class="truncate text-xs text-muted tabular-nums">{`${t("web.library.kind.video")} · ${sizeText(props.file.size)}`}</Text>
+                </View>
+                <View class="shrink-0 flex-row items-center gap-1 rounded-md border border-line bg-page px-2 py-1">
+                  <Icon name="open" size={12} tone="muted" />
+                  <Text class="whitespace-nowrap text-xs font-medium text-ink">{t("web.library.content.inspector.openExternal")}</Text>
+                </View>
+              </View>
             </If>
           }
         >
@@ -300,7 +319,7 @@ export function Reactions(props: { m: ChatMessage; names: (id: string) => string
     <View class="mt-1 mb-1 flex-row flex-wrap gap-1">
       <Each of={props.m.reactions} key={(r) => r.emoji}>
         {(r) => {
-          const mine = () => r().by.includes(userId);
+          const mine = () => r().by.includes(localUserParticipant);
           return (
             <View
               role="button"
@@ -478,7 +497,7 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
     menu.set("closed");
     router.navigate("/issues/new");
   };
-  const editable = () => props.m.from === userId && props.m.kind === "chat";
+  const editable = () => isHumanParticipant(props.m.from) && props.m.kind === "chat";
   const open = () => props.shown || menu() !== "closed";
   return (
     <If when={open()}>

@@ -117,7 +117,7 @@ impl AppletHost {
             let _ = std::fs::remove_file(&sock_path);
         }
 
-        let rt = vibevalley_rt::current_or_global_handle();
+        let rt = vibevalley_kit::rt::current_or_global_handle();
         let listener = {
             let _guard = rt.enter();
             match UnixListener::bind(&sock_path) {
@@ -345,7 +345,7 @@ fn handle_shim_message(inner: &Rc<HostInner>, conn_id: u64, msg: ShimToHost, cx:
                 });
                 return;
             };
-            let rt = vibevalley_rt::current_or_global_handle();
+            let rt = vibevalley_kit::rt::current_or_global_handle();
             let (tx, rx) = tokio::sync::oneshot::channel();
             let server_bg = server.clone();
             let note_id_bg = note_id.clone();
@@ -871,7 +871,7 @@ mod tests {
     fn unix_socket_ndjson_roundtrip_and_invalid_json_reports_error() {
         let dir = tempfile::tempdir().unwrap();
         let sock = dir.path().join("applet.sock");
-        vibevalley_rt::block_on(async move {
+        vibevalley_kit::rt::block_on(async move {
             let listener = UnixListener::bind(&sock).unwrap();
             let cancel = CancellationToken::new();
             let (cmd_tx, mut cmd_rx) = mpsc::unbounded_channel();

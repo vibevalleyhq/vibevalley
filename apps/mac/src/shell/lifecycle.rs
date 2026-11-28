@@ -89,7 +89,7 @@ impl Shell {
             let running = crate::serving::RunningServer::take_for_shutdown(cx);
             let store = this.workspace.store.take();
             async move {
-                let _ = vibevalley_rt::current_or_global_handle()
+                let _ = vibevalley_kit::rt::current_or_global_handle()
                     .spawn(async move {
                         if let Some(store) = store {
                             for job in jobs {
@@ -431,7 +431,7 @@ impl Drop for Shell {
         let jobs = self.workspace.ws.save_jobs();
         let mut ws = std::mem::take(&mut self.workspace.ws);
         let store = self.workspace.store.take();
-        vibevalley_rt::current_or_global_handle().spawn(async move {
+        vibevalley_kit::rt::current_or_global_handle().spawn(async move {
             if let Some(store) = store {
                 for job in jobs {
                     let _ = job.run(&*store).await;

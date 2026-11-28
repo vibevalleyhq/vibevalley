@@ -233,7 +233,7 @@ fn the_orchestrator_hears_the_user_and_records_an_issue() {
         .find(|e| e["type"] == "user/message")
         .unwrap_or_else(|| panic!("{page}"));
     let said = page["events"].as_array().unwrap().iter().find(|e| e["type"] != "user/message").unwrap();
-    let marked = user("orchestrator.eval.create", json!({ "on": asked["seq"], "want": " 应该先看一眼地里 " }));
+    let marked = user("session.eval.create", json!({ "on": asked["seq"], "want": " 应该先看一眼地里 " }));
     let file = std::path::PathBuf::from(marked["file"].as_str().unwrap());
     assert_eq!(file, dir.path().join("evals").join(format!("{}.json", marked["id"].as_str().unwrap())));
     let case: Value = serde_json::from_str(&std::fs::read_to_string(&file).unwrap()).unwrap();
@@ -242,7 +242,7 @@ fn the_orchestrator_hears_the_user_and_records_an_issue() {
     assert!(case["tools"].as_array().unwrap().iter().any(|t| t == "issue_create"), "{case}");
     assert_eq!(case["did"].as_array().unwrap().last().unwrap()["content"], "记下了 #1，在备选里。", "{case}");
     assert_eq!(case["before"], json!([]), "the first turn has nothing before it");
-    let refusal = |p: Value| hub.call_as(Caller::User, "orchestrator.eval.create", p).biz_code;
+    let refusal = |p: Value| hub.call_as(Caller::User, "session.eval.create", p).biz_code;
     assert_eq!(
         refusal(json!({ "on": 9999, "want": "x" })),
         vibevalley_protocol::BizCode::SessionNotFound.code()
@@ -260,7 +260,7 @@ fn the_orchestrator_hears_the_user_and_records_an_issue() {
         json!({ "name": "早会", "text": "看看昨天的活", "when": { "kind": "once", "at": at } }),
     );
     clock.advance(Duration::from_millis(150));
-    vibevalley_runtime::rt::block_on(started.test_internals().cron.tick_async());
+    vibevalley_runtime::rt::block_on(started.test_internals().orchestration.cron.tick_async());
     model.wait_seen("the cron's turn", |seen| {
         seen.iter()
             .any(|r| r.messages.last().and_then(|m| m.content.clone()).is_some_and(|c| c.contains("[来源：定时]")))
@@ -294,7 +294,7 @@ fn ask_to_create_issue(started: &vibevalley_server::App) -> String {
 }
 
 fn pending_approvals(router: &vibevalley_server::Router) -> Value {
-    let reply = router.call_as(Caller::User, "orchestrator.approval.list", json!({}));
+    let reply = router.call_as(Caller::User, "session.approval.list", json!({}));
     assert_eq!(reply.biz_code, 0);
     reply.data.unwrap()
 }
@@ -314,14 +314,14 @@ fn durable_approval_survives_restart_and_one_competing_decision_wins() {
 
     let reopened = vibevalley_server::create_app_blocking(cfg).unwrap();
     assert_eq!(pending_approvals(reopened.router()), json!([card]));
-    let resolve = |p| reopened.router().call_as(Caller::User, "orchestrator.approval.resolve", p);
+    let resolve = |p| reopened.router().call_as(Caller::User, "session.approval.resolve", p);
     let approved = json!({
-        "conversationId":card["conversationId"],"taskId":card["taskId"],"toolCallId":card["toolCallId"],"approved":true
+        "id":card["id"],"taskId":card["taskId"],"toolCallId":card["toolCallId"],"approved":true
     });
     let mut foreign = approved.clone();
-    foreign["conversationId"] = json!("wrong");
+    foreign["id"] = json!("wrong");
     assert_ne!(resolve(foreign).biz_code, 0);
-    let denied_as_helper = reopened.router().call_as(Caller::Session, "orchestrator.approval.resolve", approved.clone());
+    let denied_as_helper = reopened.router().call_as(Caller::Session, "session.approval.resolve", approved.clone());
     assert_ne!(denied_as_helper.biz_code, 0);
     assert_eq!(pending_approvals(reopened.router()), json!([card]));
 
@@ -561,7 +561,7 @@ fn regression_the_orchestrator_uses_one_mcp_connection_across_generation_phases(
 
 #[test]
 fn regression_a_stale_approval_cannot_grant_the_next_call_over_http() {
-    use vibevalley_protocol::{Envelope, InboxFrom, InboxKind, InboxSlice, InboxTarget, Issue, OrchestratorApproval, SliceKind};
+    use vibevalley_protocol::{Envelope, InboxFrom, InboxKind, InboxSlice, InboxTarget, Issue, SessionApproval, SliceKind};
 
     let home = tempfile::tempdir().unwrap();
     let (model, cfg) = approval_fixture(home.path());
@@ -579,8 +579,8 @@ fn regression_a_stale_approval_cannot_grant_the_next_call_over_http() {
         let client = reqwest::blocking::Client::builder().no_proxy().build().unwrap();
         client.post(url).json(&input).send().unwrap().json().unwrap()
     };
-    let list = |filter| -> Vec<OrchestratorApproval> {
-        let reply = request("orchestrator/approval/list", filter);
+    let list = |filter| -> Vec<SessionApproval> {
+        let reply = request("session/approval/list", filter);
         assert_eq!(reply.biz_code, 0);
         serde_json::from_value(reply.data.unwrap()).unwrap()
     };
@@ -593,29 +593,30 @@ fn regression_a_stale_approval_cannot_grant_the_next_call_over_http() {
     });
     assert_eq!(first.tool_call_id, "approval-1");
     assert_eq!(serde_json::from_str::<Value>(&first.arguments_json).unwrap(), json!({"title":"Approved work"}));
-    assert!(list(json!({"conversationId":"another-assistant"})).is_empty());
+    assert!(list(json!({"id":"another-assistant"})).is_empty());
     // Durable permission_park alerts are ignored by RuntimeInboxObserver; budget_reached alerts project into InboxSlice.
     assert!(
         inbox_slice(&started).items.iter().all(|i| !matches!(i.from, InboxFrom::Runtime(_))),
         "permission_park must not appear in InboxSlice"
     );
-    let decision = |approval: &OrchestratorApproval, approved: bool| json!({"conversationId":approval.conversation_id,"taskId":approval.task_id,"toolCallId":approval.tool_call_id,"approved":approved});
+    let decision =
+        |approval: &SessionApproval, approved: bool| json!({"id":approval.id,"taskId":approval.task_id,"toolCallId":approval.tool_call_id,"approved":approved});
     let mut ambiguous = decision(&first, true);
     ambiguous.as_object_mut().unwrap().remove("toolCallId");
-    assert_ne!(request("orchestrator/approval/resolve", ambiguous).biz_code, 0);
-    assert_eq!(request("orchestrator/approval/resolve", decision(&first, true)).biz_code, 0);
+    assert_ne!(request("session/approval/resolve", ambiguous).biz_code, 0);
+    assert_eq!(request("session/approval/resolve", decision(&first, true)).biz_code, 0);
 
-    let filter = json!({"conversationId":first.conversation_id});
+    let filter = json!({"id":first.id});
     let second = crate::support::wait_until_settled(Some(started.ctx()), Duration::from_secs(30), "second approval", || {
         list(filter.clone()).into_iter().find(|item| item.tool_call_id == "approval-2")
     });
     assert_eq!(second.task_id, first.task_id);
-    assert_eq!(request("orchestrator/approval/resolve", decision(&first, true)).biz_code, 0);
+    assert_eq!(request("session/approval/resolve", decision(&first, true)).biz_code, 0);
     assert_eq!(list(filter).into_iter().next().unwrap().tool_call_id, second.tool_call_id);
-    assert_eq!(request("orchestrator/approval/resolve", decision(&second, false)).biz_code, 0);
+    assert_eq!(request("session/approval/resolve", decision(&second, false)).biz_code, 0);
 
     // Emit a durable pi.inbox budget_reached alert and verify it lands immediately in InboxSlice & slice_snapshot.
-    let conv = first.conversation_id.clone();
+    let conv = first.id.clone();
     let task_id = first.task_id.clone();
     vibevalley_runtime::rt::block_on(started.test_internals().agent.orchestrator.execution.store().write_async(|tx| {
         let conv = conv.clone();
@@ -649,7 +650,7 @@ fn regression_a_stale_approval_cannot_grant_the_next_call_over_http() {
         runtime_alert.target,
         InboxTarget::Runtime(vibevalley_protocol::InboxTargetRuntime {
             task_id: first.task_id.clone(),
-            session_id: Some(first.conversation_id.clone()),
+            session_id: Some(first.id.clone()),
         })
     );
     assert_eq!(runtime_alert.text, "Budget cap hit");

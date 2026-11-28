@@ -3,8 +3,8 @@
 //! and what goes out, both cancelled and awaited before the account is replaced.
 
 use std::future::Future;
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 
 use backon::{BackoffBuilder, ExponentialBackoff, ExponentialBuilder};
@@ -15,26 +15,14 @@ use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 use tracing::Instrument as _;
 use vibevalley_core::SliceMask;
-use vibevalley_core::channel::for_user;
 use vibevalley_i18n::t;
-use vibevalley_protocol::{
-    ApiError, ChatMessage, ConnectorID, ConnectorLogin, ConnectorState, ConnectorStatus, Issue, IssueStageKind, SessionPermissionDecision,
-    SessionRespondPermissionInput, StuckReason,
-};
+use vibevalley_protocol::{ApiError, ConnectorID, ConnectorLogin, ConnectorState, ConnectorStatus};
 
-use super::adapter::{App, AppFailed, FailedKind, Inbound, LoginIo, Progress, Receiving};
-use super::digest::{
-    DIGEST_OVER, DigestEntry, IssueReplyAction, PermissionReplyAction, PushTarget, ReplyParseError, is_pairing, issue_target_label, parse_digest_entry,
-    parse_issue_reply, parse_permission_reply, parse_push_issue_message_id, parse_push_message_id, parse_push_perm_message_id, short_id, split_text, user_line,
-};
-use super::render::{adapt_notification, render_digest};
-use crate::channel::{Chat, Saying};
-use crate::context::port::ConnectorIssuePort;
-use crate::context::text::clip_plain;
+use super::adapter::{App, AppFailed, ConnectorHost, FailedKind, Inbound, InboundDispatch, LoginIo, Progress, Receiving};
+use super::render::{DIGEST_OVER, DigestEntry, adapt_notification, is_pairing, parse_digest_entry, render_digest, short_id, split_text};
 use crate::context::{Context, now};
-use crate::runtime::Runtime;
+use crate::service::DbError;
 use crate::service::connector::{ConnectorAccountRow, ConnectorInboundRow, ConnectorOutgoingRow};
-use crate::service::{DbError, internal_db};
 use crate::setting::{Secret, Setting};
 
 /// WeChat's official client rests this long too.
@@ -95,9 +83,7 @@ fn inbound_from_row(r: ConnectorInboundRow) -> Inbound {
 pub struct Env {
     pub ctx: Arc<Context>,
     pub setting: Arc<Setting>,
-    pub chat: Arc<Chat>,
-    pub issue: OnceLock<Arc<dyn ConnectorIssuePort>>,
-    pub runtime: OnceLock<Arc<Runtime>>,
+    pub host: Arc<dyn ConnectorHost>,
     /// What is held is tried again after this long, then twice as long after each try that fails, up to `retry_most`.
     pub retry_first: Duration,
     pub retry_most: Duration,
@@ -133,67 +119,6 @@ impl From<ApiError> for Held {
     fn from(e: ApiError) -> Held {
         Held(e.message)
     }
-}
-
-/// Whether the user still has to hear a farm message off the farm.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Handoff {
-    Unseen,
-    /// Read in the farm, answered since, or gone.
-    Settled,
-}
-
-pub async fn handoff_async(chat: &Chat, message: &str) -> Result<Handoff, ApiError> {
-    let Some((m, read_at, superseded)) = chat.user_receipt_async(message).await? else {
-        return Ok(Handoff::Settled);
-    };
-    if superseded || read_at.is_some() || !for_user(&m, chat.notify_of(&m.channel)) {
-        return Ok(Handoff::Settled);
-    }
-    Ok(Handoff::Unseen)
-}
-
-fn issue_matches_category(issue: &Issue, category: &str) -> bool {
-    if issue.status.is_closed() {
-        return false;
-    }
-    match category {
-        "asking" => issue.stage.state == IssueStageKind::Asking,
-        "reviewing" => issue.stage.state == IssueStageKind::Reviewing,
-        "conflict" => issue.stage.state == IssueStageKind::Stuck && issue.stage.stuck == Some(StuckReason::Conflict),
-        "interrupted" => issue.stage.state == IssueStageKind::Stuck && issue.stage.stuck == Some(StuckReason::Interrupted),
-        "failed" => issue.stage.state == IssueStageKind::Stuck && issue.stage.stuck == Some(StuckReason::Failed),
-        _ => true,
-    }
-}
-
-async fn outgoing_handoff_async(ctx: &Context, chat: &Chat, runtime: Option<&Runtime>, message: &str) -> Result<Handoff, ApiError> {
-    if message.starts_with("digest:") {
-        return Ok(Handoff::Unseen);
-    }
-    if let Some((issue_id, category)) = parse_push_issue_message_id(message) {
-        let Some(raw_issue) = ctx.service.issue.get(issue_id).await.map_err(internal_db)? else {
-            return Ok(Handoff::Settled);
-        };
-        let sessions = ctx.service.session.all().await.map_err(internal_db)?;
-        let derived = vibevalley_core::derive_issues(&[raw_issue], &sessions);
-        let Some(issue) = derived.into_iter().next() else {
-            return Ok(Handoff::Settled);
-        };
-        return Ok(if issue_matches_category(&issue, category) {
-            Handoff::Unseen
-        } else {
-            Handoff::Settled
-        });
-    }
-    if let Some((session_id, request_id)) = parse_push_perm_message_id(message) {
-        let still_pending = runtime.is_some_and(|rt| rt.has_pending_permission(session_id, request_id));
-        return Ok(if still_pending { Handoff::Unseen } else { Handoff::Settled });
-    }
-    if message.starts_with("push:") {
-        return Ok(Handoff::Unseen);
-    }
-    handoff_async(chat, message).await
 }
 
 struct SigningIn {
@@ -318,12 +243,7 @@ impl Bridge {
             error,
         };
         if let Some(a) = &account {
-            let channels = self.env.chat.channels();
-            let bound = channels.iter().find(|c| match &a.channel {
-                Some(id) => &c.id == id,
-                None => c.default,
-            });
-            status.channel = bound.map(|c| c.name.clone()).filter(|n| !n.is_empty());
+            status.channel = self.env.host.channel_name(a.channel.as_deref()).filter(|n| !n.is_empty());
         }
         if let Some(p) = progress {
             status.state = p.state;
@@ -463,23 +383,13 @@ impl Bridge {
         self.tell_async().await;
     }
 
-    /// A farm message for the user: kept to go out when it was said in the account's channel.
-    pub async fn offer_async(self: &Arc<Self>, m: &ChatMessage) {
-        let Some(a) = self.snapshot().filter(|a| !a.user.is_empty()) else { return };
-        let location = match self.env.chat.message_location_async(&m.id).await {
-            Ok(Some(loc)) => loc,
-            Ok(None) => return,
-            Err(e) => {
-                self.set_err_async(e.message).await;
-                return;
-            }
-        };
-        let (place, top) = location;
-        if top != a.channel.clone().unwrap_or_else(|| self.env.chat.default_channel()) {
+    /// Queues a pre-formatted channel message to go out to the paired peer.
+    pub async fn offer_text_async(self: &Arc<Self>, message_id: &str, text: &str) {
+        if self.snapshot().filter(|a| !a.user.is_empty()).is_none() {
             return;
         }
-        let pieces = split_text(&user_line(m, &place), self.app.max_chars());
-        match self.env.ctx.service.connector.add_outgoing(self.id(), &m.id, &pieces, now()).await {
+        let pieces = split_text(text, self.app.max_chars());
+        match self.env.ctx.service.connector.add_outgoing(self.id(), message_id, &pieces, now()).await {
             Ok(()) if !pieces.is_empty() => self.changed_async().await,
             Ok(()) => {}
             Err(e) => self.set_err_async(e.to_string()).await,
@@ -499,23 +409,22 @@ impl Bridge {
         }
     }
 
-    /// Withdraws one specific pending push message by exact `message_id` so newer
-    /// push rounds for the same issue are never cancelled by a stale withdrawal.
+    /// Withdraws one specific pending push message by exact `message_id`.
     pub async fn withdraw_push_message_async(self: &Arc<Self>, message_id: &str) {
         if self.env.ctx.service.connector.withdraw(message_id).await.is_ok() {
             self.tell_async().await;
         }
     }
 
-    /// Withdraws any pending issue push rows when the issue has already been handled in the workbench.
-    pub async fn withdraw_issue_pushes_async(self: &Arc<Self>, issue_id: &str) {
+    /// Withdraws all pending outgoing rows whose `message_id` starts with `prefix`.
+    pub async fn withdraw_prefix_async(self: &Arc<Self>, prefix: &str) {
         let connectors = &self.env.ctx.service.connector;
         let Ok(listed) = connectors.pending_outgoing(self.id()).await else {
             return;
         };
         let mut withdrew = false;
         for row in listed {
-            if parse_push_issue_message_id(&row.message).is_some_and(|(iid, _)| iid == issue_id) && connectors.withdraw(&row.message).await.is_ok() {
+            if row.message.starts_with(prefix) && connectors.withdraw(&row.message).await.is_ok() {
                 withdrew = true;
             }
         }
@@ -524,34 +433,9 @@ impl Bridge {
         }
     }
 
-    /// Withdraws a pending permission push row when resolved in the workbench or mobile app.
-    pub async fn withdraw_perm_push_async(self: &Arc<Self>, session_id: &str, request_id: &str) {
-        let msg_id = format!("push:perm:{session_id}:{request_id}");
-        if self.env.ctx.service.connector.withdraw(&msg_id).await.is_ok() {
-            self.tell_async().await;
-        }
-    }
-
-    /// Withdraws all pending permission push rows for `session_id` when its turn ends or closes.
-    pub async fn withdraw_session_perm_pushes_async(self: &Arc<Self>, session_id: &str) {
-        let connectors = &self.env.ctx.service.connector;
-        let Ok(listed) = connectors.pending_outgoing(self.id()).await else {
-            return;
-        };
-        let mut withdrew = false;
-        for row in listed {
-            if parse_push_perm_message_id(&row.message).is_some_and(|(sid, _)| sid == session_id) && connectors.withdraw(&row.message).await.is_ok() {
-                withdrew = true;
-            }
-        }
-        if withdrew {
-            self.tell_async().await;
-        }
-    }
-
-    /// Effective top-level channel id bound to this connector account.
-    pub fn status_channel_id(&self, chat: &Chat) -> String {
-        self.snapshot().and_then(|a| a.channel).unwrap_or_else(|| chat.default_channel())
+    /// Explicitly bound channel id (`None` means default channel).
+    pub fn bound_channel_id(&self) -> Option<String> {
+        self.snapshot().and_then(|a| a.channel)
     }
 
     /// Prepares pending outgoing batches asynchronously.
@@ -574,9 +458,9 @@ impl Bridge {
             if settled.iter().any(|s| s == &row.message) || unseen.iter().any(|s| s == &row.message) {
                 continue;
             }
-            match outgoing_handoff_async(&self.env.ctx, &self.env.chat, self.env.runtime.get().map(Arc::as_ref), &row.message).await {
-                Ok(Handoff::Unseen) => unseen.push(row.message.clone()),
-                Ok(Handoff::Settled) => {
+            match self.env.host.is_outgoing_unseen(&row.message).await {
+                Ok(true) => unseen.push(row.message.clone()),
+                Ok(false) => {
                     if let Err(e) = connectors.withdraw(&row.message).await {
                         self.set_err_async(e.to_string()).await;
                         return Err(());
@@ -697,170 +581,7 @@ impl Bridge {
         Ok(())
     }
 
-    fn issue_parse_error_receipt(err: ReplyParseError, target: &str) -> String {
-        let key = match err {
-            ReplyParseError::EmptyAnswer => "server.connector.reply.emptyAnswer",
-            ReplyParseError::ReviewUnrecognized => "server.connector.reply.reviewHint",
-            ReplyParseError::RejectNeedsReason => "server.connector.reply.rejectNeedsReason",
-            ReplyParseError::StuckUnrecognized => "server.connector.reply.stuckHint",
-            ReplyParseError::ConflictNeedsWorkbench => "server.connector.reply.conflictHint",
-            ReplyParseError::PermissionUnrecognized | ReplyParseError::UnsupportedCategory => {
-                return t("server.connector.reply.alreadyHandled", &[("target", target.into())]);
-            }
-        };
-        t(key, &[("target", target.into())])
-    }
-
-    async fn handle_issue_quote_reply_async(
-        self: &Arc<Self>,
-        m: &Inbound,
-        push_msg_id: &str,
-        issue_id: &str,
-        category: &str,
-        cancel: &CancellationToken,
-    ) -> Result<(), Held> {
-        let connectors = &self.env.ctx.service.connector;
-        let Some(issue_port) = self.env.issue.get() else {
-            return self
-                .send_reply_receipt_async(&m.id, &t("server.connector.reply.noActionPort", &[]), cancel)
-                .await;
-        };
-        let issue = match issue_port.get_issue_async(issue_id).await {
-            Ok(Some(issue)) => issue,
-            Ok(None) => {
-                let _ = connectors.withdraw(push_msg_id).await;
-                self.withdraw_issue_pushes_async(issue_id).await;
-                let target = short_id(issue_id);
-                return self
-                    .send_reply_receipt_async(&m.id, &t("server.connector.reply.alreadyHandled", &[("target", target.into())]), cancel)
-                    .await;
-            }
-            Err(e) => {
-                let target = short_id(issue_id);
-                let msg = t("server.connector.reply.actionFailed", &[("target", target.into()), ("why", e.message.into())]);
-                return self.send_reply_receipt_async(&m.id, &msg, cancel).await;
-            }
-        };
-        let target = issue_target_label(Some(issue.number), Some(&issue.title));
-        if !issue_matches_category(&issue, category) {
-            self.withdraw_push_message_async(push_msg_id).await;
-            return self
-                .send_reply_receipt_async(&m.id, &t("server.connector.reply.alreadyHandled", &[("target", target.into())]), cancel)
-                .await;
-        }
-        let action = match parse_issue_reply(category, &m.text) {
-            Ok(action) => action,
-            Err(err) => {
-                let receipt = Self::issue_parse_error_receipt(err, &target);
-                return self.send_reply_receipt_async(&m.id, &receipt, cancel).await;
-            }
-        };
-        let outcome = match &action {
-            IssueReplyAction::Answer { text } => issue_port
-                .answer_asking_async(&issue.id, text)
-                .await
-                .map(|_| t("server.connector.reply.answered", &[("target", target.clone().into())])),
-            IssueReplyAction::Accept => issue_port
-                .accept_review_async(&issue.id)
-                .await
-                .map(|_| t("server.connector.reply.accepted", &[("target", target.clone().into())])),
-            IssueReplyAction::Reject { reason } => issue_port.reject_review_async(&issue.id, reason).await.map(|_| {
-                t(
-                    "server.connector.reply.rejected",
-                    &[("target", target.clone().into()), ("reason", clip_plain(reason, 120).into())],
-                )
-            }),
-            IssueReplyAction::Retry { words } => issue_port
-                .retry_issue_async(&issue.id, words.as_deref())
-                .await
-                .map(|_| t("server.connector.reply.retried", &[("target", target.clone().into())])),
-        };
-        let receipt = match outcome {
-            Ok(ok_receipt) => {
-                self.withdraw_push_message_async(push_msg_id).await;
-                if matches!(action, IssueReplyAction::Accept) {
-                    self.withdraw_issue_pushes_async(&issue.id).await;
-                }
-                ok_receipt
-            }
-            Err(e) => t("server.connector.reply.actionFailed", &[("target", target.into()), ("why", e.message.into())]),
-        };
-        self.send_reply_receipt_async(&m.id, &receipt, cancel).await
-    }
-
-    async fn handle_perm_quote_reply_async(
-        self: &Arc<Self>,
-        m: &Inbound,
-        push_msg_id: &str,
-        session_id: &str,
-        request_id: &str,
-        cancel: &CancellationToken,
-    ) -> Result<(), Held> {
-        let connectors = &self.env.ctx.service.connector;
-        let Some(runtime) = self.env.runtime.get() else {
-            return self
-                .send_reply_receipt_async(&m.id, &t("server.connector.reply.noActionPort", &[]), cancel)
-                .await;
-        };
-        let session_label = runtime
-            .session_async(session_id)
-            .await
-            .map(|s| clip_plain(&s.name, 40))
-            .filter(|s| !s.is_empty())
-            .unwrap_or_else(|| short_id(session_id));
-        if !runtime.has_pending_permission(session_id, request_id) {
-            let _ = connectors.withdraw(push_msg_id).await;
-            return self
-                .send_reply_receipt_async(
-                    &m.id,
-                    &t("server.connector.reply.permAlreadyHandled", &[("session", session_label.into())]),
-                    cancel,
-                )
-                .await;
-        }
-        let action = match parse_permission_reply(&m.text) {
-            Ok(action) => action,
-            Err(_) => {
-                return self
-                    .send_reply_receipt_async(&m.id, &t("server.connector.reply.permHint", &[("session", session_label.into())]), cancel)
-                    .await;
-            }
-        };
-        let (decision, message, receipt_key) = match action {
-            PermissionReplyAction::AllowOnce => (SessionPermissionDecision::AllowOnce, None, "server.connector.reply.permAllowed"),
-            PermissionReplyAction::AllowAlways => (SessionPermissionDecision::AllowAlways, None, "server.connector.reply.permAllowedAlways"),
-            PermissionReplyAction::Deny { reason } => (SessionPermissionDecision::Deny, reason, "server.connector.reply.permDenied"),
-        };
-        let receipt = match runtime
-            .respond_permission_endpoint_async(SessionRespondPermissionInput {
-                id: session_id.to_owned(),
-                request_id: request_id.to_owned(),
-                decision,
-                message,
-            })
-            .await
-        {
-            Ok(()) => {
-                let _ = connectors.withdraw(push_msg_id).await;
-                self.tell_async().await;
-                t(receipt_key, &[("session", session_label.into())])
-            }
-            Err(e) => {
-                if !runtime.has_pending_permission(session_id, request_id) {
-                    let _ = connectors.withdraw(push_msg_id).await;
-                    t("server.connector.reply.permAlreadyHandled", &[("session", session_label.into())])
-                } else {
-                    t(
-                        "server.connector.reply.permFailed",
-                        &[("session", session_label.into()), ("why", e.message.into())],
-                    )
-                }
-            }
-        };
-        self.send_reply_receipt_async(&m.id, &receipt, cancel).await
-    }
-
-    /// One message of the app's: the pairing word, an actionable push quote-reply, or the user's words into the farm.
+    /// One message of the app's: the pairing word, or delegated to [`ConnectorHost::handle_inbound`].
     async fn got(self: &Arc<Self>, m: &Inbound, cancel: &CancellationToken) -> Result<Option<String>, Held> {
         enum Step {
             Ignore,
@@ -912,43 +633,32 @@ impl Bridge {
             }
             Step::Speak { key } => {
                 let quoted_message_id = self.quoted_message_id_async(&m.quoted).await?;
-                if let Some(ref push_msg_id) = quoted_message_id
-                    && let Some(target) = parse_push_message_id(push_msg_id)
-                {
-                    match target {
-                        PushTarget::Issue { issue_id, category } => {
-                            self.handle_issue_quote_reply_async(m, push_msg_id, issue_id, category, cancel).await?;
-                        }
-                        PushTarget::Permission { session_id, request_id } => {
-                            self.handle_perm_quote_reply_async(m, push_msg_id, session_id, request_id, cancel).await?;
-                        }
-                    }
-                    return Ok(None);
+                let bound_channel_id = self.snapshot().and_then(|a| a.channel);
+                let handled = self
+                    .env
+                    .host
+                    .handle_inbound(InboundDispatch {
+                        connector: self.id(),
+                        inbound_id: m.id.clone(),
+                        text: m.text.clone(),
+                        send_key: key,
+                        quoted_message_id,
+                        bound_channel_id,
+                    })
+                    .await?;
+                for msg_id in &handled.withdraw_messages {
+                    self.withdraw_push_message_async(msg_id).await;
                 }
-                let said = if key.is_empty() {
-                    None
-                } else {
-                    let channel = match quoted_message_id {
-                        Some(msg) => self.env.chat.message_location_async(&msg).await?.map(|(place, _)| place.id),
-                        None => None,
-                    }
-                    .or_else(|| self.snapshot().and_then(|a| a.channel));
-                    let (message, _) = self
-                        .env
-                        .chat
-                        .say_async(Saying {
-                            text: m.text.clone(),
-                            channel,
-                            send_key: key,
-                            source: Some("connector".into()),
-                            ..Saying::default()
-                        })
-                        .await?;
-                    Some(message.id)
-                };
+                for prefix in &handled.withdraw_prefixes {
+                    self.withdraw_prefix_async(prefix).await;
+                }
+                if let Some(reply) = handled.reply_text {
+                    self.send_reply_receipt_async(&m.id, &reply, cancel).await?;
+                    return Ok(handled.delivered_id);
+                }
                 // The user's words withdraw what they answer, before the fresh reply opens the app's delivery window.
                 self.drain(true, cancel).await;
-                Ok(said)
+                Ok(handled.delivered_id)
             }
         }
     }
@@ -1150,7 +860,10 @@ impl Bridge {
         let cancel = self.child_cancel();
         let (b, c) = (self.clone(), cancel.clone());
         let login = self.spawn_task(async move {
-            let (tell_tx, mut tell_rx) = tokio::sync::mpsc::unbounded_channel::<()>();
+            let (tell_tx, mut tell_rx) = vibevalley_kit::queue::bounded_stream::<()>(
+                std::num::NonZeroUsize::new(1).expect("non-zero"),
+                vibevalley_kit::queue::OverflowPolicy::DropNewest,
+            );
             let progress = |p: Progress| {
                 {
                     let mut shown = b.shown.lock();
@@ -1161,7 +874,7 @@ impl Bridge {
                     shown.signing_in = Some(SigningIn { progress: p, code });
                 }
                 b.progressed.notify_waiters();
-                let _ = tell_tx.send(());
+                let _ = tell_tx.try_send(());
             };
             let code = || b.shown.lock().signing_in.as_ref().map(|x| x.code.clone()).unwrap_or_default();
             let io = LoginIo {
@@ -1175,7 +888,7 @@ impl Bridge {
                     tokio::select! {
                         res = &mut login_fut => break res,
                         Some(()) = tell_rx.recv() => {
-                            while tell_rx.try_recv().is_ok() {}
+                            while tell_rx.try_recv().is_some() {}
                             b.tell_async().await;
                         }
                     }
@@ -1379,394 +1092,31 @@ mod tests {
     use parking_lot::Mutex;
     use tokio_util::sync::CancellationToken;
     use vibevalley_core::ManualClock;
-    use vibevalley_protocol::{ApiError, BizCode, ConnectorID, ConnectorLogin, Issue, IssueStage, IssueStageKind, IssueStatus, StuckReason};
+    use vibevalley_protocol::{ApiError, ConnectorID, ConnectorLogin};
 
     use super::*;
-    use crate::channel::Chat;
-    use crate::connector::adapter::{Adapter, AppFailed, Inbound, Linked, LoginIo, Receiving};
-    use crate::context::port::ConnectorIssuePort;
-    use crate::context::{BoxFuture, Http, LiveState, Outbox, PublicDownload, StateFeed, TaskGroup};
+    use crate::connector::adapter::{AppFailed, BoxFuture, ConnectorHost, InboundDispatch, InboundHandled, Linked, LoginIo, Receiving};
+    use crate::context::{Http, LiveState, Outbox, PublicDownload, StateFeed, TaskGroup};
     use crate::service::Service;
     use crate::setting::{Setting, SettingConfig};
-    use crate::storage::Storage;
 
-    struct FakeApp {
-        sent: Mutex<Vec<(String, String, String)>>,
-    }
+    struct AlwaysUnseenHost;
 
-    impl FakeApp {
-        fn new() -> Arc<Self> {
-            Arc::new(Self { sent: Mutex::new(Vec::new()) })
+    impl ConnectorHost for AlwaysUnseenHost {
+        fn channel_name(&self, _channel_id: Option<&str>) -> Option<String> {
+            Some("general".into())
         }
 
-        fn sent(&self) -> Vec<(String, String, String)> {
-            self.sent.lock().clone()
-        }
-    }
-
-    impl Adapter for FakeApp {
-        type Keys = serde_json::Value;
-        const ID: ConnectorID = ConnectorID::Weixin;
-        const MAX_CHARS: usize = 4000;
-
-        async fn login(&self, _: &ConnectorLogin, _: &LoginIo<'_>) -> Result<Linked<Self::Keys>, AppFailed> {
-            unreachable!()
+        fn is_outgoing_unseen<'a>(&'a self, _message_id: &'a str) -> BoxFuture<'a, Result<bool, ApiError>> {
+            Box::pin(async { Ok(true) })
         }
 
-        async fn receive(&self, _: &Self::Keys, _: &Receiving<'_>) -> AppFailed {
-            unreachable!()
+        fn handle_inbound<'a>(&'a self, _req: InboundDispatch) -> BoxFuture<'a, Result<InboundHandled, ApiError>> {
+            Box::pin(async { Ok(InboundHandled::default()) })
         }
-
-        async fn send(&self, _: &Self::Keys, to: &str, text: &str, reply: &str) -> Result<String, AppFailed> {
-            let mut sent = self.sent.lock();
-            let id = format!("ext-out-{}", sent.len() + 1);
-            sent.push((to.to_owned(), text.to_owned(), reply.to_owned()));
-            Ok(id)
-        }
-    }
-
-    #[derive(Default)]
-    struct FakeIssuePort {
-        issues: Mutex<std::collections::HashMap<String, Issue>>,
-        calls: Mutex<Vec<String>>,
-    }
-
-    impl FakeIssuePort {
-        fn insert(&self, issue: Issue) {
-            self.issues.lock().insert(issue.id.clone(), issue);
-        }
-
-        fn calls(&self) -> Vec<String> {
-            self.calls.lock().clone()
-        }
-    }
-
-    impl ConnectorIssuePort for FakeIssuePort {
-        fn get_issue_async<'a>(&'a self, id: &'a str) -> BoxFuture<'a, Result<Option<Issue>, ApiError>> {
-            Box::pin(async move { Ok(self.issues.lock().get(id).cloned()) })
-        }
-
-        fn answer_asking_async<'a>(&'a self, id: &'a str, text: &'a str) -> BoxFuture<'a, Result<Issue, ApiError>> {
-            Box::pin(async move {
-                self.calls.lock().push(format!("answer:{id}:{text}"));
-                let mut map = self.issues.lock();
-                let issue = map.get_mut(id).ok_or_else(|| ApiError::new(BizCode::IssueNotFound, "missing"))?;
-                if issue.stage.state != IssueStageKind::Asking {
-                    return Err(ApiError::new(BizCode::IssueRefused, "not asking"));
-                }
-                issue.stage.state = IssueStageKind::Working;
-                issue.questions.clear();
-                Ok(issue.clone())
-            })
-        }
-
-        fn accept_review_async<'a>(&'a self, id: &'a str) -> BoxFuture<'a, Result<Issue, ApiError>> {
-            Box::pin(async move {
-                self.calls.lock().push(format!("accept:{id}"));
-                let mut map = self.issues.lock();
-                let issue = map.get_mut(id).ok_or_else(|| ApiError::new(BizCode::IssueNotFound, "missing"))?;
-                if issue.stage.state != IssueStageKind::Reviewing {
-                    return Err(ApiError::new(BizCode::IssueRefused, "not reviewing"));
-                }
-                issue.status = IssueStatus::Done;
-                issue.stage.state = IssueStageKind::Done;
-                Ok(issue.clone())
-            })
-        }
-
-        fn reject_review_async<'a>(&'a self, id: &'a str, reason: &'a str) -> BoxFuture<'a, Result<Issue, ApiError>> {
-            Box::pin(async move {
-                self.calls.lock().push(format!("reject:{id}:{reason}"));
-                let mut map = self.issues.lock();
-                let issue = map.get_mut(id).ok_or_else(|| ApiError::new(BizCode::IssueNotFound, "missing"))?;
-                if issue.stage.state != IssueStageKind::Reviewing {
-                    return Err(ApiError::new(BizCode::IssueRefused, "not reviewing"));
-                }
-                issue.stage.state = IssueStageKind::Working;
-                Ok(issue.clone())
-            })
-        }
-
-        fn retry_issue_async<'a>(&'a self, id: &'a str, words: Option<&'a str>) -> BoxFuture<'a, Result<Issue, ApiError>> {
-            Box::pin(async move {
-                self.calls.lock().push(format!("retry:{id}:{}", words.unwrap_or("")));
-                let mut map = self.issues.lock();
-                let issue = map.get_mut(id).ok_or_else(|| ApiError::new(BizCode::IssueNotFound, "missing"))?;
-                let stuck_retryable =
-                    issue.stage.state == IssueStageKind::Stuck && matches!(issue.stage.stuck, Some(StuckReason::Failed | StuckReason::Interrupted));
-                if !stuck_retryable {
-                    return Err(ApiError::new(BizCode::IssueRefused, "not stuck"));
-                }
-                issue.stage.state = IssueStageKind::Working;
-                issue.stage.stuck = None;
-                Ok(issue.clone())
-            })
-        }
-    }
-
-    async fn setup_bridge(locale: &str) -> (tempfile::TempDir, Arc<Context>, Arc<FakeApp>, Arc<FakeIssuePort>, Arc<Bridge>) {
-        vibevalley_i18n::set_locale(locale);
-        let dir = tempfile::tempdir().unwrap();
-        let home = dir.path().join("home");
-        let work = dir.path().join("work");
-        tokio::fs::create_dir_all(&home).await.unwrap();
-        tokio::fs::create_dir_all(&work).await.unwrap();
-
-        let service = Service::open(&home).await.unwrap();
-        let clock = Arc::new(ManualClock::new(1_700_000_000_000));
-        let outbox = Arc::new(Outbox::new(service.clone()).with_clock(clock.clone()));
-        let ctx = Arc::new(Context::new(
-            service.clone(),
-            TaskGroup::new(),
-            Arc::new(LiveState::new()),
-            outbox,
-            Arc::new(StateFeed::new()),
-            clock.clone(),
-            Arc::new(Http),
-            Arc::new(PublicDownload),
-        ));
-        let setting = Setting::open_async(SettingConfig {
-            home: home.clone(),
-            work_root: work,
-            version: "0.1.0".into(),
-            deepseek_api_key: String::new(),
-            github_token: None,
-            storage_backend: None,
-        })
-        .await;
-        let storage = Storage::open_async(&home, ctx.clone()).await.unwrap();
-        let chat = Chat::open_async(ctx.clone(), storage, false).await.unwrap();
-        let issue_port = Arc::new(FakeIssuePort::default());
-        let env = Arc::new(Env {
-            ctx: ctx.clone(),
-            setting,
-            chat,
-            issue: OnceLock::from(issue_port.clone() as Arc<dyn ConnectorIssuePort>),
-            runtime: OnceLock::new(),
-            retry_first: Duration::from_millis(50),
-            retry_most: Duration::from_millis(200),
-            reconnect: Duration::from_millis(50),
-            moment: Duration::from_millis(50),
-            closing: AtomicBool::new(false),
-        });
-        let app = FakeApp::new();
-        let bridge = Bridge::new(app.clone(), env);
-
-        service
-            .connector
-            .connect(ConnectorID::Weixin, "{}", "wx-user-1", None, 1_000, "retired")
-            .await
-            .unwrap();
-        bridge.load_async().await;
-        (dir, ctx, app, issue_port, bridge)
-    }
-
-    async fn seed_sent_push(ctx: &Context, bridge: &Arc<Bridge>, msg_id: &str, body: &str, ext_id: &str) {
-        let conn = &ctx.service.connector;
-        conn.add_outgoing_once(ConnectorID::Weixin, msg_id, &[body.to_owned()], 2_000).await.unwrap();
-        let rows = conn.pending_outgoing(ConnectorID::Weixin).await.unwrap();
-        let seqs: Vec<i64> = rows.into_iter().filter(|r| r.message == msg_id).map(|r| r.seq).collect();
-        conn.sent(&seqs, 2_000, ext_id).await.unwrap();
-        bridge.tell_async().await;
     }
 
     static LOCALE_GUARD: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
-
-    #[tokio::test]
-    async fn quote_replies_execute_actions_enforce_idempotency_and_send_localized_receipts() {
-        let _locale = LOCALE_GUARD.lock().await;
-        let (_dir, ctx, app, issue_port, bridge) = setup_bridge("zh").await;
-        let cancel = CancellationToken::new();
-
-        // 1. Asking -> answer directly -> confirmation receipt; second quote-reply is idempotent & refused.
-        let mut ask_issue = Issue::new("iss-1", 10, "配置推送", 1_000);
-        ask_issue.status = IssueStatus::InReview;
-        ask_issue.stage = IssueStage {
-            state: IssueStageKind::Asking,
-            since: Some(2_000),
-            stuck: None,
-            lead: None,
-            acts: vec![],
-        };
-        issue_port.insert(ask_issue);
-        seed_sent_push(&ctx, &bridge, "push:issue:iss-1:asking:h1", "问题", "ext-ask-1").await;
-
-        // Empty answer is refused without executing action.
-        bridge
-            .got(
-                &Inbound {
-                    id: "in-ask-empty".into(),
-                    from: "wx-user-1".into(),
-                    text: "   ".into(),
-                    reply: "ctx-1".into(),
-                    quoted: "ext-ask-1".into(),
-                },
-                &cancel,
-            )
-            .await
-            .unwrap();
-        assert!(issue_port.calls().is_empty());
-        assert!(app.sent().last().unwrap().1.contains("【无法回复 · #10 配置推送】"));
-
-        // Valid answer executes and confirms.
-        bridge
-            .got(
-                &Inbound {
-                    id: "in-ask-ok".into(),
-                    from: "wx-user-1".into(),
-                    text: "开启安静时段".into(),
-                    reply: "ctx-2".into(),
-                    quoted: "ext-ask-1".into(),
-                },
-                &cancel,
-            )
-            .await
-            .unwrap();
-        assert_eq!(issue_port.calls(), vec!["answer:iss-1:开启安静时段".to_string()]);
-        assert!(app.sent().last().unwrap().1.contains("【已回复 · #10 配置推送】"));
-
-        // Re-quoting the same asking push after stage moved is idempotent (no second call + alreadyHandled receipt).
-        bridge
-            .got(
-                &Inbound {
-                    id: "in-ask-dup".into(),
-                    from: "wx-user-1".into(),
-                    text: "再答一次".into(),
-                    reply: "ctx-3".into(),
-                    quoted: "ext-ask-1".into(),
-                },
-                &cancel,
-            )
-            .await
-            .unwrap();
-        assert_eq!(issue_port.calls().len(), 1);
-        assert!(app.sent().last().unwrap().1.contains("【无需重复处理 · #10 配置推送】"));
-
-        // 2. Reviewing -> invalid command & missing reject reason -> reject -> accept.
-        let mut rev_issue = Issue::new("iss-2", 11, "验收测试", 1_000);
-        rev_issue.status = IssueStatus::InReview;
-        rev_issue.stage.state = IssueStageKind::Reviewing;
-        issue_port.insert(rev_issue.clone());
-        seed_sent_push(&ctx, &bridge, "push:issue:iss-2:reviewing:h2", "待验收", "ext-rev-1").await;
-
-        bridge
-            .got(
-                &Inbound {
-                    id: "in-rev-bad".into(),
-                    from: "wx-user-1".into(),
-                    text: "reject".into(),
-                    reply: "ctx-4".into(),
-                    quoted: "ext-rev-1".into(),
-                },
-                &cancel,
-            )
-            .await
-            .unwrap();
-        assert!(app.sent().last().unwrap().1.contains("【缺少打回原因 · #11 验收测试】"));
-
-        bridge
-            .got(
-                &Inbound {
-                    id: "in-rev-rej".into(),
-                    from: "wx-user-1".into(),
-                    text: "reject 补全边界用例".into(),
-                    reply: "ctx-5".into(),
-                    quoted: "ext-rev-1".into(),
-                },
-                &cancel,
-            )
-            .await
-            .unwrap();
-        assert_eq!(issue_port.calls().last().unwrap(), "reject:iss-2:补全边界用例");
-        assert!(app.sent().last().unwrap().1.contains("【已打回 · #11 验收测试】"));
-
-        // Move issue back to Reviewing for another round and accept in English locale.
-        vibevalley_i18n::set_locale("en");
-        rev_issue.stage.state = IssueStageKind::Reviewing;
-        issue_port.insert(rev_issue);
-        seed_sent_push(&ctx, &bridge, "push:issue:iss-2:reviewing:h3", "review", "ext-rev-2").await;
-
-        bridge
-            .got(
-                &Inbound {
-                    id: "in-rev-acc".into(),
-                    from: "wx-user-1".into(),
-                    text: "ok".into(),
-                    reply: "ctx-6".into(),
-                    quoted: "ext-rev-2".into(),
-                },
-                &cancel,
-            )
-            .await
-            .unwrap();
-        assert_eq!(issue_port.calls().last().unwrap(), "accept:iss-2");
-        assert!(app.sent().last().unwrap().1.contains("[Completed · #11 验收测试]"));
-
-        // 3. Interrupted / Failed -> retry/resume + pending outbox withdrawal when expired.
-        let mut stuck_issue = Issue::new("iss-3", 12, "中断恢复", 1_000);
-        stuck_issue.status = IssueStatus::InReview;
-        stuck_issue.stage.state = IssueStageKind::Stuck;
-        stuck_issue.stage.stuck = Some(StuckReason::Interrupted);
-        issue_port.insert(stuck_issue);
-        seed_sent_push(&ctx, &bridge, "push:issue:iss-3:interrupted:h4", "interrupted", "ext-int-1").await;
-
-        bridge
-            .got(
-                &Inbound {
-                    id: "in-int-bad".into(),
-                    from: "wx-user-1".into(),
-                    text: "accept".into(),
-                    reply: "ctx-7".into(),
-                    quoted: "ext-int-1".into(),
-                },
-                &cancel,
-            )
-            .await
-            .unwrap();
-        assert!(app.sent().last().unwrap().1.contains("[Invalid Command · #12 中断恢复]"));
-
-        bridge
-            .got(
-                &Inbound {
-                    id: "in-int-ok".into(),
-                    from: "wx-user-1".into(),
-                    text: "resume".into(),
-                    reply: "ctx-8".into(),
-                    quoted: "ext-int-1".into(),
-                },
-                &cancel,
-            )
-            .await
-            .unwrap();
-        assert_eq!(issue_port.calls().last().unwrap(), "retry:iss-3:");
-        assert!(app.sent().last().unwrap().1.contains("[Retried · #12 中断恢复]"));
-
-        // Pending expired outbox row is withdrawn cleanly when a stale quote-reply arrives.
-        ctx.service
-            .connector
-            .add_outgoing_once(ConnectorID::Weixin, "push:issue:iss-3:interrupted:h5", &["pending".into()], 3_000)
-            .await
-            .unwrap();
-        assert_eq!(ctx.service.connector.count_pending(ConnectorID::Weixin).await.unwrap(), 1);
-        bridge
-            .got(
-                &Inbound {
-                    id: "in-int-stale".into(),
-                    from: "wx-user-1".into(),
-                    text: "retry".into(),
-                    reply: "ctx-9".into(),
-                    quoted: "ext-int-1".into(),
-                },
-                &cancel,
-            )
-            .await
-            .unwrap();
-        assert_eq!(ctx.service.connector.count_pending(ConnectorID::Weixin).await.unwrap(), 0);
-        assert!(app.sent().last().unwrap().1.contains("[Already Handled · #12 中断恢复]"));
-
-        let _ = ctx.shutdown(Duration::from_secs(1)).await;
-        ctx.service.close().await;
-    }
 
     #[tokio::test]
     async fn late_drain_routes_nineteen_review_notifications_through_channel_renderer() {
@@ -1841,14 +1191,10 @@ mod tests {
                 storage_backend: None,
             })
             .await;
-            let storage = Storage::open_async(&home, ctx.clone()).await.unwrap();
-            let chat = Chat::open_async(ctx.clone(), storage, false).await.unwrap();
             let env = Arc::new(Env {
                 ctx: ctx.clone(),
                 setting,
-                chat,
-                issue: OnceLock::new(),
-                runtime: OnceLock::new(),
+                host: Arc::new(AlwaysUnseenHost),
                 retry_first: Duration::from_millis(50),
                 retry_most: Duration::from_millis(200),
                 reconnect: Duration::from_millis(50),

@@ -1,6 +1,6 @@
 # 助手
 
-助手（`Orchestrator`）是直接与用户对话的编排 agent：接收需求、创建与指派工单、跟进进度、转告结果。助手不读代码、不跑命令、不改代码，运行在进程内 [VibeValley 自己的 agent](docs/subsystems/brain.md) 上（使用 `role: "orchestrator"` 档案，默认为 `orchestrator`）。
+助手（`Orchestrator`）是直接与用户对话的常驻编排 `AgentSession`（`SessionController::Daemon`、`cwd: None`、内置 `vibevalley` 农机）：接收需求、创建与指派工单、跟进进度、转告结果。助手不读代码、不跑命令、不改代码，以 `role: "orchestrator"` 档案（默认为 `orchestrator`）在服务端启动时自动常驻，经进程内 MCP `ToolRouter` 注入工单、笔记、频道与管理类工具，并与所有其他会话共享统一的 `session.*` 端点、轨迹与订阅流（零独立 `OrchestratorHost` / `ChatIntake` / `orchestrator.*` 平行栈）。
 
 ## 管什么，不管什么
 
@@ -16,16 +16,17 @@
 | 位置 | 职责 |
 |---|---|
 | `crates/server/src/agent/orchestrator/` | `Orchestrator`：每个助手档案一个 `vibevalley-runtime::agent` 的持久对话（数据库队列与 `Harness`，并配置 `record_to` 写出 `<家目录>/records/<id>.jsonl` 的 `oar-voyage/3` 记录），消费频道异步投递与未指定档案的定时任务，拼现状、跑一轮、把回复写回频道 |
-| `crates/server/src/agent/orchestrator/` 的 `words.rs` | 对助手说的话：来源头、现状与增量、长汇报截断；提示在 `crates/server/assets/orchestrator/prompts.json`（含 `chart` 与 `genui` 富内容块规范） |
+| `crates/server/src/agent/orchestrator/` 的 `words.rs` | 对助手说的话：来源头、现状与增量、长汇报截断；提示在 `crates/server/assets/orchestrator/prompts.json`（含 `Base` 与强类型 `DocBlock` 选型指引、`ketchup` + `Attention` 汇报协议、执行会话两败验前提/先减后加/有序单元纪律，以及回复内 `chart` 与 `genui` 块规范） |
 | `crates/server/src/agent/tool/` | 助手和帮工共用的工具：每个工具一个参数结构体，宽松解析写一处，按调用者分支；工具名、说明与 JSON Schema 在 `crates/server/assets/tools/orchestrator.json`、`crates/server/assets/tools/helper.json` |
-| `crates/server/src/agent/tool/` 的 `issue.rs`、`chat.rs`、`content.rs`、`plan.rs`、`memory.rs` | 按领域分的工具：工单与帮工、频道、Artifact 目录化与统一实时协同（创建、版本快照、协同编辑、人机建议、12 类 `artifact_type_list` / `artifact_type_read` 技能指南，移除旧 `artifact_block_*` / `artifact_outline_import` / `artifact_entry_*`）与媒体库/媒体任务、仓库与定时任务、记性 |
+| `crates/server/src/agent/tool/` 的 `issue.rs`、`chat.rs`、`content.rs`、`plan.rs`、`memory.rs` | 按领域分的工具：工单与帮工、频道、3+1 `Note` 目录化与实时协同（创建、版本快照、`note_doc_*` 24 块文档、`note_base_*` 多维表与 Agent 列、人机建议、`note_type_list` / `note_type_read` 渐进披露指南）与媒体库/媒体任务、仓库与定时任务、记性 |
 | `crates/server/src/agent/mcp/` 的 `resource.rs` | `resource_read`：解析 `vv://` URI，按会话裁剪只读权限、分页 |
 
-接口见 [capabilities.md](docs/reference/capabilities.md)（`orchestrator.*`）。
+接口见 [capabilities.md](docs/reference/capabilities.md)（全部统一在 `session.*`：`session.stop`、`session.compact`、`session.runCode`、`session.eval.create`、`session.approval.list`、`session.approval.resolve` 与 `session.watch`；不再保留独立的 `orchestrator.*` 端点）。
 
 ## 模型和不变量
 
-- **助手是 `role: "orchestrator"` 的档案，固定用 `vibevalley` 农机与 DeepSeek 模型**：默认助手 `orchestrator` 不可删除或改为帮工，名字默认叫「管家」，在它的档案页能改；可建多个助手档案，各自拥有独立的会话与对话文件。
+- **助手即 `SessionController::Daemon` 的无目录常驻 `AgentSession`**：默认助手 `orchestrator` 不可删除或改为帮工，名字默认叫「管家」，在它的档案页能改；可建多个助手档案，各自以 `SessionController::Daemon`、`cwd: None`、`runtime: "vibevalley"` 落盘在同一 `session` / `session_mailbox` / `session_event` 表中。
+- **统一信箱与 `wakes: false` 被动上下文**：频道路由统一由 `orchestration/delivery.rs` 的 `DeliveryRouter` 经 `AgentAdapter` 送达 `Orchestrator::deliver_channel_async`：`wakes: true` 写入 `MailboxSource::ChannelOrchestrator` 并唤醒回合；`wakes: false` 持久追加到 `MailboxSource::PassiveContext`（不唤醒），在下一轮唤醒时按序排空并并入本轮上下文，重启不丢。
 - **路由归属规则**：
   - 频道内未 `@` 他人的发言、频道巡查、未指定执行人的定时任务：归该频道的 `Channel.orchestrator`（未设则归默认助手）。
   - 显式 `@助手` 或 `@<助手档案 id>`、与某助手的私聊、指派给某助手的工单：归对应助手。
@@ -41,22 +42,22 @@
 
 ## 工具审批
 
-工具策略要求确认时，执行器保存待批调用并暂停该任务。用户在助手的「执行轨迹」里核对工具名、参数与审批原因，也可以用 `vibevalley orchestrator approval list --json` 找到调用。CLI 的 `orchestrator approval resolve` 接收对话 ID、任务 ID、工具调用 ID 和 `approve` 或 `deny`。工作台和 CLI 使用同一条 Rust 审批契约。
+工具策略要求确认时，执行器保存待批调用并暂停该任务。用户在会话的「执行轨迹」里核对工具名、参数与审批原因，也可以用 `vibevalley session approval list --json` 找到调用。CLI 的 `session approval resolve` 接收会话 ID、任务 ID、工具调用 ID 和 `approve` 或 `deny`。工作台和 CLI 使用同一条 Rust 审批契约（`session.approval.list` / `session.approval.resolve`）。
 
-执行器在同一个数据库事务中核对三个 ID、记录决定和唤醒信号，并清除待批项。同一决定可重试。重试上一张审批卡只会读回上一笔决定，即使同一任务已有下一项待批调用。[审批端点](crates/server/src/agent/orchestrator/execution.rs) · [决策事务](crates/runtime/src/agent/extensions/governance.rs)
+执行器在同一个数据库事务中核对三个 ID、记录决定和唤醒信号，并清除待批项。同一决定可重试。重试上一张审批卡只会读回上一笔决定，即使同一任务已有下一项待批调用。[审批端点](crates/server/src/agent/orchestrator/execution.rs) · [决策事务](crates/agent/src/extensions/governance.rs)
 
 ## 怎么走
 
 **处理一条输入**
 
-1. 频道纯路由经 `ctx.service` 写入 `channel_delivery` 与 `Outbox` 异步投递（或定时任务触发）给 `Orchestrator`；它在忙就排着。
-2. 拼上来源头、时间与现状（或增量），跑一轮：模型调工具，生成回复。
+1. 频道纯路由经 `ctx.service` 写入基于 `ParticipantId` 的 `channel_delivery`，提交后由 `DeliveryRouter`（`KeyedLane` + `AgentAdapter`）异步投递至 `Orchestrator::deliver_channel_async`（或由定时任务触发）：`wakes: false` 持久追加进 `MailboxSource::PassiveContext`，`wakes: true` 写入 `MailboxSource::ChannelOrchestrator` 并唤醒常驻 `AgentSession`（忙时在信箱排队）。
+2. 拼上来源头、时间、已排空的被动上下文与现状（或增量），跑一轮：模型调工具，生成回复。
 3. 回复整条写入目标频道，并结算对应 `channel_delivery`。
 
 ## 和谁打交道
 
 - **频道（`channel/`）**：异步消费频道投递与启动时未结算的 `channel_delivery`；回复经 `channel::Service` 写回。
-- **工单、作品与定时任务（`issue/`、`artifact/`、`cron/`）**：经工具调用各扁平域服务；作品创建与多人/多 Agent 共编统一走目录化存储与实时协同层（动工前按需读取 12 类 `artifact_type_read` 技能指南，修改人类编辑区通过建议分流）；指派给助手的工单跑完后进 `in_review` 等用户点头。
+- **工单、笔记与定时任务（`issue/`、`note/`、`cron/`）**：经工具调用各扁平域服务；笔记创建与多人/多 Agent 共编统一走 3+1 原语目录化存储与 Loro 实时协同层（动工前按需读取 `note_type_read` / `skill://note/<type>/references/format.md`，多维台账优先用 `base` 与 `note_base_upsert_row`，方案与验收正文优先用 `note_doc_append_block` 增量追加强类型块，修改人类编辑区通过建议分流）；指派给助手的工单跑完后进 `in_review` 等用户点头。
 - **自研 agent 与记性（`vibevalley-runtime::agent`、`agent/memory/`）**：对话、模型调用与压缩在 `vibevalley-runtime::agent`（[VibeValley 自己的 agent](docs/subsystems/brain.md)）；记性工具读写档案的记忆。
 
 ## 为什么这样
@@ -74,6 +75,6 @@
 
 ## 怎么验证
 
-- `crates/server/tests/orchestrator.rs`：用脚本模型让助手听见用户的话、调工具建工单。
+- `crates/server/tests/orchestrator.rs`、`crates/server/tests/participant_delivery.rs`：用脚本模型验收常驻 `Daemon` `AgentSession`、`ParticipantId` 多人/多 Agent 投递、`HOP_LIMIT` 仅限 Agent → Agent、`wakes: false` 被动上下文持久信箱与重启恢复。
 - `crates/server/tests/mcp.rs`：帮工经 `/mcp` 调同一套工具与 `resource_read`。
-- `orchestrator.eval.create` 已在服务端实现（落盘至 `<家目录>/evals/<id>.json`）；真模型回放评测集尚未接入。
+- `session.eval.create` 已在服务端实现（落盘至 `<家目录>/evals/<id>.json`）；真模型回放评测集尚未接入。

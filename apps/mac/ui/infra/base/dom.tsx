@@ -51,7 +51,11 @@ export function useNow(ms = 30_000): Accessor<number> {
 
 /** Rebuilds its children whenever `key` changes, as a React key does: their state starts over. */
 export function Keyed(props: { key: unknown; children: () => JSX.Element }) {
-  return <Each of={[props.key]}>{() => untracked(() => props.children())}</Each>;
+  return (
+    <Each of={[props.key]} key={(k) => k}>
+      {() => untracked(() => props.children())}
+    </Each>
+  );
 }
 
 /** The value once it has stopped changing for `ms`: what is asked of the server while someone types. */

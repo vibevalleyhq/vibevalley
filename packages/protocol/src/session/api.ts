@@ -24,6 +24,12 @@ export interface SessionHandlers {
   readonly "session.compact": (a: { readonly id: string }) => Promise<T.SessionCompactResult>;
   /** Executes a durable CodeMode JavaScript script in the session's tool context. */
   readonly "session.runCode": (a: T.SessionRunCodeInput) => Promise<T.SessionRunCodeResult>;
+  /** Saves the turn begun at a step of a session's log as an eval case with expected behavior. */
+  readonly "session.eval.create": (a: T.SessionEvalRequest) => Promise<T.SessionEval>;
+  /** Lists pending durable tool approvals for a session. */
+  readonly "session.approval.list": (a: T.SessionApprovalListInput) => Promise<T.SessionApproval[]>;
+  /** Approves or rejects a pending durable tool approval for a session. */
+  readonly "session.approval.resolve": (a: T.SessionApprovalResolveInput) => Promise<void>;
 }
 
 export const sessionEndpoints: readonly Endpoint[] = [
@@ -70,7 +76,7 @@ export const sessionEndpoints: readonly Endpoint[] = [
     input: input({
       sessionId: z.exactOptional(z.string()),
       runtime: z.string(),
-      cwd: z.string(),
+      cwd: z.exactOptional(z.string()),
       repo: z.exactOptional(z.string()),
       model: z.exactOptional(z.string()),
       effort: z.exactOptional(z.string()),
@@ -168,5 +174,26 @@ export const sessionEndpoints: readonly Endpoint[] = [
     }),
     result: S.SessionRunCodeResult,
     can: ["user", "remote"],
+  },
+  {
+    op: "session.eval.create",
+    about: [],
+    input: S.SessionEvalRequest,
+    result: S.SessionEval,
+    can: ["user", "remote"],
+  },
+  {
+    op: "session.approval.list",
+    about: ["id"],
+    input: S.SessionApprovalListInput,
+    result: z.array(S.SessionApproval),
+    can: ["user"],
+  },
+  {
+    op: "session.approval.resolve",
+    about: ["id", "taskId", "toolCallId"],
+    input: S.SessionApprovalResolveInput,
+    result: undefined,
+    can: ["user"],
   },
 ];

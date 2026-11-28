@@ -12,6 +12,7 @@ import { Icon } from "../design/Icon";
 import type { IconName } from "../design/icons";
 import { motionClass, motionEnter } from "../design/motion";
 import { api, newSendKey, reasonOf } from "../infra/api";
+import { useInterval } from "../infra/base/timer";
 import { callDecoded, frame } from "../infra/bridge";
 import { useFollowed } from "../infra/channelFollow";
 import { useCollabSlice } from "../infra/frame";
@@ -44,10 +45,15 @@ const labelTone = {
 } as const;
 
 function Label(props: { children: JSX.Element; size?: 14 | 18 | 20; tone?: keyof typeof labelTone; mono?: boolean; class?: string }) {
-  const sizeClass =
-    props.size === 20 ? "text-lg font-semibold" : props.size === 18 ? "text-base font-medium" : props.size === 14 ? "text-sm font-medium" : "text-xs";
-  const familyClass = props.mono === true ? "font-mono tabular-nums" : "font-sans";
-  return <Text class={`${familyClass} ${sizeClass} ${labelTone[props.tone ?? "ink"]} ${props.class ?? ""}`}>{props.children}</Text>;
+  return (
+    <Text
+      class={`${props.mono === true ? "font-mono tabular-nums" : "font-sans"} ${
+        props.size === 20 ? "text-lg font-semibold" : props.size === 18 ? "text-base font-medium" : props.size === 14 ? "text-sm font-medium" : "text-xs"
+      } ${labelTone[props.tone ?? "ink"]} ${props.class ?? ""}`}
+    >
+      {props.children}
+    </Text>
+  );
 }
 
 function Press(props: { children: JSX.Element; run: () => void; id?: string; selected?: boolean; disabled?: boolean; class?: string }) {
@@ -246,8 +252,7 @@ function Handset(props: { calls: () => Calls }) {
   const voiceId = crypto.randomUUID();
   const error = signal("");
   const clock = signal(new Date());
-  const timer = setInterval(() => clock.set(new Date()), 15000);
-  cleanup(() => clearInterval(timer));
+  useInterval(() => clock.set(new Date()), 15000);
   cleanup(host.on("frame:unfold", () => unfolded.set(true)));
   const ringing = () => props.calls().ringing;
   const game = () => {
@@ -271,7 +276,7 @@ function Handset(props: { calls: () => Calls }) {
   let poll = false;
   let disposed = false;
   let starting = false;
-  const updates = setInterval(() => {
+  useInterval(() => {
     if (active() && !poll) {
       poll = true;
       void voice("host.voiceState").finally(() => (poll = false));
@@ -279,7 +284,6 @@ function Handset(props: { calls: () => Calls }) {
   }, 500);
   cleanup(() => {
     disposed = true;
-    clearInterval(updates);
     if (active() || starting) void voice("host.voiceStop");
   });
   const dial = async () => {
@@ -341,7 +345,9 @@ function Handset(props: { calls: () => Calls }) {
         <View class="flex-1 overflow-hidden rounded-xl border border-line bg-page">
           <View class="flex-row items-center gap-1.5 border-b border-line bg-side px-2.5 py-1.5">
             <View class="flex-row items-end gap-0.5">
-              <Each of={[3, 5, 7, 9]}>{(h) => <View class="w-0.5 rounded-xs bg-accent" style={{ height: h() }} />}</Each>
+              <Each of={[3, 5, 7, 9]} key="index">
+                {(h) => <View class="w-0.5 rounded-xs bg-accent" style={{ height: h() }} />}
+              </Each>
             </View>
             <View role="button" testID="phone-home" onPress={back} class="flex-1">
               <Label size={14}>{t("web.farm.phone.brand")}</Label>
@@ -373,7 +379,7 @@ function Handset(props: { calls: () => Calls }) {
                       </If>
                       <If when={app() === "games"}>
                         <View testID="phone-games" class="grid grid-cols-3 gap-x-2 gap-y-3.5 px-3 pt-4">
-                          <Each of={games}>
+                          <Each of={games} key={(g) => g}>
                             {(g) => (
                               <IconKey id={g()} label={t(`web.farm.phone.game.${g()}`)} run={() => app.set(g())}>
                                 <GameIcon id={g()} />
@@ -402,7 +408,7 @@ function Handset(props: { calls: () => Calls }) {
                                     <Label tone="muted">{t("web.farm.phone.noCalls")}</Label>
                                   </View>
                                 </If>
-                                <Each of={props.calls().log}>
+                                <Each of={props.calls().log} key={(e, i) => `${e.call.who}-${e.call.words.label}-${i}`}>
                                   {(e) => (
                                     <View class="rounded-lg border border-line bg-elevated px-2.5 py-2 shadow-raise">
                                       <Label>
@@ -419,7 +425,7 @@ function Handset(props: { calls: () => Calls }) {
                                 <Label tone="muted">{t("web.farm.phone.noMissed")}</Label>
                               </View>
                             </If>
-                            <Each of={props.calls().missed}>
+                            <Each of={props.calls().missed} key={(c, i) => `${c.who}-${c.words.label}-${i}`}>
                               {(c) => (
                                 <Press run={() => settle(c(), true)}>
                                   {c().who} · {c().words.label}

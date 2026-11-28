@@ -1,7 +1,7 @@
 use vibevalley_core::SliceMask;
 use vibevalley_i18n::{list, t};
 use vibevalley_protocol::{
-    ApiError, Attachment, BizCode, CallState, ChatMessage, MessageHit, MessageKind, NoteCard, NoticeLevel, Preview, SubjectKind, USER_ID,
+    ApiError, Attachment, BizCode, CallState, ChatMessage, MessageHit, MessageKind, NoteCard, NoticeLevel, ParticipantId, Preview, SubjectKind,
 };
 
 use super::model::{Q, WriteTx, message_of};
@@ -12,7 +12,7 @@ use super::types::{
 };
 use super::words::{self, Has};
 use crate::context::{LookIn, missing, now};
-use crate::service::channel::{EventRow, MsgRow, SearchParams};
+use crate::service::channel::{MsgRow, SearchParams};
 
 impl Chat {
     async fn attachments_of(&self, ids: &[String]) -> Result<Vec<Attachment>, ApiError> {
@@ -50,8 +50,18 @@ impl Chat {
         if s.send_key.encode_utf16().count() > SEND_KEY_MAX {
             return Err(refused(t("server.channel.sendKeyLong", &[])));
         }
+        let sender = s.from.clone().unwrap_or_else(ParticipantId::local_user);
+        if !sender.is_human() {
+            return Err(refused(t("server.channel.notYours", &[])));
+        }
+        let sender_id = sender.to_string();
         let written = {
             let mut inner = self.locked().await;
+            if inner.model.participant(&sender_id).is_none() {
+                let mut wtx = WriteTx::begin(&mut inner, &self.ctx.service).await?;
+                wtx.ensure_human(&sender, s.from_name.as_deref()).await?;
+                wtx.commit().await?;
+            }
             if let Some(to) = &s.to
                 && !inner.model.is_orchestrator_seat(to)
             {
@@ -62,7 +72,7 @@ impl Chat {
                 None => inner.model.default_id(),
                 Some(c) if inner.model.channel(c).is_some() => c.clone(),
                 Some(c) => {
-                    let (place, thread) = self.resolve_target_async(&mut inner, USER_ID, c).await?;
+                    let (place, thread) = self.resolve_target_async(&mut inner, &sender_id, c).await?;
                     opened = thread;
                     place
                 }
@@ -117,10 +127,10 @@ impl Chat {
                     &mut inner,
                     Write {
                         send_key: Some(s.send_key.clone()),
-                        read_by: Some(USER_ID.into()),
+                        read_by: Some(sender_id.clone()),
                         reply_to: s.reply_to,
                         meta: (!empty).then_some(meta),
-                        ..Write::new(&place, USER_ID, MessageKind::Chat, &body_text)
+                        ..Write::new(&place, &sender_id, MessageKind::Chat, &body_text)
                     },
                 )
                 .await?;
@@ -387,11 +397,15 @@ impl Chat {
         Ok(written.thread)
     }
 
-    /// `edit`: the user's own words, changed; nobody is woken.
+    /// `edit`: a participant's own words, changed; nobody is woken.
     pub async fn edit_async(&self, id: &str, text: &str, keep: Option<&[String]>) -> Result<ChatMessage, ApiError> {
+        self.edit_as_async(&ParticipantId::local_user(), id, text, keep).await
+    }
+
+    pub async fn edit_as_async(&self, who: &ParticipantId, id: &str, text: &str, keep: Option<&[String]>) -> Result<ChatMessage, ApiError> {
         let mut inner = self.locked().await;
         let row = message_of(&self.ctx.service.channel, id).await?;
-        if row.sender_id != USER_ID || row.kind != "chat" || row.deleted_at.is_some() {
+        if row.sender_id != who.to_string() || row.kind != "chat" || row.deleted_at.is_some() {
             return Err(refused(t("server.channel.notYours", &[])));
         }
         let mut meta = meta_of(row.meta.as_deref());
@@ -437,27 +451,18 @@ impl Chat {
             return Err(refused(t("server.channel.messageGone", &[])));
         }
         let at = now();
-        let seq = {
+        {
             let wtx = WriteTx::begin(&mut inner, &self.ctx.service).await?;
             let channels = &self.ctx.service.channel;
             let revision = channels.bump_revision_in_tx(&wtx.tx, &row.channel_id).await.q()?;
             channels.delete_message_in_tx(&wtx.tx, id, at, revision).await.q()?;
             channels.delete_mentions_for_message_in_tx(&wtx.tx, id).await.q()?;
             channels.withdraw_deliveries_for_message_in_tx(&wtx.tx, id, at).await.q()?;
-            let seq = channels.insert_event_in_tx(&wtx.tx, "removed", &row.channel_id, id, at).await.q()?;
             wtx.commit().await?;
-            seq
-        };
+        }
         let message = self.finish_message_change_async(&inner.model, &row).await?;
         self.publish_user_mentions_async(&inner.model).await?;
-        let event = EventRow {
-            seq,
-            kind: "removed".into(),
-            channel_id: row.channel_id.clone(),
-            message_id: id.into(),
-            at,
-        };
-        self.emit_event(ChannelEvent::Removed { event, message });
+        self.emit_event(ChannelEvent::Removed(message));
         Ok(())
     }
 
@@ -679,42 +684,5 @@ impl Chat {
                 address: model.target_of_row(&r.channel_type, r.root_number, None, Some(&r.top_id), Some(&r.channel_name)),
             })
             .collect())
-    }
-}
-
-impl crate::context::port::ChannelAnnounce for Chat {
-    fn place_exists(&self, id: &str) -> bool {
-        Chat::place_exists(self, id)
-    }
-
-    fn orchestrator_in(&self, channel: &str) -> String {
-        Chat::orchestrator_in(self, channel)
-    }
-
-    fn place_of_async<'a>(&'a self, who: &'a str, target: &'a str) -> crate::BoxFuture<'a, Result<String, ApiError>> {
-        Box::pin(Chat::place_of_async(self, who, target))
-    }
-
-    fn post_card_async<'a>(
-        &'a self,
-        from: &'a str,
-        channel: &'a str,
-        text: &'a str,
-        card: NoteCard,
-        run: Option<String>,
-        send_key: String,
-    ) -> crate::BoxFuture<'a, Result<ChatMessage, ApiError>> {
-        Box::pin(Chat::post_card_async(self, from, channel, text, card, run, send_key))
-    }
-
-    fn post_attachments_async<'a>(
-        &'a self,
-        from: &'a str,
-        channel: &'a str,
-        text: &'a str,
-        attachments: Vec<String>,
-        send_key: String,
-    ) -> crate::BoxFuture<'a, Result<ChatMessage, ApiError>> {
-        Box::pin(Chat::post_attachments_async(self, from, channel, text, attachments, send_key))
     }
 }

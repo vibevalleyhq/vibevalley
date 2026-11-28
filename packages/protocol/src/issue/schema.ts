@@ -21,6 +21,33 @@ export const ActorRef = z.discriminatedUnion("kind", [
 ]) satisfies Codec<T.ActorRef>;
 
 const Landing = z.enum(T.LandingValues) satisfies Codec<T.Landing>;
+
+export const DeliveryReceipt = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("pull_request"),
+    url: z.string(),
+    number: z.exactOptional(z.number()),
+    branch: z.exactOptional(z.string()),
+    summary: z.exactOptional(z.string()),
+  }),
+  z.object({
+    kind: z.literal("commit"),
+    sha: z.string(),
+    branch: z.exactOptional(z.string()),
+    summary: z.exactOptional(z.string()),
+  }),
+  z.object({
+    kind: z.literal("note"),
+    noteId: NoteId,
+    title: z.exactOptional(z.string()),
+    summary: z.exactOptional(z.string()),
+  }),
+  z.object({
+    kind: z.literal("answer"),
+    summary: z.string(),
+  }),
+]) satisfies Codec<T.DeliveryReceipt>;
+
 const IssueCanceled = z.enum(T.IssueCanceledValues) satisfies Codec<T.IssueCanceled>;
 
 const Priority = z.enum(T.PriorityValues) satisfies Codec<T.Priority>;
@@ -77,7 +104,6 @@ export const BoardIssueSummary = z.object({
   cardKind: IssueCardKind,
   familyDone: z.number(),
   familyTotal: z.number(),
-  needsWorktreeCheck: z.boolean(),
   prompt: z.exactOptional(IssuePromptKind),
   preview: z.exactOptional(BoardCardPreview),
   schedule: z.exactOptional(IssueScheduleSpan),
@@ -202,7 +228,6 @@ export const IssueConstraints = z.object({
   check: z.exactOptional(z.string()),
   scope: z.array(z.string()),
   acceptance: z.boolean(),
-  frozen: z.array(z.string()),
 }) satisfies Codec<T.IssueConstraints>;
 
 const issueFields = {
@@ -249,6 +274,7 @@ const issueFields = {
       mergedCommit: z.exactOptional(z.string()),
     }),
   ),
+  deliveryReceipt: z.exactOptional(DeliveryReceipt),
   findings: z.array(Finding),
   questions: z.array(Question),
   criteria: z.array(z.string()),
@@ -294,6 +320,7 @@ export const IssueUpdate = z.object({
   dueAt: z.exactOptional(z.number()),
   owner: z.exactOptional(ActorRef),
   relations: z.exactOptional(z.array(IssueRelation)),
+  deliveryReceipt: z.exactOptional(DeliveryReceipt),
 }) satisfies Codec<T.IssueUpdate>;
 
 export const IssueHistory = z.object({
@@ -372,6 +399,7 @@ export const IssueStatusRequest = z.object({
   text: z.exactOptional(z.string()),
   agent: z.exactOptional(z.string()),
   edit: z.exactOptional(IssueUpdate),
+  deliveryReceipt: z.exactOptional(DeliveryReceipt),
   requestKey: z.exactOptional(z.string()),
 }) satisfies Codec<T.IssueStatusRequest>;
 

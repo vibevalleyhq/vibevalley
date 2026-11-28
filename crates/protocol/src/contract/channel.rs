@@ -275,6 +275,8 @@ pub struct ChannelCommand {
 pub struct SayRequest {
     pub id: String,
     pub text: String,
+    pub from: Option<ParticipantId>,
+    pub from_name: Option<String>,
     pub view_context: Option<NoteViewContext>,
     pub reply_to: Option<i64>,
     pub attachments: Option<Vec<String>>,
@@ -334,6 +336,7 @@ pub struct MessageEdit {
     #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::MessageId"))]
     pub id: MessageId,
     pub text: String,
+    pub from: Option<ParticipantId>,
     /// Omit to keep all existing attachments; pass a subset to remove the rest.
     pub attachments: Option<Vec<String>>,
 }
@@ -358,6 +361,7 @@ pub struct ReactionSet {
     pub id: MessageId,
     pub emoji: String,
     pub on: bool,
+    pub from: Option<ParticipantId>,
 }
 
 #[skip_serializing_none]
@@ -491,6 +495,7 @@ pub struct ChannelMessageListInput {
 pub struct ChannelMarkReadInput {
     pub id: String,
     pub number: i64,
+    pub from: Option<ParticipantId>,
 }
 
 #[skip_serializing_none]
@@ -541,6 +546,7 @@ pub struct ChannelThreadCreateInput {
 #[serde(rename_all = "camelCase")]
 pub struct ChannelDirectCreateInput {
     pub agent: String,
+    pub from: Option<ParticipantId>,
 }
 
 #[skip_serializing_none]
@@ -551,6 +557,7 @@ pub struct ChannelDirectCreateInput {
 pub struct ChannelMarkUnreadInput {
     pub id: String,
     pub number: i64,
+    pub from: Option<ParticipantId>,
 }
 
 #[skip_serializing_none]

@@ -357,87 +357,71 @@ export function BaseCellControl(props: BaseCellContext) {
       </If>
 
       <If when={props.col.kind === "issueRef"}>
-        {(() => {
-          const linkedIssueId = () => (props.cell?._tag === "issueRef" && props.cell.issueId !== "" ? props.cell.issueId : undefined);
-          return (
-            <View class="w-full min-w-0 flex-row items-center gap-1 overflow-hidden">
-              <If when={linkedIssueId()}>
-                {(issueId) => {
-                  const found = () => props.issuesById.get(issueId());
-                  return (
-                    <View
-                      role="button"
-                      testID={`base-cell-issue-link-${props.rowId}-${props.col.id}`}
-                      onPress={() => props.onOpenIssue(issueId())}
-                      class="h-7 min-w-0 flex-1 flex-row items-center gap-1.5 rounded-md border border-line bg-side px-2 hover:bg-hover"
-                    >
-                      <Icon name="issues" size={12} tone="accent" />
-                      <Text class="min-w-0 flex-1 truncate font-mono text-2xs font-medium text-ink">
-                        {found() ? `#${found()?.number} ${found()?.title}` : issueId()}
-                      </Text>
-                    </View>
-                  );
-                }}
-              </If>
-              <Select
-                testid={`base-cell-issue-pick-${props.rowId}-${props.col.id}`}
-                label={props.col.name}
-                size="control"
-                text="xs"
-                quiet={props.dense === true || linkedIssueId() !== undefined}
-                searchable
-                disabled={props.busy}
-                value={props.cell?._tag === "issueRef" ? String(props.cell.issueId) : ""}
-                placeholder={linkedIssueId() ? undefined : t("web.base.form.unset")}
-                options={issueOptions()}
-                onChange={(v) => props.onCommitCell(props.col.id, { _tag: "issueRef", issueId: toIssueId(v) })}
-                renderValue={linkedIssueId() ? () => null : undefined}
-                class={linkedIssueId() ? "w-7 shrink-0" : "w-full min-w-0"}
-              />
-            </View>
-          );
-        })()}
+        <View class="w-full min-w-0 flex-row items-center gap-1 overflow-hidden">
+          <If when={props.cell?._tag === "issueRef" && props.cell.issueId !== "" ? props.cell.issueId : undefined}>
+            {(issueId) => (
+              <View
+                role="button"
+                testID={`base-cell-issue-link-${props.rowId}-${props.col.id}`}
+                onPress={() => props.onOpenIssue(issueId())}
+                class="h-7 min-w-0 flex-1 flex-row items-center gap-1.5 rounded-md border border-line bg-side px-2 hover:bg-hover"
+              >
+                <Icon name="issues" size={12} tone="accent" />
+                <Text class="min-w-0 flex-1 truncate font-mono text-2xs font-medium text-ink">
+                  {props.issuesById.get(issueId()) ? `#${props.issuesById.get(issueId())?.number} ${props.issuesById.get(issueId())?.title}` : issueId()}
+                </Text>
+              </View>
+            )}
+          </If>
+          <Select
+            testid={`base-cell-issue-pick-${props.rowId}-${props.col.id}`}
+            label={props.col.name}
+            size="control"
+            text="xs"
+            quiet={props.dense === true || (props.cell?._tag === "issueRef" && props.cell.issueId !== "")}
+            searchable
+            disabled={props.busy}
+            value={props.cell?._tag === "issueRef" ? String(props.cell.issueId) : ""}
+            placeholder={props.cell?._tag === "issueRef" && props.cell.issueId !== "" ? undefined : t("web.base.form.unset")}
+            options={issueOptions()}
+            onChange={(v) => props.onCommitCell(props.col.id, { _tag: "issueRef", issueId: toIssueId(v) })}
+            renderValue={props.cell?._tag === "issueRef" && props.cell.issueId !== "" ? () => null : undefined}
+            class={props.cell?._tag === "issueRef" && props.cell.issueId !== "" ? "w-7 shrink-0" : "w-full min-w-0"}
+          />
+        </View>
       </If>
 
       <If when={props.col.kind === "noteRef"}>
-        {(() => {
-          const linkedNoteId = () => (props.cell?._tag === "noteRef" && props.cell.noteId !== "" ? props.cell.noteId : undefined);
-          return (
-            <View class="w-full min-w-0 flex-row items-center gap-1 overflow-hidden">
-              <If when={linkedNoteId()}>
-                {(noteId) => {
-                  const found = () => props.notesById.get(noteId());
-                  return (
-                    <View
-                      role="button"
-                      testID={`base-cell-note-link-${props.rowId}-${props.col.id}`}
-                      onPress={() => props.onOpenNote(noteId())}
-                      class="h-7 min-w-0 flex-1 flex-row items-center gap-1.5 rounded-md border border-line bg-side px-2 hover:bg-hover"
-                    >
-                      <Icon name="notes" size={12} tone="accent" />
-                      <Text class="min-w-0 flex-1 truncate text-2xs font-medium text-ink">{found()?.title ?? noteId()}</Text>
-                    </View>
-                  );
-                }}
-              </If>
-              <Select
-                testid={`base-cell-note-pick-${props.rowId}-${props.col.id}`}
-                label={props.col.name}
-                size="control"
-                text="xs"
-                quiet={props.dense === true || linkedNoteId() !== undefined}
-                searchable
-                disabled={props.busy}
-                value={props.cell?._tag === "noteRef" ? String(props.cell.noteId) : ""}
-                placeholder={linkedNoteId() ? undefined : t("web.base.form.unset")}
-                options={noteOptions()}
-                onChange={(v) => props.onCommitCell(props.col.id, { _tag: "noteRef", noteId: toNoteId(v) })}
-                renderValue={linkedNoteId() ? () => null : undefined}
-                class={linkedNoteId() ? "w-7 shrink-0" : "w-full min-w-0"}
-              />
-            </View>
-          );
-        })()}
+        <View class="w-full min-w-0 flex-row items-center gap-1 overflow-hidden">
+          <If when={props.cell?._tag === "noteRef" && props.cell.noteId !== "" ? props.cell.noteId : undefined}>
+            {(noteId) => (
+              <View
+                role="button"
+                testID={`base-cell-note-link-${props.rowId}-${props.col.id}`}
+                onPress={() => props.onOpenNote(noteId())}
+                class="h-7 min-w-0 flex-1 flex-row items-center gap-1.5 rounded-md border border-line bg-side px-2 hover:bg-hover"
+              >
+                <Icon name="notes" size={12} tone="accent" />
+                <Text class="min-w-0 flex-1 truncate text-2xs font-medium text-ink">{props.notesById.get(noteId())?.title ?? noteId()}</Text>
+              </View>
+            )}
+          </If>
+          <Select
+            testid={`base-cell-note-pick-${props.rowId}-${props.col.id}`}
+            label={props.col.name}
+            size="control"
+            text="xs"
+            quiet={props.dense === true || (props.cell?._tag === "noteRef" && props.cell.noteId !== "")}
+            searchable
+            disabled={props.busy}
+            value={props.cell?._tag === "noteRef" ? String(props.cell.noteId) : ""}
+            placeholder={props.cell?._tag === "noteRef" && props.cell.noteId !== "" ? undefined : t("web.base.form.unset")}
+            options={noteOptions()}
+            onChange={(v) => props.onCommitCell(props.col.id, { _tag: "noteRef", noteId: toNoteId(v) })}
+            renderValue={props.cell?._tag === "noteRef" && props.cell.noteId !== "" ? () => null : undefined}
+            class={props.cell?._tag === "noteRef" && props.cell.noteId !== "" ? "w-7 shrink-0" : "w-full min-w-0"}
+          />
+        </View>
       </If>
 
       <If when={props.col.kind === "agentRef"}>

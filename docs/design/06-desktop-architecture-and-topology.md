@@ -29,7 +29,7 @@ VibeValley 作为 macOS 全原生桌面应用，将 GPUI 窗口外壳、`nsh` �
 
 | 场景组件 | 对应入口 / 触发 | 交互内容与能力 |
 | --- | --- | --- |
-| `DioramaView`（`/farm`、`/farm/:repo`） | 主农庄实时 3D 视图（`apps/mac/src/diorama/view.rs`） | 9 块农田地块、可聚焦掀顶的江南院落建筑、4 档昼夜光影循环（`1..4`）、左下农庄手机与内嵌小游戏 |
+| `DioramaView`（`/farm`、`/farm/:repo`） | 主农庄实时 3D 视图（`apps/mac/src/diorama/view/`） | 9 块农田地块、可聚焦掀顶的江南院落建筑、4 档昼夜光影循环（`1..4`）、左下农庄手机与内嵌小游戏 |
 | `OpeningView` | 应用启动与加载遮罩（`apps/mac/src/diorama/opening.rs`） | 当服务端或工作台尚未就绪时叠盖全窗；展示随本机时段切换的 `assets/brand/opening-{morning,day,night}.webp` 欢迎画与进度条（可通过 `VIBEVALLEY_NO_OPENING=1` 跳过） |
 
 ### 工作台全量路由与页面表（`App.tsx` 与 `places.ts`）

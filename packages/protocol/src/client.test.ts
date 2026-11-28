@@ -15,9 +15,9 @@ const failure = async (status: number, text: string) => {
 describe("the API client envelope and error boundary", () => {
   it("regression: the approval list preserves the JSON argument text returned by the server", async () => {
     const argumentsJson = '{ "title": "Review", "priority": 1.0, "labels": ["ui"] }';
-    const approval = { conversationId: "c1", taskId: "t1", toolCallId: "call1", toolName: "issue_create", reason: "requires review", requestedAtMs: 10 };
+    const approval = { id: "c1", taskId: "t1", toolCallId: "call1", toolName: "issue_create", reason: "requires review", requestedAtMs: 10 };
     const list = (args: unknown) =>
-      client(200, JSON.stringify({ bizCode: 0, message: "ok", data: [{ ...approval, argumentsJson: args }] })).orchestrator.approval.list({});
+      client(200, JSON.stringify({ bizCode: 0, message: "ok", data: [{ ...approval, argumentsJson: args }] })).session.approval.list({});
     expect(await list(argumentsJson)).toEqual([{ ...approval, argumentsJson }]);
     await expect(list({ title: "Review" })).rejects.toThrow(/argumentsJson/u);
   });
@@ -90,8 +90,8 @@ describe("the API client envelope and error boundary", () => {
       ok: true,
       version: "test",
     });
-    expect(await client(200, `{"bizCode":0,"message":"ok"}`).orchestrator.open()).toBeUndefined();
-    await expect(client(200, "").orchestrator.open()).rejects.toThrow(/not in its shape/u);
+    expect(await client(200, `{"bizCode":0,"message":"ok"}`).session.stop({ id: "s1" })).toBeUndefined();
+    await expect(client(200, "").session.stop({ id: "s1" })).rejects.toThrow(/not in its shape/u);
     await expect(client(200, "not json").server.health.get()).rejects.toThrow(SyntaxError);
     await expect(client(200, `{"ok":true,"version":"test"}`).server.health.get()).rejects.toThrow(/not in its shape/u);
     await expect(client(200, `{"bizCode":0,"message":"ok","data":{"ok":"yes"}}`).server.health.get()).rejects.toThrow(/not in its shape/u);
@@ -107,7 +107,7 @@ describe("the API client envelope and error boundary", () => {
       return Promise.resolve({ bizCode: BizCode.IssueNotFound, message: "missing" });
     });
     expect(await api.server.health.get()).toEqual({ ok: true, version: "native" });
-    await expect(api.orchestrator.open()).rejects.toMatchObject({
+    await expect(api.session.stop({ id: "s1" })).rejects.toMatchObject({
       status: 404,
       bizCode: BizCode.IssueNotFound,
       tag: "Missing",
@@ -115,7 +115,7 @@ describe("the API client envelope and error boundary", () => {
     });
     expect(calls).toEqual([
       ["server.health.get", undefined],
-      ["orchestrator.open", undefined],
+      ["session.stop", { id: "s1" }],
     ]);
   });
 
@@ -123,12 +123,12 @@ describe("the API client envelope and error boundary", () => {
     const payload = { ok: true, version: "native" };
     const api = VibeValleyApi.over((op) => {
       if (op === "server.health.get") return Promise.resolve({ bizCode: 0, message: "ok", data: payload });
-      if (op === "orchestrator.open") return Promise.resolve({ bizCode: 0, message: "ok" });
+      if (op === "session.stop") return Promise.resolve({ bizCode: 0, message: "ok" });
       return Promise.resolve({ bizCode: 999999, message: "unexpected" });
     });
     // Preserves exact object identity without cloning via Zod safeParse.
     expect(await api.server.health.get()).toBe(payload);
-    expect(await api.orchestrator.open()).toBeUndefined();
+    expect(await api.session.stop({ id: "s1" })).toBeUndefined();
     await expect(api.repo.list()).rejects.toMatchObject({ status: 500, reason: "unexpected" });
   });
 

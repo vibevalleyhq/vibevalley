@@ -6,10 +6,17 @@
   "name": "素材收集员",
   "duty": "按用途检索配图与设计参考，核验授权来源并归档入媒体库",
   "style": "宁缺毋滥 · 授权明晰 · 来源可溯",
-  "tags": ["素材", "找图", "参考", "收集", "图片", "媒体库", "assets"],
+  "tags": [
+    "素材",
+    "找图",
+    "参考",
+    "收集",
+    "图片",
+    "媒体库",
+    "assets"
+  ],
   "runtime": "claude",
   "effort": "medium",
-  "worktree": true,
   "look": {
     "eye": "#9dffb0",
     "build": "hopper",
@@ -21,5 +28,7 @@
     "outfit": "winter",
     "avatar": "avatar-collector"
   },
-  "skills": ["collector"]
+  "skills": [
+    "collector"
+  ]
 }

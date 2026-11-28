@@ -1,6 +1,6 @@
-//! The board end to end on real temporary git repositories and the scripted
-//! runtime (no quota). Each turn's hook plays the agent: it writes and
-//! commits files in the worktree and writes the report.
+//! The board end to end on real temporary git repositories and directoryless
+//! issues with the scripted runtime (no quota): Agent autonomy, polymorphic
+//! `DeliveryReceipt`, queuing, room limits, questions, interrupts, and recovery.
 
 use std::path::Path;
 use std::sync::Arc;
@@ -8,11 +8,10 @@ use std::time::Duration;
 
 use crate::support::*;
 use vibevalley_core::Move;
-use vibevalley_protocol::{Deliverable, IssueCanceled, IssueStageKind as StageKind, IssueStatus, Landing, Outcome, Phase, StuckReason};
+use vibevalley_protocol::{Deliverable, DeliveryReceipt, IssueCanceled, IssueStageKind as StageKind, IssueStatus, Landing, Outcome, Phase, StuckReason};
 use vibevalley_runtime::oar::scripted::{Script, Step};
 use vibevalley_runtime::oar::{PermissionMode, Runtime, StopReason};
-use vibevalley_server::issue::{Board, NewIssue};
-use vibevalley_server::runtime::{BoardError, Undelivered};
+use vibevalley_server::issue::{Board, BoardError, NewIssue};
 
 fn new(title: &str, repo: Option<&Path>) -> NewIssue {
     NewIssue {
@@ -35,15 +34,14 @@ fn exists_on(repo: &Path, branch: &str, file: &str) -> bool {
         .success()
 }
 
-fn branch_exists(repo: &Path, branch: &str) -> bool {
-    !git(repo, &["branch", "--list", branch]).is_empty()
-}
-
 #[test]
-fn an_issue_goes_from_backlog_to_merged() {
+fn an_issue_runs_directly_in_repo_records_commit_receipt_and_completes() {
     let rt = HookRuntime::new("t", quick(), |turn| {
         turn.commit("feature.txt", "made by the agent\n");
-        turn.done("Added feature.txt");
+        let sha = git(&turn.cwd, &["rev-parse", "HEAD"]);
+        turn.report(&format!(
+            r#"{{"status":"done","summary":"Added feature.txt","deliveryReceipt":{{"kind":"commit","sha":"{sha}","branch":"main","summary":"Added feature.txt"}}}}"#
+        ));
     });
     let prompts = rt.prompts.clone();
     let w = world(vec![rt], |_| {});
@@ -57,45 +55,95 @@ fn an_issue_goes_from_backlog_to_merged() {
     let session = board_session(&w.board, reviewing.latest_session_id().unwrap()).unwrap();
     assert_eq!(session.phase, Phase::done());
     assert_eq!(session.last_run.as_ref().unwrap().summary, "Added feature.txt");
-    assert_eq!(session.worktree_branch(), Some("vibevalley/issue-1"));
-    assert_eq!(w.board.session_engine().base_branch(&session.id).as_deref(), Some("main"));
-    let worktree = session.cwd.clone().unwrap();
-    assert!(worktree.ends_with("worktrees/app.1"), "{worktree}");
+    let session_cwd = session.cwd.clone().unwrap();
+    assert_eq!(
+        std::fs::canonicalize(&session_cwd).unwrap(),
+        std::fs::canonicalize(&main).unwrap(),
+        "agent runs in repo dir directly without server-managed worktree"
+    );
+    assert!(!w.dir.path().join("worktrees").exists());
     assert!(prompts.lock().unwrap()[0].starts_with("Add the feature"));
     assert!(prompts.lock().unwrap()[0].contains("1. it is there"));
     let inbox = board_bundle(&w.board).inbox.items;
     assert_eq!(inbox.len(), 1);
     assert_eq!(inbox[0].kind, vibevalley_protocol::InboxKind::Review);
 
-    let changes = board_changes(&w.board, "1").unwrap();
-    assert_eq!(changes.commits.len(), 1);
-    assert_eq!(changes.files.len(), 1);
-    assert!(changes.uncommitted.is_empty() && changes.conflicts.is_empty());
+    let head = git(&main, &["rev-parse", "HEAD"]);
+    assert_eq!(
+        reviewing.delivery_receipt,
+        Some(DeliveryReceipt::Commit {
+            sha: head.clone(),
+            branch: Some("main".into()),
+            summary: Some("Added feature.txt".into()),
+        })
+    );
 
     assert_eq!(block_on(w.board.move_to_async("1", IssueStatus::Done, None)).unwrap(), Move::Complete);
     let done = board_issue(&w.board, "1").unwrap();
     assert_eq!((done.status, done.delivered), (IssueStatus::Done, Some(Landing::Merged)));
+    assert_eq!(
+        done.delivery_receipt,
+        Some(DeliveryReceipt::Commit {
+            sha: head,
+            branch: Some("main".into()),
+            summary: Some("Added feature.txt".into()),
+        })
+    );
     assert!(exists_on(&main, "main", "feature.txt"));
-    assert!(!Path::new(&worktree).exists(), "the worktree is removed");
-    assert!(!branch_exists(&main, "vibevalley/issue-1"), "the merged branch is deleted");
     assert!(board_bundle(&w.board).sessions.sessions.is_empty(), "its session left");
     assert!(board_bundle(&w.board).inbox.items.is_empty());
 }
 
 #[test]
-fn uncommitted_leftovers_go_in_with_the_rest() {
+fn directoryless_issue_runs_without_repo_and_accepts_polymorphic_delivery_receipts() {
     let rt = HookRuntime::new("t", quick(), |turn| {
-        turn.write("loose.txt", "not committed\n");
-        turn.done("left it uncommitted");
+        if turn.prompt.contains("Write design doc") {
+            turn.report(r#"{"status":"done","summary":"Drafted note","deliveryReceipt":{"kind":"note","noteId":"n-42","title":"RFC 36","summary":"Architecture notes"}}"#);
+        } else {
+            turn.report(r#"{"status":"done","summary":"Answered directly","deliveryReceipt":{"kind":"answer","summary":"Shipped without a repository"}}"#);
+        }
     });
     let w = world(vec![rt], |_| {});
-    let main = repo(w.dir.path(), "app");
-    block_on(w.board.create_async(new("Loose", Some(&main)))).unwrap();
-    block_on(w.board.move_to_async("1", IssueStatus::Todo, None)).unwrap();
-    wait_stage(&w.board, "1", StageKind::Reviewing);
-    assert_eq!(board_changes(&w.board, "1").unwrap().uncommitted.len(), 1);
-    block_on(w.board.move_to_async("1", IssueStatus::Done, None)).unwrap();
-    assert!(exists_on(&main, "main", "loose.txt"));
+
+    let note_issue = block_on(w.board.create_async(new("Write design doc", None))).unwrap();
+    assert!(note_issue.repo.is_none());
+    block_on(w.board.move_to_async(&note_issue.id, IssueStatus::Todo, None)).unwrap();
+    let reviewing = wait_stage(&w.board, &note_issue.id, StageKind::Reviewing);
+    let sess = board_session(&w.board, reviewing.latest_session_id().unwrap()).unwrap();
+    assert!(sess.cwd.is_none(), "directoryless issue session must have cwd = None");
+    assert_eq!(
+        reviewing.delivery_receipt,
+        Some(DeliveryReceipt::Note {
+            note_id: "n-42".into(),
+            title: Some("RFC 36".into()),
+            summary: Some("Architecture notes".into()),
+        })
+    );
+    block_on(w.board.move_to_async(&note_issue.id, IssueStatus::Done, None)).unwrap();
+    let closed_note = board_issue(&w.board, &note_issue.id).unwrap();
+    assert_eq!(closed_note.status, IssueStatus::Done);
+    assert_eq!(closed_note.delivered, Some(Landing::None));
+    assert!(matches!(closed_note.delivery_receipt, Some(DeliveryReceipt::Note { ref note_id, .. }) if note_id == "n-42"));
+
+    // Closing an issue with an explicit PullRequest receipt sets Landing::Submitted.
+    let pr_issue = block_on(w.board.create_async(new("Ship PR", None))).unwrap();
+    block_on(w.board.move_to_async(&pr_issue.id, IssueStatus::Todo, None)).unwrap();
+    wait_stage(&w.board, &pr_issue.id, StageKind::Reviewing);
+    let pr_receipt = DeliveryReceipt::PullRequest {
+        url: "https://github.com/acme/repo/pull/36".into(),
+        number: Some(36),
+        branch: Some("feat/issue-36".into()),
+        summary: Some("Autonomy PR".into()),
+    };
+    block_on(
+        w.board
+            .move_with_receipt_async(&pr_issue.id, IssueStatus::Done, None, None, Some(pr_receipt.clone())),
+    )
+    .unwrap();
+    let closed_pr = board_issue(&w.board, &pr_issue.id).unwrap();
+    assert_eq!(closed_pr.delivered, Some(Landing::Submitted));
+    assert_eq!(closed_pr.delivery_receipt, Some(pr_receipt));
+    assert!(!w.dir.path().join("worktrees").exists());
 }
 
 #[test]
@@ -213,23 +261,19 @@ fn an_interrupted_round_resumes_or_completes() {
 }
 
 #[test]
-fn canceling_lets_the_session_go_and_keeps_a_branch_with_work() {
+fn canceling_lets_the_session_go_and_can_be_reopened() {
     let rt = HookRuntime::new("t", slow_first(30_000), |turn| turn.commit("wip.txt", &turn.prompt));
     let w = world(vec![rt], |_| {});
     let main = repo(w.dir.path(), "app");
     block_on(w.board.create_async(new("Doomed", Some(&main)))).unwrap();
     block_on(w.board.move_to_async("1", IssueStatus::Todo, None)).unwrap();
-    let working = wait_stage(&w.board, "1", StageKind::Working);
-    let worktree = board_session(&w.board, working.latest_session_id().unwrap()).unwrap().cwd.unwrap();
+    wait_stage(&w.board, "1", StageKind::Working);
     block_on(w.board.tell_async("1", "x")).unwrap();
-    std::fs::write(Path::new(&worktree).join("loose.txt"), "uncommitted").unwrap();
     assert_eq!(block_on(w.board.move_to_async("1", IssueStatus::Canceled, None)).unwrap(), Move::Cancel);
     let canceled = board_issue(&w.board, "1").unwrap();
     assert_eq!((canceled.status, canceled.canceled), (IssueStatus::Canceled, Some(IssueCanceled::Dismissed)));
     assert!(board_bundle(&w.board).sessions.sessions.is_empty());
-    assert!(!Path::new(&worktree).exists());
-    assert!(exists_on(&main, "vibevalley/issue-1", "wip.txt") && exists_on(&main, "vibevalley/issue-1", "loose.txt"));
-    // Reopened, it is sent again on the same branch.
+    // Reopened, it requires words and starts cleanly.
     assert!(matches!(
         block_on(w.board.move_to_async("1", IssueStatus::Todo, None)),
         Err(BoardError::WordsRequired)
@@ -306,7 +350,6 @@ fn the_per_repo_limit_holds_one_repo_back_and_not_another() {
     assert_eq!(board_issue(&w.board, "3").unwrap().stage.state, StageKind::Working);
     gate.release_n(3);
     wait_stage(&w.board, "2", StageKind::Reviewing);
-    // Words for a queued issue go with it when it is sent.
 }
 
 #[test]
@@ -368,247 +411,6 @@ fn a_restart_marks_a_working_session_interrupted_and_it_goes_on() {
 }
 
 #[test]
-fn a_lost_worktree_cancels_its_issue_on_open() {
-    let rt = HookRuntime::new("t", quick(), |turn| turn.done("ok"));
-    let w = world(vec![rt], |_| {});
-    let main = repo(w.dir.path(), "app");
-    block_on(w.board.create_async(new("Lost", Some(&main)))).unwrap();
-    block_on(w.board.move_to_async("1", IssueStatus::Todo, None)).unwrap();
-    let issue = wait_stage(&w.board, "1", StageKind::Reviewing);
-    let worktree = board_session(&w.board, issue.latest_session_id().unwrap()).unwrap().cwd.unwrap();
-    block_on(w.board.close_async());
-    std::fs::remove_dir_all(&worktree).unwrap();
-    let (board, _ctx) = open_board(&w.store, w.registry.clone(), config(w.dir.path())).unwrap();
-    let lost = board_issue(&board, "1").unwrap();
-    assert_eq!((lost.status, lost.canceled), (IssueStatus::Canceled, Some(IssueCanceled::Lost)));
-    assert!(board_bundle(&board).sessions.sessions.is_empty());
-}
-
-#[test]
-fn a_merge_conflict_stays_in_review_and_resolve_sends_it_back() {
-    let rt = HookRuntime::new("t", quick(), |turn| {
-        if turn.index == 0 {
-            turn.commit("README.md", "from the branch\n");
-            turn.done("changed the readme");
-        } else {
-            assert!(turn.prompt.contains("conflicts with main"), "{}", turn.prompt);
-            let out = std::process::Command::new("git")
-                .arg("-C")
-                .arg(&turn.cwd)
-                .args(["merge", "-q", "-X", "ours", "main", "-m", "merge main"])
-                .output()
-                .unwrap();
-            assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
-            turn.done("resolved");
-        }
-    });
-    let w = world(vec![rt], |_| {});
-    let main = repo(w.dir.path(), "app");
-    block_on(w.board.create_async(new("Readme", Some(&main)))).unwrap();
-    block_on(w.board.move_to_async("1", IssueStatus::Todo, None)).unwrap();
-    wait_stage(&w.board, "1", StageKind::Reviewing);
-    std::fs::write(main.join("README.md"), "from main\n").unwrap();
-    git(&main, &["commit", "-q", "-am", "main moves on"]);
-    assert_eq!(board_changes(&w.board, "1").unwrap().conflicts, vec![std::path::PathBuf::from("README.md")]);
-
-    match block_on(w.board.move_to_async("1", IssueStatus::Done, None)) {
-        Err(BoardError::NotDelivered(Undelivered::Conflict { base, files })) => {
-            assert_eq!((base.as_str(), files), ("main", vec!["README.md".to_string()]));
-        }
-        other => panic!("{other:?}"),
-    }
-    let conflicted = board_issue(&w.board, "1").unwrap();
-    assert_eq!(
-        (conflicted.status, conflicted.stage.stuck),
-        (IssueStatus::InReview, Some(StuckReason::Conflict))
-    );
-    assert_eq!(board_bundle(&w.board).inbox.items[0].kind, vibevalley_protocol::InboxKind::Conflict);
-    // Resolve: back to its session with the server's words.
-    block_on(w.board.move_to_async("1", IssueStatus::Todo, None)).unwrap();
-    let resolved = wait_stage(&w.board, "1", StageKind::Reviewing);
-    assert!(resolved.conflict.is_none());
-    block_on(w.board.move_to_async("1", IssueStatus::Done, None)).unwrap();
-    assert_eq!(board_issue(&w.board, "1").unwrap().delivered, Some(Landing::Merged));
-    assert_eq!(std::fs::read_to_string(main.join("README.md")).unwrap(), "from the branch\n");
-}
-
-#[test]
-fn a_failing_check_sends_the_work_back_with_the_output_tail() {
-    let rt = HookRuntime::new("t", quick(), |turn| {
-        if turn.index == 0 {
-            turn.commit("code.txt", "code\n");
-        } else {
-            assert!(turn.prompt.contains("The project check failed"), "{}", turn.prompt);
-            assert!(turn.prompt.contains("ok.txt is missing"), "{}", turn.prompt);
-            turn.commit("ok.txt", "ok\n");
-        }
-        turn.done("done");
-    });
-    let w = world(vec![rt], |_| {});
-    let main = repo(w.dir.path(), "app");
-    std::fs::create_dir_all(main.join(".vibevalley")).unwrap();
-    std::fs::write(
-        main.join(".vibevalley/check"),
-        "#!/bin/sh\ntest -f ok.txt || { echo ok.txt is missing; exit 1; }\n",
-    )
-    .unwrap();
-    git(&main, &["add", "."]);
-    git(&main, &["commit", "-q", "-m", "a check (not executable: run through sh)"]);
-    block_on(w.board.create_async(new("Checked", Some(&main)))).unwrap();
-    block_on(w.board.move_to_async("1", IssueStatus::Todo, None)).unwrap();
-    wait_stage(&w.board, "1", StageKind::Reviewing);
-    match block_on(w.board.move_to_async("1", IssueStatus::Done, None)) {
-        Err(BoardError::NotDelivered(Undelivered::CheckFailed { output, sent_back })) => {
-            assert!(sent_back);
-            assert_eq!(output, "ok.txt is missing");
-        }
-        other => panic!("{other:?}"),
-    }
-    let back = wait_stage(&w.board, "1", StageKind::Reviewing);
-    assert_eq!(board_session(&w.board, back.latest_session_id().unwrap()).unwrap().runs, 2);
-    block_on(w.board.move_to_async("1", IssueStatus::Done, None)).unwrap();
-    assert!(exists_on(&main, "main", "ok.txt"));
-}
-
-#[test]
-fn regression_review_keeps_the_seen_tree_and_records_the_delivered_commit() {
-    let rt = HookRuntime::new("t", quick(), |turn| {
-        turn.write("first.txt", "review me");
-        turn.done("ready");
-    });
-    let w = world(vec![rt], |_| {});
-    let main = repo(w.dir.path(), "app");
-    block_on(w.board.create_async(new("Review the content", Some(&main)))).unwrap();
-    block_on(w.board.move_to_async("1", IssueStatus::Todo, None)).unwrap();
-    wait_stage(&w.board, "1", StageKind::Reviewing);
-    let first = board_changes(&w.board, "1").unwrap();
-    assert_eq!(first.files.len(), 1, "the displayed patch includes uncommitted files");
-    assert_eq!(first.uncommitted[0].new_path.as_deref(), Some(Path::new("first.txt")));
-    block_on(w.board.review_async("1", true, &[], "", Some(&first.revision))).unwrap();
-    std::fs::write(first.worktree.join("second.txt"), "new edit").unwrap();
-    assert!(block_on(w.board.review_async("1", true, &[], "", Some(&first.revision))).is_err());
-    assert!(block_on(w.board.move_to_async("1", IssueStatus::Done, None)).is_err());
-    assert!(!main.join("first.txt").exists());
-    let next = board_changes(&w.board, "1").unwrap();
-    let added = next.since_review.unwrap();
-    assert_eq!(added.len(), 1);
-    assert_eq!(added[0].new_path.as_deref(), Some(Path::new("second.txt")));
-    block_on(w.board.review_async("1", true, &[], "", Some(&next.revision))).unwrap();
-    assert!(
-        block_on(w.board.move_reviewed_async("1", IssueStatus::Done, None, Some(&first.revision))).is_err(),
-        "a stale completion cannot adopt another reviewer's pass"
-    );
-    std::fs::write(main.join("unrelated"), "another issue").unwrap();
-    git(&main, &["add", "unrelated"]);
-    git(&main, &["commit", "-qm", "advance the target"]);
-    let target = git(&main, &["rev-parse", "HEAD"]);
-    block_on(w.board.move_to_async("1", IssueStatus::Done, None)).unwrap();
-
-    block_on(w.board.close_async());
-    let (board, _ctx) = open_board(&w.store, w.registry.clone(), config(w.dir.path())).unwrap();
-    let archived = block_on(board.changes_since_async("1", Some(&first.revision.tree))).unwrap();
-    assert_eq!(archived.revision, next.revision);
-    assert_eq!(archived.files.len(), 2);
-    assert_eq!(archived.since_review.unwrap().len(), 1);
-    let delivery = board_issue(&board, "1").unwrap().delivery_evidence.unwrap();
-    assert_eq!(
-        delivery.reviews.iter().map(|r| &r.revision).collect::<Vec<_>>(),
-        [&first.revision, &next.revision]
-    );
-    let check = delivery.check.unwrap();
-    assert_eq!(check.target_commit, target);
-    assert_eq!(check.source_tree, next.revision.tree);
-    assert_eq!(check.candidate_tree, git(&main, &["rev-parse", "HEAD^{tree}"]));
-    assert_eq!(check.status, vibevalley_protocol::ProjectCheckStatus::NotConfigured);
-    assert_eq!(check.command, None);
-    assert_eq!(delivery.merged_commit.as_deref(), Some(check.candidate_commit.as_str()));
-    assert_eq!(check.candidate_commit, git(&main, &["rev-parse", "HEAD"]));
-}
-
-#[test]
-fn regression_reopen_recognizes_an_already_published_candidate_without_running_git_again() {
-    let rt = HookRuntime::new("t", quick(), |turn| {
-        turn.commit("work", "reviewed");
-        turn.done("ready");
-    });
-    let w = world(vec![rt], |_| {});
-    let main = repo(w.dir.path(), "app");
-    block_on(w.board.create_async(new("Recover delivery", Some(&main)))).unwrap();
-    block_on(w.board.move_to_async("1", IssueStatus::Todo, None)).unwrap();
-    wait_stage(&w.board, "1", StageKind::Reviewing);
-    let mut db = inspect_db(&w.store);
-    execute_sql(
-        &mut db,
-        "create trigger stop_delivery before insert on issue when new.delivered = 'merged' begin select raise(fail, 'stop after Git accepted the commit'); end;",
-    );
-    let err = block_on(w.board.move_to_async("1", IssueStatus::Done, None)).unwrap_err();
-    assert!(err.to_string().contains("stop after Git"), "{err}");
-    let head = git(&main, &["rev-parse", "HEAD"]);
-    assert_eq!(git(&main, &["show", "HEAD:work"]), "reviewed");
-    assert!(!branch_exists(&main, "vibevalley/issue-1"));
-    block_on(w.board.close_async());
-    execute_sql(&mut db, "drop trigger stop_delivery");
-    let (board, _ctx) = open_board(&w.store, w.registry.clone(), config(w.dir.path())).unwrap();
-    let restored = board_issue(&board, "1").unwrap();
-    assert_eq!(restored.status, IssueStatus::Done);
-    assert_eq!(restored.delivery_evidence.unwrap().merged_commit.as_deref(), Some(head.as_str()));
-    assert_eq!(git(&main, &["rev-parse", "HEAD"]), head);
-}
-
-#[test]
-fn regression_project_check_runs_on_the_combined_tree_before_delivery() {
-    let rt = HookRuntime::new("t", quick(), |turn| {
-        turn.commit("jobs", if turn.index == 0 { "2" } else { "1" });
-        turn.done("updated jobs");
-    });
-    let w = world(vec![rt], |_| {});
-    let main = repo(w.dir.path(), "app");
-    std::fs::create_dir(main.join(".vibevalley")).unwrap();
-    std::fs::write(
-        main.join(".vibevalley/check"),
-        r#"test "$(cat jobs)" -le "$(cat limit)" || { echo "too many jobs"; exit 1; }"#,
-    )
-    .unwrap();
-    std::fs::write(main.join("jobs"), "1").unwrap();
-    std::fs::write(main.join("limit"), "2").unwrap();
-    git(&main, &["add", "."]);
-    git(&main, &["commit", "-qm", "initial capacity"]);
-    block_on(w.board.create_async(new("Increase jobs", Some(&main)))).unwrap();
-    block_on(w.board.move_to_async("1", IssueStatus::Todo, None)).unwrap();
-    let reviewing = wait_stage(&w.board, "1", StageKind::Reviewing);
-    let session = board_session(&w.board, reviewing.latest_session_id().unwrap()).unwrap();
-    let worktree = Path::new(session.cwd.as_ref().unwrap());
-    std::fs::write(main.join("limit"), "1").unwrap();
-    git(&main, &["commit", "-qam", "decrease capacity"]);
-    let target = git(&main, &["rev-parse", "HEAD"]);
-    for dir in [&*main, worktree] {
-        assert!(
-            std::process::Command::new("sh")
-                .arg(".vibevalley/check")
-                .current_dir(dir)
-                .status()
-                .unwrap()
-                .success()
-        );
-    }
-
-    let result = block_on(w.board.move_to_async("1", IssueStatus::Done, None));
-    assert!(
-        matches!(result, Err(BoardError::NotDelivered(Undelivered::CheckFailed { ref output, .. })) if output == "too many jobs"),
-        "{result:?}"
-    );
-    let failed = board_issue(&w.board, "1").unwrap().delivery_evidence.unwrap().check.unwrap();
-    assert_eq!(failed.status, vibevalley_protocol::ProjectCheckStatus::Failed);
-    assert_eq!(failed.output.as_deref(), Some("too many jobs"));
-    assert_eq!(git(&main, &["rev-parse", "HEAD"]), target);
-    assert_eq!(std::fs::read_to_string(main.join("jobs")).unwrap(), "1");
-    wait_stage(&w.board, "1", StageKind::Reviewing);
-    block_on(w.board.move_to_async("1", IssueStatus::Done, None)).unwrap();
-    assert_eq!(board_issue(&w.board, "1").unwrap().delivered, Some(Landing::Merged));
-    assert_eq!(std::fs::read_to_string(main.join("limit")).unwrap(), "1");
-}
-
-#[test]
 fn an_answer_issue_is_acknowledged_with_its_conclusion() {
     let rt = HookRuntime::new("t", quick(), |turn| {
         turn.report(r#"{"status":"done","summary":"found it","answer":{"conclusion":"It is 42.","evidence":["README.md:1"]}}"#);
@@ -642,8 +444,9 @@ fn an_answer_issue_in_a_repo_without_a_conclusion_is_stuck() {
 }
 
 #[test]
-fn a_branch_issue_keeps_its_branch() {
+fn a_branch_issue_keeps_its_autonomous_branch() {
     let rt = HookRuntime::new("t", quick(), |turn| {
+        git(&turn.cwd, &["checkout", "-q", "-b", "feat/issue-1"]);
         turn.commit("b.txt", "b\n");
         turn.done("ok");
     });
@@ -656,7 +459,7 @@ fn a_branch_issue_keeps_its_branch() {
     wait_stage(&w.board, "1", StageKind::Reviewing);
     block_on(w.board.move_to_async("1", IssueStatus::Done, None)).unwrap();
     assert_eq!(board_issue(&w.board, "1").unwrap().delivered, Some(Landing::Kept));
-    assert!(exists_on(&main, "vibevalley/issue-1", "b.txt") && !exists_on(&main, "main", "b.txt"));
+    assert!(exists_on(&main, "feat/issue-1", "b.txt") && !exists_on(&main, "main", "b.txt"));
 }
 
 #[test]
@@ -732,62 +535,6 @@ fn a_queued_issue_waits_for_the_issue_it_is_blocked_by() {
     circle.parent = Some("2".into());
     circle.blocked_by = vec!["2".into()];
     assert!(block_on(w.board.create_async(circle)).is_err());
-}
-
-#[test]
-fn regression_slow_delivery_check_does_not_block_unrelated_board_operations() {
-    let rt = HookRuntime::new("t", quick(), |turn| {
-        turn.commit(&format!("f{}.txt", turn.prompt.len()), "ok\n");
-        turn.done("ok");
-    });
-    let w = world(vec![rt], |_| {});
-    let main = repo(w.dir.path(), "app");
-    let other = repo(w.dir.path(), "other");
-    let started_flag = w.dir.path().join("check-started");
-    let proceed_flag = w.dir.path().join("check-proceed");
-
-    std::fs::create_dir_all(main.join(".vibevalley")).unwrap();
-    std::fs::write(
-        main.join(".vibevalley/check"),
-        format!(
-            "#!/bin/sh\ntouch '{}'\nwhile [ ! -f '{}' ]; do sleep 0.02; done\n",
-            started_flag.display(),
-            proceed_flag.display()
-        ),
-    )
-    .unwrap();
-    git(&main, &["add", "."]);
-    git(&main, &["commit", "-qm", "slow check"]);
-
-    block_on(w.board.create_async(new("Slow land", Some(&main)))).unwrap();
-    block_on(w.board.create_async(new("Unrelated", Some(&other)))).unwrap();
-    block_on(w.board.move_to_async("1", IssueStatus::Todo, None)).unwrap();
-    wait_stage(&w.board, "1", StageKind::Reviewing);
-
-    let board_for_land = w.board.clone();
-    let land_handle = vibevalley_runtime::rt::spawn(async move { board_for_land.move_to_async("1", IssueStatus::Done, None).await });
-
-    // While issue #1 is blocked inside slow `land_async` I/O, creating and dispatching
-    // unrelated issues must proceed without waiting on the coarse `Board::work` lock.
-    block_on(async {
-        let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
-        while !started_flag.exists() {
-            assert!(tokio::time::Instant::now() < deadline, "slow check never started");
-            tokio::time::sleep(Duration::from_millis(10)).await;
-        }
-        tokio::time::timeout(Duration::from_secs(2), async {
-            let created = w.board.create_async(new("Created during land", Some(&other))).await.unwrap();
-            assert_eq!(created.number, 3);
-            assert_eq!(w.board.move_to_async("2", IssueStatus::Todo, None).await.unwrap(), Move::Start);
-        })
-        .await
-        .expect("board operations blocked behind slow delivery I/O");
-    });
-    wait_stage(&w.board, "2", StageKind::Reviewing);
-
-    std::fs::write(&proceed_flag, "go\n").unwrap();
-    assert_eq!(block_on(land_handle).unwrap().unwrap(), Move::Complete);
-    assert_eq!(board_issue(&w.board, "1").unwrap().delivered, Some(Landing::Merged));
 }
 
 #[test]

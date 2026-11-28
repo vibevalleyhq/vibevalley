@@ -76,8 +76,6 @@
   "workdir": "默认仓库",
   "workdirTip": "项目根目录（VIBEVALLEY_WORK_ROOT）下的一个文件夹。主助手派活没说仓库时用它；留空时派活必须说在哪个仓库。",
   "workdirHint": "比如 clock-in",
-  "worktree": "每个执行会话一个 git worktree",
-  "worktreeHint": "每个执行会话在自己的分支上改，几个执行会话不会互相覆盖；完成时合进仓库。关掉就直接在仓库里改，没有分支可合。",
   "env": "环境变量",
   "envHint": "叠加在环境设置的环境变量之上。",
   "machine": "环境",

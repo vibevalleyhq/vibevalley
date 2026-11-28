@@ -2,7 +2,7 @@ import { computed, effect, List, signal, Text, untracked, View } from "nsh";
 import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
-import type { ChatMessage } from "@vibevalley/protocol";
+import { type ChatMessage, localUserParticipant } from "@vibevalley/protocol";
 import { channelLabel } from "@vibevalley/protocol/rules";
 import { ChannelEvent as ChannelEventSchema, ChatMessage as ChatMessageSchema, messageId } from "@vibevalley/protocol/schema";
 
@@ -236,8 +236,8 @@ export function ChannelsTab(props: {
       id: messageId(`pending:${sendKey}`),
       number: maxNumber + 1,
       channel: channelId,
-      from: "user",
-      actor: { kind: "user", id: "user", name: senderName },
+      from: localUserParticipant,
+      actor: { kind: "user", id: localUserParticipant, name: senderName },
       name: senderName,
       kind: "chat",
       text,

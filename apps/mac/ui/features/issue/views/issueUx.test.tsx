@@ -222,8 +222,9 @@ test("Board integrates filter bar, preserves long card titles, and suppresses un
   });
   await fake.pumpUntil(app, () => app.count("id:issue-card") === 2);
 
-  // Filter icon and selects are unified in one filter bar.
-  expect(app.count("id:issue-filter-bar")).toBe(1);
+  // Secondary filter dropdowns are collapsed into one clean filter popover trigger.
+  expect(app.count("id:issue-filter-bar")).toBe(0);
+  expect(app.count("id:issue-filter-popover")).toBe(1);
   // Full title is passed to board card (clamped visually via line-clamp-2, not truncated at 40 chars).
   expect(app.texts()).toContain(LONG_TITLE);
   // Only the confirmed todo shows card-unassigned; backlog draft avoids double badge noise.
@@ -289,7 +290,6 @@ test("Board uses professional PM lane labels without concurrency badge, renders 
             cardKind: "todo",
             familyDone: 0,
             familyTotal: 0,
-            needsWorktreeCheck: false,
             preview: { attachmentId: "att-after", isCompare: true },
           },
           [imageIssue.id]: {
@@ -297,7 +297,6 @@ test("Board uses professional PM lane labels without concurrency badge, renders 
             cardKind: "todo",
             familyDone: 0,
             familyTotal: 0,
-            needsWorktreeCheck: false,
             preview: { attachmentId: "att-shot", isCompare: false },
           },
         },
@@ -416,9 +415,14 @@ test("Board renders tags, parent badges, scope toggle, and TodoDetail supports t
   });
   await fake.pumpUntil(app, () => app.count("id:issue-card") === 3);
 
-  // Tags, parent badge, refresh button, and scope/tag filter controls exist.
+  // Tags, parent badge, refresh button, and scope/filter popover controls exist.
   expect(app.count("id:issue-scope")).toBe(1);
+  expect(app.count("id:issue-filter-popover")).toBe(1);
+  await app.press("id:issue-filter-popover");
+  await fake.pumpUntil(app, () => app.count("id:issue-filter-popover-menu") === 1);
   expect(app.count("id:filter-tag")).toBe(1);
+  await app.keyboard.press("escape");
+  await fake.pumpUntil(app, () => app.count("id:issue-filter-popover-menu") === 0);
   expect(app.count("id:issue-refresh")).toBe(1);
   expect(app.count("id:card-parent-badge")).toBe(1);
   expect(app.count("id:issue-tag-pill")).toBeGreaterThanOrEqual(3);
@@ -960,9 +964,9 @@ test("BlockedByPicker edits blockedBy with cycle-safe options and clickable Bloc
         runningSlots: 0,
         maxRunning: 3,
         byIssue: {
-          [blockerA.id]: { lane: "todo", cardKind: "todo", familyDone: 0, familyTotal: 0, needsWorktreeCheck: false, schedule: spanA },
-          [blockedB.id]: { lane: "backlog", cardKind: "todo", familyDone: 0, familyTotal: 0, needsWorktreeCheck: false, schedule: spanB },
-          [candidateC.id]: { lane: "in_progress", cardKind: "issue", familyDone: 0, familyTotal: 0, needsWorktreeCheck: false },
+          [blockerA.id]: { lane: "todo", cardKind: "todo", familyDone: 0, familyTotal: 0, schedule: spanA },
+          [blockedB.id]: { lane: "backlog", cardKind: "todo", familyDone: 0, familyTotal: 0, schedule: spanB },
+          [candidateC.id]: { lane: "in_progress", cardKind: "issue", familyDone: 0, familyTotal: 0 },
         },
         schedule: {
           todayDayMs: dayStart,
@@ -1324,7 +1328,6 @@ test("Unified DisplayMenu toggles density, field visibility, persistence, and re
             cardKind: "family",
             familyDone: 1,
             familyTotal: 1,
-            needsWorktreeCheck: false,
             preview: { attachmentId: "att-disp", isCompare: false },
             schedule: {
               startMs: todayMs,
@@ -1336,7 +1339,7 @@ test("Unified DisplayMenu toggles density, field visibility, persistence, and re
               overdue: false,
             },
           },
-          [child.id]: { lane: "done", cardKind: "todo", familyDone: 0, familyTotal: 0, needsWorktreeCheck: false },
+          [child.id]: { lane: "done", cardKind: "todo", familyDone: 0, familyTotal: 0 },
         },
         schedule: {
           todayDayMs: todayMs,

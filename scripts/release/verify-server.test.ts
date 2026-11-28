@@ -72,6 +72,7 @@ test("with the scripted helper, an issue goes out, comes back and is completed t
       "-c",
       `set -e
       vv() { "$VIBEVALLEY_VERIFY_CLI" "$@"; }
+      vv repo create clock > /dev/null
       vv issue create 写打卡并提交 --repo clock --agent docs > /dev/null
       vv issue status 1 todo > /dev/null
       vv issue show 1 --watch --timeout 60 > /dev/null
@@ -87,8 +88,8 @@ test("with the scripted helper, an issue goes out, comes back and is completed t
     expect(result.code).toBe(0);
     const [changes, preview, done, merged] = readFileSync(join(result.evidence, "command.stdout.log"), "utf8").trim().split("\n");
     expect((JSON.parse(changes!) as { files: { path: string }[] }).files.map((f) => f.path)).toEqual(["clock.ts"]);
-    expect((JSON.parse(preview!) as { does: string[] }).does.at(-1)).toContain("合进 main");
-    expect(JSON.parse(done!)).toMatchObject({ status: "done", delivered: "merged" });
+    expect((JSON.parse(preview!) as { does: string[] }).does.join("\n")).toContain("关成已完成");
+    expect(JSON.parse(done!)).toMatchObject({ status: "done", delivered: "none" });
     expect(merged).toBe("clock.ts");
   } finally {
     rmSync(result.evidence, { recursive: true, force: true });

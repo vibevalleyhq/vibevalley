@@ -2,7 +2,7 @@ import { Clipboard, computed, effect, List, platform, Scroll, signal, Text, untr
 import { isAvailable as mobileAvailable, SegmentedControl } from "nsh/mobile";
 
 import { t } from "@vibevalley/i18n";
-import type { Issue, IssueStatus } from "@vibevalley/protocol";
+import type { DeliveryReceipt, Issue, IssueStatus } from "@vibevalley/protocol";
 
 import type { MobileLayout } from "../design/layout";
 import {
@@ -53,6 +53,43 @@ function matchesFilter(issue: Issue, filter: IssueFilterKind): boolean {
 function matchesIssueSearch(issue: Issue, query: string): boolean {
   const hay = [`#${String(issue.number)}`, issue.id, issue.title, issue.description, issue.repo, issue.status].join(" ").toLowerCase();
   return hay.includes(query);
+}
+
+function receiptTone(kind: DeliveryReceipt["kind"]): TagTone {
+  switch (kind) {
+    case "pull_request":
+      return "info";
+    case "commit":
+      return "ok";
+    case "note":
+      return "wait";
+    case "answer":
+      return "neutral";
+  }
+}
+
+function receiptHeadline(receipt: DeliveryReceipt): string {
+  switch (receipt.kind) {
+    case "pull_request":
+      return receipt.number !== undefined ? `PR #${String(receipt.number)} · ${receipt.url}` : receipt.url;
+    case "commit":
+      return receipt.branch ? `${receipt.sha.slice(0, 12)} · ${receipt.branch}` : receipt.sha.slice(0, 12);
+    case "note":
+      return receipt.title ?? receipt.noteId;
+    case "answer":
+      return receipt.summary;
+  }
+}
+
+function receiptSummary(receipt: DeliveryReceipt): string | undefined {
+  switch (receipt.kind) {
+    case "pull_request":
+    case "commit":
+    case "note":
+      return receipt.summary;
+    case "answer":
+      return undefined;
+  }
 }
 
 function statusTone(status: IssueStatus): TagTone {
@@ -371,6 +408,21 @@ export function IssuesTab(props: {
                 </View>
               </If>
             </SectionCard>
+
+            <If when={issue().deliveryReceipt}>
+              {(receipt) => (
+                <SectionCard testID="issue-detail-receipt" class="gap-2">
+                  <View class="flex-row items-center justify-between gap-2">
+                    <Text class="text-xs font-semibold text-muted">{t("web.issue.receipt.title")}</Text>
+                    <StatusTag label={t(`web.issue.receipt.kinds.${receipt().kind}`)} tone={receiptTone(receipt().kind)} />
+                  </View>
+                  <If when={receipt().kind === "answer"} else={<Text class="font-mono text-xs text-ink">{receiptHeadline(receipt())}</Text>}>
+                    <MarkdownText text={receiptHeadline(receipt())} size="sm" />
+                  </If>
+                  <If when={receiptSummary(receipt())}>{(summary) => <Text class="text-xs text-muted">{summary()}</Text>}</If>
+                </SectionCard>
+              )}
+            </If>
 
             <SectionCard class="gap-2.5">
               <View class="flex-row items-center gap-2">

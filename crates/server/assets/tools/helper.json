@@ -198,7 +198,7 @@
  {
   "op": "issue.split",
   "name": "issue_split",
-  "description": "把你手上这个任务拆成几个子任务，挂在它下面，马上派给几个执行会话分头做（有先后的按 needs 等）。读完代码觉得这件活一个人做太大、能分成几件各自提交和验证的事时用；一般三到六张，最多 12 张。拆之前把已经做的提交：计划的分支从你的分支顶上开，没提交的带不过去。拆完你就别再改代码，汇报拆成了哪几步，这一轮结束。",
+  "description": "把你手上这个任务拆成几个子任务，挂在它下面，马上派给几个执行会话分头做（有先后的按 needs 等）。读完代码觉得这件活一个人做太大、能分成几件各自独立交付和验证的事时用；一般三到六张，最多 12 张。父子工单只表达任务拆解与 DAG 阻塞关系，各子任务由对应执行会话自主管理分支/worktree 并提交各自的交付凭据。拆完你就别再改代码，汇报拆成了哪几步，这一轮结束。",
   "parameters": {
    "additionalProperties": true,
    "properties": {
@@ -273,12 +273,52 @@
  {
   "op": "issue.report",
   "name": "issue_report",
-  "description": "结构化报告当前任务的一轮：summary 是净结果。prSubmit=true 提交 PR 后继续跟随 CI/评审；最终交给用户验收用 prSubmit=false。有问题或未满足的验收项则等用户。问题、验收凭据和记忆只认这些字段，不从正文猜。用用户的语言填写。",
+  "description": "结构化报告当前任务的一轮：summary 是净结果；deliveryReceipt 记录本次交付凭据（pull_request / commit / note / answer）。prSubmit=true 提交 PR 后继续跟随 CI/评审；最终交给用户验收用 prSubmit=false。有问题或未满足的验收项则等用户。问题、验收凭据和记忆只认这些字段，不从正文猜。用用户的语言填写。",
   "parameters": {
    "additionalProperties": true,
    "properties": {
     "summary": {
      "type": "string"
+    },
+    "deliveryReceipt": {
+     "description": "多态交付凭据：pull_request（url/number/branch/summary）、commit（sha/branch/summary）、note（noteId/title/summary）或 answer（summary）",
+     "additionalProperties": true,
+     "properties": {
+      "kind": {
+       "enum": [
+        "pull_request",
+        "commit",
+        "note",
+        "answer"
+       ],
+       "type": "string"
+      },
+      "url": {
+       "type": "string"
+      },
+      "number": {
+       "type": "integer"
+      },
+      "branch": {
+       "type": "string"
+      },
+      "sha": {
+       "type": "string"
+      },
+      "noteId": {
+       "type": "string"
+      },
+      "title": {
+       "type": "string"
+      },
+      "summary": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "kind"
+     ],
+     "type": "object"
     },
     "questions": {
      "items": {

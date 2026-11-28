@@ -119,7 +119,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着 Papertrails 纸�
 | 派工关联 | assignment | `Assignment`（`Issue.assignments`） |  |
 | 执行器 | executor | `Drivers`（角色经 oar 开会话） |  |
 | 起草 | refine | refine（`refine`、`refinement_brief`） |  |
-| 用户 | user | user（`User`、`userId`） | 主人、owner |
+| 用户 | user | user（`User`、`ParticipantId`） | 主人、owner |
 | 默认频道 | the farm chat | 默认频道（`default_channel`） | 群（指默认频道时）、田头（中文界面） |
 | 私聊 | direct message | direct | 私信 |
 | 和执行会话私聊 | talk | `Channel.direct`、`Session.channel` |  |

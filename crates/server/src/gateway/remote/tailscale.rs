@@ -45,8 +45,7 @@ struct RawSelfPeer {
 
 /// True for Tailscale's CGNAT IPv4 range (`100.64.0.0/10`).
 pub fn is_tailscale_ipv4(ip: Ipv4Addr) -> bool {
-    let octets = ip.octets();
-    octets[0] == 100 && (octets[1] & 0b1100_0000) == 64
+    vibevalley_kit::net::gateway::remote::is_cgnat_ipv4(ip)
 }
 
 fn first_tailscale_ipv4<'a>(ips: impl IntoIterator<Item = &'a str>) -> Option<String> {

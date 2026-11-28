@@ -9,7 +9,6 @@ import type { IconName } from "../../design/icons";
 import { api } from "../../infra/api";
 import { defineQuery, retryRead, useQuery } from "../../infra/query";
 import { Link as A, useRouter } from "../../infra/router";
-import { noteSuffixOf } from "./html";
 
 const fresh = 5_000;
 
@@ -52,10 +51,10 @@ export const kindLabel = (n: { readonly noteType: NoteType }): string => noteTyp
 
 export const noteIcon = (n: { readonly noteType: NoteType }): IconName => noteTypeIcon[n.noteType];
 
-const noteSuffix = (n: { readonly noteType: NoteType }): string => noteSuffixOf(n);
-
 const cardLine = (card: NoteCardData) =>
-  [kindLabel(card), ...(card.version > 0 ? [t("web.note.card.version", { version: card.version })] : []), ...(card.note ? [card.note] : [])].join(" · ");
+  [...(card.version > 0 ? [t("web.note.card.version", { version: card.version })] : [t("web.note.page.liveVersion")]), ...(card.note ? [card.note] : [])].join(
+    " · ",
+  );
 
 function normalizeCard(input: NoteCardData | Note): NoteCardData {
   if ("note" in input) return input;
@@ -101,7 +100,7 @@ export function NoteCard(props: { readonly card?: NoteCardData | undefined; read
             <View class="flex-row items-center gap-1.5">
               <Text class="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{c().title}</Text>
               <View class="shrink-0 rounded-xs bg-hover px-1.5 py-px">
-                <Text class="font-mono text-2xs text-muted">{noteSuffix(c())}</Text>
+                <Text class="text-2xs font-medium text-muted">{kindLabel(c())}</Text>
               </View>
             </View>
             <Text class="truncate text-xs text-muted tabular-nums">{cardLine(c())}</Text>

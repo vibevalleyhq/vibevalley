@@ -27,7 +27,6 @@ import { RunSteps, runsHref } from "../../session";
 import { type ActivityItem, mergeIssueActivity, remainingMessageAttachments } from "../model/activity";
 import { useIssueRuns, useIssueTimeline } from "../model/history";
 import { localizeIssueError } from "../model/issueError";
-import { ReconcileWorktree } from "./IssueSections";
 
 const conversationQuery = defineQuery({
   key: (id: string) => ["issues", "conversation", id],
@@ -50,7 +49,6 @@ function MilestoneRow(props: {
   isLast: boolean;
   headSessionId: string | undefined;
   now: number;
-  onChanges?: (() => void) | undefined;
 }) {
   const m = () => props.item.milestone;
   const saidInfo = computed(() => {
@@ -105,9 +103,6 @@ function MilestoneRow(props: {
             </View>
           )}
         </If>
-        <If when={props.item.attachRunSteps && props.item.run?.needsReconciliation === true}>
-          <ReconcileWorktree onChanges={props.onChanges} />
-        </If>
         <If when={stepsSession() && runId() ? ([stepsSession()!, runId()!] as const) : undefined}>
           {(target) => <RunSteps session={target()[0]} run={target()[1]} />}
         </If>
@@ -148,7 +143,6 @@ export function IssueActivity(props: {
   timelinePending?: boolean | undefined;
   rounds?: number | undefined;
   runsVersion?: string | undefined;
-  onChanges?: (() => void) | undefined;
 }) {
   const collab = useCollabSlice();
   const now = useNow();
@@ -255,7 +249,6 @@ export function IssueActivity(props: {
                     isLast={i() === items().length - 1}
                     headSessionId={props.headSessionId}
                     now={now()}
-                    onChanges={props.onChanges}
                   />
                 )}
               </If>

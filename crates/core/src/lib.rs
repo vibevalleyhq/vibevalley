@@ -36,9 +36,7 @@ pub use crate::core::{
     Applied, Core, SliceMask, Transition, board_slice, collab_slice, cron_from_rules, cron_request_to_rules, cron_to_rules, empty_space_state, farm_frame,
     inbox_slice, ops_slice, reduce, sessions_slice, slice_bundle,
 };
-pub use crate::deps::{
-    CheckoutChecks, DagNode, DagProblem, acceptance_ancestors, blocked_issues, child_checks, dag_id_valid, dag_problems, dependency_problems,
-};
+pub use crate::deps::{DagNode, DagProblem, blocked_issues, dag_id_valid, dag_problems, dependency_problems};
 pub use crate::health::{MorningDigestInput, RepoHealthInput, assess_repo_health, assess_repos_health, build_morning_digest, suggest_backlog_triage};
 pub use crate::moves::{Move, Refusal, status_move, status_moves};
 pub use crate::projection::{

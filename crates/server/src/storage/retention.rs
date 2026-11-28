@@ -1,7 +1,8 @@
 //! Configurable periodic retention housekeeping for append-only database tables
-//! (`outbox_item`, `channel_delivery`, `session_mailbox`, `pull_event`), host
-//! disk artifact directories (`debug-bundles/`, `records/`), and safe orphan
-//! attachment GC with grace period and dry-run preview.
+//! (`outbox_item`, `channel_delivery`, `session_mailbox`, `note_change`,
+//! `session_event`), host disk artifact directories (`debug-bundles/`,
+//! `records/`), and safe orphan attachment GC with grace period and dry-run
+//! preview.
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -10,6 +11,7 @@ use std::time::{Duration, SystemTime};
 
 use parking_lot::Mutex as SyncMutex;
 use serde::{Deserialize, Serialize};
+use vibevalley_kit::storage::{OrphanSweeper, extract_sha256_tokens, is_sha256_hex};
 use vibevalley_protocol::ApiError;
 
 use super::attachment::AttachmentStorage;
@@ -35,8 +37,10 @@ pub struct RetentionPolicy {
     pub channel_delivery_ttl: Duration,
     /// Retention window for settled (`status NOT IN ('pending', 'claimed')`) `session_mailbox` rows.
     pub session_mailbox_ttl: Duration,
-    /// Retention window for `pull_event` rows belonging to closed/merged `pull` records.
-    pub pull_event_ttl: Duration,
+    /// Maximum newest `note_change` rows retained per note (0 disables pruning).
+    pub note_changes_keep_per_note: u64,
+    /// Retention window for historical `session_event` rows belonging to `departed = true` sessions.
+    pub departed_session_events_ttl: Duration,
     /// Number of newest diagnostic ZIP archives to retain under `<home>/debug-bundles/`.
     pub debug_bundles_keep: usize,
     /// Retention window for `oar-voyage/3` JSONL files under `<home>/records/`.
@@ -56,7 +60,8 @@ impl Default for RetentionPolicy {
             outbox_done_ttl: Duration::from_secs(7 * DAY_SECS),
             channel_delivery_ttl: Duration::from_secs(30 * DAY_SECS),
             session_mailbox_ttl: Duration::from_secs(30 * DAY_SECS),
-            pull_event_ttl: Duration::from_secs(30 * DAY_SECS),
+            note_changes_keep_per_note: 256,
+            departed_session_events_ttl: Duration::from_secs(14 * DAY_SECS),
             debug_bundles_keep: 10,
             records_ttl: Duration::from_secs(14 * DAY_SECS),
             records_max_bytes: 256 * MIB,
@@ -84,7 +89,12 @@ impl RetentionPolicy {
             let ttl = Duration::from_secs(days.saturating_mul(DAY_SECS));
             policy.channel_delivery_ttl = ttl;
             policy.session_mailbox_ttl = ttl;
-            policy.pull_event_ttl = ttl;
+        }
+        if let Some(keep) = env_u64("VIBEVALLEY_RETENTION_NOTE_CHANGES_KEEP") {
+            policy.note_changes_keep_per_note = keep;
+        }
+        if let Some(days) = env_u64("VIBEVALLEY_RETENTION_SESSION_EVENTS_DAYS") {
+            policy.departed_session_events_ttl = Duration::from_secs(days.saturating_mul(DAY_SECS));
         }
         if let Some(keep) = env_u64("VIBEVALLEY_RETENTION_DEBUG_BUNDLES_KEEP") {
             policy.debug_bundles_keep = keep as usize;
@@ -112,7 +122,8 @@ pub struct RetentionReport {
     pub outbox_done: u64,
     pub channel_deliveries: u64,
     pub session_mailbox: u64,
-    pub pull_events: u64,
+    pub note_changes: u64,
+    pub departed_session_events: u64,
     pub debug_bundles_removed: u64,
     pub debug_bundles_bytes: u64,
     pub records_removed: u64,
@@ -121,7 +132,13 @@ pub struct RetentionReport {
 
 impl RetentionReport {
     pub fn total_removed(&self) -> u64 {
-        self.outbox_done + self.channel_deliveries + self.session_mailbox + self.pull_events + self.debug_bundles_removed + self.records_removed
+        self.outbox_done
+            + self.channel_deliveries
+            + self.session_mailbox
+            + self.note_changes
+            + self.departed_session_events
+            + self.debug_bundles_removed
+            + self.records_removed
     }
 }
 
@@ -239,12 +256,22 @@ impl Housekeeper {
         })
         .await?;
 
-        let pull_cutoff = cutoff_ms(now_ms, self.policy.pull_event_ttl);
-        let pull_events = prune_in_batches(batch, max_batches, |limit| async move {
+        let note_changes = if self.policy.note_changes_keep_per_note > 0 {
+            let keep = self.policy.note_changes_keep_per_note;
+            prune_in_batches(batch, max_batches, |limit| async move {
+                self.ctx.service.note.prune_excess_note_changes_batch(keep, limit).await.map_err(internal)
+            })
+            .await?
+        } else {
+            0
+        };
+
+        let session_events_cutoff = cutoff_ms(now_ms, self.policy.departed_session_events_ttl);
+        let departed_session_events = prune_in_batches(batch, max_batches, |limit| async move {
             self.ctx
                 .service
-                .issue
-                .prune_closed_pull_events_batch(pull_cutoff, limit)
+                .session
+                .prune_departed_events_batch(session_events_cutoff, limit)
                 .await
                 .map_err(internal)
         })
@@ -257,7 +284,8 @@ impl Housekeeper {
             outbox_done,
             channel_deliveries,
             session_mailbox,
-            pull_events,
+            note_changes,
+            departed_session_events,
             debug_bundles_removed,
             debug_bundles_bytes,
             records_removed,
@@ -268,7 +296,8 @@ impl Housekeeper {
                 outbox_done = report.outbox_done,
                 channel_deliveries = report.channel_deliveries,
                 session_mailbox = report.session_mailbox,
-                pull_events = report.pull_events,
+                note_changes = report.note_changes,
+                departed_session_events = report.departed_session_events,
                 debug_bundles_removed = report.debug_bundles_removed,
                 records_removed = report.records_removed,
                 "storage.retention pass pruned stale entries"
@@ -307,27 +336,26 @@ impl Housekeeper {
             });
         }
 
-        let stored_objects = self.backend.list("attachments/").await.map_err(internal)?;
-        for meta in stored_objects {
-            let Some(name) = meta.key.strip_prefix("attachments/") else {
-                continue;
-            };
-            // Skip nested directories (e.g. `.staging/media/...`), temp files, and non-CAS entries.
-            if name.contains('/') || !is_sha256_hex(name) {
-                continue;
+        let mut active_blob_keys: HashSet<String> = all_db_ids.iter().chain(referenced.iter()).map(|id| format!("attachments/{id}")).collect();
+        for id in &seen_ids {
+            active_blob_keys.insert(format!("attachments/{id}"));
+        }
+        let unindexed_scan = OrphanSweeper::sweep_prefix(self.backend.as_ref(), "attachments/", &active_blob_keys, cutoff, true, |meta| {
+            meta.key
+                .strip_prefix("attachments/")
+                .is_some_and(|name| !name.contains('/') && is_sha256_hex(name))
+        })
+        .await
+        .map_err(internal)?;
+        for orphan in unindexed_scan.candidates {
+            if let Some(name) = orphan.key.strip_prefix("attachments/") {
+                seen_ids.insert(name.to_owned());
+                candidates.push(OrphanAttachmentCandidate {
+                    id: name.to_owned(),
+                    size: orphan.size,
+                    unindexed_blob: true,
+                });
             }
-            if all_db_ids.contains(name) || referenced.contains(name) || seen_ids.contains(name) {
-                continue;
-            }
-            if meta.last_modified_ms.is_none_or(|modified| modified >= cutoff) {
-                continue;
-            }
-            seen_ids.insert(name.to_owned());
-            candidates.push(OrphanAttachmentCandidate {
-                id: name.to_owned(),
-                size: meta.size,
-                unindexed_blob: true,
-            });
         }
 
         let total_bytes: u64 = candidates.iter().map(|c| c.size).sum();
@@ -535,34 +563,6 @@ async fn collect_note_attachment_refs_async(backend: &Arc<dyn StorageBackend>) -
     Ok(refs)
 }
 
-/// Scans `text` for 64-character lowercase hexadecimal tokens (SHA-256 attachment IDs)
-/// delimited by non-hex characters.
-pub(crate) fn extract_sha256_tokens(text: &str, out: &mut HashSet<String>) {
-    let bytes = text.as_bytes();
-    let mut i = 0usize;
-    while i < bytes.len() {
-        if is_lower_hex(bytes[i]) {
-            let start = i;
-            while i < bytes.len() && is_lower_hex(bytes[i]) {
-                i += 1;
-            }
-            if i - start == 64 && !bytes.get(i).is_some_and(|b| b.is_ascii_hexdigit()) {
-                out.insert(text[start..i].to_owned());
-            }
-        } else {
-            i += 1;
-        }
-    }
-}
-
-fn is_lower_hex(b: u8) -> bool {
-    matches!(b, b'0'..=b'9' | b'a'..=b'f')
-}
-
-fn is_sha256_hex(s: &str) -> bool {
-    s.len() == 64 && s.bytes().all(is_lower_hex)
-}
-
 #[cfg(test)]
 mod tests {
     use std::time::Duration;
@@ -661,7 +661,8 @@ mod tests {
             outbox_done_ttl: Duration::from_secs(7 * DAY_SECS),
             channel_delivery_ttl: Duration::from_secs(30 * DAY_SECS),
             session_mailbox_ttl: Duration::from_secs(30 * DAY_SECS),
-            pull_event_ttl: Duration::from_secs(30 * DAY_SECS),
+            note_changes_keep_per_note: 256,
+            departed_session_events_ttl: Duration::from_secs(14 * DAY_SECS),
             debug_bundles_keep: 2,
             records_ttl: Duration::from_secs(14 * DAY_SECS),
             records_max_bytes: 10 * MIB,
@@ -846,11 +847,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn housekeeper_prunes_channel_deliveries_session_mailbox_and_closed_pull_events() {
-        use vibevalley_protocol::{PublishPlatform, PullRequestState};
+    async fn housekeeper_prunes_channel_deliveries_session_mailbox_note_changes_and_departed_events() {
+        use vibevalley_protocol::{ExecutionPolicy, PublishPlatform, PullRequestState, Session, SessionController, SessionEvent, SessionEventType};
 
         use crate::service::channel::{NewDelivery, NewMessage};
         use crate::service::issue::UpsertPullInput;
+        use crate::service::note::NewNote;
         use crate::service::session::MailboxSource;
 
         let dir = tempfile::tempdir().unwrap();
@@ -864,7 +866,8 @@ mod tests {
             max_batches_per_tick: 10,
             channel_delivery_ttl: Duration::from_secs(30 * DAY_SECS),
             session_mailbox_ttl: Duration::from_secs(30 * DAY_SECS),
-            pull_event_ttl: Duration::from_secs(30 * DAY_SECS),
+            note_changes_keep_per_note: 2,
+            departed_session_events_ttl: Duration::from_secs(14 * DAY_SECS),
             ..Default::default()
         };
         let storage = Storage::open_with_backend_and_policy_async(dir.path(), Arc::new(crate::storage::LocalFsBackend::new(dir.path())), ctx.clone(), policy)
@@ -912,7 +915,7 @@ mod tests {
                                 &NewDelivery {
                                     message_id: &msg_id,
                                     channel_id: "ch-1",
-                                    recipient_kind: "direct",
+                                    recipient_kind: "agent",
                                     recipient_id: "laozhou",
                                     reason: "mention",
                                     wakes: true,
@@ -951,30 +954,82 @@ mod tests {
             .await
             .unwrap();
 
-        // 3. Seed 1 merged pull (with 3 pull_events) and 1 open pull (with 1 pull_event).
-        let merged_pull = ctx
-            .service
-            .issue
-            .upsert_pull(UpsertPullInput {
-                platform: PublishPlatform::Github,
-                repo: "vibevalley".into(),
-                number: 1,
-                url: "https://example.test/pr/1".into(),
-                branch: "feat/a".into(),
-                base: "main".into(),
-                state: PullRequestState::Merged,
-                issue_id: None,
-                at: t0,
+        // 3. Seed 5 note_change rows for note-1 (keep_per_note = 2 -> prune oldest 3), plus an expired departed session
+        //    with 3 events and an active session with 2 events.
+        let ctx_n = ctx.clone();
+        ctx.service
+            .write_dirty(move |tx| {
+                Box::pin(async move {
+                    ctx_n
+                        .service
+                        .note
+                        .add_in_tx(
+                            tx,
+                            NewNote {
+                                id: "note-ret".into(),
+                                title: "Ret Note".into(),
+                                note_type: "doc".into(),
+                                parent_id: None,
+                                sort_order: 0,
+                                channel_id: None,
+                                issue: None,
+                                by_id: "user".into(),
+                                by_name: "User".into(),
+                                version: 1,
+                                created_at: t0,
+                            },
+                        )
+                        .await
+                        .map_err(internal)?;
+                    for seq in 1..=5 {
+                        ctx_n
+                            .service
+                            .note
+                            .add_file_change_in_tx(tx, "note-ret", seq, "user", None, &["structure/main.md".into()], &[], t0 + seq)
+                            .await
+                            .map_err(internal)?;
+                    }
+                    Ok::<_, ApiError>(((), SliceMask::NONE))
+                })
             })
             .await
             .unwrap();
-        for i in 0..3 {
-            ctx.service
-                .issue
-                .keep_pull_event(&merged_pull.id, &format!("ev-{i}"), None, None)
-                .await
-                .unwrap();
-        }
+
+        let make_session = |id: &str| Session::new(id, SessionController::IssueBoard, id, "scripted", ExecutionPolicy::SandboxDir, t0);
+        let make_ev = |seq: i64| SessionEvent {
+            seq,
+            revision: 1,
+            time: t0 + seq,
+            r#type: SessionEventType::AssistantMessage,
+            run: None,
+            call: None,
+            under: None,
+            thread_id: None,
+            text: format!("ev-{seq}"),
+            action: None,
+            action_text: None,
+            tool: None,
+            input: None,
+            output: None,
+            ok: None,
+            tokens: None,
+            connection: None,
+            permission: None,
+            interaction: None,
+            interaction_resolution: None,
+        };
+        ctx.service.session.put(&make_session("sess-departed"), true).await.unwrap();
+        ctx.service.session.put(&make_session("sess-active"), false).await.unwrap();
+        ctx.service
+            .session
+            .upsert_events_batch(&[
+                ("sess-departed".into(), vec![make_ev(1), make_ev(2), make_ev(3)]),
+                ("sess-active".into(), vec![make_ev(1), make_ev(2)]),
+            ])
+            .await
+            .unwrap();
+
+        // 4. Verify known_events are automatically cleared when a pull transitions to Merged.
         let open_pull = ctx
             .service
             .issue
@@ -992,20 +1047,28 @@ mod tests {
             .await
             .unwrap();
         ctx.service.issue.keep_pull_event(&open_pull.id, "ev-open", None, None).await.unwrap();
+        assert_eq!(ctx.service.issue.known_pull_events(&open_pull.id).await.unwrap().len(), 1);
 
-        // Advance ManualClock by 31 days -> all settled/closed entries expire; pending/open survive.
+        // Advance ManualClock by 31 days -> expired deliveries, mailboxes, excess note_changes, and departed session events prune cleanly.
         clock.set(t0 + 31 * (DAY_SECS as i64) * 1000);
         let report = storage.run_housekeeping_async().await.unwrap();
         assert_eq!(report.channel_deliveries, 3);
         assert_eq!(report.session_mailbox, 3);
-        assert_eq!(report.pull_events, 3);
+        assert_eq!(report.note_changes, 3);
+        assert_eq!(report.departed_session_events, 3);
 
         assert!(ctx.service.channel.delivery_is_pending(delivery_ids[3]).await.unwrap());
         let mb_left = ctx.service.session.list_mailbox("sess-1").await.unwrap();
         assert_eq!(mb_left.len(), 1);
         assert_eq!(mb_left[0].id, pending_mb.id);
-        assert!(ctx.service.issue.known_pull_events(&merged_pull.id).await.unwrap().is_empty());
-        assert_eq!(ctx.service.issue.known_pull_events(&open_pull.id).await.unwrap().len(), 1);
+        let kept_changes = ctx.service.note.file_changes_after("note-ret", 0, 10).await.unwrap();
+        let kept_seqs: Vec<i64> = kept_changes.into_iter().map(|c| c.seq).collect();
+        assert_eq!(kept_seqs, vec![4, 5]);
+        assert!(ctx.service.session.list_events_after("sess-departed", "", 0, 10).await.unwrap().is_empty());
+        assert_eq!(ctx.service.session.list_events_after("sess-active", "", 0, 10).await.unwrap().len(), 2);
+
+        ctx.service.issue.set_pull_state(&open_pull.id, PullRequestState::Merged, t0 + 1).await.unwrap();
+        assert!(ctx.service.issue.known_pull_events(&open_pull.id).await.unwrap().is_empty());
 
         storage.close_async().await;
         let _ = ctx.shutdown(Duration::from_secs(2)).await;

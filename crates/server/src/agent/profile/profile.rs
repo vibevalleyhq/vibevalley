@@ -6,8 +6,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use arc_swap::ArcSwap;
 use include_dir::{Dir, include_dir};
-use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use vibevalley_i18n::{list, t};
@@ -393,7 +393,6 @@ struct TemplateFile {
     model: Option<String>,
     effort: Option<String>,
     persona_mode: Option<PersonaMode>,
-    worktree: Option<bool>,
     look: Option<LookFile>,
     skills: Option<Vec<String>>,
 }
@@ -471,7 +470,6 @@ fn template_from(text_of: &dyn Fn(&str) -> Option<String>, dir: &str, source: Ag
         model: item.model.unwrap_or_default(),
         effort: item.effort.unwrap_or_default(),
         persona_mode: item.persona_mode.unwrap_or(PersonaMode::Append),
-        worktree: item.worktree.unwrap_or(item.role == AgentRole::Worker),
         look: Look {
             species: look.species,
             outfit: look.outfit,
@@ -607,7 +605,6 @@ fn profile_of(item: &AgentTemplate, id: String, code: String, name: String) -> A
         disallowed_tools: vec![],
         env: BTreeMap::new(),
         workdir: String::new(),
-        worktree: item.worktree,
         tags: item.tags.clone(),
         look: item.look.clone(),
         voice: None,
@@ -636,7 +633,6 @@ fn updated_from(item: &AgentTemplate, a: &Agent) -> Agent {
         tags: item.tags.clone(),
         persona: item.persona.clone(),
         persona_mode: item.persona_mode,
-        worktree: item.worktree,
         look,
         skills,
         from: Some(AgentFrom {
@@ -683,8 +679,8 @@ pub type Keep = Arc<dyn Fn(&Agent) -> Result<(), ApiError> + Send + Sync>;
 pub struct ProfileStore {
     home: PathBuf,
     file: PathBuf,
-    stored: Mutex<Stored>,
-    keeps: Mutex<Vec<Keep>>,
+    stored: ArcSwap<Stored>,
+    keeps: ArcSwap<Vec<Keep>>,
     write_gate: tokio::sync::Semaphore,
 }
 
@@ -744,12 +740,12 @@ impl ProfileStore {
         let profiles = ProfileStore {
             home: home.to_path_buf(),
             file,
-            stored: Mutex::new(Stored::default()),
-            keeps: Mutex::default(),
+            stored: ArcSwap::from_pointee(Stored::default()),
+            keeps: ArcSwap::from_pointee(Vec::new()),
             write_gate: tokio::sync::Semaphore::new(1),
         };
         profiles.write_async(&s).await?;
-        *profiles.stored.lock() = s;
+        profiles.stored.store(Arc::new(s));
         Ok(Arc::new(profiles))
     }
 
@@ -767,7 +763,7 @@ impl ProfileStore {
             .acquire()
             .await
             .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?;
-        let mut next = self.stored.lock().clone();
+        let mut next = (**self.stored.load()).clone();
         let out = f(&mut next)?;
         self.write_async(&next).await.map_err(|e| {
             refused(t(
@@ -775,24 +771,28 @@ impl ProfileStore {
                 &[("file", self.file.to_string_lossy().into_owned().into()), ("why", e.to_string().into())],
             ))
         })?;
-        *self.stored.lock() = next;
+        self.stored.store(Arc::new(next));
         Ok(out)
     }
 
     fn saved(&self, agent: Agent) -> Result<Agent, ApiError> {
-        let keeps = self.keeps.lock().clone();
-        for keep in keeps {
+        let keeps = self.keeps.load();
+        for keep in keeps.iter() {
             keep(&agent)?;
         }
         Ok(agent)
     }
 
     pub fn when_kept(&self, keep: Keep) {
-        self.keeps.lock().push(keep);
+        self.keeps.rcu(|old| {
+            let mut next = (**old).clone();
+            next.push(keep.clone());
+            next
+        });
     }
 
     pub fn all(&self) -> Vec<Agent> {
-        self.stored.lock().agents.clone()
+        self.stored.load().agents.clone()
     }
 
     /// Worker profiles (managed and external) on the teammates roster.
@@ -813,11 +813,11 @@ impl ProfileStore {
     }
 
     pub fn is_orchestrator(&self, id: &str) -> bool {
-        self.stored.lock().agents.iter().any(|a| a.id == id && a.role == AgentRole::Orchestrator)
+        self.stored.load().agents.iter().any(|a| a.id == id && a.role == AgentRole::Orchestrator)
     }
 
     pub fn agent(&self, id: &str) -> Option<Agent> {
-        self.stored.lock().agents.iter().find(|a| a.id == id).cloned()
+        self.stored.load().agents.iter().find(|a| a.id == id).cloned()
     }
 
     /// A worker by id, teammate code (`W-XX`), or name.
@@ -835,12 +835,12 @@ impl ProfileStore {
     /// Built-in skills first, followed by user skills loaded from `<home>/skills/<id>/SKILL.md`.
     pub fn skills(&self) -> Vec<Skill> {
         let mut out = built_in_skills();
-        out.extend(self.stored.lock().user_skills.clone());
+        out.extend(self.stored.load().user_skills.clone());
         out
     }
 
     pub fn settings(&self, runtime: &str) -> RuntimeSettings {
-        self.stored.lock().settings.get(runtime).cloned().unwrap_or_else(default_settings)
+        self.stored.load().settings.get(runtime).cloned().unwrap_or_else(default_settings)
     }
 
     pub async fn save_settings_async(&self, runtime: &str, settings: RuntimeSettings) -> Result<RuntimeSettings, ApiError> {
@@ -976,7 +976,6 @@ impl ProfileStore {
                     disallowed_tools: vec![],
                     env: BTreeMap::new(),
                     workdir: String::new(),
-                    worktree: false,
                     tags: input.tags.unwrap_or_default(),
                     look: Look {
                         species: None,
@@ -1037,7 +1036,7 @@ impl ProfileStore {
     fn deletable_skill(&self, id: &str) -> Result<Skill, ApiError> {
         Self::not_built_in(id)?;
         self.stored
-            .lock()
+            .load()
             .user_skills
             .iter()
             .find(|k| k.id == id)
@@ -1065,8 +1064,9 @@ impl ProfileStore {
                 ],
             ))
         })?;
-        let mut guard = self.stored.lock();
-        guard.user_skills = upsert(&guard.user_skills, kept.clone(), |k| &k.id);
+        let mut next = (**self.stored.load()).clone();
+        next.user_skills = upsert(&next.user_skills, kept.clone(), |k| &k.id);
+        self.stored.store(Arc::new(next));
         Ok(kept)
     }
 
@@ -1107,7 +1107,9 @@ impl ProfileStore {
                 ],
             ))
         })?;
-        self.stored.lock().user_skills.push(created.clone());
+        let mut next = (**self.stored.load()).clone();
+        next.user_skills.push(created.clone());
+        self.stored.store(Arc::new(next));
         Ok(created)
     }
 
@@ -1135,7 +1137,7 @@ impl ProfileStore {
         let k = self.deletable_skill(id)?;
         let holders: Vec<String> = self
             .stored
-            .lock()
+            .load()
             .agents
             .iter()
             .filter(|a| a.skills.iter().any(|s| s == id))

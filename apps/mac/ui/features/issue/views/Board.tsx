@@ -1,4 +1,4 @@
-import { computed, Scroll, signal, Text, untracked, View, windowSize } from "nsh";
+import { computed, Scroll, signal, Text, untracked, View, windowSize, type ScrollRef } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 
@@ -41,7 +41,7 @@ export {
 
 /** Six lanes to drag between; narrower than 700, one lane at a time behind tabs. */
 export function IssueBoard(props: BoardProps) {
-  const lane = signal<Lane>(props.cards.find((card) => card.id === props.selected)?.lane ?? "backlog");
+  const lane = signal<Lane>(untracked(() => props.cards.find((card) => card.id === props.selected)?.lane ?? "backlog"));
   const narrow = computed(() => windowSize().width < 700);
   const scrollWidth = signal<number | undefined>(undefined);
   const folded = signal<ReadonlySet<string>>(new Set());
@@ -63,7 +63,15 @@ export function IssueBoard(props: BoardProps) {
     return Math.max(240, w - railW - BOARD_PAD_X * 2);
   });
   const laneWidth = computed(() => boardLaneWidth(availableBoardWidth(), lanes.length));
+  const scrollOffsetX = signal(0);
   const drag = createDrag(() => props);
+  const bindBoardScroll = (el: ScrollRef) => {
+    drag.setScroll(
+      el,
+      () => untracked(scrollOffsetX),
+      () => untracked(scrollWidth) ?? windowSize().width,
+    );
+  };
   const cardsByLane = computed<Record<Lane, BoardCard[]>>(() => {
     const grouped: Record<Lane, BoardCard[]> = { backlog: [], todo: [], in_progress: [], in_review: [], done: [], canceled: [] };
     for (const c of props.cards) grouped[c.lane].push(c);
@@ -78,8 +86,13 @@ export function IssueBoard(props: BoardProps) {
     done: laneCountOf("done", props.cards, props.summary, props.filtered === true, props.older),
     canceled: laneCountOf("canceled", props.cards, props.summary, props.filtered === true, props.older),
   }));
+  const primaryEmptyLane = computed<Lane | undefined>(() => {
+    const byLane = cardsByLane();
+    if (byLane.todo.length === 0) return "todo";
+    return lanes.find((l) => byLane[l].length === 0);
+  });
   return (
-    <View testID="issue-board" ref={drag.setRoot} class="min-h-0 flex-1 px-3 py-3">
+    <View testID="issue-board" ref={drag.setRoot} class="min-h-0 min-w-0 flex-1 overflow-hidden px-3 py-3">
       <If when={narrow()}>
         <View accessibilityLabel={t("web.issue.board.whichLane")} class="mb-2.5 flex-row gap-0.5 rounded-md border border-line bg-side p-0.5">
           <Each of={lanes} key={(l) => l}>
@@ -111,14 +124,16 @@ export function IssueBoard(props: BoardProps) {
             when={narrow()}
             else={
               <Scroll
+                ref={bindBoardScroll}
                 testID="board-scroll"
                 horizontal
+                onScroll={(e) => scrollOffsetX.set(e.offset.x)}
                 onLayout={(e) => {
                   const w = Math.floor(e.bounds.size.width);
                   if (w > 0 && w !== untracked(scrollWidth)) scrollWidth.set(w);
                 }}
-                class="min-h-0 flex-1"
-                contentClass="min-h-full flex-row gap-2.5"
+                class="min-h-0 min-w-0 w-full flex-1"
+                contentClass="min-h-full flex-row gap-2.5 pr-3"
               >
                 <Each of={lanes} key={(l) => l}>
                   {(l) => (
@@ -129,7 +144,8 @@ export function IssueBoard(props: BoardProps) {
                       laneWidth={laneWidth()}
                       cards={cardsByLane()[l()]}
                       count={laneCounts()[l()]}
-                      showClear={props.filtered === true && props.cards.length === 0 && props.onClearFilter !== undefined && l() === "backlog"}
+                      emptyMode={l() === primaryEmptyLane() ? "full" : "quiet"}
+                      showClear={props.filtered === true && props.cards.length === 0 && props.onClearFilter !== undefined && l() === primaryEmptyLane()}
                       drag={drag}
                     />
                   )}
@@ -159,111 +175,115 @@ export function IssueBoard(props: BoardProps) {
         }
       >
         <Scroll
+          ref={bindBoardScroll}
           testID="board-scroll"
           horizontal={!narrow()}
+          onScroll={(e) => scrollOffsetX.set(e.offset.x)}
           onLayout={(e) => {
             const w = Math.floor(e.bounds.size.width);
             if (w > 0 && w !== untracked(scrollWidth)) scrollWidth.set(w);
           }}
-          class="min-h-0 flex-1"
-          contentClass="min-h-full flex-col gap-2"
+          class="min-h-0 min-w-0 w-full flex-1"
+          contentClass={narrow() ? "min-h-full flex-col gap-2" : "min-h-full flex-row pr-3"}
         >
-          <If when={!narrow()}>
-            <View class="shrink-0 flex-row gap-2.5">
-              <Each of={lanes} key={(l) => l}>
-                {(l) => (
-                  <View class="rounded-lg bg-side px-2.5 py-0.5" style={{ width: laneWidth() }}>
-                    <LaneHeader
-                      lane={l()}
-                      count={laneCounts()[l()]}
-                      showNew={isOrderLane(l()) && (props.loading || props.cards.length > 0)}
-                      newButtonTestId={l() === "todo" ? "issue-new" : `issue-new-${l()}`}
-                      onNew={props.onNew}
-                    />
-                  </View>
-                )}
-              </Each>
-            </View>
-          </If>
-          <Scroll testID="board-grouped-scroll" class="min-h-0 flex-1" contentClass="gap-2.5 pb-2">
-            <If when={!props.loading} else={<Text class="px-1 text-xs text-faint">{t("web.issue.reading")}</Text>}>
-              <If
-                when={groups().length > 0}
-                else={
-                  <View testID="board-grouped-empty" class="items-start gap-2 rounded-lg border border-line bg-side px-4 py-6">
-                    <Text class="text-xs text-muted">{props.filtered === true ? t("web.issue.board.emptyGuide.filtered") : t("web.issue.list.empty")}</Text>
-                    <If when={props.filtered === true && props.onClearFilter !== undefined}>
-                      <Button size="compact" tone="plain" icon="close" testID="board-clear-filter" onPress={() => props.onClearFilter?.()}>
-                        {t("web.issue.page.clear")}
-                      </Button>
-                    </If>
-                  </View>
-                }
-              >
-                <Each of={groups()} key={(g) => g.key}>
-                  {(g) => {
-                    const isFolded = computed(() => folded().has(g().key));
-                    const label = computed(() => groupLabel()(effectiveGroupBy(), g().key, g().parent, g().owner));
-                    const groupByLane = computed<Record<Lane, BoardCard[]>>(() => {
-                      const map: Record<Lane, BoardCard[]> = { backlog: [], todo: [], in_progress: [], in_review: [], done: [], canceled: [] };
-                      for (const c of g().cards) map[c.lane].push(c);
-                      return map;
-                    });
-                    return (
-                      <View testID="issue-group" accessibilityLabel={label()} class="overflow-hidden rounded-xl border border-line bg-page">
-                        <View class={`h-8.5 flex-row items-center ${!isFolded() ? "border-b border-line bg-side" : "rounded-xl bg-side"}`}>
-                          <IssueGroupHeader
-                            testid={`issue-group-${g().key || "none"}`}
-                            label={label()}
-                            count={g().cards.length}
-                            expanded={!isFolded()}
-                            empty={g().cards.length === 0}
-                            groupBy={effectiveGroupBy()}
-                            groupKey={g().key}
-                            owner={g().owner}
-                            priority={g().priority}
-                            onToggle={() => fold(g().key)}
-                          />
-                        </View>
-                        <If when={!isFolded()}>
-                          <View testID="issue-group-body" class="flex-row gap-2.5 p-2">
-                            <If
-                              when={narrow()}
-                              else={
-                                <Each of={lanes} key={(l) => l}>
-                                  {(l) => (
-                                    <SwimlaneCell
-                                      board={props}
-                                      groupKey={g().key}
-                                      lane={l()}
-                                      narrow={false}
-                                      laneWidth={laneWidth()}
-                                      cards={groupByLane()[l()]}
-                                      drag={drag}
-                                    />
-                                  )}
-                                </Each>
-                              }
-                            >
-                              <SwimlaneCell
-                                board={props}
-                                groupKey={g().key}
-                                lane={lane()}
-                                narrow
-                                laneWidth={laneWidth()}
-                                cards={groupByLane()[lane()]}
-                                drag={drag}
-                              />
-                            </If>
-                          </View>
-                        </If>
-                      </View>
-                    );
-                  }}
+          <View class="min-h-full flex-1 flex-col gap-2">
+            <If when={!narrow()}>
+              <View class="shrink-0 flex-row gap-2.5">
+                <Each of={lanes} key={(l) => l}>
+                  {(l) => (
+                    <View class="rounded-lg bg-side px-2.5 py-0.5" style={{ width: laneWidth() }}>
+                      <LaneHeader
+                        lane={l()}
+                        count={laneCounts()[l()]}
+                        showNew={isOrderLane(l()) && (props.loading || props.cards.length > 0)}
+                        newButtonTestId={l() === "todo" ? "issue-new" : `issue-new-${l()}`}
+                        onNew={props.onNew}
+                      />
+                    </View>
+                  )}
                 </Each>
-              </If>
+              </View>
             </If>
-          </Scroll>
+            <Scroll testID="board-grouped-scroll" class="min-h-0 flex-1" contentClass="gap-2.5 pb-2">
+              <If when={!props.loading} else={<Text class="px-1 text-xs text-faint">{t("web.issue.reading")}</Text>}>
+                <If
+                  when={groups().length > 0}
+                  else={
+                    <View testID="board-grouped-empty" class="items-start gap-2 rounded-lg border border-line bg-side px-4 py-6">
+                      <Text class="text-xs text-muted">{props.filtered === true ? t("web.issue.board.emptyGuide.filtered") : t("web.issue.list.empty")}</Text>
+                      <If when={props.filtered === true && props.onClearFilter !== undefined}>
+                        <Button size="compact" tone="plain" icon="close" testID="board-clear-filter" onPress={() => props.onClearFilter?.()}>
+                          {t("web.issue.page.clear")}
+                        </Button>
+                      </If>
+                    </View>
+                  }
+                >
+                  <Each of={groups()} key={(g) => g.key}>
+                    {(g) => {
+                      const isFolded = computed(() => folded().has(g().key));
+                      const label = computed(() => groupLabel()(effectiveGroupBy(), g().key, g().parent, g().owner));
+                      const groupByLane = computed<Record<Lane, BoardCard[]>>(() => {
+                        const map: Record<Lane, BoardCard[]> = { backlog: [], todo: [], in_progress: [], in_review: [], done: [], canceled: [] };
+                        for (const c of g().cards) map[c.lane].push(c);
+                        return map;
+                      });
+                      return (
+                        <View testID="issue-group" accessibilityLabel={label()} class="overflow-hidden rounded-xl border border-line bg-page">
+                          <View class={`h-8.5 flex-row items-center ${!isFolded() ? "border-b border-line bg-side" : "rounded-xl bg-side"}`}>
+                            <IssueGroupHeader
+                              testid={`issue-group-${g().key || "none"}`}
+                              label={label()}
+                              count={g().cards.length}
+                              expanded={!isFolded()}
+                              empty={g().cards.length === 0}
+                              groupBy={effectiveGroupBy()}
+                              groupKey={g().key}
+                              owner={g().owner}
+                              priority={g().priority}
+                              onToggle={() => fold(g().key)}
+                            />
+                          </View>
+                          <If when={!isFolded()}>
+                            <View testID="issue-group-body" class="flex-row gap-2.5 py-2">
+                              <If
+                                when={narrow()}
+                                else={
+                                  <Each of={lanes} key={(l) => l}>
+                                    {(l) => (
+                                      <SwimlaneCell
+                                        board={props}
+                                        groupKey={g().key}
+                                        lane={l()}
+                                        narrow={false}
+                                        laneWidth={laneWidth()}
+                                        cards={groupByLane()[l()]}
+                                        drag={drag}
+                                      />
+                                    )}
+                                  </Each>
+                                }
+                              >
+                                <SwimlaneCell
+                                  board={props}
+                                  groupKey={g().key}
+                                  lane={lane()}
+                                  narrow
+                                  laneWidth={laneWidth()}
+                                  cards={groupByLane()[lane()]}
+                                  drag={drag}
+                                />
+                              </If>
+                            </View>
+                          </If>
+                        </View>
+                      );
+                    }}
+                  </Each>
+                </If>
+              </If>
+            </Scroll>
+          </View>
         </Scroll>
       </If>
       <If when={drag.ghost()}>

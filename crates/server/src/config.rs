@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use vibevalley_core::SharedClock;
+use vibevalley_protocol::Secret;
 use vibevalley_runtime::agent::ModelClient;
 use vibevalley_runtime::agent::extensions::governance::Permissions;
 use vibevalley_runtime::oar::Registry;
@@ -11,14 +12,13 @@ use vibevalley_runtime::oar::Registry;
 use crate::context::Fetch;
 use crate::context::api::SharedHostDebug;
 use crate::log::SharedInvokeObserver;
-use crate::setting::Secret;
 
 /// Server configuration read from environment or test harness.
 #[derive(Clone)]
 pub struct Config {
     /// Home directory holding `settings.json`, `config.json`, `server.db`, and `issues/`.
     pub home: PathBuf,
-    /// Work root holding `repos/` and `worktrees/`.
+    /// Work root holding `repos/`.
     pub work_root: PathBuf,
     pub version: String,
     /// Optional fallback API key outside `settings.json` (`DEEPSEEK_API_KEY`).

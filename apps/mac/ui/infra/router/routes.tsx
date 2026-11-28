@@ -80,7 +80,7 @@ export function Outlet() {
     return n ? [n] : [];
   };
   return (
-    <Each of={rows()}>
+    <Each of={rows()} key={(d) => d}>
       {(definition) => {
         const d = untracked(definition);
         const Page = d.layout ?? d.component;

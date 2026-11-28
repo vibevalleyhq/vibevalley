@@ -285,11 +285,11 @@
         "priority": "high",
         "createdAt": 1795176443624,
         "closedAt": 1795180043624,
-        "delivered": "merged_into_parent",
+        "delivered": "merged",
         "parent": "i-edge-family",
         "blockedBy": [],
         "status": "done",
-        "moves": [],
+        "moves": ["backlog", "todo", "in_progress", "in_review", "canceled"],
         "deliver": "change",
         "findings": [],
         "questions": [],
@@ -298,7 +298,14 @@
         "stage": {
           "state": "done",
           "since": 1795180043624,
-          "acts": []
+          "acts": [
+            {
+              "does": "move",
+              "act": "reopen",
+              "status": "backlog",
+              "words": "none"
+            }
+          ]
         }
       },
       {
@@ -316,11 +323,11 @@
         "priority": "high",
         "createdAt": 1795176503624,
         "closedAt": 1795183643624,
-        "delivered": "merged_into_parent",
+        "delivered": "merged",
         "parent": "i-edge-family",
         "blockedBy": ["i-edge-fam-1"],
         "status": "done",
-        "moves": [],
+        "moves": ["backlog", "todo", "in_progress", "in_review", "canceled"],
         "deliver": "change",
         "findings": [],
         "questions": [],
@@ -329,7 +336,14 @@
         "stage": {
           "state": "done",
           "since": 1795183643624,
-          "acts": []
+          "acts": [
+            {
+              "does": "move",
+              "act": "reopen",
+              "status": "backlog",
+              "words": "none"
+            }
+          ]
         }
       },
       {
@@ -1217,7 +1231,6 @@
           "cardKind": "issue",
           "familyDone": 0,
           "familyTotal": 0,
-          "needsWorktreeCheck": false,
           "prompt": "asking"
         },
         "i-edge-canceled": {
@@ -1225,7 +1238,6 @@
           "cardKind": "todo",
           "familyDone": 0,
           "familyTotal": 0,
-          "needsWorktreeCheck": false,
           "prompt": "canceled_reopenable"
         },
         "i-edge-conflict": {
@@ -1233,80 +1245,69 @@
           "cardKind": "issue",
           "familyDone": 0,
           "familyTotal": 0,
-          "needsWorktreeCheck": false,
           "prompt": "stuck_conflict"
         },
         "i-edge-draft": {
           "lane": "backlog",
           "cardKind": "todo",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-edge-failed": {
           "lane": "in_progress",
           "cardKind": "issue",
           "familyDone": 0,
           "familyTotal": 0,
-          "needsWorktreeCheck": false,
           "prompt": "stuck_failed"
         },
         "i-edge-fam-1": {
           "lane": "done",
           "cardKind": "todo",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-edge-fam-2": {
           "lane": "done",
           "cardKind": "todo",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-edge-fam-3": {
           "lane": "canceled",
           "cardKind": "todo",
           "familyDone": 0,
           "familyTotal": 0,
-          "needsWorktreeCheck": false,
           "prompt": "canceled_reopenable"
         },
         "i-edge-fam-4": {
           "lane": "in_progress",
           "cardKind": "issue",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-edge-fam-5": {
           "lane": "todo",
           "cardKind": "todo",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-edge-fam-6": {
           "lane": "backlog",
           "cardKind": "todo",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-edge-family": {
           "lane": "in_progress",
           "cardKind": "family",
           "familyDone": 3,
-          "familyTotal": 6,
-          "needsWorktreeCheck": false
+          "familyTotal": 6
         },
         "i-edge-handed": {
           "lane": "in_review",
           "cardKind": "issue",
           "familyDone": 0,
           "familyTotal": 0,
-          "needsWorktreeCheck": false,
           "prompt": "handed_back"
         },
         "i-edge-interrupted": {
@@ -1314,57 +1315,49 @@
           "cardKind": "issue",
           "familyDone": 0,
           "familyTotal": 0,
-          "needsWorktreeCheck": true,
           "prompt": "stuck_interrupted"
         },
         "i-edge-land-kept": {
           "lane": "done",
           "cardKind": "todo",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-edge-land-merged": {
           "lane": "done",
           "cardKind": "todo",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-edge-land-none": {
           "lane": "done",
           "cardKind": "todo",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-edge-land-pr": {
           "lane": "done",
           "cardKind": "todo",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-edge-land-submitted": {
           "lane": "done",
           "cardKind": "todo",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-edge-orch": {
           "lane": "in_progress",
           "cardKind": "orchestrator",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-edge-pr-open": {
           "lane": "in_review",
           "cardKind": "issue",
           "familyDone": 0,
           "familyTotal": 0,
-          "needsWorktreeCheck": false,
           "prompt": "review_after_failed_check"
         },
         "i-edge-quiet": {
@@ -1372,7 +1365,6 @@
           "cardKind": "issue",
           "familyDone": 0,
           "familyTotal": 0,
-          "needsWorktreeCheck": false,
           "prompt": "stuck_quiet"
         },
         "i-edge-reviewed": {
@@ -1380,7 +1372,6 @@
           "cardKind": "issue",
           "familyDone": 0,
           "familyTotal": 0,
-          "needsWorktreeCheck": false,
           "prompt": "reviewed"
         },
         "i-edge-stuck-unknown": {
@@ -1388,7 +1379,6 @@
           "cardKind": "issue",
           "familyDone": 0,
           "familyTotal": 0,
-          "needsWorktreeCheck": false,
           "prompt": "stuck_unknown"
         }
       },
@@ -1429,7 +1419,7 @@
     "sessions": [
       {
         "id": "orch-1",
-        "controller": "orchestrator",
+        "controller": "daemon",
         "role": "orchestrator",
         "name": "助手",
         "profile": "orchestrator",
@@ -1466,8 +1456,9 @@
         "runtime": "claude",
         "brief": "",
         "policy": {
-          "kind": "managedWorktree",
-          "repo": "vibevalley"
+          "kind": "directCwd",
+          "repo": "vibevalley",
+          "permissionMode": "bypass"
         },
         "bindings": [
           {
@@ -1489,7 +1480,7 @@
         "phase": {
           "_tag": "resting"
         },
-        "phaseText": "歇着（上一轮做完了）"
+        "phaseText": "歇着（上一轮已完成）"
       },
       {
         "id": "w-edge-pr",
@@ -1501,9 +1492,9 @@
         "brief": "",
         "cwd": "/tmp/vibevalley/.worktrees/i-edge-pr-open",
         "policy": {
-          "kind": "managedWorktree",
+          "kind": "directCwd",
           "repo": "vibevalley",
-          "branch": "issue-812-pr-check"
+          "permissionMode": "bypass"
         },
         "bindings": [
           {
@@ -1540,8 +1531,9 @@
         "runtime": "claude",
         "brief": "",
         "policy": {
-          "kind": "managedWorktree",
-          "repo": "vibevalley"
+          "kind": "directCwd",
+          "repo": "vibevalley",
+          "permissionMode": "bypass"
         },
         "bindings": [
           {
@@ -1574,8 +1566,9 @@
         "runtime": "claude",
         "brief": "",
         "policy": {
-          "kind": "managedWorktree",
-          "repo": "vibevalley"
+          "kind": "directCwd",
+          "repo": "vibevalley",
+          "permissionMode": "bypass"
         },
         "bindings": [
           {
@@ -1614,8 +1607,9 @@
         "runtime": "codex",
         "brief": "",
         "policy": {
-          "kind": "managedWorktree",
-          "repo": "vibevalley"
+          "kind": "directCwd",
+          "repo": "vibevalley",
+          "permissionMode": "bypass"
         },
         "bindings": [
           {
@@ -1648,8 +1642,9 @@
         "runtime": "claude",
         "brief": "",
         "policy": {
-          "kind": "managedWorktree",
-          "repo": "vibevalley"
+          "kind": "directCwd",
+          "repo": "vibevalley",
+          "permissionMode": "bypass"
         },
         "bindings": [
           {
@@ -1683,8 +1678,9 @@
         "brief": "",
         "cwd": "/tmp/vibevalley/.worktrees/i-edge-interrupted",
         "policy": {
-          "kind": "managedWorktree",
-          "repo": "vibevalley"
+          "kind": "directCwd",
+          "repo": "vibevalley",
+          "permissionMode": "bypass"
         },
         "bindings": [
           {
@@ -1707,7 +1703,7 @@
         "phase": {
           "_tag": "resting"
         },
-        "phaseText": "歇着（上一轮停在半路）"
+        "phaseText": "歇着（上一轮已中断）"
       },
       {
         "id": "w-edge-quiet",
@@ -1718,8 +1714,9 @@
         "runtime": "codex",
         "brief": "",
         "policy": {
-          "kind": "managedWorktree",
-          "repo": "vibevalley"
+          "kind": "directCwd",
+          "repo": "vibevalley",
+          "permissionMode": "bypass"
         },
         "bindings": [
           {
@@ -1750,8 +1747,9 @@
         "runtime": "claude",
         "brief": "",
         "policy": {
-          "kind": "managedWorktree",
-          "repo": "vibevalley"
+          "kind": "directCwd",
+          "repo": "vibevalley",
+          "permissionMode": "bypass"
         },
         "bindings": [
           {
@@ -1780,8 +1778,9 @@
         "runtime": "codex",
         "brief": "",
         "policy": {
-          "kind": "managedWorktree",
-          "repo": "vibevalley"
+          "kind": "directCwd",
+          "repo": "vibevalley",
+          "permissionMode": "bypass"
         },
         "bindings": [
           {

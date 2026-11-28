@@ -1,4 +1,9 @@
+mod buffers;
+mod passes;
+mod pipelines;
 mod renderer;
+mod targets;
+mod textures;
 mod types;
 
 pub use renderer::{MetalRenderer, WgpuRenderer};

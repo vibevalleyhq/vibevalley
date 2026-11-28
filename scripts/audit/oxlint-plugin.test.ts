@@ -217,11 +217,16 @@ tester.run("nsh-no-eager-accessor", rule("nsh-no-eager-accessor"), {
     },
     { code: "const v = <Each of={items()} key={(x) => x.id}>{(x) => row(x)}</Each>;", filename: "a.tsx" },
     {
-      code: "function App(props: { fetchImpl?: unknown }) { const s = createRemoteSession(props.fetchImpl ? { fetch: props.fetchImpl } : undefined); return <View>{s}</View>; }",
+      code: "function App(props: { fetchImpl?: unknown }) { const s = createRemoteSession(untracked(() => (props.fetchImpl ? { fetch: props.fetchImpl } : undefined))); return <View>{s}</View>; }",
       filename: "a.tsx",
     },
   ],
   invalid: [
+    {
+      code: "function App(props: { fetchImpl?: unknown }) { const s = createRemoteSession(props.fetchImpl ? { fetch: props.fetchImpl } : undefined); return <View>{s}</View>; }",
+      filename: "a.tsx",
+      errors: [{ messageId: "componentRead" }],
+    },
     {
       code: "const v = <Each of={items()} key={(x) => x.id}>{(x) => { const item = x(); return <Text>{item.name}</Text>; }}</Each>;",
       filename: "a.tsx",
@@ -323,6 +328,248 @@ tester.run("nsh-keymap-no-text-signal", rule("nsh-keymap-no-text-signal"), {
       code: "effect(() => { const offs = []; if (query() === 'all') offs.push(keymap.bind('enter', run)); return () => offs.forEach((f) => f()); });",
       filename: "a.tsx",
       errors: [{ messageId: "textSignal" }],
+    },
+  ],
+});
+
+tester.run("nsh-no-eager-accessor-extended", rule("nsh-no-eager-accessor"), {
+  valid: [
+    {
+      code: "function ClockLabel() { const now = useNow(); return <Text>{now()}</Text>; }",
+      filename: "a.tsx",
+    },
+    {
+      code: "function SplitOk(props: { label: string; class?: string }) { const [local, rest] = split(props, ['label']); return <View {...rest}><Text>{local.label}</Text></View>; }",
+      filename: "a.tsx",
+    },
+    {
+      code: "function ListOk(props: { items: string[] }) { return <List each={props.items} keyExtractor={(x) => x} renderItem={(item) => <Text>{item()}</Text>} />; }",
+      filename: "a.tsx",
+    },
+  ],
+  invalid: [
+    {
+      code: "function ClockBad() { const now = useNow(); const ms = now(); return <Text>{ms}</Text>; }",
+      filename: "a.tsx",
+      errors: [{ messageId: "componentRead" }],
+    },
+    {
+      code: "function ObjBad(props: { title: string }) { const opts = { title: props.title }; return <Text>{opts.title}</Text>; }",
+      filename: "a.tsx",
+      errors: [{ messageId: "componentRead" }],
+    },
+    {
+      code: "function CallBad(props: { count: number }) { const label = String(props.count); return <Text>{label}</Text>; }",
+      filename: "a.tsx",
+      errors: [{ messageId: "componentRead" }],
+    },
+    {
+      code: "function ListBad(props: { items: string[] }) { return <List each={props.items} keyExtractor={(x) => x} renderItem={(item) => { const v = item(); return <Text>{v}</Text>; }} />; }",
+      filename: "a.tsx",
+      errors: [{ messageId: "callbackAccessor" }],
+    },
+  ],
+});
+
+tester.run("nsh-no-props-spread", rule("nsh-no-props-spread"), {
+  valid: [
+    {
+      code: "function Ok(props: { a: string }) { const [local, rest] = split(props, ['a']); return <View {...rest}><Text>{local.a}</Text></View>; }",
+      filename: "a.tsx",
+    },
+    {
+      code: "function OkUntracked(props: { a: string }) { const init = untracked(() => ({ ...props })); return <Text>{init.a}</Text>; }",
+      filename: "a.tsx",
+    },
+  ],
+  invalid: [
+    {
+      code: "function BadObj(props: { a: string }) { const copy = { ...props }; return <Text>{copy.a}</Text>; }",
+      filename: "a.tsx",
+      errors: [{ messageId: "spread" }],
+    },
+    {
+      code: "function BadAssign(props: { a: string }) { const copy = Object.assign({}, props); return <Text>{copy.a}</Text>; }",
+      filename: "a.tsx",
+      errors: [{ messageId: "spread" }],
+    },
+  ],
+});
+
+tester.run("nsh-no-async-reactive", rule("nsh-no-async-reactive"), {
+  valid: [
+    {
+      code: "function Ok() { effect(() => { void load(); }); return <Text>ok</Text>; }",
+      filename: "a.tsx",
+    },
+  ],
+  invalid: [
+    {
+      code: "async function BadComp() { return <Text>bad</Text>; }",
+      filename: "a.tsx",
+      errors: [{ messageId: "asyncComponent" }],
+    },
+    {
+      code: "effect(async () => { await fetch('/api'); });",
+      filename: "a.ts",
+      errors: [{ messageId: "asyncReactive" }],
+    },
+    {
+      code: "const derived = computed(async () => await load());",
+      filename: "a.tsx",
+      errors: [{ messageId: "asyncReactive" }],
+    },
+  ],
+});
+
+tester.run("nsh-no-jsx-inline-reactive", rule("nsh-no-jsx-inline-reactive"), {
+  valid: [
+    {
+      code: "function useCounter() { const c = signal(0); return c; }",
+      filename: "a.tsx",
+    },
+    {
+      code: "function Ok(props: { items: string[] }) { const label = computed(() => props.items.length); return <Each of={props.items} key={(x) => x}>{(item) => { const upper = computed(() => item().toUpperCase()); return <Text>{upper()}</Text>; }}</Each>; }",
+      filename: "a.tsx",
+    },
+    {
+      code: "function OkRenderHelper(props: { items: string[] }) { const renderRow = (item: () => string) => { const upper = computed(() => item().toUpperCase()); return <Text>{upper()}</Text>; }; return <Each of={props.items} key={(x) => x}>{renderRow}</Each>; }",
+      filename: "a.tsx",
+    },
+  ],
+  invalid: [
+    {
+      code: "function BadSlot(props: { n: number }) { return <Text>{computed(() => props.n + 1)()}</Text>; }",
+      filename: "a.tsx",
+      errors: [{ messageId: "inline" }],
+    },
+    {
+      code: "function BadHandler() { return <Button onPress={() => { const s = signal(1); }} />; }",
+      filename: "a.tsx",
+      errors: [{ messageId: "inline" }],
+    },
+    {
+      code: "function BadHelper() { const mk = () => computed(() => 1); return <Text>{mk()()}</Text>; }",
+      filename: "a.tsx",
+      errors: [{ messageId: "inline" }],
+    },
+  ],
+});
+
+tester.run("nsh-no-react-isms", rule("nsh-no-react-isms"), {
+  valid: [
+    {
+      code: "import { signal } from 'nsh'; export function Ok(props: { list: string[]; id: string }) { return <Keyed key={props.id}>{() => <Each of={props.list} key={(x) => x}>{(item) => <Button onPress={() => item()} />}</Each>}</Keyed>; }",
+      filename: "a.tsx",
+    },
+  ],
+  invalid: [
+    {
+      code: "import React from 'react';",
+      filename: "a.tsx",
+      errors: [{ messageId: "reactImport" }],
+    },
+    {
+      code: "effect(() => { go(); }, [dep]);",
+      filename: "a.tsx",
+      errors: [{ messageId: "depArray" }],
+    },
+    {
+      code: "const v = <Button onClick={() => go()} />;",
+      filename: "a.tsx",
+      errors: [{ messageId: "reactAttr" }],
+    },
+    {
+      code: "const v = <Input onChangeText={(t) => set(t)} />;",
+      filename: "a.tsx",
+      errors: [{ messageId: "reactAttr" }],
+    },
+    {
+      code: "const v = <View key='row' />;",
+      filename: "a.tsx",
+      errors: [{ messageId: "reactKey" }],
+    },
+  ],
+});
+
+tester.run("nsh-selection-change-guard", rule("nsh-selection-change-guard"), {
+  valid: [
+    {
+      code: "const v = <Input onSelectionChange={(next) => { const prev = untracked(sel); if (prev.start === next.start && prev.end === next.end) return; sel.set(next); }} />;",
+      filename: "a.tsx",
+    },
+  ],
+  invalid: [
+    {
+      code: "const v = <Input onSelectionChange={(next) => sel.set(next)} />;",
+      filename: "a.tsx",
+      errors: [{ messageId: "unguarded" }],
+    },
+    {
+      code: "const v = <RichInlineField onSelectionChange={(next) => sel.set(next)} />;",
+      filename: "a.tsx",
+      errors: [{ messageId: "unguarded" }],
+    },
+  ],
+});
+
+tester.run("nsh-no-self-canceling-effect", rule("nsh-no-self-canceling-effect"), {
+  valid: [
+    {
+      code: "effect(() => { const t = setTimeout(() => flash.set(false), 1200); return () => clearTimeout(t); });",
+      filename: "a.tsx",
+    },
+    {
+      code: "effect(() => { if (!untracked(flash)) return; const t = setTimeout(() => flash.set(false), 1200); return () => clearTimeout(t); });",
+      filename: "a.tsx",
+    },
+  ],
+  invalid: [
+    {
+      code: "effect(() => { if (!flash()) return; const t = setTimeout(() => done(), 100); flash.set(false); return () => clearTimeout(t); });",
+      filename: "a.ts",
+      errors: [{ messageId: "selfCancel" }],
+    },
+  ],
+});
+
+tester.run("nsh-no-view-text-class", rule("nsh-no-view-text-class"), {
+  valid: [
+    {
+      code: "const v = <View class='bg-selected rounded-md'><Text class='text-accent font-medium'>ok</Text></View>;",
+      filename: "a.tsx",
+    },
+  ],
+  invalid: [
+    {
+      code: "const v = <View class={active() ? 'bg-selected text-accent' : ''} />;",
+      filename: "a.tsx",
+      errors: [{ messageId: "viewTextClass" }],
+    },
+    {
+      code: "const v = <View class='font-semibold px-2' />;",
+      filename: "a.tsx",
+      errors: [{ messageId: "viewTextClass" }],
+    },
+  ],
+});
+
+tester.run("nsh-scroll-horizontal-flex-row", rule("nsh-scroll-horizontal-flex-row"), {
+  valid: [
+    {
+      code: "const v = <Scroll horizontal contentClass='flex-row gap-2' />;",
+      filename: "a.tsx",
+    },
+    {
+      code: "const v = <Scroll horizontal={false} class='flex-col' />;",
+      filename: "a.tsx",
+    },
+  ],
+  invalid: [
+    {
+      code: "const v = <Scroll horizontal class='w-full' />;",
+      filename: "a.tsx",
+      errors: [{ messageId: "missingFlexRow" }],
     },
   ],
 });

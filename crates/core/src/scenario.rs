@@ -123,7 +123,7 @@ pub fn preset(density: Density) -> SliceBundle {
                 "general",
                 1,
                 Actor::User {
-                    id: USER_ID.into(),
+                    id: ParticipantId::local_user().to_string(),
                     name: Some("你".into()),
                 },
                 MessageKind::Chat,
@@ -404,7 +404,7 @@ fn build_typical(b: &mut ScenarioBuilder) {
     let mut i41 = issue("i41", 41, "子工单 A：延迟构建工作台状态帧", Priority::Medium, now - 9 * HOUR_MS);
     i41.parent = Some("i40".into());
     i41.repo = Some("vibevalley".into());
-    i41.delivered = Some(Landing::MergedIntoParent);
+    i41.delivered = Some(Landing::Merged);
     i41.closed_at = Some(now - HOUR_MS);
 
     let mut i42 = issue("i42", 42, "子工单 B：复用像素纹理与文本缓存", Priority::Medium, now - 8 * HOUR_MS);
@@ -788,7 +788,7 @@ fn build_edge(b: &mut ScenarioBuilder) -> SliceBundle {
     // Standing orchestrator session + issue (exercises IssueCardKind::Orchestrator and verifies running_slots excludes orchestrators).
     let mut s_orch = Session::new(
         "orch-1",
-        SessionController::Orchestrator,
+        SessionController::Daemon,
         "助手",
         ORCHESTRATOR_RUNTIME,
         ExecutionPolicy::SandboxDir,
@@ -1024,21 +1024,21 @@ fn build_edge(b: &mut ScenarioBuilder) -> SliceBundle {
     i_unk.repo = Some("vibevalley".into());
     assign(&mut i_unk, "ajie", "w-edge-unk", now - 38 * MIN_MS);
 
-    // 10. Deep 1-parent-6-child family with chained blocked_by dependencies + Landing::MergedIntoParent
+    // 10. Deep 1-parent-6-child family with chained blocked_by dependencies
     let mut i_fam = issue("i-edge-family", 800, "深层拆单家族：状态机投影与端到端收口", Priority::High, now - 6 * HOUR_MS);
     i_fam.repo = Some("vibevalley".into());
 
     let mut f1 = issue("i-edge-fam-1", 801, "子工单 1：协议枚举定义", Priority::High, now - 5 * HOUR_MS);
     f1.parent = Some("i-edge-family".into());
     f1.repo = Some("vibevalley".into());
-    f1.delivered = Some(Landing::MergedIntoParent);
+    f1.delivered = Some(Landing::Merged);
     f1.closed_at = Some(now - 4 * HOUR_MS);
 
     let mut f2 = issue("i-edge-fam-2", 802, "子工单 2：核心折叠汇总", Priority::High, now - 5 * HOUR_MS + MIN_MS);
     f2.parent = Some("i-edge-family".into());
     f2.blocked_by = vec!["i-edge-fam-1".into()];
     f2.repo = Some("vibevalley".into());
-    f2.delivered = Some(Landing::MergedIntoParent);
+    f2.delivered = Some(Landing::Merged);
     f2.closed_at = Some(now - 3 * HOUR_MS);
 
     let mut f3 = issue("i-edge-fam-3", 803, "子工单 3：淘汰冗余分支", Priority::Low, now - 5 * HOUR_MS + 2 * MIN_MS);
@@ -1306,9 +1306,9 @@ fn worker(id: &str, name: &str, agent: &str, runtime: &str, hired_at: Millis) ->
         SessionController::IssueBoard,
         name,
         runtime,
-        ExecutionPolicy::ManagedWorktree {
-            repo: "vibevalley".into(),
-            branch: None,
+        ExecutionPolicy::DirectCwd {
+            repo: Some("vibevalley".into()),
+            permission_mode: SessionPermissionMode::Bypass,
         },
         hired_at,
     );
@@ -1317,7 +1317,7 @@ fn worker(id: &str, name: &str, agent: &str, runtime: &str, hired_at: Millis) ->
     s
 }
 
-fn bind_worker_issue(s: &mut Session, issue_id: impl Into<IssueId>, repo: Option<&str>, branch: Option<&str>, cwd: Option<&str>, refining: bool) {
+fn bind_worker_issue(s: &mut Session, issue_id: impl Into<IssueId>, repo: Option<&str>, _branch: Option<&str>, cwd: Option<&str>, refining: bool) {
     s.attach_binding(ContextRef::Issue {
         id: issue_id.into(),
         refining: refining.then_some(true),
@@ -1326,9 +1326,9 @@ fn bind_worker_issue(s: &mut Session, issue_id: impl Into<IssueId>, repo: Option
         s.cwd = Some(cwd.into());
     }
     if let Some(repo) = repo {
-        s.policy = ExecutionPolicy::ManagedWorktree {
-            repo: repo.into(),
-            branch: branch.map(String::from),
+        s.policy = ExecutionPolicy::DirectCwd {
+            repo: Some(repo.into()),
+            permission_mode: SessionPermissionMode::Bypass,
         };
     }
 }
@@ -1637,7 +1637,6 @@ mod tests {
         let mut prompt_kinds = HashSet::new();
 
         let mut saw_needs_reconciliation = false;
-        let mut saw_worktree_check = false;
         let mut saw_999_unread = false;
         let mut saw_deep_family = false;
         let mut saw_huge_spent = false;
@@ -1728,9 +1727,6 @@ mod tests {
                 if let Some(prompt) = summary.prompt {
                     prompt_kinds.insert(prompt);
                 }
-                if summary.needs_worktree_check {
-                    saw_worktree_check = true;
-                }
                 if summary.family_total >= 6 {
                     saw_deep_family = true;
                 }
@@ -1777,7 +1773,6 @@ mod tests {
         }
 
         assert!(saw_needs_reconciliation, "expected Interrupted session with needs_reconciliation");
-        assert!(saw_worktree_check, "expected BoardIssueSummary.needs_worktree_check");
         assert!(saw_999_unread, "expected 999+ unread count");
         assert!(saw_deep_family, "expected 1-parent-6-child family");
         assert!(saw_huge_spent, "expected >= 1234.56 spent");

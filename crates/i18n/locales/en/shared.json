@@ -39,7 +39,6 @@
   },
   "delivered": {
     "merged": "merged into main",
-    "merged_into_parent": "merged into the plan's branch",
     "pull_request": "its PR was merged",
     "kept": "branch kept, not merged",
     "none": "nothing to merge",

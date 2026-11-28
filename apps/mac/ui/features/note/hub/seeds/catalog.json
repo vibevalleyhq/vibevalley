@@ -526,6 +526,19 @@
     "icon": "plug"
   },
   {
+    "id": "tpl-sheet-ui-review",
+    "key": "sheetUiReview",
+    "category": "base",
+    "recommended": true,
+    "engineering": true,
+    "tags": ["review", "checklist", "ui", "vdp", "annotation", "qa", "走查"],
+    "kind": "deliverable",
+    "noteType": "base",
+    "previewShape": "sheet",
+    "seed": "sheetUiReview",
+    "icon": "pin"
+  },
+  {
     "id": "tpl-dash-slo",
     "key": "dashSlo",
     "category": "doc",

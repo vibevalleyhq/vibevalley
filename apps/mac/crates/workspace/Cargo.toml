@@ -6,6 +6,7 @@ license.workspace = true
 
 [dependencies]
 vibevalley-git = { version = "0.1.0", path = "../../../../crates/git" }
+vibevalley-kit = { workspace = true, features = ["db-sql"] }
 vibevalley-terminal = { version = "0.1.0", path = "../terminal" }
 serde = { workspace = true }
 serde_json = { workspace = true }

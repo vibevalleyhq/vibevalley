@@ -1,20 +1,25 @@
-import { computed, signal, Text, View } from "nsh";
+import { Clipboard, computed, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
-import type { Attachment, Issue, IssueAction, IssueAnswer, Question as QuestionItem } from "@vibevalley/protocol";
+import type { Attachment, DeliveryReceipt, Issue, IssueAction, IssueAnswer, Question as QuestionItem } from "@vibevalley/protocol";
 
 import { Button } from "../../../design/Button";
 import { Checkbox } from "../../../design/Checkbox";
 import { Icon } from "../../../design/Icon";
+import { IconButton } from "../../../design/IconButton";
 import type { IconName } from "../../../design/icons";
 import { Markdown } from "../../../design/Markdown";
+import { Tag, type TagTone } from "../../../design/Tag";
 import { TextLink } from "../../../design/TextLink";
+import { toast } from "../../../design/toasts";
 import { mix } from "../../../design/tone";
 import { createAct } from "../../../infra/act";
 import { useNow } from "../../../infra/base/dom";
 import { shortMomentText, tookText } from "../../../infra/base/format";
+import { hostApi } from "../../../infra/bridge";
 import { perform } from "../../../infra/issueActions";
 import { ready } from "../../../infra/query";
+import { Link as A } from "../../../infra/router";
 import { useIntents } from "../../../infra/state/intent";
 import { SubagentProgress } from "../../session";
 import { useIssueRuns } from "../model/history";
@@ -27,6 +32,7 @@ import { ActLines } from "./ActLines";
 import { IssueAttachments } from "./IssueAttachments";
 import { StatusMark } from "./Marks";
 import { IssueSheet, Note, Property, SheetLabel, StagePill } from "./Sheet";
+import { parseCriterion } from "./TodoSections";
 
 /** A question of the helper's: its options are replies as they are, one click each. */
 export function Question(props: { ask: QuestionItem; busy: boolean; onPick: (words: string) => void }) {
@@ -48,14 +54,12 @@ export function Question(props: { ask: QuestionItem; busy: boolean; onPick: (wor
   );
 }
 
-const resultMark: Record<NonNullable<CriterionRow["result"]>, { icon: IconName; label: string }> = {
-  met: { icon: "check", label: t("web.issue.detail.result.met") },
-  unmet: { icon: "cross", label: t("web.issue.detail.result.unmet") },
-  unsure: { icon: "warn", label: t("web.issue.detail.result.unsure") },
+const resultMark: Record<NonNullable<CriterionRow["result"]>, { icon: IconName; tone: TagTone; label: string }> = {
+  met: { icon: "check", tone: "ok", label: t("web.issue.detail.result.met") },
+  unmet: { icon: "cross", tone: "bad", label: t("web.issue.detail.result.unmet") },
+  unsure: { icon: "warn", tone: "wait", label: t("web.issue.detail.result.unsure") },
 };
 
-/** The criteria with the helper's word on each; while it is judged, each can be ticked off as the user checks it (on
- * this page only). */
 export function Criteria(props: { rows: CriterionRow[]; checking: boolean }) {
   const ticked = signal<ReadonlySet<number>>(new Set());
   const tick = (i: number) => {
@@ -66,68 +70,188 @@ export function Criteria(props: { rows: CriterionRow[]; checking: boolean }) {
   };
   return (
     <View class="overflow-hidden rounded-lg border border-line bg-page">
+      <View class="flex-row items-center border-b border-line bg-side">
+        <View
+          accessibilityLabel={t("web.issue.todo.criteriaTable.colCheck")}
+          class="w-9 shrink-0 items-center justify-center border-r border-line py-1.5"
+          style={{ borderColor: mix("line", 0.55) }}
+        >
+          <If when={props.checking} else={<Text class="font-mono text-2xs text-muted">#</Text>}>
+            <Icon name="ticked" size={11} tone="muted" />
+          </If>
+        </View>
+        <View class="min-w-0 flex-1 flex-row items-center gap-1.5 border-r border-line px-3 py-1.5" style={{ borderColor: mix("line", 0.55) }}>
+          <Icon name="issues" size={11} tone="muted" />
+          <Text class="text-2xs font-medium text-muted">{t("web.issue.todo.criteriaTable.colItem")}</Text>
+        </View>
+        <View class="w-28 shrink-0 flex-row items-center gap-1 border-r border-line px-2.5 py-1.5" style={{ borderColor: mix("line", 0.55) }}>
+          <Icon name="check" size={11} tone="muted" />
+          <Text class="text-2xs font-medium text-muted">{t("web.issue.todo.criteriaTable.colStatus")}</Text>
+        </View>
+        <View class="w-44 shrink-0 flex-row items-center gap-1 px-3 py-1.5">
+          <Icon name="notes" size={11} tone="muted" />
+          <Text class="text-2xs font-medium text-muted">{t("web.issue.todo.criteriaTable.colProof")}</Text>
+        </View>
+      </View>
       <Each of={props.rows} key={(r) => r.text}>
-        {(r, i) => (
-          <View
-            testID="criterion"
-            class={`flex-row items-start gap-2.5 px-3.5 py-2.5 ${i() < props.rows.length - 1 ? "border-b" : ""}`}
-            style={i() < props.rows.length - 1 ? { borderColor: mix("line", 0.55) } : undefined}
-          >
-            <If when={props.checking}>
-              <Checkbox
-                testid="criterion-tick"
-                label={t("web.issue.detail.ticked", { criterion: r().text })}
-                checked={ticked().has(i())}
-                onChange={() => tick(i())}
-                class="mt-0.5"
-              />
-            </If>
-            <If
-              when={r().result}
-              else={
-                <View
-                  testID="criterion-unsaid"
-                  accessibilityLabel={t("web.issue.detail.unsaid")}
-                  class="mt-1 h-3 w-3 shrink-0 rounded-full border border-idle"
-                />
-              }
+        {(r, i) => {
+          const parsed = () => parseCriterion(r().text);
+          const basisText = () => r().proof || parsed().proof;
+          return (
+            <View
+              testID="criterion"
+              class={`flex-row items-stretch ${i() < props.rows.length - 1 ? "border-b" : ""}`}
+              style={i() < props.rows.length - 1 ? { borderColor: mix("line", 0.55) } : undefined}
             >
-              {(res) => (
-                <View class="mt-0.5 shrink-0">
-                  <Icon name={resultMark[res()].icon} size={14} label={resultMark[res()].label} />
-                </View>
-              )}
-            </If>
-            <View class="min-w-0 flex-1">
-              <Text class={`text-sm leading-snug ${ticked().has(i()) ? "text-muted" : "text-ink"}`}>{r().text}</Text>
-              <If when={r().proof}>
-                <Text class="mt-0.5 text-xs text-muted">{r().proof}</Text>
-              </If>
+              <View class="w-9 shrink-0 items-center justify-center border-r border-line py-2" style={{ borderColor: mix("line", 0.55) }}>
+                <If when={props.checking} else={<Text class="font-mono text-2xs text-muted tabular-nums">{i() + 1}</Text>}>
+                  <Checkbox
+                    testid="criterion-tick"
+                    label={t("web.issue.detail.ticked", { criterion: parsed().text })}
+                    checked={ticked().has(i())}
+                    onChange={() => tick(i())}
+                  />
+                </If>
+              </View>
+              <View class="min-w-0 flex-1 justify-center border-r border-line px-3 py-2" style={{ borderColor: mix("line", 0.55) }}>
+                <Text class={`text-sm leading-snug ${ticked().has(i()) ? "text-muted line-through" : "text-ink"}`}>{parsed().text}</Text>
+              </View>
+              <View class="w-28 shrink-0 justify-center border-r border-line px-2.5 py-2" style={{ borderColor: mix("line", 0.55) }}>
+                <If
+                  when={r().result}
+                  else={
+                    <View testID="criterion-unsaid" accessibilityLabel={t("web.issue.detail.unsaid")}>
+                      <Tag
+                        tone={ticked().has(i()) || parsed().checked ? "ok" : "neutral"}
+                        icon={ticked().has(i()) || parsed().checked ? "check" : undefined}
+                        label={ticked().has(i()) || parsed().checked ? t("web.issue.todo.criteriaTable.statusDone") : t("web.issue.detail.unsaid")}
+                      />
+                    </View>
+                  }
+                >
+                  {(res) => <Tag icon={resultMark[res()].icon} tone={resultMark[res()].tone} label={resultMark[res()].label} />}
+                </If>
+              </View>
+              <View class="w-44 shrink-0 justify-center px-3 py-2">
+                <Text class={`text-xs leading-snug ${basisText() ? "text-muted" : "text-faint"}`}>
+                  {basisText() || t("web.issue.todo.criteriaTable.proofEmpty")}
+                </Text>
+              </View>
             </View>
-          </View>
-        )}
+          );
+        }}
       </Each>
     </View>
   );
 }
 
-export function ReconcileWorktree(props: { onChanges?: (() => void) | undefined }) {
+function receiptKindMeta(kind: DeliveryReceipt["kind"]): { readonly icon: IconName; readonly tone: TagTone; readonly label: string } {
+  switch (kind) {
+    case "pull_request":
+      return { icon: "branch", tone: "info", label: t("web.issue.receipt.kinds.pull_request") };
+    case "commit":
+      return { icon: "diff", tone: "ok", label: t("web.issue.receipt.kinds.commit") };
+    case "note":
+      return { icon: "notes", tone: "wait", label: t("web.issue.receipt.kinds.note") };
+    case "answer":
+      return { icon: "chat", tone: "neutral", label: t("web.issue.receipt.kinds.answer") };
+  }
+}
+
+export function DeliveryReceiptCard(props: { receipt: DeliveryReceipt; class?: string }) {
+  const meta = computed(() => receiptKindMeta(props.receipt.kind));
+  const copySha = (sha: string) => {
+    void Clipboard.writeText(sha).then(
+      () => toast(t("web.base.rich.copied")),
+      () => undefined,
+    );
+  };
   return (
-    <View testID="run-reconcile" class="my-1.5 flex-row flex-wrap items-center gap-2">
-      <Icon name="warn" size={14} tone="berry" />
-      <Text class="text-sm text-ink">{t("web.issue.run.reconcile")}</Text>
-      <If when={props.onChanges}>
-        {(show) => (
-          <Button testID="run-review-changes" onPress={() => show()()}>
-            {t("web.issue.run.currentChanges")}
-          </Button>
+    <View testID="delivery-receipt" class={`gap-2 rounded-lg border border-line bg-page p-3.5 ${props.class ?? ""}`}>
+      <View class="flex-row flex-wrap items-center justify-between gap-2">
+        <View class="flex-row items-center gap-2">
+          <Text class="text-xs font-semibold text-muted">{t("web.issue.receipt.title")}</Text>
+          <Tag icon={meta().icon} tone={meta().tone} label={meta().label} />
+        </View>
+        <If when={props.receipt.kind === "pull_request" && props.receipt.branch ? props.receipt.branch : undefined}>
+          {(branch) => (
+            <View class="rounded-sm bg-side px-1.5 py-0.5">
+              <Text class="font-mono text-2xs text-muted">{branch()}</Text>
+            </View>
+          )}
+        </If>
+        <If when={props.receipt.kind === "commit" && props.receipt.branch ? props.receipt.branch : undefined}>
+          {(branch) => (
+            <View class="rounded-sm bg-side px-1.5 py-0.5">
+              <Text class="font-mono text-2xs text-muted">{branch()}</Text>
+            </View>
+          )}
+        </If>
+      </View>
+
+      <If when={props.receipt.kind === "pull_request" ? props.receipt : undefined}>
+        {(pr) => (
+          <View class="gap-1.5">
+            <View
+              role="link"
+              testID="delivery-receipt-pr-link"
+              onPress={() => void hostApi.openUrl(pr().url)}
+              class="flex-row items-center gap-1.5 self-start rounded-md border border-line bg-side px-2.5 py-1 hover:bg-hover"
+            >
+              <Icon name="branch" size={12} tone="water" />
+              <Text class="text-xs font-medium text-water">{pr().number !== undefined ? `PR #${pr().number}` : t("web.issue.receipt.openPr")}</Text>
+              <Text class="max-w-72 truncate font-mono text-2xs text-muted">{pr().url}</Text>
+            </View>
+            <If when={pr().summary}>{(summary) => <Text class="text-sm leading-relaxed text-ink">{summary()}</Text>}</If>
+          </View>
+        )}
+      </If>
+
+      <If when={props.receipt.kind === "commit" ? props.receipt : undefined}>
+        {(commit) => (
+          <View class="gap-1.5">
+            <View class="flex-row items-center gap-1.5">
+              <View class="rounded-sm bg-side px-2 py-0.5">
+                <Text testID="delivery-receipt-commit-sha" class="font-mono text-xs font-medium text-ink">
+                  {commit().sha.slice(0, 12)}
+                </Text>
+              </View>
+              <IconButton icon="copy" size={14} label={t("web.base.rich.copy")} onClick={() => copySha(commit().sha)} />
+            </View>
+            <If when={commit().summary}>{(summary) => <Text class="text-sm leading-relaxed text-ink">{summary()}</Text>}</If>
+          </View>
+        )}
+      </If>
+
+      <If when={props.receipt.kind === "note" ? props.receipt : undefined}>
+        {(note) => (
+          <View class="gap-1.5">
+            <A
+              href={`/notes/${encodeURIComponent(note().noteId)}`}
+              testID="delivery-receipt-note-link"
+              class="flex-row items-center gap-1.5 self-start rounded-md border border-line bg-side px-2.5 py-1 hover:bg-hover"
+            >
+              <Icon name="notes" size={12} tone="water" />
+              <Text class="text-xs font-medium text-water">{note().title || note().noteId}</Text>
+              <Text class="text-2xs text-muted">{t("web.issue.receipt.openNote")}</Text>
+            </A>
+            <If when={note().summary}>{(summary) => <Text class="text-sm leading-relaxed text-ink">{summary()}</Text>}</If>
+          </View>
+        )}
+      </If>
+
+      <If when={props.receipt.kind === "answer" ? props.receipt : undefined}>
+        {(ans) => (
+          <View testID="delivery-receipt-answer" class="min-w-0">
+            <Markdown size="sm" text={ans().summary} />
+          </View>
         )}
       </If>
     </View>
   );
 }
 
-function Runs(props: { issue: string; version: string; onChanges?: (() => void) | undefined }) {
+function Runs(props: { issue: string; version: string }) {
   const query = useIssueRuns(
     () => props.issue,
     () => props.version,
@@ -158,9 +282,6 @@ function Runs(props: { issue: string; version: string; onChanges?: (() => void) 
                       </If>
                     </View>
                   )}
-                </If>
-                <If when={r().needsReconciliation}>
-                  <ReconcileWorktree onChanges={props.onChanges} />
                 </If>
                 <If when={r().subagents}>{(progress) => <SubagentProgress session={r().session} progress={progress()} now={now()} />}</If>
               </View>
@@ -240,7 +361,14 @@ export function OrchestratorIssueDetail(props: { issue: Issue }) {
         onAdd={addAttachment}
         onRemove={removeAttachment}
       />
-      <View class={hasAboveRuns() ? "mt-7 border-t border-line pt-5" : ""}>
+      <If when={props.issue.deliveryReceipt}>
+        {(receipt) => (
+          <View class="mt-4">
+            <DeliveryReceiptCard receipt={receipt()} />
+          </View>
+        )}
+      </If>
+      <View class={hasAboveRuns() || Boolean(props.issue.deliveryReceipt) ? "mt-7 border-t border-line pt-5" : ""}>
         <SheetLabel first>{t("web.issue.detail.runs")}</SheetLabel>
         <Runs issue={props.issue.id} version={`${props.issue.status}:${props.issue.closedAt}:${tagOpen(tag())}`} />
       </View>

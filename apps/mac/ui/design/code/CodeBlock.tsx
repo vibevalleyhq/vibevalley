@@ -80,7 +80,7 @@ function CodeBlockFallback(props: CodeBlockProps) {
         </View>
       </View>
       <View class="overflow-hidden px-3 pb-3" style={long() && folded() ? { maxHeight: foldAt() * 18 } : undefined}>
-        <Scroll horizontal={props.wrap !== true}>
+        <Scroll horizontal={props.wrap !== true} contentClass={props.wrap === true ? undefined : "flex-row"}>
           <Text class="font-mono text-xs text-ink">{props.code}</Text>
         </Scroll>
       </View>

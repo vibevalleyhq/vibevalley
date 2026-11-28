@@ -11,11 +11,9 @@ use vibevalley_protocol::{
 };
 
 use super::rules as m;
-use crate::BoxFuture;
 use crate::agent::profile::Profile;
 use crate::context::Context;
 use crate::context::error::AsyncRequestKeys;
-use crate::context::port::MemoryRecallPort;
 use crate::service::DbError;
 use crate::service::memory::NewMemory;
 
@@ -763,11 +761,5 @@ impl Memory {
 
     pub(crate) async fn preview_delete_endpoint_async(&self, input: MemoryDeleteInput) -> Result<Preview, ApiError> {
         self.preview_forget_async(&input.agent, &input.memory).await
-    }
-}
-
-impl MemoryRecallPort for Memory {
-    fn recall_text<'a>(&'a self, agent: &'a str, session: Option<&'a str>, repo: &'a str, query: &'a str) -> BoxFuture<'a, String> {
-        Box::pin(self.recalled_text_async(agent, session, repo, query))
     }
 }

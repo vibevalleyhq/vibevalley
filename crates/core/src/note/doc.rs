@@ -9,6 +9,7 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 use vibevalley_protocol::{BlockKind, DocBlock, DocView, LinkEntityKind, LinkRelation, NoteLinkRef};
 
+use crate::note::annotation::{doc_annotation_summary, extract_annotation_links};
 use crate::note::links::{dedup_links, extract_markdown_links};
 
 /// Current `structure/doc.json` schema version.
@@ -179,7 +180,12 @@ pub fn markdown_to_blocks(md: &str) -> Vec<DocBlock> {
             let alignments = aligns.iter().any(|a| !a.is_empty()).then_some(aligns);
             blocks.push(DocBlock {
                 id: next_id(),
-                kind: BlockKind::Table { headers, rows, alignments },
+                kind: BlockKind::Table {
+                    headers,
+                    rows,
+                    alignments,
+                    column_widths: None,
+                },
                 collapsed: None,
                 children: None,
             });
@@ -375,8 +381,27 @@ fn push_block_markdown(block: &DocBlock, out: &mut Vec<String>) {
                 title.as_deref().unwrap_or("diff")
             ));
         }
-        BlockKind::Media { media_kind, src, caption } => {
-            out.push(format!("![{} ({media_kind})]({src})", caption.as_deref().unwrap_or("media")));
+        BlockKind::Media {
+            media_kind,
+            src,
+            caption,
+            annotations,
+        } => {
+            let mut md = format!("![{} ({media_kind})]({src})", caption.as_deref().unwrap_or("media"));
+            if let Some(anns) = annotations
+                && !anns.is_empty()
+            {
+                for ann in anns {
+                    md.push_str(&format!(
+                        "\n- [#{} {} · {}] {}",
+                        ann.number,
+                        ann.severity.as_str(),
+                        ann.status.as_str(),
+                        ann.title
+                    ));
+                }
+            }
+            out.push(md);
         }
         BlockKind::Preview { title, entry, .. } => {
             out.push(format!("<!-- preview:{} ({entry}) -->", title.as_deref().unwrap_or("preview")));
@@ -406,7 +431,7 @@ fn push_block_markdown(block: &DocBlock, out: &mut Vec<String>) {
                 out.push(format!("<details>\n<summary>{title}</summary>\n\n{body}\n</details>"));
             }
         }
-        BlockKind::Table { headers, rows, alignments } => {
+        BlockKind::Table { headers, rows, alignments, .. } => {
             if !headers.is_empty() {
                 let mut table_lines = vec![format!("| {} |", headers.join(" | "))];
                 let sep: Vec<&str> = (0..headers.len())
@@ -505,12 +530,15 @@ fn collect_links_rec(blocks: &[DocBlock], out: &mut Vec<NoteLinkRef>) {
                     collect_links_rec(&col.blocks, out);
                 }
             }
+            BlockKind::Media { annotations, .. } | BlockKind::Compare { annotations, .. } => {
+                if let Some(anns) = annotations {
+                    out.extend(extract_annotation_links(anns));
+                }
+            }
             BlockKind::Code { .. }
             | BlockKind::Kpi { .. }
             | BlockKind::Chart { .. }
             | BlockKind::Diagram { .. }
-            | BlockKind::Compare { .. }
-            | BlockKind::Media { .. }
             | BlockKind::Preview { .. }
             | BlockKind::IssueList { .. }
             | BlockKind::PageBreak { .. }
@@ -654,6 +682,7 @@ pub fn project_doc_view(note_id: &str, title: &str, files: &BTreeMap<String, Vec
 
     let (word_count, page_breaks) = count_words(&blocks);
     let extracted_links = extract_doc_links(&blocks);
+    let annotation_summary = doc_annotation_summary(&blocks);
 
     DocView {
         note_id: note_id.to_owned(),
@@ -662,6 +691,7 @@ pub fn project_doc_view(note_id: &str, title: &str, files: &BTreeMap<String, Vec
         slide_count: page_breaks + 1,
         word_count,
         extracted_links,
+        annotation_summary,
     }
 }
 
@@ -742,7 +772,7 @@ mod tests {
             matches!(&blocks[0].kind, BlockKind::Quote { text, attribution } if text.contains("Clarity") && attribution.as_deref() == Some("Design Guild"))
         );
         assert!(
-            matches!(&blocks[1].kind, BlockKind::Table { headers, rows, alignments } if headers == &["Name", "Link"] && rows.len() == 1 && alignments.as_deref() == Some(&["left".to_owned(), "right".to_owned()]))
+            matches!(&blocks[1].kind, BlockKind::Table { headers, rows, alignments, .. } if headers == &["Name", "Link"] && rows.len() == 1 && alignments.as_deref() == Some(&["left".to_owned(), "right".to_owned()]))
         );
         assert!(matches!(&blocks[2].kind, BlockKind::Math { expression, display } if expression == "E = mc^2" && *display == Some(true)));
 
@@ -797,5 +827,75 @@ mod tests {
         assert!(links.iter().any(|l| l.kind == LinkEntityKind::Issue && l.id == "12"));
         let (words, _) = count_words(&blocks);
         assert!(words >= 12);
+    }
+
+    #[test]
+    fn media_compare_annotations_and_table_column_widths_project_cleanly() {
+        use vibevalley_protocol::{JsNumber, MediaAnnotation, MediaAnnotationKind, MediaAnnotationRect, MediaAnnotationSeverity, MediaAnnotationStatus};
+
+        let doc = DocDocument {
+            version: 1,
+            blocks: vec![
+                DocBlock {
+                    id: "b_img".to_owned(),
+                    kind: BlockKind::Media {
+                        media_kind: "image".to_owned(),
+                        src: "asset/audit.png".to_owned(),
+                        caption: Some("Audit capture".to_owned()),
+                        annotations: Some(vec![MediaAnnotation {
+                            id: "a1".to_owned(),
+                            number: 1,
+                            kind: Some(MediaAnnotationKind::Rect),
+                            rect: MediaAnnotationRect {
+                                x: JsNumber(0.15),
+                                y: JsNumber(0.25),
+                                w: JsNumber(0.2),
+                                h: JsNumber(0.1),
+                            },
+                            to: None,
+                            side: None,
+                            severity: MediaAnnotationSeverity::P1,
+                            title: "Spacing drift".to_owned(),
+                            body: Some("Tracks [[note:n_spec]]".to_owned()),
+                            status: MediaAnnotationStatus::Open,
+                            issue_id: Some("i144".to_owned()),
+                            base_row_id: Some("r1".to_owned()),
+                            author: Some("user".to_owned()),
+                            created_at: Some(1),
+                            updated_at: Some(1),
+                        }]),
+                    },
+                    collapsed: None,
+                    children: None,
+                },
+                DocBlock {
+                    id: "b_tbl".to_owned(),
+                    kind: BlockKind::Table {
+                        headers: vec!["Area".to_owned(), "Status".to_owned()],
+                        rows: vec![vec!["Header".to_owned(), "Open".to_owned()]],
+                        alignments: Some(vec!["left".to_owned(), "center".to_owned()]),
+                        column_widths: Some(vec![240, 120]),
+                    },
+                    collapsed: None,
+                    children: None,
+                },
+            ],
+        };
+
+        let json = serialize_doc_document(&doc).unwrap();
+        let parsed = parse_doc_document(&json).unwrap();
+        assert_eq!(parsed, doc);
+
+        let mut files = BTreeMap::new();
+        files.insert("structure/doc.json".to_owned(), json.into_bytes());
+        let view = project_doc_view("n1", "Audit", &files);
+        let summary = view.annotation_summary.expect("summary present");
+        assert_eq!(summary.total, 1);
+        assert_eq!(summary.open, 1);
+        assert_eq!(summary.p1, 1);
+        assert_eq!(summary.linked_rows, 1);
+        assert_eq!(summary.linked_issues, 1);
+        assert!(view.extracted_links.iter().any(|l| l.kind == LinkEntityKind::Issue && l.id == "i144"));
+        assert!(view.extracted_links.iter().any(|l| l.kind == LinkEntityKind::Note && l.id == "n_spec"));
     }
 }

@@ -9,17 +9,19 @@
 //!    to palette tokens at render time.
 
 use std::collections::BTreeMap;
+use std::num::NonZeroUsize;
 use std::ops::Range;
 use std::sync::{Arc, Mutex, OnceLock, RwLock};
 use std::time::{Duration, Instant};
 
 use nsh_base::editor::{EditorHighlighter, EditorText, EditorTextEdit, EditorToken, EditorTokens, register_highlighter, register_language};
+use vibevalley_kit::cache::{LruCache, hash_str};
 use vibevalley_shiki::{
     FontStyle, Grammar, Highlighter, OnigEngine, RawGrammar, RawTheme, Rgba, ShikiError, StateStack, StyledSpan, Theme, is_plain_lang, parse_grammar_json,
     parse_theme_json, split_lines,
 };
 
-use crate::cache::{CacheStats, LruCache, hash_str};
+use crate::cache::CacheStats;
 use crate::grammars::{BUNDLED_GRAMMARS, MERMAID_LANGUAGE};
 use crate::theme::{SHIKI_DARK_THEME, SHIKI_LIGHT_THEME, vv_shiki_dark_theme, vv_shiki_light_theme};
 
@@ -270,7 +272,7 @@ struct CodeCacheKey {
 
 fn code_cache() -> &'static Mutex<LruCache<CodeCacheKey, Arc<HighlightedCode>>> {
     static CACHE: OnceLock<Mutex<LruCache<CodeCacheKey, Arc<HighlightedCode>>>> = OnceLock::new();
-    CACHE.get_or_init(|| Mutex::new(LruCache::new(CODE_CACHE_CAPACITY)))
+    CACHE.get_or_init(|| Mutex::new(LruCache::new(NonZeroUsize::new(CODE_CACHE_CAPACITY).expect("non-zero capacity"))))
 }
 
 /// Registers an additional or replacement TextMate grammar from JSON into the shared Shiki engine.
@@ -361,7 +363,14 @@ pub fn highlight_code(code: &str, language: Option<&str>, dark: bool) -> Highlig
 
 /// Returns hit/miss/eviction metrics for the code-block highlight LRU cache.
 pub fn code_highlight_cache_stats() -> CacheStats {
-    code_cache().lock().unwrap_or_else(|p| p.into_inner()).stats()
+    let stats = code_cache().lock().unwrap_or_else(|p| p.into_inner()).stats();
+    CacheStats {
+        entries: stats.entries,
+        capacity: stats.capacity,
+        hits: stats.hits,
+        misses: stats.misses,
+        evictions: stats.evictions,
+    }
 }
 
 /// Clears all entries from the code-block highlight LRU cache.

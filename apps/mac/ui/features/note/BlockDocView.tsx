@@ -1,14 +1,15 @@
-import { cleanup, computed, effect, Image, keymap, Scroll, signal, Text, untracked, View, windowSize } from "nsh";
+import { cleanup, computed, effect, Image, keymap, Scroll, signal, Text, untracked, View, windowSize, type ViewRef } from "nsh";
 import { Input } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
-import type { DocBlock, DocView, Issue, IssueId, Note, NoteId, NoteLink, NoteLinkListResult } from "@vibevalley/protocol";
+import type { DocBlock, DocView, Issue, IssueId, MediaAnnotation, Note, NoteId, NoteLink, NoteLinkListResult, NotePresence } from "@vibevalley/protocol";
 import { issueId, noteId } from "@vibevalley/protocol/schema";
 
 import { Button } from "../../design/Button";
 import { Icon } from "../../design/Icon";
 import { Empty } from "../../design/layout";
 import { Lightbox, type Picture } from "../../design/Lightbox";
+import { motionClass, motionOff } from "../../design/motion";
 import { useTimeout } from "../../infra/base/timer";
 import { isVdpEnabled, useVdpNode, VdpAnchor } from "../../infra/vdpProbe";
 import { BlockItem, type BlockEditorProbeSnapshot, type BlockEditorTelemetryPatch, type FocusRequest } from "./doc/BlockItem";
@@ -27,6 +28,14 @@ import {
   replaceBlockById,
   splitBlockAtSelection,
 } from "./doc/docOps";
+import { buildDocAnnotationIndex, type DocAnnotationRef } from "./doc/mediaAnnotationModel";
+import { MediaAnnotationOverlay } from "./doc/MediaAnnotationOverlay";
+import { CollaboratorCursor, filterRemotePresences } from "./PresenceBadges";
+
+interface BlockBoxLayout {
+  readonly y: number;
+  readonly height: number;
+}
 
 interface BlockDocViewProps {
   readonly note: Note;
@@ -34,6 +43,7 @@ interface BlockDocViewProps {
   readonly notes: readonly Note[];
   readonly issues: readonly Issue[];
   readonly links?: NoteLinkListResult | undefined;
+  readonly presences?: readonly NotePresence[] | undefined;
   readonly busy?: boolean | undefined;
   readonly savedAt?: number | undefined;
   readonly embedded?: boolean | undefined;
@@ -116,11 +126,36 @@ export function BlockDocView(props: BlockDocViewProps) {
   const focusedBlockId = signal<string | undefined>(undefined);
   const focusRequest = signal<FocusRequest | undefined>(undefined);
   const highlightedBlockId = signal<string | undefined>(undefined);
+  const enteringStartIds = signal<ReadonlySet<string>>(new Set());
+  const blockLayouts = signal<ReadonlyMap<string, BlockBoxLayout>>(new Map());
   const dirty = signal(false);
   const saving = signal(false);
   const linksOpen = signal(true);
   const lightboxPicture = signal<Picture | undefined>(undefined);
+  const lightboxMediaBlockId = signal<string | undefined>(undefined);
+  const activeAnnotationLink = signal<
+    { readonly annotationId?: string | undefined; readonly baseRowId?: string | undefined; readonly mediaBlockId?: string | undefined } | undefined
+  >(undefined);
   const scheduleSaveTimer = useTimeout();
+  const entranceTimers = new Set<ReturnType<typeof setTimeout>>();
+
+  cleanup(() => {
+    for (const timer of entranceTimers) clearTimeout(timer);
+    entranceTimers.clear();
+  });
+
+  const triggerEntrance = (addedIds: readonly string[]) => {
+    if (addedIds.length === 0 || motionOff()) return;
+    enteringStartIds.set(new Set([...untracked(enteringStartIds), ...addedIds]));
+
+    const t1 = setTimeout(() => {
+      entranceTimers.delete(t1);
+      const next = new Set(untracked(enteringStartIds));
+      for (const id of addedIds) next.delete(id);
+      enteringStartIds.set(next);
+    }, 60);
+    entranceTimers.add(t1);
+  };
 
   let focusSeq = 0;
   let probeSnapshot: BlockEditorProbeSnapshot = {
@@ -163,6 +198,7 @@ export function BlockDocView(props: BlockDocViewProps) {
 
   let syncedNoteId = untracked(() => props.note.id);
   let syncedDocRef = untracked(() => props.docView?.blocks);
+  let knownBlockIds = new Set<string>(untracked(() => (props.docView?.blocks ?? []).map((b) => b.id)));
 
   effect(() => {
     const incomingNoteId = props.note.id;
@@ -171,6 +207,9 @@ export function BlockDocView(props: BlockDocViewProps) {
     if (incomingNoteId !== syncedNoteId) {
       syncedNoteId = incomingNoteId;
       syncedDocRef = incomingBlocks;
+      knownBlockIds = new Set((incomingBlocks ?? []).map((b) => b.id));
+      enteringStartIds.set(new Set());
+      blockLayouts.set(new Map());
       titleDraft.set(incomingTitle);
       blocks.set(incomingBlocks ?? []);
       dirty.set(false);
@@ -187,8 +226,12 @@ export function BlockDocView(props: BlockDocViewProps) {
       return;
     }
     if (incomingBlocks !== undefined && incomingBlocks !== syncedDocRef && !untracked(dirty)) {
+      const hadPrevDoc = syncedDocRef !== undefined;
+      const addedIds = hadPrevDoc ? incomingBlocks.filter((b) => !knownBlockIds.has(b.id)).map((b) => b.id) : [];
+      knownBlockIds = new Set(incomingBlocks.map((b) => b.id));
       syncedDocRef = incomingBlocks;
       blocks.set(incomingBlocks);
+      if (addedIds.length > 0) triggerEntrance(addedIds);
     }
   });
 
@@ -207,6 +250,7 @@ export function BlockDocView(props: BlockDocViewProps) {
   });
   const stats = computed(() => computeDocStats(blocks()));
   const slideIndices = computed(() => computeSlideIndices(blocks()));
+  const annotationIndex = computed(() => buildDocAnnotationIndex(blocks()));
   const outlineEntries = computed(() => extractTocEntries(visibleBlocks(), 3));
   const showOutlineRail = computed(() => outlineEntries().length >= 2 && windowSize().width >= 1100);
   const coverSrc = computed(() => coverUrlOf(props.note));
@@ -267,15 +311,15 @@ export function BlockDocView(props: BlockDocViewProps) {
 
   const handleInsertAfter = (afterId: string, newBlock: DocBlock) => {
     const next = insertBlockAfter(untracked(blocks), afterId, newBlock);
-    commitBlocks(next);
     requestFocus({ blockId: newBlock.id, caret: "start" });
+    commitBlocks(next);
   };
 
   const handleSplitBlock = (id: string, selStart: number, selEnd: number) => {
     const res = splitBlockAtSelection(untracked(blocks), id, selStart, selEnd);
     if (!res) return;
-    commitBlocks(res.blocks);
     requestFocus(res.focus);
+    commitBlocks(res.blocks);
   };
 
   const handleMergeBackward = (id: string) => {
@@ -283,8 +327,8 @@ export function BlockDocView(props: BlockDocViewProps) {
     if (!res) return;
     if (res.blocks.length === 0) {
       const fresh: DocBlock = { id: makeBlockId(), type: "prose", text: "" };
-      commitBlocks([fresh]);
       requestFocus({ blockId: fresh.id, caret: 0 });
+      commitBlocks([fresh]);
       return;
     }
     commitBlocks(res.blocks);
@@ -296,8 +340,8 @@ export function BlockDocView(props: BlockDocViewProps) {
     const tailId = cur.at(-1)?.id;
     const newBlock: DocBlock = { id: makeBlockId(), type: "prose", text: "" };
     const next = insertBlockAfter(cur, tailId, newBlock);
-    blocks.set(next);
     requestFocus({ blockId: newBlock.id, caret: "start" });
+    blocks.set(next);
     if (props.onAppendBlock && !untracked(dirty)) {
       void props.onAppendBlock(newBlock, tailId);
     } else {
@@ -319,8 +363,8 @@ export function BlockDocView(props: BlockDocViewProps) {
     const next = deleteBlockById(cur, id);
     if (next.length === 0) {
       const fresh: DocBlock = { id: makeBlockId(), type: "prose", text: "" };
-      commitBlocks([fresh]);
       requestFocus({ blockId: fresh.id, caret: 0 });
+      commitBlocks([fresh]);
       return;
     }
     commitBlocks(next);
@@ -341,21 +385,111 @@ export function BlockDocView(props: BlockDocViewProps) {
     }
   };
 
+  const handleSelectAnnotation = (blockId: string, annId: string | undefined, baseRowId?: string) => {
+    if (annId === undefined) {
+      activeAnnotationLink.set(undefined);
+      return;
+    }
+    activeAnnotationLink.set({ annotationId: annId, baseRowId, mediaBlockId: blockId });
+  };
+
+  const handleJumpToBaseRow = (rowId: string, annId: string) => {
+    const baseBlock = untracked(visibleBlocks).find((b) => b.type === "baseEmbed");
+    const curRef = untracked(annotationIndex).byAnnotationId.get(annId);
+    activeAnnotationLink.set({
+      annotationId: annId,
+      baseRowId: rowId,
+      mediaBlockId: curRef?.blockId,
+    });
+    if (baseBlock !== undefined) {
+      highlightedBlockId.set(baseBlock.id);
+    }
+  };
+
+  const handleSelectReviewRow = (rowId: string, ref?: DocAnnotationRef) => {
+    const resolved = ref ?? untracked(annotationIndex).byBaseRowId.get(rowId);
+    if (resolved !== undefined) {
+      activeAnnotationLink.set({
+        annotationId: resolved.annotation.id,
+        baseRowId: rowId,
+        mediaBlockId: resolved.blockId,
+      });
+      highlightedBlockId.set(resolved.blockId);
+    } else {
+      activeAnnotationLink.set({ baseRowId: rowId });
+    }
+  };
+
+  const handleCreateIssueFromAnnotation = async (ann: MediaAnnotation, blockId: string): Promise<IssueId | undefined> => {
+    if (!props.onCreateIssueFromBlock) return undefined;
+    return props.onCreateIssueFromBlock(`[#${ann.number}] ${ann.title}`, blockId);
+  };
+
   const outgoingCount = () => props.links?.outgoing.length ?? 0;
   const backlinksCount = () => props.links?.backlinks.length ?? 0;
-  useVdpNode({ testId: "note-block-doc-view", role: "region" });
+  let docRootRef: ViewRef | undefined;
+  let blocksListRef: ViewRef | undefined;
+  useVdpNode({ testId: "note-block-doc-view", role: "region", getRef: () => docRootRef });
+  useVdpNode({ testId: "doc-blocks-list", role: "list", getRef: () => blocksListRef });
   useVdpNode({
     testId: "doc-editor-probe",
     role: "status",
     text: () => JSON.stringify(probeSnapshot),
   });
-  const lightboxPictures = computed(() => {
+  const lightboxPictures = computed((): readonly Picture[] => {
+    const mediaId = lightboxMediaBlockId();
+    if (mediaId !== undefined) {
+      const blk = findBlockById(blocks(), mediaId);
+      if (blk !== undefined && blk.type === "media" && blk.src.trim() !== "") {
+        return [
+          {
+            src: blk.src,
+            name: blk.caption || blk.src,
+            renderOverlay: (frame) => {
+              const liveBlk = () => {
+                const found = findBlockById(blocks(), mediaId);
+                return found?.type === "media" ? found : undefined;
+              };
+              const liveAnns = () => liveBlk()?.annotations ?? [];
+              return (
+                <MediaAnnotationOverlay
+                  scopeId={`lb-${mediaId}`}
+                  annotations={liveAnns()}
+                  containerWidth={frame().width}
+                  containerHeight={frame().height}
+                  naturalWidth={frame().naturalWidth}
+                  naturalHeight={frame().naturalHeight}
+                  showOverlay
+                  unresolvedOnly={false}
+                  selectedId={activeAnnotationLink()?.annotationId}
+                  issues={props.issues}
+                  onSelect={(annId) => {
+                    const found = annId !== undefined ? liveAnns().find((a) => a.id === annId) : undefined;
+                    handleSelectAnnotation(mediaId, annId, found?.baseRowId);
+                  }}
+                  onChange={(next) => {
+                    const current = liveBlk();
+                    if (current !== undefined) handleUpdateBlock(mediaId, { ...current, annotations: [...next] });
+                  }}
+                  onOpenIssue={props.onOpenIssue}
+                  onCreateIssue={props.onCreateIssueFromBlock ? (ann) => handleCreateIssueFromAnnotation(ann, mediaId) : undefined}
+                  onJumpToBaseRow={(rowId, annId) => {
+                    lightboxMediaBlockId.set(undefined);
+                    handleJumpToBaseRow(rowId, annId);
+                  }}
+                />
+              );
+            },
+          },
+        ];
+      }
+    }
     const pic = lightboxPicture();
     return pic !== undefined ? [pic] : [];
   });
 
   const embedded = () => props.embedded === true;
-  const contentInsetClass = () => (embedded() ? "pl-10" : "pl-14");
+  const contentInsetClass = () => (embedded() ? "" : "pl-14");
   const bodyContent = (
     <>
       <If when={!embedded()}>
@@ -375,11 +509,13 @@ export function BlockDocView(props: BlockDocViewProps) {
             accessibilityLabel={t("web.note.page.title")}
             value={titleDraft()}
             placeholder={t("web.note.page.title")}
+            multiline
+            scrollbar={false}
             submitBehavior="submit"
             onChange={(e) => titleDraft.set(e.value)}
             onSubmit={commitTitleRename}
             onBlur={commitTitleRename}
-            class="min-w-0 flex-1 bg-transparent px-1 text-3xl font-bold leading-tight text-ink placeholder:text-faint"
+            class="min-w-0 flex-1 bg-transparent px-0 text-3xl font-bold leading-tight text-ink placeholder:text-faint"
           />
           <View class="shrink-0 flex-row items-center gap-2">
             <If when={dirty() || saving()}>
@@ -413,58 +549,133 @@ export function BlockDocView(props: BlockDocViewProps) {
           </View>
         }
       >
-        <View testID="doc-blocks-list" class="gap-1">
-          <Each of={visibleBlocks()} key={(b) => b.id}>
-            {(b) => (
-              <View class={highlightedBlockId() === b().id ? "rounded-md bg-selected" : ""}>
-                <BlockItem
-                  block={b()}
-                  allBlocks={visibleBlocks()}
-                  slideIndices={slideIndices()}
-                  note={props.note}
-                  notes={props.notes}
-                  issues={props.issues}
-                  focusedBlockId={focusedBlockId()}
-                  focusRequest={focusRequest()}
-                  compactGutter={embedded()}
-                  onFocusBlock={handleNativeFocusBlock}
-                  onRequestFocus={requestFocus}
-                  onFocusAdjacent={handleFocusAdjacent}
-                  onSplitBlock={handleSplitBlock}
-                  onMergeBackward={handleMergeBackward}
-                  onUpdateBlock={handleUpdateBlock}
-                  onInsertAfter={handleInsertAfter}
-                  onMoveBlock={handleMoveBlock}
-                  onDuplicateBlock={handleDuplicateBlock}
-                  onDeleteBlock={handleDeleteBlock}
-                  onCreateIssueFromBlock={props.onCreateIssueFromBlock}
-                  onOpenNote={props.onOpenNote}
-                  onOpenIssue={props.onOpenIssue}
-                  onScrollToBlock={(targetId) => {
-                    highlightedBlockId.set(targetId);
-                    requestFocus({ blockId: targetId, caret: "end" });
-                  }}
-                  onOpenLightbox={(pic) => lightboxPicture.set(pic)}
-                  onEditorTelemetry={telemetryHandler}
-                />
-              </View>
-            )}
-          </Each>
+        <View class="relative w-full min-w-0">
+          <View
+            ref={
+              isVdpEnabled()
+                ? (el) => {
+                    blocksListRef = el;
+                  }
+                : undefined
+            }
+            testID="doc-blocks-list"
+            class="w-full min-w-0 gap-0"
+          >
+            <Each of={visibleBlocks()} key={(b) => b.id}>
+              {(b, idx) => {
+                const isEnteringStart = () => enteringStartIds().has(b().id);
+                const wrapperTransform = () => (isEnteringStart() ? "translate-y-1 opacity-0" : "translate-y-0 opacity-100");
+                return (
+                  <View
+                    onLayout={(e) => {
+                      const id = b().id;
+                      const y = e.bounds.origin.y;
+                      const height = e.bounds.size.height;
+                      const prev = untracked(blockLayouts).get(id);
+                      if (prev && Math.abs(prev.y - y) <= 0.5 && Math.abs(prev.height - height) <= 0.5) return;
+                      const next = new Map(untracked(blockLayouts));
+                      next.set(id, { y, height });
+                      blockLayouts.set(next);
+                    }}
+                    class={`min-w-0 ${motionClass("transition-opacity duration-200 ease-out")} ${wrapperTransform()}`}
+                  >
+                    <BlockItem
+                      block={b()}
+                      prevBlock={visibleBlocks()[idx() - 1]}
+                      allBlocks={visibleBlocks()}
+                      slideIndices={slideIndices()}
+                      note={props.note}
+                      notes={props.notes}
+                      issues={props.issues}
+                      focusedBlockId={focusedBlockId()}
+                      focusRequest={focusRequest()}
+                      highlighted={highlightedBlockId() === b().id}
+                      presences={props.presences}
+                      embedded={embedded()}
+                      compactGutter={embedded()}
+                      onFocusBlock={handleNativeFocusBlock}
+                      onRequestFocus={requestFocus}
+                      onFocusAdjacent={handleFocusAdjacent}
+                      onSplitBlock={handleSplitBlock}
+                      onMergeBackward={handleMergeBackward}
+                      onUpdateBlock={handleUpdateBlock}
+                      onInsertAfter={handleInsertAfter}
+                      onMoveBlock={handleMoveBlock}
+                      onDuplicateBlock={handleDuplicateBlock}
+                      onDeleteBlock={handleDeleteBlock}
+                      onCreateIssueFromBlock={props.onCreateIssueFromBlock}
+                      onOpenNote={props.onOpenNote}
+                      onOpenIssue={props.onOpenIssue}
+                      onScrollToBlock={(targetId) => {
+                        highlightedBlockId.set(targetId);
+                        requestFocus({ blockId: targetId, caret: "end" });
+                      }}
+                      onOpenLightbox={(pic) => {
+                        lightboxMediaBlockId.set(undefined);
+                        lightboxPicture.set(pic);
+                      }}
+                      onOpenMediaLightbox={(blockId) => {
+                        lightboxPicture.set(undefined);
+                        lightboxMediaBlockId.set(blockId);
+                      }}
+                      annotationIndex={annotationIndex()}
+                      selectedAnnotationId={activeAnnotationLink()?.annotationId}
+                      highlightedBaseRowId={activeAnnotationLink()?.baseRowId}
+                      onSelectAnnotation={handleSelectAnnotation}
+                      onJumpToBaseRow={handleJumpToBaseRow}
+                      onSelectReviewRow={handleSelectReviewRow}
+                      onCreateIssueFromAnnotation={props.onCreateIssueFromBlock ? handleCreateIssueFromAnnotation : undefined}
+                      onEditorTelemetry={telemetryHandler}
+                    />
+                  </View>
+                );
+              }}
+            </Each>
+          </View>
+          <View class="pointer-events-none absolute inset-0 overflow-visible">
+            <Each
+              of={filterRemotePresences(props.presences ?? []).filter((p) => {
+                const targetId = p.nodeId ?? p.selector;
+                return targetId !== undefined && visibleBlocks().some((b) => b.id === targetId);
+              })}
+              key={(p) => p.id}
+            >
+              {(p) => {
+                const cursorStyle = () => {
+                  const targetId = p().nodeId ?? p().selector ?? "";
+                  const box = blockLayouts().get(targetId);
+                  const top = box ? Math.round(box.y + Math.min(22, Math.max(12, box.height * 0.55))) : 16;
+                  const off = p().offset;
+                  if (off !== undefined) {
+                    return { top, left: Math.min(440, Math.max(96, Math.round(58 + off * 7.2))) };
+                  }
+                  return { top, right: 16 };
+                };
+                return <CollaboratorCursor peer={p()} testIdPrefix="doc-presence-badge" class="pointer-events-none absolute" style={cursorStyle()} />;
+              }}
+            </Each>
+          </View>
         </View>
       </If>
 
-      <View class={`flex-row items-center justify-between gap-2 pt-2 pr-1 opacity-70 hover:opacity-100 ${contentInsetClass()}`}>
-        <Button size="compact" tone="quiet" icon="add" testID="doc-append-block-btn" onPress={handleAppendTail}>
-          {t("web.note.doc.addBlock")}
-        </Button>
-        <View class="flex-row items-center gap-2">
-          <If when={embedded() && (dirty() || saving())}>
-            <Text testID="doc-save-status" class="text-2xs text-warn-ink">
-              {saving() ? t("web.base.reading") : t("web.note.page.unsaved")}
-            </Text>
-          </If>
-          <Text class="text-2xs text-faint">{t("web.note.doc.slashHint")}</Text>
+      <View class={`flex-row items-center justify-between gap-2 pr-1 ${contentInsetClass()}`}>
+        <View
+          role="button"
+          testID="doc-append-block-btn"
+          accessibilityLabel={t("web.note.doc.addBlock")}
+          onPress={handleAppendTail}
+          class="group relative h-6 flex-1"
+        >
+          <View class="absolute top-0.5 left-0 flex-row items-center gap-1 rounded-sm px-1 py-0.5 opacity-0 hover:bg-hover group-hover:opacity-100 focus:opacity-100">
+            <Icon name="add" size={12} tone="faint" />
+            <Text class="text-xs text-faint">{t("web.note.doc.addBlock")}</Text>
+          </View>
         </View>
+        <If when={embedded() && (dirty() || saving())}>
+          <Text testID="doc-save-status" class="shrink-0 text-2xs text-warn-ink">
+            {saving() ? t("web.base.reading") : t("web.note.page.unsaved")}
+          </Text>
+        </If>
       </View>
 
       <If when={backlinksCount() > 0 || outgoingCount() > 0}>
@@ -510,7 +721,17 @@ export function BlockDocView(props: BlockDocViewProps) {
   );
 
   return (
-    <View testID="note-block-doc-view" class={embedded() ? "min-w-0" : "min-h-0 flex-1 flex-row bg-page"}>
+    <View
+      ref={
+        isVdpEnabled()
+          ? (el) => {
+              docRootRef = el;
+            }
+          : undefined
+      }
+      testID="note-block-doc-view"
+      class={embedded() ? "w-full min-w-0" : "min-h-0 flex-1 flex-row bg-page"}
+    >
       <If
         when={embedded()}
         else={
@@ -519,7 +740,7 @@ export function BlockDocView(props: BlockDocViewProps) {
           </Scroll>
         }
       >
-        <View class="w-full gap-2">{bodyContent}</View>
+        <View class="w-full min-w-0 gap-2">{bodyContent}</View>
       </If>
 
       <If when={!embedded() && showOutlineRail()}>
@@ -540,7 +761,7 @@ export function BlockDocView(props: BlockDocViewProps) {
                     class="w-full min-w-0 rounded-sm py-0.5 pr-1 hover:bg-hover"
                     style={{ paddingLeft: Math.max(0, entry().level - 1) * 10 }}
                   >
-                    <Text class={`w-full truncate text-2xs ${active() ? "font-semibold text-accent" : "text-faint hover:text-ink"}`}>{entry().text}</Text>
+                    <Text class={`w-full truncate text-2xs font-medium ${active() ? "text-accent" : "text-faint hover:text-ink"}`}>{entry().text}</Text>
                   </View>
                 );
               }}
@@ -551,9 +772,12 @@ export function BlockDocView(props: BlockDocViewProps) {
 
       <Lightbox
         pictures={lightboxPictures()}
-        at={lightboxPicture() !== undefined ? 0 : undefined}
+        at={lightboxPictures().length > 0 ? 0 : undefined}
         onAt={(at) => {
-          if (at === undefined) lightboxPicture.set(undefined);
+          if (at === undefined) {
+            lightboxPicture.set(undefined);
+            lightboxMediaBlockId.set(undefined);
+          }
         }}
       />
     </View>

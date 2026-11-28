@@ -2,14 +2,20 @@ import { computed, effect, Scroll, signal, Text, untracked, View } from "nsh";
 import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
-import type { IssueId, Note, NoteFileMeta } from "@vibevalley/protocol";
-import { issueId as toIssueId, jsonString } from "@vibevalley/protocol/schema";
+import type { IssueId, MediaAnnotation, Note, NoteFileMeta } from "@vibevalley/protocol";
+import {
+  issueId as toIssueId,
+  jsonString,
+  MediaAnnotationSeverity as MediaAnnotationSeveritySchema,
+  MediaAnnotationStatus as MediaAnnotationStatusSchema,
+} from "@vibevalley/protocol/schema";
 
 import { Button } from "../../../design/Button";
 import { useDesignHost } from "../../../design/host";
 import { Icon } from "../../../design/Icon";
 import { IconButton } from "../../../design/IconButton";
 import { Empty, Toggle } from "../../../design/layout";
+import { Lightbox, type Picture } from "../../../design/Lightbox";
 import { Segmented } from "../../../design/Segmented";
 import { CountPill } from "../../../design/Tag";
 import { toast } from "../../../design/toasts";
@@ -19,6 +25,8 @@ import { playAudio } from "../../../infra/attachmentFile";
 import { useInterval } from "../../../infra/base/timer";
 import { transport } from "../../../infra/transport";
 import { useVdpNode } from "../../../infra/vdpProbe";
+import { clampNormalizedRect } from "../doc/mediaAnnotationModel";
+import { MediaAnnotationOverlay, MediaAnnotationStage } from "../doc/MediaAnnotationOverlay";
 import { saveBase64File, saveTextFile, useNoteDirectory } from "./noteFiles";
 
 interface MediaViewProps {
@@ -48,6 +56,7 @@ interface MediaItemModel {
   readonly jobId: string | undefined;
   readonly transcript: readonly TranscriptCue[];
   readonly transcriptExcerpt: string;
+  readonly annotations: readonly MediaAnnotation[];
 }
 
 interface StoryboardShotModel {
@@ -76,6 +85,24 @@ const TranscriptCueRawSchema = z.looseObject({
   text: optStr,
 });
 
+const MediaAnnotationRawSchema = z.looseObject({
+  id: z.string().min(1),
+  rect: z.object({
+    x: z.number(),
+    y: z.number(),
+    w: z.number(),
+    h: z.number(),
+  }),
+  number: z.number().int().positive(),
+  severity: MediaAnnotationSeveritySchema.catch("p1"),
+  title: z.string(),
+  body: optStr,
+  status: MediaAnnotationStatusSchema.catch("open"),
+  issueId: optStr,
+  baseRowId: optStr,
+  author: optStr,
+});
+
 const MediaItemRawSchema = z.looseObject({
   id: optStr,
   kind: optStr,
@@ -90,6 +117,7 @@ const MediaItemRawSchema = z.looseObject({
     .optional()
     .catch(undefined),
   transcriptExcerpt: optStr,
+  annotations: z.array(z.unknown()).optional().catch(undefined),
 });
 
 const StoryboardStyleGuideRawSchema = z.looseObject({
@@ -226,6 +254,36 @@ function mediaKindIcon(kind: string) {
   }
 }
 
+function isDataUri(value: string): boolean {
+  return /^\s*data:/iu.test(value);
+}
+
+function localizedMediaKind(kind: string): string {
+  switch (kind.toLowerCase()) {
+    case "audio":
+      return t("web.library.kind.audio");
+    case "video":
+      return t("web.library.kind.video");
+    case "image":
+      return t("web.library.kind.image");
+    default:
+      return t("web.library.kind.other");
+  }
+}
+
+function displayMediaSubtitle(item: Pick<MediaItemModel, "kind" | "src">): string {
+  const kindLabel = localizedMediaKind(item.kind);
+  const src = item.src.trim();
+  if (!src || isDataUri(src)) return kindLabel;
+  const tail = src.split("/").pop()?.trim();
+  return tail ? `${kindLabel} · ${tail}` : kindLabel;
+}
+
+function formatIssueBadge(id: IssueId): string {
+  const m = /^i(\d+)$/iu.exec(id);
+  return m?.[1] !== undefined ? `#${m[1]}` : t("web.note.annotation.openIssue");
+}
+
 function FramingGuide(props: { readonly framing: string; readonly color?: string | undefined }) {
   return (
     <View class="h-full w-full items-center justify-center p-3">
@@ -273,6 +331,9 @@ export function MediaView(props: MediaViewProps) {
   const motionLoop = signal(true);
   const activeAudioId = signal<string | undefined>(undefined);
   const previewVideoId = signal<string | undefined>(undefined);
+  const lightboxItemId = signal<string | undefined>(undefined);
+  const selectedAnnotationByItem = signal<Readonly<Record<string, string | undefined>>>({});
+  const localAnnotationsByItem = signal<Readonly<Record<string, readonly MediaAnnotation[]>>>({});
 
   const mediaJson = computed((): MediaDocPayload | undefined =>
     parseOptionalJson(snapshot().contents.get("structure/media.json")?.content, MediaDocJsonSchema),
@@ -290,11 +351,13 @@ export function MediaView(props: MediaViewProps) {
     const items: MediaItemModel[] = parseArrayItems(obj?.items, MediaItemRawSchema).map((item, idx) => {
       const cues = parseTranscriptCues(item.transcript, `cue-${idx}`);
       const src = item.src ?? "";
+      const kind = item.kind ?? defaultKind;
+      const fallbackTitle = !isDataUri(src) && src.trim() !== "" ? src.split("/").pop()?.trim() || src : `${localizedMediaKind(kind)} ${idx + 1}`;
       return {
         id: item.id ?? `m-${idx + 1}`,
-        kind: item.kind ?? defaultKind,
+        kind,
         src,
-        title: item.title ?? item.src ?? `Item ${idx + 1}`,
+        title: item.title && !isDataUri(item.title) ? item.title : fallbackTitle,
         caption: item.caption ?? "",
         durationSec: item.durationSec,
         issueId: item.issueId ? toIssueId(item.issueId) : undefined,
@@ -307,6 +370,18 @@ export function MediaView(props: MediaViewProps) {
             .map((c) => c.text)
             .filter(Boolean)
             .join(" "),
+        annotations: parseArrayItems(item.annotations, MediaAnnotationRawSchema).map((a) => ({
+          id: a.id,
+          rect: clampNormalizedRect(a.rect),
+          number: a.number,
+          severity: a.severity,
+          title: a.title,
+          ...(a.body !== undefined ? { body: a.body } : {}),
+          status: a.status,
+          ...(a.issueId !== undefined ? { issueId: toIssueId(a.issueId) } : {}),
+          ...(a.baseRowId !== undefined ? { baseRowId: a.baseRowId } : {}),
+          ...(a.author !== undefined ? { author: a.author } : {}),
+        })),
       };
     });
 
@@ -445,6 +520,60 @@ export function MediaView(props: MediaViewProps) {
     });
   };
 
+  const annotationsForItem = (item: MediaItemModel): readonly MediaAnnotation[] => localAnnotationsByItem()[item.id] ?? item.annotations;
+
+  const saveItemAnnotations = (itemId: string, nextAnnotations: readonly MediaAnnotation[]) => {
+    localAnnotationsByItem.set({ ...untracked(localAnnotationsByItem), [itemId]: nextAnnotations });
+    const raw = untracked(snapshot).contents.get("structure/media.json")?.content;
+    if (!raw) return;
+    const parsedDoc = jsonString(z.looseObject({ items: z.array(z.unknown()).optional() })).safeParse(raw);
+    if (!parsedDoc.success || !Array.isArray(parsedDoc.data.items)) return;
+    const updatedItems = parsedDoc.data.items.map((entry, idx) => {
+      const parsedEntry = z.looseObject({ id: optStr }).safeParse(entry);
+      if (!parsedEntry.success) return entry;
+      const recId = parsedEntry.data.id ?? `m-${idx + 1}`;
+      return recId === itemId ? { ...parsedEntry.data, annotations: nextAnnotations } : entry;
+    });
+    const content = `${JSON.stringify({ ...parsedDoc.data, items: updatedItems }, null, 2)}\n`;
+    void api.note.file
+      .write({
+        id: props.note.id,
+        files: [{ path: "structure/media.json", content, mime: "application/json" }],
+        summary: "Update media annotations",
+      })
+      .catch((e) => toast(reasonOf(e), "bad"));
+  };
+
+  const lightboxPictures = computed((): readonly Picture[] => {
+    const id = lightboxItemId();
+    if (!id) return [];
+    const item = mediaDoc().items.find((it) => it.id === id);
+    if (!item || !item.src) return [];
+    return [
+      {
+        src: item.src,
+        name: item.title || item.caption || localizedMediaKind(item.kind),
+        renderOverlay: (frame) => (
+          <MediaAnnotationOverlay
+            scopeId={`lb-${item.id}`}
+            annotations={annotationsForItem(item)}
+            containerWidth={frame().width}
+            containerHeight={frame().height}
+            naturalWidth={frame().naturalWidth}
+            naturalHeight={frame().naturalHeight}
+            showOverlay
+            unresolvedOnly={false}
+            editable={props.version === undefined}
+            selectedId={selectedAnnotationByItem()[item.id]}
+            onSelect={(annId) => selectedAnnotationByItem.set({ ...untracked(selectedAnnotationByItem), [item.id]: annId })}
+            onChange={(next) => saveItemAnnotations(item.id, next)}
+            onOpenIssue={props.onOpenIssue}
+          />
+        ),
+      },
+    ];
+  });
+
   const exportAssetFile = (meta: NoteFileMeta) => {
     void api.note.file
       .get({ id: props.note.id, path: meta.path, ...(props.version !== undefined ? { version: props.version } : {}) })
@@ -477,38 +606,18 @@ export function MediaView(props: MediaViewProps) {
 
   return (
     <View testID="note-media-view" class="min-h-0 min-w-0 flex-1 bg-page">
-      <View class="h-11 shrink-0 flex-row items-center justify-between gap-2 border-b border-line bg-side px-3">
-        <View class="min-w-0 flex-1 flex-row items-center gap-2">
-          <Icon name={mediaKindIcon(mediaDoc().mediaKind)} size={14} tone="accent" />
-          <Text class="min-w-0 truncate text-sm font-semibold text-ink">{mediaDoc().title}</Text>
-          <View class="h-5 items-center justify-center rounded-sm border border-line bg-page px-1.5">
-            <Text class="font-mono text-2xs text-muted">{mediaDoc().mediaKind}</Text>
-          </View>
-          <If when={mediaDoc().durationSec !== undefined}>
+      <View class="shrink-0 flex-row items-center justify-between gap-2 bg-page px-4 py-2">
+        <Segmented testid="media-mode-tabs" label={t("web.note.page.viewMode")} value={tabMode()} onChange={(m) => tabMode.set(m)} options={tabOptions()} />
+        <View class="shrink-0 flex-row items-center gap-2">
+          <If when={mediaDoc().durationSec !== undefined && (mediaDoc().durationSec ?? 0) > 0}>
             <Text class="font-mono text-2xs text-faint tabular-nums">{`${mediaDoc().durationSec ?? 0}s`}</Text>
           </If>
-        </View>
-        <View class="shrink-0 flex-row items-center gap-2">
-          <If when={mediaDoc().issueId && props.onOpenIssue !== undefined ? mediaDoc().issueId : undefined}>
-            {(issId) => (
-              <Button size="control" tone="plain" icon="issues" testID="media-open-issue" onPress={() => props.onOpenIssue?.(issId())}>
-                {issId()}
-              </Button>
-            )}
-          </If>
-          <Segmented testid="media-mode-tabs" label={t("web.note.page.viewMode")} value={tabMode()} onChange={(m) => tabMode.set(m)} options={tabOptions()} />
         </View>
       </View>
 
       <If when={tabMode() === "media"}>
-        <Scroll testID="media-items-panel" class="min-h-0 flex-1" contentClass="gap-4 p-4">
-          <If when={mediaDoc().caption}>
-            {(cap) => (
-              <View class="rounded-lg border border-line bg-side px-3.5 py-2.5">
-                <Text class="text-xs leading-relaxed text-ink">{cap()}</Text>
-              </View>
-            )}
-          </If>
+        <Scroll testID="media-items-panel" class="min-h-0 flex-1" contentClass="gap-4 px-4 pt-2 pb-6">
+          <If when={mediaDoc().caption}>{(cap) => <Text class="text-xs leading-relaxed text-muted">{cap()}</Text>}</If>
 
           <If when={mediaDoc().items.length > 0 || assetFiles().length > 0} else={<Empty icon="media">{t("web.library.empty")}</Empty>}>
             <View class="gap-3">
@@ -524,7 +633,7 @@ export function MediaView(props: MediaViewProps) {
                           </View>
                           <View class="min-w-0 flex-1">
                             <Text class="truncate text-sm font-semibold text-ink">{item().title}</Text>
-                            <Text class="truncate font-mono text-2xs text-faint">{item().src || item().kind}</Text>
+                            <Text class="truncate text-2xs text-faint">{displayMediaSubtitle(item())}</Text>
                           </View>
                         </View>
                         <View class="shrink-0 flex-row items-center gap-1.5">
@@ -534,7 +643,7 @@ export function MediaView(props: MediaViewProps) {
                           <If when={item().issueId && props.onOpenIssue !== undefined ? item().issueId : undefined}>
                             {(issId) => (
                               <Button size="compact" tone="quiet" icon="issues" onPress={() => props.onOpenIssue?.(issId())}>
-                                {issId()}
+                                {formatIssueBadge(issId())}
                               </Button>
                             )}
                           </If>
@@ -570,6 +679,22 @@ export function MediaView(props: MediaViewProps) {
                         <Text class="text-xs leading-relaxed text-muted">{item().caption}</Text>
                       </If>
 
+                      <If when={item().kind === "image" && item().src !== ""}>
+                        <MediaAnnotationStage
+                          scopeId={`media-view-${item().id}`}
+                          src={item().src}
+                          caption={item().caption || item().title}
+                          annotations={annotationsForItem(item())}
+                          editable={props.version === undefined}
+                          stageClass="h-72"
+                          selectedAnnotationId={selectedAnnotationByItem()[item().id]}
+                          onSelectAnnotation={(annId) => selectedAnnotationByItem.set({ ...untracked(selectedAnnotationByItem), [item().id]: annId })}
+                          onChangeAnnotations={(next) => saveItemAnnotations(item().id, next)}
+                          onOpenLightbox={() => lightboxItemId.set(item().id)}
+                          onOpenIssue={props.onOpenIssue}
+                        />
+                      </If>
+
                       <If when={previewVideoId() === item().id}>
                         <View
                           testID={`media-video-stage-${item().id}`}
@@ -577,7 +702,7 @@ export function MediaView(props: MediaViewProps) {
                         >
                           <View class="min-w-0 flex-1 flex-row items-center gap-2">
                             <Icon name="video" size={14} tone="accent" />
-                            <Text class="truncate font-mono text-xs text-ink">{item().src}</Text>
+                            <Text class="truncate text-xs text-ink">{displayMediaSubtitle(item())}</Text>
                           </View>
                           <Button size="compact" tone="quiet" icon="open" onPress={() => void host.openExternal(item().src)}>
                             {t("web.library.content.inspector.openExternal")}
@@ -590,7 +715,7 @@ export function MediaView(props: MediaViewProps) {
                         else={
                           <If when={item().transcriptExcerpt}>
                             {(excerpt) => (
-                              <View testID={`media-transcript-excerpt-${item().id}`} class="gap-1 rounded-lg border border-line bg-page px-3 py-2">
+                              <View testID={`media-transcript-excerpt-${item().id}`} class="mt-2.5 gap-1 border-t border-line pt-2.5">
                                 <Text class="text-2xs font-semibold text-muted">{t("web.note.media.transcriptPreview")}</Text>
                                 <Text class="line-clamp-3 text-xs leading-relaxed text-ink">{excerpt()}</Text>
                               </View>
@@ -598,7 +723,7 @@ export function MediaView(props: MediaViewProps) {
                           </If>
                         }
                       >
-                        <View testID={`media-transcript-${item().id}`} class="gap-1.5 rounded-lg border border-line bg-page p-2.5">
+                        <View testID={`media-transcript-${item().id}`} class="mt-2.5 gap-1.5 border-t border-line pt-2.5">
                           <Each of={item().transcript} key={(cue) => cue.id}>
                             {(cue) => (
                               <View class="flex-row items-start gap-2.5">
@@ -620,7 +745,7 @@ export function MediaView(props: MediaViewProps) {
           </If>
 
           <If when={mediaDoc().topTranscript.length > 0}>
-            <View testID="media-top-transcript" class="gap-1.5 rounded-xl border border-line bg-side p-3.5">
+            <View testID="media-top-transcript" class="gap-1.5 border-t border-line pt-3">
               <Each of={mediaDoc().topTranscript} key={(cue) => cue.id}>
                 {(cue) => (
                   <View class="flex-row items-start gap-2.5">
@@ -635,7 +760,7 @@ export function MediaView(props: MediaViewProps) {
             </View>
           </If>
           <If when={mediaDoc().topTranscript.length === 0 && mediaDoc().topTranscriptExcerpt !== ""}>
-            <View testID="media-top-transcript-excerpt" class="gap-1 rounded-xl border border-line bg-side p-3.5">
+            <View testID="media-top-transcript-excerpt" class="gap-1 border-t border-line pt-3">
               <Text class="text-2xs font-semibold text-muted">{t("web.note.media.transcriptPreview")}</Text>
               <Text class="text-xs leading-relaxed text-ink">{mediaDoc().topTranscriptExcerpt}</Text>
             </View>
@@ -844,6 +969,14 @@ export function MediaView(props: MediaViewProps) {
           </If>
         </Scroll>
       </If>
+
+      <Lightbox
+        pictures={lightboxPictures()}
+        at={lightboxPictures().length > 0 ? 0 : undefined}
+        onAt={(at) => {
+          if (at === undefined) lightboxItemId.set(undefined);
+        }}
+      />
     </View>
   );
 }

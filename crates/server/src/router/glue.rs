@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use vibevalley_core::SliceMask;
-use vibevalley_protocol::{ApiError, BizCode, Caller, Health, Op, RepoTemplates, SayRequest, SessionSendInput, ops};
+use vibevalley_protocol::{ApiError, BizCode, Caller, Health, Op, ParticipantId, RepoTemplates, SayRequest, SessionSendInput, ops};
 use vibevalley_runtime::oar::{Registry, set_observer};
 
 use crate::agent::{Agent, Profile};
@@ -16,9 +16,10 @@ use crate::context::{Context, Sink};
 use crate::cron::Scheduler as CronScheduler;
 use crate::debug::DebugKit;
 use crate::game::Game;
-use crate::issue::{Board, IssueChat, Pull, SessionChat};
+use crate::issue::{Board, Pull};
 use crate::machine::Machine;
 use crate::note::Manager as NoteManager;
+use crate::orchestration::Orchestration;
 use crate::provider::Provider;
 use crate::repo::Repo;
 use crate::runtime::Runtime;
@@ -40,14 +41,13 @@ pub(crate) struct AppCore {
     pub runtime: Arc<Runtime>,
     pub board: Arc<Board>,
     pub pull: Arc<Pull>,
-    pub issue_chat: Arc<IssueChat>,
-    pub session_chat: Arc<SessionChat>,
     pub agent: Arc<Agent>,
     pub note: Arc<NoteManager>,
     pub channel: Arc<Chat>,
     pub connector: Arc<Connector>,
     pub cron: Arc<CronScheduler>,
     pub voice: Arc<Voice>,
+    pub orchestration: Arc<Orchestration>,
     pub machine: Arc<Machine>,
     pub debug: Arc<DebugKit>,
     pub game: Arc<Game>,
@@ -73,18 +73,12 @@ impl AppCore {
             set.spawn(async move { board.close_async().await });
             let pull = self.pull.clone();
             set.spawn(async move { pull.close_async().await });
-            let issue_chat = self.issue_chat.clone();
-            set.spawn(async move { issue_chat.close_async().await });
-            let session_chat = self.session_chat.clone();
-            set.spawn(async move { session_chat.close_async().await });
+            let orchestration = self.orchestration.clone();
+            set.spawn(async move { orchestration.close_async().await });
             let agent = self.agent.clone();
             set.spawn(async move { agent.close_async().await });
-            let cron = self.cron.clone();
-            set.spawn(async move { cron.close_async().await });
             let voice = self.voice.clone();
             set.spawn_blocking(move || voice.close());
-            let connector = self.connector.clone();
-            set.spawn(async move { connector.close_async().await });
         }
         if tokio::time::timeout(SHUTDOWN_DRAIN_GRACE, async { while set.join_next().await.is_some() {} })
             .await
@@ -111,13 +105,13 @@ pub(crate) async fn repo_templates_async(c: &AppCore, id: &str) -> Result<RepoTe
 
 pub(crate) async fn issue_review(c: &AppCore, r: <ops::IssueReview as Op>::Input) -> Result<<ops::IssueReview as Op>::Result, ApiError> {
     let pass = r.pass;
-    let i = c.board.issue_review_endpoint_async(r).await?;
+    let i = c.orchestration.issue.review_endpoint_async(r).await?;
     c.game.record_issue_review_async(&i, pass).await;
     Ok(i)
 }
 
 pub(crate) async fn issue_status_update(c: &AppCore, r: &<ops::IssueStatusUpdate as Op>::Input) -> Result<<ops::IssueStatusUpdate as Op>::Result, ApiError> {
-    let a = c.board.issue_status_update_endpoint_async(r).await?;
+    let a = c.orchestration.issue.status_update_endpoint_async(r).await?;
     c.game.on_issue_status_updated_async(&a.id, a.status).await;
     Ok(a)
 }
@@ -134,11 +128,14 @@ pub(crate) async fn issue_diff_req_async(
     id: &str,
     since_tree: Option<&str>,
 ) -> Result<<ops::IssueDiffGet as Op>::Result, ApiError> {
-    c.board.issue_diff_endpoint_async(caller, id, since_tree, Some(&|s| c.game.reviewed(s))).await
+    c.orchestration
+        .issue
+        .diff_endpoint_async(caller, id, since_tree, Some(&|s| c.game.reviewed(s)))
+        .await
 }
 
 pub(crate) async fn issue_comment(c: &AppCore, r: <ops::IssueCommentCreate as Op>::Input) -> Result<<ops::IssueCommentCreate as Op>::Result, ApiError> {
-    c.issue_chat.comment_endpoint_async(&r.id, &r.text, r.send_key.as_deref()).await
+    c.orchestration.issue_chat.comment_endpoint_async(&r.id, &r.text, r.send_key.as_deref()).await
 }
 
 pub(crate) async fn channel_send_async(c: &AppCore, body: SayRequest) -> Result<(), ApiError> {
@@ -150,7 +147,7 @@ pub(crate) async fn channel_send_async(c: &AppCore, body: SayRequest) -> Result<
     Ok(())
 }
 
-pub(crate) async fn channel_direct_async(c: &AppCore, agent_name: &str) -> Result<String, ApiError> {
+pub(crate) async fn channel_direct_async(c: &AppCore, agent_name: &str, from: Option<ParticipantId>) -> Result<String, ApiError> {
     let name = agent_name.trim();
     let pr = &c.agent.profile;
     let found = pr
@@ -158,7 +155,7 @@ pub(crate) async fn channel_direct_async(c: &AppCore, agent_name: &str) -> Resul
         .or_else(|| pr.agent(name))
         .or_else(|| pr.orchestrators().into_iter().find(|o| o.name == name));
     let resolved = found.map(|a| (a.clone(), pr.is_orchestrator(&a.id)));
-    c.channel.handle_direct_create(resolved.as_ref().map(|(a, o)| (a, *o)), agent_name).await
+    c.channel.handle_direct_create(resolved.as_ref().map(|(a, o)| (a, *o)), agent_name, from).await
 }
 
 pub(crate) async fn library_add_async(
@@ -251,6 +248,6 @@ pub(crate) async fn open_sub_domain_async(core: &AppCore, input: DomainSubscript
         DomainSubscription::NoteSuggestionFollow(q) => core.note.follow_suggestions_async(&q.id, sink).await,
         DomainSubscription::NotePresenceFollow(q) => core.note.follow_presence_async(&q.id, sink).await,
         DomainSubscription::SessionWatch(q) => core.runtime.watch_session_async(q, sink).await,
-        DomainSubscription::IssueWatch(q) => core.runtime.watch_issue_async(q, sink).await,
+        DomainSubscription::IssueWatch(q) => core.orchestration.issue.watch_issue_async(q, sink).await,
     }
 }

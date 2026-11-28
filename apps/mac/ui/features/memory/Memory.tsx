@@ -381,7 +381,7 @@ function WriteNote(props: { agent: string; withRepo?: boolean }) {
         </View>
         <If when={suggested().length > 0}>
           <View class="flex-row flex-wrap gap-1">
-            <Each of={suggested()}>
+            <Each of={suggested()} key={(name) => name}>
               {(name) => (
                 <View
                   role="button"
@@ -412,12 +412,14 @@ function MemoryItem(props: { memory: Memory; onForget?: (() => void) | undefined
       testID={`memory-${props.memory.id}`}
       onMouseEnter={() => hovered.set(true)}
       onMouseLeave={() => hovered.set(false)}
-      class="flex-row items-start gap-2 rounded-md border border-line bg-page px-3 py-2"
+      class="group relative flex-row items-start gap-2 rounded-md border border-line bg-page px-3 py-2 pr-14"
     >
       <View class="min-w-0 flex-1 gap-0.5">
         <Text class={`text-sm ${props.faded === true ? "text-muted" : "text-ink"}`}>{props.memory.text}</Text>
         <View class="flex-row flex-wrap gap-x-2">
-          <Each of={props.meta}>{(m) => <Text class="text-xs text-muted">{m()}</Text>}</Each>
+          <Each of={props.meta} key="index">
+            {(m) => <Text class="text-xs text-muted">{m()}</Text>}
+          </Each>
           <If when={props.warning}>
             <Text class="text-xs text-warn-ink">{props.warning}</Text>
           </If>
@@ -430,7 +432,7 @@ function MemoryItem(props: { memory: Memory; onForget?: (() => void) | undefined
           accessibilityLabel={t("web.memory.memory.forget")}
           onPress={() => props.onForget?.()}
           style={{ opacity: hovered() ? 1 : 0 }}
-          class="shrink-0 rounded-md px-2 py-0.5 hover:bg-hover"
+          class="absolute top-2 right-2 shrink-0 rounded-md px-2 py-0.5 hover:bg-hover"
         >
           <Text class="text-xs text-muted hover:text-berry">{t("web.memory.memory.forget")}</Text>
         </View>

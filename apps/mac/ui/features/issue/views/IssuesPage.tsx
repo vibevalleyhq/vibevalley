@@ -380,7 +380,7 @@ export function IssuesPage(props: { rest: string }) {
   };
 
   return (
-    <View testID="issues-page" class="flex-1">
+    <View testID="issues-page" class="min-h-0 min-w-0 flex-1">
       <If
         when={id()}
         else={

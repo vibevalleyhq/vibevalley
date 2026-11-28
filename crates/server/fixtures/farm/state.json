@@ -384,9 +384,9 @@
         "runtime": "claude",
         "brief": "",
         "policy": {
-          "kind": "managedWorktree",
+          "kind": "directCwd",
           "repo": "vibevalley",
-          "branch": "vv/i-101"
+          "permissionMode": "bypass"
         },
         "bindings": [
           {
@@ -416,9 +416,9 @@
         "runtime": "claude",
         "brief": "",
         "policy": {
-          "kind": "managedWorktree",
+          "kind": "directCwd",
           "repo": "vibevalley",
-          "branch": "vv/i-102"
+          "permissionMode": "bypass"
         },
         "bindings": [
           {
@@ -448,9 +448,9 @@
         "runtime": "claude",
         "brief": "",
         "policy": {
-          "kind": "managedWorktree",
+          "kind": "directCwd",
           "repo": "vibevalley",
-          "branch": "vv/i-103"
+          "permissionMode": "bypass"
         },
         "bindings": [
           {
@@ -480,9 +480,9 @@
         "runtime": "claude",
         "brief": "",
         "policy": {
-          "kind": "managedWorktree",
+          "kind": "directCwd",
           "repo": "vibevalley",
-          "branch": "vv/i-104"
+          "permissionMode": "bypass"
         },
         "bindings": [
           {
@@ -512,9 +512,9 @@
         "runtime": "claude",
         "brief": "",
         "policy": {
-          "kind": "managedWorktree",
+          "kind": "directCwd",
           "repo": "vibevalley",
-          "branch": "vv/i-105"
+          "permissionMode": "bypass"
         },
         "bindings": [
           {
@@ -543,9 +543,9 @@
         "runtime": "claude",
         "brief": "",
         "policy": {
-          "kind": "managedWorktree",
+          "kind": "directCwd",
           "repo": "notes",
-          "branch": "vv/i-106"
+          "permissionMode": "bypass"
         },
         "bindings": [
           {
@@ -574,9 +574,9 @@
         "runtime": "claude",
         "brief": "",
         "policy": {
-          "kind": "managedWorktree",
+          "kind": "directCwd",
           "repo": "vibevalley",
-          "branch": "vv/i-107"
+          "permissionMode": "bypass"
         },
         "bindings": [
           {

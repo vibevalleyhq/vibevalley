@@ -119,7 +119,7 @@ test("empty board always renders the unified toolbar, kanban columns, and calm e
 test("empty lanes render actionable contextual guidance and unassigned Todo cards show assign hint", async () => {
   setLocale("zh");
 
-  // minimal has 1 in_progress issue: backlog, todo, in_review, done, and canceled lanes are empty.
+  // minimal has 1 in_progress issue: todo is the primary empty actionable lane (full guide), other empty lanes stay quiet.
   const min = await mountBoard("minimal");
   expect(min.app.count("id:lane-empty-backlog")).toBe(1);
   expect(min.app.count("id:lane-empty-todo")).toBe(1);
@@ -127,11 +127,15 @@ test("empty lanes render actionable contextual guidance and unassigned Todo card
   expect(min.app.count("id:lane-empty-in_review")).toBe(1);
   expect(min.app.count("id:lane-empty-done")).toBe(1);
   expect(min.app.count("id:lane-empty-canceled")).toBe(1);
-  expect(min.app.texts()).toContain(t("web.issue.board.emptyGuide.backlogTitle"));
+  expect(min.app.count("id:lane-empty-guide-todo")).toBe(1);
+  expect(min.app.count("id:lane-empty-quiet-backlog")).toBe(1);
+  expect(min.app.count("id:lane-empty-quiet-in_review")).toBe(1);
+  expect(min.app.count("id:lane-empty-quiet-done")).toBe(1);
+  expect(min.app.count("id:lane-empty-quiet-canceled")).toBe(1);
   expect(min.app.texts()).toContain(t("web.issue.board.emptyGuide.todoTitle"));
-  expect(min.app.texts()).toContain(t("web.issue.board.emptyGuide.in_reviewTitle"));
-  expect(min.app.texts()).toContain(t("web.issue.board.emptyGuide.doneTitle"));
-  expect(min.app.texts()).toContain(t("web.issue.board.emptyGuide.canceledTitle"));
+  expect(min.app.texts()).not.toContain(t("web.issue.board.emptyGuide.in_reviewTitle"));
+  expect(min.app.texts()).not.toContain(t("web.issue.board.emptyGuide.doneTitle"));
+  expect(min.app.texts()).not.toContain(t("web.issue.board.emptyGuide.canceledTitle"));
 
   // Quick "+ New issue" inside empty todo lane opens NewIssue.
   await min.app.press("id:lane-empty-todo >> id:issue-new");
@@ -148,7 +152,7 @@ test("empty lanes render actionable contextual guidance and unassigned Todo card
   await min.fake.pumpUntil(min.app, () => min.app.count("id:issue-card") === 1);
   expect(min.app.value("id:issue-search")).toBe("");
 
-  // Custom board with 1 unassigned todo + 1 assigned todo: in_progress/in_review/done/canceled empty, unassigned hint appears once.
+  // Custom board with 1 unassigned todo + 1 assigned todo: todo is non-empty so backlog gets the single full guide, while in_progress/in_review/done/canceled stay quiet.
   const unassigned = makeTodoIssue("i-unassigned", "需要认领的待办");
   const assigned = makeTodoIssue("i-assigned", "已指派角色的待办", "laozhou");
   const customState: SliceBundle = {
@@ -169,8 +173,10 @@ test("empty lanes render actionable contextual guidance and unassigned Todo card
     { state: customState },
   );
   await todoBoard.fake.pumpUntil(todoBoard.app, () => todoBoard.app.count("id:issue-card") === 2);
-  expect(todoBoard.app.count("id:lane-empty-in_progress")).toBe(1);
-  expect(todoBoard.app.texts()).toContain(t("web.issue.board.emptyGuide.in_progressTitle"));
+  expect(todoBoard.app.count("id:lane-empty-guide-backlog")).toBe(1);
+  expect(todoBoard.app.count("id:lane-empty-quiet-in_progress")).toBe(1);
+  expect(todoBoard.app.texts()).toContain(t("web.issue.board.emptyGuide.backlogTitle"));
+  expect(todoBoard.app.texts()).not.toContain(t("web.issue.board.emptyGuide.in_progressTitle"));
   expect(todoBoard.app.count("id:card-unassigned")).toBe(1);
   expect(todoBoard.app.texts()).toContain(t("web.issue.card.assignHelper"));
 });
@@ -333,22 +339,28 @@ test("NewIssue unified AgentSelect surfaces agent.validate readiness diagnostics
   expect(app.texts()).toContain("就绪");
 });
 
-test("6-lane Kanban fits all 6 lanes at 1680px and renders 5 unclipped lanes at 1280px", async () => {
+test("6-lane Kanban fits all 6 lanes at 1920px, enforces >= 288px lane min width at 1440px/1280px, and scrolls horizontally to the rightmost column", async () => {
   setLocale("zh");
-  const wide = await mountBoard("typical", undefined, { width: 1680, height: 820 });
+  const wide = await mountBoard("typical", undefined, { width: 1920, height: 820 });
   await wide.fake.pumpUntil(wide.app, () => wide.app.count("id:lane-canceled") === 1);
-  const canceled1680 = wide.app.layout("id:lane-canceled")!;
-  const backlog1680 = wide.app.layout("id:lane-backlog")!;
-  expect(backlog1680.x).toBeGreaterThanOrEqual(76);
-  expect(canceled1680.x + canceled1680.width).toBeLessThanOrEqual(1680);
+  const canceled1920 = wide.app.layout("id:lane-canceled")!;
+  const backlog1920 = wide.app.layout("id:lane-backlog")!;
+  expect(backlog1920.width).toBeGreaterThanOrEqual(288);
+  expect(backlog1920.x).toBeGreaterThanOrEqual(76);
+  expect(canceled1920.x + canceled1920.width).toBeLessThanOrEqual(1920);
 
   const laptop = await mountBoard("typical", undefined, { width: 1280, height: 820 });
-  await laptop.fake.pumpUntil(laptop.app, () => laptop.app.count("id:lane-done") === 1);
+  await laptop.fake.pumpUntil(laptop.app, () => laptop.app.count("id:lane-canceled") === 1);
   const scroll1280 = laptop.app.layout("id:board-scroll")!;
-  const done1280 = laptop.app.layout("id:lane-done")!;
+  const backlog1280 = laptop.app.layout("id:lane-backlog")!;
   const canceled1280 = laptop.app.layout("id:lane-canceled")!;
-  expect(done1280.x + done1280.width).toBeLessThanOrEqual(scroll1280.x + scroll1280.width + 1);
+  expect(backlog1280.width).toBeGreaterThanOrEqual(288);
   expect(canceled1280.x).toBeGreaterThanOrEqual(scroll1280.x + scroll1280.width);
+
+  await laptop.app.scroll("id:board-scroll", 700);
+  const canceledAfterScroll = laptop.app.layout("id:lane-canceled")!;
+  expect(canceledAfterScroll.x).toBeLessThan(canceled1280.x);
+  expect(canceledAfterScroll.x + canceledAfterScroll.width).toBeLessThanOrEqual(scroll1280.x + scroll1280.width + 16);
 });
 
 test("regression: Board cards and List rows omit full-body hover tooltips while keeping field micro-tooltips", async () => {

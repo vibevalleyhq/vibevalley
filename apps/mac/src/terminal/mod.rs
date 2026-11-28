@@ -3,6 +3,7 @@
 
 mod element;
 mod keys;
+mod pointer;
 mod preview;
 mod status;
 mod view;

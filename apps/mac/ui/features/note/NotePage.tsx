@@ -29,6 +29,7 @@ import { createAct } from "../../infra/act";
 import { api, newSendKey, reasonOf } from "../../infra/api";
 import { Keyed } from "../../infra/base/dom";
 import { useBoardSlice } from "../../infra/frame";
+import { followNote } from "../../infra/gateway";
 import { currentHost } from "../../infra/host";
 import { ready, useQuery, useQueryClient } from "../../infra/query";
 import { useRouter, useSearch } from "../../infra/router";
@@ -258,6 +259,16 @@ function NoteDetailView(props: { note: Note; versionParam: number | undefined; n
   const docView = useQuery(() => noteDocQuery(props.note.id), {
     enabled: () => props.note.noteType === "doc",
   });
+  effect(() => {
+    const id = props.note.id;
+    if (props.note.noteType !== "doc" || isHistorical()) return;
+    return followNote(String(id), 0, (ev) => {
+      if (ev._tag === "Reset" || ev.files.some((f) => f.path === "structure/doc.json")) {
+        void queries.invalidate({ prefix: ["note-doc", id] });
+        void queries.invalidate({ prefix: ["note-links", "note", id] });
+      }
+    });
+  });
   const links = useQuery(() => noteLinksQuery(props.note.id));
   const baseSnap = useQuery(() => noteBaseQuery({ id: props.note.id, sheetId: activeSheetId(), viewId: activeViewId() }), {
     enabled: () => props.note.noteType === "base",
@@ -463,6 +474,15 @@ function NoteDetailView(props: { note: Note; versionParam: number | undefined; n
             />
           </If>
 
+          <IconButton
+            icon="pin"
+            size={16}
+            label={pinned() ? t("web.library.content.unpin") : t("web.library.content.pin")}
+            testid="note-header-pin"
+            pressed={pinned()}
+            onClick={() => togglePinned(`note:${props.note.id}`)}
+          />
+
           <If when={installedApplet()}>
             {(info) => (
               <Button testID="note-open-applet" size="control" icon="play" onPress={() => openStandaloneApplet()}>
@@ -598,6 +618,7 @@ function NoteDetailView(props: { note: Note; versionParam: number | undefined; n
                     notes={props.notes}
                     issues={issuesList()}
                     links={ready(links, undefined)}
+                    presences={presence.peers()}
                     busy={act.busy()}
                     savedAt={savedAt()}
                     onSaveDoc={saveDoc}

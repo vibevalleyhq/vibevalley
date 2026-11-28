@@ -1,12 +1,18 @@
-//! `session list|show|events|stop|compact|run-code`.
+//! `session list|show|events|stop|compact|run-code|approval`.
 
 use std::path::PathBuf;
 
-use clap::{Args, Subcommand};
+use clap::{Args, Subcommand, ValueEnum};
 use vibevalley_protocol::{
-    JsNumber, Phase, Session, SessionCompactInput, SessionCompactResult, SessionEvent, SessionEventListInput, SessionGetInput, SessionListInput,
-    SessionRunCodeInput, SessionStopInput, ops,
+    JsNumber, Phase, Session, SessionApprovalListInput, SessionApprovalResolveInput, SessionCompactInput, SessionCompactResult, SessionEvent,
+    SessionEventListInput, SessionGetInput, SessionListInput, SessionRunCodeInput, SessionStopInput, ops,
 };
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+pub enum ApprovalDecision {
+    Approve,
+    Deny,
+}
 
 use crate::client::{Client, Done, Failure, exit};
 use crate::output::{line, one_line};
@@ -84,6 +90,42 @@ pub enum SessionAction {
         /// Maximum VM step budget
         #[arg(long)]
         max_steps: Option<i64>,
+    },
+    /// Inspect and resolve pending tool approvals on a session
+    Approval(ApprovalCmd),
+}
+
+#[derive(Debug, Args)]
+#[command(arg_required_else_help = true, subcommand_required = true)]
+pub struct ApprovalCmd {
+    #[command(subcommand)]
+    pub action: ApprovalAction,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum ApprovalAction {
+    /// List pending session tool approvals
+    #[command(after_help = "Examples:\n  vibevalley session approval list --json")]
+    List {
+        /// Optional session id filter
+        #[arg(long)]
+        session: Option<String>,
+    },
+    /// Approve or deny a pending session tool call
+    #[command(after_help = "Examples:\n  vibevalley session approval resolve orchestrator task-1 call-1 approve")]
+    Resolve {
+        /// Session id
+        session: String,
+        /// Task id
+        task: String,
+        /// Tool call id
+        tool_call: String,
+        /// Decision
+        #[arg(value_enum)]
+        decision: ApprovalDecision,
+        /// Optional explanation recorded with the decision
+        #[arg(long)]
+        reason: Option<String>,
     },
 }
 
@@ -227,5 +269,44 @@ pub async fn run(client: &Client, cmd: SessionCmd) -> Done {
                 )
                 .await
         }
+        SessionAction::Approval(approval) => match approval.action {
+            ApprovalAction::List { session } => {
+                let approvals = client.ask::<ops::SessionApprovalList>(&SessionApprovalListInput { id: session }).await?;
+                client.output.show(&approvals, |items| {
+                    items
+                        .iter()
+                        .map(|item| {
+                            format!(
+                                "{}  {}  {}  {}  {}  {}",
+                                item.id, item.task_id, item.tool_call_id, item.tool_name, item.arguments_json, item.reason
+                            )
+                        })
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                });
+                Ok(())
+            }
+            ApprovalAction::Resolve {
+                session,
+                task,
+                tool_call,
+                decision,
+                reason,
+            } => {
+                client
+                    .mutate::<ops::SessionApprovalResolve>(
+                        "session approval resolve",
+                        &SessionApprovalResolveInput {
+                            id: session,
+                            task_id: task,
+                            tool_call_id: tool_call,
+                            approved: matches!(decision, ApprovalDecision::Approve),
+                            reason,
+                        },
+                        |_| "saved".into(),
+                    )
+                    .await
+            }
+        },
     }
 }

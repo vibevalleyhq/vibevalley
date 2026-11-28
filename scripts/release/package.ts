@@ -138,7 +138,7 @@ async function main(): Promise<void> {
     // Release, alpha, and `debug` + `VIBEVALLEY_EMBED_UI=1` all compile and embed UI bytecode inside `apps/mac/build.rs`.
     const cargoProfileArgs = profile === "release" ? ["--release"] : profile === "alpha" ? ["--profile", "alpha"] : [];
     const cargoFeatureArgs = profile === "release" ? [] : ["--features", "vibevalley-mac/shot"];
-    const cargoEnv = profile === "release" ? { LIBGHOSTTY_VT_SYS_OPTIMIZE: "ReleaseFast" } : profile === "debug" ? { VIBEVALLEY_EMBED_UI: "1" } : undefined;
+    const cargoEnv = profile === "debug" ? { VIBEVALLEY_EMBED_UI: "1" } : undefined;
     const buildTasks: Promise<void>[] = [
       runAsync("cargo", ["build", "--locked", ...cargoProfileArgs, "-p", "vibevalley-mac", "-p", "vibevalley-cli", ...cargoFeatureArgs], root, cargoEnv),
     ];

@@ -6,10 +6,10 @@ use std::time::Duration;
 use clap::{ArgGroup, Args, Subcommand, ValueEnum};
 use tokio_util::sync::CancellationToken;
 use vibevalley_protocol::{
-    ActWords, ActorRef, AppliedIssue, BacklogTriageConfirmInput, BacklogTriageDismissInput, BoardSlice, Changes, Issue, IssueAction, IssueCommentCreateInput,
-    IssueDeleteInput, IssueDiffGetInput, IssueDigestGetInput, IssueFilter, IssueGetInput, IssueRelation, IssueRelationKind, IssueRequest, IssueReviewInput,
-    IssueStageKind, IssueStatus, IssueStatusUpdateInput, IssueTimelineGetInput, IssueUpdateInput, IssueWatch, MorningDigest, Priority, RepoHealthStatus,
-    ReviewRevision, ops,
+    ActWords, ActorRef, AppliedIssue, BacklogTriageConfirmInput, BacklogTriageDismissInput, BoardSlice, Changes, DeliveryReceipt, Issue, IssueAction,
+    IssueCommentCreateInput, IssueDeleteInput, IssueDiffGetInput, IssueDigestGetInput, IssueFilter, IssueGetInput, IssueRelation, IssueRelationKind,
+    IssueRequest, IssueReviewInput, IssueStageKind, IssueStatus, IssueStatusUpdateInput, IssueTimelineGetInput, IssueUpdateInput, IssueWatch, MorningDigest,
+    Priority, RepoHealthStatus, ReviewRevision, ops,
 };
 
 use crate::client::{Client, Done, Failure, decode_failure, exit};
@@ -244,7 +244,7 @@ pub enum IssueActionCmd {
         #[arg(long, requires = "base_commit", requires = "pass")]
         tree: Option<String>,
     },
-    /// Show commits and changed files in an issue's worktree
+    /// Show commits and changed files for an issue
     #[command(after_help = "Examples:\n  vibevalley issue diff 12")]
     Diff {
         /// Issue number or id
@@ -359,6 +359,47 @@ fn parse_actor_ref(raw: &str) -> Result<ActorRef, Failure> {
     ))
 }
 
+fn format_delivery_receipt(receipt: &DeliveryReceipt) -> String {
+    match receipt {
+        DeliveryReceipt::PullRequest { url, number, branch, summary } => {
+            let mut parts = vec!["pull_request".to_string()];
+            if let Some(n) = number {
+                parts.push(format!("#{n}"));
+            }
+            if let Some(b) = branch.as_deref().filter(|s| !s.trim().is_empty()) {
+                parts.push(format!("({b})"));
+            }
+            parts.push(url.clone());
+            if let Some(s) = summary.as_deref().filter(|s| !s.trim().is_empty()) {
+                parts.push(format!("- {s}"));
+            }
+            parts.join(" ")
+        }
+        DeliveryReceipt::Commit { sha, branch, summary } => {
+            let short = &sha[..sha.len().min(7)];
+            let mut parts = vec!["commit".to_string(), short.to_string()];
+            if let Some(b) = branch.as_deref().filter(|s| !s.trim().is_empty()) {
+                parts.push(format!("({b})"));
+            }
+            if let Some(s) = summary.as_deref().filter(|s| !s.trim().is_empty()) {
+                parts.push(format!("- {s}"));
+            }
+            parts.join(" ")
+        }
+        DeliveryReceipt::Note { note_id, title, summary } => {
+            let mut parts = vec!["note".to_string(), note_id.clone()];
+            if let Some(t) = title.as_deref().filter(|s| !s.trim().is_empty()) {
+                parts.push(t.to_string());
+            }
+            if let Some(s) = summary.as_deref().filter(|s| !s.trim().is_empty()) {
+                parts.push(format!("- {s}"));
+            }
+            parts.join(" ")
+        }
+        DeliveryReceipt::Answer { summary } => format!("answer: {summary}"),
+    }
+}
+
 fn issue_text(issue: &Issue) -> String {
     let agent = issue.assignments.last().map(|a| format!("@{}", a.agent)).unwrap_or_default();
     let repo = issue.repo.as_ref().map(|r| format!("[{r}]")).unwrap_or_default();
@@ -374,6 +415,9 @@ fn issue_text(issue: &Issue) -> String {
     ];
     if !owner.is_empty() {
         lines.push(format!("owner: {owner}"));
+    }
+    if let Some(receipt) = &issue.delivery_receipt {
+        lines.push(format!("delivery: {}", format_delivery_receipt(receipt)));
     }
     if !issue.blocked_by.is_empty() {
         lines.push(format!("blocked_by: {}", issue.blocked_by.join(", ")));
@@ -605,6 +649,7 @@ pub async fn run(client: &Client, cmd: IssueCmd) -> Done {
                 text: comment,
                 agent: None,
                 edit: None,
+                delivery_receipt: None,
                 request_key: None,
             };
             client.mutate::<ops::IssueStatusUpdate>("issue status", &request, applied_line).await

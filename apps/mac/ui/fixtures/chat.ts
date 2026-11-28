@@ -11,6 +11,7 @@ import {
   type Feature,
   FeatureValues,
   type GitHubStatus,
+  localUserParticipant,
   type Readiness,
   type SettingsStatus,
 } from "@vibevalley/protocol";
@@ -40,7 +41,8 @@ const msg = (actor: Actor, from: string, name: string, text: string, more: Parti
   outcome: more.outcome ?? null,
 });
 
-const user = (text: string, more: Partial<ChatMessage> = {}) => msg({ kind: "user", id: "user", name: "用户" }, "user", "用户", text, more);
+const user = (text: string, more: Partial<ChatMessage> = {}) =>
+  msg({ kind: "user", id: localUserParticipant, name: "用户" }, localUserParticipant, "用户", text, more);
 const orchestrator = (text: string, more: Partial<ChatMessage> = {}) =>
   msg({ kind: "agent", id: "orchestrator", role: "orchestrator", name: "助手" }, "orchestrator", "助手", text, more);
 const helper = (text: string, more: Partial<ChatMessage> = {}) =>
@@ -65,7 +67,7 @@ const messages: ChatMessage[] = [
     embeds: [{ url: "https://example.com/design", image: "", site: "example.com", title: "登录页改版", description: "过期提示、重新登录、记住我" }],
     reactions: [
       { emoji: "👍", by: ["orchestrator", "w1"] },
-      { emoji: "👀", by: ["user"] },
+      { emoji: "👀", by: [localUserParticipant] },
     ],
   }),
   helper(["## 改了什么", "", "- `session.ts`：过期判断", "- `Login.tsx`：提示文案"].join("\n")),
@@ -151,7 +153,7 @@ const readiness = Object.fromEntries(features.map((f): [Feature, Readiness] => [
 const settings: SettingsStatus = {
   file: "~/.vibevalley/settings.json",
   home: "~/.vibevalley",
-  paths: { repos: "~/.vibevalley/repos", worktrees: "~/.vibevalley/worktrees" },
+  paths: { repos: "~/.vibevalley/repos" },
   version: "0.42.0",
   locale: "zh",
   deepseekApiKey: { source: "settings", hint: "…3f9a" },

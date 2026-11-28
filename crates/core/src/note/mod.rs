@@ -3,14 +3,21 @@
 //! wikilink extraction, starter directories, lightweight content previews,
 //! and strict-CSP presence highlight helpers.
 
+pub mod annotation;
 pub mod base;
 pub mod doc;
 pub mod links;
 pub mod manifest;
 pub mod path;
 pub mod preview;
+pub mod review;
 pub mod starter;
 
+pub use annotation::{
+    DocAnnotationEntry, collect_doc_annotations, delete_annotation_in_list, delete_doc_block_annotation, delete_media_doc_annotation, doc_annotation_summary,
+    extract_annotation_links, extract_media_doc_annotations, find_first_base_embed, mutate_doc_annotation_by_id, normalize_annotation, normalize_point,
+    normalize_rect, summarize_annotations, upsert_annotation_in_list, upsert_doc_block_annotation, upsert_media_doc_annotation,
+};
 pub use links::{dedup_links, extract_markdown_links};
 pub use manifest::{
     MANIFEST_SCHEMA_VERSION, NoteManifest, NoteTypeSpec, TITLE_MAX_LEN, all_type_specs, default_manifest, format_directory_summary, parse_manifest,

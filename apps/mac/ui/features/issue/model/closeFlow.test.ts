@@ -1,14 +1,17 @@
 import "../../../infra/polyfill";
 import { expect, test } from "nsh/test";
 
-import type { Changes } from "@vibevalley/protocol";
+import type { Changes, DeliveryReceipt } from "@vibevalley/protocol";
+import { noteId } from "@vibevalley/protocol/schema";
 
 import {
+  buildDeliveryReceipt,
   closeDialogSurface,
   type CloseFlowEvent,
   type CloseFlowState,
   closeFlowTransition,
   initialCloseFlow,
+  initialReceiptDraft,
   isCloseDialogWide,
   isCloseDiffEnabled,
   shouldSyncCloseDiff,
@@ -244,4 +247,26 @@ test("re-entrancy, referential stability, dismiss, and terminal done guards reje
   ] satisfies CloseFlowEvent[]) {
     expect(closeFlowTransition(done, event)).toBe(done);
   }
+});
+
+test("initialReceiptDraft and buildDeliveryReceipt round-trip and validate all DeliveryReceipt kinds", () => {
+  const none = initialReceiptDraft();
+  expect(none.kind).toBe("none");
+  expect(buildDeliveryReceipt(none)).toEqual({ ok: true });
+
+  const pr: DeliveryReceipt = { kind: "pull_request", url: "https://github.com/org/repo/pull/42", number: 42, branch: "feat/receipt", summary: "Shipped" };
+  expect(buildDeliveryReceipt(initialReceiptDraft(pr))).toEqual({ ok: true, receipt: pr });
+  expect(buildDeliveryReceipt({ ...none, kind: "pull_request", url: "   " })).toEqual({ ok: false, missing: "url" });
+
+  const commit: DeliveryReceipt = { kind: "commit", sha: "deadbeef1234", branch: "main", summary: "Applied fix" };
+  expect(buildDeliveryReceipt(initialReceiptDraft(commit))).toEqual({ ok: true, receipt: commit });
+  expect(buildDeliveryReceipt({ ...none, kind: "commit", sha: "" })).toEqual({ ok: false, missing: "sha" });
+
+  const note: DeliveryReceipt = { kind: "note", noteId: noteId("note-9"), title: "Architecture Spec", summary: "Documented" };
+  expect(buildDeliveryReceipt(initialReceiptDraft(note))).toEqual({ ok: true, receipt: note });
+  expect(buildDeliveryReceipt({ ...none, kind: "note", noteId: "" })).toEqual({ ok: false, missing: "noteId" });
+
+  const answer: DeliveryReceipt = { kind: "answer", summary: "No code change needed." };
+  expect(buildDeliveryReceipt(initialReceiptDraft(answer))).toEqual({ ok: true, receipt: answer });
+  expect(buildDeliveryReceipt({ ...none, kind: "answer", summary: "  " })).toEqual({ ok: false, missing: "summary" });
 });

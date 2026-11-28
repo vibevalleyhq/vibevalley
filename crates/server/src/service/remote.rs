@@ -1,23 +1,15 @@
-//! Dual-backend persistence for remote access configuration and paired device tokens.
+//! Dual-backend persistence for paired remote device tokens (`remote_device`).
 
 use std::sync::Arc;
 
-use sea_orm::sea_query::{Expr, OnConflict};
+use sea_orm::sea_query::Expr;
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 use vibevalley_protocol::{Millis, RemoteDeviceSummary, RemotePlatform};
 
 use super::with_write_tx;
 use crate::db::column::{db_word, read_db_word};
-use crate::db::entity::{remote_config, remote_device};
+use crate::db::entity::remote_device;
 use crate::db::{Database, DbResult};
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct StoredRemoteConfig {
-    pub(crate) enabled: bool,
-    pub(crate) bind_addr: Option<String>,
-    pub(crate) port: u16,
-    pub(crate) updated_at: Millis,
-}
 
 fn summary_from_model(row: remote_device::Model) -> RemoteDeviceSummary {
     RemoteDeviceSummary {
@@ -39,37 +31,6 @@ pub(crate) struct RemoteService {
 impl RemoteService {
     pub(super) fn new(db: Arc<Database>) -> Self {
         Self { db }
-    }
-
-    pub(crate) async fn get_config(&self) -> DbResult<Option<StoredRemoteConfig>> {
-        let row = remote_config::Entity::find_by_id(1i64).one(self.db.read_conn()).await?;
-        Ok(row.map(|r| StoredRemoteConfig {
-            enabled: r.enabled,
-            bind_addr: r.bind_addr.filter(|s| !s.is_empty()),
-            port: u16::try_from(r.port).unwrap_or(0),
-            updated_at: r.updated_at,
-        }))
-    }
-
-    pub(crate) async fn save_config(&self, enabled: bool, bind_addr: Option<&str>, port: u16, updated_at: Millis) -> DbResult<()> {
-        let bind_addr = bind_addr.map(str::trim).filter(|s| !s.is_empty()).map(String::from);
-        let model = remote_config::ActiveModel {
-            id: Set(1),
-            enabled: Set(enabled),
-            bind_addr: Set(bind_addr),
-            port: Set(i64::from(port)),
-            updated_at: Set(updated_at),
-        };
-        let on_conflict = OnConflict::column(remote_config::Column::Id)
-            .update_columns([
-                remote_config::Column::Enabled,
-                remote_config::Column::BindAddr,
-                remote_config::Column::Port,
-                remote_config::Column::UpdatedAt,
-            ])
-            .to_owned();
-        remote_config::Entity::insert(model).on_conflict(on_conflict).exec(self.db.write_conn()).await?;
-        Ok(())
     }
 
     pub(crate) async fn insert_device(&self, device: &RemoteDeviceSummary, token_hash: &str) -> DbResult<()> {

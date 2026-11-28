@@ -2,7 +2,7 @@
 //! `note_suggestion`, `note_collab`, `note_link`), media library items
 //! (`media_library_item`), and media jobs (`media_job`).
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::sync::Arc;
 
 use sea_orm::sea_query::{Alias, Condition, Expr, Func, LikeExpr, OnConflict, Order, Query, SelectStatement, SimpleExpr};
@@ -36,6 +36,7 @@ pub(crate) struct NoteRow {
     pub(crate) by_name: String,
     pub(crate) version: i64,
     pub(crate) seq: i64,
+    pub(crate) human_touched_paths: Vec<String>,
     pub(crate) created_at: i64,
     pub(crate) updated_at: i64,
 }
@@ -55,6 +56,7 @@ impl From<note::Model> for NoteRow {
             by_name: r.by_name,
             version: r.version,
             seq: r.seq,
+            human_touched_paths: serde_json::from_str(&r.human_touched_paths).unwrap_or_default(),
             created_at: r.created_at,
             updated_at: r.updated_at,
         }
@@ -294,6 +296,7 @@ async fn add_impl<C: ConnectionTrait>(db: &C, params: NewNote) -> DbResult<()> {
         by_name: Set(params.by_name),
         version: Set(params.version),
         seq: Set(0),
+        human_touched_paths: Set("[]".into()),
         created_at: Set(params.created_at),
         updated_at: Set(params.created_at),
     }
@@ -901,6 +904,82 @@ impl NoteService {
 
     pub(crate) async fn file_changes_after(&self, note_id: &str, seq: i64, limit: i64) -> DbResult<Vec<FileChangeRow>> {
         file_changes_after_impl(self.db.read_conn(), note_id, seq, limit).await
+    }
+
+    pub(crate) async fn record_human_touched_paths_in_tx(&self, tx: &Tx, note_id: &str, paths: &[String]) -> DbResult<()> {
+        let added: Vec<&String> = paths.iter().filter(|p| p.as_str() != "manifest.json").collect();
+        if added.is_empty() {
+            return Ok(());
+        }
+        let Some(raw) = note::Entity::find_by_id(note_id.to_owned())
+            .select_only()
+            .column(note::Column::HumanTouchedPaths)
+            .into_tuple::<String>()
+            .one(tx)
+            .await?
+        else {
+            return Ok(());
+        };
+        let mut set: BTreeSet<String> = read_db_json::<Vec<String>>(raw)?.into_iter().collect();
+        let before = set.len();
+        for path in added {
+            set.insert(path.clone());
+        }
+        if set.len() != before {
+            let updated: Vec<String> = set.into_iter().collect();
+            super::update_col_by_id::<note::Entity, _, _>(tx, note::Column::Id, note_id, note::Column::HumanTouchedPaths, db_json(&updated)?).await?;
+        }
+        Ok(())
+    }
+
+    /// Prunes excess `note_change` rows per note, keeping only the newest `keep_per_note` sequences.
+    pub(crate) async fn prune_excess_note_changes_batch(&self, keep_per_note: u64, limit: u64) -> DbResult<u64> {
+        if keep_per_note == 0 || limit == 0 {
+            return Ok(0);
+        }
+        with_write_tx(&self.db, async |tx| {
+            let note_ids: Vec<String> = note_change::Entity::find()
+                .select_only()
+                .column(note_change::Column::NoteId)
+                .distinct()
+                .into_tuple()
+                .all(tx)
+                .await?;
+            if note_ids.is_empty() {
+                return Ok(0);
+            }
+            let mut remaining = usize::try_from(limit).unwrap_or(usize::MAX);
+            let mut deleted = 0u64;
+            for note_id in note_ids {
+                if remaining == 0 {
+                    break;
+                }
+                let excess_seqs: Vec<i64> = note_change::Entity::find()
+                    .select_only()
+                    .column(note_change::Column::Seq)
+                    .filter(note_change::Column::NoteId.eq(&note_id))
+                    .order_by_desc(note_change::Column::Seq)
+                    .offset(keep_per_note)
+                    .limit(remaining as u64)
+                    .into_tuple()
+                    .all(tx)
+                    .await?;
+                if excess_seqs.is_empty() {
+                    continue;
+                }
+                remaining = remaining.saturating_sub(excess_seqs.len());
+                for chunk in excess_seqs.chunks(super::MAX_SQL_BIND_PARAMS - 1) {
+                    let res = note_change::Entity::delete_many()
+                        .filter(note_change::Column::NoteId.eq(&note_id))
+                        .filter(note_change::Column::Seq.is_in(chunk.iter().copied()))
+                        .exec(tx)
+                        .await?;
+                    deleted += res.rows_affected;
+                }
+            }
+            Ok(deleted)
+        })
+        .await
     }
 
     // --- Media library ---

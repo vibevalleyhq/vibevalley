@@ -23,7 +23,7 @@
 | `crates/server/src/agent/profile/profile.rs` | 档案、技能与农机设置（`<家目录>/config.json`）、模板的读取、安装与更新（内置的和 `<家目录>/agent-templates/`） |
 | `crates/server/src/agent/profile/runtime.rs` | 农机：经 `vibevalley-runtime::oar` 的 `Registry` 探测安装、模型、额度，花费 |
 | `crates/server/src/agent/profile/preset.rs` | 农机预设、可派性校验、挑档案、额度文案；预设在 `crates/server/assets/agent/presets.json` |
-| `crates/server/src/agent/profile/drive.rs` | 工单板跑档案：把档案、农机、技能与记性变成开会话的参数 |
+| `crates/server/src/agent/drive.rs` | 工单板跑档案：把档案、农机、技能与记性变成开会话的参数 |
 | `crates/server/assets/agent/templates/`、`crates/server/assets/agent/skills/` | 内置模板（顺序见 `templates/index.json`）与 VibeValley 自带的技能，编进二进制 |
 
 接口见 [capabilities.md](docs/reference/capabilities.md)（`agent.*`、`skill.*`、`runtime.*`）。农机在线上仍是自己的概念（`runtime.*` 接口），服务端只有档案模块一扇门。
@@ -35,7 +35,7 @@
 - **损坏配置自动备份，绝不覆盖**：启动时若 `config.json` 损坏或不符合 Schema，改名为 `config.json.unreadable-<毫秒>` 保留并按新农场初始化；改名失败则拒绝开机。
 - **角色固定为 `orchestrator` 与 `worker`，并分配稳定编号与执行模式**：默认助手 `orchestrator` 不可删除或改为帮工；所有主助手统一分配 `O-01`、`O-02`… 编号，所有队友分配唯一 `W-01`、`W-02`… 编号。`AgentExecutionMode` 区分 `managed`（默认，VibeValley 自动 OAR 调度）与 `external`（外部编程代理，通过 `agent.register` / MCP `vv_agent_register` 幂等登记，保留 `W-XX` 编号、Papertrails 头像与运行时徽标，可作工单 `owner` 与笔记协作者 `origin`，但严禁进入自动 OAR 派工队列）。
 - **MCP 队友花名册**：`vv_agent_list` 返回含 `id`、`code`、`name`、`role`、`mode`、`runtime`、`avatar` 的紧凑花名册；`vv_agent_register` 幂等登记或更新外部队友（缺失 `avatar` 时按 `id` 经 `assign_worker_avatar` 确定性避碰分配）。
-- **跨层统一用 `Actor` 表示说话和操作的人**：`kind` 固定为 `user`、`agent`、`system`，仅 `kind: "agent"` 携带 `role`（`orchestrator` 或 `worker`）与 `forUser`。
+- **跨层统一用 `Actor` 与 `ParticipantId` 表示说话和操作的人**：`Actor.kind` 固定为 `user`、`agent`、`system`，仅 `kind: "agent"` 携带 `role`（`orchestrator` 或 `worker`）与 `forUser`；频道路由与投递统一使用类型化 `ParticipantId`（`user:<id>` · `agent:<profile>` · `session:<id>`）。
 - **`duty` 供阅读，`tags` 供匹配，`voice` 配听汇报**：`duty` 是一句话职责说明；`tags` 是关键词数组；可选的 `voice` 存 MOSS 音色 id（可在档案「身份」页配置，严格配对频道「听汇报」串行播报队列，未配置时静默跳过）。
 - **挑档案顺序（`presets.rs`）**：依次匹配：点名的档案名或 ID → 点名的农机上首个可用档案 → 用户界面选定的档案 → 工单文字命中 `Agent.tags` 最多的可用档案。建单和起草都用它。
 - **自带的技能只读，按 id 引用**：技能列表先列自带的（`builtIn: true`），再列用户自己写的；`skill.update`、`skill.delete` 碰到自带的一律拒绝，新建技能不占它们的 id。档案只存技能的 id，所以 VibeValley 一更新，勾了它的档案都拿到新版本。模板在 `agent.json` 的 `skills` 里写自带技能的 id，安装时勾上；按模板更新时再勾上，用户另勾的留着。任何档案都能勾自带的技能。

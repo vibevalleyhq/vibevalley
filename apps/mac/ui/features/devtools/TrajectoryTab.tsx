@@ -448,7 +448,7 @@ export function TrajectoryTab(props: {
                   <If when={currentDetail().subagentPaths.length > 0}>
                     <View class="flex-row flex-wrap items-center gap-1 pt-1">
                       <Text class="text-2xs font-medium text-muted">{t("web.devtools.trajectory.subagents")}:</Text>
-                      <Each of={currentDetail().subagentPaths}>
+                      <Each of={currentDetail().subagentPaths} key={(subPath) => subPath}>
                         {(subPath) => (
                           <View class="rounded-xs border border-line bg-side px-1.5 py-px">
                             <Text class="font-mono text-2xs text-ink">{subPath()}</Text>
@@ -569,7 +569,7 @@ function TurnCard(props: {
         <If when={turn().tokens !== undefined}>
           <View testID={`trajectory-turn-tokens-${turn().index}`} class="flex-row flex-wrap items-center gap-1">
             <Text class="text-2xs font-medium text-muted">{t("web.devtools.trajectory.tokens")}:</Text>
-            <Each of={turn().tokens ? formatTokenBreakdown(turn().tokens!) : []}>
+            <Each of={turn().tokens ? formatTokenBreakdown(turn().tokens!) : []} key="index">
               {(part) => (
                 <View class="rounded-xs bg-hover px-1.5 py-px">
                   <Text class="font-mono text-2xs tabular-nums text-ink">{part()}</Text>
@@ -591,7 +591,9 @@ function TurnCard(props: {
         <Banner tone="bad" size="sm" testID={`trajectory-silent-errors-${turn().index}`}>
           <View class="gap-1">
             <Text class="text-xs font-semibold text-berry">{t("web.devtools.trajectory.silentError")}</Text>
-            <Each of={turn().silentErrors}>{(errText) => <Text class="font-mono text-2xs text-berry">{errText()}</Text>}</Each>
+            <Each of={turn().silentErrors} key="index">
+              {(errText) => <Text class="font-mono text-2xs text-berry">{errText()}</Text>}
+            </Each>
           </View>
         </Banner>
       </If>

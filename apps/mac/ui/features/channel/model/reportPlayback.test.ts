@@ -22,7 +22,6 @@ const baseAgent = (overrides: Partial<Agent> & Pick<Agent, "id" | "name">): Agen
   disallowedTools: [],
   env: {},
   workdir: "",
-  worktree: true,
   tags: [],
   look: {
     species: "bear",

@@ -3,14 +3,12 @@
 //! (`issue.review`).
 
 use vibevalley_core::brief::{failed_text, issue_words};
-use vibevalley_git::Repo;
 use vibevalley_i18n::t;
-use vibevalley_protocol::{Assignment, Deliverable, Finding, Issue, IssueStatus, IssueUpdate, ReviewRevision};
+use vibevalley_protocol::{Assignment, Finding, Issue, IssueStatus, IssueUpdate, ReviewRevision};
 
 use super::board::Board;
 use super::store::{BoardError, IssueChange, Result};
 use crate::context::now;
-use crate::runtime::{HandoffCleanup, HandoffRecord, Leave, WriteLease};
 
 const RANK_STEP: i64 = 1024;
 const RANK_BOUND: i64 = 2_000_000_000;
@@ -55,10 +53,9 @@ impl Board {
             let repo = match upd.repo.as_deref().map(str::trim) {
                 None => was.repo.clone(),
                 Some("") => None,
-                Some(path) => {
-                    let dir = self.worktree().repo_dir(path);
-                    let found = Repo::discover(&dir)?.ok_or(BoardError::NotARepo(dir))?;
-                    Some(self.worktree().repo_ref_async(found.root()).await)
+                Some(hint) => {
+                    let norm = self.normalize_repo_hint_async(hint).await;
+                    (!norm.is_empty()).then_some(norm)
                 }
             };
             if let Some(agent) = upd.agent.as_deref().map(str::trim).filter(|a| !a.is_empty()) {
@@ -77,6 +74,9 @@ impl Board {
             }
             if let Some(d) = upd.deliver {
                 issue.deliver = d;
+            }
+            if let Some(receipt) = upd.delivery_receipt.clone() {
+                issue.delivery_receipt = Some(receipt);
             }
             if let Some(agent) = upd.agent.as_deref().map(str::trim) {
                 assign(&mut issue, agent, at);
@@ -99,7 +99,7 @@ impl Board {
                     issue.parent = None;
                 } else {
                     let all_issues = all_issues.as_deref().expect("loaded above");
-                    let target = crate::runtime::find_issue(all_issues, raw_parent).ok_or_else(|| BoardError::NoIssue(raw_parent.to_string()))?;
+                    let target = super::types::find_issue(all_issues, raw_parent).ok_or_else(|| BoardError::NoIssue(raw_parent.to_string()))?;
                     if target.id == was.id {
                         return Err(BoardError::Other("an issue cannot be its own parent".into()));
                     }
@@ -231,8 +231,7 @@ impl Board {
             .collect())
     }
 
-    /// Deletes an issue never sent: a draft being written goes home, its
-    /// checkout is cleared.
+    /// Deletes an issue never sent: a draft being written goes home.
     pub async fn remove_async(&self, reference: &str) -> Result<()> {
         let _work = self.work.lock().await;
         let issue = self.stored_async(reference).await?;
@@ -240,15 +239,7 @@ impl Board {
             return Err(refused("server.issue.started", &[]));
         }
         if let Some(r) = &issue.refining {
-            self.session_engine().dismiss_async(&r.session, Leave::Discard).await?;
-        }
-        if let Some(main) = self.worktree().main_repo_async(issue.repo.as_deref()).await?
-            && !self.worktree().discard(&main, issue.number)?
-        {
-            return Err(refused(
-                "server.issue.cannotDelete",
-                &[("n", issue.number.into()), ("why", t("server.issue.does.cleanWorktree", &[]).into())],
-            ));
+            self.session_engine().dismiss_async(&r.session).await?;
         }
         if let Err(err) = self.take_words_async(&issue.id).await {
             tracing::warn!(issue_id = %issue.id, error = %err, "issue.remove failed to clear queued words");
@@ -290,18 +281,7 @@ impl Board {
                 return Err(refused("server.issue.nothingToAccept", &[]));
             }
             if pass {
-                let revision = if issue.deliver == Deliverable::Change && issue.repo.is_some() && issue.parent.is_none() {
-                    let c = self.changes_async(&issue.id).await?;
-                    if seen.is_some_and(|seen| seen != &c.revision) {
-                        return Err(refused("server.issue.reviewChanged", &[]));
-                    }
-                    let repo = Repo::discover(&c.worktree)?.ok_or_else(|| BoardError::NotARepo(c.worktree.clone()))?;
-                    repo.retain_review(&c.revision.base_commit, &c.revision.tree)?;
-                    Some(c.revision)
-                } else {
-                    None
-                };
-                return self.change_async(&issue.id, IssueChange::Reviewed(revision)).await;
+                return self.change_async(&issue.id, IssueChange::Reviewed(seen.cloned())).await;
             }
             let fresh = vibevalley_core::refine::kept(findings);
             let text = text.trim();
@@ -363,9 +343,6 @@ impl Board {
             let agent = agent.trim();
             self.runtime.driver().check(agent)?;
             let words = words.map(str::trim).filter(|w| !w.is_empty()).map(String::from);
-            if issue.delivered == Some(vibevalley_protocol::Landing::MergedIntoParent) {
-                return Err(BoardError::Refused(vibevalley_core::Refusal::InGraph));
-            }
             let mv = if issue.status == IssueStatus::Todo {
                 vibevalley_core::Move::Start
             } else {
@@ -404,24 +381,8 @@ impl Board {
                 send_words = Some(failed_text(&all, if findings.is_empty() { text } else { "" }));
                 self.change_async(&issue.id, IssueChange::Failed { findings: all }).await?;
             }
-            let mut handoff_note = None;
             if let Some(s) = self.on_board_async(&issue).await {
-                if let Some(key) = self.session_engine().worktree_key_for_async(&s).await {
-                    let cleanup = HandoffCleanup::Commit {
-                        message: format!("{}: uncommitted work handed over", s.name),
-                    };
-                    let rec = self.session_engine().handoff_worktree_async(Some(&s.id), &key, None, cleanup).await?;
-                    if let Some(commit) = rec.cleanup_commit {
-                        handoff_note = Some(format!("Handed over uncommitted worktree state in commit {commit}."));
-                    }
-                }
-                self.session_engine().dismiss_async(&s.id, Leave::KeepBranch).await?;
-            }
-            if let Some(note) = handoff_note {
-                send_words = Some(match send_words {
-                    Some(w) if !w.trim().is_empty() => format!("{w}\n\n{note}"),
-                    _ => note,
-                });
+                self.session_engine().dismiss_async(&s.id).await?;
             }
             self.change_async(&issue.id, IssueChange::Assigned(agent.to_string())).await?;
             if issue.mandate.is_paused() {
@@ -444,72 +405,6 @@ impl Board {
     pub async fn set_mandate_async(&self, id: &str, mandate: vibevalley_protocol::IssueMandate) -> Result<Issue> {
         let _work = self.work.lock().await;
         self.change_async(id, IssueChange::Mandate(mandate)).await
-    }
-
-    /// Cleanly commits or stashes any uncommitted changes on `reference`'s active worktree,
-    /// transfers single-writer ownership ("Hoe Handoff") to `agent`, and dispatches `agent`.
-    pub async fn handoff_async(&self, reference: &str, agent: &str, text: &str, cleanup: HandoffCleanup) -> Result<HandoffRecord> {
-        let initial = self.stored_async(reference).await?;
-        let _issue_guard = self.issue_lock(&initial.id).await;
-        let issue = self.stored_async(&initial.id).await?;
-        let next_agent = self.runtime.driver().resolve_agent_key(agent);
-        if next_agent.is_empty() {
-            return Err(refused("server.issue.noAssignee", &[]));
-        }
-        self.runtime.driver().check(&next_agent)?;
-
-        let prev = self.on_board_async(&issue).await;
-        let mut record = HandoffRecord {
-            previous_owner: prev
-                .as_ref()
-                .map(|s| WriteLease::new(&s.id, s.profile.clone(), s.machine.clone(), s.worktree_branch().map(String::from))),
-            new_owner: None,
-            cleanup_commit: None,
-            cleanup_stash: None,
-        };
-        if let Some(s) = prev.as_ref() {
-            if let Some(key) = self.session_engine().worktree_key_for_async(s).await {
-                record = self.session_engine().handoff_worktree_async(Some(&s.id), &key, None, cleanup).await?;
-            }
-            self.session_engine().dismiss_async(&s.id, Leave::KeepBranch).await?;
-        }
-        self.change_async(&issue.id, IssueChange::Assigned(next_agent.clone())).await?;
-        if issue.mandate.is_paused() {
-            self.change_async(&issue.id, IssueChange::Resumed).await?;
-        }
-        let mut words = text.trim().to_string();
-        if let Some(commit) = record.cleanup_commit.as_deref() {
-            words = if words.is_empty() {
-                format!("Previous helper work was committed at {commit}.")
-            } else {
-                format!("{words}\n\nPrevious helper work was committed at {commit}.")
-            };
-        } else if let Some(stash) = record.cleanup_stash.as_deref() {
-            words = if words.is_empty() {
-                format!("Previous helper uncommitted edits were stashed at {stash}.")
-            } else {
-                format!("{words}\n\nPrevious helper uncommitted edits were stashed at {stash}.")
-            };
-        }
-        if issue.status.is_closed() {
-            self.change_async(&issue.id, IssueChange::Reopened).await?;
-        } else if issue.status == IssueStatus::Backlog {
-            self.change_async(&issue.id, IssueChange::Queued).await?;
-        }
-        let sent = self
-            .send_for_issue_async(&issue.id, (!words.is_empty()).then_some(words), vibevalley_protocol::RunTriggerKind::Comment)
-            .await?;
-        if let super::board::Sent::Working { session } = sent
-            && let Some(new_sess) = self.session_async(&session).await
-        {
-            record.new_owner = Some(WriteLease::new(
-                &new_sess.id,
-                new_sess.profile.clone(),
-                new_sess.machine.clone(),
-                new_sess.worktree_branch().map(String::from),
-            ));
-        }
-        Ok(record)
     }
 
     /// Why one more session cannot start on `issue` now (`noRoom`), or ""

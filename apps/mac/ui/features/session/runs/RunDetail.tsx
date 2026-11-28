@@ -1,8 +1,8 @@
-import { Clipboard, computed, signal, Text, View } from "nsh";
+import { Clipboard, computed, signal, Text, untracked, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import type { Look } from "@vibevalley/protocol";
-import { oneLine, sessionIssueId, sessionProfile, sessionRepo, sessionWorktree } from "@vibevalley/protocol/rules";
+import { oneLine, sessionIssueId, sessionProfile, sessionRepo } from "@vibevalley/protocol/rules";
 
 import { Button, ButtonLink } from "../../../design/Button";
 import { AgentFace, OrchestratorFace } from "../../../design/domain/Face";
@@ -92,7 +92,7 @@ export function RunDetail(props: {
   const terminalCwd = () => {
     if (props.entry.kind !== "worker") return undefined;
     const s = props.entry.live ?? props.entry.session;
-    return sessionWorktree(s) ?? s.cwd;
+    return s.cwd;
   };
   const hasTelemetryBar = createMemo(
     () => rollup().spent !== undefined || rollup().hasContext || rollup().llmRetries > 0 || rollup().runErrors > 0 || recoverable(),
@@ -174,7 +174,7 @@ export function RunDetail(props: {
             </Text>
             <View class={`h-5 shrink-0 flex-row items-center gap-1 rounded-sm px-1.5 ${status().pillClass}`} style={pillStyle()}>
               <Dot tone={status().dot} size={6} ring={false} />
-              <Text class={`text-2xs font-medium ${status().textClass}`}>{status().label}</Text>
+              <Text class={`whitespace-nowrap text-2xs font-medium ${status().textClass}`}>{status().label}</Text>
             </View>
             <If when={subLine()}>
               <Text class="min-w-0 flex-1 truncate text-xs text-muted">{subLine()}</Text>
@@ -227,7 +227,7 @@ export function RunDetail(props: {
                     class="h-5 flex-row items-center gap-1 rounded-sm border border-line bg-page px-1.5"
                   >
                     <Icon name="spend" size={11} tone="muted" />
-                    <Text class="font-mono text-2xs font-medium text-ink tabular-nums">{spentText(s())}</Text>
+                    <Text class="whitespace-nowrap font-mono text-2xs font-medium text-ink tabular-nums">{spentText(s())}</Text>
                   </View>
                 )}
               </If>
@@ -237,7 +237,7 @@ export function RunDetail(props: {
               <If when={rollup().llmRetries > 0}>
                 <View testID="run-detail-retry-badge" class="h-5 flex-row items-center gap-1 rounded-sm bg-warn-soft px-1.5">
                   <Icon name="retry" size={11} tone="warn-ink" />
-                  <Text class="font-mono text-2xs font-medium text-warn-ink tabular-nums">
+                  <Text class="whitespace-nowrap font-mono text-2xs font-medium text-warn-ink tabular-nums">
                     {t("web.session.hub.telemetry.retries", { n: rollup().llmRetries })}
                   </Text>
                 </View>
@@ -245,7 +245,9 @@ export function RunDetail(props: {
               <If when={rollup().runErrors > 0}>
                 <View testID="run-detail-error-badge" class="h-5 flex-row items-center gap-1 rounded-sm bg-bad-soft px-1.5">
                   <Icon name="cross" size={11} tone="berry" />
-                  <Text class="font-mono text-2xs font-medium text-berry tabular-nums">{t("web.session.hub.telemetry.errors", { n: rollup().runErrors })}</Text>
+                  <Text class="whitespace-nowrap font-mono text-2xs font-medium text-berry tabular-nums">
+                    {t("web.session.hub.telemetry.errors", { n: rollup().runErrors })}
+                  </Text>
                 </View>
               </If>
             </View>
@@ -297,8 +299,8 @@ export function RunDetail(props: {
         <View class="min-h-0 w-full max-w-6xl flex-1 gap-2.5">
           <If when={props.entry.kind === "orchestrator" ? props.approvals : undefined}>
             {(Approvals) => {
-              const ViewApprovals = Approvals();
-              return <ViewApprovals conversationId={props.entry.id} />;
+              const ViewApprovals = untracked(Approvals);
+              return <ViewApprovals id={props.entry.id} />;
             }}
           </If>
           <View class="min-h-0 flex-1">

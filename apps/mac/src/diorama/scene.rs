@@ -150,7 +150,7 @@ impl RenderWorker {
         let expected_bytes = self.expected_bytes.clone();
         let busy = self.busy.clone();
         let alive = self.alive.clone();
-        vibevalley_rt::current_or_global_handle().spawn_blocking(move || {
+        vibevalley_kit::rt::current_or_global_handle().spawn_blocking(move || {
             struct BusyReset(Arc<AtomicBool>);
             impl Drop for BusyReset {
                 fn drop(&mut self) {

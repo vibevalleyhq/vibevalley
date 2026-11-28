@@ -2,7 +2,7 @@ import { computed, Scroll, signal, Text, View, windowSize } from "nsh";
 import { Popover } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
-import { type Note, type NotePresence, type Suggestion, type SuggestionId, userId } from "@vibevalley/protocol";
+import { localUserParticipant, type Note, type NotePresence, type Suggestion, type SuggestionId } from "@vibevalley/protocol";
 
 import { Button } from "../../design/Button";
 import { Icon } from "../../design/Icon";
@@ -32,7 +32,7 @@ export function CollabToolbar(props: CollabToolbarProps) {
   const drawerOpen = signal(false);
   const busyId = signal<SuggestionId | undefined>(undefined);
 
-  const remotePeers = computed(() => props.peers.filter((p) => p.id !== userId));
+  const remotePeers = computed(() => props.peers.filter((p) => p.id !== localUserParticipant));
   const openSuggestions = computed(() => props.suggestions.filter((s) => s.status === "open"));
 
   const runResolve = (id: SuggestionId, fn: (id: SuggestionId) => Promise<void> | void) => {

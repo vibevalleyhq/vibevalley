@@ -11,9 +11,68 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use tokio_util::sync::CancellationToken;
 use vibevalley_i18n::t;
-use vibevalley_protocol::{ConnectorID, ConnectorLogin, ConnectorState};
+use vibevalley_protocol::{ApiError, ConnectorID, ConnectorLogin, ConnectorState};
 
 use crate::setting::Secret;
+
+/// Authenticated inbound message delivered by a paired IM peer to the host.
+#[derive(Debug, Clone)]
+pub struct InboundDispatch {
+    pub connector: ConnectorID,
+    pub inbound_id: String,
+    pub text: String,
+    pub send_key: String,
+    pub quoted_message_id: Option<String>,
+    pub bound_channel_id: Option<String>,
+}
+
+/// Outcome returned by [`ConnectorHost::handle_inbound`] for the bridge to persist/send.
+#[derive(Debug, Clone, Default)]
+pub struct InboundHandled {
+    /// Farm message id recorded as delivered (when posted to a channel).
+    pub delivered_id: Option<String>,
+    /// Immediate receipt text sent back to the external IM peer (e.g. quote-reply action outcome).
+    pub reply_text: Option<String>,
+    /// Exact pending push message ids to withdraw from this connector's outbox.
+    pub withdraw_messages: Vec<String>,
+    /// Prefix of pending push message ids to withdraw (e.g. all pushes for an accepted issue).
+    pub withdraw_prefixes: Vec<String>,
+}
+
+/// Domain-agnostic host callbacks supplied by the application orchestration layer
+/// when opening [`crate::connector::Connector`]. Carries only primitive ids and text —
+/// zero `channel`, `issue`, or `runtime` types.
+pub trait ConnectorHost: Send + Sync {
+    /// Resolves the display name of a bound channel id (`None` = default channel).
+    fn channel_name(&self, channel_id: Option<&str>) -> Option<String>;
+    /// Checks whether a queued outgoing `message_id` is still unseen/unsettled before sending.
+    fn is_outgoing_unseen<'a>(&'a self, message_id: &'a str) -> BoxFuture<'a, Result<bool, ApiError>>;
+    /// Handles an authenticated inbound message from a paired IM peer.
+    fn handle_inbound<'a>(&'a self, req: InboundDispatch) -> BoxFuture<'a, Result<InboundHandled, ApiError>>;
+}
+
+/// Standalone fallback host for tests or detached adapter operation without an orchestration layer.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct DetachedConnectorHost;
+
+impl ConnectorHost for DetachedConnectorHost {
+    fn channel_name(&self, _channel_id: Option<&str>) -> Option<String> {
+        None
+    }
+
+    fn is_outgoing_unseen<'a>(&'a self, _message_id: &'a str) -> BoxFuture<'a, Result<bool, ApiError>> {
+        Box::pin(async { Ok(true) })
+    }
+
+    fn handle_inbound<'a>(&'a self, _req: InboundDispatch) -> BoxFuture<'a, Result<InboundHandled, ApiError>> {
+        Box::pin(async {
+            Ok(InboundHandled {
+                reply_text: Some(t("server.connector.reply.noActionPort", &[])),
+                ..Default::default()
+            })
+        })
+    }
+}
 
 /// One message of the outside chat.
 #[derive(Debug, Clone, PartialEq, Eq)]

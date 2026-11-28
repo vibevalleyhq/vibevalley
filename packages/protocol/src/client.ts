@@ -145,24 +145,6 @@ export class VibeValleyApi {
       this.call<T.MachineInfo[]>("machine.list", "/api/v1/machine/list", undefined, options),
   };
 
-  readonly orchestrator = {
-    open: (options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("orchestrator.open", "/api/v1/orchestrator/open", undefined, options),
-    /** Ends the orchestrator's run under way and drops what waits for it; the sessions it sent keep working. */
-    stop: (a: { agent?: string }, options?: { signal?: AbortSignal }): Promise<void> =>
-      this.call<void>("orchestrator.stop", "/api/v1/orchestrator/stop", a, options),
-    eval: {
-      /** Saves the turn begun at a step of the orchestrator's log as a case for its evals, with what it should have done. */
-      create: (a: T.OrchestratorEvalRequest, options?: { signal?: AbortSignal }): Promise<T.OrchestratorEval> =>
-        this.call<T.OrchestratorEval>("orchestrator.eval.create", "/api/v1/orchestrator/eval/create", a, options),
-    },
-    approval: {
-      list: (a: T.OrchestratorApprovalListInput, options?: { signal?: AbortSignal }): Promise<T.OrchestratorApproval[]> =>
-        this.call<T.OrchestratorApproval[]>("orchestrator.approval.list", "/api/v1/orchestrator/approval/list", a, options),
-      resolve: (a: T.OrchestratorApprovalResolveInput, options?: { signal?: AbortSignal }): Promise<void> =>
-        this.call<void>("orchestrator.approval.resolve", "/api/v1/orchestrator/approval/resolve", a, options),
-    },
-  };
-
   readonly setting = {
     get: (options?: { signal?: AbortSignal }): Promise<T.SettingsStatus> =>
       this.call<T.SettingsStatus>("setting.get", "/api/v1/setting/get", undefined, options),
@@ -280,7 +262,7 @@ export class VibeValleyApi {
       this.call<string>("channel.create", "/api/v1/channel/create", a, options),
     update: (a: { id: string } & T.ChannelUpdate, options?: { signal?: AbortSignal }): Promise<void> =>
       this.call<void>("channel.update", "/api/v1/channel/update", a, options),
-    markRead: (a: { id: string } & T.ChatReadRequest, options?: { signal?: AbortSignal }): Promise<void> =>
+    markRead: (a: { id: string; from?: T.ParticipantId } & T.ChatReadRequest, options?: { signal?: AbortSignal }): Promise<void> =>
       this.call<void>("channel.markRead", "/api/v1/channel/markRead", a, options),
     /** A channel nothing points at any more, with its threads and messages. */
     delete: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("channel.delete", "/api/v1/channel/delete", a, options),
@@ -288,7 +270,7 @@ export class VibeValleyApi {
     previewDelete: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<T.Preview> =>
       this.call<T.Preview>("channel.previewDelete", "/api/v1/channel/previewDelete", a, options),
     /** The user's read moved back to just before this message. */
-    markUnread: (a: { id: string } & T.ChatReadRequest, options?: { signal?: AbortSignal }): Promise<void> =>
+    markUnread: (a: { id: string; from?: T.ParticipantId } & T.ChatReadRequest, options?: { signal?: AbortSignal }): Promise<void> =>
       this.call<void>("channel.markUnread", "/api/v1/channel/markUnread", a, options),
     /** Every channel and direct channel, the default first. */
     list: (options?: { signal?: AbortSignal }): Promise<T.Channel[]> => this.call<T.Channel[]>("channel.list", "/api/v1/channel/list", undefined, options),
@@ -333,8 +315,8 @@ export class VibeValleyApi {
       set: (a: T.OnSet, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("channel.archive.set", "/api/v1/channel/archive/set", a, options),
     },
     direct: {
-      /** The user's direct channel with a helper profile (or the orchestrator), made if there is none: its id. */
-      create: (a: { agent: string }, options?: { signal?: AbortSignal }): Promise<string> =>
+      /** The user's direct channel with a helper profile (or another participant), made if there is none: its id. */
+      create: (a: { agent: string; from?: T.ParticipantId }, options?: { signal?: AbortSignal }): Promise<string> =>
         this.call<string>("channel.direct.create", "/api/v1/channel/direct/create", a, options),
     },
     notify: {
@@ -488,6 +470,19 @@ export class VibeValleyApi {
       list: (a: T.SessionEventListInput, options?: { signal?: AbortSignal }): Promise<T.SessionEventPage> =>
         this.call<T.SessionEventPage>("session.event.list", "/api/v1/session/event/list", a, options),
     },
+    eval: {
+      /** Saves the turn begun at a step of a session's log as an eval case with expected behavior. */
+      create: (a: T.SessionEvalRequest, options?: { signal?: AbortSignal }): Promise<T.SessionEval> =>
+        this.call<T.SessionEval>("session.eval.create", "/api/v1/session/eval/create", a, options),
+    },
+    approval: {
+      /** Lists pending durable tool approvals for a session. */
+      list: (a: T.SessionApprovalListInput, options?: { signal?: AbortSignal }): Promise<T.SessionApproval[]> =>
+        this.call<T.SessionApproval[]>("session.approval.list", "/api/v1/session/approval/list", a, options),
+      /** Approves or rejects a pending durable tool approval for a session. */
+      resolve: (a: T.SessionApprovalResolveInput, options?: { signal?: AbortSignal }): Promise<void> =>
+        this.call<void>("session.approval.resolve", "/api/v1/session/approval/resolve", a, options),
+    },
   };
 
   readonly note = {
@@ -540,6 +535,17 @@ export class VibeValleyApi {
       /** Runs an Agent Action column across selected or pending rows of a `base` note sheet. */
       runAgentColumn: (a: T.BaseRunAgentColumnRequest, options?: { signal?: AbortSignal }): Promise<T.BaseRunAgentColumnResult> =>
         this.call<T.BaseRunAgentColumnResult>("note.base.runAgentColumn", "/api/v1/note/base/runAgentColumn", a, options),
+      /** Bidirectionally syncs `MediaAnnotation` pins in a `doc` note with an embedded `base` review checklist (creating one when absent). */
+      syncReview: (a: T.NoteReviewSyncRequest, options?: { signal?: AbortSignal }): Promise<T.NoteReviewSyncResult> =>
+        this.call<T.NoteReviewSyncResult>("note.base.syncReview", "/api/v1/note/base/syncReview", a, options),
+    },
+    annotation: {
+      /** Upserts a non-destructive `MediaAnnotation` on a `doc` media/compare block or `media` note and optionally syncs its linked `base` row. */
+      upsert: (a: T.NoteAnnotationUpsertRequest, options?: { signal?: AbortSignal }): Promise<T.NoteAnnotationMutationResult> =>
+        this.call<T.NoteAnnotationMutationResult>("note.annotation.upsert", "/api/v1/note/annotation/upsert", a, options),
+      /** Deletes a non-destructive `MediaAnnotation` from a `doc` media/compare block or `media` note. */
+      delete: (a: T.NoteAnnotationDeleteRequest, options?: { signal?: AbortSignal }): Promise<T.NoteAnnotationMutationResult> =>
+        this.call<T.NoteAnnotationMutationResult>("note.annotation.delete", "/api/v1/note/annotation/delete", a, options),
     },
     type: {
       /** All 4 consolidated note primitives (`doc`, `base`, `canvas`, `media`). */

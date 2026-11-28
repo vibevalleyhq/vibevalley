@@ -122,7 +122,15 @@ export function PendingApprovals(props: { conversationId: string }) {
 | `vibevalley/nsh-no-jsx-map` | 产出 JSX 的 `.map()` 或 JSX 内返回 JSX 的 IIFE | 改用 `<Each of={...} key={...}>` 或 `<List keyExtractor={...}>` |
 | `vibevalley/nsh-each-key` | 缺少 `key` 属性的 `<Each>` | 补充稳定业务主键 `key={(x) => x.id}` 或 `key="index"` |
 | `vibevalley/nsh-no-props-destructure` | 组件参数解构或顶层 `const { a } = props` | 直接读 `props.a`，拆分透传属性用 `split(props, [...])` |
-| `vibevalley/nsh-no-eager-accessor` | 组件或 `<If>`/`<Each>` 回调顶层提前读取 `props.x` / 访问器 / 信号 | 放入 JSX、派生闭包 `() => ...`、`computed`、`effect` 或 `untracked` |
+| `vibevalley/nsh-no-props-spread` | 组件内 `{ ...props }` 对象展开或 `Object.assign(..., props)` | 用 `split(props, [...])` 拆分属性或在 JSX / 派生闭包里按字段读取 |
+| `vibevalley/nsh-no-eager-accessor` | 组件或 `<If>`/`<Each>`/`<List>` 回调顶层提前读取 `props.x` / 访问器 / `use*()` 信号 | 放入 JSX、派生闭包 `() => ...`、`computed`、`effect` 或 `untracked` |
+| `vibevalley/nsh-no-async-reactive` | `async` 组件函数或传给 `effect` / `computed` 的 `async` 回调 | 保持组件与响应回调同步，通过信号或事件驱动异步任务 |
+| `vibevalley/nsh-no-jsx-inline-reactive` | 在 JSX 动态槽位或组件内嵌回调中内联创建 `signal` / `computed` / `effect` | 上提到组件顶层、`<If>`/`<Each>` 渲染回调顶层或模块 / hook |
+| `vibevalley/nsh-no-react-isms` | 引入 `react`、`effect`/`computed` 传依赖数组、宿主上写 `onClick`/`onChangeText`/`htmlFor` 或非 `<Each>` 的 `key` | 改用 `nsh` 信号与原生属性（`onPress`、`onChange`、`<Each key>`） |
+| `vibevalley/nsh-selection-change-guard` | `<Input>`/`<RichInlineField>` 的 `onSelectionChange` 未对比直接 `.set(...)` | 先用 `untracked` 读取并比较 `.start` / `.end` 相等后再写入 |
+| `vibevalley/nsh-no-self-canceling-effect` | `effect` 同步读 `sig()` 又同步写 `sig.set(...)` 且返回 `clearTimeout` | 将状态写入移入定时或事件回调，避免自取消循环 |
+| `vibevalley/nsh-no-view-text-class` | 在 `<View>` 上写不被 GPUI 继承的字号、字色、字重或截断类 | 将字体、字号与文本色类名移到内层 `<Text>` |
+| `vibevalley/nsh-scroll-horizontal-flex-row` | `<Scroll horizontal>` 缺少 `flex-row` 类导致横向内容纵向堆叠或裁剪 | 为 `contentClass` 或 `class` 显式加上 `flex-row` |
 | `vibevalley/no-component-interval` | 组件内直接调用 `setInterval` | 改用 `useNow(ms)` 或 `useInterval` |
 | `vibevalley/nsh-no-direct-storage-in-event` | 输入或拖拽事件回调内直接同步写入 `localStorage` / `Storage` | 改用 `drafts.text` 缓冲、`createPersistentStorage` 合并或带相等性守卫的 `prefs` |
 | `vibevalley/nsh-keymap-no-text-signal` | `keymap.bind` 所在的 `effect` 内直接读取原始文本信号（如 `text()`、`draft()`） | 抽成 `computed()` 布尔条件（如 `isEmpty`、`menuOpen`）作为 `effect` 守卫 |

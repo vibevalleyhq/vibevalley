@@ -1,5 +1,5 @@
 import { t } from "@vibevalley/i18n";
-import { type ActorRef, type Changes, type Issue, type IssueAct, type IssueAction, VibeValleyApiError } from "@vibevalley/protocol";
+import { type ActorRef, type Changes, type DeliveryReceipt, type Issue, type IssueAct, type IssueAction, VibeValleyApiError } from "@vibevalley/protocol";
 import { latestSessionIdOf, omitUndefined } from "@vibevalley/protocol/rules";
 import { issueId } from "@vibevalley/protocol/schema";
 
@@ -13,10 +13,23 @@ export const newIssueTitle = t("web.issue.boardLabels.newIssue");
 export const actionOf = (issue: Issue, act: IssueAct) => issue.stage.acts.find((a) => a.act === act);
 
 /** An action sent once, without an overlay (the farm's bed tools, which play their effect after it). */
-export function perform(issue: Issue, a: IssueAction, words = "", sendKey = "", revision?: Changes["revision"]): Promise<unknown> {
+export function perform(
+  issue: Issue,
+  a: IssueAction,
+  words = "",
+  sendKey = "",
+  revision?: Changes["revision"],
+  deliveryReceipt?: DeliveryReceipt,
+): Promise<unknown> {
   switch (a.does) {
     case "move":
-      return api.issue.status.update({ id: issue.id, status: a.status, ...(words ? { text: words } : {}), ...(revision ? { revision } : {}) });
+      return api.issue.status.update({
+        id: issue.id,
+        status: a.status,
+        ...(words ? { text: words } : {}),
+        ...(revision ? { revision } : {}),
+        ...(deliveryReceipt ? { deliveryReceipt } : {}),
+      });
     case "say":
       return api.issue.comment.create({ id: issue.id, text: words, ...(sendKey ? { sendKey } : {}) });
     case "stop": {

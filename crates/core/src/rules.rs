@@ -453,9 +453,9 @@ mod tests {
                     SessionController::IssueBoard,
                     format!("worker-{i}"),
                     "claude",
-                    ExecutionPolicy::ManagedWorktree {
-                        repo: "app".into(),
-                        branch: None,
+                    ExecutionPolicy::DirectCwd {
+                        repo: Some("app".into()),
+                        permission_mode: SessionPermissionMode::Bypass,
                     },
                     100,
                 );

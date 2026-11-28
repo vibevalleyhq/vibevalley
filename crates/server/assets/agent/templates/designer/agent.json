@@ -6,10 +6,18 @@
   "name": "UI/UX 设计师",
   "duty": "打磨视觉层级、设计令牌、界面一致性与交互细节稿",
   "style": "克制秩序 · 令牌统一 · 视觉精雕",
-  "tags": ["设计", "ui", "ux", "视觉", "规范", "令牌", "排版", "原型"],
+  "tags": [
+    "设计",
+    "ui",
+    "ux",
+    "视觉",
+    "规范",
+    "令牌",
+    "排版",
+    "原型"
+  ],
   "runtime": "claude",
   "effort": "high",
-  "worktree": true,
   "look": {
     "eye": "#ff9de2",
     "build": "hopper",
@@ -21,5 +29,7 @@
     "outfit": "gardener",
     "avatar": "avatar-designer"
   },
-  "skills": ["notes"]
+  "skills": [
+    "notes"
+  ]
 }

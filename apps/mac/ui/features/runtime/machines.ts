@@ -20,7 +20,6 @@ export interface DisplayMachine {
   readonly ephemeral: boolean;
   readonly platform: MachinePlatform;
   readonly status: MachineStatus;
-  readonly worktreeSupported?: boolean | undefined;
   readonly joinedAt?: number | undefined;
   readonly lastSeenAt?: number | undefined;
   readonly runtimes: readonly string[];
@@ -80,7 +79,6 @@ function mergeMachines(sliceMachines: readonly SliceMachine[] | undefined, rpcMa
       ephemeral: info.ephemeral,
       platform: info.platform,
       status: info.status,
-      worktreeSupported: info.worktreeSupported,
       joinedAt: info.joinedAt,
       lastSeenAt: info.lastSeenAt,
       runtimes: info.runtimes.filter((r) => r.available).map((r) => r.id),
@@ -98,7 +96,6 @@ function mergeMachines(sliceMachines: readonly SliceMachine[] | undefined, rpcMa
       ephemeral: live.ephemeral ?? existing?.ephemeral ?? false,
       platform: live.platform ?? existing?.platform ?? "other",
       status: statusFromSlice(live),
-      worktreeSupported: existing?.worktreeSupported,
       joinedAt: live.joinedAt ?? existing?.joinedAt,
       lastSeenAt: existing?.lastSeenAt,
       runtimes,

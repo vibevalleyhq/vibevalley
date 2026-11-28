@@ -1,755 +1,754 @@
 [
-  {
-    "at": 1794500000000,
-    "session": {
-      "bindings": [
-        {
-          "id": "i1",
-          "kind": "issue"
-        }
-      ],
-      "brief": "work on i1",
-      "controller": "issueBoard",
-      "cwd": "/tmp/worktrees/demo.1",
-      "hiredAt": 1794500000000,
-      "id": "w1",
-      "name": "Helper w1",
-      "phase": {
-        "_tag": "working",
-        "doing": {
-          "action": "run_command",
-          "label": "vp test"
-        },
-        "since": 1794500000000
-      },
-      "policy": {
-        "branch": "vibevalley/issue-1",
-        "kind": "managedWorktree",
-        "repo": "demo"
-      },
-      "profile": "lab",
-      "role": "worker",
-      "runs": 0,
-      "runtime": "claude"
+ {
+  "at": 1794500000000,
+  "session": {
+   "bindings": [
+    {
+     "id": "i1",
+     "kind": "issue"
+    }
+   ],
+   "brief": "work on i1",
+   "controller": "issueBoard",
+   "cwd": "/tmp/worktrees/demo.1",
+   "hiredAt": 1794500000000,
+   "id": "w1",
+   "name": "Helper w1",
+   "phase": {
+    "_tag": "working",
+    "doing": {
+     "action": "run_command",
+     "label": "vp test"
     },
-    "type": "sessionChanged"
+    "since": 1794500000000
+   },
+   "policy": {
+    "kind": "directCwd",
+    "permissionMode": "bypass",
+    "repo": "demo"
+   },
+   "profile": "lab",
+   "role": "worker",
+   "runs": 0,
+   "runtime": "claude"
   },
-  {
-    "at": 1794500000000,
-    "session": {
-      "bindings": [
-        {
-          "id": "i2",
-          "kind": "issue"
-        }
-      ],
-      "brief": "work on i2",
-      "controller": "issueBoard",
-      "cwd": "/tmp/worktrees/demo.2",
-      "hiredAt": 1794500000000,
-      "id": "w2",
-      "name": "Helper w2",
-      "phase": {
-        "_tag": "resting"
-      },
-      "policy": {
-        "branch": "vibevalley/issue-2",
-        "kind": "managedWorktree",
-        "repo": "demo"
-      },
-      "profile": "lab",
-      "role": "worker",
-      "runs": 0,
-      "runtime": "claude"
+  "type": "sessionChanged"
+ },
+ {
+  "at": 1794500000000,
+  "session": {
+   "bindings": [
+    {
+     "id": "i2",
+     "kind": "issue"
+    }
+   ],
+   "brief": "work on i2",
+   "controller": "issueBoard",
+   "cwd": "/tmp/worktrees/demo.2",
+   "hiredAt": 1794500000000,
+   "id": "w2",
+   "name": "Helper w2",
+   "phase": {
+    "_tag": "resting"
+   },
+   "policy": {
+    "kind": "directCwd",
+    "permissionMode": "bypass",
+    "repo": "demo"
+   },
+   "profile": "lab",
+   "role": "worker",
+   "runs": 0,
+   "runtime": "claude"
+  },
+  "type": "sessionChanged"
+ },
+ {
+  "at": 1794500000000,
+  "session": {
+   "bindings": [
+    {
+     "id": "i3",
+     "kind": "issue"
+    }
+   ],
+   "brief": "work on i3",
+   "controller": "issueBoard",
+   "cwd": "/tmp/worktrees/demo.3",
+   "hiredAt": 1794500000000,
+   "id": "w3",
+   "name": "Helper w3",
+   "phase": {
+    "_tag": "resting"
+   },
+   "policy": {
+    "kind": "directCwd",
+    "permissionMode": "bypass",
+    "repo": "demo"
+   },
+   "profile": "lab",
+   "role": "worker",
+   "runs": 0,
+   "runtime": "claude"
+  },
+  "type": "sessionChanged"
+ },
+ {
+  "at": 1794500000000,
+  "session": {
+   "bindings": [
+    {
+     "id": "i4",
+     "kind": "issue"
+    }
+   ],
+   "brief": "work on i4",
+   "controller": "issueBoard",
+   "cwd": "/tmp/worktrees/demo.4",
+   "hiredAt": 1794500000000,
+   "id": "w4",
+   "name": "Helper w4",
+   "phase": {
+    "_tag": "resting"
+   },
+   "policy": {
+    "kind": "directCwd",
+    "permissionMode": "bypass",
+    "repo": "demo"
+   },
+   "profile": "lab",
+   "role": "worker",
+   "runs": 0,
+   "runtime": "claude"
+  },
+  "type": "sessionChanged"
+ },
+ {
+  "at": 1794500000000,
+  "session": {
+   "bindings": [
+    {
+     "id": "i5",
+     "kind": "issue"
+    }
+   ],
+   "brief": "work on i5",
+   "controller": "issueBoard",
+   "cwd": "/tmp/worktrees/demo.5",
+   "hiredAt": 1794500000000,
+   "id": "w5",
+   "name": "Helper w5",
+   "phase": {
+    "_tag": "working",
+    "doing": {
+     "action": "run_command",
+     "label": "vp test"
     },
-    "type": "sessionChanged"
-  },
-  {
-    "at": 1794500000000,
-    "session": {
-      "bindings": [
-        {
-          "id": "i3",
-          "kind": "issue"
-        }
-      ],
-      "brief": "work on i3",
-      "controller": "issueBoard",
-      "cwd": "/tmp/worktrees/demo.3",
-      "hiredAt": 1794500000000,
-      "id": "w3",
-      "name": "Helper w3",
-      "phase": {
-        "_tag": "resting"
-      },
-      "policy": {
-        "branch": "vibevalley/issue-3",
-        "kind": "managedWorktree",
-        "repo": "demo"
-      },
-      "profile": "lab",
-      "role": "worker",
-      "runs": 0,
-      "runtime": "claude"
+    "quietSince": 1794500300000,
+    "retry": {
+     "attempt": 1,
+     "of": 3
     },
-    "type": "sessionChanged"
+    "since": 1794500000000
+   },
+   "policy": {
+    "kind": "directCwd",
+    "permissionMode": "bypass",
+    "repo": "demo"
+   },
+   "profile": "lab",
+   "role": "worker",
+   "runs": 0,
+   "runtime": "claude"
   },
-  {
-    "at": 1794500000000,
-    "session": {
-      "bindings": [
-        {
-          "id": "i4",
-          "kind": "issue"
-        }
-      ],
-      "brief": "work on i4",
-      "controller": "issueBoard",
-      "cwd": "/tmp/worktrees/demo.4",
-      "hiredAt": 1794500000000,
-      "id": "w4",
-      "name": "Helper w4",
-      "phase": {
-        "_tag": "resting"
-      },
-      "policy": {
-        "branch": "vibevalley/issue-4",
-        "kind": "managedWorktree",
-        "repo": "demo"
-      },
-      "profile": "lab",
-      "role": "worker",
-      "runs": 0,
-      "runtime": "claude"
-    },
-    "type": "sessionChanged"
+  "type": "sessionChanged"
+ },
+ {
+  "at": 1794500000000,
+  "session": {
+   "bindings": [
+    {
+     "id": "i6",
+     "kind": "issue"
+    }
+   ],
+   "brief": "work on i6",
+   "controller": "issueBoard",
+   "cwd": "/tmp/worktrees/demo.6",
+   "hiredAt": 1794500000000,
+   "id": "w6",
+   "name": "Helper w6",
+   "phase": {
+    "_tag": "resting"
+   },
+   "policy": {
+    "kind": "directCwd",
+    "permissionMode": "bypass",
+    "repo": "demo"
+   },
+   "profile": "lab",
+   "role": "worker",
+   "runs": 0,
+   "runtime": "claude"
   },
-  {
-    "at": 1794500000000,
-    "session": {
-      "bindings": [
-        {
-          "id": "i5",
-          "kind": "issue"
-        }
-      ],
-      "brief": "work on i5",
-      "controller": "issueBoard",
-      "cwd": "/tmp/worktrees/demo.5",
-      "hiredAt": 1794500000000,
-      "id": "w5",
-      "name": "Helper w5",
-      "phase": {
-        "_tag": "working",
-        "doing": {
-          "action": "run_command",
-          "label": "vp test"
-        },
-        "quietSince": 1794500300000,
-        "retry": {
-          "attempt": 1,
-          "of": 3
-        },
-        "since": 1794500000000
-      },
-      "policy": {
-        "branch": "vibevalley/issue-5",
-        "kind": "managedWorktree",
-        "repo": "demo"
-      },
-      "profile": "lab",
-      "role": "worker",
-      "runs": 0,
-      "runtime": "claude"
-    },
-    "type": "sessionChanged"
-  },
-  {
-    "at": 1794500000000,
-    "session": {
-      "bindings": [
-        {
-          "id": "i6",
-          "kind": "issue"
-        }
-      ],
-      "brief": "work on i6",
-      "controller": "issueBoard",
-      "cwd": "/tmp/worktrees/demo.6",
-      "hiredAt": 1794500000000,
-      "id": "w6",
-      "name": "Helper w6",
-      "phase": {
-        "_tag": "resting"
-      },
-      "policy": {
-        "branch": "vibevalley/issue-6",
-        "kind": "managedWorktree",
-        "repo": "demo"
-      },
-      "profile": "lab",
-      "role": "worker",
-      "runs": 0,
-      "runtime": "claude"
-    },
-    "type": "sessionChanged"
-  },
-  {
-    "at": 1794500000000,
-    "issue": {
-      "assignments": [
-        {
-          "agent": "lab",
-          "assignedAt": 1794499940000,
-          "executions": [
-            {
-              "kind": "worker",
-              "session": "w1",
-              "startedAt": 1794500000000
-            }
-          ],
-          "id": "a1",
-          "issue": "i1"
-        }
-      ],
-      "blockedBy": [],
-      "checks": [],
-      "createdAt": 1794497780000,
-      "criteria": [
-        "logs in"
-      ],
-      "deliver": "change",
-      "description": "Fix the login",
-      "findings": [],
-      "id": "i1",
-      "mandate": {
-        "autoSubmitPr": false,
-        "maxBotReviewRounds": 3,
-        "strength": "explicit"
-      },
-      "moves": [],
-      "number": 1,
-      "priority": "high",
-      "questions": [],
-      "stage": {
-        "acts": [],
-        "state": "queued"
-      },
-      "status": "todo",
-      "title": "Issue 1"
-    },
-    "type": "issueChanged"
-  },
-  {
-    "at": 1794500000000,
-    "issue": {
-      "assignments": [
-        {
-          "agent": "lab",
-          "assignedAt": 1794499880000,
-          "executions": [
-            {
-              "kind": "worker",
-              "session": "w2",
-              "startedAt": 1794500000000
-            }
-          ],
-          "id": "a2",
-          "issue": "i2"
-        }
-      ],
-      "blockedBy": [],
-      "checks": [],
-      "createdAt": 1794495560000,
-      "criteria": [],
-      "deliver": "change",
-      "description": "",
-      "findings": [],
-      "id": "i2",
-      "mandate": {
-        "autoSubmitPr": false,
-        "maxBotReviewRounds": 3,
-        "strength": "explicit"
-      },
-      "moves": [],
-      "number": 2,
-      "priority": "medium",
-      "questions": [
-        {
-          "options": [
-            "8080",
-            "9090"
-          ],
-          "question": "Which port?"
-        }
-      ],
-      "stage": {
-        "acts": [],
-        "state": "queued"
-      },
-      "status": "todo",
-      "title": "Issue 2"
-    },
-    "type": "issueChanged"
-  },
-  {
-    "at": 1794500000000,
-    "issue": {
-      "assignments": [
-        {
-          "agent": "lab",
-          "assignedAt": 1794499820000,
-          "executions": [
-            {
-              "kind": "worker",
-              "session": "w3",
-              "startedAt": 1794500000000
-            }
-          ],
-          "id": "a3",
-          "issue": "i3"
-        }
-      ],
-      "blockedBy": [],
-      "checks": [],
-      "conflict": {
-        "base": "main",
-        "files": [
-          "a.ts"
-        ]
-      },
-      "createdAt": 1794493340000,
-      "criteria": [],
-      "deliver": "change",
-      "description": "",
-      "findings": [],
-      "id": "i3",
-      "mandate": {
-        "autoSubmitPr": false,
-        "maxBotReviewRounds": 3,
-        "strength": "explicit"
-      },
-      "moves": [],
-      "number": 3,
-      "priority": "high",
-      "questions": [],
-      "stage": {
-        "acts": [],
-        "state": "queued"
-      },
-      "status": "todo",
-      "title": "Issue 3"
-    },
-    "type": "issueChanged"
-  },
-  {
-    "at": 1794500000000,
-    "issue": {
-      "assignments": [
-        {
-          "agent": "lab",
-          "assignedAt": 1794499760000,
-          "executions": [
-            {
-              "kind": "worker",
-              "session": "w4",
-              "startedAt": 1794500000000
-            }
-          ],
-          "id": "a4",
-          "issue": "i4"
-        }
-      ],
-      "blockedBy": [],
-      "checks": [],
-      "createdAt": 1794491120000,
-      "criteria": [],
-      "deliver": "answer",
-      "description": "",
-      "findings": [],
-      "id": "i4",
-      "mandate": {
-        "autoSubmitPr": false,
-        "maxBotReviewRounds": 3,
-        "strength": "explicit"
-      },
-      "moves": [],
-      "number": 4,
-      "priority": "medium",
-      "questions": [],
-      "stage": {
-        "acts": [],
-        "state": "queued"
-      },
-      "status": "todo",
-      "title": "Issue 4"
-    },
-    "type": "issueChanged"
-  },
-  {
-    "at": 1794500000000,
-    "issue": {
-      "assignments": [
-        {
-          "agent": "lab",
-          "assignedAt": 1794499700000,
-          "executions": [
-            {
-              "kind": "worker",
-              "session": "w5",
-              "startedAt": 1794500000000
-            }
-          ],
-          "id": "a5",
-          "issue": "i5"
-        }
-      ],
-      "blockedBy": [],
-      "checks": [],
-      "createdAt": 1794488900000,
-      "criteria": [],
-      "deliver": "change",
-      "description": "",
-      "findings": [],
-      "id": "i5",
-      "mandate": {
-        "autoSubmitPr": false,
-        "maxBotReviewRounds": 3,
-        "strength": "explicit"
-      },
-      "moves": [],
-      "number": 5,
-      "priority": "high",
-      "questions": [],
-      "repo": "demo",
-      "stage": {
-        "acts": [],
-        "state": "queued"
-      },
-      "status": "todo",
-      "title": "Issue 5"
-    },
-    "type": "issueChanged"
-  },
-  {
-    "at": 1794500000000,
-    "issue": {
-      "assignments": [
-        {
-          "agent": "lab",
-          "assignedAt": 1794499640000,
-          "executions": [
-            {
-              "kind": "worker",
-              "session": "w6",
-              "startedAt": 1794500000000
-            }
-          ],
-          "id": "a6",
-          "issue": "i6"
-        }
-      ],
-      "blockedBy": [],
-      "checks": [],
-      "constraints": {
-        "acceptance": true,
-        "check": "sh check.sh",
-        "frozen": [],
-        "scope": [
-          "check.sh"
-        ]
-      },
-      "createdAt": 1794486680000,
-      "criteria": [],
-      "deliver": "change",
-      "description": "",
-      "findings": [],
-      "id": "i6",
-      "mandate": {
-        "autoSubmitPr": false,
-        "maxBotReviewRounds": 3,
-        "strength": "explicit"
-      },
-      "moves": [],
-      "number": 6,
-      "priority": "medium",
-      "questions": [],
-      "stage": {
-        "acts": [],
-        "state": "queued"
-      },
-      "status": "todo",
-      "title": "Issue 6"
-    },
-    "type": "issueChanged"
-  },
-  {
-    "at": 1794500000000,
-    "issue": {
-      "assignments": [
-        {
-          "agent": "lab",
-          "assignedAt": 1794499580000,
-          "executions": [],
-          "id": "a7",
-          "issue": "i7"
-        }
-      ],
-      "blockedBy": [],
-      "checks": [],
-      "createdAt": 1794484460000,
-      "criteria": [],
-      "deliver": "change",
-      "description": "",
-      "findings": [],
-      "id": "i7",
-      "mandate": {
-        "autoSubmitPr": false,
-        "maxBotReviewRounds": 3,
-        "strength": "explicit"
-      },
-      "moves": [],
-      "number": 7,
-      "priority": "high",
-      "questions": [],
-      "rank": 1024,
-      "stage": {
-        "acts": [],
-        "state": "draft"
-      },
-      "status": "backlog",
-      "title": "Issue 7"
-    },
-    "type": "issueChanged"
-  },
-  {
-    "at": 1794500000000,
-    "issue": {
-      "assignments": [
-        {
-          "agent": "lab",
-          "assignedAt": 1794499520000,
-          "executions": [],
-          "id": "a8",
-          "issue": "i8"
-        }
-      ],
-      "blockedBy": [],
-      "checks": [],
-      "createdAt": 1794482240000,
-      "criteria": [],
-      "deliver": "change",
-      "description": "",
-      "findings": [],
-      "id": "i8",
-      "mandate": {
-        "autoSubmitPr": false,
-        "maxBotReviewRounds": 3,
-        "strength": "explicit"
-      },
-      "moves": [],
-      "number": 8,
-      "priority": "medium",
-      "questions": [],
-      "queuedAt": 1794500000000,
-      "stage": {
-        "acts": [],
-        "state": "queued"
-      },
-      "status": "todo",
-      "title": "Issue 8"
-    },
-    "type": "issueChanged"
-  },
-  {
-    "at": 1794500000000,
-    "issue": {
-      "assignments": [
-        {
-          "agent": "lab",
-          "assignedAt": 1794499460000,
-          "executions": [],
-          "id": "a9",
-          "issue": "i9"
-        }
-      ],
-      "blockedBy": [],
-      "checks": [],
-      "closedAt": 1794500000000,
-      "createdAt": 1794480020000,
-      "criteria": [],
-      "deliver": "change",
-      "delivered": "merged",
-      "description": "",
-      "findings": [],
-      "id": "i9",
-      "mandate": {
-        "autoSubmitPr": false,
-        "maxBotReviewRounds": 3,
-        "strength": "explicit"
-      },
-      "moves": [],
-      "number": 9,
-      "priority": "high",
-      "questions": [],
-      "stage": {
-        "acts": [],
-        "state": "done"
-      },
-      "status": "done",
-      "title": "Issue 9"
-    },
-    "type": "issueChanged"
-  },
-  {
-    "at": 1794500000000,
-    "issue": {
-      "assignments": [
-        {
-          "agent": "lab",
-          "assignedAt": 1794499400000,
-          "executions": [],
-          "id": "a10",
-          "issue": "i10"
-        }
-      ],
-      "blockedBy": [],
-      "canceled": "dismissed",
-      "checks": [],
-      "closedAt": 1794500000000,
-      "createdAt": 1794477800000,
-      "criteria": [],
-      "deliver": "change",
-      "description": "",
-      "findings": [],
-      "id": "i10",
-      "mandate": {
-        "autoSubmitPr": false,
-        "maxBotReviewRounds": 3,
-        "strength": "explicit"
-      },
-      "moves": [],
-      "number": 10,
-      "priority": "medium",
-      "questions": [],
-      "stage": {
-        "acts": [],
-        "state": "canceled"
-      },
-      "status": "canceled",
-      "title": "Issue 10"
-    },
-    "type": "issueChanged"
-  },
-  {
-    "at": 1794500000000,
-    "issue": {
-      "assignments": [
-        {
-          "agent": "lab",
-          "assignedAt": 1794499340000,
-          "executions": [],
-          "id": "a11",
-          "issue": "i11"
-        }
-      ],
-      "blockedBy": [],
-      "checks": [],
-      "createdAt": 1794475580000,
-      "criteria": [],
-      "deliver": "change",
-      "description": "",
-      "findings": [],
-      "id": "i11",
-      "lastRun": {
-        "endedAt": 1794500060000,
-        "outcome": "completed",
-        "startedAt": 1794500000000
-      },
-      "mandate": {
-        "autoSubmitPr": false,
-        "maxBotReviewRounds": 3,
-        "strength": "explicit"
-      },
-      "moves": [],
-      "number": 11,
-      "priority": "high",
-      "questions": [],
-      "stage": {
-        "acts": [],
-        "state": "queued"
-      },
-      "status": "todo",
-      "title": "Issue 11"
-    },
-    "type": "issueChanged"
-  },
-  {
-    "at": 1794500120000,
-    "checks": [],
-    "id": "w2",
-    "outcome": "completed",
-    "questions": [
+  "type": "sessionChanged"
+ },
+ {
+  "at": 1794500000000,
+  "issue": {
+   "assignments": [
+    {
+     "agent": "lab",
+     "assignedAt": 1794499940000,
+     "executions": [
       {
-        "options": [
-          "8080",
-          "9090"
-        ],
-        "question": "Which port?"
+       "kind": "worker",
+       "session": "w1",
+       "startedAt": 1794500000000
       }
-    ],
-    "runs": 1,
-    "summary": "Asked about the port",
-    "type": "sessionReported"
+     ],
+     "id": "a1",
+     "issue": "i1"
+    }
+   ],
+   "blockedBy": [],
+   "checks": [],
+   "createdAt": 1794497780000,
+   "criteria": [
+    "logs in"
+   ],
+   "deliver": "change",
+   "description": "Fix the login",
+   "findings": [],
+   "id": "i1",
+   "mandate": {
+    "autoSubmitPr": false,
+    "maxBotReviewRounds": 3,
+    "strength": "explicit"
+   },
+   "moves": [],
+   "number": 1,
+   "priority": "high",
+   "questions": [],
+   "stage": {
+    "acts": [],
+    "state": "queued"
+   },
+   "status": "todo",
+   "title": "Issue 1"
   },
-  {
-    "at": 1794500180000,
-    "checks": [],
-    "id": "w3",
-    "outcome": "completed",
-    "questions": [],
-    "runs": 1,
-    "summary": "Done; conflicts",
-    "type": "sessionReported"
-  },
-  {
-    "answer": {
-      "conclusion": "It is 42.",
-      "evidence": [
-        "a.ts:1"
-      ],
-      "next": [
-        "ship"
-      ],
-      "unsure": []
-    },
-    "at": 1794500240000,
-    "checks": [
+  "type": "issueChanged"
+ },
+ {
+  "at": 1794500000000,
+  "issue": {
+   "assignments": [
+    {
+     "agent": "lab",
+     "assignedAt": 1794499880000,
+     "executions": [
       {
-        "criterion": 0,
-        "proof": "ran it",
-        "result": "met"
+       "kind": "worker",
+       "session": "w2",
+       "startedAt": 1794500000000
       }
-    ],
-    "id": "w4",
-    "outcome": "completed",
-    "questions": [],
-    "runs": 2,
-    "spent": {
-      "cny": 0.37,
-      "tokens": 1200
-    },
-    "summary": "Found it",
-    "type": "sessionReported"
+     ],
+     "id": "a2",
+     "issue": "i2"
+    }
+   ],
+   "blockedBy": [],
+   "checks": [],
+   "createdAt": 1794495560000,
+   "criteria": [],
+   "deliver": "change",
+   "description": "",
+   "findings": [],
+   "id": "i2",
+   "mandate": {
+    "autoSubmitPr": false,
+    "maxBotReviewRounds": 3,
+    "strength": "explicit"
+   },
+   "moves": [],
+   "number": 2,
+   "priority": "medium",
+   "questions": [
+    {
+     "options": [
+      "8080",
+      "9090"
+     ],
+     "question": "Which port?"
+    }
+   ],
+   "stage": {
+    "acts": [],
+    "state": "queued"
+   },
+   "status": "todo",
+   "title": "Issue 2"
   },
-  {
-    "at": 1794500300000,
-    "checks": [],
-    "id": "w6",
-    "outcome": "failed",
-    "questions": [],
-    "runs": 1,
-    "summary": "Build broke",
-    "type": "sessionReported"
-  }
+  "type": "issueChanged"
+ },
+ {
+  "at": 1794500000000,
+  "issue": {
+   "assignments": [
+    {
+     "agent": "lab",
+     "assignedAt": 1794499820000,
+     "executions": [
+      {
+       "kind": "worker",
+       "session": "w3",
+       "startedAt": 1794500000000
+      }
+     ],
+     "id": "a3",
+     "issue": "i3"
+    }
+   ],
+   "blockedBy": [],
+   "checks": [],
+   "conflict": {
+    "base": "main",
+    "files": [
+     "a.ts"
+    ]
+   },
+   "createdAt": 1794493340000,
+   "criteria": [],
+   "deliver": "change",
+   "description": "",
+   "findings": [],
+   "id": "i3",
+   "mandate": {
+    "autoSubmitPr": false,
+    "maxBotReviewRounds": 3,
+    "strength": "explicit"
+   },
+   "moves": [],
+   "number": 3,
+   "priority": "high",
+   "questions": [],
+   "stage": {
+    "acts": [],
+    "state": "queued"
+   },
+   "status": "todo",
+   "title": "Issue 3"
+  },
+  "type": "issueChanged"
+ },
+ {
+  "at": 1794500000000,
+  "issue": {
+   "assignments": [
+    {
+     "agent": "lab",
+     "assignedAt": 1794499760000,
+     "executions": [
+      {
+       "kind": "worker",
+       "session": "w4",
+       "startedAt": 1794500000000
+      }
+     ],
+     "id": "a4",
+     "issue": "i4"
+    }
+   ],
+   "blockedBy": [],
+   "checks": [],
+   "createdAt": 1794491120000,
+   "criteria": [],
+   "deliver": "answer",
+   "description": "",
+   "findings": [],
+   "id": "i4",
+   "mandate": {
+    "autoSubmitPr": false,
+    "maxBotReviewRounds": 3,
+    "strength": "explicit"
+   },
+   "moves": [],
+   "number": 4,
+   "priority": "medium",
+   "questions": [],
+   "stage": {
+    "acts": [],
+    "state": "queued"
+   },
+   "status": "todo",
+   "title": "Issue 4"
+  },
+  "type": "issueChanged"
+ },
+ {
+  "at": 1794500000000,
+  "issue": {
+   "assignments": [
+    {
+     "agent": "lab",
+     "assignedAt": 1794499700000,
+     "executions": [
+      {
+       "kind": "worker",
+       "session": "w5",
+       "startedAt": 1794500000000
+      }
+     ],
+     "id": "a5",
+     "issue": "i5"
+    }
+   ],
+   "blockedBy": [],
+   "checks": [],
+   "createdAt": 1794488900000,
+   "criteria": [],
+   "deliver": "change",
+   "description": "",
+   "findings": [],
+   "id": "i5",
+   "mandate": {
+    "autoSubmitPr": false,
+    "maxBotReviewRounds": 3,
+    "strength": "explicit"
+   },
+   "moves": [],
+   "number": 5,
+   "priority": "high",
+   "questions": [],
+   "repo": "demo",
+   "stage": {
+    "acts": [],
+    "state": "queued"
+   },
+   "status": "todo",
+   "title": "Issue 5"
+  },
+  "type": "issueChanged"
+ },
+ {
+  "at": 1794500000000,
+  "issue": {
+   "assignments": [
+    {
+     "agent": "lab",
+     "assignedAt": 1794499640000,
+     "executions": [
+      {
+       "kind": "worker",
+       "session": "w6",
+       "startedAt": 1794500000000
+      }
+     ],
+     "id": "a6",
+     "issue": "i6"
+    }
+   ],
+   "blockedBy": [],
+   "checks": [],
+   "constraints": {
+    "acceptance": true,
+    "check": "sh check.sh",
+    "scope": [
+     "check.sh"
+    ]
+   },
+   "createdAt": 1794486680000,
+   "criteria": [],
+   "deliver": "change",
+   "description": "",
+   "findings": [],
+   "id": "i6",
+   "mandate": {
+    "autoSubmitPr": false,
+    "maxBotReviewRounds": 3,
+    "strength": "explicit"
+   },
+   "moves": [],
+   "number": 6,
+   "priority": "medium",
+   "questions": [],
+   "stage": {
+    "acts": [],
+    "state": "queued"
+   },
+   "status": "todo",
+   "title": "Issue 6"
+  },
+  "type": "issueChanged"
+ },
+ {
+  "at": 1794500000000,
+  "issue": {
+   "assignments": [
+    {
+     "agent": "lab",
+     "assignedAt": 1794499580000,
+     "executions": [],
+     "id": "a7",
+     "issue": "i7"
+    }
+   ],
+   "blockedBy": [],
+   "checks": [],
+   "createdAt": 1794484460000,
+   "criteria": [],
+   "deliver": "change",
+   "description": "",
+   "findings": [],
+   "id": "i7",
+   "mandate": {
+    "autoSubmitPr": false,
+    "maxBotReviewRounds": 3,
+    "strength": "explicit"
+   },
+   "moves": [],
+   "number": 7,
+   "priority": "high",
+   "questions": [],
+   "rank": 1024,
+   "stage": {
+    "acts": [],
+    "state": "draft"
+   },
+   "status": "backlog",
+   "title": "Issue 7"
+  },
+  "type": "issueChanged"
+ },
+ {
+  "at": 1794500000000,
+  "issue": {
+   "assignments": [
+    {
+     "agent": "lab",
+     "assignedAt": 1794499520000,
+     "executions": [],
+     "id": "a8",
+     "issue": "i8"
+    }
+   ],
+   "blockedBy": [],
+   "checks": [],
+   "createdAt": 1794482240000,
+   "criteria": [],
+   "deliver": "change",
+   "description": "",
+   "findings": [],
+   "id": "i8",
+   "mandate": {
+    "autoSubmitPr": false,
+    "maxBotReviewRounds": 3,
+    "strength": "explicit"
+   },
+   "moves": [],
+   "number": 8,
+   "priority": "medium",
+   "questions": [],
+   "queuedAt": 1794500000000,
+   "stage": {
+    "acts": [],
+    "state": "queued"
+   },
+   "status": "todo",
+   "title": "Issue 8"
+  },
+  "type": "issueChanged"
+ },
+ {
+  "at": 1794500000000,
+  "issue": {
+   "assignments": [
+    {
+     "agent": "lab",
+     "assignedAt": 1794499460000,
+     "executions": [],
+     "id": "a9",
+     "issue": "i9"
+    }
+   ],
+   "blockedBy": [],
+   "checks": [],
+   "closedAt": 1794500000000,
+   "createdAt": 1794480020000,
+   "criteria": [],
+   "deliver": "change",
+   "delivered": "merged",
+   "description": "",
+   "findings": [],
+   "id": "i9",
+   "mandate": {
+    "autoSubmitPr": false,
+    "maxBotReviewRounds": 3,
+    "strength": "explicit"
+   },
+   "moves": [],
+   "number": 9,
+   "priority": "high",
+   "questions": [],
+   "stage": {
+    "acts": [],
+    "state": "done"
+   },
+   "status": "done",
+   "title": "Issue 9"
+  },
+  "type": "issueChanged"
+ },
+ {
+  "at": 1794500000000,
+  "issue": {
+   "assignments": [
+    {
+     "agent": "lab",
+     "assignedAt": 1794499400000,
+     "executions": [],
+     "id": "a10",
+     "issue": "i10"
+    }
+   ],
+   "blockedBy": [],
+   "canceled": "dismissed",
+   "checks": [],
+   "closedAt": 1794500000000,
+   "createdAt": 1794477800000,
+   "criteria": [],
+   "deliver": "change",
+   "description": "",
+   "findings": [],
+   "id": "i10",
+   "mandate": {
+    "autoSubmitPr": false,
+    "maxBotReviewRounds": 3,
+    "strength": "explicit"
+   },
+   "moves": [],
+   "number": 10,
+   "priority": "medium",
+   "questions": [],
+   "stage": {
+    "acts": [],
+    "state": "canceled"
+   },
+   "status": "canceled",
+   "title": "Issue 10"
+  },
+  "type": "issueChanged"
+ },
+ {
+  "at": 1794500000000,
+  "issue": {
+   "assignments": [
+    {
+     "agent": "lab",
+     "assignedAt": 1794499340000,
+     "executions": [],
+     "id": "a11",
+     "issue": "i11"
+    }
+   ],
+   "blockedBy": [],
+   "checks": [],
+   "createdAt": 1794475580000,
+   "criteria": [],
+   "deliver": "change",
+   "description": "",
+   "findings": [],
+   "id": "i11",
+   "lastRun": {
+    "endedAt": 1794500060000,
+    "outcome": "completed",
+    "startedAt": 1794500000000
+   },
+   "mandate": {
+    "autoSubmitPr": false,
+    "maxBotReviewRounds": 3,
+    "strength": "explicit"
+   },
+   "moves": [],
+   "number": 11,
+   "priority": "high",
+   "questions": [],
+   "stage": {
+    "acts": [],
+    "state": "queued"
+   },
+   "status": "todo",
+   "title": "Issue 11"
+  },
+  "type": "issueChanged"
+ },
+ {
+  "at": 1794500120000,
+  "checks": [],
+  "id": "w2",
+  "outcome": "completed",
+  "questions": [
+   {
+    "options": [
+     "8080",
+     "9090"
+    ],
+    "question": "Which port?"
+   }
+  ],
+  "runs": 1,
+  "summary": "Asked about the port",
+  "type": "sessionReported"
+ },
+ {
+  "at": 1794500180000,
+  "checks": [],
+  "id": "w3",
+  "outcome": "completed",
+  "questions": [],
+  "runs": 1,
+  "summary": "Done; conflicts",
+  "type": "sessionReported"
+ },
+ {
+  "answer": {
+   "conclusion": "It is 42.",
+   "evidence": [
+    "a.ts:1"
+   ],
+   "next": [
+    "ship"
+   ],
+   "unsure": []
+  },
+  "at": 1794500240000,
+  "checks": [
+   {
+    "criterion": 0,
+    "proof": "ran it",
+    "result": "met"
+   }
+  ],
+  "id": "w4",
+  "outcome": "completed",
+  "questions": [],
+  "runs": 2,
+  "spent": {
+   "cny": 0.37,
+   "tokens": 1200
+  },
+  "summary": "Found it",
+  "type": "sessionReported"
+ },
+ {
+  "at": 1794500300000,
+  "checks": [],
+  "id": "w6",
+  "outcome": "failed",
+  "questions": [],
+  "runs": 1,
+  "summary": "Build broke",
+  "type": "sessionReported"
+ }
 ]

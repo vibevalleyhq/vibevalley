@@ -27,8 +27,6 @@
     "collapseAllTooltip": "Collapse all repositories and worktrees",
     "expandCurrent": "Expand current",
     "expandCurrentTooltip": "Expand active repositories and worktrees",
-    "collapseItem": "Collapse {name}",
-    "expandItem": "Expand {name}",
     "newTerminalHere": "New terminal here",
     "newChatHere": "New chat here",
     "chatWaiting": "Waiting for confirmation",

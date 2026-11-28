@@ -69,8 +69,6 @@ pub struct MemorySource {
 #[serde(rename_all = "camelCase")]
 pub struct SpacePaths {
     pub repos: String,
-    /// Named `<repo>.<issue number>`.
-    pub worktrees: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]

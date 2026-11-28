@@ -1,4 +1,4 @@
-import { type NotePresence, userId } from "@vibevalley/protocol";
+import { localUserParticipant, type NotePresence } from "@vibevalley/protocol";
 
 import { tone } from "../../design/tone";
 
@@ -41,7 +41,7 @@ function resolveHighlightColor(raw: string | undefined): string {
 export function presenceHighlightCommand(peers: readonly NotePresence[], opts?: { readonly path?: string | undefined }): PresenceHighlightCommand {
   const items: PresenceHighlightItem[] = [];
   for (const p of peers) {
-    if (p.id === userId) continue;
+    if (p.id === localUserParticipant) continue;
     if (opts?.path !== undefined && p.path !== undefined && p.path !== opts.path) continue;
     const hasSelector = typeof p.selector === "string" && p.selector.length > 0;
     const hasPoint = typeof p.x === "number" && typeof p.y === "number";

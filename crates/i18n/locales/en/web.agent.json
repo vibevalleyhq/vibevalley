@@ -76,8 +76,6 @@
   "workdir": "Default repo",
   "workdirTip": "A folder under the projects root (VIBEVALLEY_WORK_ROOT). Used when the assistant sends work without naming a repo; when empty, the repo must be named.",
   "workdirHint": "such as clock-in",
-  "worktree": "A git worktree for each helper",
-  "worktreeHint": "Each helper changes its own branch, so helpers do not overwrite each other; completing merges it into the repo. Off, it changes the repo directly, with no branch to merge.",
   "env": "Environment variables",
   "envHint": "On top of the environment's own variables.",
   "machine": "Environment",

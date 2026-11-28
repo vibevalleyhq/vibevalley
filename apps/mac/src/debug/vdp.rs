@@ -24,8 +24,9 @@ use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio_util::sync::{CancellationToken, DropGuard};
 use vibevalley_protocol::home::{DebugEndpointGuard, write_debug_endpoint};
 use vibevalley_protocol::{
-    SliceKind, VDP_PROTOCOL_VERSION, VdpAckResult, VdpBufferedEvent, VdpCommand, VdpEndpointInfo, VdpError, VdpEvent, VdpLogEntriesResult, VdpNotification,
-    VdpRequest, VdpResponse, VdpScreenshotResult, VdpTarget, VdpTargetAttachResult, VdpTargetListResult, VdpUiInspectAtResult, VdpUiNode, VdpVersionInfo,
+    SliceKind, VDP_PROTOCOL_VERSION, VdpAckResult, VdpBufferedEvent, VdpCommand, VdpEndpointInfo, VdpError, VdpEvent, VdpLayoutNode, VdpLogEntriesResult,
+    VdpNotification, VdpRequest, VdpResponse, VdpScreenshotResult, VdpTarget, VdpTargetAttachResult, VdpTargetListResult, VdpUiBounds, VdpUiDumpLayoutParams,
+    VdpUiDumpLayoutResult, VdpUiInspectAtResult, VdpUiNode, VdpVersionInfo,
 };
 use vibevalley_server::gateway::bridge::{CallerContext, Server as BridgeServer};
 
@@ -47,6 +48,7 @@ const UI_REQUEST_DEFAULT_TIMEOUT: Duration = Duration::from_secs(5);
 
 pub(crate) type HostedViewInspectEntry = (String, f32, f32, Entity<crate::hosted::HostedView>);
 pub(crate) type PrepareInspectReply = (Vec<HostedViewInspectEntry>, Option<VdpUiInspectAtResult>);
+pub(crate) type PrepareLayoutReply = (Vec<HostedViewInspectEntry>, vibevalley_protocol::VdpPageMetrics, Option<String>);
 
 pub(crate) enum GpuiCommand {
     ListTargets {
@@ -57,6 +59,9 @@ pub(crate) enum GpuiCommand {
         x: f32,
         y: f32,
         reply: oneshot::Sender<PrepareInspectReply>,
+    },
+    PrepareDumpLayout {
+        reply: oneshot::Sender<PrepareLayoutReply>,
     },
     Execute {
         command: VdpCommand,
@@ -170,6 +175,55 @@ impl GpuiVdpDispatcher {
         }
         serde_json::to_value(best).map_err(|e| VdpError::internal(e.to_string()))
     }
+
+    async fn dispatch_dump_layout(&self, params: VdpUiDumpLayoutParams, _attached_target: Option<String>) -> Result<Value, VdpError> {
+        let (tx, rx) = oneshot::channel();
+        self.sender()
+            .send(GpuiCommand::PrepareDumpLayout { reply: tx })
+            .map_err(|_| VdpError::unavailable("main window is closed"))?;
+        let (hosted_views, metrics, route) = match tokio::time::timeout(GPUI_DISPATCH_TIMEOUT, rx).await {
+            Ok(Ok(triple)) => triple,
+            Ok(Err(_)) => return Err(VdpError::unavailable("main window closed during layout dump")),
+            Err(_) => return Err(VdpError::timeout("UI.dumpLayout preparation timed out")),
+        };
+
+        let filter_view = params.view.map(|s| s.trim().to_string()).filter(|s| !s.is_empty() && s != "all");
+        let max_depth = params.max_depth.unwrap_or(16);
+        let mut surfaces = Vec::new();
+        for (surface, ox, oy, _hosted) in hosted_views {
+            if let Some(ref want) = filter_view
+                && &surface != want
+            {
+                continue;
+            }
+            if let Ok(val) = self
+                .dispatch_ui(
+                    Some(surface.clone()),
+                    "UI.dumpLayout",
+                    json!({ "maxDepth": max_depth }),
+                    UI_REQUEST_DEFAULT_TIMEOUT,
+                )
+                .await
+                && let Some(raw_root) = val.get("root").cloned()
+                && let Ok(root) = serde_json::from_value::<VdpLayoutNode>(raw_root)
+            {
+                surfaces.push(executor::layout_from_hosted_root(&surface, ox, oy, root));
+            }
+        }
+        serde_json::to_value(VdpUiDumpLayoutResult {
+            viewport: VdpUiBounds {
+                x: 0.0,
+                y: 0.0,
+                width: metrics.width,
+                height: metrics.height,
+            },
+            scale_factor: metrics.scale_factor,
+            theme_dark: metrics.theme_dark,
+            route,
+            surfaces,
+        })
+        .map_err(|e| VdpError::internal(e.to_string()))
+    }
 }
 
 fn parse_slice_kind(name: &str) -> Result<SliceKind, VdpError> {
@@ -233,6 +287,7 @@ impl VdpDispatcher for GpuiVdpDispatcher {
                     let wire_params = serde_json::to_value(&params).unwrap_or_else(|_| json!({}));
                     self.dispatch_ui(view, "UI.getTree", wire_params, UI_REQUEST_DEFAULT_TIMEOUT).await
                 }
+                VdpCommand::UiDumpLayout(params) => self.dispatch_dump_layout(params, attached_target).await,
                 VdpCommand::UiQuery(params) => {
                     let view = effective_ui_view(params.view.clone(), attached_target);
                     let wire_params = serde_json::to_value(&params).unwrap_or_else(|_| json!({}));
@@ -314,6 +369,14 @@ pub(crate) fn spawn_gpui_command_loop(
                     let hosted = s.hosted_view_origins(f32::from(vp.width), f32::from(vp.height), cx);
                     let native = s.inspect_native_at(x, y, f32::from(vp.width), f32::from(vp.height), cx);
                     let _ = reply.send((hosted, native));
+                }
+                GpuiCommand::PrepareDumpLayout { reply } => {
+                    let vp = window.viewport_size();
+                    let metrics = executor::page_metrics(window, cx);
+                    let s = shell.read(cx);
+                    let route = s.chrome.last_route.clone();
+                    let hosted = s.hosted_view_origins(f32::from(vp.width), f32::from(vp.height), cx);
+                    let _ = reply.send((hosted, metrics, route));
                 }
                 GpuiCommand::Execute { command, reply } => {
                     let outcome = execute_on_gpui(&shell, command, window, cx);
@@ -401,6 +464,7 @@ fn execute_on_gpui(shell: &Entity<Shell>, command: VdpCommand, window: &mut gpui
         | VdpCommand::TargetAttach(_)
         | VdpCommand::TargetDetach(_)
         | VdpCommand::UiGetTree(_)
+        | VdpCommand::UiDumpLayout(_)
         | VdpCommand::UiQuery(_)
         | VdpCommand::UiPress(_)
         | VdpCommand::UiWaitFor(_)
@@ -798,7 +862,7 @@ impl VdpServer {
                 shutdown: cancel.clone(),
             });
 
-        let handle = vibevalley_rt::current_or_global_handle();
+        let handle = vibevalley_kit::rt::current_or_global_handle();
         let _entered = handle.enter();
         let listener = tokio::net::TcpListener::from_std(std_listener).map_err(|e| format!("failed to adopt tokio TcpListener: {e}"))?;
         handle.spawn(async move {

@@ -10,7 +10,6 @@ mod issue;
 mod media;
 mod memory;
 mod note;
-mod orchestrator;
 mod provider;
 mod repo;
 mod runtime;
@@ -40,7 +39,6 @@ const ENDPOINT_GROUPS: &[&[Endpoint]] = &[
     note::ENDPOINTS,
     provider::ENDPOINTS,
     setting::ENDPOINTS,
-    orchestrator::ENDPOINTS,
     system::ENDPOINTS,
 ];
 
@@ -93,7 +91,6 @@ pub mod ops {
     pub use super::media::ops::*;
     pub use super::memory::ops::*;
     pub use super::note::ops::*;
-    pub use super::orchestrator::ops::*;
     pub use super::provider::ops::*;
     pub use super::repo::ops::*;
     pub use super::runtime::ops::*;

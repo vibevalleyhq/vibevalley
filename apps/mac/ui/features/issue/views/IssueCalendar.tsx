@@ -1,4 +1,4 @@
-import { computed, Scroll, signal, Text, View, windowSize } from "nsh";
+import { computed, Scroll, signal, Text, untracked, View, windowSize } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import type { BoardSummary, Issue, Priority } from "@vibevalley/protocol";
@@ -65,7 +65,7 @@ export function IssueCalendar(props: {
   const compactHeight = () => windowSize().height < 780;
   const compact = computed(() => props.density === "compact");
   const fields = computed(() => props.fields ?? defaultFields);
-  const initial = monthDateParts(now());
+  const initial = untracked(() => monthDateParts(now()));
   const cursor = signal<{ year: number; month: number }>(initial);
   const expandedDays = signal<ReadonlySet<string>>(new Set());
 
@@ -155,7 +155,7 @@ export function IssueCalendar(props: {
                           style={cell().isWeekend && cell().inMonth ? { backgroundColor: mix("side", 0.45) } : undefined}
                         >
                           {/* Day number + quick create button */}
-                          <View class="flex-row items-center justify-between gap-1">
+                          <View class="relative mb-1 flex-row items-center justify-between gap-1 pr-5">
                             <If
                               when={cell().isToday}
                               else={
@@ -179,7 +179,7 @@ export function IssueCalendar(props: {
                               accessibilityLabel={t("web.issue.calendar.newOnDate", { date: cell().dateKey })}
                               tooltip={<Bubble text={t("web.issue.calendar.newOnDate", { date: cell().dateKey })} />}
                               onPress={() => props.onNew({ startAt: cell().dayMs, dueAt: cell().dayMs })}
-                              class={`size-5 items-center justify-center rounded-sm opacity-0 group-hover:opacity-100 hover:bg-hover focus:opacity-100 ${motionClass(
+                              class={`absolute top-0 right-0 size-5 items-center justify-center rounded-sm opacity-0 group-hover:opacity-100 hover:bg-hover focus:opacity-100 ${motionClass(
                                 "transition-transform duration-120 ease-out",
                               )} active:translate-y-px focus-visible:outline-2 focus-visible:outline-focus`}
                             >

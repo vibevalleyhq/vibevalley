@@ -8,6 +8,7 @@ use axum::extract::{FromRequestParts, Query};
 use axum::http::request::Parts;
 use axum::http::{HeaderMap, Uri};
 use axum::response::Response;
+use vibevalley_kit::net::gateway::remote as kit_remote;
 use vibevalley_protocol::{ApiError, BizCode, Caller, Envelope, SCOPE_REMOTE_MACHINE};
 
 use crate::gateway::api::{CallerContext, CallerPrincipal, ClientIdentity, ClientKind, RemoteDeviceIdentity};
@@ -19,36 +20,20 @@ struct TokenQuery {
     token: Option<String>,
 }
 
+#[cfg(test)]
 pub(super) fn is_loopback(host: &str) -> bool {
-    let Some(rest) = host
-        .strip_prefix("127.0.0.1")
-        .or_else(|| host.strip_prefix("localhost"))
-        .or_else(|| host.strip_prefix("[::1]"))
-    else {
-        return false;
-    };
-    match rest.strip_prefix(':') {
-        None => rest.is_empty(),
-        Some(port) => !port.is_empty() && port.bytes().all(|b| b.is_ascii_digit()),
-    }
+    kit_remote::is_loopback_host(host)
 }
 
 /// Only this machine's own pages and tools.
 pub fn from_the_farm(headers: &HeaderMap) -> bool {
     let header = |name: &str| headers.get(name).and_then(|v| v.to_str().ok());
-    let host = header("host").unwrap_or("");
-    let origin_ok = header("origin").is_none_or(|o| o == format!("http://{host}"));
-    let site_ok = header("sec-fetch-site").is_none_or(|s| s == "same-origin" || s == "none");
-    is_loopback(host) && origin_ok && site_ok
+    kit_remote::is_same_origin_loopback(header("host").unwrap_or(""), header("origin"), header("sec-fetch-site"))
 }
 
 pub(super) fn bearer_token(headers: &HeaderMap) -> Option<&str> {
-    let raw = headers.get("authorization")?.to_str().ok()?.trim();
-    if raw.eq_ignore_ascii_case("bearer") {
-        return Some("");
-    }
-    let (scheme, token) = raw.split_once(char::is_whitespace)?;
-    scheme.eq_ignore_ascii_case("bearer").then(|| token.trim())
+    let raw = headers.get("authorization")?.to_str().ok()?;
+    kit_remote::parse_bearer_header(raw)
 }
 
 fn query_token(uri: &Uri) -> Option<String> {

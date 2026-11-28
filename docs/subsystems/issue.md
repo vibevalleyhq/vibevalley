@@ -1,7 +1,7 @@
 # 工单
 
 一件活从创建到关闭是一张工单（`Issue`）：
-- 代码类工单绑定一条分支与一个 worktree；帮工 `Session` 可换人，工单 ID 不变。
+- `repo` 仅作为给 Agent 的可选上下文提示（可留空用于无目录问答、调研或笔记任务）；服务端彻底退出 Git/Worktree 保姆层，分支隔离、验证与 PR 交付全权交还 Agent 自治，工单只接收并持久化结构化多态交付凭据 `DeliveryReceipt`（`pull_request` / `commit` / `note` / `answer`）。帮工 `Session` 可换人，工单 ID 不变。
 - 工单分**聊清楚**、**安排活**、**完成**三段，在农场里画成一块地。
 
 ## 状态和用语
@@ -14,7 +14,7 @@
 | 展示阶段 | `stage.state` | `draft`、`queued`、`working`、`asking`、`reviewing`、`stuck`、`done`、`canceled` | `issueStageOf` 实时计算 |
 | 受阻原因 | `stage.stuck` | `conflict`、`failed`、`interrupted`、`quiet` | `issueStageOf` 实时计算 |
 | 可执行动作 | `stage.acts`、`lead` | `start`、`answer`、`reject`、`complete`、`acknowledge`、`resolve`、`resume`、`cure`、`tell`、`stop`、`close`、`reopen` | `issueStageOf` 计算，自带点击后发送的请求参数 |
-| 完成交付 | `delivered` | `merged`、`merged_into_parent`、`pull_request`（PR 合入）、`submitted`（提交了 PR/MR）、`kept`、`none` | 完成关单时由服务端判定（[完成和交付](docs/subsystems/issue.md#完成和交付)） |
+| 完成交付 | `delivered`、`deliveryReceipt` | `delivered`: `merged`、`pull_request`、`submitted`、`kept`、`none`；`deliveryReceipt`: `pull_request` / `commit` / `note` / `answer` | 完成关单或帮工通过 `issue_report` / `issue_update` 回写（[完成和交付](docs/subsystems/issue.md#完成和交付)） |
 | 取消原因 | `canceled` | `dismissed`、`lost`（工作目录丢失） | 取消关单时写入 |
 | 单轮结局 | `Run.outcome` | `completed`、`failed`、`interrupted` | 单次 `Run` 结束时写入 |
 | 会话阶段 | `Session.phase` | `working`、`done`、`failed`、`resting`、`closed` | 会话生命周期更新 |
@@ -24,24 +24,23 @@
 | 管 | 不管（谁管） |
 |---|---|
 | 工单模型、状态派生、原生父子依赖（`parent` / `blockedBy`）与合法状态流转 | 会话如何跑一轮、轨迹日志记录（[帮工](docs/subsystems/session.md)） |
-| 起草（`refine`）：派帮工只读看代码生成草稿、写回工单、重置 worktree | worktree 创建、重置与清理实现（[仓库](docs/subsystems/repo.md)） |
+| 起草（`refine`）：派帮工只读看代码或上下文生成草稿并写回工单 | 仓库只读发现与桌面侧栏 Git 状态（[仓库](docs/subsystems/repo.md)） |
 | 派活、排队重试、拆分子工单（`split`）、换人、重开与取消 | 档案选择算法（[档案和农机](docs/subsystems/agent.md#模型和不变量)） |
 | 验收、打回意见、问题清理与验收标准自评（`checks`） | 频道受众计算、环路刹车与持久投递表（[频道](docs/subsystems/channel.md)） |
 | 一件活的路由（[蓄水池和路由](#蓄水池和路由)）：`issue.comment.create`、工单开串与单轮汇报、`issue.report` 补投、按工单异步投递 `Board::tell_message`、派活队列与每张工单的各轮 | 帮工席位清理、删频道守卫与私聊帮工（[帮工](docs/subsystems/session.md)） |
-| 完成与交付：何时完成、按 `deliver` 走哪条路、子工单要过哪些检查；合并、子工单合入父分支，以及工单上记下的冲突与结局 | 农场地块渲染（[农场的皮](docs/subsystems/farm.md)） |
-| 定时任务（[定时任务](#定时任务)）：规格、到期、补跑与用户点头，每个定时任务固定一张工单 | 帮工的工作目录在谁手里、交接时怎么歇下和放走（[帮工](docs/subsystems/session.md)）；git 实现（[仓库](docs/subsystems/repo.md)）；分支发布与 PR 轮询（[PR 与分支发布](docs/subsystems/pull.md)） |
+| 完成与交付：接收并持久化多态 `DeliveryReceipt`、按 `deliver` 校验 PR 凭据、关闭会话与工单 | 农场地块渲染（[农场的皮](docs/subsystems/farm.md)）；分支/`git worktree` 创建、合并与冲突解决（由 Agent 自治） |
+| 定时任务（[定时任务](#定时任务)）：规格、到期、补跑与用户点头，每个定时任务固定一张工单 | 会话生命周期（[帮工](docs/subsystems/session.md)）；本地仓库发现与 diff 查询（[仓库](docs/subsystems/repo.md)）；分支发布与 PR 轮询（[PR 与分支发布](docs/subsystems/pull.md)） |
 
 ## 在哪
 
 | 位置 | 职责 |
 |---|---|
-| `crates/server/src/issue/board.rs` | `Board`：建单、挪状态（`move_to`）、对帮工说话（`tell`）、叫停、排队（`refresh_queue`）、改动（`changes`）、交付（`complete`）与取消；帮工交给 `Sessions`，worktree 与合并交给 `Workplace` |
-| `crates/server/src/issue/edit.rs`、`family.rs`、`refine.rs` | 改字段、删单、验收（`edit`、`remove`、`review`）；拆单与子工单合进父分支（`split`、`join_children`）；起草（`refine`）和读回草稿 |
-| `crates/server/src/game.rs` | 工单板唯一的写入口 `Ledger`：一批事实先在 `server.db` 的事务里存好，再经 `Facts` 折进核心状态；写失败时整批回滚且不修改核心状态；已有工单的变化只能是一个 `IssueChange`（入队、重开、交付、取消、冲突、汇报、起草……），由 `IssueChange::fold` 一处写 |
-| `crates/server/src/runtime/session/engine.rs`、`runs.rs` | 帮工与每一轮：见 [帮工](docs/subsystems/session.md) |
-| `crates/server/src/runtime/worktree/mod.rs`、`check.rs` | worktree、合并、冲突与分支清理；合进主分支前跑 `.vibevalley/check`、子工单合进父分支前跑它的检查，失败给末尾 40 行：见 [仓库](docs/subsystems/repo.md) |
+| `crates/server/src/issue/board.rs` | `Board`：建单、挪状态（`move_to` / `move_with_receipt_async`）、对帮工说话（`tell`）、叫停、排队（`refresh_queue`）、交付收单（`complete_for_issue_async`）与取消；不含任何 `vibevalley_git` 或 worktree 逻辑 |
+| `crates/server/src/issue/edit.rs`、`family.rs`、`refine.rs` | 改字段、删单、验收（`edit`、`remove`、`review`）；纯 DAG 父子拆单（`split`）；起草（`refine`）和读回草稿 |
+| `crates/server/src/service/issue.rs` | 工单持久化与多态 `DeliveryReceipt` 编解码（与 `delivery_evidence` 同列兼容存储，同时支持 SQLite 与 PostgreSQL） |
+| `crates/server/src/runtime/session/engine.rs`、`runs.rs` | 帮工与每一轮（支持 `cwd: Option<PathBuf>` 无目录启动）：见 [帮工](docs/subsystems/session.md) |
 | `crates/core/src/status.rs`、`moves.rs` | 状态派生、展示阶段与可执行动作；合法挪动（`status_move`） |
-| `crates/core/src/deps.rs`、`refine.rs`、`brief.rs`、`pr.rs` | 父子依赖与 DAG、子工单要过的检查；起草的提示与读回；对帮工说的话；PR 的纯规则 |
+| `crates/core/src/deps.rs`、`refine.rs`、`brief.rs`、`pr.rs` | 父子依赖与 DAG；起草的提示与读回；对帮工说的话；PR 的纯规则 |
 | `crates/server/src/issue/mod.rs`、`chat.rs` | `issue.*` 端点（含 `issue.comment.create`）与 `IssueChat`：经异步 `EventBus`（`issue-watch`）开串/续串（`open_threads`、`handed_on`）、单轮贴汇报与 `issue.report` 重放，并按工单串行异步消费 `Chat::dispatches()` 调用 `Board::tell_message` |
 | `crates/server/src/cron/`、`crates/core/src/cron/mod.rs` | 定时任务：增删改与到期（`server.db` 的 `cron` 表，`issue_id references issue(id) on delete set null`，经 `Board::use_cron_of_issue` 投影）；时间规格与 `next_run` |
 
@@ -58,24 +57,22 @@
 - **授权边界 `Mandate`**：工单绑定不可变的 `originTriggerId`，助手建单附言硬限 30 词；仅当 `autoSubmitPr` 为真时允许自动提 PR，`maxBotReviewRounds` 限制自动响应评审轮数。
 - **单轮结局只认结构化 `issue_report`**：帮工通过 `issue_report` 提交状态、问题、`checks`、`answer`、记性与 `prSubmit`，不解析自由正文。
 - **执行情况与生命周期分开**：提问、失败、中断及未明确交回的休息会话保持 `in_progress`，`stage` 提供回答、重试、继续动作；有效交回且没有待答问题才进入 `in_review`。看板、详情与 CLI 都读取同一投影；CLI 的 `issue show --watch` 在提问或受阻阶段也返回，stderr 同时给出生命周期和阶段。
-- **PR 状态轮询与同轮评审归并**：由独立模块 `work/pull` 承担（[PR 与分支发布](docs/subsystems/pull.md)），`pull` / `pull_event` 表记录开放 PR、CI 指纹与同轮机器人评审去重（`bot_round_key`）；状态变为 `merged` 或 `closed` 时通知 `Board::settle_pull` 结清工单。
-- **交付物类型 `deliver` 事先声明**：分 `change`（要求合入）、`pull_request`（提交 PR/MR 即交付）、`branch`（留分支）与只读调研 `answer`；`answer` 单将结论写入 `Issue.answer`，完成后重置 worktree 并记 `delivered: none`。
-- **原生父子工单与 DAG 依赖**：通过 `parent` 与 `blockedBy` 表达归属与前置依赖。子工单从父分支 `vibevalley/issue-<父编号>` 切出 worktree，完成后合入父分支。
-- **验收子工单先判红并冻结文件**：标记 `constraints.acceptance` 的子工单应先证明检查失败，合入父分支时将其改动文件记为 `frozen`；后继子工单不得修改冻结文件，且末端须通过全部祖先验收命令。
+- **PR 状态轮询与同轮评审归并**：由独立模块 `issue/pull` 承担（[PR 与分支发布](docs/subsystems/pull.md)），`pull` 表及 `pull.known_events` JSON 列记录开放 PR、CI 指纹与同轮机器人评审去重（`bot_round_key`）；状态变为 `merged` 或 `closed` 时自动清空 `known_events` 并通知 `Board::settle_pull_async` 结清工单。
+- **交付物类型 `deliver` 与多态交付凭据 `DeliveryReceipt`**：`deliver` 声明期望交付形态（`change`、`pull_request`、`branch`、`answer`）；帮工可在 `issue_report` / `issue_update` 中回写多态 `DeliveryReceipt`（`pull_request { url, number, branch, summary }`、`commit { sha, branch, summary }`、`note { note_id, title, summary }`、`answer { summary }`），用户关单（`issue.status.update` → `done`）时亦可补充或覆盖凭据。
+- **原生父子工单与纯 DAG 依赖**：通过 `parent` 与 `blockedBy` 表达任务拆解与前置依赖阻塞，允许无仓库工单拆单；服务端不做父子分支自动合并或文件冻结，各子工单由执行会话自治交付各自凭据。
 - **已完成只由用户点头**：单轮 `completed` 只进 `in_review`，助手或自动审查 `issue_review` 通过只记 `reviewedAt`；最后一轮为 `failed` 时禁止挪到 `done`。
-- **多帮工只读协同与单写者交接（Hoe Handoff）**：
-  - **自动审查（`in_review`）**：非自研或非自查工单进入 `in_review`（`reviewedAt` 为空且未暂停）时，若存在已启用的 `reviewer` 档案且 `mandate.maxBotReviewRounds` 仍有额度，自动以只读模式（`RunMode::ReadOnlyReview`、`PermissionMode::Plan`、屏蔽写工具）派发审查会话；审查员仅可读取工单与改动（`issue_diff_get`）并调用 `issue_review` 通过或附 `findings` 打回，不可修改代码，不写 `assignments`；轮次状态持久化在 `durable_document("issue", id, "auto_review")`。
-  - **工单串 `@<agent>` 只读协同**：工单讨论消息解析 `@<agent>`（忽略邮箱/代码块内符号），将匹配的非主执行档案以只读协同会话（`RunMode::ReadOnlyCollaborator`）接入同一工作区检查并回贴汇报，不唤醒、不打断也不抢占主执行会话与串主权。
-  - **单写锁交接（Hoe Handoff）**：同一本地或远端 worktree（`WorktreeKey`）同一时刻只允许一个写会话持有写入租约（`HoeRegistry`）；换人或交接时先序列化提交（`HandoffCleanup::Commit`）或暂存（`HandoffCleanup::Stash`）未提交改动，再干净释放并移交写所有权。
+- **多帮工只读协同**：
+  - **自动审查（`in_review`）**：非自研或非自查工单进入 `in_review`（`reviewedAt` 为空且未暂停）时，若存在已启用的 `reviewer` 档案且 `mandate.maxBotReviewRounds` 仍有额度，自动以只读模式（`RunMode::ReadOnlyReview`、`PermissionMode::Plan`、屏蔽写工具）派发审查会话；审查员仅可读取工单与改动（`issue_diff_get`）并调用 `issue_review` 通过或附 `findings` 打回，不可修改代码，不写 `assignments`；轮次状态持久化在 `issue.auto_review` 列。
+  - **工单串 `@<agent>` 只读协同**：工单讨论消息解析 `@<agent>`（忽略邮箱/代码块内符号），将匹配的非主执行档案以只读协同会话（`RunMode::ReadOnlyCollaborator`）接入同一上下文检查并回贴汇报，不唤醒、不打断也不抢占主执行会话与串主权。
 
 ## 怎么走
 
 **起草（`issue.refine`）**
 
 1. 用户对 `backlog` 工单发一句话，服务端按当前指派、仓库历史或 `chooseAgent` 选定帮工档案。
-2. 将用户输入写入同一工单串；最近 40 条讨论（最多 24,000 字符）、当前正文、验收标准及问题一起交给 `refining` 会话。有仓库用专属 worktree；没有仓库或档案目录时用隔离的上下文目录，不创建仓库，不进 `issue_assignment_execution`。
-3. 帮工返回草稿 JSON 块与问题；服务端解析写回工单，并在工单串展示整理后的需求。结束起草会话；有 worktree 时重置回主分支，无仓库的上下文目录只在没有文件时删除。
-4. 用户确认派发时，当前正文和验收标准进入执行说明。执行后不能直接编辑正文、验收条件、仓库或帮工；标题、优先级和交付方式只是标签，关单前都能改；补充与退回意见进入同一工单串，不静默替换目标。
+2. 将用户输入写入同一工单串；最近 40 条讨论（最多 24,000 字符）、当前正文、验收标准及问题一起交给 `refining` 会话。若工单带本地仓库提示则以该目录作为只读上下文，否则以无目录模式启动，不创建 worktree，不进 `issue_assignment_execution`。
+3. 帮工返回草稿 JSON 块与问题；服务端解析写回工单，并在工单串展示整理后的需求，随后关闭起草会话。
+4. 用户确认派发时，当前正文和验收标准进入执行说明。执行后不能直接编辑正文、验收条件、仓库或帮工；标题、优先级、交付方式与 `deliveryReceipt` 关单前都能改；补充与退回意见进入同一工单串，不静默替换目标。
 
 **派活与排队（`issue.status.update` → `todo`）**
 
@@ -85,27 +82,18 @@
 
 ### 完成和交付
 
-用户将工单挪到 `done` 时，服务端按 `deliver` 与分支状态判定交付：
+用户将工单挪到 `done` 时，服务端只记录最终多态 `DeliveryReceipt` 与 `delivered` 标记并关闭活跃会话，不再执行服务端本地合并或 worktree 清理：
 
-1. **无代码改动（`none`）**：助手工单、`deliver: answer` 或分支无新提交时，直接记 `delivered: none` 并关闭会话。
-2. **保留分支（`kept`）**：`deliver: branch` 且有提交时，保留分支并关闭会话，记 `delivered: kept`；工作树里未提交的改动不代提交。
-3. **提交 PR/MR（`pull_request`）**：已有开放或已合入的结构化关联（`Issue.pull_request`，由用户经 `repo.pr.submit` 或帮工在获授权时经 `issue_pr_submit` 发布，见 [PR 与分支发布](docs/subsystems/pull.md)）时即可完成，记 `delivered: submitted`，不本地合并，保留未合入分支及未提交改动；尚未关联 PR/MR 时挪到完成会被拒绝（`server.issue.deliveryNeedsPr`）。远端状态变化只更新关联，不代替验收。
-4. **要求合入（`change`）**：
-   - 普通工单提交剩余改动，按[本地合并](docs/subsystems/repo.md)交付。预检冲突时保存 `Issue.conflict` 并留在 `in_review`。候选检查失败时保留工单，按会话余量交回帮工修复。工单详情展开最近一次失败检查的命令、受检提交和输出。发生冲突时，用户可从详情或审查对话框打开该工单工作目录中的冲突文件。成功合入记 `merged`。
-   - 子工单使用父分支和自身的验收命令，合入父分支记 `merged_into_parent`。
-5. **要求合入的 PR 轮询结清**：`work/pull` 每 `github.pr_poll_seconds` 秒轮询 `pull` 表中的开放 PR；合并或关闭时调用 `Board::settle_pull` 结清关联工单（[PR 与分支发布](docs/subsystems/pull.md)）。
+1. **多态凭据归档**：合并本次请求附带的 `deliveryReceipt` 与工单上已有的 `deliveryReceipt`；`commit` 凭据同步写入 `delivery_evidence.merged_commit`。
+2. **PR 交付校验（`deliver: pull_request`）**：已派发且 `deliver: pull_request` 的工单，需具备 `Issue.pull_request` 或 `DeliveryReceipt::PullRequest` 方可完成；未提供时返回 `server.issue.deliveryNeedsPr`。
+3. **交付落点（`delivered`）**：根据凭据类型与 PR 状态自动落为 `pull_request` / `submitted` / `merged` / `kept` / `none`，并在同一流程中以 `SessionClose::Completed` 关闭在场帮工会话。
+4. **PR 轮询结清**：`issue/pull` 每 `github.pr_poll_seconds` 秒轮询开放 PR；合并或关闭时调用 `Board::settle_pull` 结清关联工单并补全 `DeliveryReceipt::PullRequest`（[PR 与分支发布](docs/subsystems/pull.md)）。
 
-交付由 `Board` 在工单的锁里做：帮工在场时等它歇下，跑检查与合并，冲突和子工单冻结的文件直接写在工单上；失败时帮工留着，工单记下冲突、把要改的话带给帮工。子工单的检查由 `worktree/check.rs` 跑：验收子工单的检查要先失败、它改的文件冻结；其余的检查要过、冻结的文件不许动；然后合进父工单的分支。
-
-本地改动的审查通过时，工单保存时间、改动的基线提交和文件树，见 [仓库](docs/subsystems/repo.md)。审查窗口在完成前提交所见版本。若文件已变，窗口展示新增改动，用户可再次审查。CLI 也可把 `issue diff --json` 的 `revision.baseCommit` 和 `revision.tree` 分别传给 `issue review --pass --base-commit … --tree …`。
-
-本地交付把检查回执先写入 SQLite，再推进 Git 引用。回执记录目标分支和提交、工单文件树、候选提交和文件树，以及检查是否配置、是否通过和失败输出。工单完成时保存最终提交。若 Git 已接受候选而进程在结算前中断，服务重开时核对目标分支是否包含候选提交，再确认源目录没有新增改动。两项吻合时，服务认领原提交并完成结算。
-
-**跟 PR**：由独立模块 `work/pull` 承担（`refresh`、`poll`、`snapshot`，见[PR 与分支发布](docs/subsystems/pull.md)）。
+**跟 PR**：由独立模块 `issue/pull` 承担（`refresh`、`poll`、`snapshot`，见[PR 与分支发布](docs/subsystems/pull.md)）。
 
 ### 蓄水池和路由
 
-Rust 版由频道的纯策略（`channel/dispatch.rs`）在写消息时同步落盘 `channel_delivery`，`IssueChat`（`issue/chat.rs`）按工单独立异步消费 `Issue` 与唤醒的 `Session` 投递，连同该会话早前待发消息经 `Board::tell_message` 交给工单的帮工（干活中插进这一轮，歇着就开下一轮；排队中随工单一起交出），成功后结算投递并记 `mark_seen` + 👀。定时任务到期时由 `work/cron` 准备它固定的那张工单并 `tell`。
+Rust 版由频道的纯策略（`channel/dispatch.rs`）在写消息时同步落盘 `channel_delivery`，L4 编排层的 `IssueChat`（`crates/server/src/orchestration/issue_chat.rs`）按工单独立异步消费 `Issue` 与唤醒的 `Session` 投递，连同该会话早前待发消息经 `Board::tell_message` 交给工单的帮工（干活中插进这一轮，歇着就开下一轮；排队中随工单一起交出），成功后结算投递并记 `mark_seen` + 👀。定时任务到期时由 `orchestration/cron.rs` 准备它固定的那张工单并 `tell`。
 
 ### 详情与讨论
 
@@ -126,17 +114,16 @@ PR/MR 创建或更新后在串内记录真实链接；关联保存在 Issue，�
 
 ## 和谁打交道
 
-- **帮工（oar 和档案）**：`Sessions` 经 `Drivers`（`crates/server/src/runtime/session/driver.rs`，服务端给的是 `crates/server/src/agent/profile/drive.rs`）把指派的档案变成农机和参数，在 worktree 里跑一轮；轨迹由 `crates/server/src/runtime/session/journal.rs` 记。
+- **帮工（oar 和档案）**：`Runtime` 经 `SessionDriver`（`crates/server/src/runtime/session/driver.rs`，服务端给的是 `crates/server/src/agent/drive.rs`）把指派的档案变成农机和参数，在可选 `cwd`（或无目录模式）里跑一轮；轨迹由 `crates/server/src/runtime/session/journal.rs` 记。
 - **频道、助手、工具**：`IssueChat` 订阅频道的 `Chat::dispatches()` 与 `Hub` 的异步 `EventBus`（`issue-watch`）维护工单串、汇报与 `Board::tell_message` 投递；助手和帮工的工单工具在 `crates/server/src/agent/tool/issue.rs`。
-- **仓库（`vibevalley-git`）**：改动、冲突预检、合并、分支。
+- **仓库（`crates/server/src/repo/`）**：仅用于可选仓库提示解析与按需只读 diff 查询；`crates/server/src/issue/**` 与 `crates/server/src/runtime/**` 零 `vibevalley_git` 依赖。
 
 ## 为什么这样
 
-- **工单是核心实体，帮工挂在工单下**：重开或换人复用同一工单 ID、同一分支与同一工单串，历史不散落。
-- **大活拆成原生父子工单，不设独立的计划服务**：子工单直接复用普通工单的看板、提问与修复动作，通过检查后合入父分支，省去平行的计划服务、表和面板。
-- **验收子工单只冻结自身改动文件，违规直接退回**：冻结整个测试目录会阻碍后续步骤新增测试，悄悄恢复文件会让帮工莫名编译失败；显式退回并仅在依赖链末端跑全量祖先验收，兼顾防作弊与效率。
+- **控制面退出 Git/Worktree 保姆层，Agent 全权自治**：服务端不再替 Agent 创建/清理 worktree 或自动合并分支，消除跨机器/容器状态漂移，同时原生支撑无仓库、无目录的调研、笔记与守护任务；工单只收敛结构化多态 `DeliveryReceipt`。
+- **大活拆成原生父子工单，不设独立的计划服务**：子工单直接复用普通工单的看板、提问与 DAG 阻塞，省去平行的计划服务、表和面板。
 - **状态只存用户意图，展示阶段与按钮由纯函数派生**：`in_progress`、`in_review`、`stage` 和 `acts` 实时算出，帮工崩溃不会导致库状态卡死。
-- **完成结论与交付去向解耦**：将 `done`/`canceled` 与 `delivered` 分为两个正交字段，使调研结论单、留分支单和合并单共用一套状态机。
+- **完成结论与交付凭据解耦**：将 `done`/`canceled` 与 `delivered` / `deliveryReceipt` 分离，使 PR、本地提交、笔记与调研结论共用一套状态机。
 
 ## 还没做的
 

@@ -302,7 +302,7 @@
    "title": "Fix bug",
    "runtime": "claude",
    "status": "working",
-   "worktree": "/tmp/vv-work/worktrees/demo.42",
+   "cwd": "/tmp/vv-work/worktrees/demo.42",
    "kind": "issue_session"
   },
   {

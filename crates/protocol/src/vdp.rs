@@ -587,6 +587,51 @@ pub struct VdpUiGetTreeParams {
 #[skip_serializing_none]
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct VdpUiDumpLayoutParams {
+    #[serde(default)]
+    pub view: Option<String>,
+    #[serde(default)]
+    pub max_depth: Option<u32>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VdpLayoutNode {
+    pub id: String,
+    pub role: String,
+    #[serde(default)]
+    pub surface: Option<String>,
+    #[serde(default)]
+    pub text: Option<String>,
+    #[serde(default)]
+    pub bounds: Option<VdpUiBounds>,
+    #[serde(default)]
+    pub local_bounds: Option<VdpUiBounds>,
+    #[serde(default)]
+    pub line_count: Option<u32>,
+    #[serde(default)]
+    pub focused: Option<bool>,
+    pub pressable: bool,
+    #[serde(default)]
+    pub children: Option<Vec<VdpLayoutNode>>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VdpUiDumpLayoutResult {
+    pub viewport: VdpUiBounds,
+    pub scale_factor: f32,
+    pub theme_dark: bool,
+    #[serde(default)]
+    pub route: Option<String>,
+    pub surfaces: Vec<VdpLayoutNode>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct VdpUiQueryParams {
     #[serde(default)]
     pub test_id: Option<String>,
@@ -621,7 +666,7 @@ pub struct VdpUiWaitForParams {
     pub timeout_ms: Option<u64>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct VdpUiBounds {
     pub x: f32,
@@ -809,6 +854,7 @@ pub enum VdpCommand {
     InputTypeText(VdpTypeTextParams),
     InputDispatchMouse(VdpDispatchMouseParams),
     UiGetTree(VdpUiGetTreeParams),
+    UiDumpLayout(VdpUiDumpLayoutParams),
     UiQuery(VdpUiQueryParams),
     UiPress(VdpUiPressParams),
     UiWaitFor(VdpUiWaitForParams),
@@ -848,6 +894,7 @@ impl VdpCommand {
         "Input.typeText",
         "Input.dispatchMouse",
         "UI.getTree",
+        "UI.dumpLayout",
         "UI.query",
         "UI.press",
         "UI.waitFor",
@@ -887,6 +934,7 @@ impl VdpCommand {
             VdpCommand::InputTypeText(_) => "Input.typeText",
             VdpCommand::InputDispatchMouse(_) => "Input.dispatchMouse",
             VdpCommand::UiGetTree(_) => "UI.getTree",
+            VdpCommand::UiDumpLayout(_) => "UI.dumpLayout",
             VdpCommand::UiQuery(_) => "UI.query",
             VdpCommand::UiPress(_) => "UI.press",
             VdpCommand::UiWaitFor(_) => "UI.waitFor",
@@ -929,6 +977,7 @@ impl VdpCommand {
             VdpCommand::InputTypeText(p) => serde_json::to_value(p).expect("serialize VdpTypeTextParams"),
             VdpCommand::InputDispatchMouse(p) => serde_json::to_value(p).expect("serialize VdpDispatchMouseParams"),
             VdpCommand::UiGetTree(p) => serde_json::to_value(p).expect("serialize VdpUiGetTreeParams"),
+            VdpCommand::UiDumpLayout(p) => serde_json::to_value(p).expect("serialize VdpUiDumpLayoutParams"),
             VdpCommand::UiQuery(p) => serde_json::to_value(p).expect("serialize VdpUiQueryParams"),
             VdpCommand::UiPress(p) => serde_json::to_value(p).expect("serialize VdpUiPressParams"),
             VdpCommand::UiWaitFor(p) => serde_json::to_value(p).expect("serialize VdpUiWaitForParams"),
@@ -979,6 +1028,7 @@ impl VdpCommand {
             "Input.typeText" => decode(method, params).map(VdpCommand::InputTypeText),
             "Input.dispatchMouse" => decode(method, params).map(VdpCommand::InputDispatchMouse),
             "UI.getTree" => decode(method, optional_object(params)).map(VdpCommand::UiGetTree),
+            "UI.dumpLayout" => decode(method, optional_object(params)).map(VdpCommand::UiDumpLayout),
             "UI.query" => decode(method, optional_object(params)).map(VdpCommand::UiQuery),
             "UI.press" => decode(method, params).map(VdpCommand::UiPress),
             "UI.waitFor" => decode(method, optional_object(params)).map(VdpCommand::UiWaitFor),
@@ -1288,6 +1338,13 @@ mod tests {
                 json!({ "view": "workbench", "maxDepth": 4 }),
             ),
             (
+                VdpCommand::UiDumpLayout(VdpUiDumpLayoutParams {
+                    view: Some("workbench".into()),
+                    max_depth: Some(12),
+                }),
+                json!({ "view": "workbench", "maxDepth": 12 }),
+            ),
+            (
                 VdpCommand::UiQuery(VdpUiQueryParams {
                     test_id: Some("nav-library".into()),
                     text: Some("Library".into()),
@@ -1402,6 +1459,7 @@ mod tests {
             "Shell.setDioramaClock",
             "Page.captureScreenshot",
             "UI.getTree",
+            "UI.dumpLayout",
             "UI.query",
             "UI.waitFor",
             "UI.highlight",

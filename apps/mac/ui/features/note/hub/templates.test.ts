@@ -13,10 +13,10 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
-test("content templates expose 65 unique entries covering all 3+1 note primitives", () => {
-  expect(CONTENT_TEMPLATES.length).toBe(65);
-  expect(new Set(CONTENT_TEMPLATES.map((t) => t.id)).size).toBe(65);
-  expect(new Set(CONTENT_TEMPLATES.map((t) => t.key)).size).toBe(65);
+test("content templates expose 66 unique entries covering all 3+1 note primitives", () => {
+  expect(CONTENT_TEMPLATES.length).toBe(66);
+  expect(new Set(CONTENT_TEMPLATES.map((t) => t.id)).size).toBe(66);
+  expect(new Set(CONTENT_TEMPLATES.map((t) => t.key)).size).toBe(66);
 
   const coveredTypes = new Set<NoteType>();
   for (const tpl of CONTENT_TEMPLATES) {
@@ -118,10 +118,12 @@ test("templateMatchesQuery matches R&D keywords, note badges, and localized titl
   expect(matchesFor("时序")).toContain("tpl-diag-sequence");
   expect(matchesFor("番茄钟")).toContain("tpl-proto-focus-studio");
   expect(matchesFor("合成器")).toContain("tpl-proto-synth-pad");
+  expect(matchesFor("走查")).toContain("tpl-sheet-ui-review");
 
   setLocale("en");
   expect(matchesFor("Runbook")).toContain("tpl-doc-runbook");
   expect(matchesFor("Event Storming")).toContain("tpl-wb-event-storming");
   expect(matchesFor("Focus")).toContain("tpl-proto-focus-studio");
   expect(matchesFor("Flow Field")).toContain("tpl-proto-particle-lab");
+  expect(matchesFor("Checklist")).toContain("tpl-sheet-ui-review");
 });

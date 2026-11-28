@@ -36,11 +36,6 @@ impl RunMode {
         matches!(self, Self::Drafting | Self::ReadOnlyAnswer | Self::ReadOnlyReview | Self::ReadOnlyCollaborator)
     }
 
-    /// Returns `true` when this mode may mutate the worktree and must hold the single-writer hoe lock.
-    pub fn needs_write_lock(self) -> bool {
-        self == Self::Execution
-    }
-
     pub fn as_doc_tag(self) -> Option<&'static str> {
         match self {
             Self::ReadOnlyReview => Some("review"),
@@ -207,8 +202,6 @@ pub trait SessionDriver: Send + Sync {
 /// Where a helper works an issue, for its rules.
 pub struct HelperPlace {
     pub repo: String,
-    /// None: the repo's own folder, no branch of its own.
-    pub branch: Option<String>,
     pub cwd: String,
     /// The helper's own id (`@w3`).
     pub id: String,

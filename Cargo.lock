@@ -219,6 +219,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "alacritty_terminal"
+version = "0.26.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bda177466b9524d59f1b12f0dd30b68696788e9992a7e959021c4a0ed96fcf59"
+dependencies = [
+ "base64 0.22.1",
+ "bitflags 2.13.2",
+ "home",
+ "libc",
+ "log",
+ "miow",
+ "parking_lot",
+ "piper",
+ "polling",
+ "regex-automata",
+ "rustix",
+ "rustix-openpty",
+ "signal-hook",
+ "unicode-width",
+ "vte",
+ "windows-sys 0.59.0",
+]
+
+[[package]]
 name = "aliasable"
 version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2332,6 +2356,12 @@ dependencies = [
  "cmov",
  "subtle",
 ]
+
+[[package]]
+name = "cursor-icon"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f27ae1dd37df86211c42e150270f82743308803d90a6f6e6651cd730d5e1732f"
 
 [[package]]
 name = "curve25519-dalek"
@@ -4859,6 +4889,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "home"
+version = "0.5.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cc627f471c528ff0c4a49e1d5e60450c8f6461dd6d10ba9dcd3a61d3dff7728d"
+dependencies = [
+ "windows-sys 0.61.2",
+]
+
+[[package]]
 name = "html5ever"
 version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5367,18 +5406,6 @@ checksum = "3a580c13f0ffc335ef42dd3f6b1a41b726051c5e1656d9a3aa6fddb3c5dfbbf9"
 dependencies = [
  "block-padding 0.4.2",
  "hybrid-array",
-]
-
-[[package]]
-name = "int-enum"
-version = "1.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "98e2fe9fba0e74e6b4cbc96a06d473ee6f2dd675f4b26ef6391a4973060c7ed1"
-dependencies = [
- "proc-macro2",
- "proc-macro2-diagnostics 0.11.0",
- "quote",
- "syn 3.0.10",
 ]
 
 [[package]]
@@ -5938,21 +5965,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "libghostty-vt"
-version = "0.2.1"
-source = "git+https://github.com/uzaaft/libghostty-rs?rev=cd4d497e8c698b27054a677ce19d1bd1a1a4d8bf#cd4d497e8c698b27054a677ce19d1bd1a1a4d8bf"
-dependencies = [
- "bitflags 2.13.2",
- "int-enum",
- "libghostty-vt-sys",
-]
-
-[[package]]
-name = "libghostty-vt-sys"
-version = "0.2.1"
-source = "git+https://github.com/uzaaft/libghostty-rs?rev=cd4d497e8c698b27054a677ce19d1bd1a1a4d8bf#cd4d497e8c698b27054a677ce19d1bd1a1a4d8bf"
-
-[[package]]
 name = "libloading"
 version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6468,6 +6480,15 @@ dependencies = [
  "libc",
  "log",
  "wasi 0.11.1+wasi-snapshot-preview1",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "miow"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "536bfad37a309d62069485248eeaba1e8d9853aaf951caaeaed0585a95346f08"
+dependencies = [
  "windows-sys 0.61.2",
 ]
 
@@ -7690,7 +7711,7 @@ checksum = "3c7028bdd3d43083f6d8d4d5187680d0d3560d54df4cc9d752005268b41e64d0"
 dependencies = [
  "heck 0.4.1",
  "proc-macro2",
- "proc-macro2-diagnostics 0.10.1",
+ "proc-macro2-diagnostics",
  "quote",
  "syn 2.0.119",
 ]
@@ -8761,17 +8782,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "proc-macro2-diagnostics"
-version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "df921e1ef974ebc8dd9effdb0c037a96928ae8cbf871438e02d6fd67204b595e"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 3.0.10",
-]
-
-[[package]]
 name = "process-wrap"
 version = "10.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9738,6 +9748,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustix-openpty"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1de16c7c59892b870a6336f185dc10943517f1327447096bbb7bb32cd85e2393"
+dependencies = [
+ "errno",
+ "libc",
+ "rustix",
+]
+
+[[package]]
 name = "rustls"
 version = "0.23.46"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10540,6 +10561,16 @@ name = "shlex"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
+
+[[package]]
+name = "signal-hook"
+version = "0.4.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "49f7447afd772ca79ad17ae0a3972a6b0df0cb4b80990fd82707593e9e012a74"
+dependencies = [
+ "libc",
+ "signal-hook-registry",
+]
 
 [[package]]
 name = "signal-hook-registry"
@@ -12432,6 +12463,50 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
+name = "vibevalley-agent"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "backon",
+ "futures-util",
+ "globset",
+ "ignore",
+ "jiff 1.0.1",
+ "nix 0.32.0",
+ "oxc_allocator",
+ "oxc_ast",
+ "oxc_ast_visit",
+ "oxc_parser",
+ "oxc_span",
+ "parking_lot",
+ "percent-encoding",
+ "proptest",
+ "quick-xml",
+ "quickjs-jit",
+ "regex",
+ "reqwest",
+ "rmcp",
+ "rustls",
+ "schemars 1.2.3",
+ "sea-orm",
+ "sea-orm-migration",
+ "sea-query",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "uuid",
+ "vibevalley-git",
+ "vibevalley-kit",
+ "vibevalley-oar",
+ "vibevalley-protocol",
+]
+
+[[package]]
 name = "vibevalley-cli"
 version = "0.1.0"
 dependencies = [
@@ -12519,6 +12594,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "vibevalley-kit"
+version = "0.1.0"
+dependencies = [
+ "arc-swap",
+ "backon",
+ "futures-util",
+ "hex",
+ "hmac 0.13.0",
+ "jiff 1.0.1",
+ "loom",
+ "parking_lot",
+ "percent-encoding",
+ "reqwest",
+ "roxmltree 0.21.2",
+ "rustls",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+ "sqlx",
+ "subtle",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tokio",
+ "tokio-stream",
+ "tokio-util",
+ "tracing",
+ "tracing-subscriber",
+ "url",
+ "uuid",
+]
+
+[[package]]
 name = "vibevalley-mac"
 version = "0.1.0"
 dependencies = [
@@ -12568,13 +12675,31 @@ dependencies = [
  "vibevalley-files",
  "vibevalley-git",
  "vibevalley-i18n",
+ "vibevalley-kit",
  "vibevalley-protocol",
  "vibevalley-rich",
- "vibevalley-rt",
  "vibevalley-server",
  "vibevalley-terminal",
  "vibevalley-workspace",
  "zip",
+]
+
+[[package]]
+name = "vibevalley-machine"
+version = "0.1.0"
+dependencies = [
+ "arc-swap",
+ "loom",
+ "parking_lot",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "tokio",
+ "tracing",
+ "uuid",
+ "vibevalley-kit",
+ "vibevalley-oar",
+ "vibevalley-protocol",
 ]
 
 [[package]]
@@ -12585,6 +12710,35 @@ dependencies = [
  "serde_json",
  "tempfile",
  "tokio",
+]
+
+[[package]]
+name = "vibevalley-oar"
+version = "0.1.0"
+dependencies = [
+ "agent-client-protocol",
+ "base64 0.23.1",
+ "futures-util",
+ "jiff 1.0.1",
+ "loom",
+ "nix 0.32.0",
+ "parking_lot",
+ "proptest",
+ "regex",
+ "semver",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tokio",
+ "tokio-util",
+ "toml_edit 0.25.19+spec-1.1.0",
+ "tracing",
+ "uuid",
+ "vibevalley-kit",
+ "vibevalley-mcp",
+ "which",
 ]
 
 [[package]]
@@ -12638,6 +12792,7 @@ dependencies = [
  "usvg 0.46.0",
  "vibevalley-core",
  "vibevalley-i18n",
+ "vibevalley-kit",
  "vibevalley-pele",
  "vibevalley-protocol",
  "vibevalley-shiki",
@@ -12645,62 +12800,31 @@ dependencies = [
 ]
 
 [[package]]
-name = "vibevalley-rt"
-version = "0.1.0"
-dependencies = [
- "rustls",
- "tokio",
-]
-
-[[package]]
 name = "vibevalley-runtime"
 version = "0.1.0"
 dependencies = [
- "agent-client-protocol",
- "arc-swap",
  "axum",
- "backon",
- "base64 0.23.1",
  "futures-util",
- "globset",
- "ignore",
  "jiff 1.0.1",
- "loom",
  "nix 0.32.0",
- "oxc_allocator",
- "oxc_ast",
- "oxc_ast_visit",
- "oxc_parser",
- "oxc_span",
  "parking_lot",
- "percent-encoding",
  "proptest",
- "quick-xml",
- "quickjs-jit",
- "regex",
  "reqwest",
- "rmcp",
- "rustls",
- "schemars 1.2.3",
  "sea-orm",
- "sea-orm-migration",
- "sea-query",
- "semver",
  "serde",
  "serde_json",
  "sqlx",
  "tempfile",
- "thiserror 2.0.21",
  "tokio",
  "tokio-util",
- "toml_edit 0.25.19+spec-1.1.0",
- "tracing",
  "uuid",
+ "vibevalley-agent",
  "vibevalley-git",
+ "vibevalley-kit",
+ "vibevalley-machine",
  "vibevalley-mcp",
+ "vibevalley-oar",
  "vibevalley-protocol",
- "vibevalley-rt",
- "which",
 ]
 
 [[package]]
@@ -12751,6 +12875,7 @@ dependencies = [
  "vibevalley-files",
  "vibevalley-git",
  "vibevalley-i18n",
+ "vibevalley-kit",
  "vibevalley-mcp",
  "vibevalley-protocol",
  "vibevalley-runtime",
@@ -12773,8 +12898,8 @@ dependencies = [
 name = "vibevalley-terminal"
 version = "0.1.0"
 dependencies = [
+ "alacritty_terminal",
  "libc",
- "libghostty-vt",
  "percent-encoding",
  "portable-pty",
  "serde",
@@ -12796,6 +12921,7 @@ dependencies = [
  "thiserror 2.0.21",
  "tokio",
  "vibevalley-git",
+ "vibevalley-kit",
  "vibevalley-terminal",
 ]
 
@@ -12832,6 +12958,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a5924018406ce0063cd67f8e008104968b74b563ee1b85dde3ed1f7cb87d3dbd"
 dependencies = [
  "arrayvec",
+ "bitflags 2.13.2",
+ "cursor-icon",
+ "log",
  "memchr",
 ]
 

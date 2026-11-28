@@ -61,10 +61,7 @@ async fn handle_socket(socket: WebSocket, server: Arc<dyn Server>, shutdown: Can
         outgoing: out_tx.clone(),
     });
 
-    let mut heartbeat = tokio::time::interval(HEARTBEAT_INTERVAL);
-    heartbeat.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
-    // Consume the immediate first tick so pings wait one full interval.
-    heartbeat.tick().await;
+    let mut heartbeat = vibevalley_kit::task::Ticker::periodic_delayed(HEARTBEAT_INTERVAL).with_delay_behavior();
 
     loop {
         tokio::select! {

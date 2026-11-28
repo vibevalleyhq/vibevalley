@@ -120,12 +120,6 @@ export function ConfigTabs(props: { draft: Agent; runtime?: RuntimeInfo | undefi
               onInput={(workdir) => props.patch({ ...draft(), workdir })}
             />
           </Labeled>
-          <Toggle
-            label={t("web.agent.worktree")}
-            hint={t("web.agent.worktreeHint")}
-            checked={draft().worktree}
-            onChange={(worktree) => props.patch({ ...draft(), worktree })}
-          />
           <Labeled
             label={t("web.agent.env")}
             hint={envRefused() ?? t("web.agent.envHint")}
@@ -658,9 +652,20 @@ function Inventory(props: { entries: InventoryEntry[] | null }) {
               {(e) => (
                 <View class="flex-row items-baseline gap-2">
                   <Text class={`font-mono text-sm ${e().enabled === false ? "text-muted line-through" : "text-ink"}`}>{e().name}</Text>
-                  <View class="min-w-0 flex-1" tooltip={e().description ? <Bubble text={e().description} /> : undefined}>
-                    <Text class="truncate text-xs text-muted">{e().description}</Text>
-                  </View>
+                  <If
+                    when={e().description}
+                    else={
+                      <View class="min-w-0 flex-1">
+                        <Text class="truncate text-xs text-muted">{e().description}</Text>
+                      </View>
+                    }
+                  >
+                    {(desc) => (
+                      <View class="min-w-0 flex-1" tooltip={<Bubble text={desc()} />}>
+                        <Text class="truncate text-xs text-muted">{desc()}</Text>
+                      </View>
+                    )}
+                  </If>
                   <If when={e().source}>
                     {(src) => (
                       <View class="max-w-40 shrink-0" tooltip={<Bubble text={src()} />}>

@@ -1,4 +1,4 @@
-import { cleanup, computed, effect, ErrorBoundary, locale, platform, signal, Text, View } from "nsh";
+import { cleanup, computed, effect, ErrorBoundary, locale, platform, signal, Text, untracked, View } from "nsh";
 import { BackHandler, isAvailable as mobileAvailable, TabBar, type TabBarItem } from "nsh/mobile";
 
 import { t } from "@vibevalley/i18n";
@@ -103,10 +103,12 @@ function MobileErrorFallback(props: { readonly error: unknown; readonly reset: (
 }
 
 function MobileShell(props: MobileAppProps) {
-  const session = createRemoteSession({
-    ...(props.fetchImpl ? { fetch: props.fetchImpl } : {}),
-    ...(props.tokenStore ? { tokenStore: props.tokenStore } : {}),
-  });
+  const session = createRemoteSession(
+    untracked(() => ({
+      ...(props.fetchImpl ? { fetch: props.fetchImpl } : {}),
+      ...(props.tokenStore ? { tokenStore: props.tokenStore } : {}),
+    })),
+  );
   cleanup(() => session.dispose());
 
   effect(() => {
@@ -144,7 +146,7 @@ function MobileShell(props: MobileAppProps) {
     }
   };
 
-  const stopNotificationPress = (props.subscribeNotificationPress ?? subscribeNotificationPress)(handleNotificationRoute);
+  const stopNotificationPress = untracked(() => props.subscribeNotificationPress ?? subscribeNotificationPress)(handleNotificationRoute);
   cleanup(() => stopNotificationPress());
 
   const stopBackHandler = BackHandler.on("press", () => {
@@ -399,7 +401,7 @@ function MobileShell(props: MobileAppProps) {
                                     </View>
                                   </If>
                                 </View>
-                                <Text class={`text-2xs ${active() ? "font-semibold text-accent" : "text-muted"}`}>{tabTitle(id())}</Text>
+                                <Text class={`text-2xs font-medium ${active() ? "text-accent" : "text-muted"}`}>{tabTitle(id())}</Text>
                               </View>
                             );
                           }}
@@ -461,7 +463,7 @@ function MobileShell(props: MobileAppProps) {
                                   </View>
                                 </If>
                               </View>
-                              <Text class={`max-w-full truncate text-2xs ${active() ? "font-semibold text-accent" : "text-muted"}`}>{tabTitle(id())}</Text>
+                              <Text class={`max-w-full truncate text-2xs font-medium ${active() ? "text-accent" : "text-muted"}`}>{tabTitle(id())}</Text>
                             </View>
                           </View>
                         );

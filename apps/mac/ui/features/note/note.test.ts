@@ -3,7 +3,7 @@ import { expect, test } from "nsh/test";
 
 import { setLocale } from "@vibevalley/i18n";
 import "@vibevalley/i18n/catalogs";
-import { NOTE_TYPE_SPECS, NOTE_TYPES, NoteTypeValues, userId } from "@vibevalley/protocol";
+import { localUserParticipant, NOTE_TYPE_SPECS, NOTE_TYPES, NoteTypeValues } from "@vibevalley/protocol";
 
 import { tone } from "../../design/tone";
 import { decodeBase64Utf8 } from "../../infra/attachment";
@@ -101,7 +101,7 @@ test("buildDocFromMarkdown delegates to Rust VvCore bridge with headless fallbac
 test("presenceHighlightCommand filters local user, scopes by path, and normalizes highlight colors", () => {
   const cmd = presenceHighlightCommand(
     [
-      { id: userId, name: "Me", kind: "highlight", selector: "#local", updatedAt: 1 },
+      { id: localUserParticipant, name: "Me", kind: "highlight", selector: "#local", updatedAt: 1 },
       {
         id: "session:1",
         name: "老周",

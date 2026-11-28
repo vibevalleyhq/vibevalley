@@ -5,9 +5,9 @@
 use std::collections::BTreeMap;
 
 use vibevalley_protocol::{
-    AchievementCategory, Actor, AgentRole, AgentTally, CallState, DEFAULT_ORCHESTRATOR, EVERYONE, Fact, Issue, IssueStatus, JsNumber, Landing, LedgerEntry,
+    AchievementCategory, Actor, AgentRole, AgentTally, CallState, DEFAULT_ORCHESTRATOR, EVERYONE, Fact, Issue, IssueStatus, JsNumber, LedgerEntry,
     LedgerEntryCalled, LedgerEntryConflicted, LedgerEntryFailed, LedgerEntryFamily, LedgerEntryHandoff, LedgerEntryHarvested, LedgerEntryHired,
-    LedgerEntryLevel, LedgerEntryMoment, LedgerEntryTold, Outcome, Progress, ProgressNews, ProgressTitle, SessionClose, SpaceState, USER_ID, Unlock,
+    LedgerEntryLevel, LedgerEntryMoment, LedgerEntryTold, Outcome, ParticipantId, Progress, ProgressNews, ProgressTitle, SessionClose, SpaceState, Unlock,
 };
 
 use super::daily::{DayActivity, daily_board_for, local_day};
@@ -341,11 +341,7 @@ fn working(state: &SpaceState) -> usize {
 }
 
 pub fn family_entry(id: &str, children: &[&Issue]) -> LedgerEntry {
-    let merged: Vec<&str> = children
-        .iter()
-        .filter(|i| i.delivered == Some(Landing::MergedIntoParent))
-        .map(|i| i.id.as_str())
-        .collect();
+    let merged: Vec<&str> = children.iter().filter(|i| i.delivered.is_some()).map(|i| i.id.as_str()).collect();
     let nodes: Vec<DagNode> = children
         .iter()
         .map(|i| DagNode {
@@ -444,7 +440,7 @@ pub fn entries_for(before: &SpaceState, fact: &Fact, after: &SpaceState) -> Vec<
                 }
                 for named in &f.message.mentions {
                     if named != DEFAULT_ORCHESTRATOR
-                        && named != USER_ID
+                        && !ParticipantId::parse(named).is_some_and(|p| p.is_human())
                         && named != EVERYONE
                         && let Some(h) = session_of(before, named)
                     {

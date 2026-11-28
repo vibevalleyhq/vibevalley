@@ -683,6 +683,15 @@ const nshNoPropsDestructure = defineRule({
 
 const reactiveCreatorNames = new Set(["signal", "computed", "createSignal", "createMemo", "frame"]);
 
+function isReactiveCreatorName(name: string): boolean {
+  return reactiveCreatorNames.has(name) || /^use[A-Z]/u.test(name);
+}
+
+function isOpaqueReactiveWrapperCallee(callee: AstNode | null | undefined): boolean {
+  const cur = unwrapTypeExpr(callee);
+  return cur?.type === "Identifier" && (cur.name === "untracked" || cur.name === "untrack" || cur.name === "split" || cur.name === "splitProps");
+}
+
 function collectLocalReactiveAccessors(body: ESTree.BlockStatement): Set<string> {
   const names = new Set<string>();
   for (const stmt of body.body) {
@@ -691,7 +700,7 @@ function collectLocalReactiveAccessors(body: ESTree.BlockStatement): Set<string>
       const init = unwrapTypeExpr(decl.init);
       if (!init || init.type !== "CallExpression" || init.callee.type !== "Identifier") continue;
       const callee = init.callee.name;
-      if (!reactiveCreatorNames.has(callee)) continue;
+      if (!isReactiveCreatorName(callee)) continue;
       if (callee === "createSignal" && decl.id.type === "ArrayPattern" && decl.id.elements[0]?.type === "Identifier") {
         names.add(decl.id.elements[0].name);
       } else if (decl.id.type === "Identifier") {
@@ -704,8 +713,22 @@ function collectLocalReactiveAccessors(body: ESTree.BlockStatement): Set<string>
 
 function readsPropsDirectly(node: AstNode | null | undefined, propsName: string): boolean {
   const cur = unwrapTypeExpr(node);
-  if (!cur) return false;
+  if (!cur || isFunctionNode(cur)) return false;
   if (cur.type === "ChainExpression") return readsPropsDirectly(cur.expression, propsName);
+  if (cur.type === "CallExpression") {
+    if (isOpaqueReactiveWrapperCallee(cur.callee)) return false;
+    if (readsPropsDirectly(cur.callee, propsName)) return true;
+    return cur.arguments.some((arg) => !isFunctionNode(arg) && readsPropsDirectly(arg, propsName));
+  }
+  if (cur.type === "ObjectExpression") {
+    return cur.properties.some((prop) =>
+      prop.type === "Property" ? !isFunctionNode(prop.value) && readsPropsDirectly(prop.value, propsName) : readsPropsDirectly(prop.argument, propsName),
+    );
+  }
+  if (cur.type === "ArrayExpression") {
+    return cur.elements.some((el) => el !== null && !isFunctionNode(el) && readsPropsDirectly(el, propsName));
+  }
+  if (cur.type === "SpreadElement") return readsPropsDirectly(cur.argument, propsName);
   if (cur.type === "MemberExpression") {
     if (cur.object.type === "Identifier" && cur.object.name === propsName) return true;
     return readsPropsDirectly(cur.object, propsName);
@@ -723,11 +746,23 @@ function readsPropsDirectly(node: AstNode | null | undefined, propsName: string)
 
 function readsAccessorDirectly(node: AstNode | null | undefined, accessors: ReadonlySet<string>): boolean {
   const cur = unwrapTypeExpr(node);
-  if (!cur) return false;
+  if (!cur || isFunctionNode(cur)) return false;
   if (cur.type === "ChainExpression") return readsAccessorDirectly(cur.expression, accessors);
   if (cur.type === "CallExpression") {
-    return cur.callee.type === "Identifier" && accessors.has(cur.callee.name) && cur.arguments.length === 0;
+    if (cur.callee.type === "Identifier" && accessors.has(cur.callee.name) && cur.arguments.length === 0) return true;
+    if (isOpaqueReactiveWrapperCallee(cur.callee)) return false;
+    if (readsAccessorDirectly(cur.callee, accessors)) return true;
+    return cur.arguments.some((arg) => !isFunctionNode(arg) && readsAccessorDirectly(arg, accessors));
   }
+  if (cur.type === "ObjectExpression") {
+    return cur.properties.some((prop) =>
+      prop.type === "Property" ? !isFunctionNode(prop.value) && readsAccessorDirectly(prop.value, accessors) : readsAccessorDirectly(prop.argument, accessors),
+    );
+  }
+  if (cur.type === "ArrayExpression") {
+    return cur.elements.some((el) => el !== null && !isFunctionNode(el) && readsAccessorDirectly(el, accessors));
+  }
+  if (cur.type === "SpreadElement") return readsAccessorDirectly(cur.argument, accessors);
   if (cur.type === "MemberExpression") return readsAccessorDirectly(cur.object, accessors);
   if (cur.type === "UnaryExpression") return readsAccessorDirectly(cur.argument, accessors);
   if (cur.type === "BinaryExpression" || cur.type === "LogicalExpression") {
@@ -784,11 +819,28 @@ const nshNoEagerAccessor = defineRule({
     const checkControlFlowChild = (node: ESTree.JSXElement) => {
       if (node.openingElement.name.type !== "JSXIdentifier") return;
       const tag = node.openingElement.name.name;
-      if (tag !== "If" && tag !== "Each") return;
+      if (tag !== "If" && tag !== "Each" && tag !== "List") return;
+      const callbacks: FnNode[] = [];
       for (const child of node.children) {
-        if (child.type !== "JSXExpressionContainer") continue;
-        const expr = child.expression;
-        if (!isFunctionNode(expr) || !expr.body) continue;
+        if (child.type === "JSXExpressionContainer" && isFunctionNode(child.expression)) {
+          callbacks.push(child.expression);
+        }
+      }
+      if (tag === "List") {
+        for (const attr of node.openingElement.attributes) {
+          if (
+            attr.type === "JSXAttribute" &&
+            attr.name.type === "JSXIdentifier" &&
+            attr.name.name === "renderItem" &&
+            attr.value?.type === "JSXExpressionContainer" &&
+            isFunctionNode(attr.value.expression)
+          ) {
+            callbacks.push(attr.value.expression);
+          }
+        }
+      }
+      for (const expr of callbacks) {
+        if (!expr.body) continue;
         const paramNames = new Set<string>();
         for (const p of expr.params) {
           if (p.type === "Identifier") paramNames.add(p.name);
@@ -947,6 +999,470 @@ const nshKeymapNoTextSignal = defineRule({
   },
 });
 
+const jsxAttrNameOf = (attr: ESTree.JSXAttribute): string | undefined => (attr.name.type === "JSXIdentifier" ? attr.name.name : undefined);
+
+const jsxOpeningTagName = (el: ESTree.JSXOpeningElement): string | undefined => (el.name.type === "JSXIdentifier" ? el.name.name : undefined);
+
+function collectStringPartsFromExpr(node: AstNode | null | undefined, out: string[]): boolean {
+  const cur = unwrapTypeExpr(node);
+  if (!cur) return false;
+  if (cur.type === "Literal" && typeof cur.value === "string") {
+    out.push(cur.value);
+    return true;
+  }
+  if (cur.type === "TemplateLiteral") {
+    for (const q of cur.quasis) out.push(q.value.raw);
+    for (const expr of cur.expressions) collectStringPartsFromExpr(expr, out);
+    return true;
+  }
+  if (cur.type === "ConditionalExpression") {
+    const a = collectStringPartsFromExpr(cur.consequent, out);
+    const b = collectStringPartsFromExpr(cur.alternate, out);
+    return a || b;
+  }
+  if (cur.type === "LogicalExpression") {
+    const a = collectStringPartsFromExpr(cur.left, out);
+    const b = collectStringPartsFromExpr(cur.right, out);
+    return a || b;
+  }
+  if (cur.type === "JSXExpressionContainer") return collectStringPartsFromExpr(cur.expression, out);
+  return false;
+}
+
+const nshNoPropsSpread = defineRule({
+  meta: {
+    messages: {
+      spread: says(
+        "spreading `props` (`{ ...props }` or `Object.assign(..., props)`) reads every reactive getter eagerly and freezes downstream updates",
+        "split owned keys with `split(props, [...])` or read `props.x` inside JSX, `computed()`, or closures",
+        "docs/style/nsh-tsx.md",
+      ),
+    },
+  },
+  create(context) {
+    const checkFn = (fn: FnNode) => {
+      if (!isJsxComponentFn(fn) || fn.body?.type !== "BlockStatement") return;
+      const first = fn.params[0];
+      if (first?.type !== "Identifier") return;
+      const propsName = first.name;
+      visitSameFunction(fn.body, (node) => {
+        if (isUntrackedCall(node)) return false;
+        if (node.type === "SpreadElement" && node.parent.type === "ObjectExpression") {
+          const arg = unwrapTypeExpr(node.argument);
+          if (arg?.type === "Identifier" && arg.name === propsName) {
+            context.report({ node, messageId: "spread" });
+          }
+        } else if (
+          node.type === "CallExpression" &&
+          node.callee.type === "MemberExpression" &&
+          node.callee.object.type === "Identifier" &&
+          node.callee.object.name === "Object" &&
+          memberPropertyName(node.callee) === "assign" &&
+          node.arguments.slice(1).some((a) => {
+            const arg = unwrapTypeExpr(a);
+            return arg?.type === "Identifier" && arg.name === propsName;
+          })
+        ) {
+          context.report({ node, messageId: "spread" });
+        }
+        return true;
+      });
+    };
+    return {
+      FunctionDeclaration: checkFn,
+      FunctionExpression: checkFn,
+      ArrowFunctionExpression: checkFn,
+    };
+  },
+});
+
+const reactiveEffectOrMemoNames = new Set(["effect", "computed", "createEffect", "createMemo"]);
+
+const nshNoAsyncReactive = defineRule({
+  meta: {
+    messages: {
+      asyncComponent: says(
+        "`async` component functions run once and break fine-grained JSX owner mounting in nsh",
+        "keep the component synchronous and load async data via signals, `effect`, or an action helper",
+        "docs/style/nsh-tsx.md",
+      ),
+      asyncReactive: says(
+        "`async` callbacks inside `effect` / `computed` stop tracking signals after the first `await` and swallow cleanup functions in a Promise",
+        "kick off an async helper from a synchronous `effect` / `onCleanup` wrapper without returning a Promise to the reactive owner",
+        "docs/style/nsh-tsx.md",
+      ),
+    },
+  },
+  create(context) {
+    const checkFn = (fn: FnNode) => {
+      if (fn.async && isJsxComponentFn(fn)) context.report({ node: fn, messageId: "asyncComponent" });
+    };
+    return {
+      FunctionDeclaration: checkFn,
+      FunctionExpression: checkFn,
+      ArrowFunctionExpression: checkFn,
+      CallExpression(node) {
+        if (node.callee.type !== "Identifier" || !reactiveEffectOrMemoNames.has(node.callee.name)) return;
+        const cb = node.arguments[0];
+        if (cb && isFunctionNode(cb) && cb.async) context.report({ node: cb, messageId: "asyncReactive" });
+      },
+    };
+  },
+});
+
+const inlineReactiveFns = new Set(["signal", "computed", "effect", "createSignal", "createMemo", "createEffect"]);
+
+function isControlFlowRenderFn(fn: FnNode): boolean {
+  const parent = fn.parent;
+  if (parent.type !== "JSXExpressionContainer") return false;
+  if (parent.parent.type === "JSXElement") {
+    const tag = jsxOpeningTagName(parent.parent.openingElement);
+    return tag === "If" || tag === "Each" || tag === "List";
+  }
+  if (parent.parent.type === "JSXAttribute" && jsxAttrNameOf(parent.parent) === "renderItem" && parent.parent.parent.type === "JSXOpeningElement") {
+    return jsxOpeningTagName(parent.parent.parent) === "List";
+  }
+  return false;
+}
+
+const nshNoJsxInlineReactive = defineRule({
+  meta: {
+    messages: {
+      inline: says(
+        "creating `{{name}}()` inline inside a JSX slot or non-component callback leaks reactive owners or recreates state on every render tick",
+        "hoist `{{name}}()` to component setup, `<If>`/`<Each>` render callback top level, or module/hook scope",
+        "docs/style/nsh-tsx.md",
+      ),
+    },
+  },
+  create(context) {
+    return {
+      CallExpression(node) {
+        if (node.callee.type !== "Identifier" || !inlineReactiveFns.has(node.callee.name)) return;
+        const name = node.callee.name;
+        let sawJsxBetween = false;
+        let nearestFn: FnNode | undefined;
+        let cur: AstNode | null | undefined = node.parent;
+        while (cur) {
+          if (isFunctionNode(cur)) {
+            nearestFn = cur;
+            break;
+          }
+          if (cur.type === "JSXExpressionContainer" || cur.type === "JSXAttribute" || cur.type === "JSXElement" || cur.type === "JSXFragment") {
+            sawJsxBetween = true;
+          }
+          cur = cur.parent;
+        }
+        if (sawJsxBetween) {
+          context.report({ node, messageId: "inline", data: { name } });
+          return;
+        }
+        if (!nearestFn) return;
+        if (isJsxComponentFn(nearestFn) || isControlFlowRenderFn(nearestFn) || (functionReturnsJsx(nearestFn) && nearestFn.parent.type !== "JSXAttribute")) {
+          return;
+        }
+        let outer: AstNode | null | undefined = nearestFn.parent;
+        while (outer) {
+          if (
+            outer.type === "JSXAttribute" ||
+            outer.type === "JSXExpressionContainer" ||
+            outer.type === "JSXElement" ||
+            outer.type === "JSXFragment" ||
+            (isFunctionNode(outer) && (isJsxComponentFn(outer) || isControlFlowRenderFn(outer)))
+          ) {
+            context.report({ node, messageId: "inline", data: { name } });
+            return;
+          }
+          outer = outer.parent;
+        }
+      },
+    };
+  },
+});
+
+const nshHostElements = new Set([
+  "View",
+  "Text",
+  "Button",
+  "Link",
+  "A",
+  "Input",
+  "Textarea",
+  "Scroll",
+  "ScrollView",
+  "Image",
+  "Press",
+  "Canvas",
+  "Switch",
+  "Toggle",
+]);
+const reactOnlyHostAttrs = new Set(["onClick", "onChangeText", "htmlFor"]);
+
+const nshNoReactIsms = defineRule({
+  meta: {
+    messages: {
+      reactImport: says(
+        "this file runs on `nsh` fine-grained signals and JSX, not React",
+        "import reactive primitives (`signal`, `computed`, `effect`) and JSX helpers (`<If>`, `<Each>`) from `nsh`",
+        "docs/style/nsh-tsx.md",
+      ),
+      depArray: says(
+        "`effect` and `computed` track signal reads automatically and do not accept React dependency arrays",
+        "remove the second array argument and read signals directly inside the callback",
+        "docs/style/nsh-tsx.md",
+      ),
+      reactAttr: says(
+        "`{{attr}}` on `<{{tag}}>` is a React/DOM prop name ignored by `nsh`",
+        "use `onPress` (for press handlers), `onChange` (for inputs), or explicit layout grouping in `nsh`",
+        "docs/style/nsh-tsx.md",
+      ),
+      reactKey: says(
+        "React's `key` reconciliation prop on `<{{tag}}>` is not used by `nsh`",
+        "move keying onto `<Each of={...} key={(item) => item.id}>` or `<List keyExtractor={...}>`",
+        "docs/style/nsh-tsx.md",
+      ),
+    },
+  },
+  create(context) {
+    return {
+      ImportDeclaration(node) {
+        if (node.source.value === "react" || node.source.value === "react-dom") {
+          context.report({ node, messageId: "reactImport" });
+        }
+      },
+      CallExpression(node) {
+        if (node.callee.type === "Identifier" && reactiveEffectOrMemoNames.has(node.callee.name) && node.arguments[1]?.type === "ArrayExpression") {
+          context.report({ node: node.arguments[1], messageId: "depArray" });
+        }
+      },
+      JSXAttribute(node) {
+        const attr = jsxAttrNameOf(node);
+        if (attr === undefined || node.parent.type !== "JSXOpeningElement") return;
+        const tag = jsxOpeningTagName(node.parent);
+        if (tag === undefined) return;
+        if (reactOnlyHostAttrs.has(attr) && nshHostElements.has(tag)) {
+          context.report({ node, messageId: "reactAttr", data: { attr, tag } });
+        } else if (attr === "key" && tag !== "Each" && tag !== "Keyed") {
+          context.report({ node, messageId: "reactKey", data: { tag } });
+        }
+      },
+    };
+  },
+});
+
+const selectionElements = new Set(["Input", "RichInlineField"]);
+
+function hasSelectionStartEndCheck(root: AstNode): boolean {
+  let found = false;
+  visitSameFunction(root, (inner) => {
+    if (found) return false;
+    if (inner.type !== "BinaryExpression" || (inner.operator !== "===" && inner.operator !== "!==")) return true;
+    const isStartEnd = (side: AstNode) => {
+      const s = unwrapTypeExpr(side);
+      const unwrapped = s?.type === "ChainExpression" ? unwrapTypeExpr(s.expression) : s;
+      if (unwrapped?.type !== "MemberExpression") return false;
+      const name = memberPropertyName(unwrapped);
+      return name === "start" || name === "end";
+    };
+    if (isStartEnd(inner.left) || isStartEnd(inner.right)) {
+      found = true;
+      return false;
+    }
+    return true;
+  });
+  return found;
+}
+
+const nshSelectionChangeGuard = defineRule({
+  meta: {
+    messages: {
+      unguarded: says(
+        "calling `.set()` directly inside `onSelectionChange` without comparing `untracked(selection)` (`.start`/`.end`) creates feedback selection loops on every cursor move",
+        "read `const prev = untracked(selection)` and return early when `prev.start === next.start && prev.end === next.end` before calling `.set(...)`",
+        "docs/style/nsh-tsx.md",
+      ),
+    },
+  },
+  create(context) {
+    return {
+      JSXAttribute(node) {
+        if (jsxAttrNameOf(node) !== "onSelectionChange" || node.parent.type !== "JSXOpeningElement") return;
+        const tag = jsxOpeningTagName(node.parent);
+        if (tag === undefined || !selectionElements.has(tag) || node.value?.type !== "JSXExpressionContainer") return;
+        const handlers: FnNode[] = [];
+        collectHandlerFns(node.value.expression, handlers);
+        for (const fn of handlers) {
+          if (!fn.body) continue;
+          let hasUntracked = false;
+          const setCalls: ESTree.CallExpression[] = [];
+          visitSameFunction(fn.body, (inner) => {
+            if (isUntrackedCall(inner) || (inner.type === "CallExpression" && inner.callee.type === "Identifier" && inner.callee.name === "untrack")) {
+              hasUntracked = true;
+            }
+            if (inner.type === "CallExpression" && inner.callee.type === "MemberExpression" && memberPropertyName(inner.callee) === "set") {
+              setCalls.push(inner);
+            }
+            return true;
+          });
+          if (setCalls.length === 0) continue;
+          if (!hasUntracked && !hasSelectionStartEndCheck(fn.body)) {
+            for (const call of setCalls) {
+              context.report({ node: call, messageId: "unguarded" });
+            }
+          }
+        }
+      },
+    };
+  },
+});
+
+function staticRefKey(node: AstNode | null | undefined): string | undefined {
+  const cur = unwrapTypeExpr(node);
+  if (!cur) return undefined;
+  if (cur.type === "ChainExpression") return staticRefKey(cur.expression);
+  if (cur.type === "Identifier") return cur.name;
+  if (cur.type === "MemberExpression") {
+    const obj = staticRefKey(cur.object);
+    const prop = memberPropertyName(cur);
+    return obj !== undefined && prop !== undefined ? `${obj}.${prop}` : undefined;
+  }
+  return undefined;
+}
+
+const nshNoSelfCancelingEffect = defineRule({
+  meta: {
+    messages: {
+      selfCancel: says(
+        "reading `{{name}}()` and synchronously calling `{{name}}.set(...)` in an `effect` that returns a `clearTimeout` cleanup re-triggers the effect immediately and cancels its own timer",
+        "write `{{name}}.set(...)` inside the event or timer callback instead, or move cleanup ownership outside the tracked state cycle",
+        "docs/style/nsh-tsx.md",
+      ),
+    },
+  },
+  create(context) {
+    return {
+      CallExpression(node) {
+        if (node.callee.type !== "Identifier" || (node.callee.name !== "effect" && node.callee.name !== "createEffect")) return;
+        const cb = node.arguments[0];
+        if (!cb || !isFunctionNode(cb) || !cb.body) return;
+        const readSignals = new Set<string>();
+        const writeCalls: Array<{ name: string; node: ESTree.CallExpression }> = [];
+        let hasClearTimeoutCleanup = false;
+        visitSameFunction(cb.body, (inner) => {
+          if (isUntrackedCall(inner)) return false;
+          if (inner.type === "CallExpression") {
+            if (inner.arguments.length === 0) {
+              const key = staticRefKey(inner.callee);
+              if (key !== undefined) readSignals.add(key);
+            }
+            if (inner.callee.type === "MemberExpression" && memberPropertyName(inner.callee) === "set") {
+              const target = staticRefKey(inner.callee.object);
+              if (target !== undefined) writeCalls.push({ name: target, node: inner });
+            }
+          } else if (inner.type === "ReturnStatement" && inner.argument && isFunctionNode(inner.argument) && inner.argument.body) {
+            visitSameFunction(inner.argument.body, (cleanupInner) => {
+              if (cleanupInner.type === "CallExpression" && staticRefKey(cleanupInner.callee)?.endsWith("clearTimeout") === true) {
+                hasClearTimeoutCleanup = true;
+              }
+              return true;
+            });
+          }
+          return true;
+        });
+        if (!hasClearTimeoutCleanup || readSignals.size === 0) return;
+        for (const { name, node: writeNode } of writeCalls) {
+          if (readSignals.has(name)) {
+            context.report({ node: writeNode, messageId: "selfCancel", data: { name } });
+          }
+        }
+      },
+    };
+  },
+});
+
+const viewDisallowedTextClassRe =
+  /^(?:text-(?:2xs|xs|sm|base|lg|xl|2xl|3xl|ink|muted|faint|accent|berry|leaf|wheat|water|warn-ink|ok-ink)|font-(?:normal|medium|semibold|bold|mono)|truncate|line-through|italic|underline|tabular-nums|leading-.+)$/u;
+
+const nshNoViewTextClass = defineRule({
+  meta: {
+    messages: {
+      viewTextClass: says(
+        "`<View>` ignores non-inherited typography/text color class `{{cls}}` in nsh GPUI containers",
+        "move `{{cls}}` onto the inner `<Text>` element where GPUI renders typography",
+        "docs/style/nsh-tsx.md",
+      ),
+    },
+  },
+  create(context) {
+    return {
+      JSXOpeningElement(node) {
+        if (jsxOpeningTagName(node) !== "View") return;
+        for (const attr of node.attributes) {
+          if (attr.type !== "JSXAttribute" || jsxAttrNameOf(attr) !== "class" || !attr.value) continue;
+          const parts: string[] = [];
+          if (attr.value.type === "Literal" && typeof attr.value.value === "string") {
+            parts.push(attr.value.value);
+          } else {
+            collectStringPartsFromExpr(attr.value, parts);
+          }
+          for (const part of parts) {
+            for (const rawToken of part.trim().split(/\s+/u)) {
+              if (!rawToken) continue;
+              const bare = rawToken.split(":").pop() ?? "";
+              if (viewDisallowedTextClassRe.test(bare)) {
+                context.report({ node: attr, messageId: "viewTextClass", data: { cls: rawToken } });
+                return;
+              }
+            }
+          }
+        }
+      },
+    };
+  },
+});
+
+const nshScrollHorizontalFlexRow = defineRule({
+  meta: {
+    messages: {
+      missingFlexRow: says(
+        "`<Scroll horizontal>` defaults its content axis to column unless `flex-row` is present, causing horizontal content to stack or clip vertically",
+        'pass `contentClass="flex-row ..."` (or add `flex-row` to `class`/`contentClass`) on `<Scroll horizontal>`',
+        "docs/style/nsh-tsx.md",
+      ),
+    },
+  },
+  create(context) {
+    return {
+      JSXOpeningElement(node) {
+        if (jsxOpeningTagName(node) !== "Scroll") return;
+        const horizAttr = node.attributes.find((attr): attr is ESTree.JSXAttribute => attr.type === "JSXAttribute" && jsxAttrNameOf(attr) === "horizontal");
+        if (!horizAttr) return;
+        if (horizAttr.value?.type === "JSXExpressionContainer" && horizAttr.value.expression.type === "Literal" && horizAttr.value.expression.value === false) {
+          return;
+        }
+        const classStrings: string[] = [];
+        let hasDynamicOnlyAttr = false;
+        for (const attr of node.attributes) {
+          if (attr.type !== "JSXAttribute") continue;
+          const attrName = jsxAttrNameOf(attr);
+          if (attrName !== "class" && attrName !== "contentClass") continue;
+          if (attr.value?.type === "Literal" && typeof attr.value.value === "string") {
+            classStrings.push(attr.value.value);
+          } else if (attr.value) {
+            const parts: string[] = [];
+            collectStringPartsFromExpr(attr.value, parts);
+            if (parts.length === 0) hasDynamicOnlyAttr = true;
+            classStrings.push(...parts);
+          }
+        }
+        if (classStrings.some((s) => /\bflex-row\b/u.test(s))) return;
+        if (hasDynamicOnlyAttr) return;
+        context.report({ node: horizAttr, messageId: "missingFlexRow" });
+      },
+    };
+  },
+});
+
 export default definePlugin({
   meta: { name: "vibevalley" },
   rules: {
@@ -966,6 +1482,14 @@ export default definePlugin({
     "nsh-each-key": nshEachKey,
     "nsh-no-props-destructure": nshNoPropsDestructure,
     "nsh-no-eager-accessor": nshNoEagerAccessor,
+    "nsh-no-props-spread": nshNoPropsSpread,
+    "nsh-no-async-reactive": nshNoAsyncReactive,
+    "nsh-no-jsx-inline-reactive": nshNoJsxInlineReactive,
+    "nsh-no-react-isms": nshNoReactIsms,
+    "nsh-selection-change-guard": nshSelectionChangeGuard,
+    "nsh-no-self-canceling-effect": nshNoSelfCancelingEffect,
+    "nsh-no-view-text-class": nshNoViewTextClass,
+    "nsh-scroll-horizontal-flex-row": nshScrollHorizontalFlexRow,
     "nsh-no-direct-storage-in-event": nshNoDirectStorageInEvent,
     "nsh-keymap-no-text-signal": nshKeymapNoTextSignal,
   },

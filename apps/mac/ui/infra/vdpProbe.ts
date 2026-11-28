@@ -25,6 +25,17 @@ export interface VdpUiNode {
   readonly children?: readonly VdpUiNode[] | undefined;
 }
 
+export interface VdpLayoutNode {
+  readonly id: string;
+  readonly role: string;
+  readonly text?: string | undefined;
+  readonly bounds?: VdpUiBounds | undefined;
+  readonly lineCount?: number | undefined;
+  readonly focused?: boolean | undefined;
+  readonly pressable: boolean;
+  readonly children?: readonly VdpLayoutNode[] | undefined;
+}
+
 export interface VdpNodeRegistration {
   readonly testId: string;
   readonly role?: string | undefined;
@@ -33,6 +44,8 @@ export interface VdpNodeRegistration {
   readonly source?: string | undefined;
   readonly parentId?: string | undefined;
   readonly getRef?: (() => ViewRef | undefined) | undefined;
+  readonly getLineCount?: ((bounds: VdpUiBounds | undefined) => number | undefined) | undefined;
+  readonly getFocused?: (() => boolean | undefined) | undefined;
   readonly onPress?: (() => void | Promise<void>) | undefined;
 }
 
@@ -48,7 +61,7 @@ const VDP_ERR_TIMEOUT = -32001;
 const VdpUiReqSchema = z.object({
   type: z.exactOptional(z.literal("vdp_ui_req")),
   reqId: z.string().min(1),
-  method: z.enum(["UI.getTree", "UI.query", "UI.press", "UI.waitFor"]),
+  method: z.enum(["UI.getTree", "UI.dumpLayout", "UI.query", "UI.press", "UI.waitFor"]),
   params: z.exactOptional(z.record(z.string(), z.unknown())),
 });
 
@@ -164,6 +177,10 @@ function resolveText(value: string | (() => string | undefined) | undefined): st
   }
 }
 
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
 async function measureRef(getRef: (() => ViewRef | undefined) | undefined): Promise<VdpUiBounds | undefined> {
   if (!getRef) return undefined;
   let ref: ViewRef | undefined;
@@ -177,10 +194,10 @@ async function measureRef(getRef: (() => ViewRef | undefined) | undefined): Prom
     const measured = await ref.measure();
     if (!measured) return undefined;
     return {
-      x: Math.round(measured.pagePosition.x),
-      y: Math.round(measured.pagePosition.y),
-      width: Math.round(measured.bounds.size.width),
-      height: Math.round(measured.bounds.size.height),
+      x: round2(measured.pagePosition.x),
+      y: round2(measured.pagePosition.y),
+      width: round2(measured.bounds.size.width),
+      height: round2(measured.bounds.size.height),
     };
   } catch {
     return undefined;
@@ -297,6 +314,93 @@ async function buildTree(view: string, maxDepth: number): Promise<VdpUiNode> {
       testId: rootId,
       role: "root",
       ...(route !== undefined ? { route, text: route } : { text: view }),
+      bounds,
+      pressable: false,
+    },
+    0,
+  );
+}
+
+async function snapshotLayoutNode(reg: VdpNodeRegistration): Promise<VdpLayoutNode> {
+  const text = resolveText(reg.text);
+  const bounds = await measureRef(reg.getRef);
+  let lineCount: number | undefined;
+  if (reg.getLineCount !== undefined) {
+    try {
+      lineCount = untracked(() => reg.getLineCount?.(bounds));
+    } catch {
+      lineCount = undefined;
+    }
+  }
+  let focused: boolean | undefined;
+  if (reg.getFocused !== undefined) {
+    try {
+      focused = untracked(() => reg.getFocused?.());
+    } catch {
+      focused = undefined;
+    }
+  }
+  return {
+    id: reg.testId,
+    role: reg.role ?? "view",
+    ...(text !== undefined ? { text } : {}),
+    ...(bounds !== undefined ? { bounds } : {}),
+    ...(lineCount !== undefined ? { lineCount } : {}),
+    ...(focused !== undefined ? { focused } : {}),
+    pressable: typeof reg.onPress === "function",
+  };
+}
+
+async function buildLayoutTree(view: string, maxDepth: number): Promise<VdpLayoutNode> {
+  const route = currentRouteFor(view);
+  const bounds = currentWindowBounds();
+  const rootId = `view:${view}`;
+  const entries = [...nodes.values()];
+  const snapshots = new Map<string, VdpLayoutNode>();
+  await Promise.all(
+    entries.map(async (reg) => {
+      snapshots.set(reg.testId, await snapshotLayoutNode(reg));
+    }),
+  );
+
+  const byParent = new Map<string, VdpLayoutNode[]>();
+  const addChild = (parentId: string, child: VdpLayoutNode) => {
+    const existing = byParent.get(parentId);
+    if (existing) existing.push(child);
+    else byParent.set(parentId, [child]);
+  };
+
+  if (route !== undefined) {
+    addChild(rootId, {
+      id: "route:current",
+      role: "route",
+      text: route,
+      pressable: false,
+    });
+  }
+
+  for (const reg of entries) {
+    const snap = snapshots.get(reg.testId);
+    if (!snap) continue;
+    const parent = reg.parentId !== undefined && snapshots.has(reg.parentId) ? reg.parentId : rootId;
+    addChild(parent, snap);
+  }
+
+  const attachChildren = (node: VdpLayoutNode, depth: number): VdpLayoutNode => {
+    if (depth >= maxDepth) return node;
+    const kids = byParent.get(node.id);
+    if (!kids || kids.length === 0) return node;
+    return {
+      ...node,
+      children: kids.map((child) => attachChildren(child, depth + 1)),
+    };
+  };
+
+  return attachChildren(
+    {
+      id: rootId,
+      role: "surface",
+      ...(route !== undefined ? { text: route } : { text: view }),
       bounds,
       pressable: false,
     },
@@ -422,6 +526,22 @@ export function installVdpProbe(options?: { readonly enabled?: boolean | undefin
             view,
             ...(route !== undefined ? { route } : {}),
             nodes: [tree],
+          });
+          return;
+        }
+        case "UI.dumpLayout": {
+          const p = GetTreeParamsSchema.safeParse(params);
+          if (!p.success) {
+            postResponse(reqId, undefined, { code: VDP_ERR_INVALID_PARAMS, message: p.error.message });
+            return;
+          }
+          const maxDepth = p.data.maxDepth ?? 16;
+          const root = await buildLayoutTree(view, maxDepth);
+          const route = currentRouteFor(view);
+          postResponse(reqId, {
+            view,
+            ...(route !== undefined ? { route } : {}),
+            root,
           });
           return;
         }

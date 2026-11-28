@@ -89,7 +89,7 @@ export function ImagePanel() {
           </Field>
           <View class="min-w-0 gap-2">
             <View class="flex-row flex-wrap items-center gap-1.5">
-              <Each of={sizePresets}>
+              <Each of={sizePresets} key={(preset) => `${preset.width}x${preset.height}`}>
                 {(preset) => {
                   const active = () => width() === preset().width && height() === preset().height;
                   return (

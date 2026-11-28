@@ -444,8 +444,8 @@
      "_tag": "failed"
     },
     "policy": {
-     "branch": "s5784",
-     "kind": "managedWorktree",
+     "kind": "directCwd",
+     "permissionMode": "bypass",
      "repo": "s5783"
     },
     "profile": "s5780",
@@ -677,9 +677,6 @@
     "constraints": {
      "acceptance": false,
      "check": "s5869",
-     "frozen": [
-      "s5872"
-     ],
      "scope": [
       "s5870"
      ]
@@ -1438,9 +1435,6 @@
      "constraints": {
       "acceptance": false,
       "check": "s4937",
-      "frozen": [
-       "s4940"
-      ],
       "scope": [
        "s4938"
       ]
@@ -1620,7 +1614,7 @@
       }
      ],
      "brief": "s5000",
-     "controller": "orchestrator",
+     "controller": "daemon",
      "cwd": "s5003",
      "hiredAt": 5004,
      "id": "s4996",
@@ -1653,8 +1647,8 @@
       "since": 5017
      },
      "policy": {
-      "branch": "s5002",
-      "kind": "managedWorktree",
+      "kind": "directCwd",
+      "permissionMode": "bypass",
       "repo": "s5001"
      },
      "profile": "s4998",
@@ -1784,7 +1778,7 @@
     {
      "bindings": [],
      "brief": "s5077",
-     "controller": "orchestrator",
+     "controller": "daemon",
      "hiredAt": 5078,
      "id": "s5073",
      "name": "s5074",

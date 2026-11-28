@@ -118,7 +118,7 @@ export function LabOverridesTab(props: { overrides: () => DebugOverrideConfig; o
       <View class="gap-3 rounded-md border border-line bg-page p-3">
         <Field label={t("web.devtools.lab.rpcDelayMs")}>
           <View class="flex-row flex-wrap items-center gap-1.5">
-            <Each of={LATENCY_PRESETS_MS}>
+            <Each of={LATENCY_PRESETS_MS} key={(ms) => ms}>
               {(ms) => (
                 <Button
                   size="compact"
@@ -137,7 +137,7 @@ export function LabOverridesTab(props: { overrides: () => DebugOverrideConfig; o
 
         <Field label={t("web.devtools.lab.sliceDelayMs")}>
           <View class="flex-row flex-wrap items-center gap-1.5">
-            <Each of={LATENCY_PRESETS_MS}>
+            <Each of={LATENCY_PRESETS_MS} key={(ms) => ms}>
               {(ms) => (
                 <Button
                   size="compact"
@@ -168,7 +168,7 @@ export function LabOverridesTab(props: { overrides: () => DebugOverrideConfig; o
         <Field label={t("web.devtools.lab.disconnectTopic")}>
           <View class="gap-1.5">
             <View class="flex-row flex-wrap gap-1">
-              <Each of={DISCONNECT_TOPICS}>
+              <Each of={DISCONNECT_TOPICS} key={(topic) => topic}>
                 {(topic) => (
                   <Button
                     size="compact"

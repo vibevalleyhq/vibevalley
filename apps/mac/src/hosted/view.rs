@@ -126,7 +126,7 @@ impl HostedView {
                             let reply_id = id.to_string();
                             let reply_host = reply_host.clone();
                             let active = active_connection.clone();
-                            vibevalley_rt::current_or_global_handle().spawn_blocking(move || {
+                            vibevalley_kit::rt::current_or_global_handle().spawn_blocking(move || {
                                 let env = handle_desktop_connection_op(&op_name, payload, &server_home(), &active);
                                 let _ = reply_host.send(format!("reply:{reply_id}"), serde_json::to_value(env).unwrap_or(Value::Null));
                             });

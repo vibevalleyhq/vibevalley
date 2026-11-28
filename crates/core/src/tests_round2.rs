@@ -69,51 +69,16 @@ fn dependencies_release_only_when_completed_or_canceled_missing_issues_remain_bl
     assert_eq!(blocked_issues(&issue, &all), vec!["review".to_string(), "missing".into()]);
 }
 
-fn child(id: &str, blocked_by: &[&str], status: IssueStatus, c: Option<IssueConstraints>) -> Issue {
-    let mut t = with_status(id, status);
-    t.parent = Some("p".into());
-    t.blocked_by = blocked_by.iter().map(|s| s.to_string()).collect();
-    t.constraints = c;
-    t
-}
-
 #[test]
-fn a_childs_checks_inherit_frozen_files_and_the_leaf_runs_every_acceptance_check() {
+fn work_constraints_formats_scope_check_and_acceptance() {
     let seed = IssueConstraints {
         acceptance: true,
         check: Some("sh check.sh".into()),
-        frozen: vec!["check.sh".into()],
-        ..Default::default()
+        scope: vec!["crates/core".into()],
     };
-    let own = IssueConstraints {
-        check: Some("cargo test".into()),
-        ..Default::default()
-    };
-    let all = vec![
-        child("seed", &[], IssueStatus::Done, Some(seed.clone())),
-        child("mid", &["seed"], IssueStatus::Todo, Some(own.clone())),
-        child("leaf", &["mid"], IssueStatus::Todo, None),
-    ];
-    assert_eq!(child_checks(&all[0], &all), CheckoutChecks::Acceptance { check: "sh check.sh".into() });
-    // Someone waits for it: only its own check.
-    assert_eq!(
-        child_checks(&all[1], &all),
-        CheckoutChecks::Plain {
-            frozen: vec!["check.sh".into()],
-            checks: vec!["cargo test".into()]
-        }
-    );
-    // The end of the chain runs the acceptance ancestors' checks.
-    assert_eq!(
-        child_checks(&all[2], &all),
-        CheckoutChecks::Plain {
-            frozen: vec!["check.sh".into()],
-            checks: vec!["sh check.sh".into()]
-        }
-    );
     let text = work_constraints(Some(&seed), &[]);
+    assert!(text.contains("crates/core"));
     assert!(text.contains("sh check.sh") && text.contains("检查应当失败"));
-    assert!(work_constraints(None, &["check.sh".into()]).contains("已经冻结"));
 }
 
 #[test]

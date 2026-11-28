@@ -3,9 +3,9 @@
 use serde::Deserialize;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    ActorKind, ActorRef, BacklogTriageSuggestInput, Caller, CriterionCheck, Deliverable, HumanPauseSource, Issue, IssueAnswer, IssueDigestGetInput,
-    IssueFilter, IssueMandate, IssueRefineInput, IssueRelation, IssueReportMemory, IssueRequest, IssueReviewInput, IssueStatus, IssueStatusUpdateInput,
-    IssueTimeline, IssueUpdateInput, MandateStrength, Priority, RepoHealthStatus, SubmitBranch, TriagePatch,
+    ActorKind, ActorRef, BacklogTriageSuggestInput, Caller, CriterionCheck, Deliverable, DeliveryReceipt, HumanPauseSource, Issue, IssueAnswer,
+    IssueDigestGetInput, IssueFilter, IssueMandate, IssueRefineInput, IssueRelation, IssueReportMemory, IssueRequest, IssueReviewInput, IssueStatus,
+    IssueStatusUpdateInput, IssueTimeline, IssueUpdateInput, MandateStrength, Priority, RepoHealthStatus, SubmitBranch, TriagePatch,
 };
 
 use super::registry::{Route, RouteSource, ToolRegistry, Who, given};
@@ -267,7 +267,7 @@ pub async fn stop(f: &ToolRegistry, who: &Who, a: IdArgs) -> Result<String, Stri
             .await
             .map_err(|e| e.to_string())
     } else {
-        f.runtime.stop_async(&w.id).await.map_err(|e| e.message)
+        f.runtime.stop_async(&w.id).await.map(|_| ()).map_err(|e| e.message)
     };
     Ok(match res {
         Ok(()) => format!("#{} 这一轮叫停了", item.number),
@@ -316,6 +316,8 @@ pub struct UpdateArgs {
     repo: Option<String>,
     criteria: Option<Vec<String>>,
     deliver: Option<Deliverable>,
+    #[serde(rename = "deliveryReceipt")]
+    delivery_receipt: Option<DeliveryReceipt>,
     priority: Option<String>,
     agent: Option<String>,
     owner: Option<ActorRef>,
@@ -326,11 +328,26 @@ pub struct UpdateArgs {
 }
 
 pub async fn update(f: &ToolRegistry, who: &Who, a: UpdateArgs) -> Result<String, String> {
-    authorize_who(f, who, AuthTier::Update)?;
     let item = match f.issue_async(&a.id).await {
         Ok(i) => i,
         Err(why) => return Ok(why),
     };
+    let helper_receipt_only = matches!(who, Who::Helper(h) if h.issue_id() == Some(item.id.as_str()))
+        && a.delivery_receipt.is_some()
+        && a.title.is_none()
+        && a.description.is_none()
+        && a.repo.is_none()
+        && a.criteria.is_none()
+        && a.deliver.is_none()
+        && a.priority.is_none()
+        && a.agent.is_none()
+        && a.owner.is_none()
+        && a.blocked_by.is_none()
+        && a.relations.is_none()
+        && a.attachments.is_none();
+    if !helper_receipt_only {
+        authorize_who(f, who, AuthTier::Update)?;
+    }
     let mut req = IssueUpdateInput {
         id: item.id.clone(),
         title: a.title,
@@ -338,6 +355,7 @@ pub async fn update(f: &ToolRegistry, who: &Who, a: UpdateArgs) -> Result<String
         repo: a.repo,
         criteria: a.criteria,
         deliver: a.deliver,
+        delivery_receipt: a.delivery_receipt,
         attachments: a.attachments,
         owner: a.owner,
         blocked_by: a.blocked_by,
@@ -371,6 +389,8 @@ pub struct StatusArgs {
     status: String,
     text: Option<String>,
     agent: Option<String>,
+    #[serde(rename = "deliveryReceipt")]
+    delivery_receipt: Option<DeliveryReceipt>,
 }
 
 pub async fn status(f: &ToolRegistry, who: &Who, a: StatusArgs) -> Result<String, String> {
@@ -388,6 +408,7 @@ pub async fn status(f: &ToolRegistry, who: &Who, a: StatusArgs) -> Result<String
         text: given(&a.text).map(String::from),
         agent: None,
         edit: None,
+        delivery_receipt: a.delivery_receipt,
         request_key: None,
     };
     let needed = to == IssueStatus::Todo && item.status == IssueStatus::Backlog && item.assigned_agent().is_none();
@@ -541,6 +562,7 @@ pub async fn create(f: &ToolRegistry, who: &Who, a: CreateArgs) -> Result<String
             text: None,
             agent: None,
             edit: None,
+            delivery_receipt: None,
             request_key: None,
         })
         .await
@@ -554,14 +576,15 @@ pub async fn create(f: &ToolRegistry, who: &Who, a: CreateArgs) -> Result<String
         return Ok(format!("{noted}，在 #{} 排进待办：有空位就开工", channel.name));
     };
     Ok(match f.worker_of_async(&now_item).await {
-        Some(h) => format!(
-            "{noted}，已在 #{} 派 {}（{}）去 {}{}",
-            channel.name,
-            h.name,
-            h.id,
-            now_item.repo.clone().unwrap_or_default(),
-            h.worktree_branch().map(|b| format!("，分支 {b}")).unwrap_or_default()
-        ),
+        Some(h) => {
+            let where_at = now_item
+                .repo
+                .as_deref()
+                .filter(|r| !r.is_empty())
+                .map(|r| format!("去 {r}"))
+                .unwrap_or_else(|| "开工".to_string());
+            format!("{noted}，已在 #{} 派 {}（{}）{where_at}", channel.name, h.name, h.id)
+        }
         None => format!("{noted}，在 #{} 排进待办：有空位就开工", channel.name),
     })
 }
@@ -661,6 +684,8 @@ pub struct ReportArgs {
     #[serde(default, rename = "prSubmit")]
     pr_submit: bool,
     answer: Option<IssueAnswer>,
+    #[serde(rename = "deliveryReceipt")]
+    delivery_receipt: Option<DeliveryReceipt>,
 }
 
 pub async fn report(f: &ToolRegistry, who: &Who, a: ReportArgs) -> Result<String, String> {
@@ -671,11 +696,15 @@ pub async fn report(f: &ToolRegistry, who: &Who, a: ReportArgs) -> Result<String
     if mode == RunMode::Drafting {
         return Err("没成：当前起草模式只读，不能调用 issue_report。".into());
     }
+    let mut delivery_receipt = a.delivery_receipt;
     if a.pr_submit {
         if mode == RunMode::ReadOnlyAnswer {
             return Err("没成：当前只读问答模式不能提交 PR。".into());
         }
-        submit(f, who, Some(&a.summary)).await?;
+        let submitted_receipt = submit(f, who, Some(&a.summary)).await?;
+        if delivery_receipt.is_none() {
+            delivery_receipt = submitted_receipt;
+        }
     }
     let report = Report {
         status: if a.questions.is_empty() { ReportStatus::Done } else { ReportStatus::Blocked },
@@ -684,6 +713,7 @@ pub async fn report(f: &ToolRegistry, who: &Who, a: ReportArgs) -> Result<String
         answer: a.answer,
         checks: a.checks,
         remember: a.remember,
+        delivery_receipt,
     };
     f.runtime.report_async(&me.id, &report).await.map_err(|e| e.to_string())?;
     Ok("报告已记录；现在用简短正文说明结果。".into())
@@ -695,22 +725,32 @@ pub struct PrArgs {
 }
 
 pub async fn pr_submit(f: &ToolRegistry, who: &Who, a: PrArgs) -> Result<String, String> {
-    submit(f, who, a.summary.as_deref()).await.map(|r| format!("PR 已提交：{r}"))
+    let receipt = submit(f, who, a.summary.as_deref()).await?;
+    let label = match receipt.as_ref() {
+        Some(DeliveryReceipt::PullRequest { url, .. }) => url.clone(),
+        _ => String::new(),
+    };
+    Ok(format!("PR 已提交：{label}"))
 }
 
 /// `submitPullRequest`: only on the user's explicit word, on an issue that delivers by pull request.
-async fn submit(f: &ToolRegistry, who: &Who, summary: Option<&str>) -> Result<String, String> {
+async fn submit(f: &ToolRegistry, who: &Who, summary: Option<&str>) -> Result<Option<DeliveryReceipt>, String> {
     let (me, issue) = helper_issue_async(f, who).await.map_err(|_| t("server.issue.prSubmitNotCurrent", &[]))?;
     if issue.mandate.strength != MandateStrength::Explicit || !issue.mandate.auto_submit_pr {
         return Err(t("server.issue.prSubmitNotAllowed", &[]));
     }
-    let (Deliverable::PullRequest, Some(cwd), Some(branch)) = (issue.deliver, me.cwd.clone(), me.worktree_branch().map(String::from)) else {
+    let (Deliverable::PullRequest, Some(cwd)) = (issue.deliver, me.cwd.clone()) else {
         return Err(t("server.issue.prSubmitUnavailable", &[]));
     };
     let repo = vibevalley_git::Repo::discover_async(std::path::Path::new(&cwd))
         .await
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "not a git repository".to_string())?;
+    let branch = repo
+        .head_async()
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| t("server.issue.prSubmitUnavailable", &[]))?;
     let sha = repo.commit_id_async("HEAD").await.map_err(|e| e.to_string())?;
     let written = match vibevalley_git::read::git_path(repo.root(), std::path::Path::new("vibevalley-pr.md")) {
         Ok(p) => tokio::fs::read_to_string(&p).await.ok().and_then(|text| pull_request_text(&text)),
@@ -727,7 +767,22 @@ async fn submit(f: &ToolRegistry, who: &Who, summary: Option<&str>) -> Result<St
         dry_run: None,
     };
     let data = f.pull.publish_async(&req, Some(&issue.id)).await.map_err(|e| e.message)?;
-    Ok(data.url.unwrap_or(data.branch))
+    let url = data.url.clone().unwrap_or_else(|| data.branch.clone());
+    let receipt = DeliveryReceipt::PullRequest {
+        url,
+        number: data.number,
+        branch: Some(data.branch),
+        summary: summary.map(|s| s.trim().to_string()).filter(|s| !s.is_empty()),
+    };
+    let _ = f
+        .issue
+        .update_from_input_async(IssueUpdateInput {
+            id: issue.id.clone(),
+            delivery_receipt: Some(receipt.clone()),
+            ..Default::default()
+        })
+        .await;
+    Ok(Some(receipt))
 }
 
 #[derive(Deserialize)]

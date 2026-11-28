@@ -93,7 +93,7 @@ export function RunListRow(props: { entry: RunEntry; look?: Look | undefined; se
           </If>
           <View class="flex-1" />
           <If when={when()}>
-            <Text class="shrink-0 text-2xs text-faint tabular-nums">{when()}</Text>
+            <Text class="shrink-0 whitespace-nowrap text-2xs text-faint tabular-nums">{when()}</Text>
           </If>
         </View>
         <If when={entrySubtitle(props.entry)}>
