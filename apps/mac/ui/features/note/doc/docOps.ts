@@ -5,6 +5,7 @@ import { issueId, noteId } from "@vibevalley/protocol/schema";
 import type { IconName } from "../../../design/icons";
 import type { DotTone } from "../../../design/Tag";
 import { matches } from "../../../infra/base/search";
+import { isValidHashIssueBoundary } from "./richInlineCodec";
 
 export const ISSUE_STATUS_DOT_TONE: Record<IssueStatus, DotTone> = {
   backlog: "faint",
@@ -585,7 +586,7 @@ export function formatWikilinkToken(kind: "note" | "issue", id: string, label: s
   return cleanLabel ? `${prefix}${kind}:${id}|${cleanLabel}]]` : `${prefix}${kind}:${id}]]`;
 }
 
-export function applyWikilinkReplacementWithCaret(
+function applyWikilinkReplacementWithCaret(
   text: string,
   startIndex: number,
   token: string,
@@ -619,12 +620,13 @@ interface InlineStyleRun {
   readonly value: string;
 }
 
-const INLINE_TOKEN_RE = /(!?\[\[(note|issue):([^\]|]+?)(?:\|([^\]]*))?\]\])|((?:^|[\s([,:;])#(\d+)(?![a-zA-Z0-9_]))/gu;
+const INLINE_TOKEN_RE = /(!?\[\[(?:(note|issue):([^\]|]+?)|#(\d+))(?:\|([^\]]*))?\]\])|((?:^|[\s([,:;/，。、；：！？（【「『《])#(\d+)(?![a-zA-Z0-9_]))/gu;
 const INLINE_MARKDOWN_RE = /(\*\*([^*\n]+?)\*\*)|(`([^`\n]+?)`)|(~~([^~\n]+?)~~)|(\*([^*\n]+?)\*)/gu;
 
 export function hasInlineRichTokens(text: string): boolean {
   if (!text) return false;
-  if (text.includes("[[") || /(?:^|[\s([,:;])#\d+/u.test(text)) return true;
+  if (text.includes("[[")) return true;
+  if (/(?:^|[\s([,:;，。、；：！？（【「『《])#\d+/u.test(text) || /#\d+\/#\d+/u.test(text)) return true;
   return /\*\*[^*\n]+?\*\*|`[^`\n]+?`|~~[^~\n]+?~~/u.test(text);
 }
 
@@ -669,26 +671,33 @@ export function parseInlineLinkSegments(text: string): readonly InlineSegment[] 
         out.push({ kind: "text", value: text.slice(cursor, m.index) });
       }
       const embed = m[1].startsWith("!");
-      const kind = m[2] === "note" ? "note" : "issue";
-      const rawId = (m[3] ?? "").trim();
-      const id = kind === "issue" ? rawId.replace(/^#/u, "") : rawId;
-      const alias = m[4]?.trim() ?? "";
-      out.push({
-        kind,
-        id,
-        label: alias || (kind === "issue" ? `#${id}` : id),
-        embed,
-      });
+      const alias = m[5]?.trim() ?? "";
+      if (m[4] !== undefined) {
+        out.push({ kind: "issueNumber", number: Number.parseInt(m[4], 10) });
+      } else {
+        const kind = m[2] === "note" ? "note" : "issue";
+        const rawId = (m[3] ?? "").trim();
+        const id = kind === "issue" ? rawId.replace(/^#/u, "") : rawId;
+        out.push({
+          kind,
+          id,
+          label: alias || (kind === "issue" ? `#${id}` : id),
+          embed,
+        });
+      }
       cursor = m.index + m[1].length;
-    } else if (m[5] !== undefined && m[6] !== undefined) {
-      const hashPos = m[5].lastIndexOf("#");
+    } else if (m[6] !== undefined && m[7] !== undefined) {
+      const hashPos = m[6].lastIndexOf("#");
       const tokenStart = m.index + hashPos;
+      if (!isValidHashIssueBoundary(text.slice(0, tokenStart), true)) {
+        continue;
+      }
       if (tokenStart > cursor) {
         out.push({ kind: "text", value: text.slice(cursor, tokenStart) });
       }
-      const num = Number.parseInt(m[6], 10);
+      const num = Number.parseInt(m[7], 10);
       out.push({ kind: "issueNumber", number: num });
-      cursor = tokenStart + 1 + m[6].length;
+      cursor = tokenStart + 1 + m[7].length;
     }
   }
   if (cursor < text.length) {
@@ -1277,8 +1286,9 @@ export function resolveIssueRef(issues: readonly Issue[], idOrNumber: string): I
   if (!clean) return undefined;
   const direct = issues.find((i) => i.id === idOrNumber || i.id === clean);
   if (direct) return direct;
-  if (/^\d+$/u.test(clean)) {
-    const num = Number.parseInt(clean, 10);
+  const match = /^(?:i|issue[-_:]?)?(\d+)$/iu.exec(clean);
+  if (match?.[1]) {
+    const num = Number.parseInt(match[1], 10);
     return issues.find((i) => i.number === num);
   }
   return undefined;

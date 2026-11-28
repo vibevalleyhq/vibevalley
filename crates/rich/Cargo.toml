@@ -12,7 +12,7 @@ path = "tests/suite.rs"
 
 [dependencies]
 base64 = { workspace = true }
-nsh-base = { version = "0.7.1", default-features = false, features = ["editor"] }
+nsh-base = { version = "0.7.1", default-features = false, features = ["editor", "rich-editor"] }
 nsh-core = { version = "0.7.1", default-features = false, features = ["svg"] }
 percent-encoding = { workspace = true }
 quick-xml = { workspace = true }

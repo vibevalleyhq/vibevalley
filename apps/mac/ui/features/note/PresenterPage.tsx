@@ -1,4 +1,4 @@
-import { cleanup, computed, keymap, Scroll, signal, Text, View } from "nsh";
+import { cleanup, computed, keymap, Scroll, signal, Text, untracked, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import type { DocBlock, DocView, Issue, IssueId, Note, NoteId } from "@vibevalley/protocol";
@@ -239,13 +239,22 @@ function PresenterSlideBlock(props: {
 
       <If when={props.block.type === "kpi" ? props.block : undefined}>
         {(blk) => (
-          <View testID={`presenter-block-kpi-${blk().id}`} class="flex-row flex-wrap gap-2">
+          <View
+            testID={`presenter-block-kpi-${blk().id}`}
+            class={
+              blk().items.length === 2 || blk().items.length === 4
+                ? "grid grid-cols-1 gap-2 sm:grid-cols-2"
+                : "grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3"
+            }
+          >
             <Each of={blk().items} key="index">
               {(metric) => (
-                <View class="min-w-28 flex-1 gap-0.5 rounded-md border border-line bg-side px-3 py-2">
+                <View class="min-w-0 gap-0.5 overflow-hidden rounded-md border border-line bg-side px-3 py-2">
                   <Text class="truncate text-2xs text-muted">{metric().label}</Text>
-                  <Text class="font-mono text-base font-semibold text-ink tabular-nums">{metric().value}</Text>
-                  <If when={metric().delta}>{(delta) => <Text class="font-mono text-2xs text-accent tabular-nums">{delta()}</Text>}</If>
+                  <View class="max-w-full flex-row flex-wrap items-baseline gap-1.5">
+                    <Text class="font-mono text-base font-semibold text-ink tabular-nums">{metric().value}</Text>
+                    <If when={metric().delta}>{(delta) => <Text class="max-w-full truncate font-mono text-2xs text-accent tabular-nums">{delta()}</Text>}</If>
+                  </View>
                 </View>
               )}
             </Each>
@@ -355,7 +364,7 @@ function Presenter(props: { id: string; version: number }) {
   };
   const goBack = () => router.navigate(noteHref(props.id, props.version > 0 ? props.version : undefined));
   const now = useNow(1000);
-  const started = signal(now());
+  const started = signal(untracked(now));
   const step = (n: 1 | -1) => {
     if (pages() > 0) at.set(stepped({ at: at(), step: n, pages: pages() }));
   };

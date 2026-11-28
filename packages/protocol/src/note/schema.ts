@@ -346,6 +346,7 @@ export const NotePresence = z.object({
   id: z.string(),
   name: z.string(),
   color: z.exactOptional(z.string()),
+  avatar: z.exactOptional(z.string()),
   kind: NotePresenceKind,
   x: z.exactOptional(z.number()),
   y: z.exactOptional(z.number()),

@@ -606,7 +606,7 @@ export function MediaView(props: MediaViewProps) {
 
   return (
     <View testID="note-media-view" class="min-h-0 min-w-0 flex-1 bg-page">
-      <View class="shrink-0 flex-row items-center justify-between gap-2 border-b border-line bg-page px-4 py-2">
+      <View class="shrink-0 flex-row items-center justify-between gap-2 bg-page px-4 py-2">
         <Segmented testid="media-mode-tabs" label={t("web.note.page.viewMode")} value={tabMode()} onChange={(m) => tabMode.set(m)} options={tabOptions()} />
         <View class="shrink-0 flex-row items-center gap-2">
           <If when={mediaDoc().durationSec !== undefined && (mediaDoc().durationSec ?? 0) > 0}>
@@ -616,14 +616,8 @@ export function MediaView(props: MediaViewProps) {
       </View>
 
       <If when={tabMode() === "media"}>
-        <Scroll testID="media-items-panel" class="min-h-0 flex-1" contentClass="gap-4 p-4">
-          <If when={mediaDoc().caption}>
-            {(cap) => (
-              <View class="rounded-lg border border-line bg-side px-3.5 py-2.5">
-                <Text class="text-xs leading-relaxed text-ink">{cap()}</Text>
-              </View>
-            )}
-          </If>
+        <Scroll testID="media-items-panel" class="min-h-0 flex-1" contentClass="gap-4 px-4 pt-2 pb-6">
+          <If when={mediaDoc().caption}>{(cap) => <Text class="text-xs leading-relaxed text-muted">{cap()}</Text>}</If>
 
           <If when={mediaDoc().items.length > 0 || assetFiles().length > 0} else={<Empty icon="media">{t("web.library.empty")}</Empty>}>
             <View class="gap-3">
@@ -751,7 +745,7 @@ export function MediaView(props: MediaViewProps) {
           </If>
 
           <If when={mediaDoc().topTranscript.length > 0}>
-            <View testID="media-top-transcript" class="gap-1.5 rounded-xl border border-line bg-side p-3.5">
+            <View testID="media-top-transcript" class="gap-1.5 border-t border-line pt-3">
               <Each of={mediaDoc().topTranscript} key={(cue) => cue.id}>
                 {(cue) => (
                   <View class="flex-row items-start gap-2.5">
@@ -766,7 +760,7 @@ export function MediaView(props: MediaViewProps) {
             </View>
           </If>
           <If when={mediaDoc().topTranscript.length === 0 && mediaDoc().topTranscriptExcerpt !== ""}>
-            <View testID="media-top-transcript-excerpt" class="gap-1 rounded-xl border border-line bg-side p-3.5">
+            <View testID="media-top-transcript-excerpt" class="gap-1 border-t border-line pt-3">
               <Text class="text-2xs font-semibold text-muted">{t("web.note.media.transcriptPreview")}</Text>
               <Text class="text-xs leading-relaxed text-ink">{mediaDoc().topTranscriptExcerpt}</Text>
             </View>

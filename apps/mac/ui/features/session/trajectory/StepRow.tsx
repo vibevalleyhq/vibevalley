@@ -77,10 +77,10 @@ export function Row(props: { spec: RowSpec; open: boolean; marked: boolean; refT
             <ToolLine step={step()} failed={failed()} />
           </If>
         </View>
-        <View class="shrink-0 flex-row items-center gap-1.5">
-          <Text class={`text-2xs text-faint ${props.open ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
-            {props.open ? t("web.session.trajectory.hideDetail") : t("web.session.trajectory.inspect")}
-          </Text>
+        <View class="relative shrink-0 flex-row items-center gap-1.5">
+          <If when={props.open}>
+            <Text class="text-2xs text-faint">{t("web.session.trajectory.hideDetail")}</Text>
+          </If>
           <If when={durationLabel()}>{(dur) => <Text class="whitespace-nowrap font-mono text-2xs text-faint tabular-nums">{dur()}</Text>}</If>
           <If when={tokenLabel()}>{(tok) => <Text class="whitespace-nowrap font-mono text-2xs text-faint tabular-nums">{tok()}</Text>}</If>
           <If when={failed()}>

@@ -166,7 +166,7 @@ describe("Interactive MediaAnnotation overlay, Lightbox, BaseEmbed linkage & Tab
     await app.press("id:lightbox-close");
     await app.waitFor("id:lightbox", { state: "gone" });
 
-    // 7. Table Block Tab navigation & row/col quick insert.
+    // 7. Table Block Tab navigation & row/col menu insert.
     await app.press("id:doc-table-cell-t_matrix-0-0");
     await app.waitFor("id:doc-table-cell-input-t_matrix-0-0");
     await app.keyboard.press("tab");
@@ -174,6 +174,8 @@ describe("Interactive MediaAnnotation overlay, Lightbox, BaseEmbed linkage & Tab
     await app.keyboard.press("shift+tab");
     await app.waitFor("id:doc-table-cell-input-t_matrix-0-0");
 
+    await app.press("id:doc-table-row-menu-t_matrix-1");
+    await app.waitFor("id:doc-table-ins-row-t_matrix-1");
     await app.press("id:doc-table-ins-row-t_matrix-1");
     await app.waitFor("id:doc-table-cell-input-t_matrix-2-0");
   });

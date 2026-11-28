@@ -22,6 +22,7 @@ import {
   type VvWhiteboardSelectionEvent,
   type VvWhiteboardViewportEvent,
 } from "../../infra/rich";
+import { filterRemotePresences, NotePresenceBadges } from "./PresenceBadges";
 import { useNotePresence } from "./store";
 import { type NoteDirectoryClient, saveBase64File, saveTextFile, useNoteDirectory } from "./views/noteFiles";
 
@@ -82,6 +83,7 @@ interface BoardDocument {
 interface PresenceWire {
   readonly id: string;
   readonly name: string;
+  readonly avatar?: string | undefined;
   readonly color?: string | undefined;
   readonly kind?: NotePresenceKind | undefined;
   readonly x?: number | undefined;
@@ -225,6 +227,7 @@ export function WhiteboardView(props: WhiteboardViewerProps) {
       out.push({
         id: peer.id,
         name: peer.name,
+        avatar: peer.avatar,
         color: peer.color,
         kind: peer.kind,
         x: peer.x,
@@ -410,9 +413,10 @@ export function WhiteboardView(props: WhiteboardViewerProps) {
 
     const boardReady = computed(() => !snapshot().loading || boardRaw() !== undefined);
     const nativeMountKey = computed(() => `${props.note.id}:${colorScheme()}`);
+    const badgePeers = computed(() => filterRemotePresences(presences(), localUserParticipant));
 
     return (
-      <View testID="whiteboard-view" class="min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border border-line bg-side">
+      <View testID="whiteboard-view" class="relative min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border border-line bg-side">
         <If when={boardReady()} else={<View testID="wb-loading" class="min-h-0 min-w-0 flex-1 bg-side" />}>
           <Keyed key={nativeMountKey()}>
             {() => (
@@ -433,6 +437,9 @@ export function WhiteboardView(props: WhiteboardViewerProps) {
               />
             )}
           </Keyed>
+        </If>
+        <If when={badgePeers().length > 0}>
+          <NotePresenceBadges peers={badgePeers()} testIdPrefix="whiteboard-presence-badge" class="pointer-events-none absolute top-14 right-3 z-20" />
         </If>
       </View>
     );
@@ -573,8 +580,8 @@ function WhiteboardHeadlessFallback(props: HeadlessProps) {
   };
 
   return (
-    <View testID="whiteboard-view" class="min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border border-line bg-side">
-      <View class="min-h-10 shrink-0 flex-row items-center gap-1.5 border-b border-line bg-page px-3 py-1">
+    <View testID="whiteboard-view" class="relative min-h-0 min-w-0 flex-1 overflow-hidden bg-side">
+      <View class="absolute top-3 right-3 left-3 z-10 min-h-10 flex-row items-center gap-1.5 rounded-lg border border-line bg-elevated px-2.5 py-1 shadow-float">
         <If when={!props.readOnly}>
           <Button icon="add" testID="wb-add-node" disabled={act.busy()} onPress={addNode}>
             {t("web.note.whiteboard.sticky")}
@@ -619,7 +626,7 @@ function WhiteboardHeadlessFallback(props: HeadlessProps) {
       </View>
 
       <View class="min-h-0 min-w-0 flex-1 flex-row">
-        <View testID="wb-canvas" accessibilityLabel={props.title} class="min-h-0 min-w-0 flex-1 bg-side p-4">
+        <View testID="wb-canvas" accessibilityLabel={props.title} class="min-h-0 min-w-0 flex-1 bg-side px-4 pt-16 pb-4">
           <If
             when={elements().length > 0}
             else={

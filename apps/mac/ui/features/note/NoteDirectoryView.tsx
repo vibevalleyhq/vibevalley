@@ -196,14 +196,14 @@ export function NoteDirectoryView(props: NoteDirectoryViewProps) {
                     testID={`note-file-row-${f().path}`}
                     accessibilityState={{ selected: selected() }}
                     onPress={() => selectFile(f().path)}
-                    class={`group flex-row items-center gap-1.5 rounded-md border px-2 py-1.5 ${
+                    class={`group relative flex-row items-center gap-1.5 rounded-md border px-2 py-1.5 pr-7 ${
                       selected() ? "border-accent bg-selected" : "border-transparent hover:bg-hover"
                     }`}
                   >
                     <Icon name="file" size={12} tone={selected() ? "ink" : "muted"} />
-                    <Text class={`min-w-0 flex-1 truncate font-mono text-2xs ${selected() ? "font-semibold text-ink" : "text-muted"}`}>{f().path}</Text>
+                    <Text class={`min-w-0 flex-1 truncate font-mono text-2xs font-medium ${selected() ? "text-ink" : "text-muted"}`}>{f().path}</Text>
                     <If when={deletable()}>
-                      <View class="opacity-0 group-hover:opacity-100 focus-within:opacity-100">
+                      <View class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100">
                         <IconButton
                           icon="delete"
                           size={12}

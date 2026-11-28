@@ -270,7 +270,7 @@ export function BlockedByChips(props: {
                 style={active() ? { borderColor: mix("wheat", 0.45) } : undefined}
               >
                 <Icon name="lock" size={props.compact === true ? 9 : 10} tone={active() ? "warn-ink" : "muted"} />
-                <Text class={`truncate font-mono text-2xs leading-3.5 ${active() ? "font-medium text-warn-ink" : "text-muted line-through"}`}>
+                <Text class={`truncate font-mono text-2xs font-medium leading-3.5 ${active() ? "text-warn-ink" : "text-muted line-through"}`}>
                   {chipText()}
                 </Text>
               </View>

@@ -1,5 +1,5 @@
 // Narrow host boundary for core `design/` primitives so design components stay completely decoupled from `infra/`.
-import { context, nativeModule, type ComponentHostProps, type JSX, type Modifiers, type ViewRef } from "nsh";
+import { context, nativeModule, untracked, type ComponentHostProps, type JSX, type Modifiers, type ViewRef } from "nsh";
 import type { TextViewClasses, TextViewLinks, TextViewStyles } from "nsh/base";
 
 import type { Agent, Attachment, Missing, RuntimeInfo, SettingsStatus } from "@vibevalley/protocol";
@@ -22,8 +22,13 @@ export interface DesignAttachmentFile {
 export interface DesignProbeNode {
   readonly testId: string;
   readonly role?: string;
+  readonly parentId?: string | undefined;
   readonly text?: () => string | undefined;
   readonly getRef?: () => ViewRef | undefined;
+  readonly getLineCount?:
+    | ((bounds: { readonly x: number; readonly y: number; readonly width: number; readonly height: number } | undefined) => number | undefined)
+    | undefined;
+  readonly getFocused?: (() => boolean | undefined) | undefined;
   readonly onPress?: () => void;
 }
 
@@ -238,7 +243,7 @@ export function useDesignAttachmentUrl(id: () => string): () => string | undefin
 
 export function DesignHostProvider(props: { host: DesignHost; children: JSX.Element }) {
   installScrollbarTheme();
-  const resolved: ResolvedDesignHost = { ...defaultDesignHost, ...props.host };
+  const resolved: ResolvedDesignHost = untracked(() => ({ ...defaultDesignHost, ...props.host }));
   return <DesignHostContext.Provider value={resolved}>{props.children}</DesignHostContext.Provider>;
 }
 

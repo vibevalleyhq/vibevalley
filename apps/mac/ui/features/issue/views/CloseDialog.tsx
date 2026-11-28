@@ -44,8 +44,8 @@ import { Note, SheetLabel } from "./Sheet";
 
 /** Closing an issue: complete it (its changes first) or cancel it. `review` opens straight on the changes. */
 export function CloseIssueDialog(props: { issue: Issue; session?: Session | undefined; review?: boolean; lane?: Lane | undefined; onClose: () => void }) {
-  const flow = signal<CloseFlowState>(initialCloseFlow(props.review ?? false));
-  const receiptDraft = signal<DeliveryReceiptDraft>(initialReceiptDraft(props.issue.deliveryReceipt));
+  const flow = signal<CloseFlowState>(untracked(() => initialCloseFlow(props.review ?? false)));
+  const receiptDraft = signal<DeliveryReceiptDraft>(untracked(() => initialReceiptDraft(props.issue.deliveryReceipt)));
   const receiptError = signal("");
   const directBusy = signal(false);
   const patchReceipt = (next: DeliveryReceiptDraft) => {

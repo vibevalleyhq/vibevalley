@@ -1,5 +1,3 @@
-import type { Bounds } from "nsh";
-
 import type { DocBlock } from "@vibevalley/protocol";
 
 export interface FocusRequest {
@@ -34,21 +32,6 @@ export interface BlockEditorTelemetryPatch {
   readonly caretPageBounds?: BlockEditorCaretRect | undefined;
 }
 
-export function roundBounds(b: Bounds): BlockEditorCaretRect {
-  return {
-    x: Math.round(b.origin.x * 10) / 10,
-    y: Math.round(b.origin.y * 10) / 10,
-    width: Math.round(b.size.width * 10) / 10,
-    height: Math.round(b.size.height * 10) / 10,
-  };
-}
-
-export function resolveRequestedCaret(caret: "start" | "end" | number | undefined, textLength: number): number {
-  if (caret === "start") return 0;
-  if (caret === "end" || caret === undefined) return textLength;
-  return Math.max(0, Math.min(textLength, caret));
-}
-
 export function headingTextClass(level: number): string {
   switch (level) {
     case 1:
@@ -60,14 +43,50 @@ export function headingTextClass(level: number): string {
   }
 }
 
-export function outerBlockSpacingClass(block: DocBlock): string {
-  if (block.type !== "heading") return "";
-  switch (block.level) {
-    case 1:
-      return "mt-5 mb-0.5";
-    case 2:
-      return "mt-4 mb-0.5";
-    default:
-      return "mt-2.5";
+const CARD_LIKE_BLOCKS: ReadonlySet<DocBlock["type"]> = new Set([
+  "kpi",
+  "table",
+  "callout",
+  "code",
+  "diagram",
+  "chart",
+  "baseEmbed",
+  "media",
+  "compare",
+  "quote",
+  "issueCard",
+  "issueList",
+  "preview",
+  "bookmark",
+  "math",
+  "columns",
+  "toggle",
+  "toc",
+  "pageBreak",
+]);
+
+export function outerBlockSpacingClass(block: DocBlock, prevBlock?: DocBlock): string {
+  if (prevBlock === undefined) {
+    return block.type === "heading" ? "mt-1 mb-0.5" : "";
   }
+  if (block.type === "heading") {
+    switch (block.level) {
+      case 1:
+        return "mt-5 mb-0.5";
+      case 2:
+        return "mt-4 mb-0.5";
+      default:
+        return "mt-3 mb-0.5";
+    }
+  }
+  if ((block.type === "todo" && prevBlock.type === "todo") || (block.type === "list" && prevBlock.type === "list")) {
+    return "mt-0";
+  }
+  if (prevBlock.type === "heading") {
+    return "mt-1";
+  }
+  if (CARD_LIKE_BLOCKS.has(block.type) || CARD_LIKE_BLOCKS.has(prevBlock.type)) {
+    return "mt-2.5";
+  }
+  return "mt-1.5";
 }

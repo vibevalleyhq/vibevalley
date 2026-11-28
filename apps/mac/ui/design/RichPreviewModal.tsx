@@ -145,7 +145,7 @@ export function RichPreviewModal(props: RichPreviewModalProps) {
             >
               <Scroll class="min-h-0 flex-1" contentClass="items-center justify-center p-5">
                 <View testID="rich-preview-diagram-pane" class="max-w-full">
-                  <Scroll horizontal class="max-w-full">
+                  <Scroll horizontal class="max-w-full" contentClass="flex-row">
                     <Diagram source={item().source} maxWidth={maxDiagramWidth()} interactive={false} />
                   </Scroll>
                 </View>

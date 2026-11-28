@@ -202,7 +202,7 @@ export function OrchestratorProfile(props: { saved?: Agent | undefined; start: A
         <View class="gap-2">
           <Text class="text-xs font-medium text-muted">{t("web.agent.orchestrator.look")}</Text>
           <View role="radiogroup" accessibilityLabel={t("web.agent.orchestrator.look")} class="grid grid-cols-3 gap-2 sm:grid-cols-6">
-            <Each of={orchestratorLooks}>
+            <Each of={orchestratorLooks} key={(look) => look.id}>
               {(look) => {
                 const on = () => (draft().look.orchestrator ?? "farmer") === look().id;
                 return (

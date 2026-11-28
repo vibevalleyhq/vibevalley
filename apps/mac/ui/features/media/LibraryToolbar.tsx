@@ -44,7 +44,7 @@ function FilterChip(props: {
       }`}
     >
       <If when={props.icon}>{(name) => <Icon name={name()} size={13} tone={props.iconTone ?? (props.active ? "ink" : "muted")} />}</If>
-      <Text class={`text-xs ${props.active ? "font-semibold text-ink" : "font-medium text-muted"}`}>{props.label}</Text>
+      <Text class={`text-xs font-medium ${props.active ? "text-ink" : "text-muted"}`}>{props.label}</Text>
       <If when={props.count > 0}>
         <Text class={`font-mono text-2xs tabular-nums ${props.active ? "text-muted" : "text-faint"}`}>{String(props.count)}</Text>
       </If>

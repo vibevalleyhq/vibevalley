@@ -22,7 +22,7 @@ use tokio_util::sync::{CancellationToken, DropGuard};
 use vibevalley_protocol::{
     VDP_PROTOCOL_VERSION, VdpAckResult, VdpCommand, VdpEndpointInfo, VdpError, VdpEvent, VdpInputResult, VdpLogEntry, VdpLogLevel, VdpNotification,
     VdpPageFrameEvent, VdpPageMetrics, VdpRequest, VdpResponse, VdpScreenshotResult, VdpTarget, VdpTargetKind, VdpTargetListResult, VdpUiBounds,
-    VdpUiConsoleEvent, VdpUiNode, VdpUiPressResult, VdpUiQueryResult, VdpUiTreeResult, VdpUiWaitForResult, VdpVersionInfo, home,
+    VdpUiConsoleEvent, VdpUiDumpLayoutResult, VdpUiNode, VdpUiPressResult, VdpUiQueryResult, VdpUiTreeResult, VdpUiWaitForResult, VdpVersionInfo, home,
 };
 
 #[derive(Clone)]
@@ -235,6 +235,10 @@ async fn drive_mock_vdp_ws(mut socket: WebSocket, state: MockVdpState) {
                     }],
                 };
                 send_json(&mut socket, &VdpResponse::ok(req.id, serde_json::to_value(tree).unwrap(), req.session_id)).await;
+            }
+            VdpCommand::UiDumpLayout(_) => {
+                let out = VdpUiDumpLayoutResult::default();
+                send_json(&mut socket, &VdpResponse::ok(req.id, serde_json::to_value(out).unwrap(), req.session_id)).await;
             }
             VdpCommand::UiQuery(p) => {
                 let out = VdpUiQueryResult {

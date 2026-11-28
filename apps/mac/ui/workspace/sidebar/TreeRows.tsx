@@ -1,4 +1,4 @@
-import { Clipboard, computed, Image, Text, View } from "nsh";
+import { Clipboard, computed, Image, Text, View, type ViewRef } from "nsh";
 import { Button, Menu, MenuItem, MenuSeparator } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
@@ -9,6 +9,7 @@ import { ActiveBar } from "../../design/layout";
 import { motionClass, popupTransition } from "../../design/motion";
 import { Bubble } from "../../design/Tip";
 import { act, hostApi } from "../../infra/bridge";
+import { useVdpNode } from "../../infra/vdpProbe";
 import { menuPopupClass, menuSeparatorClass, ShellIconButton } from "../chrome";
 import { NewAtMenu, RepoContextMenu, WorktreeContextMenu } from "./ContextMenus";
 import {
@@ -171,6 +172,17 @@ function WorktreeGroupRow(props: { group: WorktreeGroup; ctx: SidebarTreeCtx }) 
       summary(),
       expandable() && !expanded(),
     );
+  let wtRowRef: ViewRef | undefined;
+  useVdpNode({
+    testId: `sidebar-wt-row-${props.group.label}`,
+    role: "button",
+    text: () => props.group.label,
+    getRef: () => wtRowRef,
+    onPress: () => {
+      if (expandable()) props.ctx.toggleFold(groupFoldKey(props.group), expanded());
+      act({ type: "activate_path", path: props.group.path });
+    },
+  });
 
   return (
     <View class="gap-px">
@@ -179,12 +191,15 @@ function WorktreeGroupRow(props: { group: WorktreeGroup; ctx: SidebarTreeCtx }) 
         setFold={props.ctx.setFold}
         trigger={
           <View
+            ref={(el) => {
+              wtRowRef = el;
+            }}
             onMouseEnter={() => props.ctx.setHoveredKey(rowKey())}
             onMouseLeave={() => {
               if (props.ctx.hoveredKey() === rowKey()) props.ctx.setHoveredKey(null);
             }}
             tooltip={<Bubble text={tipText()} />}
-            class={`relative h-7 flex-row items-center gap-1 rounded-md pr-1.5 ${isSelected() ? "bg-selected" : expandable() && expanded() ? "bg-hover" : "hover:bg-hover"}`}
+            class={`relative h-7 flex-row items-center gap-1 rounded-md pr-1.5 ${isSelected() ? "bg-selected" : "hover:bg-hover"}`}
             style={{ paddingLeft: ROW_BASE_PAD }}
           >
             <If when={isSelected()}>
@@ -286,6 +301,17 @@ export function RepoNodeRow(props: { repo: RepoNode; parentHint?: string | undef
   const mainSessionRunning = computed(() => !hasMultipleWorktrees() && mainGroup().sessionRunning);
   const mainSessionLogo = () => (mainSessionRunning() ? props.ctx.engineLogoSrc(mainGroup().sessionAgent) : undefined);
   const repoTip = () => formatSummaryTooltip(props.repo.path, summary(), expandable() && !expanded());
+  let repoRowRef: ViewRef | undefined;
+  useVdpNode({
+    testId: `sidebar-repo-row-${props.repo.name}`,
+    role: "button",
+    text: () => props.repo.name,
+    getRef: () => repoRowRef,
+    onPress: () => {
+      if (expandable()) props.ctx.toggleFold(repoFoldKey(props.repo), expanded());
+      act({ type: "activate_path", path: props.repo.path });
+    },
+  });
 
   return (
     <View class={`gap-px rounded-lg border py-0.5 ${showActiveCard() ? "border-line bg-elevated" : "border-transparent"}`}>
@@ -294,12 +320,15 @@ export function RepoNodeRow(props: { repo: RepoNode; parentHint?: string | undef
         ctx={props.ctx}
         trigger={
           <View
+            ref={(el) => {
+              repoRowRef = el;
+            }}
             onMouseEnter={() => props.ctx.setHoveredKey(rowKey())}
             onMouseLeave={() => {
               if (props.ctx.hoveredKey() === rowKey()) props.ctx.setHoveredKey(null);
             }}
             tooltip={<Bubble text={repoTip()} />}
-            class={`relative min-h-11 flex-row items-start gap-1 rounded-md py-1.5 pr-1.5 pl-2 ${isRepoSelected() ? "bg-selected" : expandable() && expanded() && !showActiveCard() ? "bg-hover" : "hover:bg-hover"}`}
+            class={`relative min-h-11 flex-row items-start gap-1 rounded-md py-1.5 pr-1.5 pl-2 ${isRepoSelected() ? "bg-selected" : "hover:bg-hover"}`}
           >
             <If when={isRepoSelected()}>
               <ActiveBar />

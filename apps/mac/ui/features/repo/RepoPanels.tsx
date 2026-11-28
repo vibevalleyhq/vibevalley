@@ -118,7 +118,9 @@ export function Languages(props: { languages: Asked<RepoLanguages> }) {
                         <Text class="min-w-0 flex-1 truncate text-sm font-medium text-ink">{s().label}</Text>
                         <Text class="text-xs tabular-nums text-muted">{percent(s().share)}</Text>
                       </View>
-                      <Bar share={s().share < 0.02 ? 0.02 : s().share} color={s().color} />
+                      <If when={shares().length > 1}>
+                        <Bar share={s().share < 0.02 ? 0.02 : s().share} color={s().color} />
+                      </If>
                       <Text class="text-xs tabular-nums text-faint">{t("web.repo.linesAndFiles", { lines: number(s().lines), files: number(s().files) })}</Text>
                     </View>
                   </View>
@@ -168,15 +170,27 @@ export function CommitCalendar(props: { activity: Asked<RepoActivity> }) {
     >
       <Card title={t("web.repo.calendar")} action={aside()} testid="repo-calendar">
         <View class="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <Stat label={t("web.repo.inYear")} value={worked() ? t("web.repo.commits", { n: number(streaks().total) }) : "…"} />
-          <Stat label={t("web.repo.daysWorked")} value={worked() ? t("web.repo.days", { n: streaks().days }) : "…"} />
-          <Stat label={t("web.repo.longest")} value={worked() ? t("web.repo.days", { n: streaks().longest }) : "…"} />
-          <Stat label={t("web.repo.current")} value={worked() ? t("web.repo.days", { n: streaks().current }) : "…"} />
+          <Stat
+            label={t("web.repo.inYear")}
+            value={worked() ? t("web.repo.commits", { n: number(streaks().total) }) : props.activity.fetching() ? "…" : t("web.repo.commits", { n: "0" })}
+          />
+          <Stat
+            label={t("web.repo.daysWorked")}
+            value={worked() ? t("web.repo.days", { n: streaks().days }) : props.activity.fetching() ? "…" : t("web.repo.days", { n: 0 })}
+          />
+          <Stat
+            label={t("web.repo.longest")}
+            value={worked() ? t("web.repo.days", { n: streaks().longest }) : props.activity.fetching() ? "…" : t("web.repo.days", { n: 0 })}
+          />
+          <Stat
+            label={t("web.repo.current")}
+            value={worked() ? t("web.repo.days", { n: streaks().current }) : props.activity.fetching() ? "…" : t("web.repo.days", { n: 0 })}
+          />
         </View>
         <ScrollRow>
           <View class="min-w-176">
             <View class="h-4" style={{ width: 20 + calendar().weeks.length * (tile + tileGap) }}>
-              <Each of={calendar().months}>
+              <Each of={calendar().months} key={(m) => `${m.label}-${m.week}`}>
                 {(m) => (
                   <Text class="absolute top-0 text-xs text-muted" style={{ left: 20 + tileGap + m().week * (tile + tileGap) }}>
                     {m().label}
@@ -191,7 +205,7 @@ export function CommitCalendar(props: { activity: Asked<RepoActivity> }) {
               onMouseLeave={() => pointed.set(undefined)}
             >
               <View class="w-5 gap-0.75">
-                <Each of={([0, 1, 2, 3, 4, 5, 6] as const).map((i) => t(`web.repo.rows.${i}`))}>
+                <Each of={([0, 1, 2, 3, 4, 5, 6] as const).map((i) => t(`web.repo.rows.${i}`))} key="index">
                   {(d) => (
                     <View class="h-3 justify-center">
                       <Text class="text-2xs leading-none text-muted">{d()}</Text>
@@ -199,10 +213,10 @@ export function CommitCalendar(props: { activity: Asked<RepoActivity> }) {
                   )}
                 </Each>
               </View>
-              <Each of={calendar().weeks}>
+              <Each of={calendar().weeks} key="index">
                 {(week) => (
                   <View class="ml-0.75 gap-0.75">
-                    <Each of={week()}>
+                    <Each of={week()} key="index">
                       {(d) => (
                         <View onMouseEnter={() => pointed.set(d())} style={{ opacity: d().future ? 0 : worked() ? 1 : 0.5 }}>
                           <DayTile level={d().level} />
@@ -219,7 +233,7 @@ export function CommitCalendar(props: { activity: Asked<RepoActivity> }) {
           <Text class="text-xs tabular-nums text-muted">{line()}</Text>
           <View class="flex-row items-center gap-1">
             <Text class="text-xs text-muted">{t("web.repo.fewer")}</Text>
-            <Each of={[0, 1, 2, 3, 4]}>
+            <Each of={[0, 1, 2, 3, 4]} key="index">
               {(l) => (
                 <View tooltip={<Bubble text={levelName(l())} />}>
                   <DayTile level={l()} />
@@ -236,7 +250,7 @@ export function CommitCalendar(props: { activity: Asked<RepoActivity> }) {
 
 function ScrollRow(props: { children: JSX.Element }) {
   return (
-    <Scroll horizontal class="pb-1">
+    <Scroll horizontal class="pb-1" contentClass="flex-row">
       {props.children}
     </Scroll>
   );

@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use gpui::{App, Entity, Window};
 use serde_json::{Value, json};
-use vibevalley_protocol::{VdpCaptureScreenshotParams, VdpPageMetrics, VdpScreenshotTarget, VdpTarget, VdpTargetKind};
+use vibevalley_protocol::{VdpCaptureScreenshotParams, VdpLayoutNode, VdpPageMetrics, VdpScreenshotTarget, VdpTarget, VdpTargetKind};
 use vibevalley_workspace::{PaneKind, TabId};
 
 use crate::hosted::{HostedView, ShellDebugHandle};
@@ -389,6 +389,19 @@ pub(crate) fn encode_shell_png(
         width: target.width(),
         height: target.height(),
     })
+}
+
+/// Offsets hosted layout tree coordinates from surface-local points into window-space points.
+pub(crate) fn layout_from_hosted_root(surface: &str, ox: f32, oy: f32, mut node: VdpLayoutNode) -> VdpLayoutNode {
+    node.surface = Some(surface.to_string());
+    if let Some(ref mut b) = node.bounds {
+        b.x += ox;
+        b.y += oy;
+    }
+    if let Some(children) = node.children.take() {
+        node.children = Some(children.into_iter().map(|c| layout_from_hosted_root(surface, ox, oy, c)).collect());
+    }
+    node
 }
 
 /// Returns current window viewport dimensions, scale factor, theme flag, and last frame timing.

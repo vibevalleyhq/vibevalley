@@ -1,28 +1,36 @@
 import { defineScenario } from "../dsl.ts";
 
 const SETTING_SECTIONS = [
-  { route: "/settings/general", id: "settings-general", label: "General Settings" },
-  { route: "/settings/providers", id: "settings-providers", label: "Model Providers" },
-  { route: "/settings/models", id: "settings-models", label: "Models & Model Policy" },
-  { route: "/settings/appearance", id: "settings-appearance", label: "Appearance & Theme" },
-  { route: "/settings/voice", id: "settings-voice", label: "Voice & Audio" },
-  { route: "/settings/remote", id: "settings-remote", label: "Remote Access & Pairing" },
-  { route: "/settings/about", id: "settings-about", label: "About & Diagnostics" },
+  { id: "profile", label: "Profile" },
+  { id: "general", label: "General Settings" },
+  { id: "appearance", label: "Appearance & Theme" },
+  { id: "providers", label: "Model Providers" },
+  { id: "models", label: "Models & Model Policy" },
+  { id: "voice", label: "Voice & Audio" },
+  { id: "remote", label: "Remote Access & Pairing" },
+  { id: "about", label: "About & Diagnostics" },
 ] as const;
 
 export const settingsScenario = defineScenario({
   id: "settings",
-  description: "Settings navigation and key subsections (general/providers/models/appearance/voice/remote/about) in Light & Dark",
+  description: "Settings navigation via left rail button and top-to-bottom section clicks in Light & Dark",
   async run(v) {
     await v.resize(v.viewport.width, v.viewport.height);
+    await v.nav("/issues");
+    await v.waitRoute("/issues");
+    await v.wait("place-settings");
+    await v.press("place-settings");
+    await v.waitRoute("/settings");
 
     await v.forThemes(undefined, async (theme) => {
       for (const sec of SETTING_SECTIONS) {
-        await v.nav(sec.route);
-        await v.waitRoute(sec.route);
+        const route = `/settings/${sec.id}`;
+        await v.wait(`settings-section-${sec.id}`);
+        await v.press(`settings-section-${sec.id}`);
+        await v.waitRoute(route);
         await v.wait("settings-nav");
-        await v.assertClean(`${sec.id}-${theme}`);
-        await v.shot(`${sec.id}-${theme}`, { label: `${sec.label} (${theme})` });
+        await v.assertClean(`settings-${sec.id}-${theme}`);
+        await v.shot(`settings-${sec.id}-${theme}`, { label: `${sec.label} (${theme})` });
       }
     });
   },

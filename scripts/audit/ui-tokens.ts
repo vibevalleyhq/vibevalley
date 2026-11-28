@@ -6,7 +6,7 @@ import { parseSync } from "vite";
 const root = resolve(import.meta.dirname, "../..");
 const uiRoot = resolve(root, "apps/mac/ui");
 
-const SCAN_GLOBS = ["app/**/*.{ts,tsx}", "design/**/*.{ts,tsx}", "workspace/**/*.{ts,tsx}", "features/**/*.{ts,tsx}"] as const;
+const SCAN_GLOBS = ["app/**/*.{ts,tsx}", "design/**/*.{ts,tsx}", "workspace/**/*.{ts,tsx}", "features/**/*.{ts,tsx}", "farm/**/*.{ts,tsx}"] as const;
 const EXCLUDE_GLOBS = [
   // Swatch palette & validation helper (defines swatches and hexColor).
   "design/domain/cast.ts",
@@ -40,6 +40,14 @@ const HEX_ALPHA_SUFFIX_RE = /^[0-9a-fA-F]{2}$/u;
 const FULL_BORDER_TWO_RE = /\bborder-2\b/u;
 const FULL_BORDER_ONE_RE = /(?:^|\s)border(?:\s|$)/u;
 const FIXED_DOT_CLASS_RE = /\b(?:h-2\s+w-2|size-\d)/u;
+const HEAVY_FONT_RE = /\bfont-(?:semibold|bold|extrabold|black)\b/u;
+const MEDIUM_FONT_RE = /\bfont-medium\b/u;
+const NORMAL_FONT_RE = /\bfont-(?:normal|light)\b/u;
+const PX_PADDING_RE = /\b(?:px|pl|pr)-(?:\d+(?:\.\d+)?|px)\b/gu;
+const IN_FLOW_HOVER_OPACITY_RE = /\bopacity-0\b/u;
+const GROUP_HOVER_OPACITY_RE = /\bgroup-hover:opacity-/u;
+const OUT_OF_FLOW_POS_RE = /\b(?:absolute|fixed)\b/u;
+const UNREAD_TEST_RE = /\bunread\b/u;
 const SELECTION_TEST_RE = /(?:selected|active|picked|current|focus|focused|\bon\b)/iu;
 
 const BOX_GEOMETRY_STYLE_KEYS = new Set([
@@ -62,6 +70,7 @@ export type ViolationRule =
   | "arbitrary-tailwind"
   | "raw-control"
   | "selection-layout-shift"
+  | "in-flow-hover-placeholder"
   | "color-transition"
   | "unmanaged-motion"
   | "glyph-icon-substitute";
@@ -90,6 +99,8 @@ const RULE_EXEMPTIONS: Readonly<Record<string, readonly ViolationRule[]>> = {
   // Emoji grid and keyboard shortcut labels legitimately render character glyphs.
   "apps/mac/ui/features/channel/views/EmojiPicker.tsx": ["glyph-icon-substitute"],
   "apps/mac/ui/infra/base/shortcuts.ts": ["glyph-icon-substitute"],
+  // Fixed retro Game Boy monochrome palette in LCD mini-games.
+  "apps/mac/ui/farm/games/lcd.ts": ["hardcoded-color"],
 };
 
 const GLYPH_ICON_EXEMPT_PREFIXES = ["apps/mac/ui/farm/games/"] as const;
@@ -222,6 +233,70 @@ function boxBorderWidth(classNames: string): 0 | 1 | 2 {
   return 0;
 }
 
+function fontWeightTier(classNames: string): 0 | 400 | 500 | 600 {
+  if (HEAVY_FONT_RE.test(classNames)) return 600;
+  if (MEDIUM_FONT_RE.test(classNames)) return 500;
+  if (NORMAL_FONT_RE.test(classNames)) return 400;
+  return 0;
+}
+
+function horizontalPaddingSignature(classNames: string): string {
+  const matches = classNames.match(PX_PADDING_RE);
+  return matches ? matches.toSorted().join(" ") : "";
+}
+
+function collectStringsInExpr(node: unknown, out: string[]): void {
+  if (!isAstNode(node)) return;
+  if (node.type === "Literal" && typeof node.value === "string") {
+    out.push(node.value);
+    return;
+  }
+  if (node.type === "TemplateLiteral" && Array.isArray(node.quasis)) {
+    for (const q of node.quasis) {
+      if (isAstNode(q)) out.push(rawTemplateText(q));
+    }
+    if (Array.isArray(node.expressions)) {
+      for (const expr of node.expressions) collectStringsInExpr(expr, out);
+    }
+    return;
+  }
+  if (node.type === "ConditionalExpression") {
+    collectStringsInExpr(node.consequent, out);
+    collectStringsInExpr(node.alternate, out);
+    return;
+  }
+  if (node.type === "LogicalExpression") {
+    collectStringsInExpr(node.left, out);
+    collectStringsInExpr(node.right, out);
+    return;
+  }
+  if (node.type === "JSXExpressionContainer" || node.type === "ParenthesizedExpression") {
+    collectStringsInExpr(node.expression, out);
+  }
+}
+
+function elementClassText(openingEl: AstNode | undefined): string {
+  if (!openingEl || !Array.isArray(openingEl.attributes)) return "";
+  const parts: string[] = [];
+  for (const attr of openingEl.attributes) {
+    if (!isAstNode(attr) || attr.type !== "JSXAttribute") continue;
+    if (jsxAttrName(attr) !== "class") continue;
+    collectStringsInExpr(attr.value, parts);
+  }
+  return parts.join(" ");
+}
+
+function hasOutOfFlowPosition(openingEl: AstNode, ancestors: readonly AstNode[]): boolean {
+  if (OUT_OF_FLOW_POS_RE.test(elementClassText(openingEl))) return true;
+  for (let i = ancestors.length - 1; i >= 0; i--) {
+    const a = ancestors[i];
+    if (a?.type === "JSXElement" && isAstNode(a.openingElement) && OUT_OF_FLOW_POS_RE.test(elementClassText(a.openingElement))) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function styleGeometryKeysOf(expr: unknown): Set<string> {
   const out = new Set<string>();
   if (!isAstNode(expr) || expr.type !== "ObjectExpression" || !Array.isArray(expr.properties)) return out;
@@ -245,6 +320,35 @@ function checkSelectionLayoutShift(out: Finding[], file: string, line: number, s
     const cons = stringLiteralOf(node.consequent);
     const alt = stringLiteralOf(node.alternate);
     if (cons === undefined || alt === undefined) return;
+    const testSlice = isAstNode(node.test)
+      ? source.slice(typeof node.test.start === "number" ? node.test.start : 0, typeof node.test.end === "number" ? node.test.end : 0)
+      : "";
+    const jsxEl = ancestors.findLast((a) => a.type === "JSXOpeningElement");
+
+    const f1 = fontWeightTier(cons);
+    const f2 = fontWeightTier(alt);
+    if ((f1 > 0 || f2 > 0) && (f1 > 0 ? f1 : 400) !== (f2 > 0 ? f2 : 400) && SELECTION_TEST_RE.test(testSlice) && !UNREAD_TEST_RE.test(testSlice)) {
+      out.push({
+        file,
+        line,
+        rule: "selection-layout-shift",
+        snippet,
+        fix: "keep `font-weight` constant across active/selected states (distinguish selection with background or color tokens)",
+      });
+    }
+
+    const p1 = horizontalPaddingSignature(cons);
+    const p2 = horizontalPaddingSignature(alt);
+    if ((p1 !== "" || p2 !== "") && p1 !== p2 && SELECTION_TEST_RE.test(testSlice)) {
+      out.push({
+        file,
+        line,
+        rule: "selection-layout-shift",
+        snippet,
+        fix: "keep horizontal padding (`px-*` / `pl-*` / `pr-*`) constant across active/selected states",
+      });
+    }
+
     if (cons.includes("border-dashed") || alt.includes("border-dashed")) return;
     if (FIXED_DOT_CLASS_RE.test(staticClassTextOf(attr))) return;
 
@@ -252,10 +356,6 @@ function checkSelectionLayoutShift(out: Finding[], file: string, line: number, s
     const w2 = boxBorderWidth(alt);
     if (w1 === w2) return;
 
-    const testSlice = isAstNode(node.test)
-      ? source.slice(typeof node.test.start === "number" ? node.test.start : 0, typeof node.test.end === "number" ? node.test.end : 0)
-      : "";
-    const jsxEl = ancestors.findLast((a) => a.type === "JSXOpeningElement");
     if ((w1 > 0 && w2 > 0) || isInteractiveJsxElement(jsxEl) || SELECTION_TEST_RE.test(testSlice)) {
       out.push({
         file,
@@ -572,17 +672,29 @@ export function scanUiTokens(relFile: string, source: string): Finding[] {
       continue;
     }
 
-    if (node.type === "JSXOpeningElement" && isAstNode(node.name) && node.name.type === "JSXIdentifier" && node.name.name === "Switch") {
-      if (normalized !== SWITCH_PRIMITIVE) {
+    if (node.type === "JSXOpeningElement") {
+      const clsText = elementClassText(node);
+      if (IN_FLOW_HOVER_OPACITY_RE.test(clsText) && GROUP_HOVER_OPACITY_RE.test(clsText) && !hasOutOfFlowPosition(node, ancestors)) {
         rawFindings.push({
           file: normalized,
           line,
-          rule: "raw-control",
-          snippet: "<Switch",
-          fix: "use `Toggle` from `apps/mac/ui/design/layout.tsx` instead of raw `<Switch`",
+          rule: "in-flow-hover-placeholder",
+          snippet: clsText.trim().slice(0, 80),
+          fix: "position hover-revealed controls with `absolute` / `fixed` or mount them on demand with `<If>` / `<Popover>` instead of reserving in-flow `opacity-0` space",
         });
       }
-      continue;
+      if (isAstNode(node.name) && node.name.type === "JSXIdentifier" && node.name.name === "Switch") {
+        if (normalized !== SWITCH_PRIMITIVE) {
+          rawFindings.push({
+            file: normalized,
+            line,
+            rule: "raw-control",
+            snippet: "<Switch",
+            fix: "use `Toggle` from `apps/mac/ui/design/layout.tsx` instead of raw `<Switch`",
+          });
+        }
+        continue;
+      }
     }
 
     if (node.type === "ConditionalExpression") {

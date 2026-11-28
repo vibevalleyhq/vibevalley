@@ -114,7 +114,7 @@ function ConnectorDetail(props: { selected: ConnectorID; list: readonly Connecto
       </If>
       <Card title={t("web.connector.connectors.know")}>
         <View class="gap-2">
-          <Each of={[...connectorNotes[props.selected], connectorsAlways]}>
+          <Each of={[...connectorNotes[props.selected], connectorsAlways]} key="index">
             {(n) => (
               <View class="flex-row items-start gap-2.5">
                 <View class="mt-2 size-1 shrink-0 rounded-full bg-faint" />
@@ -158,7 +158,7 @@ export function ConnectorsPage(props: { id?: string | undefined; basePath?: stri
               </View>
             </View>
             <View class="flex-row flex-wrap gap-2">
-              <Each of={ConnectorIDValues}>
+              <Each of={ConnectorIDValues} key={(c) => c}>
                 {(c) => {
                   const st = () => of(c());
                   const state = () => st()?.state ?? "off";
@@ -210,7 +210,7 @@ export function ConnectorsPage(props: { id?: string | undefined; basePath?: stri
             <View class="px-2 pt-0.5 pb-2">
               <Text class="text-xs leading-relaxed text-muted">{t("web.connector.connectors.intro")}</Text>
             </View>
-            <Each of={ConnectorIDValues}>
+            <Each of={ConnectorIDValues} key={(c) => c}>
               {(c) => {
                 const st = () => of(c());
                 const state = () => st()?.state ?? "off";

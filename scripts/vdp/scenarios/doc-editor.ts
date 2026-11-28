@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { defineScenario, type VdpScenarioContext, type VdpUiBounds } from "../dsl.ts";
+import { defineScenario, flattenLayoutDump, type VdpScenarioContext, type VdpUiBounds } from "../dsl.ts";
 import { seedNoteShowcase } from "../fixtures/note.ts";
 
 const CreatedNoteSchema = z.object({
@@ -84,6 +84,12 @@ export const docEditorScenario = defineScenario({
               { id: "ed_h1", type: "heading", level: 1, text: "WYSIWYG Caret Precision & Smooth Editing" },
               { id: "ed_p1", type: "prose", text: p1Text },
               { id: "ed_p2", type: "prose", text: p2Text },
+              { id: "ed_md", type: "prose", text: "Inline stability baseline" },
+              {
+                id: "ed_wrap",
+                type: "prose",
+                text: "crates/server/src/note/collab/presence_Synchronization_Long_Unspaced_Path_Token_Soft_Wrap_Check_0123456789_ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz",
+              },
               { id: "ed_rich", type: "prose", text: richText },
               { id: "ed_list", type: "list", ordered: false, items: ["列表首项支持回车拆行", "列表次项支持上下方向键流转"] },
               { id: "ed_todo", type: "todo", checked: false, text: "待办块保持焦点与零跳动编辑" },
@@ -115,7 +121,11 @@ export const docEditorScenario = defineScenario({
 
     await v.click(leftClickX, line1Y);
     await v.settle(80);
-    await v.wait("doc-format-bar-ed_p1");
+    const barOnCaret = await v.query({ testId: "doc-format-bar-ed_p1" });
+    assertInvariant(
+      barOnCaret.nodes.length === 0,
+      `expected selection-only bubbleMenu to stay hidden on empty caret click, found ${barOnCaret.nodes.length} bar(s)`,
+    );
 
     const postP1 = await readBounds(v, "doc-block-input-ed_p1");
     const postP2 = await readBounds(v, "doc-block-input-ed_p2");
@@ -203,7 +213,7 @@ export const docEditorScenario = defineScenario({
     const splitProbe = await readEditorProbe(v);
     assertInvariant(
       splitProbe.focusedBlockId !== null && splitProbe.focusedBlockId !== "ed_p2",
-      `expected Enter to focus newly split block, got ${splitProbe.focusedBlockId}`,
+      `expected Enter to focus newly split block, got ${JSON.stringify(splitProbe)}`,
     );
     assertInvariant(
       splitProbe.value === p2Text.slice(insAt) && splitProbe.selection?.start === 0,
@@ -255,12 +265,45 @@ export const docEditorScenario = defineScenario({
       `InlineRichText -> Input shifted position: view=(${richBeforeClick.x},${richBeforeClick.y}) input=(${richInputBounds.x},${richInputBounds.y})`,
     );
 
-    // 7. List item Enter splits/inserts smoothly and retains focus; capture Dark theme active state.
+    await v.wait("doc-block-input-ed_wrap");
+    const wrapDump = flattenLayoutDump(await v.dumpLayout("workbench"));
+    const findNode = (id: string) => [...wrapDump.values()].find((n) => n.id === id);
+    const docRootNode = findNode("note-block-doc-view");
+    const wrapNode = findNode("doc-block-input-ed_wrap");
+    assertInvariant(docRootNode?.bounds !== undefined && wrapNode?.bounds !== undefined, "expected bounds for doc root and ed_wrap");
+    assertInvariant(
+      (wrapNode!.lineCount ?? 1) >= 2 || wrapNode!.bounds!.height >= 44,
+      `expected long unspaced path to wrap onto >=2 lines (lineCount=${wrapNode!.lineCount}, height=${wrapNode!.bounds!.height})`,
+    );
+    assertInvariant(
+      wrapNode!.bounds!.width <= docRootNode!.bounds!.width + 2,
+      `ed_wrap overflowed doc width (${wrapNode!.bounds!.width} > ${docRootNode!.bounds!.width})`,
+    );
+
+    const mdPre = await readBounds(v, "doc-block-input-ed_md");
+    await v.click(Math.round(mdPre.x + 80), Math.round(mdPre.y + 12));
+    await v.settle(60);
+    await v.key("end");
+    await v.settle(40);
+    await v.expectInlineStable("inline-edit-zero-shift", { targetId: "doc-block-input-ed_md" }, async () => {
+      await v.type(" + ok");
+    });
+    await v.type(" **bold** ");
+    await v.settle(80);
+    const mdProbe = await readEditorProbe(v);
+    assertInvariant(mdProbe.value.includes("**bold**"), `expected Markdown round-trip **bold**, got "${mdProbe.value}"`);
+    const mdPost = await readBounds(v, "doc-block-input-ed_md");
+    assertInvariant(
+      Math.abs(mdPost.height - mdPre.height) <= 1,
+      `expected single-line height preservation after **bold**, pre=${mdPre.height}, post=${mdPost.height}`,
+    );
+
     const list0Bounds = await readBounds(v, "doc-list-item-ed_list-0");
     await v.click(Math.round(list0Bounds.x + 48), Math.round(list0Bounds.y + 12));
     await v.settle(60);
     await v.key("enter");
     await v.wait("doc-list-item-ed_list-2");
+    await v.settle(80);
     const listProbe = await readEditorProbe(v);
     assertInvariant(
       listProbe.focusedBlockId === "ed_list" && listProbe.activeTestId === "doc-list-item-ed_list-1" && listProbe.selection?.start === 0,
@@ -269,8 +312,10 @@ export const docEditorScenario = defineScenario({
 
     await v.theme("dark");
     await v.click(midClickX, line1Y);
+    await v.settle(60);
+    await v.key("cmd-a");
     await v.wait("doc-format-bar-ed_p1");
     await v.assertClean("doc-editor-active-dark");
-    await v.shot("02-doc-editor-active-dark", { label: "Doc Editor Zero-Shift Active Caret & Format Bar (Dark)" });
+    await v.shot("02-doc-editor-active-dark", { label: "Doc Editor Zero-Shift Active Selection & Format Bar (Dark)" });
   },
 });

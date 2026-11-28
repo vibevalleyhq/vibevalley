@@ -15,6 +15,7 @@ fn sample_presence(id: &str, name: &str, updated_at: i64) -> PresencePayload {
         id: id.into(),
         name: name.into(),
         color: "#22c55e".into(),
+        avatar: None,
         kind: PresenceKind::Highlight,
         x: Some(120.0),
         y: Some(240.0),

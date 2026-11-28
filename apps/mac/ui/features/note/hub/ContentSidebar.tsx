@@ -1,4 +1,4 @@
-import { Scroll, Text, View } from "nsh";
+import { Scroll, Text, untracked, View, type ViewRef } from "nsh";
 import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
@@ -27,6 +27,7 @@ import {
   templatePickerContextFor,
 } from "../../../infra/state/contentNav";
 import { defineStored } from "../../../infra/state/stored";
+import { isVdpEnabled, useVdpNode } from "../../../infra/vdpProbe";
 import { useInstalledApplets } from "../InstallAppletModal";
 import { noteHref, noteIcon, useNotes } from "../NoteCard";
 import { PageTree } from "../PageTree";
@@ -164,7 +165,7 @@ export function ContentSidebar() {
                           <ActiveBar />
                         </If>
                         <Icon name={noteIcon(n())} size={13} tone={active() ? "ink" : "muted"} />
-                        <Text class={`min-w-0 flex-1 truncate text-xs ${active() ? "font-semibold text-ink" : "font-medium text-muted"}`}>{n().title}</Text>
+                        <Text class={`min-w-0 flex-1 truncate text-xs font-medium ${active() ? "text-ink" : "text-muted"}`}>{n().title}</Text>
                       </View>
                     );
                   }}
@@ -190,8 +191,24 @@ export function ContentSidebar() {
 }
 
 function NavRow(props: { testID: string; icon: IconName; iconTone?: string | undefined; label: string; count: number; active: boolean; onPress: () => void }) {
+  let rowRef: ViewRef | undefined;
+  const vdpTestId = untracked(() => props.testID);
+  useVdpNode({
+    testId: vdpTestId,
+    role: "button",
+    text: () => props.label,
+    getRef: () => rowRef,
+    onPress: () => props.onPress(),
+  });
   return (
     <View
+      ref={
+        isVdpEnabled()
+          ? (el) => {
+              rowRef = el;
+            }
+          : undefined
+      }
       role="button"
       testID={props.testID}
       accessibilityLabel={props.label}
@@ -203,7 +220,7 @@ function NavRow(props: { testID: string; icon: IconName; iconTone?: string | und
         <ActiveBar />
       </If>
       <Icon name={props.icon} size={14} tone={props.iconTone ?? (props.active ? "ink" : "muted")} />
-      <Text class={`min-w-0 flex-1 truncate text-sm ${props.active ? "font-semibold text-ink" : "font-medium text-muted"}`}>{props.label}</Text>
+      <Text class={`min-w-0 flex-1 truncate text-sm font-medium ${props.active ? "text-ink" : "text-muted"}`}>{props.label}</Text>
       <If when={props.count > 0}>
         <Text class="shrink-0 font-mono text-2xs text-faint tabular-nums">{String(props.count)}</Text>
       </If>

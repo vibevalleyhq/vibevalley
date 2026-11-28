@@ -463,6 +463,15 @@ function NoteDetailView(props: { note: Note; versionParam: number | undefined; n
             />
           </If>
 
+          <IconButton
+            icon="pin"
+            size={16}
+            label={pinned() ? t("web.library.content.unpin") : t("web.library.content.pin")}
+            testid="note-header-pin"
+            pressed={pinned()}
+            onClick={() => togglePinned(`note:${props.note.id}`)}
+          />
+
           <If when={installedApplet()}>
             {(info) => (
               <Button testID="note-open-applet" size="control" icon="play" onPress={() => openStandaloneApplet()}>
@@ -598,6 +607,7 @@ function NoteDetailView(props: { note: Note; versionParam: number | undefined; n
                     notes={props.notes}
                     issues={issuesList()}
                     links={ready(links, undefined)}
+                    presences={presence.peers()}
                     busy={act.busy()}
                     savedAt={savedAt()}
                     onSaveDoc={saveDoc}

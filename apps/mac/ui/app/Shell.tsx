@@ -343,13 +343,13 @@ function Rail(props: { here?: Place | undefined; farm: boolean }) {
       <View class="self-center h-px w-8 shrink-0" style={{ backgroundColor: mix("on-rail", 0.1) }} />
       <Scroll class="flex-1" contentClass="items-center py-2">
         <View class="items-center gap-1">
-          <Each of={railGroups}>
+          <Each of={railGroups} key={(g) => g}>
             {(group, i) => (
               <View class="items-center gap-1">
                 <If when={i() > 0}>
                   <View class="my-1 h-px w-8" style={{ backgroundColor: mix("on-rail", 0.1) }} />
                 </If>
-                <Each of={places.filter((p) => p.group === group() && p.id !== "settings")}>
+                <Each of={places.filter((p) => p.group === group() && p.id !== "settings")} key={(p) => p.id}>
                   {(p) => {
                     const to = () => (p().id === "workspace" && globalShell ? "/workspace" : p().id === "content" ? safeLastContentPath() : p().path);
                     const isCurrent = () =>
@@ -445,7 +445,7 @@ export function Shell(props: { children: JSX.Element }) {
         >
           <Desk place={here()} />
         </If>
-        <View class="min-h-0 flex-1">{props.children}</View>
+        <View class="min-h-0 min-w-0 flex-1">{props.children}</View>
       </View>
     </View>
   );

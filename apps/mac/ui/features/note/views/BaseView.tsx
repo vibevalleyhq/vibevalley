@@ -472,7 +472,6 @@ export function BaseView(props: BaseViewProps) {
                                 </View>
                               )}
                             </Each>
-                            <View class="w-16 shrink-0" />
                           </View>
 
                           <Each of={filteredRows()} key={(r) => r.id}>
@@ -517,7 +516,7 @@ export function BaseView(props: BaseViewProps) {
                                     )}
                                   </Each>
 
-                                  <View class="w-16 shrink-0 flex-row items-center justify-end gap-1">
+                                  <View class="pointer-events-auto absolute top-1 right-1.5 flex-row items-center gap-1 rounded-sm bg-elevated px-1 py-0.5 opacity-0 shadow-float group-hover:opacity-100 focus-within:opacity-100">
                                     <If when={row().pageNoteId}>
                                       <Icon name="notes" size={12} tone="accent" />
                                     </If>
@@ -557,7 +556,6 @@ export function BaseView(props: BaseViewProps) {
                                   );
                                 }}
                               </Each>
-                              <View class="w-16 shrink-0" />
                             </View>
                           </If>
                         </View>
@@ -565,8 +563,8 @@ export function BaseView(props: BaseViewProps) {
                       <If when={tableOverflows()}>
                         <View
                           testID="base-table-overflow-fade"
-                          class="pointer-events-none absolute top-px right-0 bottom-px w-6 rounded-r-lg border-r border-line"
-                          style={{ backgroundColor: mix("page", 0.72) }}
+                          class="pointer-events-none absolute top-px right-0 bottom-px w-4 rounded-r-lg opacity-45"
+                          style={{ backgroundColor: mix("page", 0.55) }}
                         />
                       </If>
                     </View>

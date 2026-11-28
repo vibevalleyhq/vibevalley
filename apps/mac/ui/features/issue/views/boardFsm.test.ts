@@ -168,20 +168,23 @@ test("Board drag FSM transitions idle -> measuring -> dragging -> idle and ignor
   expect(state).toEqual({ phase: "idle", epoch: 5 });
 });
 
-test("boardLaneWidth fits all 6 lanes cleanly at 1680px and avoids awkward partial clipping at 1280px", () => {
+test("boardLaneWidth fits all 6 lanes cleanly at 1920px and keeps >= 288px min width with horizontal scroll at 1440px/1280px", () => {
   const railW = 76;
-  const avail1680 = 1680 - railW - BOARD_PAD_X * 2;
-  const width1680 = boardLaneWidth(avail1680, 6);
-  const total1680 = 6 * width1680 + 5 * BOARD_LANE_GAP;
-  expect(width1680).toBeGreaterThanOrEqual(240);
-  expect(total1680).toBeLessThanOrEqual(avail1680);
+  const avail1920 = 1920 - railW - BOARD_PAD_X * 2;
+  const width1920 = boardLaneWidth(avail1920, 6);
+  const total1920 = 6 * width1920 + 5 * BOARD_LANE_GAP;
+  expect(width1920).toBeGreaterThanOrEqual(288);
+  expect(total1920).toBeLessThanOrEqual(avail1920);
+
+  const avail1440 = 1440 - railW - BOARD_PAD_X * 2;
+  const width1440 = boardLaneWidth(avail1440, 6);
+  expect(width1440).toBeGreaterThanOrEqual(288);
+  expect(6 * width1440 + 5 * BOARD_LANE_GAP).toBeGreaterThan(avail1440);
 
   const avail1280 = 1280 - railW - BOARD_PAD_X * 2;
   const width1280 = boardLaneWidth(avail1280, 6);
-  const fiveLanes1280 = 5 * width1280 + 4 * BOARD_LANE_GAP;
-  expect(width1280).toBeGreaterThanOrEqual(220);
-  expect(fiveLanes1280).toBeLessThanOrEqual(avail1280);
-  expect(avail1280 - fiveLanes1280).toBeLessThan(BOARD_LANE_GAP);
+  expect(width1280).toBeGreaterThanOrEqual(288);
+  expect(6 * width1280 + 5 * BOARD_LANE_GAP).toBeGreaterThan(avail1280);
 });
 
 test("cross-lane drag computes exact midline insertion slot (first / middle / end) on manually ordered open lanes", () => {

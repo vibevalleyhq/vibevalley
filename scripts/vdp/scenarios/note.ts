@@ -7,6 +7,12 @@ export const noteScenario = defineScenario({
   async run(v) {
     const ids = await seedNoteShowcase(v);
     await v.resize(v.viewport.width, v.viewport.height);
+    await v.nav("/issues");
+    await v.waitRoute("/issues");
+    await v.wait("place-content");
+    await v.press("place-content");
+    await v.waitRoute("/library");
+    await v.wait("library-page");
 
     // Theme matrix: static layout across Doc, Base Table, Canvas, and Media
     await v.forThemes(undefined, async (theme) => {
@@ -55,8 +61,10 @@ export const noteScenario = defineScenario({
     await v.waitRoute(`/notes/${ids.docId}`);
     await v.wait("doc-prose-rich-b2");
     await v.press("doc-prose-rich-b2");
+    await v.settle(60);
+    await v.key("cmd-a");
     await v.wait("doc-format-bar-b2");
-    await v.shot("03-doc-active-format-light", { label: "Doc Active Block & Inline Format Bar" });
+    await v.shot("03-doc-active-format-light", { label: "Doc Active Selection & Floating Format Bar" });
 
     // Jump to lower section embeds & backlinks
     await v.nav(`/notes/${ids.docId}`);

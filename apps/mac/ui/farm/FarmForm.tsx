@@ -1,5 +1,5 @@
 import "../infra/polyfill";
-import { computed, ErrorBoundary, host, keymap, Scroll, signal, Text, View, type JSX } from "nsh";
+import { computed, ErrorBoundary, host, keymap, Scroll, signal, Text, untracked, View, type JSX } from "nsh";
 
 import { setLocale, t } from "@vibevalley/i18n";
 import type { Changes, DailyTask, FarmShopView, Issue, IssueAct, RepoTemplates, ShopItem } from "@vibevalley/protocol";
@@ -20,10 +20,15 @@ const close = () => host.post("action", { type: "dismiss_farm_form" });
 const route = (path: string) => host.post("action", { type: "global_route", path });
 
 function Words(props: { children: JSX.Element; size?: 16 | 18; tone?: "ink" | "muted" | "onAccent" | "error" }) {
-  const sizeClass = props.size === 18 ? "text-lg font-semibold" : props.size === 16 ? "text-base font-medium" : "text-sm";
-  const toneClass =
-    props.tone === "onAccent" ? "text-page font-medium" : props.tone === "muted" ? "text-muted" : props.tone === "error" ? "text-berry" : "text-ink";
-  return <Text class={`font-sans ${sizeClass} ${toneClass}`}>{props.children}</Text>;
+  return (
+    <Text
+      class={`font-sans ${
+        props.size === 18 ? "text-lg font-semibold" : props.size === 16 ? "text-base font-medium" : "text-sm"
+      } ${props.tone === "onAccent" ? "text-page font-medium" : props.tone === "muted" ? "text-muted" : props.tone === "error" ? "text-berry" : "text-ink"}`}
+    >
+      {props.children}
+    </Text>
+  );
 }
 
 function Key(props: { title: string; primary?: boolean; disabled?: boolean; id?: string; onPress: () => void }) {
@@ -95,7 +100,7 @@ function Sow(props: { initialWords?: string }) {
   const agents = useManagedWorkAgents(true);
   const repos = useRepos();
   const who = signal("");
-  const words = signal(props.initialWords ?? "");
+  const words = signal(untracked(() => props.initialWords ?? ""));
   const busy = signal(false);
   const error = signal("");
   const seeds = signal<RepoTemplates | undefined>(undefined);
@@ -170,18 +175,23 @@ function Sow(props: { initialWords?: string }) {
               <If when={bag().recent.length}>
                 <Words tone="muted">{t("web.farm.sow.recent")}</Words>
                 <Buttons>
-                  <Each of={bag().recent}>{(text) => <Key title={text()} onPress={() => words.set(text())} />}</Each>
+                  <Each of={bag().recent} key={(text, i) => `${text}-${i}`}>
+                    {(text) => <Key title={text()} onPress={() => words.set(text())} />}
+                  </Each>
                 </Buttons>
               </If>
               <If when={bag().kinds.some((k) => k.templates.length > 0)}>
                 <Words tone="muted">{t("web.farm.sow.kinds")}</Words>
                 <Buttons>
-                  <Each of={bag().kinds.filter((k) => k.templates.length > 0)}>
+                  <Each of={bag().kinds.filter((k) => k.templates.length > 0)} key={(k) => k.id}>
                     {(k) => <Key title={k().name} primary={kind() === k().id} onPress={() => kind.set(k().id)} />}
                   </Each>
                 </Buttons>
                 <Buttons>
-                  <Each of={(bag().kinds.find((k) => k.id === kind()) ?? bag().kinds.find((k) => k.templates.length > 0))?.templates ?? []}>
+                  <Each
+                    of={(bag().kinds.find((k) => k.id === kind()) ?? bag().kinds.find((k) => k.templates.length > 0))?.templates ?? []}
+                    key={(s) => s.title}
+                  >
                     {(seed) => <Key title={seed().title} onPress={() => words.set(seed().text)} />}
                   </Each>
                 </Buttons>
@@ -194,7 +204,9 @@ function Sow(props: { initialWords?: string }) {
         <Words tone="muted">{t("web.farm.sow.who")}</Words>
         <Buttons>
           <Key title={t("web.farm.sow.orchestratorPicks")} primary={!who()} onPress={() => who.set("")} />
-          <Each of={agents()}>{(a) => <Key title={a().name} primary={who() === a().id} onPress={() => who.set(a().id)} />}</Each>
+          <Each of={agents()} key={(a) => a.id}>
+            {(a) => <Key title={a().name} primary={who() === a().id} onPress={() => who.set(a().id)} />}
+          </Each>
         </Buttons>
         <Words tone="muted">{t("web.farm.sow.how", { repo })}</Words>
         <Buttons>
@@ -274,12 +286,12 @@ function Work(props: { kind: string; issue: () => Issue }) {
         <If when={props.issue().repo}>{(repo) => <Words tone="muted">{t("web.farm.harvest.repo", { repo: repo() })}</Words>}</If>
       </View>
       <If when={props.kind === "inspect" && actionKeys().includes("answer")}>
-        <Each of={props.issue().questions}>
+        <Each of={props.issue().questions} key={(ask) => ask.question}>
           {(ask) => (
             <View class="gap-2 rounded-lg border border-line bg-side p-3">
               <Words>{ask().question}</Words>
               <Buttons>
-                <Each of={ask().options}>
+                <Each of={ask().options} key={(o) => o}>
                   {(option) => <Key id="plot-answer-option" title={option()} disabled={busy()} onPress={() => void submit("answer", option())} />}
                 </Each>
               </Buttons>
@@ -295,7 +307,7 @@ function Work(props: { kind: string; issue: () => Issue }) {
         <Words tone="muted">{slot()?.phase._tag === "working" ? t("web.farm.water.working") : t("web.farm.water.idle")}</Words>
         <Words tone="muted">{t("web.farm.water.thread")}</Words>
         <Buttons>
-          <Each of={[0, 1, 2, 3] as const}>
+          <Each of={[0, 1, 2, 3] as const} key="index">
             {(i) => <Key title={t(`web.farm.water.drops.${i()}`)} onPress={() => words.set(t(`web.farm.water.drops.${i()}`))} />}
           </Each>
         </Buttons>
@@ -318,7 +330,7 @@ function Work(props: { kind: string; issue: () => Issue }) {
                 {change().branch} → {change().base}
               </Words>
               <Words tone="muted">{t("web.farm.harvest.counts", { commits: change().commits.length, files: change().files.length })}</Words>
-              <Each of={change().files}>
+              <Each of={change().files} key={(f) => f.path}>
                 {(file) => (
                   <Words tone="muted">
                     {file().status} {file().path}
@@ -327,7 +339,7 @@ function Work(props: { kind: string; issue: () => Issue }) {
               </Each>
               <If when={change().sinceReview?.length}>
                 <Words>{t("web.issue.changes.sinceReview")}</Words>
-                <Each of={change().sinceReview ?? []}>
+                <Each of={change().sinceReview ?? []} key={(f) => f.path}>
                   {(file) => (
                     <Words tone="muted">
                       {file().status} {file().path}

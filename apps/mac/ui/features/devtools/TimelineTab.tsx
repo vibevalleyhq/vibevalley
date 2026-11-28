@@ -163,7 +163,7 @@ export function TimelineTab(props: {
     <View testID="devtools-timeline" class="min-h-0 flex-1">
       <View class="gap-2 border-b border-line bg-side px-3 py-2">
         <View class="flex-row flex-wrap items-center gap-1">
-          <Each of={TIMELINE_LANES}>
+          <Each of={TIMELINE_LANES} key={(item) => item}>
             {(item) => {
               const active = () => lane() === item();
               return (

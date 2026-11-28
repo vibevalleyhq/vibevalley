@@ -235,7 +235,7 @@ function Creator(props: { saved?: Agent | undefined; start: Agent; all: readonly
         <View class="min-h-104 flex-1 overflow-hidden rounded-lg border border-line bg-page">
           <Stage draft={draft()} pose={pose()} />
           <View class="flex-row flex-wrap justify-center gap-1.5 p-3">
-            <Each of={stagePoses}>
+            <Each of={stagePoses} key={(p) => p.pose}>
               {(p) => (
                 <View
                   role="button"

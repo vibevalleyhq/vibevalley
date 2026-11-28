@@ -139,11 +139,7 @@ function DocPreview(props: { readonly data: PreviewByTag<"doc">; readonly noteTi
                 when={outlineRows().length > 0}
                 else={
                   <If when={!hasHeading()}>
-                    <View class="gap-1.5 pt-1">
-                      <View class="h-1.5 w-2/3 rounded-xs bg-hover" />
-                      <View class="h-1.5 w-full rounded-xs bg-hover" />
-                      <View class="h-1.5 w-4/5 rounded-xs bg-hover" />
-                    </View>
+                    <Text class="pt-0.5 text-2xs text-faint">{t("web.note.blocks.start")}</Text>
                   </If>
                 }
               >

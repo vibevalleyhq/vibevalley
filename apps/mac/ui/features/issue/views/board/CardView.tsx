@@ -10,6 +10,7 @@ import { Bubble } from "../../../../design/Tip";
 import { mix, tone } from "../../../../design/tone";
 import { fileUrl, useAttachmentFile } from "../../../../infra/attachmentFile";
 import { createEffect } from "../../../../infra/solid";
+import { useVdpNode } from "../../../../infra/vdpProbe";
 import {
   type BoardCard,
   cardAgent,
@@ -317,6 +318,14 @@ export function CardView(props: {
     return props.drag.overKey() === props.laneKey && props.drag.before() === props.card.id ? g : undefined;
   });
   const cardStyle = () => (motionOff() ? undefined : { transitionProperty: "shadow", transitionDuration: motionDuration(180) });
+  useVdpNode({
+    testId: `issue-card-${props.card.id}`,
+    role: "button",
+    text: () => look().title,
+    getRef: () => cardEl,
+    onPress: () => props.onOpen(props.card.id),
+  });
+
   return (
     <View class={isCollapsed() ? "mb-0 overflow-hidden" : ""} style={isCollapsed() ? { height: 0, opacity: 0 } : undefined}>
       <If when={beforeGhost()}>{(g) => <DropPlaceholder lane={props.lane} number={g().number} title={g().title} height={g().h} compact={compact()} />}</If>

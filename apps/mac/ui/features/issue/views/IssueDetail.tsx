@@ -786,8 +786,8 @@ function IssueTitle(props: { shown: string; full: string; editable: boolean; sta
       >
         <TitleInput full={props.full} onInput={(v) => (typed = v)} onFinish={finish} />
       </If>
-      <If when={props.state === "pending" || savedBadge()}>
-        <View testID="issue-title-save-status" class="mt-1 flex-row items-center gap-1">
+      <View testID="issue-title-save-status" class="mt-1 h-4 flex-row items-center gap-1">
+        <If when={props.state === "pending" || savedBadge()}>
           <If
             when={props.state === "pending"}
             else={
@@ -802,8 +802,8 @@ function IssueTitle(props: { shown: string; full: string; editable: boolean; sta
             </View>
             <Text class="text-2xs text-muted">{t("web.agent.saving")}</Text>
           </If>
-        </View>
-      </If>
+        </If>
+      </View>
     </View>
   );
 }

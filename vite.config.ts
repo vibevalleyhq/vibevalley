@@ -43,22 +43,22 @@ export default defineConfig({
       "packages:build": ["vp run --filter './packages/*' build", "vpx scripts/audit/built-types.ts"],
       "names:verify": "vpx scripts/docs/stale-names.ts",
       // The TS packages the native views and the generators use; the server and the command line are Rust (`cargo xtask check`).
-      "packages:check": ["vp run packages:build", "vp check", "vp run --filter @vibevalley/protocol --filter @vibevalley/i18n test"],
+      "packages:check": ["vp run packages:build", "vp check", "vp run --filter @vibevalley/protocol --filter @vibevalley/i18n --filter @vibevalley/vdp test"],
       // Files, exports and dependencies nothing uses (knip.ts says what runs; scripts/audit/deadcode.ts says what to do).
       deadcode: "vpx scripts/audit/deadcode.ts",
       "mac:build-test": {
         command:
-          'cd apps/mac/ui && ../../../.tools/bin/nsh check && (../../../.tools/bin/nsh build App.tsx -o build & p1=$!; ../../../.tools/bin/nsh build ShellApp.tsx -o build-shell & p2=$!; s=0; wait "$p1" || s=$?; wait "$p2" || s=$?; exit "$s") && cd ../../.. && vpx scripts/audit/mac-tests.ts',
+          '(cd apps/mac/ui && ../../../.tools/bin/nsh check) && (vpx scripts/audit/nsh-build.ts apps/mac/ui App.tsx build & p1=$!; vpx scripts/audit/nsh-build.ts apps/mac/ui ShellApp.tsx build-shell & p2=$!; vpx scripts/audit/mac-tests.ts & p3=$!; s=0; wait "$p1" || s=$?; wait "$p2" || s=$?; wait "$p3" || s=$?; exit "$s")',
         cache: false,
       },
       "mac:check": {
-        command: "vp lint --deny-warnings apps/mac/ui",
+        command: "vpx scripts/audit/ui-tokens.ts && vp lint --deny-warnings apps/mac/ui",
         dependsOn: ["mac:build-test"],
         cache: false,
       },
       "mobile:check": {
         command:
-          "cd apps/mobile && ../../.tools/bin/nsh check && ../../.tools/bin/nsh build App.tsx -o build && ../../.tools/bin/nsh test && cd ../.. && vp lint --deny-warnings apps/mobile",
+          "cd apps/mobile && ../../.tools/bin/nsh check && cd ../.. && vpx scripts/audit/nsh-build.ts apps/mobile App.tsx build && cd apps/mobile && ../../.tools/bin/nsh test && cd ../.. && vp lint --deny-warnings apps/mobile",
         cache: false,
       },
       "ts:check": ["vp check --deny-warnings", "vp run packages:check", ...(hasNshCli ? ["vp run mac:check", "vp run mobile:check"] : [])],
@@ -276,6 +276,7 @@ export default defineConfig({
           "apps/mac/ui/farm/**",
           "apps/mac/ui/design/**",
           "apps/mac/ui/workspace/**",
+          "apps/mobile/src/**",
         ],
         excludeFiles: ["**/*.test.ts", "**/*.test.tsx", "**/*.story.tsx", "**/story.tsx", "**/stories/**"],
         rules: { "vibevalley/style-attrs": "error" },
@@ -310,25 +311,18 @@ export default defineConfig({
       {
         // Shipped code and its tests start no process; scripts do (scripts/audit/oxlint-plugin.ts, child-process-door).
         files: ["apps/**", "packages/**"],
-        excludeFiles: ["**/scripts/**"],
+        excludeFiles: ["**/scripts/**", "packages/vdp/src/process.ts"],
         rules: { "vibevalley/child-process-door": "error" },
       },
       {
         // Component views share bucketed clocks instead of spawning per-row timers (scripts/audit/oxlint-plugin.ts, no-component-interval).
-        files: ["apps/mac/ui/features/**/*.tsx", "apps/mac/ui/design/**/*.tsx", "apps/mac/ui/workspace/**/*.tsx", "apps/mobile/src/**/*.tsx"],
+        files: ["apps/mac/ui/**/*.tsx", "apps/mobile/src/**/*.tsx"],
+        excludeFiles: ["apps/mac/ui/infra/base/dom.tsx", "apps/mac/ui/infra/base/timer.ts", "**/*.test.tsx", "**/*.story.tsx", "**/story.tsx", "**/stories/**"],
         rules: { "vibevalley/no-component-interval": "error" },
       },
       {
-        // nsh fine-grained reactivity rules (docs/style/nsh-tsx.md; scripts/audit/oxlint-plugin.ts).
-        files: [
-          "apps/mac/ui/workspace/**/*.tsx",
-          "apps/mac/ui/design/**/*.tsx",
-          "apps/mac/ui/features/channel/**/*.tsx",
-          "apps/mac/ui/features/issue/**/*.tsx",
-          "apps/mac/ui/features/runtime/**/*.tsx",
-          "apps/mac/ui/features/setting/**/*.tsx",
-          "apps/mobile/src/**/*.tsx",
-        ],
+        // nsh fine-grained reactivity & UI rules across all native UI views (docs/style/nsh-tsx.md; scripts/audit/oxlint-plugin.ts).
+        files: ["apps/mac/ui/**/*.tsx", "apps/mobile/src/**/*.tsx"],
         excludeFiles: ["**/*.test.tsx", "**/*.story.tsx", "**/story.tsx", "**/stories/**"],
         rules: {
           "vibevalley/nsh-no-jsx-conditional": "error",
@@ -336,15 +330,38 @@ export default defineConfig({
           "vibevalley/nsh-each-key": "error",
           "vibevalley/nsh-no-props-destructure": "error",
           "vibevalley/nsh-no-eager-accessor": "error",
+          "vibevalley/nsh-no-props-spread": "error",
+          "vibevalley/nsh-no-async-reactive": "error",
+          "vibevalley/nsh-no-jsx-inline-reactive": "error",
+          "vibevalley/nsh-no-react-isms": "error",
+          "vibevalley/nsh-selection-change-guard": "error",
+          "vibevalley/nsh-no-self-canceling-effect": "error",
+          "vibevalley/nsh-no-view-text-class": "error",
+          "vibevalley/nsh-scroll-horizontal-flex-row": "error",
+          "vibevalley/nsh-no-direct-storage-in-event": "error",
+          "vibevalley/nsh-keymap-no-text-signal": "error",
         },
       },
       {
-        // nsh input/drag/keymap responsiveness ratchets across all native UI surfaces (docs/style/nsh-tsx.md).
+        // Reactive lifecycle & event storage ratchets across all native UI scripts (docs/style/nsh-tsx.md).
         files: ["apps/mac/ui/**", "apps/mobile/src/**"],
         excludeFiles: ["**/*.test.ts", "**/*.test.tsx", "**/*.story.tsx", "**/story.tsx", "**/stories/**"],
         rules: {
           "vibevalley/nsh-no-direct-storage-in-event": "error",
           "vibevalley/nsh-keymap-no-text-signal": "error",
+          "vibevalley/nsh-no-async-reactive": "error",
+          "vibevalley/nsh-no-self-canceling-effect": "error",
+        },
+      },
+      {
+        // Solid 2 components on vibevalley.dev share fine-grained props and reactive safety rules.
+        files: ["apps/site/src/**/*.tsx"],
+        excludeFiles: ["**/*.test.ts", "**/*.test.tsx"],
+        rules: {
+          "vibevalley/nsh-no-props-destructure": "error",
+          "vibevalley/nsh-no-eager-accessor": "error",
+          "vibevalley/nsh-no-props-spread": "error",
+          "vibevalley/nsh-no-async-reactive": "error",
         },
       },
     ],

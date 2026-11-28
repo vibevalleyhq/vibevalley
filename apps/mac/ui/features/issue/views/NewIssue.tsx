@@ -41,20 +41,21 @@ export interface NewIssueAt {
 export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where: NewIssueAt, requestKey: string) => Promise<boolean>; onClose: () => void }) {
   const router = useRouter();
   const last = prefsNow();
+  const initAt = untracked(() => props.at);
   const flow = signal<DraftSubmitState>(
     initialDraftSubmit({
-      text: props.at.text ?? "",
-      repo: props.at.repo ?? last.repo,
-      agent: props.at.agent ?? (last.pick === "auto" ? "" : last.pick),
-      attachments: [...(props.at.attachmentFiles ?? [])],
+      text: initAt.text ?? "",
+      repo: initAt.repo ?? last.repo,
+      agent: initAt.agent ?? (last.pick === "auto" ? "" : last.pick),
+      attachments: [...(initAt.attachmentFiles ?? [])],
     }),
   );
-  const machineId = signal(props.at.machineId ?? "");
-  const owner = signal<ActorRef | undefined>(props.at.owner ?? { kind: "user", id: "self" });
-  const parent = signal(props.at.parent ?? "");
-  const tags = signal<string[]>([...(props.at.tags ?? [])]);
-  const startAt = signal<number | undefined>(props.at.startAt);
-  const dueAt = signal<number | undefined>(props.at.dueAt);
+  const machineId = signal(initAt.machineId ?? "");
+  const owner = signal<ActorRef | undefined>(initAt.owner ?? { kind: "user", id: "self" });
+  const parent = signal(initAt.parent ?? "");
+  const tags = signal<string[]>([...(initAt.tags ?? [])]);
+  const startAt = signal<number | undefined>(initAt.startAt);
+  const dueAt = signal<number | undefined>(initAt.dueAt);
   const hasSchedule = computed(() => startAt() !== undefined || dueAt() !== undefined);
   const allIssues = useIssues();
   const dispatch = (event: DraftSubmitEvent): DraftSubmitState => {

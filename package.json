@@ -30,6 +30,7 @@
     "@types/node": "catalog:",
     "@vibevalley/i18n": "workspace:*",
     "@vibevalley/protocol": "workspace:*",
+    "@vibevalley/vdp": "workspace:*",
     "knip": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",

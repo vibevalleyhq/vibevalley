@@ -18,9 +18,9 @@ use url::Url;
 use vibevalley_protocol::{
     Next, VdpCaptureScreenshotParams, VdpCommand, VdpDispatchKeyParams, VdpDispatchMouseParams, VdpEndpointInfo, VdpError, VdpEvent, VdpInputResult,
     VdpMouseButton, VdpMouseEventKind, VdpNotification, VdpRequest, VdpScreenshotResult, VdpScreenshotTarget, VdpServerInvokeParams, VdpServerSliceParams,
-    VdpShellNavigateParams, VdpShellResizeParams, VdpShellSetThemeParams, VdpTarget, VdpTargetListResult, VdpTypeTextParams, VdpUiBounds, VdpUiGetTreeParams,
-    VdpUiInspectAtParams, VdpUiInspectAtResult, VdpUiNode, VdpUiPressParams, VdpUiPressResult, VdpUiQueryParams, VdpUiQueryResult, VdpUiTreeResult,
-    VdpUiWaitForParams, VdpUiWaitForResult, VdpVersionInfo, VdpWireMessage, home,
+    VdpShellNavigateParams, VdpShellResizeParams, VdpShellSetThemeParams, VdpTarget, VdpTargetListResult, VdpTypeTextParams, VdpUiBounds,
+    VdpUiDumpLayoutParams, VdpUiDumpLayoutResult, VdpUiGetTreeParams, VdpUiInspectAtParams, VdpUiInspectAtResult, VdpUiNode, VdpUiPressParams,
+    VdpUiPressResult, VdpUiQueryParams, VdpUiQueryResult, VdpUiTreeResult, VdpUiWaitForParams, VdpUiWaitForResult, VdpVersionInfo, VdpWireMessage, home,
 };
 
 use crate::auth::Secret;
@@ -164,6 +164,17 @@ pub enum DebugAction {
     /// Inspect the live UI node tree from vdpProbe (UI.getTree)
     #[command(after_help = "Examples:\n  vibevalley debug ui-tree\n  vibevalley debug ui-tree --view workbench --max-depth 4 --json")]
     UiTree {
+        /// Optional view id (e.g. workbench)
+        #[arg(long)]
+        view: Option<String>,
+        /// Optional maximum tree depth
+        #[arg(long)]
+        max_depth: Option<u32>,
+    },
+
+    /// Dump the full measured layout tree across mounted surfaces (UI.dumpLayout)
+    #[command(after_help = "Examples:\n  vibevalley debug dump-layout\n  vibevalley debug dump-layout --view workbench --json")]
+    DumpLayout {
         /// Optional view id (e.g. workbench)
         #[arg(long)]
         view: Option<String>,
@@ -1040,6 +1051,19 @@ pub async fn run(client: &Client, cmd: DebugCmd) -> Done {
                 .await?;
             ws.close().await;
             client.output.show(&tree, format_ui_tree);
+            Ok(())
+        }
+
+        DebugAction::DumpLayout { view, max_depth } => {
+            let endpoint = resolve_endpoint(client, &cmd.target)?;
+            let mut ws = VdpWsClient::connect(&endpoint).await?;
+            let dumped: VdpUiDumpLayoutResult = ws
+                .call_typed(&VdpCommand::UiDumpLayout(VdpUiDumpLayoutParams { view, max_depth }), DEFAULT_RPC_TIMEOUT)
+                .await?;
+            ws.close().await;
+            client.output.show(&dumped, |d| {
+                serde_json::to_string_pretty(d).unwrap_or_else(|_| format!("{} surfaces", d.surfaces.len()))
+            });
             Ok(())
         }
 

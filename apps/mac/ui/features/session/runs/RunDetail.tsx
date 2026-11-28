@@ -1,4 +1,4 @@
-import { Clipboard, computed, signal, Text, View } from "nsh";
+import { Clipboard, computed, signal, Text, untracked, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import type { Look } from "@vibevalley/protocol";
@@ -299,7 +299,7 @@ export function RunDetail(props: {
         <View class="min-h-0 w-full max-w-6xl flex-1 gap-2.5">
           <If when={props.entry.kind === "orchestrator" ? props.approvals : undefined}>
             {(Approvals) => {
-              const ViewApprovals = Approvals();
+              const ViewApprovals = untracked(Approvals);
               return <ViewApprovals id={props.entry.id} />;
             }}
           </If>

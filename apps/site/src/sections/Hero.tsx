@@ -1,6 +1,6 @@
 import type { JSX } from "@solidjs/web";
 import { springValue, type MotionValue } from "motion";
-import { createSignal, onCleanup } from "solid-js";
+import { createSignal, onCleanup, untrack } from "solid-js";
 
 import { heroWideSizes, heroPortraitSizes, type HeroArt } from "../base/images";
 import { SCENES, firefliesOf, type Scene } from "../base/scene";
@@ -128,8 +128,8 @@ export default function Hero(props: Props) {
     px.set(0);
     py.set(0);
   }
-  const stagger = Math.min(60, 360 / [...props.copy.name].length);
-  const after = [...props.copy.name].length * stagger + 220;
+  const stagger = () => Math.min(60, 360 / [...props.copy.name].length);
+  const after = () => [...props.copy.name].length * stagger() + 220;
   return (
     <section ref={root.set} id="top" aria-label={props.copy.name} class="relative h-[200svh] min-h-280">
       <div onPointerMove={point} onPointerLeave={leave} class="@container-[size] sticky top-0 isolate h-svh min-h-140 overflow-hidden bg-(--color-dusk)">
@@ -177,7 +177,7 @@ export default function Hero(props: Props) {
                   <span
                     class="inline-block motion-safe:[animation-name:title-pop] motion-safe:[animation-duration:520ms] motion-safe:[animation-timing-function:var(--ease-out)] motion-safe:[animation-fill-mode:both]"
                     style={{
-                      "animation-delay": `${i * stagger}ms`,
+                      "animation-delay": `${i * stagger()}ms`,
                     }}
                   >
                     {ch}
@@ -192,7 +192,7 @@ export default function Hero(props: Props) {
           <p
             class="pointer-events-auto font-display text-[length:clamp(26px,3.6vw,46px)] font-bold leading-[1.2] text-lantern [text-shadow:var(--text-shadow-ink)] motion-safe:[animation-name:title-in] motion-safe:[animation-duration:500ms] motion-safe:[animation-timing-function:var(--ease-out)] motion-safe:[animation-fill-mode:both]"
             style={{
-              "animation-delay": `${after}ms`,
+              "animation-delay": `${after()}ms`,
             }}
           >
             {props.copy.tagline}
@@ -200,7 +200,7 @@ export default function Hero(props: Props) {
           <p
             class="pointer-events-auto font-display text-[length:clamp(19px,2.2vw,28px)] font-bold leading-[1.35] text-paper-core [text-shadow:var(--text-shadow-ink)] motion-safe:[animation-name:title-in] motion-safe:[animation-duration:500ms] motion-safe:[animation-timing-function:var(--ease-out)] motion-safe:[animation-fill-mode:both]"
             style={{
-              "animation-delay": `${after + 90}ms`,
+              "animation-delay": `${after() + 90}ms`,
             }}
           >
             {props.copy.verses.morning.join("")}
@@ -208,7 +208,7 @@ export default function Hero(props: Props) {
           <p
             class="pointer-events-auto max-w-[34em] text-base sm:text-lg text-cream-50/95 [text-shadow:var(--text-shadow-thin)] motion-safe:[animation-name:title-in] motion-safe:[animation-duration:500ms] motion-safe:[animation-timing-function:var(--ease-out)] motion-safe:[animation-fill-mode:both]"
             style={{
-              "animation-delay": `${after + 180}ms`,
+              "animation-delay": `${after() + 180}ms`,
             }}
           >
             {props.copy.lead}
@@ -216,7 +216,7 @@ export default function Hero(props: Props) {
           <div
             class="pointer-events-auto mt-2 flex flex-wrap gap-3.5 motion-safe:[animation-name:title-in] motion-safe:[animation-duration:500ms] motion-safe:[animation-timing-function:var(--ease-out)] motion-safe:[animation-fill-mode:both]"
             style={{
-              "animation-delay": `${after + 270}ms`,
+              "animation-delay": `${after() + 270}ms`,
             }}
           >
             <PaperLink primary href={props.github}>
@@ -265,26 +265,25 @@ export default function Hero(props: Props) {
 }
 
 function HeroPicture(props: { hour: Scene; art: HeroArt; imageRef?: (el: HTMLImageElement) => void }) {
-  const first = props.hour === "morning";
   return (
     <picture>
       <source
         media="(orientation: portrait)"
         sizes={heroPortraitSizes}
-        srcset={first ? props.art.portraitSrcset : undefined}
-        data-srcset={first ? undefined : props.art.portraitSrcset}
+        srcset={props.hour === "morning" ? props.art.portraitSrcset : undefined}
+        data-srcset={props.hour === "morning" ? undefined : props.art.portraitSrcset}
       />
       <img
         ref={props.imageRef}
         data-scene={props.hour}
         sizes={heroWideSizes}
-        srcset={first ? props.art.srcset : undefined}
-        src={first ? props.art.src : undefined}
-        data-srcset={first ? undefined : props.art.srcset}
-        data-src={first ? undefined : props.art.src}
+        srcset={props.hour === "morning" ? props.art.srcset : undefined}
+        src={props.hour === "morning" ? props.art.src : undefined}
+        data-srcset={props.hour === "morning" ? undefined : props.art.srcset}
+        data-src={props.hour === "morning" ? undefined : props.art.src}
         alt=""
         draggable={false}
-        class={["absolute inset-0 w-full h-full max-w-none object-cover select-none", !first && hourVisibility[props.hour]]}
+        class={["absolute inset-0 w-full h-full max-w-none object-cover select-none", props.hour !== "morning" && hourVisibility[props.hour]]}
       />
     </picture>
   );
@@ -292,26 +291,47 @@ function HeroPicture(props: { hour: Scene; art: HeroArt; imageRef?: (el: HTMLIma
 
 /** Later scenes layer over the morning diorama render. */
 function Comes(props: { hour: Exclude<Scene, "morning">; art: HeroArt; hero: ElementRef<HTMLElement> }) {
-  const [from, to] = COMES[props.hour];
-  const ref = createScrollAnimation<HTMLImageElement>(props.hero, HOLDING, () => [{ keyframes: { opacity: [0, 0, 1, 1] }, times: [0, from, to, 1] }]);
+  const ref = createScrollAnimation<HTMLImageElement>(
+    untrack(() => props.hero),
+    HOLDING,
+    () => {
+      const [from, to] = COMES[props.hour];
+      return [{ keyframes: { opacity: [0, 0, 1, 1] }, times: [0, from, to, 1] }];
+    },
+  );
   return <HeroPicture hour={props.hour} art={props.art} imageRef={ref.set} />;
 }
 
 function Line(props: { hour: Exclude<Scene, "morning">; verse: string[]; hero: ElementRef<HTMLElement> }) {
-  const [a, b, c, d] = SAYS[props.hour];
-  const seen = createScrollAnimation<HTMLDivElement>(props.hero, HOLDING, () => [
-    props.hour === "night"
-      ? { keyframes: { opacity: [0, 0, 1, 1] }, times: [0, a, b, 1] }
-      : { keyframes: { opacity: [0, 0, 1, 1, 0, 0] }, times: [0, a, b, c, d, 1] },
-  ]);
-  const rise = createScrollAnimation<HTMLDivElement>(props.hero, HOLDING, () => [
-    props.hour === "night"
-      ? { keyframes: { transform: ["translateY(24px)", "translateY(24px)", "translateY(0px)", "translateY(0px)"] }, times: [0, a, b, 1] }
-      : {
-          keyframes: { transform: ["translateY(24px)", "translateY(24px)", "translateY(0px)", "translateY(0px)", "translateY(-24px)", "translateY(-24px)"] },
-          times: [0, a, b, c, d, 1],
-        },
-  ]);
+  const seen = createScrollAnimation<HTMLDivElement>(
+    untrack(() => props.hero),
+    HOLDING,
+    () => {
+      const [a, b, c, d] = SAYS[props.hour];
+      return [
+        props.hour === "night"
+          ? { keyframes: { opacity: [0, 0, 1, 1] }, times: [0, a, b, 1] }
+          : { keyframes: { opacity: [0, 0, 1, 1, 0, 0] }, times: [0, a, b, c, d, 1] },
+      ];
+    },
+  );
+  const rise = createScrollAnimation<HTMLDivElement>(
+    untrack(() => props.hero),
+    HOLDING,
+    () => {
+      const [a, b, c, d] = SAYS[props.hour];
+      return [
+        props.hour === "night"
+          ? { keyframes: { transform: ["translateY(24px)", "translateY(24px)", "translateY(0px)", "translateY(0px)"] }, times: [0, a, b, 1] }
+          : {
+              keyframes: {
+                transform: ["translateY(24px)", "translateY(24px)", "translateY(0px)", "translateY(0px)", "translateY(-24px)", "translateY(-24px)"],
+              },
+              times: [0, a, b, c, d, 1],
+            },
+      ];
+    },
+  );
   return (
     <div
       ref={seen.set}
@@ -340,12 +360,18 @@ function Layer(props: {
   class?: JSX.ClassValue | undefined;
   children: JSX.Element;
 }) {
-  const away = createScrollAnimation<HTMLDivElement>(props.hero, LEAVING, () => [
-    { keyframes: { transform: ["translateY(0px)", `translateY(${props.lag * innerHeight}px)`] } },
-  ]);
-  const closer = createScrollAnimation<HTMLDivElement>(props.hero, HOLDING, () => [{ keyframes: { transform: ["scale(1)", `scale(${props.zoom})`] } }]);
-  const x = readMotion(props.px);
-  const y = readMotion(props.py);
+  const away = createScrollAnimation<HTMLDivElement>(
+    untrack(() => props.hero),
+    LEAVING,
+    () => [{ keyframes: { transform: ["translateY(0px)", `translateY(${props.lag * innerHeight}px)`] } }],
+  );
+  const closer = createScrollAnimation<HTMLDivElement>(
+    untrack(() => props.hero),
+    HOLDING,
+    () => [{ keyframes: { transform: ["scale(1)", `scale(${props.zoom})`] } }],
+  );
+  const x = readMotion(untrack(() => props.px));
+  const y = readMotion(untrack(() => props.py));
   return (
     <div ref={away.set} class={["absolute inset-0", props.class]}>
       <div

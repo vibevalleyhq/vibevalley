@@ -312,11 +312,17 @@ function Overview(props: { repo: RepoSummary; health: RepoHealth | undefined; la
   const notCounted = () => !!props.languages.error();
   const firstCommit = () => {
     const w = worked();
-    return w?.first !== undefined ? dateText(w.first) : w ? t("web.repo.noCommits") : "…";
+    return w?.first !== undefined ? dateText(w.first) : w ? t("web.repo.noCommits") : props.activity.fetching() ? "…" : t("web.repo.noCommits");
   };
   const codeLines = () => {
     const n = lines();
-    return n !== undefined ? t("web.repo.lines", { n: number(n) }) : notCounted() ? t("web.repo.uncounted") : "…";
+    return n !== undefined
+      ? t("web.repo.lines", { n: number(n) })
+      : notCounted()
+        ? t("web.repo.uncounted")
+        : props.languages.fetching()
+          ? "…"
+          : t("web.repo.uncounted");
   };
   const languageCount = createMemo(() => {
     const c = counted();
@@ -324,11 +330,17 @@ function Overview(props: { repo: RepoSummary; health: RepoHealth | undefined; la
   });
   const commitTotal = () => {
     const w = worked();
-    return w ? t("web.repo.commits", { n: number(w.total) }) : "…";
+    return w ? t("web.repo.commits", { n: number(w.total) }) : props.activity.fetching() ? "…" : t("web.repo.commits", { n: "0" });
   };
   const languageTotal = () => {
     const count = languageCount();
-    return count !== undefined ? t("web.repo.kinds", { n: count }) : notCounted() ? t("web.repo.uncounted") : "…";
+    return count !== undefined
+      ? t("web.repo.kinds", { n: count })
+      : notCounted()
+        ? t("web.repo.uncounted")
+        : props.languages.fetching()
+          ? "…"
+          : t("web.repo.uncounted");
   };
   const busy = createMemo(() => props.languages.fetching() || props.activity.fetching());
   const badge = () => {

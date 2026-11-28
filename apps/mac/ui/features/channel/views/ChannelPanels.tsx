@@ -419,7 +419,10 @@ function ThreadItem(props: { thread: Channel; title: string; onOpen: () => void 
           onCancel={() => renaming.set(false)}
         />
       </If>
-      <View class="flex-row items-center gap-0.5" style={{ opacity: hovered() ? 1 : 0 }}>
+      <View
+        class="absolute top-1.5 right-2 flex-row items-center gap-0.5 rounded-md bg-elevated px-0.5 opacity-0 shadow-float group-hover:opacity-100 focus-within:opacity-100"
+        style={{ opacity: hovered() ? 1 : 0 }}
+      >
         <BarButton
           icon="edit"
           size={14}

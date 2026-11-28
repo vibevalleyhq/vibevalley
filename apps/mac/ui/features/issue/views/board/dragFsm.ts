@@ -1,4 +1,4 @@
-import { cleanup, signal, untracked, type ViewRef } from "nsh";
+import { cleanup, signal, untracked, type ScrollRef, type ViewRef } from "nsh";
 
 import type { BoardSummary, Issue } from "@vibevalley/protocol";
 
@@ -271,9 +271,11 @@ export function dragDropOutcome(state: DragState, dropped: boolean): DragDropOut
   }
 }
 
-const BOARD_LANE_MIN = 220;
-const BOARD_LANE_FIT_ALL_MIN = 224;
-const BOARD_LANE_MAX = 300;
+const BOARD_LANE_MIN = 288;
+const BOARD_LANE_FIT_ALL_MIN = 288;
+const BOARD_LANE_MAX = 340;
+const EDGE_AUTOSCROLL_PX = 48;
+const EDGE_AUTOSCROLL_STEP = 14;
 
 /** Size lanes so all 6 fit cleanly on wide windows (e.g. 1680px) and an integer count of lanes fit cleanly per screen (e.g. 5 at 1280px) without awkward partial clipping. */
 export function boardLaneWidth(availableWidth: number, laneCount = 6): number {
@@ -294,6 +296,10 @@ export function createDrag(board: () => BoardProps) {
   const laneRefs = new Map<string, { lane: Lane; ref: ViewRef }>();
   const cardRefs = new Map<string, { lane: () => Lane; laneKey: () => string; ref: ViewRef; placeable: () => boolean }>();
   let root: ViewRef | undefined;
+  let scrollView: ScrollRef | undefined;
+  let getScrollX: (() => number) | undefined;
+  let getScrollViewportWidth: (() => number) | undefined;
+  let scrollViewportLeft = 0;
   const isPlaceable = (id: string) => cardRefs.get(id)?.placeable() === true;
   const dispatch = (event: DragEvent): DragState => {
     const next = dragTransition(untracked(state), event);
@@ -374,6 +380,11 @@ export function createDrag(board: () => BoardProps) {
     before,
     ghost,
     setRoot: (r: ViewRef) => (root = r),
+    setScroll: (r: ScrollRef | undefined, readOffsetX: () => number, readViewportW: () => number) => {
+      scrollView = r;
+      getScrollX = readOffsetX;
+      getScrollViewportWidth = readViewportW;
+    },
     lane: (key: string, lane: Lane, ref: ViewRef) => {
       laneRefs.set(key, { lane, ref });
       cleanup(() => laneRefs.get(key)?.ref === ref && laneRefs.delete(key));
@@ -385,6 +396,10 @@ export function createDrag(board: () => BoardProps) {
     async start(card: BoardCard, number: string | undefined, title: string, x0: number, y0: number) {
       const started = dispatch({ kind: "start", card, ...(number !== undefined ? { number } : {}), title, at: { x: x0, y: y0 } });
       const epoch = started.epoch;
+      if (scrollView) {
+        const sm = await scrollView.measure().catch(() => undefined);
+        if (sm) scrollViewportLeft = sm.pagePosition.x;
+      }
       const otherCards = [...cardRefs.entries()].filter(([id]) => id !== card.id);
       const [lanesNow, cardsNow, rootRect, own] = await Promise.all([
         Promise.all([...laneRefs.entries()].map(async ([key, { lane, ref }]) => [lane, await rectOf(ref), key] as const)),
@@ -424,6 +439,17 @@ export function createDrag(board: () => BoardProps) {
     },
     move: (x: number, y: number) => {
       dispatch({ kind: "move", at: { x, y }, isPlaceable });
+      const vw = getScrollViewportWidth?.() ?? 0;
+      if (scrollView && vw > EDGE_AUTOSCROLL_PX * 2) {
+        const curX = getScrollX?.() ?? 0;
+        const leftThreshold = scrollViewportLeft + EDGE_AUTOSCROLL_PX;
+        const rightThreshold = scrollViewportLeft + vw - EDGE_AUTOSCROLL_PX;
+        if (x < leftThreshold && curX > 0) {
+          scrollView.scrollTo({ x: Math.max(0, curX - EDGE_AUTOSCROLL_STEP), animated: false });
+        } else if (x > rightThreshold) {
+          scrollView.scrollTo({ x: curX + EDGE_AUTOSCROLL_STEP, animated: false });
+        }
+      }
     },
     end(dropped: boolean, at?: DragPoint) {
       if (!dropped) {

@@ -61,7 +61,7 @@ export function FamilyDetail(props: { issue: Issue; children: Issue[]; onOpen: (
     Boolean(acts.box()) || props.issue.stage.acts.some((action) => action.act === "reopen" && action.does === "move" && action.words === "required");
 
   const heading = (
-    <View>
+    <View class="min-w-0">
       <IssueTrail parentId={live().parent} parent={parent()} onOpenParent={props.onOpen} />
       <TodoTitle value={live().title} editable={open()} onCommit={(title) => setLabel({ title })} />
       <View class="mt-2.5 flex-row flex-wrap items-center gap-2">

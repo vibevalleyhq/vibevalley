@@ -27,21 +27,23 @@ type VoiceUse = "live" | "speech" | "transcription";
 const sameVoice = (a: VoiceSettings, b: VoiceSettings) => same(a, b);
 
 export function VoiceForm(props: { part: VoicePart }) {
-  if (props.part === "line") {
-    return (
-      <View testID="voice-moss" class="min-h-0 gap-6">
-        <NativeCall />
-        <VoiceConfigSection />
-      </View>
-    );
-  }
   const settings = useSettings();
   return (
     <If
-      when={ready(settings, undefined)}
-      else={<Quiet>{settings.error() ? t("web.voice.voice.noSettings", { why: reasonOf(settings.error()) }) : t("web.base.form.asking")}</Quiet>}
+      when={props.part !== "line"}
+      else={
+        <View testID="voice-moss" class="min-h-0 gap-6">
+          <NativeCall />
+          <VoiceConfigSection />
+        </View>
+      }
     >
-      {(status) => <Keyed key={status().file}>{() => <AgentVoiceForm status={untracked(status)} />}</Keyed>}
+      <If
+        when={ready(settings, undefined)}
+        else={<Quiet>{settings.error() ? t("web.voice.voice.noSettings", { why: reasonOf(settings.error()) }) : t("web.base.form.asking")}</Quiet>}
+      >
+        {(status) => <Keyed key={status().file}>{() => <AgentVoiceForm status={untracked(status)} />}</Keyed>}
+      </If>
     </If>
   );
 }
@@ -57,8 +59,8 @@ function VoiceConfigSection() {
 
 function VoiceConfigForm(props: { initial: ProviderStatus }) {
   const client = useQueryClient();
-  const base = signal(props.initial);
-  const draft = signal(editableProviderUpdate(props.initial));
+  const base = signal(untracked(() => props.initial));
+  const draft = signal(untracked(() => editableProviderUpdate(props.initial)));
   const selectedId = signal<string | undefined>(undefined);
   const error = signal<string | undefined>(undefined);
   const act = createAct((why) => error.set(why));
@@ -167,7 +169,7 @@ function VoiceConfigForm(props: { initial: ProviderStatus }) {
   const voiceList = computed(() => ready(voices, undefined)?.voices ?? []);
 
   return (
-    <View testID="voice-config" class="gap-5">
+    <View testID="voice-config" class="gap-5 pb-6">
       <SettingsGroup
         title={t("web.voice.moss.configTitle")}
         note={t("web.voice.moss.configNote")}
@@ -178,7 +180,7 @@ function VoiceConfigForm(props: { initial: ProviderStatus }) {
           <If
             when={draft().connections.length > 0}
             else={
-              <Button testID="voice-add-connection" icon="add" onPress={addConnection}>
+              <Button tone="plain" testID="voice-add-connection" icon="add" onPress={addConnection}>
                 {t("web.voice.moss.addConnection")}
               </Button>
             }
@@ -343,7 +345,7 @@ function AgentVoiceForm(props: { status: SettingsStatus }) {
   };
 
   return (
-    <View testID="voice-agent" class="max-w-180 gap-4">
+    <View testID="voice-agent" class="max-w-180 gap-4 pb-6">
       <View class="flex-row flex-wrap items-center gap-x-1 rounded-lg border border-line bg-side px-3.5 py-2">
         <View class="mr-0.5 shrink-0">
           <Icon name="info" size={12} tone="faint" />

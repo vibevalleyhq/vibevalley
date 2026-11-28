@@ -43,6 +43,8 @@ pub struct PresencePayload {
     pub id: String,
     pub name: String,
     pub color: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub avatar: Option<String>,
     pub kind: PresenceKind,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub x: Option<f64>,
@@ -260,6 +262,7 @@ mod tests {
             id: id.into(),
             name: "Alice".into(),
             color: "#22c55e".into(),
+            avatar: None,
             kind: PresenceKind::Cursor,
             x: Some(x),
             y: Some(0.0),

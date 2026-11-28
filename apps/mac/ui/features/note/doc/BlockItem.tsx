@@ -1,13 +1,15 @@
-import { Scroll, Text, untracked, View, type JSX } from "nsh";
+import { Scroll, Text, untracked, View, type JSX, type ViewRef } from "nsh";
 import { Menu, MenuItem, MenuSeparator } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
-import type { DocBlock, Issue, IssueId, MediaAnnotation, Note, NoteId } from "@vibevalley/protocol";
+import type { DocBlock, Issue, IssueId, MediaAnnotation, Note, NoteId, NotePresence } from "@vibevalley/protocol";
 
 import { Icon } from "../../../design/Icon";
 import type { Picture } from "../../../design/Lightbox";
 import { motionClass, popupTransition } from "../../../design/motion";
 import { Keyed } from "../../../infra/base/dom";
+import { useVdpNode } from "../../../infra/vdpProbe";
+import { filterRemotePresences, NotePresenceBadges } from "../PresenceBadges";
 import { type BlockEditorTelemetryPatch, type FocusRequest, outerBlockSpacingClass } from "./blockEditorShared";
 import {
   type BlockFocusTarget,
@@ -50,6 +52,7 @@ export type { BlockEditorProbeSnapshot, BlockEditorTelemetryPatch, FocusRequest 
 
 interface BlockItemProps {
   readonly block: DocBlock;
+  readonly prevBlock?: DocBlock | undefined;
   readonly allBlocks: readonly DocBlock[];
   readonly slideIndices: ReadonlyMap<string, number>;
   readonly note?: Note | undefined;
@@ -57,7 +60,9 @@ interface BlockItemProps {
   readonly issues: readonly Issue[];
   readonly focusedBlockId?: string | undefined;
   readonly focusRequest?: FocusRequest | undefined;
+  readonly presences?: readonly NotePresence[] | undefined;
   readonly depth?: number | undefined;
+  readonly embedded?: boolean | undefined;
   readonly compactGutter?: boolean | undefined;
   readonly onFocusBlock?: ((id: string) => void) | undefined;
   readonly onRequestFocus?: ((target: BlockFocusTarget) => void) | undefined;
@@ -88,10 +93,11 @@ interface BlockItemProps {
 const menuPopupClass = `min-w-52 gap-0.5 rounded-lg border border-line-strong bg-elevated p-1 shadow-float ${motionClass("transition-opacity duration-120 ease-out")}`;
 const menuItemClass = "h-7 flex-row items-center gap-2 rounded-md px-2 hover:bg-hover focus:bg-hover";
 
-function renderNestedChild(child: DocBlock, props: BlockItemProps): JSX.Element {
+function renderNestedChild(child: () => DocBlock, props: BlockItemProps, prevChild?: () => DocBlock | undefined): JSX.Element {
   return (
     <BlockItem
-      block={child}
+      block={child()}
+      prevBlock={prevChild?.()}
       allBlocks={props.allBlocks}
       slideIndices={props.slideIndices}
       note={props.note}
@@ -99,7 +105,10 @@ function renderNestedChild(child: DocBlock, props: BlockItemProps): JSX.Element 
       issues={props.issues}
       focusedBlockId={props.focusedBlockId}
       focusRequest={props.focusRequest}
+      presences={props.presences}
       depth={(props.depth ?? 0) + 1}
+      embedded={false}
+      compactGutter={props.compactGutter}
       onFocusBlock={props.onFocusBlock}
       onRequestFocus={props.onRequestFocus}
       onFocusAdjacent={props.onFocusAdjacent}
@@ -160,6 +169,8 @@ function renderBlockContent(blockType: BlockType, props: BlockItemProps): JSX.El
           {(b) => (
             <HeadingBlockView
               block={b()}
+              notes={props.notes}
+              issues={props.issues}
               focused={props.focusedBlockId === b().id}
               focusRequest={props.focusRequest}
               onFocus={() => props.onFocusBlock?.(b().id)}
@@ -168,6 +179,8 @@ function renderBlockContent(blockType: BlockType, props: BlockItemProps): JSX.El
               onMergeBackward={props.onMergeBackward ? () => props.onMergeBackward?.(b().id) : undefined}
               onUpdate={(next) => props.onUpdateBlock(b().id, next)}
               onInsertAfter={(nb) => props.onInsertAfter(b().id, nb)}
+              onOpenNote={props.onOpenNote}
+              onOpenIssue={props.onOpenIssue}
               onEditorTelemetry={props.onEditorTelemetry}
             />
           )}
@@ -179,11 +192,15 @@ function renderBlockContent(blockType: BlockType, props: BlockItemProps): JSX.El
           {(b) => (
             <ListBlockView
               block={b()}
+              notes={props.notes}
+              issues={props.issues}
               focusRequest={props.focusRequest}
               onFocus={() => props.onFocusBlock?.(b().id)}
               onFocusAdjacent={(dir) => props.onFocusAdjacent?.(b().id, dir)}
               onUpdate={(next) => props.onUpdateBlock(b().id, next)}
               onInsertAfter={(nb) => props.onInsertAfter(b().id, nb)}
+              onOpenNote={props.onOpenNote}
+              onOpenIssue={props.onOpenIssue}
               onEditorTelemetry={props.onEditorTelemetry}
             />
           )}
@@ -195,6 +212,8 @@ function renderBlockContent(blockType: BlockType, props: BlockItemProps): JSX.El
           {(b) => (
             <TodoBlockView
               block={b()}
+              notes={props.notes}
+              issues={props.issues}
               focusRequest={props.focusRequest}
               onFocus={() => props.onFocusBlock?.(b().id)}
               onFocusAdjacent={(dir) => props.onFocusAdjacent?.(b().id, dir)}
@@ -202,6 +221,8 @@ function renderBlockContent(blockType: BlockType, props: BlockItemProps): JSX.El
               onMergeBackward={props.onMergeBackward ? () => props.onMergeBackward?.(b().id) : undefined}
               onUpdate={(next) => props.onUpdateBlock(b().id, next)}
               onInsertAfter={(nb) => props.onInsertAfter(b().id, nb)}
+              onOpenNote={props.onOpenNote}
+              onOpenIssue={props.onOpenIssue}
               onEditorTelemetry={props.onEditorTelemetry}
             />
           )}
@@ -244,7 +265,7 @@ function renderBlockContent(blockType: BlockType, props: BlockItemProps): JSX.El
               onUpdate={(next) => props.onUpdateBlock(b().id, next)}
               onOpenNote={props.onOpenNote}
               onOpenIssue={props.onOpenIssue}
-              renderChild={(child) => renderNestedChild(child, props)}
+              renderChild={(child, prevChild) => renderNestedChild(child, props, prevChild)}
             />
           )}
         </If>
@@ -273,7 +294,16 @@ function renderBlockContent(blockType: BlockType, props: BlockItemProps): JSX.El
     case "table":
       return (
         <If when={props.block.type === "table" ? props.block : undefined}>
-          {(b) => <TableBlockView block={b()} onUpdate={(next) => props.onUpdateBlock(b().id, next)} />}
+          {(b) => (
+            <TableBlockView
+              block={b()}
+              notes={props.notes}
+              issues={props.issues}
+              onUpdate={(next) => props.onUpdateBlock(b().id, next)}
+              onOpenNote={props.onOpenNote}
+              onOpenIssue={props.onOpenIssue}
+            />
+          )}
         </If>
       );
     case "bookmark":
@@ -305,7 +335,11 @@ function renderBlockContent(blockType: BlockType, props: BlockItemProps): JSX.El
       return (
         <If when={props.block.type === "columns" ? props.block : undefined}>
           {(b) => (
-            <ColumnsBlockView block={b()} onUpdate={(next) => props.onUpdateBlock(b().id, next)} renderChild={(child) => renderNestedChild(child, props)} />
+            <ColumnsBlockView
+              block={b()}
+              onUpdate={(next) => props.onUpdateBlock(b().id, next)}
+              renderChild={(child, prevChild) => renderNestedChild(child, props, prevChild)}
+            />
           )}
         </If>
       );
@@ -415,17 +449,33 @@ function renderBlockContent(blockType: BlockType, props: BlockItemProps): JSX.El
 }
 
 export function BlockItem(props: BlockItemProps) {
+  const rootEmbedded = () => props.embedded === true && (props.depth ?? 0) === 0;
   const compact = () => (props.depth ?? 0) > 0 || props.compactGutter === true;
+  const compactLine = () => props.block.type === "todo" || props.block.type === "list";
+  const blockPresences = () => filterRemotePresences(props.presences ?? []).filter((p) => p.nodeId === props.block.id || p.selector === props.block.id);
+
+  let blockRef: ViewRef | undefined;
+  useVdpNode({
+    testId: `doc-block-${props.block.id}`,
+    role: "group",
+    getRef: () => blockRef,
+  });
 
   return (
     <View
+      ref={(el) => {
+        blockRef = el;
+      }}
       testID={`doc-block-${props.block.id}`}
-      class={`group relative flex-row items-start rounded-md py-0.5 pr-1 ${compact() ? "pl-10" : "pl-14"} ${outerBlockSpacingClass(props.block)}`}
+      class={`group relative flex-row items-start rounded-md pr-1 ${blockPresences().length > 0 ? "ring-1 ring-accent/35" : ""} ${compactLine() ? "py-0" : "py-0.5"} ${rootEmbedded() ? "pl-0" : compact() ? "pl-9" : "pl-14"} ${outerBlockSpacingClass(props.block, props.prevBlock)}`}
     >
+      <If when={blockPresences().length > 0}>
+        <NotePresenceBadges peers={blockPresences()} testIdPrefix="doc-presence-badge" class="pointer-events-none absolute -top-5 right-1 z-20" />
+      </If>
       <View
-        class={`absolute top-1 left-0 flex-row items-center justify-end gap-0.5 pr-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 ${
-          compact() ? "w-9" : "w-12"
-        }`}
+        class={`absolute flex-row items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 ${
+          compactLine() ? "top-0.5" : "top-1"
+        } ${rootEmbedded() ? "-left-8 w-7 pr-0.5" : compact() ? "left-0 w-9 pr-0.5" : "left-0 w-12 pr-1"}`}
       >
         <View
           role="button"
@@ -433,7 +483,7 @@ export function BlockItem(props: BlockItemProps) {
           testID={`doc-gutter-add-${props.block.id}`}
           accessibilityLabel={t("web.note.doc.addBlock")}
           onPress={() => props.onInsertAfter(props.block.id, { id: makeBlockId(), type: "prose", text: "" })}
-          class="size-5 shrink-0 items-center justify-center rounded-xs hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
+          class={`${compact() ? "size-4" : "size-5"} shrink-0 items-center justify-center rounded-xs hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus`}
         >
           <Icon name="add" size={12} tone="muted" />
         </View>
@@ -448,13 +498,165 @@ export function BlockItem(props: BlockItemProps) {
             <View
               testID={`doc-gutter-menu-${props.block.id}`}
               accessibilityLabel={t("web.note.page.more")}
-              class="size-5 shrink-0 items-center justify-center rounded-xs hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus aria-expanded:bg-selected aria-expanded:opacity-100"
+              class={`${compact() ? "size-4" : "size-5"} shrink-0 items-center justify-center rounded-xs hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus aria-expanded:bg-selected aria-expanded:opacity-100`}
             >
               <Icon name="more" size={12} tone="muted" />
             </View>
           }
         >
           <Scroll class="max-h-96" contentClass="gap-0.5">
+            <If when={props.block.type === "heading"}>
+              <Each of={[1, 2, 3] as const} key={(lv) => `h${lv}`}>
+                {(lv) => (
+                  <MenuItem
+                    testID={`doc-menu-heading-${lv()}-${props.block.id}`}
+                    onSelect={() => {
+                      if (props.block.type === "heading") {
+                        props.onUpdateBlock(props.block.id, { ...props.block, level: lv() });
+                      }
+                    }}
+                    class={menuItemClass}
+                  >
+                    <Icon name="edit" size={13} tone="muted" />
+                    <Text class="min-w-0 flex-1 truncate text-xs text-ink">{`H${lv()}`}</Text>
+                  </MenuItem>
+                )}
+              </Each>
+              <MenuSeparator class="my-1 h-px bg-line" />
+            </If>
+            <If when={props.block.type === "list"}>
+              <MenuItem
+                testID={`doc-list-toggle-ordered-${props.block.id}`}
+                onSelect={() => {
+                  if (props.block.type === "list") {
+                    props.onUpdateBlock(props.block.id, { ...props.block, ordered: !props.block.ordered });
+                  }
+                }}
+                class={menuItemClass}
+              >
+                <Icon name="indent" size={13} tone="muted" />
+                <Text class="min-w-0 flex-1 truncate text-xs text-ink">
+                  {props.block.type === "list" && props.block.ordered ? t("web.note.doc.bulletedList") : t("web.note.doc.orderedList")}
+                </Text>
+              </MenuItem>
+              <MenuItem
+                testID={`doc-list-add-${props.block.id}`}
+                onSelect={() => {
+                  if (props.block.type === "list") {
+                    props.onUpdateBlock(props.block.id, { ...props.block, items: [...props.block.items, ""] });
+                  }
+                }}
+                class={menuItemClass}
+              >
+                <Icon name="add" size={13} tone="muted" />
+                <Text class="min-w-0 flex-1 truncate text-xs text-ink">{t("web.note.doc.addBlock")}</Text>
+              </MenuItem>
+              <MenuSeparator class="my-1 h-px bg-line" />
+            </If>
+            <If when={props.block.type === "quote"}>
+              <MenuItem
+                testID={`doc-quote-attr-toggle-${props.block.id}`}
+                onSelect={() => {
+                  if (props.block.type === "quote") {
+                    props.onUpdateBlock(props.block.id, {
+                      ...props.block,
+                      attribution: props.block.attribution === undefined ? "" : undefined,
+                    });
+                  }
+                }}
+                class={menuItemClass}
+              >
+                <Icon name="reply" size={13} tone="muted" />
+                <Text class="min-w-0 flex-1 truncate text-xs text-ink">{t("web.note.doc.attributionPlaceholder")}</Text>
+              </MenuItem>
+              <MenuSeparator class="my-1 h-px bg-line" />
+            </If>
+            <If when={props.block.type === "toggle"}>
+              <MenuItem
+                testID={`doc-toggle-add-child-${props.block.id}`}
+                onSelect={() => {
+                  if (props.block.type === "toggle") {
+                    props.onUpdateBlock(props.block.id, {
+                      ...props.block,
+                      collapsed: false,
+                      children: [...(props.block.children ?? []), { id: makeBlockId(), type: "prose", text: "" }],
+                    });
+                  }
+                }}
+                class={menuItemClass}
+              >
+                <Icon name="add" size={13} tone="muted" />
+                <Text class="min-w-0 flex-1 truncate text-xs text-ink">{t("web.note.doc.addBlock")}</Text>
+              </MenuItem>
+              <MenuSeparator class="my-1 h-px bg-line" />
+            </If>
+            <If when={props.block.type === "columns"}>
+              <MenuItem
+                testID={`doc-columns-2-${props.block.id}`}
+                onSelect={() => {
+                  if (props.block.type === "columns") {
+                    const cols = props.block.columns;
+                    const next = cols.length === 3 ? [cols[0] ?? { blocks: [] }, { blocks: [...(cols[1]?.blocks ?? []), ...(cols[2]?.blocks ?? [])] }] : cols;
+                    props.onUpdateBlock(props.block.id, { ...props.block, columns: next });
+                  }
+                }}
+                class={menuItemClass}
+              >
+                <Icon name="sidebar" size={13} tone="muted" />
+                <Text class="min-w-0 flex-1 truncate text-xs text-ink">{t("web.note.doc.columnsCount", { n: 2 })}</Text>
+              </MenuItem>
+              <MenuItem
+                testID={`doc-columns-3-${props.block.id}`}
+                onSelect={() => {
+                  if (props.block.type === "columns") {
+                    const cols = props.block.columns;
+                    const next = cols.length === 2 ? [cols[0] ?? { blocks: [] }, cols[1] ?? { blocks: [] }, { blocks: [] }] : cols;
+                    props.onUpdateBlock(props.block.id, { ...props.block, columns: next });
+                  }
+                }}
+                class={menuItemClass}
+              >
+                <Icon name="sidebar" size={13} tone="muted" />
+                <Text class="min-w-0 flex-1 truncate text-xs text-ink">{t("web.note.doc.columnsCount", { n: 3 })}</Text>
+              </MenuItem>
+              <MenuSeparator class="my-1 h-px bg-line" />
+            </If>
+            <If when={props.block.type === "kpi"}>
+              <MenuItem
+                testID={`doc-kpi-add-${props.block.id}`}
+                onSelect={() => {
+                  if (props.block.type === "kpi") {
+                    props.onUpdateBlock(props.block.id, {
+                      ...props.block,
+                      items: [...props.block.items, { label: t("web.note.doc.slash.kpi.label"), value: "0", delta: "+0%", tone: "good" }],
+                    });
+                  }
+                }}
+                class={menuItemClass}
+              >
+                <Icon name="add" size={13} tone="muted" />
+                <Text class="min-w-0 flex-1 truncate text-xs text-ink">{t("web.note.doc.add")}</Text>
+              </MenuItem>
+              <MenuSeparator class="my-1 h-px bg-line" />
+            </If>
+            <If when={props.block.type === "pageBreak"}>
+              <MenuItem
+                testID={`doc-page-break-notes-toggle-${props.block.id}`}
+                onSelect={() => {
+                  if (props.block.type === "pageBreak") {
+                    props.onUpdateBlock(props.block.id, {
+                      ...props.block,
+                      speakerNotes: props.block.speakerNotes === undefined ? "" : undefined,
+                    });
+                  }
+                }}
+                class={menuItemClass}
+              >
+                <Icon name="notes" size={13} tone="muted" />
+                <Text class="min-w-0 flex-1 truncate text-xs text-ink">{t("web.note.doc.speakerNotesPlaceholder")}</Text>
+              </MenuItem>
+              <MenuSeparator class="my-1 h-px bg-line" />
+            </If>
             <MenuItem testID={`doc-menu-up-${props.block.id}`} onSelect={() => props.onMoveBlock(props.block.id, "up")} class={menuItemClass}>
               <Icon name="moveUp" size={13} tone="muted" />
               <Text class="min-w-0 flex-1 truncate text-xs text-ink">{t("web.note.doc.moveUp")}</Text>

@@ -515,7 +515,7 @@ function RuntimesSidebar(props: {
                               <ActiveBar />
                             </If>
                             <RuntimeIcon runtime={entry().runtimeId} size={18} />
-                            <Text class={`min-w-20 flex-1 truncate text-sm ${active() ? "font-medium text-ink" : "text-muted group-hover:text-ink"}`}>
+                            <Text class={`min-w-20 flex-1 truncate text-sm font-medium ${active() ? "text-ink" : "text-muted group-hover:text-ink"}`}>
                               {entry().label}
                             </Text>
                             <View class="min-w-0 shrink-0 flex-row items-center justify-end gap-1.5">

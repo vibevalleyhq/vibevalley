@@ -1,4 +1,5 @@
 import type { VdpScenario } from "../dsl.ts";
+import { agentPlayScenario } from "./agent-play.ts";
 import { chatScenario } from "./chat.ts";
 import { dashboardScenario } from "./dashboard.ts";
 import { docEditorScenario } from "./doc-editor.ts";
@@ -15,6 +16,7 @@ export const SCENARIOS: Readonly<Record<string, VdpScenario>> = {
   [libraryScenario.id]: libraryScenario,
   [dashboardScenario.id]: dashboardScenario,
   [settingsScenario.id]: settingsScenario,
+  [agentPlayScenario.id]: agentPlayScenario,
 };
 
 export function listScenarios(): readonly VdpScenario[] {

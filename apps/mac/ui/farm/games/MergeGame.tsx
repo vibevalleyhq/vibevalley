@@ -307,7 +307,7 @@ export function MergeGame() {
         onPressUp={(e) => swiped(e.pagePosition.x, e.pagePosition.y)}
         style={{ width: side, height: side, flexShrink: 0, position: "relative", backgroundColor: lcd.dark }}
       >
-        <Each of={Array.from({ length: 16 }, (_, i) => i)}>
+        <Each of={Array.from({ length: 16 }, (_, i) => i)} key="index">
           {(n) => (
             <View
               style={{
@@ -318,8 +318,8 @@ export function MergeGame() {
                 width: tile,
                 alignItems: "center",
                 justifyContent: "center",
-                borderWidth: g()?.grown.includes(n()) === true ? 2 : 0,
-                borderColor: lcd.ink,
+                borderWidth: 2,
+                borderColor: g()?.grown.includes(n()) === true ? lcd.ink : lcd.light,
                 backgroundColor: (board()[n()] ?? 0) > 0 ? lcd.paper : lcd.light,
               }}
             >
@@ -337,7 +337,9 @@ export function MergeGame() {
         <If when={overlay()}>{(lines) => <Cover lines={lines()} />}</If>
       </View>
       <View accessible accessibilityLabel={t("web.farm.phone.merge.stages")} class="flex-row gap-0.5">
-        <Each of={mergeStages}>{(_, i) => <Crop stage={i() + 1} size={24} faint={i() + 1 > reached()} />}</Each>
+        <Each of={mergeStages} key="index">
+          {(_, i) => <Crop stage={i() + 1} size={24} faint={i() + 1 > reached()} />}
+        </Each>
       </View>
       <Help lines={[t("web.farm.phone.merge.help"), t("web.farm.phone.merge.help2")]} />
     </View>

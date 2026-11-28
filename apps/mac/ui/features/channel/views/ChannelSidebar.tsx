@@ -407,7 +407,7 @@ function ChannelRow(props: {
       <View class="min-w-0 flex-1 gap-0.5">
         <View class="flex-row items-center gap-1.5">
           <Text
-            class={`min-w-0 flex-1 truncate text-sm ${props.unread > 0 || props.here ? "font-semibold" : "font-medium"} ${
+            class={`min-w-0 flex-1 truncate text-sm ${props.unread > 0 ? "font-semibold" : "font-medium"} ${
               quiet() && !props.here ? "text-muted" : "text-ink"
             }`}
           >

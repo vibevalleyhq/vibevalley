@@ -422,7 +422,153 @@ mod tests {
         assert!(ev_cols.contains("event_type"), "session_event table must include event_type column");
 
         let migrations = list_applied_migrations(db.read_conn(), DatabaseBackend::Sqlite, &existing).await.unwrap();
-        assert_eq!(migrations.len(), 12);
+        assert_eq!(migrations.len(), 13);
+        db.close().await;
+    }
+
+    #[tokio::test]
+    async fn pre_unified_session_and_participants_db_upgrades_cleanly() {
+        use sea_orm_migration::MigratorTrait;
+        use vibevalley_protocol::{ExecutionPolicy, Landing, SessionController, SessionPermissionMode};
+
+        let dir = tempfile::tempdir().unwrap();
+        let db_path = dir.path().join("server.db");
+        let url = format!("sqlite://{}?mode=rwc", db_path.display());
+
+        let conn = SeaDatabase::connect(&url).await.unwrap();
+        // Apply migrations 1..=12 (before m20261128_100004) and recreate pre-9db84ff51 legacy state.
+        crate::db::migration::Migrator::up(&conn, Some(12)).await.unwrap();
+        conn.execute_unprepared(
+            "DROP TABLE channel_delivery;
+             CREATE TABLE channel_delivery (
+               id INTEGER PRIMARY KEY AUTOINCREMENT,
+               message_id TEXT NOT NULL REFERENCES channel_message (id) ON DELETE CASCADE,
+               channel_id TEXT NOT NULL REFERENCES channel (id) ON DELETE CASCADE,
+               recipient_kind TEXT NOT NULL CHECK (recipient_kind IN ('session', 'issue', 'orchestrator', 'direct')),
+               recipient_id TEXT NOT NULL,
+               reason TEXT NOT NULL CHECK (reason IN ('mention', 'everyone', 'own_thread', 'member', 'channel', 'direct', 'addressed')),
+               wakes INTEGER NOT NULL DEFAULT 0,
+               held_by TEXT CHECK (held_by IN ('hop_limit', 'cooldown')),
+               status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'delivered', 'withdrawn', 'failed')),
+               created_at INTEGER NOT NULL,
+               settled_at INTEGER,
+               UNIQUE (message_id, recipient_kind, recipient_id)
+             );
+             INSERT INTO session (id, controller, role, name, runtime, brief, policy, bindings, hired_at, runs, phase, departed)
+             VALUES
+               ('orchestrator', 'orchestrator', 'orchestrator', 'Orchestrator', 'vibevalley', '', '{\"kind\":\"sandboxDir\"}', '[]', 100, 1, '{\"_tag\":\"resting\"}', 0),
+               ('w-wt', 'issueBoard', 'worker', 'Worker', 'codex', 'ship it', '{\"kind\":\"managedWorktree\",\"repo\":\"vibevalley\",\"branch\":\"feat/x\"}', '[]', 110, 1, '{\"_tag\":\"done\"}', 0);
+             INSERT INTO issue (id, number, title, description, priority, deliver, delivered, created_at, mandate, blocked_by, criteria, checks, findings, questions, assignments)
+             VALUES ('i1', 1, 'Subtask', '', 'medium', 'change', 'merged_into_parent', 100, '{}', '[]', '[]', '[]', '[]', '[]', '[]');
+             INSERT INTO channel_participant (id, kind, name, agent_id, joined_at)
+             VALUES
+               ('user', 'user', '用户', NULL, 100),
+               ('user:self', 'user', '用户', NULL, 200),
+               ('orchestrator', 'agent', 'Orchestrator', NULL, 100),
+               ('profile:reviewer', 'agent', 'Reviewer', 'reviewer', 105);
+             INSERT INTO channel (id, type, is_default, created_at, name)
+             VALUES ('general', 'channel', 1, 100, 'general');
+             INSERT INTO channel (id, type, is_default, created_at, peer_id)
+             VALUES ('dm-rev', 'direct', 0, 106, 'profile:reviewer');
+             INSERT INTO channel_member (channel_id, participant_id, reason, from_number)
+             VALUES ('general', 'user', 'user', 1), ('general', 'orchestrator', 'manual', 0);
+             INSERT INTO channel_read_cursor (participant_id, channel_id, read_number, updated_at)
+             VALUES ('user', 'general', 5, 150);
+             INSERT INTO channel_message (id, channel_id, number, sender_id, kind, body, created_at, revision, reactions)
+             VALUES ('msg-1', 'general', 1, 'user', 'chat', 'hello @Orchestrator', 120, 1, '{\"👀\":[\"orchestrator\",\"user\",\"profile:reviewer\"]}');
+             INSERT INTO channel_delivery (message_id, channel_id, recipient_kind, recipient_id, reason, wakes, status, created_at, settled_at)
+             VALUES
+               ('msg-1', 'general', 'orchestrator', 'orchestrator', 'addressed', 1, 'delivered', 120, 121),
+               ('msg-1', 'general', 'issue', 'i1', 'own_thread', 1, 'delivered', 120, 121),
+               ('msg-1', 'general', 'direct', 'profile:reviewer', 'direct', 1, 'delivered', 120, 121);",
+        )
+        .await
+        .unwrap();
+        conn.close().await.unwrap();
+
+        let db = Database::open_at(&db_path)
+            .await
+            .expect("pre-unified alpha DB must migrate cleanly through m20261128_100004");
+
+        let orch_row = db
+            .read_conn()
+            .query_one_raw(Statement::from_string(
+                DatabaseBackend::Sqlite,
+                "SELECT controller, policy FROM session WHERE id = 'orchestrator'",
+            ))
+            .await
+            .unwrap()
+            .unwrap();
+        let ctrl: SessionController = serde_json::from_value(serde_json::Value::String(orch_row.try_get_by_index(0).unwrap())).unwrap();
+        assert_eq!(ctrl, SessionController::Daemon);
+
+        let wt_row = db
+            .read_conn()
+            .query_one_raw(Statement::from_string(DatabaseBackend::Sqlite, "SELECT policy FROM session WHERE id = 'w-wt'"))
+            .await
+            .unwrap()
+            .unwrap();
+        let wt_policy: ExecutionPolicy = serde_json::from_str(&wt_row.try_get_by_index::<String>(0).unwrap()).unwrap();
+        assert_eq!(
+            wt_policy,
+            ExecutionPolicy::DirectCwd {
+                repo: Some("vibevalley".into()),
+                permission_mode: SessionPermissionMode::Bypass,
+            }
+        );
+
+        let issue_row = db
+            .read_conn()
+            .query_one_raw(Statement::from_string(DatabaseBackend::Sqlite, "SELECT delivered FROM issue WHERE id = 'i1'"))
+            .await
+            .unwrap()
+            .unwrap();
+        let landing: Landing = serde_json::from_value(serde_json::Value::String(issue_row.try_get_by_index(0).unwrap())).unwrap();
+        assert_eq!(landing, Landing::Merged);
+
+        let cursor_row = db
+            .read_conn()
+            .query_one_raw(Statement::from_string(
+                DatabaseBackend::Sqlite,
+                "SELECT read_number FROM channel_read_cursor WHERE participant_id = 'user:self' AND channel_id = 'general'",
+            ))
+            .await
+            .unwrap()
+            .expect("legacy user read cursor migrated to user:self");
+        assert_eq!(cursor_row.try_get_by_index::<i64>(0).unwrap(), 5);
+
+        let legacy_participants = db
+            .read_conn()
+            .query_all_raw(Statement::from_string(
+                DatabaseBackend::Sqlite,
+                "SELECT id FROM channel_participant WHERE id = 'user' OR id LIKE 'profile:%'",
+            ))
+            .await
+            .unwrap();
+        assert!(legacy_participants.is_empty(), "legacy participant ids must be removed after migration");
+
+        let msg_row = db
+            .read_conn()
+            .query_one_raw(Statement::from_string(
+                DatabaseBackend::Sqlite,
+                "SELECT sender_id, reactions FROM channel_message WHERE id = 'msg-1'",
+            ))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(msg_row.try_get_by_index::<String>(0).unwrap(), "user:self");
+        let reactions = msg_row.try_get_by_index::<String>(1).unwrap();
+        assert!(reactions.contains("user:self") && reactions.contains("agent:reviewer"));
+
+        // Verify the rebuilt channel_delivery CHECK constraint accepts canonical ('user', 'agent', 'session') rows.
+        db.write_conn()
+            .execute_unprepared(
+                "INSERT INTO channel_delivery (message_id, channel_id, recipient_kind, recipient_id, reason, wakes, status, created_at)
+                 VALUES ('msg-1', 'general', 'user', 'self', 'mention', 1, 'pending', 300)",
+            )
+            .await
+            .expect("rebuilt channel_delivery table must accept recipient_kind = 'user'");
+
         db.close().await;
     }
 

@@ -328,6 +328,7 @@ export function IssueTimeline(props: {
                     horizontal
                     testID="timeline-grid-scroll"
                     class="min-w-0 flex-1"
+                    contentClass="flex-row"
                     onScroll={(e) => scrollX.set(Math.max(0, e.offset.x))}
                     onLayout={(e) => {
                       const w = e.bounds.size.width;

@@ -190,7 +190,7 @@ export function InlineRichText(props: InlineRichTextProps) {
                                   if (found) props.onOpenIssue(found.id);
                                   else if (s.kind === "issue") props.onOpenIssue(issueId(s.id));
                                 }}
-                                class="flex-row items-center gap-1 rounded-sm border border-line bg-side px-1.5 py-px hover:border-faint hover:bg-hover"
+                                class="min-w-0 max-w-full flex-row items-center gap-1 overflow-hidden rounded-sm border border-line bg-side px-1.5 py-px hover:border-faint hover:bg-hover"
                               >
                                 <If
                                   when={(() => {
@@ -203,7 +203,7 @@ export function InlineRichText(props: InlineRichTextProps) {
                                 >
                                   {(found) => <Dot tone={ISSUE_STATUS_DOT_TONE[found().status]} size={8} ring={false} />}
                                 </If>
-                                <Text class="text-xs font-medium text-ink">
+                                <Text class="min-w-0 max-w-48 truncate text-xs font-medium text-ink">
                                   {(() => {
                                     const s = seg();
                                     if (!s) return "";
@@ -232,10 +232,10 @@ export function InlineRichText(props: InlineRichTextProps) {
                               const s = seg();
                               if (s?.kind === "note") props.onOpenNote(noteId(s.id));
                             }}
-                            class="flex-row items-center gap-1 rounded-sm border border-line bg-side px-1.5 py-px hover:border-faint hover:bg-hover"
+                            class="min-w-0 max-w-full flex-row items-center gap-1 overflow-hidden rounded-sm border border-line bg-side px-1.5 py-px hover:border-faint hover:bg-hover"
                           >
                             <Icon name="notes" size={11} tone="accent" />
-                            <Text class="text-xs font-medium text-ink">
+                            <Text class="min-w-0 max-w-48 truncate text-xs font-medium text-ink">
                               {(() => {
                                 const s = seg();
                                 if (s?.kind !== "note") return "";

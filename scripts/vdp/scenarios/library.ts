@@ -3,13 +3,18 @@ import { seedNoteShowcase } from "../fixtures/note.ts";
 
 export const libraryScenario = defineScenario({
   id: "library",
-  description: "Library gallery with unified sidebar and 3+1 Notes grid in Light & Dark",
+  description: "Library gallery entered via left rail Content button in Light & Dark",
   async run(v) {
     await seedNoteShowcase(v);
     await v.resize(v.viewport.width, v.viewport.height);
+    await v.nav("/issues");
+    await v.waitRoute("/issues");
 
     await v.forThemes(undefined, async (theme) => {
-      await v.nav("/library");
+      await v.wait("place-content");
+      await v.press("place-content");
+      await v.wait("content-nav-notes-all");
+      await v.press("content-nav-notes-all");
       await v.waitRoute("/library");
       await v.wait("library-page");
       await v.assertClean(`library-grid-${theme}`);

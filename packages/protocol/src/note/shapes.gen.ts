@@ -275,7 +275,7 @@ export type NotePresence = {
 /**
  * Stable actor/peer identifier (e.g. "user" or "session:<id>").
  */
-id: string, name: string, color?: string, kind: NotePresenceKind, x?: number, y?: number, w?: number, h?: number, status?: string,
+id: string, name: string, color?: string, avatar?: string, kind: NotePresenceKind, x?: number, y?: number, w?: number, h?: number, status?: string,
 /**
  * Focused block, canvas node, or cell identifier inside `path`.
  */

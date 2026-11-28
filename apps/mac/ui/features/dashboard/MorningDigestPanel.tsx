@@ -70,10 +70,7 @@ function TriageSuggestionList(props: { suggestions: readonly BacklogTriageSugges
       <View class="gap-2">
         <Each of={props.suggestions} key={(s) => s.id}>
           {(s) => (
-            <View
-              testID={`triage-item-${s().id}`}
-              class="flex-row flex-wrap items-center justify-between gap-3 rounded-lg border border-line bg-page px-3 py-2.5"
-            >
+            <View testID={`triage-item-${s().id}`} class="flex-row flex-wrap items-center justify-between gap-3 rounded-lg bg-side px-3 py-2.5">
               <View class="min-w-0 flex-1 gap-0.5">
                 <A href={`/issues/${encodeURIComponent(s().issueId)}`} class="text-sm font-medium text-ink hover:underline">
                   {`#${s().issueNumber} ${s().issueTitle}`}
@@ -103,7 +100,7 @@ export function MorningDigestPanel() {
   const digest = computed<MorningDigest | undefined>(() => ready(query, undefined));
 
   return (
-    <View testID="dashboard-morning-digest" class="rounded-xl border border-line bg-elevated">
+    <View testID="dashboard-morning-digest" class="rounded-xl border border-line bg-page">
       <View class="flex-row flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-2.5">
         <View class="min-w-0 flex-1 gap-0.5">
           <View class="flex-row items-center gap-2">

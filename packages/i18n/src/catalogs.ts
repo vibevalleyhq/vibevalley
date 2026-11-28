@@ -2509,7 +2509,6 @@ export const catalogs = {
       links: { outgoing: "引用去向 ({n})", backlinks: "反向链接 ({n})", relation: { link: "引用", embed: "嵌入", ref: "关联" } },
       doc: {
         addBlock: "添加内容块",
-        slashHint: "输入 / 插入内容块，或输入 [[ 关联笔记或工单",
         slidesCount: "{n} 页",
         empty: "空白文档——添加一个内容块开始",
         presenter: "演示模式",
@@ -2524,9 +2523,6 @@ export const catalogs = {
         duplicate: "复制",
         convertToIssue: "转为工单",
         turnInto: "转换为",
-        edit: "编辑",
-        preview: "预览",
-        render: "渲染",
         add: "添加",
         tocTitle: "目录",
         tocEmpty: "添加标题后自动生成目录",
@@ -2540,8 +2536,6 @@ export const catalogs = {
         toggleTitlePlaceholder: "折叠标题…",
         toggleBodyPlaceholder: "折叠内容…",
         calloutPlaceholder: "提示正文…",
-        codePlaceholder: "// 在此输入代码…",
-        codeLanguagePlaceholder: "语言",
         addCol: "+列",
         addRow: "+行",
         tableAlign: "切换列对齐",
@@ -2551,33 +2545,20 @@ export const catalogs = {
         tableDeleteCol: "删除列",
         tableInsertRowBelow: "下方插入行",
         tableDeleteRow: "删除行",
-        tableNavHint: "Tab 下一格 · Shift+Tab 上一格 · Enter 下一行",
         bookmarkOpen: "打开链接",
         bookmarkEdit: "编辑书签",
         titleOptional: "标题（可选）",
         descOptional: "描述（可选）",
-        mathBlock: "块级",
-        mathInline: "行内",
         columnsCount: "{n} 栏",
-        columnsOption: "{n} 栏",
         slideLabel: "第 {n} 页",
         slideTitlePlaceholder: "幻灯片标题…",
         speakerNotesPlaceholder: "演讲者备注…",
-        kpiEdit: "编辑指标",
-        chartTitle: "图表",
-        chartEdit: "编辑图表",
-        compareEdit: "编辑对比",
         noBeforeAsset: "暂无对比前素材",
         noAfterAsset: "暂无对比后素材",
-        mediaEdit: "编辑媒体",
         previewTitle: "沙箱预览",
-        previewEdit: "编辑预览",
         selectBase: "选择多维库",
-        pickBase: "选择多维库",
         selectIssue: "选择工单",
-        pickIssue: "选择工单",
         issuesTitle: "工单 ({n})",
-        filterIssues: "筛选工单",
         repoFilter: "仓库筛选",
         statusFilter: "状态（如 todo）",
         tagFilter: "标签",
@@ -3343,7 +3324,6 @@ export const catalogs = {
         contextUpdate: "状态上下文更新",
         expandAll: "全部展开",
         collapseAll: "全部收起",
-        inspect: "查看详情",
         hideDetail: "收起详情",
         copyRawError: "复制原始错误",
         openSettings: "前往设置",
@@ -6652,7 +6632,6 @@ export const catalogs = {
       links: { outgoing: "Outgoing links ({n})", backlinks: "Backlinks ({n})", relation: { link: "link", embed: "embed", ref: "ref" } },
       doc: {
         addBlock: "Add block",
-        slashHint: "Type / for blocks or [[ to link a note or issue",
         slidesCount: "{n} slides",
         empty: "Empty document — add a block to start",
         presenter: "Presenter",
@@ -6667,9 +6646,6 @@ export const catalogs = {
         duplicate: "Duplicate",
         convertToIssue: "Convert to Issue",
         turnInto: "Turn into",
-        edit: "Edit",
-        preview: "Preview",
-        render: "Render",
         add: "Add",
         tocTitle: "Table of Contents",
         tocEmpty: "Add headings to populate outline",
@@ -6683,8 +6659,6 @@ export const catalogs = {
         toggleTitlePlaceholder: "Toggle heading…",
         toggleBodyPlaceholder: "Toggle notes…",
         calloutPlaceholder: "Callout content…",
-        codePlaceholder: "// Write code…",
-        codeLanguagePlaceholder: "language",
         addCol: "+Col",
         addRow: "+Row",
         tableAlign: "Cycle alignment",
@@ -6694,33 +6668,20 @@ export const catalogs = {
         tableDeleteCol: "Delete column",
         tableInsertRowBelow: "Insert row below",
         tableDeleteRow: "Delete row",
-        tableNavHint: "Tab next cell · Shift+Tab previous · Enter next row",
         bookmarkOpen: "Open URL",
         bookmarkEdit: "Edit bookmark",
         titleOptional: "Title (optional)",
         descOptional: "Description (optional)",
-        mathBlock: "Block",
-        mathInline: "Inline",
         columnsCount: "{n} Columns",
-        columnsOption: "{n} Col",
         slideLabel: "Slide {n}",
         slideTitlePlaceholder: "Slide title…",
         speakerNotesPlaceholder: "Speaker notes…",
-        kpiEdit: "Edit KPI",
-        chartTitle: "Chart",
-        chartEdit: "Edit chart",
-        compareEdit: "Edit compare",
         noBeforeAsset: "No before asset",
         noAfterAsset: "No after asset",
-        mediaEdit: "Edit media",
         previewTitle: "Sandbox Preview",
-        previewEdit: "Edit preview",
         selectBase: "Select a Base note",
-        pickBase: "Pick Base",
         selectIssue: "Select an issue",
-        pickIssue: "Select issue",
         issuesTitle: "Issues ({n})",
-        filterIssues: "Filter issues",
         repoFilter: "Repo filter",
         statusFilter: "Status (e.g. todo)",
         tagFilter: "Tag",
@@ -7518,7 +7479,6 @@ export const catalogs = {
         contextUpdate: "Context snapshot",
         expandAll: "Expand all",
         collapseAll: "Collapse all",
-        inspect: "Inspect",
         hideDetail: "Collapse",
         copyRawError: "Copy raw error",
         openSettings: "Open settings",
@@ -10886,43 +10846,26 @@ export interface Messages {
   "web.note.doc.calloutTones.note": undefined;
   "web.note.doc.calloutTones.tip": undefined;
   "web.note.doc.calloutTones.warn": undefined;
-  "web.note.doc.chartEdit": undefined;
-  "web.note.doc.chartTitle": undefined;
-  "web.note.doc.codeLanguagePlaceholder": undefined;
-  "web.note.doc.codePlaceholder": undefined;
   "web.note.doc.columnsCount": { readonly n: string | number };
-  "web.note.doc.columnsOption": { readonly n: string | number };
-  "web.note.doc.compareEdit": undefined;
   "web.note.doc.convertToIssue": undefined;
   "web.note.doc.descOptional": undefined;
   "web.note.doc.duplicate": undefined;
-  "web.note.doc.edit": undefined;
   "web.note.doc.empty": undefined;
-  "web.note.doc.filterIssues": undefined;
   "web.note.doc.headingPlaceholder": { readonly level: string | number };
   "web.note.doc.inlineCode": undefined;
   "web.note.doc.issuesTitle": { readonly n: string | number };
   "web.note.doc.italic": undefined;
-  "web.note.doc.kpiEdit": undefined;
   "web.note.doc.link": undefined;
   "web.note.doc.listItemPlaceholder": undefined;
-  "web.note.doc.mathBlock": undefined;
-  "web.note.doc.mathInline": undefined;
-  "web.note.doc.mediaEdit": undefined;
   "web.note.doc.moveDown": undefined;
   "web.note.doc.moveUp": undefined;
   "web.note.doc.noAfterAsset": undefined;
   "web.note.doc.noBeforeAsset": undefined;
   "web.note.doc.orderedList": undefined;
   "web.note.doc.outline": undefined;
-  "web.note.doc.pickBase": undefined;
-  "web.note.doc.pickIssue": undefined;
   "web.note.doc.presenter": undefined;
-  "web.note.doc.preview": undefined;
-  "web.note.doc.previewEdit": undefined;
   "web.note.doc.previewTitle": undefined;
   "web.note.doc.quotePlaceholder": undefined;
-  "web.note.doc.render": undefined;
   "web.note.doc.repoFilter": undefined;
   "web.note.doc.selectBase": undefined;
   "web.note.doc.selectIssue": undefined;
@@ -10983,7 +10926,6 @@ export interface Messages {
   "web.note.doc.slashCat.basic": undefined;
   "web.note.doc.slashCat.data": undefined;
   "web.note.doc.slashCat.structure": undefined;
-  "web.note.doc.slashHint": undefined;
   "web.note.doc.slideLabel": { readonly n: string | number };
   "web.note.doc.slideTitlePlaceholder": undefined;
   "web.note.doc.slidesCount": { readonly n: string | number };
@@ -10997,7 +10939,6 @@ export interface Messages {
   "web.note.doc.tableInsertRowBelow": undefined;
   "web.note.doc.tableMoveColLeft": undefined;
   "web.note.doc.tableMoveColRight": undefined;
-  "web.note.doc.tableNavHint": undefined;
   "web.note.doc.tagFilter": undefined;
   "web.note.doc.titleOptional": undefined;
   "web.note.doc.tocEmpty": undefined;
@@ -11777,7 +11718,6 @@ export interface Messages {
   "web.session.trajectory.hired": { readonly ago: string | number };
   "web.session.trajectory.hiredAndLeft": { readonly hired: string | number; readonly left: string | number };
   "web.session.trajectory.input": undefined;
-  "web.session.trajectory.inspect": undefined;
   "web.session.trajectory.lane.asked": undefined;
   "web.session.trajectory.lane.model": undefined;
   "web.session.trajectory.lane.tool": undefined;

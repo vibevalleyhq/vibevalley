@@ -1224,6 +1224,10 @@ async fn create_collab_channel(manager: &SchemaManager<'_>) -> Result<(), DbErr>
         )
         .await?;
 
+    create_channel_delivery_table_and_indexes(manager).await
+}
+
+pub(super) async fn create_channel_delivery_table_and_indexes(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
     manager
         .create_table(
             Table::create()

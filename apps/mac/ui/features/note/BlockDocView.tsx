@@ -1,8 +1,8 @@
-import { cleanup, computed, effect, Image, keymap, Scroll, signal, Text, untracked, View, windowSize } from "nsh";
+import { cleanup, computed, effect, Image, keymap, Scroll, signal, Text, untracked, View, windowSize, type ViewRef } from "nsh";
 import { Input } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
-import type { DocBlock, DocView, Issue, IssueId, MediaAnnotation, Note, NoteId, NoteLink, NoteLinkListResult } from "@vibevalley/protocol";
+import type { DocBlock, DocView, Issue, IssueId, MediaAnnotation, Note, NoteId, NoteLink, NoteLinkListResult, NotePresence } from "@vibevalley/protocol";
 import { issueId, noteId } from "@vibevalley/protocol/schema";
 
 import { Button } from "../../design/Button";
@@ -36,6 +36,7 @@ interface BlockDocViewProps {
   readonly notes: readonly Note[];
   readonly issues: readonly Issue[];
   readonly links?: NoteLinkListResult | undefined;
+  readonly presences?: readonly NotePresence[] | undefined;
   readonly busy?: boolean | undefined;
   readonly savedAt?: number | undefined;
   readonly embedded?: boolean | undefined;
@@ -274,15 +275,15 @@ export function BlockDocView(props: BlockDocViewProps) {
 
   const handleInsertAfter = (afterId: string, newBlock: DocBlock) => {
     const next = insertBlockAfter(untracked(blocks), afterId, newBlock);
-    commitBlocks(next);
     requestFocus({ blockId: newBlock.id, caret: "start" });
+    commitBlocks(next);
   };
 
   const handleSplitBlock = (id: string, selStart: number, selEnd: number) => {
     const res = splitBlockAtSelection(untracked(blocks), id, selStart, selEnd);
     if (!res) return;
-    commitBlocks(res.blocks);
     requestFocus(res.focus);
+    commitBlocks(res.blocks);
   };
 
   const handleMergeBackward = (id: string) => {
@@ -290,8 +291,8 @@ export function BlockDocView(props: BlockDocViewProps) {
     if (!res) return;
     if (res.blocks.length === 0) {
       const fresh: DocBlock = { id: makeBlockId(), type: "prose", text: "" };
-      commitBlocks([fresh]);
       requestFocus({ blockId: fresh.id, caret: 0 });
+      commitBlocks([fresh]);
       return;
     }
     commitBlocks(res.blocks);
@@ -303,8 +304,8 @@ export function BlockDocView(props: BlockDocViewProps) {
     const tailId = cur.at(-1)?.id;
     const newBlock: DocBlock = { id: makeBlockId(), type: "prose", text: "" };
     const next = insertBlockAfter(cur, tailId, newBlock);
-    blocks.set(next);
     requestFocus({ blockId: newBlock.id, caret: "start" });
+    blocks.set(next);
     if (props.onAppendBlock && !untracked(dirty)) {
       void props.onAppendBlock(newBlock, tailId);
     } else {
@@ -326,8 +327,8 @@ export function BlockDocView(props: BlockDocViewProps) {
     const next = deleteBlockById(cur, id);
     if (next.length === 0) {
       const fresh: DocBlock = { id: makeBlockId(), type: "prose", text: "" };
-      commitBlocks([fresh]);
       requestFocus({ blockId: fresh.id, caret: 0 });
+      commitBlocks([fresh]);
       return;
     }
     commitBlocks(next);
@@ -390,7 +391,10 @@ export function BlockDocView(props: BlockDocViewProps) {
 
   const outgoingCount = () => props.links?.outgoing.length ?? 0;
   const backlinksCount = () => props.links?.backlinks.length ?? 0;
-  useVdpNode({ testId: "note-block-doc-view", role: "region" });
+  let docRootRef: ViewRef | undefined;
+  let blocksListRef: ViewRef | undefined;
+  useVdpNode({ testId: "note-block-doc-view", role: "region", getRef: () => docRootRef });
+  useVdpNode({ testId: "doc-blocks-list", role: "list", getRef: () => blocksListRef });
   useVdpNode({
     testId: "doc-editor-probe",
     role: "status",
@@ -449,7 +453,7 @@ export function BlockDocView(props: BlockDocViewProps) {
   });
 
   const embedded = () => props.embedded === true;
-  const contentInsetClass = () => (embedded() ? "pl-10" : "pl-14");
+  const contentInsetClass = () => (embedded() ? "" : "pl-14");
   const bodyContent = (
     <>
       <If when={!embedded()}>
@@ -469,11 +473,13 @@ export function BlockDocView(props: BlockDocViewProps) {
             accessibilityLabel={t("web.note.page.title")}
             value={titleDraft()}
             placeholder={t("web.note.page.title")}
+            multiline
+            scrollbar={false}
             submitBehavior="submit"
             onChange={(e) => titleDraft.set(e.value)}
             onSubmit={commitTitleRename}
             onBlur={commitTitleRename}
-            class="min-w-0 flex-1 bg-transparent px-1 text-3xl font-bold leading-tight text-ink placeholder:text-faint"
+            class="min-w-0 flex-1 bg-transparent px-0 text-3xl font-bold leading-tight text-ink placeholder:text-faint"
           />
           <View class="shrink-0 flex-row items-center gap-2">
             <If when={dirty() || saving()}>
@@ -507,12 +513,23 @@ export function BlockDocView(props: BlockDocViewProps) {
           </View>
         }
       >
-        <View testID="doc-blocks-list" class="gap-1">
+        <View
+          ref={
+            isVdpEnabled()
+              ? (el) => {
+                  blocksListRef = el;
+                }
+              : undefined
+          }
+          testID="doc-blocks-list"
+          class="w-full min-w-0 gap-0"
+        >
           <Each of={visibleBlocks()} key={(b) => b.id}>
-            {(b) => (
-              <View class={highlightedBlockId() === b().id ? "rounded-md bg-selected" : ""}>
+            {(b, idx) => (
+              <View class={`min-w-0 ${highlightedBlockId() === b().id ? "rounded-md bg-selected" : ""}`}>
                 <BlockItem
                   block={b()}
+                  prevBlock={visibleBlocks()[idx() - 1]}
                   allBlocks={visibleBlocks()}
                   slideIndices={slideIndices()}
                   note={props.note}
@@ -520,6 +537,8 @@ export function BlockDocView(props: BlockDocViewProps) {
                   issues={props.issues}
                   focusedBlockId={focusedBlockId()}
                   focusRequest={focusRequest()}
+                  presences={props.presences}
+                  embedded={embedded()}
                   compactGutter={embedded()}
                   onFocusBlock={handleNativeFocusBlock}
                   onRequestFocus={requestFocus}
@@ -561,18 +580,24 @@ export function BlockDocView(props: BlockDocViewProps) {
         </View>
       </If>
 
-      <View class={`flex-row items-center justify-between gap-2 pt-2 pr-1 opacity-70 hover:opacity-100 ${contentInsetClass()}`}>
-        <Button size="compact" tone="quiet" icon="add" testID="doc-append-block-btn" onPress={handleAppendTail}>
-          {t("web.note.doc.addBlock")}
-        </Button>
-        <View class="flex-row items-center gap-2">
-          <If when={embedded() && (dirty() || saving())}>
-            <Text testID="doc-save-status" class="text-2xs text-warn-ink">
-              {saving() ? t("web.base.reading") : t("web.note.page.unsaved")}
-            </Text>
-          </If>
-          <Text class="text-2xs text-faint">{t("web.note.doc.slashHint")}</Text>
+      <View class={`flex-row items-center justify-between gap-2 pr-1 ${contentInsetClass()}`}>
+        <View
+          role="button"
+          testID="doc-append-block-btn"
+          accessibilityLabel={t("web.note.doc.addBlock")}
+          onPress={handleAppendTail}
+          class="group relative h-6 flex-1"
+        >
+          <View class="absolute top-0.5 left-0 flex-row items-center gap-1 rounded-sm px-1 py-0.5 opacity-0 hover:bg-hover group-hover:opacity-100 focus:opacity-100">
+            <Icon name="add" size={12} tone="faint" />
+            <Text class="text-xs text-faint">{t("web.note.doc.addBlock")}</Text>
+          </View>
         </View>
+        <If when={embedded() && (dirty() || saving())}>
+          <Text testID="doc-save-status" class="shrink-0 text-2xs text-warn-ink">
+            {saving() ? t("web.base.reading") : t("web.note.page.unsaved")}
+          </Text>
+        </If>
       </View>
 
       <If when={backlinksCount() > 0 || outgoingCount() > 0}>
@@ -618,7 +643,17 @@ export function BlockDocView(props: BlockDocViewProps) {
   );
 
   return (
-    <View testID="note-block-doc-view" class={embedded() ? "min-w-0" : "min-h-0 flex-1 flex-row bg-page"}>
+    <View
+      ref={
+        isVdpEnabled()
+          ? (el) => {
+              docRootRef = el;
+            }
+          : undefined
+      }
+      testID="note-block-doc-view"
+      class={embedded() ? "w-full min-w-0" : "min-h-0 flex-1 flex-row bg-page"}
+    >
       <If
         when={embedded()}
         else={
@@ -627,7 +662,7 @@ export function BlockDocView(props: BlockDocViewProps) {
           </Scroll>
         }
       >
-        <View class="w-full gap-2">{bodyContent}</View>
+        <View class="w-full min-w-0 gap-2">{bodyContent}</View>
       </If>
 
       <If when={!embedded() && showOutlineRail()}>
@@ -648,7 +683,7 @@ export function BlockDocView(props: BlockDocViewProps) {
                     class="w-full min-w-0 rounded-sm py-0.5 pr-1 hover:bg-hover"
                     style={{ paddingLeft: Math.max(0, entry().level - 1) * 10 }}
                   >
-                    <Text class={`w-full truncate text-2xs ${active() ? "font-semibold text-accent" : "text-faint hover:text-ink"}`}>{entry().text}</Text>
+                    <Text class={`w-full truncate text-2xs font-medium ${active() ? "text-accent" : "text-faint hover:text-ink"}`}>{entry().text}</Text>
                   </View>
                 );
               }}

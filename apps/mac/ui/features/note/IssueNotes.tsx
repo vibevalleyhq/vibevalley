@@ -135,7 +135,7 @@ export function IssueNotes(props: IssueNotesProps) {
           </View>
         }
       >
-        {(h) => h()}
+        {(h) => <>{h()}</>}
       </If>
       <If
         when={linkedList().length > 0}

@@ -17,7 +17,7 @@ interface CanvasViewProps {
 export function CanvasView(props: CanvasViewProps) {
   useVdpNode({ testId: "note-canvas-view", role: "region" });
   return (
-    <View testID="note-canvas-view" class="min-h-0 min-w-0 flex-1 p-3">
+    <View testID="note-canvas-view" class="min-h-0 min-w-0 flex-1">
       <WhiteboardView note={props.note} version={props.version} onOpenChat={props.onOpenChat} onRefresh={props.onRefresh} frameClass={props.frameClass} />
     </View>
   );

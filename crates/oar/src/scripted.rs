@@ -2,8 +2,8 @@
 //! for building UI against every event kind without spending quota.
 //!
 //! ```no_run
-//! use vibevalley_runtime::oar::scripted::{Script, ScriptedRuntime, Step};
-//! use vibevalley_runtime::oar::{ContentBlock, EventKind, Runtime, SessionOptions};
+//! use vibevalley_oar::scripted::{Script, ScriptedRuntime, Step};
+//! use vibevalley_oar::{ContentBlock, EventKind, Runtime, SessionOptions};
 //!
 //! # async fn example() {
 //! let runtime = ScriptedRuntime::new("scripted", Script::new().turn(vec![Step::text("hi {prompt}")]));

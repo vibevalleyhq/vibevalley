@@ -210,4 +210,46 @@ describe("ui-tokens guardrail", () => {
     expect(scanUiTokens("apps/mac/ui/infra/base/shortcuts.ts", "export const S = () => <Text>←</Text>;")).toEqual([]);
     expect(scanUiTokens("apps/mac/ui/farm/games/BlocksGame.tsx", "export const G = () => <Button>←</Button>;")).toEqual([]);
   });
+
+  it("flags selection font-weight shifts and in-flow opacity-0 hover placeholders while allowing absolute hover controls", () => {
+    const file = "apps/mac/ui/features/example/Demo.tsx";
+    const bad = [
+      "export function Demo(props: { active: boolean; unread: number }) {",
+      "  return (",
+      "    <View>",
+      '      <Text class={props.active ? "font-semibold text-ink" : "font-medium text-muted"}>Row</Text>',
+      '      <Text class={props.unread > 0 ? "font-semibold" : "font-medium"}>Unread</Text>',
+      '      <View class="opacity-0 group-hover:opacity-100"><Text>In-flow</Text></View>',
+      '      <View class="absolute top-1 right-1 opacity-0 group-hover:opacity-100"><Text>Floating</Text></View>',
+      "    </View>",
+      "  );",
+      "}",
+    ].join("\n");
+    const findings = scanUiTokens(file, bad);
+    expect(findings.map((f) => ({ line: f.line, rule: f.rule }))).toEqual([
+      { line: 4, rule: "selection-layout-shift" },
+      { line: 6, rule: "in-flow-hover-placeholder" },
+    ]);
+  });
+
+  it("flags one-sided font-weight and horizontal padding shifts on selection, and checks farm/ with lcd.ts exempt", () => {
+    const file = "apps/mac/ui/farm/games/DemoGame.tsx";
+    const bad = [
+      "export function Demo(props: { active: boolean; selected: boolean }) {",
+      "  return (",
+      "    <View>",
+      '      <Text class={props.active ? "font-semibold text-ink" : "text-muted"}>Tab</Text>',
+      '      <Text class={props.selected ? "font-medium text-ink" : "text-muted"}>Nav</Text>',
+      '      <View class={props.active ? "px-3 text-ink" : "px-2 text-muted"}><Text>Chip</Text></View>',
+      "    </View>",
+      "  );",
+      "}",
+    ].join("\n");
+    expect(scanUiTokens(file, bad).map((f) => ({ line: f.line, rule: f.rule }))).toEqual([
+      { line: 4, rule: "selection-layout-shift" },
+      { line: 5, rule: "selection-layout-shift" },
+      { line: 6, rule: "selection-layout-shift" },
+    ]);
+    expect(scanUiTokens("apps/mac/ui/farm/games/lcd.ts", 'export const lcd = { ink: "#22341a" };')).toEqual([]);
+  });
 });

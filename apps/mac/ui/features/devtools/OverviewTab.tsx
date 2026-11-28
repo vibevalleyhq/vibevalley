@@ -85,7 +85,7 @@ export function OverviewTab(props: { overview: () => DebugOverview; graph: () =>
                       <If when={client().watches.length > 0}>
                         <View class="flex-row flex-wrap items-center gap-1">
                           <Text class="text-2xs text-muted">{t("web.devtools.overview.watches")}:</Text>
-                          <Each of={client().watches}>
+                          <Each of={client().watches} key={(w) => w}>
                             {(w) => (
                               <View class="rounded-xs bg-hover px-1.5 py-px">
                                 <Text class="font-mono text-2xs text-ink">{w()}</Text>
@@ -97,7 +97,7 @@ export function OverviewTab(props: { overview: () => DebugOverview; graph: () =>
                       <If when={client().subscriptions.length > 0}>
                         <View class="flex-row flex-wrap items-center gap-1">
                           <Text class="text-2xs text-muted">{t("web.devtools.overview.subscriptions")}:</Text>
-                          <Each of={client().subscriptions}>
+                          <Each of={client().subscriptions} key={(sub) => sub}>
                             {(sub) => (
                               <View class="rounded-xs bg-hover px-1.5 py-px">
                                 <Text class="font-mono text-2xs text-ink">{sub()}</Text>

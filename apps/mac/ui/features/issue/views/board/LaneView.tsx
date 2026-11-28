@@ -187,7 +187,7 @@ export function SwimlaneCell(props: { board: BoardProps; groupKey: string; lane:
   const cellStyle = () => {
     const bg = over() ? { backgroundColor: mix("leaf", 0.14) } : undefined;
     if (props.narrow) return bg;
-    return { width: Math.max(props.laneWidth - 16, 176), ...bg };
+    return { width: props.laneWidth, ...bg };
   };
   const compact = computed(() => props.board.density === "compact");
   return (

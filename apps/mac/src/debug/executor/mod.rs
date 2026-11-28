@@ -18,7 +18,7 @@ pub(crate) use commands::{
 pub(crate) use input::{dispatch_keys, dispatch_mouse, dispatch_text};
 #[cfg(feature = "shot")]
 pub(crate) use inspect::encode_shell_png;
-pub(crate) use inspect::{capture_screenshot, collect_targets, page_metrics, resolve_hosted_view};
+pub(crate) use inspect::{capture_screenshot, collect_targets, layout_from_hosted_root, page_metrics, resolve_hosted_view};
 pub use inspect::{dump, step_unpainted_dioramas};
 
 /// Result of executing a GPUI-thread VDP command; heavy encoding or async webview

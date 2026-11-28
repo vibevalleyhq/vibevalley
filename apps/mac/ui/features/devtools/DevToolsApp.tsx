@@ -293,7 +293,7 @@ export function DevToolsApp() {
 
       <View class="min-h-0 flex-1 flex-row">
         <View testID="devtools-rail" class="w-12 shrink-0 items-center gap-1 border-r border-line bg-rail py-2">
-          <Each of={DEVTOOLS_TABS}>
+          <Each of={DEVTOOLS_TABS} key={(tab) => tab}>
             {(tab) => {
               const meta = () => tabMeta(tab());
               const selected = () => activeTab() === tab();

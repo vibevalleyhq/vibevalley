@@ -518,77 +518,108 @@ export function MediaAnnotationStage(props: MediaAnnotationStageProps) {
   });
 
   return (
-    <View testID={`media-annot-stage-wrap-${props.scopeId}`} class="gap-1.5">
-      <View class="flex-row flex-wrap items-center justify-between gap-1.5">
-        <View class="flex-row items-center gap-1.5">
-          <If when={totalCount() > 0}>
-            <View testID={`media-annot-count-${props.scopeId}`} class="flex-row items-center gap-1 rounded-sm bg-page px-1.5 py-0.5">
-              <Icon name="pin" size={11} tone="accent" />
-              <Text class="font-mono text-2xs font-medium text-muted tabular-nums">
-                {t("web.note.annotation.openCount", { open: openCount(), total: totalCount() })}
-              </Text>
-            </View>
-          </If>
-          <If when={addMode()}>
-            <Text class="text-2xs font-medium text-accent">{t("web.note.annotation.addModeHint")}</Text>
-          </If>
-        </View>
-        <View
-          class={`flex-row items-center gap-1 ${totalCount() > 0 || addMode() ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus-within:opacity-100"}`}
-        >
-          <If when={totalCount() > 0}>
-            <Button
-              size="compact"
-              tone={showOverlay() ? "plain" : "quiet"}
-              icon={showOverlay() ? "show" : "hide"}
-              testID={`media-annot-toggle-${props.scopeId}`}
-              onPress={() => showOverlay.set(!showOverlay())}
-            >
-              {showOverlay() ? t("web.note.annotation.hide") : t("web.note.annotation.show")}
-            </Button>
-            <If when={showOverlay()}>
+    <View testID={`media-annot-stage-wrap-${props.scopeId}`} class="group gap-1.5">
+      <If when={totalCount() > 0 || addMode()}>
+        <View class="flex-row flex-wrap items-center justify-between gap-1.5">
+          <View class="flex-row items-center gap-1.5">
+            <If when={totalCount() > 0}>
+              <View testID={`media-annot-count-${props.scopeId}`} class="flex-row items-center gap-1 rounded-sm bg-page px-1.5 py-0.5">
+                <Icon name="pin" size={11} tone="accent" />
+                <Text class="font-mono text-2xs font-medium text-muted tabular-nums">
+                  {t("web.note.annotation.openCount", { open: openCount(), total: totalCount() })}
+                </Text>
+              </View>
+            </If>
+            <If when={addMode()}>
+              <Text class="text-2xs font-medium text-accent">{t("web.note.annotation.addModeHint")}</Text>
+            </If>
+          </View>
+          <View class="flex-row items-center gap-1">
+            <If when={totalCount() > 0}>
               <Button
                 size="compact"
-                tone={unresolvedOnly() ? "primary" : "quiet"}
-                icon="filter"
-                testID={`media-annot-unresolved-${props.scopeId}`}
-                onPress={() => unresolvedOnly.set(!unresolvedOnly())}
+                tone={showOverlay() ? "plain" : "quiet"}
+                icon={showOverlay() ? "show" : "hide"}
+                testID={`media-annot-toggle-${props.scopeId}`}
+                onPress={() => showOverlay.set(!showOverlay())}
               >
-                {t("web.note.annotation.unresolvedOnly")}
+                {showOverlay() ? t("web.note.annotation.hide") : t("web.note.annotation.show")}
+              </Button>
+              <If when={showOverlay()}>
+                <Button
+                  size="compact"
+                  tone={unresolvedOnly() ? "primary" : "quiet"}
+                  icon="filter"
+                  testID={`media-annot-unresolved-${props.scopeId}`}
+                  onPress={() => unresolvedOnly.set(!unresolvedOnly())}
+                >
+                  {t("web.note.annotation.unresolvedOnly")}
+                </Button>
+              </If>
+            </If>
+            <If when={props.editable !== false && props.onChangeAnnotations !== undefined}>
+              <Button
+                size="compact"
+                tone={addMode() ? "primary" : "quiet"}
+                icon="pin"
+                testID={`media-annot-add-${props.scopeId}`}
+                onPress={() => {
+                  showOverlay.set(true);
+                  addMode.set(!addMode());
+                }}
+              >
+                {t("web.note.annotation.addMode")}
               </Button>
             </If>
-          </If>
-          <If when={props.editable !== false && props.onChangeAnnotations !== undefined}>
-            <Button
-              size="compact"
-              tone={addMode() ? "primary" : "quiet"}
-              icon="pin"
-              testID={`media-annot-add-${props.scopeId}`}
-              onPress={() => {
-                showOverlay.set(true);
-                addMode.set(!addMode());
-              }}
-            >
-              {t("web.note.annotation.addMode")}
-            </Button>
-          </If>
-          <If when={props.onOpenLightbox !== undefined}>
-            <IconButton
-              icon="enlarge"
-              size={14}
-              label={t("web.note.annotation.zoom")}
-              testid={`media-annot-zoom-${props.scopeId}`}
-              onClick={() => props.onOpenLightbox?.()}
-            />
-          </If>
+            <If when={props.onOpenLightbox !== undefined}>
+              <IconButton
+                icon="enlarge"
+                size={14}
+                label={t("web.note.annotation.zoom")}
+                testid={`media-annot-zoom-${props.scopeId}`}
+                onClick={() => props.onOpenLightbox?.()}
+              />
+            </If>
+          </View>
         </View>
-      </View>
+      </If>
 
       <View
         testID={`media-annot-stage-${props.scopeId}`}
         onLayout={(e) => bounds.set({ width: e.bounds.size.width, height: e.bounds.size.height })}
         class={`relative w-full overflow-hidden rounded-md border border-line bg-page ${props.stageClass ?? "h-64"}`}
       >
+        <If
+          when={
+            totalCount() === 0 && !addMode() && (props.onOpenLightbox !== undefined || (props.editable !== false && props.onChangeAnnotations !== undefined))
+          }
+        >
+          <View class="absolute top-2 right-2 z-20 flex-row items-center gap-1 rounded-md border border-line bg-elevated/95 p-0.5 opacity-0 shadow-float group-hover:opacity-100 focus-within:opacity-100">
+            <If when={props.editable !== false && props.onChangeAnnotations !== undefined}>
+              <Button
+                size="compact"
+                tone="quiet"
+                icon="pin"
+                testID={`media-annot-add-${props.scopeId}`}
+                onPress={() => {
+                  showOverlay.set(true);
+                  addMode.set(true);
+                }}
+              >
+                {t("web.note.annotation.addMode")}
+              </Button>
+            </If>
+            <If when={props.onOpenLightbox !== undefined}>
+              <IconButton
+                icon="enlarge"
+                size={14}
+                label={t("web.note.annotation.zoom")}
+                testid={`media-annot-zoom-${props.scopeId}`}
+                onClick={() => props.onOpenLightbox?.()}
+              />
+            </If>
+          </View>
+        </If>
         <Image src={props.src} accessibilityLabel={props.caption || props.src} class="h-full w-full object-contain" />
         <MediaAnnotationOverlay
           scopeId={props.scopeId}

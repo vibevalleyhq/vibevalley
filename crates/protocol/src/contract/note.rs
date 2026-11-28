@@ -888,6 +888,7 @@ pub struct NotePresence {
     pub id: String,
     pub name: String,
     pub color: Option<String>,
+    pub avatar: Option<String>,
     pub kind: NotePresenceKind,
     pub x: Option<JsNumber>,
     pub y: Option<JsNumber>,
