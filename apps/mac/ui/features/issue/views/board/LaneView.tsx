@@ -214,6 +214,7 @@ export function LaneView(props: {
   laneWidth: number;
   cards: BoardCard[];
   count: number;
+  emptyMode?: "full" | "quiet" | undefined;
   showClear: boolean;
   drag: Drag;
 }) {
@@ -221,7 +222,8 @@ export function LaneView(props: {
   const over = computed(() => props.drag.overKey() === props.lane);
   const emptyPlaceholderGhost = computed(() => (over() ? props.drag.ghost() : undefined));
   const guide = () => emptyLaneGuide[props.lane];
-  const showHeaderNew = computed(() => isOrderLane(props.lane) && (props.board.loading || props.cards.length > 0));
+  const quietEmpty = computed(() => props.emptyMode === "quiet");
+  const showHeaderNew = computed(() => isOrderLane(props.lane) && (props.board.loading || props.cards.length > 0 || quietEmpty()));
   const newButtonTestId = computed(() => (props.lane === "todo" ? "issue-new" : `issue-new-${props.lane}`));
   const laneStyle = () => {
     const bg = over() ? { backgroundColor: mix("leaf", 0.14) } : undefined;
@@ -252,38 +254,55 @@ export function LaneView(props: {
               <If
                 when={emptyPlaceholderGhost()}
                 else={
-                  <View testID="lane-empty" class={`justify-center rounded-lg border px-3 py-8 ${over() ? "border-dashed border-leaf" : "border-transparent"}`}>
-                    <View testID={`lane-empty-${props.lane}`} class="items-center gap-2">
-                      <View class="size-8 items-center justify-center rounded-full bg-hover">
-                        <Icon name={guide().icon} size={14} tone="faint" />
-                      </View>
-                      <If
-                        when={p().filtered === true}
-                        else={
-                          <>
-                            <Text class="text-center text-xs font-medium text-muted">{t(guide().titleKey)}</Text>
-                            <Text class="text-center text-2xs leading-relaxed text-faint">{t(guide().bodyKey)}</Text>
-                          </>
-                        }
+                  <If
+                    when={!quietEmpty()}
+                    else={
+                      <View
+                        testID="lane-empty"
+                        class={`items-center justify-center rounded-lg border px-3 py-8 ${over() ? "border-dashed border-leaf" : "border-transparent"}`}
                       >
-                        <Text class="text-center text-2xs leading-relaxed text-faint">{t("web.issue.board.emptyGuide.filtered")}</Text>
-                      </If>
-                      <If when={isOrderLane(props.lane) || props.showClear}>
-                        <View class="flex-row flex-wrap items-center justify-center gap-1.5 pt-1">
-                          <If when={isOrderLane(props.lane)}>
-                            <Button size="compact" icon="add" testID={newButtonTestId()} onPress={() => p().onNew()}>
-                              {t("web.issue.new.card")}
-                            </Button>
-                          </If>
-                          <If when={props.showClear}>
-                            <Button size="compact" tone="plain" icon="close" testID="board-clear-filter" onPress={() => p().onClearFilter?.()}>
-                              {t("web.issue.page.clear")}
-                            </Button>
-                          </If>
+                        <View testID={`lane-empty-${props.lane}`} class="items-center justify-center">
+                          <View testID={`lane-empty-quiet-${props.lane}`} class="h-px w-8 rounded-full bg-line" />
                         </View>
-                      </If>
+                      </View>
+                    }
+                  >
+                    <View
+                      testID="lane-empty"
+                      class={`justify-center rounded-lg border px-3 py-8 ${over() ? "border-dashed border-leaf" : "border-transparent"}`}
+                    >
+                      <View testID={`lane-empty-${props.lane}`} class="items-center gap-2">
+                        <View testID={`lane-empty-guide-${props.lane}`} class="size-8 items-center justify-center rounded-full bg-hover">
+                          <Icon name={guide().icon} size={14} tone="faint" />
+                        </View>
+                        <If
+                          when={p().filtered === true}
+                          else={
+                            <>
+                              <Text class="text-center text-xs font-medium text-muted">{t(guide().titleKey)}</Text>
+                              <Text class="text-center text-2xs leading-relaxed text-faint">{t(guide().bodyKey)}</Text>
+                            </>
+                          }
+                        >
+                          <Text class="text-center text-2xs leading-relaxed text-faint">{t("web.issue.board.emptyGuide.filtered")}</Text>
+                        </If>
+                        <If when={isOrderLane(props.lane) || props.showClear}>
+                          <View class="flex-row flex-wrap items-center justify-center gap-1.5 pt-1">
+                            <If when={isOrderLane(props.lane)}>
+                              <Button size="compact" icon="add" testID={newButtonTestId()} onPress={() => p().onNew()}>
+                                {t("web.issue.new.card")}
+                              </Button>
+                            </If>
+                            <If when={props.showClear}>
+                              <Button size="compact" tone="plain" icon="close" testID="board-clear-filter" onPress={() => p().onClearFilter?.()}>
+                                {t("web.issue.page.clear")}
+                              </Button>
+                            </If>
+                          </View>
+                        </If>
+                      </View>
                     </View>
-                  </View>
+                  </If>
                 }
               >
                 {(g) => <DropPlaceholder lane={props.lane} number={g().number} title={g().title} height={g().h} compact={compact()} />}

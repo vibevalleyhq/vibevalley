@@ -1,25 +1,23 @@
 //! Bootstrap wiring helpers invoked by [`crate::app::create_app`]: runtime
-//! registry assembly, lazy cron orchestrator binding, outbox registration, and
-//! cross-domain event bridges (chat→note and runtime/chat→farm skin).
+//! registry assembly, outbox registration, and cross-domain event bridges
+//! (runtime/chat→farm skin).
 
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, OnceLock};
 
 use tokio::sync::broadcast;
-use vibevalley_protocol::{ChatMessage, Phase};
+use vibevalley_protocol::Phase;
 use vibevalley_runtime::agent::{ModelClient, harness::SharedExecution, runtime::VibeValleyRuntime};
 use vibevalley_runtime::oar::Registry;
 
 use crate::agent::{Agent, Profile};
 use crate::channel::{ChannelMessageEvent, Chat};
 use crate::config::{Config, StartError, failed};
-use crate::connector::{Connector, Options as ConnectorOptions};
-use crate::context::api::BoxFuture;
-use crate::context::port::CronOrchestratorPort;
+use crate::connector::Options as ConnectorOptions;
 use crate::context::{Context, Fetch, Http, LiveState, Outbox, PublicDownload, StateFeed, TaskGroup};
-use crate::cron::Scheduler as CronScheduler;
 use crate::game::Game;
-use crate::issue::{Board, IssueChat, Publisher, SessionChat};
+use crate::issue::{Board, Publisher};
+use crate::orchestration::{ConnectorWorkflow, IssueChat, NotifyOptions, SessionChat};
 use crate::runtime::{OUTBOX_SESSION_REPORTED, OutboxSessionReported, Runtime, SessionLifecycleEvent};
 use crate::service::Service;
 use crate::setting::Setting;
@@ -30,6 +28,7 @@ use crate::voice::moss::{Realtime, Transcriber};
 pub struct Overrides {
     pub publisher: Option<Arc<Publisher>>,
     pub connector: Option<ConnectorOptions>,
+    pub connector_notify: Option<NotifyOptions>,
     pub voice_realtime: Option<Arc<dyn Realtime>>,
     pub voice_transcriber: Option<Arc<dyn Transcriber>>,
 }
@@ -49,7 +48,6 @@ pub(crate) async fn open_service(config: &Config) -> Result<Arc<Service>, StartE
         (&config.home, "the home"),
         (&config.work_root, "the work root"),
         (&config.work_root.join("repos"), "the work root"),
-        (&config.work_root.join("worktrees"), "the work root"),
     ] {
         tokio::fs::create_dir_all(dir).await.map_err(|e| failed(label)(&e))?;
     }
@@ -117,19 +115,6 @@ pub(crate) fn build_runtimes(setting: &Arc<Setting>, home: &std::path::Path, exe
     registry
 }
 
-pub(crate) struct LazyCronOrchestrator(pub Arc<OnceLock<Arc<dyn CronOrchestratorPort>>>);
-
-impl CronOrchestratorPort for LazyCronOrchestrator {
-    fn hear_cron<'a>(&'a self, agent: &'a str, channel: &'a str, cron_id: &'a str, line: &'a str) -> BoxFuture<'a, bool> {
-        Box::pin(async move {
-            match self.0.get() {
-                Some(o) => o.hear_cron(agent, channel, cron_id, line).await,
-                None => false,
-            }
-        })
-    }
-}
-
 pub(crate) async fn seat_orchestrators_and_watch(ctx: &Context, profile: &Arc<Profile>, channel: &Arc<Chat>) {
     for orch in profile.orchestrators() {
         if let Err(e) = channel.seat_orchestrator_async(&orch).await {
@@ -156,26 +141,6 @@ fn warn_lagged(bridge: &'static str, stream: &'static str, skipped: u64) {
     tracing::warn!(skipped, bridge, stream, "broadcast receiver lagged");
 }
 
-pub(crate) fn spawn_chat_note_bridge(ctx: &Context, channel: &Chat) -> broadcast::Receiver<ChatMessage> {
-    let (chat_msg_tx, chat_msg_rx) = broadcast::channel(256);
-    let mut msg_events = channel.subscribe_message_events();
-    let cancel = ctx.task.child_token();
-    ctx.spawn("note.chat_messages", async move {
-        loop {
-            tokio::select! {
-                biased;
-                _ = cancel.cancelled() => return,
-                res = msg_events.recv() => match res {
-                    Ok(ChannelMessageEvent::Posted { message, .. } | ChannelMessageEvent::Edited(message)) => { let _ = chat_msg_tx.send(message); }
-                    Err(broadcast::error::RecvError::Lagged(skipped)) => warn_lagged("note.chat_messages", "message", skipped),
-                    Err(broadcast::error::RecvError::Closed) => return,
-                }
-            }
-        }
-    });
-    chat_msg_rx
-}
-
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn register_session_reported_outbox(
     ctx: &Context,
@@ -184,10 +149,8 @@ pub(crate) fn register_session_reported_outbox(
     agent: &Arc<Agent>,
     game: &Arc<Game>,
     runtime: &Arc<Runtime>,
-    connector: &Arc<Connector>,
-    cron: &Arc<CronScheduler>,
+    connector: &Arc<ConnectorWorkflow>,
 ) {
-    cron.set_digest_delivery(connector.clone());
     let targets = (
         Arc::downgrade(issue_chat),
         Arc::downgrade(session_chat),
@@ -306,69 +269,23 @@ pub(crate) async fn spawn_skin_event_bridge(ctx: &Context, game: &Arc<Game>, run
 mod tests {
     use std::time::Duration;
 
-    use vibevalley_protocol::{
-        ContextRef, DeliveryEvidence, ExecutionPolicy, Issue, ProjectCheckReceipt, ProjectCheckStatus, Session, SessionClose, SessionController,
-    };
+    use vibevalley_protocol::{ContextRef, ExecutionPolicy, Issue, Session, SessionClose, SessionController, SessionPermissionMode};
 
     use super::*;
     use crate::context::{Http, LiveState, Outbox, PublicDownload, StateFeed, TaskGroup};
     use crate::repo::Repo;
-    use crate::runtime::{Leave, RuntimeConfig};
+    use crate::runtime::RuntimeConfig;
     use crate::service::Service;
     use crate::storage::Storage;
 
     #[tokio::test]
-    async fn skin_event_bridge_records_harvested_when_integrated_session_leaves_game() {
+    async fn skin_event_bridge_clears_play_when_completed_session_leaves_game() {
         let dir = tempfile::tempdir().unwrap();
         let home = dir.path().join("home");
         let work_root = dir.path().join("work");
         let repos_dir = work_root.join("repos");
-        let worktrees_dir = work_root.join("worktrees");
         tokio::fs::create_dir_all(&home).await.unwrap();
         tokio::fs::create_dir_all(&repos_dir).await.unwrap();
-        tokio::fs::create_dir_all(&worktrees_dir).await.unwrap();
-
-        // Build a real git repository with two commits on the issue branch merged into `main`.
-        let main_dir = repos_dir.join("demo");
-        let main_repo = vibevalley_git::init_async(&main_dir, Some("main")).await.unwrap();
-        main_repo
-            .run_async(&[
-                "-c",
-                "user.name=tester",
-                "-c",
-                "user.email=tester@example.com",
-                "commit",
-                "-q",
-                "--allow-empty",
-                "-m",
-                "initial",
-            ])
-            .await
-            .unwrap();
-        let target_commit = main_repo.commit_id_async("HEAD").await.unwrap();
-
-        let branch = "vibevalley/issue-1";
-        let wt_dir = worktrees_dir.join("demo.1");
-        let wt = main_repo.worktree_add_async(&wt_dir, branch, Some("main")).await.unwrap();
-        for n in 1..=2 {
-            tokio::fs::write(wt_dir.join(format!("f{n}.txt")), format!("content {n}\n")).await.unwrap();
-            wt.run_async(&["add", "."]).await.unwrap();
-            wt.run_async(&[
-                "-c",
-                "user.name=tester",
-                "-c",
-                "user.email=tester@example.com",
-                "commit",
-                "-q",
-                "-m",
-                &format!("commit {n}"),
-            ])
-            .await
-            .unwrap();
-        }
-        let source_tree = main_repo.tree_id_async(branch).await.unwrap();
-        let candidate_commit = main_repo.merge_async(branch, Some("Merge issue #1")).await.unwrap();
-        let candidate_tree = main_repo.tree_id_async(&candidate_commit).await.unwrap();
 
         let service = Service::open(&home).await.unwrap();
         let outbox = Arc::new(Outbox::new(service.clone()));
@@ -386,7 +303,6 @@ mod tests {
         let channel = Chat::open_async(ctx.clone(), storage, false).await.unwrap();
         let repo = Repo::open_async(&work_root, 2).await.unwrap();
         let cfg = RuntimeConfig {
-            worktrees_dir: worktrees_dir.clone(),
             data_dir: home.join("issues"),
             repos_dir: Some(repos_dir.clone()),
             ..RuntimeConfig::under(&home)
@@ -394,22 +310,8 @@ mod tests {
         let (runtime, _) = Runtime::open_with_registry_async(ctx.clone(), Arc::new(Registry::new()), cfg).await.unwrap();
         let game = Game::open_async(&home, ctx.clone(), repo).await;
 
-        // Seed issue with its persisted delivery receipt and a hired worker session.
         let mut issue = Issue::new("i1", 1, "Ship harvest", 10);
         issue.repo = Some("demo".into());
-        issue.delivery_evidence = Some(DeliveryEvidence {
-            check: Some(ProjectCheckReceipt {
-                target_branch: "main".into(),
-                target_commit,
-                source_tree,
-                candidate_commit,
-                candidate_tree,
-                status: ProjectCheckStatus::NotConfigured,
-                command: None,
-                output: None,
-            }),
-            ..Default::default()
-        });
         ctx.service.issue.put(&issue).await.unwrap();
 
         let mut worker = Session::new(
@@ -417,26 +319,28 @@ mod tests {
             SessionController::IssueBoard,
             "worker-w1",
             "scripted",
-            ExecutionPolicy::ManagedWorktree {
-                repo: "demo".into(),
-                branch: Some(branch.into()),
+            ExecutionPolicy::DirectCwd {
+                repo: Some("demo".into()),
+                permission_mode: SessionPermissionMode::Bypass,
             },
             10,
         );
         worker.profile = Some("backend".into());
-        worker.cwd = Some(wt_dir.to_string_lossy().into_owned());
         worker.attach_binding(ContextRef::Issue {
             id: "i1".into(),
             refining: None,
         });
         ctx.service.session.put(&worker, false).await.unwrap();
 
-        // Start the real skin event bridge, subscribe to verify the lifecycle event, and dismiss with `Leave::Integrated`.
         spawn_skin_event_bridge(&ctx, &game, &runtime, &channel).await;
         let mut events = runtime.subscribe_events();
         assert!(game.plays_snapshot().contains_key("w1"));
 
-        runtime.session_engine().dismiss_async("w1", Leave::Integrated).await.unwrap();
+        runtime
+            .session_engine()
+            .dismiss_with_close_async("w1", Some(SessionClose::Completed))
+            .await
+            .unwrap();
 
         let left = tokio::time::timeout(Duration::from_secs(2), events.recv())
             .await
@@ -447,22 +351,17 @@ mod tests {
                 left,
                 SessionLifecycleEvent::Left {
                     ref id,
-                    closed: Some(SessionClose::Merged),
-                    merged_commits: Some(2),
+                    closed: Some(SessionClose::Completed),
                     ..
                 } if id == "w1"
             ),
-            "expected Merged with 2 commits, got {left:?}"
+            "expected Completed, got {left:?}"
         );
 
         let deadline = tokio::time::Instant::now() + Duration::from_secs(2);
-        while game.progress().counts.get("harvests") != Some(&1) && tokio::time::Instant::now() < deadline {
+        while game.plays_snapshot().contains_key("w1") && tokio::time::Instant::now() < deadline {
             tokio::time::sleep(Duration::from_millis(10)).await;
         }
-        let progress = game.progress();
-        assert_eq!(progress.counts.get("harvests"), Some(&1));
-        assert_eq!(progress.streak, 1);
-        assert!(progress.coins >= vibevalley_core::game::progress::harvest_coins(2, 1));
         assert!(!game.plays_snapshot().contains_key("w1"));
 
         game.close_async().await;

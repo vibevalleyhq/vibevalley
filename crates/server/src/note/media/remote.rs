@@ -6,7 +6,8 @@ use serde::{Deserialize, Serialize};
 use vibevalley_protocol::{ApiError, MediaInputReference};
 
 use super::Stop;
-use super::job::{Media, refused};
+use super::job::Media;
+use super::state::refused;
 use super::vendor::{Account, Outcome, Uploaded};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

@@ -6,10 +6,17 @@
   "name": "测试工程师",
   "duty": "编写单元、集成与回归测试，排查失败根因并修复不稳定用例",
   "style": "边界覆盖 · 绝不假绿 · 回归护航",
-  "tags": ["测试", "单测", "集成测试", "回归", "test", "ci", "qa"],
+  "tags": [
+    "测试",
+    "单测",
+    "集成测试",
+    "回归",
+    "test",
+    "ci",
+    "qa"
+  ],
   "runtime": "claude",
   "effort": "medium",
-  "worktree": true,
   "look": {
     "eye": "#9dffb0",
     "build": "hopper",

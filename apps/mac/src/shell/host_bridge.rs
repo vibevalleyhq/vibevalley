@@ -725,7 +725,7 @@ impl Shell {
                 return;
             }
             HostOp::VdpCall(req) => {
-                vibevalley_rt::current_or_global_handle().spawn(async move {
+                vibevalley_kit::rt::current_or_global_handle().spawn(async move {
                     let envelope = crate::vdp_bus::call_remote_vdp(req).await;
                     reply.send(envelope);
                 });

@@ -1,12 +1,15 @@
-use std::collections::{HashMap, VecDeque};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::num::NonZeroUsize;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use parking_lot::Mutex;
-use sha2::{Digest, Sha256};
 use tokio::sync::Mutex as AsyncMutex;
 use vibevalley_i18n::t;
+use vibevalley_kit::cache::LruCache;
+use vibevalley_kit::net::gateway::remote::{
+    PairingConfig, PairingError, PairingStore, build_pair_deep_link, generate_prefixed_token, hash_token, verify_token_format,
+};
 use vibevalley_protocol::{
     ApiError, BizCode, Caller, Millis, RemoteDeviceRevokeRequest, RemoteDeviceSummary, RemoteEnableRequest, RemotePairCode, RemotePairExchangeRequest,
     RemotePairExchangeResult, RemotePlatform, RemoteStatus, RemoteWhoami, SCOPE_REMOTE_CLIENT, SCOPE_REMOTE_MACHINE,
@@ -19,7 +22,8 @@ use crate::gateway::api::{BoxFuture, CallerPrincipal, RemoteAuth, RemoteDeviceId
 use crate::gateway::http::{Listener, is_allowed_remote_ip, is_remote_allow_all, serve_remote};
 
 pub(super) const TOKEN_PREFIX: &str = "vv_dev_";
-pub(super) const CODE_ALPHABET: &[u8; 32] = b"ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+#[cfg(test)]
+pub(super) const CODE_ALPHABET: &[u8; 32] = vibevalley_kit::net::gateway::remote::DEFAULT_PAIR_CODE_ALPHABET;
 pub(super) const PAIR_CODE_LEN: usize = 6;
 pub(super) const PAIR_CODE_TTL_MS: Millis = 5 * 60 * 1000;
 const EXPIRED_CODE_RETENTION_MS: Millis = 30 * 60 * 1000;
@@ -28,7 +32,18 @@ const MAX_RETAINED_EXPIRED_CODES: usize = 16;
 pub(super) const RATE_LIMIT_WINDOW_MS: Millis = 60 * 1000;
 const MAX_FAILED_ATTEMPTS: usize = 10;
 pub(super) const LAST_SEEN_THROTTLE_MS: Millis = 60 * 1000;
+const LAST_SEEN_CACHE_CAP: NonZeroUsize = NonZeroUsize::new(512).unwrap();
 const MAX_DEVICE_NAME_CHARS: usize = 128;
+
+const PAIRING_CONFIG: PairingConfig = PairingConfig {
+    code_len: PAIR_CODE_LEN,
+    ttl_ms: PAIR_CODE_TTL_MS,
+    expired_retention_ms: EXPIRED_CODE_RETENTION_MS,
+    max_active_codes: MAX_ACTIVE_PAIR_CODES,
+    max_retained_expired: MAX_RETAINED_EXPIRED_CODES,
+    rate_limit_window_ms: RATE_LIMIT_WINDOW_MS,
+    max_failed_attempts: MAX_FAILED_ATTEMPTS,
+};
 
 pub fn default_remote_port() -> u16 {
     vibevalley_protocol::home::default_port().saturating_add(100)
@@ -52,19 +67,6 @@ fn env_bind_addr() -> Option<String> {
         .filter(|s| !s.is_empty())
 }
 
-#[derive(Debug, Clone)]
-struct PairCodeEntry {
-    code: String,
-    scope: Option<String>,
-    expires_at: Millis,
-}
-
-#[derive(Default)]
-struct PairingState {
-    codes: Vec<PairCodeEntry>,
-    failed_attempts: VecDeque<Millis>,
-}
-
 /// Manages the optional remote HTTP listener, one-time pairing codes, and paired device tokens.
 pub struct Remote {
     ctx: Arc<Context>,
@@ -72,36 +74,12 @@ pub struct Remote {
     enabled: AtomicBool,
     lifecycle: AsyncMutex<()>,
     listener: Mutex<Option<Listener>>,
-    pairing: Mutex<PairingState>,
-    last_seen_cache: Mutex<HashMap<String, Millis>>,
-}
-
-fn sha256_hex(input: &str) -> String {
-    hex::encode(Sha256::digest(input.as_bytes()))
-}
-
-/// Derives 32 uniform OS-random bytes from three UUID v4 values (366 bits of CSPRNG input).
-fn random_32_bytes() -> [u8; 32] {
-    let mut hasher = Sha256::new();
-    for _ in 0..3 {
-        hasher.update(uuid::Uuid::new_v4().as_bytes());
-    }
-    hasher.finalize().into()
-}
-
-fn generate_pair_code() -> String {
-    let bytes = random_32_bytes();
-    let mut out = String::with_capacity(PAIR_CODE_LEN);
-    // 256 is an exact multiple of 32, so masking 5 bits has zero modulo bias.
-    for b in &bytes[..PAIR_CODE_LEN] {
-        out.push(CODE_ALPHABET[(b & 0x1f) as usize] as char);
-    }
-    out
+    pairing: Mutex<PairingStore<Option<String>>>,
+    last_seen_cache: Mutex<LruCache<String, Millis>>,
 }
 
 fn generate_device_token() -> String {
-    let bytes = random_32_bytes();
-    format!("{TOKEN_PREFIX}{}", hex::encode(bytes))
+    generate_prefixed_token(TOKEN_PREFIX).expose().to_string()
 }
 
 fn server_name() -> String {
@@ -116,17 +94,7 @@ fn bind_failed(addr: &str, why: impl std::fmt::Display) -> ApiError {
 }
 
 fn build_pair_url(url: &str, code: &str, scope: Option<&str>) -> String {
-    let mut deep = url::Url::parse("vibevalley://pair").expect("valid pair url scheme");
-    {
-        let mut pairs = deep.query_pairs_mut();
-        pairs.append_pair("url", url).append_pair("code", code);
-        if let Some(scope) = scope
-            && !scope.is_empty()
-        {
-            pairs.append_pair("scope", scope);
-        }
-    }
-    deep.to_string()
+    build_pair_deep_link("vibevalley://pair", url, code, scope).expect("valid pair url scheme")
 }
 
 #[derive(Debug, Clone, Default)]
@@ -169,14 +137,14 @@ impl Remote {
             enabled: AtomicBool::new(persisted_enabled),
             lifecycle: AsyncMutex::new(()),
             listener: Mutex::new(None),
-            pairing: Mutex::new(PairingState::default()),
-            last_seen_cache: Mutex::new(HashMap::new()),
+            pairing: Mutex::new(PairingStore::new(PAIRING_CONFIG)),
+            last_seen_cache: Mutex::new(LruCache::new(LAST_SEEN_CACHE_CAP)),
         }))
     }
 
     #[cfg(test)]
     pub(super) fn pair_code_count(&self) -> usize {
-        self.pairing.lock().codes.len()
+        self.pairing.lock().len()
     }
 
     /// Starts the remote listener on boot only when persisted config has `enabled == true`.
@@ -352,7 +320,7 @@ impl Remote {
         let old = self.listener.lock().take();
         stop_listener_async(old).await;
         self.enabled.store(false, Ordering::Release);
-        self.pairing.lock().codes.clear();
+        self.pairing.lock().clear_codes();
         let stored = self.ctx.service.remote.get_config().await?;
         let bind_addr = stored.as_ref().and_then(|c| c.bind_addr.as_deref());
         let port = stored.as_ref().map(|c| c.port).filter(|&p| p != 0).unwrap_or_else(default_remote_port);
@@ -379,52 +347,13 @@ impl Remote {
             None => None,
         };
 
-        let now = self.ctx.now();
-        let expires_at = now + PAIR_CODE_TTL_MS;
-        let code = {
-            let mut state = self.pairing.lock();
-            state.codes.retain(|entry| entry.expires_at > now - EXPIRED_CODE_RETENTION_MS);
-
-            // Keep expired codes bounded while preserving recently expired ones for `expiredCode`.
-            let expired_count = state.codes.iter().filter(|e| e.expires_at <= now).count();
-            if expired_count > MAX_RETAINED_EXPIRED_CODES {
-                let mut drop_n = expired_count - MAX_RETAINED_EXPIRED_CODES;
-                state.codes.retain(|e| {
-                    if e.expires_at <= now && drop_n > 0 {
-                        drop_n -= 1;
-                        false
-                    } else {
-                        true
-                    }
-                });
-            }
-
-            while state.codes.iter().filter(|e| e.expires_at > now).count() >= MAX_ACTIVE_PAIR_CODES {
-                if let Some(pos) = state.codes.iter().position(|e| e.expires_at > now) {
-                    state.codes.remove(pos);
-                } else {
-                    break;
-                }
-            }
-
-            let mut candidate = generate_pair_code();
-            while state.codes.iter().any(|e| e.code == candidate) {
-                candidate = generate_pair_code();
-            }
-            state.codes.push(PairCodeEntry {
-                code: candidate.clone(),
-                scope: normalized_scope.clone(),
-                expires_at,
-            });
-            candidate
-        };
-
-        let pair_url = build_pair_url(&url, &code, normalized_scope.as_deref());
+        let issued = self.pairing.lock().issue(self.ctx.now(), normalized_scope.clone());
+        let pair_url = build_pair_url(&url, &issued.code, normalized_scope.as_deref());
         Ok(RemotePairCode {
-            code,
+            code: issued.code,
             pair_url,
             url,
-            expires_at,
+            expires_at: issued.expires_at,
             scope: normalized_scope.or_else(|| Some(SCOPE_REMOTE_CLIENT.into())),
         })
     }
@@ -443,35 +372,11 @@ impl Remote {
         };
 
         let now = self.ctx.now();
-        let submitted = req.code.trim().to_ascii_uppercase();
-        let entry_scope = {
-            let mut state = self.pairing.lock();
-            while state.failed_attempts.front().is_some_and(|&ts| now.saturating_sub(ts) >= RATE_LIMIT_WINDOW_MS) {
-                state.failed_attempts.pop_front();
-            }
-            if state.failed_attempts.len() >= MAX_FAILED_ATTEMPTS {
-                return Err(ApiError::new(BizCode::Refused, t("server.remote.rateLimited", &[])));
-            }
-            let Some(pos) = ({
-                use subtle::ConstantTimeEq as _;
-                let mut matched = None;
-                for (idx, entry) in state.codes.iter().enumerate() {
-                    if bool::from(entry.code.as_bytes().ct_eq(submitted.as_bytes())) {
-                        matched = Some(idx);
-                    }
-                }
-                matched
-            }) else {
-                state.failed_attempts.push_back(now);
-                return Err(ApiError::new(BizCode::AuthRefused, t("server.remote.invalidCode", &[])));
-            };
-            let entry = state.codes.remove(pos);
-            if entry.expires_at <= now {
-                state.failed_attempts.push_back(now);
-                return Err(ApiError::new(BizCode::AuthRefused, t("server.remote.expiredCode", &[])));
-            }
-            entry.scope
-        };
+        let entry_scope = self.pairing.lock().redeem(now, &req.code).map_err(|err| match err {
+            PairingError::RateLimited => ApiError::new(BizCode::Refused, t("server.remote.rateLimited", &[])),
+            PairingError::InvalidCode => ApiError::new(BizCode::AuthRefused, t("server.remote.invalidCode", &[])),
+            PairingError::ExpiredCode => ApiError::new(BizCode::AuthRefused, t("server.remote.expiredCode", &[])),
+        })?;
 
         let effective_scope = match (entry_scope, requested_scope) {
             (Some(bound), Some(requested)) if bound != requested => {
@@ -493,7 +398,7 @@ impl Remote {
         };
 
         let token = generate_device_token();
-        let token_hash = sha256_hex(&token);
+        let token_hash = hash_token(&token);
         let device = RemoteDeviceSummary {
             id: format!("dev_{}", uuid::Uuid::now_v7().simple()),
             name,
@@ -546,10 +451,10 @@ impl Remote {
         if !self.enabled.load(Ordering::Acquire) {
             return Err(ApiError::new(BizCode::Unauthorized, t("server.remote.disabled", &[])));
         }
-        if !token.starts_with(TOKEN_PREFIX) || token.len() <= TOKEN_PREFIX.len() {
+        if !verify_token_format(token, TOKEN_PREFIX, 1) {
             return Err(ApiError::new(BizCode::Unauthorized, t("server.remote.unauthorized", &[])));
         }
-        let hash = sha256_hex(token);
+        let hash = hash_token(token);
         let Some(device) = self.ctx.service.remote.find_device_by_token_hash(&hash).await? else {
             return Err(ApiError::new(BizCode::Unauthorized, t("server.remote.unauthorized", &[])));
         };

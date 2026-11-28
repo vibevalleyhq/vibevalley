@@ -614,7 +614,7 @@ pub fn install(cx: &mut App) {
         let asking = updater.clone();
         let cancel = tokio_util::sync::CancellationToken::new();
         let task_cancel = cancel.clone();
-        vibevalley_rt::current_or_global_handle().spawn(async move {
+        vibevalley_kit::rt::current_or_global_handle().spawn(async move {
             let mut interval = tokio::time::interval(EVERY);
             interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
             loop {
@@ -634,7 +634,7 @@ pub fn install(cx: &mut App) {
             cancel.cancel();
         }
         let updater = updater.clone();
-        let handle = vibevalley_rt::current_or_global_handle().spawn(async move {
+        let handle = vibevalley_kit::rt::current_or_global_handle().spawn(async move {
             let _ = updater.swap(false).await;
         });
         async move {
@@ -664,7 +664,7 @@ pub fn host_call(op: UpdateOp, reply: crate::host_types::Replier, cx: &mut App) 
         UpdateOp::Check => {
             if updater.begin_check() {
                 let running = updater.clone();
-                vibevalley_rt::current_or_global_handle().spawn(async move {
+                vibevalley_kit::rt::current_or_global_handle().spawn(async move {
                     running.run_check().await;
                 });
             }
@@ -672,7 +672,7 @@ pub fn host_call(op: UpdateOp, reply: crate::host_types::Replier, cx: &mut App) 
         }
         // Restarts into the new version.
         UpdateOp::Install => {
-            let handle = vibevalley_rt::current_or_global_handle().spawn(async move { updater.swap(true).await });
+            let handle = vibevalley_kit::rt::current_or_global_handle().spawn(async move { updater.swap(true).await });
             cx.spawn(async move |cx| match handle.await {
                 Ok(Ok(())) => {
                     reply.send(Envelope::ok(Value::Null));

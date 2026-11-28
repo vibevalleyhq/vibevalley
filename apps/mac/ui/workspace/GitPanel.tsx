@@ -6,7 +6,7 @@ import { computed, effect, keymap, Scroll, signal, Text, untracked, View } from 
 import { Button } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
-import { sessionIssueId, sessionWorktree } from "@vibevalley/protocol/rules";
+import { sessionIssueId } from "@vibevalley/protocol/rules";
 
 import { Icon } from "../design/Icon";
 import { motionClass } from "../design/motion";
@@ -54,7 +54,7 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
     const issuesById = new Map((board()?.issues ?? []).map((i) => [i.id, i]));
     for (const session of sessionsSlice()?.sessions ?? []) {
       if (session.phase._tag === "closed") continue;
-      const target = normWtPath(sessionWorktree(session));
+      const target = normWtPath(session.cwd);
       if (!target || map.has(target)) continue;
       const iid = sessionIssueId(session);
       const issue = iid ? issuesById.get(iid) : undefined;

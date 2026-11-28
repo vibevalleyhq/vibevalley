@@ -7,6 +7,8 @@ import type { RepoSummary } from "@vibevalley/protocol";
 
 import { fakeHost } from "../../fixtures/fakeHost";
 import { SCENARIO_NOW, scenarios } from "../../fixtures/scenarios";
+import { languagePaletteColor } from "./RepoPanels";
+import { formatRepoPath } from "./ReposPage";
 
 test("ReposPage mounts a local folder via folder picker, distinguishes local mounts, opens Workspace, and unmounts", async () => {
   setLocale("zh");
@@ -169,4 +171,56 @@ test("ReposPage displays SSOT repo health status badge and breakdown card", asyn
   await fake.pumpUntil(app, () => app.shows("id:repo-health-badge >> text:On track"));
   expect(app.count("id:repo-health-card-badge")).toBe(0);
   expect(app.texts().some((line) => line.includes("Healthy and moving smoothly"))).toBe(false);
+});
+
+test("formatRepoPath shortens home prefixes and long temp paths while ReposPage keeps full path for copy and renders slim h-2 language bar", async () => {
+  expect(formatRepoPath("/Users/farmer/workspace/external-app")).toBe("~/workspace/external-app");
+  expect(formatRepoPath("/home/alice/projects/vv")).toBe("~/projects/vv");
+  const longTemp = "/private/var/folders/ab/cdefghijklmnop123456789/T/vv-sandbox/my-repo";
+  const shortened = formatRepoPath(longTemp);
+  expect(shortened.length).toBeLessThanOrEqual(44);
+  expect(shortened).toContain("…");
+  expect(shortened.endsWith("my-repo")).toBe(true);
+
+  // Papertrails muted language colors never emit raw electric blue.
+  expect(languagePaletteColor("markdown", 0).toLowerCase()).not.toContain("0033aa");
+  expect(languagePaletteColor("markdown", 0).toLowerCase()).not.toContain("083fa1");
+
+  setLocale("zh");
+  const repos: RepoSummary[] = [
+    {
+      name: "my-repo",
+      path: longTemp,
+      git: true,
+      external: true,
+      last: Math.floor((SCENARIO_NOW - 10_000) / 1000),
+      maxSessions: 2,
+      pullRequest: { available: false, reason: "" },
+    },
+  ];
+  const fake = fakeHost(scenarios.typical, { route: "/repos/my-repo", locale: "zh" });
+  fake.respond("repo.list", () => repos);
+  fake.respond("repo.language.list", () => ({
+    at: SCENARIO_NOW - 5_000,
+    languages: [{ name: "Markdown", code: 1200, comments: 0, files: 12 }],
+  }));
+
+  const app = await open("../../app/main.tsx", {
+    width: 1280,
+    height: 820,
+    colorScheme: "light",
+    platform: "macos",
+    clock: { time: SCENARIO_NOW },
+    host: fake.options,
+  });
+  await fake.pumpUntil(app, () => app.count("id:repo-language-bar") === 1 && app.count("id:repo-path") === 1);
+
+  expect(app.texts()).toContain(shortened);
+  expect(app.texts()).not.toContain(longTemp);
+  const barBox = app.layout("id:repo-language-bar")!;
+  expect(barBox.height).toBeLessThanOrEqual(10);
+
+  // Copy button preserves the full raw path on the clipboard.
+  await app.press("id:repo-copy");
+  await app.waitUntil(() => app.clipboard() === longTemp);
 });

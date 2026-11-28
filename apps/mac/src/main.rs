@@ -16,6 +16,7 @@ mod live_voice;
 mod log;
 mod markdown_pane;
 mod panes;
+mod platform;
 mod qr;
 mod serving;
 mod shell;

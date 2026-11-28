@@ -3,9 +3,10 @@ use std::path::{Path, PathBuf};
 
 use sea_orm::sea_query::{Expr, OnConflict};
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::NotSet, ActiveValue::Set, ColumnTrait, ConnectOptions, ConnectionTrait, Database, DatabaseConnection, EntityTrait,
-    ExprTrait, QueryFilter, QueryOrder, QuerySelect,
+    ActiveModelTrait, ActiveValue::NotSet, ActiveValue::Set, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, ExprTrait, QueryFilter, QueryOrder,
+    QuerySelect, SqlxSqliteConnector,
 };
+use vibevalley_kit::db::engine::{SqlitePoolConfig, connect_sqlite_pool};
 
 use super::entities::{layouts, projects, settings, terminals};
 use super::schema;
@@ -19,26 +20,8 @@ fn path_text(path: &Path) -> String {
     path.to_string_lossy().into_owned()
 }
 
-pub(super) fn sqlite_file_url(path: &Path) -> String {
-    let raw = path_text(path);
-    let mut encoded = String::with_capacity(raw.len());
-    for byte in raw.bytes() {
-        match byte {
-            b'%' => encoded.push_str("%25"),
-            b' ' => encoded.push_str("%20"),
-            b'"' => encoded.push_str("%22"),
-            b'#' => encoded.push_str("%23"),
-            b'<' => encoded.push_str("%3C"),
-            b'>' => encoded.push_str("%3E"),
-            b'?' => encoded.push_str("%3F"),
-            b'`' => encoded.push_str("%60"),
-            b'{' => encoded.push_str("%7B"),
-            b'}' => encoded.push_str("%7D"),
-            _ => encoded.push(byte as char),
-        }
-    }
-    format!("sqlite://{encoded}?mode=rwc")
-}
+#[cfg(test)]
+pub(super) use vibevalley_kit::db::engine::sqlite_file_url;
 
 /// Drops trailing separators and `.` components so the same folder always
 /// maps to the same row. Does not touch the filesystem: a project whose
@@ -74,32 +57,18 @@ fn changed(rows: u64) -> Result<()> {
 impl Store {
     /// Opens (creating and migrating as needed) the database at `path`.
     pub async fn open(path: &Path) -> Result<Store> {
-        if let Some(parent) = path.parent()
-            && !parent.as_os_str().is_empty()
-        {
-            tokio::fs::create_dir_all(parent).await.map_err(|e| StoreError::Io(e.to_string()))?;
-        }
-        Self::connect(sqlite_file_url(path)).await
+        let cfg = SqlitePoolConfig::writer(path).with_keep_alive(true).with_slow_query_threshold(None);
+        Self::connect_with_config(&cfg).await
     }
 
     pub async fn open_in_memory() -> Result<Store> {
-        Self::connect("sqlite::memory:".into()).await
+        let cfg = SqlitePoolConfig::in_memory();
+        Self::connect_with_config(&cfg).await
     }
 
-    async fn connect(url: String) -> Result<Store> {
-        let mut opts = ConnectOptions::new(url);
-        opts.max_connections(1)
-            .min_connections(1)
-            .idle_timeout(None)
-            .max_lifetime(None)
-            .after_connect(|conn| {
-                Box::pin(async move {
-                    conn.execute_unprepared("PRAGMA busy_timeout = 5000; PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA foreign_keys = ON;")
-                        .await?;
-                    Ok(())
-                })
-            });
-        let conn = Database::connect(opts).await?;
+    async fn connect_with_config(cfg: &SqlitePoolConfig) -> Result<Store> {
+        let pool = connect_sqlite_pool(cfg).await.map_err(|e| StoreError::Io(e.to_string()))?;
+        let conn = SqlxSqliteConnector::from_sqlx_sqlite_pool(pool);
         schema::migrate(&conn).await?;
         Ok(Self { conn })
     }

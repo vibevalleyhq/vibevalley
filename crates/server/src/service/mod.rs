@@ -10,10 +10,9 @@ use std::sync::Arc;
 #[cfg(test)]
 use crate::db::DbBackend;
 pub(crate) use crate::db::error::internal_db;
-use crate::db::{BoxFuture, Database, begin_write_tx, commit_tx, rollback_tx};
-pub(crate) use crate::db::{DatabaseConfig, DbError, DbResult, Tx};
-use sea_orm::sea_query::Expr;
-use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, PrimaryKeyTrait, QueryFilter, Update};
+use crate::db::{BoxFuture, Database, commit_tx, rollback_tx};
+pub(crate) use crate::db::{DatabaseConfig, DbError, DbResult, PostCommitHooks, Tx};
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use vibevalley_core::SliceMask;
 
 pub(crate) mod channel;
@@ -27,6 +26,7 @@ pub(crate) mod outbox;
 mod query_perf_tests;
 pub(crate) mod remote;
 pub(crate) mod session;
+mod sql;
 pub(crate) mod storage;
 
 pub(crate) use channel::ChannelService;
@@ -38,86 +38,14 @@ pub(crate) use note::NoteService;
 pub(crate) use outbox::OutboxService;
 pub(crate) use remote::RemoteService;
 pub(crate) use session::SessionService;
+use sql::{MAX_SQL_BIND_PARAMS, batch_chunk_rows, delete_by_id, escape_like, fts5_trigram_phrase, update_col_by_id, with_write_tx};
 pub(crate) use storage::StorageService;
 
-/// Conservative bind-parameter budget per multi-row SQL statement so chunked
-/// `insert_many` and `IN (...)` queries stay below SQLite's 999-parameter default
-/// limit as well as PostgreSQL's 65,535 limit.
-pub(super) const MAX_SQL_BIND_PARAMS: usize = 900;
-
-pub(super) const fn batch_chunk_rows(columns_per_row: usize) -> usize {
-    let rows = MAX_SQL_BIND_PARAMS / columns_per_row;
-    if rows == 0 { 1 } else { rows }
-}
-
-/// Formats a search string as a quoted SQLite FTS5 trigram phrase when it has at least
-/// 3 Unicode scalar characters (the minimum length supported by FTS5's `trigram` tokenizer).
-pub(super) fn fts5_trigram_phrase(raw: &str) -> Option<String> {
-    let trimmed = raw.trim();
-    if trimmed.chars().count() < 3 {
-        return None;
-    }
-    Some(format!("\"{}\"", trimmed.replace('"', "\"\"")))
-}
-
-pub(super) fn escape_like(value: &str) -> String {
-    let mut out = String::with_capacity(value.len());
-    for ch in value.chars() {
-        match ch {
-            '\\' | '%' | '_' => {
-                out.push('\\');
-                out.push(ch);
-            }
-            _ => out.push(ch),
-        }
-    }
-    out
-}
-
-pub(super) async fn update_col_by_id<E, C, V>(db: &C, id_col: E::Column, id: &str, col: E::Column, val: V) -> DbResult<()>
-where
-    E: EntityTrait + Default,
-    E::Column: ColumnTrait,
-    V: Into<sea_orm::Value>,
-    C: ConnectionTrait,
-{
-    Update::many(E::default())
-        .col_expr(col, Expr::value(val))
-        .filter(id_col.eq(id))
-        .exec(db)
-        .await?;
-    Ok(())
-}
-
-pub(super) async fn delete_by_id<E, C>(db: &C, id: &str) -> DbResult<()>
-where
-    E: EntityTrait,
-    C: ConnectionTrait,
-    <E::PrimaryKey as PrimaryKeyTrait>::ValueType: From<String>,
-{
-    E::delete_by_id(id.to_owned()).exec(db).await?;
-    Ok(())
-}
-
-/// Runs a write transaction, committing on `Ok` and rolling back on `Err`.
-pub(super) async fn with_write_tx<T, E>(db: &Database, f: impl AsyncFnOnce(&Tx) -> Result<T, E>) -> Result<T, E>
-where
-    E: From<DbError>,
-{
-    let tx = begin_write_tx(db.write_conn()).await.map_err(E::from)?;
-    match f(&tx).await {
-        Ok(val) => {
-            commit_tx(tx).await.map_err(E::from)?;
-            Ok(val)
-        }
-        Err(err) => {
-            let _ = rollback_tx(tx).await;
-            Err(err)
-        }
-    }
-}
-
 /// Unified entry point for all server data services across SQLite and PostgreSQL.
+///
+/// Domain modules can either access `ctx.service.<domain>` or take a narrow,
+/// domain-scoped `<Domain>Service` via `AsRef` / `From<&Service>` / `From<&Arc<Service>>`
+/// during `app.rs` wiring to avoid coupling to unrelated tables.
 #[derive(Clone)]
 pub struct Service {
     database: Arc<Database>,
@@ -126,16 +54,53 @@ pub struct Service {
     pub(crate) channel: ChannelService,
     pub(crate) connector: ConnectorService,
     pub(crate) note: NoteService,
-    pub session: SessionService,
-    pub issue: IssueService,
+    pub(crate) session: SessionService,
+    pub(crate) issue: IssueService,
     pub(crate) memory: MemoryService,
     pub(crate) cron: CronService,
     pub(crate) remote: RemoteService,
 }
 
+macro_rules! impl_domain_service_di {
+    ($(($field:ident, $ty:ty)),* $(,)?) => {
+        $(
+            impl AsRef<$ty> for Service {
+                fn as_ref(&self) -> &$ty {
+                    &self.$field
+                }
+            }
+
+            impl From<&Service> for $ty {
+                fn from(service: &Service) -> Self {
+                    service.$field.clone()
+                }
+            }
+
+            impl From<&Arc<Service>> for $ty {
+                fn from(service: &Arc<Service>) -> Self {
+                    service.$field.clone()
+                }
+            }
+        )*
+    };
+}
+
+impl_domain_service_di!(
+    (outbox, OutboxService),
+    (storage, StorageService),
+    (channel, ChannelService),
+    (connector, ConnectorService),
+    (note, NoteService),
+    (session, SessionService),
+    (issue, IssueService),
+    (memory, MemoryService),
+    (cron, CronService),
+    (remote, RemoteService),
+);
+
 impl Service {
     /// Wraps an already-open [`Database`] handle with all domain data services.
-    pub(crate) fn new(database: Arc<Database>) -> Arc<Self> {
+    fn new(database: Arc<Database>) -> Arc<Self> {
         Arc::new(Self {
             outbox: OutboxService::new(database.clone()),
             storage: StorageService::new(database.clone()),
@@ -184,8 +149,9 @@ impl Service {
         self.database.path()
     }
 
-    /// Exposes the underlying [`Database`] handle for tests and migration checks.
-    pub fn database(&self) -> &Arc<Database> {
+    /// Exposes the underlying [`Database`] handle for crate-internal tests and migration checks.
+    #[cfg(test)]
+    pub(crate) fn database(&self) -> &Arc<Database> {
         &self.database
     }
 
@@ -193,8 +159,20 @@ impl Service {
         self.database.query_metrics()
     }
 
-    pub(crate) async fn durable(&self) -> vibevalley_runtime::agent::durable::Result<vibevalley_runtime::agent::durable::Store> {
+    pub async fn durable(&self) -> vibevalley_runtime::agent::durable::Result<vibevalley_runtime::agent::durable::Store> {
         self.database.durable().await
+    }
+
+    /// Seeds issue and session fixtures directly into persistence for integration tests.
+    #[cfg(any(test, feature = "fake"))]
+    pub async fn seed_for_test(&self, issues: &[vibevalley_protocol::Issue], sessions: &[(&vibevalley_protocol::Session, bool)]) -> DbResult<()> {
+        if !issues.is_empty() {
+            self.issue.put_batch(issues).await?;
+        }
+        for (session, departed) in sessions {
+            self.session.put(session, *departed).await?;
+        }
+        Ok(())
     }
 
     pub(crate) async fn next_seq(&self, name: &str, at_least: i64) -> DbResult<i64> {
@@ -234,6 +212,16 @@ impl Service {
         f: impl for<'a> FnOnce(&'a Tx) -> BoxFuture<'a, Result<(T, SliceMask), E>> + Send,
     ) -> Result<(T, SliceMask), E> {
         self.database.write_dirty_with(map_err, f).await
+    }
+
+    pub async fn write_with_hooks<T, E>(
+        &self,
+        f: impl for<'a> FnOnce(&'a Tx, &'a mut PostCommitHooks) -> BoxFuture<'a, Result<T, E>> + Send,
+    ) -> Result<(T, vibevalley_kit::core::DirtyMask), E>
+    where
+        E: From<DbError>,
+    {
+        self.database.write_with_hooks(f).await
     }
 
     /// Loads only the sessions needed to derive a single issue (and its descendants):
@@ -426,6 +414,35 @@ mod batch_tests {
         let dir = tempfile::tempdir().unwrap();
         let svc = Service::open(dir.path()).await.unwrap();
         assert_large_batch_writes(&svc).await;
+        svc.close().await;
+    }
+
+    #[tokio::test]
+    async fn domain_scoped_di_handles_share_underlying_persistence() {
+        let dir = tempfile::tempdir().unwrap();
+        let svc = Service::open(dir.path()).await.unwrap();
+
+        let issues_from_arc = IssueService::from(&svc);
+        let issues_from_ref = IssueService::from(svc.as_ref());
+        let sessions_ref: &SessionService = svc.as_ref().as_ref();
+        let _outbox = OutboxService::from(&svc);
+        let _storage = StorageService::from(&svc);
+        let _channel = ChannelService::from(&svc);
+        let _connector = ConnectorService::from(&svc);
+        let _note = NoteService::from(&svc);
+        let _memory = MemoryService::from(&svc);
+        let _cron = CronService::from(&svc);
+        let _remote = RemoteService::from(&svc);
+
+        let issue = Issue::new("di-1", 1, "Domain DI Issue", 100);
+        svc.seed_for_test(std::slice::from_ref(&issue), &[]).await.unwrap();
+        assert_eq!(
+            issues_from_arc.get("di-1").await.unwrap().as_ref().map(|i| i.title.as_str()),
+            Some("Domain DI Issue")
+        );
+        assert_eq!(issues_from_ref.all().await.unwrap().len(), 1);
+        assert!(sessions_ref.all().await.unwrap().is_empty());
+
         svc.close().await;
     }
 

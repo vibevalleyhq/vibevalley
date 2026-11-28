@@ -1,5 +1,5 @@
 //! Pure agent execution runtime (`runtime/`): session engine, event trajectories,
-//! durable delivery mailboxes, and git worktree management.
+//! and durable delivery mailboxes.
 //!
 //! Has zero compile-time dependency on `crate::agent` or `crate::issue`:
 //! `agent/` implements [`SessionDriver`] and injects it at boot.
@@ -8,18 +8,14 @@ mod mcp;
 mod service;
 pub mod session;
 mod types;
-pub mod worktree;
 
 pub use service::{Runtime, reopen_sessions_async};
 pub(crate) use session::delivery::IssueReportDoc;
 pub use session::{
-    ANSWER_ONLY, AgentProfileInfo, DraftEnd, Drive, HelperPlace, Hire, Journal, MailboxEntry, MailboxSource, MailboxStatus, News, PermissionEvent, Persona,
-    Report, ReportQuestion, ReportStatus, Rounds, RunMode, RuntimeDriver, SessionDriver, SessionEngine, SessionLifecycleEvent, Trajectory, WorkspaceSnapshot,
-    trigger_of,
+    ANSWER_ONLY, ActiveRunSnapshot, AgentProfileInfo, AtomicTxHook, DraftEnd, Drive, HelperPlace, Hire, Journal, MailboxEntry, MailboxSource, MailboxStatus,
+    News, PermissionEvent, Persona, Report, ReportQuestion, ReportStatus, RoundEnd, Rounds, RunMode, RuntimeDriver, SessionDriver, SessionEngine,
+    SessionLifecycleEvent, Trajectory, WorkspaceSnapshot, combine_report_and_failure, trigger_of,
 };
 pub(crate) use session::{OUTBOX_SESSION_REPORTED, OutboxSessionReported};
-pub use types::{BoardConfig, BoardError, IssueChange, Opened, Result, RuntimeConfig, RuntimeError, Step, Undelivered};
-pub(crate) use types::{derive_all_issues, find_issue, io};
-pub use worktree::{
-    Changes, Delivery, HandoffCleanup, HandoffRecord, HoeRegistry, Joined, Landed, Leave, Leaving, OnDisk, Worktree, WorktreeKey, WriteLease, issue_branch,
-};
+pub(crate) use types::io;
+pub use types::{Opened, Result, RuntimeConfig, RuntimeError, Step};

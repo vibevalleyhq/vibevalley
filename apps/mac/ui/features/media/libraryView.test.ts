@@ -6,12 +6,12 @@ import {
   type Issue,
   type IssueId,
   type LibraryItem,
+  localUserParticipant,
   type MediaJob,
   type Note,
   NoteTypeValues,
   type Session,
   type SessionId,
-  userId,
 } from "@vibevalley/protocol";
 import { noteId } from "@vibevalley/protocol/schema";
 
@@ -52,7 +52,7 @@ import {
 const makeNote = (over: Omit<Partial<Note>, "id"> & { readonly id: string; readonly title: string }): Note => ({
   noteType: "doc",
   sortOrder: 0,
-  by: userId,
+  by: localUserParticipant,
   byName: "Me",
   version: 0,
   seq: 0,
@@ -126,7 +126,7 @@ test("noteMatchesType matches all 3+1 canonical note types", () => {
 
 test("noteType, fileKind, sort, and pinned filtering work across notes and media", () => {
   const notes = [
-    makeNote({ id: "note-user", title: "My Board", noteType: "canvas", by: userId, updated: 150 }),
+    makeNote({ id: "note-user", title: "My Board", noteType: "canvas", by: localUserParticipant, updated: 150 }),
     makeNote({ id: "note-agent", title: "Agent Base", noteType: "base", by: "a1", byName: "Agent", updated: 250 }),
   ];
   const media = [
@@ -311,7 +311,7 @@ test("category filtering resolves repo, parent/issue, channel, and media origin 
         { kind: "issue", id: "i-child" as IssueId },
         { kind: "channel", id: "general" },
       ],
-      policy: { kind: "managedWorktree", repo: "vibevalley", branch: "issue-42" },
+      policy: { kind: "directCwd", repo: "vibevalley", permissionMode: "bypass" },
     },
   ];
   const jobs: Pick<MediaJob, "id" | "source">[] = [{ id: "job-img", source: { kind: "orchestrator", agent: "orchestrator", channel: "marketing" } }];

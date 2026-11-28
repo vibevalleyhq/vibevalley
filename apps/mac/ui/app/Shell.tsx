@@ -31,8 +31,8 @@ const linkWords = { connecting: t("web.base.link.connecting"), open: t("web.base
 
 /** Tailwind's `sm` (40rem): narrower, the rail is slimmer and its names go. */
 const small = () => windowSize().width < 640;
-/** Short windows (<760px tall): tighten rail vertical rhythm so all 9 nav items fit without clipping. */
-const compactTall = () => windowSize().height < 760;
+/** Short windows (<820px tall): tighten rail vertical rhythm so all nav items breathe without crowding. */
+const compactTall = () => windowSize().height < 820;
 
 /** 24px icon (or the 38px farm anchor) with its short name underneath, so it reads without hovering. */
 function Slot(props: { to: string; place: string; label: string; name?: string; current?: boolean; badge?: number; hero?: boolean; icon: () => JSX.Element }) {
@@ -69,7 +69,7 @@ function Slot(props: { to: string; place: string; label: string; name?: string; 
       tooltip={<Bubble text={props.label} placement="right" />}
       class={[
         "relative items-center justify-center gap-0.5 rounded-lg px-0.5",
-        hero() ? (small() ? "h-12 w-12" : compactTall() ? "h-15.5 w-16" : "h-16 w-16") : small() ? "h-11 w-11" : compactTall() ? "h-11.5 w-16" : "h-12.5 w-16",
+        hero() ? (small() ? "h-12 w-12" : compactTall() ? "h-14.5 w-16" : "h-16 w-16") : small() ? "h-11 w-11" : compactTall() ? "h-10.5 w-16" : "h-12.5 w-16",
         current() ? "" : "hover:bg-hover",
       ].join(" ")}
       style={current() ? { backgroundColor: mix("on-rail", colorScheme() === "dark" ? 0.12 : 0.09) } : undefined}
@@ -429,7 +429,7 @@ export function Shell(props: { children: JSX.Element }) {
       <ShortcutSheet />
       <Rail here={here()} farm={inFarm()} />
       <View class="min-w-0 flex-1">
-        {/* Dashboard, Issues, Chat, Content, Runtimes, and Team draw their own top bars; native workspace fills its own pane. */}
+        {/* Dashboard, Issues, Chat, Content, Runtimes, Team, and Settings draw their own layouts; native workspace fills its own pane. */}
         <If
           when={
             !inFarm() &&
@@ -439,6 +439,7 @@ export function Shell(props: { children: JSX.Element }) {
             here()?.id !== "content" &&
             here()?.id !== "runtimes" &&
             here()?.id !== "team" &&
+            here()?.id !== "settings" &&
             location().pathname !== "/workspace"
           }
         >

@@ -224,7 +224,6 @@ fn machine_hello_inventory_and_ephemeral_sandbox_disconnect_project_into_slices(
                 name: "GPU Devbox".into(),
                 platform: MachinePlatform::Linux,
                 ephemeral: false,
-                worktree_supported: true,
                 runtimes: vec![runtime_summary("claude", "Claude Code")],
             }),
         )
@@ -268,7 +267,6 @@ fn machine_hello_inventory_and_ephemeral_sandbox_disconnect_project_into_slices(
         assert_eq!(gpu.status, MachineStatus::Online);
         assert_eq!(gpu.runtimes.len(), 2);
         assert!(!gpu.ephemeral);
-        assert!(gpu.worktree_supported);
 
         // 2. Connect ephemeral sandbox `sbx-9`.
         let mut sbx_ws = connect_ws(&ws_url(&remote_url, None), Some(&machine_token)).await.unwrap();
@@ -279,7 +277,6 @@ fn machine_hello_inventory_and_ephemeral_sandbox_disconnect_project_into_slices(
                 name: "CI Sandbox #9".into(),
                 platform: MachinePlatform::Container,
                 ephemeral: true,
-                worktree_supported: true,
                 runtimes: vec![runtime_summary("scripted", "Scripted")],
             }),
         )
@@ -359,7 +356,6 @@ fn remote_session_disconnect_reconnect_replays_losslessly_and_skips_local_worktr
                 name: "GPU Dev".into(),
                 platform: MachinePlatform::Linux,
                 ephemeral: false,
-                worktree_supported: true,
                 runtimes: vec![runtime_summary("claude", "Claude Code")],
             }),
         )
@@ -398,8 +394,6 @@ fn remote_session_disconnect_reconnect_replays_losslessly_and_skips_local_worktr
         };
         assert_eq!(open.runtime_id, "claude");
         assert_eq!(open.repo_ref.as_deref(), Some("https://github.com/botiverse/demo.git"));
-        assert_eq!(open.branch.as_deref(), Some("vibevalley/issue-1"));
-        assert_eq!(open.base_ref.as_deref(), Some("main"));
         let mcp_token = open.mcp_session_token.clone().expect("remote session must receive mcp_session_token");
         assert!(!mcp_token.is_empty());
 
@@ -476,10 +470,9 @@ fn remote_session_disconnect_reconnect_replays_losslessly_and_skips_local_worktr
     // Confirm dispatch succeeded AND ZERO local git worktree was created!
     let dispatch_env = dispatch_handle.join().unwrap();
     assert_eq!(dispatch_env.biz_code, 0, "{}", dispatch_env.message);
-    let local_worktrees: Vec<_> = std::fs::read_dir(dir.path().join("worktrees")).unwrap().flatten().collect();
     assert!(
-        local_worktrees.is_empty(),
-        "remote dispatch must skip local worktree creation: {local_worktrees:?}"
+        !dir.path().join("worktrees").exists(),
+        "remote dispatch must not create local worktrees directory"
     );
 
     // Confirm machine transitioned to Offline while session stayed alive.
@@ -505,7 +498,6 @@ fn remote_session_disconnect_reconnect_replays_losslessly_and_skips_local_worktr
                 name: "GPU Dev".into(),
                 platform: MachinePlatform::Linux,
                 ephemeral: false,
-                worktree_supported: true,
                 runtimes: vec![runtime_summary("claude", "Claude Code")],
             }),
         )
@@ -625,7 +617,6 @@ fn remote_session_disconnect_reconnect_replays_losslessly_and_skips_local_worktr
                 name: "GPU Control".into(),
                 platform: MachinePlatform::Linux,
                 ephemeral: true,
-                worktree_supported: false,
                 runtimes: vec![runtime_summary("codex", "Codex")],
             }),
         )
@@ -744,7 +735,6 @@ fn machine_attachment_fetch_and_system_wake_hook_work_end_to_end() {
                 name: "Wake Box".into(),
                 platform: MachinePlatform::Macos,
                 ephemeral: true,
-                worktree_supported: false,
                 runtimes: vec![],
             }),
         )
@@ -819,7 +809,6 @@ fn machine_attachment_fetch_and_system_wake_hook_work_end_to_end() {
                 name: "Spoof".into(),
                 platform: MachinePlatform::Linux,
                 ephemeral: false,
-                worktree_supported: false,
                 runtimes: vec![],
             }),
         )

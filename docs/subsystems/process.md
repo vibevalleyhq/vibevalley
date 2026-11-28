@@ -19,12 +19,12 @@
 | `scripts/docs/skills.ts`、`doc-links.ts` | 校验 skill 结构、文档地图覆盖、仓库根路径链接与反引号源码路径（含 `.rs`、`.toml`） |
 | `scripts/docs/stale-names.ts`、`glossary.ts` | 拦截已废弃旧名字、校验用语表代码名 |
 | `scripts/gen/capabilities.ts`、`api-client.ts`、`primitives.ts`、`i18n.ts` | 生成并校验 `capabilities.md`、`client.ts`、`primitives.md` 与双语词典的 `catalogs.ts`；`i18n.ts check` 同步扫描 Rust 的 `t("key")` 与前端词条、拦截 `zh` 非白名单纯英文残值并核对 12 类 `ArtifactType` 全覆盖 |
-| `scripts/audit/oxlint-plugin.ts`、`deadcode.ts` 与 `xtask/src/{boundaries,ratchets,arch_audit}.rs` | 仓库自定义 lint 规则、`arch-audit` 15 条边界与并发棘轮、`knip` 死代码检查 |
+| `scripts/audit/oxlint-plugin.ts`、`deadcode.ts`、`patrol.ts` 与 `xtask/src/{boundaries,ratchets,arch_audit}.rs` | 仓库自定义 lint 规则、`arch-audit` 边界与并发棘轮、`knip` 死代码检查、确定性巡检扫描与台账工具（`vp run patrol`） |
 | `xtask/src/{trace,map,deps,ssot}.rs`、`xtask/src/qa/` | 纯 Rust 零新依赖跨层导航/SSOT 巡检与 QA 门禁套件（`crap`、`dry`、`mutate`、`uml`、`viewer`） |
 | `scripts/release/regression.ts`、`verify-server.ts` | PR 回归测试修改门禁、启动隔离沙箱服务端 |
-| `Makefile` 与 `xtask/`、`vite.config.ts` 的 `mac:check` | `cargo xtask check`（fmt、clippy `-D warnings` 与测试）、`cargo xtask loom`（四个并发内核模型检验）、`cargo xtask protocol`（TS 契约与 golden）、`vp run mac:check`（原生页面 nsh 类型检查） |
+| `Makefile` 与 `xtask/`、`vite.config.ts` 的 `mac:check` | `cargo xtask check`（fmt、clippy `-D warnings` 与测试）、`cargo xtask loom`（四个并发内核模型检验）、`cargo xtask protocol`（TS 契约与 golden）、`vp run mac:check`（原生页面 nsh 类型检查）、`make patrol`（确定性传感器巡检） |
 | `scripts/audit/comment-review.ts` | 调用模型审查新增注释 |
-| `.agents/skills/` | 仓库 skills（`.claude/skills` 软链至此） |
+| `.agents/skills/` | 仓库 skills（含 `vv-governance/references/{interrogate,blast-radius,benchmark-checklist}.md` 与 `vv-patrol/`；`.claude/skills` 软链至此） |
 | `design/sync-assets.sh`、`design/diorama.sh` | 从独立 `vibevalley-assets` 仓同步 Papertrails 纸雕、品牌、图标、头像、引擎与官网轻量产物并重生成 macOS 通道图标 |
 
 ## 模型和不变量
@@ -38,6 +38,8 @@
 - **质量指标报告而不设机械行数门槛**：已落地原生 `cargo xtask crap`、`dry`、`mutate`、`uml` 与 `ssot-check`（均仅支持 Rust + TypeScript/TSX，通过 Policy / Topology IR / `.metrics/` 三层隔离并共享 `(namespace, name, visibility)` 主键）；**明确放弃**外部 `ast-grep`、`jscpd`、`dependency-cruiser` 以及对文件行数、函数行数或 `3:1` 重构比例设机械硬门槛（真实稳定性与结构隐患直接按具体问题追踪，如 `#35`）。
 - **两层虚拟时钟与定向 `loom` 模型检验**：单调异步超时测试通过 `tokio/test-util`（仅限 `[dev-dependencies]`）与 `rt::current_or_global_handle()` 在 `#[tokio::test(start_paused = true)]` 下确定性推进，日历与挂钟期限通过 `Clock` / `ManualClock`（[clock.rs](crates/core/src/clock.rs)）注入，集成测试通过 `TurnGate`（[support/mod.rs](crates/server/tests/support/mod.rs)）同步轮次，替代测试中的 `std::thread::sleep` 轮询；四处纯原子并发内核（`SliceWakeGate`、`AcpTurnMachine`、`SessionGenerationTable`、`TeardownGate`）在独立子模块通过 `cargo xtask loom` 穷举线程交错，不侵入业务模块。
 - **死代码零容忍，回归测试受保护**：`vp run deadcode` 拦截未使用导出与依赖。修改或删除 `regression: ` 测试，或 `fix/` 分支未补回归测试，须在 PR 正文 `## Regression` 说明（`scripts/release/regression.ts` 检查）。
+- **两败验前提、复盘结构化优先漏斗与实证审查**：执行会话在同一门禁基于同一前提连败 2 次须停手证伪前提本身，并遵守先减后加与按可验证单元排序提交（注入于 `crates/server/assets/orchestrator/prompts.json`）；复盘教训凡能写成类型/`xtask`/lint/测试的一律建单补静态防线，禁止堆砌进 `AGENTS.md`；高危评审与性能优化按 [interrogate](.agents/skills/vv-governance/references/interrogate.md)（仅保留附真实失败命令的缺陷）、[blast-radius](.agents/skills/vv-governance/references/blast-radius.md)（证明唯一安全支点事实）与 [benchmark-checklist](.agents/skills/vv-governance/references/benchmark-checklist.md)（必答 `Why not double?`、A/B 交替 ≥5 次中位数与 7 句性能口诀）执行。
+- **确定性传感器驱动巡检闭环（`vv-patrol`）**：无人值守巡检与单模块爬山严格遵循「串行传感器选靶（`vp run patrol -- scan`）→ 单假设最小改动 → `make verify-fast` → Keep（单独 commit + 收紧棘轮）/ 全量 Revert → 原生 `Base` 多维台账与树外 TSV 记账 → 诚实退出谓词（达 `kept` 上限或连续 3 轮平台期停机）」，详见 [vv-patrol](.agents/skills/vv-patrol/SKILL.md)。
 - **命名一致**：展示名用 `VibeValley`；代码、目录、环境变量 `VIBEVALLEY_*` 和分支前缀 `vibevalley/` 统一用小写 `vibevalley`。
 
 ## 怎么走
@@ -74,6 +76,7 @@
 - **拒绝外部重复工具链与机械行数门槛**：不引入 `ast-grep`、`jscpd`、`dependency-cruiser` 及机械行数/`3:1` 门槛，既避免多套配置漂移，也防止 agent 机械切文件凑数；全部跨层导航与 QA 能力收拢进零新依赖 `cargo xtask`。
 - **共用原语自动生成清单（`primitives.md`）**：从 TS 地基目录导出与首行 JSDoc 生成并由 `docs:verify` 守住，让 agent 先复用已有原语；Rust 的不在里面。
 - **原素材与轻量成品分仓**：原始高清图、生成脚本与中间产物全部留在独立仓库 `vibevalley-assets`，代码仓只经 `design/sync-assets.sh` / `design/diorama.sh` 同步轻量成品，保持主仓干净。
+- **不照搬的外部工程机制**：不引入多 CLI 套壳分发层（坚持 Rust `crates/oar/src` 单底座）、不引入英文标点一刀切禁令（中文写作以 [writing.md](docs/style/writing.md) 为唯一准绳）、不引入多 PR 堆叠链（保持单 PR 内按可验证单元拆有序 commits 再 squash 合入 `main`）。
 
 ## 还没做的（按条件触发的白皮书治理项）
 

@@ -148,7 +148,12 @@ async fn create(f: &ToolRegistry, who: &Who, a: CronArgs) -> Result<String, Stri
         tz: given(&a.tz).map(Into::into),
     };
     let actor = if here.user { ActorKind::User } else { ActorKind::Agent };
-    let made = f.cron.add_async(req, actor).await.map_err(|e| e.message)?;
+    let resolved_agent = req.agent.as_deref().and_then(|name| f.profile.named(name).map(|p| p.id));
+    let made = f
+        .cron
+        .add_resolved_async(req, actor, channel.id.clone(), channel.name.clone(), channel.repo.clone(), resolved_agent)
+        .await
+        .map_err(|e| e.message)?;
     let line = text::cron_line(&made, &channel.name);
     Ok(if made.pending {
         format!(

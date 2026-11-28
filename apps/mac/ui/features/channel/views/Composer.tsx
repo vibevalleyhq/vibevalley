@@ -2,7 +2,7 @@ import { cleanup, computed, effect, keymap, Picker, signal, Text, untracked, Vie
 import { Input, Progress } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
-import { type Channel, type HostAsrState as AsrSnapshot, type NoteViewContext, userId } from "@vibevalley/protocol";
+import { type Channel, type HostAsrState as AsrSnapshot, isHumanParticipant, type NoteViewContext } from "@vibevalley/protocol";
 import { sessionProfile } from "@vibevalley/protocol/rules";
 import { HostAsrState } from "@vibevalley/protocol/schema";
 
@@ -323,7 +323,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
     const id = props.channel?.id;
     if (id && box.offered().length === 0) {
       if (name === "ArrowUp" && box.text() === "") {
-        const mine = [...followed.get(id).messages].toReversed().find((m) => m.from === userId && m.kind === "chat" && m.deleted === undefined);
+        const mine = [...followed.get(id).messages].toReversed().find((m) => isHumanParticipant(m.from) && m.kind === "chat" && m.deleted === undefined);
         if (mine) {
           setEditingId(mine.id);
           return true;
@@ -366,7 +366,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
   const stopping = createAct();
   const stop = () => {
     const agent = box.here();
-    return stopping.run(() => api.orchestrator.stop({ agent }));
+    return stopping.run(() => api.session.stop({ id: agent }));
   };
 
   return (
@@ -434,7 +434,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
             <Icon name="reply" size={12} tone="muted" />
             <Text class="min-w-0 flex-1 truncate text-xs text-muted">
               {t("shared.join.labeled", {
-                label: t("web.channel.composer.replying", { name: m().from === userId ? t("web.channel.messages.user") : m().name }),
+                label: t("web.channel.composer.replying", { name: isHumanParticipant(m().from) ? t("web.channel.messages.user") : m().name }),
                 text: m().text,
               })}
             </Text>

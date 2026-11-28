@@ -47,7 +47,7 @@ const run: Record<CommandName, (text: string, at: CommandPlace) => Promise<Comma
     return { say: t("web.channel.commands.done.remember") };
   },
   stop: async (_text, at) => {
-    await api.orchestrator.stop({ agent: at.orchestrator });
+    await api.session.stop({ id: at.orchestrator });
     return { say: t("web.channel.commands.done.stop") };
   },
   dm: async (who) => ({ open: `/chat/${await api.channel.direct.create({ agent: who })}` }),

@@ -1,13 +1,16 @@
 [workspace]
 resolver = "3"
 members = [
+  "crates/kit",
   "crates/protocol",
-  "crates/rt",
   "crates/mcp",
   "crates/i18n",
   "crates/core",
   "crates/git",
   "crates/files",
+  "crates/oar",
+  "crates/machine",
+  "crates/agent",
   "crates/runtime",
   "crates/server",
   "crates/cli",
@@ -29,6 +32,7 @@ edition = "2024"
 license = "Apache-2.0"
 
 [workspace.dependencies]
+alacritty_terminal = { version = "0.26.0", default-features = false }
 arc-swap = "1"
 backon = "1"
 base64 = "0.23.1"
@@ -75,8 +79,11 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 url = "2.5.8"
 uuid = { version = "1.29.2", features = ["v4", "v7"] }
+vibevalley-agent = { path = "crates/agent" }
+vibevalley-kit = { path = "crates/kit" }
+vibevalley-machine = { path = "crates/machine" }
 vibevalley-mcp = { path = "crates/mcp" }
-vibevalley-rt = { path = "crates/rt" }
+vibevalley-oar = { path = "crates/oar" }
 wgpu = "29.0.4"
 which = "8.0.6"
 zip = { version = "9.7.1", default-features = false, features = ["deflate"] }

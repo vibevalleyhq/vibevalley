@@ -19,7 +19,9 @@ use vibevalley_protocol::{ApiError, BizCode, ConnectorID, Millis, Outcome, Spent
 use super::api::BoxFuture;
 use super::task::TaskGroup;
 use crate::service::outbox::OutboxItem;
-use crate::service::{Service, Tx};
+use crate::service::{PostCommitHooks, Service, Tx};
+pub use vibevalley_kit::queue::outbox::OutboxDeadLetter;
+use vibevalley_kit::queue::outbox::OutboxRetryPolicy;
 
 const DEFAULT_BATCH_SIZE: u64 = 32;
 const DEFAULT_MAX_ATTEMPTS: i64 = 8;
@@ -207,30 +209,6 @@ impl OutboxDelivery {
 
 type OutboxHandler = Arc<dyn Fn(OutboxDelivery) -> BoxFuture<'static, Result<(), String>> + Send + Sync>;
 
-/// Dead-lettered (`failed`) outbox row exposed for diagnostics and manual replay.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct OutboxDeadLetter {
-    pub id: i64,
-    pub topic: String,
-    pub payload_json: String,
-    pub attempts: i64,
-    pub created_at: i64,
-    pub last_error: Option<String>,
-}
-
-impl From<OutboxItem> for OutboxDeadLetter {
-    fn from(item: OutboxItem) -> Self {
-        Self {
-            id: item.id,
-            topic: item.topic,
-            payload_json: item.payload_json,
-            attempts: item.attempts,
-            created_at: item.created_at,
-            last_error: item.last_error,
-        }
-    }
-}
-
 /// Transactional outbox dispatcher backed by [`Service::outbox`] and driven by [`TaskGroup`].
 pub struct Outbox {
     service: Arc<Service>,
@@ -325,6 +303,15 @@ impl Outbox {
         self.enqueue_event_in_tx_at(tx, event, self.clock.now_ms()).await
     }
 
+    /// Enqueues a typed [`OutboxEvent`] inside `tx` and registers a post-commit hook on `hooks`
+    /// so [`Self::wake`] fires automatically ONLY after the transaction commits.
+    pub async fn enqueue_event_in_tx_with_hooks(self: &Arc<Self>, tx: &Tx, hooks: &mut PostCommitHooks, event: &OutboxEvent) -> Result<i64, ApiError> {
+        let id = self.enqueue_event_in_tx(tx, event).await?;
+        let outbox = self.clone();
+        hooks.on_commit(move || outbox.wake());
+        Ok(id)
+    }
+
     /// Enqueues a typed [`OutboxEvent`] inside an open write transaction with an explicit timestamp (ms).
     async fn enqueue_event_in_tx_at(&self, tx: &Tx, event: &OutboxEvent, now_ms: i64) -> Result<i64, ApiError> {
         let payload_json = event.serialize_payload_json()?;
@@ -368,19 +355,6 @@ impl Outbox {
     /// Wakes the background outbox dispatcher (call after committing a transaction that enqueued items).
     pub fn wake(&self) {
         self.notify.notify_one();
-    }
-
-    /// Computes exponential backoff delay for the given attempt count (`attempts >= 1`) via `backon`.
-    fn backoff_delay(&self, attempts: i64) -> Duration {
-        use backon::{BackoffBuilder, ExponentialBuilder};
-        let mut backoff = ExponentialBuilder::new()
-            .with_factor(2.0)
-            .with_min_delay(self.config.base_backoff)
-            .with_max_delay(self.config.max_backoff)
-            .without_max_times()
-            .build();
-        let steps = attempts.saturating_sub(1).clamp(0, 20) as usize;
-        backoff.nth(steps).unwrap_or(self.config.max_backoff)
     }
 
     /// Starts the background outbox dispatcher bound to `task`'s lifecycle.
@@ -498,8 +472,13 @@ impl Outbox {
         }
     }
 
+    fn retry_policy(&self) -> OutboxRetryPolicy {
+        OutboxRetryPolicy::new(self.config.max_attempts, self.config.base_backoff, self.config.max_backoff)
+    }
+
     async fn handle_failure(&self, id: i64, topic: &str, attempts: i64, current_ms: i64, err: &str) -> Result<(), ApiError> {
-        if attempts >= self.config.max_attempts {
+        let policy = self.retry_policy();
+        if policy.is_exhausted(attempts) {
             tracing::error!(
                 outbox_id = id,
                 topic = %topic,
@@ -512,8 +491,7 @@ impl Outbox {
             self.failed_count.fetch_add(1, Ordering::Relaxed);
             Ok(())
         } else {
-            let delay_ms = self.backoff_delay(attempts).as_millis().min(i64::MAX as u128) as i64;
-            let next_at = current_ms.saturating_add(delay_ms);
+            let next_at = policy.next_available_at(current_ms, attempts);
             self.service.outbox.reschedule(id, next_at, err).await
         }
     }
@@ -844,6 +822,68 @@ mod tests {
         assert_eq!(delivered.load(Ordering::SeqCst), 2);
         assert_eq!(outbox.failed_count_async().await.unwrap(), 0);
 
+        service.close().await;
+    }
+
+    #[tokio::test]
+    async fn post_commit_hooks_wakes_outbox_only_after_commit_and_suppresses_on_rollback() {
+        let (_dir, service) = test_service().await;
+        let outbox = Arc::new(Outbox::with_config(
+            service.clone(),
+            OutboxConfig {
+                poll_interval: Duration::from_secs(60),
+                ..Default::default()
+            },
+        ));
+        let delivered = Arc::new(Notify::new());
+        let delivered_c = delivered.clone();
+        outbox.register(OUTBOX_SESSION_REMEMBER, move |_| {
+            let delivered_c = delivered_c.clone();
+            async move {
+                delivered_c.notify_one();
+                Ok::<_, String>(())
+            }
+        });
+
+        let task = TaskGroup::new();
+        outbox.start(&task);
+
+        // Rolled-back transaction must NOT commit row or deliver event.
+        let outbox_rb = outbox.clone();
+        let rb: Result<((), vibevalley_kit::core::DirtyMask), ApiError> = service
+            .write_with_hooks(move |tx, hooks| {
+                Box::pin(async move {
+                    let ev = OutboxEvent::SessionRemember {
+                        agent: "a1".into(),
+                        text: "rolled back".into(),
+                        repo: None,
+                    };
+                    outbox_rb.enqueue_event_in_tx_with_hooks(tx, hooks, &ev).await?;
+                    Err(ApiError::new(BizCode::InternalError, "rollback"))
+                })
+            })
+            .await;
+        assert!(rb.is_err());
+        assert!(service.outbox.list().await.unwrap().is_empty());
+
+        // Committed transaction enqueues row AND fires post-commit `outbox.wake()` immediately.
+        let outbox_ok = outbox.clone();
+        let (id, _) = service
+            .write_with_hooks(move |tx, hooks| {
+                Box::pin(async move {
+                    let ev = OutboxEvent::SessionRemember {
+                        agent: "a1".into(),
+                        text: "committed".into(),
+                        repo: None,
+                    };
+                    outbox_ok.enqueue_event_in_tx_with_hooks(tx, hooks, &ev).await
+                })
+            })
+            .await
+            .unwrap();
+        assert!(id > 0);
+        tokio::time::timeout(Duration::from_secs(2), delivered.notified()).await.unwrap();
+        assert!(task.shutdown(Duration::from_secs(2)).await);
         service.close().await;
     }
 }

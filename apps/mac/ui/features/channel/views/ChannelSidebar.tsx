@@ -2,7 +2,7 @@ import { computed, keymap, Scroll, signal, Text, View, windowSize } from "nsh";
 import { Popover } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
-import { type Channel, type SessionView, userId } from "@vibevalley/protocol";
+import { type Channel, isHumanParticipant, localUserParticipant, type SessionView } from "@vibevalley/protocol";
 import { isFreeUserSession, sessionProfile } from "@vibevalley/protocol/rules";
 
 import { OrchestratorFace, UserFace } from "../../../design/domain/Face";
@@ -84,7 +84,7 @@ export function ChannelAvatar(props: { channel: Channel | undefined; size?: numb
     const fallback = ch.orchestrator && orcIds.has(ch.orchestrator) ? [ch.orchestrator] : [];
     const picked = (explicit.length > 0 ? explicit : fallback).slice(0, 3);
     if (picked.length === 0) return [];
-    return [{ kind: "user", id: userId }, ...picked.map((id): CollageSlot => ({ kind: "orchestrator", id }))];
+    return [{ kind: "user", id: localUserParticipant }, ...picked.map((id): CollageSlot => ({ kind: "orchestrator", id }))];
   });
   return (
     <If
@@ -363,8 +363,9 @@ function ChannelRow(props: {
     if (last) {
       const body = localizeRuntimeError(last.text.replace(/\s+/gu, " ").trim()).text;
       if (body) {
-        const who = last.from === userId ? t("web.channel.messages.user") : last.name;
-        const formatted = props.channel.type === "channel" ? (who ? `${who}: ${body}` : body) : last.from === userId ? `${who}: ${body}` : body;
+        const isUser = isHumanParticipant(last.from);
+        const who = isUser ? t("web.channel.messages.user") : last.name;
+        const formatted = props.channel.type === "channel" ? (who ? `${who}: ${body}` : body) : isUser ? `${who}: ${body}` : body;
         return { text: formatted, tone: "muted" };
       }
     }

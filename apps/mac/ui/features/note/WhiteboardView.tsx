@@ -2,7 +2,7 @@ import { colorScheme, computed, effect, Scroll, signal, Text, untracked, View, t
 import { z } from "zod";
 
 import { currentLocale, t } from "@vibevalley/i18n";
-import { type Note, type NotePresenceKind, userId, type ViewportRect } from "@vibevalley/protocol";
+import { localUserParticipant, type Note, type NotePresenceKind, type ViewportRect } from "@vibevalley/protocol";
 import { isFreeUserSession, sessionProfile } from "@vibevalley/protocol/rules";
 import { jsonString } from "@vibevalley/protocol/schema";
 
@@ -221,7 +221,7 @@ export function WhiteboardView(props: WhiteboardViewerProps) {
     const claims: BoardElement[] = [];
 
     for (const peer of presence.peers()) {
-      if (peer.id === userId) continue;
+      if (peer.id === localUserParticipant) continue;
       out.push({
         id: peer.id,
         name: peer.name,
@@ -268,13 +268,13 @@ export function WhiteboardView(props: WhiteboardViewerProps) {
   const publishSelectionPresence = (ids: readonly string[]) => {
     const firstId = ids[0];
     if (!firstId) {
-      presence.clear(userId);
+      presence.clear(localUserParticipant);
       return;
     }
     const raw: unknown = boardDoc().elements[firstId];
     const el = raw !== undefined ? parseBoardElement(firstId, raw, "selection") : undefined;
     presence.publish({
-      id: userId,
+      id: localUserParticipant,
       name: t("web.note.blocks.user"),
       color: "blue",
       kind: "selection",
@@ -367,7 +367,7 @@ export function WhiteboardView(props: WhiteboardViewerProps) {
 
     const handleNativeCursorMove = (ev: VvWhiteboardCursorEvent) => {
       presence.publish({
-        id: userId,
+        id: localUserParticipant,
         name: t("web.note.blocks.user"),
         color: "blue",
         kind: "cursor",
@@ -380,7 +380,7 @@ export function WhiteboardView(props: WhiteboardViewerProps) {
 
     const handleNativeViewportChange = (ev: VvWhiteboardViewportEvent) => {
       presence.publish({
-        id: userId,
+        id: localUserParticipant,
         name: t("web.note.blocks.user"),
         color: "blue",
         kind: "viewport",

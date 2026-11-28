@@ -54,7 +54,7 @@ pub fn start(streams: SharedSpeechStreams, id: &str) -> Result<State, String> {
     };
     let initial = current.state.clone();
     drop(current);
-    vibevalley_rt::current_or_global_handle().spawn(async move {
+    vibevalley_kit::rt::current_or_global_handle().spawn(async move {
         let reserved = tokio::task::spawn_blocking(crate::audio::reserve_output)
             .await
             .map_err(|e| e.to_string())
@@ -285,7 +285,7 @@ mod tests {
     }
     #[test]
     fn regression_a_ten_second_burst_waits_for_playback_capacity_then_drains() {
-        vibevalley_rt::block_on(async {
+        vibevalley_kit::rt::block_on(async {
             let (claim, send, gone) = claim();
             let cancel = CancellationToken::new();
             send.send(json!({"type":"format","sampleRate":8000,"channels":1,"bitDepth":16})).await.unwrap();
@@ -315,7 +315,7 @@ mod tests {
     }
     #[test]
     fn regression_stop_interrupts_a_full_playback_window_and_releases_the_claim() {
-        vibevalley_rt::block_on(async {
+        vibevalley_kit::rt::block_on(async {
             let (claim, send, gone) = claim();
             let cancel = CancellationToken::new();
             send.send(json!({"type":"format","sampleRate":8000,"channels":1,"bitDepth":16})).await.unwrap();

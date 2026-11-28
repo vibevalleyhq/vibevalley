@@ -44,7 +44,7 @@ jobs:
             echo 'Release signing is not configured. Fix: provision a Developer ID identity and notary profile before enabling release packaging.' >&2
             exit 1
           fi
-      - run: rustup show && brew install zig
+      - run: rustup show
       - name: Restore Rust and Swift build cache
         id: mac-build-cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0

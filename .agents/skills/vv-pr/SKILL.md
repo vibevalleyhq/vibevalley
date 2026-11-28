@@ -15,10 +15,13 @@ description: 给 VibeValley 开、改、合 PR：默认把同一批工作的改�
 
 只有用户明确要求分开，或确实需要不同的发布、权限或回滚安排时才拆，并说明具体原因。PR 数量少不改变测试、CI 和 squash 合并要求。
 
-## 2. 分支
+## 2. 分支与 Worktree 自治
 
-- 从最新的 `origin/main` 起：`git fetch origin && git switch -c <类>/<主题> origin/main`。别的会话在主 checkout 上有没提交的东西时，用 `git worktree add`，不动它，也不用 `git stash`（共享的）。
+VibeValley 控制面不再代管仓库分支、worktree 创建或自动合并；分支隔离、本地检查、PR 提交与交付凭据回写全权由 Agent 自治完成：
+
+- 从最新的 `origin/main` 起：`git fetch origin && git switch -c <类>/<主题> origin/main`。当主工作区已有未提交改动或多名 Agent 并行开发时，自主使用 `git worktree add <路径> -b <类>/<主题> origin/main` 开隔离目录，不动主工作区，也不用 `git stash`（共享的）。
 - 类：`feat`（新行为）、`fix`、`docs`、`chore`（工具、依赖、仓库的规矩）、`refactor`、`test`（只加测试）。主题用英文小写、连字符，说这件事：`fix/orchestrator-answer-hangs`，不写 `fix/misc`、`fix/stuff-2`。
+- 交付完成后（提交 PR 或本地提交），务必通过 MCP（`issue_report` / `issue_update`）把结构化 `deliveryReceipt`（如 `{ "kind": "pull_request", "url": "...", "number": 123, "branch": "...", "summary": "..." }` 或 `{ "kind": "commit", "sha": "...", "branch": "...", "summary": "..." }`）写回对应工单。
 
 ## 3. 标题
 

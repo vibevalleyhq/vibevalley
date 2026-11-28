@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use vibevalley_i18n::t;
-use vibevalley_protocol::{ApiError, BizCode, OrchestratorEval, SessionEventType};
+use vibevalley_protocol::{ApiError, BizCode, SessionEval, SessionEventType};
 use vibevalley_runtime::agent::Message;
 
 use super::execution;
@@ -50,7 +50,7 @@ fn message_of_turn(entry: &execution::EvalEntry) -> Option<Option<Message>> {
 impl Orchestrator {
     /// Keeps the turn that answered step `on` of its log as a case to replay: what it had been told before, what it was
     /// asked, what it did, and what the user says it should have done.
-    pub async fn mark_wrong_async(self: &Arc<Self>, agent: Option<&str>, on: i64, want: &str) -> Result<OrchestratorEval, ApiError> {
+    pub async fn mark_wrong_async(self: &Arc<Self>, agent: Option<&str>, on: i64, want: &str) -> Result<SessionEval, ApiError> {
         let want = want.trim().to_string();
         if want.is_empty() {
             return Err(refused(BizCode::Refused, t("server.session.host.markNeedsWords", &[])));
@@ -122,7 +122,7 @@ impl Orchestrator {
             .await
             .map_err(|e| refused(BizCode::Refused, e.to_string()))?;
         out.flush().await.map_err(|e| refused(BizCode::Refused, e.to_string()))?;
-        Ok(OrchestratorEval {
+        Ok(SessionEval {
             id: case_id,
             file: file.to_string_lossy().into_owned(),
         })

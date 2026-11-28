@@ -112,6 +112,14 @@ impl DailySpend {
     }
 }
 
+const HELD_OBSERVATION_CACHE_CAPACITY: std::num::NonZeroUsize = std::num::NonZeroUsize::new(128).expect("non-zero capacity");
+
+struct FleetState {
+    held: vibevalley_kit::cache::LruCache<String, Observation>,
+    spend: DailySpend,
+    probing: HashSet<String>,
+}
+
 /// Probed runtime fleet backing agent profiles across local and remote machines.
 pub struct RuntimeFleet {
     registry: Arc<Registry>,
@@ -119,9 +127,7 @@ pub struct RuntimeFleet {
     profiles: Arc<ProfileStore>,
     ctx: Arc<Context>,
     background: bool,
-    held: Mutex<HashMap<String, Observation>>,
-    spend: Mutex<DailySpend>,
-    probing: Mutex<HashSet<String>>,
+    state: Mutex<FleetState>,
     reads: AtomicU64,
     cancel: CancellationToken,
 }
@@ -222,9 +228,11 @@ impl RuntimeFleet {
             profiles,
             ctx,
             background,
-            held: Mutex::default(),
-            spend: Mutex::new(DailySpend::new()),
-            probing: Mutex::default(),
+            state: Mutex::new(FleetState {
+                held: vibevalley_kit::cache::LruCache::new(HELD_OBSERVATION_CACHE_CAPACITY),
+                spend: DailySpend::new(),
+                probing: HashSet::new(),
+            }),
             reads: AtomicU64::new(0),
             cancel,
         });
@@ -238,9 +246,7 @@ impl RuntimeFleet {
             let f = Arc::downgrade(&fleet);
             let cancel = fleet.cancel.clone();
             fleet.ctx.spawn("agent.fleet.usage_poll", async move {
-                let mut tick = tokio::time::interval(USAGE_EVERY);
-                tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
-                tick.tick().await;
+                let mut tick = vibevalley_kit::task::Ticker::periodic_delayed(USAGE_EVERY).with_delay_behavior();
                 loop {
                     tokio::select! {
                         biased;
@@ -272,7 +278,7 @@ impl RuntimeFleet {
         let sem = Arc::new(Semaphore::new(PROBE_CONCURRENCY));
         let mut set = JoinSet::new();
         for id in ids {
-            if self.cancel.is_cancelled() || !self.probing.lock().insert(id.clone()) {
+            if self.cancel.is_cancelled() || !self.state.lock().probing.insert(id.clone()) {
                 continue;
             }
             let fleet = self.clone();
@@ -288,7 +294,7 @@ impl RuntimeFleet {
                 {
                     fleet.lookup_async(&id).await;
                 }
-                fleet.probing.lock().remove(&id);
+                fleet.state.lock().probing.remove(&id);
             });
         }
         while set.join_next().await.is_some() {}
@@ -296,10 +302,16 @@ impl RuntimeFleet {
 
     fn record_spend(&self, runtime: &str, cny: f64) {
         let key = runtime.strip_prefix("acp:").unwrap_or(runtime);
-        self.spend.lock().add(key, cny);
-        let updated = self.held(key).map(|hit| {
+        let (hit, spent_today) = {
+            let mut state = self.state.lock();
+            state.spend.add(key, cny);
+            let hit = state.held.get(key).cloned();
+            let spent_today = state.spend.get(key);
+            (hit, spent_today)
+        };
+        let updated = hit.map(|hit| {
             let settings = self.profiles.settings(key);
-            self.shown(RuntimeInfo { settings, ..hit.info })
+            Self::shown_with_spend(RuntimeInfo { settings, ..hit.info }, spent_today)
         });
         if let Some(info) = updated {
             self.ctx.live.publish_runtime(self.ctx.now(), info);
@@ -310,7 +322,7 @@ impl RuntimeFleet {
     /// runs share one read).
     pub fn usage_soon(self: &Arc<Self>, id: &str) {
         let key = format!("usage:{id}");
-        if self.cancel.is_cancelled() || !self.probing.lock().insert(key.clone()) {
+        if self.cancel.is_cancelled() || !self.state.lock().probing.insert(key.clone()) {
             return;
         }
         let fleet = Arc::downgrade(self);
@@ -323,7 +335,7 @@ impl RuntimeFleet {
                 _ = tokio::time::sleep(USAGE_AFTER_RUN) => false,
             };
             let Some(fleet) = fleet.upgrade() else { return };
-            fleet.probing.lock().remove(&key);
+            fleet.state.lock().probing.remove(&key);
             if !stopped {
                 fleet.refresh_usage_async(&id).await;
             }
@@ -343,15 +355,18 @@ impl RuntimeFleet {
         else {
             return;
         };
-        let mut held = self.held.lock();
-        let Some(now_held) = held.get_mut(id) else { return };
-        if now_held.read != before.read || now_held.info.usage.as_ref() == Some(&usage) {
-            return;
-        }
-        now_held.info.usage = Some(usage);
-        now_held.info.checked_at = self.ctx.now();
-        let info = self.shown(now_held.info.clone());
-        drop(held);
+        let info = {
+            let mut state = self.state.lock();
+            let Some(now_held) = state.held.get_mut(id) else { return };
+            if now_held.read != before.read || now_held.info.usage.as_ref() == Some(&usage) {
+                return;
+            }
+            now_held.info.usage = Some(usage);
+            now_held.info.checked_at = self.ctx.now();
+            let raw = now_held.info.clone();
+            let spent_today = state.spend.get(&raw.id);
+            Self::shown_with_spend(raw, spent_today)
+        };
         self.ctx.live.publish_runtime(self.ctx.now(), info);
     }
 
@@ -423,20 +438,24 @@ impl RuntimeFleet {
             mcp_servers: None,
             tools: None,
             settings: self.profiles.settings(id),
-            spent_today: self.spend.lock().get(id),
+            spent_today: self.state.lock().spend.get(id),
             quota: None,
             stop: String::new(),
             checked_at,
         }
     }
 
-    /// `withSpend`: the stop, daily spend, and quota from what is known now.
-    fn shown(&self, info: RuntimeInfo) -> RuntimeInfo {
-        let spent_today = self.spend.lock().get(&info.id);
+    fn shown_with_spend(info: RuntimeInfo, spent_today: Option<JsNumber>) -> RuntimeInfo {
         let mut out = RuntimeInfo { spent_today, ..info };
         out.stop = money_stop(Some(&out));
         out.quota = Some(quota_of(out.usage.as_ref()));
         out
+    }
+
+    /// `withSpend`: the stop, daily spend, and quota from what is known now.
+    fn shown(&self, info: RuntimeInfo) -> RuntimeInfo {
+        let spent_today = self.state.lock().spend.get(&info.id);
+        Self::shown_with_spend(info, spent_today)
     }
 
     /// Points the runtime's binary at the saved `binPath`; empty searches
@@ -530,14 +549,17 @@ impl RuntimeFleet {
             McpHostId::Cursor => "cursor",
         };
         let entries: Vec<InventoryEntry> = servers.iter().map(inventory_entry_from_mcp_entry).collect();
-        let mut held = self.held.lock();
-        let Some(obs) = held.get_mut(runtime_id) else {
-            return;
+        let info = {
+            let mut state = self.state.lock();
+            let Some(obs) = state.held.get_mut(runtime_id) else {
+                return;
+            };
+            obs.info.mcp_servers = Some(entries);
+            obs.info.checked_at = self.ctx.now();
+            let raw = obs.info.clone();
+            let spent_today = state.spend.get(&raw.id);
+            Self::shown_with_spend(raw, spent_today)
         };
-        obs.info.mcp_servers = Some(entries);
-        obs.info.checked_at = self.ctx.now();
-        let info = self.shown(obs.info.clone());
-        drop(held);
         self.ctx.live.publish_runtime(self.ctx.now(), info);
     }
 
@@ -545,37 +567,38 @@ impl RuntimeFleet {
     async fn lookup_async(&self, id: &str) -> RuntimeInfo {
         let read = self.reads.fetch_add(1, Ordering::Relaxed) + 1;
         let info = self.shown(self.probe_async(id).await);
-        let mut held = self.held.lock();
-        // A slower older lookup does not overwrite a newer one.
-        if held.get(id).is_none_or(|o| o.read < read) {
-            held.insert(
-                id.into(),
-                Observation {
-                    info: info.clone(),
-                    locale: vibevalley_i18n::locale(),
-                    read,
-                },
-            );
+        {
+            let mut state = self.state.lock();
+            // A slower older lookup does not overwrite a newer one.
+            if state.held.get(id).is_none_or(|o| o.read < read) {
+                state.held.insert(
+                    id.into(),
+                    Observation {
+                        info: info.clone(),
+                        locale: vibevalley_i18n::locale(),
+                        read,
+                    },
+                );
+            }
         }
-        drop(held);
         self.ctx.live.publish_runtime(self.ctx.now(), info.clone());
         info
     }
 
     fn probe_later(self: &Arc<Self>, id: &str) {
-        if self.cancel.is_cancelled() || !self.probing.lock().insert(id.to_string()) {
+        if self.cancel.is_cancelled() || !self.state.lock().probing.insert(id.to_string()) {
             return;
         }
         let fleet = self.clone();
         let id = id.to_string();
         self.ctx.spawn("agent.fleet.probe_one", async move {
             fleet.lookup_async(&id).await;
-            fleet.probing.lock().remove(&id);
+            fleet.state.lock().probing.remove(&id);
         });
     }
 
     fn held(&self, id: &str) -> Option<Observation> {
-        self.held.lock().get(id).cloned()
+        self.state.lock().held.get(id).cloned()
     }
 
     /// Active (available and enabled) runtimes sort ahead of disabled or

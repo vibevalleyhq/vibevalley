@@ -15,10 +15,11 @@ import { useNow } from "../../infra/base/dom";
 import { ago } from "../../infra/base/format";
 import { createMemo } from "../../infra/solid";
 import { createSessionProjection } from "./events";
-import { collapsedStepSummary, lastTime, localizeCollapsedSummary, projectTrajectory, runMs, secondsText, spanTone, tagOf, tokensText } from "./runs";
+import { collapsedStepSummary, lastTime, localizeCollapsedSummary, projectTrajectory, secondsText, spanTone, tagOf, tokensText } from "./runs";
 import { SubagentProgress } from "./SubagentProgress";
 import { Markable } from "./trajectory/Markable";
 import {
+  computeRunDurationMs,
   emptySummary,
   haystack,
   isErrorStep,
@@ -26,6 +27,7 @@ import {
   matchesStepFilter,
   type RowSpec,
   type RunGroup,
+  sanitizeTrajectorySummary,
   type StepFilter,
   stepFilterLabel,
   stepFilters,
@@ -119,7 +121,7 @@ export function Trajectory(props: {
   const bySeq = createMemo(() => new Map(shown().map((s) => [s.seq, s])));
   const metaBySeq = createMemo((): ReadonlyMap<number, TrajectoryStepMeta> => new Map((activeProj()?.stepMeta ?? []).map((m) => [m.seq, m])));
   const durations = createMemo(() => new Map((activeProj()?.stepDurations ?? []).map((d) => [d.seq, d.durationMs])));
-  const summary = createMemo(() => summaryText(activeProj()?.summary ?? emptySummary));
+  const summary = createMemo(() => summaryText(sanitizeTrajectorySummary(activeProj()?.summary ?? emptySummary, props.steps, props.working === true, end())));
 
   const groups = createMemo((): readonly RunGroup[] => {
     const firstAsked = shown().find((s) => s.type === "user/message" && s.under === undefined)?.seq;
@@ -167,7 +169,7 @@ export function Trajectory(props: {
         key: view.run ?? `earlier-${firstStep?.seq ?? idx}`,
         label: view.run !== undefined ? t("web.session.trajectory.run", { n }) : t("web.session.trajectory.earlier"),
         when: firstStep !== undefined ? ago(firstStep.time, props.now) : "",
-        took: secondsText(runMs(view, runEnd)),
+        took: secondsText(computeRunDurationMs(allSteps, isLive, runEnd)),
         stepsCount: allSteps.filter((s) => s.type !== "llm/usage").length,
         toolsCount,
         tokens: tokIn + tokOut > 0 ? `${tokensText(tokIn)}/${tokensText(tokOut)}` : undefined,
@@ -348,7 +350,7 @@ export function Trajectory(props: {
                       {metaParts().join(" · ")}
                     </Text>
                     <If when={group().when}>
-                      <Text class="shrink-0 text-right text-2xs text-faint tabular-nums">{group().when}</Text>
+                      <Text class="shrink-0 whitespace-nowrap text-right text-2xs text-faint tabular-nums">{group().when}</Text>
                     </If>
                   </View>
                   <If when={isRunOpen()}>

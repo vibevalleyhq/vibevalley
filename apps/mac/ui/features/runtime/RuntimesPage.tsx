@@ -182,8 +182,7 @@ export function RuntimesPage(props: { rest: string }) {
   const machines = useMergedMachines();
 
   const sidebarOpen = signal(true);
-  const inspectorOverride = signal<boolean | undefined>(undefined);
-  const inspectorOpen = () => inspectorOverride() ?? lg();
+  const inspectorOpen = signal(false);
   const inspectorWidth = usePaneWidth("runtime-inspector", 304, 248, 420);
   const refreshingAll = createAct();
   const refreshingOne = createAct();
@@ -348,7 +347,7 @@ export function RuntimesPage(props: { rest: string }) {
                 label={inspectorOpen() ? t("web.runtime.inspectorHide") : t("web.runtime.inspectorShow")}
                 testid="runtimes-inspector-toggle"
                 pressed={inspectorOpen()}
-                onClick={() => inspectorOverride.set(!inspectorOpen())}
+                onClick={() => inspectorOpen.set(!inspectorOpen())}
               />
             </View>
           </View>
@@ -402,7 +401,7 @@ export function RuntimesPage(props: { rest: string }) {
                 size={14}
                 label={t("web.runtime.inspectorHide")}
                 testid="runtimes-inspector-close"
-                onClick={() => inspectorOverride.set(false)}
+                onClick={() => inspectorOpen.set(false)}
               />
             </View>
             <Scroll class="min-h-0 flex-1" contentClass="gap-4 p-3.5 pb-6">
@@ -831,19 +830,7 @@ function RuntimeInspector(props: {
           </View>
         </View>
         <InspectorRow label={t("web.runtime.machines.machineId")} value={machine().id} mono />
-        <InspectorRow
-          label={t("web.runtime.machines.installedCount")}
-          value={String(props.groupCount)}
-          mono
-          last={machine().worktreeSupported === undefined && !hasLastSeen()}
-        />
-        <If when={machine().worktreeSupported !== undefined}>
-          <InspectorRow
-            label={t("web.runtime.machines.worktree")}
-            value={machine().worktreeSupported === true ? t("web.runtime.machines.worktreeYes") : t("web.runtime.machines.worktreeNo")}
-            last={!hasLastSeen()}
-          />
-        </If>
+        <InspectorRow label={t("web.runtime.machines.installedCount")} value={String(props.groupCount)} mono last={!hasLastSeen()} />
         <If when={machine().lastSeenAt ?? machine().joinedAt}>
           {(ts) => <InspectorRow label={t("web.runtime.machines.lastSeen")} value={momentText(ts())} last />}
         </If>

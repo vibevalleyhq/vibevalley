@@ -1,7 +1,7 @@
 import "../infra/polyfill";
 import { expect, open, test } from "nsh/test";
 
-import type { ConnectorState, ConnectorStatus, OrchestratorApproval } from "@vibevalley/protocol";
+import type { ConnectorState, ConnectorStatus, SessionApproval } from "@vibevalley/protocol";
 
 import { fakeHost } from "../fixtures/fakeHost";
 import { SCENARIO_NOW, type ScenarioDensity, scenarios } from "../fixtures/scenarios";
@@ -158,9 +158,9 @@ test("minimal scenario advances working duration on virtual clock across core vi
 test("typical scenario verifies multi-stage BDD transitions and virtual-clock polling across workbench routes", async () => {
   const t0 = Date.now();
   const fixture = scenarios.typical;
-  let pendingApprovals: OrchestratorApproval[] = [];
+  let pendingApprovals: SessionApproval[] = [];
   const fake = fakeHost(fixture, { route: "/issues" });
-  fake.respond("orchestrator.approval.list", () => pendingApprovals);
+  fake.respond("session.approval.list", () => pendingApprovals);
 
   const app = await open("./main.tsx", {
     width: 1280,
@@ -246,7 +246,7 @@ test("typical scenario verifies multi-stage BDD transitions and virtual-clock po
   });
   pendingApprovals = [
     {
-      conversationId: "orchestrator",
+      id: "orchestrator",
       taskId: "t-bdd",
       toolCallId: "call-bdd",
       toolName: "issue_create",

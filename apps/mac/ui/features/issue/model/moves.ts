@@ -1,4 +1,4 @@
-import type { AppliedIssue, Changes, Issue, IssueStatus, IssueUpdate } from "@vibevalley/protocol";
+import type { AppliedIssue, Changes, DeliveryReceipt, Issue, IssueStatus, IssueUpdate } from "@vibevalley/protocol";
 import { omitUndefined, same } from "@vibevalley/protocol/rules";
 
 import { api } from "../../../infra/api";
@@ -13,6 +13,8 @@ export interface IssueMove {
   readonly text?: string;
   /** Fields edited and not saved, saved first so the move sees them (starting a todo). */
   readonly edit?: IssueUpdate;
+  /** Optional polymorphic delivery receipt recorded when completing an issue. */
+  readonly deliveryReceipt?: DeliveryReceipt;
   /** The lane it was dropped on, when it was dragged: where the card shows until the frame catches up. */
   readonly lane?: Lane;
   /** Target sibling card id to insert before (`""` appends to the end) for optimistic board ordering. */
@@ -26,7 +28,18 @@ export interface PendingPlacement {
 
 export const issueMove = defineIntent<IssueMove, AppliedIssue, "board">({
   slice: "board",
-  send: (m, key) => api.issue.status.update(omitUndefined({ id: m.id, status: m.status, text: m.text, edit: m.edit, revision: m.revision, requestKey: key })),
+  send: (m, key) =>
+    api.issue.status.update(
+      omitUndefined({
+        id: m.id,
+        status: m.status,
+        text: m.text,
+        edit: m.edit,
+        revision: m.revision,
+        deliveryReceipt: m.deliveryReceipt,
+        requestKey: key,
+      }),
+    ),
   confirmed: bySeq,
   whileLost: "queue",
   timeoutMs: 20_000,

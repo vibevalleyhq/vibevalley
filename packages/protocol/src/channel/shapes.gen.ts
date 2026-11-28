@@ -1,7 +1,7 @@
 // Generated from crates/protocol/src/contract (vp run protocol:ts). Do not edit.
 
 import type { Attachment } from "../attachment/shapes.gen";
-import type { Actor, MessageId, Outcome, SessionId, Spent } from "../common/shapes.gen";
+import type { Actor, MessageId, Outcome, ParticipantId, SessionId, Spent } from "../common/shapes.gen";
 import type { NoteCard, NoteViewContext } from "../note/shapes.gen";
 
 export const MessageKindValues = ["chat", "dispatch", "report", "notice"] as const;
@@ -70,7 +70,7 @@ export type ChannelEvent = { "_tag": "Message", message: ChatMessage, } | { "_ta
  */
 export type ChannelCommand = { name: string, args: string, };
 
-export type SayRequest = { id: string, text: string, viewContext?: NoteViewContext, replyTo?: number, attachments?: Array<string>, station?: number, agent?: string, repo?: string, sendKey?: string,
+export type SayRequest = { id: string, text: string, from?: ParticipantId, fromName?: string, viewContext?: NoteViewContext, replyTo?: number, attachments?: Array<string>, station?: number, agent?: string, repo?: string, sendKey?: string,
 /**
  * Orchestrator profile id that alone receives this message (e.g. `/imagegen`).
  */
@@ -98,7 +98,7 @@ export type ChannelRequest = { name: string, description?: string, repo?: string
 
 export type ChatReadRequest = { number: number, };
 
-export type MessageEdit = { id: MessageId, text: string,
+export type MessageEdit = { id: MessageId, text: string, from?: ParticipantId,
 /**
  * Omit to keep all existing attachments; pass a subset to remove the rest.
  */
@@ -106,7 +106,7 @@ attachments?: Array<string>, };
 
 export type NotifyRequest = { id: string, notify: Notify, };
 
-export type ReactionSet = { id: MessageId, emoji: string, on: boolean, };
+export type ReactionSet = { id: MessageId, emoji: string, on: boolean, from?: ParticipantId, };
 
 export type OnSet = { id: string, on: boolean, };
 
@@ -138,7 +138,7 @@ export type ChannelDefaultSetInput = { id: string, };
 
 export type ChannelMessageListInput = { id: string, before?: number, limit?: number, };
 
-export type ChannelMarkReadInput = { id: string, number: number, };
+export type ChannelMarkReadInput = { id: string, number: number, from?: ParticipantId, };
 
 export type ChannelMessageDeleteInput = { id: MessageId, };
 
@@ -148,6 +148,6 @@ export type ChannelPinListInput = { id: string, };
 
 export type ChannelThreadCreateInput = { id: MessageId, requestKey?: string, };
 
-export type ChannelDirectCreateInput = { agent: string, };
+export type ChannelDirectCreateInput = { agent: string, from?: ParticipantId, };
 
-export type ChannelMarkUnreadInput = { id: string, number: number, };
+export type ChannelMarkUnreadInput = { id: string, number: number, from?: ParticipantId, };

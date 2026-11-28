@@ -92,6 +92,24 @@ impl From<DbError> for ApiError {
     }
 }
 
+impl From<vibevalley_kit::db::DbEngineError> for DbError {
+    fn from(err: vibevalley_kit::db::DbEngineError) -> Self {
+        DbError::custom(err.to_string())
+    }
+}
+
+impl From<vibevalley_kit::db::SeqError> for DbError {
+    fn from(err: vibevalley_kit::db::SeqError) -> Self {
+        DbError::custom(err.to_string())
+    }
+}
+
+impl From<vibevalley_kit::queue::OutboxError> for DbError {
+    fn from(err: vibevalley_kit::queue::OutboxError) -> Self {
+        DbError::custom(err.to_string())
+    }
+}
+
 pub fn internal_db(err: DbError) -> ApiError {
     err.into_api_error()
 }

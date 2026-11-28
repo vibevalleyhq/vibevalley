@@ -49,7 +49,7 @@ pub fn start(voice: SharedLiveVoice, owner: String) -> Result<State, String> {
     current.owner = owner;
     let state = current.state.clone();
     drop(current);
-    vibevalley_rt::current_or_global_handle().spawn(async move {
+    vibevalley_kit::rt::current_or_global_handle().spawn(async move {
         let result = run(voice, cancel).await;
         let mut current = call().lock();
         current.state.phase = Phase::Idle;
@@ -322,7 +322,7 @@ struct Playing {
 
 struct SessionMessages {
     update: String,
-    outgoing: tokio::sync::mpsc::UnboundedReceiver<String>,
+    outgoing: tokio::sync::mpsc::Receiver<String>,
     cancel: CancellationToken,
 }
 
@@ -594,7 +594,7 @@ mod tests {
         });
         let (socket, _) = tokio_tungstenite::connect_async(format!("ws://{address}")).await.unwrap();
         let cancel = CancellationToken::new();
-        let (_out, outgoing) = tokio::sync::mpsc::unbounded_channel();
+        let (_out, outgoing) = tokio::sync::mpsc::channel(16);
         session(
             socket,
             SessionMessages {
@@ -635,7 +635,7 @@ mod tests {
         });
         let (socket, _) = tokio_tungstenite::connect_async(format!("ws://{address}")).await.unwrap();
         let cancel = CancellationToken::new();
-        let (_out, outgoing) = tokio::sync::mpsc::unbounded_channel();
+        let (_out, outgoing) = tokio::sync::mpsc::channel(16);
         let probe = Arc::new(Probe::default());
         let result = session(
             socket,
@@ -706,7 +706,7 @@ mod tests {
         });
         let (socket, _) = tokio_tungstenite::connect_async(format!("ws://{address}")).await.unwrap();
         let cancel = CancellationToken::new();
-        let (_out, outgoing) = tokio::sync::mpsc::unbounded_channel();
+        let (_out, outgoing) = tokio::sync::mpsc::channel(16);
         let probe = Arc::new(Probe::default());
         session(
             socket,
@@ -769,7 +769,7 @@ mod tests {
     async fn regression_hangup_interrupts_a_blocked_microphone_send_and_stops_capture() {
         let (blocked, mut waiting) = tokio::sync::mpsc::channel(1);
         let cancel = CancellationToken::new();
-        let (_out, outgoing) = tokio::sync::mpsc::unbounded_channel();
+        let (_out, outgoing) = tokio::sync::mpsc::channel(16);
         let probe = Arc::new(Probe::default());
         let socket = SlowSocket {
             reads: VecDeque::from([

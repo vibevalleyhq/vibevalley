@@ -1,17 +1,17 @@
 use std::sync::{Arc, Weak};
 
 use arc_swap::{ArcSwap, Guard as SnapshotGuard};
-use parking_lot::{Mutex, RwLock};
+use parking_lot::RwLock;
 use tokio::sync::{Mutex as AsyncMutex, MutexGuard as AsyncMutexGuard, broadcast};
 use vibevalley_core::SliceMask;
 use vibevalley_i18n::t;
-use vibevalley_protocol::{ApiError, ChatMessage, DEFAULT_ORCHESTRATOR, Embed, SubjectKind, USER_ID, UserMention};
+use vibevalley_protocol::{ApiError, ChatMessage, DEFAULT_ORCHESTRATOR, Embed, ParticipantId, SubjectKind, UserMention};
 
 use super::dispatch;
 use super::model::{ChatModel, Inner, Q, WriteTx};
 use super::types::{
     CHANNEL_EVENT_CAPACITY, ChannelDispatched, ChannelEvent, ChannelMessageEvent, FIRST_CHANNEL, HeldBy, KEEP_CHANNELS, Noticing, QueuedDelivery, Reach,
-    ThreadSubject, Write, Written, meta_of, meta_text, new_id, refused, to_message,
+    ThreadSubject, Write, Written, local_user_id, meta_of, meta_text, new_id, refused, to_message,
 };
 use super::words::{self, ChatTarget};
 use crate::context::{AsyncRequestKeys, Context, LookIn, internal, missing, now};
@@ -36,24 +36,21 @@ pub struct Chat {
     pub(super) events: broadcast::Sender<ChannelEvent>,
     pub(super) removals: broadcast::Sender<String>,
     message_events: broadcast::Sender<ChannelMessageEvent>,
-    pub(super) dispatches: Mutex<Vec<tokio::sync::mpsc::UnboundedSender<ChannelDispatched>>>,
+    pub(super) dispatches: broadcast::Sender<ChannelDispatched>,
     pub(super) seaters: RwLock<Vec<Seater>>,
     /// Link previews are read off the web; tests turn it off.
     embeds: bool,
 }
 
-fn publish<T: Clone>(to: &Mutex<Vec<tokio::sync::mpsc::UnboundedSender<T>>>, value: &T) {
-    to.lock().retain(|tx| tx.send(value.clone()).is_ok());
-}
-
 impl Chat {
-    /// Opens the chat service on `ctx.service.channel`: ensures `user`, `system`,
+    /// Opens the chat service on `ctx.service.channel`: ensures `user:self`, `system`,
     /// the default orchestrator, and `#general` exist, then loads [`ChatModel`].
     pub async fn open_async(ctx: Arc<Context>, storage: Arc<Storage>, embeds: bool) -> Result<Arc<Chat>, ApiError> {
         let at = now();
         let channels = &ctx.service.channel;
+        let local_user = local_user_id();
         for (id, kind, name) in [
-            (USER_ID, "user", t("server.channel.name.user", &[])),
+            (local_user.as_str(), "user", t("server.channel.name.user", &[])),
             ("system", "system", "VibeValley".to_string()),
         ] {
             channels
@@ -82,13 +79,14 @@ impl Chat {
         model.load(
             channels.all_channels().await.q()?,
             channels.participants().await.q()?,
-            channels.read_cursors_of(USER_ID).await.q()?,
+            channels.read_cursors_of(&local_user).await.q()?,
             &channels.all_members().await.q()?,
         );
         let snapshot = Arc::new(ArcSwap::from_pointee(model.clone()));
         let (events, _events_rx) = broadcast::channel(CHANNEL_EVENT_CAPACITY);
         let (removals, _removals_rx) = broadcast::channel(CHANNEL_EVENT_CAPACITY);
         let (message_events, _message_events_rx) = broadcast::channel(CHANNEL_EVENT_CAPACITY);
+        let (dispatches, _dispatches_rx) = broadcast::channel(CHANNEL_EVENT_CAPACITY);
         Ok(Arc::new_cyclic(|me| Chat {
             ctx,
             storage,
@@ -103,7 +101,7 @@ impl Chat {
             events,
             removals,
             message_events,
-            dispatches: Mutex::default(),
+            dispatches,
             seaters: RwLock::default(),
             embeds,
         }))
@@ -145,9 +143,14 @@ impl Chat {
 
     /// Projects active `@user` mentions for `SliceMask::INBOX` and `collab.chat`.
     pub async fn user_mentions_snapshot_async(&self) -> Result<Vec<UserMention>, ApiError> {
+        self.user_mentions_for_async(&ParticipantId::local_user()).await
+    }
+
+    /// Projects active `@mention` inbox items for a specific human participant.
+    pub async fn user_mentions_for_async(&self, viewer: &ParticipantId) -> Result<Vec<UserMention>, ApiError> {
         let model = self.model();
         let quiet = |id: &str| model.channel(id).is_some_and(|c| c.notify == "none");
-        let rows = self.ctx.service.channel.user_mentions().await.q()?;
+        let rows = self.ctx.service.channel.user_mentions(&viewer.to_string()).await.q()?;
         Ok(rows
             .into_iter()
             .filter(|r| !quiet(&r.row.channel_id) && !quiet(&r.top_id))
@@ -198,7 +201,7 @@ impl Chat {
             .filter(|c| c.r#type != "channel" && c.subject_kind.as_deref() == Some("issue"))
             .and_then(|c| c.subject_id.clone());
         let message = to_message(row);
-        let has_user_mention = message.mentions.iter().any(|m| m == USER_ID);
+        let has_user_mention = message.mentions.iter().any(|m| ParticipantId::parse(m).is_some_and(|p| p.is_human()));
         let _ = self.message_events.send(ChannelMessageEvent::Posted {
             message,
             thread_issue_id: thread,
@@ -214,20 +217,23 @@ impl Chat {
         self.ctx.mark_dirty(mask);
     }
 
-    /// `readThrough`: a read that moves the cursor; the user's is told.
+    /// `readThrough`: a read that moves the cursor; a human's is broadcast.
     pub(super) async fn read_through_async(&self, inner: &mut Inner, who: &str, channel: &str, upto: i64) -> Result<(), ApiError> {
         let at = now();
+        let is_human = ParticipantId::parse(who).is_some_and(|p| p.is_human());
         {
             let mut wtx = WriteTx::begin(inner, &self.ctx.service).await?;
             wtx.set_read(who, channel, upto, at).await?;
+            if is_human {
+                let events = self.events.clone();
+                let ch = channel.to_string();
+                wtx.hooks.on_commit(move || {
+                    let _ = events.send(ChannelEvent::UserRead { channel: ch, upto, at });
+                });
+            }
             wtx.commit().await?;
         }
-        if who == USER_ID {
-            self.emit_event(ChannelEvent::UserRead {
-                channel: channel.to_string(),
-                upto,
-                at,
-            });
+        if is_human {
             self.publish_user_mentions_async(&inner.model).await?;
         }
         Ok(())
@@ -323,7 +329,6 @@ impl Chat {
                     again: true,
                     row: seen,
                     event: None,
-                    deliveries: vec![],
                     hop_limit_hit: false,
                 }
             } else {
@@ -397,7 +402,7 @@ impl Chat {
                     message_id: id,
                     at,
                 };
-                let (deliveries, hop_limit_hit) = if row.kind != "notice"
+                let hop_limit_hit = if row.kind != "notice"
                     && let Some(posted) = wtx.committed_from(&row, &event)
                 {
                     let plan = dispatch::plan_deliveries(&wtx.model, &mut wtx.reach, &posted, at);
@@ -409,8 +414,8 @@ impl Chat {
                                 &NewDelivery {
                                     message_id: &row.id,
                                     channel_id: &row.channel_id,
-                                    recipient_kind: d.recipient_kind.as_str(),
-                                    recipient_id: &d.recipient_id,
+                                    recipient_kind: d.recipient.kind_str(),
+                                    recipient_id: d.recipient.raw_id(),
                                     reason: d.reason.as_str(),
                                     wakes: d.wakes,
                                     held_by: d.held_by.map(HeldBy::as_str),
@@ -423,16 +428,25 @@ impl Chat {
                             id: did,
                             message_id: row.id.clone(),
                             channel_id: row.channel_id.clone(),
-                            recipient_kind: d.recipient_kind,
-                            recipient_id: d.recipient_id,
+                            recipient: d.recipient,
                             reason: d.reason,
                             wakes: d.wakes,
                             held_by: d.held_by,
                         });
                     }
-                    (queued, plan.hop_limit_hit)
+                    if !queued.is_empty() {
+                        let dispatches = self.dispatches.clone();
+                        let dispatched = ChannelDispatched {
+                            committed: Arc::new(posted),
+                            deliveries: queued.clone(),
+                        };
+                        wtx.hooks.on_commit(move || {
+                            let _ = dispatches.send(dispatched);
+                        });
+                    }
+                    plan.hop_limit_hit
                 } else {
-                    (vec![], false)
+                    false
                 };
                 wtx.commit().await?;
                 Written {
@@ -442,7 +456,6 @@ impl Chat {
                     again: false,
                     row,
                     event: Some(event),
-                    deliveries,
                     hop_limit_hit,
                 }
             }
@@ -457,24 +470,18 @@ impl Chat {
         self.embed_later(&written.row);
         self.publish_channel_async(&inner.model, &w.channel).await?;
         let meta = meta_of(written.row.meta.as_deref());
-        if written.row.sender_id == USER_ID || meta.mentions.is_some_and(|m| m.iter().any(|x| x == USER_ID)) {
+        let human_touched = written.row.sender_kind == "user"
+            || meta
+                .mentions
+                .is_some_and(|m| m.iter().any(|x| ParticipantId::parse(x).is_some_and(|p| p.is_human())));
+        if human_touched {
             self.publish_user_mentions_async(&inner.model).await?;
         }
         if !written.thread.is_empty() {
             self.publish_channel_async(&inner.model, &written.thread).await?;
         }
         if let Some(posted) = inner.model.committed_from(&written.row, &event) {
-            let posted = Arc::new(posted);
-            self.emit_event(ChannelEvent::Posted(Box::new((*posted).clone())));
-            if !written.deliveries.is_empty() {
-                publish(
-                    &self.dispatches,
-                    &ChannelDispatched {
-                        committed: posted,
-                        deliveries: written.deliveries.clone(),
-                    },
-                );
-            }
+            self.emit_event(ChannelEvent::Posted(Box::new(posted)));
         }
         if written.hop_limit_hit {
             Box::pin(self.notice_locked_async(

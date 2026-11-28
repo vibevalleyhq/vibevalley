@@ -10,10 +10,9 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
-use vibevalley_protocol::Caller;
+use vibevalley_protocol::{Caller, DEFAULT_ORCHESTRATOR, ParticipantId};
 use vibevalley_runtime::oar::scripted::{Script, ScriptedRuntime};
 use vibevalley_runtime::oar::{Capabilities, Installation, ModelInfo, Runtime, Session, SessionOptions};
-use vibevalley_server::channel::DeliveryTargetKind;
 
 #[test]
 fn the_watch_routes_the_chat_to_a_session() {
@@ -230,18 +229,19 @@ fn regression_slow_session_wakeup_does_not_block_chat_say_in_other_channels() {
     let fast_id = fast_msg["id"].as_str().unwrap().to_string();
 
     // Deleting a message withdraws its pending deliveries immediately.
+    let orch_pid = ParticipantId::agent(DEFAULT_ORCHESTRATOR);
     assert!(
-        vibevalley_runtime::rt::block_on(started.test_internals().channel.pending_deliveries_async(DeliveryTargetKind::Orchestrator))
+        vibevalley_runtime::rt::block_on(started.test_internals().channel.pending_deliveries_all_async())
             .unwrap()
             .iter()
-            .any(|d| d.message_id == fast_id)
+            .any(|d| d.recipient == orch_pid && d.message_id == fast_id)
     );
     call("channel.message.delete", json!({ "id": fast_id }));
     assert!(
-        !vibevalley_runtime::rt::block_on(started.test_internals().channel.pending_deliveries_async(DeliveryTargetKind::Orchestrator))
+        !vibevalley_runtime::rt::block_on(started.test_internals().channel.pending_deliveries_all_async())
             .unwrap()
             .iter()
-            .any(|d| d.message_id == fast_id)
+            .any(|d| d.recipient == orch_pid && d.message_id == fast_id)
     );
 
     // Unblock `runtime.open` and verify the direct-channel talk settles and reports cleanly.
@@ -251,9 +251,10 @@ fn regression_slow_session_wakeup_does_not_block_chat_say_in_other_channels() {
         rows.as_array()?.iter().any(|m| m["kind"] == "report").then_some(())
     });
     assert!(
-        vibevalley_runtime::rt::block_on(started.test_internals().channel.pending_deliveries_async(DeliveryTargetKind::Direct))
+        vibevalley_runtime::rt::block_on(started.test_internals().channel.pending_deliveries_all_async())
             .unwrap()
-            .is_empty()
+            .iter()
+            .all(|d| d.channel_id != direct)
     );
     started.close_blocking();
 }
@@ -414,7 +415,7 @@ fn pr2_deleted_channel_message_withdraws_pending_mailbox_before_claim() {
         .as_str()
         .unwrap()
         .to_string();
-    let owner = format!("profile:{}", helper.id);
+    let owner = format!("agent:{}", helper.id);
     crate::support::wait_until_settled(Some(started.ctx()), Duration::from_secs(30), "second message queued in mailbox", || {
         let entries = vibevalley_runtime::rt::block_on(started.test_internals().runtime.mailbox_entries_async(&owner)).ok()?;
         entries.into_iter().find(|e| e.payload == "撤回这条" && e.status == MailboxStatus::Pending)
@@ -441,8 +442,8 @@ fn pr2_deleted_channel_message_withdraws_pending_mailbox_before_claim() {
         || {
             let rows = call("channel.message.list", json!({ "id": direct }));
             let reports = rows.as_array()?.iter().filter(|m| m["kind"] == "report").count();
-            let pending = vibevalley_runtime::rt::block_on(started.test_internals().channel.pending_deliveries_async(DeliveryTargetKind::Direct)).ok()?;
-            (reports == 1 && pending.is_empty()).then_some(())
+            let pending = vibevalley_runtime::rt::block_on(started.test_internals().channel.pending_deliveries_all_async()).ok()?;
+            (reports == 1 && pending.iter().all(|d| d.channel_id != direct)).then_some(())
         },
     );
     let entries = vibevalley_runtime::rt::block_on(started.test_internals().runtime.mailbox_entries_async(&owner)).unwrap();
@@ -486,7 +487,7 @@ fn regression_channel_delete_withdraws_pending_mailbox_by_source_message_across_
 
     let runtime = started.test_internals().runtime;
     vibevalley_runtime::rt::block_on(runtime.enqueue_mailbox_async(
-        "profile:direct-1",
+        "agent:direct-1",
         "direct:direct-1:msg",
         MailboxSource::ChannelDirect,
         Some(&msg_id),
@@ -510,7 +511,7 @@ fn regression_channel_delete_withdraws_pending_mailbox_by_source_message_across_
         Duration::from_secs(30),
         "all three pending mailbox rows withdrawn by source_message_id",
         || {
-            let direct_w = vibevalley_runtime::rt::block_on(runtime.mailbox_entries_async("profile:direct-1"))
+            let direct_w = vibevalley_runtime::rt::block_on(runtime.mailbox_entries_async("agent:direct-1"))
                 .ok()?
                 .iter()
                 .any(|e| e.status == MailboxStatus::Withdrawn);

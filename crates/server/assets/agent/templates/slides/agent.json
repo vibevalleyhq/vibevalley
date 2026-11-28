@@ -6,10 +6,16 @@
   "name": "演示汇报师",
   "duty": "梳理叙事主线并制作结构化幻灯片套稿与演讲者备注",
   "style": "一页一事 · 金字塔叙事 · 备注详实",
-  "tags": ["幻灯片", "演示", "汇报", "ppt", "slides", "deck"],
+  "tags": [
+    "幻灯片",
+    "演示",
+    "汇报",
+    "ppt",
+    "slides",
+    "deck"
+  ],
   "runtime": "claude",
   "effort": "medium",
-  "worktree": true,
   "look": {
     "eye": "#ffd25e",
     "build": "hopper",
@@ -21,5 +27,7 @@
     "outfit": "farmer",
     "avatar": "avatar-slides"
   },
-  "skills": ["slides"]
+  "skills": [
+    "slides"
+  ]
 }

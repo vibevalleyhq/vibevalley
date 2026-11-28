@@ -248,7 +248,7 @@ export function formatToolDetails(step: SessionEvent): ToolDetails {
 
 export interface OpenWorkspaceParams {
   readonly sessionId?: string | undefined;
-  readonly cwd: string;
+  readonly cwd?: string | undefined;
   readonly repo?: string | undefined;
   readonly runtime: string;
   readonly model?: string | undefined;
@@ -258,7 +258,8 @@ export interface OpenWorkspaceParams {
 }
 
 export async function openWorkspaceSession(params: OpenWorkspaceParams): Promise<{ ok: true; workspace: SessionWorkspace } | { ok: false; reason: string }> {
-  const payload: Record<string, unknown> = { cwd: params.cwd, runtime: params.runtime };
+  const payload: Record<string, unknown> = { runtime: params.runtime };
+  if (params.cwd) payload.cwd = params.cwd;
   if (params.sessionId) payload.sessionId = params.sessionId;
   if (params.repo) payload.repo = params.repo;
   if (params.model) payload.model = params.model;

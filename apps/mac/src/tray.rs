@@ -1,52 +1,17 @@
+#![forbid(unsafe_code)]
+
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 
 use gpui::App;
-use objc2::{AnyThread, DefinedClass as _, MainThreadOnly, rc::Retained, runtime::AnyObject, sel};
-use objc2_app_kit::{NSImage, NSMenu, NSMenuItem, NSStatusBar, NSStatusItem};
-use objc2_foundation::{MainThreadMarker, NSObject, NSSize, NSString};
 use vibevalley_i18n::t;
 pub use vibevalley_protocol::HostTrayPayload as Summary;
 use vibevalley_protocol::home::{ReleaseChannel, current_channel};
 
-enum TrayEvent {
-    Open,
-    Quit,
-}
-
-struct TrayTargetIvars {
-    tx: tokio::sync::mpsc::UnboundedSender<TrayEvent>,
-}
-
-objc2::define_class!(
-    #[unsafe(super(NSObject))]
-    #[thread_kind = MainThreadOnly]
-    #[ivars = TrayTargetIvars]
-    struct TrayTarget;
-
-    impl TrayTarget {
-        #[unsafe(method(openApp:))]
-        fn open_app(&self, _sender: Option<&AnyObject>) {
-            let _ = self.ivars().tx.send(TrayEvent::Open);
-        }
-
-        #[unsafe(method(quitApp:))]
-        fn quit_app(&self, _sender: Option<&AnyObject>) {
-            let _ = self.ivars().tx.send(TrayEvent::Quit);
-        }
-    }
-);
-
-impl TrayTarget {
-    fn new(mtm: MainThreadMarker, tx: tokio::sync::mpsc::UnboundedSender<TrayEvent>) -> Retained<Self> {
-        let this = mtm.alloc::<Self>().set_ivars(TrayTargetIvars { tx });
-        unsafe { objc2::msg_send![super(this), init] }
-    }
-}
+use crate::platform::tray_ffi::{NativeTray, TrayEvent};
 
 struct InstalledTray {
-    item: Retained<NSStatusItem>,
-    target: Retained<TrayTarget>,
+    native: NativeTray,
     channel: ReleaseChannel,
     summary: Summary,
 }
@@ -104,9 +69,11 @@ fn format_tooltip(channel: ReleaseChannel, summary_title: &str) -> String {
 }
 
 pub fn install(cx: &mut App) {
-    let Some(mtm) = MainThreadMarker::new() else { return };
     let channel = current_channel();
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+    let Some(native) = NativeTray::install(tray_icon_candidates(&crate::assets::assets_dir(), channel), channel_app_name(channel), tx) else {
+        return;
+    };
     cx.spawn(async move |cx| {
         while let Some(event) = rx.recv().await {
             cx.update(|cx| match event {
@@ -119,24 +86,9 @@ pub fn install(cx: &mut App) {
         }
     })
     .detach();
-    let item = NSStatusBar::systemStatusBar().statusItemWithLength(-1.0);
-    if let Some(button) = item.button(mtm) {
-        let image = tray_icon_candidates(&crate::assets::assets_dir(), channel)
-            .into_iter()
-            .filter(|path| path.is_file())
-            .find_map(|path| NSImage::initWithContentsOfFile(NSImage::alloc(), &NSString::from_str(&path.to_string_lossy())));
-        if let Some(image) = image {
-            image.setSize(NSSize::new(18.0, 18.0));
-            button.setImage(Some(&image));
-        } else {
-            button.setTitle(&NSString::from_str(channel_app_name(channel)));
-        }
-    }
-    let target = TrayTarget::new(mtm, tx);
     TRAY.with(|slot| {
         *slot.borrow_mut() = Some(InstalledTray {
-            item,
-            target,
+            native,
             channel,
             summary: Summary::default(),
         });
@@ -154,42 +106,18 @@ pub fn update(summary: &Summary) {
 }
 
 pub fn refresh() {
-    let Some(mtm) = MainThreadMarker::new() else { return };
     TRAY.with(|slot| {
         let borrow = slot.borrow();
         let Some(tray) = borrow.as_ref() else { return };
-        if let Some(button) = tray.item.button(mtm) {
-            let tooltip = format_tooltip(tray.channel, &tray.summary.title);
-            button.setToolTip(Some(&NSString::from_str(&tooltip)));
-        }
-        let menu = NSMenu::initWithTitle(NSMenu::alloc(mtm), &NSString::from_str(channel_app_name(tray.channel)));
-        menu.setAutoenablesItems(false);
-        let header = channel_menu_header(tray.channel);
-        if let Some(title) = header {
-            let row = NSMenuItem::new(mtm);
-            row.setTitle(&NSString::from_str(title));
-            row.setEnabled(false);
-            menu.addItem(&row);
-        }
-        for line in tray.summary.lines.iter().take(12) {
-            let row = NSMenuItem::new(mtm);
-            row.setTitle(&NSString::from_str(line));
-            row.setEnabled(false);
-            menu.addItem(&row);
-        }
-        if header.is_some() || !tray.summary.lines.is_empty() {
-            menu.addItem(&NSMenuItem::separatorItem(mtm));
-        }
-        for (key, action) in [("desktop.open", sel!(openApp:)), ("desktop.quit", sel!(quitApp:))] {
-            let row = NSMenuItem::new(mtm);
-            row.setTitle(&NSString::from_str(&t(key, &[])));
-            unsafe {
-                row.setTarget(Some(&tray.target));
-                row.setAction(Some(action));
-            }
-            menu.addItem(&row);
-        }
-        tray.item.setMenu(Some(&menu));
+        let tooltip = format_tooltip(tray.channel, &tray.summary.title);
+        tray.native.update_menu(
+            channel_app_name(tray.channel),
+            &tooltip,
+            channel_menu_header(tray.channel),
+            &tray.summary.lines,
+            &t("desktop.open", &[]),
+            &t("desktop.quit", &[]),
+        );
     });
 }
 

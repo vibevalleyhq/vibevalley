@@ -30,8 +30,6 @@
 | `sessionIssueId` | `session.ts` |  |
 | `sessionChannelId` | `session.ts` |  |
 | `sessionRepo` | `session.ts` |  |
-| `sessionBranch` | `session.ts` |  |
-| `sessionWorktree` | `session.ts` |  |
 | `sessionProfile` | `session.ts` |  |
 | `isOrchestratorSession` | `session.ts` |  |
 | `isFreeUserSession` | `session.ts` |  |

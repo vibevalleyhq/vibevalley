@@ -103,10 +103,8 @@ fn a_new_slice_watcher_gets_current_snapshot_then_coalesced_updates_only_when_di
     assert!(base_seq >= 1);
 
     vibevalley_runtime::rt::block_on(async {
-        for n in 1..=5 {
-            let issue = vibevalley_protocol::Issue::new(format!("i{n}"), n, "t", n);
-            started.test_internals().service.issue.put(&issue).await.unwrap();
-        }
+        let issues: Vec<_> = (1..=5).map(|n| vibevalley_protocol::Issue::new(format!("i{n}"), n, "t", n)).collect();
+        started.test_internals().service.seed_for_test(&issues, &[]).await.unwrap();
     });
     started.ctx().mark_dirty(SliceMask::BOARD);
 

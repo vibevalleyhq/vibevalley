@@ -366,8 +366,7 @@ impl Pull {
         let span = tracing::debug_span!("pull.poll", interval_secs = interval.as_secs());
         let handle = self.ctx.task.spawn(
             async move {
-                let mut timer = tokio::time::interval_at(tokio::time::Instant::now() + interval, interval);
-                timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+                let mut timer = vibevalley_kit::task::Ticker::periodic_delayed(interval);
                 loop {
                     tokio::select! {
                         biased;

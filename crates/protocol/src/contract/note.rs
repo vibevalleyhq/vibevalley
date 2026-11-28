@@ -1215,6 +1215,319 @@ pub struct NoteLinkListResult {
 }
 
 // ============================================================================
+// Non-Destructive Image Annotation Layer (#144) & Review Checklist Linkage (#145)
+// ============================================================================
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+pub enum MediaAnnotationKind {
+    #[serde(rename = "pin")]
+    Pin,
+    #[serde(rename = "rect")]
+    Rect,
+    #[serde(rename = "arrow")]
+    Arrow,
+    #[serde(rename = "callout")]
+    Callout,
+}
+
+impl MediaAnnotationKind {
+    pub const ALL: [MediaAnnotationKind; 4] = [
+        MediaAnnotationKind::Pin,
+        MediaAnnotationKind::Rect,
+        MediaAnnotationKind::Arrow,
+        MediaAnnotationKind::Callout,
+    ];
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            MediaAnnotationKind::Pin => "pin",
+            MediaAnnotationKind::Rect => "rect",
+            MediaAnnotationKind::Arrow => "arrow",
+            MediaAnnotationKind::Callout => "callout",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+pub enum MediaAnnotationSeverity {
+    #[serde(rename = "p0")]
+    P0,
+    #[serde(rename = "p1")]
+    P1,
+    #[serde(rename = "p2")]
+    P2,
+    #[serde(rename = "ux")]
+    Ux,
+}
+
+impl MediaAnnotationSeverity {
+    pub const ALL: [MediaAnnotationSeverity; 4] = [
+        MediaAnnotationSeverity::P0,
+        MediaAnnotationSeverity::P1,
+        MediaAnnotationSeverity::P2,
+        MediaAnnotationSeverity::Ux,
+    ];
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            MediaAnnotationSeverity::P0 => "p0",
+            MediaAnnotationSeverity::P1 => "p1",
+            MediaAnnotationSeverity::P2 => "p2",
+            MediaAnnotationSeverity::Ux => "ux",
+        }
+    }
+
+    pub fn parse(raw: &str) -> Option<Self> {
+        match raw.trim().to_ascii_lowercase().as_str() {
+            "p0" => Some(MediaAnnotationSeverity::P0),
+            "p1" => Some(MediaAnnotationSeverity::P1),
+            "p2" => Some(MediaAnnotationSeverity::P2),
+            "ux" => Some(MediaAnnotationSeverity::Ux),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+pub enum MediaAnnotationStatus {
+    #[serde(rename = "open")]
+    Open,
+    #[serde(rename = "resolved")]
+    Resolved,
+}
+
+impl MediaAnnotationStatus {
+    pub const ALL: [MediaAnnotationStatus; 2] = [MediaAnnotationStatus::Open, MediaAnnotationStatus::Resolved];
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            MediaAnnotationStatus::Open => "open",
+            MediaAnnotationStatus::Resolved => "resolved",
+        }
+    }
+
+    pub fn parse(raw: &str) -> Option<Self> {
+        match raw.trim().to_ascii_lowercase().as_str() {
+            "open" | "todo" | "doing" | "in_progress" => Some(MediaAnnotationStatus::Open),
+            "resolved" | "done" | "closed" | "fixed" => Some(MediaAnnotationStatus::Resolved),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+pub enum MediaAnnotationSide {
+    #[serde(rename = "before")]
+    Before,
+    #[serde(rename = "after")]
+    After,
+}
+
+impl MediaAnnotationSide {
+    pub const ALL: [MediaAnnotationSide; 2] = [MediaAnnotationSide::Before, MediaAnnotationSide::After];
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            MediaAnnotationSide::Before => "before",
+            MediaAnnotationSide::After => "after",
+        }
+    }
+}
+
+/// Normalized `0..=1` bounding rectangle over an image, immune to Retina 2x and viewport scaling.
+#[skip_serializing_none]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct MediaAnnotationRect {
+    pub x: JsNumber,
+    pub y: JsNumber,
+    pub w: JsNumber,
+    pub h: JsNumber,
+}
+
+/// Normalized `0..=1` coordinate point (used for arrow endpoints or pin anchors).
+#[skip_serializing_none]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct MediaAnnotationPoint {
+    pub x: JsNumber,
+    pub y: JsNumber,
+}
+
+/// Non-destructive interactive image annotation stored cleanly in JSON/CRDT without touching image pixels.
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct MediaAnnotation {
+    pub id: String,
+    pub number: u32,
+    pub kind: Option<MediaAnnotationKind>,
+    pub rect: MediaAnnotationRect,
+    pub to: Option<MediaAnnotationPoint>,
+    pub side: Option<MediaAnnotationSide>,
+    pub severity: MediaAnnotationSeverity,
+    pub title: String,
+    pub body: Option<String>,
+    pub status: MediaAnnotationStatus,
+    #[cfg_attr(feature = "ts-gen", ts(as = "Option<crate::typescript::IssueId>"))]
+    pub issue_id: Option<IssueId>,
+    pub base_row_id: Option<String>,
+    pub author: Option<String>,
+    pub created_at: Option<i64>,
+    pub updated_at: Option<i64>,
+}
+
+/// Aggregate review rollup across all [`MediaAnnotation`]s in a block or note.
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct MediaAnnotationSummary {
+    pub total: u32,
+    pub open: u32,
+    pub resolved: u32,
+    pub p0: u32,
+    pub p1: u32,
+    pub p2: u32,
+    pub ux: u32,
+    pub linked_rows: u32,
+    pub linked_issues: u32,
+}
+
+/// Back-reference from a `BaseRow` to a specific `MediaAnnotation` in a `doc` or `media` note.
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct BaseAnnotationRef {
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::NoteId"))]
+    pub note_id: NoteId,
+    pub block_id: String,
+    pub annotation_id: String,
+    pub number: Option<u32>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+pub enum ReviewSyncDirection {
+    #[serde(rename = "docToBase")]
+    DocToBase,
+    #[serde(rename = "baseToDoc")]
+    BaseToDoc,
+}
+
+impl ReviewSyncDirection {
+    pub const ALL: [ReviewSyncDirection; 2] = [ReviewSyncDirection::DocToBase, ReviewSyncDirection::BaseToDoc];
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ReviewSyncDirection::DocToBase => "docToBase",
+            ReviewSyncDirection::BaseToDoc => "baseToDoc",
+        }
+    }
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct NoteAnnotationUpsertRequest {
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::NoteId"))]
+    pub id: NoteId,
+    /// Target `DocBlock.id` for `doc` notes (`media` or `compare` block),
+    /// or optional `media.json` item id for `media` notes.
+    pub block_id: Option<String>,
+    pub annotation: MediaAnnotation,
+    /// Optional linked `base` note id to keep `BaseRow.annotationRef` and review status in sync.
+    #[cfg_attr(feature = "ts-gen", ts(as = "Option<crate::typescript::NoteId>"))]
+    pub base_note_id: Option<NoteId>,
+    pub base_sheet_id: Option<String>,
+    pub origin: Option<String>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct NoteAnnotationDeleteRequest {
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::NoteId"))]
+    pub id: NoteId,
+    pub block_id: Option<String>,
+    pub annotation_id: String,
+    #[cfg_attr(feature = "ts-gen", ts(as = "Option<crate::typescript::NoteId>"))]
+    pub base_note_id: Option<NoteId>,
+    pub base_sheet_id: Option<String>,
+    pub origin: Option<String>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct NoteAnnotationMutationResult {
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::NoteId"))]
+    pub note_id: NoteId,
+    pub block_id: Option<String>,
+    pub annotations: Vec<MediaAnnotation>,
+    pub summary: MediaAnnotationSummary,
+    #[cfg_attr(feature = "ts-gen", ts(as = "Option<crate::typescript::NoteId>"))]
+    pub synced_base_note_id: Option<NoteId>,
+    pub synced_base_row_id: Option<String>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct NoteReviewSyncRequest {
+    /// The `doc` note whose `media`/`compare` annotations sync with an embedded `base` review checklist.
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::NoteId"))]
+    pub id: NoteId,
+    /// Optional target `base` note id; omit to reuse the first `baseEmbed` in `id` or create a built-in review checklist Base.
+    #[cfg_attr(feature = "ts-gen", ts(as = "Option<crate::typescript::NoteId>"))]
+    pub base_note_id: Option<NoteId>,
+    pub sheet_id: Option<String>,
+    pub spawn_issue_repo: Option<String>,
+    pub direction: Option<ReviewSyncDirection>,
+    pub origin: Option<String>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct NoteReviewSyncResult {
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::NoteId"))]
+    pub doc_note_id: NoteId,
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::NoteId"))]
+    pub base_note_id: NoteId,
+    pub sheet_id: String,
+    pub created_base: bool,
+    pub linked_count: u32,
+    pub updated_annotations: u32,
+    pub updated_rows: u32,
+    pub summary: MediaAnnotationSummary,
+    pub base_snapshot: BaseViewSnapshot,
+}
+
+// ============================================================================
 // Block Doc Projection & Blocks (#31, #38, #39)
 // ============================================================================
 
@@ -1285,9 +1598,15 @@ pub enum BlockKind {
         after_label: String,
         before_asset: String,
         after_asset: String,
+        annotations: Option<Vec<MediaAnnotation>>,
     },
     #[serde(rename = "media", rename_all = "camelCase")]
-    Media { media_kind: String, src: String, caption: Option<String> },
+    Media {
+        media_kind: String,
+        src: String,
+        caption: Option<String>,
+        annotations: Option<Vec<MediaAnnotation>>,
+    },
     #[serde(rename = "preview", rename_all = "camelCase")]
     Preview {
         entry: String,
@@ -1328,6 +1647,7 @@ pub enum BlockKind {
         headers: Vec<String>,
         rows: Vec<Vec<String>>,
         alignments: Option<Vec<String>>,
+        column_widths: Option<Vec<u32>>,
     },
     #[serde(rename = "bookmark", rename_all = "camelCase")]
     Bookmark {
@@ -1367,6 +1687,7 @@ pub struct DocView {
     pub slide_count: u32,
     pub word_count: u32,
     pub extracted_links: Vec<NoteLinkRef>,
+    pub annotation_summary: Option<MediaAnnotationSummary>,
 }
 
 #[skip_serializing_none]
@@ -1595,6 +1916,7 @@ pub struct BaseRow {
     pub cells: BTreeMap<String, BaseCellValue>,
     #[cfg_attr(feature = "ts-gen", ts(as = "Option<crate::typescript::NoteId>"))]
     pub page_note_id: Option<NoteId>,
+    pub annotation_ref: Option<BaseAnnotationRef>,
     pub created_at: i64,
     pub updated_at: i64,
 }
@@ -1843,6 +2165,21 @@ crate::typescript::module! {
     NoteLink,
     NoteLinkListRequest,
     NoteLinkListResult,
+    MediaAnnotationKind,
+    MediaAnnotationSeverity,
+    MediaAnnotationStatus,
+    MediaAnnotationSide,
+    MediaAnnotationRect,
+    MediaAnnotationPoint,
+    MediaAnnotation,
+    MediaAnnotationSummary,
+    BaseAnnotationRef,
+    ReviewSyncDirection,
+    NoteAnnotationUpsertRequest,
+    NoteAnnotationDeleteRequest,
+    NoteAnnotationMutationResult,
+    NoteReviewSyncRequest,
+    NoteReviewSyncResult,
     DocKpiItem,
     DocChartSeries,
     DocColumn,

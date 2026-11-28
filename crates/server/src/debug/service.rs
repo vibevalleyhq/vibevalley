@@ -53,7 +53,7 @@ struct RawGraphSession {
     title: String,
     runtime: String,
     status: &'static str,
-    worktree: Option<String>,
+    cwd: Option<String>,
     kind: DebugTrajectoryKind,
 }
 
@@ -100,7 +100,7 @@ fn extract_graph_sessions(issues: &[Issue], sessions: &[Session], orchestrator_i
                 title,
                 runtime: s.runtime.clone(),
                 status: trajectory::phase_status_str(&s.phase),
-                worktree: s.cwd.clone(),
+                cwd: s.cwd.clone(),
                 kind,
             }
         })
@@ -116,7 +116,7 @@ fn finish_graph(raw: Vec<RawGraphSession>, clients: Vec<DebugGraphClient>, redac
             title: redactor.redact_owned(s.title, count),
             runtime: s.runtime,
             status: s.status.to_string(),
-            worktree: redactor.redact_opt_str(s.worktree, count),
+            cwd: redactor.redact_opt_str(s.cwd, count),
             kind: s.kind,
         })
         .collect();

@@ -6,10 +6,17 @@
   "name": "数据看板师",
   "duty": "搭建交互式数据看板、调研报表与自包含轻量网页工具",
   "style": "结论置顶 · 指标有据 · 看板直观",
-  "tags": ["看板", "报表", "图表", "网页", "数据", "dashboard", "调研"],
+  "tags": [
+    "看板",
+    "报表",
+    "图表",
+    "网页",
+    "数据",
+    "dashboard",
+    "调研"
+  ],
   "runtime": "claude",
   "effort": "medium",
-  "worktree": true,
   "look": {
     "eye": "#a6f4ff",
     "build": "hopper",
@@ -21,5 +28,8 @@
     "outfit": "winter",
     "avatar": "avatar-pages"
   },
-  "skills": ["pages", "notes"]
+  "skills": [
+    "pages",
+    "notes"
+  ]
 }

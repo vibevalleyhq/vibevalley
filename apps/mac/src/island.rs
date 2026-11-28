@@ -123,7 +123,7 @@ impl Island {
         let Some(binary) = candidates.into_iter().flatten().find(|p| p.is_file()) else {
             return Ok(None);
         };
-        let handle = vibevalley_rt::current_or_global_handle();
+        let handle = vibevalley_kit::rt::current_or_global_handle();
         let mut child = {
             let _guard = handle.enter();
             Command::new(binary)
@@ -161,7 +161,7 @@ impl Drop for Island {
         self.cancel.cancel();
         if let Some(mut child) = self.child.take() {
             let _ = child.start_kill();
-            vibevalley_rt::current_or_global_handle().spawn(async move {
+            vibevalley_kit::rt::current_or_global_handle().spawn(async move {
                 let _ = child.wait().await;
             });
         }
@@ -193,7 +193,7 @@ mod tests {
 
     #[test]
     fn async_pipes_write_latest_frame_and_read_clicks() {
-        vibevalley_rt::block_on(async {
+        vibevalley_kit::rt::block_on(async {
             let (stdin_tx, mut stdin_rx) = tokio::io::duplex(256);
             let (frames_tx, frames_rx) = watch::channel(None::<String>);
             let cancel = CancellationToken::new();

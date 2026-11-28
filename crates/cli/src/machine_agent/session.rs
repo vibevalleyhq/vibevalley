@@ -2,6 +2,7 @@
 //! and OAR `Session` control/respond dispatch.
 
 use std::collections::{HashMap, VecDeque};
+use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -12,7 +13,6 @@ use vibevalley_runtime::oar::{self, ContentBlock, EventKind, InteractionDecision
 
 use super::mcp_proxy::LocalMcpProxy;
 use super::transport::TransportSlot;
-use super::worktree::WorktreeManager;
 
 pub const EVENT_RING_CAPACITY: usize = 4096;
 pub const INPUT_DEDUP_CAPACITY: usize = 1024;
@@ -134,8 +134,7 @@ struct SessionState {
 pub struct ManagedSession {
     pub session_id: String,
     pub workdir: PathBuf,
-    owned_worktree: Option<PathBuf>,
-    ephemeral_workdir: bool,
+    ephemeral_dir: Option<PathBuf>,
     oar_session: Arc<dyn oar::Session>,
     mcp_proxy: Mutex<Option<LocalMcpProxy>>,
     state: Mutex<SessionState>,
@@ -146,16 +145,14 @@ impl ManagedSession {
     pub fn new(
         session_id: String,
         workdir: PathBuf,
-        owned_worktree: Option<PathBuf>,
-        ephemeral_workdir: bool,
+        ephemeral_dir: Option<PathBuf>,
         oar_session: Arc<dyn oar::Session>,
         mcp_proxy: Option<LocalMcpProxy>,
     ) -> Self {
         Self {
             session_id,
             workdir,
-            owned_worktree,
-            ephemeral_workdir,
+            ephemeral_dir,
             oar_session,
             mcp_proxy: Mutex::new(mcp_proxy),
             state: Mutex::new(SessionState {
@@ -204,7 +201,7 @@ impl ManagedSession {
     }
 
     /// Executes `MachineSessionInput` idempotently by `input_id` and builds the correlated `MachineSessionAck`.
-    pub async fn handle_input(&self, req: &MachineSessionInput, worktrees: &WorktreeManager) -> MachineSessionAck {
+    pub async fn handle_input(&self, req: &MachineSessionInput) -> MachineSessionAck {
         if let Some(previous) = self.state.lock().dedup.get(&req.input_id).cloned() {
             return MachineSessionAck {
                 request_id: req.request_id.clone(),
@@ -235,7 +232,7 @@ impl ManagedSession {
                 .await
                 .map_err(|e| e.to_string()),
             MachineInputKind::Dispose => {
-                self.dispose_async(worktrees).await;
+                self.dispose_async().await;
                 Ok(())
             }
         };
@@ -299,7 +296,7 @@ impl ManagedSession {
         }
     }
 
-    pub async fn dispose_async(&self, worktrees: &WorktreeManager) {
+    pub async fn dispose_async(&self) {
         if self.disposed.swap(true, Ordering::AcqRel) {
             return;
         }
@@ -307,14 +304,14 @@ impl ManagedSession {
         if let Some(proxy) = self.mcp_proxy.lock().take() {
             proxy.shutdown();
         }
-        if self.ephemeral_workdir
-            && let Some(wt) = &self.owned_worktree
+        if let Some(dir) = &self.ephemeral_dir
+            && dir.exists()
         {
-            let _ = worktrees.cleanup_worktree(wt);
+            let _ = fs::remove_dir_all(dir);
         }
     }
 
-    pub fn dispose(&self, worktrees: &WorktreeManager) {
+    pub fn dispose(&self) {
         if self.disposed.swap(true, Ordering::AcqRel) {
             return;
         }
@@ -322,10 +319,10 @@ impl ManagedSession {
         if let Some(proxy) = self.mcp_proxy.lock().take() {
             proxy.shutdown();
         }
-        if self.ephemeral_workdir
-            && let Some(wt) = &self.owned_worktree
+        if let Some(dir) = &self.ephemeral_dir
+            && dir.exists()
         {
-            let _ = worktrees.cleanup_worktree(wt);
+            let _ = fs::remove_dir_all(dir);
         }
     }
 }

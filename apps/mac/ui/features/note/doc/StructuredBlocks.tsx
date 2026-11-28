@@ -1,4 +1,4 @@
-import { Clipboard, computed, signal, Text, untracked, View, type JSX } from "nsh";
+import { Clipboard, computed, effect, keymap, signal, Text, untracked, View, type JSX } from "nsh";
 import { Input } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
@@ -21,7 +21,12 @@ import {
   calloutVisualOf,
   cycleTableAlignment,
   extractTocEntries,
+  insertTableColumnAt,
+  insertTableRowAt,
   makeBlockId,
+  moveTableColumn,
+  moveTableRow,
+  nextTableCellTarget,
   removeTableColumn,
   removeTableRow,
   setColumnsCount,
@@ -286,112 +291,239 @@ function alignTextClass(align: string | undefined): string {
 }
 
 export function TableBlockView(props: { readonly block: TableBlockData; readonly onUpdate: (next: TableBlockData) => void }) {
-  const activeCell = signal<string | undefined>(undefined);
+  const activeCell = signal<{ readonly row: number; readonly col: number } | undefined>(undefined);
+  const hasActiveCell = computed(() => activeCell() !== undefined);
+
+  const navigateCell = (dir: "next" | "prev" | "down" | "up") => {
+    const cur = untracked(activeCell);
+    if (!cur) return;
+    const block = untracked(() => props.block);
+    const target = nextTableCellTarget(block.rows.length, block.headers.length, cur.row, cur.col, dir);
+    if (!target) {
+      activeCell.set(undefined);
+      return;
+    }
+    if (target.addRow === true) {
+      props.onUpdate(addTableRow(block));
+    }
+    activeCell.set({ row: target.row, col: target.col });
+  };
+
+  effect(() => {
+    if (!hasActiveCell()) return;
+    return keymap.bind(
+      {
+        tab: () => navigateCell("next"),
+        "shift+tab": () => navigateCell("prev"),
+        escape: () => activeCell.set(undefined),
+      },
+      { when: "always" },
+    );
+  });
+
   return (
     <View testID={`doc-table-${props.block.id}`} class="overflow-hidden rounded-md border border-line bg-page">
       <View class="flex-row items-center border-b border-line bg-side px-2 py-1.5">
         <Each of={props.block.headers} key={(_, colIdx) => String(colIdx)}>
           {(header, colIdx) => {
             const align = () => props.block.alignments?.[colIdx()] ?? "left";
+            const colCount = () => props.block.headers.length;
             return (
-              <View class="min-w-0 flex-1 flex-row items-center gap-1 px-1">
+              <View class="min-w-0 flex-1 flex-row items-center gap-0.5 px-1">
                 <Input
                   testID={`doc-table-header-${props.block.id}-${colIdx()}`}
                   value={header()}
                   onChange={(e) => props.onUpdate(updateTableHeader(props.block, colIdx(), e.value))}
-                  class={`min-w-0 flex-1 bg-transparent text-xs font-semibold text-ink ${alignTextClass(align())}`}
+                  onSubmit={() => activeCell.set({ row: 0, col: colIdx() })}
+                  class={`min-w-0 flex-1 rounded-xs border border-transparent bg-transparent px-1 py-0.5 text-xs font-semibold text-ink focus:border-focus focus:bg-page ${alignTextClass(align())}`}
                 />
-                <View
-                  role="button"
-                  testID={`doc-table-align-${props.block.id}-${colIdx()}`}
-                  onPress={() => props.onUpdate(cycleTableAlignment(props.block, colIdx()))}
-                  class="rounded-xs px-1 py-0.5 opacity-0 group-hover:opacity-100 hover:bg-hover"
-                >
-                  <Text class="font-mono text-2xs text-faint">{align() === "center" ? "C" : align() === "right" ? "R" : "L"}</Text>
-                </View>
-                <If when={props.block.headers.length > 1}>
+                <View class="shrink-0 flex-row items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100">
                   <View
                     role="button"
-                    testID={`doc-table-del-col-${props.block.id}-${colIdx()}`}
-                    onPress={() => props.onUpdate(removeTableColumn(props.block, colIdx()))}
-                    class="rounded-xs p-0.5 opacity-0 group-hover:opacity-100 hover:bg-bad-soft"
+                    testID={`doc-table-align-${props.block.id}-${colIdx()}`}
+                    accessibilityLabel={t("web.note.doc.tableAlign")}
+                    onPress={() => props.onUpdate(cycleTableAlignment(props.block, colIdx()))}
+                    class="rounded-xs px-1 py-0.5 hover:bg-hover"
+                  >
+                    <Text class="font-mono text-2xs text-faint">{align() === "center" ? "C" : align() === "right" ? "R" : "L"}</Text>
+                  </View>
+                  <If when={colIdx() > 0}>
+                    <View
+                      role="button"
+                      testID={`doc-table-col-left-${props.block.id}-${colIdx()}`}
+                      accessibilityLabel={t("web.note.doc.tableMoveColLeft")}
+                      onPress={() => props.onUpdate(moveTableColumn(props.block, colIdx(), colIdx() - 1))}
+                      class="rounded-xs p-0.5 hover:bg-hover"
+                    >
+                      <Icon name="previous" size={10} tone="muted" />
+                    </View>
+                  </If>
+                  <If when={colIdx() + 1 < colCount()}>
+                    <View
+                      role="button"
+                      testID={`doc-table-col-right-${props.block.id}-${colIdx()}`}
+                      accessibilityLabel={t("web.note.doc.tableMoveColRight")}
+                      onPress={() => props.onUpdate(moveTableColumn(props.block, colIdx(), colIdx() + 1))}
+                      class="rounded-xs p-0.5 hover:bg-hover"
+                    >
+                      <Icon name="next" size={10} tone="muted" />
+                    </View>
+                  </If>
+                  <View
+                    role="button"
+                    testID={`doc-table-ins-col-${props.block.id}-${colIdx()}`}
+                    accessibilityLabel={t("web.note.doc.tableInsertColAfter")}
+                    onPress={() => props.onUpdate(insertTableColumnAt(props.block, colIdx() + 1))}
+                    class="rounded-xs p-0.5 hover:bg-hover"
+                  >
+                    <Icon name="add" size={10} tone="muted" />
+                  </View>
+                  <If when={colCount() > 1}>
+                    <View
+                      role="button"
+                      testID={`doc-table-del-col-${props.block.id}-${colIdx()}`}
+                      accessibilityLabel={t("web.note.doc.tableDeleteCol")}
+                      onPress={() => {
+                        activeCell.set(undefined);
+                        props.onUpdate(removeTableColumn(props.block, colIdx()));
+                      }}
+                      class="rounded-xs p-0.5 hover:bg-bad-soft"
+                    >
+                      <Icon name="close" size={10} tone="muted" />
+                    </View>
+                  </If>
+                </View>
+              </View>
+            );
+          }}
+        </Each>
+        <View class="w-16 shrink-0" />
+      </View>
+      <Each of={props.block.rows} key={(_, rowIdx) => String(rowIdx)}>
+        {(row, rowIdx) => {
+          const rowCount = () => props.block.rows.length;
+          return (
+            <View class="flex-row items-start border-t border-line px-2 py-1 hover:bg-hover">
+              <Each of={row()} key={(_, colIdx) => String(colIdx)}>
+                {(cell, colIdx) => {
+                  const editing = () => {
+                    const cur = activeCell();
+                    return cur !== undefined && cur.row === rowIdx() && cur.col === colIdx();
+                  };
+                  return (
+                    <View class="min-w-0 flex-1 px-1">
+                      <If
+                        when={editing()}
+                        else={
+                          <View
+                            role="button"
+                            testID={`doc-table-cell-${props.block.id}-${rowIdx()}-${colIdx()}`}
+                            onPress={() => activeCell.set({ row: rowIdx(), col: colIdx() })}
+                            class="min-h-7 justify-center rounded-xs border border-transparent px-1.5 py-1 hover:bg-hover"
+                          >
+                            <Text class={`text-xs leading-5 ${cell() ? "text-ink" : "text-faint"} ${alignTextClass(props.block.alignments?.[colIdx()])}`}>
+                              {cell() || "…"}
+                            </Text>
+                          </View>
+                        }
+                      >
+                        <Input
+                          autoFocus
+                          submitBehavior="submit"
+                          testID={`doc-table-cell-input-${props.block.id}-${rowIdx()}-${colIdx()}`}
+                          value={cell()}
+                          placeholder="…"
+                          onChange={(e) => props.onUpdate(updateTableCell(props.block, rowIdx(), colIdx(), e.value))}
+                          onSubmit={() => navigateCell("down")}
+                          onBlur={() => {
+                            const cur = untracked(activeCell);
+                            if (cur !== undefined && cur.row === rowIdx() && cur.col === colIdx()) {
+                              activeCell.set(undefined);
+                            }
+                          }}
+                          class={`min-h-7 w-full min-w-0 rounded-xs border border-focus bg-page px-1.5 py-1 text-xs leading-5 text-ink placeholder:text-faint ${alignTextClass(props.block.alignments?.[colIdx()])}`}
+                        />
+                      </If>
+                    </View>
+                  );
+                }}
+              </Each>
+              <View class="w-16 shrink-0 flex-row items-center justify-end gap-0.5 pt-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100">
+                <If when={rowIdx() > 0}>
+                  <View
+                    role="button"
+                    testID={`doc-table-row-up-${props.block.id}-${rowIdx()}`}
+                    accessibilityLabel={t("web.note.doc.moveUp")}
+                    onPress={() => props.onUpdate(moveTableRow(props.block, rowIdx(), rowIdx() - 1))}
+                    class="rounded-xs p-0.5 hover:bg-hover"
+                  >
+                    <Icon name="moveUp" size={10} tone="muted" />
+                  </View>
+                </If>
+                <If when={rowIdx() + 1 < rowCount()}>
+                  <View
+                    role="button"
+                    testID={`doc-table-row-down-${props.block.id}-${rowIdx()}`}
+                    accessibilityLabel={t("web.note.doc.moveDown")}
+                    onPress={() => props.onUpdate(moveTableRow(props.block, rowIdx(), rowIdx() + 1))}
+                    class="rounded-xs p-0.5 hover:bg-hover"
+                  >
+                    <Icon name="moveDown" size={10} tone="muted" />
+                  </View>
+                </If>
+                <View
+                  role="button"
+                  testID={`doc-table-ins-row-${props.block.id}-${rowIdx()}`}
+                  accessibilityLabel={t("web.note.doc.tableInsertRowBelow")}
+                  onPress={() => {
+                    props.onUpdate(insertTableRowAt(props.block, rowIdx() + 1));
+                    activeCell.set({ row: rowIdx() + 1, col: 0 });
+                  }}
+                  class="rounded-xs p-0.5 hover:bg-hover"
+                >
+                  <Icon name="add" size={10} tone="muted" />
+                </View>
+                <If when={rowCount() > 1}>
+                  <View
+                    role="button"
+                    testID={`doc-table-del-row-${props.block.id}-${rowIdx()}`}
+                    accessibilityLabel={t("web.note.doc.tableDeleteRow")}
+                    onPress={() => {
+                      activeCell.set(undefined);
+                      props.onUpdate(removeTableRow(props.block, rowIdx()));
+                    }}
+                    class="rounded-xs p-0.5 hover:bg-bad-soft"
                   >
                     <Icon name="close" size={10} tone="muted" />
                   </View>
                 </If>
               </View>
-            );
-          }}
-        </Each>
-        <View class="w-6 shrink-0" />
-      </View>
-      <Each of={props.block.rows} key={(_, rowIdx) => String(rowIdx)}>
-        {(row, rowIdx) => (
-          <View class="flex-row items-start border-t border-line px-2 py-1.5 hover:bg-hover">
-            <Each of={row()} key={(_, colIdx) => String(colIdx)}>
-              {(cell, colIdx) => {
-                const cellKey = () => `${rowIdx()}:${colIdx()}`;
-                const editing = () => activeCell() === cellKey();
-                return (
-                  <View class="min-w-0 flex-1 px-1">
-                    <If
-                      when={editing()}
-                      else={
-                        <View
-                          role="button"
-                          testID={`doc-table-cell-${props.block.id}-${rowIdx()}-${colIdx()}`}
-                          onPress={() => activeCell.set(cellKey())}
-                          class="min-h-6 justify-center rounded-xs border border-transparent px-1 py-0.5 hover:bg-hover"
-                        >
-                          <Text class={`text-xs leading-relaxed ${cell() ? "text-ink" : "text-faint"} ${alignTextClass(props.block.alignments?.[colIdx()])}`}>
-                            {cell() || "…"}
-                          </Text>
-                        </View>
-                      }
-                    >
-                      <Input
-                        autoFocus
-                        testID={`doc-table-cell-input-${props.block.id}-${rowIdx()}-${colIdx()}`}
-                        value={cell()}
-                        placeholder="…"
-                        onChange={(e) => props.onUpdate(updateTableCell(props.block, rowIdx(), colIdx(), e.value))}
-                        onSubmit={() => activeCell.set(undefined)}
-                        onBlur={() => activeCell.set(undefined)}
-                        class={`min-h-6 w-full min-w-0 rounded-xs border border-focus bg-page px-1 py-0.5 text-xs leading-relaxed text-ink placeholder:text-faint ${alignTextClass(props.block.alignments?.[colIdx()])}`}
-                      />
-                    </If>
-                  </View>
-                );
-              }}
-            </Each>
-            <View class="w-6 shrink-0 items-center opacity-0 group-hover:opacity-100">
-              <If when={props.block.rows.length > 1}>
-                <View
-                  role="button"
-                  testID={`doc-table-del-row-${props.block.id}-${rowIdx()}`}
-                  onPress={() => props.onUpdate(removeTableRow(props.block, rowIdx()))}
-                  class="rounded-xs p-0.5 hover:bg-bad-soft"
-                >
-                  <Icon name="close" size={10} tone="muted" />
-                </View>
-              </If>
             </View>
-          </View>
-        )}
+          );
+        }}
       </Each>
-      <View class="flex-row items-center justify-end gap-1 border-t border-line bg-side px-2 py-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100">
-        <Button
-          size="compact"
-          tone="quiet"
-          icon="add"
-          testID={`doc-table-add-col-${props.block.id}`}
-          onPress={() => props.onUpdate(addTableColumn(props.block))}
-        >
-          {t("web.note.doc.addCol")}
-        </Button>
-        <Button size="compact" tone="quiet" icon="add" testID={`doc-table-add-row-${props.block.id}`} onPress={() => props.onUpdate(addTableRow(props.block))}>
-          {t("web.note.doc.addRow")}
-        </Button>
+      <View class="flex-row items-center justify-between gap-2 border-t border-line bg-side px-2.5 py-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100">
+        <Text class="text-2xs text-faint">{t("web.note.doc.tableNavHint")}</Text>
+        <View class="flex-row items-center gap-1">
+          <Button
+            size="compact"
+            tone="quiet"
+            icon="add"
+            testID={`doc-table-add-col-${props.block.id}`}
+            onPress={() => props.onUpdate(addTableColumn(props.block))}
+          >
+            {t("web.note.doc.addCol")}
+          </Button>
+          <Button
+            size="compact"
+            tone="quiet"
+            icon="add"
+            testID={`doc-table-add-row-${props.block.id}`}
+            onPress={() => props.onUpdate(addTableRow(props.block))}
+          >
+            {t("web.note.doc.addRow")}
+          </Button>
+        </View>
       </View>
     </View>
   );

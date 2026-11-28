@@ -6,15 +6,15 @@ use tokio_util::sync::CancellationToken;
 use vibevalley_core::SliceMask;
 use vibevalley_i18n::{list, t};
 use vibevalley_protocol::{
-    ApiError, Channel, ChannelEvent as ProtocolChannelEvent, ChannelUnread, ChannelUpdate, ChatMessage, DEFAULT_ORCHESTRATOR, MessageKind, Notify, Preview,
-    SubjectKind, USER_ID,
+    ApiError, Channel, ChannelEvent as ProtocolChannelEvent, ChannelUnread, ChannelUpdate, ChatMessage, DEFAULT_ORCHESTRATOR, MessageKind, Notify,
+    ParticipantId, Preview, SubjectKind,
 };
 
 use super::model::{ChatModel, Q, WriteTx};
 use super::service::Chat;
 use super::types::{
-    AddressedMessage, CATCH_UP_MAX, ChannelDispatched, ChannelEvent, Committed, DeliveryTargetKind, FIRST_CHANNEL, HeldBy, Info, LOG_KEEP, NO_NUMBER, Place,
-    QueuedDelivery, READ_LIMIT, ReadOptions, ReadResult, Reason, Seat, THREAD_TITLE_MAX, head, info_of, new_id, no_channel, notify_of, optional, refused,
+    AddressedMessage, CATCH_UP_MAX, ChannelDispatched, ChannelEvent, Committed, FIRST_CHANNEL, HeldBy, Info, LOG_KEEP, NO_NUMBER, Place, QueuedDelivery,
+    READ_LIMIT, ReadOptions, ReadResult, Reason, Seat, THREAD_TITLE_MAX, head, info_of, local_user_id, new_id, no_channel, notify_of, optional, refused,
     to_message,
 };
 use super::words;
@@ -123,7 +123,8 @@ impl Chat {
             if inner.model.channel(channel).is_some() {
                 channel.to_string()
             } else {
-                let (place, opened) = self.resolve_target_async(&mut inner, USER_ID, channel).await?;
+                let local = local_user_id();
+                let (place, opened) = self.resolve_target_async(&mut inner, &local, channel).await?;
                 if let Some(thread) = opened {
                     self.publish_channel_async(&inner.model, &thread).await?;
                 }
@@ -142,11 +143,21 @@ impl Chat {
     }
 
     pub async fn mark_read_async(&self, channel: &str, number: i64) -> Result<(), ApiError> {
+        self.mark_read_as_async(&ParticipantId::local_user(), channel, number).await
+    }
+
+    pub async fn mark_read_as_async(&self, who: &ParticipantId, channel: &str, number: i64) -> Result<(), ApiError> {
         let mut inner = self.locked().await;
         if inner.model.channel(channel).is_none() {
             return Err(no_channel(channel));
         }
-        self.read_through_async(&mut inner, USER_ID, channel, number).await?;
+        let who_id = who.to_string();
+        if who.is_human() && inner.model.participant(&who_id).is_none() {
+            let mut wtx = WriteTx::begin(&mut inner, &self.ctx.service).await?;
+            wtx.ensure_human(who, None).await?;
+            wtx.commit().await?;
+        }
+        self.read_through_async(&mut inner, &who_id, channel, number).await?;
         self.publish_channel_async(&inner.model, channel).await
     }
 
@@ -182,7 +193,7 @@ impl Chat {
         let Some(row) = channels.message_by_id(id).await.q()?.filter(|r| r.deleted_at.is_none()) else {
             return Ok(None);
         };
-        let Some((read_at, superseded)) = channels.notification_receipt(id).await.q()? else {
+        let Some((read_at, superseded)) = channels.notification_receipt(id, &local_user_id()).await.q()? else {
             return Ok(None);
         };
         Ok(Some((to_message(&row), read_at, superseded)))
@@ -190,7 +201,7 @@ impl Chat {
 
     /// Each speaker's newest report the user has read: (from, at, readAt).
     pub async fn user_read_reports_async(&self) -> Result<Vec<(String, i64, i64)>, ApiError> {
-        self.ctx.service.channel.user_read_reports().await.q()
+        self.ctx.service.channel.user_read_reports(&local_user_id()).await.q()
     }
 
     pub fn home_of(&self, participant: &str) -> Option<String> {
@@ -214,36 +225,34 @@ impl Chat {
         })
     }
 
-    /// Non-blocking stream of committed messages with their pending deliveries.
-    pub fn dispatches(&self) -> tokio::sync::mpsc::UnboundedReceiver<ChannelDispatched> {
-        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
-        self.dispatches.lock().push(tx);
-        rx
+    /// Non-blocking bounded broadcast stream of committed messages with their pending deliveries.
+    pub fn subscribe_dispatches(&self) -> broadcast::Receiver<ChannelDispatched> {
+        self.dispatches.subscribe()
     }
 
-    pub async fn pending_deliveries_async(&self, kind: DeliveryTargetKind) -> Result<Vec<QueuedDelivery>, ApiError> {
+    pub async fn pending_deliveries_all_async(&self) -> Result<Vec<QueuedDelivery>, ApiError> {
         Ok(self
             .ctx
             .service
             .channel
-            .pending_deliveries_by_kind(kind.as_str())
+            .pending_deliveries_all()
             .await
             .q()?
             .into_iter()
-            .map(queued_from_row)
+            .filter_map(queued_from_row)
             .collect())
     }
 
-    pub async fn pending_deliveries_for_async(&self, kind: DeliveryTargetKind, recipient: &str, max_id: i64) -> Result<Vec<QueuedDelivery>, ApiError> {
+    pub async fn pending_deliveries_for_async(&self, recipient: &ParticipantId, max_id: i64) -> Result<Vec<QueuedDelivery>, ApiError> {
         Ok(self
             .ctx
             .service
             .channel
-            .pending_deliveries_for_recipient(kind.as_str(), recipient, max_id)
+            .pending_deliveries_for_recipient(recipient.kind_str(), recipient.raw_id(), max_id)
             .await
             .q()?
             .into_iter()
-            .map(queued_from_row)
+            .filter_map(queued_from_row)
             .collect())
     }
 
@@ -260,13 +269,24 @@ impl Chat {
         self.ctx.service.channel.settle_delivery(id, "withdrawn", now()).await.q()
     }
 
+    /// Registers or updates a human participant (`user:<id>`).
+    pub async fn ensure_human_async(&self, id: &ParticipantId, name: &str) -> Result<(), ApiError> {
+        if !id.is_human() {
+            return Err(refused(t("server.channel.notYours", &[])));
+        }
+        let mut inner = self.locked().await;
+        let mut wtx = WriteTx::begin(&mut inner, &self.ctx.service).await?;
+        wtx.ensure_human(id, Some(name)).await?;
+        wtx.commit().await
+    }
+
     /// Ensures a session's thread is opened and seated before it speaks or reads.
     pub fn ensure_seated(&self, seater: impl Fn(&str) + Send + Sync + 'static) {
         self.seaters.write().push(Arc::new(seater));
     }
 
     pub(super) fn prepare_seat(&self, who: &str) {
-        if who == USER_ID || who == DEFAULT_ORCHESTRATOR || who == "system" || self.home_of(who).is_some() {
+        if ParticipantId::parse(who).is_some_and(|p| p.is_human()) || who == DEFAULT_ORCHESTRATOR || who == "system" || self.home_of(who).is_some() {
             return;
         }
         let seaters = self.seaters.read().clone();
@@ -293,14 +313,15 @@ impl Chat {
         let mut wtx = WriteTx::begin(&mut inner, &self.ctx.service).await?;
         self.ctx.service.channel.participant_left_in_tx(&wtx.tx, participant, at).await.q()?;
         self.ctx.service.channel.remove_from_all_in_tx(&wtx.tx, participant, at).await.q()?;
+        let pid = ParticipantId::parse(participant).unwrap_or_else(|| ParticipantId::session(participant));
         self.ctx
             .service
             .channel
-            .withdraw_deliveries_for_recipient_in_tx(&wtx.tx, DeliveryTargetKind::Session.as_str(), participant, at)
+            .withdraw_deliveries_for_recipient_in_tx(&wtx.tx, pid.kind_str(), pid.raw_id(), at)
             .await
             .q()?;
         wtx.model.left(participant, at);
-        wtx.reach.left(participant);
+        wtx.reach.left(&pid);
         wtx.commit().await
     }
 
@@ -724,16 +745,61 @@ impl Chat {
         Ok(id)
     }
 
+    /// Creates or retrieves a direct channel between two participants (Human <-> Human or Human <-> Agent).
+    pub async fn create_direct_between_async(&self, from: &ParticipantId, peer: &ParticipantId) -> Result<String, ApiError> {
+        let from_id = from.to_string();
+        let peer_id = peer.to_string();
+        if from_id == peer_id {
+            return Err(refused(t("server.channel.badTarget", &[("target", peer_id.into())])));
+        }
+        if let Some(had) = self.model().direct_with(&from_id, &peer_id) {
+            return Ok(had.id);
+        }
+        let mut inner = self.locked().await;
+        if let Some(had) = inner.model.direct_with(&from_id, &peer_id) {
+            return Ok(had.id);
+        }
+        let id = new_id();
+        let at = now();
+        {
+            let mut wtx = WriteTx::begin(&mut inner, &self.ctx.service).await?;
+            if from.is_human() {
+                wtx.ensure_human(from, None).await?;
+            }
+            if peer.is_human() {
+                wtx.ensure_human(peer, None).await?;
+            }
+            self.ctx.service.channel.create_direct_in_tx(&wtx.tx, &id, &peer_id, at).await.q()?;
+            wtx.model.created(ChannelRow {
+                peer_id: Some(peer_id.clone()),
+                ..ChannelRow::empty(&id, "direct", at)
+            });
+            wtx.add_member(&id, &from_id, "manual", 0).await?;
+            wtx.add_member(&id, &peer_id, "manual", 0).await?;
+            wtx.commit().await?;
+        }
+        self.publish_channel_async(&inner.model, &id).await?;
+        Ok(id)
+    }
+
     pub async fn mark_unread_async(&self, channel: &str, number: i64) -> Result<(), ApiError> {
+        self.mark_unread_as_async(&ParticipantId::local_user(), channel, number).await
+    }
+
+    pub async fn mark_unread_as_async(&self, who: &ParticipantId, channel: &str, number: i64) -> Result<(), ApiError> {
         let mut inner = self.locked().await;
         if inner.model.channel(channel).is_none() {
             return Err(no_channel(channel));
         }
+        let who_id = who.to_string();
         let upto = (number - 1).max(0);
         {
             let mut wtx = WriteTx::begin(&mut inner, &self.ctx.service).await?;
-            self.ctx.service.channel.mark_unread_in_tx(&wtx.tx, channel, upto, now()).await.q()?;
-            wtx.model.user_read_back(channel, upto);
+            if who.is_human() {
+                wtx.ensure_human(who, None).await?;
+            }
+            self.ctx.service.channel.mark_unread_in_tx(&wtx.tx, &who_id, channel, upto, now()).await.q()?;
+            wtx.model.read_back(&who_id, channel, upto);
             wtx.commit().await?;
         }
         self.publish_channel_async(&inner.model, channel).await?;
@@ -838,17 +904,17 @@ impl Chat {
     }
 }
 
-fn queued_from_row(r: DeliveryRow) -> QueuedDelivery {
-    QueuedDelivery {
+fn queued_from_row(r: DeliveryRow) -> Option<QueuedDelivery> {
+    let recipient = ParticipantId::from_parts(&r.recipient_kind, &r.recipient_id)?;
+    Some(QueuedDelivery {
         id: r.id,
         message_id: r.message_id,
         channel_id: r.channel_id,
-        recipient_kind: DeliveryTargetKind::from_db(&r.recipient_kind),
-        recipient_id: r.recipient_id,
+        recipient,
         reason: Reason::from_db(&r.reason),
         wakes: r.wakes,
         held_by: r.held_by.as_deref().and_then(HeldBy::from_db),
-    }
+    })
 }
 
 fn message_of(event: ChannelEvent) -> Option<ChatMessage> {

@@ -1,13 +1,14 @@
-import { computed, effect, signal, Text, untracked, View, windowSize, type JSX } from "nsh";
-import { Popover } from "nsh/base";
+import { computed, effect, signal, Text, untracked, View, windowSize } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import { type Channel } from "@vibevalley/protocol";
 import { channelOf } from "@vibevalley/protocol/rules";
 
+import { Dialog } from "../../../design/Dialog";
 import { TextInput } from "../../../design/Field";
 import { Icon } from "../../../design/Icon";
 import type { IconName } from "../../../design/icons";
+import { MoreMenu, type MoreItem } from "../../../design/MoreMenu";
 import { Splitter, usePaneWidth } from "../../../design/Splitter";
 import { Tabs } from "../../../design/Tabs";
 import { TextLink } from "../../../design/TextLink";
@@ -127,49 +128,6 @@ const tabs: { tab: Tab; icon: IconName; label: string }[] = [
 
 type HeaderOverlay = "none" | "threads" | "pins";
 
-/** A head button that opens a popover under it. */
-function HeadPopover(props: {
-  icon: IconName;
-  label: string;
-  testid: string;
-  open: boolean;
-  onOpen: (open: boolean) => void;
-  disabled?: boolean;
-  children: () => JSX.Element;
-  width: number;
-}) {
-  return (
-    <Popover
-      open={props.open}
-      onOpenChange={(e) => props.onOpen(e.open)}
-      placement="bottom"
-      align="end"
-      offset={4}
-      popupClass="flex-col overflow-hidden rounded-lg border border-line bg-elevated p-2 shadow-float"
-      popupStyle={{
-        width: Math.min(props.width, Math.max(240, windowSize().width - 24)),
-        maxHeight: Math.min(448, Math.max(200, Math.round(windowSize().height * 0.72))),
-      }}
-      trigger={
-        <View
-          testID={props.testid}
-          accessibilityLabel={props.label}
-          accessibilityState={{ expanded: props.open }}
-          tooltip={<Bubble text={props.label} />}
-          disabled={props.disabled}
-          class={`h-7 w-7 shrink-0 items-center justify-center rounded-md hover:bg-hover ${
-            props.open ? "bg-selected" : ""
-          } ${props.disabled === true ? "opacity-50" : "active:translate-y-px"}`}
-        >
-          <Icon name={props.icon} size={16} tone={props.open ? "ink" : "muted"} />
-        </View>
-      }
-    >
-      {props.children()}
-    </Popover>
-  );
-}
-
 /** Fold secondary channel tabs into the h-11 header on wide viewports (>= 960px) when the main pane has room without truncation. */
 export function isWideChannelHead(viewportWidth: number, mainPaneWidth: number, searchOpen: boolean): boolean {
   if (viewportWidth < 960) return false;
@@ -205,6 +163,44 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
   useChannelReportPlayback(() => props.channel?.id);
   const about = () =>
     [props.channel?.description, props.channel?.repo ? t("web.channel.defaultRepo", { repo: props.channel.repo }) : ""].filter(Boolean).join(" · ");
+  const moreItems = computed<MoreItem[]>(() => {
+    const c = props.channel;
+    if (!c) return [];
+    const items: MoreItem[] = [];
+    if (c.type === "channel") {
+      items.push({
+        key: "threads",
+        label: t("web.channel.threadList.title"),
+        icon: "thread",
+        onSelect: () => overlay.set("threads"),
+      });
+    }
+    items.push({
+      key: "pins",
+      label: t("web.channel.pins.open"),
+      icon: "pin",
+      onSelect: () => overlay.set("pins"),
+    });
+    if (md()) {
+      items.push({
+        key: "members",
+        label: t("web.channel.members.open"),
+        icon: "agents",
+        onSelect: () => {
+          const next = !untracked(membersOpen);
+          membersOpen.set(next);
+          if (next) tab.set("chat");
+        },
+      });
+    }
+    items.push({
+      key: "listen-reports",
+      label: listenToReports() ? t("web.channel.listenReportsActive") : t("web.channel.listenReports"),
+      icon: "audio",
+      onSelect: () => setListenToReports(!untracked(listenToReports)),
+    });
+    return items;
+  });
   return (
     <View
       accessibilityLabel={channelLabel(props.channel)}
@@ -268,56 +264,9 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
               tab.set("chat");
             }}
           />
-          <If when={props.channel?.type === "channel" ? props.channel : undefined}>
-            {(c) => (
-              <HeadPopover
-                icon="thread"
-                testid="threads-toggle"
-                label={t("web.channel.threadList.title")}
-                open={threadsOpen()}
-                onOpen={(o) => overlay.set(o ? "threads" : "none")}
-                width={384}
-              >
-                {() => <ThreadList channel={c()} onPick={() => overlay.set("none")} />}
-              </HeadPopover>
-            )}
+          <If when={moreItems().length > 0}>
+            <MoreMenu label={t("web.channel.more.label")} testid="channel-more-menu" items={moreItems()} />
           </If>
-          <HeadPopover
-            icon="pin"
-            testid="pins-toggle"
-            label={t("web.channel.pins.open")}
-            open={pinsOpen()}
-            onOpen={(o) => overlay.set(o ? "pins" : "none")}
-            disabled={!props.channel}
-            width={320}
-          >
-            {() => <If when={props.channel}>{(c) => <Pins channel={c()} onPick={() => overlay.set("none")} />}</If>}
-          </HeadPopover>
-          {/* The members panel is beside the list, which a phone has no room for. */}
-          <If when={md()}>
-            <BarButton
-              icon="agents"
-              size={16}
-              testid="members-toggle"
-              label={t("web.channel.members.open")}
-              pressed={membersOpen()}
-              disabled={!props.channel}
-              onPress={() => {
-                const next = !membersOpen();
-                membersOpen.set(next);
-                if (next) tab.set("chat");
-              }}
-            />
-          </If>
-          <BarButton
-            icon="audio"
-            size={16}
-            testid="listen-reports-toggle"
-            label={listenToReports() ? t("web.channel.listenReportsActive") : t("web.channel.listenReports")}
-            pressed={listenToReports()}
-            disabled={!props.channel}
-            onPress={() => setListenToReports(!listenToReports())}
-          />
           <BarButton
             icon="settings"
             size={16}
@@ -367,6 +316,32 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
             <If when={tab() === "crons"}>
               <Crons channel={c()} />
             </If>
+            <Dialog
+              open={threadsOpen() && c().type === "channel"}
+              onClose={() => overlay.set("none")}
+              title={t("web.channel.threadList.title")}
+              size="sm"
+              height="fixed"
+              scroll={false}
+              testid="threads-dialog"
+            >
+              <View class="min-h-0 flex-1 p-3">
+                <ThreadList channel={c()} onPick={() => overlay.set("none")} />
+              </View>
+            </Dialog>
+            <Dialog
+              open={pinsOpen()}
+              onClose={() => overlay.set("none")}
+              title={t("web.channel.pins.title")}
+              size="sm"
+              height="fixed"
+              scroll={false}
+              testid="pins-dialog"
+            >
+              <View class="min-h-0 flex-1 p-3">
+                <Pins channel={c()} onPick={() => overlay.set("none")} />
+              </View>
+            </Dialog>
             <ChannelSettingsDialog channel={c()} open={settings()} onClose={() => settings.set(false)} onGone={() => router.navigate("/chat")} />
           </>
         )}

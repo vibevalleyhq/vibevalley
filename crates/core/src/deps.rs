@@ -1,7 +1,6 @@
-//! Parent and child issues: the dependency graph, when a blocked issue may
-//! go, and what a child must pass before it merges into its parent.
+//! Parent and child issues: the dependency graph and when a blocked issue may go.
 
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 
@@ -145,68 +144,4 @@ pub fn dependency_problems(issues: &[(IssueId, Option<IssueId>, Vec<IssueId>)]) 
 pub fn blocked_issues(issue: &Issue, issues: &[Issue]) -> Vec<IssueId> {
     let settled: HashSet<&str> = issues.iter().filter(|t| t.status.is_closed()).map(|t| t.id.as_str()).collect();
     issue.blocked_by.iter().filter(|id| !settled.contains(id.as_str())).cloned().collect()
-}
-
-/// The done acceptance issues `issue` waits for, directly or through others.
-pub fn acceptance_ancestors<'a>(issue: &Issue, all: &'a [Issue]) -> Vec<&'a Issue> {
-    let by_id: HashMap<&str, &Issue> = all.iter().map(|t| (t.id.as_str(), t)).collect();
-    let mut visited: HashSet<&str> = HashSet::new();
-    let mut stack: Vec<&str> = issue.blocked_by.iter().map(String::as_str).collect();
-    while let Some(id) = stack.pop() {
-        if !visited.insert(id) {
-            continue;
-        }
-        if let Some(t) = by_id.get(id) {
-            stack.extend(t.blocked_by.iter().map(String::as_str));
-        }
-    }
-    all.iter()
-        .filter(|t| visited.contains(t.id.as_str()) && t.status == IssueStatus::Done && t.constraints.as_ref().is_some_and(|c| c.acceptance))
-        .collect()
-}
-
-/// What a child's work must pass before it merges into its parent.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case")]
-pub enum CheckoutChecks {
-    /// Its check must fail; the files it changed are then frozen.
-    Acceptance { check: String },
-    /// The frozen files must be untouched and every check must pass.
-    Plain { frozen: Vec<String>, checks: Vec<String> },
-}
-
-/// Its own check, the acceptance ancestors' frozen files, and (when no
-/// sibling waits for it: the end of the chain) their checks too.
-pub fn child_checks(child: &Issue, all: &[Issue]) -> CheckoutChecks {
-    let constraints = child.constraints.as_ref();
-    if let Some(c) = constraints
-        && c.acceptance
-    {
-        return CheckoutChecks::Acceptance {
-            check: c.check.clone().unwrap_or_default(),
-        };
-    }
-    let inherited = acceptance_ancestors(child, all);
-    let frozen: Vec<String> = inherited
-        .iter()
-        .flat_map(|t| t.constraints.as_ref().map(|c| c.frozen.clone()).unwrap_or_default())
-        .collect::<BTreeSet<_>>()
-        .into_iter()
-        .collect();
-    let leaf = !all
-        .iter()
-        .any(|t| t.parent == child.parent && t.status != IssueStatus::Canceled && t.blocked_by.contains(&child.id));
-    let mut checks: Vec<String> = Vec::new();
-    let own = constraints.and_then(|c| c.check.clone());
-    let theirs = if leaf {
-        inherited.iter().filter_map(|t| t.constraints.as_ref()?.check.clone()).collect()
-    } else {
-        vec![]
-    };
-    for check in own.into_iter().chain(theirs) {
-        if !check.is_empty() && !checks.contains(&check) {
-            checks.push(check);
-        }
-    }
-    CheckoutChecks::Plain { frozen, checks }
 }

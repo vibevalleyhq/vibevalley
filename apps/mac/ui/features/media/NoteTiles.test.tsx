@@ -3,11 +3,12 @@ import { expect, open, test } from "nsh/test";
 
 import { setLocale, t } from "@vibevalley/i18n";
 import "@vibevalley/i18n/catalogs";
-import { type Note, type NotePreview, type NoteType, userId } from "@vibevalley/protocol";
+import { localUserParticipant, type Note, type NotePreview, type NoteType } from "@vibevalley/protocol";
 import { noteId } from "@vibevalley/protocol/schema";
 
 import { fakeHost, type FakeHost } from "../../fixtures/fakeHost";
 import { SCENARIO_NOW, scenarios } from "../../fixtures/scenarios";
+import { cleanPreviewText } from "./NotePreview";
 import { noteMetaLine } from "./Tiles";
 
 function makeNote(over: {
@@ -26,7 +27,7 @@ function makeNote(over: {
     title: over.title,
     noteType: over.noteType,
     sortOrder: 0,
-    by: over.by ?? userId,
+    by: over.by ?? localUserParticipant,
     byName: over.byName ?? "You",
     version: over.version ?? 0,
     seq: over.seq ?? 1,
@@ -58,7 +59,7 @@ async function mountLibrary(notes: readonly Note[], configure?: (fake: FakeHost)
 
 test("noteMetaLine omits local default user name and shows agent collaborator name", () => {
   setLocale("en");
-  const mine = makeNote({ id: "n-mine", title: "Spec", noteType: "doc", by: userId, byName: "LocalUser", version: 2 });
+  const mine = makeNote({ id: "n-mine", title: "Spec", noteType: "doc", by: localUserParticipant, byName: "LocalUser", version: 2 });
   const lineMine = noteMetaLine(mine, SCENARIO_NOW);
   expect(lineMine).toContain(t("web.note.types.doc"));
   expect(lineMine).toContain(t("web.library.inspector.versionBadge", { version: 2 }));
@@ -185,14 +186,35 @@ test("NoteTiles renders all 3+1 structured previews, covers, and clean installed
   expect(app.count("id:library-note-cover-p-doc-covered-scrim")).toBe(0);
 });
 
-test("Library sidebar shows 3+1 note types and dark mode adds cover scrim", async () => {
+test("cleanPreviewText strips markdown syntax, resolves wikilinks, and hides data URIs", () => {
+  setLocale("en");
+  const notesById = new Map([["note_abc", { title: "Roadmap Spec" }]]);
+  const issuesById = new Map([["iss_9", { number: 9, title: "Fix clip" }]]);
+  expect(cleanPreviewText("## **Bold** and `code` > quote with __underline__")).toBe("Bold and code > quote with underline");
+  expect(
+    cleanPreviewText("See [[note:note_xyz|Design Doc]], [[note:note_abc]], [[note:note_missing]], [[issue:i5]], and [[issue:iss_9]]", {
+      notesById,
+      issuesById,
+    }),
+  ).toBe(`See Design Doc, Roadmap Spec, ${t("web.note.types.doc")}, #5, and #9`);
+  expect(cleanPreviewText("data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==")).toBe("");
+});
+
+test("Library sidebar shows compact Notion-style nav with auto-hidden Pinned, horizontal library filter chips, and dark mode cover scrim", async () => {
   setLocale("en");
   const subset: readonly Note[] = [
     makeNote({
       id: "p-doc",
       title: "Architecture RFC",
       noteType: "doc",
-      preview: { _tag: "doc", heading: "Goals", excerpt: "Concise spec.", blockCount: 2, slideCount: 1, outline: [] },
+      preview: {
+        _tag: "doc",
+        heading: "Architecture RFC",
+        excerpt: "**Concise** spec referencing [[issue:i5]] and `tokens`.",
+        blockCount: 2,
+        slideCount: 1,
+        outline: [],
+      },
     }),
     makeNote({
       id: "p-doc-covered",
@@ -210,9 +232,21 @@ test("Library sidebar shows 3+1 note types and dark mode adds cover scrim", asyn
     }),
   ];
 
-  const { app } = await mountLibrary(subset, undefined, { colorScheme: "dark" });
+  const { app, fake } = await mountLibrary(subset, undefined, { colorScheme: "dark" });
   expect(app.count("id:library-note-cover-p-doc-covered-scrim")).toBe(1);
+  expect(app.count("id:library-type-chips")).toBe(1);
   expect(app.count("id:content-nav-note-doc")).toBe(1);
+  expect(app.count("id:content-pinned-section")).toBe(0);
+
+  // Duplicate title in DocPreview is suppressed (appears once in footer, once in PageTree = 2, not 3).
+  const texts = app.texts();
+  expect(texts.filter((x) => x === "Architecture RFC").length).toBe(2);
+  expect(texts).toContain("Concise spec referencing #5 and tokens.");
+
+  // Pinning a note reveals the inline Pinned section in the sidebar.
+  await app.press("id:library-note-pin-p-doc");
+  await fake.pumpUntil(app, () => app.count("id:content-pinned-section") === 1);
+  expect(app.count("id:content-pinned-note-p-doc")).toBe(1);
 });
 
 test("LibraryPage filters notes and media by repo, issue, and channel and collapses filter bar on narrow widths", async () => {

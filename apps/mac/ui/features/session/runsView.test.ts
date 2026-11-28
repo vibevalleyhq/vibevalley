@@ -61,7 +61,6 @@ function makeAgent(id: string, role: Agent["role"], name: string, duty = ""): Ag
     disallowedTools: [],
     env: {},
     workdir: "",
-    worktree: role === "worker",
     tags: [],
     look: baseLook,
   };
@@ -140,7 +139,7 @@ test("buildRunEntries deduplicates orchestrator sessions, sorts active runs firs
   const liveOrchSession = makeLive(
     makeSession({
       id: "orch-1",
-      controller: "orchestrator",
+      controller: "daemon",
       role: "orchestrator",
       profile: defaultOrchestrator,
       name: "老村长",
@@ -153,7 +152,7 @@ test("buildRunEntries deduplicates orchestrator sessions, sorts active runs firs
     id: "w-active",
     profile: "laozhou",
     name: "老周",
-    policy: { kind: "managedWorktree", repo: "vibevalley" },
+    policy: { kind: "directCwd", repo: "vibevalley", permissionMode: "bypass" },
     bindings: [{ kind: "issue", id: iid("i18") }],
     hiredAt: 5_000,
     phase: { _tag: "working", since: 8_000, doing: { action: "edit_file", label: "app.ts" } },
@@ -178,7 +177,7 @@ test("buildRunEntries deduplicates orchestrator sessions, sorts active runs firs
   const entries = buildRunEntries({
     orchestrators: [sideOrch, mainOrch],
     sessions: [
-      makeSession({ id: "orch-1", controller: "orchestrator", role: "orchestrator", profile: defaultOrchestrator, name: "老村长", hiredAt: 2_000 }),
+      makeSession({ id: "orch-1", controller: "daemon", role: "orchestrator", profile: defaultOrchestrator, name: "老村长", hiredAt: 2_000 }),
       closedWorker,
       restingWorker,
       activeWorker,
@@ -214,7 +213,7 @@ test("runStatusOf maps every RunEntry phase and outcome deterministically", () =
       live: makeLive(
         makeSession({
           id: "orch-1",
-          controller: "orchestrator",
+          controller: "daemon",
           role: "orchestrator",
           profile: orch.id,
           name: orch.name,
@@ -253,7 +252,7 @@ test("filterRunEntries and resolveSelectedRun handle scope, agentId, issueId, qu
   const liveOrch = makeLive(
     makeSession({
       id: "orch-live",
-      controller: "orchestrator",
+      controller: "daemon",
       role: "orchestrator",
       profile: defaultOrchestrator,
       name: "老村长",
@@ -264,7 +263,7 @@ test("filterRunEntries and resolveSelectedRun handle scope, agentId, issueId, qu
     id: "w1",
     profile: "laozhou",
     name: "老周",
-    policy: { kind: "managedWorktree", repo: "vibevalley" },
+    policy: { kind: "directCwd", repo: "vibevalley", permissionMode: "bypass" },
     bindings: [{ kind: "issue", id: iid("i18") }],
     brief: "登录鉴权修复",
     phase: { _tag: "working", since: 5_000, doing: { action: "run_command", label: "cargo test" } },
@@ -273,7 +272,7 @@ test("filterRunEntries and resolveSelectedRun handle scope, agentId, issueId, qu
     id: "w2",
     profile: "xiaolin",
     name: "小林",
-    policy: { kind: "managedWorktree", repo: "site" },
+    policy: { kind: "directCwd", repo: "site", permissionMode: "bypass" },
     bindings: [{ kind: "issue", id: iid("i33") }],
     brief: "调整暗色样式",
     phase: { _tag: "done" },

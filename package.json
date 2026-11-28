@@ -15,6 +15,7 @@
     "tokens:gen": "vpx scripts/gen/tokens.ts",
     "icons:gen": "vpx scripts/gen/icons.ts",
     "ui:gallery": "vpx scripts/audit/ui-gallery.ts",
+    "patrol": "vpx scripts/audit/patrol.ts",
     "vdp": "vpx scripts/vdp/run.ts",
     "api:client": "vpx scripts/gen/api-client.ts",
     "i18n:gen": "vpx scripts/gen/i18n.ts gen",

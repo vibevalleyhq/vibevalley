@@ -1232,12 +1232,7 @@ async fn create_collab_channel(manager: &SchemaManager<'_>) -> Result<(), DbErr>
                 .col(big_pk_auto(ChannelDelivery::Id))
                 .col(text(ChannelDelivery::MessageId))
                 .col(text(ChannelDelivery::ChannelId))
-                .col(text(ChannelDelivery::RecipientKind).check(Expr::col(ChannelDelivery::RecipientKind).is_in([
-                    "session",
-                    "issue",
-                    "orchestrator",
-                    "direct",
-                ])))
+                .col(text(ChannelDelivery::RecipientKind).check(Expr::col(ChannelDelivery::RecipientKind).is_in(["user", "agent", "session"])))
                 .col(text(ChannelDelivery::RecipientId))
                 .col(text(ChannelDelivery::Reason).check(Expr::col(ChannelDelivery::Reason).is_in([
                     "mention",

@@ -174,7 +174,7 @@ pub fn orchestrator_lines(messages: &[crate::channel::AddressedMessage]) -> Stri
         .map(|m| {
             let text = m.text.trim();
             let len = text.encode_utf16().count();
-            if m.number != 0 && m.from != vibevalley_protocol::USER_ID && len > LINE_MAX {
+            if m.number != 0 && !vibevalley_protocol::ParticipantId::parse(&m.from).is_some_and(|p| p.is_human()) && len > LINE_MAX {
                 let mut cut = m.clone();
                 cut.text = head(text, LINE_MAX) + &cut_note(len, &m.target);
                 message_line(&cut)

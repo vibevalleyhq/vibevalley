@@ -30,7 +30,6 @@ const MemorySource = z.object({
 
 const SpacePaths = z.object({
   repos: z.string(),
-  worktrees: z.string(),
 }) satisfies Codec<T.SpacePaths>;
 
 const Readiness = z.discriminatedUnion("ready", [

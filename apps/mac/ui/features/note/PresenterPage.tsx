@@ -1,16 +1,19 @@
 import { cleanup, computed, keymap, Scroll, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
-import type { DocBlock, DocView, IssueId, NoteId } from "@vibevalley/protocol";
+import type { DocBlock, DocView, Issue, IssueId, Note, NoteId } from "@vibevalley/protocol";
 
+import { Icon } from "../../design/Icon";
 import { IconButton } from "../../design/IconButton";
 import { Empty, Kbd } from "../../design/layout";
+import { mix, tone } from "../../design/tone";
 import { reasonOf } from "../../infra/api";
 import { useNow } from "../../infra/base/dom";
 import { useBoardSlice } from "../../infra/frame";
 import { ready, useQuery } from "../../infra/query";
 import { useRouter } from "../../infra/router";
 import { useVdpNode } from "../../infra/vdpProbe";
+import { calloutVisualOf } from "./doc/docOps";
 import { InlineRichText } from "./doc/InlineRichText";
 import { noteHref, useNote, useNotes } from "./NoteCard";
 import { elapsedText, presenterOf, stepped } from "./slides";
@@ -64,6 +67,209 @@ function summarizeBlock(block: DocBlock): string {
     case "issueList":
       return "";
   }
+}
+
+function PresenterSlideBlock(props: {
+  readonly block: DocBlock;
+  readonly notes: readonly Note[];
+  readonly issues: readonly Issue[];
+  readonly onOpenNote: (id: NoteId) => void;
+  readonly onOpenIssue: (id: IssueId) => void;
+}) {
+  const isSpecial = () => {
+    const type = props.block.type;
+    return (
+      type === "callout" ||
+      type === "quote" ||
+      type === "todo" ||
+      type === "toggle" ||
+      type === "code" ||
+      type === "list" ||
+      type === "kpi" ||
+      type === "divider"
+    );
+  };
+
+  return (
+    <>
+      <If when={props.block.type === "callout" ? props.block : undefined}>
+        {(blk) => {
+          const visual = () => calloutVisualOf(blk().tone);
+          const bgStyle = () => (visual().mixToken !== undefined ? { backgroundColor: mix(visual().mixToken ?? "water", 0.12) } : undefined);
+          return (
+            <View
+              testID={`presenter-block-callout-${blk().id}`}
+              class={`flex-row gap-3 overflow-hidden rounded-lg border border-line p-3 ${visual().bgClass}`}
+              style={bgStyle()}
+            >
+              <View class="w-1 shrink-0 self-stretch rounded-full" style={{ backgroundColor: tone(visual().iconTone) }} />
+              <View class="min-w-0 flex-1 gap-1">
+                <View class="flex-row items-center gap-2">
+                  <Icon name={visual().icon} size={15} tone={visual().iconTone} />
+                  <If when={blk().title}>{(title) => <Text class={`min-w-0 flex-1 text-sm font-semibold ${visual().textClass}`}>{title()}</Text>}</If>
+                </View>
+                <If when={blk().text.trim() !== ""}>
+                  <InlineRichText
+                    text={blk().text}
+                    textClass="text-sm"
+                    containerClass="px-0"
+                    notes={props.notes}
+                    issues={props.issues}
+                    onOpenNote={props.onOpenNote}
+                    onOpenIssue={props.onOpenIssue}
+                  />
+                </If>
+              </View>
+            </View>
+          );
+        }}
+      </If>
+
+      <If when={props.block.type === "quote" ? props.block : undefined}>
+        {(blk) => (
+          <View testID={`presenter-block-quote-${blk().id}`} class="flex-row gap-3 py-1">
+            <View class="w-1 shrink-0 self-stretch rounded-full bg-accent" />
+            <View class="min-w-0 flex-1 gap-1">
+              <InlineRichText
+                text={blk().text}
+                textClass="text-sm italic"
+                toneClass="text-muted"
+                containerClass="px-0"
+                notes={props.notes}
+                issues={props.issues}
+                onOpenNote={props.onOpenNote}
+                onOpenIssue={props.onOpenIssue}
+              />
+              <If when={blk().attribution}>{(attr) => <Text class="text-xs text-faint">{`— ${attr()}`}</Text>}</If>
+            </View>
+          </View>
+        )}
+      </If>
+
+      <If when={props.block.type === "todo" ? props.block : undefined}>
+        {(blk) => (
+          <View testID={`presenter-block-todo-${blk().id}`} class="flex-row items-start gap-2.5 py-0.5">
+            <View
+              class={`mt-1 size-4 shrink-0 items-center justify-center rounded-xs border ${
+                blk().checked ? "border-accent bg-accent" : "border-line-strong bg-page"
+              }`}
+            >
+              <If when={blk().checked}>
+                <Icon name="check" size={10} tone="paper" />
+              </If>
+            </View>
+            <View class="min-w-0 flex-1">
+              <InlineRichText
+                text={blk().text}
+                textClass={blk().checked ? "text-sm line-through" : "text-sm"}
+                toneClass={blk().checked ? "text-muted" : "text-ink"}
+                containerClass="px-0"
+                notes={props.notes}
+                issues={props.issues}
+                onOpenNote={props.onOpenNote}
+                onOpenIssue={props.onOpenIssue}
+              />
+            </View>
+          </View>
+        )}
+      </If>
+
+      <If when={props.block.type === "toggle" ? props.block : undefined}>
+        {(blk) => (
+          <View testID={`presenter-block-toggle-${blk().id}`} class="gap-1 py-0.5">
+            <View class="flex-row items-center gap-1.5">
+              <Icon name="choose" size={12} tone="muted" />
+              <Text class="min-w-0 flex-1 text-sm font-semibold text-ink">{blk().title}</Text>
+            </View>
+            <If when={blk().text.trim() !== ""}>
+              <View class="ml-2 border-l border-line pl-3">
+                <InlineRichText
+                  text={blk().text}
+                  textClass="text-sm"
+                  toneClass="text-muted"
+                  containerClass="px-0"
+                  notes={props.notes}
+                  issues={props.issues}
+                  onOpenNote={props.onOpenNote}
+                  onOpenIssue={props.onOpenIssue}
+                />
+              </View>
+            </If>
+          </View>
+        )}
+      </If>
+
+      <If when={props.block.type === "code" ? props.block : undefined}>
+        {(blk) => (
+          <View testID={`presenter-block-code-${blk().id}`} class="gap-1.5 overflow-hidden rounded-md border border-line bg-code-bg px-3.5 py-2.5">
+            <If when={blk().language}>{(lang) => <Text class="font-mono text-2xs text-faint">{lang()}</Text>}</If>
+            <Text class="font-mono text-xs leading-relaxed text-code-ink">{blk().code}</Text>
+          </View>
+        )}
+      </If>
+
+      <If when={props.block.type === "list" ? props.block : undefined}>
+        {(blk) => (
+          <View testID={`presenter-block-list-${blk().id}`} class="gap-1">
+            <Each of={blk().items.slice(0, 6)} key="index">
+              {(item, idx) => (
+                <View class="flex-row items-start gap-2">
+                  <View class="mt-2 w-4 shrink-0 items-center">
+                    <If when={blk().ordered} else={<View class="size-1.5 rounded-full bg-muted" />}>
+                      <Text class="font-mono text-xs text-muted tabular-nums">{`${idx() + 1}.`}</Text>
+                    </If>
+                  </View>
+                  <View class="min-w-0 flex-1">
+                    <InlineRichText
+                      text={item()}
+                      textClass="text-sm"
+                      containerClass="px-0"
+                      notes={props.notes}
+                      issues={props.issues}
+                      onOpenNote={props.onOpenNote}
+                      onOpenIssue={props.onOpenIssue}
+                    />
+                  </View>
+                </View>
+              )}
+            </Each>
+          </View>
+        )}
+      </If>
+
+      <If when={props.block.type === "kpi" ? props.block : undefined}>
+        {(blk) => (
+          <View testID={`presenter-block-kpi-${blk().id}`} class="flex-row flex-wrap gap-2">
+            <Each of={blk().items} key="index">
+              {(metric) => (
+                <View class="min-w-28 flex-1 gap-0.5 rounded-md border border-line bg-side px-3 py-2">
+                  <Text class="truncate text-2xs text-muted">{metric().label}</Text>
+                  <Text class="font-mono text-base font-semibold text-ink tabular-nums">{metric().value}</Text>
+                  <If when={metric().delta}>{(delta) => <Text class="font-mono text-2xs text-accent tabular-nums">{delta()}</Text>}</If>
+                </View>
+              )}
+            </Each>
+          </View>
+        )}
+      </If>
+
+      <If when={props.block.type === "divider"}>
+        <View class="my-1 h-px w-full bg-line" />
+      </If>
+
+      <If when={!isSpecial() && summarizeBlock(props.block) !== ""}>
+        <InlineRichText
+          text={summarizeBlock(props.block)}
+          textClass="text-sm"
+          containerClass="px-0"
+          notes={props.notes}
+          issues={props.issues}
+          onOpenNote={props.onOpenNote}
+          onOpenIssue={props.onOpenIssue}
+        />
+      </If>
+    </>
+  );
 }
 
 function buildSlidesFromDoc(doc: DocView | undefined, fallbackTitle: string): readonly SlideItem[] {
@@ -227,29 +433,16 @@ function Presenter(props: { id: string; version: number }) {
                         onOpenIssue={openIssue}
                       />
                     </If>
-                    <View class="gap-1.5 pt-2">
+                    <View class="gap-2.5 pt-2">
                       <Each
                         of={slide()
                           .blocks.filter((b) => b.type !== "heading" && !(b.type === "prose" && b.text === slide().subtitle))
                           .slice(0, 6)}
                         key={(b) => b.id}
                       >
-                        {(block) => {
-                          const line = () => summarizeBlock(block());
-                          return (
-                            <If when={line() !== ""}>
-                              <InlineRichText
-                                text={line()}
-                                textClass="text-sm"
-                                containerClass="px-0"
-                                notes={notesList()}
-                                issues={issuesList()}
-                                onOpenNote={openNote}
-                                onOpenIssue={openIssue}
-                              />
-                            </If>
-                          );
-                        }}
+                        {(block) => (
+                          <PresenterSlideBlock block={block()} notes={notesList()} issues={issuesList()} onOpenNote={openNote} onOpenIssue={openIssue} />
+                        )}
                       </Each>
                     </View>
                   </>

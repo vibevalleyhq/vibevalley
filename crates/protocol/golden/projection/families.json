@@ -122,7 +122,7 @@
      "createdAt": 1794453380000,
      "criteria": [],
      "deliver": "change",
-     "delivered": "merged_into_parent",
+     "delivered": "merged",
      "description": "",
      "findings": [],
      "id": "i21",
@@ -167,7 +167,7 @@
       "createdAt": 1794453380000,
       "criteria": [],
       "deliver": "change",
-      "delivered": "merged_into_parent",
+      "delivered": "merged",
       "description": "",
       "findings": [],
       "id": "i21",
@@ -176,13 +176,26 @@
        "maxBotReviewRounds": 3,
        "strength": "explicit"
       },
-      "moves": [],
+      "moves": [
+       "backlog",
+       "todo",
+       "in_progress",
+       "in_review",
+       "canceled"
+      ],
       "number": 21,
       "parent": "i20",
       "priority": "high",
       "questions": [],
       "stage": {
-       "acts": [],
+       "acts": [
+        {
+         "act": "reopen",
+         "does": "move",
+         "status": "backlog",
+         "words": "none"
+        }
+       ],
        "since": 1794501260000,
        "state": "done"
       },
@@ -379,7 +392,7 @@
       "createdAt": 1794453380000,
       "criteria": [],
       "deliver": "change",
-      "delivered": "merged_into_parent",
+      "delivered": "merged",
       "description": "",
       "findings": [],
       "id": "i21",
@@ -388,13 +401,26 @@
        "maxBotReviewRounds": 3,
        "strength": "explicit"
       },
-      "moves": [],
+      "moves": [
+       "backlog",
+       "todo",
+       "in_progress",
+       "in_review",
+       "canceled"
+      ],
       "number": 21,
       "parent": "i20",
       "priority": "high",
       "questions": [],
       "stage": {
-       "acts": [],
+       "acts": [
+        {
+         "act": "reopen",
+         "does": "move",
+         "status": "backlog",
+         "words": "none"
+        }
+       ],
        "since": 1794501260000,
        "state": "done"
       },
@@ -573,7 +599,7 @@
       "createdAt": 1794453380000,
       "criteria": [],
       "deliver": "change",
-      "delivered": "merged_into_parent",
+      "delivered": "merged",
       "description": "",
       "findings": [],
       "id": "i21",
@@ -582,13 +608,26 @@
        "maxBotReviewRounds": 3,
        "strength": "explicit"
       },
-      "moves": [],
+      "moves": [
+       "backlog",
+       "todo",
+       "in_progress",
+       "in_review",
+       "canceled"
+      ],
       "number": 21,
       "parent": "i20",
       "priority": "high",
       "questions": [],
       "stage": {
-       "acts": [],
+       "acts": [
+        {
+         "act": "reopen",
+         "does": "move",
+         "status": "backlog",
+         "words": "none"
+        }
+       ],
        "since": 1794501260000,
        "state": "done"
       },
@@ -842,7 +881,7 @@
       "createdAt": 1794453380000,
       "criteria": [],
       "deliver": "change",
-      "delivered": "merged_into_parent",
+      "delivered": "merged",
       "description": "",
       "findings": [],
       "id": "i21",
@@ -851,13 +890,26 @@
        "maxBotReviewRounds": 3,
        "strength": "explicit"
       },
-      "moves": [],
+      "moves": [
+       "backlog",
+       "todo",
+       "in_progress",
+       "in_review",
+       "canceled"
+      ],
       "number": 21,
       "parent": "i20",
       "priority": "high",
       "questions": [],
       "stage": {
-       "acts": [],
+       "acts": [
+        {
+         "act": "reopen",
+         "does": "move",
+         "status": "backlog",
+         "words": "none"
+        }
+       ],
        "since": 1794501260000,
        "state": "done"
       },
@@ -955,7 +1007,7 @@
      "createdAt": 1794431180000,
      "criteria": [],
      "deliver": "change",
-     "delivered": "merged_into_parent",
+     "delivered": "merged",
      "description": "",
      "findings": [],
      "id": "i31",
@@ -1000,7 +1052,7 @@
       "createdAt": 1794431180000,
       "criteria": [],
       "deliver": "change",
-      "delivered": "merged_into_parent",
+      "delivered": "merged",
       "description": "",
       "findings": [],
       "id": "i31",
@@ -1009,13 +1061,26 @@
        "maxBotReviewRounds": 3,
        "strength": "explicit"
       },
-      "moves": [],
+      "moves": [
+       "backlog",
+       "todo",
+       "in_progress",
+       "in_review",
+       "canceled"
+      ],
       "number": 31,
       "parent": "i30",
       "priority": "high",
       "questions": [],
       "stage": {
-       "acts": [],
+       "acts": [
+        {
+         "act": "reopen",
+         "does": "move",
+         "status": "backlog",
+         "words": "none"
+        }
+       ],
        "since": 1794501860000,
        "state": "done"
       },
@@ -1156,7 +1221,7 @@
       "createdAt": 1794453380000,
       "criteria": [],
       "deliver": "change",
-      "delivered": "merged_into_parent",
+      "delivered": "merged",
       "description": "",
       "findings": [],
       "id": "i21",
@@ -1165,13 +1230,26 @@
        "maxBotReviewRounds": 3,
        "strength": "explicit"
       },
-      "moves": [],
+      "moves": [
+       "backlog",
+       "todo",
+       "in_progress",
+       "in_review",
+       "canceled"
+      ],
       "number": 21,
       "parent": "i20",
       "priority": "high",
       "questions": [],
       "stage": {
-       "acts": [],
+       "acts": [
+        {
+         "act": "reopen",
+         "does": "move",
+         "status": "backlog",
+         "words": "none"
+        }
+       ],
        "since": 1794501260000,
        "state": "done"
       },
@@ -1367,7 +1445,7 @@
       "createdAt": 1794431180000,
       "criteria": [],
       "deliver": "change",
-      "delivered": "merged_into_parent",
+      "delivered": "merged",
       "description": "",
       "findings": [],
       "id": "i31",
@@ -1376,13 +1454,26 @@
        "maxBotReviewRounds": 3,
        "strength": "explicit"
       },
-      "moves": [],
+      "moves": [
+       "backlog",
+       "todo",
+       "in_progress",
+       "in_review",
+       "canceled"
+      ],
       "number": 31,
       "parent": "i30",
       "priority": "high",
       "questions": [],
       "stage": {
-       "acts": [],
+       "acts": [
+        {
+         "act": "reopen",
+         "does": "move",
+         "status": "backlog",
+         "words": "none"
+        }
+       ],
        "since": 1794501860000,
        "state": "done"
       },
@@ -1523,7 +1614,7 @@
       "createdAt": 1794453380000,
       "criteria": [],
       "deliver": "change",
-      "delivered": "merged_into_parent",
+      "delivered": "merged",
       "description": "",
       "findings": [],
       "id": "i21",
@@ -1532,13 +1623,26 @@
        "maxBotReviewRounds": 3,
        "strength": "explicit"
       },
-      "moves": [],
+      "moves": [
+       "backlog",
+       "todo",
+       "in_progress",
+       "in_review",
+       "canceled"
+      ],
       "number": 21,
       "parent": "i20",
       "priority": "high",
       "questions": [],
       "stage": {
-       "acts": [],
+       "acts": [
+        {
+         "act": "reopen",
+         "does": "move",
+         "status": "backlog",
+         "words": "none"
+        }
+       ],
        "since": 1794501260000,
        "state": "done"
       },
@@ -1789,7 +1893,7 @@
       "createdAt": 1794431180000,
       "criteria": [],
       "deliver": "change",
-      "delivered": "merged_into_parent",
+      "delivered": "merged",
       "description": "",
       "findings": [],
       "id": "i31",
@@ -1798,13 +1902,26 @@
        "maxBotReviewRounds": 3,
        "strength": "explicit"
       },
-      "moves": [],
+      "moves": [
+       "backlog",
+       "todo",
+       "in_progress",
+       "in_review",
+       "canceled"
+      ],
       "number": 31,
       "parent": "i30",
       "priority": "high",
       "questions": [],
       "stage": {
-       "acts": [],
+       "acts": [
+        {
+         "act": "reopen",
+         "does": "move",
+         "status": "backlog",
+         "words": "none"
+        }
+       ],
        "since": 1794501860000,
        "state": "done"
       },
@@ -1945,7 +2062,7 @@
       "createdAt": 1794453380000,
       "criteria": [],
       "deliver": "change",
-      "delivered": "merged_into_parent",
+      "delivered": "merged",
       "description": "",
       "findings": [],
       "id": "i21",
@@ -1954,13 +2071,26 @@
        "maxBotReviewRounds": 3,
        "strength": "explicit"
       },
-      "moves": [],
+      "moves": [
+       "backlog",
+       "todo",
+       "in_progress",
+       "in_review",
+       "canceled"
+      ],
       "number": 21,
       "parent": "i20",
       "priority": "high",
       "questions": [],
       "stage": {
-       "acts": [],
+       "acts": [
+        {
+         "act": "reopen",
+         "does": "move",
+         "status": "backlog",
+         "words": "none"
+        }
+       ],
        "since": 1794501260000,
        "state": "done"
       },
@@ -2263,7 +2393,7 @@
       "createdAt": 1794431180000,
       "criteria": [],
       "deliver": "change",
-      "delivered": "merged_into_parent",
+      "delivered": "merged",
       "description": "",
       "findings": [],
       "id": "i31",
@@ -2272,13 +2402,26 @@
        "maxBotReviewRounds": 3,
        "strength": "explicit"
       },
-      "moves": [],
+      "moves": [
+       "backlog",
+       "todo",
+       "in_progress",
+       "in_review",
+       "canceled"
+      ],
       "number": 31,
       "parent": "i30",
       "priority": "high",
       "questions": [],
       "stage": {
-       "acts": [],
+       "acts": [
+        {
+         "act": "reopen",
+         "does": "move",
+         "status": "backlog",
+         "words": "none"
+        }
+       ],
        "since": 1794501860000,
        "state": "done"
       },
@@ -2419,7 +2562,7 @@
       "createdAt": 1794453380000,
       "criteria": [],
       "deliver": "change",
-      "delivered": "merged_into_parent",
+      "delivered": "merged",
       "description": "",
       "findings": [],
       "id": "i21",
@@ -2428,13 +2571,26 @@
        "maxBotReviewRounds": 3,
        "strength": "explicit"
       },
-      "moves": [],
+      "moves": [
+       "backlog",
+       "todo",
+       "in_progress",
+       "in_review",
+       "canceled"
+      ],
       "number": 21,
       "parent": "i20",
       "priority": "high",
       "questions": [],
       "stage": {
-       "acts": [],
+       "acts": [
+        {
+         "act": "reopen",
+         "does": "move",
+         "status": "backlog",
+         "words": "none"
+        }
+       ],
        "since": 1794501260000,
        "state": "done"
       },
@@ -2737,7 +2893,7 @@
       "createdAt": 1794431180000,
       "criteria": [],
       "deliver": "change",
-      "delivered": "merged_into_parent",
+      "delivered": "merged",
       "description": "",
       "findings": [],
       "id": "i31",
@@ -2746,13 +2902,26 @@
        "maxBotReviewRounds": 3,
        "strength": "explicit"
       },
-      "moves": [],
+      "moves": [
+       "backlog",
+       "todo",
+       "in_progress",
+       "in_review",
+       "canceled"
+      ],
       "number": 31,
       "parent": "i30",
       "priority": "high",
       "questions": [],
       "stage": {
-       "acts": [],
+       "acts": [
+        {
+         "act": "reopen",
+         "does": "move",
+         "status": "backlog",
+         "words": "none"
+        }
+       ],
        "since": 1794501860000,
        "state": "done"
       },
@@ -2893,7 +3062,7 @@
       "createdAt": 1794453380000,
       "criteria": [],
       "deliver": "change",
-      "delivered": "merged_into_parent",
+      "delivered": "merged",
       "description": "",
       "findings": [],
       "id": "i21",
@@ -2902,13 +3071,26 @@
        "maxBotReviewRounds": 3,
        "strength": "explicit"
       },
-      "moves": [],
+      "moves": [
+       "backlog",
+       "todo",
+       "in_progress",
+       "in_review",
+       "canceled"
+      ],
       "number": 21,
       "parent": "i20",
       "priority": "high",
       "questions": [],
       "stage": {
-       "acts": [],
+       "acts": [
+        {
+         "act": "reopen",
+         "does": "move",
+         "status": "backlog",
+         "words": "none"
+        }
+       ],
        "since": 1794501260000,
        "state": "done"
       },
@@ -3069,8 +3251,8 @@
       "since": 1794500000000
      },
      "policy": {
-      "branch": "vibevalley/issue-1",
-      "kind": "managedWorktree",
+      "kind": "directCwd",
+      "permissionMode": "bypass",
       "repo": "demo"
      },
      "profile": "lab",
@@ -3264,7 +3446,7 @@
       "createdAt": 1794431180000,
       "criteria": [],
       "deliver": "change",
-      "delivered": "merged_into_parent",
+      "delivered": "merged",
       "description": "",
       "findings": [],
       "id": "i31",
@@ -3273,13 +3455,26 @@
        "maxBotReviewRounds": 3,
        "strength": "explicit"
       },
-      "moves": [],
+      "moves": [
+       "backlog",
+       "todo",
+       "in_progress",
+       "in_review",
+       "canceled"
+      ],
       "number": 31,
       "parent": "i30",
       "priority": "high",
       "questions": [],
       "stage": {
-       "acts": [],
+       "acts": [
+        {
+         "act": "reopen",
+         "does": "move",
+         "status": "backlog",
+         "words": "none"
+        }
+       ],
        "since": 1794501860000,
        "state": "done"
       },
@@ -3420,7 +3615,7 @@
       "createdAt": 1794453380000,
       "criteria": [],
       "deliver": "change",
-      "delivered": "merged_into_parent",
+      "delivered": "merged",
       "description": "",
       "findings": [],
       "id": "i21",
@@ -3429,13 +3624,26 @@
        "maxBotReviewRounds": 3,
        "strength": "explicit"
       },
-      "moves": [],
+      "moves": [
+       "backlog",
+       "todo",
+       "in_progress",
+       "in_review",
+       "canceled"
+      ],
       "number": 21,
       "parent": "i20",
       "priority": "high",
       "questions": [],
       "stage": {
-       "acts": [],
+       "acts": [
+        {
+         "act": "reopen",
+         "does": "move",
+         "status": "backlog",
+         "words": "none"
+        }
+       ],
        "since": 1794501260000,
        "state": "done"
       },
@@ -3587,8 +3795,8 @@
        "since": 1794500000000
       },
       "policy": {
-       "branch": "vibevalley/issue-1",
-       "kind": "managedWorktree",
+       "kind": "directCwd",
+       "permissionMode": "bypass",
        "repo": "demo"
       },
       "profile": "lab",
@@ -3737,7 +3945,7 @@
       "createdAt": 1794431180000,
       "criteria": [],
       "deliver": "change",
-      "delivered": "merged_into_parent",
+      "delivered": "merged",
       "description": "",
       "findings": [],
       "id": "i31",
@@ -3746,13 +3954,26 @@
        "maxBotReviewRounds": 3,
        "strength": "explicit"
       },
-      "moves": [],
+      "moves": [
+       "backlog",
+       "todo",
+       "in_progress",
+       "in_review",
+       "canceled"
+      ],
       "number": 31,
       "parent": "i30",
       "priority": "high",
       "questions": [],
       "stage": {
-       "acts": [],
+       "acts": [
+        {
+         "act": "reopen",
+         "does": "move",
+         "status": "backlog",
+         "words": "none"
+        }
+       ],
        "since": 1794501860000,
        "state": "done"
       },
@@ -3893,7 +4114,7 @@
       "createdAt": 1794453380000,
       "criteria": [],
       "deliver": "change",
-      "delivered": "merged_into_parent",
+      "delivered": "merged",
       "description": "",
       "findings": [],
       "id": "i21",
@@ -3902,13 +4123,26 @@
        "maxBotReviewRounds": 3,
        "strength": "explicit"
       },
-      "moves": [],
+      "moves": [
+       "backlog",
+       "todo",
+       "in_progress",
+       "in_review",
+       "canceled"
+      ],
       "number": 21,
       "parent": "i20",
       "priority": "high",
       "questions": [],
       "stage": {
-       "acts": [],
+       "acts": [
+        {
+         "act": "reopen",
+         "does": "move",
+         "status": "backlog",
+         "words": "none"
+        }
+       ],
        "since": 1794501260000,
        "state": "done"
       },
@@ -4060,8 +4294,8 @@
        "since": 1794500000000
       },
       "policy": {
-       "branch": "vibevalley/issue-1",
-       "kind": "managedWorktree",
+       "kind": "directCwd",
+       "permissionMode": "bypass",
        "repo": "demo"
       },
       "profile": "lab",
@@ -4210,7 +4444,7 @@
       "createdAt": 1794431180000,
       "criteria": [],
       "deliver": "change",
-      "delivered": "merged_into_parent",
+      "delivered": "merged",
       "description": "",
       "findings": [],
       "id": "i31",
@@ -4219,13 +4453,26 @@
        "maxBotReviewRounds": 3,
        "strength": "explicit"
       },
-      "moves": [],
+      "moves": [
+       "backlog",
+       "todo",
+       "in_progress",
+       "in_review",
+       "canceled"
+      ],
       "number": 31,
       "parent": "i30",
       "priority": "high",
       "questions": [],
       "stage": {
-       "acts": [],
+       "acts": [
+        {
+         "act": "reopen",
+         "does": "move",
+         "status": "backlog",
+         "words": "none"
+        }
+       ],
        "since": 1794501860000,
        "state": "done"
       },
@@ -4366,7 +4613,7 @@
       "createdAt": 1794453380000,
       "criteria": [],
       "deliver": "change",
-      "delivered": "merged_into_parent",
+      "delivered": "merged",
       "description": "",
       "findings": [],
       "id": "i21",
@@ -4375,13 +4622,26 @@
        "maxBotReviewRounds": 3,
        "strength": "explicit"
       },
-      "moves": [],
+      "moves": [
+       "backlog",
+       "todo",
+       "in_progress",
+       "in_review",
+       "canceled"
+      ],
       "number": 21,
       "parent": "i20",
       "priority": "high",
       "questions": [],
       "stage": {
-       "acts": [],
+       "acts": [
+        {
+         "act": "reopen",
+         "does": "move",
+         "status": "backlog",
+         "words": "none"
+        }
+       ],
        "since": 1794501260000,
        "state": "done"
       },
@@ -4533,8 +4793,8 @@
        "since": 1794500000000
       },
       "policy": {
-       "branch": "vibevalley/issue-1",
-       "kind": "managedWorktree",
+       "kind": "directCwd",
+       "permissionMode": "bypass",
        "repo": "demo"
       },
       "profile": "lab",
@@ -4721,7 +4981,7 @@
      "createdAt": 1794431180000,
      "criteria": [],
      "deliver": "change",
-     "delivered": "merged_into_parent",
+     "delivered": "merged",
      "description": "",
      "findings": [],
      "id": "i31",
@@ -4730,13 +4990,26 @@
       "maxBotReviewRounds": 3,
       "strength": "explicit"
      },
-     "moves": [],
+     "moves": [
+      "backlog",
+      "todo",
+      "in_progress",
+      "in_review",
+      "canceled"
+     ],
      "number": 31,
      "parent": "i30",
      "priority": "high",
      "questions": [],
      "stage": {
-      "acts": [],
+      "acts": [
+       {
+        "act": "reopen",
+        "does": "move",
+        "status": "backlog",
+        "words": "none"
+       }
+      ],
       "since": 1794501860000,
       "state": "done"
      },
@@ -4877,7 +5150,7 @@
      "createdAt": 1794453380000,
      "criteria": [],
      "deliver": "change",
-     "delivered": "merged_into_parent",
+     "delivered": "merged",
      "description": "",
      "findings": [],
      "id": "i21",
@@ -4886,13 +5159,26 @@
       "maxBotReviewRounds": 3,
       "strength": "explicit"
      },
-     "moves": [],
+     "moves": [
+      "backlog",
+      "todo",
+      "in_progress",
+      "in_review",
+      "canceled"
+     ],
      "number": 21,
      "parent": "i20",
      "priority": "high",
      "questions": [],
      "stage": {
-      "acts": [],
+      "acts": [
+       {
+        "act": "reopen",
+        "does": "move",
+        "status": "backlog",
+        "words": "none"
+       }
+      ],
       "since": 1794501260000,
       "state": "done"
      },
@@ -5036,8 +5322,8 @@
      },
      "phaseText": "在读文件：a",
      "policy": {
-      "branch": "vibevalley/issue-1",
-      "kind": "managedWorktree",
+      "kind": "directCwd",
+      "permissionMode": "bypass",
       "repo": "demo"
      },
      "profile": "lab",

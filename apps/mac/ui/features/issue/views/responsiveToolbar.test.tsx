@@ -118,6 +118,42 @@ test("IssuesPage collapses secondary filters into a filter popover below 1100px 
   }
 });
 
+test("IssuesPage wraps toolbar into two non-overlapping rows at 560px and 720px and keeps wide filters collapsed into popover at 1280px", async () => {
+  for (const width of [560, 720]) {
+    for (const locale of ["en", "zh"] as const) {
+      const { app } = await mountIssuesAt(width, 800, locale);
+      const searchBox = app.layout("id:issue-search")!;
+      const filterBox = app.layout("id:issue-filter-popover")!;
+      const refreshBox = app.layout("id:issue-refresh")!;
+      const newBox = app.layout("id:issue-toolbar-new")!;
+      const viewBox = app.layout("id:issue-view")!;
+      const displayBox = app.layout("id:display")!;
+
+      // Row 1 controls fit left-to-right with zero horizontal overlap.
+      expect(searchBox.x + searchBox.width).toBeLessThanOrEqual(filterBox.x + 1);
+      expect(filterBox.x + filterBox.width).toBeLessThanOrEqual(refreshBox.x + 1);
+      expect(refreshBox.x + refreshBox.width).toBeLessThanOrEqual(newBox.x + 1);
+      expect(newBox.x + newBox.width).toBeLessThanOrEqual(width);
+
+      // Row 2 sits cleanly below Row 1 with zero overlap between view switcher and DisplayMenu.
+      expect(viewBox.y).toBeGreaterThanOrEqual(searchBox.y + searchBox.height - 1);
+      expect(viewBox.x + viewBox.width).toBeLessThanOrEqual(displayBox.x + 1);
+      expect(displayBox.x + displayBox.width).toBeLessThanOrEqual(width);
+
+      // VDP view switcher testIDs remain intact.
+      for (const id of ["issues-page", "issue-view-board", "issue-view-list", "issue-view-timeline", "issue-view-calendar"]) {
+        expect(app.count(`id:${id}`)).toBe(1);
+      }
+    }
+  }
+
+  // Wide 1280px toolbar collapses the 4 dropdowns into issue-filter-popover rather than an inline filter bar.
+  const wide = await mountIssuesAt(1280, 820, "zh");
+  expect(wide.app.count("id:issue-filter-bar")).toBe(0);
+  expect(wide.app.count("id:issue-filter-popover")).toBe(1);
+  expect(wide.app.count("id:issue-scope")).toBe(1);
+});
+
 test("IssueList renders compact #N ParentBadge below 1080px without bleeding over TagPills, and restores title at 1280px", async () => {
   const narrow = await mountIssuesAt(900, 720, "en");
   await narrow.app.press("id:issue-view-list");

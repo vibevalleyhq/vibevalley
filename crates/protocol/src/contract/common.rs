@@ -21,6 +21,119 @@ pub type SuggestionId = String;
 
 pub type MessageId = String;
 
+/// Unified collaboration participant identity across humans, agent profiles, and live sessions.
+/// Canonical wire format: `user:<id>` · `agent:<profile>` · `session:<id>`.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum ParticipantId {
+    User(String),
+    Agent(String),
+    Session(String),
+}
+
+impl ParticipantId {
+    pub fn user(id: impl Into<String>) -> Self {
+        Self::User(id.into())
+    }
+
+    pub fn agent(profile: impl Into<String>) -> Self {
+        Self::Agent(profile.into())
+    }
+
+    pub fn session(id: impl Into<String>) -> Self {
+        Self::Session(id.into())
+    }
+
+    /// Default interactive local user (`user:self`).
+    pub fn local_user() -> Self {
+        Self::User("self".to_owned())
+    }
+
+    pub fn from_parts(kind: &str, id: impl Into<String>) -> Option<Self> {
+        let id = id.into();
+        if id.is_empty() {
+            return None;
+        }
+        match kind {
+            "user" => Some(Self::User(id)),
+            "agent" => Some(Self::Agent(id)),
+            "session" => Some(Self::Session(id)),
+            _ => None,
+        }
+    }
+
+    pub fn parse(s: &str) -> Option<Self> {
+        let (kind, id) = s.split_once(':')?;
+        Self::from_parts(kind, id)
+    }
+
+    pub fn kind_str(&self) -> &'static str {
+        match self {
+            Self::User(_) => "user",
+            Self::Agent(_) => "agent",
+            Self::Session(_) => "session",
+        }
+    }
+
+    pub fn raw_id(&self) -> &str {
+        match self {
+            Self::User(id) | Self::Agent(id) | Self::Session(id) => id,
+        }
+    }
+
+    pub fn is_human(&self) -> bool {
+        matches!(self, Self::User(_))
+    }
+
+    pub fn is_agent(&self) -> bool {
+        matches!(self, Self::Agent(_) | Self::Session(_))
+    }
+}
+
+impl std::fmt::Display for ParticipantId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}:{}", self.kind_str(), self.raw_id())
+    }
+}
+
+impl std::str::FromStr for ParticipantId {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::parse(s).ok_or_else(|| format!("invalid ParticipantId {s:?}; expected user:<id>, agent:<profile>, or session:<id>"))
+    }
+}
+
+impl Serialize for ParticipantId {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(&self.to_string())
+    }
+}
+
+impl<'de> Deserialize<'de> for ParticipantId {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let s = String::deserialize(deserializer)?;
+        s.parse::<Self>().map_err(serde::de::Error::custom)
+    }
+}
+
+#[cfg(feature = "ts-gen")]
+impl TS for ParticipantId {
+    type WithoutGenerics = Self;
+    type OptionInnerType = Self;
+
+    fn name(_: &ts_rs::Config) -> String {
+        "ParticipantId".to_owned()
+    }
+
+    fn inline(cfg: &ts_rs::Config) -> String {
+        Self::name(cfg)
+    }
+
+    fn decl(_: &ts_rs::Config) -> String {
+        "type ParticipantId = `user:${string}` | `agent:${string}` | `session:${string}`;".to_owned()
+    }
+}
+
 /// What checking a form before saving it found: the first thing that would be refused, if any.
 #[skip_serializing_none]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -314,7 +427,8 @@ pub enum CompareMarkdownSegment {
 #[cfg(feature = "ts-gen")]
 crate::typescript::module! {
     "common";
-    types: [Validation,
+    types: [ParticipantId,
+    Validation,
     ActorKind,
     AgentRole,
     Actor,

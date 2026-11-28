@@ -205,10 +205,7 @@ async fn pull_refresh_poll_snapshot_and_issue_fk_preservation() {
         .unwrap();
     assert_eq!(standalone.issue_id, None);
     board.refresh_issue_async(&issue.id).await;
-    assert_eq!(
-        board.issue_async(&issue.id).await.unwrap().unwrap().pull_request.as_ref().map(|p| p.number),
-        Some(9)
-    );
+    assert_eq!(pulls.of_issue(&issue.id).as_ref().map(|p| p.number), Some(9));
 
     // Updating the issue MUST NOT null pull.issue_id (regression test for PutIssue ON CONFLICT DO UPDATE)
     board.move_to_async(&issue.id, IssueStatus::Todo, None).await.unwrap();

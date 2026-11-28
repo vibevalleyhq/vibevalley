@@ -177,12 +177,13 @@
   },
   "close": {
     "title": "关上「{issue}」",
-    "working": "{who} 还在干这个工单。取消就是叫停它、让它收工，分支上的改动不合进主分支。",
-    "completable": "完成就是把 {who} 的分支合进仓库的主分支，先看一遍改动；取消就是让它收工，改动不合进去。",
-    "notCompletable": "这个工单现在不能完成。取消会让 {who} 离开，改动不合进主分支。",
-    "review": "看改动，完成",
+    "working": "{who} 还在处理这个工单。取消会叫停会话并将工单标为已取消。",
+    "completable": "可以查看改动或附上交付回执来完成工单，也可以直接取消。",
+    "notCompletable": "这个工单现在不能完成。取消会叫停 {who} 并关闭工单。",
+    "review": "查看并完成",
     "stopAndCancel": "叫停并取消",
-    "cancel": "取消工单"
+    "cancel": "取消工单",
+    "completeWithoutDiff": "附回执完成"
   },
   "changes": {
     "checkOutput": "检查输出",
@@ -255,7 +256,7 @@
     "deliver": "交付",
     "crew": "一起干活的",
     "profile": "角色",
-    "branch": "分支",
+    "cwd": "工作区",
     "copyPath": "复制路径",
     "took": "用时",
     "resolved": "已解决的验收意见",
@@ -383,14 +384,46 @@
   },
   "run": {
     "working": "正在干",
-    "heard": "中途听到 {n} 句",
-    "reconcile": "需要核对工作区",
-    "currentChanges": "查看工单当前改动"
+    "heard": "中途听到 {n} 句"
+  },
+  "receipt": {
+    "title": "交付回执",
+    "hint": "可选附上交付凭证（PR、提交、笔记或结论）。",
+    "kind": "回执类型",
+    "kinds": {
+      "none": "无",
+      "pull_request": "拉取请求",
+      "commit": "提交",
+      "note": "笔记",
+      "answer": "结论"
+    },
+    "url": "PR 链接",
+    "urlPlaceholder": "例如 https://github.com/org/repo/pull/123",
+    "number": "PR 编号（可选）",
+    "numberPlaceholder": "123",
+    "sha": "提交 SHA",
+    "shaPlaceholder": "例如 a1b2c3d4…",
+    "branch": "分支（可选）",
+    "branchPlaceholder": "例如 feat/my-branch",
+    "noteId": "笔记 ID",
+    "noteIdPlaceholder": "输入笔记 ID",
+    "noteTitle": "笔记标题（可选）",
+    "noteTitlePlaceholder": "设计方案",
+    "summary": "交付摘要",
+    "summaryOptional": "摘要（可选）",
+    "summaryPlaceholder": "关键结果或验证说明…",
+    "openNote": "打开笔记",
+    "openPr": "打开 PR",
+    "missing": {
+      "url": "请填写 PR 链接。",
+      "sha": "请填写提交 SHA。",
+      "noteId": "请填写笔记 ID。",
+      "summary": "请填写结论摘要。"
+    }
   },
   "card": {
     "orchestrator": "主助手",
     "refining": "{name}在起草",
-    "draft": "草稿",
     "queued": "排队中",
     "cron": "定时任务",
     "noHelper": "还没选角色",

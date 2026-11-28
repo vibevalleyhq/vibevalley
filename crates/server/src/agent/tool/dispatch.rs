@@ -1,6 +1,6 @@
 use std::sync::{Arc, LazyLock};
 
-use parking_lot::Mutex;
+use arc_swap::ArcSwap;
 use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
 use vibevalley_protocol::{Agent, Session};
@@ -347,7 +347,7 @@ impl Tool {
 pub struct Held {
     pub tool: Tool,
     pub tools: Arc<ToolRegistry>,
-    pub route: Arc<Mutex<Route>>,
+    pub route: Arc<ArcSwap<Route>>,
 }
 
 impl vibevalley_runtime::agent::Tool for Held {
@@ -366,7 +366,7 @@ impl vibevalley_runtime::agent::Tool for Held {
     fn execute<'a>(&'a self, args: &'a Value) -> vibevalley_runtime::BoxFuture<'a, vibevalley_runtime::agent::ToolOutput> {
         let tool = self.tool.clone();
         let tools = self.tools.clone();
-        let route = self.route.lock().clone();
+        let route = (**self.route.load()).clone();
         let raw_json = args.to_string();
         Box::pin(async move {
             match tool.run_async(&tools, &Who::Orchestrator(route), &raw_json).await {
@@ -378,12 +378,12 @@ impl vibevalley_runtime::agent::Tool for Held {
 }
 
 /// The orchestrator's tools for its loop.
-pub fn held(tools: &Arc<ToolRegistry>, route: &Arc<Mutex<Route>>) -> Vec<Box<dyn vibevalley_runtime::agent::Tool>> {
+pub fn held(tools: &Arc<ToolRegistry>, route: &Arc<ArcSwap<Route>>) -> Vec<Box<dyn vibevalley_runtime::agent::Tool>> {
     held_for(tools, route, None)
 }
 
 /// The orchestrator's tools filtered by `agent`'s enabled toolsets and `can` narrowing.
-pub fn held_for(tools: &Arc<ToolRegistry>, route: &Arc<Mutex<Route>>, agent: Option<&Agent>) -> Vec<Box<dyn vibevalley_runtime::agent::Tool>> {
+pub fn held_for(tools: &Arc<ToolRegistry>, route: &Arc<ArcSwap<Route>>, agent: Option<&Agent>) -> Vec<Box<dyn vibevalley_runtime::agent::Tool>> {
     orchestrator()
         .into_iter()
         .filter(|t| toolset::allows(agent, &t.words.op, &t.words.name, toolset::Role::Orchestrator))

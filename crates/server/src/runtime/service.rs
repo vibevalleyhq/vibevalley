@@ -1,32 +1,29 @@
 use std::collections::HashSet;
-use std::path::Path;
 use std::sync::Arc;
 
 use tokio::sync::{Mutex as AsyncMutex, broadcast};
 use vibevalley_core::SliceMask;
 use vibevalley_protocol::{
-    ApiError, ExecutionPolicy, Issue, IssueGetInput, LastRun, Millis, Outcome, Phase, Run, Session, SessionChildTranscript, SessionChildTranscriptInput,
-    SessionController, SessionEventListInput, SessionEventPage, SessionOpenWorkspaceInput, SessionRespondInteractionInput, SessionRespondPermissionInput,
-    SessionSendInput, SessionSetConfigInput, SessionWatchPayload, SessionWorkspace,
+    ApiError, LastRun, Millis, Outcome, Phase, Session, SessionChildTranscript, SessionChildTranscriptInput, SessionController, SessionEventListInput,
+    SessionEventPage, SessionOpenWorkspaceInput, SessionRespondInteractionInput, SessionRespondPermissionInput, SessionSendInput, SessionSetConfigInput,
+    SessionWatchPayload, SessionWorkspace,
 };
 use vibevalley_runtime::oar::Registry;
 
 use super::session::{
-    self, MailboxEntry, MailboxSource, PermissionEvent, Report, RuntimeDriver, SessionDriver, SessionEngine, SessionLifecycleEvent, Trajectory,
+    self, ActiveRunSnapshot, MailboxEntry, MailboxSource, PermissionEvent, Report, RuntimeDriver, SessionDriver, SessionEngine, SessionLifecycleEvent,
+    Trajectory,
 };
 use super::types::{Opened, Result, RuntimeConfig, io};
-use super::worktree::Worktree;
 use crate::context::{Context, now};
 use crate::service::DbError;
 use crate::storage::Storage;
 
-/// Reopens stored sessions on server boot: interrupts active non-recoverable runs,
-/// marks lost worktrees as departed, and seeds live farm stations.
-pub async fn reopen_sessions_async(ctx: &Arc<Context>) -> Result<Opened> {
+/// Reopens stored sessions on server boot: interrupts active non-recoverable runs
+/// and records drafts for recovery.
+pub async fn reopen_sessions_async(ctx: &Arc<Context>, paused_issues: &HashSet<String>) -> Result<Opened> {
     let durable = ctx.service.durable().await?;
     let stored = ctx.service.session.all().await?;
-    let issues = ctx.service.issue.all().await?;
-    let paused_issues: HashSet<String> = issues.into_iter().filter(|i| i.mandate.is_paused()).map(|i| i.id).collect();
     let all_extras = ctx.service.session.extras().await?;
     let mut recoverable_ids = HashSet::new();
     for s in &stored {
@@ -53,13 +50,10 @@ pub async fn reopen_sessions_async(ctx: &Arc<Context>) -> Result<Opened> {
 
     let mut opened = Opened::default();
     for mut session in stored {
-        let lost = session.machine.is_none()
-            && matches!(session.policy, ExecutionPolicy::ManagedWorktree { .. })
-            && session.cwd.as_deref().is_some_and(|w| !Path::new(w).exists());
-        if !lost && session.is_refining() {
+        if session.is_refining() {
             opened.drafts.push(session.id.clone());
         }
-        if session.phase.is_working() && !lost && !session.is_refining() && recoverable_ids.contains(&session.id) {
+        if session.phase.is_working() && !session.is_refining() && recoverable_ids.contains(&session.id) {
             opened.recoverable.push(session.id.clone());
         } else if session.phase.is_working() {
             let at = now();
@@ -71,12 +65,11 @@ pub async fn reopen_sessions_async(ctx: &Arc<Context>) -> Result<Opened> {
             session.runs += 1;
             let session_svc = ctx.service.session.clone();
             let (updated_session, run) = durable
-                .write_with_async((session_svc, session, at, summary, lost), |tx, state| {
+                .write_with_async((session_svc, session, at, summary), |tx, state| {
                     let session_svc = state.0.clone();
                     let mut session = state.1.clone();
                     let at = state.2;
                     let summary = state.3;
-                    let lost = state.4;
                     Box::pin(async move {
                         let extras = session_svc.extras_in_tx(tx.transaction()).await.map_err(DbError::into_durable_error)?;
                         let recovery = session::delivery::interrupt_on_reopen(&session_svc, tx, &session, extras.get(&session.id), at, summary).await?;
@@ -95,65 +88,52 @@ pub async fn reopen_sessions_async(ctx: &Arc<Context>) -> Result<Opened> {
                                 .map_err(DbError::into_durable_error)?;
                         }
                         session_svc
-                            .put_in_tx(tx.transaction(), &session, lost)
+                            .put_in_tx(tx.transaction(), &session, false)
                             .await
                             .map_err(DbError::into_durable_error)?;
                         Ok((session, recovery.map(|(run_id, _)| run_id)))
                     })
                 })
                 .await?;
-            session = updated_session;
             if let Some(run) = run {
-                opened.interrupted.push((session.id.clone(), run));
+                opened.interrupted.push((updated_session.id.clone(), run));
             }
-        } else if lost {
-            ctx.service.session.put(&session, true).await?;
-        }
-        if lost {
-            opened.lost.extend(session.issue_id().map(String::from));
         }
     }
     ctx.mark_dirty(SliceMask::BOARD | SliceMask::SESSIONS | SliceMask::INBOX | SliceMask::FARM);
     Ok(opened)
 }
 
-/// Top-level facade grouping the session engine, trajectory logger, and worktree manager.
+/// Top-level facade grouping the session engine and trajectory logger.
 pub struct Runtime {
     ctx: Arc<Context>,
     session: SessionEngine,
     trajectory: Arc<Trajectory>,
-    worktree: Arc<Worktree>,
 }
 
 impl Runtime {
     /// Opens the execution runtime on `ctx` with the given `drivers` and `config`.
-    /// Runs reopen recovery and returns `(Arc<Runtime>, Opened)` so `issue::Board`
-    /// can settle lost/draft issues.
     pub async fn open_async(ctx: Arc<Context>, drivers: Arc<dyn SessionDriver>, config: RuntimeConfig) -> Result<(Arc<Runtime>, Opened)> {
+        Self::open_with_paused_async(ctx, drivers, config, &HashSet::new()).await
+    }
+
+    /// Opens the execution runtime on `ctx`, skipping auto-recovery for issues listed in `paused_issues`.
+    pub async fn open_with_paused_async(
+        ctx: Arc<Context>,
+        drivers: Arc<dyn SessionDriver>,
+        config: RuntimeConfig,
+        paused_issues: &HashSet<String>,
+    ) -> Result<(Arc<Runtime>, Opened)> {
         tokio::fs::create_dir_all(config.data_dir.join("reports")).await.map_err(io)?;
         tokio::fs::create_dir_all(config.data_dir.join("records")).await.map_err(io)?;
-        let opened = reopen_sessions_async(&ctx).await?;
+        let opened = reopen_sessions_async(&ctx, paused_issues).await?;
         let config = Arc::new(config);
-        let worktree = Arc::new(Worktree::with_repo(
-            config.worktrees_dir.clone(),
-            config.repos_dir.clone(),
-            config.data_dir.clone(),
-            config.repo.clone(),
-        ));
         let trajectory = Trajectory::open(ctx.clone());
         let write_lock = Arc::new(AsyncMutex::new(()));
-        let session = SessionEngine::new_async(ctx.clone(), write_lock, drivers, worktree.clone(), config, Some(trajectory.clone())).await?;
+        let session = SessionEngine::new_async(ctx.clone(), write_lock, drivers, config, Some(trajectory.clone())).await?;
         session.recover_on_connect(opened.recoverable.clone());
         session.record_interrupted_async(opened.interrupted.clone()).await;
-        Ok((
-            Arc::new(Runtime {
-                ctx,
-                session,
-                trajectory,
-                worktree,
-            }),
-            opened,
-        ))
+        Ok((Arc::new(Runtime { ctx, session, trajectory }), opened))
     }
 
     /// Standalone convenience constructor using [`RuntimeDriver`] over `registry`.
@@ -175,10 +155,6 @@ impl Runtime {
 
     pub fn trajectory(&self) -> &Arc<Trajectory> {
         &self.trajectory
-    }
-
-    pub fn worktree(&self) -> &Arc<Worktree> {
-        &self.worktree
     }
 
     pub fn driver(&self) -> &Arc<dyn SessionDriver> {
@@ -263,16 +239,8 @@ impl Runtime {
         self.session.sessions_async().await
     }
 
-    pub async fn runs_async(&self, issue: &str) -> Result<Vec<Run>> {
-        self.session.runs_async(issue).await
-    }
-
-    pub async fn stop_async(&self, id: &str) -> std::result::Result<(), ApiError> {
+    pub async fn stop_async(&self, id: &str) -> std::result::Result<Session, ApiError> {
         self.session.stop_async(id).await
-    }
-
-    pub async fn stop_with_pause_async(&self, id: &str, source: Option<vibevalley_protocol::HumanPauseSource>) -> std::result::Result<(), ApiError> {
-        self.session.stop_with_pause_async(id, source).await
     }
 
     pub async fn report_async(&self, session: &str, report: &Report) -> Result<()> {
@@ -283,8 +251,8 @@ impl Runtime {
         self.session.upsert_orchestrator_async(session).await
     }
 
-    pub async fn review_work_async(&self, vendor: &str, run_id: &str, candidate: &str) -> Result<Option<(Issue, Report)>> {
-        self.session.review_work_async(vendor, run_id, candidate).await
+    pub async fn active_run_snapshot_async(&self, vendor: &str, run_id: &str) -> Result<Option<ActiveRunSnapshot>> {
+        self.session.active_run_snapshot_async(vendor, run_id).await
     }
 
     pub async fn enqueue_mailbox_async(
@@ -298,6 +266,10 @@ impl Runtime {
         self.session
             .enqueue_mailbox_async(session_id, idempotency_key, source, source_message_id, payload)
             .await
+    }
+
+    pub async fn drain_passive_context_async(&self, session_id: &str) -> Result<Vec<MailboxEntry>> {
+        self.session.drain_passive_context_async(session_id).await
     }
 
     pub async fn withdraw_mailbox_async(&self, idempotency_key: &str) -> Result<bool> {
@@ -340,10 +312,6 @@ impl Runtime {
 
     pub(crate) async fn event_list_endpoint_async(&self, input: &SessionEventListInput) -> std::result::Result<SessionEventPage, ApiError> {
         self.session.event_list_endpoint_async(input).await
-    }
-
-    pub(crate) async fn stop_endpoint_async(&self, id: &str) -> std::result::Result<(), ApiError> {
-        self.session.stop_endpoint_async(id).await
     }
 
     pub(crate) async fn open_workspace_endpoint_async(&self, input: SessionOpenWorkspaceInput) -> std::result::Result<SessionWorkspace, ApiError> {
@@ -393,9 +361,5 @@ impl Runtime {
 
     pub(crate) async fn watch_session_async(&self, input: SessionWatchPayload, sink: crate::context::Sink) -> std::result::Result<(), ApiError> {
         self.session.watch_session_async(input, sink).await
-    }
-
-    pub(crate) async fn watch_issue_async(&self, input: IssueGetInput, sink: crate::context::Sink) -> std::result::Result<(), ApiError> {
-        self.session.watch_issue_async(input, sink).await
     }
 }

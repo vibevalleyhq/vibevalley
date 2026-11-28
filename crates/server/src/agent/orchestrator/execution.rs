@@ -1,12 +1,13 @@
 use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, OnceLock, Weak};
 
+use arc_swap::ArcSwap;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
-use vibevalley_protocol::{ApiError, BizCode, OrchestratorApproval, OrchestratorApprovalResolveInput};
+use vibevalley_protocol::{ApiError, BizCode, SessionApproval, SessionApprovalResolveInput};
 use vibevalley_runtime::BoxFuture;
 use vibevalley_runtime::agent::core::engine::{BrainProvider, Request};
 use vibevalley_runtime::agent::core::pipeline::Transcript;
@@ -20,21 +21,12 @@ use vibevalley_runtime::agent::extensions::todo::TodoExtension;
 use vibevalley_runtime::agent::harness::{Harness, SharedExecution, generation_kind};
 use vibevalley_runtime::agent::{AgentEvent, Brain, BrainError, Message, TurnOutcome};
 
+use super::state::Orchestrator;
 use super::types::Input;
 use crate::agent::tool::Route;
 use crate::channel::{Chat, Posting};
-use crate::issue::Board;
-use crate::note::Manager as NoteManager;
-use crate::runtime::Runtime;
 
-pub(super) trait OrchestratorHost: Send + Sync {
-    fn chat(&self) -> &Chat;
-    fn runtime(&self) -> &Runtime;
-    fn issue(&self) -> &Board;
-    fn note(&self) -> &NoteManager;
-    fn brain_at_async<'a>(&'a self, id: &'a str, route: &'a Arc<Mutex<Route>>, model: &'a str) -> BoxFuture<'a, Brain>;
-    fn record_worker_compaction_episode(&self, session_id: &str, level: &str, summary: &str);
-}
+const EVENT_CHANNEL_CAPACITY: usize = 256;
 
 pub(super) trait RunSink: Send + Sync {
     fn me_id(&self) -> &str;
@@ -54,9 +46,9 @@ pub(super) enum EvalEntry {
 }
 
 struct Bound {
-    orchestrator: OnceLock<Weak<dyn OrchestratorHost>>,
+    orchestrator: OnceLock<Weak<Orchestrator>>,
     store: Store,
-    listeners: Mutex<HashMap<String, mpsc::UnboundedSender<AgentEvent>>>,
+    listeners: Mutex<HashMap<String, mpsc::Sender<AgentEvent>>>,
 }
 
 impl BrainProvider for Bound {
@@ -71,10 +63,10 @@ impl BrainProvider for Bound {
                 .await?;
             let route: Route = route.map(serde_json::from_value).transpose()?.unwrap_or_else(|| Route {
                 agent: conv.into(),
-                channel: o.chat().default_channel(),
+                channel: o.chat.default_channel(),
                 ..Default::default()
             });
-            Ok(Some(Arc::new(o.brain_at_async(conv, &Arc::new(Mutex::new(route)), provider).await)))
+            Ok(Some(Arc::new(o.brain_at_async(conv, &Arc::new(ArcSwap::from_pointee(route)), provider).await)))
         })
     }
 
@@ -85,8 +77,10 @@ impl BrainProvider for Bound {
         {
             o.record_worker_compaction_episode(session_id, level, summary);
         }
-        if let Some(s) = self.listeners.lock().get(conv) {
-            let _ = s.send(event);
+        if let Some(s) = self.listeners.lock().get(conv)
+            && let Err(err) = s.try_send(event)
+        {
+            tracing::warn!(conversation = conv, error = %err, "daemon session event channel full or closed");
         }
     }
 }
@@ -143,7 +137,7 @@ impl ReviewProvider for Bound {
             };
             let o = self.orchestrator.get().and_then(Weak::upgrade).ok_or(Error::Closed)?;
             let Some((issue, report)) = o
-                .runtime()
+                .issue
                 .review_work_async(vendor, run, request.candidate)
                 .await
                 .map_err(|e| Error::Invalid(e.to_string()))?
@@ -151,7 +145,7 @@ impl ReviewProvider for Bound {
                 return Ok(None);
             };
             let changes = if issue.repo.is_some() {
-                let diff = o.issue().diff_async(&issue.id, None).await.map_err(|e| Error::Invalid(e.message))?;
+                let diff = o.issue.diff_async(&issue.id, None).await.map_err(|e| Error::Invalid(e.message))?;
                 Some(ReviewChanges {
                     files: diff.files,
                     uncommitted: diff.uncommitted,
@@ -161,7 +155,7 @@ impl ReviewProvider for Bound {
                 None
             };
             let notes = o
-                .note()
+                .note
                 .list_async(&vibevalley_protocol::NoteListRequest {
                     channel: None,
                     issue: Some(issue.id.clone()),
@@ -219,7 +213,7 @@ impl PendingExecution {
         self.shared.clone()
     }
 
-    pub(super) fn attach(self, o: Weak<dyn OrchestratorHost>) -> Execution {
+    pub(super) fn attach(self, o: Weak<Orchestrator>) -> Execution {
         let _ = self.bound.orchestrator.set(o);
         let scheduler = self.harness.scheduler().clone();
         Execution {
@@ -246,7 +240,7 @@ pub(super) struct TurnInput<'a> {
 }
 
 impl Execution {
-    pub(super) fn new(store: Store, o: Weak<dyn OrchestratorHost>, permissions: Permissions) -> Self {
+    pub(super) fn new(store: Store, o: Weak<Orchestrator>, permissions: Permissions) -> Self {
         PendingExecution::prepare(store, permissions).attach(o)
     }
 
@@ -259,7 +253,7 @@ impl Execution {
         self.harness.store()
     }
 
-    pub(super) async fn approvals_async(&self, conversation: Option<&str>) -> std::result::Result<Vec<OrchestratorApproval>, ApiError> {
+    pub(super) async fn approvals_async(&self, conversation: Option<&str>) -> std::result::Result<Vec<SessionApproval>, ApiError> {
         #[derive(serde::Deserialize)]
         #[serde(rename_all = "camelCase")]
         struct PendingApproval {
@@ -278,7 +272,7 @@ impl Execution {
         }
 
         if conversation.is_some_and(|id| id.trim().is_empty()) {
-            return Err(ApiError::new(BizCode::InvalidInput, "conversationId must be nonempty"));
+            return Err(ApiError::new(BizCode::InvalidInput, "id must be nonempty"));
         }
         let conv = conversation.map(str::to_owned);
         self.store()
@@ -293,11 +287,11 @@ impl Execution {
                         let pending: Governance = serde_json::from_value(document.state)?;
                         for (task_id, approval) in pending.pending_permissions {
                             let task = tx.task_async(&task_id).await?;
-                            if task.status == TaskStatus::Terminal || task.conversation_id != document.scope_id {
+                            if !matches!(task.status, TaskStatus::Sleeping | TaskStatus::Waiting) || task.conversation_id != document.scope_id {
                                 continue;
                             }
-                            approvals.push(OrchestratorApproval {
-                                conversation_id: task.conversation_id,
+                            approvals.push(SessionApproval {
+                                id: task.conversation_id,
                                 task_id,
                                 tool_call_id: approval.tool_call_id,
                                 tool_name: approval.evaluation.tool_name,
@@ -315,17 +309,14 @@ impl Execution {
             .map_err(approval_error)
     }
 
-    pub(super) async fn resolve_approval_async(&self, input: OrchestratorApprovalResolveInput) -> std::result::Result<(), ApiError> {
-        if [&input.conversation_id, &input.task_id, &input.tool_call_id]
-            .iter()
-            .any(|id| id.trim().is_empty())
-        {
-            return Err(ApiError::new(BizCode::InvalidInput, "conversationId, taskId and toolCallId must be nonempty"));
+    pub(super) async fn resolve_approval_async(&self, input: SessionApprovalResolveInput) -> std::result::Result<(), ApiError> {
+        if [&input.id, &input.task_id, &input.tool_call_id].iter().any(|id| id.trim().is_empty()) {
+            return Err(ApiError::new(BizCode::InvalidInput, "id, taskId and toolCallId must be nonempty"));
         }
         governance::resolve(
             self.store(),
             &self.scheduler,
-            &input.conversation_id,
+            &input.id,
             &input.task_id,
             governance::Decision {
                 tool_call_id: input.tool_call_id,
@@ -444,14 +435,14 @@ impl Execution {
 
     pub(super) async fn run_async(&self, run: &mut dyn RunSink, input: TurnInput<'_>) -> vibevalley_runtime::agent::Result<TurnOutcome> {
         let id = run.me_id().to_owned();
-        let (send, mut events) = mpsc::unbounded_channel();
+        let (send, mut events) = mpsc::channel(EVENT_CHANNEL_CAPACITY);
         self.bound.listeners.lock().insert(id.clone(), send);
         let result = self.dispatch_async(run, &input, &mut events).await;
         self.bound.listeners.lock().remove(&id);
         result.map_err(|e| BrainError::Store(e.to_string()))
     }
 
-    async fn dispatch_async(&self, run: &mut dyn RunSink, input: &TurnInput<'_>, events: &mut mpsc::UnboundedReceiver<AgentEvent>) -> Result<TurnOutcome> {
+    async fn dispatch_async(&self, run: &mut dyn RunSink, input: &TurnInput<'_>, events: &mut mpsc::Receiver<AgentEvent>) -> Result<TurnOutcome> {
         let conv = run.me_id().to_owned();
         let turn = format!("turn:{}", input.requests[0]);
         let brain = self

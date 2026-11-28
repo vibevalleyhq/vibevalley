@@ -239,7 +239,7 @@ export function WorkspaceChatPane() {
     phase.set("starting");
     const effort = untracked(effectiveThoughtLevel);
     const res = await openWorkspaceSession({
-      cwd,
+      ...(cwd ? { cwd } : {}),
       repo,
       runtime: untracked(runtime),
       model: untracked(model) || undefined,

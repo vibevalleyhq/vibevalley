@@ -926,6 +926,118 @@
       }
     }
   ],
+  "sheetUiReview": [
+    {
+      "path": "structure/base.json",
+      "json": {
+        "version": 1,
+        "sheets": [
+          {
+            "id": "sheet_review",
+            "name": "{{$t:sheetUiReviewTab}}",
+            "columns": [
+              {
+                "id": "c_title",
+                "name": "{{$t:sheetUiReviewColTitle}}",
+                "kind": "text",
+                "width": 260
+              },
+              {
+                "id": "c_severity",
+                "name": "{{$t:sheetUiReviewColSeverity}}",
+                "kind": "select",
+                "width": 112,
+                "options": [
+                  { "value": "p0", "label": "{{$t:sheetUiReviewSevP0}}", "color": "red" },
+                  { "value": "p1", "label": "{{$t:sheetUiReviewSevP1}}", "color": "amber" },
+                  { "value": "p2", "label": "{{$t:sheetUiReviewSevP2}}", "color": "blue" },
+                  { "value": "ux", "label": "{{$t:sheetUiReviewSevUx}}", "color": "green" }
+                ]
+              },
+              {
+                "id": "c_status",
+                "name": "{{$t:sheetUiReviewColStatus}}",
+                "kind": "select",
+                "width": 108,
+                "options": [
+                  { "value": "open", "label": "{{$t:sheetUiReviewStOpen}}", "color": "amber" },
+                  { "value": "in_progress", "label": "{{$t:sheetUiReviewStFixing}}", "color": "blue" },
+                  { "value": "resolved", "label": "{{$t:sheetUiReviewStResolved}}", "color": "green" }
+                ]
+              },
+              {
+                "id": "c_module",
+                "name": "{{$t:sheetUiReviewColModule}}",
+                "kind": "text",
+                "width": 156
+              },
+              {
+                "id": "c_screenshot",
+                "name": "{{$t_key:web.note.types.media}}",
+                "kind": "media",
+                "width": 140
+              },
+              {
+                "id": "c_issue",
+                "name": "{{$t:sheetUiReviewColIssue}}",
+                "kind": "issueRef",
+                "width": 168
+              },
+              {
+                "id": "c_agent",
+                "name": "{{$t:sheetUiReviewColAgent}}",
+                "kind": "agentAction",
+                "width": 180,
+                "agentConfig": {
+                  "promptTemplate": "Diagnose UI finding '{{c_title}}' (severity={{c_severity}}, module={{c_module}}) and spawn a scoped fix issue."
+                }
+              }
+            ],
+            "rows": [
+              {
+                "id": "rev_1",
+                "cells": {
+                  "c_title": { "_tag": "text", "value": "{{$t:sheetUiReviewR1Title}}" },
+                  "c_severity": { "_tag": "text", "value": "p1" },
+                  "c_status": { "_tag": "text", "value": "open" },
+                  "c_module": { "_tag": "text", "value": "{{$t:sheetUiReviewR1Mod}}" }
+                },
+                "createdAt": 0,
+                "updatedAt": 0
+              },
+              {
+                "id": "rev_2",
+                "cells": {
+                  "c_title": { "_tag": "text", "value": "{{$t:sheetUiReviewR2Title}}" },
+                  "c_severity": { "_tag": "text", "value": "p0" },
+                  "c_status": { "_tag": "text", "value": "in_progress" },
+                  "c_module": { "_tag": "text", "value": "{{$t:sheetUiReviewR2Mod}}" }
+                },
+                "createdAt": 0,
+                "updatedAt": 0
+              },
+              {
+                "id": "rev_3",
+                "cells": {
+                  "c_title": { "_tag": "text", "value": "{{$t:sheetUiReviewR3Title}}" },
+                  "c_severity": { "_tag": "text", "value": "ux" },
+                  "c_status": { "_tag": "text", "value": "resolved" },
+                  "c_module": { "_tag": "text", "value": "{{$t:sheetUiReviewR3Mod}}" }
+                },
+                "createdAt": 0,
+                "updatedAt": 0
+              }
+            ],
+            "views": [
+              { "id": "v_review_table", "name": "{{$t_key:web.note.base.table}}", "kind": "table" },
+              { "id": "v_review_board", "name": "{{$t_key:web.note.base.board}}", "kind": "board", "groupBy": "c_status" },
+              { "id": "v_review_gallery", "name": "{{$t_key:web.note.base.gallery}}", "kind": "gallery" }
+            ]
+          }
+        ]
+      }
+    }
+  ],
   "dashSlo": [
     {
       "path": "structure/doc.json",

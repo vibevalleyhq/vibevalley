@@ -294,7 +294,7 @@ pub struct DebugGraphSession {
     pub title: String,
     pub runtime: String,
     pub status: String,
-    pub worktree: Option<String>,
+    pub cwd: Option<String>,
     pub kind: DebugTrajectoryKind,
 }
 

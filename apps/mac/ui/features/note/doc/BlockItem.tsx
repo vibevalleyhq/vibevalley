@@ -2,7 +2,7 @@ import { Scroll, Text, untracked, View, type JSX } from "nsh";
 import { Menu, MenuItem, MenuSeparator } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
-import type { DocBlock, Issue, IssueId, Note, NoteId } from "@vibevalley/protocol";
+import type { DocBlock, Issue, IssueId, MediaAnnotation, Note, NoteId } from "@vibevalley/protocol";
 
 import { Icon } from "../../../design/Icon";
 import type { Picture } from "../../../design/Lightbox";
@@ -32,6 +32,7 @@ import {
 } from "./EmbedBlocks";
 import { HeadingBlockView, TodoBlockView } from "./HeadingTodoBlocks";
 import { ListBlockView, QuoteBlockView } from "./ListQuoteBlocks";
+import type { DocAnnotationIndex, DocAnnotationRef } from "./mediaAnnotationModel";
 import { ProseBlockView } from "./ProseBlockView";
 import {
   BookmarkBlockView,
@@ -73,6 +74,14 @@ interface BlockItemProps {
   readonly onOpenIssue: (id: IssueId) => void;
   readonly onScrollToBlock?: ((blockId: string) => void) | undefined;
   readonly onOpenLightbox?: ((pic: Picture) => void) | undefined;
+  readonly onOpenMediaLightbox?: ((blockId: string) => void) | undefined;
+  readonly annotationIndex?: DocAnnotationIndex | undefined;
+  readonly selectedAnnotationId?: string | undefined;
+  readonly highlightedBaseRowId?: string | undefined;
+  readonly onSelectAnnotation?: ((blockId: string, annId: string | undefined, baseRowId?: string) => void) | undefined;
+  readonly onJumpToBaseRow?: ((rowId: string, annId: string) => void) | undefined;
+  readonly onSelectReviewRow?: ((rowId: string, ref?: DocAnnotationRef) => void) | undefined;
+  readonly onCreateIssueFromAnnotation?: ((ann: MediaAnnotation, blockId: string) => Promise<IssueId | undefined>) | undefined;
   readonly onEditorTelemetry?: ((patch: BlockEditorTelemetryPatch) => void) | undefined;
 }
 
@@ -106,6 +115,14 @@ function renderNestedChild(child: DocBlock, props: BlockItemProps): JSX.Element 
       onOpenIssue={props.onOpenIssue}
       onScrollToBlock={props.onScrollToBlock}
       onOpenLightbox={props.onOpenLightbox}
+      onOpenMediaLightbox={props.onOpenMediaLightbox}
+      annotationIndex={props.annotationIndex}
+      selectedAnnotationId={props.selectedAnnotationId}
+      highlightedBaseRowId={props.highlightedBaseRowId}
+      onSelectAnnotation={props.onSelectAnnotation}
+      onJumpToBaseRow={props.onJumpToBaseRow}
+      onSelectReviewRow={props.onSelectReviewRow}
+      onCreateIssueFromAnnotation={props.onCreateIssueFromAnnotation}
       onEditorTelemetry={props.onEditorTelemetry}
     />
   );
@@ -319,13 +336,38 @@ function renderBlockContent(blockType: BlockType, props: BlockItemProps): JSX.El
     case "compare":
       return (
         <If when={props.block.type === "compare" ? props.block : undefined}>
-          {(b) => <CompareBlockView block={b()} onUpdate={(next) => props.onUpdateBlock(b().id, next)} />}
+          {(b) => (
+            <CompareBlockView
+              block={b()}
+              issues={props.issues}
+              selectedAnnotationId={props.selectedAnnotationId}
+              onUpdate={(next) => props.onUpdateBlock(b().id, next)}
+              onSelectAnnotation={(annId, rowId) => props.onSelectAnnotation?.(b().id, annId, rowId)}
+              onJumpToBaseRow={props.onJumpToBaseRow}
+              onOpenIssue={props.onOpenIssue}
+              onCreateIssueFromAnnotation={props.onCreateIssueFromAnnotation}
+              onOpenLightbox={props.onOpenLightbox}
+            />
+          )}
         </If>
       );
     case "media":
       return (
         <If when={props.block.type === "media" ? props.block : undefined}>
-          {(b) => <MediaBlockView block={b()} onUpdate={(next) => props.onUpdateBlock(b().id, next)} onOpenLightbox={props.onOpenLightbox} />}
+          {(b) => (
+            <MediaBlockView
+              block={b()}
+              issues={props.issues}
+              selectedAnnotationId={props.selectedAnnotationId}
+              onUpdate={(next) => props.onUpdateBlock(b().id, next)}
+              onSelectAnnotation={(annId, rowId) => props.onSelectAnnotation?.(b().id, annId, rowId)}
+              onJumpToBaseRow={props.onJumpToBaseRow}
+              onOpenIssue={props.onOpenIssue}
+              onCreateIssueFromAnnotation={props.onCreateIssueFromAnnotation}
+              onOpenMediaLightbox={props.onOpenMediaLightbox}
+              onOpenLightbox={props.onOpenLightbox}
+            />
+          )}
         </If>
       );
     case "preview":
@@ -337,7 +379,20 @@ function renderBlockContent(blockType: BlockType, props: BlockItemProps): JSX.El
     case "baseEmbed":
       return (
         <If when={props.block.type === "baseEmbed" ? props.block : undefined}>
-          {(b) => <BaseEmbedBlockView block={b()} notes={props.notes} onUpdate={(next) => props.onUpdateBlock(b().id, next)} onOpenNote={props.onOpenNote} />}
+          {(b) => (
+            <BaseEmbedBlockView
+              block={b()}
+              notes={props.notes}
+              issues={props.issues}
+              highlightedRowId={props.highlightedBaseRowId}
+              annotationByRowId={props.annotationIndex?.byBaseRowId}
+              annotationById={props.annotationIndex?.byAnnotationId}
+              onUpdate={(next) => props.onUpdateBlock(b().id, next)}
+              onOpenNote={props.onOpenNote}
+              onOpenIssue={props.onOpenIssue}
+              onSelectReviewRow={props.onSelectReviewRow}
+            />
+          )}
         </If>
       );
     case "issueCard":

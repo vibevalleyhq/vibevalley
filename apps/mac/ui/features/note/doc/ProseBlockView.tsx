@@ -282,7 +282,7 @@ export function ProseBlockView(props: {
           <VdpAnchor testId={`doc-format-bar-${props.block.id}`} role="toolbar" />
           <View
             testID={`doc-format-bar-${props.block.id}`}
-            class="absolute right-0 bottom-full z-20 mb-1 flex-row items-center gap-0.5 rounded-md border border-line bg-elevated px-1 py-0.5 shadow-float"
+            class="absolute right-0 bottom-full z-20 mb-2.5 flex-row items-center gap-0.5 rounded-md border border-line bg-elevated px-1 py-0.5 shadow-float"
           >
             <View
               role="button"

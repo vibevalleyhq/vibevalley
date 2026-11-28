@@ -616,7 +616,6 @@ mod tests {
             disallowed_tools: vec![],
             env: BTreeMap::new(),
             workdir: String::new(),
-            worktree: false,
             tags: vec![],
             look: Look {
                 species: None,
@@ -744,7 +743,6 @@ mod tests {
             disallowed_tools: vec![],
             env: BTreeMap::new(),
             workdir: String::new(),
-            worktree: false,
             tags: vec![],
             look: Look {
                 species: None,

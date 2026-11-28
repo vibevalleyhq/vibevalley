@@ -84,7 +84,7 @@
     "chat": "WeChat Feishu Lark QQ connectors chat pairing",
     "github": "GitHub Token gh PR login",
     "remote": "remote mobile phone lan wifi local direct Tailscale pair pairing QR device iOS Android CLI machine sandbox listener token control plane embedded",
-    "data": "home folder settings repos worktrees data storage backend",
+    "data": "home folder settings repos data storage backend",
     "about": "version update cli command line"
   },
   "scope": {
@@ -180,7 +180,7 @@
     "refresh": "Recheck"
   },
   "data": {
-    "intro": "Inspect local data paths, repository and worktree folders, and the active storage backend.",
+    "intro": "Inspect local data paths, repository folders, and the active storage backend.",
     "storageTitle": "Storage Backend",
     "backend": "Active backend",
     "backendHint": "Storage backend for attachments, media inputs, and notes",
@@ -189,7 +189,7 @@
     "backendMemory": "In-Memory (Memory)"
   },
   "providers": {
-    "intro": "Manage credentials for DeepSeek, MiniMax, MOSS, and other providers (1 provider = 1 API key), verify connectivity, and auto-fetch capability-tagged models."
+    "intro": "Manage credentials for DeepSeek and MOSS providers (1 provider = 1 API key), verify connectivity, and auto-fetch capability-tagged models."
   },
   "models": {
     "intro": "Configure per-scene primary models and fallback policies from discovered provider models only."
@@ -208,8 +208,6 @@
     "settingsHint": "The keys and these pages' settings",
     "repos": "Repositories",
     "reposHint": "The space's repos; each folder is a git repository",
-    "worktrees": "Worktrees",
-    "worktreesHint": "Each issue's own checkout while a helper works",
     "copy": "Copy the path",
     "copied": "Path copied",
     "reveal": "Show in Finder",

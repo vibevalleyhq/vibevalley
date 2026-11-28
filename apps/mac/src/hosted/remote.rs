@@ -297,7 +297,7 @@ impl RemoteSlice {
             let kind = self.kind;
             let url = format!("{}/api/v1/slice/{}", server.base_url, kind.as_str());
 
-            vibevalley_rt::current_or_global_handle().spawn(async move {
+            vibevalley_kit::rt::current_or_global_handle().spawn(async move {
                 let mut last_seq: Option<i64> = None;
                 loop {
                     let exit = run_sse_loop(
@@ -489,7 +489,7 @@ impl RemoteServer {
         self.subs.lock().insert(sub_id, cancel.clone());
         let subs_for_task = self.subs.clone();
 
-        vibevalley_rt::current_or_global_handle().spawn(async move {
+        vibevalley_kit::rt::current_or_global_handle().spawn(async move {
             let mut last_seq = None;
             let mut is_closed = || tx.is_closed();
             let mut on_message = |msg: SseMessage| {
@@ -548,7 +548,7 @@ impl Server for RemoteServer {
         let (tx, rx) = tokio::sync::mpsc::channel::<LiveEvent>(LIVE_BROADCAST_CAP);
         if let Some(mut live_rx) = self.subscribe_live() {
             let cancel = self.shutdown.child_token();
-            vibevalley_rt::current_or_global_handle().spawn(async move {
+            vibevalley_kit::rt::current_or_global_handle().spawn(async move {
                 loop {
                     let event = tokio::select! {
                         biased;
@@ -600,7 +600,7 @@ impl Server for RemoteServer {
         let token = self.token.clone();
         let url = format!("{}/api/v1/live", self.base_url);
 
-        vibevalley_rt::current_or_global_handle().spawn(async move {
+        vibevalley_kit::rt::current_or_global_handle().spawn(async move {
             let mut last_seq = None;
             loop {
                 let exit = run_sse_loop(
@@ -682,7 +682,7 @@ mod tests {
     use crate::hosted::connection::{ConnectionSaveRequest, configure_remote, exchange_pair_code};
 
     fn spawn_mock(router: Router) -> (SocketAddr, DropGuard) {
-        vibevalley_rt::block_on(async move {
+        vibevalley_kit::rt::block_on(async move {
             let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
             let addr = listener.local_addr().unwrap();
             let cancel = CancellationToken::new();
@@ -729,7 +729,7 @@ mod tests {
 
     impl AuthedFake {
         fn wait_live_watchers(&self, what: &str, min: usize) {
-            vibevalley_rt::block_on(async {
+            vibevalley_kit::rt::block_on(async {
                 tokio::time::timeout(Duration::from_secs(5), async {
                     loop {
                         let notified = self.on_live.notified();
@@ -806,7 +806,7 @@ mod tests {
         }
 
         fn wait_for(&self, what: &str, mut f: impl FnMut(&Self) -> bool) {
-            vibevalley_rt::block_on(async {
+            vibevalley_kit::rt::block_on(async {
                 tokio::time::timeout(Duration::from_secs(5), async {
                     loop {
                         let notified = self.notify.notified();
@@ -826,7 +826,7 @@ mod tests {
 
     #[test]
     fn sse_codec_and_accumulator_handle_chunk_boundaries_crlf_comments_and_multiline_data() {
-        vibevalley_rt::block_on(async {
+        vibevalley_kit::rt::block_on(async {
             let chunks = vec![
                 Ok::<_, io::Error>(b": ping\r\nid: 7\r\ndata: {\"a\":\r".to_vec()),
                 Ok(b"\ndata: 1}\r\n\r\ndata: second\n\n".to_vec()),
@@ -886,7 +886,7 @@ mod tests {
 
         let remote = RemoteServer::new(format!("http://{addr}"), Secret::new("vv_dev_utf8_test"), None).unwrap();
         let mut live_rx = remote.live();
-        let received = vibevalley_rt::block_on(async { tokio::time::timeout(Duration::from_secs(5), live_rx.recv()).await })
+        let received = vibevalley_kit::rt::block_on(async { tokio::time::timeout(Duration::from_secs(5), live_rx.recv()).await })
             .unwrap()
             .unwrap();
         match received {
@@ -928,7 +928,7 @@ mod tests {
         assert!(!debug.contains("vv_dev_header_check_token_42"));
         assert_eq!(remote.label.as_deref(), Some("Test Remote"));
 
-        let env = vibevalley_rt::block_on(Arc::clone(&remote).call_with_async(CallerContext::local(), "health".into(), Value::Null));
+        let env = vibevalley_kit::rt::block_on(Arc::clone(&remote).call_with_async(CallerContext::local(), "health".into(), Value::Null));
         assert_eq!(env.biz_code, 0);
         assert_eq!(env.data.unwrap()["version"], "1.2.3");
 
@@ -990,22 +990,22 @@ mod tests {
 
         // 2. Unauthorized token returns BizCode::Unauthorized.
         let wrong = Arc::new(RemoteServer::new(base_url.clone(), Secret::new("vv_dev_wrong_token"), None).unwrap());
-        let wrong_res = vibevalley_rt::block_on(wrong.call_with_async(CallerContext::local(), "machine.list".into(), json!({})));
+        let wrong_res = vibevalley_kit::rt::block_on(wrong.call_with_async(CallerContext::local(), "machine.list".into(), json!({})));
         assert_eq!(wrong_res.biz_code, BizCode::Unauthorized.code());
 
         // 3. Authorized async RPC call & slice_snapshot_json_async round-trip.
         let remote = Arc::new(RemoteServer::new(base_url, Secret::new(token), Some("Studio Mac".into())).unwrap());
-        let async_res = vibevalley_rt::block_on(Arc::clone(&remote).call_with_async(CallerContext::local(), "machine.list".into(), json!({})));
+        let async_res = vibevalley_kit::rt::block_on(Arc::clone(&remote).call_with_async(CallerContext::local(), "machine.list".into(), json!({})));
         assert_eq!(async_res.biz_code, 0);
         assert_eq!(async_res.data.unwrap()[0]["name"], "Studio");
 
-        let snap_raw = vibevalley_rt::block_on(Arc::clone(&remote).slice_snapshot_json_async(SliceKind::Board));
+        let snap_raw = vibevalley_kit::rt::block_on(Arc::clone(&remote).slice_snapshot_json_async(SliceKind::Board));
         let snap: Value = serde_json::from_str(&snap_raw).unwrap();
         assert_eq!(snap["seq"], 1);
 
         // 4. subscribe_slice SSE receives initial snapshot + live update cleanly.
         let mut sub = remote.subscribe_slice(SliceKind::Board).expect("remote slice subscription");
-        let initial = vibevalley_rt::block_on(async {
+        let initial = vibevalley_kit::rt::block_on(async {
             tokio::time::timeout(Duration::from_secs(5), async {
                 loop {
                     let frame = sub.borrow_and_update(true);
@@ -1024,7 +1024,7 @@ mod tests {
         next.board.issues.push(Issue::new("i-remote", 1, "Remote Issue", 2));
         fake.swap_bundle(next);
 
-        let updated = vibevalley_rt::block_on(async {
+        let updated = vibevalley_kit::rt::block_on(async {
             tokio::time::timeout(Duration::from_secs(5), async {
                 loop {
                     let frame = sub.borrow_and_update(false);
@@ -1090,27 +1090,28 @@ mod tests {
             text: "hello remote".into(),
         });
         fake.push_live(expected_notice.clone());
-        let ev = vibevalley_rt::block_on(async { tokio::time::timeout(Duration::from_secs(5), live_rx.recv()).await })
+        let ev = vibevalley_kit::rt::block_on(async { tokio::time::timeout(Duration::from_secs(5), live_rx.recv()).await })
             .unwrap()
             .unwrap();
         assert_eq!(ev, expected_notice);
         drop(live_rx);
 
         // 7. subscribe_with_async SSE streams events, handles refusal, and unsubscribes cleanly.
-        let (sub_id, mut sub_rx) = vibevalley_rt::block_on(Arc::clone(&remote).subscribe_with_async(
+        let (sub_id, mut sub_rx) = vibevalley_kit::rt::block_on(Arc::clone(&remote).subscribe_with_async(
             CallerContext::local(),
             "channel.follow".into(),
             json!({ "id": "general", "after": 0 }),
         ))
         .unwrap();
         fake.emit("channel.follow", json!({ "seq": 10, "text": "ping" }));
-        let sub_ev = vibevalley_rt::block_on(async { tokio::time::timeout(Duration::from_secs(5), sub_rx.recv()).await })
+        let sub_ev = vibevalley_kit::rt::block_on(async { tokio::time::timeout(Duration::from_secs(5), sub_rx.recv()).await })
             .unwrap()
             .unwrap();
         assert_eq!(sub_ev["seq"], 10);
         remote.unsubscribe(sub_id);
 
-        let refused = vibevalley_rt::block_on(Arc::clone(&remote).subscribe_with_async(CallerContext::local(), "fake.refuse".into(), json!({}))).unwrap_err();
+        let refused =
+            vibevalley_kit::rt::block_on(Arc::clone(&remote).subscribe_with_async(CallerContext::local(), "fake.refuse".into(), json!({}))).unwrap_err();
         assert_eq!(refused.biz_code, 500001);
 
         drop(listener);

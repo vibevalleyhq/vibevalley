@@ -36,7 +36,7 @@ export type DebugOverview = { channel: string, version: string, loopbackUrl?: st
 
 export type DebugGraphClient = { id: string, kind: string, label: string, watches: Array<string>, subscriptions: Array<string>, };
 
-export type DebugGraphSession = { sessionId: string, issueId?: number, title: string, runtime: string, status: string, worktree?: string, kind: DebugTrajectoryKind, };
+export type DebugGraphSession = { sessionId: string, issueId?: number, title: string, runtime: string, status: string, cwd?: string, kind: DebugTrajectoryKind, };
 
 export type DebugGraph = { clients: Array<DebugGraphClient>, sessions: Array<DebugGraphSession>, };
 

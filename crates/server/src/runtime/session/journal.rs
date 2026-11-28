@@ -536,12 +536,14 @@ fn known_id(id: &str) -> bool {
     !id.is_empty() && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
 }
 
+const CLOSED_NEXT_CACHE_CAPACITY: std::num::NonZeroUsize = std::num::NonZeroUsize::new(2048).expect("non-zero capacity");
+
 /// Every session's log (`Trajectory`): hot drafts in memory, full durable
 /// history in `session_event` via `ctx.service.session` with cursor pagination.
 pub struct Trajectory {
     ctx: Arc<Context>,
     open: Mutex<HashMap<String, Journal>>,
-    closed_next: Mutex<HashMap<String, i64>>,
+    closed_next: Mutex<vibevalley_kit::cache::LruCache<String, i64>>,
     wake: Arc<Notify>,
     worker: Mutex<Option<(CancellationToken, TaskHandle<()>)>>,
 }
@@ -553,7 +555,7 @@ impl Trajectory {
         let t = Arc::new(Trajectory {
             ctx: ctx.clone(),
             open: Mutex::default(),
-            closed_next: Mutex::default(),
+            closed_next: Mutex::new(vibevalley_kit::cache::LruCache::new(CLOSED_NEXT_CACHE_CAPACITY)),
             wake: wake.clone(),
             worker: Mutex::new(None),
         });

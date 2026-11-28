@@ -82,7 +82,6 @@ test("RuntimesPage: top-level nav above Experts, 3-column full-height layout, ma
       status: "online",
       here: true,
       ephemeral: false,
-      worktreeSupported: true,
       joinedAt: SCENARIO_NOW - 120_000,
       runtimes: [
         { id: "claude", label: "Claude Code", models: [], capabilities: ["listModels"], available: true },
@@ -96,7 +95,6 @@ test("RuntimesPage: top-level nav above Experts, 3-column full-height layout, ma
       status: "draining",
       here: false,
       ephemeral: true,
-      worktreeSupported: true,
       joinedAt: SCENARIO_NOW - 10_000,
       runtimes: [
         { id: "opencode", label: "OpenCode", models: [], capabilities: ["listModels"], available: true },
@@ -110,7 +108,6 @@ test("RuntimesPage: top-level nav above Experts, 3-column full-height layout, ma
       status: "online",
       here: false,
       ephemeral: false,
-      worktreeSupported: false,
       joinedAt: SCENARIO_NOW - 5_000,
       runtimes: [{ id: "codex", label: "Codex", models: [], capabilities: [], available: false }],
     },
@@ -123,12 +120,17 @@ test("RuntimesPage: top-level nav above Experts, 3-column full-height layout, ma
 
   await fake.pumpUntil(app, () => app.count("id:machine-group-sbx-42") === 1);
 
-  // Full-height 3-column layout: no top Desk bar; left sidebar, middle main, right inspector all present.
+  // Full-height workspace: no top Desk bar; left sidebar and middle main present, right inspector collapsed by default.
   expect(app.count("id:desk")).toBe(0);
   expect(app.count("id:place-runtimes")).toBe(1);
   expect(app.count("id:place-team")).toBe(1);
   expect(app.count("id:runtimes-sidebar")).toBe(1);
   expect(app.count("id:runtimes-main")).toBe(1);
+  expect(app.count("id:runtimes-inspector")).toBe(0);
+
+  // Open right inspector on demand to verify machine/runtime inspector details.
+  await app.press("id:runtimes-inspector-toggle");
+  await fake.pump(app);
   expect(app.count("id:runtimes-inspector")).toBe(1);
 
   // Machine groups rendered for machines that have installed coding agents.
@@ -269,7 +271,7 @@ test("Navigation: Runtimes sits directly above Experts, Experts has no sub-tabs,
   await fake.pumpUntil(app, () => app.count("id:settings-memory") === 1);
 });
 
-test("regression: narrow viewport (< 1024px) collapses inspector by default and keeps toggle smooth", async () => {
+test("regression: inspector stays collapsed by default on both narrow and wide viewports and toggles smoothly", async () => {
   setLocale("en");
   const { app, fake } = await mountRoute("/runtimes", scenarios.typical.state, undefined, { width: 900, height: 720 });
   await fake.pumpUntil(app, () => app.count("id:runtime-row-local-claude") === 1);
@@ -287,15 +289,16 @@ test("regression: narrow viewport (< 1024px) collapses inspector by default and 
   await fake.pump(app);
   expect(app.count("id:runtimes-inspector")).toBe(0);
 
-  // Resizing below 1024px without an explicit toggle collapses the inspector; widening restores it.
+  // Wide viewport also starts collapsed to avoid a 4-column wall, opening cleanly on demand.
   const wide = await mountRoute("/runtimes", scenarios.typical.state, undefined, { width: 1200, height: 800 });
-  await wide.fake.pumpUntil(wide.app, () => wide.app.count("id:runtimes-inspector") === 1);
-  await wide.app.setViewport(900, 720);
-  await wide.fake.pump(wide.app);
+  await wide.fake.pumpUntil(wide.app, () => wide.app.count("id:runtime-row-local-claude") === 1);
   expect(wide.app.count("id:runtimes-inspector")).toBe(0);
-  await wide.app.setViewport(1200, 800);
+  await wide.app.press("id:runtimes-inspector-toggle");
   await wide.fake.pump(wide.app);
   expect(wide.app.count("id:runtimes-inspector")).toBe(1);
+  await wide.app.press("id:runtimes-inspector-close");
+  await wide.fake.pump(wide.app);
+  expect(wide.app.count("id:runtimes-inspector")).toBe(0);
 });
 
 test("regression: repeated /runtimes mount/unmount cycles keep subscription and timer counts flat", async () => {
@@ -568,6 +571,8 @@ test("RuntimesPage: MCP InventoryCard displays real host entries and supports ad
     });
   });
 
+  await fake.pumpUntil(app, () => app.count("id:runtime-row-local-claude") === 1);
+  await app.press("id:runtimes-inspector-toggle");
   await fake.pumpUntil(app, () => app.count("id:mcp-server-row-github") === 1);
   expect(app.shows("id:mcp-server-row-github >> text:github")).toBe(true);
   expect(app.shows("id:mcp-server-row-github >> text:stdio")).toBe(true);
@@ -659,6 +664,8 @@ test("RuntimesPage shows per-engine recent run stats summary alongside MCP card 
 
   const { app, fake } = await mountRoute("/runtimes/local/claude", initialState);
   await fake.pumpUntil(app, () => app.count("id:runtime-run-stats") === 1);
+  await app.press("id:runtimes-inspector-toggle");
+  await fake.pumpUntil(app, () => app.count("id:mcp-server-add") === 1);
 
   expect(app.texts()).toContain("MCP servers");
   expect(app.count("id:mcp-server-add")).toBe(1);

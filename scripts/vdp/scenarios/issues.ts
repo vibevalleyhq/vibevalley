@@ -53,7 +53,12 @@ export const issuesScenario = defineScenario({
     await v.waitRoute("/issues");
     await v.wait("issues-page");
     await v.assertClean("issues-board-narrow-light");
-    await v.shot("issues-board-narrow-light", { label: "Issues Board Narrow (<768px)", settleMs: 220 });
+    await v.shot("issues-board-narrow-light", { label: "Issues Board Narrow (720px)", settleMs: 220 });
+
+    await v.resize(560, 820);
+    await v.wait("issues-page");
+    await v.assertClean("issues-board-narrow-560-light");
+    await v.shot("issues-board-narrow-560-light", { label: "Issues Board Narrow (560x820)", settleMs: 220 });
     await v.resize(v.viewport.width, v.viewport.height);
   },
 });

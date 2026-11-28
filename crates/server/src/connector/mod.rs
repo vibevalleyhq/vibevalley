@@ -1,22 +1,17 @@
-//! The chat apps (WeChat, Feishu, QQ): each ties one account of the user's
-//! to a channel. What the user says to the bot there is said in the channel
-//! as the user's own words; what the farm says for the user there goes out
-//! to the app while the user has not read it in the farm.
+//! Pure external IM protocol adapters (`connector/`): WeChat, Feishu, and QQ
+//! login/pairing lifecycle, durable inbox/outbox delivery, and per-app text formatting.
 //!
-//! `Connector` is the door. Behind it each app is an `Adapter` (its login,
-//! its connection, its sends) under a `Bridge` (the account, the durable
-//! inbox and outbox persisted via `ctx.service.connector`, and status updates
-//! published via `ctx.live` + `ctx.mark_dirty`).
+//! Zero direct dependency on `channel/`, `issue/`, or `runtime/`. Cross-domain
+//! channel forwarding, personal notification routing (`NotifyRouter`), and
+//! quote-reply action execution live in [`crate::orchestration::connector`].
 
 pub mod adapter;
-mod bridge;
-pub mod digest;
+pub(crate) mod bridge;
 mod feishu;
-pub mod notify;
 mod qq;
 pub mod render;
 mod service;
 mod weixin;
 
-pub use notify::{NotifyDecision, NotifyOptions, QuietHours, SuppressReason};
+pub use adapter::{ConnectorHost, InboundDispatch, InboundHandled};
 pub use service::{Connector, Options, Vendors, app_of};

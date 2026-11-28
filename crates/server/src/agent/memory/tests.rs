@@ -64,9 +64,9 @@ async fn session_reported_keeps_issue_worker_and_skips_workspace_sessions() {
         vibevalley_protocol::SessionController::IssueBoard,
         "Backend",
         "scripted",
-        vibevalley_protocol::ExecutionPolicy::ManagedWorktree {
-            repo: "farm".into(),
-            branch: None,
+        vibevalley_protocol::ExecutionPolicy::DirectCwd {
+            repo: Some("farm".into()),
+            permission_mode: vibevalley_protocol::SessionPermissionMode::Bypass,
         },
         3,
     );

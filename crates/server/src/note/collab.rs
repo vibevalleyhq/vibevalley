@@ -19,10 +19,10 @@ use vibevalley_protocol::{
     NoteFileContent, NoteFileEncoding, NoteFileMeta, NoteFileWriteItem, NoteFileWriteRequest, NoteHistoryCompactRequest, NoteHistoryEntry,
     NoteHistoryForkRequest, NoteHistoryListRequest, NoteHistoryPreviewRequest, NoteHistoryPreviewResult, NoteHistoryRestoreRequest,
     NoteHistoryUndoOriginRequest, NotePresence, NotePresenceEvent, NotePresenceKind, NotePresenceUpdateRequest, NoteSuggestionAcceptInput,
-    NoteSuggestionCreateInput, NoteType, Suggestion, SuggestionEvent, SuggestionEventKind, SuggestionStatus, USER_ID, ViewportRect,
+    NoteSuggestionCreateInput, NoteType, Suggestion, SuggestionEvent, SuggestionEventKind, SuggestionStatus, ViewportRect,
 };
 
-use super::{Maker, Manager, encode_manifest_title_if_needed, new_id, note_type_of, q, refused};
+use super::{Maker, Manager, NOTE_USER_ORIGIN, encode_manifest_title_if_needed, is_user_actor, new_id, note_type_of, q, refused};
 use crate::context::Sink;
 use crate::service::DbError;
 use crate::service::note::{NewNote, NewVersion, NoteRow, StoredSuggestion};
@@ -133,8 +133,8 @@ pub(super) struct PresenceRoom {
 }
 
 pub(super) fn commit_meta_for_actor(actor: &str, summary: Option<String>, at: i64) -> CommitMeta {
-    if actor == USER_ID {
-        CommitMeta::user(USER_ID, summary, at)
+    if is_user_actor(actor) {
+        CommitMeta::user(NOTE_USER_ORIGIN, summary, at)
     } else {
         CommitMeta {
             author: actor.to_string(),
@@ -149,8 +149,8 @@ pub(super) fn commit_meta_for_actor(actor: &str, summary: Option<String>, at: i6
 }
 
 pub(super) fn commit_meta_for_maker(maker: &Maker, summary: Option<String>, at: i64) -> CommitMeta {
-    if maker.by == USER_ID {
-        CommitMeta::user(USER_ID, summary, at)
+    if is_user_actor(&maker.by) {
+        CommitMeta::user(NOTE_USER_ORIGIN, summary, at)
     } else if maker.from != maker.by && !maker.from.is_empty() {
         CommitMeta::session(&maker.by, &maker.by, &maker.from, 1, summary, at)
     } else {
@@ -398,7 +398,7 @@ impl Manager {
         let changes = self.ctx.service.note.file_changes_after(note_id, 0, SUGGESTIONS_LIMIT).await.map_err(q)?;
         let mut touched = HashSet::new();
         for c in changes {
-            if c.actor == USER_ID {
+            if is_user_actor(&c.actor) {
                 for p in c.paths {
                     if p != "manifest.json" {
                         touched.insert(p);
@@ -458,8 +458,7 @@ impl Manager {
 
     pub async fn create_suggestion_async(&self, actor: &str, req: &NoteSuggestionCreateInput) -> Result<Suggestion, ApiError> {
         self.flush_pending_writes_async(&req.id).await;
-        let lock = self.note_lock(&req.id);
-        let _guard = lock.lock().await;
+        let _guard = self.note_lock(&req.id).await;
 
         let row = self.row_async(&req.id).await?;
         validate_note_path(&req.path).map_err(refused)?;
@@ -558,8 +557,7 @@ impl Manager {
 
     pub async fn accept_suggestion_async(&self, resolver: &str, req: &NoteSuggestionAcceptInput) -> Result<Suggestion, ApiError> {
         self.flush_pending_writes_async(&req.id).await;
-        let lock = self.note_lock(&req.id);
-        let _guard = lock.lock().await;
+        let _guard = self.note_lock(&req.id).await;
 
         let row = self.row_async(&req.id).await?;
         let ty = note_type_of(&row.note_type)?;
@@ -840,8 +838,7 @@ impl Manager {
 
     pub async fn history_list_async(&self, req: &NoteHistoryListRequest) -> Result<Vec<NoteHistoryEntry>, ApiError> {
         self.flush_pending_writes_async(&req.id).await;
-        let lock = self.note_lock(&req.id);
-        let _guard = lock.lock().await;
+        let _guard = self.note_lock(&req.id).await;
         let row = self.row_async(&req.id).await?;
         let disk_files = self.storage.note.read_all_raw_async(&row.id, None).await?;
         let (doc, _) = self.load_or_bootstrap_doc_async(&row, &disk_files).await?;
@@ -859,8 +856,7 @@ impl Manager {
 
     pub async fn history_preview_async(&self, req: &NoteHistoryPreviewRequest) -> Result<NoteHistoryPreviewResult, ApiError> {
         self.flush_pending_writes_async(&req.id).await;
-        let lock = self.note_lock(&req.id);
-        let _guard = lock.lock().await;
+        let _guard = self.note_lock(&req.id).await;
         let row = self.row_async(&req.id).await?;
         let ty = note_type_of(&row.note_type)?;
         let disk_files = self.storage.note.read_all_raw_async(&row.id, None).await?;
@@ -887,8 +883,7 @@ impl Manager {
 
     pub async fn history_restore_async(&self, maker: &Maker, req: &NoteHistoryRestoreRequest) -> Result<Wire, ApiError> {
         self.flush_pending_writes_async(&req.id).await;
-        let lock = self.note_lock(&req.id);
-        let _guard = lock.lock().await;
+        let _guard = self.note_lock(&req.id).await;
 
         let row = self.row_async(&req.id).await?;
         let ty = note_type_of(&row.note_type)?;
@@ -1013,7 +1008,7 @@ impl Manager {
         let (storage_id, size) = self.storage.note.snapshot_version_async(&new_id).await?;
 
         let channel_id = match req.channel.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
-            Some(ch) => Some(self.resolve_channel_async(&maker.from, ch).await?),
+            Some(ch) => Some(ch.to_string()),
             None => row.channel_id.clone(),
         };
         let by_name = self.actor_name(&maker.by);
@@ -1068,8 +1063,7 @@ impl Manager {
 
     pub async fn history_undo_origin_async(&self, maker: &Maker, req: &NoteHistoryUndoOriginRequest) -> Result<Wire, ApiError> {
         self.flush_pending_writes_async(&req.id).await;
-        let lock = self.note_lock(&req.id);
-        let _guard = lock.lock().await;
+        let _guard = self.note_lock(&req.id).await;
 
         let row = self.row_async(&req.id).await?;
         let ty = note_type_of(&row.note_type)?;
@@ -1140,8 +1134,7 @@ impl Manager {
 
     pub async fn history_compact_async(&self, req: &NoteHistoryCompactRequest) -> Result<Wire, ApiError> {
         self.flush_pending_writes_async(&req.id).await;
-        let lock = self.note_lock(&req.id);
-        let _guard = lock.lock().await;
+        let _guard = self.note_lock(&req.id).await;
 
         let row = self.row_async(&req.id).await?;
         let disk_files = self.storage.note.read_all_raw_async(&row.id, None).await?;
@@ -1156,8 +1149,7 @@ impl Manager {
 
     pub async fn collab_export_async(&self, req: &NoteCollabExportRequest) -> Result<NoteCollabExportResult, ApiError> {
         self.flush_pending_writes_async(&req.id).await;
-        let lock = self.note_lock(&req.id);
-        let _guard = lock.lock().await;
+        let _guard = self.note_lock(&req.id).await;
 
         let row = self.row_async(&req.id).await?;
         let disk_files = self.storage.note.read_all_raw_async(&row.id, None).await?;
@@ -1188,8 +1180,7 @@ impl Manager {
 
     pub async fn collab_import_async(&self, maker: &Maker, req: &NoteCollabImportRequest) -> Result<NoteCollabImportResult, ApiError> {
         self.flush_pending_writes_async(&req.id).await;
-        let lock = self.note_lock(&req.id);
-        let _guard = lock.lock().await;
+        let _guard = self.note_lock(&req.id).await;
 
         let row = self.row_async(&req.id).await?;
         let ty = note_type_of(&row.note_type)?;
@@ -1427,7 +1418,7 @@ impl Manager {
         let note_id = id.to_string();
         let this = self.clone();
         self.ctx.spawn("note.presence.follow", async move {
-            let mut ticker = tokio::time::interval(PRESENCE_EVICT_INTERVAL);
+            let mut ticker = vibevalley_kit::task::Ticker::periodic(PRESENCE_EVICT_INTERVAL);
             loop {
                 tokio::select! {
                     biased;

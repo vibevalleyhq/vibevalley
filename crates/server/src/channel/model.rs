@@ -7,11 +7,12 @@ use std::sync::Arc;
 use arc_swap::ArcSwap;
 use vibevalley_core::rules::compare_text;
 use vibevalley_i18n::{list, t};
-use vibevalley_protocol::{ApiError, Channel, ChannelLast, ChannelUnread, DEFAULT_ORCHESTRATOR, EVERYONE, USER_ID};
+use vibevalley_kit::db::tx::PostCommitHooks;
+use vibevalley_protocol::{ApiError, Channel, ChannelLast, ChannelUnread, DEFAULT_ORCHESTRATOR, EVERYONE, ParticipantId};
 
 use super::types::{
     AddressedMessage, CALLERS_MAX, Committed, FileAt, LAST_MAX, NoteRef, Place, Reach, Seat, THREAD_TITLE_MAX, ThreadSubject, actor_of, channel_type, line_of,
-    meta_of, meta_text, new_id, notify_of, subject_kind,
+    local_user_id, meta_of, meta_text, new_id, notify_of, subject_kind,
 };
 use super::words::{self, Nameable};
 use crate::context::{LookIn, internal, missing, now};
@@ -83,7 +84,8 @@ pub struct ChatModel {
     thread_by_root: HashMap<String, String>,
     thread_by_subject: HashMap<String, String>,
     people: Vec<ParticipantRow>,
-    user_read: HashMap<String, i64>,
+    /// Per-participant read cursor `(participant_id, channel_id) -> read_number`.
+    read_cursors: HashMap<(String, String), i64>,
     members: Members,
     /// The target each participant last read, for `speak`'s confirmation.
     pub last_read: HashMap<String, String>,
@@ -116,6 +118,7 @@ pub(super) struct WriteTx<'a> {
     pub(super) model: ChatModel,
     pub(super) reach: Reach,
     pub(super) tx: Tx,
+    pub(super) hooks: PostCommitHooks,
 }
 
 impl<'a> WriteTx<'a> {
@@ -127,6 +130,7 @@ impl<'a> WriteTx<'a> {
             inner,
             service,
             tx,
+            hooks: PostCommitHooks::new(),
         })
     }
 
@@ -135,7 +139,32 @@ impl<'a> WriteTx<'a> {
         self.inner.model = self.model;
         self.inner.reach = self.reach;
         self.inner.publish_snapshot();
+        let _ = self.hooks.fire();
         Ok(())
+    }
+
+    pub(super) async fn ensure_human(&mut self, participant: &ParticipantId, name: Option<&str>) -> Result<(), ApiError> {
+        let id = participant.to_string();
+        if self.model.participant(&id).is_some_and(|p| p.kind == "user" && p.left_at.is_none()) {
+            return Ok(());
+        }
+        let display = name.map(str::trim).filter(|s| !s.is_empty()).map(str::to_string).unwrap_or_else(|| {
+            if participant == &ParticipantId::local_user() {
+                t("server.channel.name.user", &[])
+            } else {
+                participant.raw_id().to_string()
+            }
+        });
+        self.upsert_participant(ParticipantRow {
+            id,
+            kind: "user".into(),
+            name: display,
+            agent_id: None,
+            home_id: None,
+            joined_at: now(),
+            left_at: None,
+        })
+        .await
     }
 
     pub(super) async fn add_member(&mut self, channel: &str, participant: &str, reason: &str, from: i64) -> Result<(), ApiError> {
@@ -169,9 +198,7 @@ impl<'a> WriteTx<'a> {
 
     pub(super) async fn set_read(&mut self, who: &str, channel: &str, upto: i64, at: i64) -> Result<(), ApiError> {
         self.service.channel.set_read_cursor_in_tx(&self.tx, who, channel, upto, at).await.q()?;
-        if who == USER_ID {
-            self.model.user_read_to(channel, upto);
-        }
+        self.model.read_to(who, channel, upto);
         Ok(())
     }
 
@@ -229,6 +256,7 @@ impl<'a> WriteTx<'a> {
             .ok_or_else(|| internal(format!("no channel {}", row.channel_id)))?;
         let mut meta = meta_of(row.meta.as_deref());
         let orchestrators = self.model.orchestrator_seats();
+        let humans = self.model.human_names();
         let here = self.model.orchestrator_in_row(Some(&ch));
         let mentions = if ch.r#type == "direct" {
             vec![]
@@ -238,14 +266,22 @@ impl<'a> WriteTx<'a> {
                 &Nameable {
                     here: &here,
                     orchestrators: &orchestrators,
+                    humans: &humans,
                 },
             )
         };
         let helper = |p: &ParticipantRow| p.kind == "agent" && p.agent_id.is_some() && p.left_at.is_none();
         let present: Vec<String> = self.model.participants().iter().filter(|p| helper(p)).map(|p| p.id.clone()).collect();
+        let active_humans: Vec<String> = self
+            .model
+            .participants()
+            .iter()
+            .filter(|p| p.kind == "user" && p.left_at.is_none())
+            .map(|p| p.id.clone())
+            .collect();
         let mut named: Vec<(String, &str)> = vec![];
         for m in &mentions {
-            let how = if orchestrators.contains(m) || m == USER_ID || m == EVERYONE || present.contains(m) {
+            let how = if orchestrators.contains(m) || active_humans.contains(m) || m == EVERYONE || present.contains(m) {
                 "delivered"
             } else if self.model.participant(m).is_some() {
                 "absent"
@@ -299,7 +335,8 @@ impl ChatModel {
             self.created(c);
         }
         self.people = participants;
-        self.user_read = user_read.into_iter().collect();
+        let local = local_user_id();
+        self.read_cursors = user_read.into_iter().map(|(ch, n)| ((local.clone(), ch), n)).collect();
         self.members.load(follows);
     }
 
@@ -383,7 +420,7 @@ impl ChatModel {
             .collect();
         for c in gone {
             self.by_id.remove(&c.id);
-            self.user_read.remove(&c.id);
+            self.read_cursors.retain(|(_, ch), _| ch != &c.id);
             self.published_last.remove(&c.id);
             self.members.channel_removed(&c.id);
             if let Some(root) = &c.root_id {
@@ -398,9 +435,9 @@ impl ChatModel {
         }
     }
 
-    /// `markUnread` moves the user's cursor back.
-    pub fn user_read_back(&mut self, channel: &str, number: i64) {
-        self.user_read.insert(channel.into(), number);
+    /// `markUnread` moves a participant's cursor back.
+    pub fn read_back(&mut self, viewer: &str, channel: &str, number: i64) {
+        self.read_cursors.insert((viewer.into(), channel.into()), number);
     }
 
     pub fn default_moved(&mut self, from: &str, to: &str) {
@@ -471,13 +508,21 @@ impl ChatModel {
         *n = (*n).max(number);
     }
 
-    pub fn user_read_in(&self, channel: &str) -> Option<i64> {
-        self.user_read.get(channel).copied()
+    pub fn read_in(&self, viewer: &str, channel: &str) -> Option<i64> {
+        self.read_cursors.get(&(viewer.into(), channel.into())).copied()
     }
 
-    pub fn user_read_to(&mut self, channel: &str, number: i64) {
-        let n = self.user_read.entry(channel.into()).or_insert(number);
+    pub fn read_to(&mut self, viewer: &str, channel: &str, number: i64) {
+        let n = self.read_cursors.entry((viewer.into(), channel.into())).or_insert(number);
         *n = (*n).max(number);
+    }
+
+    pub(super) fn human_names(&self) -> Vec<(String, String)> {
+        self.participants()
+            .iter()
+            .filter(|p| p.kind == "user" && p.left_at.is_none())
+            .map(|p| (p.id.clone(), p.name.clone()))
+            .collect()
     }
 
     pub(super) fn seat_matches(&self, p: &Seat) -> bool {
@@ -559,14 +604,20 @@ impl ChatModel {
     }
 
     pub(super) fn direct_with(&self, who: &str, other: &str) -> Option<ChannelRow> {
-        let peer = if who == USER_ID {
-            other
-        } else if other == USER_ID {
-            who
-        } else {
-            ""
-        };
-        self.channels("direct").into_iter().find(|c| c.peer_id.as_deref() == Some(peer))
+        let local = local_user_id();
+        self.channels("direct").into_iter().find(|c| {
+            let ms = self.members_of(&c.id);
+            if ms.iter().any(|m| m == who) && ms.iter().any(|m| m == other) {
+                return true;
+            }
+            if who == local {
+                c.peer_id.as_deref() == Some(other)
+            } else if other == local {
+                c.peer_id.as_deref() == Some(who)
+            } else {
+                false
+            }
+        })
     }
 
     pub(super) fn target_of_row(
@@ -611,7 +662,7 @@ impl ChatModel {
             subject_id: row.subject_id.clone(),
             last_number: row.last_number,
             replies: row.reply_count,
-            read: self.user_read_in(&row.id),
+            read: self.read_in(&local_user_id(), &row.id),
             unread: (unread > 0).then_some(unread),
             title,
             last: last.map(|m| ChannelLast {
@@ -627,10 +678,11 @@ impl ChatModel {
     /// `counted`: a channel as a page lists it, with the user's unread and
     /// a title.
     pub(super) async fn counted_async(&self, channels: &ChannelService, row: &ChannelRow) -> Result<Channel, ApiError> {
+        let viewer = local_user_id();
         let n = match row.notify.as_str() {
             "none" => 0,
-            "mentions" => channels.user_mentions().await.q()?.iter().filter(|m| m.row.channel_id == row.id).count() as i64,
-            _ => channels.user_unread(&row.id, self.user_read_in(&row.id).unwrap_or(0)).await.q()?,
+            "mentions" => channels.user_mentions(&viewer).await.q()?.iter().filter(|m| m.row.channel_id == row.id).count() as i64,
+            _ => channels.user_unread(&row.id, &viewer, self.read_in(&viewer, &row.id).unwrap_or(0)).await.q()?,
         };
         let sk = row.subject_kind.as_deref();
         let mut title = String::new();
@@ -759,7 +811,11 @@ impl ChatModel {
             peer: ch.peer_id.clone(),
             orchestrator: self.orchestrator_in_row(Some(ch)),
             channel_members: self.members_of_row(Some(ch)),
-            members: if ch.r#type == "thread" { self.members_of(&ch.id) } else { vec![] },
+            members: if ch.r#type == "thread" || ch.r#type == "direct" {
+                self.members_of(&ch.id)
+            } else {
+                vec![]
+            },
             topic,
         })
     }

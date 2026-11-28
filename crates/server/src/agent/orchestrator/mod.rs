@@ -7,7 +7,6 @@
 //!
 //! Inputs that come while it works wait and go in together as the next turn.
 
-mod chat;
 mod eval;
 mod execution;
 pub mod inbox;

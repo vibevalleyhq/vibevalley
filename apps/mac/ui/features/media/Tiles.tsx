@@ -2,7 +2,7 @@ import { computed, effect, Image, signal, Text, View } from "nsh";
 import { Popover } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
-import { type LibraryItem, type MediaJob, type Note, userId } from "@vibevalley/protocol";
+import { isHumanParticipant, type Issue, type LibraryItem, type MediaJob, type Note } from "@vibevalley/protocol";
 import type { NoteAppletInfo } from "@vibevalley/protocol/host";
 
 import { Button } from "../../design/Button";
@@ -254,7 +254,7 @@ const noteCardMinWidth = 256;
 
 export function noteMetaLine(note: Note, nowMs: number): string {
   const parts: string[] = [kindLabel(note)];
-  if (note.by !== userId && note.byName.trim() !== "") parts.push(note.byName);
+  if (!isHumanParticipant(note.by) && note.byName.trim() !== "") parts.push(note.byName);
   if (note.version > 0) parts.push(t("web.library.inspector.versionBadge", { version: note.version }));
   parts.push(ago(note.updated, nowMs));
   return parts.join(" · ");
@@ -262,6 +262,8 @@ export function noteMetaLine(note: Note, nowMs: number): string {
 
 export function NoteTiles(props: {
   notes: readonly Note[];
+  notesById?: ReadonlyMap<string, Pick<Note, "title">> | undefined;
+  issuesById?: ReadonlyMap<string, Pick<Issue, "number" | "title">> | undefined;
   width?: number | undefined;
   onOpen: (id: string) => void;
   isPinned: (id: string) => boolean;
@@ -298,7 +300,7 @@ export function NoteTiles(props: {
               class="group relative shrink-0 overflow-hidden rounded-lg border border-line bg-page hover:border-faint focus-visible:outline-2 focus-visible:outline-focus"
             >
               <View class="relative overflow-hidden border-b border-line bg-side" style={{ width: stageWidth(), height: stageHeight() }}>
-                <NotePreview note={n()} width={stageWidth()} height={stageHeight()} />
+                <NotePreview note={n()} width={stageWidth()} height={stageHeight()} notesById={props.notesById} issuesById={props.issuesById} />
                 <View class="absolute top-2 right-2 flex-row items-center gap-1">
                   <If
                     when={installed()}

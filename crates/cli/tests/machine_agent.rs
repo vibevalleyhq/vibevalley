@@ -1,6 +1,6 @@
 //! Unit & integration tests for `vibevalley machine` CLI, `$VIBEVALLEY_HOME/machine-auth.json` (`0o600`),
 //! `EventRingBuffer` (`seq`-indexed replay), `InputDeduplicator` (`input_id` idempotency),
-//! local `/mcp` HTTP proxy tunneling, permission responses, reconnect recovery, and git worktree isolation.
+//! local `/mcp` HTTP proxy tunneling, permission responses, reconnect recovery, and directoryless/explicit session workdirs.
 
 use std::path::Path;
 use std::process::Command;
@@ -29,7 +29,7 @@ use vibevalley_cli::machine_agent::{
 };
 use vibevalley_protocol::{
     MachineHello, MachineHelloAck, MachineInputKind, MachineMcpResponse, MachinePing, MachinePlatform, MachineSessionAttach, MachineSessionEvent,
-    MachineSessionInput, MachineSessionOpen, MachineSessionRespond, MachineWireFrame, MachineWorktreeCleanup, MachineWorktreePrepare,
+    MachineSessionInput, MachineSessionOpen, MachineSessionRespond, MachineWireFrame,
 };
 use vibevalley_runtime::oar::scripted::{Script, ScriptedRuntime, Step};
 use vibevalley_runtime::oar::{Event, EventKind, McpServer, Registry};
@@ -537,43 +537,27 @@ fn machine_agent_local_mcp_proxy_and_permission_respond_round_trip() {
 }
 
 #[test]
-fn machine_agent_worktree_prepare_cleanup_and_path_guard() {
+fn machine_agent_directoryless_and_explicit_workdir_session_open() {
     vibevalley_runtime::rt::block_on(async {
         let tmp = tempfile::tempdir().unwrap();
         let workdir = tmp.path().join("machine-work");
-        let repo_dir = workdir.join("repos").join("demo");
-        std::fs::create_dir_all(&repo_dir).unwrap();
-
-        let git = |args: &[&str]| {
-            let status = Command::new("git")
-                .current_dir(&repo_dir)
-                .args(args)
-                .env("GIT_AUTHOR_NAME", "Tester")
-                .env("GIT_AUTHOR_EMAIL", "tester@example.com")
-                .env("GIT_COMMITTER_NAME", "Tester")
-                .env("GIT_COMMITTER_EMAIL", "tester@example.com")
-                .status()
-                .unwrap();
-            assert!(status.success(), "git {args:?} failed");
-        };
-        git(&["init", "-b", "main"]);
-        std::fs::write(repo_dir.join("README.md"), "hello\n").unwrap();
-        git(&["add", "README.md"]);
-        git(&["commit", "-m", "init"]);
+        let explicit_dir = tmp.path().join("project-a");
+        std::fs::create_dir_all(&explicit_dir).unwrap();
 
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
-        let token = "vv_dev_worktree_token_12345678";
+        let token = "vv_dev_dirless_token_12345678";
 
         let mut registry = Registry::new();
         registry.register(Arc::new(ScriptedRuntime::new("scripted", Script::echo())));
-        let cfg = MachineAgentConfig::new(
+        let mut cfg = MachineAgentConfig::new(
             format!("http://{addr}"),
             Secret::new(token),
-            "wt-box".into(),
-            "Worktree Box".into(),
+            "dirless-box".into(),
+            "Dirless Box".into(),
             workdir.clone(),
         );
+        cfg.ephemeral = true;
         let cancel = CancellationToken::new();
         let agent = Arc::new(MachineAgent::new_async(cfg, Arc::new(registry), cancel.clone()).await);
         let agent_task = {
@@ -582,68 +566,83 @@ fn machine_agent_worktree_prepare_cleanup_and_path_guard() {
         };
 
         let (mut ws, hello) = accept_ws_with_auth(&listener, token).await;
-        assert!(hello.worktree_supported);
+        assert_eq!(hello.machine_id, "dirless-box");
+        assert!(hello.ephemeral);
 
-        // Prepare isolated worktree for task-42 on branch feat/task-42.
+        // 1. Directoryless session open (`workdir: None`) starts in a neutral dir under `<workdir>/sessions/<id>` without git worktrees.
         send_frame(
             &mut ws,
-            &MachineWireFrame::MachineWorktreePrepare(MachineWorktreePrepare {
-                request_id: "wt-prep-1".into(),
-                task_id: "task-42".into(),
-                repo_ref: "demo".into(),
-                branch: Some("feat/task-42".into()),
-                base_ref: Some("main".into()),
+            &MachineWireFrame::MachineSessionOpen(MachineSessionOpen {
+                request_id: "open-dirless".into(),
+                session_id: "sess-dirless".into(),
+                runtime_id: "scripted".into(),
+                workdir: None,
+                repo_ref: None,
+                ..Default::default()
             }),
         )
         .await;
-        let prepared = match recv_frame(&mut ws).await {
-            MachineWireFrame::MachineWorktreeResult(res) => res,
-            other => panic!("expected MachineWorktreeResult, got {other:?}"),
+        let opened = match recv_frame(&mut ws).await {
+            MachineWireFrame::MachineSessionOpened(res) => res,
+            other => panic!("expected MachineSessionOpened, got {other:?}"),
         };
-        assert!(prepared.ok, "prepare failed: {:?}", prepared.error);
-        assert_eq!(prepared.branch.as_deref(), Some("feat/task-42"));
-        let wt_path = Path::new(prepared.workdir.as_deref().unwrap()).to_path_buf();
-        assert!(wt_path.join("README.md").is_file());
-        assert!(wt_path.starts_with(std::fs::canonicalize(workdir.join("worktrees")).unwrap()));
+        assert!(opened.ok, "directoryless open failed: {:?}", opened.error);
+        let neutral_path = Path::new(opened.workdir.as_deref().unwrap()).to_path_buf();
+        assert!(neutral_path.is_dir(), "neutral session dir should exist");
+        assert!(neutral_path.starts_with(std::fs::canonicalize(workdir.join("sessions")).unwrap()));
+        assert!(!workdir.join("worktrees").exists(), "machine agent must not create git worktrees");
 
-        // Guard: cleanup MUST refuse a path outside `--workdir/worktrees`.
-        let outside_dir = tmp.path().join("outside");
-        std::fs::create_dir_all(&outside_dir).unwrap();
+        // Drain initial SessionStarted event before sending next open.
+        let _ = recv_frame(&mut ws).await;
+
+        // 2. Explicit existing `workdir` opens directly in that directory.
         send_frame(
             &mut ws,
-            &MachineWireFrame::MachineWorktreeCleanup(MachineWorktreeCleanup {
-                request_id: "wt-clean-bad".into(),
-                task_id: "task-42".into(),
-                workdir: outside_dir.display().to_string(),
+            &MachineWireFrame::MachineSessionOpen(MachineSessionOpen {
+                request_id: "open-explicit".into(),
+                session_id: "sess-explicit".into(),
+                runtime_id: "scripted".into(),
+                workdir: Some(explicit_dir.display().to_string()),
+                ..Default::default()
             }),
         )
         .await;
-        let rejected = match recv_frame(&mut ws).await {
-            MachineWireFrame::MachineWorktreeResult(res) => res,
-            other => panic!("expected MachineWorktreeResult, got {other:?}"),
+        let opened_explicit = loop {
+            match recv_frame(&mut ws).await {
+                MachineWireFrame::MachineSessionOpened(res) => break res,
+                MachineWireFrame::MachineSessionEvent(_) => continue,
+                other => panic!("expected MachineSessionOpened, got {other:?}"),
+            }
         };
-        assert!(!rejected.ok, "outside path cleanup must be refused");
-        assert!(outside_dir.is_dir(), "outside directory must remain untouched");
+        assert!(opened_explicit.ok, "explicit open failed: {:?}", opened_explicit.error);
+        assert_eq!(Path::new(opened_explicit.workdir.as_deref().unwrap()), explicit_dir.as_path());
 
-        // Cleanup the actual worktree cleanly.
+        // 3. Relative traversal (`../escape`) is rejected cleanly.
         send_frame(
             &mut ws,
-            &MachineWireFrame::MachineWorktreeCleanup(MachineWorktreeCleanup {
-                request_id: "wt-clean-ok".into(),
-                task_id: "task-42".into(),
-                workdir: wt_path.display().to_string(),
+            &MachineWireFrame::MachineSessionOpen(MachineSessionOpen {
+                request_id: "open-escape".into(),
+                session_id: "sess-escape".into(),
+                runtime_id: "scripted".into(),
+                workdir: Some("../escape".into()),
+                ..Default::default()
             }),
         )
         .await;
-        let cleaned = match recv_frame(&mut ws).await {
-            MachineWireFrame::MachineWorktreeResult(res) => res,
-            other => panic!("expected MachineWorktreeResult, got {other:?}"),
+        let rejected = loop {
+            match recv_frame(&mut ws).await {
+                MachineWireFrame::MachineSessionOpened(res) => break res,
+                MachineWireFrame::MachineSessionEvent(_) => continue,
+                other => panic!("expected MachineSessionOpened, got {other:?}"),
+            }
         };
-        assert!(cleaned.ok, "cleanup failed: {:?}", cleaned.error);
-        assert!(!wt_path.exists(), "worktree should have been removed");
+        assert!(!rejected.ok, "relative parent traversal must be refused");
 
+        // 4. Ephemeral shutdown cleans up the auto-created neutral session dir while leaving explicit external workdirs untouched.
         cancel.cancel();
         agent_task.await.unwrap().unwrap();
+        assert!(!neutral_path.exists(), "ephemeral neutral session dir should be removed on shutdown");
+        assert!(explicit_dir.is_dir(), "explicit external workdir must never be removed");
     });
 }
 
@@ -718,7 +717,6 @@ async fn handle_mock_http(State(cp): State<MockControlPlane>, method: Method, ur
                         "status": "online",
                         "here": true,
                         "ephemeral": false,
-                        "worktreeSupported": true,
                         "joinedAt": 1700000000000i64,
                         "runtimes": [{
                             "id": "claude",
@@ -735,7 +733,6 @@ async fn handle_mock_http(State(cp): State<MockControlPlane>, method: Method, ur
                         "status": "online",
                         "here": false,
                         "ephemeral": false,
-                        "worktreeSupported": true,
                         "joinedAt": 1700000000100i64,
                         "runtimes": [{
                             "id": "codex",

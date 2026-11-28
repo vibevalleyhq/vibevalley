@@ -1,15 +1,17 @@
-import { computed, effect, Image, signal, untracked, View, WebView, Text } from "nsh";
+import { computed, effect, signal, untracked, View, WebView, Text } from "nsh";
 import { Input } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
 import {
   type BaseCellValue,
   type BaseColumn,
+  type BaseRow,
   type DocBlock,
   type DocKpiItem,
   type Issue,
   type IssueId,
   type IssueStatus,
+  type MediaAnnotation,
   MediaInputKindValues,
   type Note,
   type NoteId,
@@ -26,14 +28,18 @@ import { IconButton } from "../../../design/IconButton";
 import type { Picture } from "../../../design/Lightbox";
 import { Segmented } from "../../../design/Segmented";
 import { Dot } from "../../../design/Tag";
+import { toast } from "../../../design/toasts";
 import { mix } from "../../../design/tone";
-import { api } from "../../../infra/api";
+import { api, reasonOf } from "../../../infra/api";
 import { currentHost } from "../../../infra/host";
 import { ready, useQuery, useQueryClient } from "../../../infra/query";
+import { VdpAnchor } from "../../../infra/vdpProbe";
 import { noteBaseQuery } from "../store";
 import { baseCellAsStrings, baseCellAsText, findSelectOption, optionToneLook } from "../views/baseModel";
 import { SANDBOX_CSP } from "../views/noteFiles";
 import { buildChartSpecJson, filterIssuesForList, ISSUE_STATUS_DOT_TONE, resolveIssueRef, updateKpiItem } from "./docOps";
+import { type DocAnnotationRef, severityVisualOf } from "./mediaAnnotationModel";
+import { MediaAnnotationStage } from "./MediaAnnotationOverlay";
 
 type KpiBlockData = Extract<DocBlock, { type: "kpi" }>;
 type ChartBlockData = Extract<DocBlock, { type: "chart" }>;
@@ -228,9 +234,33 @@ export function DiagramBlockView(props: { readonly block: DiagramBlockData; read
   );
 }
 
-export function CompareBlockView(props: { readonly block: CompareBlockData; readonly onUpdate: (next: CompareBlockData) => void }) {
+export function CompareBlockView(props: {
+  readonly block: CompareBlockData;
+  readonly issues?: readonly Issue[] | undefined;
+  readonly selectedAnnotationId?: string | undefined;
+  readonly onUpdate: (next: CompareBlockData) => void;
+  readonly onSelectAnnotation?: ((annId: string | undefined, baseRowId?: string) => void) | undefined;
+  readonly onJumpToBaseRow?: ((rowId: string, annId: string) => void) | undefined;
+  readonly onOpenIssue?: ((id: IssueId) => void) | undefined;
+  readonly onCreateIssueFromAnnotation?: ((ann: MediaAnnotation, blockId: string) => Promise<IssueId | undefined>) | undefined;
+  readonly onOpenLightbox?: ((pic: Picture) => void) | undefined;
+}) {
   const editing = signal(false);
   const mode = signal<"side" | "focus">("side");
+  const allAnnotations = computed(() => props.block.annotations ?? []);
+  const beforeAnnotations = computed(() => allAnnotations().filter((a) => a.side === "before"));
+  const afterAnnotations = computed(() => allAnnotations().filter((a) => a.side !== "before"));
+
+  const updateSideAnnotations = (side: "before" | "after", nextSide: readonly MediaAnnotation[]) => {
+    const tagged = nextSide.map((a) => ({ ...a, side }));
+    const others = allAnnotations().filter((a) => (side === "before" ? a.side !== "before" : a.side === "before"));
+    props.onUpdate({ ...props.block, annotations: [...others, ...tagged] });
+  };
+
+  const handleSelect = (annId: string | undefined) => {
+    const found = annId !== undefined ? allAnnotations().find((a) => a.id === annId) : undefined;
+    props.onSelectAnnotation?.(annId, found?.baseRowId);
+  };
 
   return (
     <View testID={`doc-compare-${props.block.id}`} class="gap-2 rounded-lg border border-line bg-side p-3">
@@ -298,14 +328,50 @@ export function CompareBlockView(props: { readonly block: CompareBlockData; read
           <View class="min-w-0 flex-1 gap-1 rounded-md border border-line bg-page p-2">
             <Text class="text-2xs font-semibold text-muted">{props.block.beforeLabel || t("web.base.compare.before")}</Text>
             <If when={props.block.beforeAsset.trim().length > 0} else={<Text class="text-2xs text-faint">{t("web.note.doc.noBeforeAsset")}</Text>}>
-              <Image src={props.block.beforeAsset} accessibilityLabel={props.block.beforeLabel} class="h-32 w-full rounded-sm object-contain" />
+              <MediaAnnotationStage
+                scopeId={`${props.block.id}-before`}
+                src={props.block.beforeAsset}
+                caption={props.block.beforeLabel}
+                annotations={beforeAnnotations()}
+                stageClass="h-40"
+                selectedAnnotationId={props.selectedAnnotationId}
+                issues={props.issues}
+                onSelectAnnotation={handleSelect}
+                onChangeAnnotations={(next) => updateSideAnnotations("before", next)}
+                onOpenLightbox={
+                  props.onOpenLightbox
+                    ? () => props.onOpenLightbox?.({ src: props.block.beforeAsset, name: props.block.beforeLabel || props.block.beforeAsset })
+                    : undefined
+                }
+                onOpenIssue={props.onOpenIssue}
+                onCreateIssue={props.onCreateIssueFromAnnotation ? (ann) => props.onCreateIssueFromAnnotation?.(ann, props.block.id) : undefined}
+                onJumpToBaseRow={props.onJumpToBaseRow}
+              />
             </If>
           </View>
         </If>
         <View class="min-w-0 flex-1 gap-1 rounded-md border border-line bg-page p-2">
           <Text class="text-2xs font-semibold text-ok-ink">{props.block.afterLabel || t("web.base.compare.after")}</Text>
           <If when={props.block.afterAsset.trim().length > 0} else={<Text class="text-2xs text-faint">{t("web.note.doc.noAfterAsset")}</Text>}>
-            <Image src={props.block.afterAsset} accessibilityLabel={props.block.afterLabel} class="h-32 w-full rounded-sm object-contain" />
+            <MediaAnnotationStage
+              scopeId={`${props.block.id}-after`}
+              src={props.block.afterAsset}
+              caption={props.block.afterLabel}
+              annotations={afterAnnotations()}
+              stageClass="h-40"
+              selectedAnnotationId={props.selectedAnnotationId}
+              issues={props.issues}
+              onSelectAnnotation={handleSelect}
+              onChangeAnnotations={(next) => updateSideAnnotations("after", next)}
+              onOpenLightbox={
+                props.onOpenLightbox
+                  ? () => props.onOpenLightbox?.({ src: props.block.afterAsset, name: props.block.afterLabel || props.block.afterAsset })
+                  : undefined
+              }
+              onOpenIssue={props.onOpenIssue}
+              onCreateIssue={props.onCreateIssueFromAnnotation ? (ann) => props.onCreateIssueFromAnnotation?.(ann, props.block.id) : undefined}
+              onJumpToBaseRow={props.onJumpToBaseRow}
+            />
           </If>
         </View>
       </View>
@@ -315,11 +381,19 @@ export function CompareBlockView(props: { readonly block: CompareBlockData; read
 
 export function MediaBlockView(props: {
   readonly block: MediaBlockData;
+  readonly issues?: readonly Issue[] | undefined;
+  readonly selectedAnnotationId?: string | undefined;
   readonly onUpdate: (next: MediaBlockData) => void;
+  readonly onSelectAnnotation?: ((annId: string | undefined, baseRowId?: string) => void) | undefined;
+  readonly onJumpToBaseRow?: ((rowId: string, annId: string) => void) | undefined;
+  readonly onOpenIssue?: ((id: IssueId) => void) | undefined;
+  readonly onCreateIssueFromAnnotation?: ((ann: MediaAnnotation, blockId: string) => Promise<IssueId | undefined>) | undefined;
+  readonly onOpenMediaLightbox?: ((blockId: string) => void) | undefined;
   readonly onOpenLightbox?: ((pic: Picture) => void) | undefined;
 }) {
   const host = useDesignHost();
   const editing = signal(untracked(() => props.block.src.trim() === ""));
+  const annotations = computed(() => props.block.annotations ?? []);
 
   return (
     <View testID={`doc-media-${props.block.id}`} class="gap-2 rounded-lg border border-line bg-side p-3">
@@ -370,13 +444,27 @@ export function MediaBlockView(props: {
             </View>
           }
         >
-          <View
-            role="button"
-            onPress={() => props.onOpenLightbox?.({ src: props.block.src, name: props.block.caption || props.block.src })}
-            class="overflow-hidden rounded-md border border-line bg-page hover:opacity-90"
-          >
-            <Image src={props.block.src} accessibilityLabel={props.block.caption || props.block.src} class="h-48 w-full object-contain" />
-          </View>
+          <MediaAnnotationStage
+            scopeId={props.block.id}
+            src={props.block.src}
+            caption={props.block.caption}
+            annotations={annotations()}
+            stageClass="h-64"
+            selectedAnnotationId={props.selectedAnnotationId}
+            issues={props.issues}
+            onSelectAnnotation={(annId) => {
+              const found = annId !== undefined ? annotations().find((a) => a.id === annId) : undefined;
+              props.onSelectAnnotation?.(annId, found?.baseRowId);
+            }}
+            onChangeAnnotations={(next) => props.onUpdate({ ...props.block, annotations: [...next] })}
+            onOpenLightbox={() => {
+              if (props.onOpenMediaLightbox) props.onOpenMediaLightbox(props.block.id);
+              else props.onOpenLightbox?.({ src: props.block.src, name: props.block.caption || props.block.src });
+            }}
+            onOpenIssue={props.onOpenIssue}
+            onCreateIssue={props.onCreateIssueFromAnnotation ? (ann) => props.onCreateIssueFromAnnotation?.(ann, props.block.id) : undefined}
+            onJumpToBaseRow={props.onJumpToBaseRow}
+          />
         </If>
       </If>
       <If when={props.block.caption}>{(cap) => <Text class="text-xs text-muted">{cap()}</Text>}</If>
@@ -476,7 +564,18 @@ export function PreviewBlockView(props: {
   );
 }
 
-function renderBaseEmbedCell(col: BaseColumn, cell: BaseCellValue | undefined, notes: readonly Note[]) {
+function renderBaseEmbedCell(
+  col: BaseColumn,
+  cell: BaseCellValue | undefined,
+  row: BaseRow,
+  ctx: {
+    readonly notes: readonly Note[];
+    readonly issues: readonly Issue[];
+    readonly runningKey: string | undefined;
+    readonly onOpenIssue?: ((id: IssueId) => void) | undefined;
+    readonly onRunAgentRow?: ((colId: string, rowId: string) => void) | undefined;
+  },
+) {
   const raw = baseCellAsText(cell);
   if (col.kind === "select") {
     const opt = findSelectOption(col, raw);
@@ -495,8 +594,62 @@ function renderBaseEmbedCell(col: BaseColumn, cell: BaseCellValue | undefined, n
     const items = baseCellAsStrings(cell).map((val) => findSelectOption(col, val)?.label ?? val);
     return <Text class="truncate text-2xs text-ink">{items.join(", ") || "—"}</Text>;
   }
+  if (col.kind === "checkbox") {
+    const checked = cell?._tag === "bool" && cell.value;
+    return <Icon name={checked ? "ticked" : "minus"} size={12} tone={checked ? "ok-ink" : "faint"} />;
+  }
+  if (col.kind === "issueRef" && cell?._tag === "issueRef" && cell.issueId !== "") {
+    const iss = resolveIssueRef(ctx.issues, cell.issueId);
+    return (
+      <View
+        role="button"
+        onPress={() => ctx.onOpenIssue?.(iss?.id ?? cell.issueId)}
+        class="h-5 max-w-full flex-row items-center gap-1 self-start rounded-sm bg-side px-1.5 hover:bg-hover"
+      >
+        <Icon name="issues" size={10} tone="accent" />
+        <Text class="truncate font-mono text-2xs font-medium text-ink">{iss ? `#${iss.number}` : cell.issueId}</Text>
+      </View>
+    );
+  }
+  if (col.kind === "agentAction") {
+    const spawnedId = cell?._tag === "agentRun" ? cell.spawnedIssueId : undefined;
+    const summary = cell?._tag === "agentRun" ? cell.summary : undefined;
+    const isRunning = ctx.runningKey === `${col.id}:${row.id}`;
+    if (spawnedId !== undefined && spawnedId !== "") {
+      const iss = resolveIssueRef(ctx.issues, spawnedId);
+      return (
+        <View
+          role="button"
+          onPress={() => ctx.onOpenIssue?.(iss?.id ?? spawnedId)}
+          class="h-5 max-w-full flex-row items-center gap-1 self-start rounded-sm bg-ok-soft px-1.5 hover:opacity-85"
+        >
+          <Icon name="issues" size={10} tone="ok-ink" />
+          <Text class="truncate font-mono text-2xs font-medium text-ok-ink">{iss ? `#${iss.number}` : spawnedId}</Text>
+        </View>
+      );
+    }
+    return (
+      <View class="flex-row items-center gap-1">
+        <If when={ctx.onRunAgentRow !== undefined}>
+          <Button
+            size="compact"
+            tone="quiet"
+            icon="play"
+            disabled={isRunning}
+            testID={`doc-base-embed-agent-${row.id}-${col.id}`}
+            onPress={() => ctx.onRunAgentRow?.(col.id, row.id)}
+          >
+            {isRunning ? t("web.note.base.runningAgentColumn") : t("web.note.base.runAgentColumn")}
+          </Button>
+        </If>
+        <If when={summary !== undefined && summary !== ""}>
+          <Text class="min-w-0 flex-1 truncate text-2xs text-muted">{summary}</Text>
+        </If>
+      </View>
+    );
+  }
   if (col.kind === "noteRef" && cell?._tag === "noteRef") {
-    const found = notes.find((n) => n.id === cell.noteId);
+    const found = ctx.notes.find((n) => n.id === cell.noteId);
     return <Text class="truncate text-2xs text-ink">{found?.title ?? (raw || "—")}</Text>;
   }
   return <Text class="truncate text-2xs text-ink">{raw || "—"}</Text>;
@@ -505,16 +658,62 @@ function renderBaseEmbedCell(col: BaseColumn, cell: BaseCellValue | undefined, n
 export function BaseEmbedBlockView(props: {
   readonly block: BaseEmbedBlockData;
   readonly notes: readonly Note[];
+  readonly issues?: readonly Issue[] | undefined;
+  readonly highlightedRowId?: string | undefined;
+  readonly annotationByRowId?: ReadonlyMap<string, DocAnnotationRef> | undefined;
+  readonly annotationById?: ReadonlyMap<string, DocAnnotationRef> | undefined;
   readonly onUpdate: (next: BaseEmbedBlockData) => void;
   readonly onOpenNote: (id: NoteId) => void;
+  readonly onOpenIssue?: ((id: IssueId) => void) | undefined;
+  readonly onSelectReviewRow?: ((rowId: string, ref?: DocAnnotationRef) => void) | undefined;
 }) {
+  const queries = useQueryClient();
   const baseNotes = computed(() => props.notes.filter((n) => n.noteType === "base"));
   const target = computed(() => props.notes.find((n) => n.id === props.block.noteId));
-  const liveSnap = useQuery(() => noteBaseQuery({ id: props.block.noteId }), {
-    enabled: () => props.block.noteId !== "",
-  });
+  const liveSnap = useQuery(
+    () =>
+      noteBaseQuery({
+        id: props.block.noteId,
+        ...(props.block.sheetId !== undefined ? { sheetId: props.block.sheetId } : {}),
+        ...(props.block.viewId !== undefined ? { viewId: props.block.viewId } : {}),
+      }),
+    {
+      enabled: () => props.block.noteId !== "",
+    },
+  );
   const editing = signal(false);
+  const runningKey = signal<string | undefined>(undefined);
   const snapData = computed(() => ready(liveSnap, undefined));
+
+  const linkedRefOfRow = (row: BaseRow): DocAnnotationRef | undefined => {
+    if (row.annotationRef !== undefined) {
+      const direct = props.annotationById?.get(row.annotationRef.annotationId);
+      if (direct !== undefined) return direct;
+    }
+    return props.annotationByRowId?.get(row.id);
+  };
+
+  const runAgentRow = (columnId: string, rowId: string) => {
+    const snap = untracked(snapData);
+    const key = `${columnId}:${rowId}`;
+    runningKey.set(key);
+    void api.note.base
+      .runAgentColumn({
+        id: props.block.noteId,
+        ...(snap?.activeSheetId ? { sheetId: snap.activeSheetId } : {}),
+        columnId,
+        rowIds: [rowId],
+        origin: "user",
+      })
+      .then((res) => {
+        toast(t("web.note.base.agentRanToast", { n: res.executed }));
+        void queries.invalidate({ prefix: ["note-base", props.block.noteId] });
+      })
+      .catch((e) => toast(reasonOf(e), "bad"))
+      .finally(() => {
+        if (untracked(runningKey) === key) runningKey.set(undefined);
+      });
+  };
 
   return (
     <View testID={`doc-base-embed-${props.block.id}`} class="gap-1.5 py-1">
@@ -571,14 +770,14 @@ export function BaseEmbedBlockView(props: {
                   {(bp) => (
                     <View class="overflow-hidden rounded-md border border-line bg-page">
                       <View class="flex-row border-b border-line bg-side px-2.5 py-1.5">
-                        <Each of={bp().columns.slice(0, 4)} key={(col) => col}>
+                        <Each of={bp().columns.slice(0, 5)} key={(col) => col}>
                           {(col) => <Text class="min-w-0 flex-1 truncate text-2xs font-semibold text-muted">{col()}</Text>}
                         </Each>
                       </View>
-                      <Each of={bp().rows.slice(0, 4)} key={(_, idx) => String(idx)}>
+                      <Each of={bp().rows.slice(0, 6)} key={(_, idx) => String(idx)}>
                         {(row) => (
                           <View class="flex-row border-t border-line px-2.5 py-1.5">
-                            <Each of={row().slice(0, 4)} key={(_, cIdx) => String(cIdx)}>
+                            <Each of={row().slice(0, 5)} key={(_, cIdx) => String(cIdx)}>
                               {(cell) => <Text class="min-w-0 flex-1 truncate text-2xs text-ink">{cell() || "—"}</Text>}
                             </Each>
                           </View>
@@ -592,24 +791,91 @@ export function BaseEmbedBlockView(props: {
           </If>
         }
       >
-        {(snap) => (
-          <View class="overflow-hidden rounded-md border border-line bg-page">
-            <View class="flex-row gap-2 border-b border-line bg-side px-2.5 py-1.5">
-              <Each of={snap().columns.slice(0, 4)} key={(col) => col.id}>
-                {(col) => <Text class="min-w-0 flex-1 truncate text-2xs font-semibold text-muted">{col().name}</Text>}
+        {(snap) => {
+          const visibleCols = () =>
+            snap()
+              .columns.filter((c) => c.kind !== "media")
+              .slice(0, 5);
+          const hasAnyLinkedPin = () => snap().rows.some((r) => linkedRefOfRow(r) !== undefined);
+          return (
+            <View class="overflow-hidden rounded-md border border-line bg-page">
+              <View class="flex-row items-center gap-2 border-b border-line bg-side px-2.5 py-1.5">
+                <If when={hasAnyLinkedPin()}>
+                  <View class="w-16 shrink-0">
+                    <Text class="font-mono text-2xs font-semibold text-faint">#</Text>
+                  </View>
+                </If>
+                <Each of={visibleCols()} key={(col) => col.id}>
+                  {(col) => <Text class="min-w-0 flex-1 truncate text-2xs font-semibold text-muted">{col().name}</Text>}
+                </Each>
+              </View>
+              <Each of={snap().rows.slice(0, 6)} key={(row) => row.id}>
+                {(row) => {
+                  const linked = () => linkedRefOfRow(row());
+                  const isHighlighted = () => props.highlightedRowId === row().id;
+                  const pinVisual = () => {
+                    const ref = linked();
+                    return ref ? severityVisualOf(ref.annotation.severity) : undefined;
+                  };
+                  const pinResolved = () => linked()?.annotation.status === "resolved";
+                  return (
+                    <View
+                      role="button"
+                      testID={`doc-base-embed-row-${props.block.id}-${row().id}`}
+                      accessibilityState={{ selected: isHighlighted() }}
+                      onPress={() => props.onSelectReviewRow?.(row().id, linked())}
+                      class={`relative flex-row items-center gap-2 border-t border-line px-2.5 py-1.5 ${isHighlighted() ? "bg-selected" : "hover:bg-hover"}`}
+                    >
+                      <If when={isHighlighted()}>
+                        <View class="pointer-events-none absolute top-0 bottom-0 left-0 w-0.5 bg-focus" />
+                      </If>
+                      <VdpAnchor
+                        testId={`doc-base-embed-row-${props.block.id}-${row().id}`}
+                        role="button"
+                        onPress={() => props.onSelectReviewRow?.(row().id, linked())}
+                      />
+                      <If when={hasAnyLinkedPin()}>
+                        <View class="w-16 shrink-0 flex-row items-center">
+                          <If when={linked()} else={<Text class="font-mono text-2xs text-faint">—</Text>}>
+                            {(ref) => (
+                              <View
+                                testID={`doc-base-embed-pin-${row().id}`}
+                                class={`h-5 flex-row items-center gap-1 rounded-full px-1.5 ${
+                                  pinResolved() ? "bg-leaf" : (pinVisual()?.badgeBgClass ?? "bg-accent")
+                                }`}
+                              >
+                                <Text
+                                  class={`font-mono text-2xs font-bold tabular-nums ${
+                                    pinResolved() ? "text-paper" : (pinVisual()?.badgeTextClass ?? "text-paper")
+                                  }`}
+                                >
+                                  {t("web.note.annotation.jumpToPin", { n: ref().annotation.number })}
+                                </Text>
+                              </View>
+                            )}
+                          </If>
+                        </View>
+                      </If>
+                      <Each of={visibleCols()} key={(col) => col.id}>
+                        {(col) => (
+                          <View class="min-w-0 flex-1">
+                            {renderBaseEmbedCell(col(), row().cells[col().id], row(), {
+                              notes: props.notes,
+                              issues: props.issues ?? [],
+                              runningKey: runningKey(),
+                              onOpenIssue: props.onOpenIssue,
+                              onRunAgentRow: runAgentRow,
+                            })}
+                          </View>
+                        )}
+                      </Each>
+                    </View>
+                  );
+                }}
               </Each>
             </View>
-            <Each of={snap().rows.slice(0, 4)} key={(row) => row.id}>
-              {(row) => (
-                <View class="flex-row items-center gap-2 border-t border-line px-2.5 py-1.5">
-                  <Each of={snap().columns.slice(0, 4)} key={(col) => col.id}>
-                    {(col) => <View class="min-w-0 flex-1">{renderBaseEmbedCell(col(), row().cells[col().id], props.notes)}</View>}
-                  </Each>
-                </View>
-              )}
-            </Each>
-          </View>
-        )}
+          );
+        }}
       </If>
     </View>
   );

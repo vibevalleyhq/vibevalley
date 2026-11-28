@@ -142,7 +142,7 @@ impl Server for LateServer {
         let (tx, rx) = tokio::sync::mpsc::channel(512);
         let cell = self.cell.clone();
         let mut ready = self.ready.clone();
-        vibevalley_rt::current_or_global_handle().spawn(async move {
+        vibevalley_kit::rt::current_or_global_handle().spawn(async move {
             tokio::select! {
                 biased;
                 _ = tx.closed() => return,
@@ -273,7 +273,7 @@ mod tests {
         }
 
         fn wait_for(&self, what: &str, mut f: impl FnMut(&Self) -> bool) {
-            vibevalley_rt::block_on(async {
+            vibevalley_kit::rt::block_on(async {
                 tokio::time::timeout(Duration::from_secs(3), async {
                     loop {
                         let notified = self.notify.notified();
@@ -308,7 +308,7 @@ mod tests {
         }
 
         fn wait_live_watchers(&self, what: &str, expected: usize) {
-            vibevalley_rt::block_on(async {
+            vibevalley_kit::rt::block_on(async {
                 tokio::time::timeout(Duration::from_secs(3), async {
                     loop {
                         let notified = self.on_live.notified();
@@ -326,7 +326,7 @@ mod tests {
         }
 
         fn wait_subscribers(&self, what: &str, expected: usize) {
-            vibevalley_rt::block_on(async {
+            vibevalley_kit::rt::block_on(async {
                 tokio::time::timeout(Duration::from_secs(3), async {
                     loop {
                         let notified = self.on_subscribe.notified();
@@ -404,7 +404,7 @@ mod tests {
         let stop = tokio_util::sync::CancellationToken::new();
         let stopped = stop.clone();
         let late_wait = Arc::clone(&late);
-        let finished = vibevalley_rt::block_on(async move {
+        let finished = vibevalley_kit::rt::block_on(async move {
             let task = tokio::spawn(async move {
                 tokio::select! {
                     biased;
@@ -429,7 +429,7 @@ mod tests {
             let _ = go_rx.recv();
             inner
         }));
-        vibevalley_rt::block_on(async {
+        vibevalley_kit::rt::block_on(async {
             let late_sub = Arc::clone(&late);
             let sub_task = tokio::spawn(async move { late_sub.subscribe_slice_async(SliceKind::Board).await });
             tokio::time::sleep(Duration::from_millis(15)).await;
@@ -540,7 +540,7 @@ mod tests {
 
     #[test]
     fn call_with_async_waits_pre_attach_and_delegates_directly_post_attach() {
-        vibevalley_rt::block_on(async {
+        vibevalley_kit::rt::block_on(async {
             let late = Arc::new(LateServer::new());
             let fake = Arc::new(FakeServer::new());
             fake.respond("issue.list", json!([{ "id": "i1" }]));
@@ -669,7 +669,7 @@ mod tests {
         assert_eq!(pre_rec.named("sub:s1")[0], json!({ "event": { "text": "hello-after-attach" } }));
         assert!(cancelled_rec.named("sub:s2").is_empty());
 
-        vibevalley_rt::block_on(async {
+        vibevalley_kit::rt::block_on(async {
             let snap = late.clone().slice_snapshot_json_async(SliceKind::Board).await;
             assert!(snap.contains("\"seq\":11"));
             assert!(late.clone().subscribe_slice_async(SliceKind::Board).await.is_some());

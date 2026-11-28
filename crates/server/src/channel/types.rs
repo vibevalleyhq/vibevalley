@@ -6,7 +6,7 @@ use serde_json::Value;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
     Actor, AgentRole, ApiError, Attachment, BizCode, ChannelCommand, ChannelType, ChatMessage, Embed, MessageKind, NoteCard, NoteViewContext, Notify, Outcome,
-    Reaction, Spent, SubjectKind, USER_ID,
+    ParticipantId, Reaction, Spent, SubjectKind,
 };
 
 use crate::context::{LookIn, missing, refused as refuse};
@@ -42,9 +42,14 @@ pub(super) fn no_channel(id: &str) -> ApiError {
 /// this; an orchestrator always is.
 const AGENT_WAKE_COOLDOWN_MS: i64 = 60_000;
 
-/// A helper profile's seat in the chat, the peer of its direct channel.
-pub fn profile_id(agent: &str) -> String {
-    format!("profile:{agent}")
+/// Canonical default local user participant id (`user:self`).
+pub fn local_user_id() -> String {
+    ParticipantId::local_user().to_string()
+}
+
+/// Canonical helper profile seat id (`agent:<profile>`), used as the peer of its direct channel.
+pub fn agent_seat_id(agent: &str) -> String {
+    ParticipantId::agent(agent).to_string()
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -108,42 +113,13 @@ impl HeldBy {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DeliveryTargetKind {
-    Session,
-    Issue,
-    Orchestrator,
-    Direct,
-}
-
-impl DeliveryTargetKind {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            DeliveryTargetKind::Session => "session",
-            DeliveryTargetKind::Issue => "issue",
-            DeliveryTargetKind::Orchestrator => "orchestrator",
-            DeliveryTargetKind::Direct => "direct",
-        }
-    }
-
-    pub fn from_db(s: &str) -> Self {
-        match s {
-            "session" => DeliveryTargetKind::Session,
-            "issue" => DeliveryTargetKind::Issue,
-            "orchestrator" => DeliveryTargetKind::Orchestrator,
-            _ => DeliveryTargetKind::Direct,
-        }
-    }
-}
-
 /// A durable pending delivery written to `channel_delivery` on commit.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct QueuedDelivery {
     pub id: i64,
     pub message_id: String,
     pub channel_id: String,
-    pub recipient_kind: DeliveryTargetKind,
-    pub recipient_id: String,
+    pub recipient: ParticipantId,
     pub reason: Reason,
     pub wakes: bool,
     pub held_by: Option<HeldBy>,
@@ -157,11 +133,11 @@ pub struct ChannelDispatched {
     pub deliveries: Vec<QueuedDelivery>,
 }
 
-/// The hops per place and each session's last wake by agents' words.
+/// The hops per place and each participant's last wake by agents' words.
 #[derive(Debug, Clone, Default)]
 pub struct Reach {
     hops_in: HashMap<String, usize>,
-    last_wake_of: HashMap<String, i64>,
+    last_wake_of: HashMap<ParticipantId, i64>,
 }
 
 impl Reach {
@@ -173,21 +149,21 @@ impl Reach {
         self.hops_in.get(scope).copied().unwrap_or(0)
     }
 
-    pub fn cooling(&self, of: &[String], at: i64) -> Vec<String> {
+    pub fn cooling(&self, of: &[ParticipantId], at: i64) -> Vec<ParticipantId> {
         of.iter()
-            .filter(|s| self.last_wake_of.get(*s).is_some_and(|last| at - last < AGENT_WAKE_COOLDOWN_MS))
+            .filter(|p| self.last_wake_of.get(*p).is_some_and(|last| at - last < AGENT_WAKE_COOLDOWN_MS))
             .cloned()
             .collect()
     }
 
-    pub fn woke(&mut self, scope: &str, session: &str, at: i64) {
-        let last = self.last_wake_of.entry(session.to_string()).or_insert(0);
+    pub fn woke(&mut self, scope: &str, recipient: &ParticipantId, at: i64) {
+        let last = self.last_wake_of.entry(recipient.clone()).or_insert(0);
         *last = (*last).max(at);
         *self.hops_in.entry(scope.to_string()).or_insert(0) += 1;
     }
 
-    pub fn left(&mut self, session: &str) {
-        self.last_wake_of.remove(session);
+    pub fn left(&mut self, participant: &ParticipantId) {
+        self.last_wake_of.remove(participant);
     }
 
     pub fn channel_removed(&mut self, channel: &str) {
@@ -398,7 +374,7 @@ pub fn to_message(row: &MsgRow) -> ChatMessage {
         outcome: meta.outcome,
         spent: meta.spent,
         spoken: meta.spoken.unwrap_or(false),
-        send_key: row.send_key.clone().filter(|k| !k.is_empty() && row.sender_id == USER_ID),
+        send_key: row.send_key.clone().filter(|k| !k.is_empty() && row.sender_kind == "user"),
         at: row.created_at,
         revision: row.revision,
         reply_to: row.reply_number,
@@ -538,10 +514,14 @@ pub enum ChannelMessageEvent {
     Edited(ChatMessage),
 }
 
-/// The user's words.
+/// A human participant's words.
 #[derive(Debug, Clone, Default)]
 pub struct Saying {
     pub text: String,
+    /// Acting human participant (`user:<id>`); defaults to `user:self`.
+    pub from: Option<ParticipantId>,
+    /// Optional display name when registering a new human participant on first speech.
+    pub from_name: Option<String>,
     /// A place's id, or a channel as the user names it; none is the default.
     pub channel: Option<String>,
     pub send_key: String,
@@ -703,7 +683,6 @@ pub(super) struct Written {
     pub(super) again: bool,
     pub(super) row: MsgRow,
     pub(super) event: Option<EventRow>,
-    pub(super) deliveries: Vec<QueuedDelivery>,
     pub(super) hop_limit_hit: bool,
 }
 

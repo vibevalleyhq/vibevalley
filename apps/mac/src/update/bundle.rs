@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -44,7 +46,7 @@ fn resolve_login_shell_path(timeout: Duration) -> Option<String> {
         .ok()
         .filter(|s| Path::new(s).is_file())
         .unwrap_or_else(|| "/bin/zsh".into());
-    vibevalley_rt::block_on(async move {
+    vibevalley_kit::rt::block_on(async move {
         let mut child = tokio::process::Command::new(&shell)
             .args(["-ilc", "printf '__VV_PATH__%s__VV_END__' \"$PATH\""])
             .stdin(std::process::Stdio::null())
@@ -80,8 +82,7 @@ pub fn enter_bundle() {
         && let Some(login_path) = resolve_login_shell_path(Duration::from_secs(2))
     {
         let merged = merge_path_entries(std::env::var_os("PATH").as_deref(), std::ffi::OsStr::new(&login_path));
-        // SAFETY: called at the top of main, before GPUI or background threads start.
-        unsafe { std::env::set_var("PATH", merged) };
+        crate::platform::objc_app::set_startup_env("PATH", merged);
     }
     let Some(bundle) = bundle else {
         return;
@@ -89,8 +90,7 @@ pub fn enter_bundle() {
     for (key, folder) in [("VIBEVALLEY_ASSETS", "assets"), ("VIBEVALLEY_UI_BUNDLE", "ui")] {
         let path = Path::new(bundle).join("Contents/Resources").join(folder);
         if std::env::var_os(key).is_none() && path.is_dir() {
-            // SAFETY: called at the top of main, before any other thread exists.
-            unsafe { std::env::set_var(key, path) };
+            crate::platform::objc_app::set_startup_env(key, path);
         }
     }
 }

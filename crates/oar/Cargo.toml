@@ -1,0 +1,39 @@
+[package]
+name = "vibevalley-oar"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Open Agent Runtime (OAR) Rust implementation: Claude Code, Codex, ACP, and scripted external coding agent drivers"
+
+[features]
+default = []
+# Test-only model checking (cargo xtask loom); never enable in release binaries.
+loom = ["dep:loom", "vibevalley-kit/loom"]
+
+[dependencies]
+agent-client-protocol = "5.2.0"
+base64 = { workspace = true }
+futures-util = { workspace = true }
+jiff = { workspace = true }
+loom = { workspace = true, optional = true }
+nix = { version = "0.32.0", features = ["signal", "process"] }
+parking_lot = { workspace = true }
+regex = { workspace = true }
+semver = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sqlx = { workspace = true, features = ["runtime-tokio"] }
+tempfile = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true, features = ["process", "io-util"] }
+tokio-util = { workspace = true }
+toml_edit = { version = "0.25", default-features = false, features = ["parse", "display"] }
+tracing = { workspace = true }
+uuid = { workspace = true }
+vibevalley-kit = { workspace = true }
+vibevalley-mcp = { workspace = true }
+which = { workspace = true }
+
+[dev-dependencies]
+proptest = "1.12.0"
+tokio = { workspace = true, features = ["test-util"] }

@@ -3,7 +3,7 @@ import { expect, open, test } from "nsh/test";
 
 import { setLocale } from "@vibevalley/i18n";
 import "@vibevalley/i18n/catalogs";
-import { type Channel, type ChatMessage, type Issue, type Note, type NoteType } from "@vibevalley/protocol";
+import { type Channel, type ChatMessage, type Issue, localUserParticipant, type Note, type NoteType } from "@vibevalley/protocol";
 import { issueId, messageId, noteId } from "@vibevalley/protocol/schema";
 
 import { fakeHost } from "../../../fixtures/fakeHost";
@@ -18,7 +18,7 @@ const sampleNote: Note = {
   sortOrder: 0,
   channel: "general",
   said: { channel: "general", number: 12 },
-  by: "user",
+  by: localUserParticipant,
   byName: "You",
   version: 1,
   seq: 1,
@@ -65,8 +65,8 @@ test("promote helpers carry /chat/<channel>?m=<seq> back-links, body, attachment
     id: messageId("m-42"),
     number: 42,
     channel: "design",
-    from: "user",
-    actor: { kind: "user", id: "user", name: "You" },
+    from: localUserParticipant,
+    actor: { kind: "user", id: localUserParticipant, name: "You" },
     name: "You",
     kind: "chat",
     text: "Fix login redirect loop\nCheck session expiry handling.",

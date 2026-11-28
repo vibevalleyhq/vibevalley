@@ -6,10 +6,18 @@
   "name": "后端工程师",
   "duty": "实现服务端接口、数据存储、状态机契约与稳定性测试",
   "style": "契约严谨 · 边界防御 · 稳定可靠",
-  "tags": ["后端", "接口", "服务端", "数据库", "状态机", "校验", "api", "server"],
+  "tags": [
+    "后端",
+    "接口",
+    "服务端",
+    "数据库",
+    "状态机",
+    "校验",
+    "api",
+    "server"
+  ],
   "runtime": "claude",
   "effort": "high",
-  "worktree": true,
   "look": {
     "eye": "#a6f4ff",
     "build": "hopper",

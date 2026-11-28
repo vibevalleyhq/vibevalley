@@ -41,6 +41,8 @@ pub enum MailboxSource {
     ChannelDirect,
     ChannelOrchestrator,
     IssueComment,
+    /// Durable passive context written for `wakes: false` deliveries; drained on next `wakes: true` turn.
+    PassiveContext,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -724,8 +726,22 @@ async fn list_mailbox_impl<C: ConnectionTrait>(db: &C, session_id: &str) -> DbRe
         .collect()
 }
 
+async fn drain_passive_context_impl<C: ConnectionTrait>(db: &C, session_id: &str, at: i64) -> DbResult<Vec<MailboxEntry>> {
+    let source = db_word(&MailboxSource::PassiveContext)?;
+    let mut rows = Update::many(session_mailbox::Entity)
+        .col_expr(session_mailbox::Column::Status, Expr::value("done"))
+        .col_expr(session_mailbox::Column::UpdatedAt, Expr::value(at))
+        .filter(session_mailbox::Column::SessionId.eq(session_id))
+        .filter(session_mailbox::Column::Source.eq(source))
+        .filter(session_mailbox::Column::Status.eq("pending"))
+        .exec_with_returning(db)
+        .await?;
+    rows.sort_by_key(|r| r.id);
+    rows.into_iter().map(read_mailbox_row).collect()
+}
+
 #[derive(Clone)]
-pub struct SessionService {
+pub(crate) struct SessionService {
     db: Arc<Database>,
 }
 
@@ -738,7 +754,7 @@ impl SessionService {
         all_impl(self.db.read_conn()).await
     }
 
-    pub(crate) async fn all_in_tx(&self, tx: &Tx) -> DbResult<Vec<Session>> {
+    pub(super) async fn all_in_tx(&self, tx: &Tx) -> DbResult<Vec<Session>> {
         all_impl(tx).await
     }
 
@@ -754,7 +770,8 @@ impl SessionService {
         find_by_departed_impl(self.db.read_conn(), id, true).await
     }
 
-    pub async fn put(&self, session: &Session, departed: bool) -> DbResult<()> {
+    #[cfg(any(test, feature = "fake"))]
+    pub(crate) async fn put(&self, session: &Session, departed: bool) -> DbResult<()> {
         put_impl(self.db.write_conn(), session, departed).await
     }
 
@@ -980,6 +997,10 @@ impl SessionService {
 
     pub(crate) async fn list_mailbox(&self, session_id: &str) -> DbResult<Vec<MailboxEntry>> {
         list_mailbox_impl(self.db.read_conn(), session_id).await
+    }
+
+    pub(crate) async fn drain_passive_context(&self, session_id: &str, at: i64) -> DbResult<Vec<MailboxEntry>> {
+        drain_passive_context_impl(self.db.write_conn(), session_id, at).await
     }
 
     /// Deletes up to `limit` settled mailbox rows (`status NOT IN ('pending', 'claimed')` and `updated_at < before_ms`).

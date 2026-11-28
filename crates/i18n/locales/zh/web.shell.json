@@ -27,8 +27,6 @@
     "collapseAllTooltip": "折叠全部仓库与工作树",
     "expandCurrent": "展开当前",
     "expandCurrentTooltip": "展开当前仓库与活动工作树",
-    "collapseItem": "折叠 {name}",
-    "expandItem": "展开 {name}",
     "newTerminalHere": "在此新建终端",
     "newChatHere": "在此新建对话",
     "chatWaiting": "等待确认回复",

@@ -15,7 +15,6 @@ import { api } from "../../infra/api";
 import { defineQuery, ready, useQuery, useQueryClient } from "../../infra/query";
 import { Link as A } from "../../infra/router";
 import { useVdpNode } from "../../infra/vdpProbe";
-import { noteSuffixOf } from "./html";
 import { noteHref, noteIcon, noteTypeIcon, noteTypeLabel, useNotes } from "./NoteCard";
 
 const issueLinksQuery = defineQuery({
@@ -167,8 +166,8 @@ export function IssueNotes(props: IssueNotesProps) {
                         <Text class="text-2xs font-medium text-muted">{noteTypeLabel(n().noteType)}</Text>
                       </View>
                     </View>
-                    <Text class="truncate font-mono text-2xs text-faint tabular-nums">
-                      {[noteSuffixOf(n()), ...(n().version > 0 ? [t("web.note.card.version", { version: n().version })] : [])].join(" · ")}
+                    <Text class="truncate text-2xs text-faint tabular-nums">
+                      {n().version > 0 ? t("web.note.card.version", { version: n().version }) : t("web.note.page.liveVersion")}
                     </Text>
                   </View>
                 </A>

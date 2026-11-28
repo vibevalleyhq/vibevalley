@@ -98,6 +98,9 @@ endpoint_ids! {
     SessionChildTranscript => "session.childTranscript",
     SessionCompact => "session.compact",
     SessionRunCode => "session.runCode",
+    SessionEvalCreate => "session.eval.create",
+    SessionApprovalList => "session.approval.list",
+    SessionApprovalResolve => "session.approval.resolve",
     // issue
     IssueConversationGet => "issue.conversation.get",
     IssueCommentCreate => "issue.comment.create",
@@ -204,6 +207,9 @@ endpoint_ids! {
     NoteBaseView => "note.base.view",
     NoteBaseUpsertRow => "note.base.upsertRow",
     NoteBaseRunAgentColumn => "note.base.runAgentColumn",
+    NoteAnnotationUpsert => "note.annotation.upsert",
+    NoteAnnotationDelete => "note.annotation.delete",
+    NoteBaseSyncReview => "note.base.syncReview",
     NoteTypeList => "note.type.list",
     NoteTypeRead => "note.type.read",
     NoteFileList => "note.file.list",
@@ -232,12 +238,6 @@ endpoint_ids! {
     SettingGet => "setting.get",
     SettingValidate => "setting.validate",
     SettingUpdate => "setting.update",
-    // orchestrator
-    OrchestratorOpen => "orchestrator.open",
-    OrchestratorStop => "orchestrator.stop",
-    OrchestratorEvalCreate => "orchestrator.eval.create",
-    OrchestratorApprovalList => "orchestrator.approval.list",
-    OrchestratorApprovalResolve => "orchestrator.approval.resolve",
     // attachment & core
     AttachmentCreate => "attachment.create",
     AttachmentImportPath => "attachment.importPath",

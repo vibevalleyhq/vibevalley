@@ -134,9 +134,6 @@
       "draining": "Draining"
     },
     "machineId": "Machine ID",
-    "worktree": "Worktree",
-    "worktreeYes": "Supported",
-    "worktreeNo": "Unavailable",
     "installedCount": "Installed",
     "lastSeen": "Last seen"
   },

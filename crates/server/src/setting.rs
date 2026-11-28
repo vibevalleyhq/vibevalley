@@ -313,7 +313,7 @@ pub use vibevalley_protocol::Secret;
 #[derive(Debug, Clone, Default)]
 pub struct SettingConfig {
     pub home: PathBuf,
-    /// The work root: repos and worktrees live under it.
+    /// The work root: local repositories live under it.
     pub work_root: PathBuf,
     pub version: String,
     pub deepseek_api_key: String,
@@ -739,7 +739,6 @@ impl Setting {
             home: path(c.home.clone()),
             paths: SpacePaths {
                 repos: path(c.work_root.join("repos")),
-                worktrees: path(c.work_root.join("worktrees")),
             },
             version: c.version.clone(),
             locale: st.locale.unwrap_or(Locale::Zh),

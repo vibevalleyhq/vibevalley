@@ -10,6 +10,7 @@ use std::time::{Duration, SystemTime};
 
 use parking_lot::Mutex as SyncMutex;
 use serde::{Deserialize, Serialize};
+use vibevalley_kit::storage::{OrphanSweeper, extract_sha256_tokens, is_sha256_hex};
 use vibevalley_protocol::ApiError;
 
 use super::attachment::AttachmentStorage;
@@ -307,27 +308,26 @@ impl Housekeeper {
             });
         }
 
-        let stored_objects = self.backend.list("attachments/").await.map_err(internal)?;
-        for meta in stored_objects {
-            let Some(name) = meta.key.strip_prefix("attachments/") else {
-                continue;
-            };
-            // Skip nested directories (e.g. `.staging/media/...`), temp files, and non-CAS entries.
-            if name.contains('/') || !is_sha256_hex(name) {
-                continue;
+        let mut active_blob_keys: HashSet<String> = all_db_ids.iter().chain(referenced.iter()).map(|id| format!("attachments/{id}")).collect();
+        for id in &seen_ids {
+            active_blob_keys.insert(format!("attachments/{id}"));
+        }
+        let unindexed_scan = OrphanSweeper::sweep_prefix(self.backend.as_ref(), "attachments/", &active_blob_keys, cutoff, true, |meta| {
+            meta.key
+                .strip_prefix("attachments/")
+                .is_some_and(|name| !name.contains('/') && is_sha256_hex(name))
+        })
+        .await
+        .map_err(internal)?;
+        for orphan in unindexed_scan.candidates {
+            if let Some(name) = orphan.key.strip_prefix("attachments/") {
+                seen_ids.insert(name.to_owned());
+                candidates.push(OrphanAttachmentCandidate {
+                    id: name.to_owned(),
+                    size: orphan.size,
+                    unindexed_blob: true,
+                });
             }
-            if all_db_ids.contains(name) || referenced.contains(name) || seen_ids.contains(name) {
-                continue;
-            }
-            if meta.last_modified_ms.is_none_or(|modified| modified >= cutoff) {
-                continue;
-            }
-            seen_ids.insert(name.to_owned());
-            candidates.push(OrphanAttachmentCandidate {
-                id: name.to_owned(),
-                size: meta.size,
-                unindexed_blob: true,
-            });
         }
 
         let total_bytes: u64 = candidates.iter().map(|c| c.size).sum();
@@ -533,34 +533,6 @@ async fn collect_note_attachment_refs_async(backend: &Arc<dyn StorageBackend>) -
         }
     }
     Ok(refs)
-}
-
-/// Scans `text` for 64-character lowercase hexadecimal tokens (SHA-256 attachment IDs)
-/// delimited by non-hex characters.
-pub(crate) fn extract_sha256_tokens(text: &str, out: &mut HashSet<String>) {
-    let bytes = text.as_bytes();
-    let mut i = 0usize;
-    while i < bytes.len() {
-        if is_lower_hex(bytes[i]) {
-            let start = i;
-            while i < bytes.len() && is_lower_hex(bytes[i]) {
-                i += 1;
-            }
-            if i - start == 64 && !bytes.get(i).is_some_and(|b| b.is_ascii_hexdigit()) {
-                out.insert(text[start..i].to_owned());
-            }
-        } else {
-            i += 1;
-        }
-    }
-}
-
-fn is_lower_hex(b: u8) -> bool {
-    matches!(b, b'0'..=b'9' | b'a'..=b'f')
-}
-
-fn is_sha256_hex(s: &str) -> bool {
-    s.len() == 64 && s.bytes().all(is_lower_hex)
 }
 
 #[cfg(test)]
@@ -912,7 +884,7 @@ mod tests {
                                 &NewDelivery {
                                     message_id: &msg_id,
                                     channel_id: "ch-1",
-                                    recipient_kind: "direct",
+                                    recipient_kind: "agent",
                                     recipient_id: "laozhou",
                                     reason: "mention",
                                     wakes: true,

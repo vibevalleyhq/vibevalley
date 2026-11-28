@@ -590,6 +590,82 @@
   },
   {
    "type": "divider"
+  },
+  {
+   "type": "media",
+   "mediaKind": "image",
+   "src": "asset/screen.png",
+   "caption": "Dark mode audit",
+   "annotations": [
+    {
+     "id": "ann-1",
+     "number": 1,
+     "kind": "rect",
+     "rect": {
+      "x": 0.1,
+      "y": 0.2,
+      "w": 0.3,
+      "h": 0.15
+     },
+     "severity": "p1",
+     "title": "Low contrast header",
+     "body": "Use text-ink token",
+     "status": "open",
+     "issueId": "i42",
+     "baseRowId": "r1",
+     "author": "user"
+    }
+   ]
+  },
+  {
+   "type": "compare",
+   "title": "Before vs After",
+   "beforeLabel": "Before",
+   "afterLabel": "After",
+   "beforeAsset": "asset/before.png",
+   "afterAsset": "asset/after.png",
+   "annotations": [
+    {
+     "id": "ann-2",
+     "number": 1,
+     "kind": "arrow",
+     "rect": {
+      "x": 0.2,
+      "y": 0.25,
+      "w": 0,
+      "h": 0
+     },
+     "to": {
+      "x": 0.45,
+      "y": 0.5
+     },
+     "side": "after",
+     "severity": "ux",
+     "title": "Aligned spacing",
+     "status": "resolved"
+    }
+   ]
+  },
+  {
+   "type": "table",
+   "headers": [
+    "Metric",
+    "Value"
+   ],
+   "rows": [
+    [
+     "Latency",
+     "12ms"
+    ]
+   ],
+   "alignments": [
+    "left",
+    "right"
+   ],
+   "columnWidths": [
+    220,
+    120
+   ]
   }
  ],
  "DocBlock": [
@@ -851,6 +927,195 @@
    "spawnedIssueIds": [
     "i1"
    ]
+  }
+ ],
+ "MediaAnnotationKind": [
+  "pin",
+  "rect",
+  "arrow",
+  "callout"
+ ],
+ "MediaAnnotationSeverity": [
+  "p0",
+  "p1",
+  "p2",
+  "ux"
+ ],
+ "MediaAnnotationStatus": [
+  "open",
+  "resolved"
+ ],
+ "MediaAnnotationSide": [
+  "before",
+  "after"
+ ],
+ "MediaAnnotationRect": [
+  {
+   "x": 0.1,
+   "y": 0.2,
+   "w": 0.25,
+   "h": 0.15
+  }
+ ],
+ "MediaAnnotationPoint": [
+  {
+   "x": 0.4,
+   "y": 0.6
+  }
+ ],
+ "MediaAnnotation": [
+  {
+   "id": "ann-1",
+   "number": 1,
+   "kind": "rect",
+   "rect": {
+    "x": 0.1,
+    "y": 0.2,
+    "w": 0.25,
+    "h": 0.15
+   },
+   "to": {
+    "x": 0.4,
+    "y": 0.35
+   },
+   "side": "after",
+   "severity": "p0",
+   "title": "Clipped CTA button",
+   "body": "Padding collapses below 768px",
+   "status": "open",
+   "issueId": "i144",
+   "baseRowId": "r1",
+   "author": "user",
+   "createdAt": 1700000000000,
+   "updatedAt": 1700000001000
+  }
+ ],
+ "MediaAnnotationSummary": [
+  {
+   "total": 3,
+   "open": 2,
+   "resolved": 1,
+   "p0": 1,
+   "p1": 1,
+   "p2": 0,
+   "ux": 1,
+   "linkedRows": 2,
+   "linkedIssues": 1
+  }
+ ],
+ "BaseAnnotationRef": [
+  {
+   "noteId": "n_doc",
+   "blockId": "b_media",
+   "annotationId": "ann-1",
+   "number": 1
+  }
+ ],
+ "ReviewSyncDirection": [
+  "docToBase",
+  "baseToDoc"
+ ],
+ "NoteAnnotationUpsertRequest": [
+  {
+   "id": "n_doc",
+   "blockId": "b_media",
+   "annotation": {
+    "id": "ann-1",
+    "number": 1,
+    "kind": "pin",
+    "rect": {
+     "x": 0.5,
+     "y": 0.5,
+     "w": 0,
+     "h": 0
+    },
+    "severity": "p1",
+    "title": "Check icon alignment",
+    "status": "open"
+   },
+   "baseNoteId": "n_base",
+   "baseSheetId": "sheet1",
+   "origin": "user"
+  }
+ ],
+ "NoteAnnotationDeleteRequest": [
+  {
+   "id": "n_doc",
+   "blockId": "b_media",
+   "annotationId": "ann-1",
+   "baseNoteId": "n_base",
+   "baseSheetId": "sheet1",
+   "origin": "user"
+  }
+ ],
+ "NoteAnnotationMutationResult": [
+  {
+   "noteId": "n_doc",
+   "blockId": "b_media",
+   "annotations": [],
+   "summary": {
+    "total": 0,
+    "open": 0,
+    "resolved": 0,
+    "p0": 0,
+    "p1": 0,
+    "p2": 0,
+    "ux": 0,
+    "linkedRows": 0,
+    "linkedIssues": 0
+   },
+   "syncedBaseNoteId": "n_base",
+   "syncedBaseRowId": "r1"
+  }
+ ],
+ "NoteReviewSyncRequest": [
+  {
+   "id": "n_doc",
+   "baseNoteId": "n_base",
+   "sheetId": "sheet1",
+   "spawnIssueRepo": "demo",
+   "direction": "docToBase",
+   "origin": "user"
+  }
+ ],
+ "NoteReviewSyncResult": [
+  {
+   "docNoteId": "n_doc",
+   "baseNoteId": "n_base",
+   "sheetId": "sheet1",
+   "createdBase": false,
+   "linkedCount": 1,
+   "updatedAnnotations": 0,
+   "updatedRows": 1,
+   "summary": {
+    "total": 1,
+    "open": 1,
+    "resolved": 0,
+    "p0": 0,
+    "p1": 1,
+    "p2": 0,
+    "ux": 0,
+    "linkedRows": 1,
+    "linkedIssues": 0
+   },
+   "baseSnapshot": {
+    "noteId": "n_base",
+    "sheets": [
+     {
+      "id": "sheet1",
+      "name": "Review Checklist",
+      "rowCount": 1
+     }
+    ],
+    "activeSheetId": "sheet1",
+    "activeViewId": "v_table",
+    "activeViewKind": "table",
+    "columns": [],
+    "rows": [],
+    "groups": [],
+    "summaries": [],
+    "totalRows": 1
+   }
   }
  ]
 }

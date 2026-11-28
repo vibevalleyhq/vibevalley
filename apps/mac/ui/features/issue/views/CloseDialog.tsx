@@ -2,14 +2,14 @@ import { cleanup, computed, effect, Scroll, signal, Text, untracked, View } from
 import { DiffView } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
-import { type ChangedFile, type Changes, type Issue, type IssueAct, type Session, VibeValleyApiError } from "@vibevalley/protocol";
-import { sessionWorktree } from "@vibevalley/protocol/rules";
+import { type ChangedFile, type Changes, type DeliveryReceipt, type Issue, type IssueAct, type Session, VibeValleyApiError } from "@vibevalley/protocol";
 
 import { Button } from "../../../design/Button";
 import { Dialog } from "../../../design/Dialog";
-import { TextArea } from "../../../design/Field";
+import { Field, TextArea, TextInput } from "../../../design/Field";
 import { Icon } from "../../../design/Icon";
 import { motionClass } from "../../../design/motion";
+import { Segmented } from "../../../design/Segmented";
 import { mix } from "../../../design/tone";
 import { createAct } from "../../../infra/act";
 import { reasonOf } from "../../../infra/api";
@@ -24,11 +24,15 @@ import { useIntents } from "../../../infra/state/intent";
 import { type Lane } from "../model/cards";
 import { changeKind, lineCounts, nothingChanged, patchLines, patchMarkOf } from "../model/changes";
 import {
+  buildDeliveryReceipt,
   closeDialogSurface,
   type CloseFlowEvent,
   type CloseFlowState,
   closeFlowTransition,
+  type DeliveryReceiptDraft,
+  type DeliveryReceiptKind,
   initialCloseFlow,
+  initialReceiptDraft,
   isCloseDialogWide,
   isCloseDiffEnabled,
   shouldSyncCloseDiff,
@@ -41,6 +45,13 @@ import { Note, SheetLabel } from "./Sheet";
 /** Closing an issue: complete it (its changes first) or cancel it. `review` opens straight on the changes. */
 export function CloseIssueDialog(props: { issue: Issue; session?: Session | undefined; review?: boolean; lane?: Lane | undefined; onClose: () => void }) {
   const flow = signal<CloseFlowState>(initialCloseFlow(props.review ?? false));
+  const receiptDraft = signal<DeliveryReceiptDraft>(initialReceiptDraft(props.issue.deliveryReceipt));
+  const receiptError = signal("");
+  const directBusy = signal(false);
+  const patchReceipt = (next: DeliveryReceiptDraft) => {
+    receiptDraft.set(next);
+    if (untracked(receiptError) !== "") receiptError.set("");
+  };
   const dispatch = (event: CloseFlowEvent): CloseFlowState => {
     const next = closeFlowTransition(untracked(flow), event);
     flow.set(next);
@@ -93,11 +104,37 @@ export function CloseIssueDialog(props: { issue: Issue; session?: Session | unde
       dispatch({ kind: "submitFailed" });
     }
   };
+  const resolveReceipt = (): { ok: true; receipt?: DeliveryReceipt } | { ok: false } => {
+    const built = buildDeliveryReceipt(untracked(receiptDraft));
+    if (!built.ok) {
+      receiptError.set(t(`web.issue.receipt.missing.${built.missing}`));
+      return { ok: false };
+    }
+    receiptError.set("");
+    return { ok: true, ...(built.receipt !== undefined ? { receipt: built.receipt } : {}) };
+  };
+  const completeDirect = async () => {
+    if (untracked(directBusy)) return;
+    const issue = live();
+    if (!issue) return;
+    const built = resolveReceipt();
+    if (!built.ok) return;
+    directBusy.set(true);
+    const ok = await presses.press(issue, "complete", undefined, built.receipt);
+    if (!mounted) return;
+    directBusy.set(false);
+    if (ok) {
+      dispatch({ kind: "completed" });
+      props.onClose();
+    }
+  };
   const take = async () => {
     const current = untracked(flow);
     if (current.kind !== "reviewing") return;
     const issue = live();
     if (!issue) return;
+    const built = resolveReceipt();
+    if (!built.ok) return;
     const shown = current.changes;
     dispatch({ kind: "submitComplete" });
     if (linkIn(registry) === "lost") {
@@ -128,7 +165,7 @@ export function CloseIssueDialog(props: { issue: Issue; session?: Session | unde
       return;
     }
     if (!mounted) return;
-    const ok = await presses.press(issue, "complete", approved.revision);
+    const ok = await presses.press(issue, "complete", approved.revision, built.receipt);
     if (!mounted) return;
     if (ok) {
       dispatch({ kind: "completed" });
@@ -171,7 +208,7 @@ export function CloseIssueDialog(props: { issue: Issue; session?: Session | unde
               {working()
                 ? t("web.issue.close.working", { who: who() })
                 : canComplete()
-                  ? t("web.issue.close.completable", { who: who() })
+                  ? t("web.issue.close.completable")
                   : t("web.issue.close.notCompletable", { who: who() })}
             </Text>
             <View class="flex-row flex-wrap items-center justify-end gap-2 border-t border-line pt-3">
@@ -214,10 +251,18 @@ export function CloseIssueDialog(props: { issue: Issue; session?: Session | unde
                 </Text>
               </View>
             </Note>
-            <View class="flex-row justify-end border-t border-line pt-3">
+            <If when={canComplete()}>
+              <DeliveryReceiptEditor draft={receiptDraft()} error={receiptError()} disabled={directBusy()} onChange={patchReceipt} />
+            </If>
+            <View class="flex-row flex-wrap items-center justify-end gap-2 border-t border-line pt-3">
               <Button tone="quiet" onPress={close}>
                 {t("web.issue.later")}
               </Button>
+              <If when={canComplete()}>
+                <Button tone="primary" testID="error-complete" disabled={directBusy()} onPress={() => void completeDirect()}>
+                  {t("web.issue.close.completeWithoutDiff")}
+                </Button>
+              </If>
             </View>
           </View>
         )}
@@ -260,7 +305,7 @@ export function CloseIssueDialog(props: { issue: Issue; session?: Session | unde
                     </View>
                     <View class="min-w-0 flex-1">
                       <Text class="text-sm font-semibold text-berry">{t("web.issue.changes.conflict", { base: c().base })}</Text>
-                      <ConflictFiles files={c().conflicts} worktree={props.session ? sessionWorktree(props.session) : undefined} />
+                      <ConflictFiles files={c().conflicts} worktree={props.session?.cwd} />
                       <Text class="mt-2 text-xs leading-relaxed text-muted">{t("web.issue.changes.resolveHow", { base: c().base })}</Text>
                     </View>
                   </View>
@@ -302,6 +347,9 @@ export function CloseIssueDialog(props: { issue: Issue; session?: Session | unde
                   </View>
                 </Note>
               </If>
+              <If when={acts().includes("complete")}>
+                <DeliveryReceiptEditor draft={receiptDraft()} error={receiptError()} disabled={rev().busy} onChange={patchReceipt} />
+              </If>
               <View class="flex-row flex-wrap items-center gap-2 border-b border-line pb-3">
                 <If when={acts().includes("complete")}>
                   <Button tone="primary" testID="review-complete" disabled={rev().busy} onPress={() => void take()}>
@@ -336,22 +384,204 @@ export function CloseIssueDialog(props: { issue: Issue; session?: Session | unde
   );
 }
 
+function DeliveryReceiptEditor(props: { draft: DeliveryReceiptDraft; error: string; disabled: boolean; onChange: (next: DeliveryReceiptDraft) => void }) {
+  const kindOptions: { value: DeliveryReceiptKind; label: string }[] = [
+    { value: "none", label: t("web.issue.receipt.kinds.none") },
+    { value: "pull_request", label: t("web.issue.receipt.kinds.pull_request") },
+    { value: "commit", label: t("web.issue.receipt.kinds.commit") },
+    { value: "note", label: t("web.issue.receipt.kinds.note") },
+    { value: "answer", label: t("web.issue.receipt.kinds.answer") },
+  ];
+  const patch = (fields: Partial<DeliveryReceiptDraft>) => props.onChange({ ...props.draft, ...fields });
+  return (
+    <View testID="delivery-receipt-editor" class="gap-2.5 rounded-lg border border-line bg-side p-3">
+      <View class="gap-1">
+        <Text class="text-xs font-semibold text-ink">{t("web.issue.receipt.title")}</Text>
+        <Text class="text-xs text-muted">{t("web.issue.receipt.hint")}</Text>
+      </View>
+      <Segmented label={t("web.issue.receipt.kind")} value={props.draft.kind} options={kindOptions} onChange={(kind) => patch({ kind })} />
+      <If when={props.draft.kind === "pull_request"}>
+        <View class="gap-2">
+          <Field label={t("web.issue.receipt.url")}>
+            <TextInput
+              testID="receipt-pr-url"
+              accessibilityLabel={t("web.issue.receipt.url")}
+              class="font-mono"
+              disabled={props.disabled}
+              placeholder={t("web.issue.receipt.urlPlaceholder")}
+              value={props.draft.url}
+              onInput={(url) => patch({ url })}
+            />
+          </Field>
+          <View class="flex-row flex-wrap gap-2">
+            <View class="min-w-32 flex-1">
+              <Field label={t("web.issue.receipt.number")}>
+                <TextInput
+                  testID="receipt-pr-number"
+                  accessibilityLabel={t("web.issue.receipt.number")}
+                  class="font-mono"
+                  disabled={props.disabled}
+                  placeholder={t("web.issue.receipt.numberPlaceholder")}
+                  value={props.draft.number}
+                  onInput={(number) => patch({ number })}
+                />
+              </Field>
+            </View>
+            <View class="min-w-40 flex-1">
+              <Field label={t("web.issue.receipt.branch")}>
+                <TextInput
+                  testID="receipt-pr-branch"
+                  accessibilityLabel={t("web.issue.receipt.branch")}
+                  class="font-mono"
+                  disabled={props.disabled}
+                  placeholder={t("web.issue.receipt.branchPlaceholder")}
+                  value={props.draft.branch}
+                  onInput={(branch) => patch({ branch })}
+                />
+              </Field>
+            </View>
+          </View>
+          <Field label={t("web.issue.receipt.summaryOptional")}>
+            <TextInput
+              testID="receipt-summary"
+              accessibilityLabel={t("web.issue.receipt.summaryOptional")}
+              disabled={props.disabled}
+              placeholder={t("web.issue.receipt.summaryPlaceholder")}
+              value={props.draft.summary}
+              onInput={(summary) => patch({ summary })}
+            />
+          </Field>
+        </View>
+      </If>
+      <If when={props.draft.kind === "commit"}>
+        <View class="gap-2">
+          <View class="flex-row flex-wrap gap-2">
+            <View class="min-w-40 flex-1">
+              <Field label={t("web.issue.receipt.sha")}>
+                <TextInput
+                  testID="receipt-commit-sha"
+                  accessibilityLabel={t("web.issue.receipt.sha")}
+                  class="font-mono"
+                  disabled={props.disabled}
+                  placeholder={t("web.issue.receipt.shaPlaceholder")}
+                  value={props.draft.sha}
+                  onInput={(sha) => patch({ sha })}
+                />
+              </Field>
+            </View>
+            <View class="min-w-40 flex-1">
+              <Field label={t("web.issue.receipt.branch")}>
+                <TextInput
+                  testID="receipt-commit-branch"
+                  accessibilityLabel={t("web.issue.receipt.branch")}
+                  class="font-mono"
+                  disabled={props.disabled}
+                  placeholder={t("web.issue.receipt.branchPlaceholder")}
+                  value={props.draft.branch}
+                  onInput={(branch) => patch({ branch })}
+                />
+              </Field>
+            </View>
+          </View>
+          <Field label={t("web.issue.receipt.summaryOptional")}>
+            <TextInput
+              testID="receipt-summary"
+              accessibilityLabel={t("web.issue.receipt.summaryOptional")}
+              disabled={props.disabled}
+              placeholder={t("web.issue.receipt.summaryPlaceholder")}
+              value={props.draft.summary}
+              onInput={(summary) => patch({ summary })}
+            />
+          </Field>
+        </View>
+      </If>
+      <If when={props.draft.kind === "note"}>
+        <View class="gap-2">
+          <View class="flex-row flex-wrap gap-2">
+            <View class="min-w-40 flex-1">
+              <Field label={t("web.issue.receipt.noteId")}>
+                <TextInput
+                  testID="receipt-note-id"
+                  accessibilityLabel={t("web.issue.receipt.noteId")}
+                  class="font-mono"
+                  disabled={props.disabled}
+                  placeholder={t("web.issue.receipt.noteIdPlaceholder")}
+                  value={props.draft.noteId}
+                  onInput={(noteIdValue) => patch({ noteId: noteIdValue })}
+                />
+              </Field>
+            </View>
+            <View class="min-w-40 flex-1">
+              <Field label={t("web.issue.receipt.noteTitle")}>
+                <TextInput
+                  testID="receipt-note-title"
+                  accessibilityLabel={t("web.issue.receipt.noteTitle")}
+                  disabled={props.disabled}
+                  placeholder={t("web.issue.receipt.noteTitlePlaceholder")}
+                  value={props.draft.title}
+                  onInput={(title) => patch({ title })}
+                />
+              </Field>
+            </View>
+          </View>
+          <Field label={t("web.issue.receipt.summaryOptional")}>
+            <TextInput
+              testID="receipt-summary"
+              accessibilityLabel={t("web.issue.receipt.summaryOptional")}
+              disabled={props.disabled}
+              placeholder={t("web.issue.receipt.summaryPlaceholder")}
+              value={props.draft.summary}
+              onInput={(summary) => patch({ summary })}
+            />
+          </Field>
+        </View>
+      </If>
+      <If when={props.draft.kind === "answer"}>
+        <Field label={t("web.issue.receipt.summary")}>
+          <TextArea
+            testID="receipt-answer-summary"
+            accessibilityLabel={t("web.issue.receipt.summary")}
+            rows={3}
+            disabled={props.disabled}
+            placeholder={t("web.issue.receipt.summaryPlaceholder")}
+            value={props.draft.summary}
+            onInput={(summary) => patch({ summary })}
+          />
+        </Field>
+      </If>
+      <If when={props.error}>
+        {(msg) => (
+          <Text testID="receipt-error" class="text-xs font-medium text-berry">
+            {msg()}
+          </Text>
+        )}
+      </If>
+    </View>
+  );
+}
+
 /** A move is an intent, not awaited: the dialog closes once it is sent, and the board shows it moving, or refused with a retry. */
 function createPresses(lane: () => Lane | undefined) {
   const moves = useIntents(issueMove);
   const act = createAct();
   return {
     /** False when the issue does not offer it or the press did not go through. */
-    press: async (issue: Issue | undefined, pressed: IssueAct, revision?: Changes["revision"]) => {
+    press: async (issue: Issue | undefined, pressed: IssueAct, revision?: Changes["revision"], deliveryReceipt?: DeliveryReceipt) => {
       const a = issue && actionOf(issue, pressed);
       if (!issue || !a) return false;
       if (a.does === "move") {
         // The lane it was dropped on is where closing puts it; a resolve sends it back to work instead.
         const to = pressed === "resolve" ? undefined : lane();
-        void sendMove(moves, { id: issue.id, status: a.status, ...(revision ? { revision } : {}), ...(to ? { lane: to } : {}) });
+        void sendMove(moves, {
+          id: issue.id,
+          status: a.status,
+          ...(revision ? { revision } : {}),
+          ...(deliveryReceipt ? { deliveryReceipt } : {}),
+          ...(to ? { lane: to } : {}),
+        });
         return true;
       }
-      return (await act.run(async () => (await perform(issue, a), true))) === true;
+      return (await act.run(async () => (await perform(issue, a, "", "", revision, deliveryReceipt), true))) === true;
     },
   };
 }

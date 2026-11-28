@@ -500,7 +500,7 @@ impl Feishu {
             .unwrap_or(0);
         let every = Duration::from_secs(config.and_then(|c| c.ping_interval).filter(|s| *s > 0).unwrap_or(120));
         let (mut ws, _) = tokio_tungstenite::connect_async(address.as_str()).await.map_err(|e| lost(e.to_string()))?;
-        let mut ping = tokio::time::interval(every);
+        let mut ping = vibevalley_kit::task::Ticker::periodic(every);
         let mut parts = HashMap::new();
         loop {
             let message = tokio::select! {

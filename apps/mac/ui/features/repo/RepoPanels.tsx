@@ -1,4 +1,4 @@
-import { Scroll, signal, Text, View, type JSX } from "nsh";
+import { colorScheme, Scroll, signal, Text, View, type JSX } from "nsh";
 
 import { list, t } from "@vibevalley/i18n";
 import type { RepoActivity, RepoLanguages, RepoSummary } from "@vibevalley/protocol";
@@ -44,9 +44,26 @@ function Bar(props: { share: number; color: string }) {
   );
 }
 
+/** Papertrails-harmonious muted palette for language bars and swatches (zero electric blue, light/dark adaptive). */
+const languagePalette: readonly (() => string)[] = [
+  () => mix("leaf", 0.8),
+  () => mix("water", 0.68),
+  () => mix("wheat", 0.82),
+  () => mix("berry", 0.68),
+  () => mix("bark-400", 0.82),
+  () => mix("leaf-300", 0.88),
+  () => mix("cream-300", 0.9),
+];
+
+export function languagePaletteColor(id: string, index: number): string {
+  if (id === "other") return mix("idle", 0.72);
+  const pick = languagePalette.at(index % languagePalette.length);
+  return pick !== undefined ? pick() : mix("idle", 0.72);
+}
+
 /** A language's colour swatch. */
 function LangMark(props: { color: string; size: number }) {
-  return <View class="shrink-0 rounded-sm border border-line" style={{ width: props.size, height: props.size, backgroundColor: props.color }} />;
+  return <View class="shrink-0 rounded-full" style={{ width: props.size, height: props.size, backgroundColor: props.color }} />;
 }
 
 /** A calendar day's tile shaded by commit activity level. */
@@ -62,24 +79,30 @@ function DayTile(props: { level: number }) {
 export function Languages(props: { languages: Asked<RepoLanguages> }) {
   const data = () => ready(props.languages, undefined);
   const shares = createMemo(() => {
+    colorScheme();
     const d = data();
-    return d ? languageShares(d.languages) : [];
+    if (!d) return [];
+    return languageShares(d.languages).map((s, idx) => ({
+      ...s,
+      color: languagePaletteColor(s.id, idx),
+    }));
   });
   return (
     <Card title={t("web.repo.whatLanguages")} action={<Text class="text-xs text-muted">{t("web.repo.byLines")}</Text>}>
       <If when={!(props.languages.error() && !data())} else={<NotCounted reason={reasonOf(props.languages.error())} />}>
-        <If when={data()} else={<View class="h-12 rounded-md bg-hover" />}>
+        <If when={data()} else={<View class="h-2 rounded-full bg-hover" />}>
           <If when={shares().length > 0} else={<Quiet>{t("web.repo.empty")}</Quiet>}>
             <View
+              testID="repo-language-bar"
               role="image"
               accessibilityLabel={list(shares().map((s) => `${s.label} ${percent(s.share)}`))}
-              class="h-14 flex-row gap-px overflow-hidden rounded-md border border-line bg-side p-1"
+              class="h-2 flex-row gap-0.5 overflow-hidden rounded-full bg-hover"
             >
               <Each of={shares()} key={(s) => s.label}>
                 {(s) => (
                   <View
                     tooltip={<Bubble text={`${s().label} · ${percent(s().share)}`} />}
-                    class="min-w-1 rounded-xs"
+                    class="h-full min-w-1"
                     style={{ flexGrow: Math.max(1, Math.round(s().share * 10000)), flexBasis: 0, backgroundColor: s().color }}
                   />
                 )}
@@ -88,15 +111,15 @@ export function Languages(props: { languages: Asked<RepoLanguages> }) {
             <View class="grid gap-x-6 gap-y-2.5 sm:grid-cols-2">
               <Each of={shares()} key={(s) => s.label}>
                 {(s) => (
-                  <View class="flex-row items-center gap-3">
-                    <LangMark color={s().color} size={28} />
+                  <View class="flex-row items-center gap-2.5">
+                    <LangMark color={s().color} size={10} />
                     <View class="min-w-0 flex-1 gap-1">
                       <View class="flex-row items-baseline gap-2">
                         <Text class="min-w-0 flex-1 truncate text-sm font-medium text-ink">{s().label}</Text>
-                        <Text class="text-sm tabular-nums text-muted">{percent(s().share)}</Text>
+                        <Text class="text-xs tabular-nums text-muted">{percent(s().share)}</Text>
                       </View>
                       <Bar share={s().share < 0.02 ? 0.02 : s().share} color={s().color} />
-                      <Text class="text-xs tabular-nums text-muted">{t("web.repo.linesAndFiles", { lines: number(s().lines), files: number(s().files) })}</Text>
+                      <Text class="text-xs tabular-nums text-faint">{t("web.repo.linesAndFiles", { lines: number(s().lines), files: number(s().files) })}</Text>
                     </View>
                   </View>
                 )}

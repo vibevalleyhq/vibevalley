@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use sea_orm::sea_query::{Alias, Expr, Func, OnConflict};
 use sea_orm::{ActiveValue::Set, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Update};
-use vibevalley_protocol::{Issue, JsNumber, PublishPlatform, PullRequestState};
+use vibevalley_protocol::{CodeReview, DeliveryEvidence, DeliveryReceipt, Issue, JsNumber, ProjectCheckReceipt, PublishPlatform, PullRequestState};
 
 use super::{MAX_SQL_BIND_PARAMS, batch_chunk_rows, with_write_tx};
 use crate::db::column::{db_json, db_word, read_db_json, read_db_word};
@@ -52,6 +52,19 @@ pub struct UpsertPullInput {
     pub at: i64,
 }
 
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct StoredDeliveryEvidence {
+    #[serde(default)]
+    reviews: Vec<CodeReview>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    check: Option<ProjectCheckReceipt>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    merged_commit: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    receipt: Option<DeliveryReceipt>,
+}
+
 fn read_issue(r: issue::Model) -> DbResult<Issue> {
     let mut item = Issue::new(r.id, r.number, r.title, r.created_at);
     item.description = r.description;
@@ -85,7 +98,16 @@ fn read_issue(r: issue::Model) -> DbResult<Issue> {
     item.conflict = r.conflict.map(read_db_json).transpose()?;
     item.last_run = r.last_run.map(read_db_json).transpose()?;
     item.answer = r.answer.map(read_db_json).transpose()?;
-    item.delivery_evidence = r.delivery_evidence.map(read_db_json).transpose()?;
+    if let Some(stored) = r.delivery_evidence.map(read_db_json::<StoredDeliveryEvidence>).transpose()? {
+        item.delivery_receipt = stored.receipt;
+        if !stored.reviews.is_empty() || stored.check.is_some() || stored.merged_commit.is_some() {
+            item.delivery_evidence = Some(DeliveryEvidence {
+                reviews: stored.reviews,
+                check: stored.check,
+                merged_commit: stored.merged_commit,
+            });
+        }
+    }
     Ok(item)
 }
 
@@ -123,7 +145,21 @@ async fn get_issue_impl<C: ConnectionTrait>(db: &C, id: &str) -> DbResult<Option
 
 const ISSUE_BATCH_ROWS: usize = batch_chunk_rows(37);
 
+fn stored_delivery_evidence(t: &Issue) -> Option<StoredDeliveryEvidence> {
+    if t.delivery_evidence.is_none() && t.delivery_receipt.is_none() {
+        return None;
+    }
+    let ev = t.delivery_evidence.clone().unwrap_or_default();
+    Some(StoredDeliveryEvidence {
+        reviews: ev.reviews,
+        check: ev.check,
+        merged_commit: ev.merged_commit,
+        receipt: t.delivery_receipt.clone(),
+    })
+}
+
 fn issue_active_model(t: &Issue) -> DbResult<issue::ActiveModel> {
+    let delivery_evidence = stored_delivery_evidence(t).as_ref().map(db_json).transpose()?;
     Ok(issue::ActiveModel {
         id: Set(t.id.clone()),
         number: Set(t.number),
@@ -147,7 +183,7 @@ fn issue_active_model(t: &Issue) -> DbResult<issue::ActiveModel> {
         conflict: Set(t.conflict.as_ref().map(db_json).transpose()?),
         last_run: Set(t.last_run.as_ref().map(db_json).transpose()?),
         answer: Set(t.answer.as_ref().map(db_json).transpose()?),
-        delivery_evidence: Set(t.delivery_evidence.as_ref().map(db_json).transpose()?),
+        delivery_evidence: Set(delivery_evidence),
         queued_words: Set("[]".into()),
         blocked_by: Set(db_json(&t.blocked_by)?),
         criteria: Set(db_json(&t.criteria)?),
@@ -313,7 +349,7 @@ async fn keep_pull_event_impl<C: ConnectionTrait>(db: &C, pull_id: &str, key: &s
 }
 
 #[derive(Clone)]
-pub struct IssueService {
+pub(crate) struct IssueService {
     db: Arc<Database>,
 }
 
@@ -322,7 +358,7 @@ impl IssueService {
         Self { db }
     }
 
-    pub async fn all(&self) -> DbResult<Vec<Issue>> {
+    pub(crate) async fn all(&self) -> DbResult<Vec<Issue>> {
         all_issues_impl(self.db.read_conn()).await
     }
 
@@ -396,7 +432,7 @@ impl IssueService {
             .await
     }
 
-    pub(crate) async fn list_board_window_in_tx(&self, tx: &Tx, keep_closed: usize, include_ids: &[String]) -> DbResult<Vec<Issue>> {
+    async fn list_board_window_in_tx(&self, tx: &Tx, keep_closed: usize, include_ids: &[String]) -> DbResult<Vec<Issue>> {
         self.db
             .query_metrics()
             .observe("issue.list_board_window", "SELECT issue (board window)", async {
@@ -453,7 +489,7 @@ impl IssueService {
             .collect()
     }
 
-    pub async fn put(&self, issue: &Issue) -> DbResult<()> {
+    pub(crate) async fn put(&self, issue: &Issue) -> DbResult<()> {
         put_issue_impl(self.db.write_conn(), issue).await
     }
 
@@ -461,7 +497,7 @@ impl IssueService {
         put_issue_impl(tx, issue).await
     }
 
-    pub async fn put_batch(&self, issues: &[Issue]) -> DbResult<()> {
+    pub(crate) async fn put_batch(&self, issues: &[Issue]) -> DbResult<()> {
         if issues.is_empty() {
             return Ok(());
         }

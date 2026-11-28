@@ -21,14 +21,7 @@ export const catalogs = {
       status: { backlog: "备选", todo: "待办", in_progress: "处理中", in_review: "待验收", done: "已完成", canceled: "已取消" },
       priority: { urgent: "紧急", high: "高", medium: "普通", low: "低" },
       deliverable: { change: "改动，合进仓库", branch: "改动，分支留着不合", answer: "结论，只查不改代码", pull_request: "提交 PR/MR" },
-      delivered: {
-        merged: "合进了主分支",
-        merged_into_parent: "合进了计划的分支",
-        pull_request: "PR 合进去了",
-        kept: "分支留着没合",
-        none: "没有改动要合",
-        submitted: "已提交 PR/MR",
-      },
+      delivered: { merged: "合进了主分支", pull_request: "PR 合进去了", kept: "分支留着没合", none: "没有改动要合", submitted: "已提交 PR/MR" },
       canceled: { dismissed: "取消了", lost: "干活的目录丢了" },
       doneWith: "已完成，{what}",
       canceledFor: "已取消，{why}",
@@ -148,8 +141,6 @@ export const catalogs = {
       workdir: "默认仓库",
       workdirTip: "项目根目录（VIBEVALLEY_WORK_ROOT）下的一个文件夹。主助手派活没说仓库时用它；留空时派活必须说在哪个仓库。",
       workdirHint: "比如 clock-in",
-      worktree: "每个执行会话一个 git worktree",
-      worktreeHint: "每个执行会话在自己的分支上改，几个执行会话不会互相覆盖；完成时合进仓库。关掉就直接在仓库里改，没有分支可合。",
       env: "环境变量",
       envHint: "叠加在环境设置的环境变量之上。",
       machine: "环境",
@@ -1434,12 +1425,13 @@ export const catalogs = {
       },
       close: {
         title: "关上「{issue}」",
-        working: "{who} 还在干这个工单。取消就是叫停它、让它收工，分支上的改动不合进主分支。",
-        completable: "完成就是把 {who} 的分支合进仓库的主分支，先看一遍改动；取消就是让它收工，改动不合进去。",
-        notCompletable: "这个工单现在不能完成。取消会让 {who} 离开，改动不合进主分支。",
-        review: "看改动，完成",
+        working: "{who} 还在处理这个工单。取消会叫停会话并将工单标为已取消。",
+        completable: "可以查看改动或附上交付回执来完成工单，也可以直接取消。",
+        notCompletable: "这个工单现在不能完成。取消会叫停 {who} 并关闭工单。",
+        review: "查看并完成",
         stopAndCancel: "叫停并取消",
         cancel: "取消工单",
+        completeWithoutDiff: "附回执完成",
       },
       changes: {
         checkOutput: "检查输出",
@@ -1508,7 +1500,7 @@ export const catalogs = {
         deliver: "交付",
         crew: "一起干活的",
         profile: "角色",
-        branch: "分支",
+        cwd: "工作区",
         copyPath: "复制路径",
         took: "用时",
         resolved: "已解决的验收意见",
@@ -1601,11 +1593,34 @@ export const catalogs = {
         refine: "起草",
         runtime: "环境自己",
       },
-      run: { working: "正在干", heard: "中途听到 {n} 句", reconcile: "需要核对工作区", currentChanges: "查看工单当前改动" },
+      run: { working: "正在干", heard: "中途听到 {n} 句" },
+      receipt: {
+        title: "交付回执",
+        hint: "可选附上交付凭证（PR、提交、笔记或结论）。",
+        kind: "回执类型",
+        kinds: { none: "无", pull_request: "拉取请求", commit: "提交", note: "笔记", answer: "结论" },
+        url: "PR 链接",
+        urlPlaceholder: "例如 https://github.com/org/repo/pull/123",
+        number: "PR 编号（可选）",
+        numberPlaceholder: "123",
+        sha: "提交 SHA",
+        shaPlaceholder: "例如 a1b2c3d4…",
+        branch: "分支（可选）",
+        branchPlaceholder: "例如 feat/my-branch",
+        noteId: "笔记 ID",
+        noteIdPlaceholder: "输入笔记 ID",
+        noteTitle: "笔记标题（可选）",
+        noteTitlePlaceholder: "设计方案",
+        summary: "交付摘要",
+        summaryOptional: "摘要（可选）",
+        summaryPlaceholder: "关键结果或验证说明…",
+        openNote: "打开笔记",
+        openPr: "打开 PR",
+        missing: { url: "请填写 PR 链接。", sha: "请填写提交 SHA。", noteId: "请填写笔记 ID。", summary: "请填写结论摘要。" },
+      },
       card: {
         orchestrator: "主助手",
         refining: "{name}在起草",
-        draft: "草稿",
         queued: "排队中",
         cron: "定时任务",
         noHelper: "还没选角色",
@@ -1799,8 +1814,6 @@ export const catalogs = {
         unpinnedToast: "已取消置顶",
         artifacts: "笔记",
         media: "素材",
-        moreTypes: "更多类型 ({n})",
-        fewerTypes: "收起空类型",
         exportArtifact: "导出",
         turnIntoIssue: "转为工单",
         issueCreated: "已创建工单",
@@ -1883,6 +1896,7 @@ export const catalogs = {
             sheetTechMatrix: { name: "技术方案评估矩阵", desc: "分维度加权打分、改造成本与运维复杂度对比" },
             sheetTestMatrix: { name: "测试与回归矩阵", desc: "核心用例、环境覆盖、预期结果与最近通过状态" },
             sheetApiInventory: { name: "接口与依赖台账", desc: "端点清单、鉴权方式、限流策略与负责人记录" },
+            sheetUiReview: { name: "UI / 产品走查清单", desc: "严重度、状态、模块、关联工单与 Agent 诊断转单的交互走查台账" },
             artDiagram: { name: "结构图表", desc: "节点、连线与架构流程表达" },
             diagMicroservices: { name: "微服务拓扑图", desc: "边缘网关、业务服务、事件总线与存储依赖" },
             diagSequence: { name: "调用时序图", desc: "客户端、认证、核心服务与持久化请求链路" },
@@ -2147,6 +2161,26 @@ export const catalogs = {
             sheetApiR4Rate: "10 次/分钟",
             sheetApiR4Owner: "远程门",
             sheetApiR4Stab: "稳定 v1",
+            sheetUiReviewTab: "UI 走查清单",
+            sheetUiReviewColTitle: "标题",
+            sheetUiReviewColSeverity: "严重度",
+            sheetUiReviewColStatus: "状态",
+            sheetUiReviewColModule: "模块",
+            sheetUiReviewColIssue: "关联工单",
+            sheetUiReviewColAgent: "Agent 转工单与诊断",
+            sheetUiReviewSevP0: "P0 阻塞",
+            sheetUiReviewSevP1: "P1 体验",
+            sheetUiReviewSevP2: "P2 润色",
+            sheetUiReviewSevUx: "UX 建议",
+            sheetUiReviewStOpen: "待处理",
+            sheetUiReviewStFixing: "修复中",
+            sheetUiReviewStResolved: "已解决",
+            sheetUiReviewR1Title: "深色模式下侧栏边框对比度偏硬",
+            sheetUiReviewR1Mod: "笔记 / 侧栏",
+            sheetUiReviewR2Title: "表格末格 Tab 未自动追加新行",
+            sheetUiReviewR2Mod: "笔记 / 文档编辑器",
+            sheetUiReviewR3Title: "灯箱标注圆标在窄图边缘轻微裁切",
+            sheetUiReviewR3Mod: "笔记 / 媒体层",
             dashSloP1: "核心可用性 (%)",
             dashSloP2: "P99 延迟 (ms)",
             dashSloP3: "错误预算剩余 (%)",
@@ -2510,6 +2544,14 @@ export const catalogs = {
         codeLanguagePlaceholder: "语言",
         addCol: "+列",
         addRow: "+行",
+        tableAlign: "切换列对齐",
+        tableMoveColLeft: "列左移",
+        tableMoveColRight: "列右移",
+        tableInsertColAfter: "右侧插入列",
+        tableDeleteCol: "删除列",
+        tableInsertRowBelow: "下方插入行",
+        tableDeleteRow: "删除行",
+        tableNavHint: "Tab 下一格 · Shift+Tab 上一格 · Enter 下一行",
         bookmarkOpen: "打开链接",
         bookmarkEdit: "编辑书签",
         titleOptional: "标题（可选）",
@@ -2595,6 +2637,29 @@ export const catalogs = {
         shot: "镜头",
         transcriptPreview: "转写预览",
         videoPreview: "播放预览",
+      },
+      annotation: {
+        show: "显示标注",
+        hide: "隐藏标注",
+        unresolvedOnly: "仅看未解决",
+        addMode: "框选标注",
+        addModeHint: "在图片上点击或拖拽框选新增标注",
+        openCount: "未解决 {open}/{total}",
+        defaultTitle: "走查项 #{n}",
+        titlePlaceholder: "标注标题…",
+        bodyPlaceholder: "评审说明或期望修改…",
+        resolve: "标为已解决",
+        reopen: "重新打开",
+        edit: "编辑标注",
+        save: "完成",
+        delete: "删除标注",
+        createIssue: "转为工单",
+        openIssue: "查看工单",
+        jumpToRow: "对应清单行",
+        jumpToPin: "标注 #{n}",
+        zoom: "灯箱放大查看",
+        severity: { p0: "P0 阻塞", p1: "P1 体验", p2: "P2 润色", ux: "UX 建议" },
+        status: { open: "未解决", resolved: "已解决" },
       },
       files: { codeMode: "源码", htmlPreviewMode: "网页预览" },
       issue: {
@@ -3150,9 +3215,6 @@ export const catalogs = {
         platform: { macos: "macOS", linux: "Linux", container: "容器", other: "其他" },
         status: { online: "在线", offline: "离线", draining: "排空中" },
         machineId: "机器 ID",
-        worktree: "工作树",
-        worktreeYes: "支持",
-        worktreeNo: "不支持",
         installedCount: "已装环境",
         lastSeen: "最近在线",
       },
@@ -3446,7 +3508,7 @@ export const catalogs = {
         chat: "微信 飞书 QQ 聊天通道 连接器 配对",
         github: "GitHub Token gh PR 登录 直连",
         remote: "远程 手机 局域网 LAN Wi-Fi 直连 Tailscale 配对 二维码 设备 iOS Android CLI 命令行 执行机 沙箱 监听 令牌 总控端 内嵌 远端",
-        data: "家目录 设置文件 仓库 目录 工作树 存储 后端 数据 data storage",
+        data: "家目录 设置文件 仓库 目录 存储 后端 数据 data storage",
         about: "版本 更新 命令行 CLI version update",
       },
       scope: { farm: "对整个 VibeValley", device: "只对这台设备" },
@@ -3528,7 +3590,7 @@ export const catalogs = {
         refresh: "重新检测",
       },
       data: {
-        intro: "查看本机数据目录、Git 仓库与工作树路径，以及当前存储后端。",
+        intro: "查看本机数据目录、Git 仓库路径以及当前存储后端。",
         storageTitle: "存储后端",
         backend: "当前后端",
         backendHint: "附件、媒体输入与笔记目录的底层存储后端",
@@ -3536,7 +3598,7 @@ export const catalogs = {
         backendS3: "对象存储 (S3)",
         backendMemory: "内存存储 (Memory)",
       },
-      providers: { intro: "统一配置 DeepSeek、MiniMax、MOSS 等模型商凭据（1 个模型商对应 1 个 API 密钥），验证连通性并自动拉取带能力标签的可用模型。" },
+      providers: { intro: "统一配置 DeepSeek 与 MOSS 模型商凭据（1 个模型商对应 1 个 API 密钥），验证连通性并自动拉取带能力标签的可用模型。" },
       models: { intro: "按场景选择主选模型与备选回退策略；仅从已配置并拉取到可用模型的模型商中选择。" },
       memory: { intro: "执行会话还能去外面的记忆来源里查、往里记。" },
       about: {
@@ -3550,8 +3612,6 @@ export const catalogs = {
         settingsHint: "钥匙和这几页的设置",
         repos: "仓库目录",
         reposHint: "这个空间的仓库，每个文件夹都是一个 git 仓库",
-        worktrees: "工作树目录",
-        worktreesHint: "执行会话运行时每个工单自己的检出",
         copy: "复制路径",
         copied: "路径复制好了",
         reveal: "在访达里显示",
@@ -3650,8 +3710,6 @@ export const catalogs = {
         collapseAllTooltip: "折叠全部仓库与工作树",
         expandCurrent: "展开当前",
         expandCurrentTooltip: "展开当前仓库与活动工作树",
-        collapseItem: "折叠 {name}",
-        expandItem: "展开 {name}",
         newTerminalHere: "在此新建终端",
         newChatHere: "在此新建对话",
         chatWaiting: "等待确认回复",
@@ -3957,7 +4015,6 @@ export const catalogs = {
       },
       delivered: {
         merged: "merged into main",
-        merged_into_parent: "merged into the plan's branch",
         pull_request: "its PR was merged",
         kept: "branch kept, not merged",
         none: "nothing to merge",
@@ -4092,9 +4149,6 @@ export const catalogs = {
       workdirTip:
         "A folder under the projects root (VIBEVALLEY_WORK_ROOT). Used when the assistant sends work without naming a repo; when empty, the repo must be named.",
       workdirHint: "such as clock-in",
-      worktree: "A git worktree for each helper",
-      worktreeHint:
-        "Each helper changes its own branch, so helpers do not overwrite each other; completing merges it into the repo. Off, it changes the repo directly, with no branch to merge.",
       env: "Environment variables",
       envHint: "On top of the environment's own variables.",
       machine: "Environment",
@@ -5477,13 +5531,13 @@ export const catalogs = {
       },
       close: {
         title: 'Close "{issue}"',
-        working: "{who} is still working on this ticket. Canceling stops it and lets it go; the changes on its branch are not merged into main.",
-        completable:
-          "Completing merges {who}'s branch into the repo's main branch, after you look over the changes; canceling lets it go without merging them.",
-        notCompletable: "This ticket cannot be completed now. Canceling lets {who} go, and its changes are not merged into main.",
-        review: "See the changes, complete",
+        working: "{who} is still working on this ticket. Canceling stops it and discards the ticket.",
+        completable: "Review the changes or attach a delivery receipt to mark this ticket done, or cancel it.",
+        notCompletable: "This ticket cannot be completed now. Canceling stops {who} and marks the ticket canceled.",
+        review: "Review and complete",
         stopAndCancel: "Stop and cancel",
         cancel: "Cancel the ticket",
+        completeWithoutDiff: "Complete with receipt",
       },
       changes: {
         checkOutput: "Check output",
@@ -5553,7 +5607,7 @@ export const catalogs = {
         deliver: "Delivers",
         crew: "Worked on by",
         profile: "Profile",
-        branch: "Branch",
+        cwd: "Working directory",
         copyPath: "Copy the path",
         took: "Took",
         resolved: "Resolved review notes",
@@ -5646,16 +5700,34 @@ export const catalogs = {
         refine: "drafting",
         runtime: "the environment itself",
       },
-      run: {
-        working: "working",
-        heard: "{n, plural, one {heard # word on the way} other {heard # words on the way}}",
-        reconcile: "Verify the working directory",
-        currentChanges: "View current issue changes",
+      run: { working: "working", heard: "{n, plural, one {heard # word on the way} other {heard # words on the way}}" },
+      receipt: {
+        title: "Delivery receipt",
+        hint: "Record proof of delivery (PR, commit, note, or answer).",
+        kind: "Receipt type",
+        kinds: { none: "None", pull_request: "Pull Request", commit: "Commit", note: "Note", answer: "Answer" },
+        url: "PR URL",
+        urlPlaceholder: "https://github.com/org/repo/pull/123",
+        number: "PR number (optional)",
+        numberPlaceholder: "123",
+        sha: "Commit SHA",
+        shaPlaceholder: "a1b2c3d4…",
+        branch: "Branch (optional)",
+        branchPlaceholder: "feat/my-branch",
+        noteId: "Note ID",
+        noteIdPlaceholder: "note-id",
+        noteTitle: "Note title (optional)",
+        noteTitlePlaceholder: "Design spec",
+        summary: "Summary",
+        summaryOptional: "Summary (optional)",
+        summaryPlaceholder: "Key outcome or verification notes…",
+        openNote: "Open note",
+        openPr: "Open PR",
+        missing: { url: "Enter a pull request URL.", sha: "Enter a commit SHA.", noteId: "Enter a note ID.", summary: "Enter an answer summary." },
       },
       card: {
         orchestrator: "Assistant",
         refining: "{name} is drafting",
-        draft: "Draft",
         queued: "Queued",
         cron: "Scheduled task",
         noHelper: "No helper yet",
@@ -5850,8 +5922,6 @@ export const catalogs = {
         unpinnedToast: "Unpinned",
         artifacts: "Notes",
         media: "Media",
-        moreTypes: "More types ({n})",
-        fewerTypes: "Hide empty types",
         exportArtifact: "Export",
         turnIntoIssue: "Turn into ticket",
         issueCreated: "Ticket created",
@@ -5955,6 +6025,10 @@ export const catalogs = {
             sheetTechMatrix: { name: "Tech Evaluation Matrix", desc: "Weighted criteria scoring, effort, and operational complexity" },
             sheetTestMatrix: { name: "QA & Regression Matrix", desc: "Core test cases, layer coverage, expected behavior, and status" },
             sheetApiInventory: { name: "API & Dependency Inventory", desc: "Endpoint registry, auth mode, rate limits, and owning module" },
+            sheetUiReview: {
+              name: "UI & Product Review Checklist",
+              desc: "Severity, status, module, linked issue & Agent triage for annotated UI walkthroughs",
+            },
             artDiagram: { name: "Architecture diagram", desc: "Nodes, edges, and architecture flows" },
             diagMicroservices: { name: "Microservices Topology", desc: "Edge gateway, domain services, event bus, and storage links" },
             diagSequence: { name: "Request Sequence Flow", desc: "Client, auth guard, core service, outbox, and live stream flow" },
@@ -6222,6 +6296,26 @@ export const catalogs = {
             sheetApiR4Rate: "10 req/min",
             sheetApiR4Owner: "Remote",
             sheetApiR4Stab: "Stable v1",
+            sheetUiReviewTab: "UI Walkthrough Checklist",
+            sheetUiReviewColTitle: "Finding",
+            sheetUiReviewColSeverity: "Severity",
+            sheetUiReviewColStatus: "Status",
+            sheetUiReviewColModule: "Module",
+            sheetUiReviewColIssue: "Linked Issue",
+            sheetUiReviewColAgent: "Agent Triage & Spawn",
+            sheetUiReviewSevP0: "P0 Blocker",
+            sheetUiReviewSevP1: "P1 Experience",
+            sheetUiReviewSevP2: "P2 Polish",
+            sheetUiReviewSevUx: "UX Suggestion",
+            sheetUiReviewStOpen: "Open",
+            sheetUiReviewStFixing: "Fixing",
+            sheetUiReviewStResolved: "Resolved",
+            sheetUiReviewR1Title: "Dark theme sidebar border contrast too sharp",
+            sheetUiReviewR1Mod: "Note / Sidebar",
+            sheetUiReviewR2Title: "Table cell Tab navigation skips last row append",
+            sheetUiReviewR2Mod: "Note / Doc Editor",
+            sheetUiReviewR3Title: "Lightbox pin badge overlaps narrow caption edge",
+            sheetUiReviewR3Mod: "Note / Media",
             dashSloP1: "Availability (%)",
             dashSloP2: "P99 Latency (ms)",
             dashSloP3: "Error Budget Left (%)",
@@ -6593,6 +6687,14 @@ export const catalogs = {
         codeLanguagePlaceholder: "language",
         addCol: "+Col",
         addRow: "+Row",
+        tableAlign: "Cycle alignment",
+        tableMoveColLeft: "Move column left",
+        tableMoveColRight: "Move column right",
+        tableInsertColAfter: "Insert column after",
+        tableDeleteCol: "Delete column",
+        tableInsertRowBelow: "Insert row below",
+        tableDeleteRow: "Delete row",
+        tableNavHint: "Tab next cell · Shift+Tab previous · Enter next row",
         bookmarkOpen: "Open URL",
         bookmarkEdit: "Edit bookmark",
         titleOptional: "Title (optional)",
@@ -6678,6 +6780,29 @@ export const catalogs = {
         shot: "Shot",
         transcriptPreview: "Transcript",
         videoPreview: "Preview",
+      },
+      annotation: {
+        show: "Show pins",
+        hide: "Hide pins",
+        unresolvedOnly: "Open only",
+        addMode: "Annotate",
+        addModeHint: "Click or drag on image to place an annotation",
+        openCount: "{open}/{total} open",
+        defaultTitle: "Finding #{n}",
+        titlePlaceholder: "Annotation title…",
+        bodyPlaceholder: "Review note or expected fix…",
+        resolve: "Resolve",
+        reopen: "Reopen",
+        edit: "Edit annotation",
+        save: "Done",
+        delete: "Delete annotation",
+        createIssue: "Create Issue",
+        openIssue: "Open Issue",
+        jumpToRow: "Review row",
+        jumpToPin: "Pin #{n}",
+        zoom: "Inspect in Lightbox",
+        severity: { p0: "P0", p1: "P1", p2: "P2", ux: "UX" },
+        status: { open: "Open", resolved: "Resolved" },
       },
       files: { codeMode: "Code", htmlPreviewMode: "Preview" },
       issue: {
@@ -7255,9 +7380,6 @@ export const catalogs = {
         platform: { macos: "macOS", linux: "Linux", container: "Container", other: "Other" },
         status: { online: "Online", offline: "Offline", draining: "Draining" },
         machineId: "Machine ID",
-        worktree: "Worktree",
-        worktreeYes: "Supported",
-        worktreeNo: "Unavailable",
         installedCount: "Installed",
         lastSeen: "Last seen",
       },
@@ -7562,7 +7684,7 @@ export const catalogs = {
         github: "GitHub Token gh PR login",
         remote:
           "remote mobile phone lan wifi local direct Tailscale pair pairing QR device iOS Android CLI machine sandbox listener token control plane embedded",
-        data: "home folder settings repos worktrees data storage backend",
+        data: "home folder settings repos data storage backend",
         about: "version update cli command line",
       },
       scope: { farm: "For all of VibeValley", device: "This device only" },
@@ -7644,7 +7766,7 @@ export const catalogs = {
         refresh: "Recheck",
       },
       data: {
-        intro: "Inspect local data paths, repository and worktree folders, and the active storage backend.",
+        intro: "Inspect local data paths, repository folders, and the active storage backend.",
         storageTitle: "Storage Backend",
         backend: "Active backend",
         backendHint: "Storage backend for attachments, media inputs, and notes",
@@ -7653,8 +7775,7 @@ export const catalogs = {
         backendMemory: "In-Memory (Memory)",
       },
       providers: {
-        intro:
-          "Manage credentials for DeepSeek, MiniMax, MOSS, and other providers (1 provider = 1 API key), verify connectivity, and auto-fetch capability-tagged models.",
+        intro: "Manage credentials for DeepSeek and MOSS providers (1 provider = 1 API key), verify connectivity, and auto-fetch capability-tagged models.",
       },
       models: { intro: "Configure per-scene primary models and fallback policies from discovered provider models only." },
       memory: { intro: "Helpers can also look things up in, and write to, memory outside VibeValley." },
@@ -7669,8 +7790,6 @@ export const catalogs = {
         settingsHint: "The keys and these pages' settings",
         repos: "Repositories",
         reposHint: "The space's repos; each folder is a git repository",
-        worktrees: "Worktrees",
-        worktreesHint: "Each issue's own checkout while a helper works",
         copy: "Copy the path",
         copied: "Path copied",
         reveal: "Show in Finder",
@@ -7769,8 +7888,6 @@ export const catalogs = {
         collapseAllTooltip: "Collapse all repositories and worktrees",
         expandCurrent: "Expand current",
         expandCurrentTooltip: "Expand active repositories and worktrees",
-        collapseItem: "Collapse {name}",
-        expandItem: "Expand {name}",
         newTerminalHere: "New terminal here",
         newChatHere: "New chat here",
         chatWaiting: "Waiting for confirmation",
@@ -8089,7 +8206,6 @@ export interface Messages {
   "shared.deliverable.pull_request": undefined;
   "shared.delivered.kept": undefined;
   "shared.delivered.merged": undefined;
-  "shared.delivered.merged_into_parent": undefined;
   "shared.delivered.none": undefined;
   "shared.delivered.pull_request": undefined;
   "shared.delivered.submitted": undefined;
@@ -8367,8 +8483,6 @@ export interface Messages {
   "web.agent.workdir": undefined;
   "web.agent.workdirHint": undefined;
   "web.agent.workdirTip": undefined;
-  "web.agent.worktree": undefined;
-  "web.agent.worktreeHint": undefined;
   "web.audio.account": undefined;
   "web.audio.addSpeaker": undefined;
   "web.audio.addTurn": undefined;
@@ -9495,7 +9609,6 @@ export interface Messages {
   "web.issue.calendar.prevMonth": undefined;
   "web.issue.card.assignHelper": undefined;
   "web.issue.card.cron": undefined;
-  "web.issue.card.draft": undefined;
   "web.issue.card.lost": undefined;
   "web.issue.card.missing": { readonly what: string | number };
   "web.issue.card.missingFlag": undefined;
@@ -9536,7 +9649,8 @@ export interface Messages {
   "web.issue.changes.uncommitted": { readonly n: string | number };
   "web.issue.changes.unreadable": undefined;
   "web.issue.close.cancel": undefined;
-  "web.issue.close.completable": { readonly who: string | number };
+  "web.issue.close.completable": undefined;
+  "web.issue.close.completeWithoutDiff": undefined;
   "web.issue.close.notCompletable": { readonly who: string | number };
   "web.issue.close.review": undefined;
   "web.issue.close.stopAndCancel": undefined;
@@ -9557,13 +9671,13 @@ export interface Messages {
   "web.issue.detail.answer": undefined;
   "web.issue.detail.answerTo": { readonly question: string | number };
   "web.issue.detail.answered": undefined;
-  "web.issue.detail.branch": undefined;
   "web.issue.detail.changedFiles": undefined;
   "web.issue.detail.changesUnread": undefined;
   "web.issue.detail.closedAt": undefined;
   "web.issue.detail.conflict": { readonly base: string | number; readonly files: string | number };
   "web.issue.detail.copyPath": undefined;
   "web.issue.detail.crew": undefined;
+  "web.issue.detail.cwd": undefined;
   "web.issue.detail.deliver": undefined;
   "web.issue.detail.evidence": undefined;
   "web.issue.detail.fileCount": { readonly n: string | number };
@@ -9784,6 +9898,35 @@ export interface Messages {
   "web.issue.peek.compareBadge": undefined;
   "web.issue.peek.expand": undefined;
   "web.issue.reading": undefined;
+  "web.issue.receipt.branch": undefined;
+  "web.issue.receipt.branchPlaceholder": undefined;
+  "web.issue.receipt.hint": undefined;
+  "web.issue.receipt.kind": undefined;
+  "web.issue.receipt.kinds.answer": undefined;
+  "web.issue.receipt.kinds.commit": undefined;
+  "web.issue.receipt.kinds.none": undefined;
+  "web.issue.receipt.kinds.note": undefined;
+  "web.issue.receipt.kinds.pull_request": undefined;
+  "web.issue.receipt.missing.noteId": undefined;
+  "web.issue.receipt.missing.sha": undefined;
+  "web.issue.receipt.missing.summary": undefined;
+  "web.issue.receipt.missing.url": undefined;
+  "web.issue.receipt.noteId": undefined;
+  "web.issue.receipt.noteIdPlaceholder": undefined;
+  "web.issue.receipt.noteTitle": undefined;
+  "web.issue.receipt.noteTitlePlaceholder": undefined;
+  "web.issue.receipt.number": undefined;
+  "web.issue.receipt.numberPlaceholder": undefined;
+  "web.issue.receipt.openNote": undefined;
+  "web.issue.receipt.openPr": undefined;
+  "web.issue.receipt.sha": undefined;
+  "web.issue.receipt.shaPlaceholder": undefined;
+  "web.issue.receipt.summary": undefined;
+  "web.issue.receipt.summaryOptional": undefined;
+  "web.issue.receipt.summaryPlaceholder": undefined;
+  "web.issue.receipt.title": undefined;
+  "web.issue.receipt.url": undefined;
+  "web.issue.receipt.urlPlaceholder": undefined;
   "web.issue.relations.clear": undefined;
   "web.issue.relations.duplicate": undefined;
   "web.issue.relations.duplicateChip": { readonly n: string | number };
@@ -9797,9 +9940,7 @@ export interface Messages {
   "web.issue.reopen.title": undefined;
   "web.issue.reopen.what": undefined;
   "web.issue.reopen.whatLabel": undefined;
-  "web.issue.run.currentChanges": undefined;
   "web.issue.run.heard": { readonly n: number };
-  "web.issue.run.reconcile": undefined;
   "web.issue.run.working": undefined;
   "web.issue.scope.active": undefined;
   "web.issue.scope.all": undefined;
@@ -9898,7 +10039,6 @@ export interface Messages {
   "web.library.content.artifactType.all": undefined;
   "web.library.content.artifacts": undefined;
   "web.library.content.exportArtifact": undefined;
-  "web.library.content.fewerTypes": undefined;
   "web.library.content.inspector.copiedPath": undefined;
   "web.library.content.inspector.copyPath": undefined;
   "web.library.content.inspector.openExternal": undefined;
@@ -9909,7 +10049,6 @@ export interface Messages {
   "web.library.content.installedAppsEmpty": undefined;
   "web.library.content.issueCreated": undefined;
   "web.library.content.media": undefined;
-  "web.library.content.moreTypes": { readonly n: string | number };
   "web.library.content.new": undefined;
   "web.library.content.pin": undefined;
   "web.library.content.pinned": undefined;
@@ -10039,6 +10178,8 @@ export interface Messages {
   "web.library.content.templates.items.sheetTechMatrix.name": undefined;
   "web.library.content.templates.items.sheetTestMatrix.desc": undefined;
   "web.library.content.templates.items.sheetTestMatrix.name": undefined;
+  "web.library.content.templates.items.sheetUiReview.desc": undefined;
+  "web.library.content.templates.items.sheetUiReview.name": undefined;
   "web.library.content.templates.items.slidesArchReview.desc": undefined;
   "web.library.content.templates.items.slidesArchReview.name": undefined;
   "web.library.content.templates.items.slidesReleaseDemo.desc": undefined;
@@ -10305,6 +10446,26 @@ export interface Messages {
   "web.library.content.templates.seed.sheetTestR4Owner": undefined;
   "web.library.content.templates.seed.sheetTestR4Res": undefined;
   "web.library.content.templates.seed.sheetTestTab": undefined;
+  "web.library.content.templates.seed.sheetUiReviewColAgent": undefined;
+  "web.library.content.templates.seed.sheetUiReviewColIssue": undefined;
+  "web.library.content.templates.seed.sheetUiReviewColModule": undefined;
+  "web.library.content.templates.seed.sheetUiReviewColSeverity": undefined;
+  "web.library.content.templates.seed.sheetUiReviewColStatus": undefined;
+  "web.library.content.templates.seed.sheetUiReviewColTitle": undefined;
+  "web.library.content.templates.seed.sheetUiReviewR1Mod": undefined;
+  "web.library.content.templates.seed.sheetUiReviewR1Title": undefined;
+  "web.library.content.templates.seed.sheetUiReviewR2Mod": undefined;
+  "web.library.content.templates.seed.sheetUiReviewR2Title": undefined;
+  "web.library.content.templates.seed.sheetUiReviewR3Mod": undefined;
+  "web.library.content.templates.seed.sheetUiReviewR3Title": undefined;
+  "web.library.content.templates.seed.sheetUiReviewSevP0": undefined;
+  "web.library.content.templates.seed.sheetUiReviewSevP1": undefined;
+  "web.library.content.templates.seed.sheetUiReviewSevP2": undefined;
+  "web.library.content.templates.seed.sheetUiReviewSevUx": undefined;
+  "web.library.content.templates.seed.sheetUiReviewStFixing": undefined;
+  "web.library.content.templates.seed.sheetUiReviewStOpen": undefined;
+  "web.library.content.templates.seed.sheetUiReviewStResolved": undefined;
+  "web.library.content.templates.seed.sheetUiReviewTab": undefined;
   "web.library.content.templates.seed.slidesArchS1Notes": undefined;
   "web.library.content.templates.seed.slidesArchS1Sub": undefined;
   "web.library.content.templates.seed.slidesArchS2B1": undefined;
@@ -10636,6 +10797,31 @@ export interface Messages {
   "web.memory.memory.words": undefined;
   "web.memory.memory.wordsHint": undefined;
   "web.memory.memory.yours": undefined;
+  "web.note.annotation.addMode": undefined;
+  "web.note.annotation.addModeHint": undefined;
+  "web.note.annotation.bodyPlaceholder": undefined;
+  "web.note.annotation.createIssue": undefined;
+  "web.note.annotation.defaultTitle": { readonly n: string | number };
+  "web.note.annotation.delete": undefined;
+  "web.note.annotation.edit": undefined;
+  "web.note.annotation.hide": undefined;
+  "web.note.annotation.jumpToPin": { readonly n: string | number };
+  "web.note.annotation.jumpToRow": undefined;
+  "web.note.annotation.openCount": { readonly open: string | number; readonly total: string | number };
+  "web.note.annotation.openIssue": undefined;
+  "web.note.annotation.reopen": undefined;
+  "web.note.annotation.resolve": undefined;
+  "web.note.annotation.save": undefined;
+  "web.note.annotation.severity.p0": undefined;
+  "web.note.annotation.severity.p1": undefined;
+  "web.note.annotation.severity.p2": undefined;
+  "web.note.annotation.severity.ux": undefined;
+  "web.note.annotation.show": undefined;
+  "web.note.annotation.status.open": undefined;
+  "web.note.annotation.status.resolved": undefined;
+  "web.note.annotation.titlePlaceholder": undefined;
+  "web.note.annotation.unresolvedOnly": undefined;
+  "web.note.annotation.zoom": undefined;
   "web.note.applet.alwaysOnTopHint": undefined;
   "web.note.applet.alwaysOnTopLabel": undefined;
   "web.note.applet.appNameLabel": undefined;
@@ -10804,6 +10990,14 @@ export interface Messages {
   "web.note.doc.speakerNotesPlaceholder": undefined;
   "web.note.doc.statusFilter": undefined;
   "web.note.doc.strike": undefined;
+  "web.note.doc.tableAlign": undefined;
+  "web.note.doc.tableDeleteCol": undefined;
+  "web.note.doc.tableDeleteRow": undefined;
+  "web.note.doc.tableInsertColAfter": undefined;
+  "web.note.doc.tableInsertRowBelow": undefined;
+  "web.note.doc.tableMoveColLeft": undefined;
+  "web.note.doc.tableMoveColRight": undefined;
+  "web.note.doc.tableNavHint": undefined;
   "web.note.doc.tagFilter": undefined;
   "web.note.doc.titleOptional": undefined;
   "web.note.doc.tocEmpty": undefined;
@@ -11356,9 +11550,6 @@ export interface Messages {
   "web.runtime.machines.status.offline": undefined;
   "web.runtime.machines.status.online": undefined;
   "web.runtime.machines.title": undefined;
-  "web.runtime.machines.worktree": undefined;
-  "web.runtime.machines.worktreeNo": undefined;
-  "web.runtime.machines.worktreeYes": undefined;
   "web.runtime.makeAgent": undefined;
   "web.runtime.maxWorking": undefined;
   "web.runtime.maxWorkingHint": undefined;
@@ -11663,8 +11854,6 @@ export interface Messages {
   "web.setting.about.version": undefined;
   "web.setting.about.versionHint": undefined;
   "web.setting.about.workingQuestion": { readonly n: string | number };
-  "web.setting.about.worktrees": undefined;
-  "web.setting.about.worktreesHint": undefined;
   "web.setting.appearance.fontApplyFailed": undefined;
   "web.setting.appearance.fontEmpty": undefined;
   "web.setting.appearance.fontFallbackBadge": undefined;
@@ -12041,11 +12230,9 @@ export interface Messages {
   "web.shell.sidebar.closeTab": undefined;
   "web.shell.sidebar.collapseAll": undefined;
   "web.shell.sidebar.collapseAllTooltip": undefined;
-  "web.shell.sidebar.collapseItem": { readonly name: string | number };
   "web.shell.sidebar.copyPath": undefined;
   "web.shell.sidebar.expandCurrent": undefined;
   "web.shell.sidebar.expandCurrentTooltip": undefined;
-  "web.shell.sidebar.expandItem": { readonly name: string | number };
   "web.shell.sidebar.files": undefined;
   "web.shell.sidebar.filesTip": undefined;
   "web.shell.sidebar.gitBranches": undefined;

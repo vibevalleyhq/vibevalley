@@ -2,26 +2,44 @@
 //! transitions through `ctx.service.issue` and `ctx.service.session`, overlays
 //! live session state, and marks dirty slices on `ctx.feed`.
 
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeSet, HashSet};
 use std::path::Path;
-use std::sync::{Arc, Weak};
+use std::sync::Arc;
 
-use parking_lot::Mutex;
-use tokio::sync::{Mutex as AsyncMutex, OwnedMutexGuard};
 use vibevalley_core::{
     BOARD_KEEP_CLOSED_ISSUES, BoardInput, LiveSnapshot, SessionInput, SliceMask, derive_issues, derive_single_issue, overlay_sessions, project_board,
     project_sessions,
 };
-use vibevalley_protocol::{Issue, PullRequest, Session, SliceBundle};
+use vibevalley_kit::sync::{KeyLock, KeyLockGuard};
+use vibevalley_protocol::{Issue, Millis, Session, SliceBundle};
+use vibevalley_runtime::agent::durable::BoxFuture;
 
+pub use super::types::{BoardConfig, BoardError, IssueChange, Result};
+pub(crate) use super::types::{best_pull_for_issue, best_pulls_by_issue, derive_all_issues, find_issue};
 use crate::context::{Context, now};
-use crate::runtime::{RuntimeError, derive_all_issues};
-use crate::service::{DatabaseConfig, Service};
+use crate::runtime::AtomicTxHook;
+pub use crate::runtime::{Opened, Step};
+use crate::service::{DatabaseConfig, DbError, Service, Tx};
 
-pub use crate::runtime::{BoardConfig, BoardError, IssueChange, Opened, Result, Step, Undelivered};
+/// Atomic transaction hook folding an [`IssueChange`] inside a [`crate::runtime::SessionEngine`] transaction.
+struct FoldIssueChangeHook {
+    service: Arc<Service>,
+    issue_id: String,
+    change: IssueChange,
+}
 
-pub type CronOfIssue = Arc<dyn Fn(&str) -> Option<String> + Send + Sync>;
-pub type PullOfIssue = Arc<dyn Fn(&str) -> Option<PullRequest> + Send + Sync>;
+impl AtomicTxHook for FoldIssueChangeHook {
+    fn apply<'a>(self: Box<Self>, tx: &'a Tx, at: Millis) -> BoxFuture<'a, std::result::Result<SliceMask, DbError>> {
+        Box::pin(async move {
+            let dirty = self.change.dirty_mask();
+            if let Some(mut item) = self.service.issue.get_in_tx(tx, &self.issue_id).await? {
+                self.change.fold(&mut item, at);
+                self.service.issue.put_in_tx(tx, &item).await?;
+            }
+            Ok(dirty)
+        })
+    }
+}
 
 /// Lightweight issue/session state coordinator backed by [`Context`] and [`Service`].
 ///
@@ -29,37 +47,30 @@ pub type PullOfIssue = Arc<dyn Fn(&str) -> Option<PullRequest> + Send + Sync>;
 /// so unrelated issue edits and session turns never serialize against each other.
 pub struct IssueState {
     ctx: Arc<Context>,
-    issue_locks: Mutex<HashMap<String, Weak<AsyncMutex<()>>>>,
-    cron_of_issue: Mutex<Option<CronOfIssue>>,
-    pull_of_issue: Mutex<Option<PullOfIssue>>,
+    issue_locks: KeyLock<String>,
 }
 
 impl IssueState {
     pub fn new(ctx: Arc<Context>) -> Self {
         Self {
             ctx,
-            issue_locks: Mutex::new(HashMap::new()),
-            cron_of_issue: Mutex::new(None),
-            pull_of_issue: Mutex::new(None),
+            issue_locks: KeyLock::new(),
         }
     }
 
-    async fn lock_issue(&self, id: &str) -> OwnedMutexGuard<()> {
-        let mutex = {
-            let mut locks = self.issue_locks.lock();
-            if let Some(existing) = locks.get(id).and_then(Weak::upgrade) {
-                existing
-            } else {
-                locks.retain(|_, w| w.strong_count() > 0);
-                let created = Arc::new(AsyncMutex::new(()));
-                locks.insert(id.to_owned(), Arc::downgrade(&created));
-                created
-            }
-        };
-        mutex.lock_owned().await
+    pub(crate) fn issue_change_hook(&self, issue_id: String, change: IssueChange) -> Box<dyn AtomicTxHook> {
+        Box::new(FoldIssueChangeHook {
+            service: self.ctx.service.clone(),
+            issue_id,
+            change,
+        })
     }
 
-    async fn lock_issues_sorted(&self, ids: impl IntoIterator<Item = String>) -> Vec<OwnedMutexGuard<()>> {
+    async fn lock_issue(&self, id: &str) -> KeyLockGuard<'_, String> {
+        self.issue_locks.lock(id.to_owned()).await
+    }
+
+    async fn lock_issues_sorted(&self, ids: impl IntoIterator<Item = String>) -> Vec<KeyLockGuard<'_, String>> {
         let sorted: BTreeSet<String> = ids.into_iter().collect();
         let mut guards = Vec::with_capacity(sorted.len());
         for id in sorted {
@@ -119,63 +130,29 @@ impl IssueState {
         self.ctx.mark_dirty(dirty)
     }
 
-    /// Registers the owner-backed `Issue.cron` projection and marks slices dirty.
-    pub async fn use_cron_of_issue_async(&self, lookup: CronOfIssue) {
-        *self.cron_of_issue.lock() = Some(lookup);
-        self.ctx.mark_dirty(SliceMask::BOARD | SliceMask::INBOX | SliceMask::FARM);
-    }
-
-    /// Registers the owner-backed `Issue.pull_request` projection and marks slices dirty.
-    pub async fn use_pull_of_issue_async(&self, lookup: PullOfIssue) {
-        *self.pull_of_issue.lock() = Some(lookup);
-        self.ctx.mark_dirty(SliceMask::BOARD | SliceMask::INBOX | SliceMask::FARM);
-    }
-
-    /// Marks slices dirty so `cron` and `pull_request` projections refresh without touching SQLite.
+    /// Marks board/inbox/farm slices dirty so derived projections refresh.
     pub async fn refresh_issue_async(&self, _id: &str) {
         self.ctx.mark_dirty(SliceMask::BOARD | SliceMask::INBOX | SliceMask::FARM);
     }
 
-    fn enrich_issue(&self, issue: &mut Issue) {
-        if let Some(lookup) = self.cron_of_issue.lock().as_ref() {
-            issue.cron = lookup(&issue.id);
-        }
-        if let Some(lookup) = self.pull_of_issue.lock().as_ref() {
-            issue.pull_request = lookup(&issue.id);
-        }
-    }
-
     pub async fn raw_issues_async(&self) -> Result<Vec<Issue>> {
-        let mut issues = self.ctx.service.issue.all().await?;
-        for issue in &mut issues {
-            self.enrich_issue(issue);
-        }
-        Ok(issues)
+        Ok(self.ctx.service.issue.all().await?)
     }
 
     /// Loads only the active board window (open issues + latest closed window + active session issues)
     /// for slice projections, avoiding full-table reads of archived closed issues.
     pub async fn raw_issues_for_board_async(&self, include_ids: &[String]) -> Result<Vec<Issue>> {
-        let mut issues = self.ctx.service.issue.list_board_window(BOARD_KEEP_CLOSED_ISSUES, include_ids).await?;
-        for issue in &mut issues {
-            self.enrich_issue(issue);
-        }
-        Ok(issues)
+        Ok(self.ctx.service.issue.list_board_window(BOARD_KEEP_CLOSED_ISSUES, include_ids).await?)
     }
 
-    /// Loads active sessions and the board issue window from a single consistent read transaction
-    /// and enriches issues with in-memory `cron` / `pull_request` metadata.
+    /// Loads active sessions and the board issue window from a single consistent read transaction.
     pub async fn projection_snapshot_async(&self) -> Result<(Vec<Session>, Vec<Issue>)> {
-        let (raw_sessions, mut raw_issues) = self
+        Ok(self
             .ctx
             .service
             .issue
             .board_projection_snapshot(&self.ctx.service.session, BOARD_KEEP_CLOSED_ISSUES)
-            .await?;
-        for issue in &mut raw_issues {
-            self.enrich_issue(issue);
-        }
-        Ok((raw_sessions, raw_issues))
+            .await?)
     }
 
     pub async fn sessions_async(&self) -> Result<Vec<Session>> {
@@ -185,16 +162,21 @@ impl IssueState {
     }
 
     pub async fn issues_async(&self) -> Result<Vec<Issue>> {
-        let (raw_issues, sessions) = tokio::try_join!(self.raw_issues_async(), self.sessions_async())?;
-        Ok(derive_all_issues(&raw_issues, &sessions))
+        let (raw_issues, sessions, pulls) = tokio::try_join!(self.raw_issues_async(), self.sessions_async(), async {
+            self.ctx.service.issue.list_pulls().await.map_err(BoardError::from)
+        })?;
+        let pulls_by_issue = best_pulls_by_issue(&pulls);
+        let mut derived = derive_all_issues(&raw_issues, &sessions);
+        for issue in &mut derived {
+            if let Some(pr) = pulls_by_issue.get(&issue.id) {
+                issue.pull_request = Some(pr.clone());
+            }
+        }
+        Ok(derived)
     }
 
-    async fn derive_single_issue_async(&self, mut target: Issue) -> Result<Issue> {
-        self.enrich_issue(&mut target);
-        let mut descendants = self.ctx.service.issue.list_descendants(&target.id).await?;
-        for child in &mut descendants {
-            self.enrich_issue(child);
-        }
+    async fn derive_single_issue_async(&self, target: Issue) -> Result<Issue> {
+        let descendants = self.ctx.service.issue.list_descendants(&target.id).await?;
         let mut session_ids: HashSet<String> = HashSet::new();
         let mut issue_ids: Vec<String> = Vec::with_capacity(1 + descendants.len());
         issue_ids.push(target.id.clone());
@@ -208,10 +190,12 @@ impl IssueState {
             }
         }
         let sid_vec: Vec<String> = session_ids.into_iter().collect();
-        let stored_sessions = self.ctx.service.sessions_for_issues(&sid_vec, &issue_ids).await?;
+        let (stored_sessions, pulls) = tokio::try_join!(self.ctx.service.sessions_for_issues(&sid_vec, &issue_ids), self.ctx.service.issue.list_pulls(),)?;
         let overlays = self.ctx.live.core_session_overlays();
         let sessions = overlay_sessions(&stored_sessions, &overlays);
-        Ok(derive_single_issue(&target, &descendants, &sessions))
+        let mut derived = derive_single_issue(&target, &descendants, &sessions);
+        derived.pull_request = best_pull_for_issue(&pulls, &derived.id);
+        Ok(derived)
     }
 
     /// By id, number or `#number`. Uses indexed lookup + local subtree derivation (no full-table scan).
@@ -239,19 +223,12 @@ impl IssueState {
     /// cross-issue or cross-session lock contention) and returns the locally derived issue.
     pub async fn change_async(&self, id: &str, change: IssueChange) -> Result<Issue> {
         let dirty = change.dirty_mask();
-        let record_episode = matches!(change, IssueChange::Delivered(..) | IssueChange::MergedIntoParent { .. });
-        let resolved_id = self.ctx.service.issue.get_by_ref(id).await?.ok_or_else(|| RuntimeError::NoIssue(id.into()))?.id;
+        let record_episode = matches!(change, IssueChange::Delivered(..));
+        let resolved_id = self.ctx.service.issue.get_by_ref(id).await?.ok_or_else(|| BoardError::NoIssue(id.into()))?.id;
 
         let (saved_issue, enqueued_episode) = {
             let _issue_guard = self.lock_issue(&resolved_id).await;
-            let mut issue = self
-                .ctx
-                .service
-                .issue
-                .get(&resolved_id)
-                .await?
-                .ok_or_else(|| RuntimeError::NoIssue(id.into()))?;
-            self.enrich_issue(&mut issue);
+            let mut issue = self.ctx.service.issue.get(&resolved_id).await?.ok_or_else(|| BoardError::NoIssue(id.into()))?;
             let session = if record_episode && let Some(sid) = issue.latest_session_id() {
                 match self.ctx.service.session.get(sid).await.ok().flatten() {
                     Some(s) => Some(s),
@@ -296,11 +273,11 @@ impl IssueState {
             let (_, written_dirty) = self
                 .ctx
                 .service
-                .write_dirty_with(RuntimeError::Store, |tx| {
+                .write_dirty_with(BoardError::Store, |tx| {
                     Box::pin(async move {
                         issue_svc.put_in_tx(tx, &to_save).await?;
                         if let Some(ev) = episode {
-                            outbox.enqueue_event_in_tx(tx, &ev).await.map_err(RuntimeError::Api)?;
+                            outbox.enqueue_event_in_tx(tx, &ev).await.map_err(BoardError::Api)?;
                         }
                         Ok(((), dirty))
                     })
@@ -351,14 +328,14 @@ impl IssueState {
     pub async fn set_body_note_id_async(&self, id: &str, note_id: String) -> Result<Issue> {
         let saved = {
             let _guard = self.lock_issue(id).await;
-            let mut issue = self.ctx.service.issue.get(id).await?.ok_or_else(|| RuntimeError::NoIssue(id.to_owned()))?;
+            let mut issue = self.ctx.service.issue.get(id).await?.ok_or_else(|| BoardError::NoIssue(id.to_owned()))?;
             if issue.body_note_id.as_deref() != Some(note_id.as_str()) {
                 issue.body_note_id = Some(note_id);
                 let issue_svc = self.ctx.service.issue.clone();
                 let to_save = issue.clone();
                 self.ctx
                     .service
-                    .write_dirty_with(RuntimeError::Store, |tx| {
+                    .write_dirty_with(BoardError::Store, |tx| {
                         Box::pin(async move {
                             issue_svc.put_in_tx(tx, &to_save).await?;
                             Ok(((), SliceMask::BOARD | SliceMask::INBOX))

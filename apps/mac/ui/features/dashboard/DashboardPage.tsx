@@ -3,10 +3,10 @@ import { computed, Scroll, Text, View } from "nsh";
 import { t } from "@vibevalley/i18n";
 import { isFreeUserSession, isOrchestratorSession, sessionIssueId, sessionProfile } from "@vibevalley/protocol/rules";
 
-import { AgentFace, OrchestratorFace, UserAvatar } from "../../design/domain/Face";
+import { AgentFace, OrchestratorFace } from "../../design/domain/Face";
 import { Icon } from "../../design/Icon";
 import type { IconName } from "../../design/icons";
-import { Empty, Quiet } from "../../design/layout";
+import { Quiet } from "../../design/layout";
 import { Segmented } from "../../design/Segmented";
 import { CountPill, Dot, type DotTone } from "../../design/Tag";
 import { useOrchestrators } from "../../infra/agents";
@@ -227,15 +227,12 @@ function DashboardOverview() {
           <If
             when={hasPending()}
             else={
-              <View class="p-3">
-                <Empty
-                  variant="zero"
-                  compact
-                  testid="dashboard-pending-empty"
-                  icon="check"
-                  title={t("web.base.dashboard.pending.zeroTitle")}
-                  description={t("web.base.dashboard.pending.empty")}
-                />
+              <View testID="dashboard-pending-empty" class="flex-row items-center gap-3 px-4 py-5">
+                <Icon name="check" size={16} tone="leaf" />
+                <View class="min-w-0 flex-1 gap-0.5">
+                  <Text class="text-sm font-medium text-ink">{t("web.base.dashboard.pending.zeroTitle")}</Text>
+                  <Text class="text-xs text-muted">{t("web.base.dashboard.pending.empty")}</Text>
+                </View>
               </View>
             }
           >
@@ -347,7 +344,6 @@ export function DashboardPage(props: { tab?: DashboardTab | undefined; approvals
         class="h-11 shrink-0 flex-row items-center justify-between gap-3 border-b border-line bg-page px-4"
       >
         <View class="min-w-0 flex-row items-center gap-2">
-          <UserAvatar size={22} />
           <Text role="header" class="truncate text-sm font-semibold text-ink">
             {t("web.base.dashboard.title")}
           </Text>

@@ -177,12 +177,13 @@
   },
   "close": {
     "title": "Close \"{issue}\"",
-    "working": "{who} is still working on this ticket. Canceling stops it and lets it go; the changes on its branch are not merged into main.",
-    "completable": "Completing merges {who}'s branch into the repo's main branch, after you look over the changes; canceling lets it go without merging them.",
-    "notCompletable": "This ticket cannot be completed now. Canceling lets {who} go, and its changes are not merged into main.",
-    "review": "See the changes, complete",
+    "working": "{who} is still working on this ticket. Canceling stops it and discards the ticket.",
+    "completable": "Review the changes or attach a delivery receipt to mark this ticket done, or cancel it.",
+    "notCompletable": "This ticket cannot be completed now. Canceling stops {who} and marks the ticket canceled.",
+    "review": "Review and complete",
     "stopAndCancel": "Stop and cancel",
-    "cancel": "Cancel the ticket"
+    "cancel": "Cancel the ticket",
+    "completeWithoutDiff": "Complete with receipt"
   },
   "changes": {
     "checkOutput": "Check output",
@@ -255,7 +256,7 @@
     "deliver": "Delivers",
     "crew": "Worked on by",
     "profile": "Profile",
-    "branch": "Branch",
+    "cwd": "Working directory",
     "copyPath": "Copy the path",
     "took": "Took",
     "resolved": "Resolved review notes",
@@ -383,14 +384,46 @@
   },
   "run": {
     "working": "working",
-    "heard": "{n, plural, one {heard # word on the way} other {heard # words on the way}}",
-    "reconcile": "Verify the working directory",
-    "currentChanges": "View current issue changes"
+    "heard": "{n, plural, one {heard # word on the way} other {heard # words on the way}}"
+  },
+  "receipt": {
+    "title": "Delivery receipt",
+    "hint": "Record proof of delivery (PR, commit, note, or answer).",
+    "kind": "Receipt type",
+    "kinds": {
+      "none": "None",
+      "pull_request": "Pull Request",
+      "commit": "Commit",
+      "note": "Note",
+      "answer": "Answer"
+    },
+    "url": "PR URL",
+    "urlPlaceholder": "https://github.com/org/repo/pull/123",
+    "number": "PR number (optional)",
+    "numberPlaceholder": "123",
+    "sha": "Commit SHA",
+    "shaPlaceholder": "a1b2c3d4…",
+    "branch": "Branch (optional)",
+    "branchPlaceholder": "feat/my-branch",
+    "noteId": "Note ID",
+    "noteIdPlaceholder": "note-id",
+    "noteTitle": "Note title (optional)",
+    "noteTitlePlaceholder": "Design spec",
+    "summary": "Summary",
+    "summaryOptional": "Summary (optional)",
+    "summaryPlaceholder": "Key outcome or verification notes…",
+    "openNote": "Open note",
+    "openPr": "Open PR",
+    "missing": {
+      "url": "Enter a pull request URL.",
+      "sha": "Enter a commit SHA.",
+      "noteId": "Enter a note ID.",
+      "summary": "Enter an answer summary."
+    }
   },
   "card": {
     "orchestrator": "Assistant",
     "refining": "{name} is drafting",
-    "draft": "Draft",
     "queued": "Queued",
     "cron": "Scheduled task",
     "noHelper": "No helper yet",

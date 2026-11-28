@@ -8,7 +8,7 @@ use std::time::Instant;
 
 use serde_json::json;
 use vibevalley_core::collab::{CollabDoc, DEFAULT_PRESENCE_TTL_MS, encode_frontiers, encode_version_vector};
-use vibevalley_core::projection::{InboxInput, derive_issues, overlay_sessions, project_inbox};
+use vibevalley_core::projection::{InboxInput, project_inbox};
 use vibevalley_protocol::{
     ApiError, BizCode, DebugCollabClock, DebugCollabNoteState, DebugCollabPresence, DebugRuntimeSummary, DebugTrajectoryKind, NoteListRequest,
     NotePresenceUpdateRequest, SessionEvent,
@@ -140,11 +140,9 @@ impl DebugDataSource for ServerDebugSources {
 
     fn state_snapshot_async(&self) -> BoxFuture<'_, DebugStateSnapshot> {
         Box::pin(async move {
-            let raw_issues = self.board.raw_issues_async().await.unwrap_or_default();
-            let raw_sessions = self.ctx.service.session.all().await.unwrap_or_default();
-            let live_overlays = self.ctx.live.core_session_overlays();
-            let sessions = overlay_sessions(&raw_sessions, &live_overlays);
-            let issues = derive_issues(&raw_issues, &sessions);
+            let (raw_sessions, raw_issues) = self.board.projection_snapshot_async().await.unwrap_or_default();
+            let sessions = self.board.sessions_async().await.unwrap_or_default();
+            let issues = self.board.issues_async().await.unwrap_or_default();
             let channels = self.channel.channels_snapshot_async().await.unwrap_or_default();
             let user_mentions = self.channel.user_mentions_snapshot_async().await.unwrap_or_default();
             let notes = self.note.list_async(&NoteListRequest::default()).await.unwrap_or_default();

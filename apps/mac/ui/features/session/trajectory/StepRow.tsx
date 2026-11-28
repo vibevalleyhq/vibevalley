@@ -81,8 +81,8 @@ export function Row(props: { spec: RowSpec; open: boolean; marked: boolean; refT
           <Text class={`text-2xs text-faint ${props.open ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
             {props.open ? t("web.session.trajectory.hideDetail") : t("web.session.trajectory.inspect")}
           </Text>
-          <If when={durationLabel()}>{(dur) => <Text class="font-mono text-2xs text-faint tabular-nums">{dur()}</Text>}</If>
-          <If when={tokenLabel()}>{(tok) => <Text class="font-mono text-2xs text-faint tabular-nums">{tok()}</Text>}</If>
+          <If when={durationLabel()}>{(dur) => <Text class="whitespace-nowrap font-mono text-2xs text-faint tabular-nums">{dur()}</Text>}</If>
+          <If when={tokenLabel()}>{(tok) => <Text class="whitespace-nowrap font-mono text-2xs text-faint tabular-nums">{tok()}</Text>}</If>
           <If when={failed()}>
             <Icon name="cross" size={12} />
           </If>
@@ -96,7 +96,9 @@ export function Row(props: { spec: RowSpec; open: boolean; marked: boolean; refT
             <Icon name="warn" size={12} />
           </If>
         </View>
-        <Text class="w-12 shrink-0 text-right text-2xs text-faint tabular-nums">{props.spec.when}</Text>
+        <Text testID={`step-when-${String(step().seq)}`} class="min-w-16 shrink-0 whitespace-nowrap text-right text-2xs text-faint tabular-nums">
+          {props.spec.when}
+        </Text>
       </View>
       <If when={props.open}>
         <StepDrawer step={step()} tag={props.spec.tag} body={bodyText()} durationMs={props.spec.durationMs} readableInput={props.spec.readableInput} />

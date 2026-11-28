@@ -50,7 +50,6 @@ fn draft() -> Agent {
         disallowed_tools: vec![],
         env: Default::default(),
         workdir: String::new(),
-        worktree: false,
         tags: vec![],
         look: Look {
             species: None,
@@ -788,6 +787,7 @@ fn teammate_codes_external_registration_and_non_dispatch() {
             text: None,
             agent: None,
             edit: None,
+            delivery_receipt: None,
             request_key: None,
         })
         .unwrap(),

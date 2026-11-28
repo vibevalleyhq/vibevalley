@@ -8,15 +8,15 @@ use vibevalley_core::{Clock, Move};
 use vibevalley_i18n::{Params, t};
 use vibevalley_protocol::{
     ActWords, ActorKind, ApiError, AppliedIssue, BacklogTriageConfirmInput, BacklogTriageDismissInput, BacklogTriageSuggestInput, BacklogTriageSuggestion,
-    BizCode, Caller, ChangedFile, Changes, Commit, Issue, IssueAction, IssueDigestGetInput, IssueFilter, IssueHistory, IssueRefineInput, IssueRequest,
+    BizCode, Caller, Changes, DeliveryReceipt, Issue, IssueAction, IssueDigestGetInput, IssueFilter, IssueHistory, IssueRefineInput, IssueRequest,
     IssueReviewInput, IssueSplitInput, IssueStageKind, IssueStatus, IssueStatusUpdateInput, IssueTimeline, IssueUpdate, IssueUpdateInput, MorningDigest, Next,
-    Preview, RepoHealth, Run, Session, StuckReason, UncommittedItem,
+    Preview, RepoHealth, Run, Session, StuckReason,
 };
 
 use super::board::{Board, NewIssue};
 use super::edit;
 use super::family::ChildDraft;
-use super::store::{BoardError, Undelivered};
+use super::store::BoardError;
 use crate::context::error::LookIn;
 
 fn refused(key: &str, params: Params) -> ApiError {
@@ -31,15 +31,17 @@ fn look_in_issues() -> Next {
 }
 
 /// Maps a [`BoardError`] into an endpoint refusal.
+impl From<BoardError> for ApiError {
+    fn from(e: BoardError) -> Self {
+        api(e)
+    }
+}
+
 pub(super) fn api(e: BoardError) -> ApiError {
     match e {
         BoardError::NoIssue(r) => ApiError::new(BizCode::IssueNotFound, t("server.issue.issueRef", &[("ref", r.into())])).with_next(vec![look_in_issues()]),
         BoardError::Refused(r) => ApiError::new(BizCode::IssueRefused, r.text()),
         BoardError::WordsRequired => refused("server.issue.roundNeedsWords", &[]),
-        BoardError::NotDelivered(Undelivered::Conflict { base, files }) => refused(
-            "server.issue.does.conflicts",
-            &[("base", base.into()), ("files", vibevalley_i18n::list(&files).into())],
-        ),
         BoardError::Store(e) => ApiError::new(BizCode::InternalError, e.to_string()),
         BoardError::Api(e) => e,
         other => ApiError::new(BizCode::IssueRefused, other.to_string()),
@@ -107,7 +109,7 @@ struct Settled {
     said: String,
 }
 
-fn settle(item: &Issue, to: IssueStatus, text: &str) -> Result<Settled, ApiError> {
+fn settle(item: &Issue, to: IssueStatus, text: &str, receipt: Option<&DeliveryReceipt>) -> Result<Settled, ApiError> {
     let mv = vibevalley_core::status_move(item, to).map_err(|r| ApiError::new(BizCode::IssueRefused, r.text()).with_next(next_steps(item)))?;
     let said = text.trim().to_string();
     if mv == Move::Round && said.is_empty() && item.stage.state != IssueStageKind::Stuck {
@@ -116,7 +118,13 @@ fn settle(item: &Issue, to: IssueStatus, text: &str) -> Result<Settled, ApiError
     if mv == Move::Round && said.is_empty() && item.stage.stuck == Some(StuckReason::Quiet) {
         return Err(refused("server.issue.roundNeedsWords", &[]));
     }
-    if mv == Move::Complete && item.was_sent() && item.deliver == vibevalley_protocol::Deliverable::PullRequest && item.pull_request.is_none() {
+    let has_pr_receipt = matches!(receipt.or(item.delivery_receipt.as_ref()), Some(DeliveryReceipt::PullRequest { .. }));
+    if mv == Move::Complete
+        && item.was_sent()
+        && item.deliver == vibevalley_protocol::Deliverable::PullRequest
+        && item.pull_request.is_none()
+        && !has_pr_receipt
+    {
         return Err(refused("server.issue.deliveryNeedsPr", &[]));
     }
     Ok(Settled { mv, to, said })
@@ -233,49 +241,10 @@ async fn move_lines_async(board: &Board, item: &Issue, s: &Settled, name: Option
             if !item.was_sent() && board.on_board_async(item).await.is_none() {
                 return vec![t("server.issue.does.completeNone", &[("n", n.into())])];
             }
-            let changes = match item.repo.as_ref() {
-                Some(_) => board.changes_async(&item.id).await.ok(),
-                None => None,
-            };
-            let commits = changes.as_ref().map(|c| c.commits.len()).unwrap_or(0);
-            if commits == 0 || item.deliver == vibevalley_protocol::Deliverable::Answer {
-                return vec![
-                    t("server.issue.does.completeNone", &[("n", n.into())]),
-                    t("server.issue.does.helperLeaves", &[("helper", helper.into())]),
-                ];
-            }
-            if matches!(
-                item.deliver,
-                vibevalley_protocol::Deliverable::Branch | vibevalley_protocol::Deliverable::PullRequest
-            ) || vibevalley_core::pr::goes_by_pull_request(item, false)
-            {
-                return vec![
-                    t("server.issue.does.completeKept", &[("n", n.into()), ("commits", commits.into())]),
-                    t("server.issue.does.helperLeaves", &[("helper", helper.into())]),
-                ];
-            }
-            let mut out = Vec::new();
-            let Some(c) = changes else { return out };
-            if !c.uncommitted.is_empty() {
-                out.push(t(
-                    "server.issue.does.commitFirst",
-                    &[("helper", helper.clone().into()), ("files", c.uncommitted.len().into())],
-                ));
-            }
-            if !c.conflicts.is_empty() {
-                let files: Vec<String> = c.conflicts.iter().map(|f| f.to_string_lossy().into_owned()).collect();
-                out.push(t(
-                    "server.issue.does.conflicts",
-                    &[("base", c.base.into()), ("files", vibevalley_i18n::list(&files).into())],
-                ));
-                return out;
-            }
-            out.push(t("server.issue.does.check", &[]));
-            out.push(t(
-                "server.issue.does.merge",
-                &[("base", c.base.into()), ("commits", commits.into()), ("helper", helper.into())],
-            ));
-            out
+            vec![
+                t("server.issue.does.completeNone", &[("n", n.into())]),
+                t("server.issue.does.helperLeaves", &[("helper", helper.into())]),
+            ]
         }
         Move::Cancel => vec![
             t("server.issue.does.cancel", &[("n", n.into())]),
@@ -297,25 +266,6 @@ fn resolve_agent(board: &Board, agent: &str) -> String {
         return String::new();
     }
     board.runtime().driver().resolve_agent_key(agent)
-}
-
-/// A file's diff as `git diff` prints it.
-fn patch_of(d: &vibevalley_git::FileDiff, path: &str) -> String {
-    let mut out = format!("diff --git a/{path} b/{path}\n");
-    for h in &d.hunks {
-        out.push_str(&h.header);
-        out.push('\n');
-        for l in &h.lines {
-            out.push(match l.kind {
-                vibevalley_git::LineKind::Added => '+',
-                vibevalley_git::LineKind::Removed => '-',
-                _ => ' ',
-            });
-            out.push_str(&l.text);
-            out.push('\n');
-        }
-    }
-    out
 }
 
 fn edit_rewords(edit: &IssueUpdate) -> bool {
@@ -352,6 +302,9 @@ fn apply_preview_edit(item: &mut Issue, edit: &IssueUpdate) {
     }
     if let Some(v) = edit.deliver {
         item.deliver = v;
+    }
+    if let Some(v) = edit.delivery_receipt.clone() {
+        item.delivery_receipt = Some(v);
     }
     if let Some(ids) = &edit.attachments {
         item.attachments = ids
@@ -469,6 +422,7 @@ impl Board {
             priority: input.priority,
             criteria: input.criteria,
             deliver: input.deliver,
+            delivery_receipt: input.delivery_receipt,
             before: input.before,
             attachments: input.attachments,
             parent: input.parent,
@@ -506,7 +460,7 @@ impl Board {
                         let said = if item.status == IssueStatus::Todo {
                             raw_text.trim().to_string()
                         } else {
-                            settle(&item, input.status, raw_text)?.said
+                            settle(&item, input.status, raw_text, input.delivery_receipt.as_ref())?.said
                         };
                         let words = (!said.is_empty()).then_some(said.as_str());
                         let findings = if item.stage.state == IssueStageKind::Reviewing && !said.is_empty() {
@@ -524,7 +478,7 @@ impl Board {
                     item = self.edit_async(&item.id, &edit).await.map_err(api)?;
                 }
             }
-            let settled = settle(&item, input.status, input.text.as_deref().unwrap_or(""))?;
+            let settled = settle(&item, input.status, input.text.as_deref().unwrap_or(""), input.delivery_receipt.as_ref())?;
             if input.status == IssueStatus::Todo && item.mandate.strength == vibevalley_protocol::MandateStrength::Inferred {
                 let mut upgraded = vibevalley_protocol::IssueMandate::explicit("user", item.mandate.auto_submit_pr);
                 upgraded.max_bot_review_rounds = item.mandate.max_bot_review_rounds;
@@ -534,7 +488,7 @@ impl Board {
             if settled.mv == Move::Round && words.is_some() && item.stage.state == IssueStageKind::Reviewing {
                 self.review_async(&item.id, false, &findings_of(&settled.said), "", None).await.map_err(api)?;
             } else {
-                self.move_reviewed_async(&item.id, input.status, words, input.revision.as_ref())
+                self.move_with_receipt_async(&item.id, input.status, words, input.revision.as_ref(), input.delivery_receipt.clone())
                     .await
                     .map_err(api)?;
             }
@@ -568,9 +522,8 @@ impl Board {
         self.tell_async(&item.id, text).await.map_err(api)
     }
 
-    /// `issue.refine`: starts a drafting session for an issue in backlog, pulling thread history
-    /// from `self.channel()` when connected.
-    pub async fn refine_async(&self, input: &IssueRefineInput) -> Result<Issue, ApiError> {
+    /// `issue.refine`: starts a drafting session for an issue in backlog with optional pre-loaded discussion text.
+    pub async fn refine_with_discussion_async(&self, input: &IssueRefineInput, discussion: &str) -> Result<Issue, ApiError> {
         let mut item = self.get_async(&input.id).await?;
         if let Some(edit) = &input.edit {
             item = self.edit_async(&item.id, edit).await.map_err(api)?;
@@ -582,88 +535,30 @@ impl Board {
             return Err(refused("server.issue.refinement.drafting", &[("name", r.name.clone().into())]));
         }
         let said = input.text.as_deref().unwrap_or("").trim().to_string();
-        let discussion = if let Some(channel) = self.channel() {
-            let thread = channel.issue_thread_async(&item.id, &item.title, None).await?;
-            let discussion = channel
-                .history_async(&thread, None, Some(40))
-                .await?
-                .into_iter()
-                .map(|m| m.text)
-                .collect::<Vec<_>>()
-                .join("\n\n");
-            if !said.is_empty() {
-                channel.say_in_async(&thread, &said, String::new()).await?;
-            }
-            discussion
-        } else {
-            String::new()
-        };
-        self.refine_with_async(&item.id, &said, &discussion).await.map_err(api)?;
+        self.refine_with_async(&item.id, &said, discussion).await.map_err(api)?;
         self.get_async(&item.id).await
     }
 
-    pub(crate) async fn changes_of_async(&self, item: &Issue, since_tree: Option<&str>) -> Result<Changes, ApiError> {
-        // A parent is worked through its children: their merges are its changes.
-        let all_issues = self.issues_async().await.map_err(api)?;
-        let has_children = all_issues.iter().any(|i| i.parent.as_deref() == Some(item.id.as_str()));
-        if item.repo.is_none() || !(item.was_sent() || has_children) {
+    /// `issue.refine`: starts a drafting session for an issue in backlog without channel discussion.
+    pub async fn refine_async(&self, input: &IssueRefineInput) -> Result<Issue, ApiError> {
+        self.refine_with_discussion_async(input, "").await
+    }
+
+    pub(crate) async fn changes_of_async(&self, item: &Issue, _since_tree: Option<&str>) -> Result<Changes, ApiError> {
+        let dir = if let Some(s) = self.on_board_async(item).await
+            && let Some(cwd) = s.cwd.as_deref().filter(|c| !c.is_empty())
+        {
+            PathBuf::from(cwd)
+        } else {
+            self.resolve_issue_cwd_async(item, true)
+                .await
+                .ok_or_else(|| refused("server.issue.notStarted", &[]))?
+        };
+        let repo_label = item.repo.clone().unwrap_or_else(|| dir.to_string_lossy().into_owned());
+        let Some(repos) = self.repos() else {
             return Err(refused("server.issue.notStarted", &[]));
-        }
-        let c = self.changes_since_async(&item.id, since_tree).await.map_err(api)?;
-        let letter = |d: &vibevalley_git::FileDiff| -> String {
-            use vibevalley_git::Change::*;
-            match d.change {
-                Added | Untracked => "A",
-                Deleted => "D",
-                Renamed => "R",
-                Copied => "C",
-                TypeChanged => "T",
-                Conflicted => "U",
-                _ => "M",
-            }
-            .into()
         };
-        let path = |d: &vibevalley_git::FileDiff| -> String {
-            d.new_path
-                .as_ref()
-                .or(d.old_path.as_ref())
-                .map(|p| p.to_string_lossy().into_owned())
-                .unwrap_or_default()
-        };
-        let changed_file = |d: &vibevalley_git::FileDiff| ChangedFile {
-            path: path(d),
-            status: letter(d),
-            added: if d.binary { -1 } else { d.added.into() },
-            removed: if d.binary { -1 } else { d.removed.into() },
-            patch: (!d.binary).then(|| patch_of(d, &path(d))),
-        };
-        Ok(Changes {
-            repo: item.repo.clone().unwrap_or_default(),
-            base: c.base.clone(),
-            branch: Some(c.branch.clone()),
-            commits: c
-                .commits
-                .iter()
-                .map(|x| Commit {
-                    hash: x.short_id.clone(),
-                    subject: x.summary.clone(),
-                    at: x.time * 1000,
-                })
-                .collect(),
-            revision: Some(c.revision.clone()),
-            since_review: c.since_review.as_deref().map(|files| files.iter().map(&changed_file).collect()),
-            files: c.files.iter().map(&changed_file).collect(),
-            uncommitted: c
-                .uncommitted
-                .iter()
-                .map(|d| UncommittedItem {
-                    path: path(d),
-                    status: letter(d),
-                })
-                .collect(),
-            conflicts: c.conflicts.iter().map(|f| f.to_string_lossy().into_owned()).collect(),
-            behind: c.behind as i64,
-        })
+        repos.diff_dir_async(&repo_label, &dir).await
     }
 
     // --- Router dispatch helpers for all 17 `Issue*` endpoints ---
@@ -736,8 +631,8 @@ impl Board {
     }
 
     pub(crate) async fn triage_list_async(&self, clock: &dyn Clock) -> Result<Vec<BacklogTriageSuggestion>, ApiError> {
-        let (issues, sessions, repos) = tokio::join!(self.issues_async(), self.sessions_async(), self.repo_health_inputs_async());
-        let issues = vibevalley_core::derive_issues(&issues.map_err(api)?, &sessions.map_err(api)?);
+        let (issues, repos) = tokio::join!(self.issues_async(), self.repo_health_inputs_async());
+        let issues = issues.map_err(api)?;
         let store = self.triage.lock().await;
         let mut out = vibevalley_core::suggest_backlog_triage(&issues, &repos, clock.now_ms(), &store.dismissed);
         for custom in &store.custom {
@@ -869,6 +764,7 @@ impl Board {
                     text: None,
                     agent: None,
                     edit: None,
+                    delivery_receipt: None,
                     request_key: None,
                     revision: None,
                 })
@@ -963,9 +859,6 @@ impl Board {
         if let Some(r) = &item.refining {
             does.push(t("server.issue.does.drafterLeaves", &[("name", r.name.clone().into())]));
         }
-        if item.repo.is_some() {
-            does.push(t("server.issue.does.cleanWorktree", &[]));
-        }
         Ok(Preview { does })
     }
 
@@ -1011,7 +904,7 @@ impl Board {
                 }
             }
         }
-        let settled = settle(&item, input.status, input.text.as_deref().unwrap_or(""))?;
+        let settled = settle(&item, input.status, input.text.as_deref().unwrap_or(""), input.delivery_receipt.as_ref())?;
         Ok(Preview {
             does: moves_words_async(self, &item, &settled).await?,
         })
@@ -1019,10 +912,6 @@ impl Board {
 
     pub(crate) async fn issue_review_endpoint_async(&self, input: IssueReviewInput) -> Result<Issue, ApiError> {
         self.review_from_input_async(input).await
-    }
-
-    pub(crate) async fn issue_refine_endpoint_async(&self, input: &IssueRefineInput) -> Result<Issue, ApiError> {
-        self.refine_async(input).await
     }
 
     pub(crate) async fn issue_split_endpoint_async(&self, input: &IssueSplitInput) -> Result<String, ApiError> {
@@ -1114,10 +1003,5 @@ impl Board {
             });
         }
         Ok(out)
-    }
-
-    pub(crate) async fn issue_conversation_endpoint_async(&self, id: &str) -> Result<Option<String>, ApiError> {
-        let item = self.get_async(id).await?;
-        Ok(self.channel().and_then(|c| c.issue_thread_id(&item.id)))
     }
 }

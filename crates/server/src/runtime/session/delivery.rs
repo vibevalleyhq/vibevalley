@@ -102,8 +102,7 @@ struct SettleErrorPayload<'a> {
 
 #[derive(serde::Serialize)]
 struct ReconciliationDocPayload<'a> {
-    worktree: Option<&'a str>,
-    branch: Option<&'a str>,
+    cwd: Option<&'a str>,
 }
 
 impl SessionEngine {
@@ -208,10 +207,7 @@ pub(crate) async fn interrupt_on_reopen(
             run.outcome = Some(Outcome::Interrupted);
             run.summary = summary.into();
             if !session.is_refining() && session.runtime != vibevalley_runtime::agent::runtime::ID && run.issue.is_some() {
-                let payload = serde_json::to_value(ReconciliationDocPayload {
-                    worktree: session.cwd.as_deref(),
-                    branch: session.worktree_branch(),
-                })?;
+                let payload = serde_json::to_value(ReconciliationDocPayload { cwd: session.cwd.as_deref() })?;
                 tx.put_document_async("run", &id, "workspace.reconciliation", &payload).await?;
                 run.needs_reconciliation = true;
             }

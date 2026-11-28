@@ -100,14 +100,7 @@ fn issue_stage_of(t: &Issue, session: Option<&Session>, has_children: bool) -> I
         mv(A::Reopen, IssueStatus::Backlog, ActWords::None)
     };
     match t.status {
-        IssueStatus::Done => {
-            let acts = if t.delivered == Some(Landing::MergedIntoParent) {
-                vec![]
-            } else {
-                vec![reopen]
-            };
-            stage(K::Done, t.closed_at, None, acts)
-        }
+        IssueStatus::Done => stage(K::Done, t.closed_at, None, vec![reopen]),
         IssueStatus::Canceled => stage(K::Canceled, t.closed_at, Some(A::Reopen), vec![reopen]),
         IssueStatus::Backlog => {
             if t.refining.is_some() {
@@ -492,10 +485,6 @@ pub(crate) fn board_summary(issues: &[Issue], sessions: &[Session], channels: &[
             IssueCardKind::Issue
         };
 
-        let session = issue.latest_session_id().and_then(|id| lookup.sessions.get(id.as_str()).copied());
-        let needs_worktree_check =
-            !issue.status.is_closed() && session.is_some_and(|s| !s.phase.is_working() && s.last_run.as_ref().is_some_and(|r| r.needs_reconciliation));
-
         by_issue.insert(
             issue.id.clone(),
             BoardIssueSummary {
@@ -503,7 +492,6 @@ pub(crate) fn board_summary(issues: &[Issue], sessions: &[Session], channels: &[
                 card_kind,
                 family_done,
                 family_total,
-                needs_worktree_check,
                 prompt: issue_prompt_of(issue),
                 preview: crate::compare::card_preview_of(issue),
                 schedule: schedule_spans.get(&issue.id).cloned(),

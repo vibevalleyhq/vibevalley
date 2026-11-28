@@ -446,7 +446,7 @@ async fn update_message_meta_impl<C: ConnectionTrait>(conn: &C, id: &str, meta: 
     Ok(())
 }
 
-async fn user_mentions_impl<C: ConnectionTrait>(conn: &C) -> DbResult<Vec<PlacedRow>> {
+async fn user_mentions_impl<C: ConnectionTrait>(conn: &C, viewer: &str) -> DbResult<Vec<PlacedRow>> {
     let c = Alias::new("c");
     let ch = Alias::new("ch");
     let reply = Alias::new("reply");
@@ -455,7 +455,7 @@ async fn user_mentions_impl<C: ConnectionTrait>(conn: &C) -> DbResult<Vec<Placed
         .expr(Expr::val(1i64))
         .from_as(channel_message::Entity, reply.clone())
         .and_where(Expr::col((reply.clone(), channel_message::Column::ChannelId)).equals((channel_message::Entity, channel_message::Column::ChannelId)))
-        .and_where(Expr::col((reply.clone(), channel_message::Column::SenderId)).eq("user"))
+        .and_where(Expr::col((reply.clone(), channel_message::Column::SenderId)).eq(viewer))
         .and_where(Expr::col((reply.clone(), channel_message::Column::DeletedAt)).is_null())
         .and_where(Expr::col((reply, channel_message::Column::Number)).gt(Expr::col((channel_message::Entity, channel_message::Column::Number))))
         .to_owned();
@@ -472,10 +472,10 @@ async fn user_mentions_impl<C: ConnectionTrait>(conn: &C) -> DbResult<Vec<Placed
                 Expr::col((channel_read_cursor::Entity, channel_read_cursor::Column::ChannelId))
                     .equals((channel_message::Entity, channel_message::Column::ChannelId)),
             )
-            .add(Expr::col((channel_read_cursor::Entity, channel_read_cursor::Column::ParticipantId)).eq("user")),
+            .add(Expr::col((channel_read_cursor::Entity, channel_read_cursor::Column::ParticipantId)).eq(viewer)),
     )
-    .and_where(Expr::col((channel_mention::Entity, channel_mention::Column::TargetId)).eq("user"))
-    .and_where(Expr::col((channel_message::Entity, channel_message::Column::SenderId)).ne("user"))
+    .and_where(Expr::col((channel_mention::Entity, channel_mention::Column::TargetId)).eq(viewer))
+    .and_where(Expr::col((channel_message::Entity, channel_message::Column::SenderId)).ne(viewer))
     .and_where(Expr::col((channel_message::Entity, channel_message::Column::DeletedAt)).is_null())
     .and_where(Expr::col((channel_message::Entity, channel_message::Column::Number)).gt(Func::coalesce([
         Expr::col((channel_read_cursor::Entity, channel_read_cursor::Column::ReadNumber)),
@@ -503,11 +503,11 @@ async fn recent_duplicate_impl<C: ConnectionTrait>(conn: &C, sender: &str, chann
     Ok(id)
 }
 
-async fn user_unread_impl<C: ConnectionTrait>(conn: &C, channel_id: &str, read: i64) -> DbResult<i64> {
+async fn user_unread_impl<C: ConnectionTrait>(conn: &C, channel_id: &str, viewer: &str, read: i64) -> DbResult<i64> {
     let count = channel_message::Entity::find()
         .filter(channel_message::Column::ChannelId.eq(channel_id))
         .filter(channel_message::Column::Number.gt(read))
-        .filter(channel_message::Column::SenderId.ne("user"))
+        .filter(channel_message::Column::SenderId.ne(viewer))
         .filter(channel_message::Column::Kind.ne("notice"))
         .filter(channel_message::Column::DeletedAt.is_null())
         .count(conn)
@@ -594,11 +594,18 @@ async fn unseen_in_impl<C: ConnectionTrait>(conn: &C, channel_id: &str, particip
 
 async fn notice_since_user_impl<C: ConnectionTrait>(conn: &C, channel_id: &str, code: &str) -> DbResult<i64> {
     let u = Alias::new("u");
+    let up = Alias::new("up");
     let last_user_subquery = Query::select()
         .expr(Expr::col((u.clone(), channel_message::Column::Id)).max())
         .from_as(channel_message::Entity, u.clone())
-        .and_where(Expr::col((u.clone(), channel_message::Column::ChannelId)).eq(channel_id))
-        .and_where(Expr::col((u, channel_message::Column::SenderId)).eq("user"))
+        .join_as(
+            JoinType::InnerJoin,
+            channel_participant::Entity,
+            up.clone(),
+            Expr::col((up.clone(), channel_participant::Column::Id)).equals((u.clone(), channel_message::Column::SenderId)),
+        )
+        .and_where(Expr::col((u, channel_message::Column::ChannelId)).eq(channel_id))
+        .and_where(Expr::col((up, channel_participant::Column::Kind)).eq("user"))
         .to_owned();
 
     let stmt = Query::select()
@@ -724,7 +731,7 @@ async fn search_messages_impl<C: ConnectionTrait>(conn: &C, q: &SearchParams<'_>
     Ok(rows.into_iter().map(Into::into).collect())
 }
 
-async fn notification_receipt_impl<C: ConnectionTrait>(conn: &C, id: &str) -> DbResult<Option<(Option<i64>, bool)>> {
+async fn notification_receipt_impl<C: ConnectionTrait>(conn: &C, id: &str, viewer: &str) -> DbResult<Option<(Option<i64>, bool)>> {
     let n = Alias::new("n");
     let superseded_exists = Query::select()
         .expr(Expr::val(1i64))
@@ -733,7 +740,7 @@ async fn notification_receipt_impl<C: ConnectionTrait>(conn: &C, id: &str) -> Db
         .and_where(Expr::col((n.clone(), channel_message::Column::Number)).gt(Expr::col((channel_message::Entity, channel_message::Column::Number))))
         .and_where(Expr::col((n.clone(), channel_message::Column::DeletedAt)).is_null())
         .cond_where(
-            Condition::any().add(Expr::col((n.clone(), channel_message::Column::SenderId)).eq("user")).add(
+            Condition::any().add(Expr::col((n.clone(), channel_message::Column::SenderId)).eq(viewer)).add(
                 Condition::all()
                     .add(Expr::col((channel_message::Entity, channel_message::Column::Kind)).eq("report"))
                     .add(Expr::col((n.clone(), channel_message::Column::Kind)).eq("report"))
@@ -753,7 +760,7 @@ async fn notification_receipt_impl<C: ConnectionTrait>(conn: &C, id: &str) -> Db
                     Expr::col((channel_read_cursor::Entity, channel_read_cursor::Column::ChannelId))
                         .equals((channel_message::Entity, channel_message::Column::ChannelId)),
                 )
-                .add(Expr::col((channel_read_cursor::Entity, channel_read_cursor::Column::ParticipantId)).eq("user"))
+                .add(Expr::col((channel_read_cursor::Entity, channel_read_cursor::Column::ParticipantId)).eq(viewer))
                 .add(
                     Expr::col((channel_read_cursor::Entity, channel_read_cursor::Column::ReadNumber))
                         .gte(Expr::col((channel_message::Entity, channel_message::Column::Number))),
@@ -768,7 +775,7 @@ async fn notification_receipt_impl<C: ConnectionTrait>(conn: &C, id: &str) -> Db
         .map(|r| (r.updated_at, r.superseded != 0)))
 }
 
-async fn user_read_reports_impl<C: ConnectionTrait>(conn: &C) -> DbResult<Vec<(String, i64, i64)>> {
+async fn user_read_reports_impl<C: ConnectionTrait>(conn: &C, viewer: &str) -> DbResult<Vec<(String, i64, i64)>> {
     let n = Alias::new("n");
     let newer_exists = Query::select()
         .expr(Expr::val(1i64))
@@ -791,7 +798,7 @@ async fn user_read_reports_impl<C: ConnectionTrait>(conn: &C) -> DbResult<Vec<(S
                     Expr::col((channel_read_cursor::Entity, channel_read_cursor::Column::ChannelId))
                         .equals((channel_message::Entity, channel_message::Column::ChannelId)),
                 )
-                .add(Expr::col((channel_read_cursor::Entity, channel_read_cursor::Column::ParticipantId)).eq("user"))
+                .add(Expr::col((channel_read_cursor::Entity, channel_read_cursor::Column::ParticipantId)).eq(viewer))
                 .add(
                     Expr::col((channel_read_cursor::Entity, channel_read_cursor::Column::ReadNumber))
                         .gte(Expr::col((channel_message::Entity, channel_message::Column::Number))),
@@ -825,9 +832,8 @@ async fn insert_delivery_impl<C: ConnectionTrait>(conn: &C, d: &NewDelivery<'_>)
     Ok(saved.id)
 }
 
-async fn pending_deliveries_by_kind_impl<C: ConnectionTrait>(conn: &C, recipient_kind: &str) -> DbResult<Vec<DeliveryRow>> {
+async fn pending_deliveries_all_impl<C: ConnectionTrait>(conn: &C) -> DbResult<Vec<DeliveryRow>> {
     Ok(channel_delivery::Entity::find()
-        .filter(channel_delivery::Column::RecipientKind.eq(recipient_kind))
         .filter(channel_delivery::Column::Status.eq("pending"))
         .order_by_asc(channel_delivery::Column::Id)
         .all(conn)
@@ -947,8 +953,8 @@ impl ChannelService {
         .await
     }
 
-    pub(crate) async fn user_mentions(&self) -> DbResult<Vec<PlacedRow>> {
-        user_mentions_impl(self.db.read_conn()).await
+    pub(crate) async fn user_mentions(&self, viewer: &str) -> DbResult<Vec<PlacedRow>> {
+        user_mentions_impl(self.db.read_conn(), viewer).await
     }
 
     pub(crate) async fn messages_before(&self, channel_id: &str, number: i64, n: i64) -> DbResult<Vec<MsgRow>> {
@@ -993,8 +999,8 @@ impl ChannelService {
         .await
     }
 
-    pub(crate) async fn user_unread(&self, channel_id: &str, read: i64) -> DbResult<i64> {
-        user_unread_impl(self.db.read_conn(), channel_id, read).await
+    pub(crate) async fn user_unread(&self, channel_id: &str, viewer: &str, read: i64) -> DbResult<i64> {
+        user_unread_impl(self.db.read_conn(), channel_id, viewer, read).await
     }
 
     pub(crate) async fn latest_number(&self, channel_id: &str) -> DbResult<i64> {
@@ -1065,20 +1071,20 @@ impl ChannelService {
             .await
     }
 
-    pub(crate) async fn notification_receipt(&self, id: &str) -> DbResult<Option<(Option<i64>, bool)>> {
-        notification_receipt_impl(self.db.read_conn(), id).await
+    pub(crate) async fn notification_receipt(&self, id: &str, viewer: &str) -> DbResult<Option<(Option<i64>, bool)>> {
+        notification_receipt_impl(self.db.read_conn(), id, viewer).await
     }
 
-    pub(crate) async fn user_read_reports(&self) -> DbResult<Vec<(String, i64, i64)>> {
-        user_read_reports_impl(self.db.read_conn()).await
+    pub(crate) async fn user_read_reports(&self, viewer: &str) -> DbResult<Vec<(String, i64, i64)>> {
+        user_read_reports_impl(self.db.read_conn(), viewer).await
     }
 
     pub(crate) async fn insert_delivery_in_tx(&self, tx: &Tx, delivery: &NewDelivery<'_>) -> DbResult<i64> {
         insert_delivery_impl(tx, delivery).await
     }
 
-    pub(crate) async fn pending_deliveries_by_kind(&self, recipient_kind: &str) -> DbResult<Vec<DeliveryRow>> {
-        pending_deliveries_by_kind_impl(self.db.read_conn(), recipient_kind).await
+    pub(crate) async fn pending_deliveries_all(&self) -> DbResult<Vec<DeliveryRow>> {
+        pending_deliveries_all_impl(self.db.read_conn()).await
     }
 
     pub(crate) async fn pending_deliveries_for_recipient(&self, recipient_kind: &str, recipient_id: &str, max_id: i64) -> DbResult<Vec<DeliveryRow>> {

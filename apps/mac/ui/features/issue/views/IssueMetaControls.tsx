@@ -622,8 +622,8 @@ function useOwnerOptions(
     if (cur?.kind === "user" && !isSelfUser(cur) && cur.id.trim() !== "") {
       collaboratorIds.add(cur.id);
     }
-    for (const userId of [...collaboratorIds].toSorted()) {
-      items.push({ value: `user:${userId}`, label: userId, group: peopleGroup });
+    for (const collaboratorId of [...collaboratorIds].toSorted()) {
+      items.push({ value: `user:${collaboratorId}`, label: collaboratorId, group: peopleGroup });
     }
 
     const agentList = ready(agents, [])

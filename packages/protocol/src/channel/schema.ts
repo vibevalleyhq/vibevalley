@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { Attachment } from "../attachment/schema";
 import type { Codec } from "../codec";
-import { Actor, MessageId, Outcome, SessionId, Spent } from "../common/schema";
+import { Actor, MessageId, Outcome, ParticipantId, SessionId, Spent } from "../common/schema";
 import { NoteCard, NoteViewContext } from "../note/schema";
 import * as T from "./shapes.gen";
 
@@ -111,6 +111,8 @@ const ChannelCommand = z.object({
 export const SayRequest = z.object({
   id: z.string(),
   text: z.string(),
+  from: z.exactOptional(ParticipantId),
+  fromName: z.exactOptional(z.string()),
   viewContext: z.exactOptional(NoteViewContext),
   replyTo: z.exactOptional(z.number()),
   attachments: z.exactOptional(z.array(z.string())),
@@ -144,12 +146,18 @@ export const ChatReadRequest = z.object({
 export const MessageEdit = z.object({
   id: MessageId,
   text: z.string(),
+  from: z.exactOptional(ParticipantId),
   attachments: z.exactOptional(z.array(z.string())),
 }) satisfies Codec<T.MessageEdit>;
 
 export const NotifyRequest = z.object({ id: z.string(), notify: Notify }) satisfies Codec<T.NotifyRequest>;
 
-export const ReactionSet = z.object({ id: MessageId, emoji: z.string(), on: z.boolean() }) satisfies Codec<T.ReactionSet>;
+export const ReactionSet = z.object({
+  id: MessageId,
+  emoji: z.string(),
+  on: z.boolean(),
+  from: z.exactOptional(ParticipantId),
+}) satisfies Codec<T.ReactionSet>;
 
 export const OnSet = z.object({ id: z.string(), on: z.boolean() }) satisfies Codec<T.OnSet>;
 

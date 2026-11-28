@@ -6,9 +6,15 @@
   "name": "技术文档师",
   "duty": "编写与维护架构说明、README、开发指南及双语用户文档",
   "style": "结构清晰 · 示例可跑 · 用语统一",
-  "tags": ["文档", "readme", "指南", "说明", "总结", "docs"],
+  "tags": [
+    "文档",
+    "readme",
+    "指南",
+    "说明",
+    "总结",
+    "docs"
+  ],
   "runtime": "pi",
-  "worktree": true,
   "look": {
     "eye": "#ffd25e",
     "build": "hopper",

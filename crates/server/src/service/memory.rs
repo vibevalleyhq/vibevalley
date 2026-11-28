@@ -2,11 +2,11 @@
 
 use std::sync::Arc;
 
-use sea_orm::sea_query::{Alias, Expr, JoinType, LikeExpr, OnConflict, Order, Query};
-use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, EntityTrait, ExprTrait, FromQueryResult, QueryFilter, QueryOrder};
+use sea_orm::sea_query::{Expr, OnConflict};
+use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, EntityTrait, ExprTrait, QueryFilter, QueryOrder};
 use vibevalley_protocol::{ActorKind, Memory, MemoryKind};
 
-use super::{MAX_SQL_BIND_PARAMS, batch_chunk_rows, fts5_trigram_phrase, with_write_tx};
+use super::{MAX_SQL_BIND_PARAMS, batch_chunk_rows, with_write_tx};
 use crate::db::column::{db_word, read_db_word};
 use crate::db::entity::memory;
 use crate::db::{Database, DbResult, Tx};
@@ -315,8 +315,13 @@ impl MemoryService {
 
     /// Searches active memories for `agent` using SQLite FTS5 (`memory_fts`) or PostgreSQL
     /// trigram GIN (`memory_text_trgm_idx`) with exact case-insensitive substring fallback.
-    #[allow(dead_code)]
-    pub(crate) async fn search(&self, agent: &str, text: &str, limit: u64) -> DbResult<Vec<Memory>> {
+    #[cfg(test)]
+    pub(super) async fn search(&self, agent: &str, text: &str, limit: u64) -> DbResult<Vec<Memory>> {
+        use sea_orm::FromQueryResult as _;
+        use sea_orm::sea_query::{Alias, JoinType, LikeExpr, Order, Query};
+
+        use super::fts5_trigram_phrase;
+
         let trimmed = text.trim();
         if trimmed.is_empty() || limit == 0 {
             return Ok(Vec::new());

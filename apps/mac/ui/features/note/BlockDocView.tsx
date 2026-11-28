@@ -2,7 +2,7 @@ import { cleanup, computed, effect, Image, keymap, Scroll, signal, Text, untrack
 import { Input } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
-import type { DocBlock, DocView, Issue, IssueId, Note, NoteId, NoteLink, NoteLinkListResult } from "@vibevalley/protocol";
+import type { DocBlock, DocView, Issue, IssueId, MediaAnnotation, Note, NoteId, NoteLink, NoteLinkListResult } from "@vibevalley/protocol";
 import { issueId, noteId } from "@vibevalley/protocol/schema";
 
 import { Button } from "../../design/Button";
@@ -27,6 +27,8 @@ import {
   replaceBlockById,
   splitBlockAtSelection,
 } from "./doc/docOps";
+import { buildDocAnnotationIndex, type DocAnnotationRef } from "./doc/mediaAnnotationModel";
+import { MediaAnnotationOverlay } from "./doc/MediaAnnotationOverlay";
 
 interface BlockDocViewProps {
   readonly note: Note;
@@ -120,6 +122,10 @@ export function BlockDocView(props: BlockDocViewProps) {
   const saving = signal(false);
   const linksOpen = signal(true);
   const lightboxPicture = signal<Picture | undefined>(undefined);
+  const lightboxMediaBlockId = signal<string | undefined>(undefined);
+  const activeAnnotationLink = signal<
+    { readonly annotationId?: string | undefined; readonly baseRowId?: string | undefined; readonly mediaBlockId?: string | undefined } | undefined
+  >(undefined);
   const scheduleSaveTimer = useTimeout();
 
   let focusSeq = 0;
@@ -207,6 +213,7 @@ export function BlockDocView(props: BlockDocViewProps) {
   });
   const stats = computed(() => computeDocStats(blocks()));
   const slideIndices = computed(() => computeSlideIndices(blocks()));
+  const annotationIndex = computed(() => buildDocAnnotationIndex(blocks()));
   const outlineEntries = computed(() => extractTocEntries(visibleBlocks(), 3));
   const showOutlineRail = computed(() => outlineEntries().length >= 2 && windowSize().width >= 1100);
   const coverSrc = computed(() => coverUrlOf(props.note));
@@ -341,6 +348,46 @@ export function BlockDocView(props: BlockDocViewProps) {
     }
   };
 
+  const handleSelectAnnotation = (blockId: string, annId: string | undefined, baseRowId?: string) => {
+    if (annId === undefined) {
+      activeAnnotationLink.set(undefined);
+      return;
+    }
+    activeAnnotationLink.set({ annotationId: annId, baseRowId, mediaBlockId: blockId });
+  };
+
+  const handleJumpToBaseRow = (rowId: string, annId: string) => {
+    const baseBlock = untracked(visibleBlocks).find((b) => b.type === "baseEmbed");
+    const curRef = untracked(annotationIndex).byAnnotationId.get(annId);
+    activeAnnotationLink.set({
+      annotationId: annId,
+      baseRowId: rowId,
+      mediaBlockId: curRef?.blockId,
+    });
+    if (baseBlock !== undefined) {
+      highlightedBlockId.set(baseBlock.id);
+    }
+  };
+
+  const handleSelectReviewRow = (rowId: string, ref?: DocAnnotationRef) => {
+    const resolved = ref ?? untracked(annotationIndex).byBaseRowId.get(rowId);
+    if (resolved !== undefined) {
+      activeAnnotationLink.set({
+        annotationId: resolved.annotation.id,
+        baseRowId: rowId,
+        mediaBlockId: resolved.blockId,
+      });
+      highlightedBlockId.set(resolved.blockId);
+    } else {
+      activeAnnotationLink.set({ baseRowId: rowId });
+    }
+  };
+
+  const handleCreateIssueFromAnnotation = async (ann: MediaAnnotation, blockId: string): Promise<IssueId | undefined> => {
+    if (!props.onCreateIssueFromBlock) return undefined;
+    return props.onCreateIssueFromBlock(`[#${ann.number}] ${ann.title}`, blockId);
+  };
+
   const outgoingCount = () => props.links?.outgoing.length ?? 0;
   const backlinksCount = () => props.links?.backlinks.length ?? 0;
   useVdpNode({ testId: "note-block-doc-view", role: "region" });
@@ -349,7 +396,54 @@ export function BlockDocView(props: BlockDocViewProps) {
     role: "status",
     text: () => JSON.stringify(probeSnapshot),
   });
-  const lightboxPictures = computed(() => {
+  const lightboxPictures = computed((): readonly Picture[] => {
+    const mediaId = lightboxMediaBlockId();
+    if (mediaId !== undefined) {
+      const blk = findBlockById(blocks(), mediaId);
+      if (blk !== undefined && blk.type === "media" && blk.src.trim() !== "") {
+        return [
+          {
+            src: blk.src,
+            name: blk.caption || blk.src,
+            renderOverlay: (frame) => {
+              const liveBlk = () => {
+                const found = findBlockById(blocks(), mediaId);
+                return found?.type === "media" ? found : undefined;
+              };
+              const liveAnns = () => liveBlk()?.annotations ?? [];
+              return (
+                <MediaAnnotationOverlay
+                  scopeId={`lb-${mediaId}`}
+                  annotations={liveAnns()}
+                  containerWidth={frame().width}
+                  containerHeight={frame().height}
+                  naturalWidth={frame().naturalWidth}
+                  naturalHeight={frame().naturalHeight}
+                  showOverlay
+                  unresolvedOnly={false}
+                  selectedId={activeAnnotationLink()?.annotationId}
+                  issues={props.issues}
+                  onSelect={(annId) => {
+                    const found = annId !== undefined ? liveAnns().find((a) => a.id === annId) : undefined;
+                    handleSelectAnnotation(mediaId, annId, found?.baseRowId);
+                  }}
+                  onChange={(next) => {
+                    const current = liveBlk();
+                    if (current !== undefined) handleUpdateBlock(mediaId, { ...current, annotations: [...next] });
+                  }}
+                  onOpenIssue={props.onOpenIssue}
+                  onCreateIssue={props.onCreateIssueFromBlock ? (ann) => handleCreateIssueFromAnnotation(ann, mediaId) : undefined}
+                  onJumpToBaseRow={(rowId, annId) => {
+                    lightboxMediaBlockId.set(undefined);
+                    handleJumpToBaseRow(rowId, annId);
+                  }}
+                />
+              );
+            },
+          },
+        ];
+      }
+    }
     const pic = lightboxPicture();
     return pic !== undefined ? [pic] : [];
   });
@@ -444,7 +538,21 @@ export function BlockDocView(props: BlockDocViewProps) {
                     highlightedBlockId.set(targetId);
                     requestFocus({ blockId: targetId, caret: "end" });
                   }}
-                  onOpenLightbox={(pic) => lightboxPicture.set(pic)}
+                  onOpenLightbox={(pic) => {
+                    lightboxMediaBlockId.set(undefined);
+                    lightboxPicture.set(pic);
+                  }}
+                  onOpenMediaLightbox={(blockId) => {
+                    lightboxPicture.set(undefined);
+                    lightboxMediaBlockId.set(blockId);
+                  }}
+                  annotationIndex={annotationIndex()}
+                  selectedAnnotationId={activeAnnotationLink()?.annotationId}
+                  highlightedBaseRowId={activeAnnotationLink()?.baseRowId}
+                  onSelectAnnotation={handleSelectAnnotation}
+                  onJumpToBaseRow={handleJumpToBaseRow}
+                  onSelectReviewRow={handleSelectReviewRow}
+                  onCreateIssueFromAnnotation={props.onCreateIssueFromBlock ? handleCreateIssueFromAnnotation : undefined}
                   onEditorTelemetry={telemetryHandler}
                 />
               </View>
@@ -551,9 +659,12 @@ export function BlockDocView(props: BlockDocViewProps) {
 
       <Lightbox
         pictures={lightboxPictures()}
-        at={lightboxPicture() !== undefined ? 0 : undefined}
+        at={lightboxPictures().length > 0 ? 0 : undefined}
         onAt={(at) => {
-          if (at === undefined) lightboxPicture.set(undefined);
+          if (at === undefined) {
+            lightboxPicture.set(undefined);
+            lightboxMediaBlockId.set(undefined);
+          }
         }}
       />
     </View>

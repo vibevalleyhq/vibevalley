@@ -4,6 +4,7 @@
 use std::sync::LazyLock;
 
 use regex::{Captures, Regex};
+pub use vibevalley_kit::core::text::{head, within};
 use vibevalley_protocol::NoteViewContext;
 
 fn re(pattern: &str) -> Regex {
@@ -33,42 +34,16 @@ pub fn plain_text(markdown: &str) -> String {
     GAPS.replace_all(&s, "\n\n").trim().to_string()
 }
 
-/// The byte index after at most `max` UTF-16 units of `s`.
-pub fn within(s: &str, max: usize) -> usize {
-    let mut units = 0;
-    for (at, ch) in s.char_indices() {
-        units += ch.len_utf16();
-        if units > max {
-            return at;
-        }
-    }
-    s.len()
-}
-
 /// Flattens Markdown to a single line and clips it to at most `max_units` UTF-16 units.
 pub fn clip_plain(text: &str, max_units: usize) -> String {
     let cleaned = plain_text(text).replace('\n', " ");
-    let collapsed = cleaned.split_whitespace().collect::<Vec<_>>().join(" ");
+    let collapsed = vibevalley_kit::core::text::collapse_whitespace(&cleaned);
     let cut = within(&collapsed, max_units);
     if cut < collapsed.len() {
         format!("{}…", collapsed[..cut].trim_end())
     } else {
         collapsed
     }
-}
-
-/// `head` (base/clip.ts): at most `n` UTF-16 units, whole characters.
-pub fn head(s: &str, n: usize) -> String {
-    let mut out = String::new();
-    let mut len = 0;
-    for ch in s.chars() {
-        len += ch.len_utf16();
-        if len > n {
-            break;
-        }
-        out.push(ch);
-    }
-    out
 }
 
 /// Formats untrusted client view state inside a fenced XML block so titles or summaries cannot break out.

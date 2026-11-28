@@ -502,9 +502,9 @@ fn trajectory_inspector_covers_issue_workspace_and_orchestrator_with_voyage_toke
         SessionController::IssueBoard,
         "Worker A",
         "claude",
-        ExecutionPolicy::ManagedWorktree {
-            repo: "farm".into(),
-            branch: Some("fix/quota".into()),
+        ExecutionPolicy::DirectCwd {
+            repo: Some("farm".into()),
+            permission_mode: vibevalley_protocol::SessionPermissionMode::Bypass,
         },
         1_732_000_000_100,
     );
@@ -529,9 +529,12 @@ fn trajectory_inspector_covers_issue_workspace_and_orchestrator_with_voyage_toke
     ws_session.cwd = Some("/tmp/repo-farm".into());
 
     vibevalley_runtime::rt::block_on(async {
-        started.test_internals().service.issue.put(&issue).await.unwrap();
-        started.test_internals().service.session.put(&issue_session, false).await.unwrap();
-        started.test_internals().service.session.put(&ws_session, false).await.unwrap();
+        started
+            .test_internals()
+            .service
+            .seed_for_test(&[issue], &[(&issue_session, false), (&ws_session, false)])
+            .await
+            .unwrap();
         started.ctx().mark_dirty(SliceMask::BOARD | SliceMask::SESSIONS);
         started.ctx().feed.flush().await;
     });

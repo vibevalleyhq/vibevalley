@@ -45,7 +45,6 @@ export function newOrchestrator(): Agent {
     disallowedTools: [],
     env: {},
     workdir: "",
-    worktree: false,
     tags: [],
     look: { species: null, outfit: null, build: "biped", head: "rounded", body: "", trim: "", hat: "", eye: "", orchestrator: "foreman" },
   };

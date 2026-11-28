@@ -20,7 +20,6 @@ pub mod machine;
 pub mod media;
 pub mod memory;
 pub mod note;
-pub mod orchestrator;
 pub mod provider;
 pub mod remote;
 pub mod repo;
@@ -47,7 +46,6 @@ pub use machine::*;
 pub use media::*;
 pub use memory::*;
 pub use note::*;
-pub use orchestrator::*;
 pub use provider::*;
 pub use remote::*;
 pub use repo::*;
@@ -76,7 +74,6 @@ pub(crate) fn ts_modules(cfg: &ts_rs::Config) -> Vec<crate::typescript::Module> 
         media::ts_module(cfg),
         memory::ts_module(cfg),
         note::ts_module(cfg),
-        orchestrator::ts_module(cfg),
         provider::ts_module(cfg),
         remote::ts_module(cfg),
         repo::ts_module(cfg),

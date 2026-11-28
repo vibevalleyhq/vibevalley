@@ -39,7 +39,6 @@
   },
   "delivered": {
     "merged": "合进了主分支",
-    "merged_into_parent": "合进了计划的分支",
     "pull_request": "PR 合进去了",
     "kept": "分支留着没合",
     "none": "没有改动要合",

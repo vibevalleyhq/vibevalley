@@ -13,7 +13,7 @@ export interface ChannelHandlers {
   readonly "channel.update": (a: { readonly id: string } & T.ChannelUpdate) => Promise<void>;
   /** What deleteTask would do, refused as it would be; nothing changes. */
   readonly "channel.message.list": (a: { readonly id: string; readonly before?: number; readonly limit?: number }) => Promise<T.ChatMessage[]>;
-  readonly "channel.markRead": (a: { readonly id: string } & T.ChatReadRequest) => Promise<void>;
+  readonly "channel.markRead": (a: { readonly id: string; readonly from?: T.ParticipantId } & T.ChatReadRequest) => Promise<void>;
   /** The user's own words, changed; nobody is told again. */
   readonly "channel.message.update": (a: T.MessageEdit) => Promise<T.ChatMessage>;
   /** Any message: its words go, its number stays, and what it still had to hand is dropped. */
@@ -36,10 +36,10 @@ export interface ChannelHandlers {
   /** What channel.delete would do, refused as it would be; nothing changes. */
   readonly "channel.previewDelete": (a: { readonly id: string }) => Promise<T.Preview>;
   readonly "channel.notify.set": (a: T.NotifyRequest) => Promise<void>;
-  /** The user's direct channel with a helper profile (or the orchestrator), made if there is none: its id. */
-  readonly "channel.direct.create": (a: { readonly agent: string }) => Promise<string>;
+  /** The user's direct channel with a helper profile (or another participant), made if there is none: its id. */
+  readonly "channel.direct.create": (a: { readonly agent: string; readonly from?: T.ParticipantId }) => Promise<string>;
   /** The user's read moved back to just before this message. */
-  readonly "channel.markUnread": (a: { readonly id: string } & T.ChatReadRequest) => Promise<void>;
+  readonly "channel.markUnread": (a: { readonly id: string; readonly from?: T.ParticipantId } & T.ChatReadRequest) => Promise<void>;
   /** Every channel and direct channel, the default first. */
   readonly "channel.list": () => Promise<T.Channel[]>;
   /** The places the caller has not read all of, the newest first. */
@@ -78,7 +78,7 @@ export const channelEndpoints: readonly Endpoint[] = [
   {
     op: "channel.markRead",
     about: ["id"],
-    input: input({ id: z.string() }, S.ChatReadRequest),
+    input: input({ id: z.string(), from: z.exactOptional(S.ParticipantId) }, S.ChatReadRequest),
     result: undefined,
     can: ["user", "remote"],
   },
@@ -164,7 +164,7 @@ export const channelEndpoints: readonly Endpoint[] = [
   {
     op: "channel.direct.create",
     about: ["agent"],
-    input: input({ agent: z.string() }),
+    input: input({ agent: z.string(), from: z.exactOptional(S.ParticipantId) }),
     result: z.string(),
     can: ["user", "remote"],
   },
@@ -178,7 +178,7 @@ export const channelEndpoints: readonly Endpoint[] = [
   {
     op: "channel.markUnread",
     about: ["id"],
-    input: input({ id: z.string() }, S.ChatReadRequest),
+    input: input({ id: z.string(), from: z.exactOptional(S.ParticipantId) }, S.ChatReadRequest),
     result: undefined,
     can: ["user", "remote"],
   },

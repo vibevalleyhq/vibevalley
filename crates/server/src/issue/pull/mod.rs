@@ -4,7 +4,7 @@
 //! `vv://github/...` snapshots.
 
 pub mod poll;
-pub mod publish;
+pub use crate::repo::publish;
 mod service;
 pub mod snapshot;
 

@@ -21,7 +21,7 @@ use vibevalley_server::channel::Chat;
 use vibevalley_server::context::{Context, Http, LiveState, Outbox, PublicDownload, StateFeed, TaskGroup};
 use vibevalley_server::db::DatabaseConfig;
 use vibevalley_server::issue::{Board, BoardConfig, BoardError};
-use vibevalley_server::runtime::{Changes, Runtime as ServerRuntime, RuntimeDriver};
+use vibevalley_server::runtime::{Runtime as ServerRuntime, RuntimeDriver};
 use vibevalley_server::service::Service;
 
 /// Opens a separate connection for assertions or SQLite failure injection.
@@ -377,7 +377,7 @@ pub fn open_board(store: &Path, registry: Arc<Registry>, config: BoardConfig) ->
             Arc::new(PublicDownload),
         ));
         let (runtime, opened) = ServerRuntime::open_async(ctx.clone(), Arc::new(RuntimeDriver { registry, model: None }), config).await?;
-        let board = Board::open_async(ctx.clone(), runtime, opened, None, None).await?;
+        let board = Board::open_async(ctx.clone(), runtime, opened, None).await?;
         Ok((board, ctx))
     })
 }
@@ -418,10 +418,6 @@ pub fn board_session(board: &Board, id: &str) -> Option<ProtocolSession> {
 
 pub fn board_sessions(board: &Board) -> Vec<ProtocolSession> {
     block_on(board.sessions_async()).unwrap_or_default()
-}
-
-pub fn board_changes(board: &Board, id: &str) -> vibevalley_server::issue::Result<Changes> {
-    block_on(board.changes_async(id))
 }
 
 pub fn board_bundle(board: &Board) -> SliceBundle {

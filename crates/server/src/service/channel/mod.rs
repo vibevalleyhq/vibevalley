@@ -12,11 +12,9 @@ mod message;
 mod participant;
 mod room;
 
-pub(crate) use message::{DeliveryRow, NewDelivery, NewMessage, SearchParams};
-pub use message::{EventRow, MsgRow};
-pub use participant::ParticipantRow;
-pub use room::ChannelRow;
-pub(crate) use room::NewThread;
+pub(crate) use message::{DeliveryRow, EventRow, MsgRow, NewDelivery, NewMessage, SearchParams};
+pub(crate) use participant::ParticipantRow;
+pub(crate) use room::{ChannelRow, NewThread};
 
 #[derive(Debug, Clone)]
 pub(crate) struct PlacedRow {

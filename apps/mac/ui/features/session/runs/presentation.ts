@@ -1,7 +1,7 @@
 import type { JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";
-import type { OrchestratorEval, SessionEvent, Spent } from "@vibevalley/protocol";
+import type { SessionEval, SessionEvent, Spent } from "@vibevalley/protocol";
 import { oneLine, sessionRepo } from "@vibevalley/protocol/rules";
 
 import type { DotTone } from "../../../design/Tag";
@@ -14,12 +14,12 @@ import { formatTokens } from "../../../infra/sessionRuns";
 import { runActivityAt, type RunEntry, type RunsScope, type RunStatusBadge } from "../runsView";
 
 /** Provided by app/: orchestrator links to runs, so session does not import orchestrator back. */
-export type RunApprovals = (props: { readonly conversationId: string }) => JSX.Element;
+export type RunApprovals = (props: { readonly id: string }) => JSX.Element;
 
 export const markWrongOf =
-  (agent: string) =>
-  (on: number, want: string): Promise<OrchestratorEval> =>
-    api.orchestrator.eval.create({ agent, on, want });
+  (id: string) =>
+  (on: number, want: string): Promise<SessionEval> =>
+    api.session.eval.create({ id, on, want });
 
 export const allSessionsQuery = defineQuery({
   key: () => ["sessions", "all"],

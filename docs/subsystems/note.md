@@ -18,15 +18,15 @@ Note（`Note`）是 VibeValley 统一的知识、块级文档与多维数据工�
 
 | 位置 | 职责 |
 |---|---|
-| `crates/protocol/src/contract/note.rs`、`crates/protocol/src/contract/endpoints/note.rs` | 跨端强类型契约与 TS 生成源：`NoteType`、24 种 `BlockKind`、`DocView`、12 种 `BaseColumnKind` / 4 种 `BaseViewKind`、`NoteLink`、协同/在场/建议/历史消息与 33 个 `note.*` RPC + 3 条 SSE 订阅（`note.follow`、`note.suggestion.follow`、`note.presence.follow`） |
+| `crates/protocol/src/contract/note.rs`、`crates/protocol/src/contract/endpoints/note.rs` | 跨端强类型契约与 TS 生成源：`NoteType`、24 种 `BlockKind`（含 `Media`/`Compare` 非破坏性 `MediaAnnotation` 标注层与 `Table.columnWidths`）、`DocView`（含 `annotationSummary`）、12 种 `BaseColumnKind` / 4 种 `BaseViewKind` / `BaseAnnotationRef`、`NoteLink`、协同/在场/建议/历史消息与 38 个 `note.*` RPC（含 `note.annotation.{upsert,delete}`、`note.base.syncReview`）+ 3 条 SSE 订阅（`note.follow`、`note.suggestion.follow`、`note.presence.follow`） |
 | `packages/protocol/src/note/schema.ts`、`packages/protocol/src/note/api.ts` | 前端边界 Zod Codec（`satisfies Codec<T.*>`）与强类型接口定义 |
-| `crates/core/src/note/mod.rs`、`crates/core/src/note/doc.rs`、`crates/core/src/note/base.rs`、`crates/core/src/note/links.rs`、`crates/core/src/note/manifest.rs`、`crates/core/src/note/path.rs`、`crates/core/src/note/preview.rs`、`crates/core/src/note/starter.rs` | 纯领域内核：路径与大小护栏、Manifest 编解码、4 原语骨架初始化、24 块 `Doc` 解析/投影/Markdown 往返、Base 过滤/排序/分组/汇总/公式/提示词投影、`[[note:...]]`/`[[issue:...]]`/`#N` 链接解析与轻量 `NotePreview` 提取 |
+| `crates/core/src/note/mod.rs`、`crates/core/src/note/annotation.rs`、`crates/core/src/note/review.rs`、`crates/core/src/note/doc.rs`、`crates/core/src/note/base.rs`、`crates/core/src/note/links.rs`、`crates/core/src/note/manifest.rs`、`crates/core/src/note/path.rs`、`crates/core/src/note/preview.rs`、`crates/core/src/note/starter.rs` | 纯领域内核：路径与大小护栏、Manifest 编解码、4 原语骨架初始化、24 块 `Doc` 解析/投影/Markdown 往返、非破坏性 `MediaAnnotation` 坐标归一化/汇总/外链提取、内置 UI/产品走查清单 `Base` 模板与 `BaseEmbed × MediaAnnotation` 双向对账、Base 过滤/排序/分组/汇总/公式/提示词投影、`[[note:...]]`/`[[issue:...]]`/`#N` 链接解析与轻量 `NotePreview` 提取 |
 | `crates/core/src/collab/doc.rs`、`crates/core/src/collab/presence.rs` | Loro 内容平面协同内核：`CollabDoc`（`texts`/`tree`/`entries`/`lists`）、`CommitMeta`、`TextRangeAnchor` 持久游标、浅快照压缩、按 `origin` 选择性撤销与 `PresenceHub`（`EphemeralStore`） |
-| `crates/server/src/note/mod.rs`、`crates/server/src/note/manager.rs`、`crates/server/src/note/collab.rs`、`crates/server/src/note/doc.rs`、`crates/server/src/note/base.rs`、`crates/server/src/note/types.rs` | 服务端领域协调器 `Manager`：`OriginWriteBatcher` 微批合并、目录与 Loro 快照双同步、人类触碰路径检测与 `Suggestion` 自动分流、Doc/Base 视图投影与 Agent 列任务准备、嵌入式技能读取 |
-| `crates/server/src/router.rs`、`crates/server/src/router/note.rs`、`crates/server/src/storage/note.rs` | 编译期穷尽路由分发、`note.base.runAgentColumn` 跨 `issue` 派工协调、`NoteStorage` 原子落盘/快照/预览缓存/封面存储 |
+| `crates/server/src/note/mod.rs`、`crates/server/src/note/manager.rs`、`crates/server/src/note/collab.rs`、`crates/server/src/note/doc.rs`、`crates/server/src/note/base.rs`、`crates/server/src/note/annotation.rs`、`crates/server/src/note/types.rs` | 服务端领域协调器 `Manager`：`OriginWriteBatcher` 微批合并、目录与 Loro 快照双同步、人类触碰路径检测与 `Suggestion` 自动分流、Doc/Base 视图投影、非破坏性标注与走查清单双向同步（`note.annotation.{upsert,delete}`、`note.base.syncReview`）、Agent 列任务准备与嵌入式技能读取 |
+| `crates/server/src/router.rs`、`crates/server/src/orchestration/note.rs`、`crates/server/src/storage/note.rs` | 编译期穷尽路由分发、`NoteWorkflow`（`note.base.runAgentColumn` 跨 `issue` 派工协调、频道 `NoteCard` 公告与媒体库/素材库桥接）、`NoteStorage` 原子落盘/快照/预览缓存/封面存储 |
 | `crates/server/src/db/entity/note.rs`、`crates/server/src/db/entity/note_version.rs`、`crates/server/src/db/entity/note_collab.rs`、`crates/server/src/db/entity/note_change.rs`、`crates/server/src/db/entity/note_suggestion.rs`、`crates/server/src/db/entity/note_link.rs`、`crates/server/src/service/note.rs` | 一表一文件实体定义、迁移 `crates/server/src/db/migration/m20261128_100001_replace_artifact_with_note.rs` 与统一数据服务 `NoteService`（`ctx.service.note`） |
 | `crates/server/src/agent/tool/content.rs`、`crates/server/src/agent/mcp/mode.rs`、`crates/cli/src/domains/content/note.rs`、`crates/cli/src/domains/mcp/note.rs`、`crates/cli/src/domains/mcp/note_defs.rs`、`crates/mcp/src/skills.rs` | 进程内 Agent 工具、按运行模式收窄的只读/写权限过滤、CLI `vibevalley note ...` 子命令、MCP `vv_note_*` / `vv_doc_*` / `vv_base_*` 工具与 SEP-2640 `skill://note/*` 目录 |
-| `crates/server/assets/note/types/`、`crates/rich/src/whiteboard.rs` | 4 种 `NoteType` 中英双语 `SKILL.md` / `SKILL.en.md` 与 `references/`；原生 `VvWhiteboard` 嵌入 `CollabDoc` |
+| `crates/server/assets/note/types/`、`crates/rich/src/whiteboard/` | 4 种 `NoteType` 中英双语 `SKILL.md` / `SKILL.en.md` 与 `references/`；原生 `VvWhiteboard` 嵌入 `CollabDoc` |
 | `apps/mac/ui/features/note/`（含 `hub/` 与 `hub/seeds/`） | 工作台 `/notes`、`/library`、`ContentShell`、`PageTree` 侧栏、24 块编辑器、Base 四视图、Row=Page 侧边抽屉、Presenter Mode、Backlinks 与 Channel 晋升弹窗 |
 
 全部接口与调用方权限见 [capabilities.md](docs/reference/capabilities.md)（`note.*` 及同域 `library.*`、`media.*`）。
@@ -148,7 +148,7 @@ VibeValley 借鉴 Notion 工程体系的核心设计，并按本机 Rust 优先�
 | **Structure** | `toggle` | `title`, `text` | `<details><summary>title</summary>...</details>` 往返；支持 `collapsed` 折叠态，展开显示 `text` 与 `children`；提取 `title` 与 `text` 出链 |
 | **Structure** | `callout` | `tone`, `title?`, `text` | `tone` 映射 `info \| ok \| warn \| bad` 语义底色与图标框；提取 `title` 与 `text` 出链 |
 | **Structure** | `code` | `language?`, `code` | 围栏代码块 ```` ```lang ````；不从代码体内提取链接；调用原生 `VvCodeBlock` 语法高亮与一键复制 |
-| **Structure** | `table` | `headers`, `rows: string[][]`, `alignments?` | GFM 管道表（支持 `:---` / `:---:` / `---:` 对齐）；提取表头与全部单元格出链；支持行列增删与内联编辑 |
+| **Structure** | `table` | `headers`, `rows: string[][]`, `alignments?`, `columnWidths?` | GFM 管道表（支持 `:---` / `:---:` / `---:` 对齐与持久化列宽）；提取表头与全部单元格出链；支持行列增删与 Tab/Shift+Tab 内联编辑 |
 | **Structure** | `bookmark` | `url`, `title?`, `description?` | 富链接卡片 `[title](url) — description`；展示域名徽标、标题与摘要，点击经宿主 `external` 打开 |
 | **Structure** | `toc` | `maxLevel?` | `<!-- toc -->` 占位序列化；由同文档 `heading` 块动态投影锚点跳转目录（默认 `1..=3` 级），不落盘冗余目录文本 |
 | **Structure** | `math` | `expression`, `display?` | 块级 `$$\n...\n$$` 或行内 `$...$`；交由 `crates/rich` 原生数学排版引擎（`TextViewMath`）渲染公式 |
@@ -157,8 +157,8 @@ VibeValley 借鉴 Notion 工程体系的核心设计，并按本机 Rust 优先�
 | **Data & VV** | `kpi` | `items: DocKpiItem[]` | 指标卡片组（`label`、`value`、`delta?`、`tone?`）；数字使用 `tabular-nums` 等宽对齐 |
 | **Data & VV** | `chart` | `title?`, `kind`, `labels`, `series` | 结构化多序列图表（`series: { name, data }[]`），由 `crates/rich` 原生 `vv_chart` 渲染 |
 | **Data & VV** | `diagram` | `title?`, `source` | Mermaid 工程图谱（````` ```mermaid ````` 往返），由 `crates/rich` 原生 `vv_diagram` 渲染 |
-| **Data & VV** | `compare` | `title?`, `beforeLabel`, `afterLabel`, `beforeAsset`, `afterAsset` | 前后视觉对比卡，引用 `"asset/"` 相对路径图片，支持滑杆/并排对比 |
-| **Data & VV** | `media` | `mediaKind`, `src`, `caption?` | 图片/音频/视频块，优先引用 `"asset/"` 相对路径或附件 URL，支持 Lightbox 放大 |
+| **Data & VV** | `compare` | `title?`, `beforeLabel`, `afterLabel`, `beforeAsset`, `afterAsset`, `annotations?` | 前后视觉对比卡，引用 `"asset/"` 相对路径图片，支持滑杆/并排对比与按 `side`（`before`/`after`）区分的非破坏性 `MediaAnnotation` 标注层 |
+| **Data & VV** | `media` | `mediaKind`, `src`, `caption?`, `annotations?` | 图片/音频/视频块，优先引用 `"asset/"` 相对路径或附件 URL，支持 Lightbox 放大与 0..1 归一化坐标非破坏性 `MediaAnnotation` 标注层（`pin`/`rect`/`arrow`/`callout`、严重度、open/resolved、关联工单与 Base 行） |
 | **Data & VV** | `preview` | `entry`, `height?`, `title?` | 可交互原型预览块，指向 `"structure/"` 下 HTML 入口，渲染于**无 `allow-same-origin`、`connect-src 'none'` 严格沙箱**内 |
 | **Data & VV** | `baseEmbed` | `noteId`, `sheetId?`, `viewId?` | 内嵌一个 `NoteType::Base` 实时视图；自动向 `note_link` 写入 `LinkRelation::Embed` 边 |
 | **Data & VV** | `issueCard` | `issueId` | 内嵌单张工单实时状态卡片；自动向 `note_link` 写入 `LinkRelation::Embed` 边 |
@@ -232,7 +232,7 @@ VibeValley 借鉴 Notion 工程体系的核心设计，并按本机 Rust 优先�
 - **`agentAction` 批量执行与派生工单**：
   1. 用户或主助手调用 `note.base.runAgentColumn`（指定 `column_id` 及可选 `row_ids`）。
   2. `Manager::prepare_base_agent_column_async` 校验 `agentConfig`，对每行执行 `format_agent_prompt` 替换 `{{column_id}}`、`{{Column Name}}` 与 `{{row_id}}`。
-  3. `crates/server/src/router/note.rs`（以及工具端口 `crates/server/src/agent/tool/content.rs`）遍历任务：若配置了 `spawn_issue_repo`，自动调用 `Board::create_async` 派生真实工单并将 `status` 设为 `"spawned"`、记录 `spawned_issue_id`；否则记录准备完成状态。
+  3. `crates/server/src/orchestration/note.rs`（以及工具端口 `crates/server/src/agent/tool/content.rs`）遍历任务：若配置了 `spawn_issue_repo`，自动调用 `Board::create_async` 派生真实工单并将 `status` 设为 `"spawned"`、记录 `spawned_issue_id`；否则记录准备完成状态。
   4. `apply_base_agent_column_outcomes_async` 原子写回该列的 `BaseCellValue::AgentRun`，若配置了 `target_column_id` 则同步写入摘要文本，并通过 `note.follow` 推送更新。
 
 #### 5.5 MCP 工具族与 SEP-2640 技能体系
@@ -260,7 +260,7 @@ VibeValley 借鉴 Notion 工程体系的核心设计，并按本机 Rust 优先�
    - 工单详情页除了展示直接外键关联（`note.issue == issue.id`）的笔记外，同步消费 `note.link.list({ entityKind: "issue", entityId })` 的 `backlinks`，直接呈现引用该工单的所有文档与 Base 行。
 4. **频道消息晋升为笔记（Channel promote-to-Note）**：
    - 频道消息菜单（参考 `apps/mac/ui/features/channel/model/promote.ts` 的草稿构造约定）提供「保存为笔记」操作：默认将消息首行（去除 Markdown 标题前缀）或首附件名作为标题，保留正文与附件引用，并在文末附加引述回链 `> [来自 #<channel> #<seq>](/chat/<channel>?m=<seq>)`；当所选类型为 `doc` 时自动转为结构化 `DocBlock` 序列。
-   - `note.create` 指定 `channel` 且 `announce = true` 时，经 `ChannelAnnounce::post_card_async` 在源频道投递带版本号的 `NoteCard`，完成「讨论 → 沉淀为结构化笔记 → 派发工单执行 → 写回验收」的完整工作流闭环。
+   - `note.create` 指定 `channel` 且 `announce = true` 时，由 L4 编排层 `NoteWorkflow`（`crates/server/src/orchestration/note.rs`）向源频道投递带版本号的 `NoteCard`，完成「讨论 → 沉淀为结构化笔记 → 派发工单执行 → 写回验收」的完整工作流闭环。
 
 ## 怎么走
 
@@ -282,8 +282,8 @@ VibeValley 借鉴 Notion 工程体系的核心设计，并按本机 Rust 优先�
 - **统一存储（`storage/`）**：`NoteStorage` 管理 `<home>/note/<id>/` 与 `<home>/note_snapshot/<id>/`，并通过 `StorageBackend` 支持远端镜像与恢复。
 - **顶层数据服务（`service/`）**：`Manager` 经 `ctx.service.note` 访问 6 张表，业务层零 `sea_orm::` 与 `db::entity` 导入。
 - **核心协作内核（`crates/core/src/collab/`、`crates/core/src/note/`）**：复用 `CollabDoc`、`PresenceHub`、24 块 `doc` 内核与 `base` 投影内核。
-- **工单（`issue/`）**：通过 `note.issue` 外键（`ON DELETE SET NULL`）、`note_link` 双向图谱以及 `router/note.rs` 的 `Board::create_async` 派生工单闭环。
-- **频道（`channel/`）**：通过 `ChannelAnnounce` 在创建或新版本发布时投递 `NoteCard`，并支持消息晋升为笔记（带 `/chat/<channel>?m=<seq>` 回链）。
+- **工单（`issue/`）**：通过 `note.issue` 外键（`ON DELETE SET NULL`）、`note_link` 双向图谱以及 `orchestration/note.rs` 的 `Board::create_async` 派生工单闭环。
+- **频道（`channel/`）**：通过 L4 `NoteWorkflow`（`orchestration/note.rs`）在创建或新版本发布时投递 `NoteCard`，并支持消息晋升为笔记（带 `/chat/<channel>?m=<seq>` 回链）。
 - **工具与 MCP（`agent/tool/`、`agent/mcp/`、`crates/cli/src/domains/mcp/`）**：提供进程内与 `/mcp` 标准化 14 枚 `vv_note_*`/`vv_doc_*`/`vv_base_*` 工具及 SEP-2640 技能目录。
 - **媒体库与媒体任务（`library`、`media/`）**：与 `Note` 共居 `crates/server/src/note/` 模块，复用统一内容中心浏览体验（[媒体和素材库](docs/subsystems/media.md)）。
 

@@ -131,8 +131,8 @@ export function OverviewTab(props: { overview: () => DebugOverview; graph: () =>
                           <Text class="font-mono text-2xs text-faint">#{sess().issueId}</Text>
                         </If>
                       </View>
-                      <If when={Boolean(sess().worktree)}>
-                        <Text class="truncate font-mono text-2xs text-faint">{sess().worktree}</Text>
+                      <If when={Boolean(sess().cwd)}>
+                        <Text class="truncate font-mono text-2xs text-faint">{sess().cwd}</Text>
                       </If>
                     </View>
                   )}

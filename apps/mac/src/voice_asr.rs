@@ -65,7 +65,7 @@ pub fn start(voice: SharedLiveVoice, owner: String) -> Result<State, String> {
     current.owner = owner;
     let initial = current.state.clone();
     drop(current);
-    vibevalley_rt::current_or_global_handle().spawn(async move {
+    vibevalley_kit::rt::current_or_global_handle().spawn(async move {
         let result = run(voice, stop_capture, abort).await;
         let mut current = dictation().lock();
         if !current.state.partial.is_empty() {
@@ -901,7 +901,7 @@ mod tests {
         fn session_update(&self) -> String {
             "{}".into()
         }
-        fn take_outgoing(&self) -> Option<tokio::sync::mpsc::UnboundedReceiver<String>> {
+        fn take_outgoing(&self) -> Option<tokio::sync::mpsc::Receiver<String>> {
             None
         }
         fn heard(&self, _raw: &str) {}

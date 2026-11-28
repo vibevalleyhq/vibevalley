@@ -16,6 +16,19 @@ const NAMING_DOC: &str = "docs/style/naming.md";
 /// This ceiling may only decrease as sync wrappers migrate to async; never raise it.
 pub const SERVER_BLOCK_ON_CEILING: usize = 3;
 
+/// Zero-ceiling ratchet for non-test bespoke per-key lock maps (`HashMap<_, Arc/Weak<*Mutex<_>>>`)
+/// across `crates/{server,runtime,oar,agent,machine}/src/`.
+pub const SERVER_BESPOKE_KEY_LOCK_CEILING: usize = 0;
+
+/// Zero-ceiling ratchet for non-test unbounded resident cache fields (`*cache*` / `closed_next` /
+/// `capabilities` / `held` / `cannot` typed as `Mutex/RwLock<HashMap<...>>`) under
+/// `crates/server/src/`.
+pub const SERVER_UNBOUNDED_CACHE_CEILING: usize = 0;
+
+/// Zero-ceiling ratchet for non-test direct `tokio::time::interval*` or `mpsc::unbounded_channel`
+/// calls under `crates/server/src/`.
+pub const SERVER_RAW_INTERVAL_OR_UNBOUNDED_SINK_CEILING: usize = 0;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[allow(clippy::enum_variant_names)]
 pub enum RustRatchetRule {
@@ -29,6 +42,9 @@ pub enum RustRatchetRule {
     NoEventBus,
     NoAttachSlot,
     SingularServerStoreNames,
+    NoBespokeKeyLock,
+    NoUnboundedResidentCache,
+    NoRawIntervalOrUnboundedSink,
 }
 
 impl RustRatchetRule {
@@ -44,6 +60,9 @@ impl RustRatchetRule {
             Self::NoEventBus => "no-event-bus",
             Self::NoAttachSlot => "no-attach-slot",
             Self::SingularServerStoreNames => "singular-server-store-names",
+            Self::NoBespokeKeyLock => "no-bespoke-key-lock",
+            Self::NoUnboundedResidentCache => "no-unbounded-resident-cache",
+            Self::NoRawIntervalOrUnboundedSink => "no-raw-interval-or-unbounded-sink",
         }
     }
 }
@@ -225,6 +244,7 @@ fn is_crate_or_mac_rust(path: &str) -> bool {
 fn is_thread_sleep_zeroed_zone(path: &str) -> bool {
     (path.starts_with("crates/server/tests/")
         || path.starts_with("apps/mac/src/")
+        || path.starts_with("crates/kit/")
         || path.starts_with("crates/cli/src/")
         || path.starts_with("crates/runtime/src/")
         || path.starts_with("crates/core/")
@@ -346,7 +366,7 @@ fn check_mac_rt_handle(file: &SourceFile, stripped_rust: &str) -> Vec<RatchetVio
     let mut violations = Vec::new();
     for offset in find_prefixed_call_matches(stripped_rust, "vibevalley_runtime::", "rt::handle", false)
         .into_iter()
-        .chain(find_word_matches(stripped_rust, "vibevalley_rt::handle"))
+        .chain(find_word_matches(stripped_rust, "vibevalley_kit::rt::handle"))
     {
         let line = index.line_at(offset);
         if !seen_line.insert(line) {
@@ -710,10 +730,19 @@ fn check_singular_server_store_names(file: &SourceFile, non_test_code: &str) -> 
     violations
 }
 
-fn collect_server_excluded_cfg_test_targets(files: &[SourceFile]) -> BTreeSet<String> {
+fn is_bespoke_key_lock_crate_src(path: &str) -> bool {
+    (path.starts_with("crates/server/src/")
+        || path.starts_with("crates/runtime/src/")
+        || path.starts_with("crates/oar/src/")
+        || path.starts_with("crates/agent/src/")
+        || path.starts_with("crates/machine/src/"))
+        && path.ends_with(".rs")
+}
+
+fn collect_excluded_cfg_test_targets(files: &[SourceFile]) -> BTreeSet<String> {
     let mut excluded_targets = BTreeSet::new();
     for file in files {
-        if file.path.starts_with("crates/server/src/") && file.path.ends_with(".rs") {
+        if is_bespoke_key_lock_crate_src(&file.path) {
             let stripped = strip_rust_comments_and_literals(&file.text);
             for target in collect_cfg_test_submodules(&file.path, &file.text, &stripped) {
                 excluded_targets.insert(target);
@@ -734,16 +763,133 @@ fn collect_server_block_on_sites(files: &[SourceFile], excluded_targets: &BTreeS
         }
         let non_test_code = strip_rust_non_code(&file.text, &file.path);
         let index = LineIndex::new(&file.text);
+        let mut seen_line = BTreeSet::new();
         for offset in find_prefixed_call_matches(&non_test_code, "vibevalley_runtime::", "rt::block_on", true)
             .into_iter()
-            .chain(find_prefixed_call_matches(&non_test_code, "", "vibevalley_rt::block_on", true))
+            .chain(find_prefixed_call_matches(&non_test_code, "", "vibevalley_kit::rt::block_on", true))
         {
             let line = index.line_at(offset);
-            sites.push(BlockOnSite {
-                file: file.path.clone(),
-                line,
-                snippet: index.snippet_at(line).to_owned(),
-            });
+            if seen_line.insert(line) {
+                sites.push(BlockOnSite {
+                    file: file.path.clone(),
+                    line,
+                    snippet: index.snippet_at(line).to_owned(),
+                });
+            }
+        }
+    }
+    sites
+}
+
+fn is_bespoke_key_lock_line(compact_line: &str) -> bool {
+    let Some(map_pos) = compact_line.find("HashMap<") else {
+        return false;
+    };
+    let after_map = &compact_line[map_pos + "HashMap<".len()..];
+    [
+        "Arc<AsyncMutex<",
+        "Arc<tokio::sync::Mutex<",
+        "Arc<parking_lot::Mutex<",
+        "Arc<Mutex<",
+        "Weak<AsyncMutex<",
+        "Weak<tokio::sync::Mutex<",
+        "Weak<parking_lot::Mutex<",
+        "Weak<Mutex<",
+    ]
+    .iter()
+    .any(|pat| after_map.contains(pat))
+}
+
+fn collect_bespoke_key_lock_sites(files: &[SourceFile], excluded_targets: &BTreeSet<String>) -> Vec<BlockOnSite> {
+    let mut sites = Vec::new();
+    for file in files {
+        if !is_bespoke_key_lock_crate_src(&file.path) || is_excluded_by_cfg_test(&file.path, excluded_targets) {
+            continue;
+        }
+        let non_test_code = strip_rust_non_code(&file.text, &file.path);
+        let index = LineIndex::new(&file.text);
+        for (line_idx, line) in non_test_code.lines().enumerate() {
+            let compact: String = line.chars().filter(|c| !c.is_whitespace()).collect();
+            if is_bespoke_key_lock_line(&compact) {
+                let line_no = line_idx + 1;
+                sites.push(BlockOnSite {
+                    file: file.path.clone(),
+                    line: line_no,
+                    snippet: index.snippet_at(line_no).to_owned(),
+                });
+            }
+        }
+    }
+    sites
+}
+
+fn is_unbounded_cache_field_line(line: &str) -> bool {
+    let trimmed = line.trim();
+    if trimmed.starts_with("let ") || trimmed.starts_with("fn ") || trimmed.starts_with("pub fn ") || trimmed.starts_with("type ") {
+        return false;
+    }
+    let Some((lhs, rhs)) = trimmed.split_once(':') else {
+        return false;
+    };
+    let field_name = lhs.split_whitespace().last().unwrap_or("");
+    let is_cache_name = field_name.contains("cache") || matches!(field_name, "closed_next" | "capabilities" | "held" | "cannot");
+    if !is_cache_name {
+        return false;
+    }
+    let compact_rhs: String = rhs.chars().filter(|c| !c.is_whitespace()).collect();
+    compact_rhs.contains("Mutex<HashMap<") || compact_rhs.contains("RwLock<HashMap<")
+}
+
+fn collect_unbounded_cache_sites(files: &[SourceFile], excluded_targets: &BTreeSet<String>) -> Vec<BlockOnSite> {
+    let mut sites = Vec::new();
+    for file in files {
+        if !(file.path.starts_with("crates/server/src/") && file.path.ends_with(".rs")) {
+            continue;
+        }
+        if is_excluded_by_cfg_test(&file.path, excluded_targets) {
+            continue;
+        }
+        let non_test_code = strip_rust_non_code(&file.text, &file.path);
+        let index = LineIndex::new(&file.text);
+        for (line_idx, line) in non_test_code.lines().enumerate() {
+            if is_unbounded_cache_field_line(line) {
+                let line_no = line_idx + 1;
+                sites.push(BlockOnSite {
+                    file: file.path.clone(),
+                    line: line_no,
+                    snippet: index.snippet_at(line_no).to_owned(),
+                });
+            }
+        }
+    }
+    sites
+}
+
+fn collect_raw_interval_or_unbounded_sink_sites(files: &[SourceFile], excluded_targets: &BTreeSet<String>) -> Vec<BlockOnSite> {
+    let mut sites = Vec::new();
+    for file in files {
+        if !(file.path.starts_with("crates/server/src/") && file.path.ends_with(".rs")) {
+            continue;
+        }
+        if is_excluded_by_cfg_test(&file.path, excluded_targets) {
+            continue;
+        }
+        let non_test_code = strip_rust_non_code(&file.text, &file.path);
+        let index = LineIndex::new(&file.text);
+        let mut seen_line = BTreeSet::new();
+        for offset in find_prefixed_call_matches(&non_test_code, "tokio::", "time::interval", true)
+            .into_iter()
+            .chain(find_prefixed_call_matches(&non_test_code, "tokio::", "time::interval_at", true))
+            .chain(find_word_matches(&non_test_code, "unbounded_channel"))
+        {
+            let line = index.line_at(offset);
+            if seen_line.insert(line) {
+                sites.push(BlockOnSite {
+                    file: file.path.clone(),
+                    line,
+                    snippet: index.snippet_at(line).to_owned(),
+                });
+            }
         }
     }
     sites
@@ -759,7 +905,7 @@ fn run_ratchets(files: &[SourceFile], ceiling: usize) -> (usize, Vec<RatchetViol
         .collect();
     sorted.sort_by(|a, b| a.path.cmp(&b.path));
 
-    let excluded_server_tests = collect_server_excluded_cfg_test_targets(&sorted);
+    let excluded_server_tests = collect_excluded_cfg_test_targets(&sorted);
     let mut violations = Vec::new();
 
     for file in &sorted {
@@ -813,6 +959,54 @@ fn run_ratchets(files: &[SourceFile], ceiling: usize) -> (usize, Vec<RatchetViol
             see: CONCURRENCY_DOC,
             details: block_on_sites.iter().map(|s| format!("{}:{}: {}", s.file, s.line, s.snippet)).collect(),
         });
+    }
+
+    let key_lock_sites = collect_bespoke_key_lock_sites(&sorted, &excluded_server_tests);
+    if key_lock_sites.len() > SERVER_BESPOKE_KEY_LOCK_CEILING {
+        for site in &key_lock_sites {
+            violations.push(RatchetViolation {
+                rule: RustRatchetRule::NoBespokeKeyLock,
+                file: site.file.clone(),
+                line: site.line,
+                message: format!("bespoke per-key lock table is forbidden ({})", site.snippet),
+                fix: "Use vibevalley_kit::sync::KeyLock<K> for leak-free per-key synchronization.".to_owned(),
+                see: CONCURRENCY_DOC,
+                details: Vec::new(),
+            });
+        }
+    }
+
+    let cache_sites = collect_unbounded_cache_sites(&sorted, &excluded_server_tests);
+    if cache_sites.len() > SERVER_UNBOUNDED_CACHE_CEILING {
+        for site in &cache_sites {
+            violations.push(RatchetViolation {
+                rule: RustRatchetRule::NoUnboundedResidentCache,
+                file: site.file.clone(),
+                line: site.line,
+                message: format!("unbounded resident HashMap cache is forbidden ({})", site.snippet),
+                fix: "Use vibevalley_kit::cache::{LruCache, TtlCache} with an explicit NonZeroUsize capacity.".to_owned(),
+                see: CONCURRENCY_DOC,
+                details: Vec::new(),
+            });
+        }
+    }
+
+    let raw_interval_or_sink_sites = collect_raw_interval_or_unbounded_sink_sites(&sorted, &excluded_server_tests);
+    if raw_interval_or_sink_sites.len() > SERVER_RAW_INTERVAL_OR_UNBOUNDED_SINK_CEILING {
+        for site in &raw_interval_or_sink_sites {
+            violations.push(RatchetViolation {
+                rule: RustRatchetRule::NoRawIntervalOrUnboundedSink,
+                file: site.file.clone(),
+                line: site.line,
+                message: format!(
+                    "direct `tokio::time::interval*` or `mpsc::unbounded_channel` is forbidden in `crates/server/src/` ({})",
+                    site.snippet
+                ),
+                fix: "Use vibevalley_kit::task::Ticker and vibevalley_kit::queue::{KeyedLane, BoundedSink}.".to_owned(),
+                see: CONCURRENCY_DOC,
+                details: Vec::new(),
+            });
+        }
     }
 
     (block_on_sites.len(), violations)
@@ -1216,5 +1410,63 @@ mod tests {
             ),
         ];
         assert!(audit_rust_ratchets(&files, None).is_empty());
+    }
+
+    #[test]
+    fn zero_ceiling_kit_ratchets_reject_bespoke_locks_unbounded_caches_and_raw_interval_or_sink() {
+        assert_eq!(SERVER_BESPOKE_KEY_LOCK_CEILING, 0);
+        assert_eq!(SERVER_UNBOUNDED_CACHE_CEILING, 0);
+        assert_eq!(SERVER_RAW_INTERVAL_OR_UNBOUNDED_SINK_CEILING, 0);
+
+        let files = vec![
+            sf(
+                "crates/server/src/issue/board.rs",
+                "struct Board { issue_locks: Mutex<HashMap<String, Weak<AsyncMutex<()>>>> }\n",
+            ),
+            sf("crates/oar/src/session.rs", "struct Pool { gates: Mutex<HashMap<String, Arc<Mutex<()>>>> }\n"),
+            sf(
+                "crates/machine/src/local.rs",
+                "struct Local { locks: Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>> }\n",
+            ),
+            sf(
+                "crates/agent/src/runner.rs",
+                "struct Runner { locks: Mutex<HashMap<String, Weak<Mutex<()>>>> }\n",
+            ),
+            sf(
+                "crates/server/src/storage/note.rs",
+                "struct Storage { preview_cache: RwLock<HashMap<String, usize>> }\n",
+            ),
+            sf(
+                "crates/server/src/connector/feishu.rs",
+                "async fn run() {\n    let mut p = tokio::time::interval(Duration::from_secs(5));\n    let (tx, rx) = mpsc::unbounded_channel::<String>();\n}\n",
+            ),
+            sf(
+                "crates/server/src/issue/pull/poll.rs",
+                "async fn poll() { let mut t = tokio::time::interval_at(now, dur); }\n#[cfg(test)]\nmod tests {\n    fn ok() { let _ = tokio::time::interval(dur); let _ = mpsc::unbounded_channel::<()>(); }\n}\n",
+            ),
+            sf(
+                "crates/server/src/runtime/session/journal.rs",
+                "struct Journal {\n    closed_next: Mutex<LruCache<String, i64>>,\n    locks: KeyLock<String>,\n}\nfn ok() { let _ = Ticker::periodic(dur); let _ = bounded_stream::<()>(cap, policy); }\n",
+            ),
+        ];
+        let violations = audit_rust_ratchets(&files, None);
+        let tags: Vec<String> = violations.iter().map(|v| format!("{}@{}:{}", v.rule.as_str(), v.file, v.line)).collect();
+        assert_eq!(
+            tags,
+            vec![
+                "no-bespoke-key-lock@crates/agent/src/runner.rs:1",
+                "no-bespoke-key-lock@crates/machine/src/local.rs:1",
+                "no-bespoke-key-lock@crates/oar/src/session.rs:1",
+                "no-bespoke-key-lock@crates/server/src/issue/board.rs:1",
+                "no-unbounded-resident-cache@crates/server/src/storage/note.rs:1",
+                "no-raw-interval-or-unbounded-sink@crates/server/src/connector/feishu.rs:2",
+                "no-raw-interval-or-unbounded-sink@crates/server/src/connector/feishu.rs:3",
+                "no-raw-interval-or-unbounded-sink@crates/server/src/issue/pull/poll.rs:1",
+            ]
+        );
+        let formatted = format_ratchet_violations(&violations);
+        assert!(formatted.contains("vibevalley_kit::sync::KeyLock<K>"));
+        assert!(formatted.contains("vibevalley_kit::cache::{LruCache, TtlCache}"));
+        assert!(formatted.contains("vibevalley_kit::task::Ticker and vibevalley_kit::queue::{KeyedLane, BoundedSink}"));
     }
 }

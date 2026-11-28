@@ -30,7 +30,10 @@ fn an_issue_goes_through_the_endpoints_from_create_to_done() {
     let mut registry = vibevalley_runtime::oar::Registry::new();
     registry.register(HookRuntime::new("t", quick(), |turn| {
         turn.commit("feature.txt", "made\n");
-        turn.done("Added feature.txt");
+        let sha = git(&turn.cwd, &["rev-parse", "HEAD"]);
+        turn.report(&format!(
+            r#"{{"status":"done","summary":"Added feature.txt","deliveryReceipt":{{"kind":"commit","sha":"{sha}","branch":"main","summary":"Added feature.txt"}}}}"#
+        ));
     }));
     let main = repo(dir.path(), "app");
     let app = app_with_registry(dir.path(), Arc::new(registry));

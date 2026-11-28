@@ -120,12 +120,6 @@ export function ConfigTabs(props: { draft: Agent; runtime?: RuntimeInfo | undefi
               onInput={(workdir) => props.patch({ ...draft(), workdir })}
             />
           </Labeled>
-          <Toggle
-            label={t("web.agent.worktree")}
-            hint={t("web.agent.worktreeHint")}
-            checked={draft().worktree}
-            onChange={(worktree) => props.patch({ ...draft(), worktree })}
-          />
           <Labeled
             label={t("web.agent.env")}
             hint={envRefused() ?? t("web.agent.envHint")}

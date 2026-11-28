@@ -78,6 +78,11 @@ export function IssueBoard(props: BoardProps) {
     done: laneCountOf("done", props.cards, props.summary, props.filtered === true, props.older),
     canceled: laneCountOf("canceled", props.cards, props.summary, props.filtered === true, props.older),
   }));
+  const primaryEmptyLane = computed<Lane | undefined>(() => {
+    const byLane = cardsByLane();
+    if (byLane.todo.length === 0) return "todo";
+    return lanes.find((l) => byLane[l].length === 0);
+  });
   return (
     <View testID="issue-board" ref={drag.setRoot} class="min-h-0 flex-1 px-3 py-3">
       <If when={narrow()}>
@@ -129,7 +134,8 @@ export function IssueBoard(props: BoardProps) {
                       laneWidth={laneWidth()}
                       cards={cardsByLane()[l()]}
                       count={laneCounts()[l()]}
-                      showClear={props.filtered === true && props.cards.length === 0 && props.onClearFilter !== undefined && l() === "backlog"}
+                      emptyMode={l() === primaryEmptyLane() ? "full" : "quiet"}
+                      showClear={props.filtered === true && props.cards.length === 0 && props.onClearFilter !== undefined && l() === primaryEmptyLane()}
                       drag={drag}
                     />
                   )}

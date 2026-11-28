@@ -134,9 +134,6 @@
       "draining": "排空中"
     },
     "machineId": "机器 ID",
-    "worktree": "工作树",
-    "worktreeYes": "支持",
-    "worktreeNo": "不支持",
     "installedCount": "已装环境",
     "lastSeen": "最近在线"
   },

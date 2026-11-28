@@ -226,7 +226,7 @@ impl Qq {
         let broken = || AppFailed::failed(t("server.connector.qq.gatewayError", &[]));
         let (mut ws, _) = tokio_tungstenite::connect_async(gateway.url.as_str()).await.map_err(|_| broken())?;
         let mut seq: Option<i64> = None;
-        let mut beat: Option<tokio::time::Interval> = None;
+        let mut beat: Option<vibevalley_kit::task::PeriodicTick> = None;
         loop {
             let frame = tokio::select! {
                 frame = ws.next() => frame,
@@ -251,7 +251,7 @@ impl Qq {
                     let identify = json!({ "op": 2, "d": { "token": format!("QQBot {token}"), "intents": INTENTS, "shard": [0, 1], "properties": {} } });
                     ws.send(WsMessage::text(identify.to_string())).await.map_err(|_| broken())?;
                     if beat.is_none() {
-                        beat = Some(tokio::time::interval_at(tokio::time::Instant::now() + heartbeat, heartbeat));
+                        beat = Some(vibevalley_kit::task::Ticker::periodic_delayed(heartbeat));
                     }
                 }
                 Event::Message(m) => (io.accept)(vec![m], String::new()).await?,

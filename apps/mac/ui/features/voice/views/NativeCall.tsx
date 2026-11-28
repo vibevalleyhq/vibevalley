@@ -1,4 +1,4 @@
-import { cleanup, signal, Text, View } from "nsh";
+import { cleanup, computed, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import type { HostLiveVoicePhase, HostLiveVoiceState as LiveVoiceSnapshot } from "@vibevalley/protocol";
@@ -11,6 +11,7 @@ import { Dot } from "../../../design/Tag";
 import { Bubble } from "../../../design/Tip";
 import { createAct } from "../../../infra/act";
 import { useInterval } from "../../../infra/base/timer";
+import { providerQuery, ready, useQuery } from "../../../infra/query";
 import { transport } from "../../../infra/transport";
 import { MossVerify } from "./MossVerify";
 import { MicWaveform, VoiceOrb } from "./VoiceVisuals";
@@ -67,6 +68,12 @@ const initialCallState: LiveVoiceSnapshot = {
 };
 
 export function NativeCall() {
+  const providers = useQuery(providerQuery);
+  const mossReady = computed(() => {
+    const status = ready(providers, undefined);
+    if (!status) return true;
+    return status.connections.some((c) => c.adapter === "moss" && c.enabled && c.key.source !== null);
+  });
   const state = signal<LiveVoiceSnapshot>(initialCallState);
   const error = signal<string | undefined>(undefined);
   const liveSince = signal<number | undefined>(undefined);
@@ -127,7 +134,7 @@ export function NativeCall() {
       case "stopping":
         return t("web.voice.moss.hangUp");
       case "idle":
-        return t("web.voice.moss.readyPrompt");
+        return mossReady() ? t("web.voice.moss.readyPrompt") : t("web.setting.missing.mossAccount");
     }
   };
 
@@ -156,10 +163,10 @@ export function NativeCall() {
         <Text class="text-center text-xs font-medium text-muted">{stagePrompt()}</Text>
         <View class="flex-row flex-wrap items-center justify-center gap-2 pt-0.5">
           <Button
-            tone="primary"
+            tone={mossReady() ? "primary" : "plain"}
             icon="call"
             testID="native-call-start"
-            disabled={act.busy() || active()}
+            disabled={act.busy() || active() || !mossReady()}
             onPress={() => void act.run(() => command("host.voiceStart"))}
           >
             {state().phase === "connecting" ? t("web.voice.moss.connecting") : t("web.voice.moss.talk")}

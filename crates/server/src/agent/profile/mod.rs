@@ -1,7 +1,6 @@
 //! `agent.*`, `skill.*`, and `runtime.*`: agent profiles, skills, templates,
 //! and the runtime fleet they execute on.
 
-pub mod drive;
 pub mod preset;
 #[allow(clippy::module_inception)]
 pub mod profile;
@@ -19,9 +18,7 @@ use vibevalley_runtime::oar::Registry;
 
 use crate::context::Context;
 use crate::context::error::{LookIn, missing};
-use crate::context::port::CronAgentPort;
 
-pub use drive::{AgentDriver, instructions};
 pub use profile::ProfileStore;
 pub use runtime::RuntimeFleet;
 
@@ -31,13 +28,16 @@ pub struct Profile {
     pub fleet: Arc<RuntimeFleet>,
 }
 
-impl CronAgentPort for Profile {
-    fn resolve_agent_id(&self, named: &str) -> Option<String> {
-        self.named(named).map(|a| a.id)
-    }
-}
-
 impl Profile {
+    /// An issue's agent as the user wrote it: a profile's name becomes its
+    /// id; anything else is kept as written.
+    pub fn agent_key(&self, written: &str) -> String {
+        let key = written.trim();
+        if key.is_empty() {
+            return String::new();
+        }
+        self.store.named(key).map(|a| a.id).unwrap_or_else(|| key.to_string())
+    }
     /// Opens agent profiles under `home` and probes runtimes in `registry` when `background` is set.
     pub async fn open_async(ctx: Arc<Context>, home: &Path, starters: &[String], registry: Arc<Registry>, background: bool) -> std::io::Result<Arc<Profile>> {
         let machines = Arc::new(MachineRegistry::with_local(registry.clone()));

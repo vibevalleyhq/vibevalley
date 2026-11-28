@@ -273,7 +273,7 @@ pub trait LiveVoiceLine: Send + Sync {
     fn url(&self) -> &str;
     fn bearer_token(&self) -> &str;
     fn session_update(&self) -> String;
-    fn take_outgoing(&self) -> Option<tokio::sync::mpsc::UnboundedReceiver<String>>;
+    fn take_outgoing(&self) -> Option<tokio::sync::mpsc::Receiver<String>>;
     fn heard(&self, raw: &str);
 }
 

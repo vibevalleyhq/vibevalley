@@ -44,7 +44,7 @@ const sampleGraph: DebugGraph = {
       title: "Fix sidebar layout",
       runtime: "codex",
       status: "working",
-      worktree: "/work/wt-42",
+      cwd: "/work/wt-42",
       kind: "issue_session",
     },
   ],

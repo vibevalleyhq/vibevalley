@@ -47,7 +47,6 @@ function newAgent(runtime: string, catalog: readonly RuntimeInfo[]): Agent {
     disallowedTools: [],
     env: {},
     workdir: "",
-    worktree: true,
     tags: [],
     look: { ...randomLook(), outfit: "farmer" },
   };

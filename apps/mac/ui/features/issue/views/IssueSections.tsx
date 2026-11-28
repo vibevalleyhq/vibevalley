@@ -1,20 +1,25 @@
-import { computed, signal, Text, View } from "nsh";
+import { Clipboard, computed, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
-import type { Attachment, Issue, IssueAction, IssueAnswer, Question as QuestionItem } from "@vibevalley/protocol";
+import type { Attachment, DeliveryReceipt, Issue, IssueAction, IssueAnswer, Question as QuestionItem } from "@vibevalley/protocol";
 
 import { Button } from "../../../design/Button";
 import { Checkbox } from "../../../design/Checkbox";
 import { Icon } from "../../../design/Icon";
+import { IconButton } from "../../../design/IconButton";
 import type { IconName } from "../../../design/icons";
 import { Markdown } from "../../../design/Markdown";
+import { Tag, type TagTone } from "../../../design/Tag";
 import { TextLink } from "../../../design/TextLink";
+import { toast } from "../../../design/toasts";
 import { mix } from "../../../design/tone";
 import { createAct } from "../../../infra/act";
 import { useNow } from "../../../infra/base/dom";
 import { shortMomentText, tookText } from "../../../infra/base/format";
+import { hostApi } from "../../../infra/bridge";
 import { perform } from "../../../infra/issueActions";
 import { ready } from "../../../infra/query";
+import { Link as A } from "../../../infra/router";
 import { useIntents } from "../../../infra/state/intent";
 import { SubagentProgress } from "../../session";
 import { useIssueRuns } from "../model/history";
@@ -111,23 +116,114 @@ export function Criteria(props: { rows: CriterionRow[]; checking: boolean }) {
   );
 }
 
-export function ReconcileWorktree(props: { onChanges?: (() => void) | undefined }) {
+function receiptKindMeta(kind: DeliveryReceipt["kind"]): { readonly icon: IconName; readonly tone: TagTone; readonly label: string } {
+  switch (kind) {
+    case "pull_request":
+      return { icon: "branch", tone: "info", label: t("web.issue.receipt.kinds.pull_request") };
+    case "commit":
+      return { icon: "diff", tone: "ok", label: t("web.issue.receipt.kinds.commit") };
+    case "note":
+      return { icon: "notes", tone: "wait", label: t("web.issue.receipt.kinds.note") };
+    case "answer":
+      return { icon: "chat", tone: "neutral", label: t("web.issue.receipt.kinds.answer") };
+  }
+}
+
+/** Renders a polymorphic `DeliveryReceipt` (`pull_request`, `commit`, `note`, or `answer`). */
+export function DeliveryReceiptCard(props: { receipt: DeliveryReceipt; class?: string }) {
+  const meta = computed(() => receiptKindMeta(props.receipt.kind));
+  const copySha = (sha: string) => {
+    void Clipboard.writeText(sha).then(
+      () => toast(t("web.base.rich.copied")),
+      () => undefined,
+    );
+  };
   return (
-    <View testID="run-reconcile" class="my-1.5 flex-row flex-wrap items-center gap-2">
-      <Icon name="warn" size={14} tone="berry" />
-      <Text class="text-sm text-ink">{t("web.issue.run.reconcile")}</Text>
-      <If when={props.onChanges}>
-        {(show) => (
-          <Button testID="run-review-changes" onPress={() => show()()}>
-            {t("web.issue.run.currentChanges")}
-          </Button>
+    <View testID="delivery-receipt" class={`gap-2 rounded-lg border border-line bg-page p-3.5 ${props.class ?? ""}`}>
+      <View class="flex-row flex-wrap items-center justify-between gap-2">
+        <View class="flex-row items-center gap-2">
+          <Text class="text-xs font-semibold text-muted">{t("web.issue.receipt.title")}</Text>
+          <Tag icon={meta().icon} tone={meta().tone} label={meta().label} />
+        </View>
+        <If when={props.receipt.kind === "pull_request" && props.receipt.branch ? props.receipt.branch : undefined}>
+          {(branch) => (
+            <View class="rounded-sm bg-side px-1.5 py-0.5">
+              <Text class="font-mono text-2xs text-muted">{branch()}</Text>
+            </View>
+          )}
+        </If>
+        <If when={props.receipt.kind === "commit" && props.receipt.branch ? props.receipt.branch : undefined}>
+          {(branch) => (
+            <View class="rounded-sm bg-side px-1.5 py-0.5">
+              <Text class="font-mono text-2xs text-muted">{branch()}</Text>
+            </View>
+          )}
+        </If>
+      </View>
+
+      <If when={props.receipt.kind === "pull_request" ? props.receipt : undefined}>
+        {(pr) => (
+          <View class="gap-1.5">
+            <View
+              role="link"
+              testID="delivery-receipt-pr-link"
+              onPress={() => void hostApi.openUrl(pr().url)}
+              class="flex-row items-center gap-1.5 self-start rounded-md border border-line bg-side px-2.5 py-1 hover:bg-hover"
+            >
+              <Icon name="branch" size={12} tone="water" />
+              <Text class="text-xs font-medium text-water">{pr().number !== undefined ? `PR #${pr().number}` : t("web.issue.receipt.openPr")}</Text>
+              <Text class="max-w-72 truncate font-mono text-2xs text-muted">{pr().url}</Text>
+            </View>
+            <If when={pr().summary}>{(summary) => <Text class="text-sm leading-relaxed text-ink">{summary()}</Text>}</If>
+          </View>
+        )}
+      </If>
+
+      <If when={props.receipt.kind === "commit" ? props.receipt : undefined}>
+        {(commit) => (
+          <View class="gap-1.5">
+            <View class="flex-row items-center gap-1.5">
+              <View class="rounded-sm bg-side px-2 py-0.5">
+                <Text testID="delivery-receipt-commit-sha" class="font-mono text-xs font-medium text-ink">
+                  {commit().sha.slice(0, 12)}
+                </Text>
+              </View>
+              <IconButton icon="copy" size={14} label={t("web.base.rich.copy")} onClick={() => copySha(commit().sha)} />
+            </View>
+            <If when={commit().summary}>{(summary) => <Text class="text-sm leading-relaxed text-ink">{summary()}</Text>}</If>
+          </View>
+        )}
+      </If>
+
+      <If when={props.receipt.kind === "note" ? props.receipt : undefined}>
+        {(note) => (
+          <View class="gap-1.5">
+            <A
+              href={`/notes/${encodeURIComponent(note().noteId)}`}
+              testID="delivery-receipt-note-link"
+              class="flex-row items-center gap-1.5 self-start rounded-md border border-line bg-side px-2.5 py-1 hover:bg-hover"
+            >
+              <Icon name="notes" size={12} tone="water" />
+              <Text class="text-xs font-medium text-water">{note().title || note().noteId}</Text>
+              <Text class="text-2xs text-muted">{t("web.issue.receipt.openNote")}</Text>
+            </A>
+            <If when={note().summary}>{(summary) => <Text class="text-sm leading-relaxed text-ink">{summary()}</Text>}</If>
+          </View>
+        )}
+      </If>
+
+      <If when={props.receipt.kind === "answer" ? props.receipt : undefined}>
+        {(ans) => (
+          <View testID="delivery-receipt-answer" class="min-w-0">
+            <Markdown size="sm" text={ans().summary} />
+          </View>
         )}
       </If>
     </View>
   );
 }
 
-function Runs(props: { issue: string; version: string; onChanges?: (() => void) | undefined }) {
+function Runs(props: { issue: string; version: string }) {
   const query = useIssueRuns(
     () => props.issue,
     () => props.version,
@@ -158,9 +254,6 @@ function Runs(props: { issue: string; version: string; onChanges?: (() => void) 
                       </If>
                     </View>
                   )}
-                </If>
-                <If when={r().needsReconciliation}>
-                  <ReconcileWorktree onChanges={props.onChanges} />
                 </If>
                 <If when={r().subagents}>{(progress) => <SubagentProgress session={r().session} progress={progress()} now={now()} />}</If>
               </View>
@@ -240,7 +333,14 @@ export function OrchestratorIssueDetail(props: { issue: Issue }) {
         onAdd={addAttachment}
         onRemove={removeAttachment}
       />
-      <View class={hasAboveRuns() ? "mt-7 border-t border-line pt-5" : ""}>
+      <If when={props.issue.deliveryReceipt}>
+        {(receipt) => (
+          <View class="mt-4">
+            <DeliveryReceiptCard receipt={receipt()} />
+          </View>
+        )}
+      </If>
+      <View class={hasAboveRuns() || Boolean(props.issue.deliveryReceipt) ? "mt-7 border-t border-line pt-5" : ""}>
         <SheetLabel first>{t("web.issue.detail.runs")}</SheetLabel>
         <Runs issue={props.issue.id} version={`${props.issue.status}:${props.issue.closedAt}:${tagOpen(tag())}`} />
       </View>

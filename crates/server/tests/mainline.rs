@@ -134,7 +134,11 @@ fn regression_mainline_dispatch_report_follow_up_merge_schedule_and_reopen() {
     });
     let session = first.latest_session_id().unwrap().clone();
     let worker = crate::support::board_session(server.test_internals().board, &session).unwrap();
-    assert!(Path::new(worker.cwd.as_ref().unwrap()).starts_with(dir.path().join("worktrees")));
+    assert_eq!(
+        std::fs::canonicalize(worker.cwd.as_ref().unwrap()).unwrap(),
+        std::fs::canonicalize(dir.path().join("repos/demo")).unwrap()
+    );
+    assert!(!dir.path().join("worktrees").exists());
     let thread = until(&server, "issue thread", || server.test_internals().channel.issue_thread_id(&id));
     until(&server, "report in issue thread", || {
         vibevalley_runtime::rt::block_on(server.test_internals().channel.history_async(&thread, None, None))
@@ -241,19 +245,27 @@ fn regression_mainline_dispatch_report_follow_up_merge_schedule_and_reopen() {
         json!({ "name": "Scheduled task", "text": "Write a scheduled file", "agent": "Worker", "repo": "demo", "when": { "kind": "once", "at": clock.now_ms() + 100 } }),
     );
     clock.advance(Duration::from_millis(150));
-    vibevalley_runtime::rt::block_on(server.test_internals().cron.tick_async());
+    vibevalley_runtime::rt::block_on(server.test_internals().orchestration.cron.tick_async());
     let scheduled = until(&server, "cron dispatched", || {
-        crate::support::board_issues(server.test_internals().board)
+        server
+            .test_internals()
+            .orchestration
+            .issue
+            .enrich_issues(crate::support::board_issues(server.test_internals().board))
             .into_iter()
             .find(|i| i.cron.as_deref() == cron["id"].as_str() && i.was_sent())
     });
     until(&server, "cron reported", || {
         crate::support::board_issue(server.test_internals().board, &scheduled.id).filter(|i| i.stage.state == IssueStageKind::Reviewing)
     });
-    vibevalley_runtime::rt::block_on(server.test_internals().cron.tick_async());
+    vibevalley_runtime::rt::block_on(server.test_internals().orchestration.cron.tick_async());
     assert_eq!(
-        crate::support::board_issues(server.test_internals().board)
-            .into_iter()
+        server
+            .test_internals()
+            .orchestration
+            .issue
+            .enrich_issues(crate::support::board_issues(server.test_internals().board))
+            .iter()
             .filter(|i| i.cron.is_some())
             .count(),
         1

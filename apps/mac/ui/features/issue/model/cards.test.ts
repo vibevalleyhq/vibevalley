@@ -94,8 +94,16 @@ test("cardLook and issueState preserve full titles over 40 chars and quiet draft
     ...makeIssue("i-draft", "draft"),
     status: "backlog",
   };
-  const draftLook = cardLook({ kind: "todo", id: draftIssue.id, lane: "todo", issue: draftIssue }, (id) => id, [draftIssue], 2_000);
-  expect(draftLook.flags).toEqual([{ text: t("web.issue.card.draft"), tone: "faint" }]);
+  const draftLook = cardLook({ kind: "todo", id: draftIssue.id, lane: "backlog", issue: draftIssue }, (id) => id, [draftIssue], 2_000);
+  expect(draftLook.flags).toEqual([]);
+
+  const queuedIssue: Issue = {
+    ...makeIssue("i-queued", "queued"),
+    status: "todo",
+    queuedAt: 1_500,
+  };
+  const queuedLook = cardLook({ kind: "todo", id: queuedIssue.id, lane: "todo", issue: queuedIssue }, (id) => id, [queuedIssue], 2_000);
+  expect(queuedLook.flags).toEqual([{ text: t("web.issue.card.queued"), tone: "water" }]);
 
   const nonSessionReview: Issue = {
     ...makeIssue("i-review-todo", "draft"),

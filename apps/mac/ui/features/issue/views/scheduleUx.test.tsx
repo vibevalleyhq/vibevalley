@@ -152,11 +152,11 @@ test("IssuesPage supports Timeline (Gantt) direct drag/resize, short-bar #N labe
         runningSlots: 0,
         maxRunning: 3,
         byIssue: {
-          [epicParent.id]: { lane: "in_progress", cardKind: "family", familyDone: 0, familyTotal: 1, needsWorktreeCheck: false, schedule: epicSpan },
-          [childScheduled.id]: { lane: "in_progress", cardKind: "todo", familyDone: 0, familyTotal: 0, needsWorktreeCheck: false, schedule: childSpan },
-          [extraA.id]: { lane: "todo", cardKind: "todo", familyDone: 0, familyTotal: 0, needsWorktreeCheck: false, schedule: extraASpan },
-          [extraB.id]: { lane: "todo", cardKind: "todo", familyDone: 0, familyTotal: 0, needsWorktreeCheck: false, schedule: extraBSpan },
-          [unscheduled.id]: { lane: "backlog", cardKind: "todo", familyDone: 0, familyTotal: 0, needsWorktreeCheck: false },
+          [epicParent.id]: { lane: "in_progress", cardKind: "family", familyDone: 0, familyTotal: 1, schedule: epicSpan },
+          [childScheduled.id]: { lane: "in_progress", cardKind: "todo", familyDone: 0, familyTotal: 0, schedule: childSpan },
+          [extraA.id]: { lane: "todo", cardKind: "todo", familyDone: 0, familyTotal: 0, schedule: extraASpan },
+          [extraB.id]: { lane: "todo", cardKind: "todo", familyDone: 0, familyTotal: 0, schedule: extraBSpan },
+          [unscheduled.id]: { lane: "backlog", cardKind: "todo", familyDone: 0, familyTotal: 0 },
         },
         schedule: {
           todayDayMs: todayMs,
@@ -479,9 +479,9 @@ test("regression: IssueCalendar keeps all 6 week rows completely accessible with
         byIssue: Object.fromEntries([
           ...scheduled.map((issue) => [
             issue.id,
-            { lane: "in_progress" as const, cardKind: "todo" as const, familyDone: 0, familyTotal: 0, needsWorktreeCheck: false, schedule: densitySpan },
+            { lane: "in_progress" as const, cardKind: "todo" as const, familyDone: 0, familyTotal: 0, schedule: densitySpan },
           ]),
-          [week6Issue.id, { lane: "todo" as const, cardKind: "todo" as const, familyDone: 0, familyTotal: 0, needsWorktreeCheck: false, schedule: week6Span }],
+          [week6Issue.id, { lane: "todo" as const, cardKind: "todo" as const, familyDone: 0, familyTotal: 0, schedule: week6Span }],
         ]),
         schedule: {
           todayDayMs: todayMs,

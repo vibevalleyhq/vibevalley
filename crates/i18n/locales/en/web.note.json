@@ -85,6 +85,14 @@
     "codeLanguagePlaceholder": "language",
     "addCol": "+Col",
     "addRow": "+Row",
+    "tableAlign": "Cycle alignment",
+    "tableMoveColLeft": "Move column left",
+    "tableMoveColRight": "Move column right",
+    "tableInsertColAfter": "Insert column after",
+    "tableDeleteCol": "Delete column",
+    "tableInsertRowBelow": "Insert row below",
+    "tableDeleteRow": "Delete row",
+    "tableNavHint": "Tab next cell · Shift+Tab previous · Enter next row",
     "bookmarkOpen": "Open URL",
     "bookmarkEdit": "Edit bookmark",
     "titleOptional": "Title (optional)",
@@ -186,6 +194,37 @@
     "shot": "Shot",
     "transcriptPreview": "Transcript",
     "videoPreview": "Preview"
+  },
+  "annotation": {
+    "show": "Show pins",
+    "hide": "Hide pins",
+    "unresolvedOnly": "Open only",
+    "addMode": "Annotate",
+    "addModeHint": "Click or drag on image to place an annotation",
+    "openCount": "{open}/{total} open",
+    "defaultTitle": "Finding #{n}",
+    "titlePlaceholder": "Annotation title…",
+    "bodyPlaceholder": "Review note or expected fix…",
+    "resolve": "Resolve",
+    "reopen": "Reopen",
+    "edit": "Edit annotation",
+    "save": "Done",
+    "delete": "Delete annotation",
+    "createIssue": "Create Issue",
+    "openIssue": "Open Issue",
+    "jumpToRow": "Review row",
+    "jumpToPin": "Pin #{n}",
+    "zoom": "Inspect in Lightbox",
+    "severity": {
+      "p0": "P0",
+      "p1": "P1",
+      "p2": "P2",
+      "ux": "UX"
+    },
+    "status": {
+      "open": "Open",
+      "resolved": "Resolved"
+    }
   },
   "files": {
     "codeMode": "Code",

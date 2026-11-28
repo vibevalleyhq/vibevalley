@@ -1004,11 +1004,11 @@
         "priority": "medium",
         "createdAt": 1795162043624,
         "closedAt": 1795190843624,
-        "delivered": "merged_into_parent",
+        "delivered": "merged",
         "parent": "i40",
         "blockedBy": [],
         "status": "done",
-        "moves": [],
+        "moves": ["backlog", "todo", "in_progress", "in_review", "canceled"],
         "deliver": "change",
         "findings": [],
         "questions": [],
@@ -1017,7 +1017,14 @@
         "stage": {
           "state": "done",
           "since": 1795190843624,
-          "acts": []
+          "acts": [
+            {
+              "does": "move",
+              "act": "reopen",
+              "status": "backlog",
+              "words": "none"
+            }
+          ]
         }
       },
       {
@@ -3178,435 +3185,375 @@
           "lane": "done",
           "cardKind": "todo",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-d101": {
           "lane": "todo",
           "cardKind": "todo",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-d102": {
           "lane": "in_progress",
           "cardKind": "issue",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-d103": {
           "lane": "in_review",
           "cardKind": "issue",
           "familyDone": 0,
           "familyTotal": 0,
-          "needsWorktreeCheck": false,
           "prompt": "handed_back"
         },
         "i-d104": {
           "lane": "done",
           "cardKind": "todo",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-d105": {
           "lane": "todo",
           "cardKind": "todo",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-d106": {
           "lane": "in_progress",
           "cardKind": "issue",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-d107": {
           "lane": "in_review",
           "cardKind": "issue",
           "familyDone": 0,
           "familyTotal": 0,
-          "needsWorktreeCheck": false,
           "prompt": "handed_back"
         },
         "i-d108": {
           "lane": "done",
           "cardKind": "todo",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-d109": {
           "lane": "todo",
           "cardKind": "todo",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-d110": {
           "lane": "in_progress",
           "cardKind": "issue",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-d111": {
           "lane": "in_review",
           "cardKind": "issue",
           "familyDone": 0,
           "familyTotal": 0,
-          "needsWorktreeCheck": false,
           "prompt": "handed_back"
         },
         "i-d112": {
           "lane": "done",
           "cardKind": "todo",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-d113": {
           "lane": "todo",
           "cardKind": "todo",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-d114": {
           "lane": "in_progress",
           "cardKind": "issue",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-d115": {
           "lane": "in_review",
           "cardKind": "issue",
           "familyDone": 0,
           "familyTotal": 0,
-          "needsWorktreeCheck": false,
           "prompt": "handed_back"
         },
         "i-d116": {
           "lane": "done",
           "cardKind": "todo",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-d117": {
           "lane": "todo",
           "cardKind": "todo",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-d118": {
           "lane": "in_progress",
           "cardKind": "issue",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-d119": {
           "lane": "in_review",
           "cardKind": "issue",
           "familyDone": 0,
           "familyTotal": 0,
-          "needsWorktreeCheck": false,
           "prompt": "handed_back"
         },
         "i-d120": {
           "lane": "done",
           "cardKind": "todo",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-d121": {
           "lane": "todo",
           "cardKind": "todo",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-d122": {
           "lane": "in_progress",
           "cardKind": "issue",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-d123": {
           "lane": "in_review",
           "cardKind": "issue",
           "familyDone": 0,
           "familyTotal": 0,
-          "needsWorktreeCheck": false,
           "prompt": "handed_back"
         },
         "i-d124": {
           "lane": "done",
           "cardKind": "todo",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-d125": {
           "lane": "todo",
           "cardKind": "todo",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-d126": {
           "lane": "in_progress",
           "cardKind": "issue",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-d127": {
           "lane": "in_review",
           "cardKind": "issue",
           "familyDone": 0,
           "familyTotal": 0,
-          "needsWorktreeCheck": false,
           "prompt": "handed_back"
         },
         "i-d128": {
           "lane": "done",
           "cardKind": "todo",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-d129": {
           "lane": "todo",
           "cardKind": "todo",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-d130": {
           "lane": "in_progress",
           "cardKind": "issue",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-d131": {
           "lane": "in_review",
           "cardKind": "issue",
           "familyDone": 0,
           "familyTotal": 0,
-          "needsWorktreeCheck": false,
           "prompt": "handed_back"
         },
         "i-d132": {
           "lane": "done",
           "cardKind": "todo",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-d133": {
           "lane": "todo",
           "cardKind": "todo",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-d134": {
           "lane": "in_progress",
           "cardKind": "issue",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-d135": {
           "lane": "in_review",
           "cardKind": "issue",
           "familyDone": 0,
           "familyTotal": 0,
-          "needsWorktreeCheck": false,
           "prompt": "handed_back"
         },
         "i-d136": {
           "lane": "done",
           "cardKind": "todo",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-d137": {
           "lane": "todo",
           "cardKind": "todo",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-d138": {
           "lane": "in_progress",
           "cardKind": "issue",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-d139": {
           "lane": "in_review",
           "cardKind": "issue",
           "familyDone": 0,
           "familyTotal": 0,
-          "needsWorktreeCheck": false,
           "prompt": "handed_back"
         },
         "i-d140": {
           "lane": "done",
           "cardKind": "todo",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-d141": {
           "lane": "todo",
           "cardKind": "todo",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-d142": {
           "lane": "in_progress",
           "cardKind": "issue",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-d143": {
           "lane": "in_review",
           "cardKind": "issue",
           "familyDone": 0,
           "familyTotal": 0,
-          "needsWorktreeCheck": false,
           "prompt": "handed_back"
         },
         "i-d144": {
           "lane": "done",
           "cardKind": "todo",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-d145": {
           "lane": "todo",
           "cardKind": "todo",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-d146": {
           "lane": "in_progress",
           "cardKind": "issue",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-d147": {
           "lane": "in_review",
           "cardKind": "issue",
           "familyDone": 0,
           "familyTotal": 0,
-          "needsWorktreeCheck": false,
           "prompt": "handed_back"
         },
         "i-d148": {
           "lane": "done",
           "cardKind": "todo",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-d149": {
           "lane": "todo",
           "cardKind": "todo",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-d150": {
           "lane": "in_progress",
           "cardKind": "issue",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-d151": {
           "lane": "in_review",
           "cardKind": "issue",
           "familyDone": 0,
           "familyTotal": 0,
-          "needsWorktreeCheck": false,
           "prompt": "handed_back"
         },
         "i-d152": {
           "lane": "done",
           "cardKind": "todo",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i-d153": {
           "lane": "todo",
           "cardKind": "todo",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i10": {
           "lane": "canceled",
           "cardKind": "todo",
           "familyDone": 0,
           "familyTotal": 0,
-          "needsWorktreeCheck": false,
           "prompt": "canceled_reopenable"
         },
         "i12": {
           "lane": "done",
           "cardKind": "todo",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i18": {
           "lane": "in_progress",
           "cardKind": "issue",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i21": {
           "lane": "backlog",
           "cardKind": "todo",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i22": {
           "lane": "todo",
           "cardKind": "todo",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i31": {
           "lane": "in_review",
           "cardKind": "issue",
           "familyDone": 0,
           "familyTotal": 0,
-          "needsWorktreeCheck": false,
           "prompt": "handed_back"
         },
         "i33": {
@@ -3614,7 +3561,6 @@
           "cardKind": "issue",
           "familyDone": 0,
           "familyTotal": 0,
-          "needsWorktreeCheck": false,
           "prompt": "asking"
         },
         "i34": {
@@ -3622,29 +3568,25 @@
           "cardKind": "issue",
           "familyDone": 0,
           "familyTotal": 0,
-          "needsWorktreeCheck": false,
           "prompt": "stuck_failed"
         },
         "i40": {
           "lane": "in_progress",
           "cardKind": "family",
           "familyDone": 1,
-          "familyTotal": 2,
-          "needsWorktreeCheck": false
+          "familyTotal": 2
         },
         "i41": {
           "lane": "done",
           "cardKind": "todo",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         },
         "i42": {
           "lane": "todo",
           "cardKind": "todo",
           "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
+          "familyTotal": 0
         }
       },
       "schedule": {
@@ -3737,9 +3679,9 @@
         "brief": "",
         "cwd": "/tmp/vibevalley/.worktrees/i18",
         "policy": {
-          "kind": "managedWorktree",
+          "kind": "directCwd",
           "repo": "vibevalley",
-          "branch": "issue-18-login"
+          "permissionMode": "bypass"
         },
         "bindings": [
           {
@@ -3822,9 +3764,9 @@
         "runtime": "claude",
         "brief": "",
         "policy": {
-          "kind": "managedWorktree",
+          "kind": "directCwd",
           "repo": "vibevalley",
-          "branch": "issue-33-shell"
+          "permissionMode": "bypass"
         },
         "bindings": [
           {
@@ -3857,9 +3799,9 @@
         "runtime": "claude",
         "brief": "",
         "policy": {
-          "kind": "managedWorktree",
+          "kind": "directCwd",
           "repo": "vibevalley",
-          "branch": "issue-31-board"
+          "permissionMode": "bypass"
         },
         "bindings": [
           {
@@ -3892,8 +3834,9 @@
         "runtime": "claude",
         "brief": "",
         "policy": {
-          "kind": "managedWorktree",
-          "repo": "vibevalley"
+          "kind": "directCwd",
+          "repo": "vibevalley",
+          "permissionMode": "bypass"
         },
         "bindings": [
           {
@@ -3926,8 +3869,9 @@
         "runtime": "claude",
         "brief": "",
         "policy": {
-          "kind": "managedWorktree",
-          "repo": "vibevalley"
+          "kind": "directCwd",
+          "repo": "vibevalley",
+          "permissionMode": "bypass"
         },
         "bindings": [
           {
@@ -3958,8 +3902,9 @@
         "runtime": "claude",
         "brief": "",
         "policy": {
-          "kind": "managedWorktree",
-          "repo": "vibevalley"
+          "kind": "directCwd",
+          "repo": "vibevalley",
+          "permissionMode": "bypass"
         },
         "bindings": [
           {
@@ -3989,8 +3934,9 @@
         "runtime": "claude",
         "brief": "",
         "policy": {
-          "kind": "managedWorktree",
-          "repo": "vibevalley"
+          "kind": "directCwd",
+          "repo": "vibevalley",
+          "permissionMode": "bypass"
         },
         "bindings": [
           {
@@ -4020,8 +3966,9 @@
         "runtime": "claude",
         "brief": "",
         "policy": {
-          "kind": "managedWorktree",
-          "repo": "vibevalley"
+          "kind": "directCwd",
+          "repo": "vibevalley",
+          "permissionMode": "bypass"
         },
         "bindings": [
           {
@@ -4051,8 +3998,9 @@
         "runtime": "claude",
         "brief": "",
         "policy": {
-          "kind": "managedWorktree",
-          "repo": "vibevalley"
+          "kind": "directCwd",
+          "repo": "vibevalley",
+          "permissionMode": "bypass"
         },
         "bindings": [
           {
@@ -4082,8 +4030,9 @@
         "runtime": "claude",
         "brief": "",
         "policy": {
-          "kind": "managedWorktree",
-          "repo": "vibevalley"
+          "kind": "directCwd",
+          "repo": "vibevalley",
+          "permissionMode": "bypass"
         },
         "bindings": [
           {
@@ -4116,8 +4065,9 @@
         "runtime": "claude",
         "brief": "",
         "policy": {
-          "kind": "managedWorktree",
-          "repo": "vibevalley"
+          "kind": "directCwd",
+          "repo": "vibevalley",
+          "permissionMode": "bypass"
         },
         "bindings": [
           {
@@ -4150,8 +4100,9 @@
         "runtime": "claude",
         "brief": "",
         "policy": {
-          "kind": "managedWorktree",
-          "repo": "vibevalley"
+          "kind": "directCwd",
+          "repo": "vibevalley",
+          "permissionMode": "bypass"
         },
         "bindings": [
           {

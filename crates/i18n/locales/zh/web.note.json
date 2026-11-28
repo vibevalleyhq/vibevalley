@@ -85,6 +85,14 @@
     "codeLanguagePlaceholder": "语言",
     "addCol": "+列",
     "addRow": "+行",
+    "tableAlign": "切换列对齐",
+    "tableMoveColLeft": "列左移",
+    "tableMoveColRight": "列右移",
+    "tableInsertColAfter": "右侧插入列",
+    "tableDeleteCol": "删除列",
+    "tableInsertRowBelow": "下方插入行",
+    "tableDeleteRow": "删除行",
+    "tableNavHint": "Tab 下一格 · Shift+Tab 上一格 · Enter 下一行",
     "bookmarkOpen": "打开链接",
     "bookmarkEdit": "编辑书签",
     "titleOptional": "标题（可选）",
@@ -186,6 +194,37 @@
     "shot": "镜头",
     "transcriptPreview": "转写预览",
     "videoPreview": "播放预览"
+  },
+  "annotation": {
+    "show": "显示标注",
+    "hide": "隐藏标注",
+    "unresolvedOnly": "仅看未解决",
+    "addMode": "框选标注",
+    "addModeHint": "在图片上点击或拖拽框选新增标注",
+    "openCount": "未解决 {open}/{total}",
+    "defaultTitle": "走查项 #{n}",
+    "titlePlaceholder": "标注标题…",
+    "bodyPlaceholder": "评审说明或期望修改…",
+    "resolve": "标为已解决",
+    "reopen": "重新打开",
+    "edit": "编辑标注",
+    "save": "完成",
+    "delete": "删除标注",
+    "createIssue": "转为工单",
+    "openIssue": "查看工单",
+    "jumpToRow": "对应清单行",
+    "jumpToPin": "标注 #{n}",
+    "zoom": "灯箱放大查看",
+    "severity": {
+      "p0": "P0 阻塞",
+      "p1": "P1 体验",
+      "p2": "P2 润色",
+      "ux": "UX 建议"
+    },
+    "status": {
+      "open": "未解决",
+      "resolved": "已解决"
+    }
   },
   "files": {
     "codeMode": "源码",

@@ -326,7 +326,7 @@ pub fn exchange_pair_code(base_url: &str, code: &str, device_name: &str) -> Resu
     }
     let client = builder.build().map_err(|e| format!("failed to build HTTP client: {e}"))?;
 
-    vibevalley_rt::block_on(async move {
+    vibevalley_kit::rt::block_on(async move {
         let response = client
             .post(&endpoint)
             .header("x-vibevalley-client", REMOTE_CLIENT_HEADER)

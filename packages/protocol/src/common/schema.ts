@@ -15,6 +15,13 @@ export const NoteId = branded<T.NoteId>();
 export const SuggestionId = branded<T.SuggestionId>();
 export const MessageId = branded<T.MessageId>();
 
+const isParticipantId = (s: string): s is T.ParticipantId =>
+  (s.startsWith("user:") && s.length > 5) || (s.startsWith("agent:") && s.length > 6) || (s.startsWith("session:") && s.length > 8);
+
+export const ParticipantId = z.string().refine(isParticipantId, {
+  message: "expected user:<id>, agent:<profile>, or session:<id>",
+}) satisfies Codec<T.ParticipantId>;
+
 /** An id minted, or taken from where the kind is known (a route, a row, a tool's argument for it). */
 function mint<K extends string>(_kind: K): (s: string) => T.Branded<K> {
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- as branded: the caller says where the string came from

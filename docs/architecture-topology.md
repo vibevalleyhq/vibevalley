@@ -120,7 +120,7 @@ flowchart LR
 | **桌面端 GUI `Desktop`** | [apps/mac](apps/mac/Cargo.toml) + [apps/mac/ui](apps/mac/ui) | GPUI 原生窗口、工作台页面、本地终端（`terminal`）、3D 纸雕农场渲染（`diorama`）、可选「单机合体启动器」与可选连接远端总控端 | 业务规则计算、擅自改写服务端持久化状态、越过协议直调服务端内部业务域 | `Client Protocol`（连远端总控端）或 `gateway/bridge/` + 进程内主机端口 |
 | **手机端 `Mobile`** | [apps/mobile](apps/mobile) | iOS / Android 移动界面（收件箱、频道、会话、任务）、设备配对、Keychain / Keystore 凭据存储、折叠屏双栏自适应 | 任何服务端状态存储、本地模型或 CLI 执行 | `Client Protocol`（`@vibevalley/protocol/remote`） |
 | **命令行 `CLI`** | [crates/cli](crates/cli/src/main.rs) | 1）`Client` 模式：经认证向总控端查询、创建任务、频道发言与提交笔记版本；2）`Machine` 模式：在执行机上探针 CLI、维持反向 WS、驱动子进程 | 总控端全量状态镜像、多用户看板 UI 呈现 | `Client Protocol`（模式 1）与 `Machine Protocol`（模式 2） |
-| **执行层 `Execution Layer`** | `Machine` + `Runtime`（含 [crates/runtime/src/oar](crates/runtime/src/oar/mod.rs)） | `Machine` 在线注册、会话持久化存活、工作目录预置与清理、驱动 `claude`/`codex`/`acp` 子进程、回传事件与轨迹、本地 MCP 代理隧道 | 任务优先级队列、频道受众路由、用户账号或跨机器授权策略 | `Machine` trait 与 `Runtime` trait |
+| **执行层 `Execution Layer`** | `Machine` + `Runtime`（含 [crates/oar/src](crates/oar/src/lib.rs)） | `Machine` 在线注册、会话持久化存活、工作目录预置与清理、驱动 `claude`/`codex`/`acp` 子进程、回传事件与轨迹、本地 MCP 代理隧道 | 任务优先级队列、频道受众路由、用户账号或跨机器授权策略 | `Machine` trait 与 `Runtime` trait |
 
 ---
 
@@ -137,7 +137,7 @@ flowchart LR
 
 ### 3.2 总控端扁平单数架构与无环 DAG（`Control Plane`）
 
-总控端不再按 `work/`、`team/`、`collab/`、`content/`、`skin/`、`infra/` 人工嵌套，改为扁平单数顶层目录 + 浅层组合根 `create_app(config) -> App` + 薄入口门 `router.rs` + 独立顶层 `service/` + 一表一文件 `db/entity/`（36 表），全部模块构成严格无环 DAG：
+总控端不再按 `work/`、`team/`、`collab/`、`content/`、`skin/`、`infra/` 人工嵌套，改为扁平单数顶层目录 + 浅层组合根 `create_app(config) -> App` + 薄入口门 `router.rs` + 独立顶层 `service/` + 一表一文件 `db/entity/`（34 业务表 + 2 kit 机制表），全部模块构成严格无环 DAG：
 
 ```mermaid
 flowchart TD
@@ -159,7 +159,7 @@ flowchart TD
     STG["storage/ (Storage: 附件 · 媒体输入 · 笔记目录与版本快照)"]
     LEAF["setting.rs · provider.rs · repo.rs · log/"]
     SVC["独立顶层 service/ (Service: 全部业务视角持久化查询)"]
-    DB["db/ (SQLite / PostgreSQL Database · migration/ · 一表一文件 entity/ 共 36 表)"]
+    DB["db/ (SQLite / PostgreSQL Database · migration/ · 一表一文件 entity/ 共 34 业务表)"]
   end
 
   subgraph L0["共享契约与纯规则层"]
@@ -176,7 +176,7 @@ flowchart TD
 
 | 边界 | 唯一机制 | 硬规矩 |
 |---|---|---|
-| **持久化读写** | 独立顶层 `crates/server/src/service/`（`Service`，挂载于 `ctx.service`） | `crates/server/src/db/entity/` 严格一表一文件（`<table_name>.rs`，共 36 表）；**`crates/server/src/{db,service}/` 之外零 `sea_orm::` 与 `db::entity` 导入** |
+| **持久化读写** | 独立顶层 `crates/server/src/service/`（`Service`，挂载于 `ctx.service`） | `crates/server/src/db/entity/` 严格一表一文件（`<table_name>.rs`，共 34 张业务表，`outbox_item` 与 `seq_counter` 归 `vibevalley-kit` 参数化 SQL）；**`crates/server/src/{db,service}/` 之外零 `sea_orm::` 与 `db::entity` 导入** |
 | **入口分发** | `router.rs`（`Router` 编译期穷尽 `match`）+ `GatewayPorts` | 零运行时 handler `HashMap` 与 `attach_*` 晚绑定槽位；`gateway/` 不导入任何业务域 |
 | **状态广播与异步因果** | 同事务写 `Outbox` + `ctx.mark_dirty(SliceMask)` → `StateFeed` 单航班纯投影；瞬态流与农场特效进 `LiveState` | 零内存影子库、零启动重放水合、零 `EventBus` |
 | **笔记目录与统一实时协同** | `storage/` 托管 `<storage>/note/<note_id>/{manifest.json,structure/,asset/}`，6 张表（`note`、`note_version`、`note_collab`、`note_change`、`note_suggestion`、`note_link`）覆盖 3+1 `NoteType` 原语 | 全类型支持多人 + 多 Agent Loro 实时协同、在场、按 `origin` 历史、评审建议与双向链接图谱（详见 [Note](docs/subsystems/note.md)） |
@@ -185,10 +185,11 @@ flowchart TD
 
 静态边界检查由 `cargo xtask audit`（[xtask/src/boundaries.rs](xtask/src/boundaries.rs) 与 [xtask/src/ratchets.rs](xtask/src/ratchets.rs)）守护：
 
-1. 扫描 `crates/server/src/gateway/`：禁止导入任何业务域模块，只允许依赖 `router.rs` 与 `GatewayPorts`。
-2. 扫描 `crates/server/src/`：除 `db/` 与 `service/` 之外禁止任何 `sea_orm::` 或 `crate::db::entity` 导入。
-3. 扫描 `crates/server/src/` 模块导入图：拓扑排序确保零有向环，破环统一收口至 `context/` 的 `port.rs`。
-4. 守住异步并发棘轮（`SERVER_BLOCK_ON_CEILING` 仅保留同步宿主与启动边界）。
+1. 守住四环拓扑 Ring 0 `crates/kit` 三条零天花板边界：`kit-zero-product-import`、`kit-zero-orm-entity`、`kit-no-global-state`。
+2. 扫描 `crates/server/src/gateway/`：禁止导入任何业务域模块，只允许依赖 `router.rs` 与 `GatewayPorts`。
+3. 扫描 `crates/server/src/`：除 `db/` 与 `service/` 之外禁止任何 `sea_orm::` 或 `crate::db::entity` 导入。
+4. 扫描 `crates/server/src/` 模块导入图：拓扑排序确保零有向环，破环统一收口至 `orchestration/`。
+5. 守住异步并发与 `kit` 原语棘轮（`SERVER_BLOCK_ON_CEILING` 仅保留同步宿主与启动边界，并锁死 `no-bespoke-key-lock`、`no-unbounded-resident-cache`、`no-raw-interval-or-unbounded-sink` 天花板为 0）。
 
 #### 3.2.3 总控端核心模块边界表
 
@@ -231,7 +232,7 @@ flowchart TD
 
 | 适配器子模块 | 运行位置 | 实现方式 | 对总控端呈现 |
 |---|---|---|---|
-| **`LocalMachine`** | 与总控端同进程（单机合体 / 个人中枢模式） | 包装本机 `worktree` 与 [crates/runtime/src/oar](crates/runtime/src/oar/mod.rs)，0 网络序列化 | 一台永远在 `local` 的普通 `Machine`，唯一支持免推送本地即时 Diff 与合并的节点 |
+| **`LocalMachine`** | 与总控端同进程（单机合体 / 个人中枢模式） | 包装本机 `worktree` 与 [crates/oar/src](crates/oar/src/lib.rs)，0 网络序列化 | 一台永远在 `local` 的普通 `Machine`，唯一支持免推送本地即时 Diff 与合并的节点 |
 | **`RemoteMachine`** | 任意开发机 / GPU 机（运行 `vibevalley machine up`） | 反向连接总控端 WS，探针本机 `claude`/`codex`/`acp`，用本地 `oar` 驱动子进程并把事件按 `seq` 写盘缓冲支持断线续读；本机起临时 `127.0.0.1:<port>/mcp` 经同一 WS 隧道回调总控端 | 一台与本机完全平权的 `Machine`；下线时注册表置为 `offline`，但已启动的远端会话继续运行等待重连 |
 | **`SandboxMachine`** | Docker / Apple Containers / 云沙箱（批量验证与赛马，当前由 `vibevalley-runtime/sandbox` Cargo feature 门控，待第三刀总控编排接线） | 容器镜像内置轻量 `vibevalley` 二进制与一次性 `Principal::Machine` 令牌，启动后自动挂上指定 `Runtime` 与仓库快照，跑完测试并回传验证证据（测试日志、截图、PR 链接）后退出销毁 | 一台声明为 `ephemeral` 的 `Machine`，任务完结自动注销并清理凭证 |
 | **`AcpRemoteRuntime`** | 外部独立暴露标准 ACP-over-WS 的 Agent 服务 | 在总控端或 `Machine` 内将远程 JSON-RPC 2.0 ACP 流适配为标准 `oar::Session` | 当作单个独立 `Runtime` 挂载于某台虚拟或宿主 `Machine` 之下 |

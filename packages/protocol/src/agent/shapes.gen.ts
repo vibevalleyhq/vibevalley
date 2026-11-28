@@ -83,7 +83,7 @@ duty: string, enabled: boolean, runtime: string,
 /**
  * Target execution host id when pinned to a specific machine; omitted lets the control plane route.
  */
-machineId?: string, model: string, effort: string, persona: string, personaMode: PersonaMode, skills: Array<string>, toolsets: Array<Toolset>, mcpServers: Array<MCPServer>, disallowedTools: Array<string>, env: { [key in string]: string }, workdir: string, worktree: boolean, tags: Array<string>, look: Look,
+machineId?: string, model: string, effort: string, persona: string, personaMode: PersonaMode, skills: Array<string>, toolsets: Array<Toolset>, mcpServers: Array<MCPServer>, disallowedTools: Array<string>, env: { [key in string]: string }, workdir: string, tags: Array<string>, look: Look,
 /**
  * Optional MOSS voice ID paired with serialized channel report playback.
  */
@@ -110,7 +110,7 @@ version: number, role: AgentRole, name: string, duty: string, tags: Array<string
 /**
  * The runtime it is written for.
  */
-runtime: string, model: string, effort: string, personaMode: PersonaMode, worktree: boolean, look: Look, persona: string, source: AgentTemplateSource,
+runtime: string, model: string, effort: string, personaMode: PersonaMode, look: Look, persona: string, source: AgentTemplateSource,
 /**
  * Built-in role category (`engineering`, `product`, `research`, `orchestration`).
  */

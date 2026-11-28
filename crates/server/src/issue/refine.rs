@@ -8,7 +8,7 @@ use vibevalley_runtime::oar::StopReason;
 
 use super::board::Board;
 use super::store::{BoardError, IssueChange, Result};
-use crate::runtime::{DraftEnd, Hire, Leave, Worktree, issue_branch, trigger_of};
+use crate::runtime::{DraftEnd, Hire, trigger_of};
 
 impl Board {
     /// Sends a drafting session to write the issue up from `words`.
@@ -31,27 +31,7 @@ impl Board {
         if space == 0 || repo == 0 {
             return Err(BoardError::NoRoom("no room for a drafting session".into()));
         }
-        let wp = self.worktree();
-        // Each draft starts from the main branch; skip local worktrees for remote machines.
-        let (cwd, branch, base) = if !drive.is_local {
-            let branch = issue.repo.as_ref().map(|_| issue_branch(issue.number));
-            let base = if let Some(repo) = issue.repo.as_deref() {
-                wp.existing(repo)?
-                    .and_then(|main| Worktree::main_branch(&main).ok())
-                    .or_else(|| Some("main".to_string()))
-            } else {
-                None
-            };
-            (std::path::PathBuf::new(), branch, base)
-        } else {
-            match wp.main_repo_async(issue.repo.as_deref()).await? {
-                Some(main) => {
-                    let (dir, branch, base) = wp.fresh_worktree_async(&main, issue.number).await?;
-                    (dir, Some(branch), Some(base))
-                }
-                None => (wp.context_async(&issue.id).await?, None, None),
-            }
-        };
+        let cwd = self.resolve_issue_cwd_async(&issue, drive.is_local).await;
         let word = words.trim();
         let mut prompt = vibevalley_core::refine::refinement_brief(
             &issue.title,
@@ -73,6 +53,8 @@ impl Board {
             issue
         };
         let name = format!("{} (draft #{})", drive.name, issue.number);
+        let state = self.state.clone();
+        let issue_id = issue.id.clone();
         self.session_engine()
             .hire_async(Hire {
                 issue: &issue,
@@ -80,13 +62,21 @@ impl Board {
                 brief: format!("Draft: {}", issue.title),
                 drive,
                 cwd,
-                branch,
-                base,
                 drafting: true,
                 prompt,
                 trigger: trigger_of(RunTriggerKind::Refine, Some(word.to_string()).filter(|w| !w.is_empty())),
+                on_start: Some(Box::new(move |sid| {
+                    state.issue_change_hook(
+                        issue_id,
+                        IssueChange::Started {
+                            session: sid.to_string(),
+                            worker: false,
+                        },
+                    )
+                })),
             })
             .await
+            .map_err(Into::into)
     }
 
     /// A drafting round's end: the draft onto the issue, what the issue's
@@ -155,7 +145,7 @@ impl Board {
             tracing::warn!(issue_id = %issue.id, session_id = %session.id, error = %err, "issue.refine failed to settle report");
         }
         // Not under `work`: a draft only touches its own issue and session.
-        if let Err(e) = sessions.dismiss_async(&session.id, Leave::Discard).await {
+        if let Err(e) = sessions.dismiss_async(&session.id).await {
             eprintln!("vibevalley: draft session {}: {e}", session.id);
         }
     }

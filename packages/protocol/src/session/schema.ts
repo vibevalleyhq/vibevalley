@@ -95,11 +95,6 @@ const ExecutionPolicy = z.discriminatedUnion("kind", [
     permissionMode: SessionPermissionMode,
   }),
   z.object({
-    kind: z.literal("managedWorktree"),
-    repo: z.string(),
-    branch: z.exactOptional(z.string()),
-  }),
-  z.object({
     kind: z.literal("sandboxDir"),
   }),
 ]) satisfies Codec<T.ExecutionPolicy>;
@@ -516,6 +511,39 @@ export const SessionRunCodeResult = z.object({
   replayedSleeps: z.number(),
   virtualNowMs: z.number(),
 }) satisfies Codec<T.SessionRunCodeResult>;
+
+export const SessionEvalRequest = z.object({
+  id: z.exactOptional(z.string()),
+  on: z.number(),
+  want: z.string(),
+}) satisfies Codec<T.SessionEvalRequest>;
+
+export const SessionEval = z.object({
+  id: z.string(),
+  file: z.string(),
+}) satisfies Codec<T.SessionEval>;
+
+export const SessionApprovalListInput = z.object({
+  id: z.exactOptional(z.string()),
+}) satisfies Codec<T.SessionApprovalListInput>;
+
+export const SessionApproval = z.object({
+  id: z.string(),
+  taskId: z.string(),
+  toolCallId: z.string(),
+  toolName: z.string(),
+  argumentsJson: z.string(),
+  reason: z.string(),
+  requestedAtMs: z.number(),
+}) satisfies Codec<T.SessionApproval>;
+
+export const SessionApprovalResolveInput = z.object({
+  id: z.string(),
+  taskId: z.string(),
+  toolCallId: z.string(),
+  approved: z.boolean(),
+  reason: z.exactOptional(z.string()),
+}) satisfies Codec<T.SessionApprovalResolveInput>;
 
 export const SessionWatchEvent = z.discriminatedUnion("kind", [
   z.object({

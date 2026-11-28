@@ -1003,6 +1003,23 @@ export function addTableRow(block: TableBlock): TableBlock {
   return { ...block, rows: [...block.rows, emptyRow] };
 }
 
+export function insertTableRowAt(block: TableBlock, index: number): TableBlock {
+  const clamped = Math.max(0, Math.min(block.rows.length, index));
+  const emptyRow = block.headers.map(() => "");
+  return { ...block, rows: [...block.rows.slice(0, clamped), emptyRow, ...block.rows.slice(clamped)] };
+}
+
+export function moveTableRow(block: TableBlock, fromIndex: number, toIndex: number): TableBlock {
+  if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || fromIndex >= block.rows.length || toIndex >= block.rows.length) {
+    return block;
+  }
+  const next = [...block.rows];
+  const [moved] = next.splice(fromIndex, 1);
+  if (moved === undefined) return block;
+  next.splice(toIndex, 0, moved);
+  return { ...block, rows: next };
+}
+
 export function removeTableRow(block: TableBlock, rowIndex: number): TableBlock {
   if (block.rows.length <= 1) return block;
   return { ...block, rows: block.rows.filter((_, idx) => idx !== rowIndex) };
@@ -1016,6 +1033,72 @@ export function addTableColumn(block: TableBlock): TableBlock {
     rows: block.rows.map((row) => [...row, ""]),
     alignments: [...(block.alignments ?? block.headers.map(() => "left")), "left"],
   };
+}
+
+export function insertTableColumnAt(block: TableBlock, index: number): TableBlock {
+  const clamped = Math.max(0, Math.min(block.headers.length, index));
+  const colNum = block.headers.length + 1;
+  const baseAligns = block.headers.map((_, idx) => block.alignments?.[idx] ?? "left");
+  return {
+    ...block,
+    headers: [...block.headers.slice(0, clamped), `Column ${colNum}`, ...block.headers.slice(clamped)],
+    rows: block.rows.map((row) => [...row.slice(0, clamped), "", ...row.slice(clamped)]),
+    alignments: [...baseAligns.slice(0, clamped), "left", ...baseAligns.slice(clamped)],
+  };
+}
+
+export function moveTableColumn(block: TableBlock, fromIndex: number, toIndex: number): TableBlock {
+  const count = block.headers.length;
+  if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || fromIndex >= count || toIndex >= count) {
+    return block;
+  }
+  const reorder = <T>(arr: readonly T[]): T[] => {
+    const next = [...arr];
+    const [moved] = next.splice(fromIndex, 1);
+    if (moved === undefined) return [...arr];
+    next.splice(toIndex, 0, moved);
+    return next;
+  };
+  const baseAligns = block.headers.map((_, idx) => block.alignments?.[idx] ?? "left");
+  return {
+    ...block,
+    headers: reorder(block.headers),
+    rows: block.rows.map((row) => reorder(row)),
+    alignments: reorder(baseAligns),
+  };
+}
+
+export interface TableCellNavTarget {
+  readonly row: number;
+  readonly col: number;
+  readonly addRow?: boolean;
+}
+
+/** Computes next table cell target for Tab / Shift+Tab / Enter navigation (`row === -1` denotes header row). */
+export function nextTableCellTarget(
+  rowCount: number,
+  colCount: number,
+  row: number,
+  col: number,
+  dir: "next" | "prev" | "down" | "up",
+): TableCellNavTarget | undefined {
+  if (colCount <= 0 || rowCount <= 0) return undefined;
+  if (dir === "next") {
+    if (col + 1 < colCount) return { row, col: col + 1 };
+    if (row + 1 < rowCount) return { row: row + 1, col: 0 };
+    return { row: rowCount, col: 0, addRow: true };
+  }
+  if (dir === "prev") {
+    if (col - 1 >= 0) return { row, col: col - 1 };
+    if (row - 1 >= 0) return { row: row - 1, col: colCount - 1 };
+    return undefined;
+  }
+  if (dir === "down") {
+    if (row + 1 < rowCount) return { row: row + 1, col };
+    return { row: rowCount, col, addRow: true };
+  }
+  if (row - 1 >= 0) return { row: row - 1, col };
+  return undefined;
 }
 
 export function removeTableColumn(block: TableBlock, colIndex: number): TableBlock {

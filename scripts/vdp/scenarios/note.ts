@@ -34,6 +34,18 @@ export const noteScenario = defineScenario({
       await v.wait("note-media-view");
       await v.assertClean(`media-${theme}`);
       await v.shot(`10-media-${theme}`, { label: `Media Transcript & Preview View (${theme})` });
+
+      // Phase 1 & 2 (#144 / #145): Interactive MediaAnnotation overlay + linked BaseEmbed checklist + Table
+      await v.nav(`/notes/${ids.reviewDocId}`);
+      await v.waitRoute(`/notes/${ids.reviewDocId}`);
+      await v.wait("media-annot-pin-ann_1");
+      await v.press("media-annot-pin-ann_1");
+      await v.wait("media-annot-popover-ann_1");
+      await v.assertClean(`review-annotations-${theme}`);
+      await v.shot(`13-review-annotations-${theme}`, {
+        label: `Interactive MediaAnnotation + BaseEmbed Review Checklist (${theme})`,
+        settleMs: 180,
+      });
     });
 
     // Interactive checks in Light mode
@@ -81,6 +93,18 @@ export const noteScenario = defineScenario({
     await v.wait("presenter-page");
     await v.assertClean("presenter-light");
     await v.shot("12-presenter-light", { label: "Doc Presenter Mode & Speaker Notes" });
+
+    // Bidirectional BaseEmbed Row -> MediaAnnotation Pin jump + Table editing in Light mode
+    await v.nav(`/notes/${ids.reviewDocId}`);
+    await v.waitRoute(`/notes/${ids.reviewDocId}`);
+    await v.wait("doc-base-embed-row-rev_base-rev_2");
+    await v.press("doc-base-embed-row-rev_base-rev_2");
+    await v.wait("media-annot-popover-ann_2");
+    await v.assertClean("review-bidirectional-light");
+    await v.shot("14-review-bidirectional-light", {
+      label: "BaseEmbed Row -> MediaAnnotation Bidirectional Jump & Table",
+      settleMs: 160,
+    });
 
     // Issue <-> Note Bidirectional Sidebar
     await v.nav(`/issues/${ids.issueIds[1]}`);

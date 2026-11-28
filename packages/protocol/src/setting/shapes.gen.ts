@@ -10,11 +10,7 @@ export type MemorySourceKind = (typeof MemorySourceKindValues)[number];
 
 export type MemorySource = { kind: MemorySourceKind, url: string, enabled: boolean, read: boolean, write: boolean, everything: boolean, user?: string, key: KeyStatus, };
 
-export type SpacePaths = { repos: string,
-/**
- * Named `<repo>.<issue number>`.
- */
-worktrees: string, };
+export type SpacePaths = { repos: string, };
 
 export const MissingValues = ["deepseekKey", "mossAccount", "mossKey", "mossOff", "binding"] as const;
 export type Missing = (typeof MissingValues)[number];

@@ -175,6 +175,11 @@ test("RunsPage shows active rail bar, strips collapsed prompt scaffolding while 
   expect(app.count("id:waterfall-bar-1")).toBe(1);
   expect(app.layout("id:waterfall-bar-1")?.width).toBeGreaterThanOrEqual(6);
 
+  // Relative time column never wraps onto two lines.
+  const stepWhenBox = app.layout("id:step-when-1");
+  expect(stepWhenBox).not.toBeNull();
+  expect(stepWhenBox!.height).toBeLessThanOrEqual(20);
+
   // Leaving /runs leaves the Dashboard host shell.
   await app.press("id:place-issues");
   await fake.pumpUntil(app, () => app.count("id:issues-page") === 1);

@@ -1,7 +1,115 @@
+import { deflateSync } from "node:zlib";
+
 import { z } from "zod";
 
 import type { VdpRpcTransport, VdpScenarioContext } from "../dsl.ts";
 import { seedWorkspaceCore } from "./workspace.ts";
+
+function crc32(buf: Uint8Array): number {
+  let c = 0xffffffff;
+  for (let i = 0; i < buf.length; i += 1) {
+    c ^= buf[i]!;
+    for (let k = 0; k < 8; k += 1) {
+      c = (c >>> 1) ^ (0xedb88320 & -(c & 1));
+    }
+  }
+  return (c ^ 0xffffffff) >>> 0;
+}
+
+function pngChunk(type: string, data: Uint8Array): Buffer {
+  const typeBytes = Buffer.from(type, "ascii");
+  const len = Buffer.alloc(4);
+  len.writeUInt32BE(data.length, 0);
+  const crcInput = Buffer.concat([typeBytes, data]);
+  const crc = Buffer.alloc(4);
+  crc.writeUInt32BE(crc32(crcInput), 0);
+  return Buffer.concat([len, typeBytes, data, crc]);
+}
+
+/** Synthesizes a crisp 640x360 Papertrails workspace mockup PNG data URI for VDP annotation inspection. */
+function buildWalkthroughMockupPngDataUri(): string {
+  const width = 640;
+  const height = 360;
+  const stride = 1 + width * 4;
+  const raw = Buffer.alloc(stride * height);
+
+  const fillRect = (x0: number, y0: number, w: number, h: number, r: number, g: number, b: number) => {
+    const rx0 = Math.max(0, Math.floor(x0));
+    const ry0 = Math.max(0, Math.floor(y0));
+    const rx1 = Math.min(width, Math.floor(x0 + w));
+    const ry1 = Math.min(height, Math.floor(y0 + h));
+    for (let y = ry0; y < ry1; y += 1) {
+      const rowOff = y * stride;
+      for (let x = rx0; x < rx1; x += 1) {
+        const off = rowOff + 1 + x * 4;
+        raw[off] = r;
+        raw[off + 1] = g;
+        raw[off + 2] = b;
+        raw[off + 3] = 255;
+      }
+    }
+  };
+
+  // Warm paper page canvas
+  fillRect(0, 0, width, height, 250, 248, 244);
+  // Left sidebar rail
+  fillRect(0, 0, 148, height, 239, 236, 230);
+  fillRect(148, 0, 2, height, 214, 208, 198);
+  // Sidebar nav rows
+  fillRect(18, 24, 96, 12, 77, 122, 42);
+  fillRect(18, 56, 110, 22, 226, 222, 213);
+  fillRect(18, 88, 92, 12, 168, 162, 154);
+  fillRect(18, 112, 102, 12, 168, 162, 154);
+  fillRect(18, 136, 84, 12, 168, 162, 154);
+  // Top header toolbar
+  fillRect(150, 0, width - 150, 44, 246, 244, 239);
+  fillRect(150, 44, width - 150, 1, 224, 220, 212);
+  fillRect(172, 16, 160, 12, 42, 38, 34);
+  fillRect(518, 11, 98, 22, 77, 122, 42);
+  // Two editorial metric cards
+  fillRect(172, 64, 212, 110, 255, 254, 251);
+  fillRect(172, 64, 212, 2, 226, 221, 213);
+  fillRect(188, 82, 88, 10, 124, 116, 108);
+  fillRect(188, 104, 120, 22, 28, 25, 23);
+  fillRect(188, 140, 160, 10, 168, 162, 154);
+
+  fillRect(404, 64, 212, 110, 255, 254, 251);
+  fillRect(404, 64, 212, 2, 226, 221, 213);
+  fillRect(420, 82, 96, 10, 124, 116, 108);
+  fillRect(420, 104, 112, 22, 44, 106, 163);
+  fillRect(420, 140, 164, 10, 168, 162, 154);
+
+  // Lower table preview block
+  fillRect(172, 194, 444, 142, 255, 254, 251);
+  fillRect(172, 194, 444, 28, 242, 239, 233);
+  fillRect(172, 256, 444, 1, 229, 225, 217);
+  fillRect(172, 294, 444, 1, 229, 225, 217);
+  fillRect(190, 204, 72, 8, 110, 104, 98);
+  fillRect(310, 204, 64, 8, 110, 104, 98);
+  fillRect(450, 204, 84, 8, 110, 104, 98);
+  fillRect(190, 234, 100, 10, 44, 40, 36);
+  fillRect(310, 232, 58, 14, 248, 228, 224);
+  fillRect(190, 270, 112, 10, 44, 40, 36);
+  fillRect(310, 268, 66, 14, 251, 240, 217);
+  fillRect(190, 308, 96, 10, 44, 40, 36);
+  fillRect(310, 306, 62, 14, 232, 240, 222);
+
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = 8; // bit depth
+  ihdr[9] = 6; // RGBA
+  ihdr[10] = 0;
+  ihdr[11] = 0;
+  ihdr[12] = 0;
+
+  const sig = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+  const idat = deflateSync(raw, { level: 6 });
+  const png = Buffer.concat([sig, pngChunk("IHDR", ihdr), pngChunk("IDAT", idat), pngChunk("IEND", Buffer.alloc(0))]);
+  return `data:image/png;base64,${png.toString("base64")}`;
+}
+
+const WALKTHROUGH_MOCKUP_PNG = buildWalkthroughMockupPngDataUri();
 
 const CreatedNoteSchema = z.object({
   id: z.string().min(1),
@@ -23,6 +131,8 @@ export interface NoteShowcaseIds {
   readonly issueIds: readonly string[];
   readonly channelId: string;
   readonly docId: string;
+  readonly reviewDocId: string;
+  readonly reviewBaseId: string;
   readonly baseId: string;
   readonly childPageId: string;
   readonly canvasId: string;
@@ -526,6 +636,35 @@ async function performSeedNoteShowcase(v: VdpScenarioContext): Promise<NoteShowc
           { id: "c5", startSec: 21, endSec: 44, speaker: "Lin", text: "各模块空状态按首屏引导与无搜索结果分层，主动作按钮位置统一对齐。" },
         ],
       },
+      {
+        id: "m3",
+        kind: "image",
+        src: WALKTHROUGH_MOCKUP_PNG,
+        title: "Workspace Editorial Review Frame",
+        caption: "Non-destructive interactive pin overlay preserved in structure/media.json without mutating pixels",
+        annotations: [
+          {
+            id: "media_ann_1",
+            number: 1,
+            rect: { x: 0.03, y: 0.14, w: 0.19, h: 0.25 },
+            severity: "p0",
+            title: "侧栏选中项对比度偏弱",
+            body: "深色模式下建议提升 selected 表面亮度层级。",
+            status: "open",
+            issueId: issue2Id,
+            author: "Ada",
+          },
+          {
+            id: "media_ann_2",
+            number: 2,
+            rect: { x: 0.78, y: 0.02, w: 0.19, h: 0.1 },
+            severity: "ux",
+            title: "顶部主按钮视觉聚焦良好",
+            status: "resolved",
+            author: "Lin",
+          },
+        ],
+      },
     ],
   };
 
@@ -681,6 +820,182 @@ async function performSeedNoteShowcase(v: VdpScenarioContext): Promise<NoteShowc
   // Keep docNote parented at root cleanly; reference siblingChecklist indirectly via Library & channel.
   void siblingChecklist;
 
+  // Seed dedicated UI Review Walkthrough Base + Doc demonstrating Phase 1 (#144) MediaAnnotation overlay,
+  // Phase 2 (#145) BaseEmbed <-> MediaAnnotation bidirectional checklist linkage, and enhanced Table Block editing.
+  const reviewBaseDoc = {
+    version: 1,
+    sheets: [
+      {
+        id: "sheet_review",
+        name: "UI 走查清单",
+        columns: [
+          { id: "c_title", name: "标题", kind: "text", width: 240 },
+          {
+            id: "c_severity",
+            name: "严重度",
+            kind: "select",
+            width: 100,
+            options: [
+              { value: "p0", label: "P0 阻塞", color: "red" },
+              { value: "p1", label: "P1 体验", color: "amber" },
+              { value: "p2", label: "P2 润色", color: "blue" },
+              { value: "ux", label: "UX 建议", color: "green" },
+            ],
+          },
+          {
+            id: "c_status",
+            name: "状态",
+            kind: "select",
+            width: 96,
+            options: [
+              { value: "open", label: "待处理", color: "amber" },
+              { value: "in_progress", label: "修复中", color: "blue" },
+              { value: "resolved", label: "已解决", color: "green" },
+            ],
+          },
+          { id: "c_module", name: "模块", kind: "text", width: 132 },
+          { id: "c_issue", name: "关联工单", kind: "issueRef", width: 112 },
+          {
+            id: "c_agent",
+            name: "Agent 转工单",
+            kind: "agentAction",
+            width: 140,
+            agentConfig: { promptTemplate: "Create a scoped fix issue for UI finding {{c_title}}." },
+          },
+        ],
+        rows: [
+          {
+            id: "rev_1",
+            cells: {
+              c_title: { _tag: "text", value: "侧栏导航选中态与分割线对比度偏弱" },
+              c_severity: { _tag: "text", value: "p0" },
+              c_status: { _tag: "text", value: "open" },
+              c_module: { _tag: "text", value: "Note / 侧栏" },
+              c_issue: { _tag: "issueRef", issueId: issue1Id },
+            },
+            createdAt: 0,
+            updatedAt: 0,
+          },
+          {
+            id: "rev_2",
+            cells: {
+              c_title: { _tag: "text", value: "顶部主操作按钮与标题基线未完全对齐" },
+              c_severity: { _tag: "text", value: "p1" },
+              c_status: { _tag: "text", value: "in_progress" },
+              c_module: { _tag: "text", value: "Note / 顶栏" },
+              c_issue: { _tag: "issueRef", issueId: issue2Id },
+            },
+            createdAt: 0,
+            updatedAt: 0,
+          },
+          {
+            id: "rev_3",
+            cells: {
+              c_title: { _tag: "text", value: "数据卡片下方留白与表格密度已收敛" },
+              c_severity: { _tag: "text", value: "ux" },
+              c_status: { _tag: "text", value: "resolved" },
+              c_module: { _tag: "text", value: "Note / 卡片" },
+            },
+            createdAt: 0,
+            updatedAt: 0,
+          },
+        ],
+        views: [
+          { id: "v_review_table", name: "表格", kind: "table" },
+          { id: "v_review_board", name: "看板", kind: "board", groupBy: "c_status" },
+          { id: "v_review_gallery", name: "画廊", kind: "gallery" },
+        ],
+      },
+    ],
+  };
+
+  const reviewBaseNote = await v.rpc(
+    "note.create",
+    {
+      title: "Papertrails UI 走查清单 Base",
+      noteType: "base",
+      sortOrder: 35,
+      issue: issue2Id,
+      content: JSON.stringify(reviewBaseDoc, null, 2),
+    },
+    CreatedNoteSchema,
+  );
+
+  const reviewWalkthroughDoc = {
+    version: 1,
+    blocks: [
+      { id: "rev_h1", type: "heading", level: 1, text: "UI 走查与非破坏性图片标注评审" },
+      {
+        id: "rev_media",
+        type: "media",
+        mediaKind: "image",
+        src: WALKTHROUGH_MOCKUP_PNG,
+        caption: "工作台截图 · 0..1 归一化坐标非破坏性标注层（与下方 Base 清单双向联动）",
+        annotations: [
+          {
+            id: "ann_1",
+            number: 1,
+            rect: { x: 0.025, y: 0.14, w: 0.19, h: 0.28 },
+            severity: "p0",
+            title: "侧栏选中态对比度偏弱",
+            body: "建议将选中态底色切到语义 selected 令牌并柔化右侧分割线。",
+            status: "open",
+            issueId: issue1Id,
+            baseRowId: "rev_1",
+            author: "Ada",
+          },
+          {
+            id: "ann_2",
+            number: 2,
+            rect: { x: 0.78, y: 0.02, w: 0.19, h: 0.1 },
+            severity: "p1",
+            title: "主操作按钮与标题基线对齐",
+            body: "统一使用 h-7 compact 尺寸并与标题行垂直居中。",
+            status: "open",
+            issueId: issue2Id,
+            baseRowId: "rev_2",
+            author: "Lin",
+          },
+          {
+            id: "ann_3",
+            number: 3,
+            rect: { x: 0.27, y: 0.54, w: 0.69, h: 0.38 },
+            severity: "ux",
+            title: "表格密度与行高已达标",
+            body: "已验证 Light / Dark 双主题下零截断。",
+            status: "resolved",
+            baseRowId: "rev_3",
+            author: "Milo",
+          },
+        ],
+      },
+      { id: "rev_base", type: "baseEmbed", noteId: reviewBaseNote.id, sheetId: "sheet_review", viewId: "v_review_table" },
+      {
+        id: "rev_table",
+        type: "table",
+        headers: ["走查维度", "目标标准", "当前结果"],
+        alignments: ["left", "center", "right"],
+        rows: [
+          ["归一化标注对齐", "1x / 2x Retina 零漂移", "已通过"],
+          ["Base 双向联动", "点击圆标 ↔ 高亮清单行", "已通过"],
+          ["轻量表格键盘流转", "Tab / Shift+Tab / Enter", "已通过"],
+        ],
+      },
+    ],
+  };
+
+  const reviewDocNote = await v.rpc(
+    "note.create",
+    {
+      title: "UI 走查与非破坏性图片标注评审",
+      noteType: "doc",
+      sortOrder: 15,
+      issue: issue2Id,
+      content: JSON.stringify(reviewWalkthroughDoc, null, 2),
+    },
+    CreatedNoteSchema,
+  );
+
   // Create one open inline suggestion so the Doc review suggestion banner renders authentically.
   const suggestedDoc = {
     ...mainDoc,
@@ -710,6 +1025,8 @@ async function performSeedNoteShowcase(v: VdpScenarioContext): Promise<NoteShowc
     issueIds: core.issueIds,
     channelId: core.channelId,
     docId: docNote.id,
+    reviewDocId: reviewDocNote.id,
+    reviewBaseId: reviewBaseNote.id,
     baseId: baseNote.id,
     childPageId: childPage.id,
     canvasId: canvasNote.id,

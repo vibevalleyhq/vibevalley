@@ -24,10 +24,5 @@ pub(crate) use database::{begin_read_tx, begin_write_tx};
 pub use error::{DbError, DbResult, internal_db};
 pub use metrics::{DEFAULT_SLOW_QUERY_THRESHOLD, QueryMetrics, QueryStatsSnapshot, redact_sql_literals};
 pub use verify::{SchemaMismatchReport, TableDrift};
-
-/// Database engine backing a [`Database`] instance.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DbBackend {
-    Sqlite,
-    Postgres,
-}
+pub use vibevalley_kit::db::DbBackendKind as DbBackend;
+pub use vibevalley_kit::db::tx::PostCommitHooks;

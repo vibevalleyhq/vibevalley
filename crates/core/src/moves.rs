@@ -35,8 +35,6 @@ pub enum Move {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "why", rename_all = "snake_case")]
 pub enum Refusal {
-    /// A sub-issue merged into its parent goes with the parent.
-    InGraph,
     Same,
     /// A draft is being written by this session.
     Drafting {
@@ -50,7 +48,6 @@ impl Refusal {
     /// The reason as VibeValley says it (`statusMove`'s second value).
     pub fn text(&self) -> String {
         match self {
-            Refusal::InGraph => t("server.issue.move.inGraph", &[]),
             Refusal::Same => t("server.issue.move.same", &[]),
             Refusal::Drafting { name } => t("server.issue.move.drafting", &[("name", name.clone().into())]),
             Refusal::Failed => t("server.issue.move.failed", &[]),
@@ -67,9 +64,6 @@ impl std::fmt::Display for Refusal {
 pub fn status_move(issue: &Issue, to: IssueStatus) -> Result<Move, Refusal> {
     use IssueStatus::*;
     let from = issue.status;
-    if issue.delivered == Some(Landing::MergedIntoParent) {
-        return Err(Refusal::InGraph);
-    }
     if from == to {
         return Err(Refusal::Same);
     }
@@ -185,8 +179,5 @@ mod tests {
         assert_eq!(status_move(&issue, IssueStatus::InReview), Ok(Move::Track));
         assert_eq!(status_move(&issue, IssueStatus::Todo), Ok(Move::Track));
         assert_eq!(status_move(&issue, IssueStatus::Canceled), Ok(Move::Drop));
-
-        issue.delivered = Some(Landing::MergedIntoParent);
-        assert_eq!(status_move(&issue, IssueStatus::InProgress), Err(Refusal::InGraph));
     }
 }

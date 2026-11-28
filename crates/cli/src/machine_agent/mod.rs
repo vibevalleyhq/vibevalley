@@ -1,6 +1,6 @@
 //! Outbound WebSocket machine daemon (`vibevalley machine up`) managing local OAR runtimes,
 //! disconnect-resilient sessions with `seq`-indexed ring buffers, idempotent inputs,
-//! ephemeral local `/mcp` reverse proxying, and isolated git worktrees.
+//! and ephemeral local `/mcp` reverse proxying.
 
 mod auth;
 pub mod mcp_proxy;
@@ -8,7 +8,6 @@ mod runner;
 mod runtime_probe;
 pub mod session;
 mod transport;
-pub mod worktree;
 
 pub use auth::{
     MACHINE_AUTH_FILE, MachineAgentConfig, MachineAuthConfig, detect_platform, load_machine_auth, machine_auth_path, machine_ws_url, save_machine_auth,

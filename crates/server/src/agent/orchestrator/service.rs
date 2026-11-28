@@ -1,56 +1,33 @@
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Weak};
 
-use parking_lot::Mutex;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 use tracing::Instrument as _;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    AgentRole, ApiError, BizCode, NoticeLevel, OrchestratorApproval, OrchestratorApprovalListInput, OrchestratorApprovalResolveInput, OrchestratorEval,
-    OrchestratorEvalRequest, OrchestratorStopInput, Outcome, Phase, SessionCompactResult, SessionController, SessionRunCodeInput, SessionRunCodeResult,
+    Actor, AgentRole, ApiError, BizCode, ChannelType, NoticeLevel, Outcome, Phase, SessionApproval, SessionApprovalListInput, SessionApprovalResolveInput,
+    SessionCompactResult, SessionController, SessionEval, SessionEvalRequest, SessionRunCodeInput, SessionRunCodeResult,
 };
 use vibevalley_runtime::agent::ai::CancelToken;
 use vibevalley_runtime::agent::durable::Error as DurableError;
-use vibevalley_runtime::agent::{Brain, ChatRequest, Delta, Message};
+use vibevalley_runtime::agent::{ChatRequest, Delta, Message};
 
-use super::chat::ChatIntake;
-use super::execution::{Execution, OrchestratorHost, TurnInput};
+use super::execution::{Execution, TurnInput};
 use super::run::Run;
 use super::state::{Orchestrator, Parts, Reply};
 use super::types::{Input, Instance};
-use super::words::Source;
-use crate::BoxFuture;
+use super::words::{self, Source};
+use crate::agent::profile::text;
 use crate::agent::tool::{Route, RouteSource};
-use crate::channel::{Chat, Posting, Saying};
+use crate::channel::{Committed, Posting, QueuedDelivery, Saying, actor_of, meta_of};
 use crate::context::error::{LookIn, missing};
-use crate::context::port::{CronOrchestratorPort, VoiceOrchestratorPort};
-use crate::issue::Board;
-use crate::note::Manager as NoteManager;
-use crate::runtime::{Runtime, Step};
+use crate::context::text::format_note_view_context;
+use crate::runtime::Step;
+use crate::service::session::{MailboxSource, MailboxStatus};
 
-impl OrchestratorHost for Orchestrator {
-    fn chat(&self) -> &Chat {
-        &self.chat
-    }
-
-    fn runtime(&self) -> &Runtime {
-        &self.runtime
-    }
-
-    fn issue(&self) -> &Board {
-        &self.issue
-    }
-
-    fn note(&self) -> &NoteManager {
-        &self.note
-    }
-
-    fn brain_at_async<'a>(&'a self, id: &'a str, route: &'a Arc<Mutex<Route>>, model: &'a str) -> BoxFuture<'a, Brain> {
-        Box::pin(Orchestrator::brain_at_async(self, id, route, model))
-    }
-
-    fn record_worker_compaction_episode(&self, session_id: &str, level: &str, summary: &str) {
+impl Orchestrator {
+    pub(super) fn record_worker_compaction_episode(&self, session_id: &str, level: &str, summary: &str) {
         if summary.trim().is_empty() {
             return;
         }
@@ -70,33 +47,14 @@ impl OrchestratorHost for Orchestrator {
                 .await;
         });
     }
-}
 
-impl ChatIntake for Orchestrator {
-    fn hear_async(&self, input: Input) -> BoxFuture<'_, bool> {
-        Box::pin(async move {
-            let Some(me) = self.me.upgrade() else { return false };
-            me.hear_async(input).await
-        })
-    }
-
-    fn overhear(&self, agent: Option<&str>, line: String) {
-        if let Some(me) = self.me.upgrade() {
-            me.overhear(agent, line);
-        }
-    }
-}
-
-impl Orchestrator {
     pub async fn open_async(mut p: Parts) -> vibevalley_runtime::agent::durable::Result<Arc<Orchestrator>> {
         let store = p.runtime.durable_store().clone();
-        let listen_chat = p.listen_chat;
         let pending = p.pending_execution.take();
         let o = Arc::new_cyclic(|weak| {
-            let host = weak.clone() as Weak<dyn OrchestratorHost>;
             let execution = match pending {
-                Some(pending) => pending.attach(host),
-                None => Execution::new(store, host, p.permissions),
+                Some(pending) => pending.attach(weak.clone()),
+                None => Execution::new(store, weak.clone(), p.permissions),
             };
             Orchestrator {
                 me: weak.clone(),
@@ -113,9 +71,7 @@ impl Orchestrator {
                 home: p.home,
                 key: p.key,
                 client: p.client,
-                instances: Default::default(),
-                ports: Default::default(),
-                chat_listener: Default::default(),
+                state: Default::default(),
                 mcp: Default::default(),
                 closed: Default::default(),
             }
@@ -144,10 +100,126 @@ impl Orchestrator {
                 o.instance(&a.id);
             }
         }
-        if listen_chat {
-            o.start_chat_listener(o.clone());
-        }
         Ok(o)
+    }
+
+    /// Returns true if `profile` is a daemon built-in orchestrator session profile.
+    pub fn is_daemon_profile(&self, profile: &str) -> bool {
+        self.profile.is_orchestrator(profile)
+    }
+
+    /// Unified channel delivery entry point called by [`crate::orchestration::DeliveryRouter`]'s
+    /// `AgentAdapter`:
+    /// - `wakes == false`: durably appends to `session_mailbox` (`MailboxSource::PassiveContext`) without waking.
+    /// - `wakes == true`: enqueues & claims `MailboxSource::ChannelOrchestrator` and triggers a daemon turn.
+    pub async fn deliver_channel_async(self: &Arc<Self>, profile: &str, d: &QueuedDelivery, c: &Committed) -> Result<bool, ApiError> {
+        const HANDED_EMOJI: &str = "👀";
+        if !self.is_daemon_profile(profile) {
+            return Ok(false);
+        }
+        let m = self.chat.addressed_of(&c.row);
+        let line = words::orchestrator_lines(std::slice::from_ref(&m));
+        if !d.wakes {
+            let key = format!("passive:{profile}:{}", d.message_id);
+            let _ = self
+                .runtime
+                .enqueue_mailbox_async(profile, &key, MailboxSource::PassiveContext, Some(&d.message_id), &line)
+                .await;
+            return Ok(true);
+        }
+
+        let sessions = &self.ctx.service.session;
+        let now_ms = self.ctx.now();
+        let mail_key = format!("orchestrator:{profile}:{}", d.message_id);
+        let mail_entry = match sessions
+            .enqueue_mailbox(profile, &mail_key, MailboxSource::ChannelOrchestrator, Some(&d.message_id), &c.row.body, now_ms)
+            .await
+        {
+            Ok(entry) => Some(entry),
+            Err(err) => {
+                tracing::warn!(mail_key = %mail_key, error = %err, "daemon session enqueue_mailbox failed");
+                None
+            }
+        };
+        let claimed = match sessions.claim_mailbox_by_key(&mail_key, now_ms).await {
+            Ok(claimed) => claimed,
+            Err(err) => {
+                tracing::warn!(mail_key = %mail_key, error = %err, "daemon session claim_mailbox_by_key failed");
+                false
+            }
+        };
+        if !claimed
+            && mail_entry
+                .as_ref()
+                .is_some_and(|e| matches!(e.status, MailboxStatus::Withdrawn | MailboxStatus::Done | MailboxStatus::Claimed))
+        {
+            return Ok(true);
+        }
+        let settle_id = mail_entry.as_ref().map(|e| e.id);
+        let actor = actor_of(&c.row.sender_kind, c.row.sender_agent.as_deref(), &c.row.sender_id, Some(&c.row.sender_name));
+        let meta = meta_of(c.row.meta.as_deref());
+        let from_user = matches!(actor, Actor::User { .. });
+        let mut picked_note = String::new();
+        if let Some(p) = &meta.picked {
+            if let Some(a) = p.agent.as_deref().and_then(|a| self.profile.agent(a)) {
+                picked_note += &words::picked_agent(&a.name);
+            }
+            if let Some(r) = &p.repo {
+                picked_note += &words::picked_repo(r);
+            }
+        }
+        let view_note = meta
+            .view_context
+            .as_ref()
+            .filter(|_| c.row.deleted_at.is_none())
+            .map(|vc| format!("{}\n", format_note_view_context(vc)))
+            .unwrap_or_default();
+        let command_note = meta
+            .command
+            .as_ref()
+            .filter(|cmd| !cmd.name.trim().is_empty())
+            .map(|cmd| words::command_note(cmd.name.trim(), cmd.args.trim()))
+            .unwrap_or_default();
+        let text = c.row.body.trim();
+        let said = match meta.voice_mode.as_deref() {
+            Some("dictated") => format!("{picked_note}{view_note}{command_note}{}{}", words::DICTATED, words::user_line(text)),
+            Some("conversation") => format!("{}\n{command_note}{}", text::PROMPTS.voice, words::user_line(text)),
+            _ if from_user && (c.channel_type == ChannelType::Direct || c.row.channel_id == self.chat.default_channel()) => {
+                format!("{picked_note}{view_note}{command_note}{}", words::user_line(text))
+            }
+            _ => format!("{picked_note}{command_note}{}", words::chat_line(&m.target, &line)),
+        };
+        let input = Input {
+            agent: Some(profile.to_string()),
+            channel: c.row.channel_id.clone(),
+            source: if from_user { Source::User } else { Source::Chat },
+            line: said,
+            user: from_user,
+            picked: meta.picked.clone(),
+            messages: vec![c.row.id.clone()],
+            port: meta.response_port.clone(),
+            cron_id: None,
+        };
+        let heard = self.hear_async(input).await;
+        if heard {
+            if let Some(id) = settle_id
+                && let Err(err) = sessions.settle_mailbox(id, true, Some(profile), self.ctx.now()).await
+            {
+                tracing::warn!(mailbox_id = id, recipient = profile, error = %err, "daemon session settle_mailbox failed");
+            }
+            if let Err(e) = self.chat.react_async(&c.row.id, profile, HANDED_EMOJI, true).await {
+                tracing::warn!(message_id = %c.row.id, recipient = profile, error = %e.message, "daemon session react 👀 failed");
+            }
+            Ok(true)
+        } else {
+            if !self.closed.load(Ordering::Acquire)
+                && let Some(id) = settle_id
+                && let Err(err) = sessions.settle_mailbox(id, false, Some("rejected"), self.ctx.now()).await
+            {
+                tracing::warn!(mailbox_id = id, recipient = profile, error = %err, "daemon session settle_mailbox failed");
+            }
+            Ok(false)
+        }
     }
 
     pub(super) fn instance(self: &Arc<Self>, id: &str) -> Arc<Instance> {
@@ -231,23 +303,13 @@ impl Orchestrator {
         .then_some(reply)
     }
 
-    /// Words it heard that did not wake it: shown with its next input.
-    pub fn overhear(self: &Arc<Self>, agent: Option<&str>, line: String) {
-        let id = self.target(agent);
-        self.instance(&id).news.lock().lines.push(line);
-    }
-
     pub async fn close_async(&self) {
         self.closed.store(true, Ordering::Release);
-        let chat_listener = self.chat_listener.lock().take();
-        if let Some((cancel, handle)) = chat_listener {
-            cancel.cancel();
-            let _ = handle.await;
-        }
         self.execution.close_async().await;
         self.mcp.close();
-        self.ports.lock().clear();
-        for me in self.instances.lock().values() {
+        let mut state = self.state.lock();
+        state.ports.clear();
+        for me in state.instances.values() {
             me.more.notify_waiters();
         }
     }
@@ -343,11 +405,11 @@ impl Orchestrator {
             cron_id,
         };
         // Taken now: a turn that cannot start ends them unanswered.
-        let ports: Vec<mpsc::UnboundedSender<String>> = {
-            let mut open = self.ports.lock();
-            batch.iter().filter_map(|i| i.port.as_ref().and_then(|p| open.remove(p))).collect()
+        let ports: Vec<mpsc::Sender<String>> = {
+            let mut state = self.state.lock();
+            batch.iter().filter_map(|i| i.port.as_ref().and_then(|p| state.ports.remove(p))).collect()
         };
-        *me.route.lock() = route.clone();
+        me.route.store(Arc::new(route.clone()));
         let cannot_reason = if (self.key)().is_none_or(|k| k.trim().is_empty()) && self.client.is_none() {
             Some(vibevalley_i18n::t("server.orchestrator.noKey", &[]))
         } else {
@@ -368,9 +430,9 @@ impl Orchestrator {
             });
             run.phase(None);
             let should_post = {
-                let mut said = me.cannot.lock();
-                if said.get(&route.channel) != Some(&why) {
-                    said.insert(route.channel.clone(), why.clone());
+                let mut state = me.state.lock();
+                if state.cannot.get(&route.channel) != Some(&why) {
+                    state.cannot.insert(route.channel.clone(), why.clone());
                     true
                 } else {
                     false
@@ -396,7 +458,7 @@ impl Orchestrator {
             Ok(m) => m,
             Err(_) => return Vec::new(),
         };
-        me.cannot.lock().clear();
+        me.state.lock().cannot.clear();
         let text = self.input_of_async(me, &batch).await;
         let mut run = Run::start_async(self, me, &route, format!("run-{}", requests[0]), Some(&model)).await;
         run.ports = ports;
@@ -415,26 +477,16 @@ impl Orchestrator {
         batch.into_iter().flat_map(|i| i.messages).collect()
     }
 
-    pub(crate) async fn open_endpoint_async(&self) -> Result<(), ApiError> {
-        self.ensure_open_async().await;
-        Ok(())
+    pub(crate) async fn approvals_endpoint_async(self: &Arc<Self>, input: SessionApprovalListInput) -> Result<Vec<SessionApproval>, ApiError> {
+        self.execution.approvals_async(input.id.as_deref()).await
     }
 
-    pub(crate) async fn stop_endpoint_async(self: &Arc<Self>, input: OrchestratorStopInput) -> Result<(), ApiError> {
-        self.stop_async(input.agent.as_deref()).await;
-        Ok(())
-    }
-
-    pub(crate) async fn approvals_endpoint_async(self: &Arc<Self>, input: OrchestratorApprovalListInput) -> Result<Vec<OrchestratorApproval>, ApiError> {
-        self.execution.approvals_async(input.conversation_id.as_deref()).await
-    }
-
-    pub(crate) async fn resolve_approval_endpoint_async(self: &Arc<Self>, input: OrchestratorApprovalResolveInput) -> Result<(), ApiError> {
+    pub(crate) async fn resolve_approval_endpoint_async(self: &Arc<Self>, input: SessionApprovalResolveInput) -> Result<(), ApiError> {
         self.execution.resolve_approval_async(input).await
     }
 
-    pub(crate) async fn eval_create_endpoint_async(self: &Arc<Self>, input: OrchestratorEvalRequest) -> Result<OrchestratorEval, ApiError> {
-        self.mark_wrong_async(input.agent.as_deref(), input.on.0 as i64, &input.want).await
+    pub(crate) async fn eval_create_endpoint_async(self: &Arc<Self>, input: SessionEvalRequest) -> Result<SessionEval, ApiError> {
+        self.mark_wrong_async(input.id.as_deref(), input.on.0 as i64, &input.want).await
     }
 
     pub(crate) async fn compact_session_endpoint_async(self: &Arc<Self>, id: &str) -> Result<SessionCompactResult, ApiError> {
@@ -443,8 +495,8 @@ impl Orchestrator {
             return Err(ApiError::new(BizCode::InvalidInput, "session id must be nonempty"));
         }
         let session = self.runtime.session_async(id).await;
-        let is_orch = session.as_ref().is_some_and(|s| s.controller == SessionController::Orchestrator) || self.profile.is_orchestrator(id);
-        if is_orch {
+        let is_daemon = session.as_ref().is_some_and(|s| s.controller == SessionController::Daemon) || self.profile.is_orchestrator(id);
+        if is_daemon {
             let model = self.model_of(id).unwrap_or_default();
             return match self.execution.harness.engine().compact_manual(id, &model).await {
                 Ok(Some(summary)) => {
@@ -561,8 +613,8 @@ impl Orchestrator {
             return Err(ApiError::new(BizCode::InvalidInput, t("server.session.codemode.emptyScript", &[])));
         }
         let session = self.runtime.session_async(id).await;
-        let is_orch = session.as_ref().is_some_and(|s| s.controller == SessionController::Orchestrator) || self.profile.is_orchestrator(id);
-        let conv = if is_orch {
+        let is_daemon = session.as_ref().is_some_and(|s| s.controller == SessionController::Daemon) || self.profile.is_orchestrator(id);
+        let conv = if is_daemon {
             id.to_owned()
         } else {
             let Some(session) = session else {
@@ -606,69 +658,61 @@ impl Orchestrator {
             virtual_now_ms: res.virtual_now_ms,
         })
     }
-}
-
-impl VoiceOrchestratorPort for Orchestrator {
-    fn brief<'a>(&'a self, line: String, wait: std::time::Duration) -> BoxFuture<'a, Option<String>> {
-        Box::pin(async move {
-            let me = self.me.upgrade()?;
-            let mut reply = me.brief_async(line).await?;
-            if wait.is_zero() {
-                Some(String::new())
-            } else {
-                Some(reply.whole_async(wait).await)
-            }
-        })
+    /// Submits a voice call briefing line and waits up to `wait` for the orchestrator's answer.
+    pub async fn brief_wait_async(&self, line: String, wait: std::time::Duration) -> Option<String> {
+        let me = self.me.upgrade()?;
+        let mut reply = me.brief_async(line).await?;
+        if wait.is_zero() {
+            Some(String::new())
+        } else {
+            Some(reply.whole_async(wait).await)
+        }
     }
 
-    fn polish_text_async<'a>(&'a self, system: &'a str, text: &'a str) -> BoxFuture<'a, Result<String, String>> {
-        Box::pin(async move {
-            let trimmed = text.trim();
-            if trimmed.is_empty() {
-                return Ok(String::new());
-            }
-            if self.client.is_none() && (self.key)().is_none() {
-                return Ok(trimmed.to_string());
-            }
-            let req = ChatRequest {
-                model: "deepseek-flash".into(),
-                messages: vec![Message::system(system), Message::user(trimmed)],
-                temperature: Some(0.1),
-                max_tokens: Some(2048),
-                ..Default::default()
-            };
-            let cancel_token = CancellationToken::new();
-            let cancel = CancelToken::from_tokio(cancel_token.clone());
-            let mut sink = |_delta: Delta| {};
-            let completion = tokio::time::timeout(std::time::Duration::from_secs(10), self.client().complete_cancellable(&req, &cancel, &mut sink))
-                .await
-                .map_err(|_| {
-                    cancel_token.cancel();
-                    "ASR polish timed out".to_string()
-                })?
-                .map_err(|e| e.to_string())?;
-            let polished = completion.message.content.unwrap_or_default().trim().to_string();
-            Ok(if polished.is_empty() { trimmed.to_string() } else { polished })
-        })
-    }
-}
-
-impl CronOrchestratorPort for Orchestrator {
-    fn hear_cron<'a>(&'a self, agent: &'a str, channel: &'a str, cron_id: &'a str, line: &'a str) -> BoxFuture<'a, bool> {
-        Box::pin(async move {
-            let Some(me) = self.me.upgrade() else { return false };
-            me.hear_async(Input {
-                agent: Some(agent.to_string()),
-                channel: channel.to_string(),
-                source: Source::Cron,
-                line: line.to_string(),
-                user: false,
-                picked: None,
-                messages: vec![],
-                port: None,
-                cron_id: Some(cron_id.to_string()),
-            })
+    /// Polishes a raw ASR transcript using the orchestrator's configured model client.
+    pub async fn polish_text_async(&self, system: &str, text: &str) -> Result<String, String> {
+        let trimmed = text.trim();
+        if trimmed.is_empty() {
+            return Ok(String::new());
+        }
+        if self.client.is_none() && (self.key)().is_none() {
+            return Ok(trimmed.to_string());
+        }
+        let req = ChatRequest {
+            model: "deepseek-flash".into(),
+            messages: vec![Message::system(system), Message::user(trimmed)],
+            temperature: Some(0.1),
+            max_tokens: Some(2048),
+            ..Default::default()
+        };
+        let cancel_token = CancellationToken::new();
+        let cancel = CancelToken::from_tokio(cancel_token.clone());
+        let mut sink = |_delta: Delta| {};
+        let completion = tokio::time::timeout(std::time::Duration::from_secs(10), self.client().complete_cancellable(&req, &cancel, &mut sink))
             .await
+            .map_err(|_| {
+                cancel_token.cancel();
+                "ASR polish timed out".to_string()
+            })?
+            .map_err(|e| e.to_string())?;
+        let polished = completion.message.content.unwrap_or_default().trim().to_string();
+        Ok(if polished.is_empty() { trimmed.to_string() } else { polished })
+    }
+
+    /// Delivers a scheduled cron trigger into the target orchestrator instance.
+    pub async fn hear_cron_async(&self, agent: &str, channel: &str, cron_id: &str, line: &str) -> bool {
+        let Some(me) = self.me.upgrade() else { return false };
+        me.hear_async(Input {
+            agent: Some(agent.to_string()),
+            channel: channel.to_string(),
+            source: Source::Cron,
+            line: line.to_string(),
+            user: false,
+            picked: None,
+            messages: vec![],
+            port: None,
+            cron_id: Some(cron_id.to_string()),
         })
+        .await
     }
 }

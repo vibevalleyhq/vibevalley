@@ -38,6 +38,8 @@ const CAP_TONES: Record<ModelCapability, TagTone> = {
   image: "neutral",
 };
 
+const PRIMARY_PROVIDER_ADAPTERS: ReadonlySet<ProviderConnectionAdapter> = new Set(["deepseek", "moss"]);
+
 function connectionNote(saved: ProviderConnection | undefined): string {
   if (!saved || saved.key.source === null) return t("web.provider.notConfiguredBadge");
   if (saved.verification?.status === "verified") {
@@ -213,9 +215,13 @@ function ProvidersForm(props: { initial: ProviderStatus }) {
     });
   };
 
+  const visibleCatalog = computed(() =>
+    PROVIDER_CATALOG.filter((v) => PRIMARY_PROVIDER_ADAPTERS.has(v.adapter) || savedFor(v.adapter) !== undefined || draftFor(v.adapter) !== undefined),
+  );
+
   return (
     <View testID="model-providers-form" class="gap-5">
-      <Each of={PROVIDER_CATALOG} key={(v) => v.adapter}>
+      <Each of={visibleCatalog()} key={(v) => v.adapter}>
         {(vendor) => {
           const saved = () => savedFor(vendor().adapter);
           const entry = () => draftFor(vendor().adapter);

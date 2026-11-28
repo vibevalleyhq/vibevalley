@@ -28,10 +28,11 @@ postgres = [
   "sea-orm/sqlx-postgres",
   "sea-orm-migration/sqlx-postgres",
   "sea-query/backend-postgres",
+  "vibevalley-kit/postgres",
   "vibevalley-runtime/postgres",
 ]
 # Test-only model checking (`cargo xtask loom`); never enable in release binaries.
-loom = ["dep:loom"]
+loom = ["dep:loom", "vibevalley-kit/loom"]
 
 [dependencies]
 arc-swap = { workspace = true }
@@ -76,6 +77,7 @@ vibevalley-core = { version = "0.1.0", path = "../core", features = ["collab"] }
 vibevalley-files = { version = "0.1.0", path = "../files" }
 vibevalley-git = { version = "0.1.0", path = "../git" }
 vibevalley-i18n = { version = "0.1.0", path = "../i18n" }
+vibevalley-kit = { workspace = true, features = ["storage-fs", "storage-s3", "db-sql", "net-client", "net-gateway"] }
 vibevalley-mcp = { workspace = true }
 vibevalley-protocol = { version = "0.1.0", path = "../protocol" }
 vibevalley-runtime = { version = "0.1.0", path = "../runtime" }

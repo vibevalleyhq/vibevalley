@@ -64,11 +64,11 @@ export const responses: Record<string, unknown> = {
 
 const lastRun = (outcome: "completed" | "failed" | "interrupted", summary: string) => ({ outcome, summary, at: now - 6 * min });
 
-const worktree = "/Users/me/vibevalley/.worktrees/issue-31-login";
+const repoDir = "/Users/me/vibevalley";
 const workingSession = sampleSession("w5", "laozhou", working(now - 4 * min), {
   name: "老周",
-  cwd: worktree,
-  policy: { kind: "managedWorktree", repo: "vibevalley", branch: "issue-32-settings" },
+  cwd: repoDir,
+  policy: { kind: "directCwd", repo: "vibevalley", permissionMode: "bypass" },
   bindings: [],
   runtime: "codex",
   subagents: {
@@ -98,8 +98,8 @@ const reviewSession = sampleSession(
   { _tag: "resting" },
   {
     name: "老周",
-    cwd: worktree,
-    policy: { kind: "managedWorktree", repo: "vibevalley", branch: "issue-31-login" },
+    cwd: repoDir,
+    policy: { kind: "directCwd", repo: "vibevalley", permissionMode: "bypass" },
     bindings: [],
     runs: 3,
     lastRun: lastRun("completed", "过期回到登录页，登录页说明原因，加了两条测试。"),

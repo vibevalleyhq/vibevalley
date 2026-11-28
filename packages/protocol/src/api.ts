@@ -14,7 +14,6 @@ import { type MachineHandlers, machineEndpoints } from "./machine/api";
 import { type MediaHandlers, mediaEndpoints } from "./media/api";
 import { type MemoryHandlers, memoryEndpoints } from "./memory/api";
 import { type NoteHandlers, noteEndpoints } from "./note/api";
-import { type OrchestratorHandlers, orchestratorEndpoints } from "./orchestrator/api";
 import { type ProviderHandlers, providerEndpoints } from "./provider/api";
 import { type RemoteHandlers, remoteEndpoints } from "./remote/api";
 import { type RepoHandlers, repoEndpoints } from "./repo/api";
@@ -33,7 +32,6 @@ export interface Handlers
     DebugHandlers,
     RemoteHandlers,
     MachineHandlers,
-    OrchestratorHandlers,
     SettingHandlers,
     ProviderHandlers,
     MediaHandlers,
@@ -56,7 +54,6 @@ export const endpoints: readonly Endpoint[] = [
   ...debugEndpoints,
   ...remoteEndpoints,
   ...machineEndpoints,
-  ...orchestratorEndpoints,
   ...settingEndpoints,
   ...providerEndpoints,
   ...mediaEndpoints,

@@ -97,11 +97,11 @@ export function RerunDialog(props: {
         return;
       }
       const session = props.entry.live ?? props.entry.session;
-      const cwd = session.cwd ?? "";
+      const cwd = session.cwd?.trim() || undefined;
       const repo = sessionRepo(session);
       const ws = await api.session.openWorkspace({
         runtime: rawId,
-        cwd,
+        ...(cwd !== undefined ? { cwd } : {}),
         ...(repo !== undefined ? { repo } : {}),
         ...(session.name ? { title: session.name } : {}),
       });

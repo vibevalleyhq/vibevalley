@@ -80,7 +80,6 @@ fn status_text(status: &SettingsStatus) -> String {
         line(&["locale", status.locale.as_str()]),
         line(&["home", &status.home]),
         line(&["repos", &status.paths.repos]),
-        line(&["worktrees", &status.paths.worktrees]),
         key_line("deepseek", &status.deepseek_api_key),
         key_line("github", &status.github_token),
     ];

@@ -22,6 +22,7 @@ pub mod issue;
 pub mod log;
 pub mod machine;
 pub mod note;
+pub mod orchestration;
 mod projection;
 pub mod provider;
 pub mod repo;

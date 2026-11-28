@@ -137,6 +137,33 @@ pub(super) const ENDPOINTS: &[Endpoint] = &[
         result: Some("BaseRunAgentColumnResult"),
     },
     Endpoint {
+        op: "note.annotation.upsert",
+        module: "note",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
+        dry_run: None,
+        input: Some("NoteAnnotationUpsertRequest"),
+        result: Some("NoteAnnotationMutationResult"),
+    },
+    Endpoint {
+        op: "note.annotation.delete",
+        module: "note",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
+        dry_run: None,
+        input: Some("NoteAnnotationDeleteRequest"),
+        result: Some("NoteAnnotationMutationResult"),
+    },
+    Endpoint {
+        op: "note.base.syncReview",
+        module: "note",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
+        dry_run: None,
+        input: Some("NoteReviewSyncRequest"),
+        result: Some("NoteReviewSyncResult"),
+    },
+    Endpoint {
         op: "note.type.list",
         module: "note",
         about: &[],
@@ -423,6 +450,27 @@ pub mod ops {
         const NAME: &'static str = "note.base.runAgentColumn";
         type Input = t::BaseRunAgentColumnRequest;
         type Result = t::BaseRunAgentColumnResult;
+    }
+    /// Upserts a non-destructive `MediaAnnotation` on a `doc` media/compare block or `media` note and optionally syncs its linked `base` row.
+    pub struct NoteAnnotationUpsert;
+    impl Op for NoteAnnotationUpsert {
+        const NAME: &'static str = "note.annotation.upsert";
+        type Input = t::NoteAnnotationUpsertRequest;
+        type Result = t::NoteAnnotationMutationResult;
+    }
+    /// Deletes a non-destructive `MediaAnnotation` from a `doc` media/compare block or `media` note.
+    pub struct NoteAnnotationDelete;
+    impl Op for NoteAnnotationDelete {
+        const NAME: &'static str = "note.annotation.delete";
+        type Input = t::NoteAnnotationDeleteRequest;
+        type Result = t::NoteAnnotationMutationResult;
+    }
+    /// Bidirectionally syncs `MediaAnnotation` pins in a `doc` note with an embedded `base` review checklist (creating one from the built-in template when absent).
+    pub struct NoteBaseSyncReview;
+    impl Op for NoteBaseSyncReview {
+        const NAME: &'static str = "note.base.syncReview";
+        type Input = t::NoteReviewSyncRequest;
+        type Result = t::NoteReviewSyncResult;
     }
     /// All 4 note primitives (`doc`, `base`, `canvas`, `media`).
     pub struct NoteTypeList;

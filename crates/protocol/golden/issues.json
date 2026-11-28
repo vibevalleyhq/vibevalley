@@ -579,8 +579,7 @@
    "scope": [
     "check.sh"
    ],
-   "acceptance": true,
-   "frozen": []
+   "acceptance": true
   },
   "id": "i6",
   "number": 6,

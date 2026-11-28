@@ -62,9 +62,6 @@ function runTriggerText(trigger: RunTrigger) {
   }
 }
 
-export const needsWorktreeCheck = (session: Pick<Session, "phase" | "lastRun">) =>
-  session.phase._tag !== "working" && session.lastRun?.needsReconciliation === true;
-
 export const runText = (r: Run, now: number, took: (ms: number) => string) =>
   [
     runTriggerText(r.triggeredBy),

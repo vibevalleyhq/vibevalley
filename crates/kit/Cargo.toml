@@ -1,0 +1,48 @@
+[package]
+name = "vibevalley-kit"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Ring 0 domain-agnostic system engineering primitives for VibeValley (rt, core, sync, cache, trace, task, queue, storage, db, net)"
+
+[features]
+default = []
+# Test-only concurrency model checking (`cargo xtask loom`); never enable in release binaries.
+loom = ["dep:loom"]
+storage-fs = ["dep:url", "dep:uuid"]
+storage-s3 = ["dep:hmac", "dep:percent-encoding", "dep:reqwest", "dep:roxmltree", "dep:url"]
+db-sql = ["dep:sqlx", "dep:url", "tracing/log"]
+postgres = ["db-sql", "sqlx/postgres"]
+net-client = ["dep:futures-util", "dep:reqwest", "dep:url"]
+net-gateway = ["dep:futures-util", "dep:percent-encoding", "dep:tokio-stream", "dep:url", "dep:uuid"]
+
+[dependencies]
+arc-swap = { workspace = true }
+backon = { workspace = true }
+futures-util = { workspace = true, optional = true }
+hex = { workspace = true }
+hmac = { workspace = true, optional = true }
+jiff = { workspace = true }
+loom = { workspace = true, optional = true }
+parking_lot = { workspace = true }
+percent-encoding = { workspace = true, optional = true }
+reqwest = { workspace = true, optional = true }
+roxmltree = { workspace = true, optional = true }
+rustls = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+sqlx = { workspace = true, features = ["runtime-tokio"], optional = true }
+subtle = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tokio-stream = { workspace = true, optional = true }
+tokio-util = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+url = { workspace = true, optional = true }
+uuid = { workspace = true, optional = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["test-util"] }

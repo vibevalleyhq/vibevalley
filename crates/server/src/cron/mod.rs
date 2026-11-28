@@ -1,11 +1,10 @@
-//! `cron.*` and the scheduler ticker: each cron, when due, keeps one issue
-//! going or nudges the channel's orchestrator. Schedule rules live in
-//! `vibevalley-core::cron`; persistence is delegated to `ctx.service.cron`.
+//! Pure cron scheduler capability (`cron/`): schedule evaluation, persistence,
+//! cron-to-issue link storage, and due-job claiming (`take_due_async`).
+//!
+//! Zero direct dependency on `issue/`, `channel/`, `connector/`, or `agent/`.
+//! Cross-domain cron execution (digest delivery, orchestrator wakeups, and
+//! scheduled issue dispatch) lives in [`crate::orchestration::cron`].
 
-pub mod digest;
 mod service;
-#[cfg(test)]
-mod tests;
 
-pub use crate::context::port::DigestDeliveryPort;
-pub use service::{DEFAULT_CHANNEL, DigestCronRequest, Scheduler};
+pub use service::{DEFAULT_CHANNEL, DueCron, Scheduler};

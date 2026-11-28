@@ -471,7 +471,7 @@ fn run_full_stack_e2e(home: &Path, database_url: Option<String>) {
     assert_eq!(whoami["data"]["device"]["id"], device_id);
 
     // 13. durable store sharing the same Database backend
-    let durable = vibevalley_runtime::rt::block_on(started.test_internals().service.database().durable()).unwrap();
+    let durable = vibevalley_runtime::rt::block_on(started.test_internals().service.durable()).unwrap();
     vibevalley_runtime::rt::block_on(durable.write_async(|tx| {
         Box::pin(async move {
             tx.create_conversation_async("dual-conv", "deepseek-flash").await?;
@@ -550,7 +550,7 @@ fn run_full_stack_e2e(home: &Path, database_url: Option<String>) {
             .any(|d| d["id"] == device_id && d["name"] == "DualDB CLI")
     );
 
-    let durable2 = vibevalley_runtime::rt::block_on(reopened.test_internals().service.database().durable()).unwrap();
+    let durable2 = vibevalley_runtime::rt::block_on(reopened.test_internals().service.durable()).unwrap();
     let doc = vibevalley_runtime::rt::block_on(durable2.read_async(|rd| Box::pin(rd.document_async("dual", "e2e", "state"))))
         .unwrap()
         .unwrap();

@@ -535,9 +535,9 @@ mod tests {
             SessionController::IssueBoard,
             "Laozhou",
             "claude",
-            ExecutionPolicy::ManagedWorktree {
-                repo: "demo".into(),
-                branch: Some("issue-1".into()),
+            ExecutionPolicy::DirectCwd {
+                repo: Some("demo".into()),
+                permission_mode: SessionPermissionMode::Bypass,
             },
             110,
         );

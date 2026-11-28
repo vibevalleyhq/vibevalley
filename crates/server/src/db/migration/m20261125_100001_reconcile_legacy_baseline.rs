@@ -373,9 +373,9 @@ async fn rebuild_legacy_session_table(manager: &SchemaManager<'_>) -> Result<(),
         let cwd = row.cwd.or_else(|| row.worktree.clone()).or_else(|| row.repo.clone());
         let policy = row.policy.unwrap_or_else(|| match &row.repo {
             Some(repo) => serde_json::json!({
-                "kind": "managedWorktree",
+                "kind": "directCwd",
                 "repo": repo,
-                "branch": row.branch,
+                "permissionMode": "bypass",
             })
             .to_string(),
             None => serde_json::json!({ "kind": "sandboxDir" }).to_string(),

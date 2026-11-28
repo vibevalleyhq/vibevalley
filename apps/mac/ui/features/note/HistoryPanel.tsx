@@ -1,7 +1,7 @@
 import { effect, Scroll, signal, Text, untracked, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
-import { type Agent, type Note, type NoteHistoryEntry, type NoteHistoryPreviewResult, type NoteId, userId } from "@vibevalley/protocol";
+import { type Agent, isHumanParticipant, type Note, type NoteHistoryEntry, type NoteHistoryPreviewResult, type NoteId } from "@vibevalley/protocol";
 
 import { Button } from "../../design/Button";
 import { hexColor, swatches } from "../../design/domain/cast";
@@ -29,7 +29,7 @@ interface HistoryPanelProps {
 }
 
 function actorDotColor(entry: NoteHistoryEntry, agent: Agent | undefined): string {
-  if (entry.author === userId) return tone("ink");
+  if (isHumanParticipant(entry.author)) return tone("ink");
   if (agent?.look.trim) return hexColor(agent.look.trim);
   const key = entry.sessionId ?? entry.agent ?? entry.author;
   let h = 0;
@@ -207,7 +207,7 @@ export function HistoryPanel(props: HistoryPanelProps) {
   };
 
   const authorName = (entry: NoteHistoryEntry): string => {
-    if (entry.author === userId) return t("web.note.blocks.user");
+    if (isHumanParticipant(entry.author)) return t("web.note.blocks.user");
     const agent = agents().get(entry.agent ?? entry.author);
     return agent?.name ?? entry.agent ?? entry.author;
   };

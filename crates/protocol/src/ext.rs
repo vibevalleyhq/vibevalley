@@ -8,9 +8,22 @@ pub type Millis = i64;
 
 pub const DEFAULT_ORCHESTRATOR: &str = "orchestrator";
 pub const ORCHESTRATOR_RUNTIME: &str = "vibevalley";
-pub const USER_ID: &str = "user";
 pub const EVERYONE: &str = "everyone";
 pub const MAX_RUNNING: usize = 6;
+
+impl Actor {
+    pub fn is_human(&self) -> bool {
+        matches!(self, Actor::User { .. })
+    }
+
+    pub fn participant_id(&self) -> Option<ParticipantId> {
+        match self {
+            Actor::User { id, .. } => Some(ParticipantId::parse(id).unwrap_or_else(|| ParticipantId::user(id.clone()))),
+            Actor::Agent { id, .. } => Some(ParticipantId::parse(id).unwrap_or_else(|| ParticipantId::agent(id.clone()))),
+            Actor::System { .. } => None,
+        }
+    }
+}
 pub const DAY_MS: Millis = 86_400_000;
 /// At most one state frame per this many milliseconds (`stateEveryMs`).
 pub const STATE_EVERY_MS: u64 = 200;
@@ -187,6 +200,7 @@ impl Issue {
             deliver: Deliverable::Change,
             reviewed_at: None,
             delivery_evidence: None,
+            delivery_receipt: None,
             findings: vec![],
             questions: vec![],
             criteria: vec![],
@@ -223,15 +237,7 @@ fn channel_binding(bindings: &[ContextRef]) -> Option<&str> {
 fn policy_repo(policy: &ExecutionPolicy) -> Option<&str> {
     match policy {
         ExecutionPolicy::DirectCwd { repo, .. } => repo.as_deref(),
-        ExecutionPolicy::ManagedWorktree { repo, .. } => Some(repo.as_str()),
         ExecutionPolicy::SandboxDir => None,
-    }
-}
-
-fn policy_branch(policy: &ExecutionPolicy) -> Option<&str> {
-    match policy {
-        ExecutionPolicy::ManagedWorktree { branch, .. } => branch.as_deref(),
-        ExecutionPolicy::DirectCwd { .. } | ExecutionPolicy::SandboxDir => None,
     }
 }
 
@@ -263,10 +269,6 @@ macro_rules! impl_session_readers {
                 policy_repo(&self.policy)
             }
 
-            pub fn worktree_branch(&self) -> Option<&str> {
-                policy_branch(&self.policy)
-            }
-
             pub fn profile_id(&self) -> Option<&str> {
                 self.profile.as_deref()
             }
@@ -285,15 +287,19 @@ macro_rules! impl_session_readers {
 
             pub fn is_board_worker(&self) -> bool {
                 (self.controller == SessionController::IssueBoard && !self.is_readonly_issue_helper())
-                    || (self.controller != SessionController::Orchestrator && self.controller != SessionController::IssueBoard && self.issue_id().is_some())
+                    || (self.controller != SessionController::Daemon && self.controller != SessionController::IssueBoard && self.issue_id().is_some())
             }
 
             pub fn is_direct_talker(&self) -> bool {
                 self.controller == SessionController::Channel
             }
 
+            pub fn is_daemon(&self) -> bool {
+                self.controller == SessionController::Daemon
+            }
+
             pub fn is_orchestrator(&self) -> bool {
-                self.controller == SessionController::Orchestrator && self.role == Some(AgentRole::Orchestrator)
+                self.controller == SessionController::Daemon && self.role == Some(AgentRole::Orchestrator)
             }
 
             pub fn is_free_user(&self) -> bool {
@@ -320,7 +326,7 @@ impl Session {
             id: id.into(),
             controller,
             role: match controller {
-                SessionController::Orchestrator => Some(AgentRole::Orchestrator),
+                SessionController::Daemon => Some(AgentRole::Orchestrator),
                 SessionController::IssueBoard | SessionController::Channel => Some(AgentRole::Worker),
                 SessionController::User => None,
             },

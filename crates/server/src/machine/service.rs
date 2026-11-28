@@ -170,7 +170,6 @@ impl Machine {
             status: MachineStatus::Online,
             here: true,
             ephemeral: false,
-            worktree_supported: true,
             joined_at: self.local_joined_at,
             last_seen_at: Some(self.ctx.now()),
             runtimes: local_runtime_summaries(&self.local_registry),
@@ -376,11 +375,6 @@ impl Machine {
                             remote.handle_session_record(rec);
                         }
                     }
-                    MachineWireFrame::MachineWorktreeResult(res) => {
-                        if let Some(remote) = &active {
-                            remote.handle_worktree_result(res);
-                        }
-                    }
                     MachineWireFrame::MachineAttachmentFetch(req) => {
                         if active.is_some() {
                             self.handle_attachment_fetch(req, conn.outgoing.clone());
@@ -410,9 +404,7 @@ impl Machine {
                     | MachineWireFrame::MachineSessionAttach(_)
                     | MachineWireFrame::MachineMcpRequest(_)
                     | MachineWireFrame::MachineMcpResponse(_)
-                    | MachineWireFrame::MachineAttachmentData(_)
-                    | MachineWireFrame::MachineWorktreePrepare(_)
-                    | MachineWireFrame::MachineWorktreeCleanup(_) => {}
+                    | MachineWireFrame::MachineAttachmentData(_) => {}
                 }
             }
 

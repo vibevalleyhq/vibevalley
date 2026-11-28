@@ -21,6 +21,10 @@ pub enum BoundaryRule {
     ServerDbBoundary,
     OneTableOneEntityFile,
     LegacyServerDirs,
+    NoContextPortPatch,
+    KitZeroProductImport,
+    KitZeroOrmEntity,
+    KitNoGlobalState,
 }
 
 impl BoundaryRule {
@@ -35,6 +39,10 @@ impl BoundaryRule {
             Self::ServerDbBoundary => "no-db-outside-service",
             Self::OneTableOneEntityFile => "one-table-one-entity-file",
             Self::LegacyServerDirs => "no-legacy-dirs",
+            Self::NoContextPortPatch => "no-context-port-patch",
+            Self::KitZeroProductImport => "kit-zero-product-import",
+            Self::KitZeroOrmEntity => "kit-zero-orm-entity",
+            Self::KitNoGlobalState => "kit-no-global-state",
         }
     }
 }
@@ -54,6 +62,7 @@ pub enum Layer {
     L1,
     L2,
     L3,
+    L4,
 }
 
 impl Layer {
@@ -62,6 +71,7 @@ impl Layer {
             Self::L1 => "L1",
             Self::L2 => "L2",
             Self::L3 => "L3",
+            Self::L4 => "L4",
         }
     }
 }
@@ -73,6 +83,8 @@ pub enum PeerDomain {
     Memory,
     Connector,
     Voice,
+    Cron,
+    Game,
 }
 
 impl PeerDomain {
@@ -83,6 +95,8 @@ impl PeerDomain {
             Self::Memory => "agent/memory",
             Self::Connector => "connector",
             Self::Voice => "voice",
+            Self::Cron => "cron",
+            Self::Game => "game",
         }
     }
 }
@@ -143,6 +157,7 @@ fn is_known_domain(domain: &str) -> bool {
             | "agent"
             | "cron"
             | "game"
+            | "orchestration"
     )
 }
 
@@ -176,8 +191,20 @@ pub fn classify_server_module(module_id: &str) -> Option<ModuleClassification> {
             layer: Layer::L2,
             peer_domain: Some(PeerDomain::Voice),
         }),
-        "cron" | "game" | "agent" | "agent/tool" | "agent/mcp" | "agent/orchestrator" => Some(ModuleClassification {
+        "cron" => Some(ModuleClassification {
+            layer: Layer::L2,
+            peer_domain: Some(PeerDomain::Cron),
+        }),
+        "game" => Some(ModuleClassification {
+            layer: Layer::L2,
+            peer_domain: Some(PeerDomain::Game),
+        }),
+        "agent" | "agent/drive" | "agent/tool" | "agent/mcp" | "agent/orchestrator" => Some(ModuleClassification {
             layer: Layer::L3,
+            peer_domain: None,
+        }),
+        "orchestration" => Some(ModuleClassification {
+            layer: Layer::L4,
             peer_domain: None,
         }),
         _ => None,
@@ -525,7 +552,7 @@ fn resolve_target_server_module(path_ref: &PathRef, file_mod_path: &[String]) ->
     if domain == "agent" {
         if let Some(sub) = next
             && is_snake_case_module_name(sub)
-            && matches!(sub.as_str(), "profile" | "memory" | "tool" | "mcp" | "orchestrator")
+            && matches!(sub.as_str(), "profile" | "memory" | "drive" | "tool" | "mcp" | "orchestrator")
         {
             return Some(TargetResolution::Module(format!("agent/{sub}")));
         }
@@ -546,6 +573,189 @@ const LEGACY_SERVER_DIRS: &[&str] = &[
     "fakes/",
     "db/entities/",
 ];
+
+const FORBIDDEN_KIT_WORKSPACE_CRATES: &[&str] = &[
+    "vibevalley-protocol",
+    "vibevalley_protocol",
+    "vibevalley-core",
+    "vibevalley_core",
+    "vibevalley-i18n",
+    "vibevalley_i18n",
+    "vibevalley-server",
+    "vibevalley_server",
+    "vibevalley-runtime",
+    "vibevalley_runtime",
+    "vibevalley-oar",
+    "vibevalley_oar",
+    "vibevalley-machine",
+    "vibevalley_machine",
+    "vibevalley-agent",
+    "vibevalley_agent",
+    "vibevalley-rich",
+    "vibevalley_rich",
+    "vibevalley-git",
+    "vibevalley_git",
+    "vibevalley-files",
+    "vibevalley_files",
+    "vibevalley-mcp",
+    "vibevalley_mcp",
+    "vibevalley-cli",
+    "vibevalley_cli",
+];
+
+fn check_kit_cargo_toml(file_path: &str, raw: &str, violations: &mut Vec<BoundaryViolation>) {
+    let index = LineIndex::new(raw);
+    for (idx, line) in raw.lines().enumerate() {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with('#') {
+            continue;
+        }
+        let code_part = trimmed.split('#').next().unwrap_or("");
+        for forbidden in FORBIDDEN_KIT_WORKSPACE_CRATES {
+            if code_part.contains(forbidden) {
+                violations.push(BoundaryViolation {
+                    rule: BoundaryRule::KitZeroProductImport,
+                    file: file_path.to_owned(),
+                    line: idx + 1,
+                    message: format!("Ring 0 `crates/kit` depends on workspace crate `{forbidden}` ({})", index.snippet_at(idx + 1)),
+                    fix: "Keep vibevalley-kit domain-agnostic at Ring 0 with zero workspace crate dependencies; inject domain behavior via generic traits."
+                        .to_owned(),
+                    details: Vec::new(),
+                });
+                break;
+            }
+        }
+        if code_part.contains("sea-orm") {
+            violations.push(BoundaryViolation {
+                rule: BoundaryRule::KitZeroOrmEntity,
+                file: file_path.to_owned(),
+                line: idx + 1,
+                message: format!("`crates/kit` must not depend on `sea-orm` ({})", index.snippet_at(idx + 1)),
+                fix: "Use parameterized SQL / SeaQuery in vibevalley-kit; ORM entities belong only in host apps.".to_owned(),
+                details: Vec::new(),
+            });
+        }
+    }
+}
+
+fn check_kit_source_file(file_path: &str, code: &str, index: &LineIndex, violations: &mut Vec<BoundaryViolation>) {
+    let bytes = code.as_bytes();
+    let mut seen_product = BTreeSet::new();
+    for forbidden in FORBIDDEN_KIT_WORKSPACE_CRATES {
+        let mut cursor = 0usize;
+        while let Some(rel) = code[cursor..].find(forbidden) {
+            let start = cursor + rel;
+            let end = start + forbidden.len();
+            cursor = end;
+            if !has_ident_boundaries(bytes, start, end) {
+                continue;
+            }
+            let line = index.line_at(start);
+            if seen_product.insert(line) {
+                violations.push(BoundaryViolation {
+                    rule: BoundaryRule::KitZeroProductImport,
+                    file: file_path.to_owned(),
+                    line,
+                    message: format!("Ring 0 `crates/kit` imports `{forbidden}` ({})", index.snippet_at(line)),
+                    fix: "Keep vibevalley-kit domain-agnostic; inject domain behavior via generic traits.".to_owned(),
+                    details: Vec::new(),
+                });
+            }
+        }
+    }
+
+    let mut seen_orm = BTreeSet::new();
+    for needle in ["DeriveEntityModel", "sea_orm::entity", "sea_orm::"] {
+        let mut cursor = 0usize;
+        while let Some(rel) = code[cursor..].find(needle) {
+            let start = cursor + rel;
+            let end = start + needle.len();
+            cursor = end;
+            let ok = if needle.ends_with("::") {
+                start == 0 || !is_ident_char(bytes[start - 1])
+            } else {
+                has_ident_boundaries(bytes, start, end)
+            };
+            if !ok {
+                continue;
+            }
+            let line = index.line_at(start);
+            if seen_orm.insert(line) {
+                violations.push(BoundaryViolation {
+                    rule: BoundaryRule::KitZeroOrmEntity,
+                    file: file_path.to_owned(),
+                    line,
+                    message: format!("ORM entity reference `{needle}` is forbidden in `crates/kit` ({})", index.snippet_at(line)),
+                    fix: "Use parameterized SQL / SeaQuery in vibevalley-kit; ORM entities belong only in host apps.".to_owned(),
+                    details: Vec::new(),
+                });
+            }
+        }
+    }
+
+    let mut seen_global = BTreeSet::new();
+    for pattern in [
+        "OnceLock<Mutex<",
+        "OnceLock<RwLock<",
+        "OnceLock<parking_lot::Mutex<",
+        "OnceLock<parking_lot::RwLock<",
+        "OnceLock<std::sync::Mutex<",
+        "OnceLock<std::sync::RwLock<",
+        "OnceLock<tokio::sync::Mutex<",
+        "OnceLock<tokio::sync::RwLock<",
+        "LazyLock<Mutex<",
+        "LazyLock<RwLock<",
+        "LazyLock<parking_lot::Mutex<",
+        "LazyLock<parking_lot::RwLock<",
+        "LazyLock<std::sync::Mutex<",
+        "LazyLock<std::sync::RwLock<",
+        "LazyLock<tokio::sync::Mutex<",
+        "LazyLock<tokio::sync::RwLock<",
+    ] {
+        for (line_idx, line) in code.lines().enumerate() {
+            let stripped_line: String = line.chars().filter(|c| !matches!(c, ' ' | '\t')).collect();
+            if stripped_line.contains(pattern) && seen_global.insert(line_idx + 1) {
+                violations.push(BoundaryViolation {
+                    rule: BoundaryRule::KitNoGlobalState,
+                    file: file_path.to_owned(),
+                    line: line_idx + 1,
+                    message: format!(
+                        "mutable process-global state `{pattern}...>` is forbidden in `crates/kit` ({})",
+                        index.snippet_at(line_idx + 1)
+                    ),
+                    fix: "Pass explicit handles (Arc<Kit>, SharedClock) instead of process-global state.".to_owned(),
+                    details: Vec::new(),
+                });
+            }
+        }
+    }
+    let mut cursor = 0usize;
+    while let Some(rel) = code[cursor..].find("static") {
+        let start = cursor + rel;
+        let end = start + "static".len();
+        cursor = end;
+        if !has_ident_boundaries(bytes, start, end) {
+            continue;
+        }
+        let mut p = end;
+        while p < bytes.len() && bytes[p].is_ascii_whitespace() {
+            p += 1;
+        }
+        if code[p..].starts_with("mut") && has_ident_boundaries(bytes, p, p + 3) {
+            let line = index.line_at(start);
+            if seen_global.insert(line) {
+                violations.push(BoundaryViolation {
+                    rule: BoundaryRule::KitNoGlobalState,
+                    file: file_path.to_owned(),
+                    line,
+                    message: format!("`static mut` global state is forbidden in `crates/kit` ({})", index.snippet_at(line)),
+                    fix: "Pass explicit handles (Arc<Kit>, SharedClock) instead of process-global state.".to_owned(),
+                    details: Vec::new(),
+                });
+            }
+        }
+    }
+}
 
 fn check_no_legacy_dirs(file_path: &str, violations: &mut Vec<BoundaryViolation>) {
     let Some(rel) = file_path.strip_prefix("crates/server/src/") else {
@@ -971,6 +1181,10 @@ pub fn audit_files(files: &[SourceFile]) -> Vec<BoundaryViolation> {
     let mut mac_graph: ModuleGraph = BTreeMap::new();
 
     for file in &sorted {
+        if file.path == "crates/kit/Cargo.toml" {
+            check_kit_cargo_toml(&file.path, &file.text, &mut violations);
+            continue;
+        }
         if file.path.starts_with("apps/mac/crates/") && file.path.ends_with("/Cargo.toml") {
             if file.text.contains("vibevalley-server") {
                 violations.push(BoundaryViolation {
@@ -992,9 +1206,23 @@ pub fn audit_files(files: &[SourceFile]) -> Vec<BoundaryViolation> {
             continue;
         };
         let index = LineIndex::new(raw);
+        if file.path.starts_with("crates/kit/src/") {
+            check_kit_source_file(&file.path, code, &index, &mut violations);
+            continue;
+        }
         let refs = extract_path_refs(code);
 
         check_no_legacy_dirs(&file.path, &mut violations);
+        if file.path == "crates/server/src/context/port.rs" {
+            violations.push(BoundaryViolation {
+                rule: BoundaryRule::NoContextPortPatch,
+                file: file.path.clone(),
+                line: 1,
+                message: "cycle-breaking `crates/server/src/context/port.rs` is forbidden; all cross-domain workflows belong in `orchestration/`".to_owned(),
+                fix: format!("Delete `crates/server/src/context/port.rs` and lift cross-domain orchestration into `crates/server/src/orchestration/`. See {TOPOLOGY_DOC}."),
+                details: Vec::new(),
+            });
+        }
         check_no_sea_orm_outside_service(&file.path, code, &index, &mut violations);
         check_no_db_outside_service(&file.path, &refs, &index, &mut violations);
         check_one_table_one_entity_file(&file.path, raw, &index, &mut violations);
@@ -1168,7 +1396,7 @@ pub fn audit_files(files: &[SourceFile]) -> Vec<BoundaryViolation> {
                         continue;
                     };
 
-                    if source_class.layer == Layer::L1 && matches!(target_class.layer, Layer::L2 | Layer::L3) {
+                    if source_class.layer == Layer::L1 && matches!(target_class.layer, Layer::L2 | Layer::L3 | Layer::L4) {
                         violations.push(BoundaryViolation {
                             rule: BoundaryRule::ServerLayerDag,
                             file: file.path.clone(),
@@ -1178,18 +1406,32 @@ pub fn audit_files(files: &[SourceFile]) -> Vec<BoundaryViolation> {
                                 target_class.layer.as_str()
                             ),
                             fix: format!(
-                                "L1 modules must have zero upward dependencies; inject a narrow port trait from crates/server/src/app/port.rs or mark slices dirty via SliceProjector. See {TOPOLOGY_DOC} Section 3.2."
+                                "L1 modules must have zero upward dependencies; lift cross-domain orchestration into `crates/server/src/orchestration/` or mark slices dirty via StateFeed. See {TOPOLOGY_DOC}."
                             ),
                             details: Vec::new(),
                         });
-                    } else if source_class.layer == Layer::L2 && target_class.layer == Layer::L3 {
+                    } else if source_class.layer == Layer::L2 && matches!(target_class.layer, Layer::L3 | Layer::L4) {
                         violations.push(BoundaryViolation {
                             rule: BoundaryRule::ServerLayerDag,
                             file: file.path.clone(),
                             line,
-                            message: format!("L2 module `{source_module}` imports L3 module `{target_module}` ({snippet})"),
+                            message: format!(
+                                "L2 module `{source_module}` imports {} module `{target_module}` ({snippet})",
+                                target_class.layer.as_str()
+                            ),
                             fix: format!(
-                                "Invert the dependency with a narrow port trait in crates/server/src/app/port.rs or move shared pure helpers down to L1 (infra/text). See {TOPOLOGY_DOC} Section 3.2."
+                                "L2 deep domain modules must not import L3/L4 modules; lift cross-domain coordination into `crates/server/src/orchestration/`. See {TOPOLOGY_DOC}."
+                            ),
+                            details: Vec::new(),
+                        });
+                    } else if source_class.layer == Layer::L3 && target_class.layer == Layer::L4 {
+                        violations.push(BoundaryViolation {
+                            rule: BoundaryRule::ServerLayerDag,
+                            file: file.path.clone(),
+                            line,
+                            message: format!("L3 module `{source_module}` imports L4 orchestration `{target_module}` ({snippet})"),
+                            fix: format!(
+                                "L3 agent modules must not import L4 `orchestration/`; keep orchestration strictly above deep domains. See {TOPOLOGY_DOC}."
                             ),
                             details: Vec::new(),
                         });
@@ -1208,7 +1450,7 @@ pub fn audit_files(files: &[SourceFile]) -> Vec<BoundaryViolation> {
                                 dst_peer.as_str()
                             ),
                             fix: format!(
-                                "L2 peer domains (work, collab, content, team/memory) must not import each other directly; use App, Outbox, LiveOverlay, SliceProjector, or a narrow port in crates/server/src/app/port.rs. See {TOPOLOGY_DOC} Section 3.2.1."
+                                "L2 peer domains (`issue`, `note`, `agent/memory`, `connector`, `voice`, `cron`, `game`) must not import each other directly; coordinate them from `crates/server/src/orchestration/`. See {TOPOLOGY_DOC}."
                             ),
                             details: Vec::new(),
                         });
@@ -1291,9 +1533,11 @@ pub fn audit_files(files: &[SourceFile]) -> Vec<BoundaryViolation> {
 }
 
 pub fn audit_workspace(root: &Path) -> Result<AuditBoundariesResult, String> {
-    let files = walk_matching_files(root, &["crates/server/src", "apps/mac/src", "apps/mac/crates"], |rel| {
-        rel.starts_with("crates/server/src/") && rel.ends_with(".rs")
-            || rel.starts_with("apps/mac/src/") && rel.ends_with(".rs")
+    let files = walk_matching_files(root, &["crates/kit", "crates/server/src", "apps/mac/src", "apps/mac/crates"], |rel| {
+        rel == "crates/kit/Cargo.toml"
+            || (rel.starts_with("crates/kit/src/") && rel.ends_with(".rs"))
+            || (rel.starts_with("crates/server/src/") && rel.ends_with(".rs"))
+            || (rel.starts_with("apps/mac/src/") && rel.ends_with(".rs"))
             || (rel.starts_with("apps/mac/crates/") && (rel.ends_with(".rs") || rel.ends_with("/Cargo.toml")))
     })?;
     let files_scanned = files.len();
@@ -1329,7 +1573,7 @@ pub fn run(root: &Path) -> Result<i32, String> {
         return Ok(1);
     }
     println!(
-        "module boundaries: {} files ok (spine, mac, L0-L3 DAG, acyclic, service/entity, flat layout)",
+        "module boundaries: {} files ok (kit Ring-0, spine, mac, L0-L3 DAG, acyclic, service/entity, flat layout)",
         result.files_scanned
     );
     Ok(0)
@@ -1435,7 +1679,22 @@ mod tests {
             })
         );
 
-        for l3 in ["cron", "game", "agent", "agent/tool", "agent/mcp", "agent/orchestrator"] {
+        assert_eq!(
+            classify_server_module("cron"),
+            Some(ModuleClassification {
+                layer: Layer::L2,
+                peer_domain: Some(PeerDomain::Cron)
+            })
+        );
+        assert_eq!(
+            classify_server_module("game"),
+            Some(ModuleClassification {
+                layer: Layer::L2,
+                peer_domain: Some(PeerDomain::Game)
+            })
+        );
+
+        for l3 in ["agent", "agent/drive", "agent/tool", "agent/mcp", "agent/orchestrator"] {
             assert_eq!(
                 classify_server_module(l3),
                 Some(ModuleClassification {
@@ -1444,6 +1703,13 @@ mod tests {
                 })
             );
         }
+        assert_eq!(
+            classify_server_module("orchestration"),
+            Some(ModuleClassification {
+                layer: Layer::L4,
+                peer_domain: None
+            })
+        );
     }
 
     #[test]
@@ -1451,7 +1717,7 @@ mod tests {
         let files = vec![
             sf("crates/server/src/lib.rs", "use crate::voice::Voice;\npub struct Server;"),
             sf(
-                "crates/server/src/context/port.rs",
+                "crates/server/src/context/api.rs",
                 "pub trait Recall { fn x(&self) -> crate::agent::memory::Note; }",
             ),
             sf("crates/server/src/service/issue.rs", "use crate::issue::Board;\n"),
@@ -1469,7 +1735,7 @@ mod tests {
         assert_eq!(
             tags,
             vec![
-                "spine-no-module-import@crates/server/src/context/port.rs:1",
+                "spine-no-module-import@crates/server/src/context/api.rs:1",
                 "spine-no-module-import@crates/server/src/db/mod.rs:1",
                 "spine-no-module-import@crates/server/src/gateway/api/mod.rs:2",
                 "spine-no-module-import@crates/server/src/lib.rs:1",
@@ -1585,11 +1851,26 @@ mod tests {
             sf("crates/server/src/connector/bridge_test.rs", "use crate::issue::Board;\n"),
             sf("crates/server/src/agent/tool/mod.rs", "use crate::agent::profile::Profile;\n"),
             sf("crates/server/src/agent/orchestrator/mod.rs", "use crate::agent::tool::ToolRegistry;\n"),
-            sf("crates/server/src/agent/mcp/mod.rs", "use crate::context::port::ToolDispatchPort;\n"),
+            sf("crates/server/src/agent/mcp/mod.rs", "use crate::context::api::Mcp;\n"),
             sf("crates/server/src/game.rs", "use crate::repo::Repo;\n"),
-            sf("crates/server/src/cron/mod.rs", "use crate::issue::Board;\n"),
+            sf("crates/server/src/cron/mod.rs", "use crate::context::Context;\n"),
+            sf(
+                "crates/server/src/orchestration/cron.rs",
+                "use crate::cron::Scheduler;\nuse crate::issue::Board;\nuse crate::agent::Orchestrator;\n",
+            ),
         ];
         assert!(audit_files(&files).is_empty());
+
+        let forbidden_port = vec![sf("crates/server/src/context/port.rs", "pub trait Patch {}\n")];
+        assert_eq!(
+            audit_files(&forbidden_port).iter().map(|v| v.rule).collect::<Vec<_>>(),
+            vec![BoundaryRule::NoContextPortPatch]
+        );
+        let reverse_orch = vec![sf("crates/server/src/agent/tool/plan.rs", "use crate::orchestration::CronWorkflow;\n")];
+        assert_eq!(
+            audit_files(&reverse_orch).iter().map(|v| v.rule).collect::<Vec<_>>(),
+            vec![BoundaryRule::ServerLayerDag]
+        );
     }
 
     #[test]
@@ -1682,10 +1963,10 @@ mod tests {
     fn audits_workspace_from_disk() {
         let dir = TempDir::new("vv-boundaries");
         dir.write("crates/server/src/lib.rs", "pub mod context;\n");
-        dir.write("crates/server/src/context/port.rs", "pub trait LiveVoicePort {}\n");
+        dir.write("crates/server/src/context/api.rs", "pub trait LiveVoicePort {}\n");
         dir.write("crates/server/src/gateway/api/mod.rs", "pub trait Server {}\n");
         dir.write("crates/server/src/setting.rs", "pub struct Setting;\n");
-        dir.write("crates/server/src/repo.rs", "use crate::context::Context;\n");
+        dir.write("crates/server/src/repo/mod.rs", "use crate::context::Context;\n");
         dir.write("apps/mac/src/live_voice.rs", "use vibevalley_server::gateway::api::SharedLiveVoice;\n");
 
         let clean = audit_workspace(&dir.0).unwrap();
@@ -1721,5 +2002,38 @@ mod tests {
         assert_eq!(violations.len(), 1);
         assert_eq!(violations[0].rule, BoundaryRule::MacModulesAcyclic);
         assert!(violations[0].message.contains("hosted -> shell -> hosted"));
+    }
+
+    #[test]
+    fn enforces_ring0_kit_product_orm_and_global_state_boundaries() {
+        let clean = vec![
+            sf("crates/kit/Cargo.toml", "[dependencies]\ntokio = { workspace = true }\n"),
+            sf("crates/kit/src/rt/runtime.rs", "static RUNTIME: OnceLock<Runtime> = OnceLock::new();\n"),
+        ];
+        assert!(audit_files(&clean).is_empty());
+
+        let dirty = vec![
+            sf(
+                "crates/kit/Cargo.toml",
+                "[dependencies]\nvibevalley-protocol = { path = \"../protocol\" }\nsea-orm = { workspace = true }\n",
+            ),
+            sf(
+                "crates/kit/src/bad.rs",
+                "use vibevalley_core::Clock;\n#[derive(DeriveEntityModel)]\npub struct Model;\nstatic BAD: OnceLock<Mutex<Vec<u8>>> = OnceLock::new();\nstatic mut MUT_GLOBAL: usize = 0;\n",
+            ),
+        ];
+        let violations = audit_files(&dirty);
+        let tags: Vec<String> = violations.iter().map(|v| format!("{}@{}:{}", v.rule.as_str(), v.file, v.line)).collect();
+        assert_eq!(
+            tags,
+            vec![
+                "kit-zero-product-import@crates/kit/Cargo.toml:2",
+                "kit-zero-orm-entity@crates/kit/Cargo.toml:3",
+                "kit-zero-product-import@crates/kit/src/bad.rs:1",
+                "kit-zero-orm-entity@crates/kit/src/bad.rs:2",
+                "kit-no-global-state@crates/kit/src/bad.rs:4",
+                "kit-no-global-state@crates/kit/src/bad.rs:5",
+            ]
+        );
     }
 }

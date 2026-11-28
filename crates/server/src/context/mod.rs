@@ -7,7 +7,6 @@ pub mod feed;
 pub mod http;
 pub mod live;
 pub mod outbox;
-pub mod port;
 pub mod task;
 pub mod text;
 
@@ -17,7 +16,8 @@ use std::time::Duration;
 
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
-use vibevalley_core::{SharedClock, SliceMask};
+use vibevalley_core::{Clock as CoreClock, SharedClock, SliceMask};
+use vibevalley_kit::Kit;
 use vibevalley_protocol::Millis;
 
 pub use api::{
@@ -46,10 +46,27 @@ pub fn now() -> Millis {
         .unwrap_or(0)
 }
 
+struct CoreClockAdapter(SharedClock);
+
+impl vibevalley_kit::core::time::Clock for CoreClockAdapter {
+    fn now_ms(&self) -> i64 {
+        self.0.now_ms()
+    }
+}
+
+struct KitClockAdapter(vibevalley_kit::core::time::SharedClock);
+
+impl CoreClock for KitClockAdapter {
+    fn now_ms(&self) -> Millis {
+        self.0.now_ms()
+    }
+}
+
 /// Shared L0 execution context passed to server domain services, replacing
 /// multi-argument infrastructure plumbing.
 #[derive(Clone)]
 pub struct Context {
+    pub kit: Arc<Kit>,
     pub service: Arc<Service>,
     pub task: TaskGroup,
     pub live: Arc<LiveState>,
@@ -72,7 +89,35 @@ impl Context {
         http: Arc<dyn Fetch>,
         download: Arc<dyn Fetch>,
     ) -> Self {
+        let kit = Arc::new(Kit::from_parts(Arc::new(CoreClockAdapter(clock.clone())), task.clone()));
         Self {
+            kit,
+            service,
+            task,
+            live,
+            outbox,
+            feed,
+            clock,
+            http,
+            download,
+        }
+    }
+
+    /// Constructs a [`Context`] backed by an explicit Ring-0 [`Kit`] handle.
+    #[allow(clippy::too_many_arguments)]
+    pub fn from_kit(
+        kit: Arc<Kit>,
+        service: Arc<Service>,
+        live: Arc<LiveState>,
+        outbox: Arc<Outbox>,
+        feed: Arc<StateFeed>,
+        http: Arc<dyn Fetch>,
+        download: Arc<dyn Fetch>,
+    ) -> Self {
+        let task = kit.task.clone();
+        let clock: SharedClock = Arc::new(KitClockAdapter(kit.clock.clone()));
+        Self {
+            kit,
             service,
             task,
             live,
@@ -120,5 +165,53 @@ impl Context {
     /// Cancels tracked tasks and awaits graceful drain up to `grace`.
     pub async fn shutdown(&self, grace: Duration) -> bool {
         self.task.shutdown(grace).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn context_embeds_kit_and_from_kit_shares_clock_and_task_group() {
+        let dir = tempfile::tempdir().unwrap();
+        let service = Service::open(dir.path()).await.unwrap();
+        let outbox = Arc::new(Outbox::new(service.clone()));
+
+        let core_clock = Arc::new(vibevalley_core::ManualClock::new(1_700_000_000_000));
+        let ctx = Context::new(
+            service.clone(),
+            TaskGroup::new(),
+            Arc::new(LiveState::new()),
+            outbox.clone(),
+            Arc::new(StateFeed::new()),
+            core_clock.clone(),
+            Arc::new(Http),
+            Arc::new(PublicDownload),
+        );
+        assert_eq!(ctx.now(), 1_700_000_000_000);
+        assert_eq!(ctx.kit.clock.now_ms(), 1_700_000_000_000);
+        core_clock.advance(Duration::from_secs(5));
+        assert_eq!(ctx.kit.clock.now_ms(), 1_700_000_005_000);
+
+        let kit_clock = Arc::new(vibevalley_kit::core::time::ManualClock::new(1_800_000_000_000));
+        let kit = Arc::new(Kit::with_clock(kit_clock.clone()));
+        let ctx_from_kit = Context::from_kit(
+            kit.clone(),
+            service.clone(),
+            Arc::new(LiveState::new()),
+            outbox,
+            Arc::new(StateFeed::new()),
+            Arc::new(Http),
+            Arc::new(PublicDownload),
+        );
+        assert_eq!(ctx_from_kit.now(), 1_800_000_000_000);
+        kit_clock.advance(Duration::from_millis(250));
+        assert_eq!(ctx_from_kit.now(), 1_800_000_000_250);
+        assert!(ctx_from_kit.kit.close_async(Duration::from_secs(1)).await);
+        assert!(ctx_from_kit.token().is_cancelled());
+
+        assert!(ctx.shutdown(Duration::from_secs(1)).await);
+        service.close().await;
     }
 }

@@ -1,30 +1,29 @@
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, Weak};
-use std::time::Duration;
 
 use parking_lot::Mutex;
+use tokio::sync::mpsc;
 use vibevalley_i18n::t;
-use vibevalley_protocol::{ApiError, ApiErrorDetail, BizCode, DEFAULT_ORCHESTRATOR, Millis, NoticeLevel, Validation, VoiceCall, VoiceFix, VoiceGrant};
+use vibevalley_protocol::{ApiError, ApiErrorDetail, BizCode, Millis, NoticeLevel, Validation, VoiceCall, VoiceFix, VoiceGrant};
 
 use super::moss::{self, HttpTranscriber, Realtime, Transcriber, Verdict};
-use super::prompt;
-use crate::channel::{Chat, Picked, Posting, Saying};
-use crate::context::api::{BoxFuture, LiveVoiceLine, LiveVoicePort};
-use crate::context::port::VoiceOrchestratorPort;
+use crate::context::api::LiveVoiceLine;
 use crate::context::{Context, now};
 use crate::setting::{Account, Secret, Setting, Use};
 
 /// How long an unused grant stays valid before expiring.
 const GRANT_TTL_SECONDS: Millis = 3600;
-/// How long a turn of the orchestrator is waited for before a call gives up on it.
-const ANSWER_WAIT: Duration = Duration::from_secs(120);
 /// What a MOSS call holds for its model until the session takes its settings.
 const MOSS_PENDING_MAX: usize = 8;
 const MOSS_PIECE_MAX: usize = 16_000;
 /// The tool calls one MOSS session may make, and at once.
 const MOSS_TOOL_CALLS: usize = 64;
 const MOSS_TOOLS_AT_ONCE: usize = 4;
+/// Bounded outbound frame queue capacity for MOSS Live socket delivery.
+const MOSS_OUTGOING_CAP: usize = 256;
+/// Bounded inbound MOSS Live tool-call queue capacity.
+const MOSS_TOOL_QUEUE_CAP: usize = 64;
 
 fn unavailable(reason: impl Into<String>, settings: Option<VoiceFix>) -> ApiError {
     ApiError {
@@ -34,16 +33,14 @@ fn unavailable(reason: impl Into<String>, settings: Option<VoiceFix>) -> ApiErro
     }
 }
 
-fn failed(reason: impl Into<String>) -> ApiError {
+pub(crate) fn failed(reason: impl Into<String>) -> ApiError {
     ApiError::new(BizCode::VoiceCallFailed, reason)
 }
 
-/// Dependencies for constructing [`Voice`].
+/// Dependencies for constructing pure [`Voice`].
 pub struct Parts {
     pub ctx: Arc<Context>,
     pub setting: Arc<Setting>,
-    pub chat: Arc<Chat>,
-    pub orchestrator: Arc<dyn VoiceOrchestratorPort>,
     /// Optional MOSS Live key probe override (tests).
     pub realtime: Option<Arc<dyn Realtime>>,
     /// Optional MOSS transcription client override (tests).
@@ -72,11 +69,11 @@ struct MossShared {
 enum MossPhase {
     /// Commentary waits in `pending` until the session takes its settings.
     Waiting {
-        out: Option<tokio::sync::mpsc::UnboundedSender<String>>,
+        out: Option<mpsc::Sender<String>>,
         pending: Vec<String>,
     },
     Ready {
-        out: tokio::sync::mpsc::UnboundedSender<String>,
+        out: mpsc::Sender<String>,
     },
     Closed,
 }
@@ -105,12 +102,36 @@ struct State {
     stopped: bool,
 }
 
+/// Inbound MOSS Live tool call emitted by [`MossLine`] for orchestration handling.
+pub struct MossToolRequest {
+    pub call_id: String,
+    pub question: String,
+    shared: Arc<MossShared>,
+    tools: Arc<Mutex<Tools>>,
+    out: mpsc::Sender<String>,
+}
+
+impl MossToolRequest {
+    /// Sends the orchestrator's answer back onto the active MOSS Live socket.
+    pub fn respond(self, answer: &str) {
+        let answer = if answer.is_empty() {
+            t("server.voice.moss.toolFailed", &[])
+        } else {
+            answer.to_string()
+        };
+        let mut tools = self.tools.lock();
+        tools.in_flight = tools.in_flight.saturating_sub(1);
+        if matches!(*self.shared.phase.lock(), MossPhase::Closed) {
+            return;
+        }
+        tools.awaiting_ack.insert(self.call_id.clone());
+        let _ = self.out.try_send(moss::tool_output(&self.call_id, &answer));
+    }
+}
+
 pub struct Voice {
-    me: Weak<Voice>,
     ctx: Arc<Context>,
     setting: Arc<Setting>,
-    chat: Arc<Chat>,
-    orchestrator: Arc<dyn VoiceOrchestratorPort>,
     realtime: Arc<dyn Realtime>,
     transcriber: Arc<dyn Transcriber>,
     state: Mutex<State>,
@@ -136,12 +157,9 @@ impl Voice {
     pub fn open(p: Parts) -> Arc<Voice> {
         let realtime = p.realtime.unwrap_or_else(|| Arc::new(moss::HttpProbe(p.ctx.http.clone())));
         let transcriber = p.transcriber.unwrap_or_else(|| Arc::new(HttpTranscriber(p.ctx.http.clone())));
-        Arc::new_cyclic(|me| Voice {
-            me: me.clone(),
+        Arc::new(Voice {
             ctx: p.ctx,
             setting: p.setting,
-            chat: p.chat,
-            orchestrator: p.orchestrator,
             realtime,
             transcriber,
             state: Mutex::default(),
@@ -149,12 +167,23 @@ impl Voice {
         })
     }
 
-    fn warn(&self, what: &str, why: impl std::fmt::Display) {
+    pub fn warn(&self, what: &str, why: impl std::fmt::Display) {
         self.ctx.live.publish_notice(now(), NoticeLevel::Warn, format!("{what}: {why}"));
     }
 
-    fn stopped() -> ApiError {
+    pub(crate) fn stopped() -> ApiError {
         unavailable(t("server.voice.stopped", &[]), None)
+    }
+
+    pub fn ensure_running(&self) -> Result<(), ApiError> {
+        if self.state.lock().stopped {
+            return Err(Self::stopped());
+        }
+        Ok(())
+    }
+
+    pub fn can_transcribe(&self) -> bool {
+        self.setting.providers().account(Use::Transcription).is_some()
     }
 
     /// The account MOSS Live calls on, or why there is none, as the voice page says it.
@@ -191,9 +220,8 @@ impl Voice {
         Ok(VoiceGrant { channel, uid })
     }
 
-    /// Begins the granted MOSS Live call. `about` is what rang:
-    /// the orchestrator says it first instead of the greeting.
-    pub fn start(self: &Arc<Self>, channel: &str, uid: &str, about: Option<&str>) -> Result<VoiceCall, ApiError> {
+    /// Begins the granted MOSS Live call. When `rang` is true, suppresses the default greeting.
+    pub fn start(&self, channel: &str, uid: &str, rang: bool) -> Result<VoiceCall, ApiError> {
         let key = (channel.to_string(), uid.to_string());
         {
             let mut state = self.state.lock();
@@ -204,17 +232,13 @@ impl Voice {
             }
             grant.phase = GrantPhase::Starting;
         }
-        let about = about.map(str::trim).filter(|a| !a.is_empty());
-        let agent = match self.start_moss(&key, about.is_some()) {
+        let agent = match self.start_moss(&key, rang) {
             Ok(agent) => agent,
             Err(e) => {
                 self.state.lock().grants.remove(&key);
                 return Err(e);
             }
         };
-        if let Some(about) = about {
-            self.tell(agent.clone(), prompt::on_call_line(&[], Some(about)));
-        }
         Ok(VoiceCall { agent_id: agent })
     }
 
@@ -286,77 +310,9 @@ impl Voice {
             .ok_or_else(|| failed(t("server.voice.hungUp", &[])))
     }
 
-    pub async fn heard_async(&self, agent: &str, text: &str, picked: Option<&str>, send_key: Option<&str>) -> Result<(), ApiError> {
-        self.call(agent)?;
-        self.chat
-            .say_async(Saying {
-                text: text.into(),
-                send_key: send_key.unwrap_or("").into(),
-                source: Some("voice".into()),
-                picked: picked.filter(|a| !a.is_empty()).map(|a| Picked {
-                    agent: Some(a.into()),
-                    repo: None,
-                }),
-                ..Default::default()
-            })
-            .await?;
-        Ok(())
-    }
-
-    /// Non-blocking host transcript handoff used by [`LiveVoicePort::heard`]: validates
-    /// the active call synchronously and records the transcript on `ctx.task`.
-    fn heard_background(self: &Arc<Self>, agent: &str, text: &str, send_key: Option<&str>) -> Result<(), ApiError> {
-        self.call(agent)?;
-        let voice = self.clone();
-        let text = text.to_string();
-        let send_key = send_key.unwrap_or("").to_string();
-        self.ctx.spawn("voice.heard", async move {
-            if let Err(e) = voice
-                .chat
-                .say_async(Saying {
-                    text,
-                    send_key,
-                    source: Some("voice".into()),
-                    ..Default::default()
-                })
-                .await
-            {
-                voice.warn("voice: the user's spoken words were not kept", e.message);
-            }
-        });
-        Ok(())
-    }
-
-    /// Non-blocking host transcript handoff used by [`LiveVoicePort::said`].
-    fn said_background(self: &Arc<Self>, agent: &str, text: &str) -> Result<(), ApiError> {
-        self.call(agent)?;
-        let voice = self.clone();
-        let agent = agent.to_string();
-        let text = text.to_string();
-        self.ctx.spawn("voice.said", async move {
-            let _ = voice.said_async(&agent, &text).await;
-        });
-        Ok(())
-    }
-
-    /// Records what the MOSS Live session said in chat; its greeting is skipped.
-    pub async fn said_async(&self, agent: &str, text: &str) -> Result<(), ApiError> {
-        let call = self.call(agent)?;
-        if text.trim() != call.greeting
-            && let Err(e) = self
-                .chat
-                .post_async(Posting {
-                    from: DEFAULT_ORCHESTRATOR.into(),
-                    channel: self.chat.default_channel(),
-                    text: text.into(),
-                    spoken: true,
-                    ..Default::default()
-                })
-                .await
-        {
-            self.warn("voice: the orchestrator's spoken words were not kept", e.message);
-        }
-        Ok(())
+    /// Verifies `agent` refers to a live call and returns its greeting text.
+    pub fn active_call_greeting(&self, agent: &str) -> Result<String, ApiError> {
+        Ok(self.call(agent)?.greeting.clone())
     }
 
     fn live_calls(&self) -> Vec<String> {
@@ -390,13 +346,13 @@ impl Voice {
         }
     }
 
-    fn deliver(&self, piece: &str, out: &tokio::sync::mpsc::UnboundedSender<String>) {
+    fn deliver(&self, piece: &str, out: &mpsc::Sender<String>) {
         for frame in moss::commentary(piece, || format!("brief-{}-{}", now(), self.commentary.fetch_add(1, Ordering::SeqCst))) {
-            let _ = out.send(frame);
+            let _ = out.try_send(frame);
         }
     }
 
-    fn speak_on(&self, agent: &str, text: &str) -> bool {
+    pub fn speak_on(&self, agent: &str, text: &str) -> bool {
         let Ok(call) = self.call(agent) else { return false };
         let piece = text.trim();
         if piece.is_empty() {
@@ -418,19 +374,6 @@ impl Voice {
         self.live_calls().first().is_some_and(|agent| self.speak_on(agent, text))
     }
 
-    /// Has the orchestrator answer `line` and reads its answer out on the call.
-    fn tell(self: &Arc<Self>, agent: String, line: String) {
-        let voice = self.clone();
-        self.ctx.spawn("voice.tell", async move {
-            let Some(said) = voice.orchestrator.brief(line, ANSWER_WAIT).await else {
-                return;
-            };
-            if !said.is_empty() {
-                voice.speak_on(&agent, &said);
-            }
-        });
-    }
-
     /// `voice.moss.verify`: whether MOSS Live takes the bound account's key;
     /// the problem is "" when it does. Captures and sends no audio.
     pub async fn verify_moss_async(&self) -> Validation {
@@ -450,12 +393,12 @@ impl Voice {
         Validation { problem }
     }
 
-    /// For the host that holds the MOSS Live socket: where to connect and
-    /// with which key, the frames to send, and where to bring the frames
-    /// MOSS says. One line at a time; dropping it ends its calls.
-    pub fn moss_line(self: &Arc<Self>) -> Result<MossLine, ApiError> {
+    /// Opens a MOSS Live socket framing handle along with a stream of inbound
+    /// MOSS tool-call requests to be answered by the caller (e.g. `orchestration::voice`).
+    pub fn moss_line(self: &Arc<Self>) -> Result<(MossLine, mpsc::Receiver<MossToolRequest>), ApiError> {
         let account = self.live_account()?;
-        let (out, outgoing) = tokio::sync::mpsc::unbounded_channel();
+        let (out, outgoing) = mpsc::channel(MOSS_OUTGOING_CAP);
+        let (tool_tx, tool_rx) = mpsc::channel(MOSS_TOOL_QUEUE_CAP);
         let shared = {
             let mut state = self.state.lock();
             if state.stopped {
@@ -470,15 +413,19 @@ impl Voice {
         if let MossPhase::Waiting { out: slot, .. } = &mut *shared.phase.lock() {
             *slot = Some(out.clone());
         }
-        Ok(MossLine {
-            url: format!("wss://api.mosi.cn/v1/realtime?model={}", account.model),
-            key: account.key,
-            outgoing: Mutex::new(Some(outgoing)),
-            out,
-            voice: self.clone(),
-            shared,
-            tools: Arc::default(),
-        })
+        Ok((
+            MossLine {
+                url: format!("wss://api.mosi.cn/v1/realtime?model={}", account.model),
+                key: account.key,
+                outgoing: Mutex::new(Some(outgoing)),
+                out,
+                voice: self.clone(),
+                shared,
+                tools: Arc::default(),
+                tool_tx,
+            },
+            tool_rx,
+        ))
     }
 
     /// Ends every active call and rejects new grants.
@@ -501,9 +448,7 @@ impl Voice {
 
     /// Transcribes raw WAV bytes via MOSS Transcription (`Use::Transcription`).
     pub async fn transcribe_wav_async(&self, wav: Vec<u8>) -> Result<String, ApiError> {
-        if self.state.lock().stopped {
-            return Err(Self::stopped());
-        }
+        self.ensure_running()?;
         if wav.len() <= 44 || wav.len() > (16 << 20) || !wav.starts_with(b"RIFF") || &wav[8..12] != b"WAVE" {
             return Err(ApiError::new(BizCode::InvalidInput, t("server.voice.asr.badAudio", &[])));
         }
@@ -515,24 +460,10 @@ impl Voice {
         self.transcriber.transcribe_wav_async(&account.key, &account.model, wav).await.map_err(failed)
     }
 
-    /// Lightweight post-dictation text polish pass (punctuation restoration + filler/repetition cleanup).
-    pub async fn polish_transcript_async(&self, raw: &str) -> Result<String, ApiError> {
-        let trimmed = raw.trim();
-        if trimmed.is_empty() {
-            return Ok(String::new());
-        }
-        if self.state.lock().stopped {
-            return Err(Self::stopped());
-        }
-        self.orchestrator.polish_text_async(prompt::ASR_POLISH_SYSTEM, trimmed).await.map_err(failed)
-    }
-
     /// Lightweight dictation-only MOSS Live WebSocket credentials (no tools or commentary).
     pub fn asr_line(&self) -> Result<MossAsrLine, ApiError> {
         let account = self.live_account()?;
-        if self.state.lock().stopped {
-            return Err(Self::stopped());
-        }
+        self.ensure_running()?;
         Ok(MossAsrLine {
             url: format!("wss://api.mosi.cn/v1/realtime?model={}", account.model),
             key: account.key,
@@ -559,7 +490,7 @@ impl LiveVoiceLine for MossAsrLine {
         moss::asr_session_update()
     }
 
-    fn take_outgoing(&self) -> Option<tokio::sync::mpsc::UnboundedReceiver<String>> {
+    fn take_outgoing(&self) -> Option<mpsc::Receiver<String>> {
         None
     }
 
@@ -582,17 +513,19 @@ pub struct MossLine {
     pub url: String,
     pub key: Secret,
     /// Frames for MOSS, in order (taken once by the socket driver).
-    pub outgoing: Mutex<Option<tokio::sync::mpsc::UnboundedReceiver<String>>>,
-    out: tokio::sync::mpsc::UnboundedSender<String>,
+    pub outgoing: Mutex<Option<mpsc::Receiver<String>>>,
+    out: mpsc::Sender<String>,
     voice: Arc<Voice>,
     shared: Arc<MossShared>,
     tools: Arc<Mutex<Tools>>,
+    tool_tx: mpsc::Sender<MossToolRequest>,
 }
 
 impl MossLine {
-    pub fn take_outgoing(&self) -> Option<tokio::sync::mpsc::UnboundedReceiver<String>> {
+    pub fn take_outgoing(&self) -> Option<mpsc::Receiver<String>> {
         self.outgoing.lock().take()
     }
+
     /// The session's settings: the voice page's persona, how to open, and
     /// the tool that asks the orchestrator.
     pub fn session_update(&self) -> String {
@@ -606,8 +539,7 @@ impl MossLine {
     }
 
     /// A text frame from MOSS: settings taken let the waiting commentary
-    /// go; a tool call is put to the orchestrator and answered; an answer
-    /// MOSS has taken lets its model go on.
+    /// go; tool calls are emitted on `tool_tx`; tool acks trigger responses.
     fn hear_line(&self, raw: &str) {
         if moss::session_updated(raw) {
             let mut phase = self.shared.phase.lock();
@@ -621,7 +553,7 @@ impl MossLine {
         if let Some(call) = moss::tool_ack(raw)
             && self.tools.lock().awaiting_ack.remove(&call)
         {
-            let _ = self.out.send(moss::response_create(&call));
+            let _ = self.out.try_send(moss::response_create(&call));
         }
         for call in moss::tool_calls(raw) {
             {
@@ -636,18 +568,17 @@ impl MossLine {
                 tools.executed.insert(call.call_id.clone());
                 tools.in_flight += 1;
             }
-            let (voice, shared, tools, out) = (self.voice.clone(), self.shared.clone(), self.tools.clone(), self.out.clone());
-            self.voice.ctx.spawn("voice.tool", async move {
-                let answer = voice.orchestrator.brief(call.question, ANSWER_WAIT).await.unwrap_or_default();
-                let answer = if answer.is_empty() { t("server.voice.moss.toolFailed", &[]) } else { answer };
-                let mut tools = tools.lock();
-                tools.in_flight -= 1;
-                if matches!(*shared.phase.lock(), MossPhase::Closed) {
-                    return;
-                }
-                tools.awaiting_ack.insert(call.call_id.clone());
-                let _ = out.send(moss::tool_output(&call.call_id, &answer));
-            });
+            let req = MossToolRequest {
+                call_id: call.call_id,
+                question: call.question,
+                shared: self.shared.clone(),
+                tools: self.tools.clone(),
+                out: self.out.clone(),
+            };
+            if self.tool_tx.try_send(req).is_err() {
+                let mut tools = self.tools.lock();
+                tools.in_flight = tools.in_flight.saturating_sub(1);
+            }
         }
     }
 }
@@ -695,65 +626,11 @@ impl LiveVoiceLine for MossLine {
         MossLine::session_update(self)
     }
 
-    fn take_outgoing(&self) -> Option<tokio::sync::mpsc::UnboundedReceiver<String>> {
+    fn take_outgoing(&self) -> Option<mpsc::Receiver<String>> {
         MossLine::take_outgoing(self)
     }
 
     fn heard(&self, raw: &str) {
         self.hear_line(raw)
-    }
-}
-
-impl LiveVoicePort for Voice {
-    fn grant(&self) -> Result<VoiceGrant, ApiError> {
-        Voice::grant(self)
-    }
-
-    fn moss_line(&self) -> Result<Box<dyn LiveVoiceLine>, ApiError> {
-        let me = self.me.upgrade().ok_or_else(Voice::stopped)?;
-        Ok(Box::new(Voice::moss_line(&me)?))
-    }
-
-    fn asr_line(&self) -> Result<Box<dyn LiveVoiceLine>, ApiError> {
-        Voice::asr_line(self).map(|line| Box::new(line) as Box<dyn LiveVoiceLine>)
-    }
-
-    fn can_transcribe(&self) -> bool {
-        self.setting.providers().account(Use::Transcription).is_some()
-    }
-
-    fn transcribe_wav_async(&self, wav: Vec<u8>) -> BoxFuture<'static, Result<String, ApiError>> {
-        let voice = self.me.upgrade();
-        Box::pin(async move {
-            let voice = voice.ok_or_else(Voice::stopped)?;
-            voice.transcribe_wav_async(wav).await
-        })
-    }
-
-    fn polish_transcript_async(&self, raw: String) -> BoxFuture<'static, Result<String, ApiError>> {
-        let voice = self.me.upgrade();
-        Box::pin(async move {
-            let voice = voice.ok_or_else(Voice::stopped)?;
-            voice.polish_transcript_async(&raw).await
-        })
-    }
-
-    fn start(&self, channel: &str, uid: &str) -> Result<VoiceCall, ApiError> {
-        let me = self.me.upgrade().ok_or_else(Voice::stopped)?;
-        Voice::start(&me, channel, uid, None)
-    }
-
-    fn heard(&self, agent_id: &str, text: &str, turn: Option<&str>) -> Result<(), ApiError> {
-        let me = self.me.upgrade().ok_or_else(Voice::stopped)?;
-        Voice::heard_background(&me, agent_id, text, turn)
-    }
-
-    fn said(&self, agent_id: &str, text: &str) -> Result<(), ApiError> {
-        let me = self.me.upgrade().ok_or_else(Voice::stopped)?;
-        Voice::said_background(&me, agent_id, text)
-    }
-
-    fn stop(&self, agent_id: &str) {
-        let _ = Voice::stop(self, agent_id);
     }
 }

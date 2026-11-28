@@ -5,8 +5,7 @@
  {
   "constraints": {
    "scope": [],
-   "acceptance": false,
-   "frozen": []
+   "acceptance": false
   },
   "title": "child",
   "parent": "i1",

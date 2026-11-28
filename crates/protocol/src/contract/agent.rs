@@ -468,7 +468,6 @@ pub struct Agent {
     pub disallowed_tools: Vec<String>,
     pub env: BTreeMap<String, String>,
     pub workdir: String,
-    pub worktree: bool,
     pub tags: Vec<String>,
     pub look: Look,
     /// Optional MOSS voice ID paired with serialized channel report playback.
@@ -518,7 +517,6 @@ pub struct AgentTemplate {
     pub model: String,
     pub effort: String,
     pub persona_mode: PersonaMode,
-    pub worktree: bool,
     pub look: Look,
     pub persona: String,
     pub source: AgentTemplateSource,

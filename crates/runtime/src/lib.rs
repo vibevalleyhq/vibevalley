@@ -1,26 +1,22 @@
-//! VibeValley agent runtimes: external engines (`oar`), dynamic execution
-//! machines (`machine`), and the built-in DeepSeek durable harness (`agent`).
+//! VibeValley agent runtimes facade: re-exports [`vibevalley_kit::rt`] and the
+//! acyclic sub-crates `vibevalley-oar`, `vibevalley-machine` (with optional
+//! `sandbox`), and optional `vibevalley-agent`.
 
 #[cfg(feature = "agent")]
-pub mod agent;
-mod loom_sync;
-pub mod machine;
-pub mod oar;
-#[cfg(any(test, feature = "sandbox"))]
-pub mod sandbox;
-#[cfg(any(test, feature = "sandbox"))]
-mod teardown_gate;
+pub use vibevalley_agent as agent;
+pub use vibevalley_kit::rt;
+pub use vibevalley_machine as machine;
+#[cfg(feature = "sandbox")]
+pub use vibevalley_machine::sandbox;
+pub use vibevalley_oar as oar;
+pub use vibevalley_oar::BoxFuture;
 
-pub use vibevalley_rt as rt;
-
-pub type BoxFuture<'a, T> = std::pin::Pin<Box<dyn std::future::Future<Output = T> + Send + 'a>>;
-
-pub use machine::{
-    LOCAL_MACHINE_ID, LocalMachine, Machine, MachineDescriptor, MachinePlatform, MachineRegistry, MachineRegistryEvent, MachineStatus, RuntimeRef,
-    RuntimeRefParseError, WorkdirHandle, WorkdirSpec,
-};
-#[cfg(any(test, feature = "sandbox"))]
-pub use sandbox::{
+#[cfg(feature = "sandbox")]
+pub use vibevalley_machine::sandbox::{
     AppleContainerSandboxProvider, DockerSandboxProvider, MockSandboxProvider, SandboxCommand, SandboxError, SandboxHandle, SandboxMachine, SandboxProvider,
     SandboxSpec,
+};
+pub use vibevalley_machine::{
+    LOCAL_MACHINE_ID, LocalMachine, Machine, MachineDescriptor, MachinePlatform, MachineRegistry, MachineRegistryEvent, MachineStatus, RuntimeRef,
+    RuntimeRefParseError,
 };

@@ -2,15 +2,15 @@
 //! The async mutex protects admission and pins, never a streaming read or CAS promotion.
 
 use std::collections::HashSet;
-use std::io::{Read, Write};
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use parking_lot::Mutex as SyncMutex;
-use sha2::{Digest, Sha256};
 use tokio::sync::Mutex as AsyncMutex;
 use vibevalley_i18n::t;
+use vibevalley_kit::storage::{CasError, StageError, StageLimits, StagingArea, verify_file_cas_async};
 use vibevalley_protocol::{ApiError, AttachmentFile, BizCode, MediaInput, MediaInputKind, MediaInputPhase, MediaInputRequest, Preview};
 
 use super::attachment::AttachmentStorage;
@@ -44,70 +44,35 @@ pub struct MediaInputStorage {
     sweeper: SyncMutex<Option<Ticker>>,
 }
 
-fn stage_upload_blocking(path: &Path, file: tokio::fs::File, r: &MediaInput, mut source: Box<dyn Read + Send>) -> Result<(PathBuf, String), ApiError> {
-    let mut file = file.try_into_std().map_err(|_| storage("media staging file busy"))?;
-    let mut buffer = [0u8; 64 * 1024];
-    let mut hash = Sha256::new();
-    let mut size = 0i64;
-    let mut prefix = Vec::with_capacity(16);
-    let start = Instant::now();
-    loop {
-        if start.elapsed() > Duration::from_secs(300) {
-            return Err(refused("inputTimeout"));
-        }
-        let n = source.read(&mut buffer).map_err(|e| {
-            if e.kind() == std::io::ErrorKind::TimedOut {
-                refused("inputTimeout")
+fn stage_upload_blocking(directory: &Path, r: &MediaInput, source: Box<dyn Read + Send>) -> Result<(PathBuf, String), ApiError> {
+    let area = StagingArea::with_prefix(directory, ".content-");
+    let limits = StageLimits::exact(r.size.max(0) as u64).with_timeout(Duration::from_secs(300));
+    let mime = r.mime.clone();
+    let staged = area
+        .stage_reader_blocking(source, limits, 16, move |prefix| {
+            if validate::container(&mime, prefix) {
+                Ok(())
             } else {
-                refused("inputDisconnected")
+                Err("invalid container signature".into())
             }
+        })
+        .map_err(|err| match err {
+            StageError::Timeout => refused("inputTimeout"),
+            StageError::Read(_) => refused("inputDisconnected"),
+            StageError::Empty | StageError::TooLarge { .. } | StageError::SizeMismatch { .. } | StageError::Rejected(_) => refused("inputInvalid"),
+            StageError::Io(e) => storage(e),
         })?;
-        if n == 0 {
-            break;
-        }
-        size += n as i64;
-        if size > r.size {
-            return Err(refused("inputInvalid"));
-        }
-        prefix.extend_from_slice(&buffer[..n.min(16 - prefix.len())]);
-        if prefix.len() == 16 && !validate::container(&r.mime, &prefix) {
-            return Err(refused("inputInvalid"));
-        }
-        hash.update(&buffer[..n]);
-        file.write_all(&buffer[..n]).map_err(storage)?;
-    }
-    if size != r.size || !validate::container(&r.mime, &prefix) {
-        return Err(refused("inputInvalid"));
-    }
-    file.sync_all().map_err(storage)?;
-    drop(file);
-    let hash = hash.finalize().iter().map(|b| format!("{b:02x}")).collect::<String>();
-    if r.hash.as_ref().is_some_and(|h| h != &hash) {
+    if r.hash.as_ref().is_some_and(|h| h != &staged.sha256) {
         return Err(refused("inputChanged"));
     }
-    Ok((path.to_path_buf(), hash))
+    Ok((staged.path, staged.sha256))
 }
 
 async fn verify_content_async(path: &Path, expected_size: u64, expected_hash: &str) -> Result<(), ApiError> {
-    let mut f = tokio::fs::File::open(path).await.map_err(storage)?;
-    let mut digest = Sha256::new();
-    let mut size = 0u64;
-    let mut buffer = [0u8; 64 * 1024];
-    loop {
-        let n = tokio::io::AsyncReadExt::read(&mut f, &mut buffer).await.map_err(storage)?;
-        if n == 0 {
-            break;
-        }
-        size += n as u64;
-        if size > expected_size {
-            return Err(refused("inputChanged"));
-        }
-        digest.update(&buffer[..n]);
-    }
-    if size != expected_size || digest.finalize().iter().map(|b| format!("{b:02x}")).collect::<String>() != expected_hash {
-        return Err(refused("inputChanged"));
-    }
-    Ok(())
+    verify_file_cas_async(path, expected_size, expected_hash).await.map_err(|err| match err {
+        CasError::HashMismatch { .. } | CasError::SizeMismatch { .. } => refused("inputChanged"),
+        CasError::Io(e) => storage(e),
+    })
 }
 
 impl MediaInputStorage {
@@ -316,18 +281,8 @@ impl MediaInputStorage {
 
     async fn upload_inner_async(&self, r: &MediaInput, source: Box<dyn Read + Send>) -> Result<(), ApiError> {
         let directory = self.staging.join(&r.id);
-        tokio::fs::create_dir_all(&directory).await.map_err(storage)?;
-        let stage_path = directory.join("content");
-        let mut options = tokio::fs::OpenOptions::new();
-        options.write(true).create_new(true);
-        #[cfg(unix)]
-        {
-            options.mode(0o600);
-        }
-        let file = options.open(&stage_path).await.map_err(storage)?;
         let record = r.clone();
-        let stage_path_owned = stage_path.clone();
-        let (path, hash) = spawn_blocking_traced(move || stage_upload_blocking(&stage_path_owned, file, &record, source))
+        let (path, hash) = spawn_blocking_traced(move || stage_upload_blocking(&directory, &record, source))
             .await
             .map_err(storage)??;
         if r.kind == MediaInputKind::Audio {

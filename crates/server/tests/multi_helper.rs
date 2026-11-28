@@ -1,7 +1,6 @@
 //! Multi-helper collaboration tests (Issue #50):
 //! 1. Auto-dispatch readonly reviewer on `in_review`, bounded by `mandate.max_bot_review_rounds`.
 //! 2. Thread `@<agent>` readonly collaborators without clobbering the primary worker.
-//! 3. Single write-lock handoff ("Hoe Handoff") committing or stashing uncommitted worktree edits.
 
 use crate::support::RouterTestExt as _;
 use std::path::PathBuf;
@@ -16,9 +15,8 @@ use vibevalley_protocol::{
 };
 use vibevalley_runtime::oar::scripted::Script;
 use vibevalley_runtime::oar::{Capabilities, ContentBlock, Installation, McpServer, ModelInfo, PermissionMode, Registry, Runtime, Session, SessionOptions};
-use vibevalley_server::runtime::{HandoffCleanup, WorktreeKey, WriteLease};
 
-use crate::support::{self, HookRuntime, TurnGate, block_on, git, quick, wait_until_transition};
+use crate::support::{self, HookRuntime, block_on, quick, wait_until_transition};
 
 fn default_look() -> Look {
     Look {
@@ -56,7 +54,6 @@ fn worker_profile(id: &str, name: &str, runtime: &str) -> Agent {
         disallowed_tools: vec![],
         env: Default::default(),
         workdir: String::new(),
-        worktree: true,
         tags: vec![],
         look: default_look(),
         from: None,
@@ -447,8 +444,10 @@ fn auto_reviewer_stops_at_max_bot_review_rounds_and_respects_disabled_profile() 
     vibevalley_i18n::set_locale("en");
     let dir = tempfile::tempdir().unwrap();
 
-    let coder_rt = HookRuntime::new("coder-rt", quick(), |turn| {
-        turn.commit(&format!("round_{}.txt", turn.index), "work\n");
+    let coder_seq = Arc::new(AtomicUsize::new(0));
+    let coder_rt = HookRuntime::new("coder-rt", quick(), move |turn| {
+        let n = coder_seq.fetch_add(1, Ordering::SeqCst);
+        turn.commit(&format!("round_{n}.txt"), &format!("work {n}\n"));
         turn.done("Done round");
     });
 
@@ -681,146 +680,5 @@ fn thread_agent_mentions_dispatch_readonly_collaborators_without_clobbering_prim
     assert_eq!(coder_rt.prompts.lock().unwrap().len(), 1);
 
     drop(listener);
-    app.close_blocking();
-}
-
-#[test]
-fn hoe_handoff_prevents_concurrent_writes_and_commits_or_stashes_dirty_worktree_before_transfer() {
-    vibevalley_i18n::set_locale("en");
-    let dir = tempfile::tempdir().unwrap();
-
-    let (entered_tx, entered_rx) = mpsc::channel::<PathBuf>();
-    let gate = TurnGate::new();
-
-    let gated_rt = HookRuntime::new("gated-rt", gate.script("Alpha finished"), move |turn| {
-        if turn.index == 0 {
-            turn.commit("base_work.txt", "committed base\n");
-            // Leave dirty tracked + untracked edits in the worktree while paused.
-            turn.write("base_work.txt", "uncommitted dirty edit from alpha\n");
-            turn.write("alpha_wip.txt", "untracked wip from alpha\n");
-            turn.done("Alpha finished");
-            let _ = entered_tx.send(turn.cwd.clone());
-        }
-    });
-
-    let successor_rt = HookRuntime::new("successor-rt", quick(), |turn| {
-        let dirty = git(&turn.cwd, &["status", "--porcelain"]);
-        assert!(dirty.is_empty(), "successor must receive clean worktree after handoff, got: {dirty}");
-        if turn.prompt.contains("Commit handoff") {
-            let content = std::fs::read_to_string(turn.cwd.join("alpha_wip.txt")).unwrap();
-            assert_eq!(content, "untracked wip from alpha\n");
-            turn.write("beta_dirty.txt", "beta uncommitted wip\n");
-        }
-        turn.done("Successor finished");
-    });
-
-    let mut registry = Registry::new();
-    registry.register(gated_rt);
-    registry.register(successor_rt);
-    let app = vibevalley_server::create_app_blocking(vibevalley_server::Config {
-        registry: Some(Arc::new(registry)),
-        probe_runtimes: false,
-        orchestrator_listens: false,
-        link_previews: false,
-        ..vibevalley_server::Config::under(dir.path())
-    })
-    .unwrap();
-    let call = |op: &str, p| app.router().call_as(Caller::User, op, p);
-
-    assert_eq!(call("repo.create", json!({ "name": "hoe-repo" })).biz_code, 0);
-    block_on(
-        app.test_internals()
-            .agent
-            .profile
-            .store
-            .save_async(worker_profile("alpha", "Alpha", "gated-rt")),
-    )
-    .unwrap();
-    block_on(
-        app.test_internals()
-            .agent
-            .profile
-            .store
-            .save_async(worker_profile("beta", "Beta", "successor-rt")),
-    )
-    .unwrap();
-    block_on(
-        app.test_internals()
-            .agent
-            .profile
-            .store
-            .save_async(worker_profile("gamma", "Gamma", "successor-rt")),
-    )
-    .unwrap();
-
-    let created = call("issue.create", json!({ "title": "Hoe handoff test", "repo": "hoe-repo", "agent": "alpha" }));
-    let issue_id = created.data.unwrap()["id"].as_str().unwrap().to_string();
-    assert_eq!(call("issue.status.update", json!({ "id": issue_id, "status": "todo" })).biz_code, 0);
-
-    let wt_path = entered_rx.recv_timeout(Duration::from_secs(10)).expect("alpha entered worktree");
-    let wt_key = block_on(WorktreeKey::local_async(&wt_path));
-    let engine = app.test_internals().board.session_engine().clone();
-
-    // While alpha holds the write lease mid-turn, a competing writer cannot acquire the same worktree lock.
-    let alpha_sid = support::board_issue(app.test_internals().board, &issue_id)
-        .unwrap()
-        .latest_session_id()
-        .unwrap()
-        .to_string();
-    assert_eq!(engine.worktree().hoe().owner(&wt_key).unwrap().session_id, alpha_sid);
-    let competing = block_on(
-        engine
-            .worktree()
-            .hoe()
-            .acquire_async(&wt_key, WriteLease::new("w-rival", Some("beta".into()), None, None)),
-    );
-    assert!(competing.is_err(), "concurrent writer on same worktree must be refused");
-
-    // Release alpha gate and finish turn 1, then handoff via Commit while leaving dirty files on disk.
-    gate.release();
-    wait_until_transition(app.ctx(), Duration::from_secs(10), "alpha in_review", || {
-        support::board_issue(app.test_internals().board, &issue_id).filter(|i| i.status == IssueStatus::InReview)
-    });
-
-    // Ensure uncommitted files still exist right before commit-handoff (dismiss KeepBranch hasn't run yet).
-    std::fs::write(wt_path.join("alpha_wip.txt"), "untracked wip from alpha\n").unwrap();
-    let rec1 = block_on(app.test_internals().board.handoff_async(
-        &issue_id,
-        "beta",
-        "Commit handoff: finish remaining work",
-        HandoffCleanup::Commit {
-            message: "alpha: commit wip before hoe handoff".into(),
-        },
-    ))
-    .unwrap();
-    assert!(rec1.cleanup_commit.is_some());
-    assert!(rec1.cleanup_stash.is_none());
-    assert_eq!(rec1.previous_owner.unwrap().session_id, alpha_sid);
-
-    let after_beta = wait_until_transition(app.ctx(), Duration::from_secs(10), "beta in_review", || {
-        support::board_issue(app.test_internals().board, &issue_id).filter(|i| i.status == IssueStatus::InReview && i.assigned_agent() == Some("beta"))
-    });
-    let beta_sid = after_beta.latest_session_id().unwrap().to_string();
-    assert!(wt_path.join("beta_dirty.txt").exists(), "beta left uncommitted scratch file");
-
-    // Handoff to gamma using HandoffCleanup::Stash.
-    let rec2 = block_on(app.test_internals().board.handoff_async(
-        &issue_id,
-        "gamma",
-        "Stash handoff: take clean branch",
-        HandoffCleanup::Stash {
-            message: "beta: stash scratch before hoe handoff".into(),
-        },
-    ))
-    .unwrap();
-    assert!(rec2.cleanup_commit.is_none());
-    assert!(rec2.cleanup_stash.is_some());
-    assert_eq!(rec2.previous_owner.unwrap().session_id, beta_sid);
-    assert!(!wt_path.join("beta_dirty.txt").exists(), "stash cleanup removes uncommitted scratch file");
-
-    wait_until_transition(app.ctx(), Duration::from_secs(10), "gamma in_review", || {
-        support::board_issue(app.test_internals().board, &issue_id).filter(|i| i.status == IssueStatus::InReview && i.assigned_agent() == Some("gamma"))
-    });
-
     app.close_blocking();
 }

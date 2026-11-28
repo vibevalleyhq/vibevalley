@@ -11,8 +11,9 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use base64::Engine;
-use sha2::{Digest, Sha256};
 use vibevalley_i18n::t;
+use vibevalley_kit::core::secret::sha256_hex;
+use vibevalley_kit::storage::{StageError, StageLimits, StagingArea, is_sha256_hex};
 use vibevalley_protocol::{ApiError, Attachment, AttachmentFile, AttachmentImportPathInput, AttachmentUpload, BizCode};
 
 use super::backend::{LocalFsBackend, StorageBackend, StorageKind};
@@ -123,7 +124,7 @@ impl AttachmentStorage {
             if bytes.is_empty() {
                 return Err(refused(t("server.attachment.emptyFile", &[])));
             }
-            let id = Sha256::digest(&bytes).iter().map(|b| format!("{b:02x}")).collect::<String>();
+            let id = sha256_hex(&bytes);
             Ok((id, bytes))
         })
         .await
@@ -160,7 +161,7 @@ impl AttachmentStorage {
         }
         let bytes_for_hash = bytes.clone();
         let (id, size) = spawn_blocking_traced(move || -> (String, i64) {
-            let id = Sha256::digest(&bytes_for_hash).iter().map(|b| format!("{b:02x}")).collect::<String>();
+            let id = sha256_hex(&bytes_for_hash);
             (id, bytes_for_hash.len() as i64)
         })
         .await
@@ -173,7 +174,7 @@ impl AttachmentStorage {
     /// Promotes a verified private staging file into CAS (atomic rename on `LocalFsBackend`,
     /// backend upload on remote/memory backends).
     pub(crate) async fn keep_staged_async(&self, path: PathBuf, hash: String, size: i64, name: String, kind: String) -> Result<Attachment, ApiError> {
-        if hash.len() != 64 || !hash.bytes().all(|b| b.is_ascii_hexdigit()) {
+        if !is_sha256_hex(&hash) {
             return Err(refused("invalid content hash".into()));
         }
         let key = attachment_key(&hash);
@@ -301,7 +302,7 @@ async fn stream_import_to_staging_async(root: &Path, input: &AttachmentImportPat
         return Err(file_too_big());
     }
 
-    let mut source = tokio::fs::File::open(path).await.map_err(|e| refused(format!("{}: {e}", path.display())))?;
+    let source = tokio::fs::File::open(path).await.map_err(|e| refused(format!("{}: {e}", path.display())))?;
     let file_meta = source.metadata().await.map_err(|e| refused(format!("{}: {e}", path.display())))?;
     if !file_meta.is_file() {
         return Err(refused(format!("{} is not a regular file", path.display())));
@@ -310,43 +311,16 @@ async fn stream_import_to_staging_async(root: &Path, input: &AttachmentImportPat
         return Err(file_too_big());
     }
 
-    tokio::fs::create_dir_all(root).await.map_err(|e| refused(e.to_string()))?;
-    let staging = root.join(format!(".put-{}", uuid::Uuid::new_v4()));
-    let streamed = async {
-        let mut dest = tokio::fs::File::create(&staging).await.map_err(|e| refused(e.to_string()))?;
-        let mut hasher = Sha256::new();
-        let mut buf = [0u8; 64 * 1024];
-        let mut total: u64 = 0;
-        loop {
-            let n = tokio::io::AsyncReadExt::read(&mut source, &mut buf).await.map_err(|e| refused(e.to_string()))?;
-            if n == 0 {
-                break;
-            }
-            total = total.saturating_add(n as u64);
-            if total > ATTACHMENT_MAX as u64 {
-                return Err(file_too_big());
-            }
-            hasher.update(&buf[..n]);
-            tokio::io::AsyncWriteExt::write_all(&mut dest, &buf[..n])
-                .await
-                .map_err(|e| refused(e.to_string()))?;
-        }
-        if total == 0 {
-            return Err(refused(t("server.attachment.emptyFile", &[])));
-        }
-        dest.sync_all().await.map_err(|e| refused(e.to_string()))?;
-        let id = hasher.finalize().iter().map(|b| format!("{b:02x}")).collect::<String>();
-        Ok((id, total as i64))
-    }
-    .await;
-
-    let (id, size) = match streamed {
-        Ok(pair) => pair,
-        Err(err) => {
-            let _ = tokio::fs::remove_file(&staging).await;
-            return Err(err);
-        }
-    };
+    let staging_area = StagingArea::with_prefix(root, ".put-");
+    let staged = staging_area
+        .stage_async_read(source, StageLimits::max_only(ATTACHMENT_MAX as u64))
+        .await
+        .map_err(|err| match err {
+            StageError::TooLarge { .. } => file_too_big(),
+            StageError::Empty => refused(t("server.attachment.emptyFile", &[])),
+            other => refused(other.to_string()),
+        })?;
+    let (id, size, staging) = (staged.sha256, staged.size as i64, staged.path);
 
     let fallback_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("file");
     let name = input

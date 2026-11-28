@@ -4,12 +4,13 @@
 //! `structure/`, and `asset/`, plus immutable version snapshots under
 //! `<home>/note_snapshot/<id>/<storage_id>/`.
 
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet};
+use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use base64::Engine as _;
-use parking_lot::RwLock;
+use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use tokio::io::AsyncWriteExt;
@@ -19,6 +20,7 @@ use vibevalley_core::note::{
     validate_manifest, validate_note_path, validate_prefix,
 };
 use vibevalley_i18n::t;
+use vibevalley_kit::cache::LruCache;
 use vibevalley_protocol::{
     ApiError, BizCode, NoteCover, NoteCoverSetRequest, NoteFileContent, NoteFileEncoding, NoteFileMeta, NoteFileWriteItem, NotePreview, NoteType,
 };
@@ -31,6 +33,7 @@ const PREVIEW_CACHE_FILE: &str = ".preview.json";
 const PREVIEW_CACHE_VERSION: u32 = 1;
 const COVER_MAX_BYTES: usize = 2 * 1024 * 1024;
 const PREVIEW_STRUCTURE_MAX_BYTES: u64 = 512 * 1024;
+const NOTE_METADATA_CACHE_CAP: NonZeroUsize = NonZeroUsize::new(256).unwrap();
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -234,8 +237,8 @@ pub struct NoteStorage {
     snapshot_root: PathBuf,
     backend: Arc<dyn StorageBackend>,
     ctx: Arc<Context>,
-    preview_cache: RwLock<HashMap<String, (i64, NotePreview)>>,
-    cover_cache: RwLock<HashMap<String, Option<NoteCover>>>,
+    preview_cache: Mutex<LruCache<String, (i64, NotePreview)>>,
+    cover_cache: Mutex<LruCache<String, Option<NoteCover>>>,
 }
 
 /// Initialized note directory metadata and raw file map returned by [`NoteStorage::init_directory_async`].
@@ -253,8 +256,8 @@ impl NoteStorage {
             snapshot_root: home.join("note_snapshot"),
             backend,
             ctx,
-            preview_cache: RwLock::new(HashMap::new()),
-            cover_cache: RwLock::new(HashMap::new()),
+            preview_cache: Mutex::new(LruCache::new(NOTE_METADATA_CACHE_CAP)),
+            cover_cache: Mutex::new(LruCache::new(NOTE_METADATA_CACHE_CAP)),
         })
     }
 
@@ -633,8 +636,8 @@ impl NoteStorage {
 
     /// Deletes `<home>/note/<id>/` and any version snapshots under `<home>/note_snapshot/<id>/`.
     pub async fn delete_directory_async(&self, note_id: &str) -> Result<(), ApiError> {
-        self.preview_cache.write().remove(note_id);
-        self.cover_cache.write().remove(note_id);
+        self.preview_cache.lock().remove(note_id);
+        self.cover_cache.lock().remove(note_id);
         let live = self.note_dir(note_id);
         let snap = self.snapshot_root.join(note_id);
         if tokio::fs::try_exists(&live).await.map_err(internal)? {
@@ -673,7 +676,7 @@ impl NoteStorage {
 
     /// Extracts (or serves from cache) a lightweight structured [`NotePreview`] keyed by `(note_id, seq)`.
     pub async fn preview_async(&self, note_id: &str, note_type: NoteType, seq: i64) -> NotePreview {
-        if let Some((cached_seq, cached)) = self.preview_cache.read().get(note_id)
+        if let Some((cached_seq, cached)) = self.preview_cache.lock().get(note_id)
             && *cached_seq == seq
         {
             return cached.clone();
@@ -687,7 +690,7 @@ impl NoteStorage {
             && disk.seq == seq
         {
             self.resolve_frame_path_async(&root, &mut disk.preview).await;
-            self.preview_cache.write().insert(note_id.to_owned(), (seq, disk.preview.clone()));
+            self.preview_cache.lock().insert(note_id.to_owned(), (seq, disk.preview.clone()));
             return disk.preview;
         }
 
@@ -720,7 +723,7 @@ impl NoteStorage {
             let _ = write_atomic_async(&cache_file, &encoded).await;
         }
 
-        self.preview_cache.write().insert(note_id.to_owned(), (seq, preview.clone()));
+        self.preview_cache.lock().insert(note_id.to_owned(), (seq, preview.clone()));
         preview
     }
 
@@ -741,11 +744,11 @@ impl NoteStorage {
 
     /// Reads the derived auto-cover metadata for `note_id` if present (cached in memory).
     pub async fn cover_async(&self, note_id: &str) -> Option<NoteCover> {
-        if let Some(cached) = self.cover_cache.read().get(note_id) {
+        if let Some(cached) = self.cover_cache.lock().get(note_id) {
             return cached.clone();
         }
         let loaded = self.read_cover_from_disk_async(note_id).await;
-        self.cover_cache.write().insert(note_id.to_owned(), loaded.clone());
+        self.cover_cache.lock().insert(note_id.to_owned(), loaded.clone());
         loaded
     }
 
@@ -812,7 +815,7 @@ impl NoteStorage {
 
         let canonical = tokio::fs::canonicalize(&cover_abs).await.unwrap_or(cover_abs);
         let wire = cover_wire(note_id, &canonical, &meta);
-        self.cover_cache.write().insert(note_id.to_owned(), Some(wire.clone()));
+        self.cover_cache.lock().insert(note_id.to_owned(), Some(wire.clone()));
         Ok(wire)
     }
 }

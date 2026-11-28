@@ -741,7 +741,7 @@ test("workspace Palette searches global commands, issues (#N/title), notes (titl
           profile: "reviewer",
           runtime: "codex",
           brief: "Inspect OAuth callback edge cases",
-          policy: { kind: "managedWorktree", repo: "vibevalley" },
+          policy: { kind: "directCwd", repo: "vibevalley", permissionMode: "bypass" },
           bindings: [{ kind: "issue", id: "iss-77" }],
           hiredAt: 1_700_000_000_000,
           runs: 2,

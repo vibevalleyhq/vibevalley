@@ -6,10 +6,10 @@ import type { MachinePlatform, MachineStatus } from "../machine/shapes.gen";
 export const SessionActionValues = ["run_command", "read_file", "edit_file", "search", "web", "mcp", "wait", "other", "thinking", "speaking_text", "none"] as const;
 export type SessionAction = (typeof SessionActionValues)[number];
 
-export const SessionControllerValues = ["user", "issueBoard", "channel", "orchestrator"] as const;
+export const SessionControllerValues = ["user", "issueBoard", "channel", "daemon"] as const;
 export type SessionController = (typeof SessionControllerValues)[number];
 
-export type ExecutionPolicy = { "kind": "directCwd", repo?: string, permissionMode: SessionPermissionMode, } | { "kind": "managedWorktree", repo: string, branch?: string, } | { "kind": "sandboxDir" };
+export type ExecutionPolicy = { "kind": "directCwd", repo?: string, permissionMode: SessionPermissionMode, } | { "kind": "sandboxDir" };
 
 export type ContextRef = { "kind": "issue", id: IssueId, refining?: boolean, } | { "kind": "channel", id: string, } | { "kind": "note", id: NoteId, };
 
@@ -228,7 +228,7 @@ export type SessionBindingInput = { id: string, binding: ContextRef, };
 
 export type SessionContextFile = { path: string, startLine?: number, endLine?: number, };
 
-export type SessionOpenWorkspaceInput = { sessionId?: string, runtime: string, cwd: string, repo?: string, model?: string, effort?: string, permissionMode?: SessionPermissionMode, title?: string, };
+export type SessionOpenWorkspaceInput = { sessionId?: string, runtime: string, cwd?: string, repo?: string, model?: string, effort?: string, permissionMode?: SessionPermissionMode, title?: string, };
 
 export type SessionCloseWorkspaceInput = { id: string, };
 
@@ -285,6 +285,20 @@ export type SessionRunCodeInput = { id: string, script: string, seed?: number, t
  * Result of a durable CodeMode script execution.
  */
 export type SessionRunCodeResult = { id: string, taskId: string, outputJson: string, executedSteps: number, replayedCalls: number, replayedSleeps: number, virtualNowMs: number, };
+
+export type SessionEvalRequest = {
+/**
+ * Target session or daemon profile id; defaults to the built-in daemon assistant when omitted.
+ */
+id?: string, on: number, want: string, };
+
+export type SessionEval = { id: string, file: string, };
+
+export type SessionApprovalListInput = { id?: string, };
+
+export type SessionApproval = { id: string, taskId: string, toolCallId: string, toolName: string, argumentsJson: string, reason: string, requestedAtMs: number, };
+
+export type SessionApprovalResolveInput = { id: string, taskId: string, toolCallId: string, approved: boolean, reason?: string, };
 
 export type SessionWatchPayload = { id: string, afterSeq?: number, };
 

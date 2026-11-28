@@ -8,28 +8,16 @@ use vibevalley_i18n::t;
 use vibevalley_protocol::{ApiError, BizCode, BranchPublication, Caller, PublishPlatform, PullRequest, PullRequestState, SubmitBranch};
 
 use super::super::board::Board;
+use super::super::types::prefers_pull_for_issue;
 use super::publish::{self, HostRun, HostRunner, HostedRepo, Publisher, hosted_origin};
 use super::snapshot::{self, GitHubPullSnapshot};
 use crate::context::error::refused as refuse;
 use crate::context::{Context, now};
-use crate::log::spawn_blocking_traced;
 use crate::repo::Repo;
 use crate::service::internal_db;
 use crate::service::issue::{KnownPullEvent, PullRecord, UpsertPullInput};
 
 pub(super) const DEFAULT_POLL_SECONDS: u64 = 180;
-
-fn prefers_for_issue(candidate: &PullRecord, current: &PullRecord) -> bool {
-    let cand_open = candidate.state == PullRequestState::Open;
-    let curr_open = current.state == PullRequestState::Open;
-    if cand_open != curr_open {
-        return cand_open;
-    }
-    if candidate.updated_at != current.updated_at {
-        return candidate.updated_at > current.updated_at;
-    }
-    candidate.number >= current.number
-}
 
 /// Synchronous in-memory index of tracked pull requests for fast issue projection.
 #[derive(Default)]
@@ -73,7 +61,7 @@ impl PullIndex {
             if item.issue_id.as_deref() != Some(issue_id) {
                 continue;
             }
-            if best.is_none_or(|curr| prefers_for_issue(item, curr)) {
+            if best.is_none_or(|curr| prefers_pull_for_issue(item, curr)) {
                 best = Some(item);
             }
         }
@@ -140,10 +128,6 @@ impl Pull {
         let mut idx = PullIndex::default();
         idx.load(rows);
         let index = Arc::new(Mutex::new(idx));
-        if let Some(board) = &board {
-            let idx = index.clone();
-            board.use_pull_of_issue_async(Arc::new(move |issue_id| idx.lock().of_issue(issue_id))).await;
-        }
         Ok(Arc::new(Pull {
             ctx,
             index,
@@ -220,19 +204,7 @@ impl Pull {
 
     async fn infer_farm_repo_async(&self, cwd: &str) -> Option<String> {
         let repos = self.repos.clone()?;
-        let discovered_root = vibevalley_git::Repo::discover_async(Path::new(cwd))
-            .await
-            .ok()
-            .flatten()
-            .map(|r| r.root().to_path_buf())?;
-        let root_real = tokio::fs::canonicalize(&discovered_root).await.ok()?;
-        let listed = repos.list_async().await;
-        for p in listed {
-            if tokio::fs::canonicalize(&p.path).await.ok().as_ref() == Some(&root_real) {
-                return Some(p.name);
-            }
-        }
-        None
+        repos.infer_name_for_dir_async(Path::new(cwd)).await
     }
 
     pub(crate) async fn hosted_repo_of_async(&self, name: &str, platform: Option<PublishPlatform>) -> Result<HostedRepo, ApiError> {
@@ -248,24 +220,17 @@ impl Pull {
             .repos
             .clone()
             .ok_or_else(|| refuse(BizCode::RepoRefused, t("server.repo.github.notGithub", &[])))?;
-        let listed = repos.list_async().await;
-        let name = name.to_string();
-        spawn_blocking_traced(move || {
-            let found = listed
-                .into_iter()
-                .find(|p| p.name == name)
-                .ok_or_else(|| refuse(BizCode::RepoRefused, t("server.repo.github.notGithub", &[])))?;
-            let origin = vibevalley_git::read::remote_url(&found.path, "origin").ok().flatten().unwrap_or_default();
-            let hosted = hosted_origin(&origin).ok_or_else(|| refuse(BizCode::RepoRefused, t("server.repo.github.notGithub", &[])))?;
-            if let Some(want) = platform
-                && hosted.platform != want
-            {
-                return Err(refuse(BizCode::RepoRefused, t("server.repo.github.notGithub", &[])));
-            }
-            Ok(hosted)
-        })
-        .await
-        .map_err(|_| refuse(BizCode::RepoRefused, t("server.repo.github.notGithub", &[])))?
+        let origin = repos
+            .origin_url_async(name)
+            .await
+            .ok_or_else(|| refuse(BizCode::RepoRefused, t("server.repo.github.notGithub", &[])))?;
+        let hosted = hosted_origin(&origin).ok_or_else(|| refuse(BizCode::RepoRefused, t("server.repo.github.notGithub", &[])))?;
+        if let Some(want) = platform
+            && hosted.platform != want
+        {
+            return Err(refuse(BizCode::RepoRefused, t("server.repo.github.notGithub", &[])));
+        }
+        Ok(hosted)
     }
 
     pub(crate) async fn github_remote_async(&self, name: &str) -> Result<String, ApiError> {

@@ -351,3 +351,208 @@ fn collab_suggestions_presence_and_history_work_for_notes() {
 
     started.close_blocking();
 }
+
+#[test]
+fn non_destructive_media_annotations_and_review_checklist_bidirectional_sync_end_to_end() {
+    let dir = tempfile::tempdir().unwrap();
+    let started = start(dir.path());
+    let hub = started.router().clone();
+    let call = |op: &str, p: Value| hub.call_as(Caller::User, op, p);
+
+    let issue = ok(call("issue.create", json!({ "title": "Fix dark header contrast" })));
+    let issue_id = issue["id"].as_str().unwrap().to_string();
+
+    // 1. Create Doc note with a clean binary PNG asset + Media block + Compare block + Table with columnWidths.
+    let doc = ok(call("note.create", json!({ "title": "UI Audit Pass", "noteType": "doc", "announce": false })));
+    let doc_id = doc["id"].as_str().unwrap().to_string();
+
+    // Write raw image bytes into asset/ and capture SHA-256 hash to prove zero pixel mutation.
+    let png_b64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+    let written_asset = ok(call(
+        "note.file.write",
+        json!({
+            "id": doc_id,
+            "files": [{
+                "path": "asset/screen.png",
+                "content": png_b64,
+                "encoding": "base64",
+                "mime": "image/png"
+            }]
+        }),
+    ));
+    let original_hash = written_asset["files"][0]["hash"].as_str().unwrap().to_string();
+
+    ok(call(
+        "note.doc.appendBlock",
+        json!({
+            "id": doc_id,
+            "block": {
+                "id": "b_media",
+                "type": "media",
+                "mediaKind": "image",
+                "src": "asset/screen.png",
+                "caption": "Main screen"
+            }
+        }),
+    ));
+    ok(call(
+        "note.doc.appendBlock",
+        json!({
+            "id": doc_id,
+            "block": {
+                "id": "b_table",
+                "type": "table",
+                "headers": ["Surface", "Contrast"],
+                "rows": [["Header", "3.1:1"]],
+                "alignments": ["left", "right"],
+                "columnWidths": [240, 110]
+            }
+        }),
+    ));
+
+    // 2. Upsert two non-destructive annotations (out-of-bounds rect clamped + auto-numbered).
+    let up1 = ok(call(
+        "note.annotation.upsert",
+        json!({
+            "id": doc_id,
+            "blockId": "b_media",
+            "annotation": {
+                "id": "ann-1",
+                "number": 0,
+                "kind": "rect",
+                "rect": { "x": 0.1, "y": 0.2, "w": 0.35, "h": 0.12 },
+                "severity": "p0",
+                "title": "Header contrast too low",
+                "body": "Switch to text-ink token",
+                "status": "open",
+                "issueId": issue_id,
+                "author": "user"
+            }
+        }),
+    ));
+    assert_eq!(up1["annotations"].as_array().unwrap().len(), 1);
+    assert_eq!(up1["annotations"][0]["number"], 1);
+    assert_eq!(up1["summary"]["total"], 1);
+    assert_eq!(up1["summary"]["open"], 1);
+    assert_eq!(up1["summary"]["p0"], 1);
+    assert_eq!(up1["summary"]["linkedIssues"], 1);
+
+    let up2 = ok(call(
+        "note.annotation.upsert",
+        json!({
+            "id": doc_id,
+            "blockId": "b_media",
+            "annotation": {
+                "id": "",
+                "number": 0,
+                "kind": "arrow",
+                "rect": { "x": 0.8, "y": 0.85, "w": 0.0, "h": 0.0 },
+                "to": { "x": 1.25, "y": 0.9 },
+                "severity": "ux",
+                "title": "Badge overlaps border",
+                "status": "open"
+            }
+        }),
+    ));
+    assert_eq!(up2["annotations"].as_array().unwrap().len(), 2);
+    let ann2_id = up2["annotations"][1]["id"].as_str().unwrap().to_string();
+    assert_eq!(up2["annotations"][1]["number"], 2);
+    assert_eq!(up2["annotations"][1]["to"]["x"], 1.0);
+
+    // Verify original PNG asset bytes & SHA-256 are 100% untouched (zero pixel mutation).
+    let asset_after = ok(call("note.file.get", json!({ "id": doc_id, "path": "asset/screen.png" })));
+    assert_eq!(asset_after["hash"], original_hash);
+    assert_eq!(asset_after["content"], png_b64);
+
+    // Verify DocView projects annotationSummary, Table.columnWidths, and issue links.
+    let doc_view = ok(call("note.doc.view", json!({ "id": doc_id })));
+    assert_eq!(doc_view["annotationSummary"]["total"], 2);
+    assert_eq!(doc_view["annotationSummary"]["p0"], 1);
+    assert_eq!(doc_view["annotationSummary"]["ux"], 1);
+    assert!(doc_view["extractedLinks"].as_array().unwrap().iter().any(|l| l["id"] == issue_id));
+    let tbl = doc_view["blocks"].as_array().unwrap().iter().find(|b| b["id"] == "b_table").unwrap();
+    assert_eq!(tbl["columnWidths"], json!([240, 110]));
+
+    // 3. Phase 2: Sync Review auto-creates built-in UI/Product Review Checklist Base + appends BaseEmbed.
+    let sync = ok(call("note.base.syncReview", json!({ "id": doc_id })));
+    assert_eq!(sync["createdBase"], true);
+    assert_eq!(sync["linkedCount"], 2);
+    assert_eq!(sync["updatedRows"], 2);
+    assert_eq!(sync["updatedAnnotations"], 2);
+    assert_eq!(sync["summary"]["linkedRows"], 2);
+    let base_id = sync["baseNoteId"].as_str().unwrap().to_string();
+    let rows = sync["baseSnapshot"]["rows"].as_array().unwrap();
+    assert_eq!(rows.len(), 2);
+    let row1 = rows
+        .iter()
+        .find(|r| r["annotationRef"]["annotationId"] == "ann-1")
+        .expect("row linked to ann-1");
+    let row1_id = row1["id"].as_str().unwrap().to_string();
+    assert_eq!(row1["annotationRef"]["noteId"], doc_id);
+    assert_eq!(row1["annotationRef"]["blockId"], "b_media");
+    assert_eq!(row1["cells"]["c_severity"]["value"], "p0");
+    assert_eq!(row1["cells"]["c_screenshot"]["value"], "asset/screen.png");
+
+    // 4. Bidirectional propagation: editing the Base row via note.base.upsertRow updates the Doc annotation!
+    ok(call(
+        "note.base.upsertRow",
+        json!({
+            "id": base_id,
+            "sheetId": "sheet1",
+            "rowId": row1_id,
+            "cells": {
+                "c_status": { "_tag": "text", "value": "resolved" },
+                "c_severity": { "_tag": "text", "value": "p2" }
+            }
+        }),
+    ));
+    let doc_after_base_edit = ok(call("note.doc.view", json!({ "id": doc_id })));
+    assert_eq!(doc_after_base_edit["annotationSummary"]["resolved"], 1);
+    assert_eq!(doc_after_base_edit["annotationSummary"]["open"], 1);
+    let media_blk = doc_after_base_edit["blocks"].as_array().unwrap().iter().find(|b| b["id"] == "b_media").unwrap();
+    let ann1_after = media_blk["annotations"].as_array().unwrap().iter().find(|a| a["id"] == "ann-1").unwrap();
+    assert_eq!(ann1_after["status"], "resolved");
+    assert_eq!(ann1_after["severity"], "p2");
+    assert_eq!(ann1_after["baseRowId"], row1_id);
+
+    // 5. Reverse direction: deleting ann-2 removes it from Doc and clears annotationRef on Base row.
+    let del = ok(call(
+        "note.annotation.delete",
+        json!({ "id": doc_id, "blockId": "b_media", "annotationId": ann2_id }),
+    ));
+    assert_eq!(del["annotations"].as_array().unwrap().len(), 1);
+    assert_eq!(del["syncedBaseNoteId"], base_id);
+    let base_after_del = ok(call("note.base.view", json!({ "id": base_id })));
+    let cleared_row = base_after_del["rows"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["id"] == del["syncedBaseRowId"])
+        .unwrap();
+    assert!(cleared_row.get("annotationRef").is_none());
+
+    // 6. Media note still-frame annotations also work via note.annotation.upsert & delete.
+    let media_note = ok(call("note.create", json!({ "title": "Still Audit", "noteType": "media", "announce": false })));
+    let media_id = media_note["id"].as_str().unwrap().to_string();
+    let m_up = ok(call(
+        "note.annotation.upsert",
+        json!({
+            "id": media_id,
+            "annotation": {
+                "id": "m-ann-1",
+                "number": 1,
+                "kind": "pin",
+                "rect": { "x": 0.4, "y": 0.5, "w": 0.0, "h": 0.0 },
+                "severity": "p1",
+                "title": "Frame artifact",
+                "status": "open",
+                "issueId": issue_id
+            }
+        }),
+    ));
+    assert_eq!(m_up["annotations"].as_array().unwrap().len(), 1);
+    let m_links = ok(call("note.link.list", json!({ "entityKind": "note", "entityId": media_id })));
+    assert!(m_links["outgoing"].as_array().unwrap().iter().any(|l| l["targetId"] == issue_id));
+
+    started.close_blocking();
+}

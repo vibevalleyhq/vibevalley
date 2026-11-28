@@ -151,7 +151,6 @@ pub async fn run(client: &Client, cmd: AgentCmd) -> Done {
                 disallowed_tools: vec![],
                 env: Default::default(),
                 workdir: String::new(),
-                worktree: true,
                 tags: vec![],
                 look: default_look(role),
                 voice: None,

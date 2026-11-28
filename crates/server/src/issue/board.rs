@@ -15,20 +15,20 @@ use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex as AsyncMutex;
 use vibevalley_core::{Move, status_move};
+use vibevalley_kit::sync::{KeyLock, KeyLockGuard};
 use vibevalley_protocol::{
-    ActorRef, ApiError, AppliedIssue, Assignment, Attachment, BacklogTriageSuggestion, BizCode, Deliverable, HumanPause, HumanPauseSource, Issue,
-    IssueCanceled, IssueConstraints, IssueMandate, IssueRelation, IssueStageKind as StageKind, IssueStatus, JsNumber, Landing, Outcome, Phase, Priority,
-    ResumeCondition, Run, RunTriggerKind, Session, SliceBundle, StuckReason,
+    ActorRef, ApiError, AppliedIssue, Assignment, Attachment, BacklogTriageSuggestion, BizCode, Deliverable, DeliveryReceipt, HumanPause, HumanPauseSource,
+    Issue, IssueCanceled, IssueConstraints, IssueMandate, IssueRelation, IssueStageKind as StageKind, IssueStatus, JsNumber, Landing, Outcome, Phase, Priority,
+    PullRequestState, ResumeCondition, Run, RunTriggerKind, Session, SessionClose, SliceBundle, StuckReason,
 };
 use vibevalley_runtime::oar::Registry;
 
-use super::store::{BoardConfig, BoardError, CronOfIssue, IssueChange, IssueState, Opened, PullOfIssue, Result, Undelivered};
-use crate::channel::Chat;
+use super::store::{BoardConfig, BoardError, IssueChange, IssueState, Opened, Result, find_issue};
+use super::types::{board_io, read_round};
 use crate::context::{AsyncRequestKeys, Context, now};
 use crate::repo::Repo;
 use crate::runtime::{
-    Changes, Delivery, DraftEnd, Hire, Landed, Leave, MailboxSource, MailboxStatus, OnDisk, Rounds, RunMode, Runtime, SessionEngine, Worktree, find_issue, io,
-    issue_branch, trigger_of,
+    DraftEnd, Hire, MailboxSource, MailboxStatus, Report, RoundEnd, Rounds, RunMode, Runtime, SessionEngine, combine_report_and_failure, trigger_of,
 };
 use crate::storage::Storage;
 
@@ -250,18 +250,16 @@ pub struct Board {
     pub(super) state: Arc<IssueState>,
     pub(super) runtime: Arc<Runtime>,
     pub(super) repos: Option<Arc<Repo>>,
-    channel: Option<Arc<Chat>>,
     storage: Option<Arc<Storage>>,
     pub(super) create_keys: AsyncRequestKeys<AppliedIssue>,
     pub(super) status_keys: AsyncRequestKeys<AppliedIssue>,
     /// Held for short workflow state checks and room reservations so slow
-    /// git/worktree/dispatch I/O runs outside this coarse lock.
+    /// dispatch I/O runs outside this coarse lock.
     pub(super) work: AsyncMutex<()>,
     pub(super) triage_path: PathBuf,
     pub(super) triage: AsyncMutex<TriageStore>,
-    issue_locks: Mutex<HashMap<String, Weak<AsyncMutex<()>>>>,
+    issue_locks: KeyLock<String>,
     in_flight: Mutex<HashMap<String, Option<String>>>,
-    join_lock: AsyncMutex<()>,
     lock: Mutex<Option<tokio::fs::File>>,
 }
 
@@ -280,11 +278,19 @@ impl Drop for InFlightGuard<'_> {
 struct Heard(Weak<Board>);
 
 impl Rounds for Heard {
-    fn drafted(&self, end: DraftEnd) -> vibevalley_runtime::agent::durable::BoxFuture<'_, ()> {
+    fn lookup_issue<'a>(&'a self, issue_id: &'a str) -> vibevalley_runtime::agent::durable::BoxFuture<'a, Option<Issue>> {
+        let weak = self.0.clone();
+        Box::pin(async move {
+            let board = weak.upgrade()?;
+            board.issue_async(issue_id).await.ok().flatten()
+        })
+    }
+
+    fn round_ended(&self, end: RoundEnd) -> vibevalley_runtime::agent::durable::BoxFuture<'_, ()> {
         let weak = self.0.clone();
         Box::pin(async move {
             if let Some(board) = weak.upgrade() {
-                board.finish_draft_async(end).await;
+                board.finish_round_ended_async(end).await;
             }
         })
     }
@@ -299,18 +305,6 @@ impl Rounds for Heard {
     }
 }
 
-fn pending_delivery(issue: &Issue) -> Option<&vibevalley_protocol::ProjectCheckReceipt> {
-    if issue.status.is_closed() || issue.deliver != Deliverable::Change {
-        return None;
-    }
-    issue
-        .delivery_evidence
-        .as_ref()?
-        .check
-        .as_ref()
-        .filter(|r| r.status != vibevalley_protocol::ProjectCheckStatus::Failed && r.target_commit != r.candidate_commit)
-}
-
 impl Board {
     /// The board as stored, without taking it: for reading while another
     /// process holds it. Working sessions show as they were last stored.
@@ -318,17 +312,18 @@ impl Board {
         IssueState::snapshot_async(path).await
     }
 
+    /// Returns issue ids that currently hold a persisted human pause so boot
+    /// session recovery skips auto-resuming them.
+    pub async fn paused_issue_ids_async(ctx: &Context) -> Result<HashSet<String>> {
+        let issues = ctx.service.issue.all().await?;
+        Ok(issues.into_iter().filter(|i| i.mandate.is_paused()).map(|i| i.id).collect())
+    }
+
     /// Takes the board lock and wires issue workflow coordination onto an already-opened
     /// [`Runtime`]. Settles published deliveries, cancels lost issues, and dismisses
     /// cut-short drafts from `opened`. Call `refresh_queue_async` afterwards to send what waits.
-    pub async fn open_async(
-        ctx: Arc<Context>,
-        runtime: Arc<Runtime>,
-        opened: Opened,
-        repos: Option<Arc<Repo>>,
-        channel: Option<Arc<Chat>>,
-    ) -> Result<Arc<Board>> {
-        Self::with_storage(ctx, runtime, opened, repos, channel, None).await
+    pub async fn open_async(ctx: Arc<Context>, runtime: Arc<Runtime>, opened: Opened, repos: Option<Arc<Repo>>) -> Result<Arc<Board>> {
+        Self::with_storage(ctx, runtime, opened, repos, None).await
     }
 
     /// Takes the board lock with optional content-addressed [`Storage`] for resolving
@@ -338,14 +333,13 @@ impl Board {
         runtime: Arc<Runtime>,
         opened: Opened,
         repos: Option<Arc<Repo>>,
-        channel: Option<Arc<Chat>>,
         storage: Option<Arc<Storage>>,
     ) -> Result<Arc<Board>> {
         let config = runtime.config();
-        tokio::fs::create_dir_all(config.data_dir.join("reports")).await.map_err(io)?;
-        tokio::fs::create_dir_all(config.data_dir.join("records")).await.map_err(io)?;
+        tokio::fs::create_dir_all(config.data_dir.join("reports")).await.map_err(board_io)?;
+        tokio::fs::create_dir_all(config.data_dir.join("records")).await.map_err(board_io)?;
         let lock_path = config.data_dir.join("board.lock");
-        let file = tokio::fs::File::create(&lock_path).await.map_err(io)?.into_std().await;
+        let file = tokio::fs::File::create(&lock_path).await.map_err(board_io)?.into_std().await;
         // A child process forked while the last holder had it open may hold
         // it a moment longer.
         let deadline = Instant::now() + Duration::from_secs(2);
@@ -366,49 +360,26 @@ impl Board {
             state,
             runtime,
             repos,
-            channel,
             storage,
             create_keys: AsyncRequestKeys::default(),
             status_keys: AsyncRequestKeys::default(),
             work: AsyncMutex::new(()),
             triage_path,
             triage: AsyncMutex::new(triage_store),
-            issue_locks: Mutex::new(HashMap::new()),
+            issue_locks: KeyLock::new(),
             in_flight: Mutex::new(HashMap::new()),
-            join_lock: AsyncMutex::new(()),
             lock: Mutex::new(Some(tokio::fs::File::from_std(file))),
         });
         board.runtime.session_engine().on_rounds(Box::new(Heard(Arc::downgrade(&board))));
-        board.recover_published_deliveries_async().await?;
-        for id in opened.lost {
-            if let Ok(issue) = board.stored_async(&id).await
-                && !issue.status.is_closed()
-                && issue.latest_session_id().is_some()
-                && pending_delivery(&issue).is_none()
-            {
-                board.close_issue_async(&issue, IssueCanceled::Lost).await?;
-            }
-        }
         // A draft cut short leaves its issue as it was.
         for draft in opened.drafts {
-            board.runtime.session_engine().dismiss_async(&draft, Leave::Discard).await?;
+            board.runtime.session_engine().dismiss_async(&draft).await?;
         }
         Ok(board)
     }
 
-    pub(super) async fn issue_lock(&self, id: &str) -> tokio::sync::OwnedMutexGuard<()> {
-        let lock = {
-            let mut map = self.issue_locks.lock();
-            map.retain(|_, v| v.strong_count() > 0);
-            if let Some(existing) = map.get(id).and_then(Weak::upgrade) {
-                existing
-            } else {
-                let fresh = Arc::new(AsyncMutex::new(()));
-                map.insert(id.to_string(), Arc::downgrade(&fresh));
-                fresh
-            }
-        };
-        lock.lock_owned().await
+    pub(super) async fn issue_lock(&self, id: &str) -> KeyLockGuard<'_, String> {
+        self.issue_locks.lock(id.to_owned()).await
     }
 
     fn reserve_in_flight(&self, issue: &Issue) -> InFlightGuard<'_> {
@@ -421,8 +392,13 @@ impl Board {
 
     /// Standalone convenience constructor opening a [`Runtime`] backed by `registry`.
     pub async fn open_standalone_async(ctx: Arc<Context>, registry: Arc<Registry>, config: BoardConfig) -> Result<Arc<Board>> {
-        let (runtime, opened) = Runtime::open_with_registry_async(ctx.clone(), registry, config).await?;
-        Board::open_async(ctx, runtime, opened, None, None).await
+        let paused = Self::paused_issue_ids_async(&ctx).await?;
+        let drivers = Arc::new(crate::runtime::RuntimeDriver {
+            registry,
+            model: config.model.clone(),
+        });
+        let (runtime, opened) = Runtime::open_with_paused_async(ctx.clone(), drivers, config, &paused).await?;
+        Board::open_async(ctx, runtime, opened, None).await
     }
 
     /// Lets the board go: active sessions stop and the lock is released.
@@ -451,16 +427,46 @@ impl Board {
         self.runtime.session_engine()
     }
 
-    pub fn worktree(&self) -> &Worktree {
-        self.runtime.worktree()
-    }
-
     pub fn repos(&self) -> Option<&Arc<Repo>> {
         self.repos.as_ref()
     }
 
-    pub fn channel(&self) -> Option<&Arc<Chat>> {
-        self.channel.as_ref()
+    /// Normalizes an optional advisory repository hint to a registered repo name when matched,
+    /// without requiring the path to be a local Git repository.
+    pub(super) async fn normalize_repo_hint_async(&self, raw: &str) -> String {
+        let trimmed = raw.trim();
+        if trimmed.is_empty() {
+            return String::new();
+        }
+        if let Some(repos) = &self.repos {
+            if let Some(name) = repos.infer_name_for_dir_async(Path::new(trimmed)).await {
+                return name;
+            }
+            if repos.resolve_dir_async(trimmed).await.is_some() {
+                return trimmed.to_string();
+            }
+        }
+        trimmed.to_string()
+    }
+
+    /// Resolves an optional working directory for an issue session.
+    /// Returns `None` for directoryless sessions (no repo hint, remote machine, or non-local path).
+    pub(super) async fn resolve_issue_cwd_async(&self, issue: &Issue, drive_is_local: bool) -> Option<PathBuf> {
+        if !drive_is_local {
+            return None;
+        }
+        let hint = issue.repo.as_deref().map(str::trim).filter(|r| !r.is_empty())?;
+        if let Some(repos) = &self.repos
+            && let Some(dir) = repos.resolve_dir_async(hint).await
+        {
+            return Some(dir);
+        }
+        let path = PathBuf::from(hint);
+        if path.is_dir() {
+            return Some(path);
+        }
+        let under_repos = self.config().repos_dir.as_ref()?.join(hint);
+        under_repos.is_dir().then_some(under_repos)
     }
 
     pub fn storage(&self) -> Option<&Arc<Storage>> {
@@ -531,7 +537,106 @@ impl Board {
 
     /// The issue's runs, oldest first.
     pub async fn runs_async(&self, issue: &str) -> Result<Vec<Run>> {
-        self.runtime.runs_async(issue).await
+        Ok(self.ctx.service.session.runs(issue).await?)
+    }
+
+    /// Evaluates whether an active built-in worker run has criteria ready for grading.
+    pub async fn review_work_async(&self, vendor: &str, run_id: &str, candidate: &str) -> Result<Option<(Issue, Report)>> {
+        let Some(snap) = self.runtime.active_run_snapshot_async(vendor, run_id).await? else {
+            return Ok(None);
+        };
+        let Some(issue_id) = snap.run.issue.as_deref() else { return Ok(None) };
+        let Some(issue) = self.issue_async(issue_id).await? else {
+            return Ok(None);
+        };
+        if issue.criteria.iter().all(|line| line.trim().is_empty()) {
+            return Ok(None);
+        }
+        let round = read_round(&issue, vibevalley_runtime::oar::StopReason::Completed, snap.report.as_ref(), candidate, &[]);
+        if round.outcome != Outcome::Completed || !round.questions.is_empty() {
+            return Ok(None);
+        }
+        Ok(Some((
+            issue,
+            Report {
+                summary: round.summary,
+                checks: round.checks,
+                answer: round.answer,
+                ..Report::default()
+            },
+        )))
+    }
+
+    /// Settles an issue-bound session round reported by [`SessionEngine`].
+    async fn finish_round_ended_async(&self, end: RoundEnd) {
+        let Some(issue) = self.issue_async(&end.issue_id).await.ok().flatten() else {
+            return;
+        };
+        if end.refining {
+            self.finish_draft_async(DraftEnd {
+                spent: end.spent,
+                session: end.session,
+                issue,
+                reason: end.reason,
+                said: end.said,
+                asked: end.asked,
+            })
+            .await;
+            return;
+        }
+        let failed = matches!(
+            end.reason,
+            vibevalley_runtime::oar::StopReason::Error | vibevalley_runtime::oar::StopReason::MaxTurns
+        );
+        let mut round = read_round(
+            &issue,
+            end.reason.clone(),
+            end.report.as_ref(),
+            end.graded_output.as_deref().unwrap_or(&end.said),
+            &end.asked,
+        );
+        if failed {
+            let error_fact = end.failure.as_deref().map(str::trim).filter(|e| !e.is_empty()).or_else(|| {
+                end.report.as_ref().map(|_| match end.reason {
+                    vibevalley_runtime::oar::StopReason::MaxTurns => "达到最大轮次",
+                    _ => "会话连接异常断开",
+                })
+            });
+            if let Some(error) = error_fact {
+                round.summary = combine_report_and_failure(end.report.as_ref(), error);
+            }
+        } else if let Some(error) = end.failure.as_deref().map(str::trim).filter(|e| !e.is_empty())
+            && round.outcome == Outcome::Interrupted
+        {
+            round.summary = combine_report_and_failure(end.report.as_ref(), error);
+        }
+        let outcome = round.outcome;
+        let sessions = self.session_engine();
+        let mode = sessions.helper_mode_async(&end.session, Some(&issue)).await;
+        let tx_hook = if matches!(mode, RunMode::ReadOnlyReview | RunMode::ReadOnlyCollaborator) {
+            None
+        } else {
+            Some(self.state.issue_change_hook(
+                issue.id.clone(),
+                IssueChange::Reported {
+                    questions: (round.outcome != Outcome::Interrupted).then_some(round.questions),
+                    checks: round.checks,
+                    answer: round.answer.clone(),
+                    delivery_receipt: round.delivery_receipt,
+                },
+            ))
+        };
+        sessions.finish_run_record_async(&end.session.id, end.run_id.as_deref(), outcome).await;
+        if let Err(error) = sessions
+            .settle_report_async(&end.session, outcome, round.summary, end.spent, round.answer, end.run_id, tx_hook)
+            .await
+        {
+            eprintln!("vibevalley: settling {}: {error}", end.session.id);
+            return;
+        }
+        if let Some(r) = end.report.as_ref() {
+            sessions.enqueue_remember_notes_async(&end.session, r).await;
+        }
     }
 
     pub(super) async fn stored_async(&self, reference: &str) -> Result<Issue> {
@@ -548,21 +653,13 @@ impl Board {
 
     pub async fn create_async(&self, new: NewIssue) -> Result<Issue> {
         let machine_id = new.machine_id.as_deref().map(str::trim).filter(|m| !m.is_empty()).map(String::from);
-        let remote_machine = machine_id.as_deref().is_some_and(|m| m != vibevalley_protocol::LOCAL_MACHINE_ID);
-        let is_remote_repo_url = |raw: &str| {
-            let trimmed = raw.trim();
-            trimmed.starts_with("https://") || trimmed.starts_with("http://") || trimmed.starts_with("ssh://") || trimmed.starts_with("git@")
-        };
-        let (repo, remote_repo_ref) = match &new.repo {
+        let repo_root_from_repo = match &new.repo {
             Some(path) => {
                 let raw = path.to_string_lossy();
-                if remote_machine && is_remote_repo_url(&raw) {
-                    (None, Some(raw.trim().to_string()))
-                } else {
-                    (Some(self.worktree().ensure_repo_async(self.worktree().repo_dir(&raw)).await?), None)
-                }
+                let norm = self.normalize_repo_hint_async(&raw).await;
+                (!norm.is_empty()).then_some(norm)
             }
-            None => (None, None),
+            None => None,
         };
         if !new.agent.trim().is_empty() {
             self.runtime.driver().check(new.agent.trim())?;
@@ -576,11 +673,6 @@ impl Board {
         {
             return Err(BoardError::Other("an acceptance issue needs a check command".into()));
         }
-        let repo_root_from_repo = match (&repo, remote_repo_ref) {
-            (Some(r), _) => Some(self.worktree().repo_ref_async(r.root()).await),
-            (None, Some(url)) => Some(url),
-            (None, None) => None,
-        };
         let attachments = self.resolve_attachments_async(&new.attachments).await?;
 
         let id = {
@@ -683,7 +775,7 @@ impl Board {
         to: IssueStatus,
         words: Option<&'a str>,
     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Move>> + Send + 'a>> {
-        self.move_reviewed_async(reference, to, words, None)
+        self.move_with_receipt_async(reference, to, words, None, None)
     }
 
     pub fn move_reviewed_async<'a>(
@@ -692,6 +784,17 @@ impl Board {
         to: IssueStatus,
         words: Option<&'a str>,
         seen: Option<&'a vibevalley_protocol::ReviewRevision>,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Move>> + Send + 'a>> {
+        self.move_with_receipt_async(reference, to, words, seen, None)
+    }
+
+    pub fn move_with_receipt_async<'a>(
+        &'a self,
+        reference: &'a str,
+        to: IssueStatus,
+        words: Option<&'a str>,
+        seen: Option<&'a vibevalley_protocol::ReviewRevision>,
+        delivery_receipt: Option<DeliveryReceipt>,
     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Move>> + Send + 'a>> {
         Box::pin(async move {
             let initial = self.stored_async(reference).await?;
@@ -760,7 +863,7 @@ impl Board {
                 }
                 Move::Track => {
                     if let Some(s) = self.on_board_async(&issue).await {
-                        self.session_engine().dismiss_async(&s.id, Leave::KeepBranch).await?;
+                        self.session_engine().dismiss_async(&s.id).await?;
                     }
                     let _work = self.work.lock().await;
                     let mut tracked = self.stored_async(&issue.id).await?;
@@ -773,7 +876,7 @@ impl Board {
                     self.state.put_issues_async(&[tracked]).await?;
                 }
                 Move::Complete => {
-                    self.complete_for_issue_async(&issue).await?;
+                    self.complete_for_issue_async(&issue, delivery_receipt).await?;
                     drop(issue_guard);
                     self.refresh_queue_unlocked_async().await;
                 }
@@ -835,7 +938,7 @@ impl Board {
             if let Some(session) = board_session
                 && let Some(steered) = self.session_engine().steer_async(&session, words).await
             {
-                return steered;
+                return steered.map_err(BoardError::from);
             }
             match issue.status {
                 IssueStatus::Backlog | IssueStatus::Todo => {
@@ -918,7 +1021,7 @@ impl Board {
             let result = sessions
                 .steer_async(&session, words)
                 .await
-                .unwrap_or_else(|| Err(BoardError::Other("the active run ended during handoff".into())));
+                .unwrap_or_else(|| Err(crate::runtime::RuntimeError::Other("the active run ended during handoff".into())));
             if let Err(err) = sessions
                 .settle_mailbox_async(mail_entry.id, result.is_ok(), result.as_ref().err().map(|e| e.to_string()).as_deref())
                 .await
@@ -928,7 +1031,7 @@ impl Board {
             if let Err(e) = &result {
                 sessions.settle_words_async(&sub.id, false, Some(&e.to_string())).await?;
             }
-            return result;
+            return result.map_err(BoardError::from);
         }
         if matches!(issue.status, IssueStatus::Backlog | IssueStatus::Todo) {
             return Ok(());
@@ -961,6 +1064,20 @@ impl Board {
             self.change_async(&issue.id, IssueChange::Answered).await?;
         }
         Ok(())
+    }
+
+    /// Records an explicit human pause on an issue without touching its runtime session.
+    pub async fn mark_human_pause_async(&self, issue_id: &str, source: HumanPauseSource, session_id: Option<String>) -> Result<Issue> {
+        let pause = HumanPause {
+            source,
+            clear_condition: ResumeCondition::ExplicitUserResume,
+            paused_at: now(),
+            session_id,
+            note: None,
+        };
+        let _issue_guard = self.issue_lock(issue_id).await;
+        let _work = self.work.lock().await;
+        self.change_async(issue_id, IssueChange::Paused(pause)).await
     }
 
     /// Stops the running turn of the issue's session (its drafter's while
@@ -998,13 +1115,8 @@ impl Board {
         Ok(())
     }
 
-    /// Sends queued issues while there is room, in board order. Children in
-    /// review are merged into their parents first.
+    /// Sends queued issues while there is room, in board order.
     pub async fn refresh_queue_async(&self) -> Result<()> {
-        {
-            let _join = self.join_lock.lock().await;
-            self.join_children_async().await?;
-        }
         self.refresh_queue_unlocked_async().await;
         self.retry_replies_unlocked_async().await;
         Ok(())
@@ -1026,7 +1138,7 @@ impl Board {
             }
         };
         for id in queued {
-            if let Err(e) = self.send_unlocked_async(&id, None, RunTriggerKind::Issue).await {
+            if let Err(e) = self.send_queued_unlocked_async(&id).await {
                 // One that cannot go any more leaves the queue.
                 tracing::warn!(issue_id = %id, error = %e, "issue.board queued issue could not be sent; unqueuing");
                 let _work = self.work.lock().await;
@@ -1061,15 +1173,8 @@ impl Board {
         }
     }
 
-    /// After every round: children in review merge into their parents,
-    /// then what waits is sent.
+    /// After every round: send what waits, retry replies, and dispatch auto-reviews.
     async fn after_round_async(&self) {
-        {
-            let _join = self.join_lock.lock().await;
-            if let Err(e) = self.join_children_async().await {
-                eprintln!("vibevalley: child issues could not be merged: {e}");
-            }
-        }
         self.refresh_queue_unlocked_async().await;
         self.retry_replies_unlocked_async().await;
         self.dispatch_auto_reviews_async().await;
@@ -1150,9 +1255,19 @@ impl Board {
         Box::pin(async move { self.state.take_words_async(id).await })
     }
 
-    async fn send_unlocked_async(&self, id: &str, words: Option<String>, kind: RunTriggerKind) -> Result<Sent> {
+    async fn send_queued_unlocked_async(&self, id: &str) -> Result<Option<Sent>> {
         let _issue_guard = self.issue_lock(id).await;
-        self.send_for_issue_async(id, words, kind).await
+        // Re-check under the per-issue lock: another caller (e.g. `move_to_async`) may have
+        // already dispatched or unqueued this issue between the queue snapshot and lock acquisition.
+        let still_queued = {
+            let _work = self.work.lock().await;
+            let issue = self.stored_async(id).await?;
+            issue.status == IssueStatus::Todo && issue.queued_at.is_some() && !issue.mandate.is_paused()
+        };
+        if !still_queued {
+            return Ok(None);
+        }
+        self.send_for_issue_async(id, None, RunTriggerKind::Issue).await.map(Some)
     }
 
     pub(super) fn send_for_issue_async<'a>(
@@ -1236,12 +1351,27 @@ impl Board {
                 let storage = self.storage.as_deref();
                 let again = |words: &str| {
                     format!(
-                        "{}\n\nYou are taking this issue up again in its worktree; earlier work is on its branch: \
-                         check `git status` and `git log` first.",
+                        "{}\n\nYou are taking this issue up again; earlier work may exist in the workspace or your branch: \
+                         check `git status` and `git log` first if working in a repo.",
                         brief(issue, all_issues, Some(words), storage)
                     )
                 };
-                self.session_engine().next_round_async(issue, &s, words, again, trigger).await
+                let live_hook = self.state.issue_change_hook(issue.id.clone(), IssueChange::Answered);
+                let reopen_hook = (!s.is_readonly_issue_helper()).then(|| {
+                    self.state.issue_change_hook(
+                        issue.id.clone(),
+                        IssueChange::Started {
+                            session: s.id.clone(),
+                            worker: !s.is_refining(),
+                        },
+                    )
+                });
+                let sid = self
+                    .session_engine()
+                    .next_round_async(issue, &s, words, again, trigger, Some(live_hook), reopen_hook)
+                    .await?;
+                let _ = self.change_async(&issue.id, IssueChange::Unqueued).await;
+                Ok(sid)
             }
             None => self.hire_async(issue, all_issues, words, kind).await,
         }
@@ -1312,38 +1442,10 @@ impl Board {
 
     async fn hire_async(&self, issue: &Issue, all: &[Issue], words: Option<String>, kind: RunTriggerKind) -> Result<String> {
         let drive = self.runtime.driver().drive(issue.assigned_agent(), issue).await?;
-        let wp = self.worktree();
-        let parent_number = match issue.parent.as_deref() {
-            Some(p) => all.iter().find(|i| i.id == p).map(|p| p.number),
-            None => None,
-        };
-        let (cwd, branch, base) = if !drive.is_local {
-            // PR-first remote dispatch: skip local git worktree creation; the remote machine
-            // prepares its own isolated worktree using `repo_ref`, `branch`, and `base_ref`.
-            let branch = issue.repo.as_ref().map(|_| issue_branch(issue.number));
-            let base = if let Some(repo) = issue.repo.as_deref() {
-                if let Some(p) = parent_number {
-                    Some(issue_branch(p))
-                } else {
-                    wp.existing(repo)?
-                        .and_then(|main| Worktree::main_branch(&main).ok())
-                        .or_else(|| Some("main".to_string()))
-                }
-            } else {
-                None
-            };
-            (PathBuf::new(), branch, base)
-        } else {
-            match wp.main_repo_async(issue.repo.as_deref()).await? {
-                Some(main) => {
-                    let base = wp.base(&main, parent_number)?;
-                    let (dir, branch) = wp.worktree_async(&main, issue.number, &base).await?;
-                    (dir, Some(branch), Some(base))
-                }
-                None => (wp.context_async(&issue.id).await?, None, None),
-            }
-        };
+        let cwd = self.resolve_issue_cwd_async(issue, drive.is_local).await;
         let name = format!("{} #{}", drive.name, issue.number);
+        let state = self.state.clone();
+        let issue_id = issue.id.clone();
         self.session_engine()
             .hire_async(Hire {
                 issue,
@@ -1351,13 +1453,21 @@ impl Board {
                 trigger: trigger_of(kind, words),
                 drive,
                 cwd,
-                branch,
-                base,
                 name,
                 brief: issue.title.clone(),
                 drafting: false,
+                on_start: Some(Box::new(move |sid| {
+                    state.issue_change_hook(
+                        issue_id,
+                        IssueChange::Started {
+                            session: sid.to_string(),
+                            worker: true,
+                        },
+                    )
+                })),
             })
             .await
+            .map_err(Into::into)
     }
 
     async fn load_auto_review_async(&self, issue_id: &str) -> AutoReviewDoc {
@@ -1393,24 +1503,13 @@ impl Board {
         }
     }
 
-    async fn readonly_issue_place_async(&self, issue: &Issue, drive_is_local: bool) -> Result<(PathBuf, Option<String>, Option<String>)> {
-        let wp = self.worktree();
+    async fn readonly_issue_place_async(&self, issue: &Issue, drive_is_local: bool) -> Option<PathBuf> {
         if let Some(worker) = self.on_board_async(issue).await
             && let Some(cwd) = worker.cwd.as_deref().filter(|c| !c.is_empty())
         {
-            return Ok((
-                PathBuf::from(cwd),
-                worker.worktree_branch().map(String::from),
-                self.session_engine().base_branch(&worker.id),
-            ));
+            return Some(PathBuf::from(cwd));
         }
-        if !drive_is_local {
-            return Ok((PathBuf::new(), issue.repo.as_ref().map(|_| issue_branch(issue.number)), None));
-        }
-        if let Some(main) = wp.main_repo_async(issue.repo.as_deref()).await? {
-            return Ok((main.root().to_path_buf(), None, None));
-        }
-        Ok((wp.context_async(&issue.id).await?, None, None))
+        self.resolve_issue_cwd_async(issue, drive_is_local).await
     }
 
     /// Dispatches a readonly auto-reviewer for `InReview` issues when an eligible
@@ -1474,9 +1573,7 @@ impl Board {
             let Ok(drive) = self.runtime.driver().drive(Some(&reviewer.id), &fresh).await else {
                 continue;
             };
-            let Ok((cwd, branch, base)) = self.readonly_issue_place_async(&fresh, drive.is_local).await else {
-                continue;
-            };
+            let cwd = self.readonly_issue_place_async(&fresh, drive.is_local).await;
             let next_round = previous_doc.rounds + 1;
             let next_doc = AutoReviewDoc {
                 rounds: next_round,
@@ -1512,11 +1609,10 @@ impl Board {
                 trigger: trigger_of(RunTriggerKind::Issue, None),
                 drive,
                 cwd,
-                branch,
-                base,
                 name,
                 brief: format!("Review #{}: {}", fresh.number, fresh.title),
                 drafting: false,
+                on_start: None,
             };
             if let Err(e) = self.session_engine().hire_readonly_async(hire, RunMode::ReadOnlyReview).await {
                 self.save_auto_review_async(&fresh.id, &previous_doc).await;
@@ -1527,7 +1623,7 @@ impl Board {
 
     /// Dispatches or re-engages a readonly `@<agent>` collaborator session for `issue_id`
     /// without acquiring write ownership or disturbing the issue's primary worker.
-    pub(super) async fn dispatch_collaborator_async(&self, issue_id: &str, agent_id: &str, message_body: &str, _message_id: &str) -> Result<String> {
+    pub(crate) async fn dispatch_collaborator_async(&self, issue_id: &str, agent_id: &str, message_body: &str, _message_id: &str) -> Result<String> {
         let fresh = self.stored_async(issue_id).await?;
         if fresh.status.is_closed() {
             return Err(BoardError::Api(ApiError::new(
@@ -1555,7 +1651,7 @@ impl Board {
                 && self.session_engine().helper_mode_async(&s, Some(&fresh)).await == RunMode::ReadOnlyCollaborator
             {
                 if let Some(steered) = self.session_engine().steer_async(&s, &prompt).await {
-                    return steered.map(|()| s.id);
+                    return steered.map(|()| s.id).map_err(Into::into);
                 }
                 return self
                     .session_engine()
@@ -1566,10 +1662,11 @@ impl Board {
                         |_| prompt.clone(),
                         trigger_of(RunTriggerKind::Comment, Some(message_body.to_string())),
                     )
-                    .await;
+                    .await
+                    .map_err(Into::into);
             }
         }
-        let (cwd, branch, base) = self.readonly_issue_place_async(&fresh, drive.is_local).await?;
+        let cwd = self.readonly_issue_place_async(&fresh, drive.is_local).await;
         let name = format!("{} #{}", drive.name, fresh.number);
         self.session_engine()
             .hire_readonly_async(
@@ -1579,34 +1676,24 @@ impl Board {
                     trigger: trigger_of(RunTriggerKind::Comment, Some(message_body.to_string())),
                     drive,
                     cwd,
-                    branch,
-                    base,
                     name,
                     brief: format!("Collaborate #{}: {}", fresh.number, fresh.title),
                     drafting: false,
+                    on_start: None,
                 },
                 RunMode::ReadOnlyCollaborator,
             )
             .await
+            .map_err(Into::into)
     }
 
-    /// Registers the owner-backed `Issue.cron` lookup (from `cron`).
-    pub async fn use_cron_of_issue_async(&self, lookup: CronOfIssue) {
-        self.state.use_cron_of_issue_async(lookup).await;
-    }
-
-    /// Registers the owner-backed `Issue.pull_request` lookup (from `issue/pull`).
-    pub async fn use_pull_of_issue_async(&self, lookup: PullOfIssue) {
-        self.state.use_pull_of_issue_async(lookup).await;
-    }
-
-    /// Refreshes owner-backed `cron` and `pull_request` projections on `id`.
+    /// Marks slices dirty so derived issue projections refresh.
     pub async fn refresh_issue_async(&self, id: &str) {
         self.state.refresh_issue_async(id).await;
     }
 
     /// Settles `reference` after its tracked pull request transitions to `merged` or `closed`.
-    pub async fn settle_pull_async(&self, reference: &str, state: vibevalley_protocol::PullRequestState) -> Result<Option<Issue>> {
+    pub async fn settle_pull_async(&self, reference: &str, state: PullRequestState) -> Result<Option<Issue>> {
         let Some(initial) = self.issue_async(reference).await? else {
             return Ok(None);
         };
@@ -1615,18 +1702,27 @@ impl Board {
         let Some(updated) = self.issue_async(&initial.id).await? else {
             return Ok(None);
         };
-        if state == vibevalley_protocol::PullRequestState::Open || !vibevalley_core::pr::finishes_with_pull_request(&updated) {
+        if state == PullRequestState::Open || !vibevalley_core::pr::finishes_with_pull_request(&updated) {
             return Ok(Some(updated));
         }
         if let Some(s) = self.on_board_async(&updated).await {
-            self.session_engine().dismiss_async(&s.id, Leave::KeepBranch).await?;
-        } else if let Some(main) = self.worktree().main_repo_async(updated.repo.as_deref()).await? {
-            self.worktree().clear_checkout(&main, updated.number)?;
+            let close = (state == PullRequestState::Merged).then_some(SessionClose::Completed);
+            self.session_engine().dismiss_with_close_async(&s.id, close).await?;
         }
         let change = match state {
-            vibevalley_protocol::PullRequestState::Merged => IssueChange::Delivered(vibevalley_protocol::Landing::PullRequest, None),
-            vibevalley_protocol::PullRequestState::Closed => IssueChange::Canceled(vibevalley_protocol::IssueCanceled::Dismissed),
-            vibevalley_protocol::PullRequestState::Open => unreachable!(),
+            PullRequestState::Merged => {
+                let receipt = updated.delivery_receipt.clone().or_else(|| {
+                    updated.pull_request.as_ref().map(|pr| DeliveryReceipt::PullRequest {
+                        url: pr.url.clone(),
+                        number: Some(pr.number),
+                        branch: None,
+                        summary: None,
+                    })
+                });
+                IssueChange::Delivered(Landing::PullRequest, receipt)
+            }
+            PullRequestState::Closed => IssueChange::Canceled(IssueCanceled::Dismissed),
+            PullRequestState::Open => unreachable!(),
         };
         let done = {
             let _work = self.work.lock().await;
@@ -1641,22 +1737,12 @@ impl Board {
         Ok(Some(done))
     }
 
-    /// Finds an open issue whose worktree or `vibevalley/issue-<n>` branch
-    /// matches a published branch in `cwd`.
+    /// Finds an open issue whose active session `cwd`, `delivery_receipt` branch, or
+    /// conventional `vibevalley/issue-<n>` branch matches a published branch in `cwd`.
     pub async fn open_issue_for_branch_async(&self, cwd: &str, branch: &str) -> Option<Issue> {
         let cwd_canon = tokio::fs::canonicalize(cwd).await.ok();
-        let cwd_owned = cwd.to_string();
-        let raw_repo_root = crate::log::spawn_blocking_traced(move || {
-            vibevalley_git::Repo::discover(Path::new(&cwd_owned))
-                .ok()
-                .flatten()
-                .map(|r| r.root().to_path_buf())
-        })
-        .await
-        .ok()
-        .flatten();
-        let repo_root = match raw_repo_root {
-            Some(r) => tokio::fs::canonicalize(r).await.ok(),
+        let inferred_repo = match &self.repos {
+            Some(repos) => repos.infer_name_for_dir_async(Path::new(cwd)).await,
             None => None,
         };
         let issues = self.issues_async().await.ok()?;
@@ -1666,20 +1752,30 @@ impl Board {
                 continue;
             }
             let session = issue.latest_session_id().and_then(|id| sessions.iter().find(|s| s.id == *id));
+            let receipt_branch = match issue.delivery_receipt.as_ref() {
+                Some(DeliveryReceipt::PullRequest { branch: Some(b), .. }) | Some(DeliveryReceipt::Commit { branch: Some(b), .. }) => Some(b.as_str()),
+                _ => None,
+            };
+            let conventional_branch = format!("vibevalley/issue-{}", issue.number);
+            let branch_matches = receipt_branch == Some(branch) || conventional_branch == branch;
             if let Some(wt) = session.and_then(|s| s.cwd.as_deref()) {
                 let wt_canon = tokio::fs::canonicalize(wt).await.ok();
-                if (wt == cwd || (wt_canon.is_some() && wt_canon == cwd_canon))
-                    && (session.and_then(|s| s.worktree_branch()) == Some(branch) || issue_branch(issue.number) == branch)
-                {
+                if (wt == cwd || (wt_canon.is_some() && wt_canon == cwd_canon)) && branch_matches {
                     return Some(issue);
                 }
             }
-            if issue_branch(issue.number) != branch {
+            if !branch_matches {
                 continue;
             }
-            if let (Some(repo), Some(root)) = (&issue.repo, &repo_root)
-                && let Ok(Some(m)) = self.worktree().main_repo_async(Some(repo.as_str())).await
-                && tokio::fs::canonicalize(m.root()).await.ok().as_ref() == Some(root)
+            if let (Some(repo), Some(inferred)) = (&issue.repo, &inferred_repo)
+                && repo == inferred
+            {
+                return Some(issue);
+            }
+            if let Some(repo) = &issue.repo
+                && let Some(repos) = &self.repos
+                && let Some(dir) = repos.resolve_dir_async(repo).await
+                && tokio::fs::canonicalize(&dir).await.ok() == cwd_canon
             {
                 return Some(issue);
             }
@@ -1687,122 +1783,16 @@ impl Board {
         None
     }
 
-    /// The issue's work as it stands.
-    pub async fn changes_async(&self, reference: &str) -> Result<Changes> {
-        self.changes_since_async(reference, None).await
-    }
-
-    pub async fn changes_since_async(&self, reference: &str, since_tree: Option<&str>) -> Result<Changes> {
-        let issue = self.stored_async(reference).await?;
-        let wp = self.worktree();
-        let main = wp
-            .main_repo_async(issue.repo.as_deref())
-            .await?
-            .ok_or_else(|| BoardError::Other("the issue has no repository".into()))?;
-        if issue.status.is_closed()
-            && let Some(evidence) = &issue.delivery_evidence
-            && let Some(receipt) = &evidence.check
-            && evidence.merged_commit.as_deref() == Some(receipt.candidate_commit.as_str())
-        {
-            let revision = evidence
-                .reviews
-                .last()
-                .map(|r| r.revision.clone())
-                .unwrap_or_else(|| vibevalley_protocol::ReviewRevision {
-                    base_commit: receipt.target_commit.clone(),
-                    tree: receipt.candidate_tree.clone(),
-                });
-            return Worktree::published_changes(&main, issue.number, revision, receipt, since_tree);
-        }
-        let base = self.session_base_async(&issue, &main).await?;
-        let worktree = self.on_board_async(&issue).await.and_then(|s| s.cwd);
-        let at = OnDisk {
-            number: issue.number,
-            title: &issue.title,
-            worktree: worktree.as_deref(),
-        };
-        wp.changes_async(
-            &main,
-            &at,
-            base,
-            issue.parent.is_some(),
-            since_tree.or_else(|| {
-                issue
-                    .delivery_evidence
-                    .as_ref()
-                    .and_then(|e| e.reviews.last())
-                    .map(|r| r.revision.tree.as_str())
-            }),
-        )
-        .await
-    }
-
-    /// The branch the issue's work forked from: its session's, else its
-    /// parent's or the main branch.
-    async fn session_base_async(&self, issue: &Issue, main: &vibevalley_git::Repo) -> Result<String> {
-        match self.on_board_async(issue).await.and_then(|s| self.session_engine().base_branch(&s.id)) {
-            Some(base) => Ok(base),
-            None => {
-                let parent = match issue.parent.as_deref() {
-                    Some(p) => self.issue_async(p).await?.map(|p| p.number),
-                    None => None,
-                };
-                self.worktree().base(main, parent)
-            }
-        }
-    }
-
-    async fn recover_published_deliveries_async(&self) -> Result<()> {
-        let issues: Vec<(Issue, vibevalley_protocol::ProjectCheckReceipt)> = self
-            .issues_async()
-            .await?
-            .into_iter()
-            .filter_map(|i| pending_delivery(&i).cloned().map(|r| (i, r)))
-            .collect();
-        for (issue, receipt) in issues {
-            match self.recover_delivery_async(&issue, &receipt).await {
-                Err(BoardError::Git(_) | BoardError::NotARepo(_) | BoardError::Other(_)) => {
-                    self.hold_delivery_async(&issue.id, &receipt.candidate_commit).await?
-                }
-                result => result?,
-            }
-        }
-        Ok(())
-    }
-
-    async fn hold_delivery_async(&self, issue: &str, commit: &str) -> Result<()> {
-        let why = vibevalley_i18n::t("server.issue.verifyDelivery", &[("commit", commit.into())]);
-        self.change_async(issue, IssueChange::Stuck { why, conflict: None }).await.map(|_| ())
-    }
-
-    async fn recover_delivery_async(&self, issue: &Issue, last: &vibevalley_protocol::ProjectCheckReceipt) -> Result<()> {
-        let Some(repo) = issue.repo.as_deref() else { return Ok(()) };
-        let Some(main) = self.worktree().existing(repo)? else {
-            return self.hold_delivery_async(&issue.id, &last.candidate_commit).await;
-        };
-        let session = self.on_board_async(issue).await;
-        let worktree = session.as_ref().and_then(|s| s.cwd.as_deref());
-        let tree = self
-            .worktree()
-            .checkout_async(&main, issue.number, worktree, false)
-            .await?
-            .as_ref()
-            .map(vibevalley_git::Repo::worktree_tree)
-            .transpose()?;
-        if self.worktree().was_published(&main, &issue_branch(issue.number), tree.as_deref(), last)? {
-            self.finish_delivery_async(issue, Some(&main), vibevalley_protocol::Landing::Merged, Some(last.candidate_commit.clone()))
-                .await?;
-        } else if tree.is_none() {
-            self.hold_delivery_async(&issue.id, &last.candidate_commit).await?;
-        }
-        Ok(())
-    }
-
-    /// Accepted: deliver as the issue says (caller holds `issue_lock` for `issue.id` and refreshes queue afterwards).
-    fn complete_for_issue_async<'a>(&'a self, issue: &'a Issue) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send + 'a>> {
+    /// Accepted: closes the issue with its polymorphic [`DeliveryReceipt`] (caller holds
+    /// `issue_lock` for `issue.id` and refreshes queue afterwards).
+    fn complete_for_issue_async<'a>(
+        &'a self,
+        issue: &'a Issue,
+        incoming_receipt: Option<DeliveryReceipt>,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send + 'a>> {
         Box::pin(async move {
             if let Some(r) = &issue.refining {
-                self.session_engine().dismiss_async(&r.session, Leave::Discard).await?;
+                self.session_engine().dismiss_async(&r.session).await?;
             }
             let session = self.on_board_async(issue).await;
             if let Some(s) = &session
@@ -1811,114 +1801,47 @@ impl Board {
             {
                 tracing::warn!(issue_id = %issue.id, session_id = %s.id, error = %err, "issue.board failed to abort active turn before completing issue");
             }
-            let all_issues = self.issues_async().await?;
-            let has_merged_child = all_issues
-                .iter()
-                .any(|t| t.parent.as_ref() == Some(&issue.id) && t.delivered == Some(Landing::MergedIntoParent));
-            // Manual completion from backlog/todo (never sent to a worker and no merged child branch):
-            // close cleanly with Landing::None without requiring a git branch or PR.
-            if !issue.was_sent() && !has_merged_child {
-                return self.finish_delivery_async(issue, None, Landing::None, None).await;
+            let receipt = incoming_receipt.or_else(|| issue.delivery_receipt.clone());
+            if !issue.was_sent() && receipt.is_none() {
+                return self.finish_delivery_async(issue, Landing::None, None).await;
             }
-            let wp = self.worktree();
-            if issue.deliver == Deliverable::PullRequest && issue.pull_request.is_none() {
+            let has_pr_receipt = matches!(receipt, Some(DeliveryReceipt::PullRequest { .. }));
+            if issue.was_sent() && issue.deliver == Deliverable::PullRequest && issue.pull_request.is_none() && !has_pr_receipt {
                 return Err(BoardError::Other(vibevalley_i18n::t("server.issue.deliveryNeedsPr", &[])));
             }
-            let main = wp.main_repo_async(issue.repo.as_deref()).await?;
-            let pr_merged = issue.deliver == Deliverable::Change
-                && issue
-                    .pull_request
-                    .as_ref()
-                    .is_some_and(|pr| pr.state == vibevalley_protocol::PullRequestState::Merged);
-            let mut merged = None;
-            let landing = match &main {
-                _ if issue.deliver == Deliverable::Answer => Landing::None,
-                _ if issue.deliver == Deliverable::PullRequest => Landing::Submitted,
-                _ if pr_merged => Landing::PullRequest,
-                None => Landing::None,
-                Some(main) => {
-                    let has_children = all_issues.iter().any(|t| t.parent.as_ref() == Some(&issue.id));
-                    let worktree = session.as_ref().and_then(|s| s.cwd.clone());
-                    let at = OnDisk {
-                        number: issue.number,
-                        title: &issue.title,
-                        worktree: worktree.as_deref(),
-                    };
-                    let delivery = Delivery {
-                        work: at,
-                        kind: issue.deliver,
-                        has_children,
-                        evidence: issue.delivery_evidence.as_ref(),
-                    };
-                    let base = self.session_base_async(issue, main).await?;
-                    match wp
-                        .land_async(
-                            main,
-                            delivery,
-                            move || Ok(base),
-                            |receipt| Box::pin(async move { self.change_async(&issue.id, IssueChange::ProjectChecked(receipt)).await.map(|_| ()) }),
-                        )
-                        .await?
-                    {
-                        Landed::Merged(commit) => {
-                            merged = Some(commit);
-                            vibevalley_protocol::Landing::Merged
-                        }
-                        Landed::Landed(landing) => landing,
-                        Landed::Conflict(conflict) => {
-                            let (base, files) = (conflict.base.clone(), conflict.files.clone());
-                            self.change_async(&issue.id, IssueChange::Conflicted(conflict)).await?;
-                            return Err(BoardError::NotDelivered(Undelivered::Conflict { base, files }));
-                        }
-                        Landed::CheckFailed(output) => {
-                            let sent_back = if session.is_some() {
-                                let _work = self.work.lock().await;
-                                if self.room_for_round_async(issue).await.is_ok() {
-                                    self.change_async(&issue.id, IssueChange::Queued).await?;
-                                    true
-                                } else {
-                                    false
-                                }
-                            } else {
-                                false
-                            };
-                            if sent_back {
-                                let words = format!("The project check failed. Fix it and commit:\n\n{output}");
-                                self.send_for_issue_async(&issue.id, Some(words), RunTriggerKind::Comment).await?;
-                            }
-                            return Err(BoardError::NotDelivered(Undelivered::CheckFailed { output, sent_back }));
-                        }
+            let pr_merged = issue.pull_request.as_ref().is_some_and(|pr| pr.state == PullRequestState::Merged);
+            let landing = match receipt.as_ref() {
+                Some(DeliveryReceipt::PullRequest { .. }) => {
+                    if pr_merged {
+                        Landing::PullRequest
+                    } else {
+                        Landing::Submitted
+                    }
+                }
+                Some(DeliveryReceipt::Commit { .. }) => Landing::Merged,
+                Some(DeliveryReceipt::Note { .. } | DeliveryReceipt::Answer { .. }) => Landing::None,
+                None => {
+                    if pr_merged {
+                        Landing::PullRequest
+                    } else if issue.deliver == Deliverable::PullRequest {
+                        Landing::Submitted
+                    } else if issue.deliver == Deliverable::Branch {
+                        Landing::Kept
+                    } else {
+                        Landing::None
                     }
                 }
             };
-            self.finish_delivery_async(issue, main.as_ref(), landing, merged).await
+            self.finish_delivery_async(issue, landing, receipt).await
         })
     }
 
-    async fn finish_delivery_async(
-        &self,
-        issue: &Issue,
-        main: Option<&vibevalley_git::Repo>,
-        landing: vibevalley_protocol::Landing,
-        merged: Option<String>,
-    ) -> Result<()> {
+    async fn finish_delivery_async(&self, issue: &Issue, landing: Landing, receipt: Option<DeliveryReceipt>) -> Result<()> {
         if let Some(s) = self.on_board_async(issue).await {
-            let leave = if matches!(issue.deliver, Deliverable::Branch | Deliverable::PullRequest)
-                || landing == vibevalley_protocol::Landing::PullRequest
-                || vibevalley_core::pr::goes_by_pull_request(issue, false)
-            {
-                Leave::KeepBranch
-            } else if issue.deliver == Deliverable::Change {
-                Leave::Integrated
-            } else {
-                Leave::Discard
-            };
-            self.session_engine().dismiss_async(&s.id, leave).await?;
-        } else if let Some(main) = main {
-            self.worktree().clear_checkout(main, issue.number)?;
+            self.session_engine().dismiss_with_close_async(&s.id, Some(SessionClose::Completed)).await?;
         }
         let _work = self.work.lock().await;
-        self.change_async(&issue.id, IssueChange::Delivered(landing, merged)).await?;
+        self.change_async(&issue.id, IssueChange::Delivered(landing, receipt)).await?;
         if let Err(err) = self.take_words_async(&issue.id).await {
             tracing::warn!(issue_id = %issue.id, error = %err, "issue.board failed to clear queued words on delivery");
         }
@@ -1942,10 +1865,10 @@ impl Board {
                 self.close_issue_for_locked_parent_async(&child, why).await?;
             }
             if let Some(r) = &issue.refining {
-                self.session_engine().dismiss_async(&r.session, Leave::Discard).await?;
+                self.session_engine().dismiss_async(&r.session).await?;
             }
             if let Some(s) = self.on_board_async(issue).await {
-                self.session_engine().dismiss_async(&s.id, Leave::KeepBranch).await?;
+                self.session_engine().dismiss_async(&s.id).await?;
             }
             let _work = self.work.lock().await;
             if let Err(err) = self.take_words_async(&issue.id).await {
@@ -1953,15 +1876,6 @@ impl Board {
             }
             self.change_async(&issue.id, IssueChange::Canceled(why)).await?;
             Ok(())
-        })
-    }
-
-    /// Not done any more: its session goes home (leftovers committed on its
-    /// branch, which stays when it has commits), its open children with it.
-    pub(super) fn close_issue_async<'a>(&'a self, issue: &'a Issue, why: IssueCanceled) -> vibevalley_runtime::agent::durable::BoxFuture<'a, Result<()>> {
-        Box::pin(async move {
-            let _issue_guard = self.issue_lock(&issue.id).await;
-            self.close_issue_for_locked_parent_async(issue, why).await
         })
     }
 }
@@ -1994,14 +1908,10 @@ pub(super) fn attachments_brief(issue: &Issue, storage: Option<&Storage>) -> Str
 }
 
 /// What the agent is told to do.
-pub(super) fn brief(issue: &Issue, all: &[Issue], words: Option<&str>, storage: Option<&Storage>) -> String {
-    let frozen: Vec<String> = vibevalley_core::acceptance_ancestors(issue, all)
-        .iter()
-        .flat_map(|t| t.constraints.as_ref().map(|c| c.frozen.clone()).unwrap_or_default())
-        .collect();
+pub(super) fn brief(issue: &Issue, _all: &[Issue], words: Option<&str>, storage: Option<&Storage>) -> String {
     let brief = vibevalley_core::prompts::issue_brief(&issue.title, &issue.description, &issue.criteria, issue.deliver);
     let attachments = attachments_brief(issue, storage);
-    let constraints = vibevalley_core::work_constraints(issue.constraints.as_ref(), &frozen);
+    let constraints = vibevalley_core::work_constraints(issue.constraints.as_ref(), &[]);
     let brief = [brief, attachments, constraints]
         .into_iter()
         .filter(|s| !s.is_empty())

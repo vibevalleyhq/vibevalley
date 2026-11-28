@@ -27,6 +27,7 @@ tokio = { workspace = true }
 ttf-parser = "0.25"
 vibevalley-core = { path = "../core", features = ["collab"] }
 vibevalley-i18n = { path = "../i18n" }
+vibevalley-kit = { workspace = true }
 vibevalley-pele = { path = "../engines/pele" }
 vibevalley-protocol = { path = "../protocol" }
 vibevalley-shiki = { path = "../engines/shiki" }

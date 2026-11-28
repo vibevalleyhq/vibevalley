@@ -81,17 +81,24 @@ fn crons_are_kept_refused_and_run_when_due() {
     );
     let once = once.data.unwrap_or_else(|| panic!("{}", once.message));
     assert_eq!(once["agent"], helper.id.as_str());
-    vibevalley_runtime::rt::block_on(crons.tick_async());
+    vibevalley_runtime::rt::block_on(app.test_internals().orchestration.cron.tick_async());
     assert_eq!(
-        crate::support::board_issues(app.test_internals().board)
+        app.test_internals()
+            .orchestration
+            .issue
+            .enrich_issues(crate::support::board_issues(app.test_internals().board))
             .iter()
             .filter(|i| i.cron.is_some())
             .count(),
         0
     );
     clock.advance(Duration::from_secs(60));
-    vibevalley_runtime::rt::block_on(crons.tick_async());
-    let made = crate::support::board_issues(app.test_internals().board)
+    vibevalley_runtime::rt::block_on(app.test_internals().orchestration.cron.tick_async());
+    let made = app
+        .test_internals()
+        .orchestration
+        .issue
+        .enrich_issues(crate::support::board_issues(app.test_internals().board))
         .into_iter()
         .find(|i| i.cron.as_deref() == once["id"].as_str())
         .unwrap();
@@ -101,9 +108,12 @@ fn crons_are_kept_refused_and_run_when_due() {
     assert!(!after.enabled && after.last_run == Some(at));
     // Run once: the next tick makes nothing new.
     clock.advance(Duration::from_secs(60));
-    vibevalley_runtime::rt::block_on(crons.tick_async());
+    vibevalley_runtime::rt::block_on(app.test_internals().orchestration.cron.tick_async());
     assert_eq!(
-        crate::support::board_issues(app.test_internals().board)
+        app.test_internals()
+            .orchestration
+            .issue
+            .enrich_issues(crate::support::board_issues(app.test_internals().board))
             .iter()
             .filter(|i| i.cron.is_some())
             .count(),
@@ -131,10 +141,19 @@ fn crons_are_kept_refused_and_run_when_due() {
     let reloaded_crons = again.test_internals().cron.list();
     assert_eq!(reloaded_crons.len(), 1);
     assert_eq!(reloaded_crons[0].name, "say hi");
-    let reloaded = crate::support::board_issue(again.test_internals().board, &made.id).unwrap();
+    let reloaded = again
+        .test_internals()
+        .orchestration
+        .issue
+        .enrich_issue(crate::support::board_issue(again.test_internals().board, &made.id).unwrap());
     assert_eq!(reloaded.cron.as_deref(), once["id"].as_str());
     // Deleting the cron clears Issue.cron on the linked issue.
     vibevalley_runtime::rt::block_on(again.test_internals().cron.remove_async(once["id"].as_str().unwrap())).unwrap();
-    assert_eq!(crate::support::board_issue(again.test_internals().board, &made.id).unwrap().cron, None);
+    let after_del = again
+        .test_internals()
+        .orchestration
+        .issue
+        .enrich_issue(crate::support::board_issue(again.test_internals().board, &made.id).unwrap());
+    assert_eq!(after_del.cron, None);
     again.close_blocking();
 }

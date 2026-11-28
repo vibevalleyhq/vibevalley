@@ -48,6 +48,10 @@ impl SessionEngine {
     pub async fn mailbox_entries_async(&self, session_id: &str) -> Result<Vec<MailboxEntry>> {
         Ok(self.0.ctx.service.session.list_mailbox(session_id).await?)
     }
+
+    pub async fn drain_passive_context_async(&self, session_id: &str) -> Result<Vec<MailboxEntry>> {
+        Ok(self.0.ctx.service.session.drain_passive_context(session_id, now()).await?)
+    }
 }
 
 #[cfg(test)]

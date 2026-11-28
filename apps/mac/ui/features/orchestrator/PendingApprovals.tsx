@@ -1,7 +1,7 @@
 import { Scroll, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
-import type { OrchestratorApproval } from "@vibevalley/protocol";
+import type { SessionApproval } from "@vibevalley/protocol";
 
 import { Button } from "../../design/Button";
 import { Icon } from "../../design/Icon";
@@ -15,24 +15,24 @@ import { momentText, wallClockText } from "../../infra/base/format";
 import { defineQuery, retryRead, useQuery, useQueryClient } from "../../infra/query";
 
 const approvalsQuery = defineQuery({
-  key: (conversationId: string) => ["orchestrator-approvals", conversationId],
-  fetch: (conversationId, context) => api.orchestrator.approval.list({ conversationId }, context),
+  key: (id: string) => ["session-approvals", id],
+  fetch: (id, context) => api.session.approval.list({ id }, context),
   ...retryRead,
 });
 
-export function PendingApprovals(props: { conversationId: string }) {
+export function PendingApprovals(props: { id: string }) {
   const client = useQueryClient();
-  const query = useQuery(() => approvalsQuery(props.conversationId), { interval: () => 3_000 });
-  const pending = () => query.data()?.filter((approval) => approval.conversationId === props.conversationId) ?? [];
+  const query = useQuery(() => approvalsQuery(props.id), { interval: () => 3_000 });
+  const pending = () => query.data()?.filter((approval) => approval.id === props.id) ?? [];
   const act = createAct();
-  const decide = async (approval: OrchestratorApproval, approved: boolean) => {
+  const decide = async (approval: SessionApproval, approved: boolean) => {
     if (act.busy()) return;
     await act.run(async () => {
-      const { conversationId, taskId, toolCallId } = approval;
+      const { id, taskId, toolCallId } = approval;
       try {
-        await api.orchestrator.approval.resolve({ conversationId, taskId, toolCallId, approved });
+        await api.session.approval.resolve({ id, taskId, toolCallId, approved });
       } finally {
-        await client.invalidate({ key: approvalsQuery(conversationId).key });
+        await client.invalidate({ key: approvalsQuery(id).key });
       }
     });
   };
@@ -67,7 +67,7 @@ export function PendingApprovals(props: { conversationId: string }) {
   );
 }
 
-function ApprovalRow(props: { item: OrchestratorApproval; first: boolean; busy: boolean; onDecide: (approved: boolean) => void }) {
+function ApprovalRow(props: { item: SessionApproval; first: boolean; busy: boolean; onDecide: (approved: boolean) => void }) {
   const expanded = signal(true);
   return (
     <View class={`gap-2 px-3.5 py-3 ${props.first ? "" : "border-t border-line"}`}>

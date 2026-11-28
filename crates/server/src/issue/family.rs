@@ -1,16 +1,15 @@
-//! Parent and child issues: an open issue split into children that each go
-//! once the siblings they need are done, and a child in review checked and
-//! merged into its parent's branch.
+//! Parent and child issues: pure task decomposition and DAG blocking.
+//! Each child runs once the siblings it depends on are closed; agents manage
+//! their own Git branches/worktrees autonomously and record a `DeliveryReceipt`.
 
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
-use vibevalley_protocol::{ActorRef, Assignment, Deliverable, Issue, IssueConstraints, IssueStageKind as StageKind};
+use vibevalley_protocol::{ActorRef, Assignment, Deliverable, Issue, IssueConstraints};
 
 use super::board::Board;
-use super::store::{BoardError, IssueChange, Result};
+use super::store::{BoardError, Result};
 use crate::context::now;
-use crate::runtime::{Joined, Leave, OnDisk, Worktree};
 
 /// One child of a split (`IssueChildDraft`).
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -40,9 +39,6 @@ impl Board {
         if parent.status.is_closed() {
             return Err(BoardError::Other(format!("issue #{} is closed", parent.number)));
         }
-        let Some(repo) = parent.repo.clone() else {
-            return Err(BoardError::Other("only an issue with a repository can be split".into()));
-        };
         let all_issues = self.issues_async().await?;
         if all_issues.iter().any(|t| t.parent.as_ref() == Some(&parent.id)) {
             return Err(BoardError::Other(format!("issue #{} is split already", parent.number)));
@@ -66,13 +62,10 @@ impl Board {
         if drafts.iter().any(|d| d.acceptance && d.check.as_deref().unwrap_or("").trim().is_empty()) {
             return Err(BoardError::Other("an acceptance child needs a check command".into()));
         }
-        if let Some(s) = self.on_board_async(&parent).await {
-            if s.phase.is_working() {
-                return Err(BoardError::Other("the parent's session is working; split it when it rests".into()));
-            }
-            if let Some(wt) = s.cwd.as_deref() {
-                Worktree::commit_leftovers(wt, &format!("Issue #{}: work before the split", parent.number))?;
-            }
+        if let Some(s) = self.on_board_async(&parent).await
+            && s.phase.is_working()
+        {
+            return Err(BoardError::Other("the parent's session is working; split it when it rests".into()));
         }
         let agent_of_parent = parent.assigned_agent().unwrap_or("").to_string();
         for d in &drafts {
@@ -97,7 +90,7 @@ impl Board {
             };
             let mut child = Issue::new(&id, number, title, at);
             child.description = description;
-            child.repo = Some(repo.clone());
+            child.repo = parent.repo.clone();
             child.parent = Some(parent.id.clone());
             child.priority = parent.priority;
             child.owner = parent.owner.clone().or_else(|| Some(ActorRef::self_user()));
@@ -106,7 +99,6 @@ impl Board {
             child.constraints = Some(IssueConstraints {
                 acceptance: d.acceptance,
                 scope: d.scope.clone(),
-                frozen: vec![],
                 check: d.check.clone().filter(|c| !c.trim().is_empty()),
             });
             child.queued_at = Some(at);
@@ -128,69 +120,5 @@ impl Board {
         self.refresh_queue_locked_async().await;
         let updated = self.issues_async().await?;
         Ok(made.into_iter().filter_map(|id| updated.iter().find(|i| i.id == id).cloned()).collect())
-    }
-
-    /// Children whose round is in review are checked and merged into their
-    /// parent's branch.
-    pub(super) async fn join_children_async(&self) -> Result<()> {
-        let issues = self.issues_async().await?;
-        let reviewing: Vec<Issue> = issues
-            .iter()
-            .filter(|t| t.parent.is_some() && t.stage.state == StageKind::Reviewing)
-            .cloned()
-            .collect();
-        for child in reviewing {
-            self.join_one_async(&child, &issues).await?;
-        }
-        Ok(())
-    }
-
-    async fn join_one_async(&self, child: &Issue, all_issues: &[Issue]) -> Result<()> {
-        let Some(parent) = child.parent.as_deref().and_then(|p| all_issues.iter().find(|i| i.id == p)).cloned() else {
-            return Ok(());
-        };
-        if parent.status.is_closed() {
-            return Ok(());
-        }
-        let wp = self.worktree();
-        let Some(main) = wp.main_repo_async(parent.repo.as_deref()).await? else {
-            return Ok(());
-        };
-        let Some(session) = self.on_board_async(child).await else { return Ok(()) };
-        // The parent's session is busy or still holds a write lock on the parent's worktree: wait.
-        let parent_session = self.on_board_async(&parent).await;
-        if parent_session.as_ref().is_some_and(|s| s.phase.is_working()) {
-            return Ok(());
-        }
-        if let Some(ps) = parent_session.as_ref()
-            && let Some(key) = self.session_engine().worktree_key_for_async(ps).await
-            && self.worktree().hoe().owner(&key).is_some_and(|l| l.session_id != ps.id)
-        {
-            return Ok(());
-        }
-        let checks = vibevalley_core::child_checks(child, all_issues);
-        let parent_worktree = parent_session.and_then(|s| s.cwd);
-        let child_at = OnDisk {
-            number: child.number,
-            title: &child.title,
-            worktree: session.cwd.as_deref(),
-        };
-        let parent_at = OnDisk {
-            number: parent.number,
-            title: &parent.title,
-            worktree: parent_worktree.as_deref(),
-        };
-        let joined = wp.join_async(&main, &child_at, &parent_at, &checks).await?;
-        match joined {
-            None => {}
-            Some(Joined::Stuck { why, conflict }) => {
-                self.change_async(&child.id, IssueChange::Stuck { why, conflict }).await?;
-            }
-            Some(Joined::Merged { frozen }) => {
-                self.session_engine().dismiss_async(&session.id, Leave::Discard).await?;
-                self.change_async(&child.id, IssueChange::MergedIntoParent { frozen }).await?;
-            }
-        }
-        Ok(())
     }
 }

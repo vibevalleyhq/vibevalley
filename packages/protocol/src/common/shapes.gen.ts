@@ -18,6 +18,8 @@ export type SuggestionId = Branded<"SuggestionId">;
 
 export type MessageId = Branded<"MessageId">;
 
+export type ParticipantId = `user:${string}` | `agent:${string}` | `session:${string}`;
+
 /**
  * What checking a form before saving it found: the first thing that would be refused, if any.
  */

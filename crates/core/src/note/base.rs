@@ -385,6 +385,16 @@ pub fn extract_base_links(files: &BTreeMap<String, Vec<u8>>) -> Vec<NoteLinkRef>
                     title: None,
                 });
             }
+            if let Some(aref) = &row.annotation_ref
+                && !aref.note_id.trim().is_empty()
+            {
+                out.push(NoteLinkRef {
+                    kind: LinkEntityKind::Note,
+                    id: aref.note_id.trim().to_owned(),
+                    relation: LinkRelation::Link,
+                    title: None,
+                });
+            }
             for cell in row.cells.values() {
                 match cell {
                     BaseCellValue::NoteRef { note_id } if !note_id.trim().is_empty() => out.push(NoteLinkRef {
@@ -995,6 +1005,7 @@ pub fn upsert_row(doc: &mut BaseDocument, req: &BaseUpsertRowRequest, now: i64, 
             id: row_id.clone(),
             cells: req.cells.clone(),
             page_note_id: None,
+            annotation_ref: None,
             created_at: now,
             updated_at: now,
         });
@@ -1077,6 +1088,7 @@ mod tests {
                         id: "r1".to_owned(),
                         cells: r1,
                         page_note_id: None,
+                        annotation_ref: None,
                         created_at: 1,
                         updated_at: 1,
                     },
@@ -1084,6 +1096,7 @@ mod tests {
                         id: "r2".to_owned(),
                         cells: r2,
                         page_note_id: None,
+                        annotation_ref: None,
                         created_at: 2,
                         updated_at: 2,
                     },
@@ -1198,6 +1211,7 @@ mod tests {
                         id: "r1".to_owned(),
                         cells: r1_cells,
                         page_note_id: Some("n_child_page".to_owned()),
+                        annotation_ref: None,
                         created_at: 1,
                         updated_at: 1,
                     },
@@ -1205,6 +1219,7 @@ mod tests {
                         id: "r2".to_owned(),
                         cells: r2_cells,
                         page_note_id: None,
+                        annotation_ref: None,
                         created_at: 2,
                         updated_at: 2,
                     },
@@ -1305,6 +1320,7 @@ mod tests {
                     id: "r1".to_owned(),
                     cells,
                     page_note_id: None,
+                    annotation_ref: None,
                     created_at: 1,
                     updated_at: 1,
                 }],

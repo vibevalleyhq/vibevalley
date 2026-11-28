@@ -6,7 +6,7 @@
 
 ### 单一共享运行时
 
-进程全局唯一的 Tokio 多线程运行时由 [lib.rs](crates/rt/src/lib.rs)（`vibevalley-rt` crate，`vibevalley_runtime::rt` 重导出）维护（工作线程名为 `vibevalley-io-<n>`，线程数读取 `VIBEVALLEY_IO_WORKERS` 并钳位在 `1–16`，缺省按硬件并发数钳位在 `2–4`）。工作区不应引入额外异步执行器或 `pollster`，跨同步/异步边界统一通过 `vibevalley_rt` 暴露的四项原语协作：
+进程全局唯一的 Tokio 多线程运行时由 [runtime.rs](crates/kit/src/rt/runtime.rs)（`vibevalley_kit::rt`，`vibevalley_runtime::rt` 重导出）维护（工作线程名为 `vibevalley-io-<n>`，线程数读取 `VIBEVALLEY_IO_WORKERS` 并钳位在 `1–16`，缺省按硬件并发数钳位在 `2–4`）。工作区不应引入额外异步执行器或 `pollster`，跨同步/异步边界统一通过 `vibevalley_kit::rt` 暴露的四项原语协作：
 
 | 原语 | 职责 | 适用边界 |
 |---|---|---|
@@ -19,7 +19,7 @@
 
 在 `async fn` 处理器、Tokio 工作任务或异步回调内部不应调用 `rt::block_on`。阻塞工作线程会引发线程池饥饿，并在 `CurrentThread` 运行时上触发死锁或 panic。
 
-所有持有后台任务与订阅的服务端组件应提供原生异步关闭入口 `close_async(&self)`（见 [lib.rs](crates/server/src/lib.rs) 的 `Hub::close_async`、[event_bus.rs](crates/server/src/context/outbox.rs) 的 `EventBus::close_async` 与 `Subscription::close_async`、[mod.rs](crates/server/src/gateway/http/mod.rs) 的 `Listener::shutdown`、[repo.rs](crates/server/src/repo.rs) 的 `Repos::close_async`、[mod.rs](crates/server/src/issue/pull/mod.rs) 的 `Pulls::close_async`、[journal.rs](crates/server/src/runtime/session/journal.rs) 的 `Trajectories::close_async` 与 [mod.rs](crates/server/src/gateway/remote/mod.rs) 的 `Remote::close_async`）。只需在释放时触发取消的结构应直接持有 `CancellationToken::drop_guard()` 返回的 `DropGuard`，不手写仅调用 `cancel()` 的 `impl Drop`（如 `Hub` 与 [mcp_proxy.rs](crates/cli/src/machine_agent/mcp_proxy.rs) 的 `LocalMcpProxy`）。
+所有持有后台任务与订阅的服务端组件应提供原生异步关闭入口 `close_async(&self)`（见 [lib.rs](crates/server/src/lib.rs) 的 `Hub::close_async`、[event_bus.rs](crates/server/src/context/outbox.rs) 的 `EventBus::close_async` 与 `Subscription::close_async`、[mod.rs](crates/server/src/gateway/http/mod.rs) 的 `Listener::shutdown`、[repo/local.rs](crates/server/src/repo/local.rs) 的 `Repo::close_async`、[mod.rs](crates/server/src/issue/pull/mod.rs) 的 `Pulls::close_async`、[journal.rs](crates/server/src/runtime/session/journal.rs) 的 `Trajectories::close_async` 与 [mod.rs](crates/server/src/gateway/remote/mod.rs) 的 `Remote::close_async`）。只需在释放时触发取消的结构应直接持有 `CancellationToken::drop_guard()` 返回的 `DropGuard`，不手写仅调用 `cancel()` 的 `impl Drop`（如 `Hub` 与 [mcp_proxy.rs](crates/cli/src/machine_agent/mcp_proxy.rs) 的 `LocalMcpProxy`）。
 
 ### `apps/mac/src` 零 `rt::handle`
 
@@ -33,7 +33,7 @@
 
 根 [Cargo.toml](Cargo.toml) 为 `tokio-util` 启用 `"rt"`、`"io"`、`"io-util"` 与 `"codec"`。跨异步流与字节分块边界的适配应使用以下原语，禁止手写 `Vec<u8>` 分片缓冲或裸 UTF-8 切片：
 
-- **SSE / NDJSON 行解码**：应使用 `FramedRead::new(StreamReader::new(stream), LinesCodec::new())`（见 [deepseek.rs](crates/runtime/src/agent/ai/providers/deepseek.rs) 与 [remote.rs](apps/mac/src/hosted/remote.rs)）。严禁对单个 TCP byte chunk 直接调用 `String::from_utf8_lossy`，否则跨分片的多字节 UTF-8 中文字符会被截断成替换符。
+- **SSE / NDJSON 行解码**：应使用 `FramedRead::new(StreamReader::new(stream), LinesCodec::new())`（见 [deepseek.rs](crates/agent/src/ai/providers/deepseek.rs) 与 [remote.rs](apps/mac/src/hosted/remote.rs)）。严禁对单个 TCP byte chunk 直接调用 `String::from_utf8_lossy`，否则跨分片的多字节 UTF-8 中文字符会被截断成替换符。
 - **异步流转同步 `Read`**：在 `spawn_blocking` 线程内消费 HTTP 请求或响应体时，应使用 `SyncIoBridge::new(StreamReader::new(stream))`（见 [media.rs](crates/server/src/gateway/http/media.rs) 与 [http.rs](crates/server/src/context/http.rs)），不可在 Tokio 异步工作线程直接调用 `SyncIoBridge::read`。
 - **范围文件分块下载**：应使用 `ReaderStream::with_capacity(file.take(length), FILE_STREAM_CHUNK_BYTES)`（`FILE_STREAM_CHUNK_BYTES = 64 * 1024`，见 [mod.rs](crates/server/src/gateway/http/mod.rs) 的 `file_range_stream`），在保证流式背压的同时对截断文件返回 `UnexpectedEof`。
 
@@ -98,14 +98,14 @@
 根 [Cargo.toml](Cargo.toml) 定义 `[profile.loom]`（`inherits = "dev"`、`opt-level = 2`、`debug = false`、`incremental = true`），[crates/runtime/Cargo.toml](crates/runtime/Cargo.toml) 与 [crates/server/Cargo.toml](crates/server/Cargo.toml) 定义可选特性 `loom = ["dep:loom"]`。日常通过 `cargo xtask loom` 运行全量模型检验。
 
 - **为何不用全局 `--cfg loom`**：工作区 `Cargo.lock` 传递引入的 `event-listener` 会在全局 `RUSTFLAGS="--cfg loom"` 下激活其内部 `cfg(loom)` 编译分支并与非 loom 依赖树冲突；使用显式 Cargo feature `--features loom` 可将模型检验精确限定在 `vibevalley-runtime` 与 `vibevalley-server`。
-- **零侵入垫片与状态空间上界**：`#[cfg(feature = "loom")]` 仅允许出现在 [crates/runtime/src/loom_sync.rs](crates/runtime/src/loom_sync.rs)、[crates/runtime/src/loom_sync.rs](crates/runtime/src/loom_sync.rs) 及各内核文件的 `mod loom_models` 测试子模块中，业务代码保持零条件编译。每个模型只包含最小原子状态与 2–3 条线程；三线程竞争模型应设置 `builder.preemption_bound = Some(2)` 防止状态空间爆炸。
+- **零侵入垫片与状态空间上界**：`#[cfg(feature = "loom")]` 仅允许出现在 [crates/oar/src/loom_sync.rs](crates/oar/src/loom_sync.rs)、[crates/oar/src/loom_sync.rs](crates/oar/src/loom_sync.rs) 及各内核文件的 `mod loom_models` 测试子模块中，业务代码保持零条件编译。每个模型只包含最小原子状态与 2–3 条线程；三线程竞争模型应设置 `builder.preemption_bound = Some(2)` 防止状态空间爆炸。
 
 ### 四个状态机内核范式
 
 | 内核 | 位置 | 同步原语与核心不变量 |
 |---|---|---|
-| `TeardownGate` | [teardown_gate.rs](crates/runtime/src/teardown_gate.rs) | `ARMED -> TERMINATING -> TERMINATED` 三态门 + `RollbackGuard`：并发调用不重复执行关闭闭包，正在关闭时不提前返回 `Ok`，失败或 unwind 时回滚 `ARMED` 并唤醒等待者 |
-| `AcpTurnMachine` | [turn_state.rs](crates/runtime/src/oar/acp/turn_state.rs) | 单字 `AtomicU64` 位压缩状态（`REPLAYING_BIT`、`ABORT_WANTED_BIT`、`DETACHED_BIT` 与低位 `in_flight`）：通过单一 `cas_update` 保证 `prompt` 完成、分离 `usage_update` 与 `abort`/`Cancel` 交错下 `TurnFinished` 精确触发一次且计数永不下溢 |
+| `TeardownGate` | [teardown_gate.rs](crates/machine/src/teardown_gate.rs) | `ARMED -> TERMINATING -> TERMINATED` 三态门 + `RollbackGuard`：并发调用不重复执行关闭闭包，正在关闭时不提前返回 `Ok`，失败或 unwind 时回滚 `ARMED` 并唤醒等待者 |
+| `AcpTurnMachine` | [turn_state.rs](crates/oar/src/acp/turn_state.rs) | 单字 `AtomicU64` 位压缩状态（`REPLAYING_BIT`、`ABORT_WANTED_BIT`、`DETACHED_BIT` 与低位 `in_flight`）：通过单一 `cas_update` 保证 `prompt` 完成、分离 `usage_update` 与 `abort`/`Cancel` 交错下 `TurnFinished` 精确触发一次且计数永不下溢 |
 | `SliceWakeGate` | [slice_wake.rs](crates/server/src/context/feed.rs) | 无锁全局提交 `seq`、6 域切片单调水位 `dirty_seqs: [AtomicI64; 6]`（`store_max` CAS 推进）与 `pending_mask: AtomicU8`（仅 `0 -> 非零` 触发 `Notify`），确保跨线程零丢失唤醒与切片序号永不倒退 |
 | `SessionGenerationTable` | [gen_table.rs](crates/server/src/runtime/session/gen_table.rs) | 互斥锁内原子递增分配 `generation` 并安装会话句柄，旧泵退出时调用 `remove_if_current(id, generation)` 校验代次，杜绝旧泵误逐新会话与句柄泄漏/双释放 |
 
@@ -122,7 +122,7 @@
 
 | 检查 / 脚本 | 守卫范围 | 触发方式 |
 |---|---|---|
-| [ratchets.rs](xtask/src/ratchets.rs) | 禁止引入 `pollster`、锁定服务端非测试 `rt::block_on(` 仅缩减上限（`SERVER_BLOCK_ON_CEILING = 5`）、禁止 `apps/mac/src` 使用 `rt::handle`、禁止 `crates/server/tests/`、`apps/mac/src/`、`crates/cli/src/` 与 `crates/runtime/src/` 使用 `std::thread::sleep`、禁止 `crates/rich` 在 `highlight.rs` 外经 `Handle::try_current()` 回退同步执行等 | `cargo xtask audit --ratchets` |
-| [boundaries.rs](xtask/src/boundaries.rs) | 守住服务端 `L0–L3` 无环 DAG、模块无循环依赖、脊柱（`lib.rs` / `context/port.rs` / `transport/`）与 `apps/mac/src` 不直接导入 `crate::<domain>::*` | `cargo xtask audit --boundaries` |
+| [ratchets.rs](xtask/src/ratchets.rs) | 禁止引入 `pollster`、锁定服务端非测试 `rt::block_on(` 仅缩减上限（`SERVER_BLOCK_ON_CEILING = 3`）、禁止 `apps/mac/src` 使用 `rt::handle`、禁止零容忍区使用 `std::thread::sleep`、禁止 `crates/rich` 在 `highlight.rs` 外经 `Handle::try_current()` 回退同步执行，并锁死 `no-bespoke-key-lock`、`no-unbounded-resident-cache`、`no-raw-interval-or-unbounded-sink` 三条零天花板 `kit` 棘轮 | `cargo xtask audit --ratchets` |
+| [boundaries.rs](xtask/src/boundaries.rs) | 守住 Ring 0 `crates/kit` 三条零天花板边界（`kit-zero-product-import`、`kit-zero-orm-entity`、`kit-no-global-state`）、服务端 `L0–L4` 无环 DAG、模块无循环依赖、零破环 trait 补丁，以及脊柱（`lib.rs` / `context/` / `gateway/`）与 `apps/mac/src` 不直接导入 `crate::<domain>::*` | `cargo xtask audit --boundaries` |
 | Rust 工作区全检 | `cargo fmt`、`cargo clippy --all-targets -- -D warnings`、工作区测试 | `cargo xtask check` |
 | Loom 状态机模型检验 | 4 个并发状态机内核穷举交错检查（`--features loom --profile loom`） | `cargo xtask loom` |

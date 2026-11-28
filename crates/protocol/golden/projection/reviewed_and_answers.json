@@ -27,8 +27,8 @@
       "since": 1794500000000
      },
      "policy": {
-      "branch": "vibevalley/issue-50",
-      "kind": "managedWorktree",
+      "kind": "directCwd",
+      "permissionMode": "bypass",
       "repo": "demo"
      },
      "profile": "lab",
@@ -78,8 +78,8 @@
        "since": 1794500000000
       },
       "policy": {
-       "branch": "vibevalley/issue-50",
-       "kind": "managedWorktree",
+       "kind": "directCwd",
+       "permissionMode": "bypass",
        "repo": "demo"
       },
       "profile": "lab",
@@ -242,8 +242,8 @@
        "since": 1794500000000
       },
       "policy": {
-       "branch": "vibevalley/issue-50",
-       "kind": "managedWorktree",
+       "kind": "directCwd",
+       "permissionMode": "bypass",
        "repo": "demo"
       },
       "profile": "lab",
@@ -374,8 +374,8 @@
        "_tag": "done"
       },
       "policy": {
-       "branch": "vibevalley/issue-50",
-       "kind": "managedWorktree",
+       "kind": "directCwd",
+       "permissionMode": "bypass",
        "repo": "demo"
       },
       "profile": "lab",
@@ -413,8 +413,8 @@
       "since": 1794500000000
      },
      "policy": {
-      "branch": "vibevalley/issue-51",
-      "kind": "managedWorktree",
+      "kind": "directCwd",
+      "permissionMode": "bypass",
       "repo": "demo"
      },
      "profile": "lab",
@@ -539,8 +539,8 @@
        "_tag": "done"
       },
       "policy": {
-       "branch": "vibevalley/issue-50",
-       "kind": "managedWorktree",
+       "kind": "directCwd",
+       "permissionMode": "bypass",
        "repo": "demo"
       },
       "profile": "lab",
@@ -570,8 +570,8 @@
        "since": 1794500000000
       },
       "policy": {
-       "branch": "vibevalley/issue-51",
-       "kind": "managedWorktree",
+       "kind": "directCwd",
+       "permissionMode": "bypass",
        "repo": "demo"
       },
       "profile": "lab",
@@ -806,8 +806,8 @@
        "_tag": "done"
       },
       "policy": {
-       "branch": "vibevalley/issue-50",
-       "kind": "managedWorktree",
+       "kind": "directCwd",
+       "permissionMode": "bypass",
        "repo": "demo"
       },
       "profile": "lab",
@@ -837,8 +837,8 @@
        "since": 1794500000000
       },
       "policy": {
-       "branch": "vibevalley/issue-51",
-       "kind": "managedWorktree",
+       "kind": "directCwd",
+       "permissionMode": "bypass",
        "repo": "demo"
       },
       "profile": "lab",
@@ -1042,8 +1042,8 @@
        "_tag": "done"
       },
       "policy": {
-       "branch": "vibevalley/issue-50",
-       "kind": "managedWorktree",
+       "kind": "directCwd",
+       "permissionMode": "bypass",
        "repo": "demo"
       },
       "profile": "lab",
@@ -1073,8 +1073,8 @@
        "_tag": "done"
       },
       "policy": {
-       "branch": "vibevalley/issue-51",
-       "kind": "managedWorktree",
+       "kind": "directCwd",
+       "permissionMode": "bypass",
        "repo": "demo"
       },
       "profile": "lab",
@@ -1112,8 +1112,8 @@
       "since": 1794500000000
      },
      "policy": {
-      "branch": "vibevalley/issue-52",
-      "kind": "managedWorktree",
+      "kind": "directCwd",
+      "permissionMode": "bypass",
       "repo": "demo"
      },
      "profile": "lab",
@@ -1311,8 +1311,8 @@
        "_tag": "done"
       },
       "policy": {
-       "branch": "vibevalley/issue-50",
-       "kind": "managedWorktree",
+       "kind": "directCwd",
+       "permissionMode": "bypass",
        "repo": "demo"
       },
       "profile": "lab",
@@ -1342,8 +1342,8 @@
        "_tag": "done"
       },
       "policy": {
-       "branch": "vibevalley/issue-51",
-       "kind": "managedWorktree",
+       "kind": "directCwd",
+       "permissionMode": "bypass",
        "repo": "demo"
       },
       "profile": "lab",
@@ -1373,8 +1373,8 @@
        "since": 1794500000000
       },
       "policy": {
-       "branch": "vibevalley/issue-52",
-       "kind": "managedWorktree",
+       "kind": "directCwd",
+       "permissionMode": "bypass",
        "repo": "demo"
       },
       "profile": "lab",
@@ -1692,8 +1692,8 @@
        "_tag": "done"
       },
       "policy": {
-       "branch": "vibevalley/issue-50",
-       "kind": "managedWorktree",
+       "kind": "directCwd",
+       "permissionMode": "bypass",
        "repo": "demo"
       },
       "profile": "lab",
@@ -1723,8 +1723,8 @@
        "_tag": "done"
       },
       "policy": {
-       "branch": "vibevalley/issue-51",
-       "kind": "managedWorktree",
+       "kind": "directCwd",
+       "permissionMode": "bypass",
        "repo": "demo"
       },
       "profile": "lab",
@@ -1754,8 +1754,8 @@
        "since": 1794500000000
       },
       "policy": {
-       "branch": "vibevalley/issue-52",
-       "kind": "managedWorktree",
+       "kind": "directCwd",
+       "permissionMode": "bypass",
        "repo": "demo"
       },
       "profile": "lab",
@@ -2034,8 +2034,8 @@
        "_tag": "done"
       },
       "policy": {
-       "branch": "vibevalley/issue-50",
-       "kind": "managedWorktree",
+       "kind": "directCwd",
+       "permissionMode": "bypass",
        "repo": "demo"
       },
       "profile": "lab",
@@ -2065,8 +2065,8 @@
        "_tag": "done"
       },
       "policy": {
-       "branch": "vibevalley/issue-51",
-       "kind": "managedWorktree",
+       "kind": "directCwd",
+       "permissionMode": "bypass",
        "repo": "demo"
       },
       "profile": "lab",
@@ -2096,8 +2096,8 @@
        "_tag": "resting"
       },
       "policy": {
-       "branch": "vibevalley/issue-52",
-       "kind": "managedWorktree",
+       "kind": "directCwd",
+       "permissionMode": "bypass",
        "repo": "demo"
       },
       "profile": "lab",
@@ -2135,8 +2135,8 @@
       "since": 1794500000000
      },
      "policy": {
-      "branch": "vibevalley/issue-53",
-      "kind": "managedWorktree",
+      "kind": "directCwd",
+      "permissionMode": "bypass",
       "repo": "demo"
      },
      "profile": "lab",
@@ -2406,8 +2406,8 @@
        "_tag": "done"
       },
       "policy": {
-       "branch": "vibevalley/issue-50",
-       "kind": "managedWorktree",
+       "kind": "directCwd",
+       "permissionMode": "bypass",
        "repo": "demo"
       },
       "profile": "lab",
@@ -2437,8 +2437,8 @@
        "_tag": "done"
       },
       "policy": {
-       "branch": "vibevalley/issue-51",
-       "kind": "managedWorktree",
+       "kind": "directCwd",
+       "permissionMode": "bypass",
        "repo": "demo"
       },
       "profile": "lab",
@@ -2468,8 +2468,8 @@
        "_tag": "resting"
       },
       "policy": {
-       "branch": "vibevalley/issue-52",
-       "kind": "managedWorktree",
+       "kind": "directCwd",
+       "permissionMode": "bypass",
        "repo": "demo"
       },
       "profile": "lab",
@@ -2499,8 +2499,8 @@
        "since": 1794500000000
       },
       "policy": {
-       "branch": "vibevalley/issue-53",
-       "kind": "managedWorktree",
+       "kind": "directCwd",
+       "permissionMode": "bypass",
        "repo": "demo"
       },
       "profile": "lab",
@@ -2894,8 +2894,8 @@
        "_tag": "done"
       },
       "policy": {
-       "branch": "vibevalley/issue-50",
-       "kind": "managedWorktree",
+       "kind": "directCwd",
+       "permissionMode": "bypass",
        "repo": "demo"
       },
       "profile": "lab",
@@ -2925,8 +2925,8 @@
        "_tag": "done"
       },
       "policy": {
-       "branch": "vibevalley/issue-51",
-       "kind": "managedWorktree",
+       "kind": "directCwd",
+       "permissionMode": "bypass",
        "repo": "demo"
       },
       "profile": "lab",
@@ -2956,8 +2956,8 @@
        "_tag": "resting"
       },
       "policy": {
-       "branch": "vibevalley/issue-52",
-       "kind": "managedWorktree",
+       "kind": "directCwd",
+       "permissionMode": "bypass",
        "repo": "demo"
       },
       "profile": "lab",
@@ -2987,8 +2987,8 @@
        "since": 1794500000000
       },
       "policy": {
-       "branch": "vibevalley/issue-53",
-       "kind": "managedWorktree",
+       "kind": "directCwd",
+       "permissionMode": "bypass",
        "repo": "demo"
       },
       "profile": "lab",
@@ -3419,8 +3419,8 @@
        "_tag": "done"
       },
       "policy": {
-       "branch": "vibevalley/issue-50",
-       "kind": "managedWorktree",
+       "kind": "directCwd",
+       "permissionMode": "bypass",
        "repo": "demo"
       },
       "profile": "lab",
@@ -3450,8 +3450,8 @@
        "_tag": "done"
       },
       "policy": {
-       "branch": "vibevalley/issue-51",
-       "kind": "managedWorktree",
+       "kind": "directCwd",
+       "permissionMode": "bypass",
        "repo": "demo"
       },
       "profile": "lab",
@@ -3481,8 +3481,8 @@
        "_tag": "resting"
       },
       "policy": {
-       "branch": "vibevalley/issue-52",
-       "kind": "managedWorktree",
+       "kind": "directCwd",
+       "permissionMode": "bypass",
        "repo": "demo"
       },
       "profile": "lab",
@@ -3512,8 +3512,8 @@
        "since": 1794500000000
       },
       "policy": {
-       "branch": "vibevalley/issue-53",
-       "kind": "managedWorktree",
+       "kind": "directCwd",
+       "permissionMode": "bypass",
        "repo": "demo"
       },
       "profile": "lab",
@@ -3548,8 +3548,8 @@
       "closed": "merged"
      },
      "policy": {
-      "branch": "vibevalley/issue-55",
-      "kind": "managedWorktree",
+      "kind": "directCwd",
+      "permissionMode": "bypass",
       "repo": "demo"
      },
      "profile": "lab",
@@ -3949,8 +3949,8 @@
        "_tag": "done"
       },
       "policy": {
-       "branch": "vibevalley/issue-50",
-       "kind": "managedWorktree",
+       "kind": "directCwd",
+       "permissionMode": "bypass",
        "repo": "demo"
       },
       "profile": "lab",
@@ -3980,8 +3980,8 @@
        "_tag": "done"
       },
       "policy": {
-       "branch": "vibevalley/issue-51",
-       "kind": "managedWorktree",
+       "kind": "directCwd",
+       "permissionMode": "bypass",
        "repo": "demo"
       },
       "profile": "lab",
@@ -4011,8 +4011,8 @@
        "_tag": "resting"
       },
       "policy": {
-       "branch": "vibevalley/issue-52",
-       "kind": "managedWorktree",
+       "kind": "directCwd",
+       "permissionMode": "bypass",
        "repo": "demo"
       },
       "profile": "lab",
@@ -4042,8 +4042,8 @@
        "since": 1794500000000
       },
       "policy": {
-       "branch": "vibevalley/issue-53",
-       "kind": "managedWorktree",
+       "kind": "directCwd",
+       "permissionMode": "bypass",
        "repo": "demo"
       },
       "profile": "lab",
@@ -4070,8 +4070,8 @@
        "closed": "merged"
       },
       "policy": {
-       "branch": "vibevalley/issue-55",
-       "kind": "managedWorktree",
+       "kind": "directCwd",
+       "permissionMode": "bypass",
        "repo": "demo"
       },
       "profile": "lab",
@@ -4483,8 +4483,8 @@
      },
      "phaseText": "这一轮做完了，等你看",
      "policy": {
-      "branch": "vibevalley/issue-50",
-      "kind": "managedWorktree",
+      "kind": "directCwd",
+      "permissionMode": "bypass",
       "repo": "demo"
      },
      "profile": "lab",
@@ -4515,8 +4515,8 @@
      },
      "phaseText": "这一轮做完了，等你看",
      "policy": {
-      "branch": "vibevalley/issue-51",
-      "kind": "managedWorktree",
+      "kind": "directCwd",
+      "permissionMode": "bypass",
       "repo": "demo"
      },
      "profile": "lab",
@@ -4547,8 +4547,8 @@
      },
      "phaseText": "歇着（上一轮做完了）",
      "policy": {
-      "branch": "vibevalley/issue-52",
-      "kind": "managedWorktree",
+      "kind": "directCwd",
+      "permissionMode": "bypass",
       "repo": "demo"
      },
      "profile": "lab",
@@ -4580,8 +4580,8 @@
      },
      "phaseText": "在跑命令：vp test",
      "policy": {
-      "branch": "vibevalley/issue-53",
-      "kind": "managedWorktree",
+      "kind": "directCwd",
+      "permissionMode": "bypass",
       "repo": "demo"
      },
      "profile": "lab",
@@ -4609,8 +4609,8 @@
      },
      "phaseText": "",
      "policy": {
-      "branch": "vibevalley/issue-55",
-      "kind": "managedWorktree",
+      "kind": "directCwd",
+      "permissionMode": "bypass",
       "repo": "demo"
      },
      "profile": "lab",

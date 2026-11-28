@@ -1,11 +1,11 @@
 import { t } from "@vibevalley/i18n";
 import type { BoardSummary, DoingView, Issue, IssuePromptKind, IssueStage, IssueStageKind, Session, SessionEvent, SessionView } from "@vibevalley/protocol";
-import { sessionProfile, sessionRepo, sessionWorktree } from "@vibevalley/protocol/rules";
+import { sessionProfile, sessionRepo } from "@vibevalley/protocol/rules";
 import { sessionId } from "@vibevalley/protocol/schema";
 
 import { spanText, tookText } from "../../../infra/base/format";
 import type { Tone } from "./cards";
-import { endedAt, issueTitle, needsWorktreeCheck } from "./issue";
+import { endedAt, issueTitle } from "./issue";
 import { localizeIssueError } from "./issueError";
 /** An action's words as a sentence starts them (English capitalizes; Chinese has no case). */
 const capitalized = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -145,7 +145,7 @@ export function issueState(issue: Issue, sessions: Session[], session: SessionVi
   const rows = criteriaRows(issue);
   // Each helper once, the first time it worked the issue.
   const crew = sessions.filter((s, i) => !sessions.slice(0, i).some((x) => (sessionProfile(x) ?? x.id) === (sessionProfile(s) ?? s.id)));
-  const hand = sessionWorktree(head) !== undefined ? session : undefined;
+  const hand = head.cwd !== undefined ? session : undefined;
   const title = issueTitle(issue, issues);
 
   /** The status summary, one part each: the stage, how long, who, the rounds, the time used, the money. cny is all the issue's runs when known. */
@@ -177,8 +177,6 @@ export function issueState(issue: Issue, sessions: Session[], session: SessionVi
     repo: issue.repo ?? sessionRepo(head),
     parentText: parent?.title ?? issue.parent ?? "",
     ask: userQuestion(stage, issue, head, boardSummary),
-    needsWorktreeCheck:
-      boardSummary?.byIssue[issue.id]?.needsWorktreeCheck ?? (stage.state !== "done" && stage.state !== "canceled" && needsWorktreeCheck(head)),
     /** The lead act and the rest the user may do, as the server says. */
     lead: stage.lead,
     others: stage.acts.map((a) => a.act).filter((a) => a !== stage.lead),

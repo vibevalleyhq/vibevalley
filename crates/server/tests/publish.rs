@@ -346,9 +346,10 @@ fn pull_request_issue_mandates_records_and_completes_cleanly() {
     let refused = started.router().call("issue.status.update", json!({ "id": &issue_id, "status": "done" }));
     assert_ne!(refused.biz_code, 0);
 
-    // Commit a change on the issue's worktree branch and publish it via repo.pr.submit.
+    // Autonomous agent creates its feature branch, commits a change, and publishes it via repo.pr.submit.
     git(&worktree, &["config", "user.email", "helper@farm.test"]);
     git(&worktree, &["config", "user.name", "helper"]);
+    git(&worktree, &["checkout", "-q", "-b", "vibevalley/issue-1"]);
     std::fs::write(worktree.join("a.txt"), "two\n").unwrap();
     git(&worktree, &["commit", "-q", "-am", "feat: two"]);
     let sha = git(&worktree, &["rev-parse", "HEAD"]);

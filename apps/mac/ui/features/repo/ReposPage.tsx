@@ -257,6 +257,29 @@ function Details(props: { repo: RepoSummary; health: RepoHealth | undefined; now
   );
 }
 
+/** Replaces home prefix with `~/` and middle-ellipsizes overly long local paths for display while preserving full path for tooltips and copy. */
+export function formatRepoPath(rawPath: string, maxLen = 44): string {
+  const trimmed = rawPath.trim();
+  if (trimmed === "") return "";
+  const normalized = trimmed.replace(/^\/(?:Users|home)\/[^/]+(?=\/|$)/u, "~").replace(/^[A-Za-z]:\\Users\\[^\\]+(?=\\|$)/u, "~");
+  if (normalized.length <= maxLen) return normalized;
+  const sep = normalized.includes("/") ? "/" : "\\";
+  const parts = normalized.split(sep).filter((p) => p.length > 0);
+  const leadingSep = normalized.startsWith(sep) ? sep : "";
+  if (parts.length >= 3) {
+    const first = `${leadingSep}${parts[0] ?? ""}`;
+    const lastTwo = `${parts[parts.length - 2] ?? ""}${sep}${parts[parts.length - 1] ?? ""}`;
+    const withTwo = `${first}${sep}…${sep}${lastTwo}`;
+    if (withTwo.length <= maxLen) return withTwo;
+    const lastOne = parts[parts.length - 1] ?? "";
+    const withOne = `${first}${sep}…${sep}${lastOne}`;
+    if (withOne.length <= maxLen) return withOne;
+  }
+  const keepTail = Math.max(8, Math.floor((maxLen - 1) * 0.6));
+  const keepHead = Math.max(4, maxLen - 1 - keepTail);
+  return `${normalized.slice(0, keepHead)}…${normalized.slice(-keepTail)}`;
+}
+
 async function copyPath(path: string) {
   try {
     await Clipboard.writeText(path);
@@ -350,7 +373,9 @@ function Overview(props: { repo: RepoSummary; health: RepoHealth | undefined; la
         <View class="flex-row flex-wrap items-center gap-1.5">
           <Icon name="folder" size={14} tone="muted" />
           <View class="min-w-0 shrink" tooltip={<Bubble text={props.repo.path} />}>
-            <Text class="truncate font-mono text-xs text-muted">{props.repo.path}</Text>
+            <Text testID="repo-path" class="truncate font-mono text-xs text-muted">
+              {formatRepoPath(props.repo.path)}
+            </Text>
           </View>
           <IconButton icon="copy" size={14} testid="repo-copy" label={t("web.repo.copyPath")} onClick={() => void copyPath(props.repo.path)} />
           <OpenTerminal cwd={props.repo.path} title={props.repo.name} testid="repo-terminal" />

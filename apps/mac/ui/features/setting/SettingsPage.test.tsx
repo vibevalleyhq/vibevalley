@@ -69,6 +69,7 @@ test("SettingsPage search finds 技能 and 记忆 in Chinese locale", async () =
 
 test("SettingsPage general and appearance render separate sections with split IA groups (zh & en)", async () => {
   const zh = await mountSettings("/settings/general", "zh");
+  expect(zh.app.count("id:desk")).toBe(0);
   const zhTexts = zh.app.texts();
   expect(zhTexts).toContain("个人与项目");
   expect(zhTexts).toContain("连接与集成");
@@ -401,8 +402,9 @@ test("SettingsPage splits Model Providers (/settings/providers) and Models & Mod
   // Clicking CTA on empty Models & Model Policy navigates to /settings/providers.
   await app.press("id:models-go-providers");
   await fake.pumpUntil(app, () => app.count("id:settings-providers") === 1 && app.count("id:provider-card-deepseek") === 1);
-  expect(app.count("id:provider-card-minimax")).toBe(1);
   expect(app.count("id:provider-card-moss")).toBe(1);
+  expect(app.count("id:provider-card-minimax")).toBe(0);
+  expect(app.count("id:provider-card-openai")).toBe(0);
 
   // Enter DeepSeek API key and click Save & Verify -> auto-fetches models with capability tags.
   await app.type("id:provider-key-deepseek >> id:secret", "sk-deepseek-9999");

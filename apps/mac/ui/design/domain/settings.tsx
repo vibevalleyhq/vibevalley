@@ -65,13 +65,7 @@ export function SettingsGroup(props: {
             </If>
           </View>
           <View class="shrink-0 flex-row items-center gap-2">
-            <If when={props.note}>
-              {(note) => (
-                <View class="rounded-full bg-hover px-2 py-0.5">
-                  <Text class="text-2xs font-medium text-faint">{note()}</Text>
-                </View>
-              )}
-            </If>
+            <If when={props.note}>{(note) => <Text class="text-2xs text-faint">{note()}</Text>}</If>
             {props.action}
           </View>
         </View>

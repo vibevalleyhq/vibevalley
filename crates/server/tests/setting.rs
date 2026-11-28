@@ -47,7 +47,7 @@ fn a_key_saved_here_wins_over_the_configurations_and_only_its_end_is_shown() {
     let app = app(dir.path());
     let before = call(&app, "setting.get", Value::Null)["data"].clone();
     assert_eq!(before["deepseekApiKey"], json!({ "source": "config", "hint": "…0000" }));
-    assert_eq!(before["paths"]["worktrees"], dir.path().join("work/worktrees").to_string_lossy().as_ref());
+    assert!(before["paths"].get("worktrees").is_none());
     assert!(before["paths"].get("pkm").is_none());
     let after = call(
         &app,

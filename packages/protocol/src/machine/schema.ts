@@ -28,7 +28,6 @@ export const MachineInfo = z.object({
   status: MachineStatus,
   here: z.boolean(),
   ephemeral: z.boolean(),
-  worktreeSupported: z.boolean(),
   joinedAt: z.number(),
   lastSeenAt: z.exactOptional(z.number()),
   runtimes: z.array(MachineRuntimeSummary),
@@ -42,7 +41,6 @@ const MachineHello = z.object({
   name: z.string(),
   platform: MachinePlatform,
   ephemeral: z.boolean(),
-  worktreeSupported: z.boolean(),
   runtimes: z.array(MachineRuntimeSummary),
 }) satisfies Codec<T.MachineHello>;
 
@@ -75,8 +73,6 @@ const MachineSessionOpen = z.object({
   sessionId: z.string(),
   runtimeId: z.string(),
   repoRef: z.exactOptional(z.string()),
-  branch: z.exactOptional(z.string()),
-  baseRef: z.exactOptional(z.string()),
   workdir: z.exactOptional(z.string()),
   systemPrompt: z.exactOptional(z.string()),
   model: z.exactOptional(z.string()),
@@ -179,31 +175,6 @@ const MachineAttachmentData = z.object({
   error: z.exactOptional(z.string()),
 }) satisfies Codec<T.MachineAttachmentData>;
 
-const MachineWorktreePrepare = z.object({
-  type: z.literal("worktree.prepare"),
-  requestId: z.string(),
-  taskId: z.string(),
-  repoRef: z.string(),
-  branch: z.exactOptional(z.string()),
-  baseRef: z.exactOptional(z.string()),
-}) satisfies Codec<T.MachineWorktreePrepare>;
-
-const MachineWorktreeResult = z.object({
-  type: z.literal("worktree.result"),
-  requestId: z.string(),
-  ok: z.boolean(),
-  workdir: z.exactOptional(z.string()),
-  branch: z.exactOptional(z.string()),
-  error: z.exactOptional(z.string()),
-}) satisfies Codec<T.MachineWorktreeResult>;
-
-const MachineWorktreeCleanup = z.object({
-  type: z.literal("worktree.cleanup"),
-  requestId: z.string(),
-  taskId: z.string(),
-  workdir: z.string(),
-}) satisfies Codec<T.MachineWorktreeCleanup>;
-
 const MachineWireError = z.object({
   type: z.literal("error"),
   requestId: z.exactOptional(z.string()),
@@ -229,8 +200,5 @@ export const MachineWireFrame = z.discriminatedUnion("type", [
   MachineMcpResponse,
   MachineAttachmentFetch,
   MachineAttachmentData,
-  MachineWorktreePrepare,
-  MachineWorktreeResult,
-  MachineWorktreeCleanup,
   MachineWireError,
 ]) satisfies Codec<T.MachineWireFrame>;

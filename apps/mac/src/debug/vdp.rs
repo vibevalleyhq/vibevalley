@@ -798,7 +798,7 @@ impl VdpServer {
                 shutdown: cancel.clone(),
             });
 
-        let handle = vibevalley_rt::current_or_global_handle();
+        let handle = vibevalley_kit::rt::current_or_global_handle();
         let _entered = handle.enter();
         let listener = tokio::net::TcpListener::from_std(std_listener).map_err(|e| format!("failed to adopt tokio TcpListener: {e}"))?;
         handle.spawn(async move {

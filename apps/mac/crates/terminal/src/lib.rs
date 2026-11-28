@@ -1,4 +1,4 @@
-//! Terminal core: one OS thread per session owning a libghostty-vt `Terminal`
+//! Terminal core: one OS thread per session owning an `alacritty_terminal::Term`
 //! and its PTY. The UI only ever sees [`TermSession`] (a cheap, cloneable,
 //! `Send + Sync` handle) and immutable [`Snapshot`]s.
 //!

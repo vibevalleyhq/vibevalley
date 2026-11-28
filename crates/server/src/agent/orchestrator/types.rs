@@ -1,14 +1,17 @@
-use std::collections::HashMap;
+use std::num::NonZeroUsize;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 
 use arc_swap::ArcSwap;
 use parking_lot::Mutex;
 use tokio::sync::Notify;
+use vibevalley_kit::cache::LruCache;
 
 use super::words::Source;
 use crate::agent::tool::Route;
 use crate::channel::Picked;
+
+const CANNOT_CACHE_CAPACITY: NonZeroUsize = NonZeroUsize::new(128).expect("non-zero capacity");
 
 /// One input to an orchestrator (`Handed`).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -31,20 +34,25 @@ pub struct Input {
     pub cron_id: Option<String>,
 }
 
-/// Messages heard but not woken for: shown with the next input (`digest`).
-#[derive(Default)]
-pub(super) struct Waiting {
-    pub(super) lines: Vec<String>,
+pub(super) struct InstanceState {
+    /// What it last said it cannot start for, per place.
+    pub(super) cannot: LruCache<String, String>,
+}
+
+impl Default for InstanceState {
+    fn default() -> Self {
+        Self {
+            cannot: LruCache::new(CANNOT_CACHE_CAPACITY),
+        }
+    }
 }
 
 pub(super) struct Instance {
     pub(super) id: String,
     pub(super) pending: AtomicBool,
     pub(super) more: Arc<Notify>,
-    pub(super) route: Arc<Mutex<Route>>,
+    pub(super) route: Arc<ArcSwap<Route>>,
     /// The situation it was last shown whole; "" shows it whole again.
     pub(super) shown: ArcSwap<String>,
-    /// What it last said it cannot start for, per place.
-    pub(super) cannot: Mutex<HashMap<String, String>>,
-    pub(super) news: Mutex<Waiting>,
+    pub(super) state: Mutex<InstanceState>,
 }
