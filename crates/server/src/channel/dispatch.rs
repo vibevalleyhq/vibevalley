@@ -458,7 +458,7 @@ mod tests {
 
     use super::*;
     use crate::channel::types::Place;
-    use crate::service::channel::{ChannelRow, EventRow, MsgRow};
+    use crate::service::channel::{ChannelRow, MsgRow};
 
     fn agent(id: &str, role: AgentRole) -> Actor {
         Actor::Agent {
@@ -747,13 +747,6 @@ mod tests {
         let mut reach = Reach::default();
 
         let thread_msg = Committed {
-            event: EventRow {
-                seq: 1,
-                kind: "posted".into(),
-                channel_id: "t-1".into(),
-                message_id: "m1".into(),
-                at: 10,
-            },
             row: MsgRow {
                 id: "m1".into(),
                 channel_id: "t-1".into(),
@@ -806,13 +799,6 @@ mod tests {
         );
 
         let direct_msg = Committed {
-            event: EventRow {
-                seq: 2,
-                kind: "posted".into(),
-                channel_id: "d-1".into(),
-                message_id: "m2".into(),
-                at: 20,
-            },
             row: MsgRow {
                 id: "m2".into(),
                 channel_id: "d-1".into(),

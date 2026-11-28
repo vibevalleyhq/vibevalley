@@ -17,6 +17,7 @@ pub mod m20261128_100001_replace_artifact_with_note;
 pub mod m20261128_100002_add_issue_body_note_id;
 pub mod m20261128_100003_query_perf_indexes_and_fts;
 pub mod m20261128_100004_reconcile_unified_session_and_participants;
+pub mod m20261128_100005_batch1_drop_dead_tables_and_quarantine_durable;
 
 use sea_orm_migration::prelude::*;
 
@@ -43,6 +44,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261128_100002_add_issue_body_note_id::Migration),
             Box::new(m20261128_100003_query_perf_indexes_and_fts::Migration),
             Box::new(m20261128_100004_reconcile_unified_session_and_participants::Migration),
+            Box::new(m20261128_100005_batch1_drop_dead_tables_and_quarantine_durable::Migration),
         ]
     }
 }

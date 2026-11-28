@@ -116,6 +116,15 @@ opt-level = 2
 [profile.dev.package.tiny-skia]
 opt-level = 2
 
+[profile.dev.package.fontdb]
+opt-level = 2
+
+[profile.dev.package.nsh-platform-gpui]
+opt-level = 2
+
+[profile.dev.package.ttf-parser]
+opt-level = 2
+
 [profile.dev.package.vibevalley-pele]
 opt-level = 2
 

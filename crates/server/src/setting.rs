@@ -364,6 +364,8 @@ struct Stored {
     providers: Option<Providers>,
     #[serde(skip_serializing_if = "Option::is_none")]
     profile: Option<UserProfile>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    remote: Option<crate::context::api::RemoteAccessConfig>,
 }
 
 fn fold_legacy_deepseek_key(stored: &mut Stored) {
@@ -888,6 +890,23 @@ impl Setting {
                     &[("file", self.file.to_string_lossy().into_owned().into()), ("why", e.to_string().into())],
                 ),
             )
+        })
+    }
+}
+
+impl crate::context::api::RemoteConfigStore for Setting {
+    fn get_remote_config(&self) -> Option<crate::context::api::RemoteAccessConfig> {
+        self.stored.lock().remote.clone()
+    }
+
+    fn save_remote_config<'a>(&'a self, cfg: crate::context::api::RemoteAccessConfig) -> crate::context::api::BoxFuture<'a, Result<(), ApiError>> {
+        Box::pin(async move {
+            let next = {
+                let mut guard = self.stored.lock();
+                guard.remote = Some(cfg);
+                guard.clone()
+            };
+            self.persist_async(&next).await
         })
     }
 }

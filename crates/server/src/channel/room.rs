@@ -19,7 +19,7 @@ use super::types::{
 };
 use super::words;
 use crate::context::{LookIn, Sink, missing, now};
-use crate::service::channel::{ChannelRow, DeliveryRow, EventRow, MsgRow, ParticipantRow};
+use crate::service::channel::{ChannelRow, DeliveryRow, MsgRow, ParticipantRow};
 
 impl Chat {
     /// `place_of_async`: a place's id, or an address as `from` would say it.
@@ -208,21 +208,11 @@ impl Chat {
         self.model().home_of(participant)
     }
 
-    /// The events after `after`, oldest first, at most n.
-    pub async fn events_async(&self, after: i64, n: i64) -> Result<Vec<EventRow>, ApiError> {
-        self.ctx.service.channel.events_after(after, n).await.q()
-    }
-
     /// A posted message as it is now, told as when it was committed.
     pub async fn committed_of_async(&self, message: &str) -> Result<Option<Committed>, ApiError> {
-        let channels = &self.ctx.service.channel;
-        let row = channels.message_by_id(message).await.q()?;
-        let event = channels.event_of(message).await.q()?;
+        let row = self.ctx.service.channel.message_by_id(message).await.q()?;
         let model = self.model();
-        Ok(match (row, event) {
-            (Some(row), Some(e)) if row.deleted_at.is_none() => model.committed_from(&row, &e),
-            _ => None,
-        })
+        Ok(row.filter(|r| r.deleted_at.is_none()).and_then(|r| model.committed_from(&r)))
     }
 
     /// Non-blocking bounded broadcast stream of committed messages with their pending deliveries.
@@ -920,7 +910,7 @@ fn queued_from_row(r: DeliveryRow) -> Option<QueuedDelivery> {
 fn message_of(event: ChannelEvent) -> Option<ChatMessage> {
     match event {
         ChannelEvent::Posted(c) => Some(to_message(&c.row)),
-        ChannelEvent::Edited(m) | ChannelEvent::Removed { message: m, .. } | ChannelEvent::Reacted(m) | ChannelEvent::Pinned(m) => Some(m),
+        ChannelEvent::Edited(m) | ChannelEvent::Removed(m) | ChannelEvent::Reacted(m) | ChannelEvent::Pinned(m) => Some(m),
         ChannelEvent::UserRead { .. } => None,
     }
 }

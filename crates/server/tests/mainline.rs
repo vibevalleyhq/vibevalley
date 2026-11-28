@@ -204,12 +204,8 @@ fn regression_mainline_dispatch_report_follow_up_merge_schedule_and_reopen() {
         .unwrap();
     assert!(run.heard.is_empty());
     let queued = vibevalley_runtime::rt::block_on(server.test_internals().runtime.durable_store().read_async(|tx| {
-        let run_id = run.id.clone();
         let conv = format!("issue:{draft_id}");
-        Box::pin(async move {
-            assert!(tx.document_async("run", &run_id, "issue.report").await?.is_none());
-            tx.submissions_async(&conv).await
-        })
+        Box::pin(async move { tx.submissions_async(&conv).await })
     }))
     .unwrap();
     assert_eq!(queued.len(), 1);
@@ -247,27 +243,31 @@ fn regression_mainline_dispatch_report_follow_up_merge_schedule_and_reopen() {
     clock.advance(Duration::from_millis(150));
     vibevalley_runtime::rt::block_on(server.test_internals().orchestration.cron.tick_async());
     let scheduled = until(&server, "cron dispatched", || {
-        server
-            .test_internals()
-            .orchestration
-            .issue
-            .enrich_issues(crate::support::board_issues(server.test_internals().board))
-            .into_iter()
-            .find(|i| i.cron.as_deref() == cron["id"].as_str() && i.was_sent())
+        vibevalley_runtime::rt::block_on(
+            server
+                .test_internals()
+                .orchestration
+                .issue
+                .enrich_issues(crate::support::board_issues(server.test_internals().board)),
+        )
+        .into_iter()
+        .find(|i| i.cron.as_deref() == cron["id"].as_str() && i.was_sent())
     });
     until(&server, "cron reported", || {
         crate::support::board_issue(server.test_internals().board, &scheduled.id).filter(|i| i.stage.state == IssueStageKind::Reviewing)
     });
     vibevalley_runtime::rt::block_on(server.test_internals().orchestration.cron.tick_async());
     assert_eq!(
-        server
-            .test_internals()
-            .orchestration
-            .issue
-            .enrich_issues(crate::support::board_issues(server.test_internals().board))
-            .iter()
-            .filter(|i| i.cron.is_some())
-            .count(),
+        vibevalley_runtime::rt::block_on(
+            server
+                .test_internals()
+                .orchestration
+                .issue
+                .enrich_issues(crate::support::board_issues(server.test_internals().board)),
+        )
+        .iter()
+        .filter(|i| i.cron.is_some())
+        .count(),
         1
     );
     server.close_blocking();

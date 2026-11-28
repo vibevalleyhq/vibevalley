@@ -196,7 +196,7 @@ impl CronWorkflow {
             }
             return self.to_orchestrator_async(cron, &words).await;
         };
-        let found = match self.scheduler.issue_of(&cron.id) {
+        let found = match self.scheduler.issue_of_async(&cron.id).await {
             Some(id) => self.board.issue_async(&id).await.map_err(ApiError::from)?,
             None => None,
         };

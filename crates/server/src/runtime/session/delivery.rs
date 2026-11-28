@@ -1,5 +1,5 @@
 use serde_json::{Value, json};
-use vibevalley_protocol::{Millis, Outcome, Run, RunTriggerKind, Session};
+use vibevalley_protocol::{Millis, Outcome, Run, Session};
 use vibevalley_runtime::agent::durable::{Error, Result as DurableResult, Store, Submission, SubmissionStatus, Tx};
 
 use super::engine::SessionEngine;
@@ -100,11 +100,6 @@ struct SettleErrorPayload<'a> {
     error: &'a str,
 }
 
-#[derive(serde::Serialize)]
-struct ReconciliationDocPayload<'a> {
-    cwd: Option<&'a str>,
-}
-
 impl SessionEngine {
     /// Reserve input against a running external process before writing to its protocol stream.
     /// An unknown outcome is reconciled from this run on recovery.
@@ -184,9 +179,6 @@ pub(super) async fn settle_run(tx: &mut Tx<'_>, run: &Run) -> DurableResult<()> 
             tx.settle_async(&sub.id, status, &payload).await?;
         }
     }
-    if run.outcome != Some(Outcome::Interrupted) && run.triggered_by.kind != RunTriggerKind::Refine {
-        tx.put_document_async("run", &run.id, "issue.report", &payload).await?;
-    }
     Ok(())
 }
 
@@ -207,8 +199,6 @@ pub(crate) async fn interrupt_on_reopen(
             run.outcome = Some(Outcome::Interrupted);
             run.summary = summary.into();
             if !session.is_refining() && session.runtime != vibevalley_runtime::agent::runtime::ID && run.issue.is_some() {
-                let payload = serde_json::to_value(ReconciliationDocPayload { cwd: session.cwd.as_deref() })?;
-                tx.put_document_async("run", &id, "workspace.reconciliation", &payload).await?;
                 run.needs_reconciliation = true;
             }
             session_svc.put_run_in_tx(tx.transaction(), &run).await.map_err(DbError::into_durable_error)?;

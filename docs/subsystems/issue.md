@@ -57,12 +57,12 @@
 - **授权边界 `Mandate`**：工单绑定不可变的 `originTriggerId`，助手建单附言硬限 30 词；仅当 `autoSubmitPr` 为真时允许自动提 PR，`maxBotReviewRounds` 限制自动响应评审轮数。
 - **单轮结局只认结构化 `issue_report`**：帮工通过 `issue_report` 提交状态、问题、`checks`、`answer`、记性与 `prSubmit`，不解析自由正文。
 - **执行情况与生命周期分开**：提问、失败、中断及未明确交回的休息会话保持 `in_progress`，`stage` 提供回答、重试、继续动作；有效交回且没有待答问题才进入 `in_review`。看板、详情与 CLI 都读取同一投影；CLI 的 `issue show --watch` 在提问或受阻阶段也返回，stderr 同时给出生命周期和阶段。
-- **PR 状态轮询与同轮评审归并**：由独立模块 `work/pull` 承担（[PR 与分支发布](docs/subsystems/pull.md)），`pull` / `pull_event` 表记录开放 PR、CI 指纹与同轮机器人评审去重（`bot_round_key`）；状态变为 `merged` 或 `closed` 时通知 `Board::settle_pull` 结清工单。
+- **PR 状态轮询与同轮评审归并**：由独立模块 `issue/pull` 承担（[PR 与分支发布](docs/subsystems/pull.md)），`pull` 表及 `pull.known_events` JSON 列记录开放 PR、CI 指纹与同轮机器人评审去重（`bot_round_key`）；状态变为 `merged` 或 `closed` 时自动清空 `known_events` 并通知 `Board::settle_pull_async` 结清工单。
 - **交付物类型 `deliver` 与多态交付凭据 `DeliveryReceipt`**：`deliver` 声明期望交付形态（`change`、`pull_request`、`branch`、`answer`）；帮工可在 `issue_report` / `issue_update` 中回写多态 `DeliveryReceipt`（`pull_request { url, number, branch, summary }`、`commit { sha, branch, summary }`、`note { note_id, title, summary }`、`answer { summary }`），用户关单（`issue.status.update` → `done`）时亦可补充或覆盖凭据。
 - **原生父子工单与纯 DAG 依赖**：通过 `parent` 与 `blockedBy` 表达任务拆解与前置依赖阻塞，允许无仓库工单拆单；服务端不做父子分支自动合并或文件冻结，各子工单由执行会话自治交付各自凭据。
 - **已完成只由用户点头**：单轮 `completed` 只进 `in_review`，助手或自动审查 `issue_review` 通过只记 `reviewedAt`；最后一轮为 `failed` 时禁止挪到 `done`。
 - **多帮工只读协同**：
-  - **自动审查（`in_review`）**：非自研或非自查工单进入 `in_review`（`reviewedAt` 为空且未暂停）时，若存在已启用的 `reviewer` 档案且 `mandate.maxBotReviewRounds` 仍有额度，自动以只读模式（`RunMode::ReadOnlyReview`、`PermissionMode::Plan`、屏蔽写工具）派发审查会话；审查员仅可读取工单与改动（`issue_diff_get`）并调用 `issue_review` 通过或附 `findings` 打回，不可修改代码，不写 `assignments`；轮次状态持久化在 `durable_document("issue", id, "auto_review")`。
+  - **自动审查（`in_review`）**：非自研或非自查工单进入 `in_review`（`reviewedAt` 为空且未暂停）时，若存在已启用的 `reviewer` 档案且 `mandate.maxBotReviewRounds` 仍有额度，自动以只读模式（`RunMode::ReadOnlyReview`、`PermissionMode::Plan`、屏蔽写工具）派发审查会话；审查员仅可读取工单与改动（`issue_diff_get`）并调用 `issue_review` 通过或附 `findings` 打回，不可修改代码，不写 `assignments`；轮次状态持久化在 `issue.auto_review` 列。
   - **工单串 `@<agent>` 只读协同**：工单讨论消息解析 `@<agent>`（忽略邮箱/代码块内符号），将匹配的非主执行档案以只读协同会话（`RunMode::ReadOnlyCollaborator`）接入同一上下文检查并回贴汇报，不唤醒、不打断也不抢占主执行会话与串主权。
 
 ## 怎么走

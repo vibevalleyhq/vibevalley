@@ -12,7 +12,7 @@ mod message;
 mod participant;
 mod room;
 
-pub(crate) use message::{DeliveryRow, EventRow, MsgRow, NewDelivery, NewMessage, SearchParams};
+pub(crate) use message::{DeliveryRow, MsgRow, NewDelivery, NewMessage, SearchParams};
 pub(crate) use participant::ParticipantRow;
 pub(crate) use room::{ChannelRow, NewThread};
 

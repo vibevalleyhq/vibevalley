@@ -14,7 +14,7 @@ use crate::channel::Chat;
 use crate::context::{Context, encode_slice};
 use crate::cron::Scheduler as CronScheduler;
 use crate::game::Game;
-use crate::issue::{Board, Pull};
+use crate::issue::Board;
 use crate::note::Manager as NoteManager;
 use crate::repo::Repo;
 use crate::service::DbError;
@@ -24,7 +24,6 @@ use crate::service::DbError;
 pub(crate) struct SliceSources {
     pub ctx: Arc<Context>,
     pub board: Arc<Board>,
-    pub pull: Arc<Pull>,
     pub channel: Arc<Chat>,
     pub cron: Arc<CronScheduler>,
     pub note: Arc<NoteManager>,
@@ -49,9 +48,16 @@ pub(crate) async fn project_slices_batch_json(sources: &SliceSources, batch: &[(
     let shared_bundle = if needs_core_snapshot {
         match sources.board.projection_snapshot_async().await {
             Ok((raw_sessions, mut raw_issues)) => {
+                let issue_ids: Vec<String> = raw_issues.iter().map(|i| i.id.clone()).collect();
+                let (crons_res, pulls_res) = tokio::join!(
+                    sources.ctx.service.cron.cron_by_issue_map(),
+                    sources.ctx.service.issue.pulls_by_issue_map(&issue_ids),
+                );
+                let crons_by_issue = crons_res.unwrap_or_default();
+                let pulls_by_issue = pulls_res.unwrap_or_default();
                 for issue in &mut raw_issues {
-                    issue.cron = sources.cron.cron_of(&issue.id);
-                    issue.pull_request = sources.pull.of_issue(&issue.id);
+                    issue.cron = crons_by_issue.get(&issue.id).cloned();
+                    issue.pull_request = pulls_by_issue.get(&issue.id).cloned();
                 }
                 let mut live = sources.ctx.live.to_core_snapshot(needs_farm);
                 if needs_farm {
@@ -164,7 +170,6 @@ pub(crate) async fn project_slices_batch_json(sources: &SliceSources, batch: &[(
 pub(crate) fn finish_boot_and_start_feeds(
     ctx: &Arc<Context>,
     board: &Arc<Board>,
-    pull: &Arc<Pull>,
     channel: &Arc<Chat>,
     cron: &Arc<CronScheduler>,
     note: &Arc<NoteManager>,
@@ -174,7 +179,6 @@ pub(crate) fn finish_boot_and_start_feeds(
     let sources = SliceSources {
         ctx: ctx.clone(),
         board: board.clone(),
-        pull: pull.clone(),
         channel: channel.clone(),
         cron: cron.clone(),
         note: note.clone(),

@@ -3,7 +3,6 @@
 pub mod attachment;
 pub mod channel;
 pub mod channel_delivery;
-pub mod channel_event;
 pub mod channel_member;
 pub mod channel_mention;
 pub mod channel_message;
@@ -27,8 +26,6 @@ pub mod note_link;
 pub mod note_suggestion;
 pub mod note_version;
 pub mod pull;
-pub mod pull_event;
-pub mod remote_config;
 pub mod remote_device;
 pub mod session;
 pub mod session_event;

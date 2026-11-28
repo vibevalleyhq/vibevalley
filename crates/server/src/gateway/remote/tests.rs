@@ -8,8 +8,8 @@ use vibevalley_protocol::{BizCode, RemoteEnableRequest, RemotePairExchangeReques
 
 use super::lan;
 use super::service::{
-    CODE_ALPHABET, LAST_SEEN_THROTTLE_MS, MAX_ACTIVE_PAIR_CODES, NetworkProbe, PAIR_CODE_LEN, PAIR_CODE_TTL_MS, RATE_LIMIT_WINDOW_MS, Remote, TOKEN_PREFIX,
-    default_scope_for_platform, resolve_auto_bind_ip,
+    CODE_ALPHABET, LAST_SEEN_THROTTLE_MS, MAX_ACTIVE_PAIR_CODES, MemoryRemoteConfigStore, NetworkProbe, PAIR_CODE_LEN, PAIR_CODE_TTL_MS, RATE_LIMIT_WINDOW_MS,
+    Remote, TOKEN_PREFIX, default_scope_for_platform, resolve_auto_bind_ip,
 };
 use super::tailscale::TailscaleInfo;
 use crate::context::{Context, Http, LiveState, Outbox, PublicDownload, StateFeed, TaskGroup};
@@ -39,7 +39,9 @@ async fn pairing_code_format_expiry_cap_and_rate_limit_work() {
     let clock = Arc::new(ManualClock::new(1_700_000_000_000));
     let ctx = test_context(dir.path(), clock.clone()).await;
     let fake: Arc<dyn Server> = Arc::new(FakeServer::new());
-    let remote = Remote::open(ctx.clone(), "0.1.0-test".into()).await.unwrap();
+    let remote = Remote::open(ctx.clone(), Arc::new(MemoryRemoteConfigStore::default()), "0.1.0-test".into())
+        .await
+        .unwrap();
 
     let status = remote
         .enable_async(
@@ -188,7 +190,9 @@ async fn verify_bearer_async_reads_wal_read_pool_while_writer_holds_transaction(
     let dir = tempfile::tempdir().unwrap();
     let ctx = test_context(dir.path(), vibevalley_core::system_clock()).await;
     let fake: Arc<dyn Server> = Arc::new(FakeServer::new());
-    let remote = Remote::open(ctx.clone(), "0.1.0-test".into()).await.unwrap();
+    let remote = Remote::open(ctx.clone(), Arc::new(MemoryRemoteConfigStore::default()), "0.1.0-test".into())
+        .await
+        .unwrap();
 
     let status = remote
         .enable_async(
@@ -270,7 +274,9 @@ async fn enable_pair_and_token_auth_work_without_tailscale() {
     let clock = Arc::new(ManualClock::new(1_700_000_000_000));
     let ctx = test_context(dir.path(), clock).await;
     let fake: Arc<dyn Server> = Arc::new(FakeServer::new());
-    let remote = Remote::open(ctx.clone(), "0.1.0-test".into()).await.unwrap();
+    let remote = Remote::open(ctx.clone(), Arc::new(MemoryRemoteConfigStore::default()), "0.1.0-test".into())
+        .await
+        .unwrap();
 
     let detected_lan = lan::detect_lan_ipv4();
     let expected_bind = detected_lan.clone().unwrap_or_else(|| "127.0.0.1".into());
@@ -331,7 +337,9 @@ async fn status_exposes_both_lan_and_tailscale_addresses_and_switches_bind_addr(
     let dir = tempfile::tempdir().unwrap();
     let ctx = test_context(dir.path(), vibevalley_core::system_clock()).await;
     let fake: Arc<dyn Server> = Arc::new(FakeServer::new());
-    let remote = Remote::open(ctx.clone(), "0.1.0-test".into()).await.unwrap();
+    let remote = Remote::open(ctx.clone(), Arc::new(MemoryRemoteConfigStore::default()), "0.1.0-test".into())
+        .await
+        .unwrap();
 
     let dual_probe = NetworkProbe {
         tailscale: TailscaleInfo {

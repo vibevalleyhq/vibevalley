@@ -10,6 +10,7 @@ pub mod session;
 mod types;
 
 pub use service::{Runtime, reopen_sessions_async};
+#[cfg(test)]
 pub(crate) use session::delivery::IssueReportDoc;
 pub use session::{
     ANSWER_ONLY, ActiveRunSnapshot, AgentProfileInfo, AtomicTxHook, DraftEnd, Drive, HelperPlace, Hire, Journal, MailboxEntry, MailboxSource, MailboxStatus,

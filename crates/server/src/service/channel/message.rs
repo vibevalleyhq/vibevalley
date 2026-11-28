@@ -9,7 +9,7 @@ use sea_orm::{
 };
 
 use super::{ChannelService, PlacedRow, count_by_two, limit_u64};
-use crate::db::entity::{channel, channel_delivery, channel_event, channel_mention, channel_message, channel_participant, channel_read_cursor, channel_seen};
+use crate::db::entity::{channel, channel_delivery, channel_mention, channel_message, channel_participant, channel_read_cursor, channel_seen};
 use crate::db::{DbError, DbResult, Tx};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -32,15 +32,6 @@ pub struct MsgRow {
     pub sender_name: String,
     pub sender_kind: String,
     pub sender_agent: Option<String>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct EventRow {
-    pub seq: i64,
-    pub kind: String,
-    pub channel_id: String,
-    pub message_id: String,
-    pub at: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -93,18 +84,6 @@ pub(crate) struct NewDelivery<'a> {
     pub(crate) wakes: bool,
     pub(crate) held_by: Option<&'a str>,
     pub(crate) at: i64,
-}
-
-impl From<channel_event::Model> for EventRow {
-    fn from(r: channel_event::Model) -> Self {
-        Self {
-            seq: r.seq,
-            kind: r.kind,
-            channel_id: r.channel_id,
-            message_id: r.message_id,
-            at: r.at,
-        }
-    }
 }
 
 impl From<channel_delivery::Model> for DeliveryRow {
@@ -337,40 +316,6 @@ async fn messages_cursor_impl<C: ConnectionTrait>(
             .limit(limit_u64(n));
     })
     .await
-}
-
-async fn insert_event_impl<C: ConnectionTrait>(conn: &C, kind: &str, channel_id: &str, message: &str, at: i64) -> DbResult<i64> {
-    let saved = channel_event::ActiveModel {
-        kind: Set(kind.to_owned()),
-        channel_id: Set(channel_id.to_owned()),
-        message_id: Set(message.to_owned()),
-        at: Set(at),
-        ..Default::default()
-    }
-    .insert(conn)
-    .await?;
-    Ok(saved.seq)
-}
-
-async fn events_after_impl<C: ConnectionTrait>(conn: &C, after: i64, n: i64) -> DbResult<Vec<EventRow>> {
-    Ok(channel_event::Entity::find()
-        .filter(channel_event::Column::Seq.gt(after))
-        .order_by_asc(channel_event::Column::Seq)
-        .limit(limit_u64(n))
-        .all(conn)
-        .await?
-        .into_iter()
-        .map(Into::into)
-        .collect())
-}
-
-async fn event_of_impl<C: ConnectionTrait>(conn: &C, message: &str) -> DbResult<Option<EventRow>> {
-    Ok(channel_event::Entity::find()
-        .filter(channel_event::Column::MessageId.eq(message))
-        .filter(channel_event::Column::Kind.eq("posted"))
-        .one(conn)
-        .await?
-        .map(Into::into))
 }
 
 fn meta_has_file(meta: Option<&str>) -> bool {
@@ -910,18 +855,6 @@ async fn message_locations_impl<C: ConnectionTrait>(conn: &C, ids: &[String]) ->
 }
 
 impl ChannelService {
-    pub(crate) async fn insert_event_in_tx(&self, tx: &Tx, kind: &str, channel_id: &str, message: &str, at: i64) -> DbResult<i64> {
-        insert_event_impl(tx, kind, channel_id, message, at).await
-    }
-
-    pub(crate) async fn events_after(&self, after: i64, n: i64) -> DbResult<Vec<EventRow>> {
-        events_after_impl(self.db.read_conn(), after, n).await
-    }
-
-    pub(crate) async fn event_of(&self, message: &str) -> DbResult<Option<EventRow>> {
-        event_of_impl(self.db.read_conn(), message).await
-    }
-
     pub(crate) async fn insert_message_in_tx(&self, tx: &Tx, msg: &NewMessage<'_>) -> DbResult<i64> {
         insert_message_impl(tx, msg).await
     }

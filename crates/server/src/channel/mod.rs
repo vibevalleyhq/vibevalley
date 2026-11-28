@@ -3,10 +3,10 @@
 //! and durable pending deliveries (`channel_delivery`) persisted via
 //! `ctx.service.channel` with an atomic in-memory [`model::ChatModel`] snapshot.
 //!
-//! Every message is written with a numbered event (`channel_event`) and its
-//! synchronous `DeliveryPolicy` rows in one transaction; once committed via
-//! `PostCommitHooks`, [`Chat::subscribe_events`] and [`Chat::subscribe_dispatches`]
-//! notify downstream consumers without blocking the writer.
+//! Every message is written with its synchronous `DeliveryPolicy` rows in one
+//! transaction; once committed via `PostCommitHooks`, [`Chat::subscribe_events`]
+//! and [`Chat::subscribe_dispatches`] notify downstream consumers without blocking
+//! the writer.
 
 pub mod dispatch;
 mod message;

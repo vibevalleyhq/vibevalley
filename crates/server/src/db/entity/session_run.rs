@@ -19,6 +19,7 @@ pub struct Model {
     pub spent: Option<String>,
     #[sea_orm(column_type = "Text", nullable)]
     pub subagent_summary: Option<String>,
+    pub needs_reconciliation: bool,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

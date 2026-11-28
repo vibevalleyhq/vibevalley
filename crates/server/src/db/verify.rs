@@ -2,7 +2,7 @@
 //!
 //! Ensures forward-only SeaORM migrations cannot silently skip an older
 //! un-migrated database (via `CREATE TABLE IF NOT EXISTS`) or allow column
-//! drift between [`crate::db::entity`] (34 business tables) + `vibevalley-kit`
+//! drift between [`crate::db::entity`] (31 business tables) + `vibevalley-kit`
 //! mechanism tables (`outbox_item`, `seq_counter`) and the live database schema.
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -42,7 +42,6 @@ fn expected_server_entity_schema() -> Vec<ExpectedTable> {
         entity_table!(attachment),
         entity_table!(channel),
         entity_table!(channel_delivery),
-        entity_table!(channel_event),
         entity_table!(channel_member),
         entity_table!(channel_mention),
         entity_table!(channel_message),
@@ -66,8 +65,6 @@ fn expected_server_entity_schema() -> Vec<ExpectedTable> {
         entity_table!(note_suggestion),
         entity_table!(note_version),
         entity_table!(pull),
-        entity_table!(pull_event),
-        entity_table!(remote_config),
         entity_table!(remote_device),
         entity_table!(session),
         entity_table!(session_event),
@@ -172,7 +169,7 @@ async fn load_actual_columns(
     Ok(out)
 }
 
-/// Verifies after running migrations that every business entity table (34), kit mechanism table (2),
+/// Verifies after running migrations that every business entity table (31), kit mechanism table (2),
 /// and durable execution table (6) exists with all expected columns and no blocking legacy columns.
 pub(crate) async fn verify_schema(conn: &DatabaseConnection, backend: DbBackend, db_path: Option<&Path>) -> DbResult<()> {
     let raw_backend = conn.get_database_backend();
@@ -227,8 +224,8 @@ mod tests {
 
         assert_eq!(
             entity_files.len(),
-            34,
-            "expected 34 business ORM entity files (outbox_item & seq_counter retired to kit)"
+            31,
+            "expected 31 business ORM entity files (outbox_item & seq_counter retired to kit; channel_event/remote_config/pull_event removed)"
         );
         assert_eq!(
             expected_entity_names, entity_files,
@@ -422,7 +419,10 @@ mod tests {
         assert!(ev_cols.contains("event_type"), "session_event table must include event_type column");
 
         let migrations = list_applied_migrations(db.read_conn(), DatabaseBackend::Sqlite, &existing).await.unwrap();
-        assert_eq!(migrations.len(), 13);
+        assert_eq!(migrations.len(), 14);
+        assert!(!existing.contains("channel_event"));
+        assert!(!existing.contains("remote_config"));
+        assert!(!existing.contains("pull_event"));
         db.close().await;
     }
 

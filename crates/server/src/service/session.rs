@@ -4,14 +4,13 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use sea_orm::sea_query::{Alias, Condition, Expr, Func, JoinType, OnConflict, Order, Query, SelectStatement};
+use sea_orm::sea_query::{Alias, Condition, Expr, Func, OnConflict, Order, Query, SelectStatement};
 use sea_orm::{
     ActiveValue::Set, ColumnTrait, ConnectionTrait, EntityTrait, ExprTrait, FromQueryResult, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Update,
 };
 use serde::{Deserialize, Serialize};
 use vibevalley_core::{apply_session_telemetry, fold_session_telemetry};
 use vibevalley_protocol::{Run, Session, SessionEvent, SessionPermissionMode, SessionSubagents, SessionTelemetry};
-use vibevalley_runtime::agent::durable::entities::durable_document;
 
 use super::{batch_chunk_rows, with_write_tx};
 use crate::db::column::{db_json, db_word, read_db_json, read_db_word};
@@ -103,7 +102,7 @@ struct RunQueryRow {
     summary: String,
     spent: Option<String>,
     subagents: Option<String>,
-    reconciliation: Option<String>,
+    needs_reconciliation: bool,
 }
 
 fn read_session(r: SessionQueryRow, subagents: Option<String>) -> DbResult<Session> {
@@ -143,7 +142,7 @@ fn read_run(r: RunQueryRow) -> DbResult<Run> {
         outcome: r.outcome.map(read_db_word).transpose()?,
         spent: r.spent.map(read_db_json).transpose()?,
         subagents: r.subagents.map(read_db_json).transpose()?,
-        needs_reconciliation: r.reconciliation.is_some(),
+        needs_reconciliation: r.needs_reconciliation,
     })
 }
 
@@ -249,7 +248,6 @@ async fn latest_subagents_for_sessions_impl<C: ConnectionTrait>(db: &C, ids: &[S
 
 fn run_select() -> SelectStatement {
     let r_alias = Alias::new("r");
-    let d_alias = Alias::new("d");
     let mut q = Query::select();
     q.columns([
         (r_alias.clone(), session_run::Column::Id),
@@ -264,17 +262,8 @@ fn run_select() -> SelectStatement {
         (r_alias.clone(), session_run::Column::Spent),
     ])
     .expr_as(Expr::col((r_alias.clone(), session_run::Column::SubagentSummary)), Alias::new("subagents"))
-    .expr_as(Expr::col((d_alias.clone(), durable_document::Column::DocKind)), Alias::new("reconciliation"))
-    .from_as(session_run::Entity, r_alias.clone())
-    .join_as(
-        JoinType::LeftJoin,
-        durable_document::Entity,
-        d_alias.clone(),
-        Condition::all()
-            .add(Expr::col((d_alias.clone(), durable_document::Column::ScopeKind)).eq("run"))
-            .add(Expr::col((d_alias.clone(), durable_document::Column::ScopeId)).equals((r_alias.clone(), session_run::Column::Id)))
-            .add(Expr::col((d_alias, durable_document::Column::DocKind)).eq("workspace.reconciliation")),
-    );
+    .column((r_alias.clone(), session_run::Column::NeedsReconciliation))
+    .from_as(session_run::Entity, r_alias);
     q
 }
 
@@ -537,6 +526,7 @@ async fn put_run_impl<C: ConnectionTrait>(db: &C, r: &Run) -> DbResult<()> {
         outcome: Set(r.outcome.as_ref().map(db_word).transpose()?),
         summary: Set(r.summary.clone()),
         spent: Set(r.spent.as_ref().map(db_json).transpose()?),
+        needs_reconciliation: Set(r.needs_reconciliation),
         ..Default::default()
     };
     let on_conflict = OnConflict::column(session_run::Column::Id)
@@ -550,6 +540,7 @@ async fn put_run_impl<C: ConnectionTrait>(db: &C, r: &Run) -> DbResult<()> {
             session_run::Column::Outcome,
             session_run::Column::Summary,
             session_run::Column::Spent,
+            session_run::Column::NeedsReconciliation,
         ])
         .to_owned();
     session_run::Entity::insert(model).on_conflict(on_conflict).exec(db).await?;
@@ -1029,6 +1020,114 @@ impl SessionService {
                     .exec(tx)
                     .await?;
                 deleted += res.rows_affected;
+            }
+            Ok(deleted)
+        })
+        .await
+    }
+
+    pub(crate) async fn helper_modes(&self) -> DbResult<HashMap<String, String>> {
+        let rows = session::Entity::find()
+            .select_only()
+            .columns([session::Column::Id, session::Column::HelperMode])
+            .filter(session::Column::HelperMode.is_not_null())
+            .into_tuple::<(String, Option<String>)>()
+            .all(self.db.read_conn())
+            .await?;
+        Ok(rows.into_iter().filter_map(|(id, mode)| mode.map(|m| (id, m))).collect())
+    }
+
+    pub(crate) async fn helper_mode(&self, session_id: &str) -> DbResult<Option<String>> {
+        let row = session::Entity::find_by_id(session_id.to_owned())
+            .select_only()
+            .column(session::Column::HelperMode)
+            .into_tuple::<Option<String>>()
+            .one(self.db.read_conn())
+            .await?;
+        Ok(row.flatten())
+    }
+
+    pub(crate) async fn put_helper_mode_in_tx(&self, tx: &Tx, session_id: &str, mode: Option<&str>) -> DbResult<()> {
+        super::update_col_by_id::<session::Entity, _, _>(tx, session::Column::Id, session_id, session::Column::HelperMode, mode.map(str::to_owned)).await
+    }
+
+    /// Deletes up to `limit` historical `session_event` rows for departed sessions whose
+    /// most recent activity (`MAX(session_run.ended_at)` or `session.hired_at`) is `< before_ms`.
+    pub(crate) async fn prune_departed_events_batch(&self, before_ms: i64, limit: u64) -> DbResult<u64> {
+        if limit == 0 {
+            return Ok(0);
+        }
+        with_write_tx(&self.db, async |tx| {
+            let departed: Vec<(String, i64)> = session::Entity::find()
+                .select_only()
+                .columns([session::Column::Id, session::Column::HiredAt])
+                .filter(session::Column::Departed.eq(true))
+                .into_tuple()
+                .all(tx)
+                .await?;
+            if departed.is_empty() {
+                return Ok(0);
+            }
+            let departed_ids: Vec<String> = departed.iter().map(|(id, _)| id.clone()).collect();
+            let mut latest_ended: HashMap<String, i64> = HashMap::new();
+            for chunk in departed_ids.chunks(super::MAX_SQL_BIND_PARAMS) {
+                let runs: Vec<(String, Option<i64>, i64)> = session_run::Entity::find()
+                    .select_only()
+                    .columns([session_run::Column::Session, session_run::Column::EndedAt, session_run::Column::StartedAt])
+                    .filter(session_run::Column::Session.is_in(chunk.iter().cloned()))
+                    .into_tuple()
+                    .all(tx)
+                    .await?;
+                for (sid, ended_at, started_at) in runs {
+                    let ts = ended_at.unwrap_or(started_at);
+                    latest_ended.entry(sid).and_modify(|prev| *prev = std::cmp::Ord::max(*prev, ts)).or_insert(ts);
+                }
+            }
+            let expired_ids: Vec<String> = departed
+                .into_iter()
+                .filter(|(sid, hired_at)| latest_ended.get(sid).copied().unwrap_or(*hired_at) < before_ms)
+                .map(|(sid, _)| sid)
+                .collect();
+            if expired_ids.is_empty() {
+                return Ok(0);
+            }
+
+            let mut remaining = usize::try_from(limit).unwrap_or(usize::MAX);
+            let mut pairs: Vec<(String, i64)> = Vec::new();
+            for chunk in expired_ids.chunks(super::MAX_SQL_BIND_PARAMS) {
+                if remaining == 0 {
+                    break;
+                }
+                let batch: Vec<(String, i64)> = session_event::Entity::find()
+                    .select_only()
+                    .columns([session_event::Column::SessionId, session_event::Column::Seq])
+                    .filter(session_event::Column::SessionId.is_in(chunk.iter().cloned()))
+                    .order_by_asc(session_event::Column::SessionId)
+                    .order_by_asc(session_event::Column::Seq)
+                    .limit(remaining as u64)
+                    .into_tuple()
+                    .all(tx)
+                    .await?;
+                remaining = remaining.saturating_sub(batch.len());
+                pairs.extend(batch);
+            }
+            if pairs.is_empty() {
+                return Ok(0);
+            }
+            let mut by_session: HashMap<String, Vec<i64>> = HashMap::new();
+            for (sid, seq) in pairs {
+                by_session.entry(sid).or_default().push(seq);
+            }
+            let mut deleted = 0u64;
+            for (sid, seqs) in by_session {
+                for seq_chunk in seqs.chunks(super::MAX_SQL_BIND_PARAMS - 1) {
+                    let res = session_event::Entity::delete_many()
+                        .filter(session_event::Column::SessionId.eq(&sid))
+                        .filter(session_event::Column::Seq.is_in(seq_chunk.iter().copied()))
+                        .exec(tx)
+                        .await?;
+                    deleted += res.rows_affected;
+                }
             }
             Ok(deleted)
         })

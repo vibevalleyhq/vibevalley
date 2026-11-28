@@ -23,7 +23,7 @@ const POLL_CONCURRENCY: usize = 4;
 /// Polls every tracked `open` PR's remote state in parallel (bounded); settles linked issues on `merged` / `closed`.
 pub async fn refresh(pulls: &Pull) {
     let _guard = pulls.refresh_lock.lock().await;
-    let open = pulls.open_pulls();
+    let open = pulls.open_pulls_async().await;
     let mut targets: Vec<(usize, PullRecord, HostedRepo, HostRunner)> = Vec::with_capacity(open.len());
     for (idx, row) in open.into_iter().enumerate() {
         let Ok(hosted) = pulls.hosted_repo_of_async(&row.repo, Some(row.platform)).await else {
@@ -92,7 +92,7 @@ struct PollEvent {
 /// Polls GitHub CI checks, reviews, and comments for every tracked `open` GitHub PR.
 pub async fn poll(pulls: &Pull) {
     let _guard = pulls.poll_lock.lock().await;
-    let open = pulls.open_pulls();
+    let open = pulls.open_pulls_async().await;
     let mut targets: Vec<(usize, PullRecord, String)> = Vec::new();
     for (idx, row) in open.into_iter().filter(|row| row.platform == PublishPlatform::Github).enumerate() {
         let Ok(remote) = pulls.github_remote_async(&row.repo).await else {

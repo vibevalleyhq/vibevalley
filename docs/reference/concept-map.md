@@ -40,7 +40,7 @@
 | Note（笔记） | `note::Manager`（`note/mod.rs`、`note/manager.rs`） | `server.db` 的 `note*` 表与 `<storage>/note/` | — |
 | 记性 | `Memories`（`team/memory/`） | `memory` 表 | — |
 | 定时任务 | `Crons`（`cron/mod.rs`，什么时候跑在 `crates/core/src/cron`） | `server.db` 的 `cron` 表 | — |
-| PR 与分支发布 | `Pulls`（`pull/mod.rs`、`publish.rs`、`store.rs`、`poll.rs`、`snapshot.rs`） | `server.db` 的 `pull`、`pull_event` 表 | — |
+| PR 与分支发布 | `Pull`（`pull/{mod,service,poll,snapshot}.rs`、`repo/publish.rs`） | `server.db` 的 `pull` 表（含 `known_events` JSON 列） | — |
 
 ## oar 那一层
 

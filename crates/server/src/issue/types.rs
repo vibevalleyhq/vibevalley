@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use vibevalley_core::{Refusal, SliceMask, derive_issues};
 use vibevalley_protocol::{
     ApiError, Assignment, Conflict, CriterionCheck, Deliverable, DeliveryReceipt, Execution, Finding, HumanPause, Issue, IssueAnswer, IssueCanceled,
-    IssueMandate, Landing, Millis, Outcome, PullRequest, PullRequestState, Question, Session,
+    IssueMandate, Landing, Millis, Outcome, PullRequest, Question, Session,
 };
 use vibevalley_runtime::oar::StopReason;
 
@@ -68,26 +68,8 @@ pub(crate) fn find_issue<'a>(issues: &'a [Issue], reference: &str) -> Option<&'a
     issues.iter().find(|t| t.id == r || t.number.to_string() == r)
 }
 
-/// Ranking rule choosing the primary pull request for an issue (Open > newest > highest number).
-pub(crate) fn prefers_pull_for_issue(candidate: &PullRecord, current: &PullRecord) -> bool {
-    let cand_open = candidate.state == PullRequestState::Open;
-    let curr_open = current.state == PullRequestState::Open;
-    if cand_open != curr_open {
-        return cand_open;
-    }
-    if candidate.updated_at != current.updated_at {
-        return candidate.updated_at > current.updated_at;
-    }
-    candidate.number >= current.number
-}
-
-fn pull_record_to_summary(row: &PullRecord) -> PullRequest {
-    PullRequest {
-        url: row.url.clone(),
-        number: row.number,
-        state: row.state,
-    }
-}
+pub(crate) use crate::service::issue::prefers_pull_for_issue;
+use crate::service::issue::pull_record_to_summary;
 
 /// Projects the primary [`PullRequest`] per issue id from persisted [`PullRecord`] rows.
 pub(crate) fn best_pulls_by_issue(rows: &[PullRecord]) -> HashMap<String, PullRequest> {

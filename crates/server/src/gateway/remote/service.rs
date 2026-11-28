@@ -18,7 +18,7 @@ use vibevalley_protocol::{
 use super::lan;
 use super::tailscale::{self, TailscaleInfo};
 use crate::context::Context;
-use crate::gateway::api::{BoxFuture, CallerPrincipal, RemoteAuth, RemoteDeviceIdentity, Server};
+use crate::gateway::api::{BoxFuture, CallerPrincipal, RemoteAccessConfig, RemoteAuth, RemoteConfigStore, RemoteDeviceIdentity, Server};
 use crate::gateway::http::{Listener, is_allowed_remote_ip, is_remote_allow_all, serve_remote};
 
 pub(super) const TOKEN_PREFIX: &str = "vv_dev_";
@@ -70,12 +70,31 @@ fn env_bind_addr() -> Option<String> {
 /// Manages the optional remote HTTP listener, one-time pairing codes, and paired device tokens.
 pub struct Remote {
     ctx: Arc<Context>,
+    config_store: Arc<dyn RemoteConfigStore>,
     version: String,
     enabled: AtomicBool,
     lifecycle: AsyncMutex<()>,
     listener: Mutex<Option<Listener>>,
     pairing: Mutex<PairingStore<Option<String>>>,
     last_seen_cache: Mutex<LruCache<String, Millis>>,
+}
+
+#[cfg(test)]
+#[derive(Default)]
+pub(super) struct MemoryRemoteConfigStore(Mutex<Option<RemoteAccessConfig>>);
+
+#[cfg(test)]
+impl RemoteConfigStore for MemoryRemoteConfigStore {
+    fn get_remote_config(&self) -> Option<RemoteAccessConfig> {
+        self.0.lock().clone()
+    }
+
+    fn save_remote_config<'a>(&'a self, cfg: RemoteAccessConfig) -> BoxFuture<'a, Result<(), ApiError>> {
+        Box::pin(async move {
+            *self.0.lock() = Some(cfg);
+            Ok(())
+        })
+    }
 }
 
 fn generate_device_token() -> String {
@@ -129,10 +148,11 @@ async fn stop_listener_async(listener: Option<Listener>) {
 }
 
 impl Remote {
-    pub async fn open(ctx: Arc<Context>, version: String) -> Result<Arc<Self>, ApiError> {
-        let persisted_enabled = ctx.service.remote.get_config().await?.is_some_and(|cfg| cfg.enabled);
+    pub async fn open(ctx: Arc<Context>, config_store: Arc<dyn RemoteConfigStore>, version: String) -> Result<Arc<Self>, ApiError> {
+        let persisted_enabled = config_store.get_remote_config().is_some_and(|cfg| cfg.enabled);
         Ok(Arc::new(Self {
             ctx,
+            config_store,
             version,
             enabled: AtomicBool::new(persisted_enabled),
             lifecycle: AsyncMutex::new(()),
@@ -151,13 +171,8 @@ impl Remote {
     /// Failures (e.g. an offline Tailscale interface) log a warning without failing server boot.
     pub async fn restore_if_enabled_async(&self, server: Arc<dyn Server>) {
         let _guard = self.lifecycle.lock().await;
-        let cfg = match self.ctx.service.remote.get_config().await {
-            Ok(Some(cfg)) if cfg.enabled => cfg,
-            Ok(_) => return,
-            Err(err) => {
-                tracing::warn!(error = %err, "failed to read remote access config on boot");
-                return;
-            }
+        let Some(cfg) = self.config_store.get_remote_config().filter(|c| c.enabled) else {
+            return;
         };
         let requested_bind = cfg
             .bind_addr
@@ -204,7 +219,7 @@ impl Remote {
     }
 
     pub(super) async fn status_with_probe_async(&self, probe: NetworkProbe) -> Result<RemoteStatus, ApiError> {
-        let cfg = self.ctx.service.remote.get_config().await?;
+        let cfg = self.config_store.get_remote_config();
         let devices = self.ctx.service.remote.list_devices().await?;
         let live_addr = self.listener.lock().as_ref().map(|l| (l.addr, l.url()));
         let enabled = self.enabled.load(Ordering::Acquire);
@@ -241,7 +256,7 @@ impl Remote {
         probe: NetworkProbe,
     ) -> Result<RemoteStatus, ApiError> {
         let _guard = self.lifecycle.lock().await;
-        let stored = self.ctx.service.remote.get_config().await?;
+        let stored = self.config_store.get_remote_config();
         let requested_bind = req
             .bind_addr
             .as_deref()
@@ -263,10 +278,13 @@ impl Remote {
 
         let current_addr = self.listener.lock().as_ref().map(|l| l.addr);
         if port != 0 && current_addr == Some(target) {
-            self.ctx
-                .service
-                .remote
-                .save_config(true, Some(&target.ip().to_string()), target.port(), self.ctx.now())
+            self.config_store
+                .save_remote_config(RemoteAccessConfig {
+                    enabled: true,
+                    bind_addr: Some(target.ip().to_string()),
+                    port: target.port(),
+                    updated_at: self.ctx.now(),
+                })
                 .await?;
             self.enabled.store(true, Ordering::Release);
             return self.status_with_probe_async(probe).await;
@@ -285,15 +303,13 @@ impl Remote {
                 if need_drop_first {
                     self.enabled.store(false, Ordering::Release);
                     if let Err(save_err) = self
-                        .ctx
-                        .service
-                        .remote
-                        .save_config(
-                            false,
-                            stored.as_ref().and_then(|c| c.bind_addr.as_deref()),
-                            stored.as_ref().map(|c| c.port).unwrap_or_else(default_remote_port),
-                            self.ctx.now(),
-                        )
+                        .config_store
+                        .save_remote_config(RemoteAccessConfig {
+                            enabled: false,
+                            bind_addr: stored.as_ref().and_then(|c| c.bind_addr.clone()),
+                            port: stored.as_ref().map(|c| c.port).unwrap_or_else(default_remote_port),
+                            updated_at: self.ctx.now(),
+                        })
                         .await
                     {
                         tracing::warn!(error = %save_err, "remote.service failed to persist disabled config after bind error");
@@ -304,10 +320,13 @@ impl Remote {
         };
 
         let actual = next.addr;
-        self.ctx
-            .service
-            .remote
-            .save_config(true, Some(&actual.ip().to_string()), actual.port(), self.ctx.now())
+        self.config_store
+            .save_remote_config(RemoteAccessConfig {
+                enabled: true,
+                bind_addr: Some(actual.ip().to_string()),
+                port: actual.port(),
+                updated_at: self.ctx.now(),
+            })
             .await?;
         let old = self.listener.lock().replace(next);
         stop_listener_async(old).await;
@@ -321,10 +340,17 @@ impl Remote {
         stop_listener_async(old).await;
         self.enabled.store(false, Ordering::Release);
         self.pairing.lock().clear_codes();
-        let stored = self.ctx.service.remote.get_config().await?;
-        let bind_addr = stored.as_ref().and_then(|c| c.bind_addr.as_deref());
+        let stored = self.config_store.get_remote_config();
+        let bind_addr = stored.as_ref().and_then(|c| c.bind_addr.clone());
         let port = stored.as_ref().map(|c| c.port).filter(|&p| p != 0).unwrap_or_else(default_remote_port);
-        self.ctx.service.remote.save_config(false, bind_addr, port, self.ctx.now()).await?;
+        self.config_store
+            .save_remote_config(RemoteAccessConfig {
+                enabled: false,
+                bind_addr,
+                port,
+                updated_at: self.ctx.now(),
+            })
+            .await?;
         self.status_async().await
     }
 

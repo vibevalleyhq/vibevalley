@@ -783,7 +783,38 @@ fn check_no_sea_orm_outside_service(file_path: &str, code: &str, index: &LineInd
     let Some(rel) = file_path.strip_prefix("crates/server/src/") else {
         return;
     };
-    if !rel.ends_with(".rs") || rel.starts_with("db/") || rel.starts_with("service/") {
+    if !rel.ends_with(".rs") || rel.starts_with("db/") {
+        return;
+    }
+    if rel.starts_with("service/") {
+        let mut cursor = 0usize;
+        let bytes = code.as_bytes();
+        let needle = "durable::entities";
+        let mut seen = BTreeSet::new();
+        while let Some(rel_idx) = code[cursor..].find(needle) {
+            let start = cursor + rel_idx;
+            let end = start + needle.len();
+            cursor = end;
+            if !has_ident_boundaries(bytes, start, end) {
+                continue;
+            }
+            let line = index.line_at(start);
+            if seen.insert(line) {
+                violations.push(BoundaryViolation {
+                    rule: BoundaryRule::SeaOrmBoundary,
+                    file: file_path.to_owned(),
+                    line,
+                    message: format!(
+                        "`durable::entities` referenced inside `crates/server/src/service/` ({})",
+                        index.snippet_at(line)
+                    ),
+                    fix:
+                        "Do not read or join runtime durable tables directly from `crates/server/src/service/`; persist server state in server tables instead."
+                            .to_owned(),
+                    details: Vec::new(),
+                });
+            }
+        }
         return;
     }
 

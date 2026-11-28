@@ -176,7 +176,7 @@ flowchart TD
 
 | 边界 | 唯一机制 | 硬规矩 |
 |---|---|---|
-| **持久化读写** | 独立顶层 `crates/server/src/service/`（`Service`，挂载于 `ctx.service`） | `crates/server/src/db/entity/` 严格一表一文件（`<table_name>.rs`，共 34 张业务表，`outbox_item` 与 `seq_counter` 归 `vibevalley-kit` 参数化 SQL）；**`crates/server/src/{db,service}/` 之外零 `sea_orm::` 与 `db::entity` 导入** |
+| **持久化读写** | 独立顶层 `crates/server/src/service/`（`Service`，挂载于 `ctx.service`） | `crates/server/src/db/entity/` 严格一表一文件（`<table_name>.rs`，共 31 张业务表，`outbox_item` 与 `seq_counter` 归 `vibevalley-kit` 参数化 SQL）；**`crates/server/src/{db,service}/` 之外零 `sea_orm::` 与 `db::entity` 导入，`service/` 零 `durable::entities` 导入** |
 | **入口分发** | `router.rs`（`Router` 编译期穷尽 `match`）+ `GatewayPorts` | 零运行时 handler `HashMap` 与 `attach_*` 晚绑定槽位；`gateway/` 不导入任何业务域 |
 | **状态广播与异步因果** | 同事务写 `Outbox` + `ctx.mark_dirty(SliceMask)` → `StateFeed` 单航班纯投影；瞬态流与农场特效进 `LiveState` | 零内存影子库、零启动重放水合、零 `EventBus` |
 | **笔记目录与统一实时协同** | `storage/` 托管 `<storage>/note/<note_id>/{manifest.json,structure/,asset/}`，6 张表（`note`、`note_version`、`note_collab`、`note_change`、`note_suggestion`、`note_link`）覆盖 3+1 `NoteType` 原语 | 全类型支持多人 + 多 Agent Loro 实时协同、在场、按 `origin` 历史、评审建议与双向链接图谱（详见 [Note](docs/subsystems/note.md)） |

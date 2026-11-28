@@ -15,7 +15,7 @@ use super::types::{
 };
 use super::words::{self, ChatTarget};
 use crate::context::{AsyncRequestKeys, Context, LookIn, internal, missing, now};
-use crate::service::channel::{EventRow, MsgRow, NewDelivery, NewMessage, ParticipantRow};
+use crate::service::channel::{MsgRow, NewDelivery, NewMessage, ParticipantRow};
 use crate::storage::Storage;
 
 type Seater = Arc<dyn Fn(&str) + Send + Sync>;
@@ -164,8 +164,8 @@ impl Chat {
 
     pub(super) fn emit_event(&self, event: ChannelEvent) {
         match &event {
-            ChannelEvent::Removed { event: ev, .. } => {
-                let _ = self.removals.send(ev.message_id.clone());
+            ChannelEvent::Removed(m) => {
+                let _ = self.removals.send(m.id.clone());
             }
             ChannelEvent::Edited(message) => {
                 let _ = self.message_events.send(ChannelMessageEvent::Edited(message.clone()));
@@ -328,7 +328,6 @@ impl Chat {
                     thread: String::new(),
                     again: true,
                     row: seen,
-                    event: None,
                     hop_limit_hit: false,
                 }
             } else {
@@ -363,7 +362,6 @@ impl Chat {
                     .await
                     .q()?;
                 wtx.touch_channel(&w.channel, number).await?;
-                let seq = channels.insert_event_in_tx(&wtx.tx, "posted", &w.channel, &id, at).await.q()?;
                 let inserted = MsgRow {
                     id: id.clone(),
                     channel_id: w.channel.clone(),
@@ -395,15 +393,8 @@ impl Chat {
                     Some(subject) => wtx.thread_for(&id, number, &w.channel, subject).await?,
                     None => String::new(),
                 };
-                let event = EventRow {
-                    seq,
-                    kind: "posted".into(),
-                    channel_id: w.channel.clone(),
-                    message_id: id,
-                    at,
-                };
                 let hop_limit_hit = if row.kind != "notice"
-                    && let Some(posted) = wtx.committed_from(&row, &event)
+                    && let Some(posted) = wtx.committed_from(&row)
                 {
                     let plan = dispatch::plan_deliveries(&wtx.model, &mut wtx.reach, &posted, at);
                     let mut queued = Vec::with_capacity(plan.deliveries.len());
@@ -455,7 +446,6 @@ impl Chat {
                     thread,
                     again: false,
                     row,
-                    event: Some(event),
                     hop_limit_hit,
                 }
             }
@@ -463,7 +453,6 @@ impl Chat {
         if written.again {
             return Ok(written);
         }
-        let Some(event) = written.event.clone() else { return Ok(written) };
         let answers = inner.model.answers_of_async(&self.ctx.service.channel, &written.row).await?;
         let written = Written { answers, ..written };
         self.publish_message(inner, &written.row, written.answers.clone());
@@ -480,7 +469,7 @@ impl Chat {
         if !written.thread.is_empty() {
             self.publish_channel_async(&inner.model, &written.thread).await?;
         }
-        if let Some(posted) = inner.model.committed_from(&written.row, &event) {
+        if let Some(posted) = inner.model.committed_from(&written.row) {
             self.emit_event(ChannelEvent::Posted(Box::new(posted)));
         }
         if written.hop_limit_hit {

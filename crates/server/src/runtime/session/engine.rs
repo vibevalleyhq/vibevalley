@@ -183,10 +183,7 @@ impl SessionEngine {
         trajectory: Option<Arc<Trajectory>>,
     ) -> Result<SessionEngine> {
         let durable = ctx.service.durable().await?;
-        let (extras, configs) = tokio::try_join!(ctx.service.session.extras(), ctx.service.session.configs())?;
-        let mode_docs = durable
-            .read_async(|r| Box::pin(async move { r.documents_by_kind_async("session", "helper_mode").await }))
-            .await?;
+        let (extras, configs, mode_tags) = tokio::try_join!(ctx.service.session.extras(), ctx.service.session.configs(), ctx.service.session.helper_modes())?;
         let mut workspaces = HashMap::new();
         for (id, cfg) in configs {
             workspaces.insert(
@@ -198,11 +195,9 @@ impl SessionEngine {
             );
         }
         let mut helper_modes = HashMap::new();
-        for doc in mode_docs {
-            if let Some(tag) = doc.state.as_str()
-                && let Some(mode) = RunMode::from_doc_tag(tag)
-            {
-                helper_modes.insert(doc.scope_id, mode);
+        for (id, tag) in mode_tags {
+            if let Some(mode) = RunMode::from_doc_tag(&tag) {
+                helper_modes.insert(id, mode);
             }
         }
         let (events, _) = broadcast::channel(256);
@@ -489,34 +484,13 @@ impl SessionEngine {
             return mode;
         }
         if session.is_readonly_issue_helper()
-            && let Ok(Some(doc)) = self
-                .0
-                .durable
-                .read_with_async(session.id.clone(), |tx, id| {
-                    Box::pin(async move { tx.document_async("session", id, "helper_mode").await })
-                })
-                .await
-            && let Some(mode) = doc.state.as_str().and_then(RunMode::from_doc_tag)
+            && let Ok(Some(tag)) = self.0.ctx.service.session.helper_mode(&session.id).await
+            && let Some(mode) = RunMode::from_doc_tag(&tag)
         {
             self.0.helper_modes.lock().insert(session.id.clone(), mode);
             return mode;
         }
         RunMode::from_session_issue(session, issue)
-    }
-
-    async fn record_helper_mode_async(&self, session_id: &str, mode: RunMode) -> Result<()> {
-        self.0.helper_modes.lock().insert(session_id.to_string(), mode);
-        if let Some(tag) = mode.as_doc_tag() {
-            let sid = session_id.to_string();
-            let val = serde_json::Value::String(tag.to_string());
-            self.0
-                .durable
-                .write_with_async((sid, val), |tx, (sid, val)| {
-                    Box::pin(async move { tx.put_document_async("session", sid, "helper_mode", val).await })
-                })
-                .await?;
-        }
-        Ok(())
     }
 
     /// A new session on an issue, its agent opened and its first prompt sent.
@@ -591,7 +565,7 @@ impl SessionEngine {
             id: h.issue.id.clone(),
             refining: None,
         });
-        self.record_helper_mode_async(&id, mode).await?;
+        self.0.helper_modes.lock().insert(id.clone(), mode);
         let started = self.start_with_hook_async(h.drive, session, h.issue, h.prompt, false, h.trigger, None).await;
         if started.is_err() {
             self.0.helper_modes.lock().remove(&id);
@@ -834,6 +808,7 @@ impl SessionEngine {
             let s = session.clone();
             let e = extra.clone();
             let sid = id.clone();
+            let helper_tag = self.0.helper_modes.lock().get(&id).and_then(|m| m.as_doc_tag()).map(str::to_owned);
             // Update the live overlay before committing so a concurrent `StateFeed` projection
             // can never combine newly committed domain changes with a stale `Idle` phase.
             let prev_live = self.0.ctx.live.session(&id);
@@ -844,6 +819,9 @@ impl SessionEngine {
                     Box::pin(async move {
                         service.session.put_in_tx(tx, &s, false).await?;
                         service.session.put_extra_in_tx(tx, &sid, &e).await?;
+                        if let Some(tag) = helper_tag {
+                            service.session.put_helper_mode_in_tx(tx, &sid, Some(&tag)).await?;
+                        }
                         let mut dirty = SliceMask::BOARD | SliceMask::SESSIONS | SliceMask::INBOX | SliceMask::FARM;
                         if let Some(hook) = tx_hook {
                             dirty |= hook.apply(tx, at).await?;

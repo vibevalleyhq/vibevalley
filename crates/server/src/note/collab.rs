@@ -397,18 +397,10 @@ impl Manager {
     }
 
     pub(super) async fn human_touched_paths_async(&self, note_id: &str) -> Result<HashSet<String>, ApiError> {
-        let changes = self.ctx.service.note.file_changes_after(note_id, 0, SUGGESTIONS_LIMIT).await.map_err(q)?;
-        let mut touched = HashSet::new();
-        for c in changes {
-            if is_user_actor(&c.actor) {
-                for p in c.paths {
-                    if p != "manifest.json" {
-                        touched.insert(p);
-                    }
-                }
-            }
-        }
-        Ok(touched)
+        let row = self.ctx.service.note.get(note_id).await.map_err(q)?;
+        Ok(row
+            .map(|r| r.human_touched_paths.into_iter().filter(|p| p != "manifest.json").collect())
+            .unwrap_or_default())
     }
 
     pub(super) async fn flush_batch_bucket_async(&self, key: &BatchKey) {

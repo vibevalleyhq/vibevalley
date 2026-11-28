@@ -10,7 +10,7 @@ use vibevalley_protocol::{
 };
 
 use crate::context::{LookIn, missing, refused as refuse};
-use crate::service::channel::{ChannelRow, EventRow, MsgRow};
+use crate::service::channel::{ChannelRow, MsgRow};
 
 pub(super) const CHANNEL_EVENT_CAPACITY: usize = 1024;
 /// The channel a new farm opens with.
@@ -476,7 +476,6 @@ pub struct ThreadSubject {
 /// said: what the layers above route on.
 #[derive(Debug, Clone)]
 pub struct Committed {
-    pub event: EventRow,
     pub row: MsgRow,
     pub place: Place,
     /// The channel the place is in (a thread's parent's, a channel's own).
@@ -497,7 +496,7 @@ pub struct Committed {
 pub enum ChannelEvent {
     Posted(Box<Committed>),
     Edited(ChatMessage),
-    Removed { event: EventRow, message: ChatMessage },
+    Removed(ChatMessage),
     Reacted(ChatMessage),
     Pinned(ChatMessage),
     UserRead { channel: String, upto: i64, at: i64 },
@@ -682,7 +681,6 @@ pub(super) struct Written {
     pub(super) thread: String,
     pub(super) again: bool,
     pub(super) row: MsgRow,
-    pub(super) event: Option<EventRow>,
     pub(super) hop_limit_hit: bool,
 }
 

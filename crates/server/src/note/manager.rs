@@ -901,6 +901,9 @@ impl Manager {
                     svc_tx.note.rename_in_tx(tx, &id_tx, &updated_title_tx, at).await?;
                 }
                 svc_tx.note.set_seq_in_tx(tx, &id_tx, new_seq, at).await?;
+                if is_user_actor(&actor) {
+                    svc_tx.note.record_human_touched_paths_in_tx(tx, &id_tx, &written_paths_tx).await?;
+                }
                 svc_tx
                     .note
                     .add_file_change_in_tx(tx, &id_tx, new_seq, &actor, Some(&frontiers_b64_tx), &written_paths_tx, &[], at)

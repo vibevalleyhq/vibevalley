@@ -35,6 +35,7 @@ pub struct Model {
     pub agent_session: Option<String>,
     pub base: Option<String>,
     pub run: Option<String>,
+    pub helper_mode: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

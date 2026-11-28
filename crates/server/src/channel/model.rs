@@ -16,7 +16,7 @@ use super::types::{
 };
 use super::words::{self, Nameable};
 use crate::context::{LookIn, internal, missing, now};
-use crate::service::channel::{ChannelRow, ChannelService, EventRow, MsgRow, NewThread, ParticipantRow};
+use crate::service::channel::{ChannelRow, ChannelService, MsgRow, NewThread, ParticipantRow};
 use crate::service::{DbError, Service, Tx};
 use crate::storage::Storage;
 
@@ -315,8 +315,8 @@ impl<'a> WriteTx<'a> {
         Ok((row, absent))
     }
 
-    pub(super) fn committed_from(&self, row: &MsgRow, event: &EventRow) -> Option<Committed> {
-        self.model.committed_from(row, event)
+    pub(super) fn committed_from(&self, row: &MsgRow) -> Option<Committed> {
+        self.model.committed_from(row)
     }
 }
 
@@ -788,7 +788,7 @@ impl ChatModel {
             .collect())
     }
 
-    pub(super) fn committed_from(&self, row: &MsgRow, event: &EventRow) -> Option<Committed> {
+    pub(super) fn committed_from(&self, row: &MsgRow) -> Option<Committed> {
         let ch = self.channel(&row.channel_id)?;
         let topic = if ch.r#type != "channel" {
             subject_kind(ch.subject_kind.as_deref()).zip(ch.subject_id.clone())
@@ -796,7 +796,6 @@ impl ChatModel {
             None
         };
         Some(Committed {
-            event: event.clone(),
             row: row.clone(),
             place: self.place_of(ch),
             channel_name: ch

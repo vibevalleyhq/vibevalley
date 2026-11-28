@@ -583,7 +583,7 @@ async fn feed(connector: Arc<Connector>, chat: Arc<Chat>, mut events: broadcast:
                             }
                             true
                         }
-                        ChannelEvent::Removed { .. } | ChannelEvent::UserRead { .. } => true,
+                        ChannelEvent::Removed(_) | ChannelEvent::UserRead { .. } => true,
                         ChannelEvent::Edited(_) | ChannelEvent::Reacted(_) | ChannelEvent::Pinned(_) => false,
                     };
                     if wake {

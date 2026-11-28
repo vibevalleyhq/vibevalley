@@ -186,7 +186,7 @@ async fn create_app_inner(mut config: Config, storage_config: StorageConfig, ove
     ))
     .await
     .map_err(|e| failed("the profiles")(&e))?;
-    let remote = Box::pin(Remote::open(ctx.clone(), config.version.clone()))
+    let remote = Box::pin(Remote::open(ctx.clone(), setting.clone(), config.version.clone()))
         .await
         .map_err(|e| failed("remote access")(&e.message))?;
 
@@ -357,16 +357,7 @@ async fn create_app_inner(mut config: Config, storage_config: StorageConfig, ove
     let gw = GatewayMeta::new(ports, observer, fault_gate, config.host_debug, active_subscriptions);
     let router = Router::new(core.clone(), remote.clone(), gw);
 
-    finish_boot_and_start_feeds(
-        &core.ctx,
-        &core.board,
-        &core.pull,
-        &core.channel,
-        &core.cron,
-        &core.note,
-        &core.game,
-        &core.repo,
-    );
+    finish_boot_and_start_feeds(&core.ctx, &core.board, &core.channel, &core.cron, &core.note, &core.game, &core.repo);
     core.orchestration.note.backfill_issue_bodies_async().await;
     core.ctx.feed.flush().await;
     core.board.refresh_queue_async().await.map_err(|e| failed("the queue")(&e))?;

@@ -21,7 +21,7 @@ use crate::context::error::{LookIn, missing, refused};
 use crate::context::text::{format_note_view_context, head};
 use crate::context::{Context, now};
 use crate::issue::Board;
-use crate::runtime::{IssueReportDoc, MailboxSource, OUTBOX_SESSION_REPORTED, OutboxSessionReported, SessionLifecycleEvent};
+use crate::runtime::{MailboxSource, OUTBOX_SESSION_REPORTED, OutboxSessionReported, SessionLifecycleEvent};
 
 const HANDED_EMOJI: &str = "👀";
 pub(super) const REPORT_MAX: usize = 1500;
@@ -114,7 +114,6 @@ impl IssueChat {
         let coordinator = ctx.spawn("issue_chat.coordinator", async move {
             let Some(boot_ic) = w.upgrade() else { return };
             boot_ic.open_threads_async().await;
-            boot_ic.replay_reports_async().await;
             loop {
                 tokio::select! {
                     biased;
@@ -505,59 +504,8 @@ impl IssueChat {
         Ok(())
     }
 
-    async fn replay_reports_async(&self) {
-        let store = self.board.session_engine().durable_store();
-        let docs = match store
-            .read_async(|r| Box::pin(async move { r.documents_by_kind_async("run", "issue.report").await }))
-            .await
-        {
-            Ok(d) => d,
-            Err(e) => {
-                eprintln!("vibevalley: report outbox: {e}");
-                return;
-            }
-        };
-        for d in docs {
-            let Ok(report) = serde_json::from_value::<IssueReportDoc>(d.state) else {
-                continue;
-            };
-            let Some(outcome) = report.outcome else { continue };
-            let Some(thread) = self.channel.issue_thread_id(&report.issue_id) else {
-                continue;
-            };
-            let note = Note {
-                channel: thread,
-                from: report.session_id,
-                kind: MessageKind::Report,
-                text: head(&report.summary, REPORT_MAX),
-                meta: Meta {
-                    outcome: Some(outcome),
-                    spent: report.spent,
-                    run: Some(d.scope_id.clone()),
-                    ..Meta::default()
-                },
-                topic: None,
-                member: None,
-                seat: None,
-            };
-            if let Err(e) = self.deliver_report_async(note, Some(&d.scope_id)).await {
-                warn("replay report", &e);
-            }
-        }
-    }
-
     async fn deliver_report_async(&self, note: Note, run: Option<&str>) -> Result<(), ApiError> {
         self.channel.note_once_async(note, run.map(|id| format!("report:{id}"))).await?;
-        if let Some(id) = run {
-            self.board
-                .session_engine()
-                .durable_store()
-                .write_with_async(id.to_string(), |tx, id| {
-                    Box::pin(async move { tx.delete_document_async("run", id, "issue.report").await })
-                })
-                .await
-                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?;
-        }
         Ok(())
     }
 
@@ -931,6 +879,7 @@ mod tests {
 
     #[test]
     fn issue_report_doc_decodes_typed_and_omitted_fields() {
+        use crate::runtime::IssueReportDoc;
         let minimal: IssueReportDoc = serde_json::from_value(serde_json::json!({
             "issueId": "i-1",
             "sessionId": "s-1",

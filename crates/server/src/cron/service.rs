@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -36,33 +35,10 @@ pub struct DueCron {
     pub at: Millis,
 }
 
-#[derive(Default)]
-struct CronLinks {
-    issue_of_cron: HashMap<String, String>,
-    cron_of_issue: HashMap<String, String>,
-}
-
-impl CronLinks {
-    fn link(&mut self, cron_id: &str, issue_id: Option<&str>) -> Option<String> {
-        let prev_issue = self.issue_of_cron.remove(cron_id);
-        if let Some(prev) = &prev_issue {
-            self.cron_of_issue.remove(prev);
-        }
-        if let Some(issue_id) = issue_id {
-            if let Some(prev_cron) = self.cron_of_issue.insert(issue_id.into(), cron_id.into()) {
-                self.issue_of_cron.remove(&prev_cron);
-            }
-            self.issue_of_cron.insert(cron_id.into(), issue_id.into());
-        }
-        prev_issue
-    }
-}
-
 /// Pure scheduled cron store and due-job evaluator.
 pub struct Scheduler {
     ctx: Arc<Context>,
     crons: Mutex<Vec<Cron>>,
-    links: Arc<Mutex<CronLinks>>,
     /// Serializes mutations and due-job claiming across callers and the ticker.
     lock: AsyncMutex<()>,
     closed: AtomicBool,
@@ -72,18 +48,11 @@ impl Scheduler {
     /// Loads stored crons via `ctx.service.cron`.
     pub async fn open_async(ctx: Arc<Context>) -> Result<Arc<Scheduler>, ApiError> {
         let stored = ctx.service.cron.list().await.map_err(internal_db)?;
-        let links = Arc::new(Mutex::new(CronLinks::default()));
         let mut crons = Vec::with_capacity(stored.len());
         let mut has_pending = false;
-        {
-            let mut map = links.lock();
-            for item in stored {
-                if let Some(issue_id) = item.issue_id.as_deref() {
-                    map.link(&item.cron.id, Some(issue_id));
-                }
-                has_pending |= item.cron.pending;
-                crons.push(item.cron);
-            }
+        for cron in stored {
+            has_pending |= cron.pending;
+            crons.push(cron);
         }
         if !crons.is_empty() {
             let mut dirty = SliceMask::OPS;
@@ -95,7 +64,6 @@ impl Scheduler {
         Ok(Arc::new(Scheduler {
             ctx,
             crons: Mutex::new(crons),
-            links,
             lock: AsyncMutex::new(()),
             closed: AtomicBool::new(false),
         }))
@@ -114,17 +82,17 @@ impl Scheduler {
         self.crons.lock().clone()
     }
 
-    pub fn issue_of(&self, cron_id: &str) -> Option<String> {
-        self.links.lock().issue_of_cron.get(cron_id).cloned()
+    pub async fn issue_of_async(&self, cron_id: &str) -> Option<String> {
+        self.ctx.service.cron.issue_of_cron(cron_id).await.ok().flatten()
     }
 
-    pub fn cron_of(&self, issue_id: &str) -> Option<String> {
-        self.links.lock().cron_of_issue.get(issue_id).cloned()
+    pub async fn cron_of_async(&self, issue_id: &str) -> Option<String> {
+        self.ctx.service.cron.cron_of_issue(issue_id).await.ok().flatten()
     }
 
     /// Persists `cron` (keeping its linked issue, if any) and marks dirty slices.
     async fn put_async(&self, cron: Cron) -> Result<(), ApiError> {
-        let issue_id = self.issue_of(&cron.id);
+        let issue_id = self.issue_of_async(&cron.id).await;
         self.ctx.service.cron.upsert(&cron, issue_id.as_deref()).await.map_err(internal_db)?;
         let (changed, was_pending, is_pending) = {
             let mut list = self.crons.lock();
@@ -154,8 +122,8 @@ impl Scheduler {
 
     /// Links (or unlinks) `cron_id` with `issue_id` and marks issue slices dirty.
     pub async fn link_issue_async(&self, cron_id: &str, issue_id: Option<&str>) -> Result<(), ApiError> {
+        let prev = self.issue_of_async(cron_id).await;
         self.ctx.service.cron.set_issue(cron_id, issue_id).await.map_err(internal_db)?;
-        let prev = self.links.lock().link(cron_id, issue_id);
         if prev.as_deref() != issue_id {
             self.ctx.mark_dirty(SliceMask::BOARD | SliceMask::INBOX | SliceMask::FARM);
         }
@@ -229,8 +197,8 @@ impl Scheduler {
     pub async fn remove_async(&self, id: &str) -> Result<Cron, ApiError> {
         let _l = self.lock.lock().await;
         let was = self.find(id)?;
+        let prev_issue = self.issue_of_async(id).await;
         self.ctx.service.cron.remove(id).await.map_err(internal_db)?;
-        let prev_issue = self.links.lock().link(id, None);
         self.crons.lock().retain(|c| c.id != id);
         let mut dirty = SliceMask::OPS;
         if was.pending {

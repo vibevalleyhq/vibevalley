@@ -12,7 +12,7 @@ use super::types::{
 };
 use super::words::{self, Has};
 use crate::context::{LookIn, missing, now};
-use crate::service::channel::{EventRow, MsgRow, SearchParams};
+use crate::service::channel::{MsgRow, SearchParams};
 
 impl Chat {
     async fn attachments_of(&self, ids: &[String]) -> Result<Vec<Attachment>, ApiError> {
@@ -451,27 +451,18 @@ impl Chat {
             return Err(refused(t("server.channel.messageGone", &[])));
         }
         let at = now();
-        let seq = {
+        {
             let wtx = WriteTx::begin(&mut inner, &self.ctx.service).await?;
             let channels = &self.ctx.service.channel;
             let revision = channels.bump_revision_in_tx(&wtx.tx, &row.channel_id).await.q()?;
             channels.delete_message_in_tx(&wtx.tx, id, at, revision).await.q()?;
             channels.delete_mentions_for_message_in_tx(&wtx.tx, id).await.q()?;
             channels.withdraw_deliveries_for_message_in_tx(&wtx.tx, id, at).await.q()?;
-            let seq = channels.insert_event_in_tx(&wtx.tx, "removed", &row.channel_id, id, at).await.q()?;
             wtx.commit().await?;
-            seq
-        };
+        }
         let message = self.finish_message_change_async(&inner.model, &row).await?;
         self.publish_user_mentions_async(&inner.model).await?;
-        let event = EventRow {
-            seq,
-            kind: "removed".into(),
-            channel_id: row.channel_id.clone(),
-            message_id: id.into(),
-            at,
-        };
-        self.emit_event(ChannelEvent::Removed { event, message });
+        self.emit_event(ChannelEvent::Removed(message));
         Ok(())
     }
 

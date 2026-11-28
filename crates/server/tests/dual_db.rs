@@ -502,7 +502,7 @@ fn run_full_stack_e2e(home: &Path, database_url: Option<String>) {
     let crons = ok(&reopened, "cron.list", json!({}));
     assert!(crons.as_array().unwrap().iter().any(|c| c["id"] == cron_id && c["enabled"] == false));
 
-    let pull_reloaded = reopened.test_internals().pull.find("acme/dual", 88).expect("pull persisted");
+    let pull_reloaded = vibevalley_runtime::rt::block_on(reopened.test_internals().pull.find_async("acme/dual", 88)).expect("pull persisted");
     assert_eq!(pull_reloaded.issue_id.as_deref(), Some(issue_id.as_str()));
     assert_eq!(
         vibevalley_runtime::rt::block_on(reopened.test_internals().pull.known_events_async(&pull_reloaded.id))

@@ -15,6 +15,8 @@ pub struct Model {
     pub issue_id: Option<String>,
     pub check_fingerprint: String,
     pub check_revision: i64,
+    #[sea_orm(column_type = "Text")]
+    pub known_events: String,
     pub created_at: i64,
     pub updated_at: i64,
 }

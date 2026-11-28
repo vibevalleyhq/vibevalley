@@ -1471,29 +1471,21 @@ impl Board {
     }
 
     async fn load_auto_review_async(&self, issue_id: &str) -> AutoReviewDoc {
-        self.session_engine()
-            .durable_store()
-            .read_with_async(issue_id.to_string(), |tx, id| {
-                Box::pin(async move { tx.document_async("issue", id, "auto_review").await })
-            })
+        self.ctx
+            .service
+            .issue
+            .get_auto_review(issue_id)
             .await
             .ok()
             .flatten()
-            .and_then(|d| serde_json::from_value::<AutoReviewDoc>(d.state).ok())
+            .and_then(|raw| serde_json::from_str::<AutoReviewDoc>(&raw).ok())
             .unwrap_or_default()
     }
 
     async fn save_auto_review_async(&self, issue_id: &str, doc: &AutoReviewDoc) {
-        match serde_json::to_value(doc) {
-            Ok(val) => {
-                if let Err(err) = self
-                    .session_engine()
-                    .durable_store()
-                    .write_with_async((issue_id.to_string(), val), |tx, (id, val)| {
-                        Box::pin(async move { tx.put_document_async("issue", id, "auto_review", val).await })
-                    })
-                    .await
-                {
+        match serde_json::to_string(doc) {
+            Ok(raw) => {
+                if let Err(err) = self.ctx.service.issue.set_auto_review(issue_id, Some(&raw)).await {
                     tracing::warn!(issue_id, error = %err, "issue.board failed to persist auto_review state");
                 }
             }

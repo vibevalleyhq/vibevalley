@@ -237,16 +237,9 @@ fn the_chat_through_its_endpoints() {
     let chat = app2.test_internals().channel;
     let list = vibevalley_runtime::rt::block_on(chat.list_async()).unwrap();
     assert_eq!(list[0].id, dev);
-    assert_eq!(vibevalley_runtime::rt::block_on(chat.history_async(&dev, None, None)).unwrap().len(), 1);
-    assert!(collab_slice(&app2).chat.unwrap().channels.iter().any(|c| c.id == dev));
-    assert_eq!(
-        vibevalley_runtime::rt::block_on(chat.events_async(0, 1000))
-            .unwrap()
-            .iter()
-            .filter(|e| e.kind == "removed")
-            .count(),
-        1
-    );
+    let dev_history = vibevalley_runtime::rt::block_on(chat.history_async(&dev, None, None)).unwrap();
+    assert_eq!(dev_history.len(), 1);
+    assert_eq!(dev_history[0].attachments[0].name, "a.txt");
     app2.close_blocking();
 }
 
@@ -271,12 +264,13 @@ fn regression_send_key_thread_pages_and_observer_cursor_survive_sigkill() {
             .clone();
         let thread = call("channel.thread.create", json!({"id":root}));
         call("channel.message.send", json!({"id":thread,"text":"first reply","sendKey":"thread-first"}));
-        let checkpoint = vibevalley_runtime::rt::block_on(server.test_internals().channel.events_async(0, 100))
+        let first_id = vibevalley_runtime::rt::block_on(server.test_internals().channel.history_async(thread.as_str().unwrap(), None, Some(10)))
             .unwrap()
             .last()
             .unwrap()
-            .seq;
-        std::fs::write(home.join("checkpoint"), checkpoint.to_string()).unwrap();
+            .id
+            .clone();
+        std::fs::write(home.join("checkpoint"), first_id).unwrap();
         call(
             "channel.message.send",
             json!({"id":thread,"text":"second reply @助手","sendKey":"thread-second"}),
@@ -292,7 +286,7 @@ fn regression_send_key_thread_pages_and_observer_cursor_survive_sigkill() {
         .status()
         .unwrap();
     assert_eq!(result.signal(), Some(9));
-    let checkpoint: i64 = std::fs::read_to_string(dir.path().join("checkpoint")).unwrap().trim().parse().unwrap();
+    let first_reply_id = std::fs::read_to_string(dir.path().join("checkpoint")).unwrap().trim().to_owned();
     let server = start(dir.path());
     let call = |op, params| ok(server.router().call_as(Caller::User, op, params));
     let channel = server.test_internals().channel.default_channel();
@@ -306,9 +300,7 @@ fn regression_send_key_thread_pages_and_observer_cursor_survive_sigkill() {
         replies.iter().map(|m| m.text.as_str()).collect::<Vec<_>>(),
         ["first reply", "second reply @助手"]
     );
-    let unseen = vibevalley_runtime::rt::block_on(server.test_internals().channel.events_async(checkpoint, 10)).unwrap();
-    assert_eq!(unseen.len(), 1);
-    assert_eq!(unseen[0].message_id, replies[1].id);
+    assert_eq!(replies[0].id, first_reply_id);
     let orch_pid = ParticipantId::agent(DEFAULT_ORCHESTRATOR);
     let pending: Vec<_> = vibevalley_runtime::rt::block_on(server.test_internals().channel.pending_deliveries_all_async())
         .unwrap()
@@ -319,10 +311,6 @@ fn regression_send_key_thread_pages_and_observer_cursor_survive_sigkill() {
     call(
         "channel.message.send",
         json!({"id":thread,"text":"second reply @助手","sendKey":"thread-second"}),
-    );
-    assert_eq!(
-        vibevalley_runtime::rt::block_on(server.test_internals().channel.events_async(checkpoint, 10)).unwrap(),
-        unseen
     );
     assert_eq!(
         vibevalley_runtime::rt::block_on(server.test_internals().channel.history_async(&thread, None, Some(5)))

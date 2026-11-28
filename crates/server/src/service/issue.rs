@@ -1,5 +1,4 @@
-//! Dual-backend persistence for board issues (`issue`), tracked pull requests (`pull`),
-//! and pull request webhook/check deduplication events (`pull_event`).
+//! Dual-backend persistence for board issues (`issue`) and tracked pull requests (`pull`).
 //!
 //! Derived issue status and stage are rebuilt from issues and sessions, never persisted.
 
@@ -8,11 +7,13 @@ use std::sync::Arc;
 
 use sea_orm::sea_query::{Alias, Expr, Func, OnConflict};
 use sea_orm::{ActiveValue::Set, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Update};
-use vibevalley_protocol::{CodeReview, DeliveryEvidence, DeliveryReceipt, Issue, JsNumber, ProjectCheckReceipt, PublishPlatform, PullRequestState};
+use vibevalley_protocol::{
+    CodeReview, DeliveryEvidence, DeliveryReceipt, Issue, JsNumber, ProjectCheckReceipt, PublishPlatform, PullRequest, PullRequestState,
+};
 
 use super::{MAX_SQL_BIND_PARAMS, batch_chunk_rows, with_write_tx};
 use crate::db::column::{db_json, db_word, read_db_json, read_db_word};
-use crate::db::entity::{issue, pull, pull_event};
+use crate::db::entity::{issue, pull};
 use crate::db::{Database, DbError, DbResult, Tx};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -32,10 +33,13 @@ pub struct PullRecord {
     pub updated_at: i64,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct KnownPullEvent {
     pub key: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bot_round_key: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bot_round: Option<i64>,
 }
 
@@ -143,7 +147,7 @@ async fn get_issue_impl<C: ConnectionTrait>(db: &C, id: &str) -> DbResult<Option
     issue::Entity::find_by_id(id).one(db).await?.map(read_issue).transpose()
 }
 
-const ISSUE_BATCH_ROWS: usize = batch_chunk_rows(37);
+const ISSUE_BATCH_ROWS: usize = batch_chunk_rows(38);
 
 fn stored_delivery_evidence(t: &Issue) -> Option<StoredDeliveryEvidence> {
     if t.delivery_evidence.is_none() && t.delivery_receipt.is_none() {
@@ -198,6 +202,7 @@ fn issue_active_model(t: &Issue) -> DbResult<issue::ActiveModel> {
         owner: Set(t.owner.as_ref().map(db_json).transpose()?),
         relations: Set(db_json(&t.relations)?),
         body_note_id: Set(t.body_note_id.clone()),
+        auto_review: Set(None),
     })
 }
 
@@ -276,7 +281,29 @@ async fn put_issues_batch_impl<C: ConnectionTrait>(db: &C, issues: &[Issue]) -> 
     Ok(())
 }
 
+/// Ranking rule choosing the primary pull request for an issue (Open > newest > highest number).
+pub(crate) fn prefers_pull_for_issue(candidate: &PullRecord, current: &PullRecord) -> bool {
+    let cand_open = candidate.state == PullRequestState::Open;
+    let curr_open = current.state == PullRequestState::Open;
+    if cand_open != curr_open {
+        return cand_open;
+    }
+    if candidate.updated_at != current.updated_at {
+        return candidate.updated_at > current.updated_at;
+    }
+    candidate.number >= current.number
+}
+
+pub(crate) fn pull_record_to_summary(row: &PullRecord) -> PullRequest {
+    PullRequest {
+        url: row.url.clone(),
+        number: row.number,
+        state: row.state,
+    }
+}
+
 async fn upsert_pull_impl<C: ConnectionTrait>(db: &C, input: UpsertPullInput) -> DbResult<PullRecord> {
+    let clear_events = input.state != PullRequestState::Open;
     let model = pull::ActiveModel {
         id: Set(uuid::Uuid::now_v7().to_string()),
         platform: Set(db_word(&input.platform)?),
@@ -289,10 +316,12 @@ async fn upsert_pull_impl<C: ConnectionTrait>(db: &C, input: UpsertPullInput) ->
         issue_id: Set(input.issue_id),
         check_fingerprint: Set(String::new()),
         check_revision: Set(0),
+        known_events: Set("[]".into()),
         created_at: Set(input.at),
         updated_at: Set(input.at),
     };
-    let on_conflict = OnConflict::columns([pull::Column::Repo, pull::Column::Number])
+    let mut on_conflict = OnConflict::columns([pull::Column::Repo, pull::Column::Number]);
+    on_conflict
         .update_columns([
             pull::Column::Platform,
             pull::Column::Url,
@@ -307,20 +336,24 @@ async fn upsert_pull_impl<C: ConnectionTrait>(db: &C, input: UpsertPullInput) ->
                 Expr::col((Alias::new("excluded"), pull::Column::IssueId)),
                 Expr::col((pull::Entity, pull::Column::IssueId)),
             ])),
-        )
-        .to_owned();
+        );
+    if clear_events {
+        on_conflict.value(pull::Column::KnownEvents, Expr::value("[]"));
+    }
     let saved = pull::Entity::insert(model).on_conflict(on_conflict).exec_with_returning(db).await?;
     read_pull(saved)
 }
 
 async fn set_pull_state_impl<C: ConnectionTrait>(db: &C, id: &str, state: PullRequestState, at: i64) -> DbResult<PullRecord> {
     let state_word = db_word(&state)?;
-    let rows = Update::many(pull::Entity)
+    let mut update = Update::many(pull::Entity)
         .col_expr(pull::Column::State, Expr::value(state_word))
         .col_expr(pull::Column::UpdatedAt, Expr::value(at))
-        .filter(pull::Column::Id.eq(id))
-        .exec_with_returning(db)
-        .await?;
+        .filter(pull::Column::Id.eq(id));
+    if state != PullRequestState::Open {
+        update = update.col_expr(pull::Column::KnownEvents, Expr::value("[]"));
+    }
+    let rows = update.exec_with_returning(db).await?;
     let saved = rows.into_iter().next().ok_or_else(|| DbError::not_found(format!("pull {id} not found")))?;
     read_pull(saved)
 }
@@ -335,17 +368,6 @@ async fn observe_pull_checks_impl<C: ConnectionTrait>(db: &C, id: &str, fingerpr
         .await?;
     let saved = rows.into_iter().next().ok_or_else(|| DbError::not_found(format!("pull {id} not found")))?;
     read_pull(saved)
-}
-
-async fn keep_pull_event_impl<C: ConnectionTrait>(db: &C, pull_id: &str, key: &str, bot_round_key: Option<&str>, bot_round: Option<i64>) -> DbResult<()> {
-    let model = pull_event::ActiveModel {
-        pull_id: Set(pull_id.to_owned()),
-        key: Set(key.to_owned()),
-        bot_round_key: Set(bot_round_key.map(str::to_owned)),
-        bot_round: Set(bot_round),
-    };
-    pull_event::Entity::insert(model).on_conflict_do_nothing().exec(db).await?;
-    Ok(())
 }
 
 #[derive(Clone)]
@@ -555,6 +577,92 @@ impl IssueService {
         .await
     }
 
+    pub(crate) async fn get_auto_review(&self, issue_id: &str) -> DbResult<Option<String>> {
+        let found: Option<Option<String>> = issue::Entity::find_by_id(issue_id.to_owned())
+            .select_only()
+            .column(issue::Column::AutoReview)
+            .into_tuple()
+            .one(self.db.read_conn())
+            .await?;
+        Ok(found.flatten())
+    }
+
+    pub(crate) async fn set_auto_review(&self, issue_id: &str, raw: Option<&str>) -> DbResult<()> {
+        super::update_col_by_id::<issue::Entity, _, _>(
+            self.db.write_conn(),
+            issue::Column::Id,
+            issue_id,
+            issue::Column::AutoReview,
+            raw.map(str::to_owned),
+        )
+        .await
+    }
+
+    pub(crate) async fn find_pull(&self, repo: &str, number: i64) -> DbResult<Option<PullRecord>> {
+        pull::Entity::find()
+            .filter(pull::Column::Repo.eq(repo))
+            .filter(pull::Column::Number.eq(number))
+            .one(self.db.read_conn())
+            .await?
+            .map(read_pull)
+            .transpose()
+    }
+
+    pub(crate) async fn open_pulls(&self) -> DbResult<Vec<PullRecord>> {
+        pull::Entity::find()
+            .filter(pull::Column::State.eq("open"))
+            .order_by_asc(pull::Column::CreatedAt)
+            .order_by_asc(pull::Column::Id)
+            .all(self.db.read_conn())
+            .await?
+            .into_iter()
+            .map(read_pull)
+            .collect()
+    }
+
+    pub(crate) async fn pull_of_issue(&self, issue_id: &str) -> DbResult<Option<PullRequest>> {
+        let rows: Vec<PullRecord> = pull::Entity::find()
+            .filter(pull::Column::IssueId.eq(issue_id))
+            .all(self.db.read_conn())
+            .await?
+            .into_iter()
+            .map(read_pull)
+            .collect::<DbResult<_>>()?;
+        let mut best: Option<&PullRecord> = None;
+        for row in &rows {
+            if best.is_none_or(|curr| prefers_pull_for_issue(row, curr)) {
+                best = Some(row);
+            }
+        }
+        Ok(best.map(pull_record_to_summary))
+    }
+
+    pub(crate) async fn pulls_by_issue_map(&self, issue_ids: &[String]) -> DbResult<HashMap<String, PullRequest>> {
+        if issue_ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+        let mut best: HashMap<String, PullRecord> = HashMap::new();
+        for chunk in issue_ids.chunks(MAX_SQL_BIND_PARAMS) {
+            let rows = pull::Entity::find()
+                .filter(pull::Column::IssueId.is_in(chunk.iter().cloned()))
+                .all(self.db.read_conn())
+                .await?;
+            for model in rows {
+                let row = read_pull(model)?;
+                let Some(issue_id) = row.issue_id.as_deref() else {
+                    continue;
+                };
+                match best.get(issue_id) {
+                    Some(curr) if !prefers_pull_for_issue(&row, curr) => {}
+                    _ => {
+                        best.insert(issue_id.to_owned(), row);
+                    }
+                }
+            }
+        }
+        Ok(best.into_iter().map(|(id, row)| (id, pull_record_to_summary(&row))).collect())
+    }
+
     pub(crate) async fn list_pulls(&self) -> DbResult<Vec<PullRecord>> {
         pull::Entity::find()
             .order_by_asc(pull::Column::CreatedAt)
@@ -579,79 +687,44 @@ impl IssueService {
     }
 
     pub(crate) async fn known_pull_events(&self, pull_id: &str) -> DbResult<Vec<KnownPullEvent>> {
-        let rows = pull_event::Entity::find()
-            .filter(pull_event::Column::PullId.eq(pull_id))
-            .all(self.db.read_conn())
-            .await?;
-        Ok(rows
-            .into_iter()
-            .map(|r| KnownPullEvent {
-                key: r.key,
-                bot_round_key: r.bot_round_key,
-                bot_round: r.bot_round,
-            })
-            .collect())
+        let Some(raw) = pull::Entity::find_by_id(pull_id.to_owned())
+            .select_only()
+            .column(pull::Column::KnownEvents)
+            .into_tuple::<String>()
+            .one(self.db.read_conn())
+            .await?
+        else {
+            return Ok(Vec::new());
+        };
+        read_db_json(raw)
     }
 
     pub(crate) async fn keep_pull_event(&self, pull_id: &str, key: &str, bot_round_key: Option<&str>, bot_round: Option<i64>) -> DbResult<()> {
-        keep_pull_event_impl(self.db.write_conn(), pull_id, key, bot_round_key, bot_round).await
-    }
-
-    /// Deletes up to `limit` `pull_event` rows belonging to closed/merged pulls with `updated_at < before_ms`.
-    pub(crate) async fn prune_closed_pull_events_batch(&self, before_ms: i64, limit: u64) -> DbResult<u64> {
-        if limit == 0 {
-            return Ok(0);
-        }
         with_write_tx(&self.db, async |tx| {
-            let pull_ids: Vec<String> = pull::Entity::find()
+            let Some(raw) = pull::Entity::find_by_id(pull_id.to_owned())
                 .select_only()
-                .column(pull::Column::Id)
-                .filter(pull::Column::State.is_in(["merged", "closed"]))
-                .filter(pull::Column::UpdatedAt.lt(before_ms))
-                .into_tuple()
-                .all(tx)
+                .column(pull::Column::KnownEvents)
+                .into_tuple::<String>()
+                .one(tx)
+                .await?
+            else {
+                return Ok(());
+            };
+            let mut events: Vec<KnownPullEvent> = read_db_json(raw)?;
+            if events.iter().any(|e| e.key == key) {
+                return Ok(());
+            }
+            events.push(KnownPullEvent {
+                key: key.to_owned(),
+                bot_round_key: bot_round_key.map(str::to_owned),
+                bot_round,
+            });
+            Update::many(pull::Entity)
+                .col_expr(pull::Column::KnownEvents, Expr::value(db_json(&events)?))
+                .filter(pull::Column::Id.eq(pull_id))
+                .exec(tx)
                 .await?;
-            if pull_ids.is_empty() {
-                return Ok(0);
-            }
-            let mut remaining = usize::try_from(limit).unwrap_or(usize::MAX);
-            let mut pairs: Vec<(String, String)> = Vec::new();
-            for chunk in pull_ids.chunks(super::MAX_SQL_BIND_PARAMS) {
-                if remaining == 0 {
-                    break;
-                }
-                let batch: Vec<(String, String)> = pull_event::Entity::find()
-                    .select_only()
-                    .columns([pull_event::Column::PullId, pull_event::Column::Key])
-                    .filter(pull_event::Column::PullId.is_in(chunk.iter().cloned()))
-                    .order_by_asc(pull_event::Column::PullId)
-                    .order_by_asc(pull_event::Column::Key)
-                    .limit(remaining as u64)
-                    .into_tuple()
-                    .all(tx)
-                    .await?;
-                remaining = remaining.saturating_sub(batch.len());
-                pairs.extend(batch);
-            }
-            if pairs.is_empty() {
-                return Ok(0);
-            }
-            let mut by_pull: HashMap<String, Vec<String>> = HashMap::new();
-            for (pull_id, key) in pairs {
-                by_pull.entry(pull_id).or_default().push(key);
-            }
-            let mut deleted = 0u64;
-            for (pull_id, keys) in by_pull {
-                for key_chunk in keys.chunks(super::MAX_SQL_BIND_PARAMS - 1) {
-                    let res = pull_event::Entity::delete_many()
-                        .filter(pull_event::Column::PullId.eq(&pull_id))
-                        .filter(pull_event::Column::Key.is_in(key_chunk.iter().cloned()))
-                        .exec(tx)
-                        .await?;
-                    deleted += res.rows_affected;
-                }
-            }
-            Ok(deleted)
+            Ok(())
         })
         .await
     }

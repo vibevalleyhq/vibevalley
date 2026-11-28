@@ -20,7 +20,7 @@ pub use actions::next_steps;
 pub use board::{Board, NewIssue, Sent};
 pub use family::{ChildDraft, MAX_CHILDREN};
 pub use pull::{
-    Answer, GitHubCheck, GitHubComment, GitHubPullSnapshot, GitHubReview, HostRun, HostedRepo, KnownPullEvent, Network, Publisher, Pull, PullIndex, PullRecord,
+    Answer, GitHubCheck, GitHubComment, GitHubPullSnapshot, GitHubReview, HostRun, HostedRepo, KnownPullEvent, Network, Publisher, Pull, PullRecord,
     UpsertPullInput, actions_job_of, checks_fingerprint, checks_verdict, hosted_origin,
 };
 pub use store::{IssueState, Opened, Step};

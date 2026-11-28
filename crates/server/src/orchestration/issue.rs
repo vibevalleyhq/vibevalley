@@ -56,53 +56,67 @@ impl IssueWorkflow {
         })
     }
 
-    pub fn enrich_issue(&self, mut issue: Issue) -> Issue {
-        issue.cron = self.cron.cron_of(&issue.id);
-        issue.pull_request = self.pull.of_issue(&issue.id);
+    pub async fn enrich_issue(&self, mut issue: Issue) -> Issue {
+        let (cron, pull_request) = tokio::join!(self.cron.cron_of_async(&issue.id), self.pull.of_issue_async(&issue.id));
+        issue.cron = cron;
+        issue.pull_request = pull_request.ok().flatten();
         issue
     }
 
-    pub fn enrich_issues(&self, issues: Vec<Issue>) -> Vec<Issue> {
-        issues.into_iter().map(|i| self.enrich_issue(i)).collect()
+    pub async fn enrich_issues(&self, mut issues: Vec<Issue>) -> Vec<Issue> {
+        let issue_ids: Vec<String> = issues.iter().map(|i| i.id.clone()).collect();
+        let (crons_res, pulls_res) = tokio::join!(self.ctx.service.cron.cron_by_issue_map(), self.ctx.service.issue.pulls_by_issue_map(&issue_ids),);
+        let crons = crons_res.unwrap_or_default();
+        let pulls = pulls_res.unwrap_or_default();
+        for issue in &mut issues {
+            issue.cron = crons.get(&issue.id).cloned();
+            issue.pull_request = pulls.get(&issue.id).cloned();
+        }
+        issues
     }
 
-    fn enrich_applied(&self, mut applied: AppliedIssue) -> AppliedIssue {
-        applied.cron = self.cron.cron_of(&applied.id);
-        applied.pull_request = self.pull.of_issue(&applied.id);
+    async fn enrich_applied(&self, mut applied: AppliedIssue) -> AppliedIssue {
+        let (cron, pull_request) = tokio::join!(self.cron.cron_of_async(&applied.id), self.pull.of_issue_async(&applied.id));
+        applied.cron = cron;
+        applied.pull_request = pull_request.ok().flatten();
         applied
     }
 
     pub async fn get_endpoint_async(&self, id: &str) -> Result<Issue, ApiError> {
-        Ok(self.enrich_issue(self.board.issue_get_endpoint_async(id).await?))
+        Ok(self.enrich_issue(self.board.issue_get_endpoint_async(id).await?).await)
     }
 
     pub async fn list_endpoint_async(&self, filter: &IssueFilter, clock: &dyn Clock) -> Result<Vec<Issue>, ApiError> {
-        Ok(self.enrich_issues(self.board.issue_list_endpoint_async(filter, clock).await?))
+        Ok(self.enrich_issues(self.board.issue_list_endpoint_async(filter, clock).await?).await)
     }
 
     pub async fn history_list_endpoint_async(&self) -> Result<Vec<IssueHistory>, ApiError> {
         let mut history = self.board.issue_history_list_endpoint_async().await?;
+        let issue_ids: Vec<String> = history.iter().map(|e| e.issue.id.clone()).collect();
+        let (crons_res, pulls_res) = tokio::join!(self.ctx.service.cron.cron_by_issue_map(), self.ctx.service.issue.pulls_by_issue_map(&issue_ids),);
+        let crons = crons_res.unwrap_or_default();
+        let pulls = pulls_res.unwrap_or_default();
         for entry in &mut history {
-            entry.issue.cron = self.cron.cron_of(&entry.issue.id);
-            entry.issue.pull_request = self.pull.of_issue(&entry.issue.id);
+            entry.issue.cron = crons.get(&entry.issue.id).cloned();
+            entry.issue.pull_request = pulls.get(&entry.issue.id).cloned();
         }
         Ok(history)
     }
 
     pub async fn create_endpoint_async(&self, req: &IssueRequest) -> Result<AppliedIssue, ApiError> {
-        Ok(self.enrich_applied(self.board.issue_create_endpoint_async(req).await?))
+        Ok(self.enrich_applied(self.board.issue_create_endpoint_async(req).await?).await)
     }
 
     pub async fn review_endpoint_async(&self, input: IssueReviewInput) -> Result<Issue, ApiError> {
-        Ok(self.enrich_issue(self.board.issue_review_endpoint_async(input).await?))
+        Ok(self.enrich_issue(self.board.issue_review_endpoint_async(input).await?).await)
     }
 
     pub async fn status_update_endpoint_async(&self, input: &IssueStatusUpdateInput) -> Result<AppliedIssue, ApiError> {
-        Ok(self.enrich_applied(self.board.issue_status_update_endpoint_async(input).await?))
+        Ok(self.enrich_applied(self.board.issue_status_update_endpoint_async(input).await?).await)
     }
 
     pub async fn triage_confirm_endpoint_async(&self, input: &BacklogTriageConfirmInput, clock: &dyn Clock) -> Result<AppliedIssue, ApiError> {
-        Ok(self.enrich_applied(self.board.issue_triage_confirm_endpoint_async(input, clock).await?))
+        Ok(self.enrich_applied(self.board.issue_triage_confirm_endpoint_async(input, clock).await?).await)
     }
 
     /// `issue.conversation.get`: returns the issue's discussion thread id, if opened.
@@ -133,7 +147,7 @@ impl IssueWorkflow {
             String::new()
         };
         let refined = self.board.refine_with_discussion_async(input, &discussion).await?;
-        Ok(self.enrich_issue(refined))
+        Ok(self.enrich_issue(refined).await)
     }
 
     /// `session.stop`: stops a daemon orchestrator session or a worker/workspace session
@@ -169,7 +183,7 @@ impl IssueWorkflow {
             .await
             .map_err(|e| ApiError::new(vibevalley_protocol::BizCode::InternalError, e.to_string()))?;
         let sessions = self.runtime.list_async().await;
-        let issues = self.enrich_issues(derive_issues(&raw_issues, &sessions));
+        let issues = self.enrich_issues(derive_issues(&raw_issues, &sessions)).await;
         let initial = issues
             .into_iter()
             .find(|i| i.id == input.id || i.number.to_string() == input.id.trim_start_matches('#'))
@@ -327,15 +341,16 @@ async fn emit_issue_watch_state_async(
     let raw_issues = ctx.service.issue.all().await.unwrap_or_default();
     let all_sessions = runtime.list_async().await;
     let issues = derive_issues(&raw_issues, &all_sessions);
-    let issue = issues
-        .into_iter()
-        .find(|i| i.id == initial.id)
-        .map(|mut i| {
-            i.cron = cron.cron_of(&i.id);
-            i.pull_request = pull.of_issue(&i.id);
-            i
-        })
-        .or_else(|| initial.closed_at.is_some().then(|| initial.clone()));
+    let found = issues.into_iter().find(|i| i.id == initial.id);
+    let issue = match found {
+        Some(mut i) => {
+            let (cron_id, pull_request) = tokio::join!(cron.cron_of_async(&i.id), pull.of_issue_async(&i.id));
+            i.cron = cron_id;
+            i.pull_request = pull_request.ok().flatten();
+            Some(i)
+        }
+        None => initial.closed_at.is_some().then(|| initial.clone()),
+    };
     let Some(issue) = issue else {
         return send_watch_event(sink, &IssueWatch::Missing { issue: initial.id.clone() });
     };
